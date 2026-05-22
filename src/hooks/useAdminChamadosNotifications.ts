@@ -43,8 +43,12 @@ export function useAdminChamadosNotifications(role: string | undefined) {
     });
 
     return () => {
-      channel.unbind(EVENT);
-      pusherClient.unsubscribe(CHANNEL);
+      try {
+        channel.unbind(EVENT);
+        pusherClient.unsubscribe(CHANNEL);
+      } catch {
+        // ignore cleanup errors on closed connection
+      }
       subscribedRef.current = false;
     };
   }, [role, adicionarNotificacao]);

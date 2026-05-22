@@ -39,7 +39,11 @@ export function PusherGlobal() {
     });
 
     return () => {
-      pusherClient.unsubscribe("presence-alpha-comm");
+      try {
+        pusherClient.unsubscribe("presence-alpha-comm");
+      } catch {
+        // ignore cleanup errors on closed connection
+      }
     };
   }, [session]);
 

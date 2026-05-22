@@ -197,7 +197,7 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
     return (
         <div className="min-h-screen bg-[#020617] text-white selection:bg-white/10">
 
-            <header className="fixed top-0 left-0 w-full h-20 border-b border-white/5 bg-slate-950/50 backdrop-blur-2xl z-50 flex items-center px-8">
+            <header className="fixed top-0 left-0 w-full h-20 border-b border-white/5 bg-slate-950/50 backdrop-blur-2xl z-40 flex items-center px-8">
                 <div className="container mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">

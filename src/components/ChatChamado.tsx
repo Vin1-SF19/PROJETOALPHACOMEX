@@ -89,8 +89,12 @@ export default function ChatChamado({
     });
 
     return () => {
-      channel.unbind("nova-mensagem");
-      pusherClient.unsubscribe(`chat-${chamadoId}`);
+      try {
+        channel.unbind("nova-mensagem");
+        pusherClient.unsubscribe(`chat-${chamadoId}`);
+      } catch {
+        // ignore cleanup errors on closed connection
+      }
     };
   }, [mounted, chamadoId, usuarioAtualId]);
 

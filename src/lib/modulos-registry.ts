@@ -54,7 +54,8 @@ export const MODULOS_REGISTRY: ModuloRegistryItem[] = [
   { id: 'Documentos',         label: 'POP',                   href: '/PainelAlpha/DocsAlpha',                                                        iconName: 'FileStack',     category: 'infra',       permission: 'Documentos',         img: '/arquivo.png',            desc: 'Documentos de guia e normas para funções.',             tag: 'POP',        color: 'from-indigo-600/20' },
 
   // ─── ADMIN ───
-  { id: 'cadastro',           label: 'Gestão de Equipe',      href: '/PainelAlpha/cadastro',                                                         iconName: 'Users',         category: 'admin',       permission: 'cadastro',          allowedRoles: ['Admin', 'CEO', 'RECURSOS HUMANOS', 'FINANCEIRO'], img: '/people_10893485.png', desc: 'Gerenciamento de contas, permissões e usuários.',      tag: 'Admin',      color: 'from-purple-600/20' },
+  { id: 'cadastro',              label: 'Gestão de Equipe',         href: '/PainelAlpha/cadastro',                                                      iconName: 'Users',         category: 'admin',       permission: 'cadastro',          adminOnly: true, allowedRoles: ['Admin', 'CEO'], img: '/people_10893485.png', desc: 'Gerenciamento de contas, permissões e usuários.',      tag: 'Admin',      color: 'from-purple-600/20' },
+  { id: 'gestaoColaboradores',   label: 'Gestão de Colaboradores',  href: '/PainelAlpha/GestaoColaboradores',                                           iconName: 'UserCog',       category: 'admin',       permission: 'gestaoColaboradores', allowedRoles: ['RECURSOS HUMANOS', 'FINANCEIRO'],               img: '/developers.png',     desc: 'Visualização e edição de perfis de colaboradores.',    tag: 'RH',         color: 'from-teal-600/20' },
 ];
 
 export const CATEGORIAS: CategoriaItem[] = [

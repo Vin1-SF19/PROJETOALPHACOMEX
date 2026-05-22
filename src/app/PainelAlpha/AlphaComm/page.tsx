@@ -93,7 +93,11 @@ export default function AlphaCommPage() {
     });
   
     return () => {
-      pusherClient.unsubscribe(`user-notifications-${meuId}`);
+      try {
+        pusherClient.unsubscribe(`user-notifications-${meuId}`);
+      } catch {
+        // ignore cleanup errors on closed connection
+      }
     };
   }, [meuId, agenteAtivo, isMuted]);
 
@@ -123,7 +127,13 @@ export default function AlphaCommPage() {
       }, 100);
     });
 
-    return () => { pusherClient.unsubscribe(canalId); };
+    return () => {
+      try {
+        pusherClient.unsubscribe(canalId);
+      } catch {
+        // ignore cleanup errors on closed connection
+      }
+    };
 
   }, [agenteAtivo, meuId]);
 

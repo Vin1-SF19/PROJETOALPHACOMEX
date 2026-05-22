@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Clock, ChevronLeft, LayoutGrid, CheckCircle2, Trophy, Sparkles } from 'lucide-react';
+import { Play, Clock, LayoutGrid, CheckCircle2, Trophy, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { marcarAulaComoConcluida } from '@/actions/GetVideos';
 import { UserDropdown } from '@/components/UserDropdown';
@@ -48,13 +48,7 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
             </div>
 
             {/* Navbar */}
-            <nav className="fixed top-0 w-full z-50 bg-black/40 backdrop-blur-xl border-b border-white/5 px-6 md:px-12 py-4 flex items-center justify-between">
-                <button onClick={() => router.back()} className="group flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white transition-all">
-                    <div className="bg-white/5 p-2 rounded-xl group-hover:bg-orange-600 transition-colors">
-                        <ChevronLeft size={16} />
-                    </div>
-                    Voltar para trilha
-                </button>
+            <nav className="fixed top-0 w-full z-40 bg-black/40 backdrop-blur-xl border-b border-white/5 px-6 md:px-12 py-4 flex items-center justify-end">
                 <UserDropdown userName={userName} userRole={userRole} userImage={session?.user?.imagemUrl} />
             </nav>
 

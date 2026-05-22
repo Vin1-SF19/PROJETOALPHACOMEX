@@ -42,8 +42,12 @@ export function useHoleriteNotifications(authenticated: boolean) {
     });
 
     return () => {
-      channel.unbind(EVENT);
-      pusherClient.unsubscribe(CHANNEL);
+      try {
+        channel.unbind(EVENT);
+        pusherClient.unsubscribe(CHANNEL);
+      } catch {
+        // ignore cleanup errors on closed connection
+      }
       subscribedRef.current = false;
     };
   }, [authenticated, setAlerta]);
