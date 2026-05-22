@@ -14,15 +14,25 @@ export default async function CadastroPage() {
   }
 
   const userId = Number(session?.user?.id);
+  const sessionRole = (session?.user as { role?: string })?.role ?? '';
 
-  // Busca role do DB — evita role stale no JWT
-  const dbUser = userId > 0
-    ? await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } })
-    : null;
-  const role = dbUser?.role ?? session?.user?.role ?? '';
+  // Busca role do DB — evita role stale no JWT, com fallback seguro
+  let role = sessionRole;
+  try {
+    if (userId > 0) {
+      const dbUser = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
+      if (dbUser?.role) role = dbUser.role;
+    }
+  } catch {
+    // Se o DB falhar, usa role da sessão como fallback
+  }
 
-  if (!ROLES_GESTAO.includes(role)) {
-    const permissoes = userId > 0 ? await getPermissoesEfetivas(userId) : [];
+  const ROLES_GESTAO_ALL = [...ROLES_GESTAO, 'Lider Comercial'];
+  if (!ROLES_GESTAO_ALL.includes(role)) {
+    let permissoes: string[] = [];
+    try {
+      permissoes = userId > 0 ? await getPermissoesEfetivas(userId) : [];
+    } catch { /* fallback: sem permissões */ }
     if (!permissoes.includes("cadastro")) {
       redirect("/PainelAlpha");
     }
