@@ -11,7 +11,7 @@ import {
 } from '@/actions/PermissoesSetor';
 
 const SETORES = [
-  'OPERACIONAL', 'COMERCIAL', 'FINANCEIRO', 'RECURSOS HUMANOS',
+  'OPERACIONAL', 'COMERCIAL', 'Lider Comercial', 'FINANCEIRO', 'RECURSOS HUMANOS',
   'JURÍDICO', 'PARCEIRO', 'Serviços Gerais', 'CEO',
 ];
 

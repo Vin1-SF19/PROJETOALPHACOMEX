@@ -80,9 +80,13 @@ export async function getDadosMetas(
     }
 }
 
+function podeGerenciarMetas(role: string) {
+    return role === "Admin" || role === "CEO" || role === "Lider Comercial";
+}
+
 export async function getColaboradoresParaConfigurar() {
     const session = await auth();
-    if (!session || session.user.role !== "Admin")
+    if (!session || !podeGerenciarMetas(session.user.role ?? ""))
         return { success: false as const, error: "Não autorizado" };
 
     const agora = new Date();
@@ -120,7 +124,7 @@ export async function getColaboradoresParaConfigurar() {
 
 export async function toggleMetaVisibilidade(userId: number, visivel: boolean) {
     const session = await auth();
-    if (!session || session.user.role !== "Admin")
+    if (!session || !podeGerenciarMetas(session.user.role ?? ""))
         return { success: false, error: "Não autorizado" };
 
     try {
@@ -141,7 +145,7 @@ export async function upsertMetaUsuario(
     ano: number,
 ) {
     const session = await auth();
-    if (!session || session.user.role !== "Admin")
+    if (!session || !podeGerenciarMetas(session.user.role ?? ""))
         return { success: false, error: "Não autorizado" };
 
     try {
@@ -159,7 +163,7 @@ export async function upsertMetaUsuario(
 
 export async function upsertMetaEquipe(metaMensal: number, mes: number, ano: number) {
     const session = await auth();
-    if (!session || session.user.role !== "Admin")
+    if (!session || !podeGerenciarMetas(session.user.role ?? ""))
         return { success: false, error: "Não autorizado" };
 
     try {

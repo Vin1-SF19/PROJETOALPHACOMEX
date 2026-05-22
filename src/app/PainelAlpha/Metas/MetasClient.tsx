@@ -951,7 +951,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
     // Sem polling: atualizar é chamado via callback onDadosAlterados do modal
 
     const isTV = role === 'TV';
-    const HEADER_HEIGHT = isTV ? 0 : 72;
+    const HEADER_HEIGHT = isTV ? 56 : 72;
     const MIN_ROW = isTV ? 130 : 100;
     const MAX_ROW = isTV ? 260 : 190;
 
@@ -975,6 +975,36 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                 <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-blue-700/5 blur-[200px] rounded-full" />
                 <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[50%] bg-indigo-800/5 blur-[180px] rounded-full" />
             </div>
+
+            {/* ── Header TV — só meta da equipe ── */}
+            {isTV && (
+                <header className="relative z-10 flex items-center justify-center px-6 py-3 border-b border-white/5 bg-slate-950/60 backdrop-blur-2xl shrink-0">
+                    <div className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl border transition-all
+                        ${equipeBateuMeta
+                            ? "bg-amber-500/10 border-amber-500/30 shadow-[0_0_25px_-5px_rgba(245,158,11,0.3)]"
+                            : "bg-slate-900/60 border-white/5"}`}>
+                        <Target size={16} className={equipeBateuMeta ? "text-amber-400" : "text-slate-500"} />
+                        <div>
+                            <p className={`text-[9px] font-black uppercase tracking-widest ${equipeBateuMeta ? "text-amber-400" : "text-slate-500"}`}>
+                                Meta Equipe
+                            </p>
+                            <p className="text-base font-black leading-none">
+                                <span className={equipeBateuMeta ? "text-amber-400" : "text-white"}>{totalVendas}</span>
+                                <span className="text-slate-600 font-black"> / {metaEquipe || "—"}</span>
+                            </p>
+                        </div>
+                        {metaEquipe > 0 && (
+                            <div className="h-8 w-1.5 rounded-full bg-slate-800 overflow-hidden relative">
+                                <div
+                                    className={`absolute bottom-0 left-0 right-0 rounded-full transition-all duration-700 ${equipeBateuMeta ? "bg-amber-400" : "bg-blue-500"}`}
+                                    style={{ height: `${metaEquipePct}%` }}
+                                />
+                            </div>
+                        )}
+                        {equipeBateuMeta && <Trophy size={16} className="text-amber-400" />}
+                    </div>
+                </header>
+            )}
 
             {/* ── Header (oculto no modo TV) ── */}
             {!isTV && <header
@@ -1048,7 +1078,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                         <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Gerenciamento de Leads</span>
                     </button>
 
-                    {isAdmin && (
+                    {(isAdmin || role === 'CEO' || role === 'Lider Comercial') && (
                         <button
                             onClick={() => setModalAberto(true)}
                             className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 transition-all text-blue-400"
