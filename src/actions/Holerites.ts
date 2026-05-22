@@ -346,6 +346,75 @@ export async function deletarHolerite(id: number) {
   }
 }
 
+// ─── substituirHolerite ────────────────────────────────────────────────────────
+
+const substituirSchema = z.object({
+  arquivoUrl: z.string().url(),
+  arquivoNome: z.string().min(1).max(255),
+  arquivoTamanho: z.number().int().positive().max(10 * 1024 * 1024),
+  assinado: z.boolean(),
+  observacao: z.string().max(1000).optional(),
+});
+
+export async function substituirHolerite(id: number, data: z.infer<typeof substituirSchema>) {
+  const session = await auth();
+  const user = sessionUser(session);
+  if (!user?.id) return { success: false as const, error: "Não autorizado" };
+
+  const userId = Number(user.id);
+
+  if (!z.number().int().positive().safeParse(id).success) {
+    return { success: false as const, error: "ID inválido" };
+  }
+
+  const holerite = await db.holerite.findUnique({
+    where: { id },
+    select: { colaboradorId: true, status: true },
+  });
+  if (!holerite) return { success: false as const, error: "Holerite não encontrado" };
+
+  if (!podeGestao(user.role) && holerite.colaboradorId !== userId) {
+    return { success: false as const, error: "Sem permissão" };
+  }
+
+  if (holerite.status !== "REJEITADO") {
+    return { success: false as const, error: "Só é possível substituir holerites rejeitados" };
+  }
+
+  const parsed = substituirSchema.safeParse(data);
+  if (!parsed.success) {
+    return { success: false as const, error: parsed.error.issues[0].message };
+  }
+
+  const d = parsed.data;
+
+  try {
+    const atualizado = await db.holerite.update({
+      where: { id },
+      data: {
+        arquivoUrl: d.arquivoUrl,
+        arquivoNome: d.arquivoNome,
+        arquivoTamanho: d.arquivoTamanho,
+        assinado: d.assinado,
+        assinadoEm: d.assinado ? new Date() : null,
+        observacao: d.observacao ?? null,
+        status: "PENDENTE",
+        motivoRejeicao: null,
+        validadoPor: null,
+        validadoEm: null,
+        uploadedAt: new Date(),
+        uploadedById: userId,
+      },
+    });
+    revalidatePath("/PainelAlpha/Holerites");
+    return { success: true as const, data: atualizado };
+  } catch (e) {
+    const err = e as Error;
+    console.error("[substituirHolerite]", err.message);
+    return { success: false as const, error: err.message };
+  }
+}
+
 // ─── getHoleriteById ───────────────────────────────────────────────────────────
 
 export async function getHoleriteById(id: number) {

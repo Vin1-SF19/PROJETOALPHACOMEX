@@ -4,7 +4,13 @@ import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Upload, FileText, Check, ChevronRight, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { uploadHolerite } from "@/actions/Holerites";
+import { uploadHolerite, substituirHolerite } from "@/actions/Holerites";
+
+function getMesPadrao() {
+  const m = new Date().getMonth(); // 0-indexed — já é o mês anterior (0 = jan → prev = dez)
+  if (m === 0) return { mes: 12, ano: new Date().getFullYear() - 1 };
+  return { mes: m, ano: new Date().getFullYear() };
+}
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -16,15 +22,20 @@ interface ModalUploadHoleriteProps {
   onClose: () => void;
   colaboradorId: number;
   onSucesso?: () => void;
+  substituirId?: number;
+  mesFixo?: number;
+  anoFixo?: number;
 }
 
 export default function ModalUploadHolerite({
   open, onClose, colaboradorId, onSucesso,
+  substituirId, mesFixo, anoFixo,
 }: ModalUploadHoleriteProps) {
   const anoAtual = new Date().getFullYear();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [mes, setMes] = useState(new Date().getMonth() + 1);
-  const [ano, setAno] = useState(anoAtual);
+  const padrao = getMesPadrao();
+  const [step, setStep] = useState<1 | 2 | 3>(substituirId ? 2 : 1);
+  const [mes, setMes] = useState(mesFixo ?? padrao.mes);
+  const [ano, setAno] = useState(anoFixo ?? padrao.ano);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -35,9 +46,10 @@ export default function ModalUploadHolerite({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
-    setStep(1);
-    setMes(new Date().getMonth() + 1);
-    setAno(anoAtual);
+    setStep(substituirId ? 2 : 1);
+    const p = getMesPadrao();
+    setMes(mesFixo ?? p.mes);
+    setAno(anoFixo ?? p.ano);
     setArquivo(null);
     setUploadUrl(null);
     setAssinado(false);
@@ -92,18 +104,18 @@ export default function ModalUploadHolerite({
     if (!assinado) { toast.error("Confirme a declaração de assinatura digital"); return; }
     setSalvando(true);
     try {
-      const res = await uploadHolerite({
-        colaboradorId,
-        mes,
-        ano,
+      const payload = {
         arquivoUrl: uploadUrl,
         arquivoNome: arquivo.name,
         arquivoTamanho: arquivo.size,
         assinado: true,
         observacao: observacao.trim() || undefined,
-      });
+      };
+      const res = substituirId
+        ? await substituirHolerite(substituirId, payload)
+        : await uploadHolerite({ colaboradorId, mes, ano, ...payload });
       if (res.success) {
-        toast.success("Holerite enviado com sucesso");
+        toast.success(substituirId ? "Holerite substituído — voltou para Pendente" : "Holerite enviado com sucesso");
         onSucesso?.();
         handleClose();
       } else {
@@ -135,7 +147,9 @@ export default function ModalUploadHolerite({
           <div className="flex items-center justify-between p-5 border-b border-white/5">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Alpha Holerites</p>
-              <p className="text-sm font-black text-white">Enviar Holerite</p>
+              <p className="text-sm font-black text-white">
+                {substituirId ? `Substituir Holerite — ${MESES[(mesFixo ?? 1) - 1]}/${anoFixo ?? anoAtual}` : "Enviar Holerite"}
+              </p>
             </div>
             <button
               onClick={handleClose}

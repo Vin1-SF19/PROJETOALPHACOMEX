@@ -38,6 +38,7 @@ export default function MeusHoleritesView({ userId, anoInicial }: MeusHoleritesV
   const [holerites, setHolerites] = useState<HoleriteItem[]>([] as HoleriteItem[]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [substituindo, setSubstituindo] = useState<{ id: number; mes: number; ano: number } | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -55,7 +56,7 @@ export default function MeusHoleritesView({ userId, anoInicial }: MeusHoleritesV
   const mesesHeatmap: MesHeatmap[] = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1;
     const h = holerites.find((x) => x.mes === m);
-    if (m > mesAtual && ano === anoAtual) return { mes: m, status: "FUTURO" };
+    if (m >= mesAtual && ano === anoAtual) return { mes: m, status: "FUTURO" };
     if (!h) return { mes: m, status: "AUSENTE" };
     return { mes: m, status: h.status as MesHeatmap["status"] };
   });
@@ -119,7 +120,14 @@ export default function MeusHoleritesView({ userId, anoInicial }: MeusHoleritesV
             </p>
           </motion.div>
         ) : (
-          holerites.map((h, i) => <CardHolerite key={h.id} holerite={h} index={i} />)
+          holerites.map((h, i) => (
+            <CardHolerite
+              key={h.id}
+              holerite={h}
+              index={i}
+              onSubstituir={h.status === "REJEITADO" ? () => setSubstituindo({ id: h.id, mes: h.mes, ano: h.ano }) : undefined}
+            />
+          ))
         )}
       </div>
 
@@ -129,6 +137,18 @@ export default function MeusHoleritesView({ userId, anoInicial }: MeusHoleritesV
         colaboradorId={userId}
         onSucesso={carregar}
       />
+
+      {substituindo && (
+        <ModalUploadHolerite
+          open
+          onClose={() => setSubstituindo(null)}
+          colaboradorId={userId}
+          onSucesso={() => { setSubstituindo(null); void carregar(); }}
+          substituirId={substituindo.id}
+          mesFixo={substituindo.mes}
+          anoFixo={substituindo.ano}
+        />
+      )}
     </div>
   );
 }
