@@ -146,20 +146,12 @@ export async function confirmarFechamento(raw: unknown) {
         });
 
         // Auto-cria cliente no painel CS/NPS se ainda não existir
-        // e marca contaComVenda=false quando CNPJ já existia (venda retroativa)
+        // CNPJ duplicado = não cria no CS/NPS mas SEMPRE conta como venda
         try {
             const existeCliente = await db.clientes.findFirst({
                 where: { cnpj: atualizado.cnpj },
                 select: { id: true },
             });
-
-            if (existeCliente) {
-                // CNPJ já estava no CS/NPS → não conta como nova venda no painel de metas
-                await db.contratoComercial.update({
-                    where: { id: d.id },
-                    data: { contaComVenda: false },
-                });
-            }
 
             if (!existeCliente) {
                 type SocioJson = { nome?: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string };
