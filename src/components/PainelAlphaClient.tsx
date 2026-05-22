@@ -160,7 +160,7 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
             {
               label: "Nível de Acesso", value: userRole, icon: ShieldCheck,
               color: `${style.text} ${style.glow}`,
-              href: isRh || isAdmin || isCeo || isFinc ? "/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoTarefa" : undefined,
+              href: isRh || isAdmin || isCeo || isFinc ? "/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa" : undefined,
             },
             { label: "Alpha Comm", value: "Canal de mensagens", icon: Zap, color: "text-blue-500 bg-blue-500/10", href: "/PainelAlpha/AlphaComm" },
             {
