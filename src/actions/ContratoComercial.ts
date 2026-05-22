@@ -12,7 +12,7 @@ function isAdminOrCeo(role: string) {
 }
 
 function isComercialOrAdmin(role: string) {
-    return role === "COMERCIAL" || role === "Admin" || role === "CEO";
+    return role === "COMERCIAL" || role === "Lider Comercial" || role === "Admin" || role === "CEO";
 }
 
 // ─── Schemas Zod ─────────────────────────────────────────────────────────────
@@ -146,11 +146,21 @@ export async function confirmarFechamento(raw: unknown) {
         });
 
         // Auto-cria cliente no painel CS/NPS se ainda não existir
+        // e marca contaComVenda=false quando CNPJ já existia (venda retroativa)
         try {
             const existeCliente = await db.clientes.findFirst({
                 where: { cnpj: atualizado.cnpj },
                 select: { id: true },
             });
+
+            if (existeCliente) {
+                // CNPJ já estava no CS/NPS → não conta como nova venda no painel de metas
+                await db.contratoComercial.update({
+                    where: { id: d.id },
+                    data: { contaComVenda: false },
+                });
+            }
+
             if (!existeCliente) {
                 type SocioJson = { nome?: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string };
                 const sociosJson = ((atualizado.socios ?? []) as SocioJson[]).filter((s) => s.nome?.trim());

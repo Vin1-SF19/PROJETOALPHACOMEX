@@ -88,6 +88,7 @@ const SETORES_LISTA = [
   { value: 'CEO', label: 'CEO' },
   { value: 'OPERACIONAL', label: 'OPERACIONAL' },
   { value: 'COMERCIAL', label: 'COMERCIAL' },
+  { value: 'Lider Comercial', label: 'LIDER COMERCIAL' },
   { value: 'RECURSOS HUMANOS', label: 'RECURSOS HUMANOS' },
   { value: 'FINANCEIRO', label: 'FINANCEIRO' },
   { value: 'JURÍDICO', label: 'JURÍDICO' },

@@ -893,6 +893,8 @@ model ContratoComercial {
   contratoAssinado Boolean @default(false)
   contratoUrl      String?
 
+  contaComVenda Boolean @default(true)
+
   socios Json?
 
   mes Int
