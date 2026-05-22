@@ -20,7 +20,7 @@ import {
     Zap,
     Eye
 } from "lucide-react";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 import ModalCadastroCliente from "./ModalCadastros/modal";
 import { ListarExtratos } from '@/actions/Extratos';
 import { toast } from 'sonner';
@@ -286,7 +286,6 @@ export default function ExtratosBancarios() {
                     </div>
 
                     <div className="flex items-center gap-3 relative">
-                        <BotaoVoltar />
                         <button
                             onClick={() => setModalAberto(true)}
                             className="group flex items-center gap-3 px-8 py-4 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-indigo-500 hover:text-white active:scale-95 shadow-xl shadow-white/5"

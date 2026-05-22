@@ -5,6 +5,7 @@ import GlobalSidebar, { SidebarMobileToggle } from './GlobalSidebar';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useAdminChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
 import NotificationToast from '@/components/chamados/NotificationToast';
+import { HoleriteNotificacaoGlobal } from '@/components/holerites/HoleriteNotificacaoGlobal';
 
 interface PainelLayoutClientProps {
   children: React.ReactNode;
@@ -25,9 +26,14 @@ export default function PainelLayoutClient({
 
   useAdminChamadosNotifications(role);
 
+  if (role === 'TV') {
+    return <>{children}</>;
+  }
+
   return (
     <>
       <NotificationToast />
+      <HoleriteNotificacaoGlobal authenticated />
       <GlobalSidebar
         permissoes={permissoes}
         role={role}

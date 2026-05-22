@@ -46,6 +46,7 @@ interface Contrato {
     ano: number;
     usuarioId: number;
     usuario: { id: number; nome: string; imagemUrl: string | null };
+    createdAt: Date | string;
 }
 
 interface Props {
@@ -53,6 +54,7 @@ interface Props {
     nomeUsuario?: string;
     onFechar: () => void;
     onDadosAlterados?: () => void;
+    onVendaFechada?: (data: { closerNome: string; razaoSocial: string; pagamentoConfirmado: boolean; contratoAssinado: boolean }) => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -581,6 +583,7 @@ function TabelaEnviados({
     onConfirmar: (c: Contrato) => void;
     onExcluir: (c: Contrato) => void;
 }) {
+    const agora = new Date();
     const thCls = "px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap";
     return (
         <div className="space-y-3">
@@ -596,6 +599,7 @@ function TabelaEnviados({
                 <table className="w-full text-left">
                     <thead>
                         <tr className="bg-slate-900/60 border-b border-white/5">
+                            <th className={thCls}>Data Enviado</th>
                             {showCloser && <th className={thCls}>Closer</th>}
                             <th className={thCls}>CNPJ</th>
                             <th className={thCls}>Razão Social</th>
@@ -610,59 +614,65 @@ function TabelaEnviados({
                         {contratos.length === 0 ? (
                             <tr>
                                 <td
-                                    colSpan={(showCloser ? 1 : 0) + (canDelete ? 1 : 0) + 6}
+                                    colSpan={(showCloser ? 1 : 0) + (canDelete ? 1 : 0) + 7}
                                     className="px-4 py-8 text-center text-[9px] font-black uppercase tracking-widest text-slate-700"
                                 >
                                     Nenhum contrato enviado
                                 </td>
                             </tr>
                         ) : (
-                            contratos.map((c) => (
-                                <tr
-                                    key={c.id}
-                                    className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors"
-                                >
-                                    {showCloser && (
-                                        <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">
-                                            {c.closerNome}
+                            contratos.map((c) => {
+                                const atrasado = agora.getTime() - new Date(c.createdAt).getTime() > 24 * 60 * 60 * 1000;
+                                return (
+                                    <tr
+                                        key={c.id}
+                                        className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors"
+                                    >
+                                        <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">
+                                            {new Date(c.createdAt).toLocaleDateString("pt-BR")}
                                         </td>
-                                    )}
-                                    <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">
-                                        {formatCNPJ(c.cnpj)}
-                                    </td>
-                                    <td className="px-3 py-3 text-[11px] font-black text-white max-w-[200px] truncate">
-                                        {c.razaoSocial}
-                                    </td>
-                                    <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[160px] truncate">
-                                        {c.nomeFantasia || <span className="text-slate-700">—</span>}
-                                    </td>
-                                    <td className="px-3 py-3 text-[11px] font-black text-emerald-400 whitespace-nowrap">
-                                        {formatBRL(c.valorContrato)}
-                                    </td>
-                                    <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">
-                                        {c.servico}
-                                    </td>
-                                    <td className="px-3 py-3 text-right">
-                                        <button
-                                            onClick={() => onConfirmar(c)}
-                                            className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-colors animate-pulse hover:animate-none flex items-center gap-1.5 ml-auto whitespace-nowrap"
-                                        >
-                                            <Check size={11} /> Confirmar Fechamento
-                                        </button>
-                                    </td>
-                                    {canDelete && (
+                                        {showCloser && (
+                                            <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">
+                                                {c.closerNome}
+                                            </td>
+                                        )}
+                                        <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                                            {formatCNPJ(c.cnpj)}
+                                        </td>
+                                        <td className={`px-3 py-3 text-[11px] font-black max-w-[200px] truncate ${atrasado ? "text-red-500 animate-pulse" : "text-white"}`}>
+                                            {c.razaoSocial}
+                                        </td>
+                                        <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[160px] truncate">
+                                            {c.nomeFantasia || <span className="text-slate-700">—</span>}
+                                        </td>
+                                        <td className="px-3 py-3 text-[11px] font-black text-emerald-400 whitespace-nowrap">
+                                            {formatBRL(c.valorContrato)}
+                                        </td>
+                                        <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">
+                                            {c.servico}
+                                        </td>
                                         <td className="px-3 py-3 text-right">
                                             <button
-                                                onClick={() => onExcluir(c)}
-                                                className="p-1.5 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                                title="Excluir contrato"
+                                                onClick={() => onConfirmar(c)}
+                                                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-colors animate-pulse hover:animate-none flex items-center gap-1.5 ml-auto whitespace-nowrap"
                                             >
-                                                <Trash2 size={13} />
+                                                <Check size={11} /> Confirmar Fechamento
                                             </button>
                                         </td>
-                                    )}
-                                </tr>
-                            ))
+                                        {canDelete && (
+                                            <td className="px-3 py-3 text-right">
+                                                <button
+                                                    onClick={() => onExcluir(c)}
+                                                    className="p-1.5 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                    title="Excluir contrato"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
@@ -838,7 +848,7 @@ function TabelaFechados({
 
 // ─── Modal Principal ──────────────────────────────────────────────────────────
 
-export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, onDadosAlterados }: Props) {
+export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, onDadosAlterados, onVendaFechada }: Props) {
     const agora = new Date();
     const [mes, setMes] = useState(agora.getMonth() + 1);
     const [ano, setAno] = useState(agora.getFullYear());
@@ -1117,10 +1127,19 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                 <ModalConfirmacaoFechamento
                     contrato={contratoParaFechar}
                     onFechar={() => setContratoParaFechar(null)}
-                    onConfirmado={() => {
+                    onConfirmado={(confirmData) => {
+                        const contrato = contratoParaFechar;
                         setContratoParaFechar(null);
                         void carregarContratos();
                         onDadosAlterados?.();
+                        if (contrato) {
+                            onVendaFechada?.({
+                                closerNome: contrato.closerNome,
+                                razaoSocial: contrato.razaoSocial,
+                                pagamentoConfirmado: confirmData.pagamentoConfirmado,
+                                contratoAssinado: confirmData.contratoAssinado,
+                            });
+                        }
                     }}
                 />
             )}

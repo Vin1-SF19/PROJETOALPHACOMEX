@@ -8,7 +8,7 @@ import {
     Loader2, CalendarDays, Info, Trash2, Filter, XCircle, AlertTriangle, ShoppingCart
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { BotaoVoltar } from '@/components/BotaoVoltar';
+
 import { BuscarTarefasPorUsuario, AlternarStatusTarefa } from '@/actions/Tarefas';
 import { toast } from 'sonner';
 import { buscarReservasAtivas, BuscarTodasDiretrizes } from '@/actions/Reservas';
@@ -416,9 +416,6 @@ export default function PainelTarefas() {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-4">
-                            <BotaoVoltar />
-                        </div>
 
                         <div className="flex flex-wrap items-center gap-4">
                             <div className="flex bg-[#050a18]/60 p-1.5 rounded-full border border-white/5 backdrop-blur-md shadow-inner">

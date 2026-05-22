@@ -8,7 +8,7 @@ import {
     Loader2, CalendarDays, Info, Trash2, Filter, XCircle, AlertTriangle, ShoppingCart
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { BotaoVoltar } from '@/components/BotaoVoltar';
+
 import { BuscarTarefasPorUsuario, AlternarStatusTarefa } from '@/actions/Tarefas';
 import { toast } from 'sonner';
 import { buscarReservasAtivas, BuscarTodasDiretrizes } from '@/actions/Reservas';
@@ -440,7 +440,6 @@ export default function PainelTarefas() {
                         </div>
 
                         <div className="flex items-center justify-between gap-4">
-                            <BotaoVoltar />
 
                             <button
                                 onClick={() => setAbaAtual((prev) => (prev === "TAREFAS" ? "COMPRAS" : "TAREFAS"))}

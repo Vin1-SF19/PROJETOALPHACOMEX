@@ -20,7 +20,7 @@ interface Contrato {
 interface Props {
     contrato: Contrato;
     onFechar: () => void;
-    onConfirmado: () => void;
+    onConfirmado: (data: { pagamentoConfirmado: boolean; contratoAssinado: boolean }) => void;
 }
 
 export default function ModalConfirmacaoFechamento({ contrato, onFechar, onConfirmado }: Props) {
@@ -84,7 +84,7 @@ export default function ModalConfirmacaoFechamento({ contrato, onFechar, onConfi
                 return;
             }
             toast.success("Contrato fechado!");
-            onConfirmado();
+            onConfirmado({ pagamentoConfirmado, contratoAssinado });
         } catch {
             toast.error("Erro ao confirmar");
         } finally {

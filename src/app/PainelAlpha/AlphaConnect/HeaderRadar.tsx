@@ -7,7 +7,7 @@ import { BotaoUploadExcel } from "./BotaoUploadExcel";
 import { BotaoExportarTabelaCompleta } from "./BotaoExportarTabelaCompleta";
 import { FiltroRadar } from "./FiltroRadar";
 import { ModalHistorico } from "./Historico";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 
 interface HeaderRadarProps {
     style: any;
@@ -43,7 +43,6 @@ export function HeaderRadar({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        <BotaoVoltar/>
                         <button
                             onClick={() => setModalAberto(true)}
                             className={`cursor-pointer h-14 px-8 ${style.bg} rounded-2xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-95 shadow-2xl`}

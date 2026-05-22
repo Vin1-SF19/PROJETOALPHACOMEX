@@ -1,7 +1,6 @@
 "use client";
 
 import { UserIcon } from "lucide-react";
-import { BotaoVoltar } from "./BotaoVoltar";
 
 type UserProps = {
   user?: {
@@ -29,10 +28,6 @@ export default function HeaderUser({ user }: UserProps) {
             {user?.usuario}
           </span>
         </div>
-
-      </div>
-      <div className="bg-gray-800 rounded-2xl">
-        <BotaoVoltar/>
 
       </div>
 

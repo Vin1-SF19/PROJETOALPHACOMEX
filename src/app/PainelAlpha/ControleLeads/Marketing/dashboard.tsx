@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { Users, TrendingUp, Award, Target, Zap, BarChart3, Download } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import BotaoVoltar from '@/components/BotaoVoltarMinimalista';
+
 import XLSX from 'xlsx-js-style';
 import { getExportDataColaborador } from '@/actions/ComercialControle';
 import { useSession } from 'next-auth/react';
@@ -386,7 +386,6 @@ export default function MarketingDashboard({ dadosEquipe = [] }: any) {
                 </div>
 
                 <div className="mt-6 lg:mt-0 flex flex-wrap items-center gap-4">
-                    <BotaoVoltar />
                     <button
                         onClick={exportarDados}
                         className="cursor-pointer h-12 px-5 bg-white/[0.03] hover:bg-blue-500/10 border border-white/5 hover:border-blue-500/30 rounded-2xl flex items-center gap-3 transition-all group"

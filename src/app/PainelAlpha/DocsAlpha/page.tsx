@@ -16,7 +16,7 @@ import { buscarOrdemPastas, salvarOrdemPastas } from "@/actions/OrdemPastas";
 import { renomearPasta } from "@/actions/RenamePastas";
 import { getAcessosDoUsuario } from "@/actions/PopAcessos";
 import ModalGerenciamentoAcessos from "@/components/pop/ModalGerenciamentoAcessos";
-import BotaoVoltar from "@/components/BotaoVoltarMinimalista";
+
 
 export const dynamic = 'force-dynamic';
 
@@ -289,7 +289,6 @@ export default function PaginaDocumentos() {
                                 <KeyRound size={13} /> Acessos
                             </button>
                         )}
-                        <BotaoVoltar/>
                     </div>
                 </div>
 

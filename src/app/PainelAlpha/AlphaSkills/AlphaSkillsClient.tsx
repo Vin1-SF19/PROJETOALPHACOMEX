@@ -5,7 +5,7 @@ import { Search, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import BotaoVoltar from '@/components/BotaoVoltarMinimalista';
+
 import TrilhaCarrossel from './TrilhaCarrossel';
 import ModuloModal from './ModuloModal';
 
@@ -92,10 +92,6 @@ export default function AlphaSkillsClient({ session, initialCursos, initialVideo
 
     return (
         <div className="min-h-screen bg-[#050505] text-white selection:bg-orange-500/30 overflow-x-hidden">
-
-            <div className="absolute top-8 left-6 md:left-16 z-[60]">
-                <BotaoVoltar />
-            </div>
 
             <div className="fixed inset-0 flex items-center justify-center z-0 pointer-events-none overflow-hidden">
                 <div className="absolute w-[800px] h-[800px] bg-orange-600/5 rounded-full blur-[120px]" />

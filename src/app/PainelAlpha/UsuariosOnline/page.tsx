@@ -3,7 +3,7 @@ import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
 import { Activity, User, ArrowUpRight, ShieldCheck, Zap, Globe, Fingerprint, Search } from "lucide-react";
 import { getTema } from "@/lib/temas";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,6 @@ export default async function UsuariosOnlinePage() {
       <div className="max-w-full mx-auto relative z-10">
         <header className="mb-20 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
           <div className="space-y-4">
-            <BotaoVoltar />
             <div className="pt-4">
                 <h1 className="text-6xl font-black uppercase italic tracking-[ -0.05em] leading-none flex items-center gap-6">
                 <div className={`p-4 rounded-[2rem] ${style.bg} bg-opacity-20 border ${style.border} backdrop-blur-3xl`}>

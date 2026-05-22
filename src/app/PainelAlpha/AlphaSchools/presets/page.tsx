@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getTema } from "@/lib/temas";
 import AlphaPresetsConfig from "../AlphaPresets";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 
 export default function PresetsPage() {
   const { data: session, status } = useSession();
@@ -40,7 +40,6 @@ export default function PresetsPage() {
       
       <div className="max-w-7xl mx-auto relative z-10">
         <header className="mb-12">
-          <BotaoVoltar />
           <div className="mt-8">
             <h1 className="text-4xl font-black uppercase italic tracking-tighter">
               Gestão de <span className={temaConfig.text}>Presets</span>

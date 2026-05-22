@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { Send, User, Search, Hash, ShieldCheck, Zap, X, Volume2, VolumeX } from "lucide-react";
 import { getTema } from "@/lib/temas";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 import { getContatosChat } from "@/actions/get-contatos";
 import { pusherClient } from "@/lib/pusher";
 import { enviarMensagemChatAction, getHistoricoMensagens, marcarChatComoLido } from "@/actions/ChatAction";
@@ -153,7 +153,6 @@ export default function AlphaCommPage() {
     <main className="h-screen bg-[#02040a] flex flex-col text-white overflow-hidden selection:bg-blue-500/30">
       <header className="h-24 border-b border-white/5 bg-black/60 backdrop-blur-3xl flex items-center justify-between px-10 shrink-0 z-50">
         <div className="flex items-center gap-8">
-          <BotaoVoltar />
           <h1 className="text-2xl font-black uppercase italic tracking-tighter flex items-center gap-3 group">
             Alpha <span className={style.text}>Comm</span>
           </h1>

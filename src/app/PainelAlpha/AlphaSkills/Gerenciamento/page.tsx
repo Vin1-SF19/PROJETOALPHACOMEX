@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, MoveVertical, Edit3, Trash2, Upload, Film, Image as ImageIcon, CheckCircle2, Activity, Search, ChevronLeft, ChevronRight, Settings, FolderKanban, PlayCircle, X, BookOpen } from 'lucide-react';
+import { MoveVertical, Edit3, Trash2, Upload, Film, Image as ImageIcon, CheckCircle2, Activity, Search, ChevronLeft, ChevronRight, Settings, FolderKanban, PlayCircle, X, BookOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getUsers } from '@/actions/get-user';
@@ -126,13 +126,6 @@ export default function GerenciadorAlphaSkills() {
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
                         <div className="flex items-center gap-4">
                             <div className="relative">
-                                <button
-                                    onClick={() => router.push('/PainelAlpha/AlphaSkills')}
-                                    className="group flex items-center gap-2 mb-6 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all duration-300 cursor-pointer"
-                                >
-                                    <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-                                    Voltar ao Painel
-                                </button>
                                 <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-500/50 mb-1 leading-none">
                                     Alpha Skills Cloud
                                 </h2>

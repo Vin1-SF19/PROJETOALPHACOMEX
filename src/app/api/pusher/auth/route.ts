@@ -4,6 +4,7 @@ import { pusherServer } from "@/lib/pusher-server.ts";
 
 const ADMIN_ROLES = ["Admin", "CEO"];
 const ADMIN_CHANNELS = ["private-admin-chamados"];
+const ALL_USER_CHANNELS = ["private-holerite-alerts"];
 
 export async function POST(req: Request) {
   try {
@@ -22,6 +23,11 @@ export async function POST(req: Request) {
       if (!ADMIN_ROLES.includes(role)) {
         return new NextResponse("Proibido", { status: 403 });
       }
+      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(authResponse);
+    }
+
+    if (ALL_USER_CHANNELS.includes(channelName)) {
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);
       return NextResponse.json(authResponse);
     }

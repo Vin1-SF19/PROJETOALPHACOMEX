@@ -41,6 +41,8 @@ model usuarios {
   contato_emerg_2_tel  String?
   observacoes_internas String?
 
+  meta_visivel_painel Boolean @default(true)
+
   contratosColaborador ContratoColaborador[]
   checklistDocumental  ChecklistDocumental?
 
@@ -67,6 +69,7 @@ model usuarios {
   popAcessos               PopAcesso[]                @relation("PopAcessoUsuario")
   permissaoOverrides       UsuarioPermissaoOverride[]
   contratosComerciais      ContratoComercial[]        @relation("ContratosComerciais")
+  holeriteAlertas          HoleriteAlertaHistorico[]
 }
 
 model chamados {
@@ -1021,6 +1024,19 @@ model Holerite {
   @@index([ano, mes])
   @@index([status])
   @@map("holerite")
+}
+
+model HoleriteAlertaHistorico {
+  id           Int      @id @default(autoincrement())
+  tipo         String   // "INICIAL" | "FINAL"
+  disparadoPor Int
+  disparadoEm  DateTime @default(now())
+
+  usuario usuarios @relation(fields: [disparadoPor], references: [id])
+
+  @@index([disparadoPor])
+  @@index([disparadoEm])
+  @@map("holerite_alerta_historico")
 }
 
 // ─── RH / Colaboradores ───────────────────────────────────────────────────────

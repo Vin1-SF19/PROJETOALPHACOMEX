@@ -15,7 +15,7 @@ import {
     CheckCircle2,
     AlertCircle
 } from "lucide-react";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 import ModalCadastroCliente from "./ModalCadastro/modal";
 import { buscarClientes } from "@/actions/Clientes";
 import ModalGestaoCliente from './ModalCadastro/modalDados';
@@ -123,7 +123,6 @@ export default function CadastroCliente() {
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap">
-                        <BotaoVoltar />
                         <div className="h-8 w-[1px] bg-slate-800 mx-2 hidden md:block" />
                     </div>
                 </header>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import db from "@/lib/prisma";
 import DetalhesChamado from "@/components/DetalhesChamado";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 import ChatChamado from "@/components/ChatChamado";
 import { FiltroChamadosCards } from "@/components/FiltroChamado";
 
@@ -132,7 +132,6 @@ export default async function Chamados({
         </div>
 
         <div className="flex items-center gap-4 relative z-10">
-          <BotaoVoltar />
           {podeAbrirChamado && (
             <Link href="/PainelAlpha/Chamados/NovoChamado">
               <Button className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white rounded-[1.5rem] px-8 h-14 font-black uppercase tracking-widest shadow-2xl shadow-blue-900/40 border-t border-white/20 transition-all active:scale-95 group">

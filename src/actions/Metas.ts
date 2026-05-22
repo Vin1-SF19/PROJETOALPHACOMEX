@@ -38,7 +38,7 @@ export async function getDadosMetas(
         // Fonte de verdade: ContratoComercial.status = FECHADO (desacoplado de ComercialPerformance)
         const [comerciais, contratosFechados, metas, metaEquipe] = await Promise.all([
             db.usuarios.findMany({
-                where: { role: "COMERCIAL" },
+                where: { role: "COMERCIAL", meta_visivel_painel: true },
                 select: { id: true, nome: true, imagemUrl: true, tema_interface: true },
                 orderBy: { nome: "asc" },
             }),
@@ -93,7 +93,7 @@ export async function getColaboradoresParaConfigurar() {
         const [comerciais, metas, metaEquipe] = await Promise.all([
             db.usuarios.findMany({
                 where: { role: "COMERCIAL" },
-                select: { nome: true },
+                select: { id: true, nome: true, meta_visivel_painel: true },
                 orderBy: { nome: "asc" },
             }),
             db.metaUsuario.findMany({ where: { mes, ano } }),
@@ -103,8 +103,10 @@ export async function getColaboradoresParaConfigurar() {
         return {
             success: true as const,
             colaboradores: comerciais.map((c) => ({
+                id: c.id,
                 colaboradoraId: c.nome,
                 meta: metas.find((m) => m.colaboradoraId === c.nome)?.metaMensal ?? 0,
+                visivelNoPainel: c.meta_visivel_painel,
             })),
             metaEquipe: metaEquipe?.metaMensal ?? 0,
             mes,
@@ -113,6 +115,22 @@ export async function getColaboradoresParaConfigurar() {
     } catch (error) {
         console.error("Erro ao buscar colaboradores:", error);
         return { success: false as const, error: "Erro ao buscar dados" };
+    }
+}
+
+export async function toggleMetaVisibilidade(userId: number, visivel: boolean) {
+    const session = await auth();
+    if (!session || session.user.role !== "Admin")
+        return { success: false, error: "Não autorizado" };
+
+    try {
+        await db.usuarios.update({
+            where: { id: userId },
+            data: { meta_visivel_painel: visivel },
+        });
+        return { success: true };
+    } catch {
+        return { success: false, error: "Erro ao atualizar visibilidade" };
     }
 }
 

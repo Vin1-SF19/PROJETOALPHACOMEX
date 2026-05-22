@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { alterarSenhaPropriaAction } from "@/actions/perfil";
 import { logout } from "@/actions/logout";
 import { useFormStatus } from "react-dom";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 
 export function FormSenha() {
     async function handleAction(formData: FormData) {
@@ -67,7 +67,6 @@ export function FormSenha() {
             </div>
 
             <div className="md:col-span-2 flex justify-end gap-16">
-                <BotaoVoltar/>
                 <BotaoSubmit/>
             </div>
         </form>

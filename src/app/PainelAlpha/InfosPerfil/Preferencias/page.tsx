@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { Palette, Layout, Save, CheckCircle2, Monitor, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { atualizarInterfaceAction, toggleBibbleAction } from "@/actions/preferencias";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 import { getTema } from "@/lib/temas";
 
 const TEMAS = [
@@ -117,7 +117,6 @@ export default function PreferenciasPage() {
         </header>
 
         <div className="grid gap-8">
-          <BotaoVoltar />
 
           <section className={`bg-slate-900/20 backdrop-blur-md border ${preview.border} p-8 rounded-[2.5rem] transition-all duration-500 shadow-2xl`}>
             <h2 className="text-xs font-black uppercase tracking-widest mb-8 flex items-center gap-2 text-slate-400">

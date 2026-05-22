@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LoaderCircle, Fingerprint, Mail, Lock, Globe, ArrowLeft, Zap, ShieldCheck, Check
+  LoaderCircle, Fingerprint, Mail, Lock, Globe, Zap, ShieldCheck, Check
 } from "lucide-react";
 import { toast } from "sonner";
 import Form from "next/form";
@@ -61,9 +61,6 @@ export default function CadastroUsuarios({ currentUserRole = 'Admin' }: { curren
       {/* Header */}
       <nav className="relative z-10 w-full px-8 py-5 flex items-center justify-between border-b border-white/5 bg-slate-950/20 backdrop-blur-md">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="cursor-pointer p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all group">
-            <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
-          </button>
           <div>
             <h1 className="text-xl font-black tracking-tighter uppercase italic text-white">
               SISTEMA <span className="text-indigo-400">ALPHA</span>

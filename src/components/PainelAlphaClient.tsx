@@ -170,7 +170,7 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
               color: temNotificacao ? "text-amber-500 bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-amber-500 bg-amber-500/10",
               active: temNotificacao,
             },
-            { label: "Sistema Alpha", value: "Explorar Guia", icon: Zap, color: "text-purple-500 bg-purple-500/10", href: "/PainelAlpha/Guia" },
+            { label: "Sistema Alpha", value: "Explorar Notas de Atualização", icon: Zap, color: "text-purple-500 bg-purple-500/10", href: "/PainelAlpha/Guia" },
           ].map((stat, i) => {
             const Content = (
               <div className={`p-5 h-full rounded-[1.8rem] border flex items-center gap-4 transition-all duration-500 group overflow-hidden relative ${stat.active ? "bg-amber-600/10 border-amber-500/50 animate-pulse shadow-[0_0_20px_rgba(245,158,11,0.2)]" : "bg-slate-900/40 border-white/5"} ${stat.href ? "cursor-pointer hover:border-purple-500/40 hover:bg-slate-900/80 active:scale-[0.98]" : "cursor-default"}`}>

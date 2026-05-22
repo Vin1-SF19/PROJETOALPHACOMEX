@@ -7,7 +7,7 @@ import { getTema } from "@/lib/temas";
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import BotaoVoltar from '@/components/BotaoVoltarMinimalista';
+
 
 export default function AlphaSchoolsWelcome({ onEnter }: any) {
     const { data: session } = useSession();
@@ -106,7 +106,6 @@ export default function AlphaSchoolsWelcome({ onEnter }: any) {
                         </div>
 
                         <div className="w-full md:w-80 bg-black/40 border-l border-white/5 p-8 flex flex-col justify-center gap-6">
-                            <BotaoVoltar/>
                             <div className={`p-6 rounded-3xl border ${temPreset ? style.border : 'border-red-500/20'} bg-white/5 space-y-4`}>
                                 <div className="flex flex-col">
                                     <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Status do Preset</span>

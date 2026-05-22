@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, UserPlus } from "lucide-react";
 import { ModalAdicionarColaborador } from "@/app/PainelAlpha/AlphaVault/AdicionarColaborador/ModalAdicionarColaborador";
 import { ModalAdicionarSistema } from "@/app/PainelAlpha/AlphaVault/AdicionarSistema/ModalAdicionarSistema";
-import { BotaoVoltar } from "../BotaoVoltar";
+
 
 export function BotoesHeader({ style }: { style: any }) {
   const [modalColabAberto, setModalColabAberto] = useState(false);
@@ -28,7 +28,6 @@ export function BotoesHeader({ style }: { style: any }) {
           >
           <UserPlus size={18} /> Adicionar Colaborador
         </button>
-          <BotaoVoltar/>
       </div>
 
       <ModalAdicionarColaborador 

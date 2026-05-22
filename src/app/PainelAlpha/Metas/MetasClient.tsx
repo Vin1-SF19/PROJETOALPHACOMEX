@@ -6,6 +6,7 @@ import Image from "next/image";
 import {
     Settings, Trophy, Target, ArrowLeft,
     X, Check, RefreshCw, Users, Loader2, Crown, TrendingUp, Briefcase,
+    Eye, EyeOff,
 } from "lucide-react";
 import ModalGerenciamentoLeads from "@/components/comercial/ModalGerenciamentoLeads";
 import { getTema } from "@/lib/temas";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 import {
     upsertMetaUsuario,
     upsertMetaEquipe,
+    toggleMetaVisibilidade,
     getColaboradoresParaConfigurar,
     getDadosMetas,
     type ColaboradorMeta,
@@ -194,6 +196,93 @@ function tocarSomMeta(tipo: "individual" | "equipe") {
     }
 }
 
+// ─── Alerta de Venda / Pagamento ─────────────────────────────────────────────
+
+function AlertaVenda({ tipo, closerNome, razaoSocial, onFechar }: {
+    tipo: "VENDA" | "PAGAMENTO";
+    closerNome: string;
+    razaoSocial: string;
+    onFechar: () => void;
+}) {
+    useEffect(() => {
+        const t = setTimeout(onFechar, 7_000);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const isVenda = tipo === "VENDA";
+    const accentColor = isVenda ? "rgba(16,185,129,1)" : "rgba(59,130,246,1)";
+    const glowBg = isVenda ? "bg-emerald-950/30" : "bg-blue-950/30";
+    const glowAccent = isVenda ? "bg-emerald-700/15" : "bg-blue-700/15";
+    const labelCls = isVenda ? "text-emerald-500" : "text-blue-500";
+    const avatarBg = isVenda ? "bg-emerald-600" : "bg-blue-600";
+    const avatarShadow = isVenda ? "rgba(16,185,129,0.5)" : "rgba(59,130,246,0.5)";
+    const pulseBg = isVenda ? "bg-emerald-600/15" : "bg-blue-600/15";
+    const borderColor = isVenda ? "rgba(16,185,129,0.6)" : "rgba(59,130,246,0.6)";
+
+    return (
+        <div
+            className="fixed inset-0 z-[9998] bg-[#040d1a]/95 flex flex-col items-center justify-center select-none cursor-pointer"
+            onClick={onFechar}
+        >
+            {/* accent frame */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }} />
+                <div className="absolute bottom-0 left-0 right-0 h-1.5" style={{ background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }} />
+                <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: `linear-gradient(180deg, transparent, ${accentColor}, transparent)` }} />
+                <div className="absolute right-0 top-0 bottom-0 w-1.5" style={{ background: `linear-gradient(180deg, transparent, ${accentColor}, transparent)` }} />
+                {[["top-0 left-0", "border-t-2 border-l-2"], ["top-0 right-0", "border-t-2 border-r-2"], ["bottom-0 left-0", "border-b-2 border-l-2"], ["bottom-0 right-0", "border-b-2 border-r-2"]].map(([pos, border], i) => (
+                    <div key={i} className={`absolute ${pos} h-16 w-16 ${border}`} style={{ borderColor }} />
+                ))}
+            </div>
+
+            {/* glows */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] ${glowBg} blur-[180px] rounded-full`} />
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] ${glowAccent} blur-[120px] rounded-full`} />
+            </div>
+
+            <div className="absolute top-8 left-10 text-[9px] font-black uppercase tracking-[0.4em]" style={{ color: isVenda ? "rgba(16,185,129,0.4)" : "rgba(59,130,246,0.4)" }}>
+                {isVenda ? "ALPHA::VENDA::REALIZADA" : "ALPHA::PAGAMENTO::CONFIRMADO"}
+            </div>
+
+            <button
+                onClick={(e) => { e.stopPropagation(); onFechar(); }}
+                className="absolute top-6 right-6 p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-500 hover:text-white transition-colors z-10"
+            >
+                <X size={18} />
+            </button>
+
+            <div className="relative z-10 flex flex-col items-center gap-8 text-center px-8 max-w-lg">
+                {/* Initials */}
+                <div className="relative">
+                    <div className={`absolute -inset-4 rounded-full blur-xl animate-pulse ${pulseBg}`} />
+                    <div
+                        className={`relative h-36 w-36 rounded-full ${avatarBg} flex items-center justify-center border-4`}
+                        style={{ borderColor, boxShadow: `0 0 80px ${avatarShadow}` }}
+                    >
+                        <span className="text-white font-black text-5xl">
+                            {closerNome.substring(0, 2).toUpperCase()}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <p className={`text-[11px] font-black uppercase tracking-[0.6em] ${labelCls}`}>
+                        {isVenda ? "Venda Realizada!" : "Pagamento Confirmado!"}
+                    </p>
+                    <h2 className="text-5xl font-black uppercase italic text-white tracking-tighter leading-none">
+                        {closerNome}
+                    </h2>
+                    <p className="text-xl font-black text-slate-300 uppercase italic mt-2">
+                        {razaoSocial}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Linha de colaborador (pill com avatar sobreposição) ────────────────────
 
 function LinhaColaborador({ colab, rank, rowHeight }: {
@@ -208,9 +297,14 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
     const progresso = colab.meta > 0 ? Math.min((colab.vendas / colab.meta) * 100, 100) : 0;
     const accentRgb = tema.accent;
 
-    const barHeight = Math.max(52, Math.min(80, rowHeight - 28));
-    const avatarDiam = barHeight + 28;
+    const barHeight = Math.max(72, Math.min(160, rowHeight - 28));
+    const avatarDiam = barHeight + 36;
     const avatarRad = avatarDiam / 2;
+
+    const fontVendas = Math.max(26, Math.round(barHeight * 0.52));
+    const fontNome   = Math.max(14, Math.round(barHeight * 0.26));
+    const fontStatus = Math.max(9,  Math.round(barHeight * 0.115));
+    const fontRank   = Math.max(18, Math.round(barHeight * 0.38));
 
     return (
         <div className="flex items-center px-6 lg:px-10 py-2.5">
@@ -342,13 +436,13 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                     style={{ paddingLeft: `${avatarRad + 14}px`, paddingRight: "20px" }}
                 >
                     {/* Rank */}
-                    <div className="shrink-0 w-7">
+                    <div className="shrink-0" style={{ width: `${Math.round(fontRank * 1.6)}px` }}>
                         {rank <= 3 ? (
-                            <span className="text-base lg:text-lg leading-none">
+                            <span className="leading-none" style={{ fontSize: `${fontRank}px` }}>
                                 {rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉"}
                             </span>
                         ) : (
-                            <span className="text-[9px] font-black tabular-nums text-slate-700 uppercase tracking-widest">
+                            <span className="font-black tabular-nums text-slate-700 uppercase tracking-widest" style={{ fontSize: `${fontStatus}px` }}>
                                 #{rank}
                             </span>
                         )}
@@ -357,16 +451,19 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                     {/* Nome + status */}
                     <div className="flex-1 min-w-0">
                         <h3
-                            className={`font-black uppercase italic tracking-tight truncate leading-tight text-sm lg:text-base
+                            className={`font-black uppercase italic tracking-tight truncate leading-tight
                                 ${bateuMeta ? "text-amber-300" : quaseNaMeta ? "text-white" : "text-slate-200"}`}
-                            style={quaseNaMeta && !bateuMeta
-                                ? { textShadow: `0 0 20px rgba(${accentRgb},0.5)` }
-                                : undefined}
+                            style={{
+                                fontSize: `${fontNome}px`,
+                                ...(quaseNaMeta && !bateuMeta ? { textShadow: `0 0 20px rgba(${accentRgb},0.5)` } : {}),
+                            }}
                         >
                             {colab.nome}
                         </h3>
-                        <p className={`text-[8px] font-black uppercase tracking-[0.15em] mt-0.5
-                            ${bateuMeta ? "text-amber-500/80" : quaseNaMeta ? "text-white/50" : "text-slate-700"}`}>
+                        <p className={`font-black uppercase tracking-[0.15em] mt-0.5
+                            ${bateuMeta ? "text-amber-500/80" : quaseNaMeta ? "text-white/50" : "text-slate-700"}`}
+                            style={{ fontSize: `${fontStatus}px` }}
+                        >
                             {bateuMeta ? "● META BATIDA"
                                 : quaseNaMeta ? `⚡ FALTA ${faltam}!`
                                 : colab.meta > 0 ? `Meta: ${colab.meta}` : "Sem meta"}
@@ -397,18 +494,21 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                     {/* Vendas totais / Meta */}
                     <div className="shrink-0 flex items-baseline gap-1 ml-auto">
                         <span
-                            className={`font-black tabular-nums leading-none text-xl lg:text-2xl
+                            className={`font-black tabular-nums leading-none
                                 ${bateuMeta ? "text-amber-400" : quaseNaMeta ? "text-white" : tema.text}`}
-                            style={quaseNaMeta && !bateuMeta
-                                ? { textShadow: `0 0 24px rgba(${accentRgb},0.7)` }
-                                : bateuMeta
-                                ? { textShadow: "0 0 24px rgba(245,158,11,0.4)" }
-                                : undefined}
+                            style={{
+                                fontSize: `${fontVendas}px`,
+                                ...(quaseNaMeta && !bateuMeta
+                                    ? { textShadow: `0 0 24px rgba(${accentRgb},0.7)` }
+                                    : bateuMeta
+                                    ? { textShadow: "0 0 24px rgba(245,158,11,0.4)" }
+                                    : {}),
+                            }}
                         >
                             {colab.vendas}
                         </span>
-                        <span className="font-black text-slate-700 text-base">/</span>
-                        <span className="font-black tabular-nums text-base text-slate-500">
+                        <span className="font-black text-slate-700" style={{ fontSize: `${Math.round(fontVendas * 0.7)}px` }}>/</span>
+                        <span className="font-black tabular-nums text-slate-500" style={{ fontSize: `${Math.round(fontVendas * 0.7)}px` }}>
                             {colab.meta || "—"}
                         </span>
                     </div>
@@ -598,21 +698,38 @@ function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, onFechar }: {
 
 // ─── Modal de configuração (admin) ───────────────────────────────────────────
 
+type ColabConfig = { id: number; colaboradoraId: string; meta: number; visivelNoPainel: boolean };
+
 function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onFechar: () => void }) {
-    const [colabs, setColabs] = useState<{ colaboradoraId: string; meta: number }[]>([]);
+    const [colabs, setColabs] = useState<ColabConfig[]>([]);
     const [metaEquipe, setMetaEquipe] = useState(0);
     const [carregando, setCarregando] = useState(true);
     const [salvando, setSalvando] = useState(false);
+    const [togglingId, setTogglingId] = useState<number | null>(null);
 
     useEffect(() => {
         getColaboradoresParaConfigurar().then((res) => {
             if (res.success) {
-                setColabs(res.colaboradores);
+                setColabs(res.colaboradores as ColabConfig[]);
                 setMetaEquipe(res.metaEquipe);
             }
             setCarregando(false);
         });
     }, []);
+
+    const toggleVisivel = async (colab: ColabConfig) => {
+        setTogglingId(colab.id);
+        const novoVisivel = !colab.visivelNoPainel;
+        const res = await toggleMetaVisibilidade(colab.id, novoVisivel);
+        if (res.success) {
+            setColabs((prev) =>
+                prev.map((c) => c.id === colab.id ? { ...c, visivelNoPainel: novoVisivel } : c)
+            );
+        } else {
+            toast.error("Erro ao alterar visibilidade");
+        }
+        setTogglingId(null);
+    };
 
     const salvar = async () => {
         setSalvando(true);
@@ -680,8 +797,19 @@ function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onF
                                     </p>
                                 )}
                                 {colabs.map((c, i) => (
-                                    <div key={c.colaboradoraId} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-900/50 border border-white/5">
-                                        <span className="flex-1 text-[11px] font-black uppercase text-white truncate">{c.colaboradoraId}</span>
+                                    <div key={c.colaboradoraId} className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${c.visivelNoPainel ? "bg-slate-900/50 border-white/5" : "bg-slate-950/50 border-white/[0.03] opacity-60"}`}>
+                                        <span className={`flex-1 text-[11px] font-black uppercase truncate ${c.visivelNoPainel ? "text-white" : "text-slate-500 line-through"}`}>{c.colaboradoraId}</span>
+                                        <button
+                                            onClick={() => toggleVisivel(c)}
+                                            disabled={togglingId === c.id}
+                                            title={c.visivelNoPainel ? "Ocultar do painel TV" : "Exibir no painel TV"}
+                                            className={`shrink-0 p-2 rounded-xl border transition-all ${c.visivelNoPainel ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20" : "bg-slate-800/50 border-white/5 text-slate-600 hover:bg-slate-700/50 hover:text-slate-400"}`}
+                                        >
+                                            {togglingId === c.id
+                                                ? <Loader2 size={13} className="animate-spin" />
+                                                : c.visivelNoPainel ? <Eye size={13} /> : <EyeOff size={13} />
+                                            }
+                                        </button>
                                         <input
                                             type="number"
                                             value={c.meta}
@@ -731,6 +859,13 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
     const [modalAberto, setModalAberto] = useState(false);
     const [modalGerenciamentoAberto, setModalGerenciamentoAberto] = useState(false);
     const [rowHeight, setRowHeight] = useState(120);
+
+    // Alerta de venda / pagamento
+    const [alertaVenda, setAlertaVenda] = useState<{
+        tipo: "VENDA" | "PAGAMENTO";
+        closerNome: string;
+        razaoSocial: string;
+    } | null>(null);
 
     // Celebrações individuais
     const [celebracaoQueue, setCelebracaoQueue] = useState<ColaboradorMeta[]>([]);
@@ -815,13 +950,14 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
 
     // Sem polling: atualizar é chamado via callback onDadosAlterados do modal
 
-    const HEADER_HEIGHT = 72;
-    const MIN_ROW = 84;
-    const MAX_ROW = 150;
+    const isTV = role === 'TV';
+    const HEADER_HEIGHT = isTV ? 0 : 72;
+    const MIN_ROW = isTV ? 130 : 100;
+    const MAX_ROW = isTV ? 260 : 190;
 
     useEffect(() => {
         const calc = () => {
-            if (colaboradores.length === 0) { setRowHeight(120); return; }
+            if (colaboradores.length === 0) { setRowHeight(isTV ? 160 : 120); return; }
             setRowHeight(Math.max(MIN_ROW, Math.min(MAX_ROW, Math.floor((window.innerHeight - HEADER_HEIGHT) / colaboradores.length))));
         };
         calc();
@@ -840,8 +976,8 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                 <div className="absolute -bottom-[20%] -right-[10%] w-[50%] h-[50%] bg-indigo-800/5 blur-[180px] rounded-full" />
             </div>
 
-            {/* ── Header ── */}
-            <header
+            {/* ── Header (oculto no modo TV) ── */}
+            {!isTV && <header
                 className="relative z-10 flex items-center justify-between gap-4 px-6 lg:px-8 border-b border-white/5 bg-slate-950/60 backdrop-blur-2xl shrink-0"
                 style={{ height: `${HEADER_HEIGHT}px` }}
             >
@@ -922,7 +1058,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                         </button>
                     )}
                 </div>
-            </header>
+            </header>}
 
             {/* ── Scoreboard ── */}
             <div className="relative z-10 flex-1 flex flex-col overflow-y-auto py-3">
@@ -987,6 +1123,23 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                     nomeUsuario={nomeUsuario}
                     onFechar={() => setModalGerenciamentoAberto(false)}
                     onDadosAlterados={() => { void atualizar(); }}
+                    onVendaFechada={(data) => {
+                        setAlertaVenda({
+                            tipo: data.pagamentoConfirmado && data.contratoAssinado ? "VENDA" : "PAGAMENTO",
+                            closerNome: data.closerNome,
+                            razaoSocial: data.razaoSocial,
+                        });
+                    }}
+                />
+            )}
+
+            {/* Alerta de venda / pagamento */}
+            {alertaVenda && (
+                <AlertaVenda
+                    tipo={alertaVenda.tipo}
+                    closerNome={alertaVenda.closerNome}
+                    razaoSocial={alertaVenda.razaoSocial}
+                    onFechar={() => setAlertaVenda(null)}
                 />
             )}
         </main>

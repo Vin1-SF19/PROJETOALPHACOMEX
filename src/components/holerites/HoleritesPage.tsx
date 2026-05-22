@@ -5,9 +5,10 @@ import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+
 import MeusHoleritesView from "./MeusHoleritesView";
 import GestaoHoleritesView from "./GestaoHoleritesView";
+import { HoleriteAlertButtons } from "./HoleriteAlertButtons";
 
 const ROLES_GESTAO = ["Admin", "FINANCEIRO", "CEO", "RECURSOS HUMANOS"];
 
@@ -41,13 +42,6 @@ export default function HoleritesPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-4"
       >
-        <Link
-          href="/PainelAlpha"
-          className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:border-white/20 transition-all shrink-0"
-          title="Voltar ao painel"
-        >
-          <ArrowLeft size={16} />
-        </Link>
         <div className="p-3 rounded-2xl bg-teal-500/10 border border-teal-500/20 shrink-0">
           <Image src="/bank-check.png" alt="Holerites" width={28} height={28} />
         </div>
@@ -58,6 +52,8 @@ export default function HoleritesPage() {
           <h1 className="text-xl font-black text-white">Alpha Holerites</h1>
         </div>
       </motion.div>
+
+      <HoleriteAlertButtons role={role} />
 
       {isGestao ? (
         <>

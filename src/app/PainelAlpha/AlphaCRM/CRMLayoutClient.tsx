@@ -10,7 +10,6 @@ import {
   Users,
   CalendarCheck,
   BarChart3,
-  ArrowLeft,
   Menu,
   X,
 } from "lucide-react";
@@ -78,17 +77,6 @@ export default function CRMLayout({ children, session }: { children: React.React
         })}
       </nav>
 
-      {/* Back */}
-      <div className="p-3 border-t border-white/5">
-        <Link
-          href="/PainelAlpha"
-          onClick={() => setOpen(false)}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-white transition-colors"
-        >
-          <ArrowLeft size={14} />
-          Voltar ao Painel
-        </Link>
-      </div>
     </>
   );
 

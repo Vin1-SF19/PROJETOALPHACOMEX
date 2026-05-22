@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { upsertConsulta, buscarHistorico } from "@/actions/PreAnalise";
 import BlocoResultados from "./BlocoResultados";
 import ProgressCard from "./ProgressCard";
-import BotaoVoltarMinimalista from "@/components/BotaoVoltarMinimalista";
+
 
 type StatusConsulta = "idle" | "loading" | "success" | "error";
 type Fase = "input" | "loading" | "results";
@@ -236,7 +236,6 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
                                 <RefreshCw size={14} className={visual.text} /> Nova Consulta
                             </button>
                         )}
-                        <BotaoVoltarMinimalista />
                     </div>
                 </div>
             </header>

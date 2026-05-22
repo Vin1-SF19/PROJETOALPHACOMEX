@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { getTema } from "@/lib/temas";
-import { BotaoVoltar } from "@/components/BotaoVoltar";
+
 import ModalButtons from "@/components/ComponentesRadar/BotoesModal";
 import LoadingImport from "@/components/ComponentesRadar/ImportacaoLoading";
 import ImportarPlanilha from "@/components/ComponentesRadar/ImportacaoLote";
@@ -637,7 +637,6 @@ export default function HabilitacaoRadar() {
               sincronização com banco Alpha e exportação de dados.
             </p>
           </div>
-          <BotaoVoltar />
         </div>
 
         {/* InfoSimples strip */}

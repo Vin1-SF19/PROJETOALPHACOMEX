@@ -8,7 +8,7 @@ import { DayPicker } from 'react-day-picker';
 import { ptBR } from 'date-fns/locale';
 import 'react-day-picker/dist/style.css';
 import { agendarSala, buscarReservasAtivas, cancelarReserva, buscarHistoricoReservas, editarReserva as editarReservaAction } from '@/actions/Reservas';
-import { BotaoVoltar } from '@/components/BotaoVoltar';
+
 import { getTema } from '@/lib/temas';
 
 export default function ReservaSalas() {
@@ -150,7 +150,6 @@ export default function ReservaSalas() {
             </div>
           </div>
         </div>
-        <BotaoVoltar />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-[1600px] mx-auto">
