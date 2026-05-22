@@ -64,7 +64,13 @@ export async function buscarClientes() {
         }
       },
       include: {
-        socios: true 
+        socios: true,
+        log_cs: {
+          orderBy: { dataRegistro: 'desc' },
+        },
+        logFeedback: {
+          orderBy: { dataRegistro: 'desc' },
+        },
       },
       orderBy: { createdAt: 'desc' }
     });

@@ -294,8 +294,8 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
     useEffect(() => {
         if (isOpen && cliente?.id) {
             const logsDoCliente = [...(cliente.log_cs || [])].sort((a, b) => {
-                const dataA = new Date(a.data_registro || a.createdAt).getTime();
-                const dataB = new Date(b.data_registro || b.createdAt).getTime();
+                const dataA = new Date(a.dataRegistro || a.data_registro).getTime();
+                const dataB = new Date(b.dataRegistro || b.data_registro).getTime();
                 return dataB - dataA;
             });
             setListaLogsCS(logsDoCliente);
