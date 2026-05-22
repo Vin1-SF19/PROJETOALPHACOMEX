@@ -4,6 +4,7 @@ import { z } from "zod";
 import { auth } from "../../auth";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { hashSync } from "bcryptjs";
 
 // ─── Role helpers ─────────────────────────────────────────────────────────────
 
@@ -381,6 +382,31 @@ export async function getContratosVencendo() {
     return { success: true as const, contratos };
   } catch {
     return { success: false as const, error: "Erro ao buscar contratos" };
+  }
+}
+
+// ─── Alterar senha (Admin only) ───────────────────────────────────────────────
+
+export async function alterarSenhaAdmin(usuarioId: number, novaSenha: string) {
+  const session = await auth();
+  if (!session?.user) return { success: false as const, error: "Não autorizado" };
+
+  const userId = Number((session.user as { id?: string }).id);
+  const dbUser = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
+  if (dbUser?.role !== "Admin") return { success: false as const, error: "Sem permissão" };
+
+  if (!novaSenha || novaSenha.length < 6) {
+    return { success: false as const, error: "Senha deve ter ao menos 6 caracteres" };
+  }
+
+  try {
+    await db.usuarios.update({
+      where: { id: usuarioId },
+      data: { senha: hashSync(novaSenha, 10) },
+    });
+    return { success: true as const };
+  } catch {
+    return { success: false as const, error: "Erro ao alterar senha" };
   }
 }
 

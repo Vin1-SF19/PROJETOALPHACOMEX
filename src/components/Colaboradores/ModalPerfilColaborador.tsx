@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import {
   X, User, Camera, ChevronDown,
   Plus, FileText, AlertTriangle, CheckSquare, Eye, Edit3,
-  Clock, BadgeCheck, UserX, RefreshCw, Calendar,
+  Clock, BadgeCheck, UserX, RefreshCw, Calendar, KeyRound,
 } from 'lucide-react';
 
 import {
@@ -15,7 +15,7 @@ import {
   getCargos, createCargo, getModalidades, createModalidade,
   criarContratoColaborador, renovarContratoColaborador,
   efetivarColaborador, desligarColaborador,
-  saveChecklist,
+  saveChecklist, alterarSenhaAdmin,
 } from '@/actions/ColaboradorRH';
 
 // ─── Explicit types (independent of Prisma client version) ───────────────────
@@ -212,7 +212,7 @@ export default function ModalPerfilColaborador({
   onClose,
   onAtualizado,
 }: ModalPerfilColaboradorProps) {
-  const [tab, setTab] = useState<'dados' | 'contrato' | 'documentos' | 'observacoes'>('dados');
+  const [tab, setTab] = useState<'dados' | 'contrato' | 'documentos' | 'observacoes' | 'senha'>('dados');
   const [loading, setLoading] = useState(true);
   const [saving, startSave] = useTransition();
   const [usuario, setUsuario] = useState<ColaboradorFull | null>(null);
@@ -258,6 +258,11 @@ export default function ModalPerfilColaborador({
   // Upload
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+
+  // Senha (Admin only)
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
 
   const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'CEO';
   const isRH = currentUserRole === 'RECURSOS HUMANOS';
@@ -402,6 +407,17 @@ export default function ModalPerfilColaborador({
     else toast.error(res.error);
   }
 
+  async function handleSalvarSenha() {
+    if (!usuarioId) return;
+    if (novaSenha.length < 6) { toast.error('Senha deve ter ao menos 6 caracteres'); return; }
+    if (novaSenha !== confirmarSenha) { toast.error('Senhas não coincidem'); return; }
+    setSalvandoSenha(true);
+    const res = await alterarSenhaAdmin(usuarioId, novaSenha);
+    setSalvandoSenha(false);
+    if (res.success) { toast.success('Senha alterada com sucesso'); setNovaSenha(''); setConfirmarSenha(''); }
+    else toast.error(res.error ?? 'Erro ao alterar senha');
+  }
+
   const initials = (nome || 'CO').substring(0, 2).toUpperCase();
   const contratos = usuario?.contratosColaborador ?? [];
   const contratoAtivo = contratos.find(c => c.status !== 'DESLIGADO') ?? null;
@@ -488,6 +504,7 @@ export default function ModalPerfilColaborador({
                 <TabBtn active={tab === 'contrato'} onClick={() => setTab('contrato')} label="Contrato" icon={FileText} />
                 <TabBtn active={tab === 'documentos'} onClick={() => setTab('documentos')} label={`Documentos ${checklistCount}/${CHECKLIST_ITEMS.length}`} icon={CheckSquare} />
                 {podeVerObs && <TabBtn active={tab === 'observacoes'} onClick={() => setTab('observacoes')} label="Observações" icon={Eye} />}
+                {currentUserRole === 'Admin' && <TabBtn active={tab === 'senha'} onClick={() => setTab('senha')} label="Senha" icon={KeyRound} />}
               </div>
 
               {/* ── Body ── */}
@@ -825,6 +842,60 @@ export default function ModalPerfilColaborador({
                           <button onClick={() => void handleSaveDados()} disabled={saving}
                             className="flex items-center gap-2 h-10 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest cursor-pointer disabled:opacity-50">
                             {saving ? 'Salvando...' : 'Salvar Observações'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB: SENHA — Admin only */}
+                    {tab === 'senha' && currentUserRole === 'Admin' && (
+                      <div className="p-6 space-y-6">
+                        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/15">
+                          <KeyRound size={12} className="text-red-400 shrink-0" />
+                          <p className="text-[9px] font-bold text-red-400/80 uppercase tracking-wide">
+                            Visível apenas para Admin · Senha antiga não é necessária
+                          </p>
+                        </div>
+
+                        <div className="space-y-4 max-w-sm">
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">
+                              Nova Senha
+                            </label>
+                            <input
+                              type="password"
+                              value={novaSenha}
+                              onChange={e => setNovaSenha(e.target.value)}
+                              placeholder="Mínimo 6 caracteres"
+                              className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">
+                              Confirmar Nova Senha
+                            </label>
+                            <input
+                              type="password"
+                              value={confirmarSenha}
+                              onChange={e => setConfirmarSenha(e.target.value)}
+                              placeholder="Repita a nova senha"
+                              className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
+                            />
+                          </div>
+
+                          {novaSenha && confirmarSenha && novaSenha !== confirmarSenha && (
+                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">
+                              Senhas não coincidem
+                            </p>
+                          )}
+
+                          <button
+                            onClick={() => void handleSalvarSenha()}
+                            disabled={salvandoSenha || !novaSenha || !confirmarSenha}
+                            className="flex items-center gap-2 h-10 px-6 rounded-xl bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest cursor-pointer disabled:opacity-40 transition-colors"
+                          >
+                            <KeyRound size={13} />
+                            {salvandoSenha ? 'Salvando...' : 'Alterar Senha'}
                           </button>
                         </div>
                       </div>
