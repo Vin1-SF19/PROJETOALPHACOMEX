@@ -140,7 +140,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
         const dataSelecionada = new Date(`${dataCS}T12:00:00`).toISOString();
 
         const novoLog = {
-            colaborador: session?.user?.nome || "Analista",
             sentimento: feedbackCS,
             observacao: obsCS,
             data_registro: dataSelecionada
@@ -355,7 +354,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
         const dataSelecionada = new Date(`${dataFeedback}T12:00:00`).toISOString();
 
         const novoLog = {
-            colaborador: session?.user?.nome || "Analista",
             sentimento: sentimentoFeedback,
             observacao: obsFeedback,
             data_registro: dataSelecionada
@@ -422,8 +420,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                 servicos: servicosSelecionados,
                 embasamento: embasamentoDesbloqueado ? embasamento || null : null,
                 origemLead: origemLead || null,
-            },
-            session?.user?.nome || "Analista"
+            }
         );
 
         if (res.success) {

@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LoaderCircle, Fingerprint, Mail, Lock, Globe, Zap, ShieldCheck, Check
+  LoaderCircle, Fingerprint, Mail, Lock, Globe, Zap, ShieldCheck, Check, Settings2
 } from "lucide-react";
 import { toast } from "sonner";
 import Form from "next/form";
@@ -19,20 +19,13 @@ import TogglePillCadastro, { AbaAtiva } from "./cadastro/TogglePillCadastro";
 import PreviewModulosSetor from "./cadastro/PreviewModulosSetor";
 import AbaGestaoEquipe from "./cadastro/AbaGestaoEquipe";
 
-const SETORES_LISTA = [
-  { value: "Admin",             label: "TI.ADMINISTRADOR" },
-  { value: "CEO",               label: "CEO" },
-  { value: "OPERACIONAL",       label: "OPERACIONAL" },
-  { value: "COMERCIAL",         label: "COMERCIAL" },
-  { value: "Lider Comercial",   label: "LIDER COMERCIAL" },
-  { value: "RECURSOS HUMANOS",  label: "RECURSOS HUMANOS" },
-  { value: "FINANCEIRO",        label: "FINANCEIRO" },
-  { value: "JURÍDICO",          label: "JURÍDICO" },
-  { value: "PARCEIRO",          label: "PARCEIRO" },
-  { value: "Serviços Gerais",   label: "SERVIÇOS GERAIS" },
-];
-
-export default function CadastroUsuarios({ currentUserRole = 'Admin' }: { currentUserRole?: string }) {
+export default function CadastroUsuarios({
+  currentUserRole = 'Admin',
+  setores = [],
+}: {
+  currentUserRole?: string;
+  setores?: string[];
+}) {
   const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'CEO';
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(registerAction, null);
@@ -145,9 +138,19 @@ export default function CadastroUsuarios({ currentUserRole = 'Admin' }: { curren
 
                     {/* Hierarquia / Setor */}
                     <div className="space-y-2 pt-2 border-t border-white/5">
-                      <Label className="text-[10px] font-black uppercase text-amber-500 ml-1 tracking-widest italic flex items-center gap-2">
-                        <ShieldCheck size={13} /> Hierarquia Operacional
-                      </Label>
+                      <div className="flex items-center justify-between ml-1">
+                        <Label className="text-[10px] font-black uppercase text-amber-500 tracking-widest italic flex items-center gap-2">
+                          <ShieldCheck size={13} /> Hierarquia Operacional
+                        </Label>
+                        <button
+                          type="button"
+                          onClick={() => router.push("/PainelAlpha/GestaoSetores")}
+                          className="flex items-center gap-1 text-[8px] font-black uppercase text-slate-500 hover:text-indigo-400 transition-colors tracking-widest"
+                        >
+                          <Settings2 size={10} />
+                          Gerenciar
+                        </button>
+                      </div>
                       <Select
                         name="role"
                         defaultValue=""
@@ -157,9 +160,9 @@ export default function CadastroUsuarios({ currentUserRole = 'Admin' }: { curren
                           <SelectValue placeholder="Definir Setor / Nível" />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
-                          {SETORES_LISTA.map(s => (
-                            <SelectItem key={s.value} value={s.value} className="text-[10px] font-black uppercase py-3 focus:bg-indigo-600 focus:text-white">
-                              {s.label}
+                          {setores.map(s => (
+                            <SelectItem key={s} value={s} className="text-[10px] font-black uppercase py-3 focus:bg-indigo-600 focus:text-white">
+                              {s}
                             </SelectItem>
                           ))}
                         </SelectContent>

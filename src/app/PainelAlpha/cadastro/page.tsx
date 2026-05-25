@@ -2,6 +2,7 @@ import { auth } from '../../../../auth'
 import CadastroUsuarios from "@/components/FormCadastro";
 import { redirect } from 'next/navigation';
 import { getPermissoesEfetivas } from '@/actions/PermissoesSetor';
+import { getSetoresParaSelect } from '@/actions/gestaoSetores';
 import db from '@/lib/prisma';
 
 const ROLES_GESTAO = ['Admin', 'CEO', 'RECURSOS HUMANOS', 'FINANCEIRO'];
@@ -38,10 +39,12 @@ export default async function CadastroPage() {
     }
   }
 
+  const setores = await getSetoresParaSelect().catch(() => []);
+
   return (
     <main className="text-alpha min-h-screen bg-[#020617] flex flex-col">
       <div className="text-alpha flex-1 w-full h-full flex flex-col overflow-hidden">
-        <CadastroUsuarios currentUserRole={role} />
+        <CadastroUsuarios currentUserRole={role} setores={setores} />
       </div>
     </main>
   );

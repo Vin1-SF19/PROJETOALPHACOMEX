@@ -1041,6 +1041,19 @@ model HoleriteAlertaHistorico {
   @@map("holerite_alerta_historico")
 }
 
+// ─── Setores e Cargos Dinâmicos ───────────────────────────────────────────────
+
+model Setor {
+  id        Int      @id @default(autoincrement())
+  nome      String   @unique
+  isBase    Boolean  @default(false)
+  protegido Boolean  @default(false)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("setor")
+}
+
 // ─── RH / Colaboradores ───────────────────────────────────────────────────────
 
 model CargoColaborador {

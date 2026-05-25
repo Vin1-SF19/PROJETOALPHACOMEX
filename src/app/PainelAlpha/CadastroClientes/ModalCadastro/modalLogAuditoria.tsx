@@ -55,7 +55,7 @@ export default function ModalLogAuditoria({ isOpen, onClose, cliente, aoSalvar }
         if (!confirm("⚠️ Confirmar restauração?")) return;
 
         try {
-            const res = await restaurarVersaoCliente(cliente.id, dadosAntigosJSON, "Sistema (Restore)");
+            const res = await restaurarVersaoCliente(cliente.id, dadosAntigosJSON);
 
             if (res.success) {
                 toast.success("Versão restaurada!");

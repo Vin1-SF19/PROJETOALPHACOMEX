@@ -9,11 +9,7 @@ import {
   listarPermissoesPorSetor,
   atribuirModulosAoSetor,
 } from '@/actions/PermissoesSetor';
-
-const SETORES = [
-  'OPERACIONAL', 'COMERCIAL', 'Lider Comercial', 'FINANCEIRO', 'RECURSOS HUMANOS',
-  'JURÍDICO', 'PARCEIRO', 'Serviços Gerais', 'CEO',
-];
+import { getSetoresParaSelect } from '@/actions/gestaoSetores';
 
 const MODULOS_GERENCIAVEIS = MODULOS_REGISTRY.filter(m => m.permission && !m.adminOnly);
 
@@ -24,12 +20,22 @@ interface Props {
 }
 
 export default function ModalGerenciarSetor({ open, onClose, totalUsers }: Props) {
-  const [setorAtivo, setSetorAtivo] = useState(SETORES[0]);
+  const [setores, setSetores] = useState<string[]>([]);
+  const [setorAtivo, setSetorAtivo] = useState('');
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
+    getSetoresParaSelect().then(lista => {
+      const filtrados = lista.filter(s => s !== 'DESVINCULADO');
+      setSetores(filtrados);
+      if (!setorAtivo && filtrados.length > 0) setSetorAtivo(filtrados[0]);
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !setorAtivo) return;
     listarPermissoesPorSetor(setorAtivo).then(modulos => {
       setSelecionados(new Set(modulos));
     });
@@ -107,7 +113,7 @@ export default function ModalGerenciarSetor({ open, onClose, totalUsers }: Props
                 <div className="space-y-2">
                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Setor</span>
                   <div className="flex flex-wrap gap-2">
-                    {SETORES.map(s => (
+                    {setores.map(s => (
                       <button
                         key={s}
                         onClick={() => setSetorAtivo(s)}

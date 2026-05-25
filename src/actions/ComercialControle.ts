@@ -3,6 +3,7 @@
 import db from "@/lib/prisma";
 import { startOfMonth, startOfWeek, startOfDay, endOfDay, endOfMonth } from "date-fns";
 import { revalidatePath } from "next/cache";
+import { auth } from "../../auth";
 
 export async function getPerformanceColaborador(colaboradoraId: string, data: Date) {
   try {
@@ -25,13 +26,17 @@ export async function getPerformanceColaborador(colaboradoraId: string, data: Da
 
 export async function upsertPerformance(dados: any) {
   try {
+    const session = await auth();
+    const u = session?.user as { nome?: string; usuario?: string } | undefined;
+    const colaboradoraId = u?.nome || u?.usuario || "Sistema";
+
     const dataNormalizada = startOfDay(new Date(dados.dataRegistro));
 
     const registro = await db.comercialPerformance.upsert({
       where: {
         performance_pk: {
           dataRegistro: dataNormalizada,
-          colaboradoraId: dados.colaboradoraId,
+          colaboradoraId: colaboradoraId,
           canal: dados.canal,
           servico: dados.servico,
         },
@@ -49,7 +54,7 @@ export async function upsertPerformance(dados: any) {
       },
       create: {
         dataRegistro: dataNormalizada,
-        colaboradoraId: dados.colaboradoraId,
+        colaboradoraId: colaboradoraId,
         canal: dados.canal,
         servico: dados.servico,
         leadsRecebidos: Number(dados.leadsRecebidos) || 0,

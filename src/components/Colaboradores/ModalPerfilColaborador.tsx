@@ -17,6 +17,7 @@ import {
   efetivarColaborador, desligarColaborador,
   saveChecklist, alterarSenhaAdmin,
 } from '@/actions/ColaboradorRH';
+import { getSetoresParaSelect } from '@/actions/gestaoSetores';
 
 // ─── Explicit types (independent of Prisma client version) ───────────────────
 
@@ -82,19 +83,6 @@ interface ModalPerfilColaboradorProps {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const SETORES_LISTA = [
-  { value: 'Admin', label: 'TI.ADMINISTRADOR' },
-  { value: 'CEO', label: 'CEO' },
-  { value: 'OPERACIONAL', label: 'OPERACIONAL' },
-  { value: 'COMERCIAL', label: 'COMERCIAL' },
-  { value: 'Lider Comercial', label: 'LIDER COMERCIAL' },
-  { value: 'RECURSOS HUMANOS', label: 'RECURSOS HUMANOS' },
-  { value: 'FINANCEIRO', label: 'FINANCEIRO' },
-  { value: 'JURÍDICO', label: 'JURÍDICO' },
-  { value: 'PARCEIRO', label: 'PARCEIRO' },
-  { value: 'Serviços Gerais', label: 'SERVIÇOS GERAIS' },
-];
 
 const STATUS_OPTIONS = ['ATIVO', 'INATIVO', 'AFASTADO', 'FÉRIAS'];
 
@@ -238,6 +226,7 @@ export default function ModalPerfilColaborador({
   const [imagemUrl, setImagemUrl] = useState('');
 
   // Lists
+  const [setoresLista, setSetoresLista] = useState<string[]>([]);
   const [cargos, setCargos] = useState<{ id: number; nome: string }[]>([]);
   const [modalidades, setModalidades] = useState<{ id: number; nome: string }[]>([]);
   const [novoCargo, setNovoCargo] = useState('');
@@ -282,10 +271,11 @@ export default function ModalPerfilColaborador({
     if (!usuarioId) return;
     setLoading(true);
 
-    const [res, cargosRes, modalRes] = await Promise.all([
+    const [res, cargosRes, modalRes, setoresRes] = await Promise.all([
       getColaboradorCompleto(usuarioId),
       getCargos(),
       getModalidades(),
+      getSetoresParaSelect(),
     ]);
 
     if (res.success) {
@@ -315,6 +305,7 @@ export default function ModalPerfilColaborador({
 
     if (cargosRes.success) setCargos(cargosRes.cargos);
     if (modalRes.success) setModalidades(modalRes.modalidades);
+    setSetoresLista(setoresRes);
 
     setLoading(false);
   }
@@ -536,7 +527,7 @@ export default function ModalPerfilColaborador({
                             <div className="grid grid-cols-2 gap-4">
                               <Field label="Setor / Role">
                                 <SelectInput value={role} onChange={setRole} disabled={!podeEditarRole}
-                                  options={SETORES_LISTA.map(s => ({ value: s.value, label: s.label }))} />
+                                  options={setoresLista.map(s => ({ value: s, label: s }))} />
                               </Field>
                               <Field label="Status">
                                 <SelectInput value={status} onChange={setStatus}

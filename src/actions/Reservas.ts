@@ -2,6 +2,7 @@
 
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { auth } from "../../auth";
 
 const toBRT = (dateStr: string, timeStr: string) => {
   const date = new Date(`${dateStr}T${timeStr}:00`);
@@ -12,8 +13,14 @@ const formatToISO = (date: Date) => {
   return new Date(date.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
 };
 
-export async function agendarSala(dados: { sala: string, usuario: string, data: string, inicio: string, fim: string, tipo: string, paoDeQueijo: boolean, motivo: string }) {
+export async function agendarSala(dados: { sala: string, data: string, inicio: string, fim: string, tipo: string, paoDeQueijo: boolean, motivo: string }) {
   try {
+    const session = await auth();
+    if (!session?.user) return { success: false, error: "Sessão expirada. Faça login novamente." };
+
+    const u = session.user as { nome?: string; usuario?: string };
+    const usuarioNome = u.nome || u.usuario || "Usuário";
+
     const dataHoraInicio = new Date(`${dados.data}T${dados.inicio}:00-03:00`);
     const dataHoraFim = new Date(`${dados.data}T${dados.fim}:00-03:00`);
 
@@ -34,7 +41,7 @@ export async function agendarSala(dados: { sala: string, usuario: string, data: 
     await db.reservas.create({
       data: {
         sala: dados.sala,
-        usuario: dados.usuario,
+        usuario: usuarioNome,
         data: new Date(`${dados.data}T00:00:00-03:00`),
         inicio: dataHoraInicio,
         fim: dataHoraFim,

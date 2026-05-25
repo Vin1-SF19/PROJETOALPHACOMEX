@@ -82,7 +82,6 @@ export default function ReservaSalas() {
     const res = await agendarSala({
       ...form,
       data: dataAjustada,
-      usuario: usuarioLogado
     });
 
     if (res.success) {
@@ -271,18 +270,23 @@ export default function ReservaSalas() {
 
               <button
                 type="submit"
-                disabled={isPending}
-                className={`cursor-pointer w-full h-16 ${style.bg} hover:brightness-110 text-white font-black rounded-2xl transition-all active:scale-95 shadow-xl uppercase text-[11px] tracking-[0.4em] flex items-center justify-center gap-3 group mt-4`}
+                disabled={isPending || status !== "authenticated"}
+                className={`cursor-pointer w-full h-16 ${style.bg} hover:brightness-110 text-white font-black rounded-2xl transition-all active:scale-95 shadow-xl uppercase text-[11px] tracking-[0.4em] flex items-center justify-center gap-3 group mt-4 disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isPending ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Processando...
                   </span>
+                ) : status === "loading" ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Carregando sessão...
+                  </span>
                 ) : (
                   "Confirmar Reserva "
                 )}
-                <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                {status === "authenticated" && !isPending && <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />}
               </button>
 
             </form>

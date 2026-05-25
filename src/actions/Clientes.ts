@@ -1,6 +1,13 @@
 "use server"
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { auth } from "../../auth";
+
+async function getColaboradorNome(): Promise<string> {
+  const session = await auth();
+  const u = session?.user as { nome?: string; usuario?: string } | undefined;
+  return u?.nome || u?.usuario || "Sistema";
+}
 
 export async function verificarCNPJDuplicado(cnpj: string): Promise<{ existe: boolean; razaoSocial?: string }> {
   const cnpjLimpo = cnpj.replace(/\D/g, "");
@@ -81,12 +88,13 @@ export async function buscarClientes() {
   }
 }
 
-export async function salvarLogCS(clienteId: number, dados: { colaborador: string, sentimento: string, observacao: string, data_registro: string }) {
+export async function salvarLogCS(clienteId: number, dados: { sentimento: string, observacao: string, data_registro: string }) {
   try {
+    const colaborador = await getColaboradorNome();
     await db.$executeRawUnsafe(
-      `INSERT INTO log_cs (colaborador, sentimento, observacao, clienteId, dataRegistro) 
+      `INSERT INTO log_cs (colaborador, sentimento, observacao, clienteId, dataRegistro)
          VALUES (?, ?, ?, ?, ?)`,
-      dados.colaborador,
+      colaborador,
       dados.sentimento,
       dados.observacao,
       clienteId,
@@ -121,7 +129,7 @@ export async function atualizarDadosGestao(clienteId: number, dados: any) {
 
 export async function salvarLogFeedback(clienteId: number, dados: any) {
   try {
-    const colaborador = dados.colaborador || "Analista";
+    const colaborador = await getColaboradorNome();
     const sentimento = dados.sentimento || "N/A";
     const observacao = dados.observacao || "";
     const dataRegistro = dados.data_registro; 
@@ -144,8 +152,9 @@ export async function salvarLogFeedback(clienteId: number, dados: any) {
   }
 }
 
-export async function salvarAlteracoesGestao(clienteId: number, novosDados: any, colaborador: string) {
+export async function salvarAlteracoesGestao(clienteId: number, novosDados: any) {
   try {
+    const colaborador = await getColaboradorNome();
     const estadoAntesDaMudanca = await db.clientes.findUnique({
       where: { id: clienteId }
     });
@@ -195,7 +204,7 @@ export async function salvarAlteracoesGestao(clienteId: number, novosDados: any,
 
 
 
-export async function restaurarVersaoCliente(clienteId: number, jsonAntigo: string, colaborador: string) {
+export async function restaurarVersaoCliente(clienteId: number, jsonAntigo: string) {
   try {
     const dadosBrutos = JSON.parse(jsonAntigo);
 
@@ -214,6 +223,7 @@ export async function restaurarVersaoCliente(clienteId: number, jsonAntigo: stri
     if (dadosLimpos.dataExito) dadosLimpos.dataExito = new Date(dadosLimpos.dataExito).toISOString();
     if (dadosLimpos.dataConstituicao) dadosLimpos.dataConstituicao = new Date(dadosLimpos.dataConstituicao).toISOString();
 
+    const colaborador = await getColaboradorNome();
     const estadoAtualParaLog = await db.clientes.findUnique({ where: { id: clienteId } });
 
     await db.clientes.update({
@@ -238,8 +248,9 @@ export async function restaurarVersaoCliente(clienteId: number, jsonAntigo: stri
   }
 }
 
-export async function salvarAlteracoesGeral(clienteId: number, dadosNovos: any, colaborador: string) {
+export async function salvarAlteracoesGeral(clienteId: number, dadosNovos: any) {
   try {
+    const colaborador = await getColaboradorNome();
     const estadoAnterior = await db.clientes.findUnique({ where: { id: clienteId } });
 
     await db.clientes.update({

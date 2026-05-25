@@ -137,7 +137,6 @@ export default function Lancamentos({ dadosAcumulados }: any) {
         try {
             const payload = {
                 dataRegistro: new Date(dataUrl + 'T12:00:00'),
-                colaboradoraId: session?.user?.nome || "SISTEMA",
                 canal: canalAtual,
                 servico,
                 leadsRecebidos: metricas.leads_recebidos,
