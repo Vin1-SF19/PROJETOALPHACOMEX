@@ -73,21 +73,50 @@ model usuarios {
 }
 
 model chamados {
-  id          Int                @id @default(autoincrement())
-  titulo      String
-  descricao   String
-  categoria   String
-  status      String             @default("ABERTO")
-  prioridade  String             @default("MEDIA")
-  solucao     String?
-  usuarioId   Int
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  solicitante usuarios           @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
-  mensagens   MensagensChamado[]
+  id            Int                @id @default(autoincrement())
+  titulo        String
+  descricao     String
+  categoria     String
+  status        String             @default("ABERTO")
+  prioridade    String             @default("MEDIA")
+  solucao       String?
+  causa         String?
+  mensagemFinal String?
+  templateId    Int?
+  closedAt      DateTime?
+  usuarioId     Int
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  solicitante   usuarios           @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
+  mensagens     MensagensChamado[]
 
   @@index([usuarioId])
   @@index([status])
+}
+
+model ProtocoloTemplate {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  categoria String
+  template  String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("protocolo_template")
+}
+
+model WhatsAppLog {
+  id           Int      @id @default(autoincrement())
+  chamadoId    Int
+  usuarioId    Int
+  telefone     String
+  mensagem     String
+  enviadoPorId Int
+  createdAt    DateTime @default(now())
+
+  @@map("whatsapp_log")
+  @@index([chamadoId])
 }
 
 model consultas_radar {

@@ -56,6 +56,7 @@ export const MODULOS_REGISTRY: ModuloRegistryItem[] = [
   // ─── ADMIN ───
   { id: 'cadastro',              label: 'Gestão de Equipe',         href: '/PainelAlpha/cadastro',                                                      iconName: 'Users',         category: 'admin',       permission: 'cadastro',          adminOnly: true, allowedRoles: ['Admin', 'CEO'], img: '/people_10893485.png', desc: 'Gerenciamento de contas, permissões e usuários.',      tag: 'Admin',      color: 'from-purple-600/20' },
   { id: 'gestaoColaboradores',   label: 'Gestão de Colaboradores',  href: '/PainelAlpha/GestaoColaboradores',                                           iconName: 'UserCog',       category: 'admin',       permission: 'gestaoColaboradores', allowedRoles: ['RECURSOS HUMANOS', 'FINANCEIRO'],               img: '/developers.png',     desc: 'Visualização e edição de perfis de colaboradores.',    tag: 'RH',         color: 'from-teal-600/20' },
+  { id: 'gestaoProtocolos',      label: 'Gestão de Protocolos',     href: '/PainelAlpha/GestaoProtocolos',                                              iconName: 'BookOpen',      category: 'admin',       permission: 'gestaoProtocolos',  allowedRoles: ['Admin', 'CEO', 'SUPORTE'],                      img: '/arquivo.png',        desc: 'Biblioteca de templates de protocolo para chamados.',  tag: 'Suporte',    color: 'from-violet-600/20' },
 ];
 
 export const CATEGORIAS: CategoriaItem[] = [

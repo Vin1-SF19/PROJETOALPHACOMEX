@@ -8,13 +8,16 @@ import { Button } from "./ui/button";
 import { updateChamadosStatus } from "@/actions/chamados";
 import {
   Clock, CheckCircle, User, MessageSquare, Calendar,
-  CheckCircle2, Tag, AlertTriangle, Eye,
+  CheckCircle2, Tag, AlertTriangle, Eye, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
+import ModalProtocolo from "./ModalProtocolo";
 
 type Solicitante = {
   nome: string;
   usuario: string;
+  telefone?: string | null;
+  telefone_corporativo?: string | null;
 };
 
 type ChamadoDetalhes = {
@@ -25,13 +28,25 @@ type ChamadoDetalhes = {
   status: string;
   prioridade: string;
   solucao: string | null;
+  causa?: string | null;
+  mensagemFinal?: string | null;
+  usuarioId?: number;
   createdAt: Date | string;
   solicitante: Solicitante;
+};
+
+type Template = {
+  id: number;
+  nome: string;
+  categoria: string;
+  template: string;
+  ativo: boolean;
 };
 
 type Props = {
   chamado: ChamadoDetalhes;
   isAdmin: boolean;
+  templates?: Template[];
 };
 
 const prioridadeConfig: Record<string, { label: string; class: string }> = {
@@ -50,11 +65,12 @@ function tempoAberto(data: Date | string): string {
   return `${d}d`;
 }
 
-export default function DetalhesChamado({ chamado, isAdmin }: Props) {
+export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [solucaoInput, setSolucaoInput] = useState("");
   const [confirmando, setConfirmando] = useState(false);
   const [carregando, setCarregando] = useState(false);
+  const [modalProtocolo, setModalProtocolo] = useState(false);
 
   const handleStatus = async (status: string) => {
     if (status === "CONCLUIDO") {
@@ -173,16 +189,27 @@ export default function DetalhesChamado({ chamado, isAdmin }: Props) {
 
             {/* Solução cadastrada */}
             {chamado.solucao && !confirmando && (
-              <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
-                <h4 className="text-emerald-400 text-[10px] font-black uppercase mb-2 flex items-center gap-2">
+              <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
+                <h4 className="text-emerald-400 text-[10px] font-black uppercase flex items-center gap-2">
                   <CheckCircle2 size={14} />
                   Solução Aplicada
+                  {chamado.mensagemFinal && (
+                    <span className="ml-auto px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[8px] font-black normal-case">
+                      Com protocolo
+                    </span>
+                  )}
                 </h4>
                 <p className="text-emerald-100/80 text-sm leading-relaxed">{chamado.solucao}</p>
+                {chamado.causa && (
+                  <div className="pt-2 border-t border-emerald-500/10">
+                    <p className="text-[9px] text-emerald-600 font-black uppercase mb-1">Causa identificada:</p>
+                    <p className="text-emerald-200/60 text-sm">{chamado.causa}</p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Input de solução (aparece ao clicar em Finalizar) */}
+            {/* Input de solução rápida (aparece ao clicar em Finalizar Rápido) */}
             {confirmando && (
               <div className="space-y-3">
                 <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
@@ -202,9 +229,9 @@ export default function DetalhesChamado({ chamado, isAdmin }: Props) {
 
             {/* Ações do admin */}
             {isAdmin && chamado.status !== "CONCLUIDO" && (
-              <div className={`grid gap-3 pt-5 border-t border-white/5 ${confirmando ? "grid-cols-2" : "grid-cols-2"}`}>
+              <div className="pt-5 border-t border-white/5 space-y-2">
                 {confirmando ? (
-                  <>
+                  <div className="grid grid-cols-2 gap-3">
                     <Button
                       variant="ghost"
                       onClick={() => { setConfirmando(false); setSolucaoInput(""); }}
@@ -220,24 +247,34 @@ export default function DetalhesChamado({ chamado, isAdmin }: Props) {
                       <CheckCircle className="mr-2 w-4 h-4" />
                       {carregando ? "Salvando..." : "Confirmar Solução"}
                     </Button>
-                  </>
+                  </div>
                 ) : (
                   <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        onClick={() => handleStatus("EM_ATENDIMENTO")}
+                        disabled={carregando || chamado.status === "EM_ATENDIMENTO"}
+                        className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/20 h-12 font-bold rounded-xl disabled:opacity-40"
+                      >
+                        <Clock className="mr-2 w-4 h-4" />
+                        Em Atendimento
+                      </Button>
+                      <Button
+                        onClick={() => handleStatus("CONCLUIDO")}
+                        disabled={carregando}
+                        className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/20 h-12 font-bold rounded-xl disabled:opacity-40"
+                      >
+                        <CheckCircle className="mr-2 w-4 h-4" />
+                        Finalizar Rápido
+                      </Button>
+                    </div>
+                    {/* Botão principal de protocolo */}
                     <Button
-                      onClick={() => handleStatus("EM_ATENDIMENTO")}
-                      disabled={carregando || chamado.status === "EM_ATENDIMENTO"}
-                      className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/20 h-12 font-bold rounded-xl disabled:opacity-40"
+                      onClick={() => { setOpen(false); setModalProtocolo(true); }}
+                      className="w-full cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white h-12 font-black rounded-xl shadow-lg shadow-emerald-900/20"
                     >
-                      <Clock className="mr-2 w-4 h-4" />
-                      Em Atendimento
-                    </Button>
-                    <Button
-                      onClick={() => handleStatus("CONCLUIDO")}
-                      disabled={carregando}
-                      className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white h-12 font-black rounded-xl shadow-lg shadow-blue-900/20"
-                    >
-                      <CheckCircle className="mr-2 w-4 h-4" />
-                      Finalizar Chamado
+                      <FileText className="mr-2 w-4 h-4" />
+                      Finalizar com Protocolo
                     </Button>
                   </>
                 )}
@@ -246,6 +283,16 @@ export default function DetalhesChamado({ chamado, isAdmin }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de protocolo completo */}
+      {modalProtocolo && (
+        <ModalProtocolo
+          open={modalProtocolo}
+          onClose={() => setModalProtocolo(false)}
+          chamado={chamado}
+          templates={templates}
+        />
+      )}
     </>
   );
 }

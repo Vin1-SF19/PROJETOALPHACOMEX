@@ -1,4 +1,4 @@
-import { PlusCircle, LayoutDashboard, Headphones } from "lucide-react";
+import { PlusCircle, Headphones, BookOpen } from "lucide-react";
 import { redirect } from "next/navigation";
 import { auth } from "../../../../auth";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import DetalhesChamado from "@/components/DetalhesChamado";
 
 import ChatChamado from "@/components/ChatChamado";
 import { FiltroChamadosCards } from "@/components/FiltroChamado";
+import { listarTemplates } from "@/actions/protocolos";
 
 const STATUS_STYLES: Record<string, string> = {
   ABERTO: "text-amber-400 bg-amber-400/10 border-amber-400/20",
@@ -60,33 +61,36 @@ export default async function Chamados({
   const podeVerTodos = isAdmin || isCeo;
   const podeAbrirChamado = !isAdmin || isCeo;
 
-  const todosChamados = await db.chamados.findMany({
-    where: podeVerTodos ? {} : { usuarioId: userId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      solicitante: {
-        select: { nome: true, usuario: true },
-      },
-      mensagens: {
-        include: {
-          autor: { select: { id: true, nome: true, usuario: true } },
+  const [todosChamados, templates] = await Promise.all([
+    db.chamados.findMany({
+      where: podeVerTodos ? {} : { usuarioId: userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        solicitante: {
+          select: { nome: true, usuario: true, telefone: true, telefone_corporativo: true },
         },
-        orderBy: { createdAt: "asc" },
-      },
-      _count: {
-        select: {
-          mensagens: {
-            where: {
-              AND: [
-                { autorId: { not: userId } },
-                isAdmin ? { lida_admin: false } : { lida_usuario: false },
-              ],
+        mensagens: {
+          include: {
+            autor: { select: { id: true, nome: true, usuario: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        _count: {
+          select: {
+            mensagens: {
+              where: {
+                AND: [
+                  { autorId: { not: userId } },
+                  isAdmin ? { lida_admin: false } : { lida_usuario: false },
+                ],
+              },
             },
           },
         },
       },
-    },
-  });
+    }),
+    podeVerTodos ? listarTemplates().catch(() => []) : Promise.resolve([]),
+  ]);
 
   const total = todosChamados.length;
   const abertos = todosChamados.filter((c) => c.status === "ABERTO").length;
@@ -132,6 +136,14 @@ export default async function Chamados({
         </div>
 
         <div className="flex items-center gap-4 relative z-10">
+          {podeVerTodos && (
+            <Link href="/PainelAlpha/GestaoProtocolos">
+              <Button variant="ghost" className="cursor-pointer text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 rounded-[1.5rem] px-6 h-12 font-black uppercase tracking-widest border border-violet-500/20 hover:border-violet-500/40 transition-all">
+                <BookOpen className="mr-2 w-4 h-4" />
+                Protocolos
+              </Button>
+            </Link>
+          )}
           {podeAbrirChamado && (
             <Link href="/PainelAlpha/Chamados/NovoChamado">
               <Button className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white rounded-[1.5rem] px-8 h-14 font-black uppercase tracking-widest shadow-2xl shadow-blue-900/40 border-t border-white/20 transition-all active:scale-95 group">
@@ -269,7 +281,7 @@ export default async function Chamados({
 
                       {/* Ações */}
                       <td className="px-8 py-5 text-right">
-                        <DetalhesChamado chamado={chamado} isAdmin={isAdmin} />
+                        <DetalhesChamado chamado={chamado} isAdmin={isAdmin} templates={templates} />
                       </td>
                     </tr>
                   ))
