@@ -74,6 +74,7 @@
     "react-dom": "19.2.3",
     "react-pdf": "^10.4.0",
     "react-player": "^3.4.0",
+    "react-qr-code": "^2.0.21",
     "recharts": "^2.15.4",
     "resend": "^6.9.2",
     "sonner": "^2.0.7",

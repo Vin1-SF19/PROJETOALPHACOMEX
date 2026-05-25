@@ -35,6 +35,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           densidade_painel: (user as any).densidade_painel,
           esconderBloqueados: (user as any).esconderBloqueados,
           bibble_ativo: (user as any).bibble_ativo ?? true,
+          senhaTemporaria: !!(user as any).senhaTemporaria,
         };
       },
     }),
@@ -74,6 +75,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.presetId = (user as any).presetId;
         token.usuario = (user as any).usuario;
         token.bibble_ativo = (user as any).bibble_ativo ?? true;
+        token.senhaTemporaria = !!(user as any).senhaTemporaria;
 
       }
 
@@ -84,6 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (session.user.tema_interface) token.tema_interface = session.user.tema_interface;
         if (session.user.densidade_painel) token.densidade_painel = session.user.densidade_painel;
         if ((session.user as any).bibble_ativo !== undefined) token.bibble_ativo = (session.user as any).bibble_ativo;
+        if ((session.user as any).senhaTemporaria === false) token.senhaTemporaria = false;
       }
 
       return token;
@@ -106,6 +109,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).presetId = token.presetId;
         (session.user as any).usuario = token.usuario;
         (session.user as any).bibble_ativo = token.bibble_ativo ?? true;
+        (session.user as any).senhaTemporaria = !!token.senhaTemporaria;
 
       }
 

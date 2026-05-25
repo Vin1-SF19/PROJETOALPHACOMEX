@@ -3,6 +3,7 @@ import CadastroUsuarios from "@/components/FormCadastro";
 import { redirect } from 'next/navigation';
 import { getPermissoesEfetivas } from '@/actions/PermissoesSetor';
 import { getSetoresParaSelect } from '@/actions/gestaoSetores';
+import { listarTemplatesOnboarding } from '@/actions/onboarding';
 import db from '@/lib/prisma';
 
 const ROLES_GESTAO = ['Admin', 'CEO', 'RECURSOS HUMANOS', 'FINANCEIRO'];
@@ -39,12 +40,15 @@ export default async function CadastroPage() {
     }
   }
 
-  const setores = await getSetoresParaSelect().catch(() => []);
+  const [setores, templates] = await Promise.all([
+    getSetoresParaSelect().catch(() => []),
+    listarTemplatesOnboarding().catch(() => []),
+  ]);
 
   return (
     <main className="text-alpha min-h-screen bg-[#020617] flex flex-col">
       <div className="text-alpha flex-1 w-full h-full flex flex-col overflow-hidden">
-        <CadastroUsuarios currentUserRole={role} setores={setores} />
+        <CadastroUsuarios currentUserRole={role} setores={setores} templates={templates} />
       </div>
     </main>
   );

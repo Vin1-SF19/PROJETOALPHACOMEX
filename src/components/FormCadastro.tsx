@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LoaderCircle, Fingerprint, Mail, Lock, Globe, Zap, ShieldCheck, Check, Settings2
+  LoaderCircle, Fingerprint, Mail, Lock, Globe, Zap, ShieldCheck, Check, Settings2, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import Form from "next/form";
@@ -18,29 +18,52 @@ import registerAction from "../actions/CreateAction";
 import TogglePillCadastro, { AbaAtiva } from "./cadastro/TogglePillCadastro";
 import PreviewModulosSetor from "./cadastro/PreviewModulosSetor";
 import AbaGestaoEquipe from "./cadastro/AbaGestaoEquipe";
+import ModalOnboarding, { type OnboardingTemplate, type NovoUsuario } from "./ModalOnboarding";
+
+function gerarSenhaSegura(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!";
+  const array = new Uint8Array(12);
+  window.crypto.getRandomValues(array);
+  return Array.from(array, (b) => chars[b % chars.length]).join("");
+}
 
 export default function CadastroUsuarios({
-  currentUserRole = 'Admin',
+  currentUserRole = "Admin",
   setores = [],
+  templates = [],
 }: {
   currentUserRole?: string;
   setores?: string[];
+  templates?: OnboardingTemplate[];
 }) {
-  const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'CEO';
+  const isAdmin = currentUserRole === "Admin" || currentUserRole === "CEO";
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(registerAction, null);
   const [aba, setAba] = useState<AbaAtiva>(isAdmin ? "cadastro" : "equipe");
   const [setorSelecionado, setSetorSelecionado] = useState("");
+  const [senhaCapturada, setSenhaCapturada] = useState("");
+  const [modalOnboarding, setModalOnboarding] = useState(false);
+  const [usuarioOnboarding, setUsuarioOnboarding] = useState<NovoUsuario | null>(null);
 
   useEffect(() => {
     if (state) {
       if (state.success) {
         toast.success(state.message || "Acesso Alpha Criado");
+        if (state.novoUsuario) {
+          setUsuarioOnboarding(state.novoUsuario);
+          setModalOnboarding(true);
+        }
       } else {
         toast.error(state.message || "Falha no Protocolo");
       }
     }
   }, [state]);
+
+  const handleFecharModal = () => {
+    setModalOnboarding(false);
+    setSenhaCapturada("");
+    setUsuarioOnboarding(null);
+  };
 
   return (
     <main className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-blue-500/30 overflow-hidden flex flex-col relative">
@@ -119,9 +142,28 @@ export default function CadastroUsuarios({
                         <Input name="usuario" autoComplete="off" placeholder="@user" className="h-13 bg-black/40 border-white/5 rounded-2xl text-xs font-bold uppercase focus:border-indigo-500/50" required />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Master Key</Label>
+                        <div className="flex items-center justify-between ml-1">
+                          <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Master Key</Label>
+                          <button
+                            type="button"
+                            onClick={() => setSenhaCapturada(gerarSenhaSegura())}
+                            className="flex items-center gap-1 text-[8px] font-black uppercase text-indigo-500 hover:text-indigo-400 transition-colors tracking-widest"
+                          >
+                            <RefreshCw size={9} />
+                            Gerar
+                          </button>
+                        </div>
                         <div className="relative group">
-                          <Input name="senha" autoComplete="new-password" type="password" placeholder="••••••••" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-10 focus:border-indigo-500/50" required />
+                          <Input
+                            name="senha"
+                            autoComplete="new-password"
+                            type="text"
+                            placeholder="••••••••"
+                            value={senhaCapturada}
+                            onChange={(e) => setSenhaCapturada(e.target.value)}
+                            className="h-13 bg-black/40 border-white/5 rounded-2xl pl-10 focus:border-indigo-500/50 font-mono text-sm"
+                            required
+                          />
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={16} />
                         </div>
                       </div>
@@ -154,13 +196,13 @@ export default function CadastroUsuarios({
                       <Select
                         name="role"
                         defaultValue=""
-                        onValueChange={val => setSetorSelecionado(val)}
+                        onValueChange={(val) => setSetorSelecionado(val)}
                       >
                         <SelectTrigger className="h-13 bg-black/40 border-white/5 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50">
                           <SelectValue placeholder="Definir Setor / Nível" />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
-                          {setores.map(s => (
+                          {setores.map((s) => (
                             <SelectItem key={s} value={s} className="text-[10px] font-black uppercase py-3 focus:bg-indigo-600 focus:text-white">
                               {s}
                             </SelectItem>
@@ -213,6 +255,15 @@ export default function CadastroUsuarios({
 
         </AnimatePresence>
       </div>
+
+      {/* Modal de onboarding — abre automaticamente após criar usuário */}
+      <ModalOnboarding
+        open={modalOnboarding}
+        onClose={handleFecharModal}
+        usuario={usuarioOnboarding}
+        senhaTemporaria={senhaCapturada}
+        templates={templates}
+      />
     </main>
   );
 }

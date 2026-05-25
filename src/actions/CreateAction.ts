@@ -45,7 +45,7 @@ export default async function registerAction(
     });
     const permissoesString = setorPerms.map(p => p.modulo).join(',');
 
-    await db.usuarios.create({
+    const novoUsuario = await db.usuarios.create({
       data: {
         nome,
         usuario,
@@ -54,13 +54,18 @@ export default async function registerAction(
         role,
         permissoes: permissoesString,
       },
+      select: { id: true, nome: true, usuario: true, email: true, role: true, telefone: true, telefone_corporativo: true },
     });
+
+    // senhaTemporaria não está nos tipos Prisma ainda — atualiza via raw SQL
+    await db.$executeRawUnsafe(`UPDATE usuarios SET senhaTemporaria = 1 WHERE id = ?`, novoUsuario.id);
 
     revalidatePath("/PainelAlpha/cadastro");
 
     return {
       success: true,
       message: "Usuário criado com sucesso!",
+      novoUsuario,
     };
 
   } catch (error) {

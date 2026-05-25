@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import {
   Rocket, Wrench, Bug, Sparkles, Shield, Zap,
   Users, FileText, BarChart3, Bell, Palette, Package,
+  MessageCircle, Phone,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────
@@ -42,9 +43,68 @@ const TIPO_CONFIG: Record<ItemTipo, { label: string; cls: string }> = {
 // ── Changelog ─────────────────────────────────────────────
 const RELEASES: Release[] = [
   {
-    versao: "2.2",
+    versao: "2.5",
     data: "Maio 2026",
     destaque: true,
+    titulo: "Protocolos & Automação",
+    subtitulo: "Sistema de protocolos de chamados, integração WhatsApp e gestão dinâmica de setores",
+    icon: Sparkles,
+    cor: "text-emerald-400",
+    grupos: [
+      {
+        label: "Sistema de Protocolos de Chamados",
+        icon: FileText,
+        items: [
+          { tipo: "novo",     texto: "Sistema completo de protocolos de encerramento: causa raiz, solução técnica e mensagem final" },
+          { tipo: "novo",     texto: "Modal de finalização em 2 etapas — Etapa 1 (causa + solução + template) → Etapa 2 (preview e envio)" },
+          { tipo: "novo",     texto: "Biblioteca de templates de protocolo por categoria (Hardware, Software, Rede, Acesso, Financeiro, Outro, GERAL)" },
+          { tipo: "novo",     texto: "Placeholders dinâmicos: [NOME], [PROTOCOLO], [SOLUCAO], [CAUSA], [RESPONSAVEL], [DATA], [CATEGORIA]" },
+          { tipo: "novo",     texto: "Painel de Gestão de Protocolos com CRUD completo de templates — exclusivo Admin/CEO" },
+          { tipo: "novo",     texto: "Botão 'Finalizar com Protocolo' em paralelo ao encerramento rápido existente — retrocompatível" },
+          { tipo: "melhoria", texto: "Chamados agora registram campos: causa, mensagemFinal, templateId, closedAt" },
+          { tipo: "melhoria", texto: "Histórico de chamados exibe badge 'Com protocolo' quando solução foi gerada via template" },
+        ],
+      },
+      {
+        label: "Integração WhatsApp",
+        icon: MessageCircle,
+        items: [
+          { tipo: "novo",     texto: "Busca automática do telefone do solicitante no perfil (telefone_corporativo tem preferência sobre telefone pessoal)" },
+          { tipo: "novo",     texto: "Botão 'WhatsApp' abre wa.me com número e mensagem preenchidos — sem API externa, zero configuração" },
+          { tipo: "novo",     texto: "Formatação automática para padrão internacional BR (5547XXXXXXXX) — aceita qualquer formato de entrada" },
+          { tipo: "novo",     texto: "Indicador visual 'WhatsApp disponível' / 'Sem telefone' no header do modal de protocolo" },
+          { tipo: "novo",     texto: "Histórico de envios WhatsApp salvo (tabela whatsapp_log): chamado, usuário, telefone, mensagem, operador, horário" },
+          { tipo: "melhoria", texto: "Arquitetura preparada para Evolution API / WhatsApp Cloud API sem refatoração futura" },
+        ],
+      },
+      {
+        label: "Gestão Dinâmica de Setores e Cargos",
+        icon: Users,
+        items: [
+          { tipo: "novo",     texto: "Painel de Gestão de Setores: adicionar, excluir e visualizar setores com contagem de usuários em tempo real" },
+          { tipo: "novo",     texto: "Aba de Cargos integrada — cargos influenciam a seleção no cadastro de usuários" },
+          { tipo: "novo",     texto: "Setor/cargo base 'DESVINCULADO' protegido: ao excluir setor com usuários, estes são migrados automaticamente" },
+          { tipo: "novo",     texto: "Botão 'Gerenciar Setores' no formulário de cadastro substitui lista estática — sem mais hardcode" },
+          { tipo: "melhoria", texto: "Selects de setor em Gestão de Equipe e perfil de colaborador agora carregam do banco dinamicamente" },
+          { tipo: "fix",      texto: "Setores Admin/CEO/DESVINCULADO protegidos contra exclusão — ícone de escudo indica proteção" },
+        ],
+      },
+      {
+        label: "Segurança — Identidade nas Server Actions",
+        icon: Shield,
+        items: [
+          { tipo: "segurança", texto: "Todas as server actions leem identidade do usuário via auth() server-side — eliminado trust em dados do cliente" },
+          { tipo: "fix",      texto: "Bug crítico: nomes salvos como 'Usuário', 'Analista' ou 'SISTEMA' em navegação SPA (useSession async) corrigido" },
+          { tipo: "fix",      texto: "ReservaSalas: reservas agora sempre registram o nome real do operador — F5 não mais necessário" },
+          { tipo: "segurança", texto: "Afetado: salvarLogCS, salvarLogFeedback, salvarAlteracoesGeral, restaurarVersaoCliente, upsertPerformance, agendarSala" },
+        ],
+      },
+    ],
+  },
+  {
+    versao: "2.2",
+    data: "Maio 2026",
+    destaque: false,
     titulo: "Painel Inteligente",
     subtitulo: "Visão personalizada por setor e controle de acesso refinado",
     icon: Sparkles,
@@ -319,7 +379,7 @@ export default function NotasAtualizacao() {
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">
-              Sistema Operacional — v2.2
+              Sistema Operacional — v2.5
             </span>
           </div>
         </footer>

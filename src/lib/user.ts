@@ -15,6 +15,7 @@ type User = {
   densidade_painel?: string | null;
   esconderBloqueados?: boolean;
   presetId?: string | null;
+  senhaTemporaria?: boolean;
 };
 
 export async function findUserByCredentials(
@@ -49,5 +50,6 @@ export async function findUserByCredentials(
     tema_interface: (user as any).tema_interface ?? "blue",
     densidade_painel: (user as any).densidade_painel ?? "default",
     esconderBloqueados: !!(user as any).esconderBloqueados,
+    senhaTemporaria: !!(user as any).senhaTemporaria,
   };
 }

@@ -70,6 +70,34 @@ model usuarios {
   permissaoOverrides       UsuarioPermissaoOverride[]
   contratosComerciais      ContratoComercial[]        @relation("ContratosComerciais")
   holeriteAlertas          HoleriteAlertaHistorico[]
+
+  senhaTemporaria  Boolean   @default(false)
+  primeiroAcessoEm DateTime?
+}
+
+model OnboardingTemplate {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  setor     String?
+  mensagem  String
+  ativo     Boolean  @default(true)
+  padrao    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("onboarding_template")
+}
+
+model OnboardingLog {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int
+  criadoPorId Int
+  templateId  Int?
+  tipoEnvio   String
+  telefone    String?
+  email       String?
+  enviadoEm   DateTime @default(now())
+  @@map("onboarding_log")
+  @@index([usuarioId])
 }
 
 model chamados {

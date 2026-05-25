@@ -11,8 +11,16 @@ export const authConfig = {
       const isPrivateRoute = nextUrl.pathname.startsWith("/PainelAlpha");
 
       if (isPrivateRoute) {
-        if (isLoggedIn) return true;
-        return false; 
+        if (!isLoggedIn) return false;
+
+        const senhaTemporaria = !!(auth?.user as any)?.senhaTemporaria;
+        const isMudarSenhaPage = nextUrl.pathname === "/PainelAlpha/mudar-senha";
+
+        if (senhaTemporaria && !isMudarSenhaPage) {
+          return Response.redirect(new URL("/PainelAlpha/mudar-senha", nextUrl));
+        }
+
+        return true;
       }
       return true;
     },
