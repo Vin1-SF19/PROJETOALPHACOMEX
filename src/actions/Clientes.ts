@@ -83,8 +83,8 @@ export async function buscarClientes() {
     });
     return lista;
   } catch (error: any) {
-    console.error("ERRO DO PRISMA:", error);
-    return [];
+    console.error("ERRO DO PRISMA buscarClientes:", error?.message ?? error);
+    throw error;
   }
 }
 

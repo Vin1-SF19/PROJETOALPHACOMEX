@@ -89,9 +89,14 @@ export default function CadastroCliente() {
 
     const carregarDados = async () => {
         setCarregando(true);
-        const dados = await buscarClientes();
-        setClientes(dados);
-        setCarregando(false);
+        try {
+            const dados = await buscarClientes();
+            setClientes(dados);
+        } catch (err) {
+            console.error("Erro ao carregar clientes CS/NPS:", err);
+        } finally {
+            setCarregando(false);
+        }
     };
 
     useEffect(() => {

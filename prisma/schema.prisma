@@ -225,8 +225,8 @@ model clientes {
   ultimoCs            Int?           @default(0)
   nps                 Int?
   feedbackGoogle      Boolean        @default(false)
-  createdAt           String         @default("")
-  updatedAt           String         @default("")
+  createdAt           String?        @default("")
+  updatedAt           String?        @default("")
   log_cs              log_cs[]
   socios              socios[]
   logFeedback         logFeedback[]
