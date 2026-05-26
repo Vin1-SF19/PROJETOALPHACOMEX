@@ -90,7 +90,7 @@ const SERVICOS_PADRAO = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isAdminOrCeo(role: string) {
-    return role === "Admin" || role === "CEO";
+    return role === "Admin" || role === "CEO" || role === "Lider Comercial";
 }
 
 function formatBRL(v: number) {

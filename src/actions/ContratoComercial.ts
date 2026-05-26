@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isAdminOrCeo(role: string) {
-    return role === "Admin" || role === "CEO";
+    return role === "Admin" || role === "CEO" || role === "Lider Comercial";
 }
 
 function isComercialOrAdmin(role: string) {
