@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fmtDate } from "@/lib/format-date";
 import { useRouter } from "next/navigation";
 import { Plus, X, CheckCircle2, Circle, Phone, Mail, Video, FileText, StickyNote, Trash2 } from "lucide-react";
 import { criarAtividade, concluirAtividade, excluirAtividade } from "@/actions/CRM";
@@ -66,7 +67,7 @@ function AtivCard({
           )}
           {a.dataPrevista && (
             <span className={`text-[10px] font-medium ${atrasada ? "text-rose-400" : a.concluida ? "text-slate-600" : "text-slate-400"}`}>
-              {new Date(a.dataPrevista).toLocaleDateString("pt-BR")}
+              {fmtDate(a.dataPrevista)}
             </span>
           )}
           <span className="text-[10px] text-slate-600">{a.autor?.nome}</span>

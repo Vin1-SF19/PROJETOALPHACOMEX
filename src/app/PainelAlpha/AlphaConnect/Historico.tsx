@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { fmtDateTime } from "@/lib/format-date";
 import { X, Download, FileSpreadsheet, Clock, Trash2, Loader2 } from "lucide-react";
 import { getHistoricoPlanilhas, baixarPlanilhaDoBanco, excluirPlanilhaBanco } from "@/actions/HistoricoPlanilhaFiscal";
 import { saveAs } from "file-saver";
@@ -74,7 +75,7 @@ export function ModalHistorico({ isOpen, onClose }: { isOpen: boolean, onClose: 
                                 <div>
                                     <p className="text-[10px] font-black text-white uppercase truncate max-w-[250px]">{item.nome}</p>
                                     <p className="text-[8px] font-bold text-slate-500 uppercase">
-                                        {new Date(item.data).toLocaleString('pt-BR')}
+                                        {fmtDateTime(item.data)}
                                     </p>
                                 </div>
                             </div>

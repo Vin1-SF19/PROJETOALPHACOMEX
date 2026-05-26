@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fmtDateTime } from "@/lib/format-date";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "./ui/dialog";
@@ -133,7 +134,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                   </DialogTitle>
                   <div className="flex items-center gap-2 text-slate-500 text-xs mt-1 font-bold">
                     <Calendar size={13} />
-                    {new Date(chamado.createdAt).toLocaleString("pt-BR")}
+                    {fmtDateTime(chamado.createdAt)}
                     <span className="text-slate-700">•</span>
                     <Clock size={13} />
                     <span>Aberto há {tempoAberto(chamado.createdAt)}</span>

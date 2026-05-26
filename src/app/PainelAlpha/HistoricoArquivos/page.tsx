@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { fmtDate } from "@/lib/format-date";
 import {
     History,
     Download,
@@ -300,7 +301,7 @@ export default function PaginaHistorico() {
                                         <div className="flex flex-wrap gap-4 items-center">
                                             <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 uppercase">
                                                 <Calendar size={12} className="text-amber-500/50" />
-                                                {new Date(doc.data_criacao).toLocaleDateString('pt-BR')}
+                                                {fmtDate(doc.data_criacao)}
                                             </div>
                                             <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 uppercase">
                                                 <User size={12} className="text-amber-500/50" />

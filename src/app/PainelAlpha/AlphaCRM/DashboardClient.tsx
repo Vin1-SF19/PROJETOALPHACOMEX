@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fmtDateLong } from "@/lib/format-date";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -101,8 +102,8 @@ export default function DashboardCRM({ stats, atividadesPendentes, oportunidades
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black text-white">Dashboard</h1>
-          <p className="text-sm text-slate-500">
-            {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+          <p className="text-sm text-slate-500" suppressHydrationWarning>
+            {fmtDateLong(new Date())}
           </p>
         </div>
         <button

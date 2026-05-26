@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { fmtDate } from "@/lib/format-date";
 import { ArrowLeft, FileText, CheckCircle, Clock, XCircle, Shield } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -102,7 +103,7 @@ export default function HoleriteDetalheClient({ holerite, isGestao }: HoleriteDe
               { label: "Arquivo", value: holerite.arquivoNome },
               { label: "Tamanho", value: `${Math.round(holerite.arquivoTamanho / 1024)} KB` },
               { label: "Enviado por", value: holerite.uploadedBy?.nome ?? "—" },
-              { label: "Enviado em", value: new Date(holerite.uploadedAt).toLocaleDateString("pt-BR") },
+              { label: "Enviado em", value: fmtDate(holerite.uploadedAt) },
             ].map((item) => (
               <div key={item.label}>
                 <p className="text-[8px] font-black uppercase tracking-widest text-slate-600">{item.label}</p>

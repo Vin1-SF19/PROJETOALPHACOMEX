@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { fmtTime } from "@/lib/format-date";
 import { useSession } from "next-auth/react";
 import { Send, User, Search, Hash, ShieldCheck, Zap, X, Volume2, VolumeX } from "lucide-react";
 import { getTema } from "@/lib/temas";
@@ -237,7 +238,7 @@ export default function AlphaCommPage() {
                       <div className={`p-5 rounded-[2.2rem] ${souEu ? `${style.bg} rounded-tr-none shadow-2xl` : 'bg-white/5 border border-white/10 rounded-tl-none backdrop-blur-sm'}`}>
                         <p className={`text-[13px] leading-relaxed ${souEu ? 'font-black italic uppercase text-white' : 'font-medium text-slate-200'}`}>{msg.texto}</p>
                       </div>
-                      <span className="text-[8px] font-black text-slate-600 uppercase mt-2 tracking-widest">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="text-[8px] font-black text-slate-600 uppercase mt-2 tracking-widest">{fmtTime(msg.createdAt)}</span>
                     </div>
                   );
                 })}

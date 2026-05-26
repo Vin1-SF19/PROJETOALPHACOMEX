@@ -1,6 +1,7 @@
 "use client";
 
 import ExcelJS from 'exceljs';
+import { fmtDate, fmtTime } from "@/lib/format-date";
 import { saveAs } from 'file-saver';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -380,17 +381,10 @@ export default function ExtratosBancarios() {
                                             <td className="px-8 py-6">
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[20px] font-black text-white uppercase tracking-tighter">
-                                                        {new Date(c.createdAt).toLocaleDateString('pt-BR', {
-                                                            day: '2-digit',
-                                                            month: '2-digit',
-                                                            year: 'numeric'
-                                                        })}
+                                                        {fmtDate(c.createdAt)}
                                                     </span>
                                                     <span className="text-[16px] font-bold text-slate-500 uppercase tracking-widest">
-                                                        {new Date(c.createdAt).toLocaleTimeString('pt-BR', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit'
-                                                        })}
+                                                        {fmtTime(c.createdAt)}
                                                     </span>
                                                 </div>
                                             </td>

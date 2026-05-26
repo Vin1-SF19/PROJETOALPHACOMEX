@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { fmtDate, fmtDateTime } from "@/lib/format-date";
 import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, User, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle } from "lucide-react";
 import { adicionarSocio, atualizarLogCS, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, salvarAlteracoesGeral, salvarAlteracoesGestao, salvarLogCS, salvarLogFeedback } from '@/actions/Clientes';
 import { toast } from 'sonner';
@@ -629,7 +630,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                                 />
                             ) : (
                                 <div className="bg-slate-900/30 border border-slate-800/50 p-3 rounded-xl text-sm text-slate-400 font-mono">
-                                    {cliente.dataContratacao ? new Date(cliente.dataContratacao).toLocaleDateString('pt-BR') : "---"}
+                                    {cliente.dataContratacao ? fmtDate(cliente.dataContratacao) : "---"}
                                 </div>
                             )}
                         </div>
@@ -995,7 +996,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                                                             return dataRaw.split('T')[0].split('-').reverse().join('/');
                                                         }
 
-                                                        return d.toLocaleDateString('pt-BR');
+                                                        return fmtDate(d);
                                                     })()}
                                                 </td>
 
@@ -1176,7 +1177,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                                         listaLogsFeedback.map((log: any, index: number) => (
                                             <tr key={log.id || index} className="hover:bg-white/[0.02] transition-colors group">
                                                 <td className="px-6 py-4 text-[11px] font-black text-blue-300">
-                                                    {new Date(log.data_registro || log.dataRegistro).toLocaleDateString('pt-BR')}
+                                                    {fmtDate(log.data_registro || log.dataRegistro)}
                                                 </td>
                                                 <td className="px-6 py-4 text-xs font-bold text-white uppercase">
                                                     {log.colaborador}

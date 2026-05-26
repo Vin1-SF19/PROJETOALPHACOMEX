@@ -1,6 +1,7 @@
 "use client";
 
 import { atualizarRadar } from "@/actions/PreAnalise";
+import { fmtDateTime } from "@/lib/format-date";
 import {
     ShieldCheck, BarChart3, MapPin,
     Users, Phone, Mail, Landmark, User, History
@@ -281,10 +282,7 @@ export default function BlocoResultados({ dados, visual, userName }: Props) {
                                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
                                                         Consultado em{" "}
                                                         <span className="text-blue-400">
-                                                            {new Date(etapas.radar.consultadoEm).toLocaleString("pt-BR", {
-                                                                day: "2-digit", month: "2-digit", year: "numeric",
-                                                                hour: "2-digit", minute: "2-digit",
-                                                            })}
+                                                            {fmtDateTime(etapas.radar.consultadoEm)}
                                                         </span>
                                                     </p>
                                                 ) : (

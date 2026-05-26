@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { fmtDateTime } from "@/lib/format-date";
 import { X, History, User, RotateCcw, ArrowRight, ShieldAlert, Clock } from "lucide-react";
 import { restaurarVersaoCliente } from '@/actions/Clientes';
 import { toast } from 'sonner';
@@ -116,7 +117,7 @@ export default function ModalLogAuditoria({ isOpen, onClose, cliente, aoSalvar }
                                     <div className="flex justify-between items-start mb-6">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2 text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">
-                                                <Clock size={12} /> {new Date(log.dataAlteracao || log.dataRegistro).toLocaleString('pt-BR')}
+                                                <Clock size={12} /> {fmtDateTime(log.dataAlteracao || log.dataRegistro)}
                                             </div>
                                             <div className="flex items-center gap-2 text-sm font-bold text-white uppercase italic">
                                                 <User size={14} className="text-slate-600" /> {log.colaborador}

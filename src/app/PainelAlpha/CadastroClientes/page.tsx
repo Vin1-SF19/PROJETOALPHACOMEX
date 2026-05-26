@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { fmtDate } from "@/lib/format-date";
 import {
     Plus,
     Filter,
@@ -300,7 +301,7 @@ export default function CadastroCliente() {
                                                     {c.log_cs && c.log_cs.length > 0 ? (() => {
                                                         const datas = c.log_cs.map((l: any) => new Date(l.data_registro || l.dataRegistro).getTime());
                                                         const ultimaData = new Date(Math.max(...datas));
-                                                        return ultimaData.toLocaleDateString('pt-BR');
+                                                        return fmtDate(ultimaData);
                                                     })() : "---"}
                                                 </span>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { fmtDate, fmtTimeFull } from "@/lib/format-date";
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CriarTarefa, BuscarTarefasPorUsuario, DeletarTarefa, EditarTarefa } from '@/actions/Tarefas';
@@ -646,12 +647,7 @@ export default function AdminTarefas() {
                                             <td className="px-10 py-6 text-center font-mono">
                                                 {t.feita && (t.concluidaEm || t.concluidaem) ? (
                                                     <span className="text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20 text-[11px] font-black">
-                                                        {new Date(t.concluidaEm || t.concluidaem).toLocaleTimeString('pt-BR', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            second: '2-digit',
-                                                            hour12: false
-                                                        })}
+                                                        {fmtTimeFull(t.concluidaEm || t.concluidaem)}
                                                     </span>
                                                 ) : (
                                                     <span className="text-slate-700 italic text-[10px]">--:--:--</span>
@@ -706,7 +702,7 @@ export default function AdminTarefas() {
                                                                         <div className="grid grid-cols-1 gap-3">
                                                                             <div className="flex justify-between items-center p-3 bg-black/20 rounded-xl border border-white/5 text-[11px]">
                                                                                 <span className="text-slate-500 font-bold uppercase">Data de Início:</span>
-                                                                                <span className="text-white font-black">{t.dataInicio ? new Date(t.dataInicio).toLocaleDateString('pt-BR') : '--'}</span>
+                                                                                <span className="text-white font-black">{t.dataInicio ? fmtDate(t.dataInicio) : '--'}</span>
                                                                             </div>
 
                                                                             {t.intervaloDias > 0 && (

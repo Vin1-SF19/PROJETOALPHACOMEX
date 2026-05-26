@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { fmtDate } from "@/lib/format-date";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     X, ChevronLeft, ChevronRight, Plus, Search, Loader2,
@@ -629,7 +630,7 @@ function TabelaEnviados({
                                         className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors"
                                     >
                                         <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">
-                                            {new Date(c.createdAt).toLocaleDateString("pt-BR")}
+                                            {fmtDate(c.createdAt)}
                                         </td>
                                         {showCloser && (
                                             <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">
@@ -793,7 +794,7 @@ function TabelaFechados({
                                     )}
                                     <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">
                                         {c.pagamentoConfirmadoEm
-                                            ? new Date(c.pagamentoConfirmadoEm).toLocaleDateString("pt-BR")
+                                            ? fmtDate(c.pagamentoConfirmadoEm)
                                             : "—"}
                                     </td>
                                     <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">

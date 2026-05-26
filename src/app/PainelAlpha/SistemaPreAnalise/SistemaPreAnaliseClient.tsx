@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { fmtDateTime } from "@/lib/format-date";
 import {
     Search, Database, BarChart3, RefreshCw,
     Fingerprint, ArrowRight, History, X, Building2
@@ -376,7 +377,7 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
                                                         <div className="flex items-center gap-3 mt-1 text-[10px] font-mono text-slate-500">
                                                             <span>{item.cnpj}</span>
                                                             <span className="w-1 h-1 rounded-full bg-slate-700" />
-                                                            <span>{new Date(item.updatedAt).toLocaleString("pt-BR")}</span>
+                                                            <span>{fmtDateTime(item.updatedAt)}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -451,7 +452,7 @@ export default function SistemaPreAnaliseClient({ sessionUser, visual }: Props) 
                         <p className="text-sm font-bold text-white mt-3 mb-1 truncate px-2">{cnpjHistorico.razaoSocial}</p>
                         <p className="text-[10px] font-mono text-slate-500 mb-1">{cnpjHistorico.cnpj}</p>
                         <p className="text-[10px] text-slate-600 mb-8">
-                            Consultado em {new Date(cnpjHistorico.updatedAt).toLocaleString("pt-BR")}
+                            Consultado em {fmtDateTime(cnpjHistorico.updatedAt)}
                         </p>
                         <div className="flex flex-col gap-3">
                             <button

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { fmtTime } from "@/lib/format-date";
 import { createPortal } from "react-dom";
 import { pusherClient } from "@/lib/pusher";
 import {
@@ -255,10 +256,7 @@ export default function ChatChamado({
                         isMe ? "justify-end" : "justify-start"
                       }`}
                     >
-                      {new Date(msg.createdAt).toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {fmtTime(msg.createdAt)}
                     </div>
                   </div>
                 </div>

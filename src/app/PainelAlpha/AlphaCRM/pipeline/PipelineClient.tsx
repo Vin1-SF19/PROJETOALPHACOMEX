@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { fmtDate } from "@/lib/format-date";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -110,7 +111,7 @@ function KanbanCard({
       {op.dataFechamento && (
         <div className="flex items-center gap-1 text-[10px] text-slate-500">
           <Calendar size={10} />
-          {new Date(op.dataFechamento).toLocaleDateString("pt-BR")}
+          {fmtDate(op.dataFechamento)}
         </div>
       )}
     </div>
