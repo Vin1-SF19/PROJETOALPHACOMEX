@@ -6,7 +6,7 @@ import Image from "next/image";
 import {
     Settings, Trophy, Target, ArrowLeft,
     X, Check, RefreshCw, Users, Loader2, Crown, TrendingUp, Briefcase,
-    Eye, EyeOff,
+    Eye, EyeOff, Tv,
 } from "lucide-react";
 import ModalGerenciamentoLeads from "@/components/comercial/ModalGerenciamentoLeads";
 import { getTema } from "@/lib/temas";
@@ -857,6 +857,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
     const [totalVendas, setTotalVendas] = useState(dadosIniciais.success ? dadosIniciais.totalVendas : 0);
     const [atualizando, setAtualizando] = useState(false);
     const [modalAberto, setModalAberto] = useState(false);
+    const [modoTV, setModoTV] = useState(false);
     const [modalGerenciamentoAberto, setModalGerenciamentoAberto] = useState(false);
     const [rowHeight, setRowHeight] = useState(120);
 
@@ -950,7 +951,13 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
 
     // Sem polling: atualizar é chamado via callback onDadosAlterados do modal
 
-    const isTV = role === 'TV';
+    const isTV = role === 'TV' || modoTV;
+
+    const toggleModoTV = () => {
+        const next = !modoTV;
+        setModoTV(next);
+        window.parent.postMessage({ type: 'ALPHA_TV_MODE', active: next }, '*');
+    };
     const HEADER_HEIGHT = isTV ? 56 : 72;
     const MIN_ROW = isTV ? 130 : 100;
     const MAX_ROW = isTV ? 260 : 190;
@@ -1003,6 +1010,17 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                         )}
                         {equipeBateuMeta && <Trophy size={16} className="text-amber-400" />}
                     </div>
+
+                    {/* Botão sair modo TV — só visível quando ativado por botão (não role TV real) */}
+                    {modoTV && (
+                        <button
+                            onClick={toggleModoTV}
+                            title="Sair do Modo TV"
+                            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 transition-all"
+                        >
+                            <Tv size={13} />
+                        </button>
+                    )}
                 </header>
             )}
 
@@ -1087,6 +1105,18 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                             <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Metas</span>
                         </button>
                     )}
+
+                    <button
+                        onClick={toggleModoTV}
+                        title="Modo TV — oculta sidebar e abas"
+                        className={`p-2.5 rounded-xl border transition-all ${
+                            modoTV
+                                ? "bg-violet-500/20 border-violet-500/40 text-violet-300"
+                                : "bg-white/5 border-white/5 text-slate-500 hover:text-white hover:border-white/10"
+                        }`}
+                    >
+                        <Tv size={14} />
+                    </button>
                 </div>
             </header>}
 

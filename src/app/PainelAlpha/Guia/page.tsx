@@ -43,9 +43,55 @@ const TIPO_CONFIG: Record<ItemTipo, { label: string; cls: string }> = {
 // ── Changelog ─────────────────────────────────────────────
 const RELEASES: Release[] = [
   {
-    versao: "2.5",
+    versao: "2.6",
     data: "Maio 2026",
     destaque: true,
+    titulo: "Multi-Abas, Radar Inteligente & Leads Editáveis",
+    subtitulo: "Navegação simultânea entre módulos, importação em lote sem travar e edição de leads diretamente na tabela",
+    icon: Zap,
+    cor: "text-blue-400",
+    grupos: [
+      {
+        label: "Sistema de Abas (Multi-Página)",
+        icon: Package,
+        items: [
+          { tipo: "novo",     texto: "Barra de abas no topo do conteúdo — abra múltiplos módulos ao mesmo tempo" },
+          { tipo: "novo",     texto: "Cada aba roda em iframe isolado: processos em background continuam mesmo ao trocar de página" },
+          { tipo: "novo",     texto: "Clique na sidebar abre nova aba ou ativa a já existente — sem recarregar" },
+          { tipo: "novo",     texto: "Abas persistem no localStorage: sessão restaurada ao recarregar o painel" },
+          { tipo: "novo",     texto: "Botão × fecha a aba individualmente; aba anterior é ativada automaticamente" },
+          { tipo: "melhoria", texto: "Sidebar destaca o módulo da aba ativa, não mais o da URL do navegador" },
+        ],
+      },
+      {
+        label: "Radar Fiscal — Importação em Lote",
+        icon: BarChart3,
+        items: [
+          { tipo: "fix",      texto: "Importação de planilhas grandes (11 mil CNPJs) não trava mais o navegador" },
+          { tipo: "melhoria", texto: "Verificação prévia no banco de dados antes de chamar a API da Receita — evita consultas desnecessárias" },
+          { tipo: "melhoria", texto: "Consultas ao banco em chunks de 200 CNPJs (limite SQLite respeitado)" },
+          { tipo: "novo",     texto: "Controles de Pausar / Retomar / Cancelar na barra de progresso da importação" },
+          { tipo: "melhoria", texto: "Barra de progresso interativa: cor roxa na fase banco, ciano na fase Receita, âmbar quando pausado" },
+          { tipo: "melhoria", texto: "Indicadores API RECEITA / DATABASE SYNC / AGUARDANDO em tempo real" },
+          { tipo: "melhoria", texto: "Toast informativo: X no banco · Y sendo consultados na Receita" },
+        ],
+      },
+      {
+        label: "Painel de Metas — Gerenciamento de Leads",
+        icon: Users,
+        items: [
+          { tipo: "novo",     texto: "Edição de lead direto na tabela: clique na razão social para abrir formulário pré-preenchido" },
+          { tipo: "novo",     texto: "Botão de edição disponível tanto em Contratos Enviados quanto em Contratos Fechados" },
+          { tipo: "novo",     texto: "Toggle 'Empresa em Constituição': CNPJ zerado, razão social 'Em constituição', sem consulta à API" },
+          { tipo: "fix",      texto: "Contratos fechados filtrados por data de pagamento (não mais pela data de envio) — mês correto garantido" },
+        ],
+      },
+    ],
+  },
+  {
+    versao: "2.5",
+    data: "Maio 2026",
+    destaque: false,
     titulo: "Protocolos & Automação",
     subtitulo: "Sistema de protocolos de chamados, integração WhatsApp e gestão dinâmica de setores",
     icon: Sparkles,

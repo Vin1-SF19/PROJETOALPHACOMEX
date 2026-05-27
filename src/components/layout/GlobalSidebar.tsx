@@ -58,6 +58,9 @@ interface GlobalSidebarProps {
   isMobileOpen: boolean;
   onToggleCollapse: () => void;
   onCloseMobile: () => void;
+  onOpenTab?: (href: string, label: string) => void;
+  activeUrl?: string;
+  openUrls?: string[];
 }
 
 export default function GlobalSidebar({
@@ -69,9 +72,14 @@ export default function GlobalSidebar({
   isMobileOpen,
   onToggleCollapse,
   onCloseMobile,
+  onOpenTab,
+  activeUrl,
+  openUrls = [],
 }: GlobalSidebarProps) {
   const pathname = usePathname();
   const isAdmin = role === 'Admin' || role === 'CEO';
+  // Use activeUrl (tab-aware) for highlighting; fallback to pathname
+  const effectiveUrl = activeUrl ?? pathname;
 
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
 
@@ -158,9 +166,14 @@ export default function GlobalSidebar({
         {/* Pinned + unpinned non-admin modules — flat list */}
         {[...pinnedModulos, ...unpinnedModulos].map(mod => {
           const Icon = ICON_MAP[mod.iconName] ?? FileText;
-          const isActive = pathname === mod.href || pathname.startsWith(mod.href + '/');
+          const isActive = effectiveUrl === mod.href || effectiveUrl.startsWith(mod.href + '/');
+          const isOpen = !isActive && openUrls.some(u => u === mod.href || u.startsWith(mod.href + '/'));
           const isPinned = pinnedIds.includes(mod.id);
-          const activeClass = isActive ? ACTIVE_BG[mod.category] : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
+          const activeClass = isActive
+            ? ACTIVE_BG[mod.category]
+            : isOpen
+            ? 'text-slate-400 bg-white/[0.03] border-white/[0.07] hover:text-white hover:bg-white/5'
+            : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
 
           return (
             <div key={mod.id} className="relative group/item">
@@ -168,6 +181,7 @@ export default function GlobalSidebar({
                 href={mod.href}
                 title={isCollapsed ? mod.label : undefined}
                 aria-label={mod.label}
+                onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab(mod.href, mod.label); } : undefined}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200 group
                   ${isCollapsed ? 'justify-center' : 'pr-8'}
@@ -185,6 +199,12 @@ export default function GlobalSidebar({
                 )}
                 {isActive && !isCollapsed && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-current shrink-0" />
+                )}
+                {isOpen && !isCollapsed && (
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" title="Aba aberta em background" />
+                )}
+                {isOpen && isCollapsed && (
+                  <div className="absolute bottom-1 right-1 w-1 h-1 rounded-full bg-slate-500" />
                 )}
               </Link>
               {!isCollapsed && (
@@ -225,7 +245,7 @@ export default function GlobalSidebar({
             <div className="space-y-0.5">
               {adminModulos.map(mod => {
                 const Icon = ICON_MAP[mod.iconName] ?? FileText;
-                const isActive = pathname === mod.href || pathname.startsWith(mod.href + '/');
+                const isActive = effectiveUrl === mod.href || effectiveUrl.startsWith(mod.href + '/');
                 const activeClass = isActive ? ACTIVE_BG['admin'] : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
 
                 return (
@@ -234,6 +254,7 @@ export default function GlobalSidebar({
                     href={mod.href}
                     title={isCollapsed ? mod.label : undefined}
                     aria-label={mod.label}
+                    onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab(mod.href, mod.label); } : undefined}
                     className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200 group
                       ${isCollapsed ? 'justify-center' : ''}
