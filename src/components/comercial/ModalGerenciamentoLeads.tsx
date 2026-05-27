@@ -5,11 +5,12 @@ import { fmtDate } from "@/lib/format-date";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     X, ChevronLeft, ChevronRight, Plus, Search, Loader2,
-    Eye, Check, BarChart3, Users, FileText, Minus, Trash2, Upload,
+    Eye, Check, BarChart3, Users, FileText, Minus, Trash2, Upload, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
     criarContrato,
+    atualizarContrato,
     getContratos,
     getColaboradoresComerciais,
     getServicosComerciais,
@@ -47,6 +48,7 @@ interface Contrato {
     ano: number;
     usuarioId: number;
     usuario: { id: number; nome: string; imagemUrl: string | null };
+    socios?: unknown;
     createdAt: Date | string;
 }
 
@@ -146,6 +148,8 @@ interface FormNovoContratoProps {
     colaboradores: UsuarioSimples[];
     servicos: string[];
     nomeUsuario?: string;
+    initialData?: Contrato;
+    editandoId?: string;
     onServicoNovo: (nome: string) => Promise<void>;
     onSalvo: () => void;
     onCancelar: () => void;
@@ -153,29 +157,53 @@ interface FormNovoContratoProps {
 
 function FormNovoContrato({
     mes, ano,
-    colaboradores, servicos, nomeUsuario, onServicoNovo, onSalvo, onCancelar,
+    colaboradores, servicos, nomeUsuario, initialData, editandoId, onServicoNovo, onSalvo, onCancelar,
 }: FormNovoContratoProps) {
-    const [cnpj, setCnpj] = useState("");
-    const [consultando, setConsultando] = useState(false);
-    const [dadosEmpresa, setDadosEmpresa] = useState({ razaoSocial: "", nomeFantasia: "" });
-    const [consultado, setConsultado] = useState(false);
+    const isEdicao = !!editandoId;
+    const cnpjInicial = initialData?.cnpj ? formatCNPJ(initialData.cnpj) : "";
+    const eConstituicaoInicial = initialData?.cnpj === "00000000000000";
 
-    const [valorContrato, setValorContrato] = useState(0);
-    const [formaPagamento, setFormaPagamento] = useState<string>("");
+    const [cnpj, setCnpj] = useState(cnpjInicial);
+    const [consultando, setConsultando] = useState(false);
+    const [dadosEmpresa, setDadosEmpresa] = useState({
+        razaoSocial: initialData?.razaoSocial ?? "",
+        nomeFantasia: initialData?.nomeFantasia ?? "",
+    });
+    const [consultado, setConsultado] = useState(isEdicao);
+    const [empresaEmConstituicao, setEmpresaEmConstituicao] = useState(eConstituicaoInicial);
+
+    const padraoFormaPag = (v: string) => (["ENTRADA_EXITO","PARCELADO_CC","INTEGRAL_PIX"].includes(v) ? v : v === "OUTRO" ? "" : "");
+    const isCustomPag = initialData ? !["ENTRADA_EXITO","PARCELADO_CC","INTEGRAL_PIX"].includes(initialData.formaPagamento) : false;
+
+    const [valorContrato, setValorContrato] = useState(initialData?.valorContrato ?? 0);
+    const [formaPagamento, setFormaPagamento] = useState<string>(initialData ? padraoFormaPag(initialData.formaPagamento) : "");
     const [formaPagamentoCustom, setFormaPagamentoCustom] = useState("");
-    const [mostraFormaPagCustom, setMostraFormaPagCustom] = useState(false);
-    const [servico, setServico] = useState("");
+    const [mostraFormaPagCustom, setMostraFormaPagCustom] = useState(isCustomPag);
+    const [servico, setServico] = useState(initialData?.servico ?? "");
     const [novoServico, setNovoServico] = useState("");
     const [mostraNovo, setMostraNovo] = useState(false);
     const [showServicos, setShowServicos] = useState(false);
     const [showPagamento, setShowPagamento] = useState(false);
     const [showCloser, setShowCloser] = useState(false);
-    const [canalAquisicao, setCanalAquisicao] = useState("");
-    const [closerNome, setCloserNome] = useState(nomeUsuario ?? "");
+    const [canalAquisicao, setCanalAquisicao] = useState(initialData?.canalAquisicao ?? "");
+    const [closerNome, setCloserNome] = useState(initialData?.closerNome ?? nomeUsuario ?? "");
     const [closerCustom, setCloserCustom] = useState("");
     const [mostraCloserCustom, setMostraCloserCustom] = useState(false);
-    const [socios, setSocios] = useState<Socio[]>([]);
+    const [socios, setSocios] = useState<Socio[]>((initialData?.socios as Socio[]) ?? []);
     const [salvando, setSalvando] = useState(false);
+
+    const ativarConstituicao = (ativo: boolean) => {
+        setEmpresaEmConstituicao(ativo);
+        if (ativo) {
+            setCnpj("00.000.000/0000-00");
+            setDadosEmpresa({ razaoSocial: "Em constituição", nomeFantasia: "" });
+            setConsultado(true);
+        } else {
+            setCnpj("");
+            setDadosEmpresa({ razaoSocial: "", nomeFantasia: "" });
+            setConsultado(false);
+        }
+    };
 
     const consultarCNPJ = async () => {
         const cnpjLimpo = cnpj.replace(/\D/g, "");
@@ -230,7 +258,7 @@ function FormNovoContrato({
 
         setSalvando(true);
         try {
-            const res = await criarContrato({
+            const payload = {
                 cnpj: cnpj.replace(/\D/g, ""),
                 razaoSocial: dadosEmpresa.razaoSocial,
                 nomeFantasia: dadosEmpresa.nomeFantasia || undefined,
@@ -239,13 +267,15 @@ function FormNovoContrato({
                 servico,
                 canalAquisicao,
                 closerNome: closerFinal,
-                mes,
-                ano,
                 socios: sociosComVinculo,
-            });
+            };
+
+            const res = isEdicao
+                ? await atualizarContrato({ ...payload, id: editandoId })
+                : await criarContrato({ ...payload, mes, ano });
 
             if (!res.success) { toast.error(res.error); return; }
-            toast.success("Contrato enviado!");
+            toast.success(isEdicao ? "Lead atualizado!" : "Contrato enviado!");
             onSalvo();
         } catch {
             toast.error("Erro ao salvar");
@@ -268,14 +298,28 @@ function FormNovoContrato({
         >
             <div className="border-t border-white/5 p-6 space-y-5">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Novo Contrato — {MESES[mes - 1]} {ano}
+                    {isEdicao ? "Editar Lead" : `Novo Contrato — ${MESES[mes - 1]} ${ano}`}
                 </h4>
 
                 {/* Bloco 1 — CNPJ */}
                 <div className={sectionCls}>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-400">
-                        1 · Empresa
-                    </p>
+                    <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-blue-400">
+                            1 · Empresa
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => ativarConstituicao(!empresaEmConstituicao)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-colors ${
+                                empresaEmConstituicao
+                                    ? "bg-amber-500/20 border border-amber-500/40 text-amber-400"
+                                    : "bg-white/5 border border-white/5 text-slate-500 hover:text-white"
+                            }`}
+                        >
+                            {empresaEmConstituicao ? <Check size={10} /> : <Plus size={10} />}
+                            Empresa em Constituição
+                        </button>
+                    </div>
                     <div>
                         <label className={labelCls}>CNPJ *</label>
                         <div className="flex gap-2">
@@ -283,18 +327,21 @@ function FormNovoContrato({
                                 type="text"
                                 placeholder="00.000.000/0000-00"
                                 value={cnpj}
+                                disabled={empresaEmConstituicao}
                                 onChange={(e) => { setCnpj(e.target.value); setConsultado(false); }}
                                 className={`${inputCls} flex-1`}
                             />
-                            <button
-                                type="button"
-                                onClick={consultarCNPJ}
-                                disabled={consultando}
-                                className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50 transition-colors whitespace-nowrap"
-                            >
-                                {consultando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-                                Consultar
-                            </button>
+                            {!empresaEmConstituicao && (
+                                <button
+                                    type="button"
+                                    onClick={consultarCNPJ}
+                                    disabled={consultando}
+                                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50 transition-colors whitespace-nowrap"
+                                >
+                                    {consultando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                                    Consultar
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -559,6 +606,8 @@ function FormNovoContrato({
                     >
                         {salvando ? (
                             <Loader2 size={13} className="animate-spin" />
+                        ) : isEdicao ? (
+                            <><Check size={13} /> Salvar Alterações</>
                         ) : (
                             <><FileText size={13} /> Contrato Enviado</>
                         )}
@@ -577,12 +626,14 @@ function TabelaEnviados({
     canDelete,
     onConfirmar,
     onExcluir,
+    onEditar,
 }: {
     contratos: Contrato[];
     showCloser: boolean;
     canDelete: boolean;
     onConfirmar: (c: Contrato) => void;
     onExcluir: (c: Contrato) => void;
+    onEditar: (c: Contrato) => void;
 }) {
     const agora = new Date();
     const thCls = "px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap";
@@ -640,8 +691,16 @@ function TabelaEnviados({
                                         <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">
                                             {formatCNPJ(c.cnpj)}
                                         </td>
-                                        <td className={`px-3 py-3 text-[11px] font-black max-w-[200px] truncate ${atrasado ? "text-red-500 animate-pulse" : "text-white"}`}>
-                                            {c.razaoSocial}
+                                        <td className="px-3 py-3 max-w-[200px]">
+                                            <button
+                                                type="button"
+                                                onClick={() => onEditar(c)}
+                                                title="Editar lead"
+                                                className={`flex items-center gap-1.5 text-[11px] font-black truncate hover:underline group ${atrasado ? "text-red-500" : "text-white"}`}
+                                            >
+                                                {c.razaoSocial}
+                                                <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                                            </button>
                                         </td>
                                         <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[160px] truncate">
                                             {c.nomeFantasia || <span className="text-slate-700">—</span>}
@@ -739,12 +798,14 @@ function TabelaFechados({
     canDelete,
     onExcluir,
     onRecarregar,
+    onEditar,
 }: {
     contratos: Contrato[];
     showCloser: boolean;
     canDelete: boolean;
     onExcluir: (c: Contrato) => void;
     onRecarregar: () => void;
+    onEditar: (c: Contrato) => void;
 }) {
     return (
         <div className="space-y-3">
@@ -800,8 +861,16 @@ function TabelaFechados({
                                     <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">
                                         {formatCNPJ(c.cnpj)}
                                     </td>
-                                    <td className="px-3 py-3 text-[11px] font-black text-white max-w-[200px] truncate">
-                                        {c.razaoSocial}
+                                    <td className="px-3 py-3 max-w-[200px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => onEditar(c)}
+                                            title="Editar lead"
+                                            className="flex items-center gap-1.5 text-[11px] font-black text-white truncate hover:underline group"
+                                        >
+                                            {c.razaoSocial}
+                                            <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                                        </button>
                                     </td>
                                     <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[160px] truncate">
                                         {c.nomeFantasia || <span className="text-slate-700">—</span>}
@@ -857,12 +926,14 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
     const [painelGlobal, setPainelGlobal] = useState(false);
     const [filtroColaboradorId, setFiltroColaboradorId] = useState<number | undefined>(undefined);
 
-    const [contratos, setContratos] = useState<Contrato[]>([]);
+    const [enviados, setEnviados] = useState<Contrato[]>([]);
+    const [fechados, setFechados] = useState<Contrato[]>([]);
     const [carregando, setCarregando] = useState(true);
     const [colaboradores, setColaboradores] = useState<UsuarioSimples[]>([]);
     const [servicos, setServicos] = useState<string[]>([]);
     const [contratoParaFechar, setContratoParaFechar] = useState<Contrato | null>(null);
     const [contratoParaExcluir, setContratoParaExcluir] = useState<Contrato | null>(null);
+    const [modoEdicao, setModoEdicao] = useState<Contrato | null>(null);
     const [excluindo, setExcluindo] = useState(false);
 
     const isAdmin = isAdminOrCeo(role);
@@ -877,7 +948,8 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                 filtroUsuarioId: filtroColaboradorId,
             });
             if (res.success) {
-                setContratos(res.contratos as unknown as Contrato[]);
+                setEnviados(res.enviados as unknown as Contrato[]);
+                setFechados(res.fechados as unknown as Contrato[]);
             }
         } finally {
             setCarregando(false);
@@ -935,10 +1007,8 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
         setMes(novoMes);
         setAno(novoAno);
         setMostraForm(false);
+        setModoEdicao(null);
     };
-
-    const enviados = contratos.filter((c) => c.status === "ENVIADO");
-    const fechados = contratos.filter((c) => c.status === "FECHADO");
 
     const totalFechado = fechados.reduce((acc, c) => acc + c.valorContrato, 0);
 
@@ -1052,10 +1122,10 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                     )}
 
                                     <button
-                                        onClick={() => setMostraForm((v) => !v)}
+                                        onClick={() => { setMostraForm((v) => !v); setModoEdicao(null); }}
                                         className="flex items-center gap-2 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase tracking-widest transition-colors"
                                     >
-                                        {mostraForm ? <Minus size={13} /> : <Plus size={13} />}
+                                        {(mostraForm && !modoEdicao) ? <Minus size={13} /> : <Plus size={13} />}
                                         <span className="hidden sm:block">Novo Cliente</span>
                                     </button>
                                 </div>
@@ -1066,20 +1136,23 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             {/* Formulário */}
                             <AnimatePresence>
-                                {mostraForm && (
+                                {(mostraForm || modoEdicao) && (
                                     <FormNovoContrato
                                         mes={mes}
                                         ano={ano}
                                         colaboradores={colaboradores}
                                         servicos={servicos}
                                         nomeUsuario={nomeUsuario}
+                                        initialData={modoEdicao ?? undefined}
+                                        editandoId={modoEdicao?.id}
                                         onServicoNovo={handleServicoNovo}
                                         onSalvo={() => {
                                             setMostraForm(false);
+                                            setModoEdicao(null);
                                             void carregarContratos();
                                             onDadosAlterados?.();
                                         }}
-                                        onCancelar={() => setMostraForm(false)}
+                                        onCancelar={() => { setMostraForm(false); setModoEdicao(null); }}
                                     />
                                 )}
                             </AnimatePresence>
@@ -1101,6 +1174,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                             canDelete={isAdmin}
                                             onConfirmar={setContratoParaFechar}
                                             onExcluir={setContratoParaExcluir}
+                                            onEditar={(c) => { setModoEdicao(c); setMostraForm(false); }}
                                         />
                                         <TabelaFechados
                                             contratos={fechados}
@@ -1108,6 +1182,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                             canDelete={isAdmin}
                                             onExcluir={setContratoParaExcluir}
                                             onRecarregar={carregarContratos}
+                                            onEditar={(c) => { setModoEdicao(c); setMostraForm(false); }}
                                         />
                                     </>
                                 )}

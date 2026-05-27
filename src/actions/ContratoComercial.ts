@@ -39,6 +39,19 @@ const CriarContratoSchema = z.object({
     socios: z.array(SocioSchema).optional(),
 });
 
+const AtualizarContratoSchema = z.object({
+    id: z.string().cuid(),
+    cnpj: z.string().min(14).max(18),
+    razaoSocial: z.string().min(1),
+    nomeFantasia: z.string().optional(),
+    valorContrato: z.number().positive(),
+    formaPagamento: z.enum(["ENTRADA_EXITO", "PARCELADO_CC", "INTEGRAL_PIX", "OUTRO"]),
+    servico: z.string().min(1),
+    canalAquisicao: z.string().min(1),
+    closerNome: z.string().min(1),
+    socios: z.array(SocioSchema).optional(),
+});
+
 const ConfirmarFechamentoSchema = z.object({
     id: z.string().cuid(),
     pagamentoConfirmado: z.boolean(),
@@ -94,6 +107,47 @@ export async function criarContrato(raw: unknown) {
     } catch (err) {
         console.error("criarContrato:", err);
         return { success: false as const, error: "Erro ao criar contrato" };
+    }
+}
+
+export async function atualizarContrato(raw: unknown) {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+    const userId = Number((session.user as { id?: string }).id);
+    const dbUser = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
+    const role = dbUser?.role ?? "";
+    if (!isComercialOrAdmin(role)) return { success: false as const, error: "Sem permissão" };
+
+    const parsed = AtualizarContratoSchema.safeParse(raw);
+    if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message };
+    const d = parsed.data;
+
+    const contrato = await db.contratoComercial.findUnique({ where: { id: d.id } });
+    if (!contrato) return { success: false as const, error: "Contrato não encontrado" };
+    if (!isAdminOrCeo(role) && contrato.usuarioId !== userId) {
+        return { success: false as const, error: "Sem permissão" };
+    }
+
+    try {
+        const atualizado = await db.contratoComercial.update({
+            where: { id: d.id },
+            data: {
+                cnpj: d.cnpj.replace(/\D/g, ""),
+                razaoSocial: d.razaoSocial,
+                nomeFantasia: d.nomeFantasia ?? null,
+                valorContrato: d.valorContrato,
+                formaPagamento: d.formaPagamento,
+                servico: d.servico,
+                canalAquisicao: d.canalAquisicao,
+                closerNome: d.closerNome,
+                socios: d.socios ?? [],
+            },
+        });
+        revalidatePath("/PainelAlpha/Metas");
+        return { success: true as const, contrato: atualizado };
+    } catch (err) {
+        console.error("atualizarContrato:", err);
+        return { success: false as const, error: "Erro ao atualizar contrato" };
     }
 }
 
@@ -240,22 +294,29 @@ export async function getContratos(options: GetContratosOptions) {
         whereUsuarioId = userId;
     }
 
-    try {
-        const contratos = await db.contratoComercial.findMany({
-            where: {
-                mes,
-                ano,
-                ...(whereUsuarioId !== undefined ? { usuarioId: whereUsuarioId } : {}),
-            },
-            include: {
-                usuario: {
-                    select: { id: true, nome: true, imagemUrl: true },
-                },
-            },
-            orderBy: { createdAt: "desc" },
-        });
+    const inicioMes = new Date(ano, mes - 1, 1);
+    const fimMes = new Date(ano, mes, 1);
+    const usuarioFilter = whereUsuarioId !== undefined ? { usuarioId: whereUsuarioId } : {};
 
-        return { success: true as const, contratos };
+    try {
+        const [enviados, fechados] = await Promise.all([
+            db.contratoComercial.findMany({
+                where: { mes, ano, status: "ENVIADO", ...usuarioFilter },
+                include: { usuario: { select: { id: true, nome: true, imagemUrl: true } } },
+                orderBy: { createdAt: "desc" },
+            }),
+            db.contratoComercial.findMany({
+                where: {
+                    status: "FECHADO",
+                    pagamentoConfirmadoEm: { gte: inicioMes, lt: fimMes },
+                    ...usuarioFilter,
+                },
+                include: { usuario: { select: { id: true, nome: true, imagemUrl: true } } },
+                orderBy: { pagamentoConfirmadoEm: "desc" },
+            }),
+        ]);
+
+        return { success: true as const, enviados, fechados };
     } catch (err) {
         console.error("getContratos:", err);
         return { success: false as const, error: "Erro ao buscar contratos" };
