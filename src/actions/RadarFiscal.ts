@@ -3,6 +3,19 @@
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+export async function verificarCnpjsNoRadarFiscal(cnpjs: string[]) {
+    try {
+        const registros = await db.radar_fiscal.findMany({
+            where: { cnpj: { in: cnpjs } },
+            select: { cnpj: true },
+        });
+        return { success: true as const, encontrados: registros.map((r) => r.cnpj) };
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : "Erro desconhecido";
+        return { success: false as const, error: msg, encontrados: [] as string[] };
+    }
+}
+
 export async function protocolarNoRadarAction(dados: any) {
     try {
         const payload = {

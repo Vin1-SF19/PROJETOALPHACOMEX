@@ -13,6 +13,7 @@ import {
   deletarRegistrosBanco,
   salvarConsultaIndividual,
   salvarPlanilhaCompleta,
+  verificarCnpjsExistentes,
 } from "@/actions/RadarAction";
 import { prepararReconsultaLote } from "@/app/api/Reconsulta/ReconsultaRadar";
 import { toast } from "sonner";
@@ -81,10 +82,12 @@ export default function HabilitacaoRadar() {
   const [empresas, setEmpresas] = useState<EmpresaRadar[]>([]);
   const [loading, setLoading] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const [pausado, setPausado] = useState(false);
   const [totalLote, setTotalLote] = useState(0);
   const [processadas, setProcessadas] = useState(0);
   const [statusLote, setStatusLote] = useState("");
-  const cancelarProcessamento = useRef<Boolean>(false);
+  const cancelarProcessamento = useRef<boolean>(false);
+  const pausarRef = useRef<boolean>(false);
   const [infosimples, setInfosimples] = useState<any>(null);
   const [isOffline, setIsOffline] = useState(false);
   const [empresaSelecionada, setEmpresaSelecionada] = useState<any | null>(null);
@@ -437,6 +440,23 @@ export default function HabilitacaoRadar() {
     toast.success("Reconsulta concluída!");
   };
 
+  const esperarResumido = async () => {
+    while (pausarRef.current && !cancelarProcessamento.current) {
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  };
+
+  const handlePausar = () => {
+    pausarRef.current = true;
+    setPausado(true);
+    setStatusLote("PAUSADO — clique em retomar para continuar");
+  };
+
+  const handleRetomar = () => {
+    pausarRef.current = false;
+    setPausado(false);
+  };
+
   const handleImportarLote = async (dadosNovos: EmpresaRadar[]) => {
     const existentes = new Set(
       empresas.map((e) => String(e.cnpj).replace(/\D/g, "").padStart(14, "0"))
@@ -458,51 +478,88 @@ export default function HabilitacaoRadar() {
     const tid = toast.loading("Sincronizando com o banco Alpha...");
 
     try {
-      const resultados = await Promise.all(
-        filtrados.map(async (item) => {
-          const r = await fetch(
-            `/api/ConsultaCompleta?cnpj=${item.cnpj}&somenteBanco=true`
-          );
-          setProcessadas((p) => p + 1);
-          if (r.ok) {
-            const b = await r.json();
-            if (b?.razao_social) return { ...item, ...b, salvo: true };
+      // ── Fase 1: consulta banco em chunks (SQLite limit = 200/query) ──
+      const CHUNK = 200;
+      const encontradosMap = new Map<string, EmpresaRadar>();
+      const cnpjsFiltrados = filtrados.map((i) => i.cnpj);
+
+      for (let i = 0; i < cnpjsFiltrados.length; i += CHUNK) {
+        await esperarResumido();
+        if (cancelarProcessamento.current) break;
+
+        setStatusLote(`Verificando banco... ${Math.min(i + CHUNK, filtrados.length).toLocaleString()} / ${filtrados.length.toLocaleString()}`);
+        const chunk = cnpjsFiltrados.slice(i, i + CHUNK);
+        const res = await verificarCnpjsExistentes(chunk);
+        if (res.success) {
+          for (const d of res.data) {
+            encontradosMap.set(d.cnpj, d as unknown as EmpresaRadar);
           }
-          return { ...item, salvo: false };
-        })
-      );
+        }
+        setProcessadas(Math.min(i + CHUNK, filtrados.length));
+      }
+
+      if (cancelarProcessamento.current) {
+        toast.error("Importação cancelada.", { id: tid });
+        setEmpresas((prev) => [...prev, ...filtrados.map((f) => ({ ...f, salvo: false }))]);
+        return;
+      }
+
+      const resultados: EmpresaRadar[] = filtrados.map((item) => {
+        const db = encontradosMap.get(item.cnpj);
+        return db ? { ...item, ...db, salvo: true } : { ...item, salvo: false };
+      });
 
       const novos = resultados.filter((e) => !e.salvo);
       setEmpresas((prev) => [...prev, ...resultados]);
 
-      if (novos.length > 0) {
-        toast.loading(
-          `${resultados.length - novos.length} no banco. Consultando ${novos.length} novos...`,
-          { id: tid }
-        );
-        (async () => {
-          for (const item of novos) {
-            try {
-              const r = await fetch(`/api/ConsultaCompleta?cnpj=${item.cnpj}`);
-              if (r.ok) {
-                const d = await r.json();
-                setEmpresas((prev) =>
-                  prev.map((e) => (e.cnpj === item.cnpj ? { ...e, ...d, salvo: true } : e))
-                );
-              }
-            } catch {}
+      if (novos.length === 0) {
+        toast.success(`${resultados.length} registros recuperados do banco.`, { id: tid });
+        return;
+      }
+
+      toast.loading(
+        `${resultados.length - novos.length} no banco · ${novos.length} sendo consultados na Receita...`,
+        { id: tid }
+      );
+
+      // ── Fase 2: API externa só para CNPJs novos ──
+      setTotalLote(novos.length);
+      setProcessadas(0);
+
+      for (let i = 0; i < novos.length; i++) {
+        await esperarResumido();
+        if (cancelarProcessamento.current) break;
+
+        const item = novos[i];
+        setStatusLote(`Consultando Receita... ${i + 1} / ${novos.length}`);
+        setProcessadas(i + 1);
+
+        try {
+          const r = await fetch(`/api/ConsultaCompleta?cnpj=${item.cnpj}`);
+          if (r.ok) {
+            const d = await r.json();
+            setEmpresas((prev) =>
+              prev.map((e) => (e.cnpj === item.cnpj ? { ...e, ...d, salvo: true } : e))
+            );
           }
-          toast.success("Importação concluída!", { id: tid });
-        })();
+        } catch {}
+      }
+
+      if (cancelarProcessamento.current) {
+        toast.error("Consulta interrompida.", { id: tid });
       } else {
-        toast.success(`${resultados.length} registros recuperados.`, { id: tid });
+        toast.success(`Importação concluída! ${novos.length} consultados na Receita.`, { id: tid });
       }
     } catch {
       toast.error("Erro ao processar lote", { id: tid });
       setEmpresas((prev) => [...prev, ...filtrados]);
     } finally {
+      cancelarProcessamento.current = false;
+      pausarRef.current = false;
+      setPausado(false);
       setLoading(false);
       setProcessando(false);
+      setStatusLote("");
     }
   };
 
@@ -808,6 +865,8 @@ export default function HabilitacaoRadar() {
             processando={processando}
             onCancelar={() => {
               cancelarProcessamento.current = true;
+              pausarRef.current = false;
+              setPausado(false);
               setProcessando(false);
               setStatusLote("Operação cancelada.");
             }}
@@ -878,8 +937,13 @@ export default function HabilitacaoRadar() {
             processadas={processadas}
             statusLote={statusLote}
             processando={processando || loading}
+            pausado={pausado}
+            onPausar={handlePausar}
+            onRetomar={handleRetomar}
             onCancelar={() => {
               cancelarProcessamento.current = true;
+              pausarRef.current = false;
+              setPausado(false);
               setProcessando(false);
               setStatusLote("Cancelando...");
               setLoading(false);
