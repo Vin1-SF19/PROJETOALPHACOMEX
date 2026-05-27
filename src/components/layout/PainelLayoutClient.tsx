@@ -46,16 +46,12 @@ export default function PainelLayoutClient({
   useAdminChamadosNotifications(role);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────
-  const [isEmbedded, setIsEmbedded] = useState(false);
+  // Lazy initializer: detecta no primeiro render client-side, evita flash de sidebar dupla
+  const [isEmbedded] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try { return window !== window.top; } catch { return true; }
+  });
   const [tvMode, setTvMode] = useState(false);
-
-  useEffect(() => {
-    try {
-      setIsEmbedded(window !== window.top);
-    } catch {
-      setIsEmbedded(true);
-    }
-  }, []);
 
   // Recebe postMessage dos iframes filhos (ex: Modo TV do Painel de Metas)
   useEffect(() => {
@@ -140,6 +136,17 @@ export default function PainelLayoutClient({
       return filtered;
     });
   }, []);
+
+  // Recebe ALPHA_OPEN_TAB dos iframes filhos (ex: PainelAlpha abrindo módulo em nova aba)
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'ALPHA_OPEN_TAB' && e.data.url) {
+        openTab(e.data.url, e.data.label || getLabelForUrl(e.data.url));
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [openTab]);
 
   // ── Embedded: render children only, no sidebar/tabs ──────────────────────
 

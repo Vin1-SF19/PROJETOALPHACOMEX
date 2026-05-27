@@ -259,12 +259,18 @@ function ModuloCard({
     mod.allowedRoles?.includes(userRole) ||
     userPermissions.some(p => p.toLowerCase() === mod.permission?.toLowerCase());
 
+  function openModuleTab(e: React.MouseEvent) {
+    if (!temAcesso) { e.preventDefault(); return; }
+    e.preventDefault();
+    window.parent.postMessage({ type: 'ALPHA_OPEN_TAB', url: mod.href, label: mod.label }, '*');
+  }
+
   if (compact) {
     return (
       <AbaDeAcesso permissaoRequerida={mod.id} userRole={isAdmin ? "Admin" : "User"} userPermissions={userPermissions}>
         <Link
           href={temAcesso ? mod.href : "#"}
-          onClick={e => !temAcesso && e.preventDefault()}
+          onClick={openModuleTab}
           className={`group relative h-28 rounded-[2rem] border transition-all p-5 flex items-center gap-5 overflow-hidden ${style.border} hover:${style.border.replace("20", "40")} shadow-lg ${style.shadow}`}
         >
           <div className="p-3 bg-white/5 rounded-2xl border border-white/5 group-hover:scale-110 transition-transform duration-500 shrink-0">
@@ -308,7 +314,7 @@ function ModuloCard({
         </div>
 
         <div className="relative z-10 pt-4">
-          <Link href={temAcesso ? mod.href : "#"} onClick={e => !temAcesso && e.preventDefault()}>
+          <Link href={temAcesso ? mod.href : "#"} onClick={openModuleTab}>
             <Button className={`cursor-pointer w-full h-14 border rounded-[1.5rem] font-black uppercase tracking-[0.3em] text-[9px] transition-all duration-500 ${temAcesso ? `bg-slate-900/80 ${style.text} ${style.border.replace("20", "40")} hover:${style.bg} hover:text-white hover:border-transparent` : "bg-slate-950 text-slate-800 border-white/5 cursor-not-allowed"}`}>
               <span className="flex items-center justify-center gap-2">
                 {temAcesso ? (
