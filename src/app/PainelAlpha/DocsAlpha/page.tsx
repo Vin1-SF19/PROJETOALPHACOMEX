@@ -337,7 +337,7 @@ export default function PaginaDocumentos() {
                                     </div>
                                 </div>
                                 <div className="flex-1 bg-white relative overflow-auto">
-                                    <AntiCapture screenshotPrevent clipboardPrevent devtoolsPrevent userSelect={false}>
+                                    <AntiCapture screenshotPrevent clipboardPrevent userSelect={false}>
                                         {docSelecionado.tipo === "VIDEO" ? (
                                             <video controls className="w-full h-full bg-black" src={docSelecionado.url} />
                                         ) : (
@@ -426,7 +426,7 @@ export default function PaginaDocumentos() {
                                         </div>
                                     </div>
                                     <div className="flex-1 bg-white relative overflow-auto">
-                                        <AntiCapture screenshotPrevent clipboardPrevent devtoolsPrevent userSelect={false}>
+                                        <AntiCapture screenshotPrevent clipboardPrevent userSelect={false}>
                                             {docSelecionado.tipo === "VIDEO" ? (
                                                 <video controls className="w-full h-full bg-black" src={docSelecionado.url} />
                                             ) : (
