@@ -48,7 +48,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
     const listaServicos = ["Habilitação RADAR - 50K", "Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO", "TTD 409", "Recuperação AFRMM", "Outras Recuperaçoes Tributarias"];
     const SERVICOS_COM_EMBASAMENTO = ["Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO"];
     const embasamentoDesbloqueado = SERVICOS_COM_EMBASAMENTO.some(s => servicosSelecionados.includes(s));
-    const listaAnalistas = ["Vitor", "Maria", "Kaline", "Marcelo"];
+    const listaAnalistas = ["Vitor", "Maria", "Kaline", "Marcelo", "Heline"];
 
     const updateSocio = (index: number, field: string, value: string) => {
         const novosSocios = [...socios];

@@ -64,9 +64,11 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
     const [showAnalistas, setShowAnalistas] = useState(false);
     const [isCriandoServico, setIsCriandoServico] = useState(false);
     const [novoServicoNome, setNovoServicoNome] = useState("");
+    const [isCriandoAnalista, setIsCriandoAnalista] = useState(false);
+    const [novoAnalistaNome, setNovoAnalistaNome] = useState("");
 
     const listaServicos = ["Habilitação RADAR - 50K", "Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO", "TTD 409", "Recuperação AFRMM", "Outras Recuperaçoes Tributarias"];
-    const listaAnalistas = ["Vitor", "Maria", "Kaline", "Marcelo"];
+    const listaAnalistas = ["Vitor", "Maria", "Kaline", "Marcelo", "Heline"];
     const SERVICOS_COM_EMBASAMENTO = ["Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO"];
     const embasamentoDesbloqueado = SERVICOS_COM_EMBASAMENTO.some(s => servicosSelecionados.includes(s));
 
@@ -675,7 +677,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                                                     <button
                                                         key={a}
                                                         type="button"
-                                                        onClick={() => { setAnalistaResponsavel(a); setShowAnalistas(false); }}
+                                                        onClick={() => { setAnalistaResponsavel(a); setShowAnalistas(false); setIsCriandoAnalista(false); }}
                                                         className={`w-full text-left p-3 rounded-xl text-xs font-bold transition-all ${
                                                             analistaResponsavel === a
                                                                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
@@ -685,6 +687,51 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                                                         {a}
                                                     </button>
                                                 ))}
+
+                                                {/* OPÇÃO NOVO ANALISTA */}
+                                                {!isCriandoAnalista ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsCriandoAnalista(true)}
+                                                        className="w-full text-left p-3 rounded-xl text-[10px] font-black text-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-2 border-t border-white/5 mt-2 pt-3"
+                                                    >
+                                                        <Plus size={14} /> NOVO ANALISTA
+                                                    </button>
+                                                ) : (
+                                                    <div className="mt-2 p-2 border-t border-white/5 space-y-2 animate-in slide-in-from-top-2">
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            placeholder="Nome do analista..."
+                                                            value={novoAnalistaNome}
+                                                            onChange={(e) => setNovoAnalistaNome(e.target.value)}
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-white outline-none focus:border-emerald-500"
+                                                        />
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (novoAnalistaNome) {
+                                                                        setAnalistaResponsavel(novoAnalistaNome);
+                                                                        setShowAnalistas(false);
+                                                                        setIsCriandoAnalista(false);
+                                                                        setNovoAnalistaNome("");
+                                                                    }
+                                                                }}
+                                                                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black p-2 rounded-lg uppercase transition-colors"
+                                                            >
+                                                                Confirmar
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsCriandoAnalista(false)}
+                                                                className="bg-slate-800 hover:bg-slate-700 text-slate-400 text-[9px] font-black p-2 rounded-lg uppercase transition-colors"
+                                                            >
+                                                                Cancelar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
