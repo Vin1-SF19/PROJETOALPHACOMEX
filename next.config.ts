@@ -19,8 +19,7 @@ const nextConfig = {
     ],
   },
 
-  // Turbopack: config vazio para silenciar aviso de webpack-sem-turbopack
-  turbopack: {},
+
 };
 
 export default nextConfig;

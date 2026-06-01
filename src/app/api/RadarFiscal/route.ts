@@ -96,14 +96,30 @@ export async function GET(req: Request) {
             });
         }
 
-        let regimeEAraw = ea?.regime_tributario || "NÃO INFORMADO";
-        let regimeLimpo = regimeEAraw;
-        if (regimeEAraw.includes(";")) {
-            const partes = regimeEAraw.split(";").map((p: string) => p.trim()).filter(Boolean);
-            regimeLimpo = partes[partes.length - 1].replace(/ANO \d{4} /i, "").trim();
+        const isSimplesEA = String(ea?.opcao_simples || "").toUpperCase() === "S";
+
+        let regimeLimpo: string;
+        if (isSimplesEA) {
+            // opcao_simples é a fonte autoritativa para Simples Nacional
+            regimeLimpo = "SIMPLES NACIONAL";
+        } else {
+            const regimeEAraw = String(ea?.regime_tributario || "NÃO INFORMADO");
+            const stripAno = (s: string) => s.replace(/ANO\s+\d{4}\s+/i, "").trim();
+
+            if (regimeEAraw.includes(";")) {
+                const partes = regimeEAraw.split(";").map((p: string) => p.trim()).filter(Boolean);
+                // Ordena por ano desc para garantir que pegamos o regime mais recente
+                const comAno = partes.map(p => {
+                    const m = p.match(/ANO\s+(\d{4})\s+/i);
+                    return { ano: m ? parseInt(m[1]) : 0, regime: stripAno(p) };
+                });
+                comAno.sort((a, b) => b.ano - a.ano);
+                regimeLimpo = comAno[0]?.regime || stripAno(partes[partes.length - 1]);
+            } else {
+                regimeLimpo = stripAno(regimeEAraw);
+            }
         }
 
-        const isSimplesEA = String(ea?.opcao_simples || "").toUpperCase() === "S";
         const regimeEA = String(regimeLimpo).toUpperCase();
 
         let qualificacaoFinal = "DESQUALIFICADO";

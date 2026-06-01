@@ -255,7 +255,7 @@ export const FichaAlphaPDF = ({ dados, userLogado }: { dados: any, userLogado: s
 
                 <View style={[styles.optionRow, { marginTop: 4 }]}>
                   <Text style={[styles.optionText, { color: '#666' }]}>Obs: </Text>
-              {!regime.includes("SIMPLES") && eq.regimeEA && (
+              {(regime.includes("REAL") || regime.includes("PRESUMIDO")) && (
                   <Text style={styles.optionText}>{eq.regimeEA}</Text>
                 )}
                 </View>
