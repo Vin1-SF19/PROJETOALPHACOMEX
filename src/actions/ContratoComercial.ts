@@ -286,8 +286,9 @@ export async function getContratos(options: GetContratosOptions) {
 
     let whereUsuarioId: number | undefined;
 
-    if (isAdminOrCeo(role) && adminView) {
-        // admin vê todos — filtra por colaborador se filtroUsuarioId passado
+    const podeVerTodos = isAdminOrCeo(role) || role === "FINANCEIRO";
+    if (podeVerTodos && adminView) {
+        // admin/financeiro vê todos — filtra por colaborador se filtroUsuarioId passado
         whereUsuarioId = filtroUsuarioId;
     } else {
         // comercial só vê o próprio
