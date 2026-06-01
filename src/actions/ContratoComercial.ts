@@ -300,14 +300,16 @@ export async function getContratos(options: GetContratosOptions) {
 
     try {
         const [enviados, fechados, arquivados] = await Promise.all([
+            // Enviados: sem filtro de mês — aparecem independente do mês selecionado
             db.contratoComercial.findMany({
-                where: { mes, ano, status: "ENVIADO", arquivado: false, ...usuarioFilter },
+                where: { status: "ENVIADO", arquivado: false, ...usuarioFilter },
                 include: {
                     usuario: { select: { id: true, nome: true, imagemUrl: true } },
                     observacoes: { orderBy: { criadoEm: "desc" } },
                 },
                 orderBy: { createdAt: "desc" },
             }),
+            // Fechados: filtrados pelo mês selecionado via pagamentoConfirmadoEm
             db.contratoComercial.findMany({
                 where: {
                     status: "FECHADO",
@@ -321,8 +323,9 @@ export async function getContratos(options: GetContratosOptions) {
                 },
                 orderBy: { pagamentoConfirmadoEm: "desc" },
             }),
+            // Arquivados: sem filtro de mês — mesmo comportamento dos enviados
             db.contratoComercial.findMany({
-                where: { mes, ano, status: "ENVIADO", arquivado: true, ...usuarioFilter },
+                where: { status: "ENVIADO", arquivado: true, ...usuarioFilter },
                 include: {
                     usuario: { select: { id: true, nome: true, imagemUrl: true } },
                     observacoes: { orderBy: { criadoEm: "desc" } },
