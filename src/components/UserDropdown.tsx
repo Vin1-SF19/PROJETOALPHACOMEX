@@ -10,8 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, Shield, Activity, Fingerprint, ShieldCheck, SlidersHorizontal, Zap } from "lucide-react";
 import LogoutButton from "./LogoutUser";
-import Link from "next/link";
 import { useSession } from "next-auth/react";
+
+function openTab(url: string, label: string) {
+    window.parent.postMessage({ type: "ALPHA_OPEN_TAB", url, label }, "*");
+}
 
 interface UserDropdownProps {
     userName: string;
@@ -80,26 +83,29 @@ export function UserDropdown({ userName, userRole }: UserDropdownProps) {
                 <DropdownMenuSeparator className="bg-white/5 mx-2" />
 
                 <div className="py-3 space-y-2"> 
-                    <Link href="/PainelAlpha/InfosPerfil/Perfil" className="cursor-pointer block">
-                        <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-blue-500/30 hover:bg-blue-600/10 hover:text-blue-400 focus:bg-blue-600/10 focus:text-blue-400 transition-all duration-300 group outline-none">
-                            <User size={16} className="group-hover:rotate-12 transition-transform" />
-                            <span className="text-[10px] font-black uppercase tracking-widest italic">Meu Dossiê</span>
-                        </DropdownMenuItem>
-                    </Link>
+                    <DropdownMenuItem
+                        onClick={() => openTab("/PainelAlpha/InfosPerfil/Perfil", "Meu Dossiê")}
+                        className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-blue-500/30 hover:bg-blue-600/10 hover:text-blue-400 focus:bg-blue-600/10 focus:text-blue-400 transition-all duration-300 group outline-none"
+                    >
+                        <User size={16} className="group-hover:rotate-12 transition-transform" />
+                        <span className="text-[10px] font-black uppercase tracking-widest italic">Meu Dossiê</span>
+                    </DropdownMenuItem>
 
-                    <Link href="/PainelAlpha/InfosPerfil/Preferencias" className="cursor-pointer block">
-                        <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-indigo-500/30 hover:bg-indigo-600/10 hover:text-indigo-400 focus:bg-indigo-600/10 focus:text-indigo-400 transition-all duration-300 group outline-none">
-                            <SlidersHorizontal size={16} className="text-blue-500 group-hover:scale-110 transition-transform" />
-                            <span className="text-[10px] font-black uppercase tracking-widest italic">Interface Alpha</span>
-                        </DropdownMenuItem>
-                    </Link>
+                    <DropdownMenuItem
+                        onClick={() => openTab("/PainelAlpha/InfosPerfil/Preferencias", "Interface Alpha")}
+                        className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-indigo-500/30 hover:bg-indigo-600/10 hover:text-indigo-400 focus:bg-indigo-600/10 focus:text-indigo-400 transition-all duration-300 group outline-none"
+                    >
+                        <SlidersHorizontal size={16} className="text-blue-500 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] font-black uppercase tracking-widest italic">Interface Alpha</span>
+                    </DropdownMenuItem>
 
-                    <Link href="/PainelAlpha/InfosPerfil/Atalhos" className="cursor-pointer block">
-                        <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-amber-500/30 hover:bg-amber-600/10 hover:text-amber-400 focus:bg-amber-600/10 focus:text-amber-400 transition-all duration-300 group outline-none">
-                            <Zap size={16} className="text-amber-500 group-hover:animate-pulse" />
-                            <span className="text-[10px] font-black uppercase tracking-widest italic">Atalhos Rápidos</span>
-                        </DropdownMenuItem>
-                    </Link>
+                    <DropdownMenuItem
+                        onClick={() => openTab("/PainelAlpha/InfosPerfil/Atalhos", "Atalhos Rápidos")}
+                        className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-amber-500/30 hover:bg-amber-600/10 hover:text-amber-400 focus:bg-amber-600/10 focus:text-amber-400 transition-all duration-300 group outline-none"
+                    >
+                        <Zap size={16} className="text-amber-500 group-hover:animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-widest italic">Atalhos Rápidos</span>
+                    </DropdownMenuItem>
                 </div>
 
 

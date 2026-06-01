@@ -1,33 +1,30 @@
+import { auth } from "../../../../auth";
+import { redirect } from "next/navigation";
+import { getEmpresasChecklist } from "@/actions/checklist";
 import db from "@/lib/prisma";
-import ListaClientesOperacional from "./ListaClientesOperacional";
-import { Plus } from "lucide-react";
+import ListaChecklist from "./ListaChecklist";
 
-export default async function OperacionalPage() {
+export default async function CheckListPage() {
+  const session = await auth();
+  if (!session) redirect("/");
 
-    
-    const empresas = await db.operacionalClientes.findMany({ include: { cliente: true } });
-    const usuarios = await db.clienteOperacional.findMany(); // Busca todos os usuários de acesso
+  const userId = Number((session.user as any)?.id);
 
-    const clientes = await db.operacionalClientes.findMany({
-        orderBy: { createdAt: 'desc' }
-    });
+  const [result, clientesAcesso, userDb] = await Promise.all([
+    getEmpresasChecklist(),
+    db.clienteOperacional.findMany({ select: { id: true, nome: true, email: true } }),
+    db.usuarios.findUnique({
+      where: { id: userId },
+      select: { tema_interface: true },
+    }),
+  ]);
 
-    return (
-        <div className="p-8 space-y-8 bg-[#020617] min-h-screen text-slate-200">
-            <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight italic uppercase">
-                        Portfolio Operacional
-                    </h1>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-                        Gestão de Clientes e Protocolos
-                    </p>
-                </div>
+  const empresas = result.data ?? [];
+  const tema = userDb?.tema_interface ?? "blue";
 
-
-            </header>
-
-            <ListaClientesOperacional dadosIniciais={clientes} usuariosAcesso={usuarios} />
-        </div>
-    );
+  return (
+    <div className="relative min-h-screen text-slate-200 overflow-x-hidden">
+      <ListaChecklist empresas={empresas} clientesAcesso={clientesAcesso} tema={tema} />
+    </div>
+  );
 }

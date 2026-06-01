@@ -830,12 +830,15 @@ model OperacionalClientes {
   dataConstituicao String?
   contribuinte     String?
 
+  tipo         TipoEmbasamento?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   clienteId  String
   cliente    ClienteOperacional @relation(fields: [clienteId], references: [id])
   documentos DocumentoUnidade[]
+  checklists Checklist[]
 
   @@map("operacional_clientes")
 }
@@ -858,6 +861,67 @@ model DocumentoUnidade {
   updatedAt DateTime @updatedAt
 
   @@index([empresaId, codigoDocumento])
+}
+
+// ─── Checklist RADAR ──────────────────────────────────────────────────────────
+
+enum TipoEmbasamento {
+  RECEITA_BRUTA_DAS
+  RECEITA_BRUTA_CPRB
+  INICIO_RETOMADA
+  DISPONIBILIDADE_FINANCEIRA
+}
+
+enum StatusItemChecklist {
+  PENDENTE
+  OK
+  IRREGULAR
+  PARCIALMENTE_IRREGULAR
+  REVISAR
+  DESNECESSARIO
+  EM_ANALISE
+  AGUARDANDO_DOCUMENTOS
+  PRIORIDADE
+  FALAR_DR_EDVAN
+  FALAR_ANDREW
+}
+
+model Checklist {
+  id            String              @id @default(cuid())
+  empresaId     String
+  empresa       OperacionalClientes @relation(fields: [empresaId], references: [id])
+  tipo          TipoEmbasamento
+  itens         ItemChecklist[]
+  criadoEm      DateTime            @default(now())
+  atualizadoEm  DateTime            @updatedAt
+
+  @@unique([empresaId, tipo])
+}
+
+model ItemChecklist {
+  id           String              @id @default(cuid())
+  checklistId  String
+  checklist    Checklist           @relation(fields: [checklistId], references: [id])
+  codigo       String
+  secao        String
+  descricao    String
+  complemento  String?
+  status       StatusItemChecklist @default(PENDENTE)
+  observacao   String?
+  obrigatorio  Boolean             @default(true)
+  documentos   DocumentoChecklist[]
+  atualizadoEm DateTime            @updatedAt
+}
+
+model DocumentoChecklist {
+  id                String        @id @default(cuid())
+  itemId            String
+  item              ItemChecklist @relation(fields: [itemId], references: [id])
+  nome              String
+  url               String
+  uploadedByCliente Boolean       @default(false)
+  observacao        String?
+  criadoEm          DateTime      @default(now())
 }
 
 // ─── Alpha CRM ────────────────────────────────────────────────────────────────
@@ -952,13 +1016,17 @@ model ContratoComercial {
 
   contaComVenda Boolean @default(true)
 
+  arquivado   Boolean   @default(false)
+  arquivadoEm DateTime?
+
   socios Json?
 
   mes Int
   ano Int
 
-  usuarioId Int
-  usuario   usuarios @relation("ContratosComerciais", fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId    Int
+  usuario      usuarios             @relation("ContratosComerciais", fields: [usuarioId], references: [id], onDelete: Cascade)
+  observacoes  ObservacaoContrato[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -967,6 +1035,18 @@ model ContratoComercial {
   @@index([mes, ano])
   @@index([status])
   @@map("contratos_comerciais")
+}
+
+model ObservacaoContrato {
+  id         String             @id @default(cuid())
+  contratoId String
+  contrato   ContratoComercial  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  texto      String
+  tipo       String             @default("NA")
+  criadoEm   DateTime           @default(now())
+
+  @@index([contratoId])
+  @@map("observacoes_contratos")
 }
 
 model ServicosComerciais {

@@ -8,7 +8,7 @@ import { z } from "zod";
 
 // ─── Roles com acesso de gestão ────────────────────────────────────────────────
 
-const ROLES_GESTAO = ["Admin", "FINANCEIRO", "CEO"] as const;
+const ROLES_GESTAO = ["Admin", "FINANCEIRO", "CEO", "RECURSOS HUMANOS"] as const;
 type RoleGestao = (typeof ROLES_GESTAO)[number];
 
 function podeGestao(role: string): role is RoleGestao {
@@ -240,7 +240,7 @@ export async function validarHolerite(id: number) {
   if (!user?.id) return { success: false as const, error: "Não autorizado" };
 
   const role = user.role;
-  if (role !== "Admin" && role !== "FINANCEIRO") {
+  if (!podeGestao(role)) {
     return { success: false as const, error: "Acesso negado" };
   }
 
@@ -280,7 +280,7 @@ export async function rejeitarHolerite(id: number, motivo: string) {
   if (!user?.id) return { success: false as const, error: "Não autorizado" };
 
   const role = user.role;
-  if (role !== "Admin" && role !== "FINANCEIRO") {
+  if (!podeGestao(role)) {
     return { success: false as const, error: "Acesso negado" };
   }
 

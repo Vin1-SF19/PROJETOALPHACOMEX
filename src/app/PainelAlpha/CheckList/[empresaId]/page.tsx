@@ -1,62 +1,40 @@
-import db from "@/lib/prisma";
-import EmbasamentoRetomada from "../Embasamentos/EmbasamentoRetomada";
-import EmbasamentoFinanceiro from "../Embasamentos/EmbasamentoDisFinanc";
-import EmbasamentoDAS from "../Embasamentos/EmbasamentoDAS";
-import { getTema } from "@/lib/temas";
 import { auth } from "../../../../../auth";
 import { redirect } from "next/navigation";
+import { getEmpresaChecklist } from "@/actions/checklist";
+import db from "@/lib/prisma";
+import ChecklistView from "../ChecklistView";
 
-export default async function PageEmbasamento({ params, configBanco }: { params: Promise<{ empresaId: string }>, configBanco: any }) {
-    const session = await auth();
+export default async function EmpresaChecklistPage({
+  params,
+}: {
+  params: Promise<{ empresaId: string }>;
+}) {
+  const session = await auth();
+  if (!session) redirect("/");
 
-    const resolvedParams = await params;
-    const { empresaId } = resolvedParams;
+  const { empresaId } = await params;
 
-    const empresa = await db.operacionalClientes.findUnique({
-        where: { id: empresaId },
-        include: { cliente: true }
-    });
+  const [result, userDb] = await Promise.all([
+    getEmpresaChecklist(empresaId),
+    db.usuarios.findUnique({
+      where: { id: Number((session.user as any)?.id) },
+      select: { tema_interface: true },
+    }),
+  ]);
 
-    const userDb = await db.usuarios.findUnique({
-        where: { id: Number(session?.user?.id) },
-        select: { 
-          tema_interface: true, 
-          densidade_painel: true,
-          atalhos: true,
-          esconderBloqueados: true
-        }
-      });
-
-
-    if (!session) {
-        redirect("/");
-    }
-
-
-    if (!empresa) return <div className="p-10 text-white font-black">Empresa não encontrada</div>;
-
+  if (result.error || !result.data) {
     return (
-        <div className="p-8 min-h-screen bg-black">
-           
-
-            <div className="z-10">
-                {empresa.embasamento === "EmbasamentoFinanceiro" && (
-                    <EmbasamentoFinanceiro empresa={empresa} />
-                )}
-
-                {empresa.embasamento === "EmbasamentoRetomada" && (
-                    <EmbasamentoRetomada
-                        empresa={empresa}
-                        configBanco={{
-                            tema: userDb?.tema_interface || "blue"
-                        }}
-                    />
-                )}
-
-                {empresa.embasamento === "EmbasamentoDAS" && (
-                    <EmbasamentoDAS empresa={empresa} />
-                )}
-            </div>
-        </div>
+      <div className="p-10 text-white font-black text-center">
+        {result.error ?? "Empresa não encontrada"}
+      </div>
     );
+  }
+
+  return (
+    <ChecklistView
+      empresa={result.data as any}
+      userNome={(session.user as any)?.nome ?? (session.user as any)?.name ?? "Analista"}
+      tema={userDb?.tema_interface ?? "blue"}
+    />
+  );
 }

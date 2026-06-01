@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     X, ChevronLeft, ChevronRight, Plus, Search, Loader2,
     Eye, Check, BarChart3, Users, FileText, Minus, Trash2, Upload, Pencil,
+    MessageSquare, Archive, ArchiveRestore, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -17,6 +18,9 @@ import {
     criarServicoComercial,
     excluirContrato,
     atualizarContratoUrl,
+    arquivarContrato,
+    restaurarContrato,
+    criarObservacaoContrato,
 } from "@/actions/ContratoComercial";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
@@ -27,6 +31,14 @@ interface UsuarioSimples {
     id: number;
     nome: string;
     imagemUrl: string | null;
+}
+
+interface ObservacaoContrato {
+    id: string;
+    contratoId: string;
+    texto: string;
+    tipo: "POSITIVO" | "NEGATIVO" | "NA";
+    criadoEm: Date | string;
 }
 
 interface Contrato {
@@ -44,11 +56,14 @@ interface Contrato {
     pagamentoConfirmadoEm: Date | null;
     contratoAssinado: boolean;
     contratoUrl: string | null;
+    arquivado: boolean;
+    arquivadoEm: Date | null;
     mes: number;
     ano: number;
     usuarioId: number;
     usuario: { id: number; nome: string; imagemUrl: string | null };
     socios?: unknown;
+    observacoes?: ObservacaoContrato[];
     createdAt: Date | string;
 }
 
@@ -94,6 +109,10 @@ const SERVICOS_PADRAO = [
 
 function isAdminOrCeo(role: string) {
     return role === "Admin" || role === "CEO" || role === "Lider Comercial";
+}
+
+function podeVerGlobal(role: string) {
+    return role === "Admin" || role === "CEO" || role === "Lider Comercial" || role === "FINANCEIRO";
 }
 
 function formatBRL(v: number) {
@@ -618,6 +637,168 @@ function FormNovoContrato({
     );
 }
 
+// ─── Modal de Observação ─────────────────────────────────────────────────────
+
+const TIPO_CONFIG = {
+    POSITIVO: { icon: ThumbsUp,   label: "Positivo", cls: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20" },
+    NEGATIVO: { icon: ThumbsDown, label: "Negativo", cls: "text-red-400    border-red-500/30    bg-red-500/10    hover:bg-red-500/20"    },
+    NA:       { icon: FileText,   label: "N/A",      cls: "text-slate-400  border-white/10      bg-white/5       hover:bg-white/10"      },
+} as const;
+
+function ModalObservacao({
+    contrato,
+    onFechar,
+    onSalvo,
+}: {
+    contrato: Contrato;
+    onFechar: () => void;
+    onSalvo: (novaObs: ObservacaoContrato) => void;
+}) {
+    const [tipo, setTipo] = useState<"POSITIVO" | "NEGATIVO" | "NA">("NA");
+    const [texto, setTexto] = useState("");
+    const [salvando, setSalvando] = useState(false);
+    const [mostraForm, setMostraForm] = useState(!(contrato.observacoes?.length));
+
+    const obs = contrato.observacoes ?? [];
+
+    const handleSalvar = async () => {
+        if (!texto.trim()) { toast.error("Escreva a observação"); return; }
+        setSalvando(true);
+        try {
+            const res = await criarObservacaoContrato(contrato.id, texto, tipo);
+            if (!res.success) { toast.error(res.error); return; }
+            toast.success("Observação salva!");
+            onSalvo(res.obs as ObservacaoContrato);
+            setTexto("");
+            setTipo("NA");
+            setMostraForm(false);
+        } finally {
+            setSalvando(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onFechar} />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 10 }}
+                className="relative z-10 w-full max-w-md bg-[#070e1c] border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                    <div>
+                        <h3 className="font-black text-white uppercase italic text-sm leading-none">Observações</h3>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5 truncate max-w-[260px]">
+                            {contrato.razaoSocial}
+                        </p>
+                    </div>
+                    <button onClick={onFechar} className="p-1.5 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-colors">
+                        <X size={15} />
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    {/* Obs existentes */}
+                    {obs.length > 0 && (
+                        <div className="space-y-2">
+                            {obs.map((o) => {
+                                const cfg = TIPO_CONFIG[o.tipo as keyof typeof TIPO_CONFIG] ?? TIPO_CONFIG.NA;
+                                const Icon = cfg.icon;
+                                return (
+                                    <div key={o.id} className="p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase ${cfg.cls}`}>
+                                                <Icon size={10} /> {cfg.label}
+                                            </span>
+                                            <span className="text-[9px] text-slate-600 ml-auto">
+                                                {new Date(o.criadoEm).toLocaleDateString("pt-BR")}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-300 leading-relaxed">{o.texto}</p>
+                                    </div>
+                                );
+                            })}
+
+                            {!mostraForm && (
+                                <button
+                                    onClick={() => setMostraForm(true)}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border border-dashed border-white/10 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-white hover:border-white/20 transition-colors"
+                                >
+                                    <Plus size={11} /> Adicionar outra observação
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Formulário de nova obs */}
+                    <AnimatePresence>
+                        {mostraForm && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="space-y-3 overflow-hidden"
+                            >
+                                {/* Tipo */}
+                                <div className="flex gap-2">
+                                    {(Object.entries(TIPO_CONFIG) as [keyof typeof TIPO_CONFIG, typeof TIPO_CONFIG[keyof typeof TIPO_CONFIG]][]).map(([key, cfg]) => {
+                                        const Icon = cfg.icon;
+                                        return (
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                onClick={() => setTipo(key)}
+                                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${
+                                                    tipo === key
+                                                        ? cfg.cls + " ring-1 ring-inset ring-current"
+                                                        : "border-white/5 bg-white/[0.02] text-slate-600 hover:text-slate-400"
+                                                }`}
+                                            >
+                                                <Icon size={12} /> {cfg.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Texto */}
+                                <textarea
+                                    rows={4}
+                                    value={texto}
+                                    onChange={(e) => setTexto(e.target.value)}
+                                    placeholder="Descreva a observação..."
+                                    className="w-full bg-slate-950/80 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-700 focus:border-blue-500/50 focus:outline-none transition-colors resize-none"
+                                />
+
+                                <div className="flex gap-2">
+                                    {obs.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setMostraForm(false); setTexto(""); }}
+                                            className="flex-1 h-10 rounded-xl bg-white/5 border border-white/5 text-slate-400 font-black text-[9px] uppercase tracking-widest hover:bg-white/10 transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleSalvar}
+                                        disabled={salvando || !texto.trim()}
+                                        className="flex-1 h-10 rounded-xl bg-blue-600 text-white font-black text-[9px] uppercase tracking-widest hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-40"
+                                    >
+                                        {salvando ? <Loader2 size={13} className="animate-spin" /> : <><Check size={12} /> Salvar</>}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </motion.div>
+        </div>
+    );
+}
+
 // ─── Tabela de Contratos Enviados ─────────────────────────────────────────────
 
 function TabelaEnviados({
@@ -627,6 +808,8 @@ function TabelaEnviados({
     onConfirmar,
     onExcluir,
     onEditar,
+    onObsAtualizada,
+    onRecarregar,
 }: {
     contratos: Contrato[];
     showCloser: boolean;
@@ -634,9 +817,28 @@ function TabelaEnviados({
     onConfirmar: (c: Contrato) => void;
     onExcluir: (c: Contrato) => void;
     onEditar: (c: Contrato) => void;
+    onObsAtualizada: (contratoId: string, obs: ObservacaoContrato) => void;
+    onRecarregar: () => void;
 }) {
     const agora = new Date();
     const thCls = "px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap";
+    const [obsAberto, setObsAberto] = useState<string | null>(null);
+    const [expandido, setExpandido] = useState<string | null>(null);
+    const [arquivando, setArquivando] = useState<string | null>(null);
+
+    const handleArquivar = async (c: Contrato) => {
+        setArquivando(c.id);
+        try {
+            const res = await arquivarContrato(c.id);
+            if (res.success) { toast.success("Arquivado!"); onRecarregar(); }
+            else toast.error(res.error);
+        } finally {
+            setArquivando(null);
+        }
+    };
+
+    const contratoObsAberto = obsAberto ? contratos.find((c) => c.id === obsAberto) : null;
+
     return (
         <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -651,6 +853,7 @@ function TabelaEnviados({
                 <table className="w-full text-left">
                     <thead>
                         <tr className="bg-slate-900/60 border-b border-white/5">
+                            <th className="px-2 py-3 w-6" />
                             <th className={thCls}>Data Enviado</th>
                             {showCloser && <th className={thCls}>Closer</th>}
                             <th className={thCls}>CNPJ</th>
@@ -658,85 +861,139 @@ function TabelaEnviados({
                             <th className={thCls}>Nome Fantasia</th>
                             <th className={thCls}>Valor</th>
                             <th className={thCls}>Serviço</th>
-                            <th className={`${thCls} text-right`}>Ação</th>
-                            {canDelete && <th className={`${thCls} text-right`} />}
+                            <th className={`${thCls} text-right`}>Fechar</th>
+                            <th className={`${thCls} text-right`}>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {contratos.length === 0 ? (
                             <tr>
-                                <td
-                                    colSpan={(showCloser ? 1 : 0) + (canDelete ? 1 : 0) + 7}
-                                    className="px-4 py-8 text-center text-[9px] font-black uppercase tracking-widest text-slate-700"
-                                >
+                                <td colSpan={(showCloser ? 1 : 0) + 9} className="px-4 py-8 text-center text-[9px] font-black uppercase tracking-widest text-slate-700">
                                     Nenhum contrato enviado
                                 </td>
                             </tr>
                         ) : (
                             contratos.map((c) => {
                                 const atrasado = agora.getTime() - new Date(c.createdAt).getTime() > 24 * 60 * 60 * 1000;
+                                const obsCount = c.observacoes?.length ?? 0;
+                                const isExpanded = expandido === c.id;
                                 return (
-                                    <tr
-                                        key={c.id}
-                                        className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors"
-                                    >
-                                        <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">
-                                            {fmtDate(c.createdAt)}
-                                        </td>
-                                        {showCloser && (
-                                            <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">
-                                                {c.closerNome}
+                                    <>
+                                        <tr key={c.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                            {/* Seta de expansão */}
+                                            <td className="px-2 py-3">
+                                                {obsCount > 0 && (
+                                                    <button onClick={() => setExpandido(isExpanded ? null : c.id)} className="p-1 rounded-lg text-slate-600 hover:text-slate-300 transition-colors">
+                                                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                                    </button>
+                                                )}
                                             </td>
-                                        )}
-                                        <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">
-                                            {formatCNPJ(c.cnpj)}
-                                        </td>
-                                        <td className="px-3 py-3 max-w-[200px]">
-                                            <button
-                                                type="button"
-                                                onClick={() => onEditar(c)}
-                                                title="Editar lead"
-                                                className={`flex items-center gap-1.5 text-[11px] font-black truncate hover:underline group ${atrasado ? "text-red-500" : "text-white"}`}
-                                            >
-                                                {c.razaoSocial}
-                                                <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
-                                            </button>
-                                        </td>
-                                        <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[160px] truncate">
-                                            {c.nomeFantasia || <span className="text-slate-700">—</span>}
-                                        </td>
-                                        <td className="px-3 py-3 text-[11px] font-black text-emerald-400 whitespace-nowrap">
-                                            {formatBRL(c.valorContrato)}
-                                        </td>
-                                        <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">
-                                            {c.servico}
-                                        </td>
-                                        <td className="px-3 py-3 text-right">
-                                            <button
-                                                onClick={() => onConfirmar(c)}
-                                                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-colors animate-pulse hover:animate-none flex items-center gap-1.5 ml-auto whitespace-nowrap"
-                                            >
-                                                <Check size={11} /> Confirmar Fechamento
-                                            </button>
-                                        </td>
-                                        {canDelete && (
-                                            <td className="px-3 py-3 text-right">
-                                                <button
-                                                    onClick={() => onExcluir(c)}
-                                                    className="p-1.5 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                                    title="Excluir contrato"
+                                            <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">
+                                                {fmtDate(c.createdAt)}
+                                            </td>
+                                            {showCloser && (
+                                                <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">{c.closerNome}</td>
+                                            )}
+                                            <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                                                {formatCNPJ(c.cnpj)}
+                                            </td>
+                                            <td className="px-3 py-3 max-w-[200px]">
+                                                <button type="button" onClick={() => onEditar(c)} title="Editar lead"
+                                                    className={`flex items-center gap-1.5 text-[11px] font-black truncate hover:underline group ${atrasado ? "text-red-500" : "text-white"}`}
                                                 >
-                                                    <Trash2 size={13} />
+                                                    {c.razaoSocial}
+                                                    <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
                                                 </button>
                                             </td>
+                                            <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[160px] truncate">
+                                                {c.nomeFantasia || <span className="text-slate-700">—</span>}
+                                            </td>
+                                            <td className="px-3 py-3 text-[11px] font-black text-emerald-400 whitespace-nowrap">
+                                                {formatBRL(c.valorContrato)}
+                                            </td>
+                                            <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">{c.servico}</td>
+                                            <td className="px-3 py-3 text-right">
+                                                <button
+                                                    onClick={() => onConfirmar(c)}
+                                                    className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-colors animate-pulse hover:animate-none flex items-center gap-1.5 ml-auto whitespace-nowrap"
+                                                >
+                                                    <Check size={11} /> Confirmar Fechamento
+                                                </button>
+                                            </td>
+                                            {/* Ações: obs + arquivar + excluir */}
+                                            <td className="px-3 py-3 text-right">
+                                                <div className="flex items-center gap-1 justify-end">
+                                                    <button
+                                                        onClick={() => setObsAberto(c.id)}
+                                                        title="Observações"
+                                                        className="relative p-1.5 rounded-lg text-slate-600 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                                    >
+                                                        <MessageSquare size={13} />
+                                                        {obsCount > 0 && (
+                                                            <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 text-[8px] font-black flex items-center justify-center text-white">
+                                                                {obsCount}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleArquivar(c)}
+                                                        disabled={arquivando === c.id}
+                                                        title="Arquivar"
+                                                        className="p-1.5 rounded-lg text-slate-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-40"
+                                                    >
+                                                        {arquivando === c.id ? <Loader2 size={13} className="animate-spin" /> : <Archive size={13} />}
+                                                    </button>
+                                                    {canDelete && (
+                                                        <button onClick={() => onExcluir(c)} className="p-1.5 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Excluir">
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {/* Linha expandida com observações */}
+                                        {isExpanded && obsCount > 0 && (
+                                            <tr key={`${c.id}-obs`} className="bg-white/[0.01]">
+                                                <td colSpan={(showCloser ? 1 : 0) + 9 + 1} className="px-6 py-3">
+                                                    <div className="space-y-2">
+                                                        {c.observacoes?.map((o) => {
+                                                            const cfg = TIPO_CONFIG[o.tipo as keyof typeof TIPO_CONFIG] ?? TIPO_CONFIG.NA;
+                                                            const Icon = cfg.icon;
+                                                            return (
+                                                                <div key={o.id} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                                                                    <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[8px] font-black uppercase mt-0.5 ${cfg.cls}`}>
+                                                                        <Icon size={9} />
+                                                                    </span>
+                                                                    <p className="text-[11px] text-slate-300 flex-1">{o.texto}</p>
+                                                                    <span className="text-[9px] text-slate-600 shrink-0">{new Date(o.criadoEm).toLocaleDateString("pt-BR")}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </td>
+                                            </tr>
                                         )}
-                                    </tr>
+                                    </>
                                 );
                             })
                         )}
                     </tbody>
                 </table>
             </div>
+
+            {/* Modal de observação */}
+            <AnimatePresence>
+                {contratoObsAberto && (
+                    <ModalObservacao
+                        contrato={contratoObsAberto}
+                        onFechar={() => setObsAberto(null)}
+                        onSalvo={(novaObs) => {
+                            onObsAtualizada(contratoObsAberto.id, novaObs);
+                            setObsAberto(null);
+                        }}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }
@@ -807,6 +1064,7 @@ function TabelaFechados({
     onRecarregar: () => void;
     onEditar: (c: Contrato) => void;
 }) {
+    const thCls = "px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap";
     return (
         <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -821,53 +1079,34 @@ function TabelaFechados({
                 <table className="w-full text-left">
                     <thead>
                         <tr className="bg-slate-900/60 border-b border-white/5">
-                            {showCloser && <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap">Closer</th>}
-                            <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap">Data</th>
-                            <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap">CNPJ</th>
-                            <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap">Razão Social</th>
-                            <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap">Nome Fantasia</th>
-                            <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap">Valor</th>
-                            <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 whitespace-nowrap">Serviço</th>
-                            <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 text-right whitespace-nowrap">Contrato</th>
-                            {canDelete && <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600" />}
+                            {showCloser && <th className={thCls}>Closer</th>}
+                            <th className={thCls}>Data</th>
+                            <th className={thCls}>CNPJ</th>
+                            <th className={thCls}>Razão Social</th>
+                            <th className={thCls}>Nome Fantasia</th>
+                            <th className={thCls}>Valor</th>
+                            <th className={thCls}>Serviço</th>
+                            <th className={`${thCls} text-right`}>Contrato</th>
+                            {canDelete && <th className={thCls} />}
                         </tr>
                     </thead>
                     <tbody>
                         {contratos.length === 0 ? (
                             <tr>
-                                <td
-                                    colSpan={(showCloser ? 1 : 0) + (canDelete ? 1 : 0) + 7}
-                                    className="px-4 py-8 text-center text-[9px] font-black uppercase tracking-widest text-slate-700"
-                                >
+                                <td colSpan={(showCloser ? 1 : 0) + (canDelete ? 1 : 0) + 7} className="px-4 py-8 text-center text-[9px] font-black uppercase tracking-widest text-slate-700">
                                     Nenhum contrato fechado
                                 </td>
                             </tr>
                         ) : (
                             contratos.map((c) => (
-                                <tr
-                                    key={c.id}
-                                    className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors"
-                                >
-                                    {showCloser && (
-                                        <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">
-                                            {c.closerNome}
-                                        </td>
-                                    )}
+                                <tr key={c.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                                    {showCloser && <td className="px-3 py-3 text-[10px] font-bold text-slate-300 whitespace-nowrap">{c.closerNome}</td>}
                                     <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">
-                                        {c.pagamentoConfirmadoEm
-                                            ? fmtDate(c.pagamentoConfirmadoEm)
-                                            : "—"}
+                                        {c.pagamentoConfirmadoEm ? fmtDate(c.pagamentoConfirmadoEm) : "—"}
                                     </td>
-                                    <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">
-                                        {formatCNPJ(c.cnpj)}
-                                    </td>
+                                    <td className="px-3 py-3 text-[10px] font-mono text-slate-400 whitespace-nowrap">{formatCNPJ(c.cnpj)}</td>
                                     <td className="px-3 py-3 max-w-[200px]">
-                                        <button
-                                            type="button"
-                                            onClick={() => onEditar(c)}
-                                            title="Editar lead"
-                                            className="flex items-center gap-1.5 text-[11px] font-black text-white truncate hover:underline group"
-                                        >
+                                        <button type="button" onClick={() => onEditar(c)} className="flex items-center gap-1.5 text-[11px] font-black text-white truncate hover:underline group">
                                             {c.razaoSocial}
                                             <Pencil size={10} className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
                                         </button>
@@ -875,20 +1114,11 @@ function TabelaFechados({
                                     <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[160px] truncate">
                                         {c.nomeFantasia || <span className="text-slate-700">—</span>}
                                     </td>
-                                    <td className="px-3 py-3 text-[11px] font-black text-emerald-400 whitespace-nowrap">
-                                        {formatBRL(c.valorContrato)}
-                                    </td>
-                                    <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">
-                                        {c.servico}
-                                    </td>
+                                    <td className="px-3 py-3 text-[11px] font-black text-emerald-400 whitespace-nowrap">{formatBRL(c.valorContrato)}</td>
+                                    <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">{c.servico}</td>
                                     <td className="px-3 py-3 text-right">
                                         {c.contratoUrl ? (
-                                            <a
-                                                href={c.contratoUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-blue-400 transition-colors"
-                                            >
+                                            <a href={c.contratoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-blue-400 transition-colors">
                                                 <Eye size={14} />
                                             </a>
                                         ) : (
@@ -897,11 +1127,7 @@ function TabelaFechados({
                                     </td>
                                     {canDelete && (
                                         <td className="px-3 py-3 text-right">
-                                            <button
-                                                onClick={() => onExcluir(c)}
-                                                className="p-1.5 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                                title="Excluir contrato"
-                                            >
+                                            <button onClick={() => onExcluir(c)} className="p-1.5 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Excluir">
                                                 <Trash2 size={13} />
                                             </button>
                                         </td>
@@ -916,6 +1142,85 @@ function TabelaFechados({
     );
 }
 
+// ─── Tabela de Contratos Arquivados ───────────────────────────────────────────
+
+function TabelaArquivados({
+    contratos,
+    showCloser,
+    onRecarregar,
+}: {
+    contratos: Contrato[];
+    showCloser: boolean;
+    onRecarregar: () => void;
+}) {
+    const [restaurando, setRestaurando] = useState<string | null>(null);
+
+    const handleRestaurar = async (id: string) => {
+        setRestaurando(id);
+        try {
+            const res = await restaurarContrato(id);
+            if (res.success) { toast.success("Restaurado!"); onRecarregar(); }
+            else toast.error(res.error);
+        } finally {
+            setRestaurando(null);
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-amber-500/60" />
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Contratos Arquivados
+                    <span className="ml-2 text-amber-500/70">({contratos.length})</span>
+                </h4>
+            </div>
+
+            {contratos.length === 0 ? (
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-700 py-4 text-center">
+                    Nenhum contrato arquivado
+                </p>
+            ) : (
+                <div className="rounded-2xl border border-white/5 overflow-x-auto opacity-80">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-slate-900/60 border-b border-white/5">
+                                {showCloser && <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600">Closer</th>}
+                                <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600">Data</th>
+                                <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600">Razão Social</th>
+                                <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600">Valor</th>
+                                <th className="px-3 py-3 text-[8px] font-black uppercase tracking-widest text-slate-600 text-right">Restaurar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {contratos.map((c) => (
+                                <tr key={c.id} className="border-b border-white/[0.03]">
+                                    {showCloser && <td className="px-3 py-3 text-[10px] text-slate-500">{c.closerNome}</td>}
+                                    <td className="px-3 py-3 text-[10px] text-slate-600 whitespace-nowrap">
+                                        {c.pagamentoConfirmadoEm ? fmtDate(c.pagamentoConfirmadoEm) : "—"}
+                                    </td>
+                                    <td className="px-3 py-3 text-[10px] text-slate-500 max-w-[220px] truncate">{c.razaoSocial}</td>
+                                    <td className="px-3 py-3 text-[10px] text-slate-500 whitespace-nowrap">{formatBRL(c.valorContrato)}</td>
+                                    <td className="px-3 py-3 text-right">
+                                        <button
+                                            onClick={() => handleRestaurar(c.id)}
+                                            disabled={restaurando === c.id}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+                                        >
+                                            {restaurando === c.id ? <Loader2 size={10} className="animate-spin" /> : <ArchiveRestore size={10} />}
+                                            Restaurar
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Modal Principal ──────────────────────────────────────────────────────────
 
 export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, onDadosAlterados, onVendaFechada }: Props) {
@@ -924,10 +1229,12 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
     const [ano, setAno] = useState(agora.getFullYear());
     const [mostraForm, setMostraForm] = useState(false);
     const [painelGlobal, setPainelGlobal] = useState(false);
+    const [abaEnviados, setAbaEnviados] = useState<"enviados" | "arquivados">("enviados");
     const [filtroColaboradorId, setFiltroColaboradorId] = useState<number | undefined>(undefined);
 
     const [enviados, setEnviados] = useState<Contrato[]>([]);
     const [fechados, setFechados] = useState<Contrato[]>([]);
+    const [arquivados, setArquivados] = useState<Contrato[]>([]);
     const [carregando, setCarregando] = useState(true);
     const [colaboradores, setColaboradores] = useState<UsuarioSimples[]>([]);
     const [servicos, setServicos] = useState<string[]>([]);
@@ -937,6 +1244,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
     const [excluindo, setExcluindo] = useState(false);
 
     const isAdmin = isAdminOrCeo(role);
+    const podeGlobal = podeVerGlobal(role);
 
     const carregarContratos = useCallback(async () => {
         setCarregando(true);
@@ -944,12 +1252,13 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
             const res = await getContratos({
                 mes,
                 ano,
-                adminView: isAdmin && painelGlobal,
+                adminView: podeGlobal && painelGlobal,
                 filtroUsuarioId: filtroColaboradorId,
             });
             if (res.success) {
                 setEnviados(res.enviados as unknown as Contrato[]);
                 setFechados(res.fechados as unknown as Contrato[]);
+                setArquivados((res.arquivados ?? []) as unknown as Contrato[]);
             }
         } finally {
             setCarregando(false);
@@ -1012,6 +1321,16 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
 
     const totalFechado = fechados.reduce((acc, c) => acc + c.valorContrato, 0);
 
+    const handleObsAtualizada = (contratoId: string, novaObs: ObservacaoContrato) => {
+        setEnviados((prev) =>
+            prev.map((c) =>
+                c.id === contratoId
+                    ? { ...c, observacoes: [novaObs, ...(c.observacoes ?? [])] }
+                    : c
+            )
+        );
+    };
+
     return (
         <>
             <AnimatePresence>
@@ -1029,7 +1348,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.97, y: 12 }}
                         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                        className="relative z-10 w-full max-w-6xl max-h-[92vh] bg-[#060d1c] border border-white/10 rounded-3xl shadow-2xl shadow-black/60 flex flex-col overflow-hidden"
+                        className="relative z-10 w-full max-w-[96vw] max-h-[92vh] bg-[#060d1c] border border-white/10 rounded-3xl shadow-2xl shadow-black/60 flex flex-col overflow-hidden"
                     >
                         {/* ── Header ── */}
                         <div className="shrink-0 border-b border-white/5 bg-[#060d1c]/95 backdrop-blur-xl">
@@ -1050,8 +1369,8 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    {/* Painel Global — só admin/ceo */}
-                                    {isAdmin && (
+                                    {/* Painel Global — admin/ceo/financeiro */}
+                                    {podeGlobal && (
                                         <button
                                             onClick={() => { setPainelGlobal((v) => !v); setFiltroColaboradorId(undefined); }}
                                             className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors ${
@@ -1097,7 +1416,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
 
                                 <div className="flex items-center gap-3">
                                     {/* Filtro por colaborador — admin/global */}
-                                    {isAdmin && painelGlobal && (
+                                    {podeGlobal && painelGlobal && (
                                         <select
                                             value={filtroColaboradorId ?? ""}
                                             onChange={(e) =>
@@ -1158,27 +1477,64 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                             </AnimatePresence>
 
                             {/* Tabelas */}
-                            <div className="p-6 space-y-8">
+                            <div className="p-6 space-y-6">
                                 {carregando ? (
                                     <div className="flex items-center justify-center py-16 gap-3 text-slate-600">
                                         <Loader2 size={20} className="animate-spin" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">
-                                            Carregando contratos...
-                                        </span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Carregando contratos...</span>
                                     </div>
                                 ) : (
                                     <>
-                                        <TabelaEnviados
-                                            contratos={enviados}
-                                            showCloser={isAdmin && painelGlobal}
-                                            canDelete={isAdmin}
-                                            onConfirmar={setContratoParaFechar}
-                                            onExcluir={setContratoParaExcluir}
-                                            onEditar={(c) => { setModoEdicao(c); setMostraForm(false); }}
-                                        />
+                                        {/* Tabs Enviados / Arquivados */}
+                                        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.03] border border-white/5 w-fit">
+                                            <button
+                                                onClick={() => setAbaEnviados("enviados")}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                                                    abaEnviados === "enviados"
+                                                        ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+                                                        : "text-slate-500 hover:text-slate-300"
+                                                }`}
+                                            >
+                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                                Enviados
+                                                <span className="ml-0.5 opacity-70">({enviados.length})</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setAbaEnviados("arquivados")}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                                                    abaEnviados === "arquivados"
+                                                        ? "bg-amber-500/20 border border-amber-500/30 text-amber-400"
+                                                        : "text-slate-500 hover:text-slate-300"
+                                                }`}
+                                            >
+                                                <Archive size={11} />
+                                                Arquivados
+                                                <span className="ml-0.5 opacity-70">({arquivados.length})</span>
+                                            </button>
+                                        </div>
+
+                                        {abaEnviados === "enviados" ? (
+                                            <TabelaEnviados
+                                                contratos={enviados}
+                                                showCloser={podeGlobal && painelGlobal}
+                                                canDelete={isAdmin}
+                                                onConfirmar={setContratoParaFechar}
+                                                onExcluir={setContratoParaExcluir}
+                                                onEditar={(c) => { setModoEdicao(c); setMostraForm(false); }}
+                                                onObsAtualizada={handleObsAtualizada}
+                                                onRecarregar={carregarContratos}
+                                            />
+                                        ) : (
+                                            <TabelaArquivados
+                                                contratos={arquivados}
+                                                showCloser={podeGlobal && painelGlobal}
+                                                onRecarregar={() => { void carregarContratos(); setAbaEnviados("enviados"); }}
+                                            />
+                                        )}
+
                                         <TabelaFechados
                                             contratos={fechados}
-                                            showCloser={isAdmin && painelGlobal}
+                                            showCloser={podeGlobal && painelGlobal}
                                             canDelete={isAdmin}
                                             onExcluir={setContratoParaExcluir}
                                             onRecarregar={carregarContratos}

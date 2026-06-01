@@ -1,0 +1,622 @@
+"use client";
+
+import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft, FileText, CheckCircle2,
+  ChevronDown, ChevronUp, BarChart3, Sparkles,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import Velocimetro from "@/components/Checklist/Velocimetro";
+import { criarChecklist, atualizarItemChecklist, atualizarObservacaoDocumento } from "@/actions/checklist";
+import {
+  TIPO_LABELS, TIPO_CORES, STATUS_LABELS, STATUS_CORES,
+  STATUS_CONCLUIDOS, SECOES, calcularProgressoItens,
+} from "@/lib/checklist/items";
+import { getTema } from "@/lib/temas";
+
+type TipoEmbasamento =
+  | "RECEITA_BRUTA_DAS"
+  | "RECEITA_BRUTA_CPRB"
+  | "INICIO_RETOMADA"
+  | "DISPONIBILIDADE_FINANCEIRA";
+
+type StatusItemChecklist =
+  | "PENDENTE"
+  | "OK"
+  | "IRREGULAR"
+  | "PARCIALMENTE_IRREGULAR"
+  | "REVISAR"
+  | "DESNECESSARIO"
+  | "EM_ANALISE"
+  | "AGUARDANDO_DOCUMENTOS"
+  | "PRIORIDADE"
+  | "FALAR_DR_EDVAN"
+  | "FALAR_ANDREW";
+
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
+interface Documento { id: string; nome: string; url: string; uploadedByCliente: boolean; observacao: string | null; criadoEm: Date; }
+interface Item {
+  id: string; codigo: string; secao: string; descricao: string;
+  complemento: string | null; status: StatusItemChecklist;
+  observacao: string | null; obrigatorio: boolean; documentos: Documento[];
+}
+interface ChecklistData { id: string; tipo: TipoEmbasamento; itens: Item[]; }
+interface Empresa {
+  id: string; cnpj: string; razaoSocial: string; nomeFantasia: string | null;
+  status: string; embasamento: string; tipo: TipoEmbasamento | null;
+  progresso: number; mesProtocolo: string | null; submodalidade: string | null;
+  situacaoRadar: string | null; regimeTributario: string | null;
+  cliente: { nome: string; email: string }; checklists: ChecklistData[];
+}
+
+const STATUS_OPTIONS: StatusItemChecklist[] = [
+  "PENDENTE", "OK", "IRREGULAR", "PARCIALMENTE_IRREGULAR",
+  "REVISAR", "DESNECESSARIO", "EM_ANALISE", "AGUARDANDO_DOCUMENTOS",
+  "PRIORIDADE", "FALAR_DR_EDVAN", "FALAR_ANDREW",
+];
+const TIPOS: TipoEmbasamento[] = [
+  "RECEITA_BRUTA_DAS", "RECEITA_BRUTA_CPRB", "INICIO_RETOMADA", "DISPONIBILIDADE_FINANCEIRA",
+];
+
+// ─── HOOK: gradient que segue o mouse ─────────────────────────────────────────
+
+function useMouseGlow(accentRgb: string, intensity = 0.12) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    ref.current.style.setProperty("--gx", `${x}px`);
+    ref.current.style.setProperty("--gy", `${y}px`);
+    ref.current.style.setProperty("--gi", `${intensity}`);
+  }, [intensity]);
+
+  const onMouseLeave = useCallback(() => {
+    if (!ref.current) return;
+    ref.current.style.setProperty("--gi", "0");
+  }, []);
+
+  return { ref, onMouseMove, onMouseLeave };
+}
+
+// ─── COMPONENT ────────────────────────────────────────────────────────────────
+
+export default function ChecklistView({
+  empresa: empresaInicial,
+  userNome,
+  tema: temaNome = "blue",
+}: {
+  empresa: Empresa;
+  userNome: string;
+  tema?: string;
+}) {
+  const router = useRouter();
+  const tema = getTema(temaNome);
+  const accentRgb = tema.accent;
+
+  const [criandoChecklist, setCriandoChecklist] = useState(false);
+  const [tipoSelecionado, setTipoSelecionado] = useState<TipoEmbasamento | null>(
+    empresaInicial.tipo ?? null
+  );
+  const [secaoAtiva, setSecaoAtiva] = useState<string>(SECOES.CONSTITUICAO);
+
+  const checklistBase = empresaInicial.checklists[0] ?? null;
+  const [itens, setItens] = useState<Item[]>(checklistBase?.itens ?? []);
+
+  const progresso = calcularProgressoItens(itens);
+  const secoesUnicas = [...new Set(itens.map((i) => i.secao))];
+
+  // ─── ACTIONS ────────────────────────────────────────────────────────────────
+
+  const handleCriarChecklist = async () => {
+    if (!tipoSelecionado) return;
+    setCriandoChecklist(true);
+    try {
+      const res = await criarChecklist(empresaInicial.id, tipoSelecionado);
+      if (res.data) router.refresh();
+    } finally {
+      setCriandoChecklist(false);
+    }
+  };
+
+  const handleStatusChange = (itemId: string, status: StatusItemChecklist) => {
+    setItens((prev) => prev.map((i) => (i.id === itemId ? { ...i, status } : i)));
+    atualizarItemChecklist(itemId, { status }).catch(() => {
+      setItens((prev) =>
+        prev.map((i) =>
+          i.id === itemId
+            ? { ...i, status: checklistBase?.itens.find((x) => x.id === itemId)?.status ?? i.status }
+            : i
+        )
+      );
+    });
+  };
+
+  const handleObsBlur = (itemId: string, observacao: string, statusAtual: StatusItemChecklist) => {
+    atualizarItemChecklist(itemId, { status: statusAtual, observacao });
+  };
+
+  // ─── RENDER ──────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="relative min-h-screen text-white pb-24">
+
+      {/* HEADER sticky */}
+      <div
+        className="sticky top-0 z-30 border-b border-white/5 backdrop-blur-2xl"
+        style={{ background: `rgba(2,6,23,0.75)` }}
+      >
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/PainelAlpha/CheckList"
+              className="p-2 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition-all active:scale-95"
+            >
+              <ArrowLeft size={20} />
+            </Link>
+            <div>
+              <h1 className="text-base font-black text-white italic uppercase tracking-tight leading-none">
+                {empresaInicial.razaoSocial}
+              </h1>
+              <p className="text-[10px] font-mono text-slate-500 mt-0.5">{empresaInicial.cnpj}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {checklistBase && (
+              <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border ${TIPO_CORES[checklistBase.tipo]}`}>
+                {TIPO_LABELS[checklistBase.tipo]}
+              </span>
+            )}
+            <Velocimetro percent={progresso} size="sm" showLabel={false} />
+            <span className="text-sm font-black text-white tabular-nums">{progresso}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 pt-8 space-y-6">
+
+        {/* ── CARD PRINCIPAL DA EMPRESA ── */}
+        <GlowCard accentRgb={accentRgb} className="rounded-[2rem] overflow-hidden">
+          <div className="flex flex-col lg:flex-row">
+            {/* Info da empresa */}
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-white/5">
+              {[
+                { label: "Razão Social", value: empresaInicial.razaoSocial, full: true },
+                { label: "CNPJ", value: empresaInicial.cnpj },
+                { label: "Situação", value: empresaInicial.status,
+                  highlight: empresaInicial.status === "ATIVO" ? "text-emerald-400" : "text-rose-400" },
+                { label: "Cliente", value: empresaInicial.cliente.nome, full: true },
+                { label: "Regime Tributário", value: empresaInicial.regimeTributario || "—" },
+                { label: "Radar Atual", value: empresaInicial.submodalidade || "—" },
+                { label: "Mês Protocolo", value: empresaInicial.mesProtocolo || "—" },
+              ].map((cell, i) => (
+                <div
+                  key={i}
+                  className={`p-4 flex flex-col gap-1 ${(cell as any).full ? "col-span-2 sm:col-span-3" : ""}`}
+                >
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em]">
+                    {cell.label}
+                  </span>
+                  <span className={`text-xs font-bold uppercase truncate ${(cell as any).highlight ?? "text-slate-200"}`}>
+                    {cell.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Velocímetro — separador vertical */}
+            <div
+              className="lg:w-52 flex flex-col items-center justify-center gap-2 p-6 border-t lg:border-t-0 lg:border-l border-white/5"
+              style={{
+                background: `radial-gradient(circle at 50% 50%, rgba(${accentRgb}, 0.1), transparent 70%)`,
+              }}
+            >
+              <Velocimetro percent={progresso} size="lg" />
+            </div>
+          </div>
+        </GlowCard>
+
+        {/* ── SEM CHECKLIST — escolher tipo ── */}
+        {!checklistBase && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-[2rem] border border-white/5 p-10 text-center space-y-8"
+            style={{ background: "rgba(15,23,42,0.6)", backdropFilter: "blur(20px)" }}
+          >
+            <div>
+              <div
+                className="mx-auto w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background: `rgba(${accentRgb}, 0.12)`, border: `1px solid rgba(${accentRgb}, 0.3)` }}
+              >
+                <BarChart3 size={28} style={{ color: `rgb(${accentRgb})` }} />
+              </div>
+              <h2 className="text-xl font-black text-white uppercase italic">Selecionar Embasamento</h2>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">
+                Escolha o tipo para gerar o checklist automaticamente
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {TIPOS.map((tipo) => (
+                <GlowCard
+                  key={tipo}
+                  accentRgb={accentRgb}
+                  as="button"
+                  onClick={() => setTipoSelecionado(tipo)}
+                  className={`p-6 rounded-[1.5rem] text-left transition-all cursor-pointer w-full ${
+                    tipoSelecionado === tipo
+                      ? `border border-[rgba(${accentRgb},0.5)] shadow-lg`
+                      : "border border-white/5"
+                  }`}
+                  style={
+                    tipoSelecionado === tipo
+                      ? { background: `rgba(${accentRgb}, 0.12)` }
+                      : undefined
+                  }
+                >
+                  <Sparkles size={18} className="mb-3" style={{ color: `rgb(${accentRgb})` }} />
+                  <span className={`text-[11px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border ${TIPO_CORES[tipo]}`}>
+                    {TIPO_LABELS[tipo]}
+                  </span>
+                </GlowCard>
+              ))}
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleCriarChecklist}
+              disabled={!tipoSelecionado || criandoChecklist}
+              className="inline-flex items-center gap-2 px-10 py-4 text-white font-black uppercase text-xs tracking-widest rounded-2xl transition-all disabled:opacity-40 cursor-pointer"
+              style={{ background: `rgb(${accentRgb})`, boxShadow: `0 8px 32px rgba(${accentRgb}, 0.4)` }}
+            >
+              {criandoChecklist
+                ? <span className="animate-spin w-4 h-4 border-2 border-white/40 border-t-white rounded-full" />
+                : <CheckCircle2 size={16} />
+              }
+              Criar Checklist
+            </motion.button>
+          </motion.div>
+        )}
+
+        {/* ── CHECKLIST ── */}
+        {checklistBase && itens.length > 0 && (
+          <div className="space-y-5">
+
+            {/* Tabs de seção */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {secoesUnicas.map((secao) => {
+                const itensSecao = itens.filter((i) => i.secao === secao && i.obrigatorio);
+                const done = itensSecao.filter((i) => STATUS_CONCLUIDOS.has(i.status)).length;
+                const pct = itensSecao.length > 0 ? Math.round((done / itensSecao.length) * 100) : 0;
+                const ativo = secaoAtiva === secao;
+
+                return (
+                  <GlowCard
+                    key={secao}
+                    accentRgb={accentRgb}
+                    as="button"
+                    onClick={() => setSecaoAtiva(secao)}
+                    className={`cursor-pointer p-4 rounded-2xl border text-left transition-all w-full ${
+                      ativo
+                        ? `border-[rgba(${accentRgb},0.5)]`
+                        : "border-white/5"
+                    }`}
+                    style={ativo ? { background: `rgba(${accentRgb}, 0.08)` } : undefined}
+                  >
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] leading-tight block">
+                      {secao}
+                    </span>
+                    <div className="flex items-center gap-2 mt-2.5">
+                      <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                          style={{
+                            background: pct < 34 ? "#ef4444" : pct < 67 ? "#eab308" : "#22c55e",
+                            boxShadow: pct === 100 ? "0 0 8px #22c55e" : undefined,
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-black text-white tabular-nums flex-shrink-0">
+                        {done}/{itensSecao.length}
+                      </span>
+                    </div>
+                  </GlowCard>
+                );
+              })}
+            </div>
+
+            {/* Lista de itens */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={secaoAtiva}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="rounded-[2rem] overflow-hidden border border-white/5"
+                style={{ background: "rgba(15,23,42,0.6)", backdropFilter: "blur(20px)" }}
+              >
+                {/* Header da seção */}
+                <div
+                  className="p-5 border-b border-white/5 flex items-center gap-3"
+                  style={{ background: `rgba(${accentRgb}, 0.05)` }}
+                >
+                  <div
+                    className="p-2 rounded-xl"
+                    style={{ background: `rgba(${accentRgb}, 0.15)` }}
+                  >
+                    <FileText size={14} style={{ color: `rgb(${accentRgb})` }} />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                    {secaoAtiva}
+                  </h3>
+                  <span className="ml-auto text-[10px] font-bold text-slate-500">
+                    {itens.filter((i) => i.secao === secaoAtiva).length} itens
+                  </span>
+                </div>
+
+                <div className="divide-y divide-white/[0.04]">
+                  {itens
+                    .filter((i) => i.secao === secaoAtiva)
+                    .map((item, idx) => (
+                      <ChecklistItem
+                        key={item.id}
+                        item={item}
+                        accentRgb={accentRgb}
+                        onStatusChange={handleStatusChange}
+                        onObsBlur={handleObsBlur}
+                        index={idx}
+                      />
+                    ))}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── GLOW CARD — container com gradient que segue o mouse ─────────────────────
+
+function GlowCard({
+  children,
+  accentRgb,
+  className = "",
+  style,
+  as: Tag = "div",
+  onClick,
+}: {
+  children: React.ReactNode;
+  accentRgb: string;
+  className?: string;
+  style?: React.CSSProperties;
+  as?: "div" | "button";
+  onClick?: () => void;
+}) {
+  const ref = useRef<HTMLDivElement & HTMLButtonElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!ref.current || !glowRef.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    glowRef.current.style.opacity = "1";
+    glowRef.current.style.background = `radial-gradient(circle 280px at ${x}px ${y}px, rgba(${accentRgb}, 0.13), transparent 70%)`;
+  };
+
+  const onMouseLeave = () => {
+    if (glowRef.current) glowRef.current.style.opacity = "0";
+  };
+
+  const baseStyle: React.CSSProperties = {
+    background: "rgba(15,23,42,0.6)",
+    backdropFilter: "blur(20px)",
+    ...style,
+  };
+
+  return (
+    <Tag
+      ref={ref as any}
+      className={`relative overflow-hidden ${className}`}
+      style={baseStyle}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      onClick={onClick}
+    >
+      {/* Glow layer */}
+      <div
+        ref={glowRef}
+        className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+        style={{ opacity: 0 }}
+      />
+      <div className="relative z-10">{children}</div>
+    </Tag>
+  );
+}
+
+// ─── CHECKLIST ITEM ──────────────────────────────────────────────────────────
+
+function ChecklistItem({
+  item,
+  accentRgb,
+  onStatusChange,
+  onObsBlur,
+  index,
+}: {
+  item: Item;
+  accentRgb: string;
+  onStatusChange: (id: string, status: StatusItemChecklist) => void;
+  onObsBlur: (id: string, obs: string, status: StatusItemChecklist) => void;
+  index: number;
+}) {
+  const [obs, setObs] = useState(item.observacao ?? "");
+  const [expandido, setExpandido] = useState(false);
+  const concluido = STATUS_CONCLUIDOS.has(item.status);
+
+  const dotColor =
+    item.status === "OK" ? "#22c55e" :
+    item.status === "IRREGULAR" || item.status === "PRIORIDADE" ? "#ef4444" :
+    item.status === "PARCIALMENTE_IRREGULAR" ? "#f97316" :
+    item.status === "AGUARDANDO_DOCUMENTOS" ? "#eab308" :
+    item.status === "EM_ANALISE" ? "#a855f7" :
+    item.status === "REVISAR" ? "#3b82f6" :
+    item.status === "FALAR_DR_EDVAN" || item.status === "FALAR_ANDREW" ? "#ec4899" :
+    "#475569";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03, duration: 0.2 }}
+      className="group relative overflow-hidden"
+    >
+      {/* Hover glow layer */}
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{ background: `linear-gradient(90deg, rgba(${accentRgb}, 0.04) 0%, transparent 60%)` }}
+      />
+
+      <div className={`relative p-5 flex items-start gap-4 transition-colors duration-300 ${concluido ? "opacity-60" : ""}`}>
+
+        {/* Dot de status com glow */}
+        <motion.div
+          layout
+          className={`mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+            (item.status === "IRREGULAR" || item.status === "PRIORIDADE") ? "animate-pulse" : ""
+          }`}
+          style={{ backgroundColor: dotColor, boxShadow: `0 0 8px ${dotColor}80` }}
+        />
+
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex items-start gap-3 flex-wrap">
+            <span className="font-mono text-[10px] text-slate-600 flex-shrink-0 mt-0.5">{item.codigo}</span>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-bold uppercase tracking-tight transition-all duration-300 ${
+                concluido ? "text-slate-500 line-through" : "text-slate-200"
+              }`}>
+                {item.descricao}
+              </p>
+              {item.complemento && (
+                <p className="text-[11px] text-slate-500 mt-0.5 italic">{item.complemento}</p>
+              )}
+            </div>
+            {!item.obrigatorio && (
+              <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest border border-slate-700/40 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                Condicional
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <motion.select
+              layout
+              value={item.status}
+              onChange={(e) => onStatusChange(item.id, e.target.value as StatusItemChecklist)}
+              className={`border rounded-xl py-1.5 px-3 text-[10px] font-black uppercase outline-none cursor-pointer transition-all duration-200 appearance-none ${
+                STATUS_CORES[item.status] ?? "border-slate-700/40 text-slate-400 bg-slate-800/80"
+              }`}
+              style={{ backdropFilter: "blur(8px)" }}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s} className="bg-slate-900 text-white">{STATUS_LABELS[s]}</option>
+              ))}
+            </motion.select>
+
+            {item.documentos.length > 0 && (
+              <button
+                onClick={() => setExpandido((v) => !v)}
+                className="cursor-pointer flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-white transition-colors"
+              >
+                {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {item.documentos.length} doc{item.documentos.length > 1 ? "s" : ""}
+              </button>
+            )}
+          </div>
+
+          <textarea
+            rows={1}
+            value={obs}
+            onChange={(e) => setObs(e.target.value)}
+            onBlur={() => onObsBlur(item.id, obs, item.status)}
+            placeholder="Adicionar observação técnica..."
+            className="w-full bg-transparent border border-transparent hover:border-white/5 focus:border-white/10 focus:bg-white/[0.02] rounded-xl p-2.5 text-[11px] text-slate-400 outline-none transition-all resize-none italic placeholder:text-slate-800"
+          />
+
+          <AnimatePresence>
+            {expandido && item.documentos.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-1.5 overflow-hidden"
+              >
+                {item.documentos.map((doc) => (
+                  <DocRow key={doc.id} doc={doc} />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── DOC ROW ─────────────────────────────────────────────────────────────────
+
+function DocRow({ doc }: { doc: Documento }) {
+  const [obs, setObs] = useState(doc.observacao ?? "");
+
+  const handleBlur = () => {
+    if (obs !== (doc.observacao ?? "")) {
+      atualizarObservacaoDocumento(doc.id, obs);
+    }
+  };
+
+  return (
+    <div className="rounded-xl bg-white/[0.03] border border-white/5 overflow-hidden">
+      {/* Linha principal do documento */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <FileText size={12} className="text-slate-500 flex-shrink-0" />
+        <a
+          href={doc.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors flex-1 truncate"
+        >
+          {doc.nome}
+        </a>
+        {doc.uploadedByCliente && (
+          <span className="text-[9px] font-black text-slate-600 uppercase flex-shrink-0">
+            Cliente
+          </span>
+        )}
+      </div>
+
+      {/* Campo de observação vinculado a este documento */}
+      <div className="px-3 pb-2">
+        <textarea
+          rows={1}
+          value={obs}
+          onChange={(e) => setObs(e.target.value)}
+          onBlur={handleBlur}
+          placeholder="Observação sobre este documento..."
+          className="w-full bg-transparent border border-transparent hover:border-white/5 focus:border-white/10 focus:bg-white/[0.02] rounded-lg px-2 py-1.5 text-[10px] text-slate-400 outline-none transition-all resize-none italic placeholder:text-slate-800"
+        />
+      </div>
+    </div>
+  );
+}

@@ -299,24 +299,39 @@ export async function getContratos(options: GetContratosOptions) {
     const usuarioFilter = whereUsuarioId !== undefined ? { usuarioId: whereUsuarioId } : {};
 
     try {
-        const [enviados, fechados] = await Promise.all([
+        const [enviados, fechados, arquivados] = await Promise.all([
             db.contratoComercial.findMany({
-                where: { mes, ano, status: "ENVIADO", ...usuarioFilter },
-                include: { usuario: { select: { id: true, nome: true, imagemUrl: true } } },
+                where: { mes, ano, status: "ENVIADO", arquivado: false, ...usuarioFilter },
+                include: {
+                    usuario: { select: { id: true, nome: true, imagemUrl: true } },
+                    observacoes: { orderBy: { criadoEm: "desc" } },
+                },
                 orderBy: { createdAt: "desc" },
             }),
             db.contratoComercial.findMany({
                 where: {
                     status: "FECHADO",
+                    arquivado: false,
                     pagamentoConfirmadoEm: { gte: inicioMes, lt: fimMes },
                     ...usuarioFilter,
                 },
-                include: { usuario: { select: { id: true, nome: true, imagemUrl: true } } },
+                include: {
+                    usuario: { select: { id: true, nome: true, imagemUrl: true } },
+                    observacoes: { orderBy: { criadoEm: "desc" } },
+                },
                 orderBy: { pagamentoConfirmadoEm: "desc" },
+            }),
+            db.contratoComercial.findMany({
+                where: { mes, ano, status: "ENVIADO", arquivado: true, ...usuarioFilter },
+                include: {
+                    usuario: { select: { id: true, nome: true, imagemUrl: true } },
+                    observacoes: { orderBy: { criadoEm: "desc" } },
+                },
+                orderBy: { createdAt: "desc" },
             }),
         ]);
 
-        return { success: true as const, enviados, fechados };
+        return { success: true as const, enviados, fechados, arquivados };
     } catch (err) {
         console.error("getContratos:", err);
         return { success: false as const, error: "Erro ao buscar contratos" };
@@ -471,5 +486,80 @@ export async function excluirContrato(id: string) {
     } catch (err) {
         console.error("excluirContrato:", err);
         return { success: false as const, error: "Erro ao excluir contrato" };
+    }
+}
+
+
+// ─── Arquivar / Restaurar ─────────────────────────────────────────────────────
+
+export async function arquivarContrato(id: string) {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+    const userId = Number((session.user as { id?: string }).id);
+    const dbUser = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!isAdminOrCeo(dbUser?.role ?? "")) return { success: false as const, error: "Sem permissão" };
+
+    try {
+        await db.contratoComercial.update({
+            where: { id },
+            data: { arquivado: true, arquivadoEm: new Date() },
+        });
+        return { success: true as const };
+    } catch {
+        return { success: false as const, error: "Erro ao arquivar" };
+    }
+}
+
+export async function restaurarContrato(id: string) {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+    const userId = Number((session.user as { id?: string }).id);
+    const dbUser = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!isAdminOrCeo(dbUser?.role ?? "")) return { success: false as const, error: "Sem permissão" };
+
+    try {
+        await db.contratoComercial.update({
+            where: { id },
+            data: { arquivado: false, arquivadoEm: null },
+        });
+        return { success: true as const };
+    } catch {
+        return { success: false as const, error: "Erro ao restaurar" };
+    }
+}
+
+// ─── Observações ─────────────────────────────────────────────────────────────
+
+export async function criarObservacaoContrato(
+    contratoId: string,
+    texto: string,
+    tipo: "POSITIVO" | "NEGATIVO" | "NA",
+) {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+    if (!texto.trim()) return { success: false as const, error: "Observação vazia" };
+
+    try {
+        const obs = await db.observacaoContrato.create({
+            data: { contratoId, texto: texto.trim(), tipo },
+        });
+        return { success: true as const, obs };
+    } catch {
+        return { success: false as const, error: "Erro ao salvar observação" };
+    }
+}
+
+export async function getObservacoesContrato(contratoId: string) {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+
+    try {
+        const observacoes = await db.observacaoContrato.findMany({
+            where: { contratoId },
+            orderBy: { criadoEm: "desc" },
+        });
+        return { success: true as const, observacoes };
+    } catch {
+        return { success: false as const, error: "Erro ao buscar observações" };
     }
 }
