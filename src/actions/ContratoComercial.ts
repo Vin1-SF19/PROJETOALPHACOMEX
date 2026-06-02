@@ -190,6 +190,7 @@ export async function confirmarFechamento(raw: unknown) {
             where: { id: d.id },
             data: {
                 status: "FECHADO",
+                contaComVenda: true,
                 pagamentoConfirmado: d.pagamentoConfirmado,
                 pagamentoConfirmadoEm: d.pagamentoConfirmadoEm
                     ? new Date(d.pagamentoConfirmadoEm)

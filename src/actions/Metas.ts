@@ -45,7 +45,14 @@ export async function getDadosMetas(
             db.contratoComercial.groupBy({
                 by: ["usuarioId"],
                 _count: { id: true },
-                where: { status: "FECHADO", contaComVenda: true, mes, ano },
+                where: {
+                    status: "FECHADO",
+                    contaComVenda: true,
+                    pagamentoConfirmadoEm: {
+                        gte: new Date(ano, mes - 1, 1),
+                        lt: new Date(ano, mes, 1),
+                    },
+                },
             }),
             db.metaUsuario.findMany({ where: { mes, ano } }),
             db.metaEquipe.findFirst({ where: { mes, ano } }),
