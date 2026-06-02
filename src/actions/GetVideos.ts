@@ -205,7 +205,11 @@ export async function getModulos() {
             orderBy: { nome: 'asc' },
             include: {
                 cursos: {
-                    select: { cursoId: true }
+                    include: {
+                        curso: { select: { id: true, nome: true } }
+                    },
+                    orderBy: { ordem: 'asc' },
+                    take: 1,
                 }
             }
         });

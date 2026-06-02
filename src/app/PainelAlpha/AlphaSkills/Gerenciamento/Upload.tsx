@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Image as ImageIcon, CheckCircle2, Loader2, Plus, Film, X, FolderPlus, FolderKanban, AlignLeft, Trash2, Layers, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Upload, Image as ImageIcon, CheckCircle2, Loader2, Plus, Film, X, FolderPlus, FolderKanban, AlignLeft, Trash2, Layers, BookOpen, Search } from 'lucide-react';
 import { createVideo, getModulos } from '@/actions/GetVideos';
 import { uploadVideosLote } from '@/actions/UploadVideosLote';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ interface ModuloItem {
     id: string;
     nome: string;
     setor: string;
+    cursoNome?: string;
 }
 
 interface VideoLoteItem {
@@ -64,15 +65,35 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
     const [modulosDisponiveis, setModulosDisponiveis] = useState<ModuloItem[]>([]);
     const [modalModuloOpen, setModalModuloOpen] = useState(false);
     const [modalCursoOpen, setModalCursoOpen] = useState(false);
+    const [buscaSingle, setBuscaSingle] = useState("");
+    const [buscaLote, setBuscaLote] = useState("");
 
     const fetchModulos = async () => {
         const data = await getModulos();
-        setModulosDisponiveis(data as ModuloItem[]);
+        const mapped = (data as any[]).map((m) => ({
+            id: m.id,
+            nome: m.nome,
+            setor: m.setor,
+            cursoNome: m.cursos?.[0]?.curso?.nome ?? null,
+        }));
+        setModulosDisponiveis(mapped);
     };
 
     useEffect(() => {
         fetchModulos();
     }, [modalModuloOpen]);
+
+    const modulosFiltradosSingle = useMemo(() =>
+        modulosDisponiveis.filter(m =>
+            m.nome.toLowerCase().includes(buscaSingle.toLowerCase()) ||
+            (m.cursoNome ?? "").toLowerCase().includes(buscaSingle.toLowerCase())
+        ), [modulosDisponiveis, buscaSingle]);
+
+    const modulosFiltradosLote = useMemo(() =>
+        modulosDisponiveis.filter(m =>
+            m.nome.toLowerCase().includes(buscaLote.toLowerCase()) ||
+            (m.cursoNome ?? "").toLowerCase().includes(buscaLote.toLowerCase())
+        ), [modulosDisponiveis, buscaLote]);
 
     // ── Single helpers ──
     const toggleModulo = (modulo: ModuloItem) => {
@@ -338,32 +359,53 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
                                 </button>
 
                                 {showModulos && (
-                                    <div className="grid grid-cols-1 gap-2 p-3 bg-[#111] rounded-2xl border border-white/5 max-h-48 overflow-y-auto">
-                                        {modulosDisponiveis.length > 0 ? (
-                                            modulosDisponiveis.map((modulo) => {
-                                                const isSelected = modulosSelecionados.find(m => m.id === modulo.id);
-                                                return (
-                                                    <button
-                                                        key={modulo.id}
-                                                        type="button"
-                                                        onClick={() => toggleModulo(modulo)}
-                                                        className={`cursor-pointer flex items-center justify-between px-4 py-3 rounded-xl transition-all border ${isSelected ? 'bg-blue-500/20 border-blue-500 text-blue-500' : 'bg-[#1C1C1C] border-transparent text-slate-600 hover:bg-white/5'}`}
-                                                    >
-                                                        <div className="flex flex-col items-start">
-                                                            <span className="text-[9px] font-black uppercase">{modulo.nome}</span>
-                                                            <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{modulo.setor}</span>
-                                                        </div>
-                                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-800 bg-black'}`}>
-                                                            {isSelected && <CheckCircle2 size={10} />}
-                                                        </div>
-                                                    </button>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="py-4 text-center text-[8px] font-black text-slate-700 uppercase italic">
-                                                Nenhum módulo. Crie um acima.
-                                            </div>
-                                        )}
+                                    <div className="bg-[#111] rounded-2xl border border-white/5 overflow-hidden">
+                                        {/* Barra de pesquisa */}
+                                        <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5">
+                                            <Search size={12} className="text-slate-600 flex-shrink-0" />
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                value={buscaSingle}
+                                                onChange={(e) => setBuscaSingle(e.target.value)}
+                                                placeholder="Pesquisar módulo ou curso..."
+                                                className="flex-1 bg-transparent text-[10px] text-white outline-none placeholder:text-slate-700"
+                                            />
+                                            {buscaSingle && (
+                                                <button type="button" onClick={() => setBuscaSingle("")} className="text-slate-600 hover:text-slate-400 transition-colors">
+                                                    <X size={10} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-1.5 p-2 max-h-48 overflow-y-auto">
+                                            {modulosFiltradosSingle.length > 0 ? (
+                                                modulosFiltradosSingle.map((modulo) => {
+                                                    const isSelected = modulosSelecionados.find(m => m.id === modulo.id);
+                                                    return (
+                                                        <button
+                                                            key={modulo.id}
+                                                            type="button"
+                                                            onClick={() => toggleModulo(modulo)}
+                                                            className={`cursor-pointer flex items-center justify-between px-4 py-3 rounded-xl transition-all border ${isSelected ? 'bg-blue-500/20 border-blue-500 text-blue-500' : 'bg-[#1C1C1C] border-transparent text-slate-600 hover:bg-white/5'}`}
+                                                        >
+                                                            <div className="flex flex-col items-start">
+                                                                <span className="text-[9px] font-black uppercase">{modulo.nome}</span>
+                                                                <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">
+                                                                    {modulo.cursoNome ?? modulo.setor ?? "—"}
+                                                                </span>
+                                                            </div>
+                                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-800 bg-black'}`}>
+                                                                {isSelected && <CheckCircle2 size={10} />}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div className="py-4 text-center text-[8px] font-black text-slate-700 uppercase italic">
+                                                    {buscaSingle ? "Nenhum resultado." : "Nenhum módulo. Crie um acima."}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -424,32 +466,53 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
                                     </button>
 
                                     {showModuloLote && (
-                                        <div className="grid grid-cols-1 gap-2 p-3 bg-[#111] rounded-2xl border border-white/5 max-h-48 overflow-y-auto">
-                                            {modulosDisponiveis.length > 0 ? (
-                                                modulosDisponiveis.map((modulo) => {
-                                                    const isSelected = moduloLoteId === modulo.id;
-                                                    return (
-                                                        <button
-                                                            key={modulo.id}
-                                                            type="button"
-                                                            onClick={() => { setModuloLoteId(modulo.id); setShowModuloLote(false); }}
-                                                            className={`cursor-pointer flex items-center justify-between px-4 py-3 rounded-xl transition-all border ${isSelected ? 'bg-blue-500/20 border-blue-500 text-blue-500' : 'bg-[#1C1C1C] border-transparent text-slate-600 hover:bg-white/5'}`}
-                                                        >
-                                                            <div className="flex flex-col items-start">
-                                                                <span className="text-[9px] font-black uppercase">{modulo.nome}</span>
-                                                                <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">{modulo.setor}</span>
-                                                            </div>
-                                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-800 bg-black'}`}>
-                                                                {isSelected && <CheckCircle2 size={10} />}
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                })
-                                            ) : (
-                                                <div className="py-4 text-center text-[8px] font-black text-slate-700 uppercase italic">
-                                                    Nenhum módulo. Crie um acima.
-                                                </div>
-                                            )}
+                                        <div className="bg-[#111] rounded-2xl border border-white/5 overflow-hidden">
+                                            {/* Barra de pesquisa */}
+                                            <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5">
+                                                <Search size={12} className="text-slate-600 flex-shrink-0" />
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    value={buscaLote}
+                                                    onChange={(e) => setBuscaLote(e.target.value)}
+                                                    placeholder="Pesquisar módulo ou curso..."
+                                                    className="flex-1 bg-transparent text-[10px] text-white outline-none placeholder:text-slate-700"
+                                                />
+                                                {buscaLote && (
+                                                    <button type="button" onClick={() => setBuscaLote("")} className="text-slate-600 hover:text-slate-400 transition-colors">
+                                                        <X size={10} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-1.5 p-2 max-h-48 overflow-y-auto">
+                                                {modulosFiltradosLote.length > 0 ? (
+                                                    modulosFiltradosLote.map((modulo) => {
+                                                        const isSelected = moduloLoteId === modulo.id;
+                                                        return (
+                                                            <button
+                                                                key={modulo.id}
+                                                                type="button"
+                                                                onClick={() => { setModuloLoteId(modulo.id); setShowModuloLote(false); setBuscaLote(""); }}
+                                                                className={`cursor-pointer flex items-center justify-between px-4 py-3 rounded-xl transition-all border ${isSelected ? 'bg-blue-500/20 border-blue-500 text-blue-500' : 'bg-[#1C1C1C] border-transparent text-slate-600 hover:bg-white/5'}`}
+                                                            >
+                                                                <div className="flex flex-col items-start">
+                                                                    <span className="text-[9px] font-black uppercase">{modulo.nome}</span>
+                                                                    <span className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">
+                                                                        {modulo.cursoNome ?? modulo.setor ?? "—"}
+                                                                    </span>
+                                                                </div>
+                                                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-800 bg-black'}`}>
+                                                                    {isSelected && <CheckCircle2 size={10} />}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <div className="py-4 text-center text-[8px] font-black text-slate-700 uppercase italic">
+                                                        {buscaLote ? "Nenhum resultado." : "Nenhum módulo. Crie um acima."}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>

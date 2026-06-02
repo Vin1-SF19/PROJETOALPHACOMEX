@@ -193,6 +193,7 @@ export async function atualizarItemChecklist(
         checklist: {
           include: {
             itens: { select: { status: true, obrigatorio: true } },
+            empresa: { include: { cliente: { select: { id: true } } } },
           },
         },
       },
@@ -203,6 +204,26 @@ export async function atualizarItemChecklist(
       where: { id: item.checklist.empresaId },
       data: { progresso: progressoNovo },
     });
+
+    // Notificar cliente
+    const clienteId = item.checklist.empresa.cliente?.id;
+    if (clienteId) {
+      const tipo = parsed.observacao ? "OBSERVACAO_ITEM" : "STATUS_MUDOU";
+      const titulo = parsed.observacao
+        ? `Nova observação: ${item.descricao.substring(0, 60)}`
+        : `Status atualizado: ${item.descricao.substring(0, 60)}`;
+      const mensagem = parsed.observacao ?? `Novo status: ${parsed.status.replace(/_/g, " ")}`;
+      await db.notificacaoCliente.create({
+        data: {
+          clienteId,
+          tipo,
+          titulo,
+          mensagem,
+          empresaId: item.checklist.empresaId,
+          itemId: item.id,
+        },
+      }).catch(() => {}); // silencia erros para não quebrar a action principal
+    }
 
     revalidatePath(`/PainelAlpha/CheckList/${item.checklist.empresaId}`);
     return { data: item, progresso: progressoNovo };

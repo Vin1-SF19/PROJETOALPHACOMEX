@@ -801,12 +801,30 @@ model ComercialPerformance {
 }
 
 model ClienteOperacional {
-  id         String                @id @default(cuid())
-  nome       String
-  email      String                @unique
-  senha      String
-  empresas   OperacionalClientes[]
-  documentos DocumentoUnidade[]
+  id           String                @id @default(cuid())
+  nome         String
+  email        String                @unique
+  senha        String
+  imagemUrl    String?
+  empresas     OperacionalClientes[]
+  documentos   DocumentoUnidade[]
+  notificacoes NotificacaoCliente[]
+}
+
+model NotificacaoCliente {
+  id        String             @id @default(cuid())
+  clienteId String
+  cliente   ClienteOperacional @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipo      String
+  titulo    String
+  mensagem  String?
+  empresaId String
+  itemId    String?
+  lida      Boolean            @default(false)
+  criadaEm  DateTime           @default(now())
+
+  @@index([clienteId, lida])
+  @@index([clienteId, criadaEm])
 }
 
 model OperacionalClientes {
@@ -914,14 +932,18 @@ model ItemChecklist {
 }
 
 model DocumentoChecklist {
-  id                String        @id @default(cuid())
-  itemId            String
-  item              ItemChecklist @relation(fields: [itemId], references: [id])
-  nome              String
-  url               String
-  uploadedByCliente Boolean       @default(false)
-  observacao        String?
-  criadoEm          DateTime      @default(now())
+  id                 String        @id @default(cuid())
+  itemId             String
+  item               ItemChecklist @relation(fields: [itemId], references: [id])
+  nome               String
+  url                String
+  uploadedByCliente  Boolean       @default(false)
+  observacao         String?
+  deletadoEm         DateTime?
+  deletadoPorCliente Boolean       @default(false)
+  criadoEm           DateTime      @default(now())
+
+  @@index([itemId, deletadoEm])
 }
 
 // ─── Alpha CRM ────────────────────────────────────────────────────────────────

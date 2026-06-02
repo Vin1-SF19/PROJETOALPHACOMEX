@@ -12,11 +12,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       onBeforeGenerateToken: async (_pathname) => {
         return {
           allowedContentTypes: [
-            'video/mp4', 
-            'video/quicktime', 
-            'image/jpeg', 
-            'image/png', 
-            'video/x-matroska'
+            'video/mp4',
+            'video/webm',
+            'image/jpeg',
+            'image/png',
+            'image/webp',
           ],
           addRandomSuffix: true,
         };
