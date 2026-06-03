@@ -603,7 +603,7 @@ model ConsultaPreAnalise {
 
 model videos {
   id        String  @id @default(cuid())
-  titulo    String  @unique
+  titulo    String
   descricao String?
   url       String
   thumbUrl  String?
