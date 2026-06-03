@@ -234,11 +234,12 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
 
     return (
         <>
-            <div className="lg:col-span-5">
-                <div className="bg-[#161616] p-8 rounded-[2.5rem] border border-white/5 sticky top-10 shadow-2xl">
+            <div className="lg:col-span-4">
+                <div className="bg-[#161616] rounded-[2.5rem] border border-white/5 sticky top-4 shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
 
-                    {/* Header */}
-                    <header className="flex items-center justify-between mb-6">
+                    {/* Header fixo */}
+                    <div className="px-7 pt-7 pb-5 shrink-0 border-b border-white/[0.06]">
+                    <header className="flex items-center justify-between mb-5">
                         <div>
                             <h2 className="text-sm font-black uppercase tracking-widest text-white">Upload de Mídia</h2>
                             <p className="text-[9px] text-slate-500 uppercase mt-1">Vincular aula a módulos</p>
@@ -267,7 +268,7 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
                     </header>
 
                     {/* Toggle Single / Lote */}
-                    <div className="flex bg-[#1C1C1C] p-1 rounded-2xl border border-white/5 mb-6">
+                    <div className="flex bg-[#1C1C1C] p-1 rounded-2xl border border-white/5">
                         <button
                             onClick={() => setModo('single')}
                             className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${modo === 'single' ? 'bg-orange-500 text-white' : 'text-slate-500 hover:text-white'}`}
@@ -281,6 +282,11 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
                             <Layers size={12} /> Lote
                         </button>
                     </div>
+
+                    </div>{/* /header fixo */}
+
+                    {/* Conteúdo rolável */}
+                    <div className="flex-1 overflow-y-auto px-7 py-5 custom-scrollbar">
 
                     {/* ── SINGLE MODE ── */}
                     {modo === 'single' && (
@@ -538,6 +544,8 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
                             </div>
                         </div>
                     )}
+
+                    </div>{/* /conteúdo rolável */}
                 </div>
             </div>
 

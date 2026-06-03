@@ -1,17 +1,22 @@
 import { auth } from "../../../../auth";
 import { getVideos, getUserProgresso } from "@/actions/GetVideos";
 import { getAllCursos } from "@/actions/Cursos";
+import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import AlphaSkillsClient from "./AlphaSkillsClient";
 
 export default async function AlphaSkillsPage() {
     const session = await auth();
     const userId = session?.user?.id || "";
 
-    const [cursos, vids, progressRaw] = await Promise.all([
+    const numericUserId = Number(userId);
+    const [cursos, vids, progressRaw, permissoes] = await Promise.all([
         getAllCursos(),
         getVideos(),
-        getUserProgresso(userId)
+        getUserProgresso(userId),
+        numericUserId > 0 ? getPermissoesEfetivas(numericUserId) : Promise.resolve([] as string[]),
     ]);
+
+    const podeGerenciar = permissoes.includes('skillsGerenciamento');
 
     const progress = (progressRaw || []).map((p: any) => ({
         aulaId: String(p.aulaId),
@@ -74,6 +79,7 @@ export default async function AlphaSkillsPage() {
             session={session}
             initialCursos={cursosProcessados}
             initialVideos={vids}
+            podeGerenciar={podeGerenciar}
         />
     );
 }

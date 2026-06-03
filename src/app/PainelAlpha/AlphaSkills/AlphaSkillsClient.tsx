@@ -50,9 +50,10 @@ interface Props {
         thumbUrl?: string | null;
         modulo?: { id: string; nome: string }[];
     }[];
+    podeGerenciar?: boolean;
 }
 
-export default function AlphaSkillsClient({ session, initialCursos, initialVideos }: Props) {
+export default function AlphaSkillsClient({ session, initialCursos, initialVideos, podeGerenciar = false }: Props) {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedModulo, setSelectedModulo] = useState<Modulo | null>(null);
     const [setorFiltro, setSetorFiltro] = useState("Todos");
@@ -140,7 +141,7 @@ export default function AlphaSkillsClient({ session, initialCursos, initialVideo
                                     className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
                                 />
                             </div>
-                            {isAdmin && (
+                            {(isAdmin || podeGerenciar) && (
                                 <Link href="/PainelAlpha/AlphaSkills/Gerenciamento">
                                     <button className="cursor-pointer bg-white text-black px-6 py-4 rounded-2xl hover:bg-orange-500 hover:text-white transition-all flex items-center gap-2 font-bold uppercase text-xs">
                                         <Settings size={18} /> Gerenciar

@@ -155,6 +155,52 @@ export async function listarUsersParaGestao() {
   return users;
 }
 
+// ── Listar usuários e seus acessos a um módulo específico ────────────────────
+export async function listarAcessoModulo(modulo: string) {
+  await requireAdminSession();
+  return db.usuarios.findMany({
+    select: {
+      id: true,
+      nome: true,
+      usuario: true,
+      role: true,
+      imagemUrl: true,
+      status: true,
+      permissaoOverrides: {
+        where: { modulo },
+        select: { id: true, acao: true },
+      },
+    },
+    orderBy: [{ role: 'asc' }, { nome: 'asc' }],
+  });
+}
+
+// ── Toggle de acesso de um usuário a um módulo ────────────────────────────────
+export async function toggleAcessoModulo(usuarioId: number, modulo: string) {
+  const session = await requireAdminSession();
+  const adminId = Number((session.user as { id?: string })?.id ?? 0);
+
+  if (!KNOWN_MODULOS.has(modulo)) return { success: false as const, error: 'Módulo desconhecido' };
+
+  const existing = await db.usuarioPermissaoOverride.findUnique({
+    where: { usuarioId_modulo: { usuarioId, modulo } },
+  });
+
+  if (existing?.acao === 'ADD') {
+    await db.usuarioPermissaoOverride.delete({ where: { id: existing.id } });
+    revalidatePath('/PainelAlpha/AlphaSkills/Gerenciamento');
+    return { success: true as const, hasAccess: false };
+  }
+
+  await db.usuarioPermissaoOverride.upsert({
+    where: { usuarioId_modulo: { usuarioId, modulo } },
+    create: { usuarioId, modulo, acao: 'ADD', criadoPor: adminId },
+    update: { acao: 'ADD', criadoPor: adminId },
+  });
+  revalidatePath('/PainelAlpha/AlphaSkills/Gerenciamento');
+  return { success: true as const, hasAccess: true };
+}
+
 // ── Listar módulos efetivos de um user específico ────────────────────────────
 export async function listarModulosEfetivosDeUser(usuarioId: number) {
   const user = await db.usuarios.findUnique({
