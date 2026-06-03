@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { upload } from '@vercel/blob/client';
 import ModalModulos from './CriarModulo';
 import ModalCurso from './CriarCurso';
-import { useRouter } from 'next/navigation';
 
 interface ModuloItem {
     id: string;
@@ -41,7 +40,6 @@ function newLoteItem(): VideoLoteItem {
 }
 
 export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
-    const router = useRouter();
     const [modo, setModo] = useState<'single' | 'lote'>('single');
 
     // ── Single mode state ──
@@ -147,7 +145,6 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
                 if (thumbInputRef.current) thumbInputRef.current.value = "";
                 toast.success("Mídia publicada e vinculada aos módulos!");
                 onSuccess?.();
-                router.refresh();
             } else {
                 toast.error((result as { error?: string })?.error || "Erro ao processar upload.");
             }
@@ -228,7 +225,6 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
             setVideos([newLoteItem()]);
             setModuloLoteId("");
             onSuccess?.();
-            router.refresh();
         } else {
             toast.error((result as { error?: string }).error || "Erro ao salvar vídeos.");
         }
