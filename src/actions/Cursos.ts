@@ -221,3 +221,24 @@ export async function desvincularModuloDeCurso(cursoId: string, moduloId: string
         return { success: false, error: error.message }
     }
 }
+
+export async function updateModuloOrderInCurso(cursoId: string, moduloIds: string[]) {
+    const session = await auth()
+    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+        return { success: false, error: 'Sem permissão' }
+    }
+    try {
+        await db.$transaction(
+            moduloIds.map((moduloId, index) =>
+                db.cursoModulo.update({
+                    where: { cursoId_moduloId: { cursoId, moduloId } },
+                    data: { ordem: index },
+                })
+            )
+        )
+        revalidatePath('/PainelAlpha/AlphaSkills')
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}

@@ -21,10 +21,11 @@ export default async function CheckListPage() {
 
   const empresas = result.data ?? [];
   const tema = userDb?.tema_interface ?? "blue";
+  const role = (session.user as any)?.role ?? "";
 
   return (
     <div className="relative min-h-screen text-slate-200 overflow-x-hidden">
-      <ListaChecklist empresas={empresas} clientesAcesso={clientesAcesso} tema={tema} />
+      <ListaChecklist empresas={empresas} clientesAcesso={clientesAcesso} tema={tema} role={role} />
     </div>
   );
 }

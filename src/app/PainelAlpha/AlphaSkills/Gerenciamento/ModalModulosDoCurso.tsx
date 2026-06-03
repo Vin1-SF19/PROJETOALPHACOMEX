@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from 'react';
-import { X, PlayCircle, Unlink, BookOpen, FolderKanban, Loader2 } from 'lucide-react';
+import { X, PlayCircle, Unlink, BookOpen, FolderKanban, Loader2, GripVertical, ArrowUpDown, Save } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { desvincularModuloDeCurso } from '@/actions/Cursos';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { desvincularModuloDeCurso, updateModuloOrderInCurso } from '@/actions/Cursos';
 import Image from 'next/image';
 import { toast } from 'sonner';
 
@@ -34,8 +35,52 @@ interface Props {
 
 export default function ModalModulosDoCurso({ isOpen, onClose, curso, onVerAulas, onSuccess }: Props) {
     const [removendoId, setRemovendoId] = useState<string | null>(null);
+    const [modoOrdenar, setModoOrdenar] = useState(false);
+    const [ordemLocal, setOrdemLocal] = useState<Modulo[]>([]);
+    const [salvando, setSalvando] = useState(false);
 
     if (!isOpen || !curso) return null;
+
+    const modulosOrdenados = [...curso.modulos].sort(
+        (a, b) => (a.ordemNoCurso ?? 0) - (b.ordemNoCurso ?? 0)
+    );
+
+    const handleIniciarOrdenar = () => {
+        setOrdemLocal(modulosOrdenados);
+        setModoOrdenar(true);
+    };
+
+    const handleCancelarOrdenar = () => {
+        setModoOrdenar(false);
+        setOrdemLocal([]);
+    };
+
+    const onDragEnd = (result: DropResult) => {
+        if (!result.destination) return;
+        const nova = Array.from(ordemLocal);
+        const [item] = nova.splice(result.source.index, 1);
+        nova.splice(result.destination.index, 0, item);
+        setOrdemLocal(nova);
+    };
+
+    const handleSalvarOrdem = async () => {
+        if (!curso) return;
+        setSalvando(true);
+        try {
+            const res = await updateModuloOrderInCurso(curso.id, ordemLocal.map(m => m.id));
+            if (res.success) {
+                toast.success("Ordem salva!");
+                await onSuccess();
+                setModoOrdenar(false);
+            } else {
+                toast.error("Erro ao salvar ordem.");
+            }
+        } catch {
+            toast.error("Erro ao salvar ordem.");
+        } finally {
+            setSalvando(false);
+        }
+    };
 
     const handleRemover = async (moduloId: string, moduloNome: string) => {
         setRemovendoId(moduloId);
@@ -61,7 +106,7 @@ export default function ModalModulosDoCurso({ isOpen, onClose, curso, onVerAulas
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-black/90 backdrop-blur-md"
-                onClick={onClose}
+                onClick={modoOrdenar ? undefined : onClose}
             />
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -69,6 +114,7 @@ export default function ModalModulosDoCurso({ isOpen, onClose, curso, onVerAulas
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 className="relative bg-[#0A0A0A] border border-white/10 rounded-[3rem] max-w-xl w-full flex flex-col max-h-[85vh] overflow-hidden shadow-2xl"
             >
+                {/* Header */}
                 <div className="p-6 border-b border-white/5 bg-[#0F0F0F] flex items-center gap-4">
                     <div className="relative w-14 h-14 rounded-2xl bg-black border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
                         {curso.capa
@@ -88,19 +134,81 @@ export default function ModalModulosDoCurso({ isOpen, onClose, curso, onVerAulas
                             </span>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-500 hover:text-white transition-colors cursor-pointer shrink-0">
-                        <X size={18} />
-                    </button>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* Botão organizar / cancelar */}
+                        {curso.modulos.length > 1 && !modoOrdenar && (
+                            <button
+                                onClick={handleIniciarOrdenar}
+                                title="Reordenar módulos"
+                                className="p-2 bg-orange-600/10 border border-orange-500/20 text-orange-500 hover:bg-orange-600 hover:text-white rounded-xl transition-all cursor-pointer"
+                            >
+                                <ArrowUpDown size={15} />
+                            </button>
+                        )}
+                        {!modoOrdenar && (
+                            <button onClick={onClose} className="p-2 text-slate-500 hover:text-white transition-colors cursor-pointer">
+                                <X size={18} />
+                            </button>
+                        )}
+                    </div>
                 </div>
 
+                {/* Lista */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
                     {curso.modulos.length === 0 ? (
                         <div className="py-16 flex flex-col items-center justify-center gap-3">
                             <FolderKanban size={32} className="text-slate-800" />
                             <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Nenhum módulo neste curso</p>
                         </div>
+                    ) : modoOrdenar ? (
+                        /* ── MODO ORDENAÇÃO ── */
+                        <DragDropContext onDragEnd={onDragEnd}>
+                            <Droppable droppableId="modulos-curso">
+                                {(provided) => (
+                                    <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                                        {ordemLocal.map((mod, index) => (
+                                            <Draggable key={mod.id} draggableId={mod.id} index={index}>
+                                                {(provided, snapshot) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        className={`flex items-center gap-4 p-4 rounded-[2rem] border transition-all ${
+                                                            snapshot.isDragging
+                                                                ? 'bg-[#1E1E1E] border-orange-500/50 shadow-2xl scale-[1.02]'
+                                                                : 'bg-[#111] border-white/5'
+                                                        }`}
+                                                    >
+                                                        <div
+                                                            {...provided.dragHandleProps}
+                                                            className="p-2 text-slate-700 hover:text-orange-500 cursor-grab active:cursor-grabbing"
+                                                        >
+                                                            <GripVertical size={18} />
+                                                        </div>
+                                                        <div className="w-7 h-7 shrink-0 bg-black rounded-full flex items-center justify-center text-[9px] font-black text-slate-500 border border-white/5">
+                                                            {index + 1}
+                                                        </div>
+                                                        <div className="w-10 h-10 rounded-xl bg-black border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                                                            {mod.imagemUrl
+                                                                ? <img src={mod.imagemUrl} alt="" className="w-full h-full object-cover" />
+                                                                : <FolderKanban size={14} className="text-slate-700" />
+                                                            }
+                                                        </div>
+                                                        <h4 className="flex-1 text-[11px] font-black text-white uppercase truncate tracking-tight">
+                                                            {mod.nome}
+                                                        </h4>
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
                     ) : (
-                        curso.modulos.map((mod) => (
+                        /* ── MODO VISUALIZAÇÃO ── */
+                        modulosOrdenados.map((mod) => (
                             <div
                                 key={mod.id}
                                 className="group flex items-center gap-4 p-4 bg-[#111] border border-white/5 rounded-[2rem] hover:border-orange-500/20 transition-all"
@@ -141,6 +249,26 @@ export default function ModalModulosDoCurso({ isOpen, onClose, curso, onVerAulas
                         ))
                     )}
                 </div>
+
+                {/* Footer de ordenação */}
+                {modoOrdenar && (
+                    <div className="p-6 bg-[#0F0F0F] border-t border-white/5 flex justify-end gap-3">
+                        <button
+                            onClick={handleCancelarOrdenar}
+                            className="px-6 py-3 rounded-2xl text-[10px] font-black text-slate-500 uppercase hover:bg-white/5 transition-all cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleSalvarOrdem}
+                            disabled={salvando}
+                            className="px-8 py-3 bg-orange-600 hover:bg-orange-500 disabled:opacity-30 rounded-2xl text-[10px] font-black uppercase text-white flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-orange-900/20"
+                        >
+                            {salvando ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                            {salvando ? "Salvando..." : "Confirmar Ordem"}
+                        </button>
+                    </div>
+                )}
             </motion.div>
         </div>
     );

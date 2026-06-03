@@ -6,8 +6,10 @@ import GlobalSidebar, { SidebarMobileToggle } from './GlobalSidebar';
 import TabBar, { Tab } from './TabBar';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useAdminChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
+import { useChecklistNotifications } from '@/hooks/useChecklistNotifications';
 import NotificationToast from '@/components/chamados/NotificationToast';
 import { HoleriteNotificacaoGlobal } from '@/components/holerites/HoleriteNotificacaoGlobal';
+import ChecklistNotificationToast from '@/components/Checklist/ChecklistNotificationToast';
 import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,6 +46,7 @@ export default function PainelLayoutClient({
   const pathname = usePathname();
 
   useAdminChamadosNotifications(role);
+  useChecklistNotifications(role);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────
   // Lazy initializer: detecta no primeiro render client-side, evita flash de sidebar dupla
@@ -174,6 +177,7 @@ export default function PainelLayoutClient({
   return (
     <>
       <NotificationToast />
+      <ChecklistNotificationToast />
       <HoleriteNotificacaoGlobal authenticated />
 
       {!tvMode && (

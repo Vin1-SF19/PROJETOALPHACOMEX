@@ -24,7 +24,7 @@ interface Video {
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
-    modulo: { id: string; nome: string } | null;
+    modulo: { id: string; nome: string; imagemUrl?: string | null } | null;
     videos: Video[];
     onSuccess: () => void;
 }
@@ -117,7 +117,9 @@ export default function ModalGerenciamento({ isOpen, onClose, modulo, videos, on
                                                     </div>
 
                                                     <div className="w-12 h-8 bg-black rounded-lg overflow-hidden shrink-0 border border-white/5">
-                                                        {vid.thumbUrl && <img src={vid.thumbUrl} className="w-full h-full object-cover opacity-80" />}
+                                                        {(vid.thumbUrl || modulo?.imagemUrl) && (
+                                                            <img src={vid.thumbUrl || modulo?.imagemUrl!} className="w-full h-full object-cover opacity-80" />
+                                                        )}
                                                     </div>
 
                                                     <h4 className="flex-1 text-[11px] font-black text-white uppercase truncate tracking-tight">

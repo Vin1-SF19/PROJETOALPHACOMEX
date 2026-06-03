@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Play, Clock, LayoutGrid, CheckCircle2, Trophy, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,6 +18,7 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
 
     const userName = session?.user?.nome || "Operador";
     const userRole = session?.user?.role || "USER";
+    const cursoCapa: string = modulo?.cursos?.[0]?.curso?.capa || "";
 
     const progressoPorcentagem = useMemo(() => {
         if (aulasIniciais.length === 0) return 0;
@@ -58,7 +60,7 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
                 <div className="lg:col-span-8 space-y-6">
                     <div className="relative aspect-video rounded-[2.5rem] overflow-hidden bg-black shadow-[0_0_100px_rgba(249,115,22,0.1)] border border-white/10 group">
                         {videoAtivo ? (
-                            <video key={videoAtivo.url} src={videoAtivo.url} controls className="w-full h-full object-contain shadow-2xl" />
+                            <video key={videoAtivo.url} src={videoAtivo.url} poster={videoAtivo.thumbUrl || cursoCapa || modulo?.imagemUrl || undefined} controls className="w-full h-full object-contain shadow-2xl" />
                         ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center opacity-20"><Play size={80} /></div>
                         )}
@@ -80,8 +82,8 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
                         <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-6 italic leading-none text-white">
                             {videoAtivo?.titulo}
                         </h1>
-                        <p className="text-slate-400 text-sm md:text-lg leading-relaxed max-w-4xl border-l-2 border-orange-500/30 pl-6">
-                            {modulo.descricao || "Domine esta especialização com a metodologia Alpha."}
+                        <p className="text-slate-400 text-sm md:text-lg leading-relaxed max-w-4xl border-l-2 border-orange-500/30 pl-6 whitespace-pre-wrap">
+                            {videoAtivo?.descricao?.trim() || modulo.descricao?.trim() || "Domine esta especialização com a metodologia Alpha."}
                         </p>
                     </motion.div>
                 </div>
@@ -127,7 +129,7 @@ export default function ModuloDetalhesClient({ session, modulo, aulasIniciais, p
                                     >
                                         <div className="relative shrink-0 w-20 aspect-video rounded-xl overflow-hidden bg-black/60">
                                             {isConcluida && <div className="absolute inset-0 z-10 bg-green-500/20 flex items-center justify-center"><CheckCircle2 className="text-green-400" size={16} /></div>}
-                                            <img src={aula.thumbUrl || "/placeholder.png"} className={`w-full h-full object-cover ${isConcluida ? 'opacity-30' : 'opacity-70'}`} alt="" />
+                                            <Image src={aula.thumbUrl || cursoCapa || modulo?.imagemUrl || "/placeholder.png"} alt={aula.titulo || ""} fill className={`object-cover ${isConcluida ? 'opacity-30' : 'opacity-70'}`} unoptimized />
                                         </div>
                                         <div className="text-left min-w-0">
                                             <p className={`text-[8px] font-black uppercase mb-1 ${isAtiva ? 'text-orange-200' : 'text-slate-500'}`}>Aula {(idx + 1).toString().padStart(2, '0')}</p>

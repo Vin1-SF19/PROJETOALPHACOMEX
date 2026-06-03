@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, FileText, CheckCircle2,
   ChevronDown, ChevronUp, BarChart3, Sparkles,
+  ExternalLink, Trash2, Clock, History,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Velocimetro from "@/components/Checklist/Velocimetro";
-import { criarChecklist, atualizarItemChecklist, atualizarObservacaoDocumento } from "@/actions/checklist";
+import { criarChecklist, atualizarItemChecklist, atualizarObservacaoDocumento, excluirDocumentoAnalista } from "@/actions/checklist";
+import ChecklistNotificacoesWidget from "@/components/Checklist/ChecklistNotificacoesWidget";
 import {
   TIPO_LABELS, TIPO_CORES, STATUS_LABELS, STATUS_CORES,
   STATUS_CONCLUIDOS, SECOES, calcularProgressoItens,
@@ -37,7 +39,12 @@ type StatusItemChecklist =
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-interface Documento { id: string; nome: string; url: string; uploadedByCliente: boolean; observacao: string | null; criadoEm: Date; }
+interface Documento {
+  id: string; nome: string; url: string;
+  uploadedByCliente: boolean; observacao: string | null;
+  deletadoEm: Date | null; deletadoPorCliente: boolean;
+  criadoEm: Date;
+}
 interface Item {
   id: string; codigo: string; secao: string; descricao: string;
   complemento: string | null; status: StatusItemChecklist;
@@ -90,10 +97,12 @@ export default function ChecklistView({
   empresa: empresaInicial,
   userNome,
   tema: temaNome = "blue",
+  role = "",
 }: {
   empresa: Empresa;
   userNome: string;
   tema?: string;
+  role?: string;
 }) {
   const router = useRouter();
   const tema = getTema(temaNome);
@@ -174,6 +183,9 @@ export default function ChecklistView({
             )}
             <Velocimetro percent={progresso} size="sm" showLabel={false} />
             <span className="text-sm font-black text-white tabular-nums">{progresso}%</span>
+            {['Admin', 'CEO', 'OPERACIONAL'].includes(role) && (
+              <ChecklistNotificacoesWidget role={role} />
+            )}
           </div>
         </div>
       </div>
@@ -199,10 +211,10 @@ export default function ChecklistView({
                   key={i}
                   className={`p-4 flex flex-col gap-1 ${(cell as any).full ? "col-span-2 sm:col-span-3" : ""}`}
                 >
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em]">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">
                     {cell.label}
                   </span>
-                  <span className={`text-xs font-bold uppercase truncate ${(cell as any).highlight ?? "text-slate-200"}`}>
+                  <span className={`text-xs font-bold uppercase truncate ${(cell as any).highlight ?? "text-white"}`}>
                     {cell.value}
                   </span>
                 </div>
@@ -305,16 +317,20 @@ export default function ChecklistView({
                     onClick={() => setSecaoAtiva(secao)}
                     className={`cursor-pointer p-4 rounded-2xl border text-left transition-all w-full ${
                       ativo
-                        ? `border-[rgba(${accentRgb},0.5)]`
-                        : "border-white/5"
+                        ? `border-[rgba(${accentRgb},0.6)] shadow-lg`
+                        : "border-slate-700/60 hover:border-slate-600/80"
                     }`}
-                    style={ativo ? { background: `rgba(${accentRgb}, 0.08)` } : undefined}
+                    style={
+                      ativo
+                        ? { background: `rgba(${accentRgb}, 0.14)` }
+                        : { background: "rgba(15,23,42,0.75)" }
+                    }
                   >
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] leading-tight block">
+                    <span className={`text-[9px] font-black uppercase tracking-[0.15em] leading-tight block ${ativo ? "text-white" : "text-slate-400"}`}>
                       {secao}
                     </span>
                     <div className="flex items-center gap-2 mt-2.5">
-                      <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div className="flex-1 h-1.5 bg-slate-700/60 rounded-full overflow-hidden">
                         <motion.div
                           className="h-full rounded-full"
                           initial={{ width: 0 }}
@@ -343,13 +359,13 @@ export default function ChecklistView({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
-                className="rounded-[2rem] overflow-hidden border border-white/5"
-                style={{ background: "rgba(15,23,42,0.6)", backdropFilter: "blur(20px)" }}
+                className="rounded-[2rem] overflow-hidden border border-slate-700/60"
+                style={{ background: "rgba(10,18,38,0.92)", backdropFilter: "blur(24px)" }}
               >
                 {/* Header da seção */}
                 <div
-                  className="p-5 border-b border-white/5 flex items-center gap-3"
-                  style={{ background: `rgba(${accentRgb}, 0.05)` }}
+                  className="p-5 border-b border-slate-700/60 flex items-center gap-3"
+                  style={{ background: `rgba(${accentRgb}, 0.10)` }}
                 >
                   <div
                     className="p-2 rounded-xl"
@@ -360,12 +376,12 @@ export default function ChecklistView({
                   <h3 className="text-sm font-black text-white uppercase tracking-widest">
                     {secaoAtiva}
                   </h3>
-                  <span className="ml-auto text-[10px] font-bold text-slate-500">
+                  <span className="ml-auto text-[10px] font-bold text-slate-300">
                     {itens.filter((i) => i.secao === secaoAtiva).length} itens
                   </span>
                 </div>
 
-                <div className="divide-y divide-white/[0.04]">
+                <div className="divide-y divide-slate-700/50">
                   {itens
                     .filter((i) => i.secao === secaoAtiva)
                     .map((item, idx) => (
@@ -422,8 +438,8 @@ function GlowCard({
   };
 
   const baseStyle: React.CSSProperties = {
-    background: "rgba(15,23,42,0.6)",
-    backdropFilter: "blur(20px)",
+    background: "rgba(15,23,42,0.82)",
+    backdropFilter: "blur(24px)",
     ...style,
   };
 
@@ -464,6 +480,7 @@ function ChecklistItem({
 }) {
   const [obs, setObs] = useState(item.observacao ?? "");
   const [expandido, setExpandido] = useState(false);
+  const [verExcluidos, setVerExcluidos] = useState(false);
   const concluido = STATUS_CONCLUIDOS.has(item.status);
 
   const dotColor =
@@ -486,7 +503,7 @@ function ChecklistItem({
       {/* Hover glow layer */}
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-        style={{ background: `linear-gradient(90deg, rgba(${accentRgb}, 0.04) 0%, transparent 60%)` }}
+        style={{ background: `linear-gradient(90deg, rgba(${accentRgb}, 0.08) 0%, transparent 60%)` }}
       />
 
       <div className={`relative p-5 flex items-start gap-4 transition-colors duration-300 ${concluido ? "opacity-60" : ""}`}>
@@ -502,19 +519,19 @@ function ChecklistItem({
 
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-start gap-3 flex-wrap">
-            <span className="font-mono text-[10px] text-slate-600 flex-shrink-0 mt-0.5">{item.codigo}</span>
+            <span className="font-mono text-[10px] text-slate-500 flex-shrink-0 mt-0.5">{item.codigo}</span>
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-bold uppercase tracking-tight transition-all duration-300 ${
-                concluido ? "text-slate-500 line-through" : "text-slate-200"
+                concluido ? "text-slate-500 line-through" : "text-white"
               }`}>
                 {item.descricao}
               </p>
               {item.complemento && (
-                <p className="text-[11px] text-slate-500 mt-0.5 italic">{item.complemento}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 italic">{item.complemento}</p>
               )}
             </div>
             {!item.obrigatorio && (
-              <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest border border-slate-700/40 px-1.5 py-0.5 rounded-md flex-shrink-0">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest border border-slate-600/50 px-1.5 py-0.5 rounded-md flex-shrink-0">
                 Condicional
               </span>
             )}
@@ -535,15 +552,35 @@ function ChecklistItem({
               ))}
             </motion.select>
 
-            {item.documentos.length > 0 && (
-              <button
-                onClick={() => setExpandido((v) => !v)}
-                className="cursor-pointer flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-white transition-colors"
-              >
-                {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                {item.documentos.length} doc{item.documentos.length > 1 ? "s" : ""}
-              </button>
-            )}
+            {/* Botão docs ativos */}
+            {(() => {
+              const ativos = item.documentos.filter((d) => !d.deletadoEm);
+              const excluidos = item.documentos.filter((d) => d.deletadoEm);
+              return (
+                <>
+                  {ativos.length > 0 && (
+                    <button
+                      onClick={() => setExpandido((v) => !v)}
+                      className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-700/50 bg-slate-800/60 text-[10px] font-black text-slate-300 hover:border-slate-500 hover:text-white transition-all"
+                    >
+                      {expandido ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                      <FileText size={11} className="text-blue-400" />
+                      {ativos.length} doc{ativos.length !== 1 ? "s" : ""}
+                    </button>
+                  )}
+                  {excluidos.length > 0 && (
+                    <button
+                      onClick={() => setVerExcluidos((v) => !v)}
+                      className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-rose-500/25 bg-rose-500/8 text-[10px] font-black text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/15 transition-all"
+                    >
+                      <History size={11} />
+                      {excluidos.length} excluído{excluidos.length !== 1 ? "s" : ""}
+                      {verExcluidos ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                    </button>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <textarea
@@ -552,20 +589,44 @@ function ChecklistItem({
             onChange={(e) => setObs(e.target.value)}
             onBlur={() => onObsBlur(item.id, obs, item.status)}
             placeholder="Adicionar observação técnica..."
-            className="w-full bg-transparent border border-transparent hover:border-white/5 focus:border-white/10 focus:bg-white/[0.02] rounded-xl p-2.5 text-[11px] text-slate-400 outline-none transition-all resize-none italic placeholder:text-slate-800"
+            className="w-full bg-transparent border border-transparent hover:border-slate-700/50 focus:border-slate-600/60 focus:bg-slate-800/30 rounded-xl p-2.5 text-[11px] text-slate-300 outline-none transition-all resize-none italic placeholder:text-slate-600"
           />
 
           <AnimatePresence>
-            {expandido && item.documentos.length > 0 && (
+            {expandido && item.documentos.filter((d) => !d.deletadoEm).length > 0 && (
               <motion.div
+                key="ativos"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="space-y-1.5 overflow-hidden"
+                className="space-y-2 overflow-hidden"
               >
-                {item.documentos.map((doc) => (
+                {item.documentos.filter((d) => !d.deletadoEm).map((doc) => (
                   <DocRow key={doc.id} doc={doc} />
                 ))}
+              </motion.div>
+            )}
+            {verExcluidos && item.documentos.filter((d) => d.deletadoEm).length > 0 && (
+              <motion.div
+                key="excluidos"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-1 border-t border-rose-500/10 mt-1">
+                  <div className="flex items-center gap-1.5 py-1.5">
+                    <History size={10} className="text-rose-500/60" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-rose-500/60">
+                      Histórico — excluídos pelo cliente
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {item.documentos.filter((d) => d.deletadoEm).map((doc) => (
+                      <DocRow key={doc.id} doc={doc} />
+                    ))}
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -579,6 +640,10 @@ function ChecklistItem({
 
 function DocRow({ doc }: { doc: Documento }) {
   const [obs, setObs] = useState(doc.observacao ?? "");
+  const [confirmando, setConfirmando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [removido, setRemovido] = useState(false);
+  const excluido = !!doc.deletadoEm;
 
   const handleBlur = () => {
     if (obs !== (doc.observacao ?? "")) {
@@ -586,36 +651,136 @@ function DocRow({ doc }: { doc: Documento }) {
     }
   };
 
-  return (
-    <div className="rounded-xl bg-white/[0.03] border border-white/5 overflow-hidden">
-      {/* Linha principal do documento */}
-      <div className="flex items-center gap-2 px-3 py-2">
-        <FileText size={12} className="text-slate-500 flex-shrink-0" />
-        <a
-          href={doc.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors flex-1 truncate"
-        >
-          {doc.nome}
-        </a>
-        {doc.uploadedByCliente && (
-          <span className="text-[9px] font-black text-slate-600 uppercase flex-shrink-0">
-            Cliente
-          </span>
-        )}
-      </div>
+  const handleExcluir = async () => {
+    setExcluindo(true);
+    await excluirDocumentoAnalista(doc.id);
+    setRemovido(true);
+  };
 
-      {/* Campo de observação vinculado a este documento */}
-      <div className="px-3 pb-2">
-        <textarea
-          rows={1}
-          value={obs}
-          onChange={(e) => setObs(e.target.value)}
-          onBlur={handleBlur}
-          placeholder="Observação sobre este documento..."
-          className="w-full bg-transparent border border-transparent hover:border-white/5 focus:border-white/10 focus:bg-white/[0.02] rounded-lg px-2 py-1.5 text-[10px] text-slate-400 outline-none transition-all resize-none italic placeholder:text-slate-800"
-        />
+  const dataFormatada = (d: Date | null) => {
+    if (!d) return "";
+    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  };
+
+  return (
+    <div className={`rounded-xl overflow-hidden border transition-all ${
+      removido
+        ? "opacity-0 h-0 border-0 overflow-hidden"
+        : excluido
+          ? "bg-slate-900/40 border-rose-500/15 opacity-60"
+          : doc.uploadedByCliente
+            ? "bg-blue-950/40 border-blue-500/25"
+            : "bg-slate-800/60 border-slate-600/30"
+    }`}>
+      {/* Barra colorida lateral */}
+      <div className="flex">
+        <div className={`w-0.5 flex-shrink-0 ${
+          excluido ? "bg-rose-500/40" : doc.uploadedByCliente ? "bg-blue-500/60" : "bg-slate-600/40"
+        }`} />
+
+        <div className="flex-1 min-w-0">
+          {/* Linha principal */}
+          <div className="flex items-center gap-2.5 px-3 py-2.5">
+            <FileText size={14} className={`flex-shrink-0 ${
+              excluido ? "text-rose-500/60" : doc.uploadedByCliente ? "text-blue-400" : "text-slate-400"
+            }`} />
+
+            {excluido ? (
+              <span className="text-[11px] font-bold text-slate-500 line-through flex-1 truncate">
+                {doc.nome}
+              </span>
+            ) : (
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] font-bold text-white hover:text-blue-300 transition-colors flex-1 truncate group flex items-center gap-1"
+              >
+                {doc.nome}
+                <ExternalLink size={10} className="opacity-0 group-hover:opacity-60 flex-shrink-0 transition-opacity" />
+              </a>
+            )}
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {excluido && (
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border bg-rose-500/10 border-rose-500/30 text-rose-400 text-[8px] font-black uppercase">
+                  <Trash2 size={8} />
+                  Excluído
+                </span>
+              )}
+              {doc.uploadedByCliente && !excluido && (
+                <span className="px-1.5 py-0.5 rounded-md border bg-blue-500/15 border-blue-500/30 text-blue-400 text-[8px] font-black uppercase">
+                  Cliente
+                </span>
+              )}
+              {!doc.uploadedByCliente && !excluido && (
+                <span className="px-1.5 py-0.5 rounded-md border bg-slate-700/50 border-slate-600/40 text-slate-500 text-[8px] font-black uppercase">
+                  Analista
+                </span>
+              )}
+
+              {/* Botão excluir — só para docs ativos */}
+              {!excluido && (
+                confirmando ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleExcluir}
+                      disabled={excluindo}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-500/50 bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 transition-all text-[8px] font-black uppercase cursor-pointer disabled:opacity-50"
+                    >
+                      {excluindo
+                        ? <span className="w-3 h-3 border border-rose-400/40 border-t-rose-400 rounded-full animate-spin" />
+                        : <Trash2 size={9} />}
+                      Confirmar
+                    </button>
+                    <button
+                      onClick={() => setConfirmando(false)}
+                      className="px-2 py-1 rounded-lg border border-slate-700/50 text-slate-500 hover:text-slate-300 transition-colors text-[8px] font-black uppercase cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmando(true)}
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer"
+                    title="Mover para histórico"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* Timestamps */}
+          <div className="flex items-center gap-3 px-3 pb-1.5">
+            <span className="flex items-center gap-1 text-[9px] text-slate-600">
+              <Clock size={9} />
+              {dataFormatada(doc.criadoEm)}
+            </span>
+            {excluido && doc.deletadoEm && (
+              <span className="flex items-center gap-1 text-[9px] text-rose-500/60">
+                <Trash2 size={9} />
+                {dataFormatada(doc.deletadoEm)}
+              </span>
+            )}
+          </div>
+
+          {/* Observação — só para docs ativos */}
+          {!excluido && (
+            <div className="px-3 pb-2.5">
+              <textarea
+                rows={1}
+                value={obs}
+                onChange={(e) => setObs(e.target.value)}
+                onBlur={handleBlur}
+                placeholder="Adicionar observação sobre este documento..."
+                className="w-full bg-transparent border border-transparent hover:border-white/8 focus:border-slate-600/50 focus:bg-slate-800/40 rounded-lg px-2 py-1.5 text-[10px] text-slate-400 outline-none transition-all resize-none italic placeholder:text-slate-700"
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

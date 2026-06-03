@@ -325,13 +325,101 @@ export async function atualizarObservacaoDocumento(docId: string, observacao: st
   }
 }
 
-// ─── REMOVER DOCUMENTO ───────────────────────────────────────────────────────
+// ─── REMOVER DOCUMENTO (hard delete — legado) ────────────────────────────────
 
 export async function removerDocumento(docId: string) {
   try {
     await requireSession();
     await db.documentoChecklist.delete({ where: { id: docId } });
     return { success: true };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+// ─── EXCLUIR DOCUMENTO PELO ANALISTA (soft delete → histórico) ───────────────
+
+export async function excluirDocumentoAnalista(docId: string) {
+  try {
+    await requireSession();
+    await db.documentoChecklist.update({
+      where: { id: docId },
+      data: { deletadoEm: new Date(), deletadoPorCliente: false },
+    });
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+// ─── HISTÓRICO DE DOCUMENTOS EXCLUÍDOS ───────────────────────────────────────
+
+export type DocHistorico = {
+  id: string;
+  nome: string;
+  url: string;
+  uploadedByCliente: boolean;
+  observacao: string | null;
+  criadoEm: Date;
+  deletadoEm: Date;
+  deletadoPorCliente: boolean;
+  itemDescricao: string;
+  itemCodigo: string;
+  empresaId: string;
+  razaoSocial: string;
+  cnpj: string;
+  clienteNome: string;
+};
+
+export async function getHistoricoDocumentosExcluidos(): Promise<{ data?: DocHistorico[]; error?: string }> {
+  try {
+    await requireSession();
+
+    const docs = await db.documentoChecklist.findMany({
+      where: { deletadoEm: { not: null } },
+      orderBy: { deletadoEm: "desc" },
+      include: {
+        item: {
+          select: {
+            descricao: true,
+            codigo: true,
+            checklist: {
+              select: {
+                empresa: {
+                  select: {
+                    id: true,
+                    razaoSocial: true,
+                    cnpj: true,
+                    cliente: { select: { nome: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const data: DocHistorico[] = docs
+      .filter((d) => d.deletadoEm !== null)
+      .map((d) => ({
+        id: d.id,
+        nome: d.nome,
+        url: d.url,
+        uploadedByCliente: d.uploadedByCliente,
+        observacao: d.observacao,
+        criadoEm: d.criadoEm,
+        deletadoEm: d.deletadoEm!,
+        deletadoPorCliente: d.deletadoPorCliente,
+        itemDescricao: d.item.descricao,
+        itemCodigo: d.item.codigo,
+        empresaId: d.item.checklist.empresa.id,
+        razaoSocial: d.item.checklist.empresa.razaoSocial,
+        cnpj: d.item.checklist.empresa.cnpj,
+        clienteNome: d.item.checklist.empresa.cliente?.nome ?? "—",
+      }));
+
+    return { data };
   } catch (err: any) {
     return { error: err.message };
   }

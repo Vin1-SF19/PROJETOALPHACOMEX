@@ -206,7 +206,7 @@ export async function getModulos() {
             include: {
                 cursos: {
                     include: {
-                        curso: { select: { id: true, nome: true } }
+                        curso: { select: { id: true, nome: true, capa: true } }
                     },
                     orderBy: { ordem: 'asc' },
                     take: 1,

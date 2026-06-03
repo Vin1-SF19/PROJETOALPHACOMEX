@@ -5,6 +5,8 @@ import { pusherServer } from "@/lib/pusher-server.ts";
 const ADMIN_ROLES = ["Admin", "CEO"];
 const ADMIN_CHANNELS = ["private-admin-chamados"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts"];
+const CHECKLIST_ROLES = ["Admin", "CEO", "OPERACIONAL"];
+const CHECKLIST_CHANNELS = ["private-checklist-docs"];
 
 export async function POST(req: Request) {
   try {
@@ -28,6 +30,15 @@ export async function POST(req: Request) {
     }
 
     if (ALL_USER_CHANNELS.includes(channelName)) {
+      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(authResponse);
+    }
+
+    if (CHECKLIST_CHANNELS.includes(channelName)) {
+      const role = session.user.role ?? "";
+      if (!CHECKLIST_ROLES.includes(role)) {
+        return new NextResponse("Proibido", { status: 403 });
+      }
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);
       return NextResponse.json(authResponse);
     }

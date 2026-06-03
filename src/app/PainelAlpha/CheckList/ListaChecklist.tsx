@@ -2,13 +2,14 @@
 
 import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
-import { Search, Plus, ArrowUpRight, Building2, Calendar, ScanSearch } from "lucide-react";
+import { Search, Plus, ArrowUpRight, Building2, Calendar, ScanSearch, History } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import Velocimetro from "@/components/Checklist/Velocimetro";
 import ModalCadastroCliente from "./Modais/CadastroCliente";
 import { TIPO_LABELS, TIPO_CORES } from "@/lib/checklist/items";
 import { getTema } from "@/lib/temas";
 import type { EmpresaComProgresso } from "@/actions/checklist";
+import ChecklistNotificacoesWidget from "@/components/Checklist/ChecklistNotificacoesWidget";
 
 type TipoEmbasamento =
   | "RECEITA_BRUTA_DAS"
@@ -42,10 +43,12 @@ export default function ListaChecklist({
   empresas,
   clientesAcesso = [],
   tema: temaNome = "blue",
+  role = "",
 }: {
   empresas: EmpresaComProgresso[];
   clientesAcesso?: { id: string; nome: string; email: string }[];
   tema?: string;
+  role?: string;
 }) {
   const tema = getTema(temaNome);
   const accentRgb = tema.accent;
@@ -104,7 +107,7 @@ export default function ListaChecklist({
             </motion.p>
           </div>
 
-          {/* Counters */}
+          {/* Counters + sino */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -129,6 +132,10 @@ export default function ListaChecklist({
                 {concluidos}
               </p>
             </div>
+            {/* Notificações de documentos de clientes */}
+            {['Admin', 'CEO', 'OPERACIONAL'].includes(role) && (
+              <ChecklistNotificacoesWidget role={role} />
+            )}
           </motion.div>
         </header>
 
@@ -175,11 +182,22 @@ export default function ListaChecklist({
             </select>
           </div>
 
-          {/* Botão Nova Empresa */}
-          <MagneticButton accentRgb={accentRgb} onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} />
-            Nova Empresa
-          </MagneticButton>
+          <div className="flex items-center gap-3">
+            {/* Histórico de excluídos */}
+            <Link
+              href="/PainelAlpha/CheckList/Historico"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-rose-500/25 bg-rose-500/8 text-[10px] font-black uppercase tracking-wider text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/15 transition-all"
+            >
+              <History size={14} />
+              Histórico
+            </Link>
+
+            {/* Botão Nova Empresa */}
+            <MagneticButton accentRgb={accentRgb} onClick={() => setIsModalOpen(true)}>
+              <Plus size={16} />
+              Nova Empresa
+            </MagneticButton>
+          </div>
         </motion.div>
 
         {/* GRID DE CARDS */}

@@ -314,9 +314,9 @@ export default function GerenciadorAlphaSkills() {
                                                         onClick={() => setVideoPreviewUrl(vid.url)}
                                                         className="w-24 h-14 bg-black rounded-2xl overflow-hidden border border-white/10 shrink-0 relative cursor-pointer group/thumb"
                                                     >
-                                                        {vid.thumbUrl ? (
+                                                        {(vid.thumbUrl || moduloAtivo?.imagemUrl) ? (
                                                             <img
-                                                                src={vid.thumbUrl}
+                                                                src={vid.thumbUrl || moduloAtivo?.imagemUrl}
                                                                 className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-500"
                                                             />
                                                         ) : (

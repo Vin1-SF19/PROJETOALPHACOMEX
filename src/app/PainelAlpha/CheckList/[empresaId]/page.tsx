@@ -35,6 +35,7 @@ export default async function EmpresaChecklistPage({
       empresa={result.data as any}
       userNome={(session.user as any)?.nome ?? (session.user as any)?.name ?? "Analista"}
       tema={userDb?.tema_interface ?? "blue"}
+      role={(session.user as any)?.role ?? ""}
     />
   );
 }
