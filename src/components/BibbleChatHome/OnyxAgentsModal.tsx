@@ -8,7 +8,7 @@ import {
   Globe, Lock, User, Users, Search, LayoutGrid,
 } from "lucide-react";
 import {
-  fetchAgents, fetchTools, createAgent, updateAgent, deleteAgent, createCustomTool,
+  fetchAgents, fetchAgent, fetchTools, createAgent, updateAgent, deleteAgent, createCustomTool,
   uploadAgentImage, agentAvatarUrl,
   type OnyxAgent, type OnyxTool, type AgentFormData,
 } from "@/lib/onyx/browser";
@@ -76,6 +76,7 @@ export default function OnyxAgentsModal({
   const [saving, setSaving] = useState(false);
   const [imgPreview, setImgPreview] = useState<string | null>(null); // object URL ou avatar URL
   const [imgUploading, setImgUploading] = useState(false);
+  const [loadingPrompt, setLoadingPrompt] = useState(false); // carrega o detalhe (system_prompt)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // editor de skill
@@ -117,21 +118,37 @@ export default function OnyxAgentsModal({
     setView("editor");
   };
 
-  const openEdit = (agent: OnyxAgent) => {
+  const openEdit = async (agent: OnyxAgent) => {
     setEditingId(agent.id);
+    // Preenche com o que a lista tem; o system_prompt vem do detalhe (lista não traz)
     setForm({
       name: agent.name,
       description: agent.description,
-      system_prompt: stripGlobalRule(agent.system_prompt),
-      task_prompt: agent.task_prompt ?? "",
+      system_prompt: "",
+      task_prompt: "",
       tool_ids: agent.tools?.map(t => t.id) ?? [],
       is_public: agent.isPublic ?? false,
       uploaded_image_id: agent.uploaded_image_id ?? null,
       remove_image: false,
     });
-    // Imagem existente é servida pelo proxy de avatar (cache-bust por id)
     setImgPreview(agent.uploaded_image_id ? agentAvatarUrl(agent.id) : null);
     setView("editor");
+
+    // Busca o detalhe completo (system_prompt, task_prompt)
+    setLoadingPrompt(true);
+    try {
+      const full = await fetchAgent(agent.id);
+      setForm(f => ({
+        ...f,
+        system_prompt: stripGlobalRule(full.system_prompt),
+        task_prompt: full.task_prompt ?? "",
+        tool_ids: full.tools?.map(t => t.id) ?? f.tool_ids,
+      }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoadingPrompt(false);
+    }
   };
 
   const onPickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -426,7 +443,7 @@ export default function OnyxAgentsModal({
 
                         {(agent.ownedByMe || isAdmin) && (
                           <>
-                            <button onClick={() => openEdit(agent)} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: "#6b7fa0" }} title="Editar">
+                            <button onClick={() => void openEdit(agent)} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: "#6b7fa0" }} title="Editar">
                               <Pencil size={13} />
                             </button>
                             <button onClick={() => removeAgent(agent.id)} className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 hover:text-red-400" style={{ color: "#6b7fa0" }} title="Excluir">
@@ -523,8 +540,19 @@ export default function OnyxAgentsModal({
                 <input className={inputCls} style={inputStyle} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="O que este agente faz" />
               </div>
               <div>
-                <label className={labelCls} style={labelStyle}>Instruções (system prompt)</label>
-                <textarea className={inputCls + " resize-none"} style={inputStyle} rows={6} value={form.system_prompt} onChange={e => setForm(f => ({ ...f, system_prompt: e.target.value }))} placeholder="Defina personalidade, regras e objetivo do agente…" />
+                <label className={labelCls} style={labelStyle}>
+                  Instruções (system prompt)
+                  {loadingPrompt && <Loader2 size={11} className="inline-block ml-2 animate-spin align-[-1px]" style={{ color: "#a5b4fc" }} />}
+                </label>
+                <textarea
+                  className={inputCls + " resize-none"}
+                  style={inputStyle}
+                  rows={6}
+                  value={form.system_prompt}
+                  disabled={loadingPrompt}
+                  onChange={e => setForm(f => ({ ...f, system_prompt: e.target.value }))}
+                  placeholder={loadingPrompt ? "Carregando instruções do agente…" : "Defina personalidade, regras e objetivo do agente…"}
+                />
               </div>
 
               {/* Visibilidade: público x privado */}

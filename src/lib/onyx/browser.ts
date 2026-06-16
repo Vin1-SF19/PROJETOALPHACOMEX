@@ -65,6 +65,14 @@ export async function fetchAgents(): Promise<OnyxAgent[]> {
   return data.agents;
 }
 
+/** Detalhe completo de um agente (inclui system_prompt, que a lista NÃO traz). */
+export async function fetchAgent(id: number): Promise<OnyxAgent> {
+  const res = await fetch(`/api/onyx/agents/${id}`);
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = (await res.json()) as { agent: OnyxAgent };
+  return data.agent;
+}
+
 export async function fetchTools(): Promise<OnyxTool[]> {
   const res = await fetch("/api/onyx/tools");
   if (!res.ok) throw new Error(await parseError(res));
