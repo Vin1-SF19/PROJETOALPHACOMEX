@@ -1,0 +1,307 @@
+/* ── CYBERPUNK ALPHA DESIGN SYSTEM ───────────────────────────── */
+/* Azul Escuro Alpha + Vermelho Neon Cyberpunk */
+/* Para: Bibble Chat Home ── Transformação Cyberpunk */
+
+
+/* ── Variáveis Cyperpunk ──────────────── */
+:root {
+  /* Azul Base Alpha Cyber */
+  --cyber-blue-darkest:   263.83 0.132 0.30474;      /* #1e1428 fundo principal */
+  --cyber-blue-dark:      265.755 0.042 0.208;       /* #1a1834 cards */
+  --cyber-blue-mid:       260.031 0.041 0.279;       /* #283850 hover */
+  --cyber-blue-light:     256.788 0.04 0.704;        /* #58608a bordas */
+  --cyber-blue-pale:      247.896 0.007 0.968;       /* #f8f8ff texto secundário */
+  --cyber-red-neon:       345.3 0.84 0.6;            /* #ff1a4d vermelho neon intensivo */
+  --cyber-red-glow:       345.3 0.84 0.5;            /* #ff1a4d com opacidade */
+  --cyber-red-dark:       359 0.76 0.469;            /* #e61940 vermelho mais suave */
+
+  /* Cyberpunk effects */
+  --glow-neon: 0 0 8px rgba(255, 26, 77, 0.6), 0 0 20px rgba(255, 26, 77, 0.4);
+  --glow-blue: 0 0 8px rgba(74, 98, 246, 0.6), 0 0 20px rgba(74, 98, 246, 0.4);
+  --shadow-cyber: 0 4px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(255, 26, 77, 0.2);
+  --border-cyber: 1px solid rgba(255, 26, 77, 0.2);
+  --border-glow: 1px solid rgba(255, 26, 77, 0.4);
+
+  /* Bibble clean design tokens */
+  --bibble-bg-900: #060c1a;
+  --bibble-bg-800: #0b1120;
+  --bibble-bg-700: #111111;
+  --bibble-bg-600: #161d2e;
+  --bibble-border: #1e2740;
+  --bibble-border-hi: #2a3556;
+  --bibble-red: #ff1a4d;
+  --bibble-red-soft: #ff6b8a;
+  --bibble-blue: #4a62f6;
+  --bibble-lavender: #a5b4fc;
+  --bibble-text-hi: #f4f6fb;
+  --bibble-text: #c3cbe0;
+  --bibble-text-dim: #6b7592;
+}
+
+/* ── Classes Cyperpunk ───────────────────── */
+
+/* Neon glow effects */
+.cyber-neon-text {
+  text-shadow: 0 0 8px rgba(255, 26, 77, 0.6), 0 0 20px rgba(255, 26, 77, 0.4);
+}
+
+.cyber-neon-border {
+  border: 1px solid rgba(255, 26, 77, 0.4);
+  box-shadow: 0 0 10px rgba(255, 26, 77, 0.2);
+}
+
+.cyber-glow-bg {
+  background: radial-gradient(ellipse at center, rgba(255, 26, 77, 0.12) 0%, rgba(74, 98, 246, 0.06) 40%, transparent 70%);
+}
+
+/* Cyberpunk gradients */
+.cyber-gradient-primary {
+  background: linear-gradient(135deg,
+    hsl(var(--cyber-red-neon)) 0%,
+    hsl(var(--cyber-blue-mid)) 50%,
+    hsl(265.755 0.042 0.15) 100%
+  );
+}
+
+.cyber-gradient-secondary {
+  background: linear-gradient(180deg,
+    hsl(var(--cyber-red-neon) / 0.15) 0%,
+    hsl(var(--cyber-blue-mid) / 0.3) 100%
+  );
+}
+
+.cyber-gradient-text {
+  background: linear-gradient(160deg,
+    hsl(var(--cyber-red-neon)) 0%,
+    hsl(var(--cyber-blue-light)) 50%,
+    hsl(var(--cyber-pale)) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Pulsing animation */
+@keyframes cyber-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.cyber-pulse {
+  animation: cyber-pulse 3s ease-in-out infinite;
+}
+
+/* Glow heartbeat */
+@keyframes cyber-heartbeat {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 26, 77, 0.3), 0 0 10px rgba(255, 26, 77, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(255, 26, 77, 0.6), 0 0 25px rgba(255, 26, 77, 0.4);
+  }
+}
+
+.cyber-heartbeat {
+  animation: cyber-heartbeat 2s ease-in-out infinite;
+}
+
+/* Scanline effect */
+@keyframes cyber-scan {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 100%; }
+}
+
+.cyber-scanline-1 {
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-scanline-1::before {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(255, 26, 77, 0.08) 50%,
+    transparent 100%
+  );
+  animation: cyber-scan 3s linear infinite;
+  pointer-events: none;
+}
+
+/* Cyber flicker on hover */
+@keyframes cyber-flicker {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 26, 77, 0.3), inset 0 0 10px rgba(255, 26, 77, 0.05); }
+  25% { box-shadow: 0 0 15px rgba(255, 26, 77, 0.5), inset 0 0 15px rgba(255, 26, 77, 0.1); }
+  50% { box-shadow: 0 0 8px rgba(255, 26, 77, 0.4), inset 0 0 8px rgba(255, 26, 77, 0.08); }
+  75% { box-shadow: 0 0 12px rgba(255, 26, 77, 0.6), inset 0 0 12px rgba(255, 26, 77, 0.12); }
+}
+
+.cyber-flicker-hover:hover {
+  animation: cyber-flicker 2s ease-in-out infinite;
+}
+
+/* Glitch animation */
+@keyframes cyber-glitch {
+  0%, 100% { transform: translate(0); }
+  2%, 6% { transform: translate(-2px, 1px); }
+  4%, 8% { transform: translate(2px, -1px); }
+  6%, 10% { transform: translate(-1px, 2px); }
+  8%, 12% { transform: translate(1px, -2px); }
+}
+
+.cyber-glitch-hover:hover {
+  animation: cyber-glitch 0.3s ease-in-out infinite;
+}
+
+/* Matrix-style glow */
+@keyframes cyber-matrix {
+  0%, 100% {
+    background: radial-gradient(
+      circle at center,
+      rgba(255, 26, 77, 0.1) 0%,
+      transparent 70%
+    );
+  }
+  50% {
+    background: radial-gradient(
+      circle at center,
+      rgba(255, 26, 77, 0.2) 0%,
+      transparent 70%
+    );
+  }
+}
+
+.cyber-matrix-glow {
+  animation: cyber-matrix 4s ease-in-out infinite;
+}
+
+/* Cyber grid background */
+.cyber-grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 26, 77, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 26, 77, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  position: relative;
+}
+
+.cyber-grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(74, 98, 246, 0.03) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Cyber border glow on focus */
+.cyber-focus-glow:focus {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(255, 26, 77, 0.1),
+    0 0 10px rgba(255, 26, 77, 0.3),
+    inset 0 0 20px rgba(255, 26, 77, 0.05);
+}
+
+/* Cyber button hover */
+.cyber-button-hover {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cyber-button-hover::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: radial-gradient(
+    circle,
+    rgba(255, 26, 77, 0.2) 0%,
+    transparent 70%
+  );
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.cyber-button-hover:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Loading animation - cyber spinner */
+@keyframes cyber-spin-dots {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.8); opacity: 0.6; }
+}
+
+.cyber-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: hsl(var(--cyber-red-neon));
+  margin: 0 2px;
+  animation: cyber-spin-dots 1.4s ease-in-out infinite both;
+}
+
+.cyber-dot:nth-child(1) { animation-delay: -0.32s; }
+.cyber-dot:nth-child(2) { animation-delay: -0.16s; }
+.cyber-dot:nth-child(3) { animation-delay: 0s; }
+
+/* Cyber pulse ring */
+@keyframes cyber-rings {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(255, 26, 77, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(255, 26, 77, 0);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(255, 26, 77, 0);
+  }
+}
+
+.cyber-ring-pulse {
+  animation: cyber-rings 2s infinite;
+}
+
+/* ── Clean avatar animations (Bibble chat) ─────────────────── */
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 1px rgba(74, 98, 246, 0.35);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 1px rgba(74, 98, 246, 0.55), 0 0 14px rgba(74, 98, 246, 0.25);
+  }
+}
+
+@keyframes streamPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(255, 26, 77, 0.45), 0 0 12px rgba(255, 26, 77, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(255, 26, 77, 0.7), 0 0 18px rgba(255, 26, 77, 0.45);
+  }
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}

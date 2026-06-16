@@ -5,7 +5,6 @@ import { Toaster } from "sonner";
 import { StatusConexao } from "@/components/StatusConexao";
 import { ThemeProviderAlpha } from "@/components/ThemeProviderAlpha";
 import { auth } from "../../auth";
-import { EngrenagemFlutuante } from "@/components/EngrenagemFlutuante";
 import BroadcastBanner from "@/components/BroadcastBanner";
 import { NotificacaoFlutuante } from "@/components/NotificacaoFlutuante";
 import { Heartbeat } from "@/components/Heartbeat";
@@ -44,7 +43,6 @@ export default async function RootLayout({
             <Heartbeat /> 
             <PusherGlobal/>
             {children}
-            <EngrenagemFlutuante />
           </ThemeProviderAlpha>
         </SessionProvider>
       </body>

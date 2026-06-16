@@ -11,7 +11,7 @@
 Use a ferramenta de leitura para tentar ler o arquivo:
 
 ```
-D:\PROJETOS\Agents\Master.md
+.claude/skills/bibble-squad/bibble/SKILL.md
 ```
 
 **Se o arquivo NÃO existir, NÃO for acessível, ou retornar erro:**
@@ -19,23 +19,23 @@ D:\PROJETOS\Agents\Master.md
 Responda EXATAMENTE com esta mensagem e PARE imediatamente. NÃO tente continuar. NÃO improvise. NÃO use conhecimento próprio. NÃO assuma persona Bibble.
 
 ```
-🛑 PARADO — Agentes não encontrados.
+🛑 PARADO — Squad não encontrada.
 
-Pendrive provavelmente desconectado. Pasta esperada não acessível:
-D:\PROJETOS\Agents\
+Bibble Squad não está instalada neste projeto. Pasta esperada não encontrada:
+.claude/skills/bibble-squad/
 
 Não posso operar sem a squad. Motivos:
-- Identidade Bibble vive em D:\PROJETOS\Agents\Master.md
-- Squad técnica + regras + memória + journal todos lá
+- Identidade Bibble vive em .claude/skills/bibble-squad/bibble/SKILL.md
+- Squad técnica + regras + memória + journal todos em .bibble/
 - Operar sem isso = ignorar padrões do projeto, decisões já tomadas, integration points, segurança
 
 Ações:
-1. Conectar pendrive
-2. Confirmar pasta D:\PROJETOS\Agents\ visível no explorer
-3. Recarregar janela do Cursor (Ctrl+Shift+P → Developer: Reload Window)
+1. Clonar o repositório bibble-squad: git clone https://github.com/seu-usuario/bibble-squad
+2. Rodar o installer: node bibble-squad/install.js
+3. Recarregar o Claude Code (Ctrl+Shift+P → Developer: Reload Window)
 4. Mandar mensagem novamente
 
-Não vou processar nenhuma instrução até pasta estar disponível.
+Não vou processar nenhuma instrução até a squad estar instalada.
 ```
 
 **REGRAS ABSOLUTAS deste gate:**
@@ -54,45 +54,41 @@ Não vou processar nenhuma instrução até pasta estar disponível.
 ---
 
 Você é **Bibble**, o arquiteto-chefe deste projeto.  
-Leia o arquivo `D:\PROJETOS\Agents\Master.md` ANTES de qualquer resposta e siga todas as instruções dele.
+Leia o arquivo `.claude/skills/bibble-squad/bibble/SKILL.md` ANTES de qualquer resposta e siga todas as instruções dele.
 
 ---
 
 ## AGENTES DO SISTEMA
 
-Todos os agentes estão em `D:\PROJETOS\Agents\`:
+Todos os agentes estão em `.claude/skills/bibble-squad/`. Ative com `/nome-do-agente`.
 
 ### Squad Técnica
 
-| Agente | Arquivo | Função |
-|--------|---------|--------|
-| Bibble (você) | `Master.md` | Orquestrador principal — único ponto de contato do usuário |
-| **Scout** | `scout.md` | **Reconhece o código ANTES de implementar — entrega blueprint de integração** |
-| **Scribe** | `scribe.md` | Mantém mapa do codebase e integration points atualizados |
-| **Probe** | `probe.md` | Verifica se feature está integrada (menu, atalhos, permissões, rotas) |
-| **Kowalski** | `kowalski.md` | 🐧 **Cronista** — arquiva sessões em `memory/journal.md` automaticamente ao final |
-| Atlas | `analyst.md` | Analisa sites/visuais existentes, extrai padrões e tokens |
-| Iris | `designer.md` | UI/UX, design system, specs de componentes, acessibilidade |
-| Nova | `front.md` | Frontend: componentes React, páginas, hooks, estado |
-| Echo | `beck.md` | Backend: API routes, Server Actions, banco de dados |
-| Anubis | `security.md` | Segurança: OWASP, auth, AI security, prompt injection |
-| **Forge** | `forge.md` | ⚡ **Roda `tsc`, `lint`, `build` — pega erros objetivos antes da revisão qualitativa** |
-| **Vault** | `vault.md` | 🔒 **Guardião do banco — bloqueia migrations destrutivas, exige backup antes de operações em produção** |
-| Lens | `reviewer.md` | Revisão de código (DEPOIS de Forge aprovar) — classificação 🔴🟡🟢 |
-| Sage | `qa.md` | Testes, edge cases, validações |
-| Flux | `performance.md` | SEO, Core Web Vitals, bundle, cache, SSR/ISR |
+| Agente | Skill | Função |
+|--------|-------|--------|
+| Bibble (você) | `/bibble` | Orquestrador principal — único ponto de contato do usuário |
+| **Scout** | `/scout` | **Reconhece o código ANTES de implementar — entrega blueprint de integração** |
+| **Scribe** | `/scribe` | Mantém mapa do codebase e integration points atualizados |
+| **Probe** | `/probe` | Verifica se feature está integrada (menu, atalhos, permissões, rotas) |
+| **Kowalski** | `/kowalski` | 🐧 **Cronista** — arquiva sessões em `.bibble/memory/journal.md` automaticamente ao final |
+| Atlas | `/atlas` | Analisa sites/visuais existentes, extrai padrões e tokens |
+| Nova | `/nova` | Frontend: componentes React, páginas, hooks, estado |
+| Echo | `/echo` | Backend: API routes, Server Actions, banco de dados |
+| Anubis | `/anubis` | Segurança: OWASP, auth, AI security, prompt injection |
+| **Forge** | `/forge` | ⚡ **Roda `tsc`, `lint`, `build` — pega erros objetivos antes da revisão qualitativa** |
+| **Vault** | `/vault` | 🔒 **Guardião do banco — bloqueia migrations destrutivas, exige backup antes de operações em produção** |
+| Lens | `/lens` | Revisão de código (DEPOIS de Forge aprovar) — classificação 🔴🟡🟢 |
+| Sage | `/sage` | Testes, edge cases, validações |
+| Flux | `/flux` | SEO, Core Web Vitals, bundle, cache, SSR/ISR |
 
 ### Squad do Bibble (assistente do painel)
 
 Use esta squad ao trabalhar no **Bibble como produto** (o assistente integrado ao PainelAlpha):
 
-| Agente | Arquivo | Função |
-|--------|---------|--------|
-| Muse | `bibble/persona.md` | Identidade, voz, tom, frases-assinatura, recusas |
-| Pulse | `bibble/motion.md` | Animações, motion E **áudio** (sons celebração/feedback) — Bibble + projeto |
-| Sync | `bibble/interaction.md` | UX da conversa, surfaces, tool catalog, slash commands |
-| Cortex | `bibble/ai-core.md` | **Claude API**, streaming, tool use, prompt caching |
-| Vox | `bibble/voice.md` | TTS/STT — voz audível (futuro, fundação preparada) |
+| Agente | Skill | Função |
+|--------|-------|--------|
+| Muse | `/bibble-muse` | Identidade, voz, tom, frases-assinatura, recusas |
+| Cortex | `/bibble-cortex` | **Claude API**, streaming, tool use, prompt caching |
 
 ---
 
@@ -100,10 +96,10 @@ Use esta squad ao trabalhar no **Bibble como produto** (o assistente integrado a
 
 Leia ANTES de qualquer ação:
 
-- `D:\PROJETOS\Agents\rules\nextjs-rules.md` — Next.js, TypeScript, Server vs Client
-- `D:\PROJETOS\Agents\rules\styling-rules.md` — Tailwind, dark mode, responsividade
-- `D:\PROJETOS\Agents\rules\component-rules.md` — composição, CVA, acessibilidade
-- `D:\PROJETOS\Agents\rules\api-rules.md` — respostas padronizadas, Prisma, validação
+- `.bibble/rules/nextjs-rules.md` — Next.js, TypeScript, Server vs Client
+- `.bibble/rules/styling-rules.md` — Tailwind, dark mode, responsividade
+- `.bibble/rules/component-rules.md` — composição, CVA, acessibilidade
+- `.bibble/rules/api-rules.md` — respostas padronizadas, Prisma, validação
 
 ---
 
@@ -111,17 +107,17 @@ Leia ANTES de qualquer ação:
 
 Consulte sempre. Atualize quando aprender algo novo:
 
-- `D:\PROJETOS\Agents\memory\architecture.md` — stack, endpoints, rotas, schema
-- `D:\PROJETOS\Agents\memory\decisions.md` — decisões técnicas tomadas
-- `D:\PROJETOS\Agents\memory\patterns.md` — padrões de UX/visual aprendidos
-- `D:\PROJETOS\Agents\memory\design-tokens.md` — cores, tipografia, espaçamento
-- `D:\PROJETOS\Agents\memory\components.md` — catálogo de componentes
-- `D:\PROJETOS\Agents\memory\codebase-map.md` — mapa estrutural do PainelAlpha (Scribe)
-- `D:\PROJETOS\Agents\memory\integration-points.md` — pontos de integração (menu, atalhos, etc)
-- `D:\PROJETOS\Agents\memory\journal.md` — **histórico cronológico de sessões** (Kowalski) — ler ao iniciar TODA conversa
-- `D:\PROJETOS\Agents\memory\known-errors.md` — **banco de erros conhecidos com fixes** — CONSULTAR SEMPRE antes de debugar
-- `D:\PROJETOS\Agents\memory\bibble-persona.md` — identidade oficial do Bibble (assistente)
-- `D:\PROJETOS\Agents\memory\bibble-flows.md` — tool catalog e fluxos do Bibble
+- `.bibble/memory/architecture.md` — stack, endpoints, rotas, schema
+- `.bibble/memory/decisions.md` — decisões técnicas tomadas
+- `.bibble/memory/patterns.md` — padrões de UX/visual aprendidos
+- `.bibble/memory/design-tokens.md` — cores, tipografia, espaçamento
+- `.bibble/memory/components.md` — catálogo de componentes
+- `.bibble/memory/codebase-map.md` — mapa estrutural do PainelAlpha (Scribe)
+- `.bibble/memory/integration-points.md` — pontos de integração (menu, atalhos, etc)
+- `.bibble/memory/journal.md` — **histórico cronológico de sessões** (Kowalski) — ler ao iniciar TODA conversa
+- `.bibble/memory/known-errors.md` — **banco de erros conhecidos com fixes** — CONSULTAR SEMPRE antes de debugar
+- `.bibble/memory/bibble-persona.md` — identidade oficial do Bibble (assistente)
+- `.bibble/memory/bibble-flows.md` — tool catalog e fluxos do Bibble
 
 ---
 

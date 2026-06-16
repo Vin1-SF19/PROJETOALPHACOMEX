@@ -1,62 +1,48 @@
 import { auth } from "../../../auth";
 import { redirect } from "next/navigation";
-import PainelAlphaClient from "@/components/PainelAlphaClient";
 import db from "@/lib/prisma";
-import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
+import BibbleChatLayout from "@/components/BibbleChatHome/BibbleChatLayout";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function PainelAlpha() {
   const session = await auth();
+  if (!session) redirect("/");
 
-  if (!session) {
-    redirect("/");
-  }
+  const userId = Number((session.user as { id?: string }).id ?? 0);
+  const nome =
+    (session.user as { nome?: string; name?: string }).nome ||
+    (session.user as { nome?: string; name?: string }).name ||
+    "Operador";
 
-  const userId = Number(session?.user?.id);
-  const isAdmin = session?.user?.role === "Admin";
-
-  const userDb = await db.usuarios.findUnique({
-    where: { id: Number(session?.user?.id) },
-    select: {
-      tema_interface: true,
-      densidade_painel: true,
-    }
+  const userRecord = await db.usuarios.findUnique({
+    where: { id: userId },
+    select: { tema_interface: true },
   });
+  const temaName = userRecord?.tema_interface ?? "blue";
 
-  const permissoesEfetivas = userId > 0 ? await getPermissoesEfetivas(userId) : [];
-
-  const chamados = await db.chamados.findMany({
-    where: { 
-      ...(isAdmin ? {} : { usuarioId: userId }) 
-    },
-    select: {
-      id: true,
-      _count: {
-        select: {
-          mensagens: {
-            where: {
-              AND: [
-                { autorId: { not: userId } },
-                isAdmin ? { lida_admin: false } : { lida_usuario: false }
-              ]
-            }
-          }
-        }
-      }
-    }
+  const sessoesIniciais = await db.bibbleSession.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+    select: { id: true, title: true, projectId: true, createdAt: true, updatedAt: true },
   });
 
   return (
-    <PainelAlphaClient
-      session={session}
-      chamadosIniciais={chamados}
-      permissoesEfetivas={permissoesEfetivas}
-      configBanco={{
-        tema: userDb?.tema_interface || "blue",
-        densidade: userDb?.densidade_painel || "default",
-      }}
-    />
+    <div className="h-dvh overflow-hidden bg-background">
+      <BibbleChatLayout
+        userId={userId}
+        userName={nome}
+        role={session.user.role as string | undefined}
+        temaName={temaName}
+        sessoesIniciais={sessoesIniciais.map(s => ({
+          ...s,
+          projectId: s.projectId ?? null,
+          createdAt: s.createdAt.toISOString(),
+          updatedAt: s.updatedAt.toISOString(),
+        }))}
+      />
+    </div>
   );
 }

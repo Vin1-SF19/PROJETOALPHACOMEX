@@ -4,6 +4,8 @@ import { Toaster } from "sonner";
 import { auth } from "../../../auth";
 import PainelLayoutClient from "@/components/layout/PainelLayoutClient";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
+import { getOnboardingVideo, type OnboardingVideo } from "@/lib/onboarding";
+import db from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Painel Alpha",
@@ -21,18 +23,32 @@ export default async function PainelLayout({
   const role = user?.role ?? 'User';
 
   let permissoes: string[] = [];
+  let temaName = "blue";
+  let onboardingVisto = true;        // default true = não bloqueia se não houver usuário
+  let onboardingVideo: OnboardingVideo | null = null;
   if (userId > 0) {
-    permissoes = await getPermissoesEfetivas(userId);
+    const [perms, userRecord] = await Promise.all([
+      getPermissoesEfetivas(userId),
+      db.usuarios.findUnique({ where: { id: userId }, select: { tema_interface: true, onboarding_ialpha_visto: true } }),
+    ]);
+    permissoes = perms;
+    temaName = userRecord?.tema_interface ?? "blue";
+    onboardingVisto = userRecord?.onboarding_ialpha_visto ?? false;
+    // Só busca o vídeo se ainda não viu (economiza query)
+    if (!onboardingVisto) onboardingVideo = await getOnboardingVideo();
   }
 
   return (
-    <div className="min-h-screen bg-[#020617]">
+    <div className="min-h-dvh bg-[#020617]">
       <Toaster richColors position="top-right" />
       <PainelLayoutClient
         permissoes={permissoes}
         role={role}
         nome={user?.nome ?? user?.name ?? "Operador"}
         imagemUrl={user?.imagemUrl ?? null}
+        temaName={temaName}
+        onboardingVisto={onboardingVisto}
+        onboardingVideo={onboardingVideo}
       >
         {children}
       </PainelLayoutClient>

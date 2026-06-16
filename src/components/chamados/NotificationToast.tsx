@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { X, AlertTriangle, AlertCircle, Info } from 'lucide-react';
@@ -53,19 +53,16 @@ export default function NotificationToast() {
   const router = useRouter();
 
   const [visivel, setVisivel] = useState<ChamadoNotificacao | null>(null);
-  const [lastCount, setLastCount] = useState(0);
+  const lastShownIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (notificacoes.length > lastCount && notificacoes[0]) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setVisivel(notificacoes[0]);
-      setLastCount(notificacoes.length);
-      const timer = setTimeout(() => setVisivel(null), 6000);
-      return () => clearTimeout(timer);
-    }
-    setLastCount(notificacoes.length);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificacoes.length]);
+    const latest = notificacoes[0];
+    if (!latest || latest.id === lastShownIdRef.current) return;
+    lastShownIdRef.current = latest.id;
+    setVisivel(latest);
+    const timer = setTimeout(() => setVisivel(null), 6000);
+    return () => clearTimeout(timer);
+  }, [notificacoes]);
 
   const config = visivel
     ? (URGENCIA_CONFIG[visivel.urgencia as keyof typeof URGENCIA_CONFIG] ?? FALLBACK)

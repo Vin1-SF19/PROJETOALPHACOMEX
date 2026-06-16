@@ -1,0 +1,150 @@
+# Ambiente do Painel Alpha
+version: "1.0.0"
+
+# Informações do projeto
+project:
+  name: "PainelAlpha"
+  description: "Sistema de gerenciamento para Painel Alpha"
+  version: "1.0.0"
+  language: "TypeScript"
+  framework: "Next.js 14"
+  database: "Prisma"
+  styling: "Tailwind CSS"
+  deployment: "Vercel"
+
+# Estrutura de diretórios
+directories:
+  src: "src"
+  app: "src/app"
+  components: "src/components"
+  lib: "src/lib"
+  styles: "src/styles"
+  public: "public"
+  api: "src/app/api"
+  assets: "public/assets"
+
+# Tecnologias principais
+technologies:
+  - name: "Next.js"
+    version: "14.0.0"
+    type: "framework"
+  - name: "TypeScript"
+    version: "5.0.0"
+    type: "language"
+  - name: "Prisma"
+    version: "5.0.0"
+    type: "orm"
+  - name: "Tailwind CSS"
+    version: "3.3.0"
+    type: "styling"
+  - name: "React"
+    version: "18.2.0"
+    type: "library"
+  - name: "Node.js"
+    version: "20.0.0"
+    type: "runtime"
+
+# Configurações específicas
+settings:
+  # Configurações do Next.js
+  nextjs:
+    appDir: true
+    pagesDir: false
+    typescript: true
+    eslint: true
+    prettier: true
+    tailwind: true
+    turbo: true
+
+  # Configurações do Prisma
+  prisma:
+    schema: "prisma/schema.prisma"
+    migrations: "prisma/migrations"
+    seed: "prisma/seed.ts"
+
+  # Configurações do Tailwind
+  tailwind:
+    config: "tailwind.config.ts"
+    theme: "src/styles/theme"
+
+  # Configurações de API
+  api:
+    base: "/api"
+    routes:
+      - name: "UploadSkills"
+        path: "/upload-skills"
+        method: "POST"
+        description: "Endpoint para upload de skills"
+      - name: "BibbleChat"
+        path: "/bibble/chat"
+        method: "POST"
+        description: "Endpoint para chat Bibble"
+      - name: "GerarFicha"
+        path: "/bibble/gerar-ficha"
+        method: "POST"
+        description: "Endpoint para geração de ficha"
+      - name: "BibbleDocuments"
+        path: "/bibble/documents"
+        method: "POST"
+        description: "Endpoint para documentos Bibble"
+      - name: "BibbleModels"
+        path: "/bibble/models"
+        method: "POST"
+        description: "Endpoint para modelos Bibble"
+      - name: "BibbleProjects"
+        path: "/bibble/projects"
+        method: "POST"
+        description: "Endpoint para projetos Bibble"
+      - name: "BibbleSessions"
+        path: "/bibble/sessions"
+        method: "POST"
+        description: "Endpoint para sessões Bibble"
+      - name: "BibbleUploadToBlob"
+        path: "/bibble/upload-to-blob"
+        method: "POST"
+        description: "Endpoint para upload para blob Bibble"
+      - name: "BibbleUpload"
+        path: "/bibble/upload"
+        method: "POST"
+        description: "Endpoint para upload Bibble"
+
+# Padrões de projeto
+patterns:
+  - name: "Component Structure"
+    description: "Estrutura de componentes React"
+    template: |
+      src/components/{component-name}/{component-name}.tsx
+      src/components/{component-name}/index.ts
+      src/components/{component-name}/styles.css
+
+  - name: "API Route Structure"
+    description: "Estrutura de rotas API"
+    template: |
+      src/app/api/{route-name}/route.ts
+      src/app/api/{route-name}/types.ts
+
+  - name: "Service Structure"
+    description: "Estrutura de serviços"
+    template: |
+      src/lib/{service-name}/index.ts
+      src/lib/{service-name}/types.ts
+
+# Diretórios importantes
+importantDirectories:
+  - src/app
+  - src/components
+  - src/lib
+  - prisma
+  - public
+  - src/styles
+  - src/app/api
+
+# Arquivos importantes
+importantFiles:
+  - src/app/layout.tsx
+  - src/app/page.tsx
+  - prisma/schema.prisma
+  - tailwind.config.ts
+  - next.config.ts
+  - package.json
+  - tsconfig.json

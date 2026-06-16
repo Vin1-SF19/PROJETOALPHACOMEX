@@ -27,6 +27,9 @@ model usuarios {
   densidade_painel String? @default("default")
   bibble_ativo     Boolean @default(true)
 
+  // Onboarding: vídeo obrigatório de introdução ao IAlpha (some após marcar visto)
+  onboarding_ialpha_visto Boolean @default(false)
+
   cargo            String?
   data_contratacao String?
   status           String  @default("ATIVO")
@@ -73,6 +76,11 @@ model usuarios {
 
   senhaTemporaria  Boolean   @default(false)
   primeiroAcessoEm DateTime?
+
+  bibbleSessions BibbleSession[]
+  bibbleProjects BibbleProject[]
+
+  onyxAgents OnyxAgentOwner[]
 }
 
 model OnboardingTemplate {
@@ -1276,4 +1284,67 @@ model ChecklistDocumental {
   updatedAt DateTime @updatedAt
 
   @@map("checklist_documental")
+}
+
+// ─── Bibble Chat ──────────────────────────────────────────────────────────────
+
+model BibbleProject {
+  id           String          @id @default(cuid())
+  userId       Int
+  title        String
+  systemPrompt String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  sessions     BibbleSession[]
+  user         usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("bibble_project")
+}
+
+model BibbleSession {
+  id        String          @id @default(cuid())
+  userId    Int
+  title     String          @default("Nova conversa")
+  projectId String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  messages  BibbleMessage[]
+  user      usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   BibbleProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("bibble_session")
+}
+
+model BibbleMessage {
+  id        String        @id @default(cuid())
+  sessionId String
+  role      String
+  content   String
+  tokens    Int?
+  createdAt DateTime      @default(now())
+  session   BibbleSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("bibble_message")
+}
+
+// ─── Onyx ─────────────────────────────────────────────────────────────────────
+// Vincula cada agente criado no Onyx (conta de serviço única) ao usuário do
+// PainelAlpha que o criou. Permite filtrar/gerenciar agentes por dono sem
+// precisar criar usuários no Onyx.
+model OnyxAgentOwner {
+  id          Int      @id @default(autoincrement())
+  onyxAgentId Int      @unique
+  userId      Int
+  agentName   String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isPublic])
+  @@map("onyx_agent_owner")
 }

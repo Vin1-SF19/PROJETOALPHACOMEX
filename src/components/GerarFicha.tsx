@@ -12,7 +12,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  logo: { width: 150, height: 'auto' },
+  logo: { width: 130, height: 'auto' },
   headerInfo: {
     flex: 1,
     marginLeft: 15,
@@ -24,7 +24,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 2,
   },
-  headerText: { fontSize: 12, fontWeight: 'bold' },
+  headerText: { fontSize: 9, fontWeight: 'bold' },
   table: {
     borderTopWidth: 1,
     borderLeftWidth: 1,
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   }
 });
 
-export const FichaAlphaPDF = ({ dados, userLogado }: { dados: any, userLogado: string }) => {
+export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: any, userLogado: string, logoPath?: string }) => {
   const rfb = dados?.rfb?.dados || dados?.rfb || {};
   const radar = dados?.radar || {};
   const eq = dados?.empresaqui?.dados || dados?.empresaqui || {};
@@ -127,18 +127,18 @@ export const FichaAlphaPDF = ({ dados, userLogado }: { dados: any, userLogado: s
     <Document title={`Ficha Alpha - ${rfb?.razaoSocial || 'Reunião'}`}>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Image src="/LogoTipo02.png" style={styles.logo} />
+          <Image src={logoPath ?? "/LogoTipo02.png"} style={styles.logo} />
           <View style={[styles.headerInfo, { flex: 1, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 5, marginLeft: 10 }]}>
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={[styles.headerText, { marginBottom: 2 }]}>CLOSER: {userLogado} / FICHA DE REUNIÃO</Text>
-              <Text style={[styles.headerText, { marginBottom: 2 }]}>ALIMENTADO NO CRM (RD): (   ) SIM (   ) NÃO</Text>
-              <Text style={styles.headerText}>PROPOSTA ENVIADA: (   ) SIM (   ) NÃO</Text>
+              <Text wrap={false} style={[styles.headerText, { marginBottom: 2 }]}>CLOSER: {userLogado} / FICHA DE REUNIÃO</Text>
+              <Text wrap={false} style={[styles.headerText, { marginBottom: 2 }]}>ALIMENTADO NO CRM (RD): (   ) SIM (   ) NÃO</Text>
+              <Text wrap={false} style={styles.headerText}>PROPOSTA ENVIADA: (   ) SIM (   ) NÃO</Text>
             </View>
             <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-              <Text style={styles.headerText}>
+              <Text wrap={false} style={styles.headerText}>
                 DATA: {dados.extra?.dataSituacao || "___/___/___"}
               </Text>
-              <Text style={styles.headerText}>
+              <Text wrap={false} style={styles.headerText}>
                 HORARIO: {dados.extra?.horaSituacao || "__:__"}
               </Text>
             </View>

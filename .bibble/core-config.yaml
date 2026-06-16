@@ -1,0 +1,232 @@
+# Bibble Squad — Core Configuration
+# Versão: 1.0.0
+
+squad:
+  name: "Bibble Squad"
+  version: "1.0.0"
+  description: "Squad de IA especializada para desenvolvimento de software moderno"
+  installedAt: ""  # Preenchido pelo install.js
+
+# Agentes disponíveis
+agents:
+  orchestrator:
+    - id: bibble
+      name: "Bibble"
+      title: "Arquiteto-Chefe"
+      icon: "🧠"
+      skill: "/bibble"
+  technical:
+    - id: scout
+      name: "Scout"
+      title: "Detetive de Código"
+      icon: "🔭"
+      skill: "/scout"
+    - id: forge
+      name: "Forge"
+      title: "Verificador de Build"
+      icon: "⚡"
+      skill: "/forge"
+    - id: vault
+      name: "Vault"
+      title: "Guardião do Banco"
+      icon: "🔒"
+      skill: "/vault"
+    - id: probe
+      name: "Probe"
+      title: "Verificador de Integração"
+      icon: "🔎"
+      skill: "/probe"
+    - id: anubis
+      name: "Anubis"
+      title: "Guardião de Segurança"
+      icon: "🛡️"
+      skill: "/anubis"
+    - id: lens
+      name: "Lens"
+      title: "Revisor de Código"
+      icon: "🔍"
+      skill: "/lens"
+    - id: sage
+      name: "Sage"
+      title: "Arquiteto de Testes"
+      icon: "🧪"
+      skill: "/sage"
+    - id: nova
+      name: "Nova"
+      title: "Engenheiro Frontend"
+      icon: "✨"
+      skill: "/nova"
+    - id: echo
+      name: "Echo"
+      title: "Engenheiro Backend"
+      icon: "📡"
+      skill: "/echo"
+    - id: iris
+      name: "Iris"
+      title: "Designer UI/UX"
+      icon: "🎨"
+      skill: "/iris"
+    - id: flux
+      name: "Flux"
+      title: "Especialista em Performance"
+      icon: "⚡"
+      skill: "/flux"
+    - id: atlas
+      name: "Atlas"
+      title: "Analista Visual"
+      icon: "🗺️"
+      skill: "/atlas"
+  memory:
+    - id: scribe
+      name: "Scribe"
+      title: "Cartógrafo do Codebase"
+      icon: "📝"
+      skill: "/scribe"
+    - id: kowalski
+      name: "Kowalski"
+      title: "Cronista de Sessões"
+      icon: "🐧"
+      skill: "/kowalski"
+  product:
+    - id: pm
+      name: "PM"
+      title: "Product Manager"
+      icon: "📊"
+      skill: "/pm"
+    - id: analyst
+      name: "Analyst"
+      title: "Analista de Produto"
+      icon: "🔬"
+      skill: "/analyst"
+    - id: data-engineer
+      name: "DataEngineer"
+      title: "Engenheiro de Dados"
+      icon: "🗄️"
+      skill: "/data-engineer"
+    - id: devops
+      name: "DevOps"
+      title: "Operador de Infraestrutura"
+      icon: "🚀"
+      skill: "/devops"
+  bibble_assistant:
+    - id: bibble-muse
+      name: "Muse"
+      title: "Designer de Persona"
+      icon: "🎭"
+      skill: "/bibble-muse"
+    - id: bibble-cortex
+      name: "Cortex"
+      title: "Engenheiro de IA"
+      icon: "🧬"
+      skill: "/bibble-cortex"
+
+# Fluxo padrão de execução
+executionFlow:
+  standard:
+    - scout        # Blueprint obrigatório
+    - implement    # Nova/Echo/Iris conforme necessário
+    - vault        # Se mudança no DB
+    - forge        # Build/type/lint check
+    - probe        # Integration check
+    - anubis       # Se auth/API/AI
+    - lens         # Code review
+    - sage         # Testes
+    - scribe       # Atualizar memória
+    - kowalski     # Arquivar sessão
+
+# Localização dos recursos
+paths:
+  memory: ".bibble/memory"
+  rules: ".bibble/rules"
+  tasks: "tasks"
+  workflows: "workflows"
+  checklists: "checklists"
+  templates: "templates"
+  skills: "skills"
+  constitution: "constitution.md"
+
+# Memória do projeto
+memory:
+  files:
+    - architecture.md       # Stack, endpoints, schema
+    - decisions.md          # Decisões técnicas
+    - patterns.md           # Padrões de UX/visual
+    - design-tokens.md      # Cores, tipografia, espaçamento
+    - components.md         # Catálogo de componentes
+    - codebase-map.md       # Mapa estrutural
+    - integration-points.md # Pontos de integração
+    - journal.md            # Histórico de sessões
+    - known-errors.md       # Erros conhecidos e fixes
+    - bibble-persona.md     # Identidade do assistente Bibble
+    - bibble-flows.md       # Tool catalog e fluxos
+
+# Regras do projeto
+rules:
+  files:
+    - nextjs-rules.md      # Next.js, TypeScript, Server vs Client
+    - api-rules.md         # Respostas padronizadas, Prisma, validação
+    - styling-rules.md     # Tailwind, dark mode, responsividade
+    - component-rules.md   # CVA, composição, acessibilidade
+
+# Configuração de AI (Bibble como produto)
+ai:
+  provider: "anthropic"
+  defaultModel: "claude-sonnet-4-6"
+  streaming: true
+  promptCaching: true
+  maxTokens: 1024
+  contextWindowStrategy: "sliding"
+
+# Comportamento do install.js
+install:
+  skillsTarget: ".claude/skills/bibble-squad"
+  bibbleTarget: ".bibble"
+  skipExistingMemory: true
+  verbose: true
+
+# Detecção de produção (Vault)
+production:
+  envVarIndicators:
+    - NODE_ENV=production
+  urlIndicators:
+    - turso.io
+    - neon.tech
+    - supabase.co
+    - planetscale.com
+    - railway.app
+    - render.com
+  requireBackupBefore:
+    - DROP TABLE
+    - DROP COLUMN
+    - DELETE FROM
+    - TRUNCATE
+    - ALTER TABLE ... DROP
+    - prisma migrate reset
+
+# Quality gates
+qualityGates:
+  forge:
+    commands:
+      - "npx tsc --noEmit"
+      - "npm run lint"
+      - "npm run build"
+    required: true
+  codeReview:
+    requireForgeFirst: true
+    classifications:
+      critical: "🔴"
+      warning: "🟡"
+      suggestion: "🟢"
+  security:
+    requireAnubis:
+      - auth
+      - api
+      - ai
+      - upload
+      - payments
+
+# Versioning
+versioning:
+  format: "semver"
+  autoTag: false
+  changelogFile: "CHANGELOG.md"

@@ -18,6 +18,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             'image/png',
             'image/webp',
           ],
+          maximumSizeInBytes: 2.5 * 1024 * 1024 * 1024, // 2.5 GB
           addRandomSuffix: true,
         };
       },

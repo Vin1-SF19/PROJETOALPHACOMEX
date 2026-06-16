@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -11,7 +11,8 @@ import {
   Megaphone, Trophy, Landmark, FileSearch, ScanSearch,
   Scale, FileText, GraduationCap, BookOpen, KeyRound,
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
-  ChevronLeft, ChevronRight, X, PanelLeft, User, SlidersHorizontal, Pin,
+  X, PanelLeft, User, SlidersHorizontal, Pin, ChevronLeft, ChevronRight,
+  Instagram, Activity,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -20,6 +21,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import LogoutButton from '@/components/LogoutUser';
 import { MODULOS_REGISTRY, CATEGORIAS } from '@/lib/modulos-registry';
+import { ModalBroadcast } from '@/components/ModalBroadcast';
+import { getTema } from '@/lib/temas';
 
 // ── Icon map ──────────────────────────────────────────────
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -28,6 +31,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Megaphone, Trophy, Landmark, FileSearch, ScanSearch,
   Scale, FileText, GraduationCap, BookOpen, KeyRound,
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
+  Instagram,
 };
 
 const ACTIVE_BG: Record<string, string> = {
@@ -48,6 +52,15 @@ const CAT_COLORS: Record<string, string> = {
   admin:       'text-slate-400',
 };
 
+const TOOLTIP_ACCENT: Record<string, string> = {
+  operacional: '59, 130, 246',
+  comercial:   '99, 102, 241',
+  financeiro:  '16, 185, 129',
+  pessoas:     '244, 63, 94',
+  infra:       '245, 158, 11',
+  admin:       '148, 163, 184',
+};
+
 // ── Props ─────────────────────────────────────────────────
 interface GlobalSidebarProps {
   permissoes: string[];
@@ -56,11 +69,12 @@ interface GlobalSidebarProps {
   imagemUrl?: string | null;
   isCollapsed: boolean;
   isMobileOpen: boolean;
-  onToggleCollapse: () => void;
+  onToggleCollapse?: () => void;
   onCloseMobile: () => void;
   onOpenTab?: (href: string, label: string) => void;
   activeUrl?: string;
   openUrls?: string[];
+  temaName?: string;
 }
 
 export default function GlobalSidebar({
@@ -75,6 +89,7 @@ export default function GlobalSidebar({
   onOpenTab,
   activeUrl,
   openUrls = [],
+  temaName,
 }: GlobalSidebarProps) {
   const pathname = usePathname();
   const isAdmin = role === 'Admin' || role === 'CEO';
@@ -82,11 +97,24 @@ export default function GlobalSidebar({
   const effectiveUrl = activeUrl ?? pathname;
 
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  const tema = getTema(temaName ?? "blue");
+
+  const asideRef = useRef<HTMLElement>(null);
+  const [tooltip, setTooltip] = useState<{ label: string; top: number; category: string } | null>(null);
+
+  const showTooltip = (e: React.MouseEvent<HTMLElement>, label: string, category: string) => {
+    if (!isCollapsed || !asideRef.current) return;
+    const itemRect = e.currentTarget.getBoundingClientRect();
+    const asideRect = asideRef.current.getBoundingClientRect();
+    setTooltip({ label, top: itemRect.top - asideRect.top + itemRect.height / 2, category });
+  };
+  const hideTooltip = () => setTooltip(null);
 
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('painel_alpha_sidebar_pins') ?? '[]') as string[];
-      if (stored.length > 0) setPinnedIds(stored);
+      if (stored.length > 0) setPinnedIds(stored); // eslint-disable-line react-hooks/set-state-in-effect
     } catch { /* ignore */ }
   }, []);
 
@@ -112,6 +140,34 @@ export default function GlobalSidebar({
     return () => document.removeEventListener('keydown', handler);
   }, [onCloseMobile]);
 
+  // Desktop: clicar fora da sidebar EXPANDIDA → recolhe (só quando aberta)
+  useEffect(() => {
+    if (isCollapsed || !onToggleCollapse) return;
+    const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (!isDesktop()) return;
+      if (asideRef.current && !asideRef.current.contains(e.target as Node)) {
+        onToggleCollapse();
+      }
+    };
+    // Clicar dentro de um módulo (iframe) tira o foco da janela → recolhe
+    const onWindowBlur = () => {
+      window.setTimeout(() => {
+        if (isDesktop() && document.activeElement?.tagName === 'IFRAME') {
+          onToggleCollapse();
+        }
+      }, 0);
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('blur', onWindowBlur);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('blur', onWindowBlur);
+    };
+  }, [isCollapsed, onToggleCollapse]);
+
   const modulos = MODULOS_REGISTRY.filter(m => {
     if (m.adminOnly && !isAdmin) {
       if (!m.allowedRoles?.includes(role)) return false;
@@ -135,30 +191,38 @@ export default function GlobalSidebar({
   const SidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`flex items-center h-16 shrink-0 border-b border-white/5 px-4 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-        {!isCollapsed && (
-          <Link href="/PainelAlpha" className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
-              <span className="text-white font-black text-[10px]">α</span>
+      <div className="flex items-center h-16 shrink-0 border-b border-white/5 px-4 justify-between">
+        {isCollapsed ? (
+          <Link
+            href="/PainelAlpha"
+            onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab('/PainelAlpha', 'Início'); } : undefined}
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+          >
+            <Image src="/A.PNG" alt="Logo" width={32} height={32} className="object-contain" />
+          </Link>
+        ) : (
+          <Link
+            href="/PainelAlpha"
+            onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab('/PainelAlpha', 'Início'); } : undefined}
+            className="flex items-center gap-3 min-w-0"
+          >
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0">
+              <Image src="/A.PNG" alt="Logo" width={32} height={32} className="object-contain" />
             </div>
-            <span className="text-white font-black uppercase italic tracking-tighter text-sm">
-              Painel<span className="text-blue-500">Alpha</span>
+            <span className="text-white font-black uppercase italic tracking-tighter text-sm truncate">
+              Painel<span className={tema.text}>Alpha</span>
             </span>
           </Link>
         )}
-        {isCollapsed && (
-          <Link href="/PainelAlpha" className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <span className="text-white font-black text-sm">α</span>
-          </Link>
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            title={isCollapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+            className="p-1.5 rounded-xl text-slate-600 hover:text-white hover:bg-white/5 transition-all cursor-pointer shrink-0"
+          >
+            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
         )}
-        {/* Desktop collapse toggle */}
-        <button
-          onClick={onToggleCollapse}
-          aria-label={isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
-          className="hidden lg:flex p-1.5 rounded-lg text-slate-600 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
-        >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
       </div>
 
       {/* Nav */}
@@ -176,10 +240,14 @@ export default function GlobalSidebar({
             : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
 
           return (
-            <div key={mod.id} className="relative group/item">
+            <div
+              key={mod.id}
+              className="relative group/item"
+              onMouseEnter={(e) => showTooltip(e, mod.label, mod.category)}
+              onMouseLeave={hideTooltip}
+            >
               <Link
                 href={mod.href}
-                title={isCollapsed ? mod.label : undefined}
                 aria-label={mod.label}
                 onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab(mod.href, mod.label); } : undefined}
                 className={`
@@ -249,10 +317,14 @@ export default function GlobalSidebar({
                 const activeClass = isActive ? ACTIVE_BG['admin'] : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
 
                 return (
-                  <Link
+                  <div
                     key={mod.id}
+                    className="relative"
+                    onMouseEnter={(e) => showTooltip(e, mod.label, 'admin')}
+                    onMouseLeave={hideTooltip}
+                  >
+                  <Link
                     href={mod.href}
-                    title={isCollapsed ? mod.label : undefined}
                     aria-label={mod.label}
                     onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab(mod.href, mod.label); } : undefined}
                     className={`
@@ -274,6 +346,7 @@ export default function GlobalSidebar({
                       <div className="ml-auto w-1.5 h-1.5 rounded-full bg-current shrink-0" />
                     )}
                   </Link>
+                  </div>
                 );
               })}
             </div>
@@ -325,21 +398,44 @@ export default function GlobalSidebar({
             <DropdownMenuSeparator className="bg-white/5 mx-2" />
 
             <div className="py-3 space-y-2">
-              <Link href="/PainelAlpha/InfosPerfil/Perfil" className="cursor-pointer block">
-                <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-blue-500/30 hover:bg-blue-600/10 hover:text-blue-400 focus:bg-blue-600/10 focus:text-blue-400 transition-all duration-300 group outline-none">
-                  <User size={16} className="group-hover:rotate-12 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest italic">Meu Dossiê</span>
-                </DropdownMenuItem>
-              </Link>
+              <DropdownMenuItem
+                onClick={() => onOpenTab?.('/PainelAlpha/InfosPerfil/Perfil', 'Meu Dossiê')}
+                className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-blue-500/30 hover:bg-blue-600/10 hover:text-blue-400 focus:bg-blue-600/10 focus:text-blue-400 transition-all duration-300 group outline-none"
+              >
+                <User size={16} className="group-hover:rotate-12 transition-transform" />
+                <span className="text-[10px] font-black uppercase tracking-widest italic">Meu Dossiê</span>
+              </DropdownMenuItem>
 
-              <Link href="/PainelAlpha/InfosPerfil/Preferencias" className="cursor-pointer block">
-                <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-indigo-500/30 hover:bg-indigo-600/10 hover:text-indigo-400 focus:bg-indigo-600/10 focus:text-indigo-400 transition-all duration-300 group outline-none">
-                  <SlidersHorizontal size={16} className="text-blue-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest italic">Interface Alpha</span>
-                </DropdownMenuItem>
-              </Link>
-
+              <DropdownMenuItem
+                onClick={() => onOpenTab?.('/PainelAlpha/InfosPerfil/Preferencias', 'Interface Alpha')}
+                className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-indigo-500/30 hover:bg-indigo-600/10 hover:text-indigo-400 focus:bg-indigo-600/10 focus:text-indigo-400 transition-all duration-300 group outline-none"
+              >
+                <SlidersHorizontal size={16} className="text-blue-500 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-black uppercase tracking-widest italic">Interface Alpha</span>
+              </DropdownMenuItem>
             </div>
+
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator className="bg-white/5 mx-2" />
+                <div className="py-3 space-y-2">
+                  <DropdownMenuItem
+                    onClick={() => setIsBroadcastOpen(true)}
+                    className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-amber-500/30 hover:bg-amber-600/10 hover:text-amber-400 focus:bg-amber-600/10 focus:text-amber-400 transition-all duration-300 group outline-none"
+                  >
+                    <Megaphone size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest italic">Broadcast</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onOpenTab?.('/PainelAlpha/UsuariosOnline', 'Agentes Online')}
+                    className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-emerald-500/30 hover:bg-emerald-600/10 hover:text-emerald-400 focus:bg-emerald-600/10 focus:text-emerald-400 transition-all duration-300 group outline-none"
+                  >
+                    <Activity size={16} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest italic">Agentes Online</span>
+                  </DropdownMenuItem>
+                </div>
+              </>
+            )}
 
             <DropdownMenuSeparator className="bg-white/5 mx-2" />
 
@@ -354,16 +450,70 @@ export default function GlobalSidebar({
 
   return (
     <>
+      <ModalBroadcast
+        isOpen={isBroadcastOpen}
+        onClose={() => setIsBroadcastOpen(false)}
+        style={tema}
+      />
+
       {/* ── Desktop sidebar ── */}
       <aside
+        ref={asideRef}
         className={`
-          hidden lg:flex flex-col fixed left-0 top-0 bottom-0 z-50
+          hidden lg:flex flex-col fixed left-0 top-0 z-50 h-dvh
           bg-[#060c1a]/95 backdrop-blur-xl border-r border-white/5
           transition-all duration-250 ease-in-out
           ${isCollapsed ? 'w-[72px]' : 'w-[260px]'}
         `}
       >
         {SidebarContent}
+
+        {/* Tooltip customizado — renderizado fora do nav para escapar do overflow:hidden */}
+        <AnimatePresence>
+          {isCollapsed && tooltip && (
+            <motion.div
+              key={tooltip.label}
+              className="absolute pointer-events-none"
+              style={{ left: 80, top: tooltip.top, transform: 'translateY(-50%)', zIndex: 200 }}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -4 }}
+              transition={{ duration: 0.14, ease: 'easeOut' }}
+            >
+              {/* Seta apontando para o ícone */}
+              <div
+                className="absolute right-full top-1/2 -translate-y-1/2"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderRight: '5px solid rgba(14, 20, 38, 0.97)',
+                  borderTop: '4px solid transparent',
+                  borderBottom: '4px solid transparent',
+                }}
+              />
+              {/* Conteúdo */}
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl whitespace-nowrap"
+                style={{
+                  background: 'rgba(8, 14, 28, 0.97)',
+                  border: `1px solid rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 0.2)`,
+                  boxShadow: `0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03), 0 0 12px rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 0.08)`,
+                }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{
+                    background: `rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 1)`,
+                    boxShadow: `0 0 6px rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 0.7)`,
+                  }}
+                />
+                <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                  {tooltip.label}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </aside>
 
       {/* ── Mobile: hamburger trigger (rendered in layout) + drawer ── */}

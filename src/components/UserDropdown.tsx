@@ -11,10 +11,7 @@ import {
 import { User, Shield, Activity, Fingerprint, ShieldCheck, SlidersHorizontal, Zap } from "lucide-react";
 import LogoutButton from "./LogoutUser";
 import { useSession } from "next-auth/react";
-
-function openTab(url: string, label: string) {
-    window.parent.postMessage({ type: "ALPHA_OPEN_TAB", url, label }, "*");
-}
+import { useRouter } from "next/navigation";
 
 interface UserDropdownProps {
     userName: string;
@@ -23,7 +20,16 @@ interface UserDropdownProps {
 }
 
 export function UserDropdown({ userName, userRole }: UserDropdownProps) {
+    const router = useRouter();
     const { data: session, update } = useSession();
+
+    const navigateTo = (url: string, label: string) => {
+        if (typeof window !== 'undefined' && window.parent !== window) {
+            window.parent.postMessage({ type: 'ALPHA_OPEN_TAB', url, label }, '*');
+        } else {
+            router.push(url);
+        }
+    };
 
     const userImage = session?.user?.imagemUrl;
     const fotoFinal = userImage || session?.user?.imagemUrl || (session?.user as any)?.image;
@@ -84,7 +90,7 @@ export function UserDropdown({ userName, userRole }: UserDropdownProps) {
 
                 <div className="py-3 space-y-2"> 
                     <DropdownMenuItem
-                        onClick={() => openTab("/PainelAlpha/InfosPerfil/Perfil", "Meu Dossiê")}
+                        onClick={() => navigateTo("/PainelAlpha/InfosPerfil/Perfil", "Meu Dossiê")}
                         className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-blue-500/30 hover:bg-blue-600/10 hover:text-blue-400 focus:bg-blue-600/10 focus:text-blue-400 transition-all duration-300 group outline-none"
                     >
                         <User size={16} className="group-hover:rotate-12 transition-transform" />
@@ -92,7 +98,7 @@ export function UserDropdown({ userName, userRole }: UserDropdownProps) {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={() => openTab("/PainelAlpha/InfosPerfil/Preferencias", "Interface Alpha")}
+                        onClick={() => navigateTo("/PainelAlpha/InfosPerfil/Preferencias", "Interface Alpha")}
                         className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-indigo-500/30 hover:bg-indigo-600/10 hover:text-indigo-400 focus:bg-indigo-600/10 focus:text-indigo-400 transition-all duration-300 group outline-none"
                     >
                         <SlidersHorizontal size={16} className="text-blue-500 group-hover:scale-110 transition-transform" />
@@ -100,7 +106,7 @@ export function UserDropdown({ userName, userRole }: UserDropdownProps) {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={() => openTab("/PainelAlpha/InfosPerfil/Atalhos", "Atalhos Rápidos")}
+                        onClick={() => navigateTo("/PainelAlpha/InfosPerfil/Atalhos", "Atalhos Rápidos")}
                         className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-amber-500/30 hover:bg-amber-600/10 hover:text-amber-400 focus:bg-amber-600/10 focus:text-amber-400 transition-all duration-300 group outline-none"
                     >
                         <Zap size={16} className="text-amber-500 group-hover:animate-pulse" />

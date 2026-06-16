@@ -95,6 +95,8 @@ function randomPos() {
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
+// Nota: Bibble aparece apenas em páginas do PainelAlpha (/PainelAlpha/*)
+// para evitar distrações no dashboard
 
 export default function BibbleChat() {
   const { data: session } = useSession();
@@ -102,6 +104,10 @@ export default function BibbleChat() {
   const pathname = usePathname();
 
   const isAdmin = session?.user?.role === "Admin";
+
+  // ─── Guard: só aparece em páginas do PainelAlpha (outra área para o dashboard) ───
+  const isPainelAlpha = pathname.startsWith("/PainelAlpha");
+  if (!isPainelAlpha) return null;
 
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface;
   const visual = getTema(temaNome);
@@ -294,7 +300,6 @@ export default function BibbleChat() {
     }
   };
 
-  if (!isAdmin) return null;
 
   const currentSprite = (SPRITES[status] ?? SPRITES.idle)[frame] ?? SPRITES.idle[0];
 

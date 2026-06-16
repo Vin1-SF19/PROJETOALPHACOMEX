@@ -112,12 +112,14 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
             const videoBlob = await upload(videoFile.name, videoFile, {
                 access: 'public',
                 handleUploadUrl: '/api/UploadSkills',
+                multipart: true,
             });
             let thumbUrl = "";
             if (thumbFile) {
                 const thumbBlob = await upload(thumbFile.name, thumbFile, {
                     access: 'public',
                     handleUploadUrl: '/api/UploadSkills',
+                    multipart: true,
                 });
                 thumbUrl = thumbBlob.url;
             }
@@ -186,12 +188,14 @@ export default function SecaoUpload({ onSuccess }: { onSuccess: () => void }) {
                 const videoBlob = await upload(item.videoFile!.name, item.videoFile!, {
                     access: 'public',
                     handleUploadUrl: '/api/UploadSkills',
+                    multipart: true,
                 });
                 let thumbUrl = item.thumbUrl || "";
                 if (item.thumbFile) {
                     const thumbBlob = await upload(item.thumbFile.name, item.thumbFile, {
                         access: 'public',
                         handleUploadUrl: '/api/UploadSkills',
+                        multipart: true,
                     });
                     thumbUrl = thumbBlob.url;
                 }

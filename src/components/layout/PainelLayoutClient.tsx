@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/refs -- padrão SSR intencional: refs de init lidos no render para o fallback */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
@@ -11,6 +12,9 @@ import NotificationToast from '@/components/chamados/NotificationToast';
 import { HoleriteNotificacaoGlobal } from '@/components/holerites/HoleriteNotificacaoGlobal';
 import ChecklistNotificationToast from '@/components/Checklist/ChecklistNotificationToast';
 import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
+import BibbleWeatherWidget from '@/components/BibbleChatHome/BibbleWeatherWidget';
+import OnboardingModal from './OnboardingModal';
+import type { OnboardingVideo } from '@/lib/onboarding';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +27,21 @@ function getLabelForUrl(url: string): string {
 
 const STORAGE_KEY = 'painel_alpha_tabs_v1';
 
+// Aba inicial fixa (não fecha)
+const HOME_URL = '/PainelAlpha';
+const HOME_LABEL = 'IAlpha';
+const HOME_TAB_ID = 'tab-home';
+
+/** Garante a aba inicial "IAlpha" fixada na primeira posição. */
+function ensurePinnedHome(tabs: Tab[]): Tab[] {
+  const homeIdx = tabs.findIndex(t => t.url === HOME_URL);
+  if (homeIdx >= 0) {
+    const home: Tab = { ...tabs[homeIdx], label: HOME_LABEL, pinned: true };
+    return [home, ...tabs.filter((_, i) => i !== homeIdx)];
+  }
+  return [{ id: HOME_TAB_ID, url: HOME_URL, label: HOME_LABEL, pinned: true }, ...tabs];
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface PainelLayoutClientProps {
@@ -31,6 +50,9 @@ interface PainelLayoutClientProps {
   role: string;
   nome: string;
   imagemUrl?: string | null;
+  temaName?: string;
+  onboardingVisto?: boolean;
+  onboardingVideo?: OnboardingVideo | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -41,9 +63,16 @@ export default function PainelLayoutClient({
   role,
   nome,
   imagemUrl,
+  temaName,
+  onboardingVisto = true,
+  onboardingVideo = null,
 }: PainelLayoutClientProps) {
   const { isCollapsed, isMobileOpen, toggleCollapse, toggleMobile, closeMobile } = useSidebarState();
   const pathname = usePathname();
+
+  // Onboarding obrigatório: mostra o vídeo até o usuário marcar como visto
+  const [onboardingDone, setOnboardingDone] = useState(false);
+  const showOnboarding = !onboardingVisto && !onboardingDone && !!onboardingVideo;
 
   useAdminChamadosNotifications(role);
   useChecklistNotifications(role);
@@ -76,23 +105,38 @@ export default function PainelLayoutClient({
 
   // Initialize: restore from localStorage or create from current URL
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- inicialização das abas a partir do localStorage/URL */
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as
         | { tabs: Tab[]; activeId: string }
         | null;
       if (saved?.tabs?.length) {
-        setTabs(saved.tabs);
-        const restoredActive = saved.activeId ?? saved.tabs[0].id;
+        const normalized = ensurePinnedHome(saved.tabs);
+        setTabs(normalized);
+        const activeExists = normalized.some(t => t.id === saved.activeId);
+        const restoredActive = activeExists ? saved.activeId : normalized[0].id;
         setActiveId(restoredActive);
         initTabIdRef.current = restoredActive;
         return;
       }
     } catch { /* ignore */ }
 
-    const id = `tab-${Date.now()}`;
-    initTabIdRef.current = id;
-    setTabs([{ id, url: pathname, label: getLabelForUrl(pathname) }]);
-    setActiveId(id);
+    // Fresh: home fixa + (se não estiver na home) a aba da página atual
+    const onHome = pathname === HOME_URL || pathname === HOME_URL + '/';
+    if (onHome) {
+      initTabIdRef.current = HOME_TAB_ID;
+      setTabs([{ id: HOME_TAB_ID, url: HOME_URL, label: HOME_LABEL, pinned: true }]);
+      setActiveId(HOME_TAB_ID);
+    } else {
+      const id = `tab-${Date.now()}`;
+      initTabIdRef.current = id;
+      setTabs([
+        { id: HOME_TAB_ID, url: HOME_URL, label: HOME_LABEL, pinned: true },
+        { id, url: pathname, label: getLabelForUrl(pathname) },
+      ]);
+      setActiveId(id);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -122,14 +166,16 @@ export default function PainelLayoutClient({
 
   const closeTab = useCallback((id: string) => {
     setTabs(prev => {
+      const target = prev.find(t => t.id === id);
+      if (target?.pinned) return prev; // aba fixa (IAlpha) não fecha
+
       const idx = prev.findIndex(t => t.id === id);
       const filtered = prev.filter(t => t.id !== id);
 
       if (filtered.length === 0) {
-        // Última aba fechada → volta para home
-        const homeId = `tab-${Date.now()}`;
-        setActiveId(homeId);
-        return [{ id: homeId, url: '/PainelAlpha', label: 'Início' }];
+        // Segurança: recria a home fixa
+        setActiveId(HOME_TAB_ID);
+        return [{ id: HOME_TAB_ID, url: HOME_URL, label: HOME_LABEL, pinned: true }];
       }
 
       setActiveId(curr => {
@@ -193,6 +239,7 @@ export default function PainelLayoutClient({
           onCloseMobile={closeMobile}
           onOpenTab={openTab}
           activeUrl={activeUrl}
+          temaName={temaName}
         />
       )}
 
@@ -204,16 +251,23 @@ export default function PainelLayoutClient({
       )}
 
       {/* Main content area */}
-      <div className={`transition-all duration-300 ease-in-out ${tvMode ? '' : sidebarOffset} flex flex-col h-screen`}>
+      <div className={`transition-all duration-300 ease-in-out ${tvMode ? '' : sidebarOffset} flex flex-col h-dvh`}>
 
-        {/* Tab bar */}
+        {/* Tab bar + widget de clima */}
         {!tvMode && (
-          <TabBar
-            tabs={tabs}
-            activeId={activeId}
-            onActivate={setActiveId}
-            onClose={closeTab}
-          />
+          <div className="relative flex items-center shrink-0 h-10 bg-[#030813] border-b border-white/[0.06]">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <TabBar
+                tabs={tabs}
+                activeId={activeId}
+                onActivate={setActiveId}
+                onClose={closeTab}
+              />
+            </div>
+            <div className="shrink-0 pr-3">
+              <BibbleWeatherWidget />
+            </div>
+          </div>
         )}
 
         {/* Page content */}
@@ -251,6 +305,11 @@ export default function PainelLayoutClient({
             <div className="flex items-center justify-center h-full">
               <span className="text-2xl font-black italic text-slate-800 animate-pulse">α</span>
             </div>
+          )}
+
+          {/* Onboarding obrigatório — cobre o conteúdo, mantém sidebar e abas */}
+          {showOnboarding && onboardingVideo && (
+            <OnboardingModal video={onboardingVideo} onDone={() => setOnboardingDone(true)} />
           )}
         </div>
       </div>

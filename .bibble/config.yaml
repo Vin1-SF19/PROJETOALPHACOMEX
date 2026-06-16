@@ -1,0 +1,208 @@
+# Configuração do Bibble para o PainelAlpha
+version: "1.0.0"
+
+# Identidade do assistente
+assistant:
+  id: "bibble-alpha"
+  name: "Bibble Alpha"
+  description: "Assistente especializado para o Painel Alpha"
+  persona: "Você é um assistente de desenvolvimento experiente com foco em Next.js, TypeScript, Tailwind CSS e Prisma. Você ajuda a criar aplicações modernas com boas práticas de arquitetura e segurança."
+
+# Configuração do ambiente
+environment:
+  projectRoot: "/c/Users/TI/Desktop/PainelAlpha"
+  framework: "Next.js"
+  language: "TypeScript"
+  database: "Prisma"
+  styling: "Tailwind CSS"
+  deployment: "Vercel"
+
+# Ferramentas disponíveis
+tools:
+  - name: "scout"
+    description: "Detetive de Código para análise"
+    enabled: true
+  - name: "forge"
+    description: "Verificador de Build"
+    enabled: true
+  - name: "vault"
+    description: "Guardião do Banco"
+    enabled: true
+  - name: "probe"
+    description: "Verificador de Integração"
+    enabled: true
+  - name: "anubis"
+    description: "Guardião de Segurança"
+    enabled: true
+  - name: "lens"
+    description: "Revisor de Código"
+    enabled: true
+  - name: "sage"
+    description: "Arquiteto de Testes"
+    enabled: true
+  - name: "nova"
+    description: "Engenheiro Frontend"
+    enabled: true
+  - name: "echo"
+    description: "Engenheiro Backend"
+    enabled: true
+  - name: "iris"
+    description: "Designer UI/UX"
+    enabled: true
+  - name: "flux"
+    description: "Especialista em Performance"
+    enabled: true
+  - name: "atlas"
+    description: "Analista Visual"
+    enabled: true
+  - name: "scribe"
+    description: "Cartógrafo do Codebase"
+    enabled: true
+  - name: "kowalski"
+    description: "Cronista de Sessões"
+    enabled: true
+  - name: "pm"
+    description: "Product Manager"
+    enabled: true
+  - name: "analyst"
+    description: "Analista de Produto"
+    enabled: true
+  - name: "data-engineer"
+    description: "Engenheiro de Dados"
+    enabled: true
+  - name: "devops"
+    description: "Operador de Infraestrutura"
+    enabled: true
+
+# Fluxo padrão de execução para o Painel Alpha
+executionFlow:
+  standard:
+    - scout
+    - implement
+    - vault
+    - forge
+    - probe
+    - anubis
+    - lens
+    - sage
+    - scribe
+    - kowalski
+
+# Regras específicas para o projeto
+rules:
+  files:
+    - name: "nextjs-rules.md"
+      description: "Regras Next.js, TypeScript, Server vs Client"
+    - name: "api-rules.md"
+      description: "Regras de API, Prisma, validação"
+    - name: "styling-rules.md"
+      description: "Regras Tailwind, dark mode, responsividade"
+    - name: "component-rules.md"
+      description: "Regras de componente, CVA, composição, acessibilidade"
+
+# Configuração de segurança
+security:
+  requireAnubisFor:
+    - auth
+    - api
+    - ai
+    - upload
+    - payments
+  requireBackupBefore:
+    - DROP TABLE
+    - DROP COLUMN
+    - DELETE FROM
+    - TRUNCATE
+    - ALTER TABLE ... DROP
+    - prisma migrate reset
+
+# Configuração de qualidade
+qualityGates:
+  forge:
+    commands:
+      - "npx tsc --noEmit"
+      - "npm run lint"
+      - "npm run build"
+    required: true
+  codeReview:
+    requireForgeFirst: true
+    classifications:
+      critical: "🔴"
+      warning: "🟡"
+      suggestion: "🟢"
+
+# Integração com o projeto
+integration:
+  project:
+    name: "PainelAlpha"
+    version: "1.0.0"
+    description: "Painel Alpha - Sistema de gerenciamento"
+  dependencies:
+    next: "14.0.0"
+    react: "18.2.0"
+    typescript: "5.0.0"
+    prisma: "5.0.0"
+    tailwindcss: "3.3.0"
+  devDependencies:
+    - "@types/node"
+    - "@types/react"
+    - "@types/react-dom"
+    - "autoprefixer"
+    - "postcss"
+    - "tailwindcss"
+    - "eslint"
+    - "eslint-config-next"
+
+# Configuração do modelo AI
+ai:
+  provider: "anthropic"
+  defaultModel: "claude-sonnet-4-6"
+  streaming: true
+  promptCaching: true
+  maxTokens: 1024
+  contextWindowStrategy: "sliding"
+
+# Memória do projeto
+memory:
+  files:
+    - architecture.md
+    - decisions.md
+    - patterns.md
+    - design-tokens.md
+    - components.md
+    - codebase-map.md
+    - integration-points.md
+    - journal.md
+    - known-errors.md
+    - bibble-persona.md
+    - bibble-flows.md
+
+# Localização dos recursos
+paths:
+  memory: ".bibble/memory"
+  rules: ".bibble/rules"
+  tasks: "tasks"
+  workflows: "workflows"
+  checklists: "checklists"
+  templates: "templates"
+  skills: "skills"
+  constitution: "constitution.md"
+
+# Configuração de instalação
+install:
+  skillsTarget: ".claude/skills/bibble-squad"
+  bibbleTarget: ".bibble"
+  skipExistingMemory: true
+  verbose: true
+
+# Detecção de produção
+production:
+  envVarIndicators:
+    - NODE_ENV=production
+  urlIndicators:
+    - turso.io
+    - neon.tech
+    - supabase.co
+    - planetscale.com
+    - railway.app
+    - render.com

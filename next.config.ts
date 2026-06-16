@@ -1,5 +1,6 @@
 const nextConfig = {
   transpilePackages: ["pusher-js"],
+  serverExternalPackages: ["@react-pdf/renderer", "pdf-parse"],
   experimental: {
     serverActions: {
       bodySizeLimit: "100mb",
