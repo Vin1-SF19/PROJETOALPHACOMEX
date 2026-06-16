@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
+import { getOllamaHeaders } from "@/lib/bibble/client";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const res = await fetch(`${ollamaUrl}/api/tags`, {
       signal: AbortSignal.timeout(5000),
-      headers: { Accept: "application/json" },
+      headers: getOllamaHeaders({ Accept: "application/json" }),
     });
 
     if (!res.ok) {

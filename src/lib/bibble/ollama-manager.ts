@@ -2,6 +2,8 @@
  * Ollama Manager for handling URL changes and model detection
  */
 
+import { getOllamaHeaders } from "@/lib/bibble/client";
+
 /**
  * Fetch available models from an Ollama instance
  * @param ollamaUrl The Ollama API URL to query
@@ -9,12 +11,12 @@
  */
 export async function fetchAvailableModels(ollamaUrl: string): Promise<string[]> {
   try {
-    const response = await fetch(`${ollamaUrl}/api/tags`);
+    const response = await fetch(`${ollamaUrl}/api/tags`, { headers: getOllamaHeaders() });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    const data = await response.json();
-    return data.models?.map((model: any) => model.name) || [];
+    const data = (await response.json()) as { models?: Array<{ name: string }> };
+    return data.models?.map(model => model.name) ?? [];
   } catch (error) {
     console.error("[BIBBLE] Failed to fetch available models:", error);
     return [];
@@ -37,7 +39,7 @@ export async function updateOllamaUrl(newUrl: string): Promise<{ success: boolea
     }
 
     // Check if the URL is reachable and verify it points to Ollama
-    const response = await fetch(`${newUrl}/api/tags`);
+    const response = await fetch(`${newUrl}/api/tags`, { headers: getOllamaHeaders() });
     if (!response.ok) {
       return {
         success: false,

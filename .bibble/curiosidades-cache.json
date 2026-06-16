@@ -171,7 +171,7 @@
       },
       {
         "text": "Os músculos do nosso corpo não são estáticos; eles passam por um processo constante de microlesões e recuperação. Esse processo é fundamental para fortalecer o tecido muscular, tornando-nos mais resistentes ao tempo.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -196,6 +196,10 @@
       {
         "text": "A maioria dos produtos de consumo são, na verdade, itens com um histórico complexo de transbordamento global. Algumas peças se movem por rotas marítimas que cruzam mais oceanos do que o Brasil tem estados.",
         "shown": 4
+      },
+      {
+        "text": "A maioria dos países impõe tarifas de importação não só para proteger a indústria local, mas também como forma de combate ao crime organizado transnacional. Essas taxas podem ser usadas para monitorar e combater o tráfico ilícito de bens ou animais silvestres.",
+        "shown": 1
       }
     ]
   },
@@ -483,7 +487,7 @@
       },
       {
         "text": "O primeiro processador digital programável foi o ENIAC, um gigante de 36 toneladas. Ele era tão grande que ocupava quase duas salas inteiras nos EUA.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -527,7 +531,7 @@
     "entries": [
       {
         "text": "A Amazônia não é um bioma único; ela abriga diversos ecossistemas com características variadas. A vastidão fluvial sustenta uma biodiversidade ainda muito mal estudada pelos cientistas.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -555,7 +559,7 @@
     "entries": [
       {
         "text": "Algumas linhas de metrô foram desenhadas com sistemas de trilhos elétricos reversíveis. Isso permitia que os trens operassem em diferentes direções sem a necessidade de mudar fisicamente o equipamento.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -563,7 +567,7 @@
     "entries": [
       {
         "text": "O primeiro processador comercial não era um sucesso de vendas inicial e teve problemas sérios. Sua arquitetura foi crucial para pavimentar o caminho dos computadores modernos como os conhecemos hoje.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -603,7 +607,7 @@
       },
       {
         "text": "A ISS não voa no espaço vazio; ela se move através da atmosfera terrestre. Essa resistência mínima permite que a estação mantenha sua órbita com combustível.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -651,7 +655,7 @@
       },
       {
         "text": "Alguns robôs domésticos são programados para reconhecer a presença humana; eles ajustam a rota em tempo real. Essa capacidade imita o sistema de evasão que animais usam instintivamente.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -659,7 +663,7 @@
     "entries": [
       {
         "text": "Antigamente, as pizzas de elite eram cobertas com detalhes comestíveis de ouro ou prata. Algumas culturas usavam ingredientes ácidos para conservar a massa antes mesmo da descoberta do forno moderno.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -695,7 +699,7 @@
     "entries": [
       {
         "text": "As correntes oceânicas são como rios gigantes nos mares. Elas redistribuem calor por todo o planeta, influenciando drasticamente os climas costeiros.",
-        "shown": 1
+        "shown": 3
       }
     ]
   },
@@ -808,6 +812,10 @@
       {
         "text": "O olfato de um cachorro é até 100 vezes mais potente que o humano; ele consegue detectar cheiros químicos muito tênues no ar. Eles utilizam a visão e o olfato em conjunto para entenderem melhor o ambiente ao redor.",
         "shown": 4
+      },
+      {
+        "text": "Alguns cães conseguem processar o campo eletromagnético, podendo detectar a presença de doenças ou ferimentos antes que um humano perceba. Seu olfato é incrivelmente sofisticado, sendo milhares de vezes mais potente que o nosso.",
+        "shown": 1
       }
     ]
   },
@@ -823,7 +831,7 @@
     "entries": [
       {
         "text": "O sal foi um item de comércio tão valioso que deu origem à palavra \"salário\", remetendo a \"soldo\". Antigos romanos utilizavam o vinagre como conservante alimentar, muito antes do uso moderno.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -999,7 +1007,7 @@
       },
       {
         "text": "O hieróglifo egípcio pode representar tanto um objeto quanto o som de um falante. Um mesmo símbolo podia mudar completamente seu significado dependendo do contexto gramatical da palavra.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1023,7 +1031,7 @@
     "entries": [
       {
         "text": "A bandeira americana exibida na Lua foi projetada com um braço horizontal para dar a ilusão de que estava sendo hasteada, já que não havia vento. As pegadas dos astronautas são muito nítidas devido ao regolito lunar, que age como uma areia fina e compacta.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1091,7 +1099,7 @@
     "entries": [
       {
         "text": "O primeiro celular comercial não era verdadeiramente móvel. Ele operava por um sistema de rádio com baterias que precisavam ser carregadas na base, limitando o tempo de uso a poucas horas. As primeiras ligações eram mais demonstrativas do que cotidianas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1155,7 +1163,7 @@
     "entries": [
       {
         "text": "O cérebro continua processando eventos do dia mesmo durante o sono REM. Isso ajuda a consolidação da memória e a entender emoções complexas.",
-        "shown": 2
+        "shown": 4
       }
     ]
   },
@@ -1267,7 +1275,7 @@
     "entries": [
       {
         "text": "Os motores de foguete são muito mais potentes que qualquer motor a combustão terrestre existe hoje. Eles usam propulsores químicos ultracongelados para gerar o impulso necessário ao espaço.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1331,7 +1339,7 @@
     "entries": [
       {
         "text": "A possibilidade de civilizações extraterrestres usar raios gama para comunicação é teorizada por físicos. Esse sinal seria detectável mesmo que o meio fosse muito denso, como estrelas ou planetas.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1355,7 +1363,7 @@
       },
       {
         "text": "Algumas usam o mecanismo de \"sequestro\" na água para atrair insetos, em vez de apenas armadilhas físicas. Essas estruturas são verdadeiras trampas biológicas projetadas para maximizar a captura.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1379,7 +1387,7 @@
     "entries": [
       {
         "text": "O peixe-gota usa um mecanismo de inflagem para se camuflar perfeitamente no ambiente. Ele pode ajustar sua cor, textura e até mesmo a forma de seu corpo quase instantaneamente.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1472,6 +1480,10 @@
       {
         "text": "Alguns peixes das profundezas bioluminescem para atrair presas ou confundir predadores. Essa luz é usada como isca, camuflagem e até defesa sexual em seu habitat escuro.",
         "shown": 4
+      },
+      {
+        "text": "Algumas espécies usam bioluminescência não só para caçar, mas também para confundir predadores com flashes de luz intermitentes. Os abismos mantêm criaturas que desafiam a compreensão da vida em ambientes sem luz solar.",
+        "shown": 1
       }
     ]
   },
@@ -1479,7 +1491,7 @@
     "entries": [
       {
         "text": "Possuem um vocabulário complexo capaz de vocalizar mais de 100 sons diferentes. Eles são incrivelmente inteligentes, resolvendo charadas físicas para obter comida.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1575,7 +1587,7 @@
     "entries": [
       {
         "text": "As lulas possuem um sistema de imitação incrível, mudando não só a cor e textura da pele como também o formato do corpo. Elas podem até projetar fluidos pigmentados para confundir predadores durante fugas rápidas.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1647,7 +1659,7 @@
     "entries": [
       {
         "text": "Um átomo de hidrogênio pode ser instável se removido do estado gasoso e forçado a um plasma. Essa energia é tão contida que o processo libera calor suficiente para acender um fósforo ou iniciar reações químicas diversas.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1723,7 +1735,7 @@
     "entries": [
       {
         "text": "Escravizadas africanas formavam um corpo de resistência organizado mesmo nos engenhos. Muitas dessas mulheres usaram o bordado como códigos secretos para passar informações.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1739,7 +1751,7 @@
     "entries": [
       {
         "text": "Os pinguins não conseguem voar verdadeiramente; suas asas foram adaptadas para nadar, agindo como poderosas nadadeiras. Eles também possuem um sistema de isolamento térmico incrível que lhes permite sobreviver em águas muito frias.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1755,7 +1767,7 @@
     "entries": [
       {
         "text": "O primeiro videogame comercialmente bem-sucedido foi Pong, mas ele não inventou o conceito de jogo eletrônico. Jogos como *Tennis for Two* (1958) são considerados os verdadeiros precursores.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1780,6 +1792,14 @@
       {
         "text": "A Via Láctea está constantemente expandindo-se, esticando-se por um vasto espaço tridimensional invisível. Ela é muito mais extensa do que imaginamos, com sua estrutura sendo influenciada pela gravidade de galáxias vizinhas.",
         "shown": 2
+      }
+    ]
+  },
+  "evolução": {
+    "entries": [
+      {
+        "text": "Os primeiros hominídeos não eram exclusivamente bípedes; eles também utilizavam o arremesso de objetos com as mãos. Essa transição indica que a capacidade manual foi desenvolvida em conjunto com a locomoção ereta.",
+        "shown": 1
       }
     ]
   }

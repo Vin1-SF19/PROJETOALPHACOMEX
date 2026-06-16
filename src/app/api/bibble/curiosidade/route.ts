@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { getOllamaHeaders } from "@/lib/bibble/client";
 
 export const runtime = "nodejs";
 
@@ -73,7 +74,7 @@ export async function GET() {
   try {
     r = await fetch(`${ollamaUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getOllamaHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         model,
         messages: [

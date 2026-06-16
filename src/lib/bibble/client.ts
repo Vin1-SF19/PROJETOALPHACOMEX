@@ -60,12 +60,25 @@ export interface ProviderConfig {
   headers: Record<string, string>;
 }
 
+/**
+ * Headers para chamar o Ollama. Inclui `Authorization: Bearer <OLLAMA_API_KEY>` quando
+ * a env está setada — necessário em produção, onde o Ollama é exposto via proxy
+ * autenticado (Cloudflare). Sem o token o proxy responde 403. Só roda no servidor.
+ */
+export function getOllamaHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const key = process.env.OLLAMA_API_KEY;
+  return {
+    ...extra,
+    ...(key ? { Authorization: `Bearer ${key}` } : {}),
+  };
+}
+
 export function getProviderConfig(provider: Provider): ProviderConfig {
   switch (provider) {
     case "ollama":
       return {
         baseUrl: `${BIBBLE_OLLAMA_URL}/v1/chat/completions`,
-        headers: { "Content-Type": "application/json" },
+        headers: getOllamaHeaders({ "Content-Type": "application/json" }),
       };
     case "openai":
       return {
@@ -105,12 +118,12 @@ export function getProviderConfig(provider: Provider): ProviderConfig {
  */
 export async function fetchAvailableModels(ollamaUrl: string): Promise<string[]> {
   try {
-    const response = await fetch(`${ollamaUrl}/api/tags`);
+    const response = await fetch(`${ollamaUrl}/api/tags`, { headers: getOllamaHeaders() });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    const data = await response.json();
-    return data.models?.map((model: any) => model.name) || [];
+    const data = (await response.json()) as { models?: Array<{ name: string }> };
+    return data.models?.map(model => model.name) ?? [];
   } catch (error) {
     console.error("[BIBBLE] Failed to fetch available models:", error);
     return [];
@@ -130,7 +143,7 @@ export async function updateOllamaUrl(newUrl: string): Promise<{ success: boolea
     }
 
     // Check if the URL is reachable and verify it points to Ollama
-    const response = await fetch(`${newUrl}/api/tags`);
+    const response = await fetch(`${newUrl}/api/tags`, { headers: getOllamaHeaders() });
     if (!response.ok) {
       return {
         success: false,
