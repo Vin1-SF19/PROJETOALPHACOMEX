@@ -307,8 +307,8 @@ export default function PainelLayoutClient({
             </div>
           )}
 
-          {/* Onboarding obrigatório — cobre o conteúdo, mantém sidebar e abas */}
-          {showOnboarding && onboardingVideo && (
+          {/* Onboarding — só na aba inicial (IAlpha); outros módulos ficam livres */}
+          {showOnboarding && onboardingVideo && activeUrl === HOME_URL && (
             <OnboardingModal video={onboardingVideo} onDone={() => setOnboardingDone(true)} />
           )}
         </div>

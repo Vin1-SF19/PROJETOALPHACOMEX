@@ -388,6 +388,10 @@
       {
         "text": "O Telescópio Espacial James Webb é mais potente que todos os telescópios terrestres juntos. Ele consegue detectar luz infravermelha, permitindo ver estrelas de eras muito antigas.",
         "shown": 4
+      },
+      {
+        "text": "O coração de galáxia está sempre engolindo matéria ao seu redor com o alimento gravitacional. Esse processo alimenta um disco intenso de radiação, tornando-se mais brilhante que toda a galáxia circundante.",
+        "shown": 1
       }
     ]
   },
@@ -475,7 +479,7 @@
       },
       {
         "text": "A bicicleta mais rápida já construída não é usada para pedalar, mas sim como um conjunto de motores a combustão. Cientistas pesquisam adaptá-la ao transporte urbano elétrico do futuro.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -631,7 +635,7 @@
       },
       {
         "text": "O primeiro programa de TV transmitido na Inglaterra em 1928 era um show teatral com personagens caricatos. Ele foi crucial para testar a tecnologia e o público antes da popularização do formato doméstico.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
