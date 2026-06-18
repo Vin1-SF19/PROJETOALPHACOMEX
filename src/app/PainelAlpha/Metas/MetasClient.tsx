@@ -205,6 +205,14 @@ function AlertaVenda({ tipo, closerNome, razaoSocial, onFechar }: {
     onFechar: () => void;
 }) {
     useEffect(() => {
+        // Som de comemoração só para venda fechada (pagamento + contrato)
+        if (tipo === "VENDA") {
+            try {
+                const audio = new Audio("/sounds/efeitoVendaUnica.mp3");
+                audio.volume = 0.85;
+                void audio.play().catch(() => {});
+            } catch {}
+        }
         const t = setTimeout(onFechar, 7_000);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps

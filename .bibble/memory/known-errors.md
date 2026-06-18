@@ -20,4 +20,9 @@
 
 ## Erros Catalogados
 
-<!-- Adicionar aqui conforme o projeto avança -->
+### InfoSimples CPF — data_nascimento formato errado
+**Sintoma:** Consulta CPF retorna erro "CPF não encontrado" mesmo com dados corretos.
+**Causa:** `<input type="date">` envia `YYYY-MM-DD`; InfoSimples `receita-federal/cpf` exige `DD/MM/YYYY`.
+**Fix:** Converter no servidor antes de chamar a API: `[d,m,y] = iso.split('-')` → `${d}/${m}/${y}` (implementado em `paraFormatoInfoSimples()` em `/api/ConsultaCpf/route.ts`).
+**Contexto:** Qualquer campo de data HTML que seja enviado para a InfoSimples.
+**Adicionado em:** 2026-06-17

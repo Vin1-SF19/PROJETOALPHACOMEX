@@ -122,6 +122,15 @@ agents:
 
 # Fluxo padrão de execução
 executionFlow:
+  # Execução SERIAL — um agente por vez. Bibble aciona, espera o relatório de
+  # conclusão, valida o gate e só então aciona o próximo. NUNCA em paralelo.
+  mode: serial
+  concurrency: 1
+  rules:
+    - "Apenas UM agente ativo por vez. Os demais esperam."
+    - "Não avançar para o próximo sem o relatório de conclusão do agente da vez."
+    - "Reprovou (Forge/Vault/Anubis)? A fila para e volta para correção, não pula."
+    - "Bibble é o único maestro — agentes não chamam outros agentes."
   standard:
     - scout        # Blueprint obrigatório
     - implement    # Nova/Echo/Iris conforme necessário

@@ -222,6 +222,7 @@ Para QUALQUER tarefa de implementação:
 9. **Scribe atualiza** a memória com novos padrões descobertos
 10. **Kowalski arquiva** a sessão em `memory/journal.md` se houve trabalho real
 
+**REGRA DE OURO 0 (EXECUÇÃO SERIAL):** A squad trabalha **um agente por vez**, em fila. Enquanto um agente trabalha, **todos os outros esperam**. Bibble é o único maestro: aciona → espera o relatório de conclusão → valida o gate → só então aciona o próximo. **NUNCA** dois agentes ativos simultaneamente. **NUNCA** avançar sem o relatório do agente da vez. Detalhe completo no Protocolo de Execução Serial em `bibble/SKILL.md`.  
 **REGRA DE OURO 1:** Nenhuma implementação começa sem o blueprint do Scout.  
 **REGRA DE OURO 2:** Nenhum código vai para Lens sem Forge aprovar (build/typecheck/lint).  
 **REGRA DE OURO 3:** Forge DEVE rodar comandos de verdade — `npx tsc --noEmit`, `npm run lint`, `npm run build`. NUNCA "verificação estática". Em mudanças significativas, também `npm run dev` para validar boot.  

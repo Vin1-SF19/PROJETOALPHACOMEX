@@ -78,6 +78,10 @@ export async function buscarClientes() {
         logFeedback: {
           orderBy: { dataRegistro: 'desc' },
         },
+        indicacao: {
+          where: { status: "ATIVA" },
+          include: { parceiro: { select: { id: true, nome: true, nivel: true } } },
+        },
       },
       orderBy: { createdAt: 'desc' }
     });

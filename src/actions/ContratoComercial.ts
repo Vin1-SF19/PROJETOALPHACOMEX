@@ -33,6 +33,8 @@ const CriarContratoSchema = z.object({
     formaPagamento: z.enum(["ENTRADA_EXITO", "PARCELADO_CC", "INTEGRAL_PIX", "OUTRO"]),
     servico: z.string().min(1),
     canalAquisicao: z.string().min(1),
+    canalOutro: z.string().optional(),
+    indicadoPorParceiroId: z.number().int().positive().optional(),
     closerNome: z.string().min(1),
     mes: z.number().int().min(1).max(12),
     ano: z.number().int().min(2024).max(2099),
@@ -48,6 +50,8 @@ const AtualizarContratoSchema = z.object({
     formaPagamento: z.enum(["ENTRADA_EXITO", "PARCELADO_CC", "INTEGRAL_PIX", "OUTRO"]),
     servico: z.string().min(1),
     canalAquisicao: z.string().min(1),
+    canalOutro: z.string().optional(),
+    indicadoPorParceiroId: z.number().int().positive().optional(),
     closerNome: z.string().min(1),
     socios: z.array(SocioSchema).optional(),
 });
@@ -94,6 +98,8 @@ export async function criarContrato(raw: unknown) {
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
                 canalAquisicao: d.canalAquisicao,
+                canalOutro: d.canalOutro ?? null,
+                indicadoPorParceiroId: d.indicadoPorParceiroId ?? null,
                 closerNome: d.closerNome,
                 mes: d.mes,
                 ano: d.ano,
@@ -139,6 +145,8 @@ export async function atualizarContrato(raw: unknown) {
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
                 canalAquisicao: d.canalAquisicao,
+                canalOutro: d.canalOutro ?? null,
+                indicadoPorParceiroId: d.indicadoPorParceiroId ?? null,
                 closerNome: d.closerNome,
                 socios: d.socios ?? [],
             },
@@ -228,7 +236,7 @@ export async function confirmarFechamento(raw: unknown) {
                     // dados complementares opcionais — falha silenciosa
                 }
 
-                await db.clientes.create({
+                const novoCliente = await db.clientes.create({
                     data: {
                         cnpj: atualizado.cnpj,
                         razaoSocial: atualizado.razaoSocial,
@@ -236,6 +244,8 @@ export async function confirmarFechamento(raw: unknown) {
                         servicos: atualizado.servico,
                         analistaResponsavel: "SEM ATRIBUIÇÃO",
                         origemLead: atualizado.canalAquisicao || null,
+                        canalAquisicao: atualizado.canalAquisicao || null,
+                        canalOutro: atualizado.canalOutro || null,
                         dataConstituicao: dataConstituicao || null,
                         uf: uf || null,
                         regimeTributario: regimeTributario || null,
@@ -255,6 +265,25 @@ export async function confirmarFechamento(raw: unknown) {
                         },
                     },
                 });
+
+                // Vínculo de indicação: liga o parceiro indicador à empresa criada
+                if (atualizado.indicadoPorParceiroId) {
+                    try {
+                        await db.indicacao.create({
+                            data: {
+                                parceiroId: atualizado.indicadoPorParceiroId,
+                                clienteId: novoCliente.id,
+                                criadoPorId: userId,
+                            },
+                        });
+                        const { recalcularNivel } = await import("@/actions/parceiros");
+                        await recalcularNivel(atualizado.indicadoPorParceiroId);
+                        revalidatePath("/PainelAlpha/Parceiros");
+                    } catch (indErr) {
+                        console.error("vincular indicação parceiro:", indErr);
+                    }
+                }
+
                 revalidatePath("/PainelAlpha/CadastroClientes");
             }
         } catch (clienteErr) {

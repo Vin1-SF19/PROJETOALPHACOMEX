@@ -778,6 +778,15 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                                     <option value={origemLead} className="bg-slate-900">{origemLead}</option>
                                 )}
                             </select>
+
+                            {/* Indicado por (parceiro) */}
+                            {cliente?.indicacao?.parceiro && (
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-xl mt-1" style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)" }}>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300/70">Indicado por</span>
+                                    <span className="text-[12px] font-bold text-indigo-200">{cliente.indicacao.parceiro.nome}</span>
+                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded" style={{ background: "rgba(99,102,241,0.2)", color: "#c7d2fe" }}>{cliente.indicacao.parceiro.nivel}</span>
+                                </div>
+                            )}
                         </div>
 
                     </section>

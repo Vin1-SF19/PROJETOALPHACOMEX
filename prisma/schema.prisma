@@ -81,6 +81,10 @@ model usuarios {
   bibbleProjects BibbleProject[]
 
   onyxAgents OnyxAgentOwner[]
+
+  parceirosCriados  Parceiro[]
+  indicacoesCriadas Indicacao[]     @relation("IndicacaoAutor")
+  parceiroAcessos   ParceiroAcesso[]
 }
 
 model OnboardingTemplate {
@@ -90,6 +94,7 @@ model OnboardingTemplate {
   mensagem  String
   ativo     Boolean  @default(true)
   padrao    Boolean  @default(false)
+  tipo      String   @default("USUARIO")  // USUARIO | PARCEIRO | CLIENTE
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("onboarding_template")
@@ -242,6 +247,11 @@ model clientes {
   nomeGoogle          String?
   embasamento         String?
   origemLead          String?
+
+  // Canal de aquisição (Painel de Metas) + indicação por parceiro
+  canalAquisicao      String?
+  canalOutro          String?
+  indicacao           Indicacao?
 
   crm_oportunidades crm_oportunidades[]
   crm_contatos      crm_contatos[]
@@ -1033,6 +1043,8 @@ model ContratoComercial {
   formaPagamento String
   servico        String
   canalAquisicao String
+  canalOutro     String? // texto livre quando canal = "Outro"
+  indicadoPorParceiroId Int? // parceiro indicador quando canal = "Indicação Parceiro"
 
   closerNome String
 
@@ -1347,4 +1359,94 @@ model OnyxAgentOwner {
   @@index([userId])
   @@index([isPublic])
   @@map("onyx_agent_owner")
+}
+
+// ─── Parceiros ────────────────────────────────────────────────────────────────
+
+model Parceiro {
+  id            Int                  @id @default(autoincrement())
+  tipo          String               // "PF" | "PJ"
+  documento     String               @unique
+  nome          String
+  nomeFantasia  String?
+  email         String
+  chavePix      String?
+  tipoChavePix  String?
+  nivel             String               @default("GOLD")
+  nivelAtualizadoEm DateTime?            // base da janela de 60 dias (promoção/rebaixamento)
+  comissaoPercentual Float?              // override manual opcional (lógica futura)
+  dadosConsulta String?
+  loginEmail    String
+  senhaHash     String
+  criadoPorId   Int
+  criadoPor     usuarios             @relation(fields: [criadoPorId], references: [id])
+  endereco      ParceiroEndereco?
+  responsavel   ParceiroResponsavel?
+  indicacoes    Indicacao[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([documento])
+  @@index([criadoPorId])
+  @@map("parceiros")
+}
+
+// Indicação: vincula um Parceiro a uma empresa do CS&NPS (model `clientes`).
+// Fonte de verdade tanto do fluxo "Nova Indicação" quanto do canal de aquisição no Metas.
+model Indicacao {
+  id            Int      @id @default(autoincrement())
+  parceiroId    Int
+  parceiro      Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  clienteId     Int      @unique            // uma empresa é indicada por no máximo 1 parceiro
+  cliente       clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  dataIndicacao DateTime @default(now())
+  status        String   @default("ATIVA")  // "ATIVA" | "DESVINCULADA"
+  criadoPorId   Int
+  criadoPor     usuarios @relation("IndicacaoAutor", fields: [criadoPorId], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([parceiroId])
+  @@index([clienteId])
+  @@map("indicacoes")
+}
+
+// Permissões do módulo de Parceiros (geridas pelo Admin via engrenagem).
+// Admin/CEO sempre têm acesso total e NÃO dependem desta tabela.
+model ParceiroAcesso {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  user       usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podeEditar Boolean  @default(false)
+  podeExcluir Boolean @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("parceiro_acesso")
+}
+
+model ParceiroEndereco {
+  id          Int      @id @default(autoincrement())
+  parceiroId  Int      @unique
+  parceiro    Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  cep         String
+  logradouro  String
+  numero      String?
+  complemento String?
+  bairro      String
+  cidade      String
+  uf          String
+
+  @@map("parceiro_endereco")
+}
+
+model ParceiroResponsavel {
+  id             Int      @id @default(autoincrement())
+  parceiroId     Int      @unique
+  parceiro       Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  nome           String
+  cpf            String
+  dataNascimento String
+  cargo          String?
+
+  @@map("parceiro_responsavel")
 }

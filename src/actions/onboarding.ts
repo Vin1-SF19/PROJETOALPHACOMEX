@@ -18,6 +18,7 @@ export type OnboardingTemplate = {
   mensagem: string;
   ativo: boolean;
   padrao: boolean;
+  tipo: string; // USUARIO | PARCEIRO | CLIENTE
   createdAt: Date;
   updatedAt: Date;
 };

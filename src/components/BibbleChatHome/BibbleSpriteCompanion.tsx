@@ -13,12 +13,28 @@ interface Ctx { temp: number | null; hour: number; timeSlot: TimeSlot; isWeekend
 // ── Sprites ────────────────────────────────────────────────────────────────────
 
 const SPRITE_MAP: Record<string, string> = {
-  happy:     "/assets/bibble/sprites/happy.png",
-  pensando:  "/assets/bibble/sprites/pensando.png",
-  relaxando: "/assets/bibble/sprites/relaxando.png",
-  sad:       "/assets/bibble/sprites/sad.png",
-  frio:      "/assets/bibble/sprites/frio.png",
-  escondido: "/assets/bibble/sprites/escondido.png",
+  // base — sprites neutros/normais (o arquivo de falas usa pt e en)
+  happy:             "/assets/bibble/sprites/happy.png",
+  pensando:          "/assets/bibble/sprites/pensando.png",
+  thinking:          "/assets/bibble/sprites/pensando.png",
+  relaxando:         "/assets/bibble/sprites/relaxando.png",
+  relaxing:          "/assets/bibble/sprites/relaxando.png",
+  sad:               "/assets/bibble/sprites/sad.png",
+  frio:              "/assets/bibble/sprites/frio.png",
+  cold:              "/assets/bibble/sprites/frio.png",
+  escondido:         "/assets/bibble/sprites/escondido.png",
+  hidden:            "/assets/bibble/sprites/escondido.png",
+  walking:           "/assets/bibble/sprites/relaxando.png",
+  "serious-walking": "/assets/bibble/sprites/relaxando.png",
+  "walking-serius":  "/assets/bibble/sprites/relaxando.png",
+
+  // EXCLUSIVO do setor "Anti-Guaxinim" — moods bravo-* só existem nessas falas
+  "bravo-puto":      "/assets/bibble/sprites/bravo/putodavida.png",
+  "bravo-chateado":  "/assets/bibble/sprites/bravo/chateado.png",
+  "bravo-magoado":   "/assets/bibble/sprites/bravo/magoei.png",
+  "bravo-chega":     "/assets/bibble/sprites/bravo/chega.png",
+  "bravo-naomais":   "/assets/bibble/sprites/bravo/naoqueromais.png",
+  "bravo-affs":      "/assets/bibble/sprites/bravo/affs.png",
 };
 
 function spriteFor(mood: string): string {
