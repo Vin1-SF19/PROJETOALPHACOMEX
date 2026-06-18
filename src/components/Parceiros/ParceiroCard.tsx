@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, User, Mail, FileText, ArrowRight, Sparkles, Check } from "lucide-react";
+import { Building2, User, Mail, FileText, ArrowRight, Sparkles, Check, BadgeCheck } from "lucide-react";
 
 export type CardParceiro = {
   id: number;
@@ -12,6 +12,7 @@ export type CardParceiro = {
   email: string;
   nivel: string;
   comissaoPercentual?: number | null;
+  termoAceito?: boolean;
   indicacoes?: { id: number; cliente: { id: number; razaoSocial: string; nomeFantasia?: string | null } }[];
 };
 
@@ -84,6 +85,16 @@ export default function ParceiroCard({
             {parceiro.nivel}
             <span className="opacity-70">· {comissao}%</span>
           </div>
+          {parceiro.termoAceito && (
+            <div
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest"
+              style={{ background: "rgba(16,185,129,0.15)", color: "#34d399", border: "1px solid rgba(16,185,129,0.4)" }}
+              title="Parceiro assinou o termo de adesão"
+            >
+              <BadgeCheck size={11} />
+              Assinou o termo
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1 text-slate-600 text-[9px] font-black uppercase tracking-widest">
           {parceiro.tipo === "PJ" ? <Building2 size={11} /> : <User size={11} />}

@@ -35,6 +35,10 @@ const SPRITE_MAP: Record<string, string> = {
   "bravo-chega":     "/assets/bibble/sprites/bravo/chega.png",
   "bravo-naomais":   "/assets/bibble/sprites/bravo/naoqueromais.png",
   "bravo-affs":      "/assets/bibble/sprites/bravo/affs.png",
+
+  // EXCLUSIVO do tema "Copa 2026" — moods copa-* (pasta copa)
+  "copa-tranquilo":  "/assets/bibble/sprites/copa/tranquilo.png",
+  "copa-serio":      "/assets/bibble/sprites/copa/serio.png",
 };
 
 function spriteFor(mood: string): string {
@@ -202,11 +206,12 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
   const [side] = useState<"left" | "right">(() => Math.random() > 0.5 ? "right" : "left");
 
   const [baseFalas, setBaseFalas] = useState<Fala[]>(FALLBACK_FALAS);
+  const [copaFalas, setCopaFalas] = useState<Fala[]>([]);
   const [allFalas,  setAllFalas]  = useState<Fala[]>(FALLBACK_FALAS);
   const [index,     setIndex]     = useState(0);
   const [blink,     setBlink]     = useState(false);
   const isStreamingRef            = useRef(isStreaming);
-  const streamingFalaIndex        = useRef(0);
+  const [streamingFalaIndex, setStreamingFalaIndex] = useState(0);
 
   // Curiosidade — controle via ref para evitar stale closures
   const pendingCuriosidade        = useRef<Fala | null>(null);
@@ -228,20 +233,48 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
     return () => { active = false; };
   }, []);
 
-  // ── Contexto clima + hora ─────────────────────────────────────────────────
+  // ── Falas da Copa 2026 (API, com data do próximo jogo) ────────────────────
+  // Busca algumas variações distintas para não repetir sempre a mesma.
+
+  useEffect(() => {
+    let active = true;
+    const carregar = async () => {
+      try {
+        const respostas = await Promise.all(
+          Array.from({ length: 4 }, () =>
+            fetch("/api/bibble/copa").then(r => r.ok ? r.json() : null).catch(() => null),
+          ),
+        );
+        if (!active) return;
+        const falas = respostas
+          .filter((d): d is { mood: string; fala: string } => !!d?.fala)
+          .map(d => ({ mood: d.mood, fala: d.fala }));
+        // dedup por texto
+        const unicas = Array.from(new Map(falas.map(f => [f.fala, f])).values());
+        if (unicas.length) setCopaFalas(unicas);
+      } catch { /* sem copa */ }
+    };
+    void carregar();
+    const id = setInterval(() => { void carregar(); }, 15 * 60 * 1000);
+    return () => { active = false; clearInterval(id); };
+  }, []);
+
+  // ── Contexto clima + hora (+ Copa) ────────────────────────────────────────
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       const ctx = await fetchCtx();
       if (!active) return;
-      setAllFalas(interleaveFalas(baseFalas, buildContextFalas(ctx), 2));
+      // Copa entra junto do contexto: 1 fala da Copa a cada ~3 falas base
+      const contexto = [...buildContextFalas(ctx), ...copaFalas];
+      setAllFalas(interleaveFalas(baseFalas, contexto, 2));
       setIndex(0);
     };
     void load();
     const id = setInterval(() => { void load(); }, 10 * 60 * 1000);
     return () => { active = false; clearInterval(id); };
-  }, [baseFalas]);
+  }, [baseFalas, copaFalas]);
 
   // ── Fetch de curiosidades ─────────────────────────────────────────────────
 
@@ -281,8 +314,7 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
 
       if (isStreamingRef.current) {
         // Durante streaming: cicla entre falas de "processando"
-        streamingFalaIndex.current =
-          (streamingFalaIndex.current + 1) % STREAMING_FALAS.length;
+        setStreamingFalaIndex(p => (p + 1) % STREAMING_FALAS.length);
         // Avança o índice normal também para não repetir ao sair do streaming
         setIndex(p => (p + 1) % allFalas.length);
         return;
@@ -314,7 +346,7 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const streamingFala = STREAMING_FALAS[streamingFalaIndex.current % STREAMING_FALAS.length];
+  const streamingFala = STREAMING_FALAS[streamingFalaIndex % STREAMING_FALAS.length];
   const isCuriosidade = !isStreaming && curiosidade !== null;
   const current       = isStreaming
     ? streamingFala
@@ -322,7 +354,7 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
   const sprite        = spriteFor(current.mood);
   const bubbleText    = current.fala;
   const bubbleKey     = isStreaming
-    ? `s-${streamingFalaIndex.current}`
+    ? `s-${streamingFalaIndex}`
     : `${isCuriosidade ? "c" : "f"}-${current.fala.slice(0, 8)}-${index}`;
   const isRight       = side === "right";
 
@@ -345,6 +377,7 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
             }
           >
             <Image
+              key={sprite}
               src={sprite}
               alt="Bibble"
               width={72}
@@ -354,6 +387,7 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
                 filter: "drop-shadow(0 2px 12px rgba(99,102,241,0.45))",
               }}
               priority
+              unoptimized
             />
           </motion.div>
         </div>

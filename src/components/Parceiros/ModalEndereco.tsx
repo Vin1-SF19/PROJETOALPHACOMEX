@@ -72,7 +72,7 @@ export default function ModalEndereco({ open, onClose, onSalvar, inicial }: Prop
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white font-black uppercase italic tracking-tight">
             <MapPin size={18} className="text-indigo-400" />
-            Endereço do Parceiro
+            Endereço para brindes e presentes
           </DialogTitle>
         </DialogHeader>
 

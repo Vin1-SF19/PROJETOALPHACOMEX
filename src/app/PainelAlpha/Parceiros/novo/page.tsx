@@ -2,6 +2,7 @@ import { auth } from "../../../../../auth";
 import { redirect } from "next/navigation";
 import db from "@/lib/prisma";
 import NovoParceiro from "@/components/Parceiros/NovoParceiro";
+import { getTemplateParadaoParceiro } from "@/actions/onboarding";
 
 export default async function NovoParceiroPAge() {
   const session = await auth();
@@ -13,11 +14,7 @@ export default async function NovoParceiroPAge() {
     userId
       ? db.usuarios.findUnique({ where: { id: userId }, select: { tema_interface: true } })
       : null,
-    db.onboardingTemplate.findFirst({
-      where: { setor: "parceiros", ativo: true },
-      select: { id: true, nome: true, mensagem: true },
-      orderBy: { padrao: "desc" },
-    }),
+    getTemplateParadaoParceiro(),
   ]);
 
   const temaName = rec?.tema_interface ?? "blue";

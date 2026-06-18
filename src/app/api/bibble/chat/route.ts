@@ -57,11 +57,15 @@ async function extractFilesContent(
         const res = await fetch(file.url, { signal: AbortSignal.timeout(15000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buffer = Buffer.from(await res.arrayBuffer());
-        const pdfParse = (await import("pdf-parse")).default;
-        const parsed = await pdfParse(buffer);
+        const { PDFParse } = await import("pdf-parse");
+        const parser = new PDFParse({ data: buffer, verbosity: 0 });
+        const parsed = await parser.getText();
+        await parser.destroy();
         const text = parsed.text.trim();
         const content = text.length > 25000 ? text.slice(0, 25000) + "\n\n...[conteúdo truncado após 25.000 caracteres]" : text;
-        parts.push(`#### 📄 ${file.name} (PDF — ${parsed.numpages} pág.)\n\`\`\`\n${content}\n\`\`\``);
+        const info = await new PDFParse({ data: buffer, verbosity: 0 }).getInfo().catch(() => null);
+        const numpages = info?.total ?? "?";
+        parts.push(`#### 📄 ${file.name} (PDF — ${numpages} pág.)\n\`\`\`\n${content}\n\`\`\``);
       } else if (isImage) {
         parts.push(`- 🖼️ **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — [imagem disponível em: ${file.url}]`);
       } else if (isVideo) {

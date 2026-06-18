@@ -233,14 +233,14 @@ export default function DetalheParceiroClient({
 
         {/* Endereço */}
         <div className={cardCls}>
-          <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><MapPin size={10} /> Endereço</p>
+          <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><MapPin size={10} /> Endereço para brindes e presentes</p>
           {!editando ? (
             parceiro.endereco ? (
               <>
                 <p className="text-sm text-white font-bold">{parceiro.endereco.logradouro}{parceiro.endereco.numero ? `, ${parceiro.endereco.numero}` : ""}{parceiro.endereco.complemento ? ` — ${parceiro.endereco.complemento}` : ""}</p>
                 <p className="text-xs text-slate-400">{parceiro.endereco.bairro} · {parceiro.endereco.cidade}/{parceiro.endereco.uf} · CEP {parceiro.endereco.cep}</p>
               </>
-            ) : <p className="text-xs text-slate-600">Sem endereço cadastrado.</p>
+            ) : <p className="text-xs text-slate-600">Sem endereço para brindes cadastrado.</p>
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">

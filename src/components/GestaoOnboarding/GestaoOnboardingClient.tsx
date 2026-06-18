@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Pencil, Trash2, Check, X, Eye, Star, StarOff,
@@ -19,6 +19,22 @@ import {
 } from "@/actions/onboarding";
 
 const SETORES_OPCOES = ["Geral", "Comercial", "Financeiro", "Recursos Humanos", "TI", "Operacional", "Outro"];
+
+const DEFAULT_MENSAGEM_PARCEIRO = `🤝 Bem-vindo ao Portal de Parceiros Alpha Comex!
+
+Seu cadastro foi realizado com sucesso em nosso sistema.
+
+🔗 Link de acesso:
+https://painel-alpha-projeto.vercel.app/parceiros
+
+👤 Seu login:
+[LOGIN]
+
+🔑 Sua senha:
+[SENHA]
+
+⚠️ Importante:
+Guarde estas credenciais com segurança. Em caso de dúvidas, entre em contato com nossa equipe comercial.`;
 
 const DEFAULT_MENSAGEM = `🎉 Seja muito bem-vindo ao Painel Alpha!
 
@@ -42,6 +58,7 @@ type FormState = {
   mensagem: string;
   ativo: boolean;
   padrao: boolean;
+  tipo: string;
 };
 
 function FormularioTemplate({
@@ -57,6 +74,16 @@ function FormularioTemplate({
 }) {
   const [form, setForm] = useState<FormState>(inicial);
   const [expandido, setExpandido] = useState(true);
+
+  useEffect(() => {
+    if (form.tipo === "PARCEIRO" && (form.mensagem === "" || form.mensagem === DEFAULT_MENSAGEM)) {
+      setForm((f) => ({ ...f, mensagem: DEFAULT_MENSAGEM_PARCEIRO }));
+    }
+    if (form.tipo === "USUARIO" && (form.mensagem === "" || form.mensagem === DEFAULT_MENSAGEM_PARCEIRO)) {
+      setForm((f) => ({ ...f, mensagem: DEFAULT_MENSAGEM }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.tipo]);
 
   const inserirPlaceholder = (ph: string) => {
     setForm((f) => ({ ...f, mensagem: f.mensagem + ph }));
@@ -102,6 +129,28 @@ function FormularioTemplate({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+              Tipo de Template
+            </Label>
+            <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: v }))}>
+              <SelectTrigger className="h-10 bg-black/40 border-white/5 rounded-xl text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
+                <SelectItem value="USUARIO" className="text-xs focus:bg-indigo-600">
+                  👤 Usuário (Colaborador)
+                </SelectItem>
+                <SelectItem value="PARCEIRO" className="text-xs focus:bg-indigo-600">
+                  🤝 Parceiro
+                </SelectItem>
+                <SelectItem value="CLIENTE" className="text-xs focus:bg-indigo-600">
+                  🏢 Cliente (em breve)
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -190,6 +239,7 @@ export default function GestaoOnboardingClient({ templates: initialTemplates }: 
         setor: dados.setor && dados.setor !== "__todos__" ? dados.setor : undefined,
         mensagem: dados.mensagem,
         padrao: dados.padrao,
+        tipo: dados.tipo,
       });
       if (res.success) {
         toast.success("Template criado!");
@@ -209,6 +259,7 @@ export default function GestaoOnboardingClient({ templates: initialTemplates }: 
         mensagem: dados.mensagem,
         ativo: dados.ativo,
         padrao: dados.padrao,
+        tipo: dados.tipo,
       });
       if (res.success) {
         toast.success("Template atualizado!");
@@ -249,7 +300,7 @@ export default function GestaoOnboardingClient({ templates: initialTemplates }: 
       {/* Formulário criar */}
       {criando && (
         <FormularioTemplate
-          inicial={{ nome: "", setor: "__todos__", mensagem: DEFAULT_MENSAGEM, ativo: true, padrao: false }}
+          inicial={{ nome: "", setor: "__todos__", mensagem: DEFAULT_MENSAGEM, ativo: true, padrao: false, tipo: "USUARIO" }}
           onSalvar={handleCriar}
           onCancelar={() => setCriando(false)}
           salvando={isPending}
@@ -271,7 +322,7 @@ export default function GestaoOnboardingClient({ templates: initialTemplates }: 
             return (
               <FormularioTemplate
                 key={t.id}
-                inicial={{ nome: t.nome, setor: t.setor ?? "__todos__", mensagem: t.mensagem, ativo: t.ativo, padrao: t.padrao }}
+                inicial={{ nome: t.nome, setor: t.setor ?? "__todos__", mensagem: t.mensagem, ativo: t.ativo, padrao: t.padrao, tipo: t.tipo ?? "USUARIO" }}
                 onSalvar={(dados) => handleAtualizar(t.id, dados)}
                 onCancelar={() => setEditandoId(null)}
                 salvando={isPending}
@@ -298,6 +349,21 @@ export default function GestaoOnboardingClient({ templates: initialTemplates }: 
                     {t.setor && (
                       <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-black">
                         {t.setor}
+                      </span>
+                    )}
+                    {t.tipo === "PARCEIRO" && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase">
+                        🤝 Parceiro
+                      </span>
+                    )}
+                    {t.tipo === "CLIENTE" && (
+                      <span className="px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-black uppercase">
+                        🏢 Cliente
+                      </span>
+                    )}
+                    {(!t.tipo || t.tipo === "USUARIO") && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-700/40 border border-slate-600/20 text-slate-400 text-[8px] font-black uppercase">
+                        👤 Usuário
                       </span>
                     )}
                   </div>

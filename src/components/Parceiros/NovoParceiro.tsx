@@ -284,7 +284,7 @@ export default function NovoParceiro({
               <Button type="button" variant="outline" onClick={() => setModalEnderecoOpen(true)}
                 className={`w-full h-12 rounded-2xl border font-black uppercase text-xs tracking-widest gap-2 transition-all ${endereco ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" : "border-white/10 text-slate-400 hover:border-indigo-500/50"}`}>
                 <MapPin size={13} />
-                {endereco ? `${endereco.logradouro}, ${endereco.numero || "S/N"} — ${endereco.cidade}/${endereco.uf}` : "Cadastrar Endereço"}
+                {endereco ? `${endereco.logradouro}, ${endereco.numero || "S/N"} — ${endereco.cidade}/${endereco.uf}` : "Endereço para brindes e presentes"}
                 {!endereco && <Plus size={11} />}
               </Button>
             </div>

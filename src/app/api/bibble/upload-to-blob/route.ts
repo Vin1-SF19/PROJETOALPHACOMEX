@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
 
-type PdfParseResult = { text: string; numpages: number };
-type PdfParseFn = (buf: Buffer) => Promise<PdfParseResult>;
-
 async function extractPdfText(buf: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as PdfParseFn;
-  const parsed = await pdfParse(buf);
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: buf, verbosity: 0 });
+  const parsed = await parser.getText();
+  await parser.destroy();
   return parsed.text.trim();
 }
 

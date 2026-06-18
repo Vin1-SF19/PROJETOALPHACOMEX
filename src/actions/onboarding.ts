@@ -62,6 +62,7 @@ export async function criarTemplateOnboarding(dados: {
   setor?: string;
   mensagem: string;
   padrao?: boolean;
+  tipo?: string;
 }) {
   try {
     await requireAdmin();
@@ -77,6 +78,7 @@ export async function criarTemplateOnboarding(dados: {
         setor: dados.setor?.trim() || null,
         mensagem: dados.mensagem.trim(),
         padrao: dados.padrao ?? false,
+        tipo: dados.tipo ?? "USUARIO",
       },
     });
     revalidatePath("/PainelAlpha/GestaoOnboarding");
@@ -88,7 +90,7 @@ export async function criarTemplateOnboarding(dados: {
 
 export async function atualizarTemplateOnboarding(
   id: number,
-  dados: { nome: string; setor?: string; mensagem: string; ativo: boolean; padrao: boolean }
+  dados: { nome: string; setor?: string; mensagem: string; ativo: boolean; padrao: boolean; tipo?: string }
 ) {
   try {
     await requireAdmin();
@@ -106,6 +108,7 @@ export async function atualizarTemplateOnboarding(
         mensagem: dados.mensagem.trim(),
         ativo: dados.ativo,
         padrao: dados.padrao,
+        tipo: dados.tipo ?? "USUARIO",
       },
     });
     revalidatePath("/PainelAlpha/GestaoOnboarding");
@@ -123,6 +126,18 @@ export async function excluirTemplateOnboarding(id: number) {
     return { success: true };
   } catch (e: unknown) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao excluir." };
+  }
+}
+
+export async function getTemplateParadaoParceiro(): Promise<OnboardingTemplate | null> {
+  try {
+    const template = await onboardingTemplateModel.findFirst({
+      where: { ativo: true, tipo: "PARCEIRO" },
+      orderBy: [{ padrao: "desc" }, { createdAt: "desc" }],
+    });
+    return template ?? null;
+  } catch {
+    return null;
   }
 }
 

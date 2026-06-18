@@ -22,11 +22,19 @@ function encode(event: SSEEvent, enc: TextEncoder): Uint8Array {
   return enc.encode(`data: ${JSON.stringify(event)}\n\n`);
 }
 
+interface AttachedFile {
+  name: string;
+  type: string;
+  size: number;
+  extractedContent?: string;
+}
+
 interface ChatInput {
   message: string;
   agentId: number;
   onyxSessionId?: string | null;
   pageContext?: string | null;
+  files?: AttachedFile[];
 }
 
 // Pacote NDJSON do Onyx

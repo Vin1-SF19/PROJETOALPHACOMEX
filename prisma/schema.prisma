@@ -1376,12 +1376,20 @@ model Parceiro {
   nivelAtualizadoEm DateTime?            // base da janela de 60 dias (promoção/rebaixamento)
   comissaoPercentual Float?              // override manual opcional (lógica futura)
   dadosConsulta String?
+  telefone      String?
   loginEmail    String
   senhaHash     String
+  // ─── Onboarding / termo de adesão (portal AlphaParceiros) ──────────────────
+  senhaTemporaria    Boolean   @default(true)
+  onboardingCompleto Boolean   @default(false)
+  termoAceito        Boolean   @default(false)
+  termoAceitoEm      DateTime?
+  termoVersao        String?
   criadoPorId   Int
   criadoPor     usuarios             @relation(fields: [criadoPorId], references: [id])
   endereco      ParceiroEndereco?
   responsavel   ParceiroResponsavel?
+  representantes ParceiroRepresentante[]
   indicacoes    Indicacao[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -1449,4 +1457,22 @@ model ParceiroResponsavel {
   cargo          String?
 
   @@map("parceiro_responsavel")
+}
+
+// Representantes cadastrados pelo parceiro no portal AlphaParceiros (manual, N por parceiro).
+model ParceiroRepresentante {
+  id             Int      @id @default(autoincrement())
+  parceiroId     Int
+  parceiro       Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  tipo           String
+  documento      String
+  nome           String
+  dataNascimento String?
+  cargo          String?
+  email          String?
+  telefone       String?
+  createdAt      DateTime @default(now())
+
+  @@index([parceiroId])
+  @@map("parceiro_representante")
 }
