@@ -432,12 +432,28 @@ Caminhos desta máquina:
 REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou listar arquivos/pastas, USE as ferramentas acima imediatamente. NUNCA diga que não tem acesso ao sistema de arquivos quando este modo estiver ativo.`;
   }
 
-  const baseMessages: ChatMessage[] = [
-    { role: "system", content: finalSystemPrompt },
-    ...(history ?? []).slice(-10).map((m): ChatMessage => ({
+  // Janela de histórico por orçamento de caracteres: mantém o máximo de trocas
+  // recentes que cabe sem estourar o contexto do modelo. Aproxima ~4 chars/token;
+  // reserva espaço para system prompt + mensagem atual + resposta.
+  const ctxTokens = contextWindow && contextWindow > 0 ? contextWindow : 8192;
+  const historyCharBudget = Math.max(4000, Math.floor(ctxTokens * 4 * 0.5));
+
+  const trimmedHistory: ChatMessage[] = [];
+  let usedChars = 0;
+  for (let i = (history ?? []).length - 1; i >= 0; i--) {
+    const m = history[i];
+    const len = m.text?.length ?? 0;
+    if (usedChars + len > historyCharBudget && trimmedHistory.length >= 2) break;
+    usedChars += len;
+    trimmedHistory.unshift({
       role: m.role === "bibble" ? "assistant" : "user",
       content: m.text,
-    })),
+    });
+  }
+
+  const baseMessages: ChatMessage[] = [
+    { role: "system", content: finalSystemPrompt },
+    ...trimmedHistory,
     { role: "user", content: userContentWithPage },
   ];
 

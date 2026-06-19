@@ -31,12 +31,18 @@ interface AttachedFile {
   extractedContent?: string;
 }
 
+interface HistoryMessage {
+  role: "user" | "bibble";
+  text: string;
+}
+
 interface ChatInput {
   message: string;
   agentId: number;
   onyxSessionId?: string | null;
   pageContext?: string | null;
   files?: AttachedFile[];
+  history?: HistoryMessage[];
 }
 
 const MAX_FILE_CHARS = 25000;
@@ -45,6 +51,22 @@ function truncate(text: string): string {
   return text.length > MAX_FILE_CHARS
     ? text.slice(0, MAX_FILE_CHARS) + "\n\n...[conteúdo truncado após 25.000 caracteres]"
     : text;
+}
+
+/**
+ * Formata o histórico recente como texto para reforçar o contexto do agente.
+ * O Onyx mantém a própria sessão (onyxSessionId), mas quando ela zera (troca de
+ * agente, reload), este histórico garante que o agente não perca o fio.
+ */
+function buildHistoryContext(history: HistoryMessage[]): string {
+  if (!history.length) return "";
+  const recent = history.slice(-12); // últimas 12 trocas
+  const lines = recent.map(m => {
+    const who = m.role === "bibble" ? "Assistente" : "Usuário";
+    const txt = m.text.length > 4000 ? m.text.slice(0, 4000) + " [...]" : m.text;
+    return `${who}: ${txt}`;
+  });
+  return `---\n### Histórico recente da conversa\n\n${lines.join("\n\n")}\n---`;
 }
 
 async function buildFileContext(files: AttachedFile[]): Promise<string> {
@@ -144,6 +166,14 @@ export async function POST(req: NextRequest) {
     pageContext: input.pageContext ?? null,
   });
 
+  // O Onyx mantém o próprio histórico via onyxSessionId. Só reforçamos o
+  // histórico quando a sessão Onyx é nova (zerou) mas a conversa já tem trocas —
+  // assim o agente não perde o fio ao trocar de agente ou recarregar.
+  const historyContext = !onyxSessionId ? buildHistoryContext(input.history ?? []) : "";
+  const additionalContext = historyContext
+    ? `${systemContext}\n\n${historyContext}`
+    : systemContext;
+
   const enc = new TextEncoder();
   const providerCtrl = new AbortController();
 
@@ -168,7 +198,7 @@ export async function POST(req: NextRequest) {
         const res = await sendChatMessageStream({
           chatSessionId: onyxSessionId,
           message: finalMessage,
-          additionalContext: systemContext,
+          additionalContext,
           signal: providerCtrl.signal,
         });
 

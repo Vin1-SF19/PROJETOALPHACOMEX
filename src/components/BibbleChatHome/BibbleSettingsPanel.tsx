@@ -44,6 +44,7 @@ const CTX_PRESETS = [
   { label: "32K",  value: 32768 },
   { label: "64K",  value: 65536 },
   { label: "128K", value: 131072 },
+  { label: "256K", value: 262144 },
 ];
 
 // ── Provider visual config ─────────────────────────────────────────────────────
@@ -280,13 +281,13 @@ export default function BibbleSettingsPanel({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <LayoutList size={14} style={{ color: "#a5b4fc" }} />
-                <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-[#a5b4fc]">Janela de Contexto</h3>
+                <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-[#a5b4fc]">Janela de Contexto · Bibble</h3>
               </div>
               <div className="flex items-center gap-1.5">
                 <input
-                  type="number" min={512} max={131072} step={512} value={contextWindow}
+                  type="number" min={512} max={262144} step={512} value={contextWindow}
                   onChange={e => {
-                    const v = Math.max(512, Math.min(131072, Number(e.target.value) || 4096));
+                    const v = Math.max(512, Math.min(262144, Number(e.target.value) || 4096));
                     onContextWindowChange(v);
                   }}
                   className="w-20 h-7 px-2 text-center text-[12px] font-bold rounded-md outline-none tabular-nums"
@@ -311,9 +312,17 @@ export default function BibbleSettingsPanel({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] leading-relaxed" style={{ color: "#64748b" }}>
-              Tokens de contexto enviados ao modelo. Apenas Ollama local.
-            </p>
+            <div className="space-y-1.5">
+              <p className="text-[11px] leading-relaxed" style={{ color: "#64748b" }}>
+                Controla a <strong style={{ color: "#94a3b8" }}>memória de conversa do Bibble</strong>: quanto
+                maior, mais mensagens anteriores e documentos (PDFs) ele lembra ao responder. Valores altos
+                deixam as respostas mais lentas e consomem mais recursos do servidor.
+              </p>
+              <p className="text-[10px] leading-relaxed" style={{ color: "#4f6272" }}>
+                ⚙️ Aplica-se <strong>apenas ao Bibble</strong> (Ollama local). Agentes do Onyx têm o contexto
+                gerenciado pelo próprio servidor Onyx e não são afetados por esta configuração.
+              </p>
+            </div>
           </section>
 
           {/* ── System Prompt ───────────────────────────────────── */}

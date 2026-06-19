@@ -15,7 +15,13 @@ import Image from "next/image";
 export interface Message {
   id: string;
   role: "user" | "assistant";
+  /** Texto exibido na bolha (label curto quando há arquivos). */
   content: string;
+  /**
+   * Conteúdo completo enviado à IA e persistido no histórico — inclui o texto
+   * extraído de PDFs/documentos. Quando ausente, usa-se `content`.
+   */
+  fullContent?: string;
   thinkContent?: string;
   files?: Array<{ name: string; type: string }>;
   streaming?: boolean;

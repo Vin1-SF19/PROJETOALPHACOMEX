@@ -55,6 +55,19 @@ function splitThink(raw: string): { content: string; thinkContent?: string } {
   };
 }
 
+/** Marcador inserido em persistedContent ao anexar texto de arquivos. */
+const FILE_CONTENT_MARKER = "\n\n---\n### Conteúdo dos arquivos anexados\n\n";
+
+/**
+ * Ao recarregar uma sessão do banco, separa o label curto (exibido na bolha) do
+ * bloco com o texto extraído dos arquivos (mantido em fullContent para a IA).
+ */
+function splitPersisted(raw: string): { display: string; full: string } {
+  const idx = raw.indexOf(FILE_CONTENT_MARKER);
+  if (idx === -1) return { display: raw, full: raw };
+  return { display: raw.slice(0, idx).trim(), full: raw };
+}
+
 export default function BibbleChatLayout({
   userName,
   role,
@@ -203,10 +216,21 @@ export default function BibbleChatLayout({
       };
       setMessages(
         data.messages.map(m => {
+          // Mensagens do usuário podem conter o bloco de arquivos anexados:
+          // separa o que aparece na bolha do que vai para a IA (fullContent).
+          if (m.role === "user") {
+            const { display, full } = splitPersisted(m.content);
+            return {
+              id: m.id,
+              role: "user" as const,
+              content: display,
+              fullContent: full !== display ? full : undefined,
+            };
+          }
           const { content, thinkContent } = splitThink(m.content);
           return {
             id: m.id,
-            role: m.role as "user" | "assistant",
+            role: "assistant" as const,
             content,
             thinkContent,
           };
@@ -324,15 +348,29 @@ export default function BibbleChatLayout({
 
     setInputValue("");
 
-    // Preparar mensagem com arquivos
+    const readyFiles = uploadFiles.filter(f => !f.uploading && !f.error);
+
+    // Label curto exibido na bolha do usuário (UI limpa)
     let msgContent = text;
-    if (uploadFiles.length > 0) {
-      const files = uploadFiles.filter(f => !f.uploading && !f.error);
-      const fileNames = files.map(f => `📎 ${f.file.name} (${f.file.type})`).join(", ");
+    if (readyFiles.length > 0) {
+      const fileNames = readyFiles.map(f => `📎 ${f.file.name} (${f.file.type})`).join(", ");
       msgContent = `[Arquivos: ${fileNames}]\n\n${text}`;
     }
 
-    const userMsg: Message      = { id: newId(), role: "user",      content: msgContent };
+    // Conteúdo COMPLETO (com texto extraído dos arquivos) — persistido no
+    // histórico para que a IA reenxergue o documento nas perguntas seguintes.
+    let persistedContent = msgContent;
+    if (readyFiles.length > 0) {
+      const docParts = readyFiles
+        .filter(f => f.extractedContent?.trim())
+        .map(f => `#### 📄 ${f.file.name}\n\`\`\`\n${f.extractedContent!.slice(0, 25000)}\n\`\`\``);
+      if (docParts.length > 0) {
+        persistedContent = `${msgContent}\n\n---\n### Conteúdo dos arquivos anexados\n\n${docParts.join("\n\n")}\n---`;
+      }
+    }
+
+    // A bolha mostra o label curto; o histórico/banco guarda o conteúdo completo.
+    const userMsg: Message      = { id: newId(), role: "user",      content: msgContent, fullContent: persistedContent };
     const assistantMsg: Message = { id: newId(), role: "assistant",  content: "", streaming: true };
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
@@ -363,7 +401,8 @@ export default function BibbleChatLayout({
       .filter(m => !m.streaming)
       .map(m => ({
         role: m.role === "assistant" ? "bibble" as const : "user" as const,
-        text: m.content,
+        // Usa o conteúdo completo (com texto dos PDFs) quando disponível.
+        text: m.fullContent ?? m.content,
       }));
 
     const ctrl = new AbortController();
@@ -398,6 +437,7 @@ export default function BibbleChatLayout({
               onyxSessionId: onyxSessionRef.current,
               pageContext: typeof window !== "undefined" ? window.location.pathname : null,
               files: filesForChat.length > 0 ? filesForChat : undefined,
+              history,
             }),
           })
         : await fetch("/api/bibble/chat", {
@@ -437,7 +477,9 @@ export default function BibbleChatLayout({
     abortRef.current = null;
 
     if (fullResponse && sessionId) {
-      await saveMessages(sessionId, text, fullResponse);
+      // Persiste o conteúdo COMPLETO (com texto dos PDFs) para a IA reenxergar
+      // o documento ao recarregar a sessão e em perguntas futuras.
+      await saveMessages(sessionId, persistedContent, fullResponse);
     }
   }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream]);
 

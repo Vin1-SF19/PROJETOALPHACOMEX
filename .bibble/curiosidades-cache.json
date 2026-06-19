@@ -339,7 +339,7 @@
       },
       {
         "text": "Algumas orquídeas podem mudar de cor e forma dependendo da temperatura ou do nível de luz ambiente. Essas transições são sinais de que a planta está reagindo ativamente ao seu habitat artificial.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -415,7 +415,7 @@
       },
       {
         "text": "Açafrão é mais caro pelo peso do que o ouro e sua cor amarelo vibrante era usada como sinal de status no Egito Antigo. Ele também possui um aroma suave, sendo usado tanto na culinária quanto em cosméticos.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1195,7 +1195,7 @@
       },
       {
         "text": "Algumas aves modernas são descendentes diretas de terópodes, um grupo de dinossauros carnívoros. Isso comprova que muitos dinossauros não eram apenas répteis gigantes, mas sim formas de vida complexamente adaptáveis.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1396,6 +1396,10 @@
       {
         "text": "O sono não é um estado de inatividade, mas sim de intensa atividade cerebral reorganizadora. Seu cérebro elimina toxinas e consolida memórias durante esse período.",
         "shown": 4
+      },
+      {
+        "text": "O corpo continua realizando processos de limpeza noturna no cérebro. Enquanto dormimos, o sistema glinfático remove resíduos metabólicos acumulados durante o dia.",
+        "shown": 1
       }
     ]
   },
@@ -2211,7 +2215,7 @@
       },
       {
         "text": "A Língua Nwo speaking nos estados britânicos é um idioma isolado falado por apenas algumas pessoas. Ela não tem parentesco conhecido com nenhuma outra língua registrada, intrigando linguistas até hoje.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
