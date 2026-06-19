@@ -1,39 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
-
-async function extractPdfText(buf: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: buf, verbosity: 0 });
-  const parsed = await parser.getText();
-  await parser.destroy();
-  return parsed.text.trim();
-}
-
-async function extractTextContent(buffer: ArrayBuffer, type: string, name: string): Promise<string | undefined> {
-  const isPdf = type === "application/pdf" || name.toLowerCase().endsWith(".pdf");
-  const isText =
-    type.startsWith("text/") ||
-    type === "application/json" ||
-    name.match(/\.(txt|csv|json|md|log|xml|yaml|yml|ts|tsx|js|jsx|py)$/i) !== null;
-
-  try {
-    if (isPdf) {
-      const text = await extractPdfText(Buffer.from(buffer));
-      console.log(`[BIBBLE UPLOAD] PDF extraído: ${text.length} chars`);
-      if (!text) return undefined;
-      return text.length > 50000 ? text.slice(0, 50000) + "\n\n...[truncado]" : text;
-    }
-
-    if (isText) {
-      const text = new TextDecoder("utf-8").decode(buffer);
-      return text.length > 50000 ? text.slice(0, 50000) + "\n\n...[truncado]" : text;
-    }
-  } catch (err) {
-    console.error("[BIBBLE UPLOAD] Falha ao extrair conteúdo:", err);
-  }
-  return undefined;
-}
+import { extractTextFromBuffer } from "@/lib/bibble/tika";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +15,8 @@ const ALLOWED_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "text/plain", "text/csv", "application/json",
   "application/zip", "application/x-zip-compressed",
 ];
@@ -85,14 +55,23 @@ export async function POST(request: NextRequest) {
   const uploadPath = `bibble-chat/${uniqueName}`;
 
   const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
 
-  const [blob, extractedContent] = await Promise.all([
+  const [blob, extraction] = await Promise.all([
     put(uploadPath, new Blob([arrayBuffer], { type: file.type }), {
       access: "public",
       token: process.env.IACHAT_READ_WRITE_TOKEN,
     }),
-    extractTextContent(arrayBuffer, file.type, file.name),
+    extractTextFromBuffer(buffer, file.type, file.name),
   ]);
+
+  const extractedContent = extraction.text
+    ? (extraction.text.length > 50000
+        ? extraction.text.slice(0, 50000) + "\n\n...[truncado]"
+        : extraction.text)
+    : undefined;
+
+  console.log(`[BIBBLE UPLOAD] ${file.name} — fonte: ${extraction.source}, chars: ${extraction.text.length}`);
 
   return NextResponse.json({
     success: true,
@@ -103,7 +82,7 @@ export async function POST(request: NextRequest) {
       size: file.size,
       url: blob.url,
       uploadPath,
-      extractedContent, // texto extraído para PDFs e arquivos de texto
+      extractedContent,
     },
   });
 }

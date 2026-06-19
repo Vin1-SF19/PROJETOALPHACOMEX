@@ -121,3 +121,44 @@
 - Adicionar `const session = await auth(); if (!session) return null;` em `getTemplateParadaoParceiro` (consistência de padrão)
 - Adicionar `z.enum(["USUARIO","PARCEIRO","CLIENTE"])` na validação de `tipo` em `criarTemplateOnboarding` e `atualizarTemplateOnboarding`
 - Tipo `CLIENTE` existe no banco e na UI mas sem lógica de busca/exibição implementada (reservado para futuro)
+
+---
+
+## [2026-06-19] — Integração Tika para leitura de PDF no Bibble e Onyx
+
+**Tags:** #feature #bugfix #integration #nextjs #critical
+**Agentes envolvidos:** Scout → Echo → Forge
+**Arquivos tocados:**
+- `src/lib/bibble/tika.ts` *(CRIADO)*
+- `src/app/api/bibble/chat/route.ts`
+- `src/app/api/bibble/upload-to-blob/route.ts`
+- `src/app/api/onyx/chat/route.ts`
+- `src/components/BibbleChatHome/BibbleChatLayout.tsx`
+- `.env.local`
+
+### Contexto
+Bibble e agentes Onyx não conseguiam ler PDFs. O Tika (Apache Tika 3.3.1) já estava instalado no servidor Onyx (`http://192.168.35.113:9998`) mas não estava integrado ao PainelAlpha.
+
+### O que foi feito
+- **Diagnóstico**: `pdf-parse` atualizado para v2 quebrou a API — `(await import("pdf-parse")).default` retornava `undefined` (v2 exporta `{ PDFParse }` classe, não função). Código anterior causava `TypeError: pdfParse is not a function` silenciado no `catch`.
+- **Criado `src/lib/bibble/tika.ts`**: helper centralizado com `extractTextFromBuffer` e `extractTextFromUrl`. Usa Tika como primário via `PUT /tika` com `Accept: text/plain`. Fallback automático para `pdf-parse v2` (`new PDFParse({ data: buffer }).getText()`) se Tika estiver fora do ar. Suporta PDF, DOCX, XLSX, PPTX, ODT, RTF, HTML, XML.
+- **`upload-to-blob/route.ts`**: substituiu lógica de extração inline por `extractTextFromBuffer` do Tika. Ampliou tipos permitidos (PPTX agora aceito).
+- **`bibble/chat/route.ts`**: função `extractFilesContent` reescrita — usa `extractTextFromUrl` do Tika para documentos; texto puro segue fetch direto; imagens/vídeos seguem caminho próprio. Removida dependência direta de `pdf-parse`.
+- **`onyx/chat/route.ts`**: adicionado suporte completo a arquivos — interface `AttachedFile` com `url`, nova função `buildFileContext` que extrai texto via Tika/fallback e injeta no corpo da mensagem antes de enviar ao Onyx. `finalMessage` substitui `message` na chamada `sendChatMessageStream`.
+- **`BibbleChatLayout.tsx`**: `handleSend` passa `filesForChat` também quando agente Onyx está ativo (antes só enviava para Bibble/Ollama).
+- **`.env.local`**: adicionado `TIKA_SERVER_URL=http://192.168.35.113:9998`.
+
+### Decisões tomadas
+- **Tika como primário, pdf-parse como fallback**: Tika suporta muito mais formatos e já está no servidor; pdf-parse v2 é fallback só para PDFs quando Tika cair.
+- **Body do fetch como `ArrayBuffer`** (não `Buffer` nem `Uint8Array`): TS target ES2017 + lib `dom` não reconhece `Buffer`/`Uint8Array` como `BodyInit`. Fix: `buffer.buffer.slice(byteOffset, byteOffset + byteLength) as ArrayBuffer`.
+- **Onyx recebe texto extraído no corpo da mensagem**: Onyx não tem API de "documentos" como a Claude API — o texto vai concatenado na mensagem via `buildFileContext`, formato markdown com delimitadores.
+- **`TIKA_SERVER_URL`** como env var: mesmo IP que o `ONYX_API_URL` (`192.168.35.113`), mas porta `9998` separada.
+
+### Problemas encontrados / resolvidos
+- **pdf-parse v2 API quebrada**: v1 exportava função; v2 exporta classe `PDFParse`. Fix: `new PDFParse({ data: buffer, verbosity: 0 }).getText()` + `parser.destroy()`.
+- **TS2769 no tika.ts**: `Buffer` e `Uint8Array` rejeitados como `BodyInit` no tsconfig atual (target ES2017). Fix: cast para `ArrayBuffer` via `buffer.buffer.slice(...)`.
+- **`prisma generate` EPERM**: DLL bloqueada pelo dev server (pré-existente, não desta sessão).
+
+### Pendências
+- Testar com PDF real enviado via UI para confirmar extração correta end-to-end.
+- Considerar cache de extração: PDFs grandes enviados múltiplas vezes reprocessam do zero.

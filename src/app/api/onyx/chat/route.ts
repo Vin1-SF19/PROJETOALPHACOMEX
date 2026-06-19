@@ -6,6 +6,7 @@ import {
   OnyxError,
 } from "@/lib/onyx/client";
 import { buildAgentSystemContext } from "@/lib/onyx/system-knowledge";
+import { extractTextFromUrl } from "@/lib/bibble/tika";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -26,6 +27,7 @@ interface AttachedFile {
   name: string;
   type: string;
   size: number;
+  url?: string;
   extractedContent?: string;
 }
 
@@ -35,6 +37,62 @@ interface ChatInput {
   onyxSessionId?: string | null;
   pageContext?: string | null;
   files?: AttachedFile[];
+}
+
+const MAX_FILE_CHARS = 25000;
+
+function truncate(text: string): string {
+  return text.length > MAX_FILE_CHARS
+    ? text.slice(0, MAX_FILE_CHARS) + "\n\n...[conteúdo truncado após 25.000 caracteres]"
+    : text;
+}
+
+async function buildFileContext(files: AttachedFile[]): Promise<string> {
+  if (!files.length) return "";
+  const parts: string[] = ["---", "### Arquivos Anexados\n"];
+
+  for (const file of files) {
+    if (file.type.startsWith("image/") || file.type.startsWith("video/")) continue;
+
+    // Conteúdo já extraído no upload
+    if (file.extractedContent?.trim()) {
+      parts.push(`#### 📄 ${file.name}\n\`\`\`\n${truncate(file.extractedContent)}\n\`\`\``);
+      continue;
+    }
+
+    // Texto puro
+    const isText =
+      file.type.startsWith("text/") ||
+      file.type === "application/json" ||
+      file.name.match(/\.(txt|csv|json|md|log|xml|yaml|yml|ts|tsx|js|jsx|py)$/i) !== null;
+
+    if (isText && file.url) {
+      try {
+        const res = await fetch(file.url, { signal: AbortSignal.timeout(12000) });
+        if (res.ok) {
+          const raw = await res.text();
+          parts.push(`#### 📄 ${file.name}\n\`\`\`\n${truncate(raw)}\n\`\`\``);
+          continue;
+        }
+      } catch { /* fallback para Tika */ }
+    }
+
+    // Documentos binários: usa Tika
+    if (file.url) {
+      try {
+        const { text, source } = await extractTextFromUrl(file.url, file.type, file.name, 20000);
+        if (text) {
+          parts.push(`#### 📄 ${file.name} [via ${source}]\n\`\`\`\n${truncate(text)}\n\`\`\``);
+          continue;
+        }
+      } catch { /* ignora */ }
+    }
+
+    parts.push(`- 📎 **${file.name}** (${file.type}) — não foi possível extrair texto`);
+  }
+
+  parts.push("---\n");
+  return parts.join("\n\n");
 }
 
 // Pacote NDJSON do Onyx
@@ -63,12 +121,19 @@ export async function POST(req: NextRequest) {
   const agentId = Number(input.agentId);
   let onyxSessionId = input.onyxSessionId ?? null;
 
-  if (!message) {
+  if (!message && (!input.files || input.files.length === 0)) {
     return new Response(JSON.stringify({ error: "Mensagem vazia" }), { status: 400 });
   }
   if (!Number.isInteger(agentId) || agentId < 0) {
     return new Response(JSON.stringify({ error: "Agente inválido" }), { status: 400 });
   }
+
+  // Extrai texto dos arquivos antes de abrir o stream
+  const files = input.files ?? [];
+  const fileContext = files.length > 0 ? await buildFileContext(files) : "";
+  const finalMessage = fileContext
+    ? `${fileContext}\n\n${message || "Analise os arquivos acima."}`
+    : message;
 
   // Conhecimento do sistema + contexto do usuário, compartilhado com o agente
   const userTyped = session.user as { nome?: string; name?: string; role?: string; permissoes?: string[] };
@@ -102,7 +167,7 @@ export async function POST(req: NextRequest) {
         // 2. Envia a mensagem e faz streaming (com o conhecimento do sistema)
         const res = await sendChatMessageStream({
           chatSessionId: onyxSessionId,
-          message,
+          message: finalMessage,
           additionalContext: systemContext,
           signal: providerCtrl.signal,
         });

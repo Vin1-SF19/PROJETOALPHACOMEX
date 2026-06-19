@@ -4,6 +4,7 @@ import { getProvider, getProviderConfig } from "@/lib/bibble/client";
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { BIBBLE_TOOLS, type OllamaTool } from "@/lib/bibble/tools";
 import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
+import { extractTextFromUrl } from "@/lib/bibble/tika";
 import db from "@/lib/prisma";
 
 // ─── File content extraction ──────────────────────────────────────────────────
@@ -14,6 +15,14 @@ function fmtBytes(b: number) {
   return `${(b / (1024 * 1024)).toFixed(1)}MB`;
 }
 
+const MAX_CONTENT_CHARS = 25000;
+
+function truncate(text: string): string {
+  return text.length > MAX_CONTENT_CHARS
+    ? text.slice(0, MAX_CONTENT_CHARS) + "\n\n...[conteúdo truncado após 25.000 caracteres]"
+    : text;
+}
+
 async function extractFilesContent(
   files: Array<{ name: string; type: string; size: number; url?: string; base64?: string; extractedContent?: string }>
 ): Promise<string> {
@@ -22,60 +31,59 @@ async function extractFilesContent(
   const parts: string[] = ["---", "### Arquivos Anexados pelo Usuário\n"];
 
   for (const file of files) {
-    if (!file.url) {
-      parts.push(`- 📎 **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — sem URL de acesso`);
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+
+    if (isImage) {
+      parts.push(`- 🖼️ **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — [imagem disponível em: ${file.url ?? "sem URL"}]`);
+      continue;
+    }
+    if (isVideo) {
+      parts.push(`- 🎬 **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — [vídeo disponível em: ${file.url ?? "sem URL"}]`);
       continue;
     }
 
     // Conteúdo já extraído no upload (blobs privados não podem ser re-fetchados)
     if (file.extractedContent?.trim()) {
-      const content = file.extractedContent.length > 25000
-        ? file.extractedContent.slice(0, 25000) + "\n\n...[conteúdo truncado após 25.000 caracteres]"
-        : file.extractedContent;
-      const isPdfByName = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      parts.push(`#### 📄 ${file.name}${isPdfByName ? " (PDF)" : ""}\n\`\`\`\n${content}\n\`\`\``);
+      parts.push(`#### 📄 ${file.name}\n\`\`\`\n${truncate(file.extractedContent)}\n\`\`\``);
       continue;
     }
 
+    if (!file.url) {
+      parts.push(`- 📎 **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — sem URL de acesso`);
+      continue;
+    }
+
+    // Texto puro (código, CSV, JSON, Markdown…)
     const isText =
       file.type.startsWith("text/") ||
       file.type === "application/json" ||
       file.name.match(/\.(txt|csv|json|md|log|xml|yaml|yml|env|ts|tsx|js|jsx|py|java|cs|go|rs|cpp|c|h|php|rb|swift|kt)$/i) !== null;
 
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-
-    try {
-      if (isText) {
+    if (isText) {
+      try {
         const res = await fetch(file.url, { signal: AbortSignal.timeout(12000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.text();
-        const content = raw.length > 20000 ? raw.slice(0, 20000) + "\n\n...[conteúdo truncado após 20.000 caracteres]" : raw;
-        parts.push(`#### 📄 ${file.name} (${file.type})\n\`\`\`\n${content}\n\`\`\``);
-      } else if (isPdf) {
-        const res = await fetch(file.url, { signal: AbortSignal.timeout(15000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const { PDFParse } = await import("pdf-parse");
-        const parser = new PDFParse({ data: buffer, verbosity: 0 });
-        const parsed = await parser.getText();
-        await parser.destroy();
-        const text = parsed.text.trim();
-        const content = text.length > 25000 ? text.slice(0, 25000) + "\n\n...[conteúdo truncado após 25.000 caracteres]" : text;
-        const info = await new PDFParse({ data: buffer, verbosity: 0 }).getInfo().catch(() => null);
-        const numpages = info?.total ?? "?";
-        parts.push(`#### 📄 ${file.name} (PDF — ${numpages} pág.)\n\`\`\`\n${content}\n\`\`\``);
-      } else if (isImage) {
-        parts.push(`- 🖼️ **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — [imagem disponível em: ${file.url}]`);
-      } else if (isVideo) {
-        parts.push(`- 🎬 **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — [vídeo disponível em: ${file.url}]`);
+        parts.push(`#### 📄 ${file.name} (${file.type})\n\`\`\`\n${truncate(raw)}\n\`\`\``);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        parts.push(`- ⚠️ **${file.name}** — falha ao ler: ${msg}`);
+      }
+      continue;
+    }
+
+    // Documentos: usa Tika (PDF, DOCX, XLSX, PPTX, etc.)
+    try {
+      const { text, source } = await extractTextFromUrl(file.url, file.type, file.name, 20000);
+      if (text) {
+        parts.push(`#### 📄 ${file.name} [via ${source}]\n\`\`\`\n${truncate(text)}\n\`\`\``);
       } else {
-        parts.push(`- 📎 **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — arquivo binário`);
+        parts.push(`- 📎 **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — formato não suportado para extração de texto`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      parts.push(`- ⚠️ **${file.name}** — falha ao ler conteúdo: ${msg}`);
+      parts.push(`- ⚠️ **${file.name}** — falha ao extrair conteúdo: ${msg}`);
     }
   }
 

@@ -47,7 +47,7 @@
       },
       {
         "text": "Os guerreiros nórdicos eram adeptos de estratégias psicológicas no campo de batalha. Eles usavam o medo do desconhecido e a reputação feroz para desmoralizar os inimigos antes mesmo do combate começar.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -215,7 +215,7 @@
       },
       {
         "text": "Os antigos gregos não tinham moeda com conchas; usavam principalmente metais como o cobre e prata para trocas comerciais complexas. Eles também desenvolveram a filosofia, um pilar que moldaria o pensamento ocidental.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -279,7 +279,7 @@
       },
       {
         "text": "Seus grandes colmilhas eram na verdade incisivos longos. Eles foram extintos há milhares de anos por uma combinação de mudanças climáticas e caça humana.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -499,7 +499,7 @@
       },
       {
         "text": "Alguns cogumelos são compostos por milhares de indivíduos unidos pelo micélio subterrâneo. Eles desempenham um papel vital decompondo matéria orgânica, reciclando nutrientes essenciais para a vida do planeta.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -703,7 +703,7 @@
       },
       {
         "text": "A Fossa das Marianas é o ponto azul mais profundo conhecido no planeta. Nesses abismos habitam criaturas adaptadas a pressões extremas, como os anfípodes gigantes.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -748,6 +748,10 @@
       {
         "text": "O primeiro astronauta a pisar na Lua, Neil Armstrong, não foi o único a fazer isso. A cápsula Eagle transportou três homens no total para completar todas as tarefas científicas necessárias.",
         "shown": 4
+      },
+      {
+        "text": "Neil Armstrong nunca pisou na Lua com um pé só. Ele deu alguns passos após o módulo lunar descer até a superfície, seguindo os protocolos de segurança.",
+        "shown": 1
       }
     ]
   },
@@ -843,7 +847,7 @@
       },
       {
         "text": "As baleias jubarte produzem um som emitido de forma tão complexa que os cientistas ainda não conseguem decifrar sua linguagem completa. Esse canto abrange frequências debaixo, na verdade criando desenhos acústicos impressionantes no meio líquido.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -856,6 +860,10 @@
       {
         "text": "Bahia só desaba após o Carnaval; a força cultural do período é tão intensa que quase sobrecarrega a infraestrutura local. Seu ritmo contagiante molda não apenas festas, mas a própria energia da cidade.",
         "shown": 4
+      },
+      {
+        "text": "O Amapá é o estado brasileiro com a maior área dentro do Oceano Atlântico, formando ilhas de grande importância ecológica. Muitas dessas áreas são preservadas e abrigam espécies únicas da fauna amazônica.",
+        "shown": 1
       }
     ]
   },
@@ -923,7 +931,7 @@
       },
       {
         "text": "A primeira pizzaria documentada foi no Nápoles, Itália, por volta de 1889. Essa receita icônica estava originalmente destinada à família real italiana.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -963,7 +971,7 @@
       },
       {
         "text": "Alguns recifes de coral são tão complexos que espelham a diversidade de ecossistemas terrestres. Eles sustentam cerca de um quarto de toda a vida marinha, apesar de cobrirem menos de 1% do oceano.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1175,7 +1183,7 @@
       },
       {
         "text": "O nome \"aurora\" significa amanhecer em latim; hoje ele representa um espetáculo noturno. Essa luz é na verdade o resultado de partículas solares interagindo com a atmosfera terrestre.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1347,7 +1355,7 @@
       },
       {
         "text": "A língua de proto-indoeuropeu não é um idioma falado, mas sim uma reconstrução linguística. Estudar essa linguagem ajuda a traçar as migrações humanas ao longo dos milênios.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1375,7 +1383,7 @@
       },
       {
         "text": "As primeiras lâmpadas elétricas comerciais não eram tão brilhantes quanto as atuais. Os primeiros modelos exigiam muito consumo de energia, sendo limitados a poucas horas de uso contínuo.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1487,7 +1495,7 @@
       },
       {
         "text": "Algumas espécies de aranhas tecem teias com seda guiada por proteínas que as tornam quase indetectáveis para o olho humano. Essa seda é tão resistente que pode ser usada para criar materiais biomiméticos extremamente robustos na engenharia.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1499,7 +1507,7 @@
       },
       {
         "text": "O campo magnético da Terra nos protege de partículas nocivas do espaço. Sem ele, a vida na superfície teria dificuldade para sobreviver à radiação solar intensa.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1507,7 +1515,11 @@
     "entries": [
       {
         "text": "O Monte Everest não é o ponto mais alto de altitude absoluta, mas sim na elevação acima do nível do mar. O Mauna Kea, no Havaí, possui uma altura maior se medido desde sua base oceânica até seu cume.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O Monte Everest não é o pico mais alto em termos geográficos; ele está localizado no Techo do Mundo Tibetano. O Mauna Kea, no Havaí, pode ser mais alto se medido desde sua base oceânica até seu cume.",
+        "shown": 1
       }
     ]
   },
@@ -1531,7 +1543,7 @@
       },
       {
         "text": "O primeiro celular portátil não era o modelo moderno; ele tinha um teclado numérico em vez de tela sensível ao toque. O aparelho original ainda operava com baterias menores do que as de um relógio.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1563,7 +1575,7 @@
       },
       {
         "text": "Antigamente, na Grécia e Roma, acreditava-se que algumas cores protegiam contra o mau-olhado. Pendurar um pedaço de vermelho ou preto era comum para afastar energias negativas em casas e objetos pessoais.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1627,7 +1639,7 @@
       },
       {
         "text": "A capacidade de criar narrativas complexas nos sonhos é um desvio temporário para nossa mente inconsciente. Muitas cores e sentimentos vividos no sonho são processados pelo cérebro como se fossem experiências reais, afetando nosso humor acordado.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1675,7 +1687,7 @@
       },
       {
         "text": "O seu corpo consegue produzir anticorpos contra vírus ainda antes de você ser exposto a eles. Este mecanismo de vigilância permite que ele comece a se preparar para ataques iminentes.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1691,7 +1703,7 @@
       },
       {
         "text": "As geleiras são \"máquinas de tempo\" porque preservam o DNA de criaturas extintas dentro do gelo. Em certas regiões, elas podem revelar padrões climáticos passados em suas camadas de neve-gelo.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1739,7 +1751,7 @@
       },
       {
         "text": "Os samurais não eram apenas guerreiros; eles também serviam como burocratas para as famílias nobres. Seu código de conduta, Bushido, valorizava a lealdade e o dever acima da própria vida.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1800,6 +1812,10 @@
       {
         "text": "A língua da girafa é preta e possui mais de um milhão de sensores musculares. Isso a ajuda a identificar as minúsculas quantidades de sal nos alimentos, que ela não conseguiria detectar de outra forma.",
         "shown": 4
+      },
+      {
+        "text": "O sangue das girafas é mais escuro porque elas têm até quatro tipos de glóbulos vermelhos diferentes circulando no corpo. Esse sistema único ajuda a manter o sangue oxigenado mesmo em grandes variações de altitude.",
+        "shown": 1
       }
     ]
   },
@@ -1839,7 +1855,7 @@
       },
       {
         "text": "Eles não são de fato pássaros nem peixes; pertencem a um grupo chamado Phoenicopteridae. Suas cores vibrantes vêm da dieta, pois precisam consumir pigmentos carotenoides presentes em salmão e algas.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1915,7 +1931,7 @@
       },
       {
         "text": "O primeiro relógio de bolso portátil datou da China e já utilizava mecanismos complexos. Alguns modelos antigos eram incrivelmente precisos, utilizados até mesmo para calcular a passagem do tempo em diferentes fusos horários manualmente.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1967,7 +1983,7 @@
       },
       {
         "text": "O planeta Terra possui uma carga elétrica natural negativa, e essa acumulação é desfeita através de descargas atmosféricas. Essas tempestades são, portanto, um mecanismo natural para equilibrar o potencial elétrico do nosso globo.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1983,7 +1999,7 @@
       },
       {
         "text": "Os elefantes não conseguem ser imobilizados com apenas um golpe de contenção no acostamento; eles têm que desviar ou saltar por cima. Eles usam a tromba para várias funções, como pegar água, cheirar o chão e até mesmo auxiliar na respiração.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2019,7 +2035,7 @@
       },
       {
         "text": "O Império Maya não colapsou por um único fator; foi resultado de mudanças climáticas, superpopulação e guerras internas. Essas tensões combinadas debilitaram suas estruturas sociais em um período prolongado.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2099,7 +2115,7 @@
     "entries": [
       {
         "text": "A maioria dos bolídos, aqueles meteoros mais brilhantes, não são corpos celestes incomuns; eles são apenas rochas de asteroides entrando na atmosfera da Terra. O brilho intenso é gerado pelo atrito do ar que aquece a pedra em temperaturas elevadíssimas.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2127,7 +2143,7 @@
       },
       {
         "text": "Suas luas Titã possui rios de metano líquido e é considerada o único sistema planetário conhecido com química tão diferente da Terra. Observou-se lá também faixas na atmosfera que se assemelham a um véu complexo de gases.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2140,6 +2156,10 @@
       {
         "text": "Os romanos eram mestres na engenharia de aquedutos, construindo sistemas complexos para levar água potável a grandes cidades. Essas obras não só garantiam saúde pública, mas também simbolizavam o poder da civilização romana.",
         "shown": 4
+      },
+      {
+        "text": "Alguns romanos usavam banhos públicos não só para higiene, mas também como centros sociais de negócios e fofocas políticas. Os banhistas podiam negociar contratos ou simplesmente ouvir os últimos rumores da cidade enquanto relaxavam no vapor.",
+        "shown": 2
       }
     ]
   },
@@ -2331,7 +2351,7 @@
       },
       {
         "text": "Um átomo não possui um centro físico definido. Ele é mais bem descrito como uma nuvem de probabilidades onde os elétrons se movem em diferentes níveis de energia.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2384,6 +2404,10 @@
       {
         "text": "O cacau era cultivado por civilizações pré-colombianas, como os Maias e Astecas. Na época, ele era usado mais como bebida ritualística e moeda do que como doce.",
         "shown": 4
+      },
+      {
+        "text": "As primeiras referências de chocolate vêm dos Maias e Astecas, que o utilizavam em rituais religiosos. Eles preparavam a bebida amarga sem açúcar e valorizavam tanto quanto um afrodisíaco.",
+        "shown": 1
       }
     ]
   },
@@ -2395,7 +2419,7 @@
       },
       {
         "text": "O olho humano é tão complexo que requer mais de um bilhão de conexões neuronais diferentes para funcionar. Suas cores podem mudar sutilmente ao longo do dia devido à forma como a luz interage com as camadas da íris.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2407,7 +2431,7 @@
       },
       {
         "text": "O Windows original não era projetado para o computador pessoal comum. Ele foi originalmente criado como um software de sistema operacional para a IBM em máquinas mainframe corporativas enormes.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2439,7 +2463,7 @@
       },
       {
         "text": "A Ilha de Páscova tem um sistema de escrita único chamado Rongo-Rongo, cuja decifração ainda é um mistério arqueológico. As gigantes estátuas Moai não só decoravam o local, mas também possuíam um significado astronômico complexo para sua cultura original.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2452,6 +2476,10 @@
       {
         "text": "O Estima é o único pássaro não-voador que faz ninhos no solo e se alimenta de fontes naturais de alimento encontrado na natureza, como carcaças e restos orgânicos. Eles passam cerca de 70% do tempo submersos em águas frias para caçar.",
         "shown": 4
+      },
+      {
+        "text": "Os pinguins não conseguem voar, mas são nadadores extremamente ágeis. Eles utilizam suas asas adaptadas como propulsores potentes debaixo d'água.",
+        "shown": 2
       }
     ]
   },
@@ -2463,7 +2491,7 @@
       },
       {
         "text": "Um tigre não deita o corpo totalmente sobre um objeto; ele usa a força muscular para se manter ligeiramente elevado. Essa postura aumenta sua mobilidade e permite saltos mais explosivos durante a caçada.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2499,7 +2527,7 @@
       },
       {
         "text": "O Reino Unido nunca teve um país chamado \"Britânia\" oficialmente, apesar de grande parte da população se identificar dessa forma. Sua história geológica complexa resulta do encontro entre placas tectônicas do Atlântico Norte e Euroasiática na área britânica.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2523,7 +2551,7 @@
     "entries": [
       {
         "text": "Plutão não é o único planeta anão; há cinco corpos classificados com status similar. Esses mini-mundos rochosos orbitam seus próprios sóis ou estrelas gigantes vermelhas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },

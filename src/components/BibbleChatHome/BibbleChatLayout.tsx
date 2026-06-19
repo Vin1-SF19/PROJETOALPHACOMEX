@@ -393,10 +393,11 @@ export default function BibbleChatLayout({
             headers: { "Content-Type": "application/json" },
             signal: ctrl.signal,
             body: JSON.stringify({
-              message: msgContent,
+              message: text,
               agentId: agente.id,
               onyxSessionId: onyxSessionRef.current,
               pageContext: typeof window !== "undefined" ? window.location.pathname : null,
+              files: filesForChat.length > 0 ? filesForChat : undefined,
             }),
           })
         : await fetch("/api/bibble/chat", {
