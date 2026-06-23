@@ -324,3 +324,70 @@ export function sendChatMessageStream(
     }),
   });
 }
+
+/**
+ * Consulta one-shot à base de conhecimento do Onyx: cria uma sessão temporária
+ * com o agente indicado (default = 0), faz a pergunta, coleta a resposta completa
+ * do stream NDJSON e devolve o texto. Usado pelo Bibble para acessar o que está
+ * documentado/indexado no Onyx (RAG nativo do Onyx).
+ *
+ * @returns texto da resposta, ou string vazia se nada foi retornado.
+ */
+export async function askOnyxOneShot(
+  pergunta: string,
+  personaId = 0,
+  timeoutMs = 60_000,
+): Promise<string> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  try {
+    const { chat_session_id } = await createChatSession(personaId, "Bibble — consulta de conhecimento");
+
+    const res = await onyxFetch("/chat/send-chat-message", {
+      method: "POST",
+      timeoutMs,
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        chat_session_id,
+        message: pergunta,
+        parent_message_id: null,
+        stream: true,
+      }),
+    });
+
+    if (!res.ok || !res.body) {
+      throw new OnyxError(`Onyx respondeu ${res.status}`, res.status);
+    }
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let answer = "";
+
+    const handle = (line: string) => {
+      const t = line.trim();
+      if (!t) return;
+      try {
+        const pkt = JSON.parse(t) as { obj?: { type: string; content?: string } };
+        if (pkt.obj?.type === "message_delta" && pkt.obj.content) {
+          answer += pkt.obj.content;
+        }
+      } catch { /* linha parcial */ }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const l of lines) handle(l);
+    }
+    if (buf.trim()) handle(buf);
+
+    return answer.trim();
+  } finally {
+    clearTimeout(timer);
+  }
+}

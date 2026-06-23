@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle } from "lucide-react";
+import { Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import ParceiroCard, { type CardParceiro } from "./ParceiroCard";
 import ModalNovaIndicacao from "./ModalNovaIndicacao";
 import ModalEngrenagem from "./ModalEngrenagem";
+import ModalTermo from "./ModalTermo";
 import { excluirParceiros } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
 
@@ -28,6 +29,7 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
 
   const [novaIndicacaoOpen, setNovaIndicacaoOpen] = useState(false);
   const [engrenagemOpen, setEngrenagemOpen] = useState(false);
+  const [termoOpen, setTermoOpen] = useState(false);
   const [modoExclusao, setModoExclusao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -92,6 +94,15 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
                 className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all"
                 style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5" }}>
                 <Trash2 size={14} /> Excluir parceiro
+              </button>
+            )}
+
+            {/* Atualizar termo — só Admin */}
+            {permissao.isAdmin && (
+              <button onClick={() => setTermoOpen(true)}
+                className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-200"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <FileText size={14} /> Atualizar termo
               </button>
             )}
 
@@ -167,6 +178,7 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
       {/* Modais */}
       <ModalNovaIndicacao open={novaIndicacaoOpen} onClose={() => setNovaIndicacaoOpen(false)} onDone={() => router.refresh()} accent={accent} />
       <ModalEngrenagem open={engrenagemOpen} onClose={() => setEngrenagemOpen(false)} accent={accent} />
+      <ModalTermo open={termoOpen} onClose={() => setTermoOpen(false)} accent={accent} />
 
       {/* Confirmação de exclusão */}
       {confirmOpen && (

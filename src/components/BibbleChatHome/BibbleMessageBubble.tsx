@@ -215,7 +215,7 @@ function BibbleAvatar({ streaming }: { streaming?: boolean }) {
         boxShadow: streaming ? "0 0 14px rgba(99,102,241,0.55)" : "0 0 8px rgba(99,102,241,0.2)",
       }}
     >
-      <Image src="/AvatarIA.png" alt="Bibble" width={32} height={32} className="w-full h-full object-contain p-0.5" priority />
+      <Image src="/bibbleAlpha.png" alt="Bibble" width={32} height={32} className="w-full h-full object-contain p-0.5" priority />
     </div>
   );
 }

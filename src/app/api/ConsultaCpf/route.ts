@@ -3,13 +3,14 @@ import { auth } from "../../../../auth";
 
 export const dynamic = "force-dynamic";
 
-// Input type="date" envia YYYY-MM-DD; InfoSimples exige DD/MM/YYYY
+// A InfoSimples (campo `birthdate`) exige o formato ISO AAAA-MM-DD.
+// O <input type="date"> já envia nesse formato; só normalizamos DD/MM/AAAA se vier assim.
 function paraFormatoInfoSimples(data: string): string | null {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(data)) {
-    const [y, m, d] = data.split("-");
-    return `${d}/${m}/${y}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(data)) return data; // já está em AAAA-MM-DD
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(data)) {
+    const [d, m, y] = data.split("/");
+    return `${y}-${m}-${d}`;
   }
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(data)) return data;
   return null;
 }
 
@@ -40,14 +41,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "INFOSIMPLES_TOKEN não configurado no servidor" }, { status: 500 });
     }
 
+    // ⚠️ A InfoSimples usa o campo `birthdate` (não `data_nascimento`). Mandar o
+    // nome errado faz a API responder code 606 (parâmetro obrigatório ausente).
     const body = new URLSearchParams({
       token,
       cpf: cpfLimpo,
-      data_nascimento: dataFormatada,
+      birthdate: dataFormatada,
       timeout: "30",
     });
 
-    console.log("[ConsultaCpf] enviando →", { cpf: cpfLimpo, data_nascimento: dataFormatada });
+    console.log("[ConsultaCpf] enviando →", { cpf: cpfLimpo, birthdate: dataFormatada });
 
     const resp = await fetch(
       "https://api.infosimples.com/api/v2/consultas/receita-federal/cpf",
@@ -86,7 +89,9 @@ export async function POST(req: NextRequest) {
         msgFinal = msgBruta;
       }
 
-      return NextResponse.json({ error: msgFinal }, { status: 404 });
+      // 422 (não 404) — a rota existe e processou; só a consulta na Receita não retornou.
+      // 404 fazia o browser logar "404 Not Found" como se a rota não existisse.
+      return NextResponse.json({ error: msgFinal }, { status: 422 });
     }
 
     const d = data.data[0];

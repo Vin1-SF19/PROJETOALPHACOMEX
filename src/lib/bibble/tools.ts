@@ -316,6 +316,24 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
   {
     type: "function",
     function: {
+      name: "consultar_base_onyx",
+      description:
+        "Consulta a base de conhecimento dos agentes Onyx (documentos, POPs e materiais indexados no Onyx). Use quando o usuário perguntar sobre procedimentos, documentação ou conhecimento que pode estar registrado no Onyx e não nas suas tools diretas. Retorna a resposta da base do Onyx.",
+      parameters: {
+        type: "object",
+        properties: {
+          pergunta: {
+            type: "string",
+            description: "A pergunta a fazer à base de conhecimento do Onyx, em português.",
+          },
+        },
+        required: ["pergunta"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "ler_arquivo",
       description:
         "Lê o conteúdo de um arquivo ou lista o conteúdo de uma pasta. Disponível apenas quando o usuário habilitou acesso ao computador.",

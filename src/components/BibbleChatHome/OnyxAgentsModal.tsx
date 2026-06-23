@@ -5,7 +5,7 @@ import Image from "next/image";
 import {
   X, Bot, Wrench, Plus, Trash2, Pencil, MessageSquare,
   Loader2, Check, AlertTriangle, ArrowLeft, Sparkles, ImagePlus,
-  Globe, Lock, User, Users, Search, LayoutGrid,
+  Globe, Lock, User, Users, Search, LayoutGrid, Pin, HelpCircle,
 } from "lucide-react";
 import {
   fetchAgents, fetchAgent, fetchTools, createAgent, updateAgent, deleteAgent, createCustomTool,
@@ -22,11 +22,17 @@ interface OnyxAgentsModalProps {
   open: boolean;
   onClose: () => void;
   isAdmin: boolean;
-  /** Ativa o agente e já inicia uma conversa NOVA com apresentação ("Quem é você?") */
+  /** Abre uma conversa NOVA e vazia com o agente (sem apresentação automática) */
   onConverse: (agent: OnyxAgent) => void;
+  /** Abre conversa NOVA e já pergunta "Quem é você?" (apresentação) */
+  onQuemEhVoce: (agent: OnyxAgent) => void;
   /** Ativa o agente na conversa ATUAL, sem reiniciar nem apresentar */
   onAddToConversation: (agent: OnyxAgent) => void;
   selectedAgentId: number | null;
+  /** Lista de agentes fixados (onyxAgentId) — controla o estado do pino */
+  fixadosIds: number[];
+  /** Fixa/desfixa um agente */
+  onToggleFixar: (agent: OnyxAgent) => void;
 }
 
 const EMPTY_FORM: AgentFormData = {
@@ -56,7 +62,8 @@ const SKILL_PLACEHOLDER = `{
 }`;
 
 export default function OnyxAgentsModal({
-  open, onClose, isAdmin, onConverse, onAddToConversation, selectedAgentId,
+  open, onClose, isAdmin, onConverse, onQuemEhVoce, onAddToConversation, selectedAgentId,
+  fixadosIds, onToggleFixar,
 }: OnyxAgentsModalProps) {
   const [tab, setTab] = useState<Tab>("agentes");
   const [view, setView] = useState<View>("list");
@@ -219,6 +226,134 @@ export default function OnyxAgentsModal({
     return true;
   });
 
+  // Separa fixados (seção própria no topo) dos demais
+  const fixadosList = filteredAgents.filter(a => fixadosIds.includes(a.id));
+  const outrosList = filteredAgents.filter(a => !fixadosIds.includes(a.id));
+
+  const renderAgentCard = (agent: OnyxAgent) => {
+    const fixado = fixadosIds.includes(agent.id);
+    return (
+      <div
+        key={agent.id}
+        className="group rounded-2xl p-3.5 transition-all"
+        style={{
+          background: selectedAgentId === agent.id ? "rgba(79,70,229,0.15)" : "rgba(15,23,42,0.5)",
+          border: `1px solid ${selectedAgentId === agent.id ? "rgba(99,102,241,0.45)" : fixado ? "rgba(245,158,11,0.3)" : "rgba(99,102,241,0.12)"}`,
+        }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl grid place-items-center shrink-0 overflow-hidden relative" style={{ background: "rgba(99,102,241,0.15)" }}>
+            {agent.uploaded_image_id ? (
+              <Image src={agentAvatarUrl(agent.id)} alt={agent.name} fill unoptimized className="object-cover" />
+            ) : (
+              <Bot size={17} style={{ color: "#a5b4fc" }} />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-[13px] font-bold truncate" style={{ color: "#f1f5f9" }}>{agent.name}</h3>
+              {/* Pino para fixar/desfixar */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleFixar(agent); }}
+                title={fixado ? "Desfixar agente" : "Fixar agente (máx. 3)"}
+                className="shrink-0 p-1 rounded-md transition-all hover:scale-110"
+                style={{
+                  background: fixado ? "rgba(245,158,11,0.18)" : "rgba(255,255,255,0.04)",
+                  color: fixado ? "#fbbf24" : "#64748b",
+                }}
+              >
+                <Pin size={13} strokeWidth={2.5} fill={fixado ? "#fbbf24" : "none"} className={fixado ? "" : "rotate-45"} />
+              </button>
+              {selectedAgentId === agent.id && (
+                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded" style={{ background: "rgba(99,102,241,0.25)", color: "#a5b4fc" }}>Ativo</span>
+              )}
+              <span
+                className="flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0"
+                style={agent.isPublic
+                  ? { background: "rgba(16,185,129,0.15)", color: "#6ee7b7" }
+                  : { background: "rgba(100,116,139,0.15)", color: "#94a3b8" }}
+              >
+                {agent.isPublic ? <Globe size={9} /> : <Lock size={9} />}
+                {agent.isPublic ? "Público" : "Privado"}
+              </span>
+            </div>
+            <p className="text-[11.5px] mt-0.5 line-clamp-2" style={{ color: "#8fa3bc" }}>{agent.description}</p>
+            {agent.tools && agent.tools.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {agent.tools.map(t => (
+                  <span key={t.id} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(30,45,74,0.7)", color: "#6b7fa0" }}>
+                    {t.display_name ?? t.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
+          <button
+            onClick={() => { onConverse(agent); onClose(); }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-black transition-all active:scale-[0.97] hover:brightness-110"
+            style={{
+              background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+              color: "#ffffff",
+              boxShadow: "0 4px 16px rgba(79,70,229,0.45), 0 0 0 1px rgba(129,140,248,0.4)",
+            }}
+            title="Abrir uma conversa nova e vazia com este agente"
+          >
+            <MessageSquare size={14} strokeWidth={2.5} /> Conversar
+          </button>
+
+          <button
+            onClick={() => { onQuemEhVoce(agent); onClose(); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11.5px] font-bold transition-all active:scale-[0.97]"
+            style={{
+              background: "rgba(168,85,247,0.14)",
+              border: "1px solid rgba(168,85,247,0.4)",
+              color: "#d8b4fe",
+            }}
+            title="Abrir conversa nova e pedir que o agente se apresente"
+          >
+            <HelpCircle size={13} strokeWidth={2.5} /> Quem é você?
+          </button>
+
+          <button
+            onClick={() => { onAddToConversation(agent); onClose(); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11.5px] font-bold transition-all active:scale-[0.97]"
+            style={{
+              background: "rgba(79,70,229,0.12)",
+              border: "1px solid rgba(99,102,241,0.35)",
+              color: "#a5b4fc",
+            }}
+            title="Usar este agente na conversa atual, sem reiniciar"
+          >
+            <Plus size={13} strokeWidth={2.5} /> Adicionar à conversa
+          </button>
+
+          {agent.createdByName && (
+            <span className="flex items-center gap-1 text-[10.5px] min-w-0" style={{ color: "#6b7fa0" }}>
+              <User size={11} className="shrink-0" />
+              <span className="shrink-0">Criado por:</span>
+              <span className="font-semibold truncate" style={{ color: "#8fa3bc" }}>{agent.createdByName}</span>
+            </span>
+          )}
+
+          <div className="flex-1" />
+
+          {(agent.ownedByMe || isAdmin) && (
+            <>
+              <button onClick={() => void openEdit(agent)} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: "#6b7fa0" }} title="Editar">
+                <Pencil size={13} />
+              </button>
+              <button onClick={() => removeAgent(agent.id)} className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 hover:text-red-400" style={{ color: "#6b7fa0" }} title="Excluir">
+                <Trash2 size={13} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const saveSkill = async () => {
     let parsed: Record<string, unknown>;
     try {
@@ -359,101 +494,26 @@ export default function OnyxAgentsModal({
               ) : filteredAgents.length === 0 ? (
                 <p className="text-center text-[12px] py-8" style={{ color: "#5a7090" }}>Nenhum agente encontrado com esse filtro.</p>
               ) : (
-                <div className="space-y-2">
-                  {filteredAgents.map(agent => (
-                    <div
-                      key={agent.id}
-                      className="group rounded-2xl p-3.5 transition-all"
-                      style={{
-                        background: selectedAgentId === agent.id ? "rgba(79,70,229,0.15)" : "rgba(15,23,42,0.5)",
-                        border: `1px solid ${selectedAgentId === agent.id ? "rgba(99,102,241,0.45)" : "rgba(99,102,241,0.12)"}`,
-                      }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-9 h-9 rounded-xl grid place-items-center shrink-0 overflow-hidden relative" style={{ background: "rgba(99,102,241,0.15)" }}>
-                          {agent.uploaded_image_id ? (
-                            <Image src={agentAvatarUrl(agent.id)} alt={agent.name} fill unoptimized className="object-cover" />
-                          ) : (
-                            <Bot size={17} style={{ color: "#a5b4fc" }} />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-[13px] font-bold truncate" style={{ color: "#f1f5f9" }}>{agent.name}</h3>
-                            {selectedAgentId === agent.id && (
-                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded" style={{ background: "rgba(99,102,241,0.25)", color: "#a5b4fc" }}>Ativo</span>
-                            )}
-                            <span
-                              className="flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0"
-                              style={agent.isPublic
-                                ? { background: "rgba(16,185,129,0.15)", color: "#6ee7b7" }
-                                : { background: "rgba(100,116,139,0.15)", color: "#94a3b8" }}
-                            >
-                              {agent.isPublic ? <Globe size={9} /> : <Lock size={9} />}
-                              {agent.isPublic ? "Público" : "Privado"}
-                            </span>
-                          </div>
-                          <p className="text-[11.5px] mt-0.5 line-clamp-2" style={{ color: "#8fa3bc" }}>{agent.description}</p>
-                          {agent.tools && agent.tools.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5">
-                              {agent.tools.map(t => (
-                                <span key={t.id} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(30,45,74,0.7)", color: "#6b7fa0" }}>
-                                  {t.display_name ?? t.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <button
-                          onClick={() => { onConverse(agent); onClose(); }}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-black transition-all active:scale-[0.97] hover:brightness-110"
-                          style={{
-                            background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-                            color: "#ffffff",
-                            boxShadow: "0 4px 16px rgba(79,70,229,0.45), 0 0 0 1px rgba(129,140,248,0.4)",
-                          }}
-                        >
-                          <MessageSquare size={14} strokeWidth={2.5} /> Conversar
-                        </button>
-
-                        <button
-                          onClick={() => { onAddToConversation(agent); onClose(); }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11.5px] font-bold transition-all active:scale-[0.97]"
-                          style={{
-                            background: "rgba(79,70,229,0.12)",
-                            border: "1px solid rgba(99,102,241,0.35)",
-                            color: "#a5b4fc",
-                          }}
-                          title="Usar este agente na conversa atual, sem reiniciar"
-                        >
-                          <Plus size={13} strokeWidth={2.5} /> Adicionar à conversa
-                        </button>
-
-                        {agent.createdByName && (
-                          <span className="flex items-center gap-1 text-[10.5px] min-w-0" style={{ color: "#6b7fa0" }}>
-                            <User size={11} className="shrink-0" />
-                            <span className="shrink-0">Criado por:</span>
-                            <span className="font-semibold truncate" style={{ color: "#8fa3bc" }}>{agent.createdByName}</span>
-                          </span>
-                        )}
-
-                        <div className="flex-1" />
-
-                        {(agent.ownedByMe || isAdmin) && (
-                          <>
-                            <button onClick={() => void openEdit(agent)} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: "#6b7fa0" }} title="Editar">
-                              <Pencil size={13} />
-                            </button>
-                            <button onClick={() => removeAgent(agent.id)} className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 hover:text-red-400" style={{ color: "#6b7fa0" }} title="Excluir">
-                              <Trash2 size={13} />
-                            </button>
-                          </>
-                        )}
-                      </div>
+                <div className="space-y-4">
+                  {/* Seção: Fixados */}
+                  {fixadosList.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-1" style={{ color: "#fbbf24" }}>
+                        <Pin size={11} fill="#fbbf24" /> Fixados ({fixadosList.length})
+                      </p>
+                      {fixadosList.map(renderAgentCard)}
                     </div>
-                  ))}
+                  )}
+
+                  {/* Seção: Todos os demais */}
+                  {outrosList.length > 0 && (
+                    <div className="space-y-2">
+                      {fixadosList.length > 0 && (
+                        <p className="text-[10px] font-black uppercase tracking-widest px-1" style={{ color: "#5a7090" }}>Todos</p>
+                      )}
+                      {outrosList.map(renderAgentCard)}
+                    </div>
+                  )}
                 </div>
               )}
             </>

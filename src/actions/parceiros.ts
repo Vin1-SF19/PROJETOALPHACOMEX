@@ -5,6 +5,7 @@ import { auth } from "../../auth";
 import { hashSync } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { put } from "@vercel/blob";
 
 const EnderecoSchema = z.object({
   cep: z.string().min(8),
@@ -29,13 +30,15 @@ const ParceiroSchema = z.object({
   nome: z.string().min(2),
   nomeFantasia: z.string().optional(),
   email: z.string().email(),
+  telefone: z.string().optional(),
+  telefone2: z.string().optional(),
   chavePix: z.string().optional(),
   tipoChavePix: z.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional(),
   nivel: z.enum(["GOLD", "PLATINUM", "BLACK"]).default("GOLD"),
   comissaoPercentual: z.number().min(0).max(100).optional(),
   dadosConsulta: z.string().optional(),
   endereco: EnderecoSchema.optional(),
-  responsavel: ResponsavelSchema.optional(),
+  responsaveis: z.array(ResponsavelSchema).optional(),
 });
 
 function gerarSenhaSegura(): string {
@@ -62,15 +65,16 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
       return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     }
 
-    const { tipo, documento, nome, nomeFantasia, email, chavePix, tipoChavePix, nivel, comissaoPercentual, dadosConsulta, endereco, responsavel } = parsed.data;
+    const { tipo, documento, nome, nomeFantasia, email, telefone, telefone2, chavePix, tipoChavePix, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis } = parsed.data;
 
     const docLimpo = documento.replace(/\D/g, "");
 
     const existente = await db.parceiro.findUnique({ where: { documento: docLimpo } });
     if (existente) return { success: false, error: "Documento já cadastrado como parceiro" };
 
-    if (tipo === "PJ" && !responsavel) {
-      return { success: false, error: "Responsável físico obrigatório para Pessoa Jurídica" };
+    const respValidos = (responsaveis ?? []).filter(r => r.nome.trim() && r.cpf.replace(/\D/g, "").length >= 11);
+    if (tipo === "PJ" && respValidos.length === 0) {
+      return { success: false, error: "Ao menos um responsável físico é obrigatório para Pessoa Jurídica" };
     }
 
     const senhaGerada = gerarSenhaSegura();
@@ -83,6 +87,8 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
         nome,
         nomeFantasia: nomeFantasia || null,
         email,
+        telefone: telefone || null,
+        telefone2: telefone2 || null,
         chavePix: chavePix || null,
         tipoChavePix: tipoChavePix || null,
         nivel,
@@ -104,14 +110,14 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
             },
           },
         }),
-        ...(responsavel && {
-          responsavel: {
-            create: {
-              nome: responsavel.nome,
-              cpf: responsavel.cpf.replace(/\D/g, ""),
-              dataNascimento: responsavel.dataNascimento,
-              cargo: responsavel.cargo || null,
-            },
+        ...(respValidos.length > 0 && {
+          responsaveis: {
+            create: respValidos.map(r => ({
+              nome: r.nome,
+              cpf: r.cpf.replace(/\D/g, ""),
+              dataNascimento: r.dataNascimento,
+              cargo: r.cargo || null,
+            })),
           },
         }),
       },
@@ -164,14 +170,14 @@ export async function buscarParceiro(id: number) {
     where: { id },
     include: {
       endereco: true,
-      responsavel: true,
+      responsaveis: true,
       indicacoes: {
         where: { status: "ATIVA" },
         include: {
           cliente: {
             select: {
               id: true, razaoSocial: true, nomeFantasia: true, cnpj: true,
-              dataConstituicao: true, uf: true, regimeTributario: true, status: true,
+              dataConstituicao: true, dataContratacao: true, uf: true, regimeTributario: true, status: true,
             },
           },
         },
@@ -365,11 +371,13 @@ const EditarParceiroSchema = z.object({
   nome: z.string().min(2),
   nomeFantasia: z.string().optional().nullable(),
   email: z.string().email(),
+  telefone: z.string().optional().nullable(),
+  telefone2: z.string().optional().nullable(),
   chavePix: z.string().optional().nullable(),
   tipoChavePix: z.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional().nullable(),
   comissaoPercentual: z.number().min(0).max(100).optional().nullable(),
   endereco: EnderecoSchema.optional(),
-  responsavel: ResponsavelSchema.optional(),
+  responsaveis: z.array(ResponsavelSchema).optional(),
 });
 
 export async function editarParceiro(id: number, input: z.infer<typeof EditarParceiroSchema>) {
@@ -388,6 +396,8 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
         nomeFantasia: d.nomeFantasia ?? null,
         email: d.email,
         loginEmail: d.email,
+        telefone: d.telefone ?? null,
+        telefone2: d.telefone2 ?? null,
         chavePix: d.chavePix ?? null,
         tipoChavePix: d.tipoChavePix ?? null,
         comissaoPercentual: d.comissaoPercentual ?? null,
@@ -399,12 +409,13 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
             },
           },
         }),
-        ...(d.responsavel && {
-          responsavel: {
-            upsert: {
-              create: { nome: d.responsavel.nome, cpf: d.responsavel.cpf.replace(/\D/g, ""), dataNascimento: d.responsavel.dataNascimento, cargo: d.responsavel.cargo || null },
-              update: { nome: d.responsavel.nome, cpf: d.responsavel.cpf.replace(/\D/g, ""), dataNascimento: d.responsavel.dataNascimento, cargo: d.responsavel.cargo || null },
-            },
+        ...(d.responsaveis && {
+          // Substitui o conjunto de responsáveis (deleta os antigos e recria)
+          responsaveis: {
+            deleteMany: {},
+            create: d.responsaveis
+              .filter(r => r.nome.trim() && r.cpf.replace(/\D/g, "").length >= 11)
+              .map(r => ({ nome: r.nome, cpf: r.cpf.replace(/\D/g, ""), dataNascimento: r.dataNascimento, cargo: r.cargo || null })),
           },
         }),
       },
@@ -414,6 +425,30 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
     return { success: true };
   } catch {
     return { success: false, error: "Erro ao salvar alterações" };
+  }
+}
+
+/**
+ * Redefine a senha de acesso de um parceiro — SOMENTE Admin/CEO.
+ * Não exige a senha atual. A nova senha entra como temporária, forçando o
+ * parceiro a definir uma própria no próximo acesso ao portal.
+ */
+export async function redefinirSenhaParceiro(parceiroId: number, novaSenha: string) {
+  const ctx = await getCtx();
+  if (!ctx?.isAdmin) return { success: false, error: "Apenas administradores podem redefinir a senha" };
+
+  const senha = (novaSenha ?? "").trim();
+  if (senha.length < 6) return { success: false, error: "A senha deve ter ao menos 6 caracteres" };
+
+  try {
+    await db.parceiro.update({
+      where: { id: parceiroId },
+      data: { senhaHash: hashSync(senha, 10), senhaTemporaria: true },
+    });
+    revalidatePath(`/PainelAlpha/Parceiros/${parceiroId}`);
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erro ao redefinir a senha" };
   }
 }
 
@@ -428,5 +463,155 @@ export async function excluirParceiros(ids: number[]) {
     return { success: true, count: res.count };
   } catch {
     return { success: false, error: "Erro ao excluir" };
+  }
+}
+
+// ─── Termo de adesão editável (Admin) + histórico ───────────────────────────
+
+/** Retorna o termo ATIVO (versão + conteúdo). Qualquer usuário logado pode ler. */
+export async function obterTermoAtivo() {
+  const session = await auth();
+  if (!session?.user) return null;
+  const termo = await db.parceiroTermo.findFirst({
+    where: { ativo: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return termo ? { id: termo.id, versao: termo.versao, conteudo: termo.conteudo, updatedAt: termo.updatedAt } : null;
+}
+
+/** Histórico de todas as versões do termo (mais recente primeiro). Admin. */
+export async function listarHistoricoTermos() {
+  const ctx = await getCtx();
+  if (!ctx?.isAdmin) return [];
+  const termos = await db.parceiroTermo.findMany({
+    orderBy: { createdAt: "desc" },
+    select: { id: true, versao: true, ativo: true, createdAt: true },
+  });
+  return termos.map((t) => ({
+    id: t.id,
+    versao: t.versao,
+    ativo: t.ativo,
+    createdAt: t.createdAt.toISOString(),
+  }));
+}
+
+/** Lê o conteúdo de uma versão específica do termo (para visualizar histórico). Admin. */
+export async function obterTermoPorId(id: number) {
+  const ctx = await getCtx();
+  if (!ctx?.isAdmin) return null;
+  const termo = await db.parceiroTermo.findUnique({ where: { id } });
+  return termo
+    ? { id: termo.id, versao: termo.versao, conteudo: termo.conteudo, ativo: termo.ativo, createdAt: termo.createdAt.toISOString() }
+    : null;
+}
+
+/**
+ * Publica uma NOVA versão do termo — SOMENTE Admin. Sempre cria um registro novo
+ * e desativa as anteriores (NUNCA edita versões já existentes → histórico imutável).
+ * A versão deve ser única (não pode repetir uma já publicada).
+ */
+export async function atualizarTermo(versao: string, conteudo: string) {
+  const ctx = await getCtx();
+  if (!ctx?.isAdmin) return { success: false, error: "Apenas administradores podem atualizar o termo" };
+
+  const v = (versao ?? "").trim();
+  const texto = (conteudo ?? "").trim();
+  if (!v) return { success: false, error: "Informe a versão do termo (ex: V1.1 - 2026)" };
+  if (texto.length < 20) return { success: false, error: "O conteúdo do termo é muito curto" };
+
+  try {
+    // Versão não pode colidir com uma já publicada (histórico imutável por versão)
+    const jaExiste = await db.parceiroTermo.findFirst({ where: { versao: v }, select: { id: true } });
+    if (jaExiste) {
+      return { success: false, error: `A versão "${v}" já existe no histórico. Use um número de versão novo.` };
+    }
+
+    await db.parceiroTermo.updateMany({ where: { ativo: true }, data: { ativo: false } });
+    await db.parceiroTermo.create({
+      data: { versao: v, conteudo: texto, ativo: true, criadoPorId: ctx.userId ?? null },
+    });
+    revalidatePath("/PainelAlpha/Parceiros");
+    return { success: true };
+  } catch (err) {
+    // Expõe a causa real no servidor (antes ficava silenciado pelo catch vazio)
+    console.error("[atualizarTermo] falhou:", err);
+    const msg = err instanceof Error ? err.message : "Erro desconhecido";
+    return { success: false, error: `Erro ao atualizar o termo: ${msg}` };
+  }
+}
+
+// ─── Comprovante de comissão (envio no PainelAlpha, visto no portal) ─────────
+
+/**
+ * Envia (ou substitui) o comprovante de comissão de uma indicação. SÓ Admin ou
+ * quem tem podeEditar. Aceita qualquer tipo de arquivo. Sobe pro Vercel Blob
+ * usando o token dedicado COMISSOES_READ_WRITE_TOKEN (access público).
+ */
+export async function enviarComprovante(indicacaoId: number, formData: FormData) {
+  const ctx = await getCtx();
+  if (!ctx || (!ctx.isAdmin && !ctx.podeEditar)) return { success: false, error: "Sem permissão" };
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { success: false, error: "Nenhum arquivo selecionado" };
+  if (file.size > 25 * 1024 * 1024) return { success: false, error: "Arquivo muito grande (máx. 25MB)" };
+
+  const ind = await db.indicacao.findUnique({ where: { id: indicacaoId }, select: { id: true } });
+  if (!ind) return { success: false, error: "Indicação não encontrada" };
+
+  const token = process.env.COMISSOES_READ_WRITE_TOKEN;
+  if (!token) return { success: false, error: "COMISSOES_READ_WRITE_TOKEN não configurado" };
+
+  try {
+    const blob = await put(`comprovantes/${indicacaoId}-${file.name}`, file, {
+      access: "public",
+      addRandomSuffix: true,
+      contentType: file.type || "application/octet-stream",
+      token,
+    });
+
+    // Quem enviou (nome do usuário logado)
+    const session = await auth();
+    const enviadoPor = (session?.user as { nome?: string })?.nome ?? "—";
+
+    await db.indicacao.update({
+      where: { id: indicacaoId },
+      data: {
+        comprovanteUrl: blob.url,
+        comprovanteNome: file.name,
+        comprovanteTipo: file.type || "application/octet-stream",
+        comprovanteEnviadoEm: new Date(),
+        comprovanteEnviadoPor: enviadoPor,
+      },
+    });
+
+    revalidatePath(`/PainelAlpha/Parceiros/${ind.id}`);
+    revalidatePath("/PainelAlpha/Parceiros");
+    return { success: true, url: blob.url, nome: file.name };
+  } catch (err) {
+    console.error("[enviarComprovante] falhou:", err);
+    const msg = err instanceof Error ? err.message : "Erro desconhecido";
+    return { success: false, error: `Erro ao enviar comprovante: ${msg}` };
+  }
+}
+
+/** Remove o comprovante de uma indicação (Admin/podeEditar). */
+export async function removerComprovante(indicacaoId: number) {
+  const ctx = await getCtx();
+  if (!ctx || (!ctx.isAdmin && !ctx.podeEditar)) return { success: false, error: "Sem permissão" };
+  try {
+    await db.indicacao.update({
+      where: { id: indicacaoId },
+      data: {
+        comprovanteUrl: null,
+        comprovanteNome: null,
+        comprovanteTipo: null,
+        comprovanteEnviadoEm: null,
+        comprovanteEnviadoPor: null,
+      },
+    });
+    revalidatePath("/PainelAlpha/Parceiros");
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erro ao remover comprovante" };
   }
 }

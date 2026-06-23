@@ -1,12 +1,17 @@
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
+import { getPainelAlphaKnowledge } from "@/lib/shared/painelalpha-knowledge";
 
 /**
  * Conhecimento do sistema compartilhado com os agentes Onyx.
  *
- * Reaproveita a seção "MÓDULOS DO PAINELALPHA" do system prompt do Bibble (fonte
- * única de verdade — quando o Bibble aprende sobre um módulo novo, os agentes
- * herdam automaticamente). É injetado como `additional_context` em cada mensagem,
- * junto com o contexto dinâmico do usuário logado.
+ * Combina DUAS fontes únicas de verdade:
+ * 1. A seção "MÓDULOS DO PAINELALPHA" do system prompt do Bibble (o que existe).
+ * 2. A base de conhecimento processual compartilhada (como os processos funcionam,
+ *    vocabulário interno) — a mesma que o Bibble usa.
+ *
+ * Assim os agentes Onyx deixam de operar em silo: conhecem módulos, processos
+ * (abertura de chamado, qualificação de lead, etapas da pré-análise) e o
+ * vocabulário interno. É injetado como `additional_context` em cada mensagem.
  */
 
 /** Extrai só a seção de módulos do system prompt do Bibble. */
@@ -42,6 +47,8 @@ export function buildAgentSystemContext(input: AgentContextInput): string {
     "Você é um agente integrado ao PainelAlpha, sistema de gestão interno da empresa.",
     "",
     modules,
+    "",
+    getPainelAlphaKnowledge(),
     "",
     "## USUÁRIO ATUAL",
     `Nome: ${input.userName} | Papel: ${input.role} | Módulos com acesso: ${acesso}`,

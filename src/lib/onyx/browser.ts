@@ -65,6 +65,37 @@ export async function fetchAgents(): Promise<OnyxAgent[]> {
   return data.agents;
 }
 
+// ── Agentes fixados (máx. 3, salvos no banco e seguem o usuário) ─────────────
+
+export interface AgenteFixado {
+  onyxAgentId: number;
+  agentName: string | null;
+  ordem: number;
+}
+
+export async function fetchFixados(): Promise<AgenteFixado[]> {
+  const res = await fetch("/api/onyx/agentes-fixados");
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = (await res.json()) as { fixados: AgenteFixado[] };
+  return data.fixados;
+}
+
+/** Fixa ou desfixa um agente. Retorna a lista atualizada de fixados. */
+export async function toggleFixarAgente(
+  onyxAgentId: number,
+  acao: "fixar" | "desfixar",
+  agentName?: string,
+): Promise<AgenteFixado[]> {
+  const res = await fetch("/api/onyx/agentes-fixados", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ onyxAgentId, acao, agentName }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = (await res.json()) as { fixados: AgenteFixado[] };
+  return data.fixados;
+}
+
 /** Detalhe completo de um agente (inclui system_prompt, que a lista NÃO traz). */
 export async function fetchAgent(id: number): Promise<OnyxAgent> {
   const res = await fetch(`/api/onyx/agents/${id}`);

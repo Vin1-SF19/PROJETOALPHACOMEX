@@ -4,10 +4,11 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Plus, Trash2, MessageSquare, FolderOpen,
   ChevronDown, Search, Check, Pencil, X,
-  ChevronRight, FileText, AlertTriangle, Settings, Bot,
+  ChevronRight, FileText, AlertTriangle, Settings, Bot, Pin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PROVIDER_MODELS, getModelLabel, type Provider, type ModelEntry } from "@/lib/bibble/client";
+import { agentAvatarUrl } from "@/lib/onyx/browser";
 import Image from "next/image";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -49,6 +50,12 @@ interface BibbleSidebarPanelProps {
   onOpenAgents: () => void;
   activeAgentName?: string | null;
   onClearAgent?: () => void;
+  /** Agentes fixados (até 3) — exibidos abaixo do botão Agentes */
+  fixados?: { id: number; name: string; hasImage: boolean }[];
+  /** Clicou num agente fixado — pai decide se abre conversa nova ou adiciona à atual */
+  onPickFixado?: (id: number) => void;
+  /** id do agente ativo na conversa (destaca o fixado correspondente) */
+  activeAgentId?: number | null;
 }
 
 // ─── Provider icon SVGs ───────────────────────────────────────────────────────
@@ -583,6 +590,9 @@ export default function BibbleSidebarPanel({
   onOpenAgents,
   activeAgentName,
   onClearAgent,
+  fixados = [],
+  onPickFixado,
+  activeAgentId,
 }: BibbleSidebarPanelProps) {
   const [tab, setTab]                   = useState<SidebarTab>("chat");
   const [search, setSearch]             = useState("");
@@ -749,6 +759,42 @@ export default function BibbleSidebarPanel({
                 <X size={11} strokeWidth={2.5} />
               </button>
             )}
+          </div>
+        )}
+
+        {/* ── Agentes fixados (até 3) ─────────────────────────── */}
+        {fixados.length > 0 && (
+          <div className="pt-1">
+            <p className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-1 mb-1.5" style={{ color: "#fbbf24" }}>
+              <Pin size={9} fill="#fbbf24" /> Seus agentes fixados
+            </p>
+            <div className="space-y-1">
+              {fixados.slice(0, 3).map(fx => {
+                const ativo = activeAgentId === fx.id;
+                return (
+                  <button
+                    key={fx.id}
+                    onClick={() => onPickFixado?.(fx.id)}
+                    title={ativo ? `${fx.name} (ativo)` : `Usar ${fx.name}`}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all active:scale-[0.98]"
+                    style={{
+                      background: ativo ? "rgba(245,158,11,0.16)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${ativo ? "rgba(245,158,11,0.45)" : "rgba(255,255,255,0.07)"}`,
+                    }}
+                  >
+                    <div className="w-6 h-6 rounded-lg grid place-items-center shrink-0 overflow-hidden relative" style={{ background: "rgba(245,158,11,0.15)" }}>
+                      {fx.hasImage ? (
+                        <Image src={agentAvatarUrl(fx.id)} alt={fx.name} fill unoptimized className="object-cover" />
+                      ) : (
+                        <Bot size={12} style={{ color: "#fbbf24" }} />
+                      )}
+                    </div>
+                    <span className="flex-1 text-[11px] font-bold truncate text-left" style={{ color: ativo ? "#fcd34d" : "#cbd5e1" }}>{fx.name}</span>
+                    {ativo && <Check size={11} strokeWidth={3} style={{ color: "#fbbf24" }} className="shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

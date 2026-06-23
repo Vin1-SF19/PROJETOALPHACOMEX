@@ -4,28 +4,36 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Building2, User, Mail, MapPin, CreditCard, ShieldCheck,
-  Pencil, X, Loader2, Save, Sparkles, Unlink, ChevronDown,
+  ArrowLeft, Building2, User, Mail, Phone, MapPin, CreditCard, ShieldCheck,
+  Pencil, X, Loader2, Save, Sparkles, Unlink, ChevronDown, Receipt, FileCheck2, Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { editarParceiro, desvincularIndicacao } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
+import TrocarSenhaParceiro from "./TrocarSenhaParceiro";
+import ModalComprovante from "./ModalComprovante";
 
 type Endereco = { cep: string; logradouro: string; numero: string | null; complemento: string | null; bairro: string; cidade: string; uf: string };
 type Responsavel = { nome: string; cpf: string; dataNascimento: string; cargo: string | null };
 type Indicacao = {
   id: number;
+  comprovanteUrl: string | null;
+  comprovanteNome: string | null;
+  comprovanteTipo: string | null;
+  comprovanteEnviadoEm: Date | string | null;
+  comprovanteEnviadoPor: string | null;
   cliente: {
     id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string;
-    dataConstituicao: string | null; uf: string | null; regimeTributario: string | null; status: string | null;
+    dataConstituicao: string | null; dataContratacao: string | null; uf: string | null; regimeTributario: string | null; status: string | null;
   };
 };
 
 export type DetalheParceiro = {
   id: number; tipo: string; documento: string; nome: string; nomeFantasia: string | null;
-  email: string; chavePix: string | null; tipoChavePix: string | null; nivel: string;
+  email: string; telefone: string | null; telefone2: string | null;
+  chavePix: string | null; tipoChavePix: string | null; nivel: string;
   comissaoPercentual: number | null; loginEmail: string;
-  endereco: Endereco | null; responsavel: Responsavel | null; indicacoes: Indicacao[];
+  endereco: Endereco | null; responsaveis: Responsavel[]; indicacoes: Indicacao[];
 };
 
 const NIVEL_COLOR: Record<string, string> = {
@@ -35,6 +43,18 @@ const NIVEL_COLOR: Record<string, string> = {
 };
 const NIVEL_ICON: Record<string, string> = { GOLD: "★", PLATINUM: "◆", BLACK: "■" };
 const COMISSAO_POR_NIVEL: Record<string, number> = { GOLD: 5, PLATINUM: 10, BLACK: 15 };
+
+/** Formata datas do CS&NPS (ISO, YYYY-MM-DD ou DD/MM/AAAA) para DD/MM/AAAA. */
+function fmtDataBR(valor: string | null | undefined): string {
+  if (!valor) return "";
+  const v = valor.trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) return v; // já está em BR
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
+  }
+  return v;
+}
 
 export default function DetalheParceiroClient({
   parceiro, permissao, temaName = "blue",
@@ -52,15 +72,19 @@ export default function DetalheParceiroClient({
   const [empresaAberta, setEmpresaAberta] = useState<number | null>(null);
   const toggleEmpresa = (indId: number) => setEmpresaAberta(prev => (prev === indId ? null : indId));
 
+  // Comprovante de comissão por indicação
+  const [comprovanteInd, setComprovanteInd] = useState<Indicacao | null>(null);
+
   // form
   const [nome, setNome] = useState(parceiro.nome);
   const [nomeFantasia, setNomeFantasia] = useState(parceiro.nomeFantasia ?? "");
   const [email, setEmail] = useState(parceiro.email);
+  const [telefone, setTelefone] = useState(parceiro.telefone ?? "");
+  const [telefone2, setTelefone2] = useState(parceiro.telefone2 ?? "");
   const [chavePix, setChavePix] = useState(parceiro.chavePix ?? "");
   const [tipoChavePix, setTipoChavePix] = useState(parceiro.tipoChavePix ?? "");
   const [comissao, setComissao] = useState(parceiro.comissaoPercentual != null ? String(parceiro.comissaoPercentual) : "");
   const [end, setEnd] = useState<Endereco>(parceiro.endereco ?? { cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "" });
-  const [resp, setResp] = useState<Responsavel>(parceiro.responsavel ?? { nome: "", cpf: "", dataNascimento: "", cargo: "" });
 
   function fmtDoc(doc: string): string {
     const d = doc.replace(/\D/g, "");
@@ -76,15 +100,14 @@ export default function DetalheParceiroClient({
     setSalvando(true);
     const res = await editarParceiro(parceiro.id, {
       nome, nomeFantasia: nomeFantasia || null, email,
+      telefone: telefone || null, telefone2: telefone2 || null,
       chavePix: chavePix || null,
       tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || null,
       comissaoPercentual: comissao ? Number(comissao) : null,
       endereco: end.cep && end.logradouro && end.bairro && end.cidade && end.uf
         ? { cep: end.cep, logradouro: end.logradouro, numero: end.numero || undefined, complemento: end.complemento || undefined, bairro: end.bairro, cidade: end.cidade, uf: end.uf }
         : undefined,
-      responsavel: parceiro.tipo === "PJ" && resp.nome && resp.cpf && resp.dataNascimento
-        ? { nome: resp.nome, cpf: resp.cpf, dataNascimento: resp.dataNascimento, cargo: resp.cargo || undefined }
-        : undefined,
+      // responsaveis não são editados aqui (preserva os do cadastro); omitir = manter
     });
     setSalvando(false);
     if (res.success) { toast.success("Parceiro atualizado"); setEditando(false); router.refresh(); }
@@ -145,6 +168,7 @@ export default function DetalheParceiroClient({
                 const aberto = empresaAberta === ind.id;
                 const c = ind.cliente;
                 const formatarDoc = (d: string) => d.replace(/\D/g, "").replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+                const dtContratacao = fmtDataBR(c.dataContratacao);
                 return (
                   <div key={ind.id} className="rounded-xl overflow-hidden" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
                     <div className="flex items-center gap-3 px-3 py-2.5">
@@ -153,9 +177,31 @@ export default function DetalheParceiroClient({
                         <div className="flex-1 min-w-0">
                           <p className="text-[12.5px] font-bold text-slate-200 truncate">{c.razaoSocial}</p>
                           <p className="text-[10px] text-slate-500 truncate"><span className="font-mono">{formatarDoc(c.cnpj)}</span>{c.nomeFantasia ? ` · ${c.nomeFantasia}` : ""}</p>
+                          {dtContratacao && (
+                            <p className="text-[10px] mt-0.5 font-bold flex items-center gap-1" style={{ color: "#34d399" }}>
+                              <Calendar size={9} /> Contratado em {dtContratacao}
+                            </p>
+                          )}
                         </div>
                         <ChevronDown size={15} className={`shrink-0 text-slate-500 transition-transform ${aberto ? "rotate-180" : ""}`} />
                       </button>
+
+                      {/* Comprovante de comissão — Admin/podeEditar */}
+                      {(permissao.isAdmin || permissao.podeEditar) && (
+                        <button
+                          onClick={() => setComprovanteInd(ind)}
+                          title={ind.comprovanteUrl ? "Comprovante enviado — clique para substituir" : "Enviar comprovante de comissão"}
+                          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0 transition-colors ${
+                            ind.comprovanteUrl
+                              ? "text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20"
+                              : "text-slate-400 bg-white/5 hover:text-white hover:bg-white/10"
+                          }`}
+                        >
+                          {ind.comprovanteUrl ? <FileCheck2 size={12} /> : <Receipt size={12} />}
+                          <span className="hidden sm:inline">{ind.comprovanteUrl ? "Enviado" : "Comprovante"}</span>
+                        </button>
+                      )}
+
                       {permissao.isAdmin && (
                         <button onClick={() => desvincular(ind.id)} title="Desvincular (Admin)" className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 shrink-0">
                           <Unlink size={13} />
@@ -170,7 +216,8 @@ export default function DetalheParceiroClient({
                           ["CNPJ", formatarDoc(c.cnpj), true, false],
                           ["Razão Social", c.razaoSocial, false, true],
                           ["Nome Fantasia", c.nomeFantasia || "—", false, false],
-                          ["Data de Constituição", c.dataConstituicao || "—", false, false],
+                          ["Data de Constituição", fmtDataBR(c.dataConstituicao) || "—", false, false],
+                          ["Data Contratação", dtContratacao || "—", false, false],
                           ["UF", c.uf || "—", false, false],
                           ["Regime Tributário", c.regimeTributario || "—", false, false],
                           ["Status (CS&NPS)", c.status || "—", false, false],
@@ -206,6 +253,18 @@ export default function DetalheParceiroClient({
                 <p className={`${labelCls} flex items-center gap-1`}><Mail size={9} /> E-mail</p>
                 <p className="font-bold text-white">{parceiro.email}</p>
               </div>
+              {parceiro.telefone && (
+                <div>
+                  <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Telefone 1</p>
+                  <p className="font-bold text-white">{parceiro.telefone}</p>
+                </div>
+              )}
+              {parceiro.telefone2 && (
+                <div>
+                  <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Telefone 2</p>
+                  <p className="font-bold text-white">{parceiro.telefone2}</p>
+                </div>
+              )}
               {parceiro.chavePix && (
                 <div className="col-span-2">
                   <p className={`${labelCls} flex items-center gap-1`}><CreditCard size={9} /> Chave Pix ({parceiro.tipoChavePix})</p>
@@ -218,6 +277,10 @@ export default function DetalheParceiroClient({
               <div><p className={labelCls}>{parceiro.tipo === "PJ" ? "Razão Social" : "Nome"}</p><input value={nome} onChange={e => setNome(e.target.value)} className={inputCls} /></div>
               {parceiro.tipo === "PJ" && <div><p className={labelCls}>Nome Fantasia</p><input value={nomeFantasia} onChange={e => setNomeFantasia(e.target.value)} className={inputCls} /></div>}
               <div><p className={labelCls}>E-mail</p><input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className={labelCls}>Telefone 1</p><input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
+                <div><p className={labelCls}>Telefone 2</p><input value={telefone2} onChange={e => setTelefone2(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><p className={labelCls}>Chave Pix</p><input value={chavePix} onChange={e => setChavePix(e.target.value)} className={inputCls} /></div>
                 <div><p className={labelCls}>Tipo Pix</p>
@@ -263,24 +326,21 @@ export default function DetalheParceiroClient({
         {/* Responsável (PJ) */}
         {parceiro.tipo === "PJ" && (
           <div className={cardCls}>
-            <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">Responsável Físico</p>
-            {!editando ? (
-              parceiro.responsavel ? (
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="col-span-2"><p className={labelCls}>Nome</p><p className="font-black text-white">{parceiro.responsavel.nome}</p></div>
-                  <div><p className={labelCls}>CPF</p><p className="font-mono font-bold text-slate-300">{parceiro.responsavel.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</p></div>
-                  <div><p className={labelCls}>Nascimento</p><p className="font-bold text-slate-300">{parceiro.responsavel.dataNascimento}</p></div>
-                  {parceiro.responsavel.cargo && <div><p className={labelCls}>Cargo</p><p className="font-bold text-slate-300">{parceiro.responsavel.cargo}</p></div>}
-                </div>
-              ) : <p className="text-xs text-slate-600">Sem responsável.</p>
+            <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
+              Responsáveis Físicos{parceiro.responsaveis.length > 1 ? ` (${parceiro.responsaveis.length})` : ""}
+            </p>
+            {parceiro.responsaveis.length === 0 ? (
+              <p className="text-xs text-slate-600">Sem responsável.</p>
             ) : (
-              <div className="space-y-3">
-                <div><p className={labelCls}>Nome</p><input value={resp.nome} onChange={e => setResp({ ...resp, nome: e.target.value })} className={inputCls} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><p className={labelCls}>CPF</p><input value={resp.cpf} onChange={e => setResp({ ...resp, cpf: e.target.value })} className={inputCls} /></div>
-                  <div><p className={labelCls}>Nascimento</p><input type="date" value={resp.dataNascimento} onChange={e => setResp({ ...resp, dataNascimento: e.target.value })} className={inputCls} /></div>
-                </div>
-                <div><p className={labelCls}>Cargo / Relação</p><input value={resp.cargo ?? ""} onChange={e => setResp({ ...resp, cargo: e.target.value })} className={inputCls} /></div>
+              <div className="space-y-2.5">
+                {parceiro.responsaveis.map((r, i) => (
+                  <div key={i} className="rounded-xl p-3 grid grid-cols-2 gap-3 text-sm" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
+                    <div className="col-span-2"><p className={labelCls}>Nome</p><p className="font-black text-white">{r.nome}</p></div>
+                    <div><p className={labelCls}>CPF</p><p className="font-mono font-bold text-slate-300">{r.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</p></div>
+                    <div><p className={labelCls}>Nascimento</p><p className="font-bold text-slate-300">{r.dataNascimento}</p></div>
+                    {r.cargo && <div className="col-span-2"><p className={labelCls}>Cargo</p><p className="font-bold text-slate-300">{r.cargo}</p></div>}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -291,8 +351,25 @@ export default function DetalheParceiroClient({
           <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Acesso ao Sistema de Parceiros</p>
           <p className="text-xs text-slate-400">Login: <span className="text-white font-mono font-bold">{parceiro.loginEmail}</span></p>
           <p className="text-[9px] text-slate-600 italic">Senha armazenada com hash — não recuperável.</p>
+          {permissao.isAdmin && <TrocarSenhaParceiro parceiroId={parceiro.id} />}
         </div>
       </div>
+
+      {comprovanteInd && (
+        <ModalComprovante
+          open
+          onClose={() => setComprovanteInd(null)}
+          indicacaoId={comprovanteInd.id}
+          empresaNome={comprovanteInd.cliente.razaoSocial}
+          comprovante={{
+            url: comprovanteInd.comprovanteUrl,
+            nome: comprovanteInd.comprovanteNome,
+            enviadoEm: comprovanteInd.comprovanteEnviadoEm,
+            enviadoPor: comprovanteInd.comprovanteEnviadoPor,
+          }}
+          onChange={() => router.refresh()}
+        />
+      )}
     </main>
   );
 }

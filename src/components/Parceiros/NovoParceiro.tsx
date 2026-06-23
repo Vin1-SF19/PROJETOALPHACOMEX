@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, User, Loader2, Search, MapPin, ArrowLeft,
-  CheckCircle2, AlertCircle, Plus, X,
+  CheckCircle2, AlertCircle, Plus, X, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,15 +58,30 @@ export default function NovoParceiro({
   const [nome, setNome] = useState("");
   const [nomeFantasia, setNomeFantasia] = useState("");
   const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [telefone2, setTelefone2] = useState("");
   const [chavePix, setChavePix] = useState("");
   const [tipoChavePix, setTipoChavePix] = useState("");
   const [comissao, setComissao] = useState("");
   const [dadosConsultaBrutos, setDadosConsultaBrutos] = useState("");
 
-  const [respNome, setRespNome] = useState("");
-  const [respCpf, setRespCpf] = useState("");
-  const [respDataNasc, setRespDataNasc] = useState("");
-  const [respCargo, setRespCargo] = useState("");
+  // Responsáveis físicos (vários) — em "gaveta": só um aberto por vez
+  type Resp = { nome: string; cpf: string; dataNascimento: string; cargo: string };
+  const respVazio = (): Resp => ({ nome: "", cpf: "", dataNascimento: "", cargo: "" });
+  const [responsaveis, setResponsaveis] = useState<Resp[]>([respVazio()]);
+  const [respAbertoIdx, setRespAbertoIdx] = useState<number>(0); // qual está expandido
+
+  const respCompleto = (r: Resp) => r.nome.trim() && r.cpf.replace(/\D/g, "").length === 11 && !!r.dataNascimento;
+  const updateResp = (i: number, campo: keyof Resp, valor: string) =>
+    setResponsaveis(prev => prev.map((r, idx) => idx === i ? { ...r, [campo]: valor } : r));
+  const addResp = () => {
+    setResponsaveis(prev => [...prev, respVazio()]);
+    setRespAbertoIdx(responsaveis.length); // abre o novo
+  };
+  const removeResp = (i: number) => {
+    setResponsaveis(prev => prev.filter((_, idx) => idx !== i));
+    setRespAbertoIdx(-1);
+  };
 
   const [endereco, setEndereco] = useState<EnderecoData | null>(null);
   const [modalEnderecoOpen, setModalEnderecoOpen] = useState(false);
@@ -104,6 +119,7 @@ export default function NovoParceiro({
         setNome(d.razaoSocial || "");
         setNomeFantasia(d.nomeFantasia || "");
         setEmail(d.email || "");
+        if (d.telefone) setTelefone(d.telefone);
         setDadosConsultaBrutos(JSON.stringify(d));
       } else {
         const r = await fetch("/api/ConsultaCpf", {
@@ -132,8 +148,9 @@ export default function NovoParceiro({
     if (tipo === "PJ" && docLimpo.length !== 14) { toast.error("CNPJ inválido"); return; }
     if (tipo === "PF" && docLimpo.length !== 11) { toast.error("CPF inválido"); return; }
     if (!nome || !email) { toast.error("Nome e e-mail são obrigatórios"); return; }
-    if (tipo === "PJ" && (!respNome || !respCpf || !respDataNasc)) {
-      toast.error("Preencha os dados do responsável físico (obrigatório para PJ)");
+    const respValidos = responsaveis.filter(respCompleto);
+    if (tipo === "PJ" && respValidos.length === 0) {
+      toast.error("Preencha ao menos um responsável físico (obrigatório para PJ)");
       return;
     }
 
@@ -145,13 +162,15 @@ export default function NovoParceiro({
         nome,
         nomeFantasia: nomeFantasia || undefined,
         email,
+        telefone: telefone || undefined,
+        telefone2: telefone2 || undefined,
         chavePix: chavePix || undefined,
         tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || undefined,
         comissaoPercentual: comissao ? Number(comissao) : undefined,
         dadosConsulta: dadosConsultaBrutos || undefined,
         endereco: endereco ?? undefined,
-        responsavel: tipo === "PJ" && respNome && respCpf && respDataNasc
-          ? { nome: respNome, cpf: respCpf.replace(/\D/g, ""), dataNascimento: respDataNasc, cargo: respCargo || undefined }
+        responsaveis: tipo === "PJ"
+          ? respValidos.map(r => ({ nome: r.nome, cpf: r.cpf.replace(/\D/g, ""), dataNascimento: r.dataNascimento, cargo: r.cargo || undefined }))
           : undefined,
       });
 
@@ -259,6 +278,17 @@ export default function NovoParceiro({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
+                  <Label className={labelCls}>Telefone 1</Label>
+                  <Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                </div>
+                <div className="space-y-1">
+                  <Label className={labelCls}>Telefone 2</Label>
+                  <Input value={telefone2} onChange={e => setTelefone2(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <Label className={labelCls}>Chave Pix</Label>
                   <Input value={chavePix} onChange={e => setChavePix(e.target.value)} placeholder="Chave pix" className={inputCls} />
                 </div>
@@ -289,28 +319,76 @@ export default function NovoParceiro({
               </Button>
             </div>
 
-            {/* Responsável (PJ) */}
+            {/* Responsáveis Físicos (PJ) — gaveta, vários */}
             {tipo === "PJ" && (
-              <div className="p-8 border-b border-white/5 space-y-4">
-                <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">3. Responsável Físico <span className="text-slate-600">(obrigatório para PJ)</span></p>
-                <div className="space-y-1">
-                  <Label className={labelCls}>Nome Completo *</Label>
-                  <Input value={respNome} onChange={e => setRespNome(e.target.value)} className={inputCls} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className={labelCls}>CPF *</Label>
-                    <Input value={respCpf} onChange={e => setRespCpf(formatarDocumento(e.target.value, "PF"))} placeholder="000.000.000-00" className={`${inputCls} font-mono`} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className={labelCls}>Data Nasc. *</Label>
-                    <Input type="date" value={respDataNasc} onChange={e => setRespDataNasc(e.target.value)} className={inputCls} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className={labelCls}>Cargo / Relação</Label>
-                  <Input value={respCargo} onChange={e => setRespCargo(e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
-                </div>
+              <div className="p-8 border-b border-white/5 space-y-3">
+                <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
+                  3. Responsáveis Físicos <span className="text-slate-600">(ao menos um para PJ)</span>
+                </p>
+
+                {responsaveis.map((r, i) => {
+                  const aberto = respAbertoIdx === i;
+                  const completo = respCompleto(r);
+                  return (
+                    <div key={i} className="rounded-2xl overflow-hidden" style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                      {/* Cabeçalho da gaveta */}
+                      <div className="flex items-center gap-2 px-4 py-3">
+                        <button type="button" onClick={() => setRespAbertoIdx(aberto ? -1 : i)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                          <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0" style={{ background: completo ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.12)" }}>
+                            <User size={13} className={completo ? "text-emerald-400" : "text-amber-400"} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12.5px] font-bold text-slate-200 truncate">{r.nome || `Responsável ${i + 1}`}</p>
+                            {completo && <p className="text-[10px] text-slate-500 truncate font-mono">{r.cpf}{r.cargo ? ` · ${r.cargo}` : ""}</p>}
+                          </div>
+                          <ChevronDown size={15} className={`shrink-0 text-slate-500 transition-transform ${aberto ? "rotate-180" : ""}`} />
+                        </button>
+                        {responsaveis.length > 1 && (
+                          <button type="button" onClick={() => removeResp(i)} title="Remover" className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 shrink-0">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Corpo da gaveta */}
+                      {aberto && (
+                        <div className="px-4 pb-4 pt-1 space-y-3 border-t" style={{ borderColor: "rgba(245,158,11,0.15)" }}>
+                          <div className="space-y-1">
+                            <Label className={labelCls}>Nome Completo *</Label>
+                            <Input value={r.nome} onChange={e => updateResp(i, "nome", e.target.value)} className={inputCls} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className={labelCls}>CPF *</Label>
+                              <Input value={r.cpf} onChange={e => updateResp(i, "cpf", formatarDocumento(e.target.value, "PF"))} placeholder="000.000.000-00" className={`${inputCls} font-mono`} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className={labelCls}>Data Nasc. *</Label>
+                              <Input type="date" value={r.dataNascimento} onChange={e => updateResp(i, "dataNascimento", e.target.value)} className={inputCls} />
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className={labelCls}>Cargo / Relação</Label>
+                            <Input value={r.cargo} onChange={e => updateResp(i, "cargo", e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
+                          </div>
+                          {/* Botão "salvar" abaixo: fecha a gaveta se estiver completo */}
+                          <Button type="button" variant="outline" disabled={!completo}
+                            onClick={() => setRespAbertoIdx(-1)}
+                            className="w-full h-10 rounded-xl border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-black uppercase text-[11px] tracking-widest gap-2 disabled:opacity-30">
+                            <CheckCircle2 size={14} /> Salvar responsável
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Botão + adicionar */}
+                <Button type="button" variant="outline"
+                  onClick={addResp}
+                  className="w-full h-11 rounded-xl border-dashed border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-black uppercase text-[11px] tracking-widest gap-2">
+                  <Plus size={14} /> Adicionar responsável
+                </Button>
               </div>
             )}
 

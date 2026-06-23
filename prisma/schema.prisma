@@ -81,6 +81,7 @@ model usuarios {
   bibbleProjects BibbleProject[]
 
   onyxAgents OnyxAgentOwner[]
+  onyxAgentesFixados OnyxAgenteFixado[]
 
   parceirosCriados  Parceiro[]
   indicacoesCriadas Indicacao[]     @relation("IndicacaoAutor")
@@ -1361,6 +1362,21 @@ model OnyxAgentOwner {
   @@map("onyx_agent_owner")
 }
 
+// Agentes fixados pelo usuário no chat IAlpha (máx. 3). Segue o usuário entre dispositivos.
+model OnyxAgenteFixado {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  onyxAgentId Int
+  agentName   String?
+  ordem       Int      @default(0)
+  createdAt   DateTime @default(now())
+  user        usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, onyxAgentId])
+  @@index([userId])
+  @@map("onyx_agente_fixado")
+}
+
 // ─── Parceiros ────────────────────────────────────────────────────────────────
 
 model Parceiro {
@@ -1377,6 +1393,7 @@ model Parceiro {
   comissaoPercentual Float?              // override manual opcional (lógica futura)
   dadosConsulta String?
   telefone      String?
+  telefone2     String?
   loginEmail    String
   senhaHash     String
   // ─── Onboarding / termo de adesão (portal AlphaParceiros) ──────────────────
@@ -1388,7 +1405,7 @@ model Parceiro {
   criadoPorId   Int
   criadoPor     usuarios             @relation(fields: [criadoPorId], references: [id])
   endereco      ParceiroEndereco?
-  responsavel   ParceiroResponsavel?
+  responsaveis  ParceiroResponsavel[]
   representantes ParceiroRepresentante[]
   indicacoes    Indicacao[]
   createdAt     DateTime             @default(now())
@@ -1411,6 +1428,12 @@ model Indicacao {
   status        String   @default("ATIVA")  // "ATIVA" | "DESVINCULADA"
   criadoPorId   Int
   criadoPor     usuarios @relation("IndicacaoAutor", fields: [criadoPorId], references: [id])
+  // Comprovante de comissão (enviado no PainelAlpha, visto no portal do parceiro)
+  comprovanteUrl        String?
+  comprovanteNome       String?
+  comprovanteTipo       String?   // mime type
+  comprovanteEnviadoEm  DateTime?
+  comprovanteEnviadoPor String?
   createdAt     DateTime @default(now())
 
   @@index([parceiroId])
@@ -1449,13 +1472,14 @@ model ParceiroEndereco {
 
 model ParceiroResponsavel {
   id             Int      @id @default(autoincrement())
-  parceiroId     Int      @unique
+  parceiroId     Int
   parceiro       Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
   nome           String
   cpf            String
   dataNascimento String
   cargo          String?
 
+  @@index([parceiroId])
   @@map("parceiro_responsavel")
 }
 
@@ -1475,4 +1499,18 @@ model ParceiroRepresentante {
 
   @@index([parceiroId])
   @@map("parceiro_representante")
+}
+
+// Termo de adesão editável pelo Admin (sem mexer no código). O parceiro lê a
+// versão ATIVA no onboarding do portal. Mantém histórico de versões.
+model ParceiroTermo {
+  id          Int      @id @default(autoincrement())
+  versao      String                           // ex: "v1-2026"
+  conteudo    String                           // texto do termo (markdown/plano)
+  ativo       Boolean  @default(true)
+  criadoPorId Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("parceiro_termo")
 }

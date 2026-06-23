@@ -162,3 +162,106 @@ Bibble e agentes Onyx não conseguiam ler PDFs. O Tika (Apache Tika 3.3.1) já e
 ### Pendências
 - Testar com PDF real enviado via UI para confirmar extração correta end-to-end.
 - Considerar cache de extração: PDFs grandes enviados múltiplas vezes reprocessam do zero.
+
+---
+
+## [2026-06-19] — Tika e Onyx via Cloudflare (produção na Vercel)
+
+**Tags:** #integration #decision #infra
+**Agentes envolvidos:** Bibble
+**Arquivos tocados:**
+- `.env.local`
+- `src/lib/bibble/tika.ts` *(comentário do topo atualizado)*
+
+### Contexto
+O Next.js do PainelAlpha roda na Vercel (nuvem externa), fora da rede `192.168.35.x`. Logo, IPs privados (`192.168.35.113:9998` Tika, `:3000` Onyx) são inalcançáveis de produção.
+
+### O que foi feito
+- Confirmado que o usuário expôs Tika e Onyx via Cloudflare Tunnel: `TIKA_SERVER_URL=https://tika.alpha-comex.com/` e `ONYX_API_URL=https://onyx.alpha-comex.com/`.
+- Diagnóstico dos túneis: **Onyx responde 200** ✅; **Tika falha handshake SSL** (HTTP 000) — túnel do Tika ainda não funcional (falta entrada no config.yml do cloudflared ou cert SSL não propagado).
+
+### Decisões tomadas
+- **Cloudflare Tunnel é o caminho correto** (mesmo padrão de `studio-api.alpha-comex.com`): código não muda, só a env var. `tika.ts` normaliza barra final, então `https://tika.alpha-comex.com/` + `/tika` funciona.
+- **Fallback pdf-parse cobre Tika fora do ar**: enquanto o túnel do Tika não sobe, PDFs continuam lidos via fallback; DOCX/XLSX/PPTX ficam indisponíveis até o túnel funcionar.
+
+### Pendências
+- Subir o túnel do Tika: adicionar `tika.alpha-comex.com → http://localhost:9998` no config.yml do cloudflared no servidor e reiniciar.
+
+---
+
+## [2026-06-19] — Fix: heartbeat P2025 (sessão órfã)
+
+**Tags:** #bugfix #prisma
+**Agentes envolvidos:** Bibble
+**Arquivos tocados:**
+- `src/app/api/heartbeat/route.ts`
+
+### Contexto
+O `/api/heartbeat` (chamado a cada 20s) lançava `PrismaClientKnownRequestError P2025` quando a sessão JWT tinha um email sem usuário correspondente no banco (usuário deletado/renomeado com sessão ativa).
+
+### O que foi feito
+- Trocado `db.usuarios.update()` (lança P2025) por `db.usuarios.updateMany()` (retorna `count: 0` sem lançar).
+- Se `count === 0`, retorna 404 silencioso (sem `console.error`, sem 500).
+
+### Decisões tomadas
+- `updateMany` é o padrão correto para update idempotente onde "registro não existe" não é erro de servidor. O componente cliente `Heartbeat.tsx` já descarta a resposta — 404 não causa efeito colateral.
+
+---
+
+## [2026-06-19] — Fix da memória/contexto das IAs (Bibble e Onyx)
+
+**Tags:** #bugfix #feature #critical
+**Agentes envolvidos:** Bibble → Echo → Forge
+**Arquivos tocados:**
+- `src/components/BibbleChatHome/BibbleChatLayout.tsx`
+- `src/components/BibbleChatHome/BibbleMessageBubble.tsx` *(tipo Message ganhou fullContent)*
+- `src/app/api/bibble/chat/route.ts`
+- `src/app/api/onyx/chat/route.ts`
+- `src/components/BibbleChatHome/BibbleSettingsPanel.tsx`
+
+### Contexto
+As IAs perdiam o contexto logo após responder: enviava-se PDF → análise OK → pergunta de follow-up → IA pedia o PDF de novo. Também perdia o fio em conversas normais.
+
+### O que foi feito
+- **Bug 1 (principal): conteúdo do PDF não era persistido.** `saveMessages` salvava só `text` (digitado), não o conteúdo extraído. Agora salva `persistedContent` — mensagem + texto extraído dos arquivos. A bolha mostra label curto (`fullContent` vs `content` na interface Message); ao recarregar a sessão, `splitPersisted()` separa display do conteúdo completo.
+- **Bug 2: Onyx ignorava histórico.** Adicionado `history` ao payload e `buildHistoryContext()` no route — injeta histórico só quando `onyxSessionId` é novo (zerou), evitando duplicar o que o Onyx já mantém.
+- **Bug 3: histórico fixo em 10 msgs.** Substituído `slice(-10)` por janela com **orçamento de caracteres** proporcional ao `contextWindow` (`ctxTokens * 4 * 0.5`).
+- **UI**: settings ganhou preset 256K (max 262144), título "Janela de Contexto · Bibble", texto de ajuda explicando que controla a memória de conversa e que é **só do Bibble** (Onyx gerencia próprio contexto).
+
+### Decisões tomadas
+- **Anexar conteúdo do PDF à mensagem persistida** (escolha do usuário) em vez de resumo separado: robusto, funciona igual nos dois sistemas, IA sempre reenxerga o doc.
+- **Onyx NÃO tem janela de contexto configurável por agente pelo painel**: a API do Onyx só expõe `num_chunks` (RAG) e override de modelo. Janela real é fixada no servidor Onyx. Não criado controle falso no painel.
+
+### Pendências
+- Testar follow-up com PDF real no chat para validar end-to-end.
+
+---
+
+## [2026-06-19] — Conhecimento unificado Bibble ⇄ Onyx
+
+**Tags:** #feature #integration #architecture
+**Agentes envolvidos:** Bibble → Scout → Echo → Forge
+**Arquivos tocados:**
+- `src/lib/shared/painelalpha-knowledge.ts` *(CRIADO)*
+- `src/lib/bibble/system-prompt.ts`
+- `src/lib/onyx/system-knowledge.ts`
+- `src/lib/onyx/client.ts` *(askOnyxOneShot)*
+- `src/lib/bibble/tools.ts` *(tool consultar_base_onyx)*
+- `src/lib/bibble/tool-executor.ts` *(case consultar_base_onyx)*
+
+### Contexto
+Usuário queria conhecimento completo nas duas IAs: agentes Onyx falhavam ao perguntar sobre processos internos (abrir chamado, qualificar lead, etapas da pré-análise); e o Bibble não acessava o que está no Onyx. O prompt que o usuário trouxe pedia RAG/Knowledge Graph/Pinecone — descartado por over-engineering (Onyx já é RAG; dados são vivos no banco, não PDFs estáticos).
+
+### O que foi feito
+- **Criada base de conhecimento compartilhada** (`painelalpha-knowledge.ts`): vocabulário interno + processos operacionais (chamado, fluxo lead→tarefa, etapas pré-análise, RADAR, CS&NPS). Fonte ÚNICA de verdade.
+- **Direção 1 (Onyx aprende PainelAlpha)**: `system-knowledge.ts` injeta a base nos agentes Onyx (antes só recebiam lista de módulos). Tools em tempo real já existiam via `AGENT_TOOLS` registry.
+- **Direção 2 (Bibble acessa Onyx)**: `askOnyxOneShot()` no client (consulta one-shot à base do Onyx, coleta resposta do stream NDJSON) + tool `consultar_base_onyx` no Bibble.
+- Base injetada também no system-prompt do Bibble (mesma fonte).
+
+### Decisões tomadas
+- **Base de conhecimento de PROCESSOS (texto) + tools em tempo real, NÃO RAG vetorizado**: dados são vivos no banco; vetor desatualizaria. Tool sempre lê estado atual.
+- **Fonte única `painelalpha-knowledge.ts`** consumida por Bibble e Onyx: atualizar um processo propaga aos dois.
+- **`consultar_base_onyx` é exclusiva do Bibble** (não está no AGENT_TOOLS do Onyx) — evita Onyx consultar a si mesmo / loop. Import dinâmico no executor evita dependência circular.
+
+### Pendências
+- **Usuário deve revisar/expandir `painelalpha-knowledge.ts`** — os processos foram inferidos do código; critérios reais (qualificação de lead, etapas obrigatórias do CheckList) precisam de validação humana.

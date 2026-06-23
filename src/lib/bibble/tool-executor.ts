@@ -812,6 +812,25 @@ export async function executarTool(
       }
     }
 
+    case "consultar_base_onyx": {
+      const pergunta = String(params.pergunta ?? "").trim();
+      if (!pergunta) return JSON.stringify({ erro: "Informe a pergunta a consultar." });
+
+      try {
+        const { askOnyxOneShot, isOnyxConfigured } = await import("@/lib/onyx/client");
+        if (!isOnyxConfigured()) {
+          return JSON.stringify({ erro: "A base de conhecimento do Onyx não está configurada." });
+        }
+        const resposta = await askOnyxOneShot(pergunta);
+        if (!resposta) {
+          return JSON.stringify({ resultado: "A base do Onyx não retornou informação para essa pergunta." });
+        }
+        return JSON.stringify({ resultado: resposta });
+      } catch (err) {
+        return JSON.stringify({ erro: `Falha ao consultar a base do Onyx: ${err instanceof Error ? err.message : String(err)}` });
+      }
+    }
+
     default:
       return `Tool desconhecida: ${nome}`;
   }

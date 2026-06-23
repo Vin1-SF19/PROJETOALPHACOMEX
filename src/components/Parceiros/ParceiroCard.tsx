@@ -13,6 +13,7 @@ export type CardParceiro = {
   nivel: string;
   comissaoPercentual?: number | null;
   termoAceito?: boolean;
+  termoVersao?: string | null;
   indicacoes?: { id: number; cliente: { id: number; razaoSocial: string; nomeFantasia?: string | null } }[];
 };
 
@@ -89,10 +90,10 @@ export default function ParceiroCard({
             <div
               className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest"
               style={{ background: "rgba(16,185,129,0.15)", color: "#34d399", border: "1px solid rgba(16,185,129,0.4)" }}
-              title="Parceiro assinou o termo de adesão"
+              title={parceiro.termoVersao ? `Assinou o termo ${parceiro.termoVersao}` : "Parceiro assinou o termo de adesão"}
             >
               <BadgeCheck size={11} />
-              Assinou o termo
+              {parceiro.termoVersao ? `Assinou: ${parceiro.termoVersao}` : "Assinou o termo"}
             </div>
           )}
         </div>

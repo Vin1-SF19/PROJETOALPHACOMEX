@@ -8,7 +8,7 @@ import BibbleSettingsPanel from "./BibbleSettingsPanel";
 import OnyxAgentsModal from "./OnyxAgentsModal";
 import { type Message } from "./BibbleMessageBubble";
 import type { UploadedFile } from "./BibbleFileUpload";
-import { agentAvatarUrl, type OnyxAgent } from "@/lib/onyx/browser";
+import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, type OnyxAgent, type AgenteFixado } from "@/lib/onyx/browser";
 import { getTema } from "@/lib/temas";
 
 interface BibbleChatLayoutProps {
@@ -93,6 +93,39 @@ export default function BibbleChatLayout({
   const [selectedAgent, setSelectedAgent] = useState<OnyxAgent | null>(null);
   const onyxSessionRef = useRef<string | null>(null);   // sessão Onyx da conversa atual
   const selectedAgentRef = useRef<OnyxAgent | null>(null);
+
+  // Agentes fixados (máx. 3, do banco). Lista enriquecida com nome/avatar via fetchAgents.
+  const [fixados, setFixados] = useState<AgenteFixado[]>([]);
+  const [agentesCache, setAgentesCache] = useState<OnyxAgent[]>([]);
+  const fixadosIds = fixados.map(f => f.onyxAgentId);
+
+  useEffect(() => {
+    let ativo = true;
+    Promise.all([fetchFixados(), fetchAgents()])
+      .then(([fx, ags]) => { if (ativo) { setFixados(fx); setAgentesCache(ags); } })
+      .catch(() => {});
+    return () => { ativo = false; };
+  }, []);
+
+  const handleToggleFixar = useCallback(async (agent: OnyxAgent) => {
+    const jaFixado = fixados.some(f => f.onyxAgentId === agent.id);
+    try {
+      const novos = await toggleFixarAgente(agent.id, jaFixado ? "desfixar" : "fixar", agent.name);
+      setFixados(novos);
+    } catch {
+      /* limite de 3 ou erro — silencioso (o modal já valida via fixadosIds) */
+    }
+  }, [fixados]);
+
+  // Lista de fixados enriquecida com nome/imagem (busca no cache de agentes)
+  const fixadosSidebar = fixados.slice(0, 3).map(f => {
+    const ag = agentesCache.find(a => a.id === f.onyxAgentId);
+    return {
+      id: f.onyxAgentId,
+      name: ag?.name ?? f.agentName ?? `Agente ${f.onyxAgentId}`,
+      hasImage: !!ag?.uploaded_image_id,
+    };
+  });
   const [temperature, setTemperature] = useState<number>(() => {
     if (typeof window === "undefined") return 0.7;
     return Number(localStorage.getItem("bibble-temperature") ?? "0.7");
@@ -483,8 +516,20 @@ export default function BibbleChatLayout({
     }
   }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream]);
 
-  /* ── Conversar com agente: ativa o agente, abre conversa nova e já pergunta "Quem é você?" ── */
-  const conversarComAgente = useCallback(async (agent: OnyxAgent) => {
+  /* ── Conversar (vazio): ativa o agente e abre uma conversa NOVA sem mensagens ── */
+  const conversarVazio = useCallback((agent: OnyxAgent) => {
+    setSelectedAgent(agent);
+    selectedAgentRef.current = agent;
+    onyxSessionRef.current = null;
+    setActiveSessionId(null);
+    setMessages([]);
+    setInputValue("");
+    setIsStreaming(false);
+    setStreamStatus("idle");
+  }, []);
+
+  /* ── "Quem é você?": ativa o agente, abre conversa nova e já pede apresentação ── */
+  const quemEhVoceAgente = useCallback(async (agent: OnyxAgent) => {
     // Ativa o agente imediatamente (UI: header, avatares) e zera a conversa/sessão Onyx
     setSelectedAgent(agent);
     selectedAgentRef.current = agent;
@@ -551,6 +596,16 @@ export default function BibbleChatLayout({
     selectedAgentRef.current = agent;
     onyxSessionRef.current = null;
   }, []);
+
+  /* ── Clique num agente fixado (sidebar) ──────────────────── */
+  // Tela inicial (sem mensagens) → abre conversa nova vazia.
+  // Dentro de um chat → adiciona/troca o agente na conversa atual.
+  const handlePickFixado = useCallback((agentId: number) => {
+    const ag = agentesCache.find(a => a.id === agentId);
+    if (!ag) return;
+    if (messages.length === 0) conversarVazio(ag);
+    else adicionarAgenteNaConversa(ag);
+  }, [agentesCache, messages.length, conversarVazio, adicionarAgenteNaConversa]);
 
   /* ── Stop ───────────────────────────────────────────────── */
   const handleStop = useCallback(() => {
@@ -705,6 +760,9 @@ export default function BibbleChatLayout({
             onOpenAgents={() => setOnyxModalOpen(true)}
             activeAgentName={selectedAgent?.name ?? null}
             onClearAgent={() => setSelectedAgent(null)}
+            fixados={fixadosSidebar}
+            onPickFixado={handlePickFixado}
+            activeAgentId={selectedAgent?.id ?? null}
           />
         </div>
       </div>
@@ -750,6 +808,9 @@ export default function BibbleChatLayout({
                 onOpenAgents={() => setOnyxModalOpen(true)}
                 activeAgentName={selectedAgent?.name ?? null}
                 onClearAgent={() => setSelectedAgent(null)}
+                fixados={fixadosSidebar}
+                onPickFixado={handlePickFixado}
+                activeAgentId={selectedAgent?.id ?? null}
               />
             </motion.div>
           </div>
@@ -777,8 +838,11 @@ export default function BibbleChatLayout({
         onClose={() => setOnyxModalOpen(false)}
         isAdmin={isAdmin}
         selectedAgentId={selectedAgent?.id ?? null}
-        onConverse={conversarComAgente}
+        onConverse={conversarVazio}
+        onQuemEhVoce={quemEhVoceAgente}
         onAddToConversation={adicionarAgenteNaConversa}
+        fixadosIds={fixadosIds}
+        onToggleFixar={handleToggleFixar}
       />
     </div>
   );
