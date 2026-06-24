@@ -265,3 +265,69 @@ Usuário queria conhecimento completo nas duas IAs: agentes Onyx falhavam ao per
 
 ### Pendências
 - **Usuário deve revisar/expandir `painelalpha-knowledge.ts`** — os processos foram inferidos do código; critérios reais (qualificação de lead, etapas obrigatórias do CheckList) precisam de validação humana.
+
+---
+
+## [2026-06-23 18:30] — Parceiros: comprovantes, multi-responsável, termo-histórico + IAlpha: Quem é você?/fixar agentes
+
+**Tags:** #feature #bugfix #integration #prisma #nextjs
+**Agentes envolvidos:** Bibble, Kowalski
+**Arquivos tocados:** src/actions/parceiros.ts, src/components/Parceiros/{NovoParceiro,DetalheParceiroClient,ModalComprovante,ModalTermo}.tsx, src/app/api/ConsultaCpf/route.ts, src/components/BibbleChatHome/{OnyxAgentsModal,BibbleChatLayout,BibbleSidebarPanel}.tsx, src/lib/onyx/browser.ts, src/app/api/onyx/agentes-fixados/route.ts, prisma/schema.prisma
+
+### Contexto
+Várias melhorias no módulo Parceiros e no chat IAlpha (Onyx), além de correção crítica da consulta de CPF que estava quebrada.
+
+### O que foi feito
+- **Comprovante de comissão**: envio no PainelAlpha (botão por empresa indicada → ModalComprovante, upload Vercel Blob com token COMISSOES_READ_WRITE_TOKEN, qualquer tipo, substituir/remover) → visto no portal do parceiro (Google Docs Viewer). Colunas comprovante* em `indicacoes`.
+- **Termo de adesão editável + histórico**: ModalTermo com abas (Nova versão / Histórico imutável, ver versões antigas só-leitura). Card do parceiro mostra "Assinou: {termoVersao}". Tabela `parceiro_termo`.
+- **Telefone 1 e 2** no parceiro (cadastro + detalhe).
+- **Multi-responsável físico**: ParceiroResponsavel virou 1:N (removido @unique). UI em GAVETA no NovoParceiro (vários, botão +, um aberto por vez).
+- **Data Contratação** no detalhe (vem de clientes.dataContratacao do CS&NPS, formatada).
+- **IAlpha**: botão "Quem é você?" separado de "Conversar" (vazio); pino para fixar agentes (máx 3, tabela onyx_agente_fixado); seção "Fixados" no modal + "Seus agentes fixados" na sidebar (clique = conversa nova se vazio, senão adiciona à conversa).
+
+### Decisões tomadas
+- Agentes fixados no BANCO (não localStorage): seguem o usuário entre dispositivos.
+- Termo: histórico IMUTÁVEL — atualizar sempre cria nova versão e desativa anteriores; versão duplicada bloqueada.
+- Comprovante: Blob público (URL direta) + Google Docs Viewer p/ renderizar Word/Excel/PDF inline.
+- Multi-responsável usa a tabela ParceiroResponsavel existente (1:N), não a de representantes.
+
+### Problemas encontrados / resolvidos
+- **CPF consulta 404 + nunca funcionava**: 2 bugs combinados na InfoSimples — (1) campo é `birthdate`, não `data_nascimento` (dava code 606); (2) formato é AAAA-MM-DD (ISO), não DD/MM/AAAA (dava code 607). Testado: 2003-10-25=code 200 ✓. O "404" no browser era a rota retornando status 404 em erro de consulta → trocado p/ 422.
+- **"Erro ao atualizar termo" sem log**: catch vazio engolia + Prisma Client stale (db.parceiroTermo undefined). Fix: prisma generate + restart + catch loga erro real.
+- **Status do portal "front igualzinho"**: corStatus não mapeava "Deferido"/"Stand By" (status reais do CS&NPS) → caíam no cinza. Corrigido com status reais.
+- **Tooltip atrás da gaveta**: era overflow-hidden do card cortando, não z-index. Removido overflow + z-50.
+- **Regra de nível no aviso**: corrigido — indicar SOBE o nível (PLATINUM→BLACK 15%), não "mantém".
+
+### Pendências
+- Reiniciar dev servers (Prisma Client regenerado várias vezes: parceiro_termo, telefone2, multi-responsável, onyx_agente_fixado).
+- Texto oficial do termo (hoje placeholder, editável via UI).
+- DetalheParceiroPage.tsx órfão (import quebrado, não usado) polui tsc — não removido (não foi criado por nós).
+
+### Refletido também em
+- Memória de sessão (Claude): project_parceiros.md, project_integracao_onyx.md, project_alphaparceiros_portal.md atualizados.
+- Banco Turso (já aplicado): +5 colunas comprovante* em indicacoes, parceiro_termo, parceiro_responsavel índice unique→normal, parceiros +telefone/telefone2, onyx_agente_fixado.
+
+---
+
+## [2026-06-23 19:10] — Metas: Habilitação RADAR 50K contabilizava venda indevidamente
+
+**Tags:** #bugfix #critical #prisma
+**Arquivos tocados:** src/actions/ContratoComercial.ts
+
+### Contexto
+No módulo de Metas, Habilitação RADAR 50K estava contando como venda. Regra: só Revisão RADAR 150K e ILIMITADO contam.
+
+### O que foi feito
+- `confirmarFechamento` setava `contaComVenda: true` HARDCODED. Agora usa helper `servicoContaComoVenda(servico)` — lista de inclusão estrita: só "Revisão RADAR" + (150K ou ILIMITADO).
+- Corrigidos dados no Turso (1 ILIMITADO estava conta=0 inconsistente → 1). Estado final: 50K=0, 150K=1, ILIMITADO=1.
+
+### Decisões tomadas
+- Lista de inclusão ESTRITA: qualquer serviço que não seja Revisão RADAR 150K/ILIMITADO NÃO conta (inclui 50K, TTD, AFRMM futuros).
+- Metas.ts:50 e tool-executor.ts:592 já filtravam `where: contaComVenda:true` corretamente — o bug era só na ESCRITA (fechamento).
+
+### Problemas encontrados / resolvidos
+- **Helper inicial bugado**: usei `.replace(/[^a-z0-9]/g,"")` para normalizar → removia acentos ("revisão"→"reviso") e o `includes("revisao")` nunca casava → retornava false p/ TUDO. Fix: `.normalize("NFD").replace(/diacríticos/,"")` ANTES de filtrar.
+- **Quase corrompi dados**: primeiro UPDATE ia marcar 150K/ILIMITADO como 0 (helper bugado) — salvou que os IDs são cuid (string) e o UPDATE sem aspas falhou. Sempre testar helper isolado ANTES de UPDATE em massa.
+
+### Refletido também em
+- known-errors.md: bug do normalize de acentos.

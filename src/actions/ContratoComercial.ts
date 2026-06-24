@@ -11,6 +11,20 @@ function isAdminOrCeo(role: string) {
     return role === "Admin" || role === "CEO" || role === "Lider Comercial";
 }
 
+/**
+ * Regra de negócio: APENAS Revisão RADAR 150K e Revisão RADAR ILIMITADO
+ * contabilizam venda no módulo de Metas. Habilitação RADAR 50K (e quaisquer
+ * outros serviços) NÃO contam. Match tolerante a acento/caixa/separador.
+ */
+function servicoContaComoVenda(servico: string | null | undefined): boolean {
+    // Remove acentos (ã→a, ç→c…) ANTES de filtrar, senão "revisão"→"reviso" e nada casa.
+    const s = (servico ?? "")
+        .normalize("NFD").replace(/[̀-ͯ]/g, "") // tira diacríticos (ã→a, ç→c)
+        .toLowerCase();
+    const ehRevisaoRadar = s.includes("revisao") && s.includes("radar");
+    return ehRevisaoRadar && (s.includes("150k") || s.includes("ilimitad"));
+}
+
 function isComercialOrAdmin(role: string) {
     return role === "COMERCIAL" || role === "Lider Comercial" || role === "Admin" || role === "CEO";
 }
@@ -198,7 +212,8 @@ export async function confirmarFechamento(raw: unknown) {
             where: { id: d.id },
             data: {
                 status: "FECHADO",
-                contaComVenda: true,
+                // Só Revisão RADAR 150K/ILIMITADO contam como venda; 50K (e outros) não.
+                contaComVenda: servicoContaComoVenda(contrato.servico),
                 pagamentoConfirmado: d.pagamentoConfirmado,
                 pagamentoConfirmadoEm: d.pagamentoConfirmadoEm
                     ? new Date(d.pagamentoConfirmadoEm)
