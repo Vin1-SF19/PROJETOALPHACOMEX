@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getAgent, updateAgent, deleteAgent, getImageGenToolId, OnyxError, type CreateAgentInput } from "@/lib/onyx/client";
 import { isAdminRole, userOwnsAgent, removeAgentOwner, recordAgentOwner } from "@/lib/onyx/ownership";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 /** Remove a skill de geração de imagem dos tool_ids quando o usuário não é admin. */
 async function sanitizeToolIds(toolIds: number[], role: string): Promise<number[]> {
@@ -81,6 +82,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const role = (session.user as { role?: string }).role ?? "";
 
   try {
+    const userToken = await getUserOnyxToken(session.user.id);
     const toolIds = await sanitizeToolIds(Array.isArray(body.tool_ids) ? body.tool_ids : [], role);
     const agent = await updateAgent(id, {
       name,
@@ -93,7 +95,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       icon_name: body.icon_name ?? null,
       uploaded_image_id: body.uploaded_image_id ?? null,
       remove_image: body.remove_image ?? false,
-    });
+    }, userToken);
     // Sincroniza nome e visibilidade no vínculo (não altera o dono original)
     await recordAgentOwner(id, Number(session.user.id), agent.name, isPublic).catch(() => {});
     return NextResponse.json({ agent });
@@ -120,7 +122,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (denied) return denied;
 
   try {
-    await deleteAgent(id);
+    const userToken = await getUserOnyxToken(session.user.id);
+    await deleteAgent(id, userToken);
     await removeAgentOwner(id).catch(() => {});
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -17,6 +17,9 @@ export default async function registerAction(
     const email = formData.get("email") as string;
     const senha = formData.get("senha") as string;
     const role = (formData.get("role") as string) || "User";
+    // Token Onyx é opcional — pode ser preenchido depois. String vazia → null.
+    const tokenOnyxRaw = (formData.get("token_onyx") as string | null)?.trim();
+    const tokenOnyx = tokenOnyxRaw ? tokenOnyxRaw : null;
 
     if (!nome || !usuario || !email || !senha) {
       return {
@@ -53,7 +56,9 @@ export default async function registerAction(
         senha: hashSync(senha, 10),
         role,
         permissoes: permissoesString,
+        ...(tokenOnyx ? { token_onyx: tokenOnyx } : {}),
       },
+      // token_onyx NUNCA retornado ao cliente.
       select: { id: true, nome: true, usuario: true, email: true, role: true, telefone: true, telefone_corporativo: true },
     });
 

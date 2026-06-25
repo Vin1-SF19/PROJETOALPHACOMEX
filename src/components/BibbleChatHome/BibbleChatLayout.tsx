@@ -383,12 +383,21 @@ export default function BibbleChatLayout({
 
     const readyFiles = uploadFiles.filter(f => !f.uploading && !f.error);
 
-    // Label curto exibido na bolha do usuário (UI limpa)
+    // A bolha mostra os anexos visualmente (imagem/chip), então o texto fica limpo.
+    // Só docs (não-imagem) ganham um rótulo curto quando não há texto digitado.
     let msgContent = text;
-    if (readyFiles.length > 0) {
-      const fileNames = readyFiles.map(f => `📎 ${f.file.name} (${f.file.type})`).join(", ");
-      msgContent = `[Arquivos: ${fileNames}]\n\n${text}`;
+    if (!text && readyFiles.length > 0) {
+      const temImagem = readyFiles.some(f => f.file.type.startsWith("image/"));
+      msgContent = temImagem ? "" : `Analise o(s) arquivo(s) anexado(s).`;
     }
+
+    // Anexos exibidos na bolha (imagem inline / chip de doc) — com URL do Blob
+    const filesForBubble = readyFiles.map(f => ({
+      name: f.file.name,
+      type: f.file.type,
+      url: f.uploadUrl ?? f.previewUrl,
+      size: f.file.size,
+    }));
 
     // Conteúdo COMPLETO (com texto extraído dos arquivos) — persistido no
     // histórico para que a IA reenxergue o documento nas perguntas seguintes.
@@ -402,8 +411,8 @@ export default function BibbleChatLayout({
       }
     }
 
-    // A bolha mostra o label curto; o histórico/banco guarda o conteúdo completo.
-    const userMsg: Message      = { id: newId(), role: "user",      content: msgContent, fullContent: persistedContent };
+    // A bolha mostra os anexos visualmente; o histórico/banco guarda o conteúdo completo.
+    const userMsg: Message      = { id: newId(), role: "user",      content: msgContent, fullContent: persistedContent, files: filesForBubble.length > 0 ? filesForBubble : undefined };
     const assistantMsg: Message = { id: newId(), role: "assistant",  content: "", streaming: true };
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);

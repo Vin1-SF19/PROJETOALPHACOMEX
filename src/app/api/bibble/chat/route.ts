@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
-import { getProvider, getProviderConfig } from "@/lib/bibble/client";
+import { getProvider, getProviderConfig, modelSupportsVision, getModelLabel } from "@/lib/bibble/client";
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { BIBBLE_TOOLS, type OllamaTool } from "@/lib/bibble/tools";
 import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
@@ -35,7 +35,9 @@ async function extractFilesContent(
     const isVideo = file.type.startsWith("video/");
 
     if (isImage) {
-      parts.push(`- 🖼️ **${file.name}** (${file.type}, ${fmtBytes(file.size)}) — [imagem disponível em: ${file.url ?? "sem URL"}]`);
+      // Imagens são enviadas como conteúdo de VISÃO (base64) — não como texto-link.
+      // Tratadas à parte em coletarImagens(). Aqui só registramos o nome.
+      parts.push(`- 🖼️ **${file.name}** (anexada como imagem para análise visual)`);
       continue;
     }
     if (isVideo) {
@@ -91,14 +93,46 @@ async function extractFilesContent(
   return parts.join("\n\n");
 }
 
+type FileInput = { name: string; type: string; size: number; url?: string; base64?: string; extractedContent?: string };
+
+/**
+ * Coleta as imagens dos anexos como data URLs base64 (formato de visão OpenAI-compat).
+ * Prioriza o base64 já enviado pelo cliente; senão baixa da URL do Blob e converte.
+ */
+async function coletarImagensBase64(files: FileInput[]): Promise<string[]> {
+  const imagens: string[] = [];
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) continue;
+    try {
+      if (file.base64?.trim()) {
+        const url = file.base64.startsWith("data:") ? file.base64 : `data:${file.type};base64,${file.base64}`;
+        imagens.push(url);
+      } else if (file.url) {
+        const res = await fetch(file.url, { signal: AbortSignal.timeout(15000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf = Buffer.from(await res.arrayBuffer());
+        imagens.push(`data:${file.type};base64,${buf.toString("base64")}`);
+      }
+    } catch (err) {
+      console.error(`[BIBBLE] Falha ao carregar imagem ${file.name}:`, err);
+    }
+  }
+  return imagens;
+}
+
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Conteúdo multimodal (OpenAI-compat): texto + imagens. Quando só texto, content é string.
+type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string;
+  content: string | ContentPart[];
   tool_calls?: ToolCallRaw[];
   tool_call_id?: string;
 }
@@ -375,6 +409,7 @@ export async function POST(req: NextRequest) {
 
   // ── Formatar mensagem com arquivos — extrair conteúdo real ──
   let userContent = message.trim();
+  let imagensBase64: string[] = [];
 
   if (files && files.length > 0) {
     console.log(`[BIBBLE] Extraindo conteúdo de ${files.length} arquivo(s)...`);
@@ -385,6 +420,19 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error("[BIBBLE] Erro ao extrair conteúdo de arquivos:", err);
+    }
+
+    // Imagens → visão (base64). Se o modelo não suporta, avisa o usuário.
+    const temImagem = files.some(f => f.type.startsWith("image/"));
+    if (temImagem) {
+      if (modelSupportsVision(activeModel)) {
+        imagensBase64 = await coletarImagensBase64(files);
+      } else {
+        userContent =
+          `⚠️ O modelo atual (**${getModelLabel(activeModel)}**) não consegue analisar imagens. ` +
+          `Troque para um modelo com visão (ex.: GPT-4o, Claude, Gemini) ou contate o administrador.\n\n` +
+          userContent;
+      }
     }
   }
 
@@ -451,10 +499,22 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
     });
   }
 
+  // Mensagem do usuário: array multimodal quando há imagens (visão), senão string.
+  const userMessage: ChatMessage =
+    imagensBase64.length > 0
+      ? {
+          role: "user",
+          content: [
+            { type: "text", text: userContentWithPage },
+            ...imagensBase64.map((url): ContentPart => ({ type: "image_url", image_url: { url } })),
+          ],
+        }
+      : { role: "user", content: userContentWithPage };
+
   const baseMessages: ChatMessage[] = [
     { role: "system", content: finalSystemPrompt },
     ...trimmedHistory,
-    { role: "user", content: userContentWithPage },
+    userMessage,
   ];
 
   const providerCtrl = new AbortController();

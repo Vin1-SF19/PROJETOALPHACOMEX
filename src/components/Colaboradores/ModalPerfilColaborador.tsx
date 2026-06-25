@@ -68,6 +68,8 @@ interface ColaboradorFull {
   contato_emerg_2_nome: string | null;
   contato_emerg_2_tel: string | null;
   observacoes_internas: string | null;
+  // Só indica SE há token (valor nunca trafega ao cliente).
+  tem_token_onyx?: boolean;
   contratosColaborador: ContratoColaborador[];
   checklistDocumental: ChecklistDocumental | null;
 }
@@ -224,6 +226,9 @@ export default function ModalPerfilColaborador({
   const [emerg2Tel, setEmerg2Tel] = useState('');
   const [obsInternas, setObsInternas] = useState('');
   const [imagemUrl, setImagemUrl] = useState('');
+  // Token Onyx — só admin/CEO. Vazio = não alterar (mantém o atual no banco).
+  const [tokenOnyx, setTokenOnyx] = useState('');
+  const [temTokenOnyx, setTemTokenOnyx] = useState(false);
 
   // Lists
   const [setoresLista, setSetoresLista] = useState<string[]>([]);
@@ -298,6 +303,8 @@ export default function ModalPerfilColaborador({
       setEmerg2Tel(u.contato_emerg_2_tel ?? '');
       setObsInternas(u.observacoes_internas ?? '');
       setImagemUrl(u.imagemUrl ?? '');
+      setTemTokenOnyx(!!u.tem_token_onyx);
+      setTokenOnyx(''); // nunca pré-preenche (valor não trafega)
 
       const cl = u.checklistDocumental;
       setChecklist(cl ? { ...cl } : { ...EMPTY_CHECKLIST });
@@ -321,9 +328,40 @@ export default function ModalPerfilColaborador({
         contato_emerg_2_nome: emerg2Nome, contato_emerg_2_tel: emerg2Tel,
         observacoes_internas: obsInternas,
         ...(imagemUrl ? { imagemUrl } : {}),
+        // Token só vai quando admin digitou algo (define/atualiza). Para limpar,
+        // o botão de remover envia a string vazia separadamente.
+        ...(isAdmin && tokenOnyx.trim() ? { token_onyx: tokenOnyx.trim() } : {}),
       });
-      if (res.success) { toast.success('Dados salvos'); onAtualizado(); void load(); }
+      if (res.success) {
+        toast.success('Dados salvos');
+        if (isAdmin && tokenOnyx.trim()) { setTemTokenOnyx(true); setTokenOnyx(''); }
+        onAtualizado();
+        void load();
+      }
       else toast.error(res.error ?? 'Erro ao salvar');
+    });
+  }
+
+  async function handleRemoverToken() {
+    if (!usuarioId || !isAdmin) return;
+    startSave(async () => {
+      const res = await updateColaboradorDados(usuarioId, {
+        nome, usuario: usuarioLogin, email, role, cargo, status,
+        data_contratacao: dataContratacao, cpf, data_nascimento: dataNascimento,
+        telefone, telefone_corporativo: telefoneCorp,
+        contato_emerg_1_nome: emerg1Nome, contato_emerg_1_tel: emerg1Tel,
+        contato_emerg_2_nome: emerg2Nome, contato_emerg_2_tel: emerg2Tel,
+        observacoes_internas: obsInternas,
+        ...(imagemUrl ? { imagemUrl } : {}),
+        token_onyx: '', // string vazia = limpar o token no banco
+      });
+      if (res.success) {
+        toast.success('Token Onyx removido');
+        setTemTokenOnyx(false);
+        setTokenOnyx('');
+        onAtualizado();
+        void load();
+      } else toast.error(res.error ?? 'Erro ao remover token');
     });
   }
 
@@ -616,6 +654,42 @@ export default function ModalPerfilColaborador({
                             </div>
                           </div>
                         </section>
+
+                        {/* Integração Onyx — só admin/CEO */}
+                        {isAdmin && (
+                          <section>
+                            <p className="text-[8px] font-black uppercase tracking-[0.3em] text-cyan-500 mb-4 flex items-center gap-1.5">
+                              <KeyRound size={11} /> Integração Onyx (IA)
+                            </p>
+                            <Field label="Token Onyx do usuário">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="password"
+                                  autoComplete="off"
+                                  value={tokenOnyx}
+                                  onChange={(e) => setTokenOnyx(e.target.value)}
+                                  placeholder={temTokenOnyx ? '•••••••• (configurado — digite para substituir)' : 'onyx_pat_… (opcional)'}
+                                  className="flex-1 h-11 rounded-xl bg-black/40 border border-white/10 text-[11px] font-bold text-white px-3 placeholder:text-slate-600 focus:border-cyan-500/50 outline-none"
+                                />
+                                {temTokenOnyx && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleRemoverToken()}
+                                    disabled={saving}
+                                    className="shrink-0 h-11 px-3 rounded-xl border border-red-500/30 text-red-400 text-[9px] font-black uppercase tracking-wider hover:bg-red-500/10 transition-all cursor-pointer disabled:opacity-50"
+                                  >
+                                    Remover
+                                  </button>
+                                )}
+                              </div>
+                            </Field>
+                            <p className="text-[8px] text-slate-600 leading-relaxed mt-1.5">
+                              {temTokenOnyx
+                                ? 'Há um token configurado. As conversas e agentes deste usuário usam a identidade dele no Onyx. Digite um novo valor para substituir, ou Remover para voltar à conta de serviço.'
+                                : 'Cole o PAT individual deste usuário no Onyx. Sem token, ele usa a conta de serviço compartilhada.'}
+                            </p>
+                          </section>
+                        )}
 
                         <div className="flex justify-end pt-2">
                           <button onClick={() => void handleSaveDados()} disabled={saving}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { uploadAgentImage, OnyxError } from "@/lib/onyx/client";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const uploadedImageId = await uploadAgentImage(file, file.name || "avatar.png");
+    const userToken = await getUserOnyxToken(session.user.id);
+    const uploadedImageId = await uploadAgentImage(file, file.name || "avatar.png", userToken);
     return NextResponse.json({ uploaded_image_id: uploadedImageId });
   } catch (err) {
     const status = err instanceof OnyxError ? err.status : 500;

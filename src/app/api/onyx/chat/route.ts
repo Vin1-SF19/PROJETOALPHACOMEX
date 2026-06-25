@@ -3,10 +3,13 @@ import { auth } from "../../../../../auth";
 import {
   createChatSession,
   sendChatMessageStream,
+  uploadChatFiles,
   OnyxError,
+  type OnyxFileDescriptor,
 } from "@/lib/onyx/client";
-import { buildAgentSystemContext } from "@/lib/onyx/system-knowledge";
+import { buildAgentSystemContext, buildUserIdentityBlock } from "@/lib/onyx/system-knowledge";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -150,6 +153,11 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "Agente inválido" }), { status: 400 });
   }
 
+  // Token Onyx individual do usuário (se cadastrado): autentica como o próprio
+  // usuário no Onyx. Quando NULL, cai no PAT de serviço (comportamento atual).
+  // Resolvido pelo id da sessão — nunca aceitar token do corpo da requisição.
+  const userToken = await getUserOnyxToken(session.user.id);
+
   // Extrai texto dos arquivos antes de abrir o stream
   const files = input.files ?? [];
   const fileContext = files.length > 0 ? await buildFileContext(files) : "";
@@ -157,8 +165,44 @@ export async function POST(req: NextRequest) {
     ? `${fileContext}\n\n${message || "Analise os arquivos acima."}`
     : message;
 
+  // Imagens → upload pro Onyx (file_descriptors) para o agente "enxergar".
+  let fileDescriptors: OnyxFileDescriptor[] = [];
+  const imagens = files.filter((f) => f.type.startsWith("image/") && f.url);
+  if (imagens.length > 0) {
+    try {
+      const blobs = await Promise.all(
+        imagens.map(async (img) => {
+          const r = await fetch(img.url!, { signal: AbortSignal.timeout(15000) });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return { blob: await r.blob(), name: img.name };
+        }),
+      );
+      fileDescriptors = await uploadChatFiles(blobs);
+    } catch (err) {
+      console.error("[ONYX] Falha ao subir imagens pro chat:", err);
+    }
+  }
+
   // Conhecimento do sistema + contexto do usuário, compartilhado com o agente
-  const userTyped = session.user as { nome?: string; name?: string; role?: string; permissoes?: string[] };
+  const userTyped = session.user as {
+    id?: string;
+    nome?: string;
+    name?: string;
+    usuario?: string;
+    email?: string;
+    role?: string;
+    permissoes?: string[];
+  };
+
+  // Identidade estável do usuário — enviada em TODA requisição ao Onyx para que
+  // o servidor acesse a memória pessoal em memory/{user_id}. user_id = id do
+  // PainelAlpha (estável, nunca muda).
+  const identityBlock = buildUserIdentityBlock({
+    userId: String(userTyped.id ?? session.user.id),
+    username: userTyped.usuario ?? userTyped.nome ?? userTyped.name ?? "",
+    email: userTyped.email ?? "",
+  });
+
   const systemContext = buildAgentSystemContext({
     userName: userTyped.nome ?? userTyped.name ?? "Usuário",
     role: userTyped.role ?? "",
@@ -170,9 +214,11 @@ export async function POST(req: NextRequest) {
   // histórico quando a sessão Onyx é nova (zerou) mas a conversa já tem trocas —
   // assim o agente não perde o fio ao trocar de agente ou recarregar.
   const historyContext = !onyxSessionId ? buildHistoryContext(input.history ?? []) : "";
-  const additionalContext = historyContext
+  const baseContext = historyContext
     ? `${systemContext}\n\n${historyContext}`
     : systemContext;
+  // Identidade vai SEMPRE no topo, em toda mensagem (estável p/ memory/{user_id}).
+  const additionalContext = `${identityBlock}\n\n${baseContext}`;
 
   const enc = new TextEncoder();
   const providerCtrl = new AbortController();
@@ -188,7 +234,7 @@ export async function POST(req: NextRequest) {
 
         // 1. Garante uma sessão Onyx (cria na primeira mensagem da conversa)
         if (!onyxSessionId) {
-          const created = await createChatSession(agentId, "PainelAlpha");
+          const created = await createChatSession(agentId, "PainelAlpha", userToken);
           onyxSessionId = created.chat_session_id;
         }
         // Informa o id ao cliente para reutilizar nas próximas mensagens
@@ -199,6 +245,8 @@ export async function POST(req: NextRequest) {
           chatSessionId: onyxSessionId,
           message: finalMessage,
           additionalContext,
+          fileDescriptors,
+          userToken,
           signal: providerCtrl.signal,
         });
 

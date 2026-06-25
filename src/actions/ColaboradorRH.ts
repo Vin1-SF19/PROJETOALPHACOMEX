@@ -115,6 +115,8 @@ export async function getColaboradorCompleto(usuarioId: number) {
         contato_emerg_2_nome: true,
         contato_emerg_2_tel: true,
         observacoes_internas: true,
+        // token_onyx é credencial: NUNCA retornar o valor, só se existe.
+        token_onyx: true,
         contratosColaborador: {
           orderBy: { createdAt: "desc" },
         },
@@ -124,7 +126,11 @@ export async function getColaboradorCompleto(usuarioId: number) {
 
     if (!usuario) return { success: false as const, error: "Usuário não encontrado" };
 
-    return { success: true as const, usuario };
+    // Substitui o valor do token por um booleano antes de devolver ao cliente.
+    const { token_onyx, ...rest } = usuario;
+    const usuarioSeguro = { ...rest, tem_token_onyx: !!token_onyx?.trim() };
+
+    return { success: true as const, usuario: usuarioSeguro };
   } catch {
     return { success: false as const, error: "Erro ao buscar dados" };
   }
@@ -150,6 +156,9 @@ const UpdateDadosSchema = z.object({
   contato_emerg_2_tel: z.string().optional(),
   observacoes_internas: z.string().optional(),
   imagemUrl: z.string().optional(),
+  // Token Onyx individual. undefined = não mexer; "" = limpar; valor = definir.
+  // Só aplicado quando quem edita é admin/CEO (checado na action).
+  token_onyx: z.string().optional(),
 });
 
 export async function updateColaboradorDados(usuarioId: number, raw: unknown) {
@@ -164,6 +173,14 @@ export async function updateColaboradorDados(usuarioId: number, raw: unknown) {
   if (!isAdminOrCeo(currentRole) && currentRole !== "RECURSOS HUMANOS") {
     d.role = (await db.usuarios.findUnique({ where: { id: usuarioId }, select: { role: true } }))?.role ?? d.role;
   }
+
+  // Token Onyx só pode ser alterado por admin/CEO (é credencial de acesso).
+  // undefined = campo não enviado (não mexe); string (incl. "") = admin definiu.
+  const podeEditarToken = isAdminOrCeo(currentRole);
+  const tokenUpdate =
+    podeEditarToken && d.token_onyx !== undefined
+      ? { token_onyx: d.token_onyx.trim() ? d.token_onyx.trim() : null }
+      : {};
 
   try {
     await db.usuarios.update({
@@ -186,6 +203,7 @@ export async function updateColaboradorDados(usuarioId: number, raw: unknown) {
         contato_emerg_2_tel: d.contato_emerg_2_tel ?? null,
         observacoes_internas: d.observacoes_internas ?? null,
         ...(d.imagemUrl ? { imagemUrl: d.imagemUrl } : {}),
+        ...tokenUpdate,
       },
     });
 

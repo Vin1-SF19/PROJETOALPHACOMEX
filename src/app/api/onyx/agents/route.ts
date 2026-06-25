@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { listAgents, createAgent, getImageGenToolId, OnyxError, type CreateAgentInput } from "@/lib/onyx/client";
 import { isAdminRole, recordAgentOwner, getOwnerInfoMap } from "@/lib/onyx/ownership";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 /** Remove a skill de geração de imagem dos tool_ids quando o usuário não é admin. */
 async function sanitizeToolIds(toolIds: number[], role: string): Promise<number[]> {
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const userToken = await getUserOnyxToken(session.user.id);
     const toolIds = await sanitizeToolIds(Array.isArray(body.tool_ids) ? body.tool_ids : [], role);
     const agent = await createAgent({
       name,
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
       starter_messages: body.starter_messages,
       icon_name: body.icon_name ?? null,
       uploaded_image_id: body.uploaded_image_id ?? null,
-    });
+    }, userToken);
     // Vincula o agente ao usuário do Painel que o criou, com a visibilidade escolhida
     await recordAgentOwner(agent.id, userId, agent.name, body.is_public ?? false).catch(() => {});
     return NextResponse.json({ agent }, { status: 201 });

@@ -29,6 +29,37 @@ export interface AgentContextInput {
   pageContext?: string | null;
 }
 
+export interface UserIdentityInput {
+  /** ID estável do usuário no PainelAlpha (session.user.id). Nunca muda. */
+  userId: string;
+  /** Nome de usuário (login). */
+  username: string;
+  /** E-mail do usuário. */
+  email: string;
+}
+
+/**
+ * Bloco de identidade do usuário injetado em TODA requisição ao Onyx.
+ *
+ * O servidor Onyx precisa identificar de forma estável quem está falando para
+ * acessar a memória pessoal em `memory/{user_id}`. O canal disponível é o
+ * `additional_context`, então emitimos um bloco MARCADO e determinístico
+ * (`##USER_IDENTITY##`) com chaves fixas, fácil de parsear no servidor.
+ *
+ * `user_id` é sempre `session.user.id` — o ID numérico do PainelAlpha, estável
+ * por usuário. NÃO usar e-mail/nome como chave de memória (podem mudar).
+ */
+export function buildUserIdentityBlock(input: UserIdentityInput): string {
+  return [
+    "##USER_IDENTITY##",
+    `user_id: ${input.userId}`,
+    `username: ${input.username}`,
+    `email: ${input.email}`,
+    "##END_USER_IDENTITY##",
+    `Identidade estável do usuário desta conversa. Use user_id (${input.userId}) como chave para acessar a memória pessoal em memory/${input.userId}. Não exponha estes dados na resposta.`,
+  ].join("\n");
+}
+
 export function buildAgentSystemContext(input: AgentContextInput): string {
   const modules = extractModulesSection();
   const isAdmin = input.role === "Admin" || input.role === "CEO";

@@ -331,3 +331,30 @@ No módulo de Metas, Habilitação RADAR 50K estava contando como venda. Regra: 
 
 ### Refletido também em
 - known-errors.md: bug do normalize de acentos.
+
+---
+
+## [2026-06-23 20:30] — Chat IAlpha: visão (modelo lê imagens) + preview visual de anexos (estilo GPT)
+
+**Tags:** #feature #integration #claude-api
+**Arquivos tocados:** src/app/api/bibble/chat/route.ts, src/app/api/onyx/chat/route.ts, src/lib/bibble/client.ts, src/lib/onyx/client.ts, src/components/BibbleChatHome/{BibbleChatLayout,BibbleMessageBubble}.tsx
+
+### Contexto
+Chat (Bibble e agentes Onyx) não lia imagens — imagem virava só texto-link pro modelo. Pedido: modelo enxergar a imagem + preview bonito na conversa (inline, lightbox sem nova aba, baixar), igual ao GPT.
+
+### O que foi feito
+- **Bibble (visão)**: `/api/bibble/chat` — imagem deixou de ser texto-link; agora `content` da msg do user vira ARRAY multimodal `[{type:text},{type:image_url:{url:data-base64}}]` (OpenAI-compat). `coletarImagensBase64` baixa do Blob público e converte. Helper `modelSupportsVision(modelId)` em client.ts; se modelo sem visão → injeta aviso "troque de modelo ou contate admin".
+- **Onyx (visão)**: `uploadChatFiles()` (POST /api/chat/file → file_descriptors) + `fileDescriptors` no `sendChatMessageStream`. Rota faz upload das imagens pro Onyx e passa os descriptors → agente enxerga.
+- **Preview visual** (`BibbleMessageBubble`): `Message.files` ganhou url/size. Componente `AnexoPreview` — imagens inline (grid, hover com ampliar/baixar) + lightbox modal full no próprio chat (ESC fecha, sem nova aba) + docs como chip clicável. Resposta do assistente: `ImagemRespostaMarkdown` (img do markdown) também com lightbox+baixar (antes abria em nova aba). `baixarArquivo()` força download via blob.
+- handleSend passa `filesForBubble` (url do Blob) no userMsg; texto da bolha ficou limpo (sem prefixo "[Arquivos:...]").
+
+### Decisões tomadas
+- Base64 inline pra imagem (robusto, funciona com Blob privado/offline).
+- Modelos com visão: GPT-4o/4.1, todos Claude, todos Gemini, e Ollama só gemma3/llava/llama3.2/vision/minicpm/-vl. Resto não tem visão.
+- Onyx usa file_descriptors (mecanismo nativo dele), não base64.
+
+### Pendências
+- Testar o endpoint /api/chat/file do Onyx com a API real (assumido o formato padrão {files:[{id,type,name}]}).
+
+### Refletido também em
+- known-errors.md: imagem como texto-link não funciona (precisa content multimodal).

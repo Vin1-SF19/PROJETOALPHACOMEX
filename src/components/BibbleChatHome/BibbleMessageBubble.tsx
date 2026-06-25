@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronUp, FileText, Image as ImageIcon,
-  Video, File, Copy, Check, Lightbulb,
+  Video, File, Copy, Check, Lightbulb, Download, X, Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -23,7 +23,7 @@ export interface Message {
    */
   fullContent?: string;
   thinkContent?: string;
-  files?: Array<{ name: string; type: string }>;
+  files?: Array<{ name: string; type: string; url?: string; size?: number }>;
   streaming?: boolean;
   createdAt?: Date;
 }
@@ -268,6 +268,150 @@ function extractPdfUrl(content: string): string | null {
   return match ? match[0] : null;
 }
 
+function fmtFileSize(bytes?: number): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function baixarArquivo(url: string, nome: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = nome || "arquivo";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objUrl);
+  } catch {
+    // fallback: abre em nova aba
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+// ── Anexos (imagem inline com lightbox + doc como chip) ─────────────────────────
+
+function AnexoPreview({
+  files,
+}: {
+  files: Array<{ name: string; type: string; url?: string; size?: number }>;
+}) {
+  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
+
+  const imagens = files.filter(f => f.type.startsWith("image/") && f.url);
+  const outros = files.filter(f => !f.type.startsWith("image/"));
+
+  // Fecha o lightbox com ESC
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
+
+  if (imagens.length === 0 && outros.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      {/* Imagens — grid inline */}
+      {imagens.length > 0 && (
+        <div className={cn("grid gap-1.5", imagens.length === 1 ? "grid-cols-1" : "grid-cols-2")}>
+          {imagens.map((img, idx) => (
+            <div
+              key={idx}
+              className="group/img relative rounded-xl overflow-hidden cursor-pointer"
+              style={{ border: "1px solid rgba(99,102,241,0.25)", maxHeight: 260 }}
+              onClick={() => setLightbox({ url: img.url!, name: img.name })}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- imagem de anexo (blob externo) */}
+              <img
+                src={img.url}
+                alt={img.name}
+                className="w-full h-full object-cover"
+                style={{ maxHeight: 260 }}
+              />
+              {/* Overlay com ações no hover */}
+              <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover/img:opacity-100">
+                <span className="p-2 rounded-lg bg-black/50 text-white" title="Ampliar"><Maximize2 size={16} /></span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); void baixarArquivo(img.url!, img.name); }}
+                  className="p-2 rounded-lg bg-black/50 text-white hover:bg-black/70"
+                  title="Baixar"
+                >
+                  <Download size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Documentos — chip clicável (abre/baixa) */}
+      {outros.map((file, idx) => (
+        <div
+          key={idx}
+          className="flex items-center gap-2.5 p-2 rounded-lg"
+          style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.18)" }}
+        >
+          <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0" style={{ background: "rgba(99,102,241,0.15)" }}>
+            {FileIcon({ fileType: file.type, size: 15 })}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-bold truncate" style={{ color: "#e2e8f0" }}>{file.name}</p>
+            <p className="text-[9.5px] text-slate-500 uppercase">{file.type.split("/").pop()}{file.size ? ` · ${fmtFileSize(file.size)}` : ""}</p>
+          </div>
+          {file.url && (
+            <button
+              onClick={() => void baixarArquivo(file.url!, file.name)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 shrink-0"
+              title="Baixar"
+            >
+              <Download size={14} />
+            </button>
+          )}
+        </div>
+      ))}
+
+      {/* Lightbox (modal full no próprio chat — sem nova aba) */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(4px)" }}
+          onClick={() => setLightbox(null)}
+        >
+          {/* Barra de ações */}
+          <div className="absolute top-4 right-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => void baixarArquivo(lightbox.url, lightbox.name)}
+              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[12px] font-bold flex items-center gap-1.5"
+            >
+              <Download size={15} /> Baixar
+            </button>
+            <button
+              onClick={() => setLightbox(null)}
+              className="w-10 h-10 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 text-white"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- imagem ampliada (blob externo) */}
+          <img
+            src={lightbox.url}
+            alt={lightbox.name}
+            className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-[12px] font-medium">{lightbox.name}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PdfDownloadButton({ url, label }: { url: string; label?: string }) {
   return (
     <a
@@ -337,21 +481,68 @@ const MARKDOWN_COMPONENTS: Parameters<typeof ReactMarkdown>[0]["components"] = {
   img: ({ src, alt }) => {
     const url = typeof src === "string" ? src : "";
     if (!url) return null;
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block my-2">
-        <Image
-          src={url}
-          alt={typeof alt === "string" ? alt : "imagem"}
-          width={768}
-          height={768}
-          unoptimized
-          className="rounded-xl"
-          style={{ width: "100%", height: "auto", maxWidth: 420, border: "1px solid rgba(99,102,241,0.2)" }}
-        />
-      </a>
-    );
+    return <ImagemRespostaMarkdown url={url} alt={typeof alt === "string" ? alt : "imagem"} />;
   },
 };
+
+// Imagem dentro da resposta do assistente: inline + lightbox (sem nova aba) + baixar
+function ImagemRespostaMarkdown({ url, alt }: { url: string; alt: string }) {
+  const [aberto, setAberto] = useState(false);
+
+  useEffect(() => {
+    if (!aberto) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setAberto(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [aberto]);
+
+  const nome = alt && alt !== "imagem" ? alt : "imagem-gerada.png";
+
+  return (
+    <>
+      <div
+        className="group/genimg relative inline-block my-2 rounded-xl overflow-hidden cursor-pointer"
+        style={{ border: "1px solid rgba(99,102,241,0.2)", maxWidth: 420 }}
+        onClick={() => setAberto(true)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- imagem da resposta (proxy onyx/blob) */}
+        <img src={url} alt={alt} className="rounded-xl" style={{ width: "100%", height: "auto", display: "block" }} />
+        <div className="absolute inset-0 bg-black/0 group-hover/genimg:bg-black/25 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover/genimg:opacity-100">
+          <span className="p-2 rounded-lg bg-black/50 text-white"><Maximize2 size={16} /></span>
+          <button
+            onClick={(e) => { e.stopPropagation(); void baixarArquivo(url, nome); }}
+            className="p-2 rounded-lg bg-black/50 text-white hover:bg-black/70"
+            title="Baixar"
+          >
+            <Download size={16} />
+          </button>
+        </div>
+      </div>
+
+      {aberto && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(4px)" }}
+          onClick={() => setAberto(false)}
+        >
+          <div className="absolute top-4 right-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => void baixarArquivo(url, nome)}
+              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[12px] font-bold flex items-center gap-1.5"
+            >
+              <Download size={15} /> Baixar
+            </button>
+            <button onClick={() => setAberto(false)} className="w-10 h-10 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 text-white">
+              <X size={18} />
+            </button>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- imagem ampliada */}
+          <img src={url} alt={alt} className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+    </>
+  );
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -372,17 +563,22 @@ export default function BibbleMessageBubble({
   const initials = userName.substring(0, 2).toUpperCase();
   const timeStr  = formatTime(message.createdAt);
 
-  // Extrai e limpa arquivos do conteúdo da mensagem do usuário
-  const attachedFiles: Array<{ name: string; type: string }> = [];
-  let cleanedContent = message.content;
+  // Anexos: usa message.files (com url) quando disponível; fallback no regex antigo.
+  const attachedFiles: Array<{ name: string; type: string; url?: string; size?: number }> =
+    message.files && message.files.length > 0
+      ? message.files
+      : [];
 
-  const fileRegex = /📎 ([^\n]+)/gi;
-  let fMatch;
-  while ((fMatch = fileRegex.exec(cleanedContent)) !== null) {
-    const name = fMatch[1].trim();
-    const typeMatch = message.content.match(/\(([^)]+)\)/);
-    const type = typeMatch ? typeMatch[1].trim().replace(/[()]/g, "").replace(/\s+/g, "/") : "desconhecido";
-    attachedFiles.push({ name, type });
+  let cleanedContent = message.content;
+  if (attachedFiles.length === 0) {
+    const fileRegex = /📎 ([^\n]+)/gi;
+    let fMatch;
+    while ((fMatch = fileRegex.exec(cleanedContent)) !== null) {
+      const name = fMatch[1].trim();
+      const typeMatch = message.content.match(/\(([^)]+)\)/);
+      const type = typeMatch ? typeMatch[1].trim().replace(/[()]/g, "").replace(/\s+/g, "/") : "desconhecido";
+      attachedFiles.push({ name, type });
+    }
   }
 
   cleanedContent = cleanedContent
@@ -409,26 +605,15 @@ export default function BibbleMessageBubble({
             }}
           >
             <div className="px-4 py-2.5 space-y-2">
-              {attachedFiles.length > 0 && (
-                <div className="space-y-1">
-                  {attachedFiles.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 p-2 rounded-lg"
-                      style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.18)" }}
-                    >
-                      {FileIcon({ fileType: file.type, size: 14 })}
-                      <p className="text-[11px] font-medium truncate opacity-90">{file.name}</p>
-                    </div>
-                  ))}
-                </div>
+              {attachedFiles.length > 0 && <AnexoPreview files={attachedFiles} />}
+              {cleanedContent.trim() && (
+                <p
+                  className="text-[14px] whitespace-pre-wrap leading-relaxed"
+                  style={{ color: "#f1f5f9" }}
+                >
+                  {cleanedContent.replace(/\[Arquivos:.*?\]/, "") || message.content}
+                </p>
               )}
-              <p
-                className="text-[14px] whitespace-pre-wrap leading-relaxed"
-                style={{ color: "#f1f5f9" }}
-              >
-                {cleanedContent.replace(/\[Arquivos:.*?\]/, "") || message.content}
-              </p>
             </div>
           </div>
           {timeStr && (

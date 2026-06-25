@@ -25,9 +25,16 @@ export function isOnyxConfigured(): boolean {
   return Boolean(ONYX_BASE && API_KEY);
 }
 
-function authHeaders(extra?: Record<string, string>): Record<string, string> {
+/**
+ * Monta os headers de autenticação.
+ * @param userToken  PAT individual do usuário (token_onyx). Quando presente,
+ *                   autentica como o próprio usuário no Onyx; quando ausente,
+ *                   usa o PAT de serviço (ONYX_API_KEY).
+ */
+function authHeaders(extra?: Record<string, string>, userToken?: string | null): Record<string, string> {
+  const token = userToken?.trim() || API_KEY;
   return {
-    Authorization: `Bearer ${API_KEY}`,
+    Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
     ...extra,
   };
@@ -42,22 +49,25 @@ export class OnyxError extends Error {
   }
 }
 
+/** Opções de fetch interno, incluindo token individual do usuário. */
+type OnyxFetchInit = RequestInit & { timeoutMs?: number; userToken?: string | null };
+
 /** Fetch interno com timeout e tratamento de erro padronizado. */
 async function onyxFetch(
   path: string,
-  init: RequestInit & { timeoutMs?: number } = {},
+  init: OnyxFetchInit = {},
 ): Promise<Response> {
   if (!isOnyxConfigured()) {
     throw new OnyxError("Onyx não configurado (ONYX_API_URL / ONYX_API_KEY ausentes).", 503);
   }
-  const { timeoutMs = 30_000, headers, ...rest } = init;
+  const { timeoutMs = 30_000, headers, userToken, ...rest } = init;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(`${ONYX_BASE}/api${path}`, {
       ...rest,
       signal: rest.signal ?? ctrl.signal,
-      headers: authHeaders(headers as Record<string, string> | undefined),
+      headers: authHeaders(headers as Record<string, string> | undefined, userToken),
     });
     return res;
   } catch (err) {
@@ -70,7 +80,7 @@ async function onyxFetch(
   }
 }
 
-async function onyxJson<T>(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+async function onyxJson<T>(path: string, init: OnyxFetchInit = {}): Promise<T> {
   const res = await onyxFetch(path, init);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -177,29 +187,31 @@ function buildUpsertBody(input: CreateAgentInput): Record<string, unknown> {
   };
 }
 
-export function createAgent(input: CreateAgentInput): Promise<OnyxAgent> {
+export function createAgent(input: CreateAgentInput, userToken?: string | null): Promise<OnyxAgent> {
   return onyxJson<OnyxAgent>("/persona", {
     method: "POST",
+    userToken,
     body: JSON.stringify(buildUpsertBody(input)),
   });
 }
 
-export function updateAgent(id: number, input: CreateAgentInput): Promise<OnyxAgent> {
+export function updateAgent(id: number, input: CreateAgentInput, userToken?: string | null): Promise<OnyxAgent> {
   return onyxJson<OnyxAgent>(`/persona/${id}`, {
     method: "PATCH",
+    userToken,
     body: JSON.stringify(buildUpsertBody(input)),
   });
 }
 
-export async function deleteAgent(id: number): Promise<void> {
-  await onyxJson<void>(`/persona/${id}`, { method: "DELETE" });
+export async function deleteAgent(id: number, userToken?: string | null): Promise<void> {
+  await onyxJson<void>(`/persona/${id}`, { method: "DELETE", userToken });
 }
 
 /**
  * Faz upload de uma imagem de agente (multipart) e retorna o file_id que deve
  * ser passado como uploaded_image_id no create/update do agente.
  */
-export async function uploadAgentImage(file: Blob, filename: string): Promise<string> {
+export async function uploadAgentImage(file: Blob, filename: string, userToken?: string | null): Promise<string> {
   if (!isOnyxConfigured()) {
     throw new OnyxError("Onyx não configurado.", 503);
   }
@@ -209,7 +221,7 @@ export async function uploadAgentImage(file: Blob, filename: string): Promise<st
   // multipart: NÃO setar Content-Type (o fetch define o boundary sozinho)
   const res = await fetch(`${ONYX_BASE}/api/admin/persona/upload-image`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${API_KEY}` },
+    headers: { Authorization: `Bearer ${userToken?.trim() || API_KEY}` },
     body: form,
   });
   if (!res.ok) {
@@ -230,6 +242,37 @@ export function getAgentAvatar(id: number, signal?: AbortSignal): Promise<Respon
 /** Retorna a Response BRUTA de um arquivo de chat (ex: imagem gerada por agente). */
 export function getChatFile(fileId: string, signal?: AbortSignal): Promise<Response> {
   return onyxFetch(`/chat/file/${encodeURIComponent(fileId)}`, { method: "GET", signal, timeoutMs: 20_000 });
+}
+
+export interface OnyxFileDescriptor {
+  id: string;
+  type: string; // "image" | "document" | "plain_text"
+  name?: string;
+}
+
+/**
+ * Faz upload de um arquivo de chat pro Onyx (multipart) e retorna os descriptors,
+ * que devem ser passados como `file_descriptors` no send-chat-message para o
+ * agente "enxergar" a imagem/documento.
+ */
+export async function uploadChatFiles(files: Array<{ blob: Blob; name: string }>): Promise<OnyxFileDescriptor[]> {
+  if (!isOnyxConfigured()) throw new OnyxError("Onyx não configurado.", 503);
+  if (files.length === 0) return [];
+
+  const form = new FormData();
+  for (const f of files) form.append("files", f.blob, f.name);
+
+  const res = await fetch(`${ONYX_BASE}/api/chat/file`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${API_KEY}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
+  }
+  const data = (await res.json()) as { files?: OnyxFileDescriptor[] };
+  return data.files ?? [];
 }
 
 // ─── Modelos de geração de imagem ────────────────────────────────────────────
@@ -291,9 +334,14 @@ export interface CreateSessionResult {
   chat_session_id: string;
 }
 
-export function createChatSession(personaId: number, description?: string): Promise<CreateSessionResult> {
+export function createChatSession(
+  personaId: number,
+  description?: string,
+  userToken?: string | null,
+): Promise<CreateSessionResult> {
   return onyxJson<CreateSessionResult>("/chat/create-chat-session", {
     method: "POST",
+    userToken,
     body: JSON.stringify({ persona_id: personaId, description: description ?? null }),
   });
 }
@@ -308,6 +356,8 @@ export function sendChatMessageStream(
     message: string;
     parentMessageId?: number | null;
     additionalContext?: string | null;
+    fileDescriptors?: OnyxFileDescriptor[];
+    userToken?: string | null;
     signal?: AbortSignal;
   },
 ): Promise<Response> {
@@ -315,11 +365,15 @@ export function sendChatMessageStream(
     method: "POST",
     timeoutMs: 120_000,
     signal: params.signal,
+    userToken: params.userToken,
     body: JSON.stringify({
       chat_session_id: params.chatSessionId,
       message: params.message,
       parent_message_id: params.parentMessageId ?? null,
       ...(params.additionalContext ? { additional_context: params.additionalContext } : {}),
+      ...(params.fileDescriptors && params.fileDescriptors.length > 0
+        ? { file_descriptors: params.fileDescriptors }
+        : {}),
       stream: true,
     }),
   });

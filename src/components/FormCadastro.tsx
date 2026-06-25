@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LoaderCircle, Fingerprint, Mail, Lock, Globe, Zap, ShieldCheck, Check, Settings2, RefreshCw,
+  LoaderCircle, Fingerprint, Mail, Lock, Globe, Zap, ShieldCheck, Check, Settings2, RefreshCw, Key,
 } from "lucide-react";
 import { toast } from "sonner";
 import Form from "next/form";
@@ -176,6 +176,20 @@ export default function CadastroUsuarios({
                         <Input name="email" type="email" placeholder="operador@alphasystems.com" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold focus:border-indigo-500/50 transition-all" required />
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={18} />
                       </div>
+                    </div>
+
+                    {/* Token Onyx (opcional) */}
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest flex items-center gap-1.5">
+                        Token Onyx <span className="text-slate-600 normal-case font-bold tracking-normal">(opcional)</span>
+                      </Label>
+                      <div className="relative group">
+                        <Input name="token_onyx" type="password" autoComplete="off" placeholder="onyx_pat_… — pode preencher depois" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold focus:border-indigo-500/50 transition-all" />
+                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                      </div>
+                      <p className="text-[8px] text-slate-600 leading-relaxed ml-1">
+                        PAT individual do usuário no Onyx. Se informado, as conversas com agentes usam a identidade dele; senão, usa a conta de serviço.
+                      </p>
                     </div>
 
                     {/* Hierarquia / Setor */}

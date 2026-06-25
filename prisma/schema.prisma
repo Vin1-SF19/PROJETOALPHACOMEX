@@ -52,6 +52,11 @@ model usuarios {
   reset_token   String?
   reset_expires DateTime?
 
+  // Token (PAT) individual do usuário no Onyx. Opcional: quando preenchido, as
+  // chamadas ao Onyx usam este token (identidade real do usuário); quando NULL,
+  // cai no PAT de serviço (ONYX_API_KEY). NUNCA expor ao cliente nem logar.
+  token_onyx String?
+
   mensagensEnviadas  mensagens[] @relation("Enviadas")
   mensagensRecebidas mensagens[] @relation("Recebidas")
 

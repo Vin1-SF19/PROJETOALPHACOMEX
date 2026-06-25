@@ -55,6 +55,24 @@ export function getModelLabel(modelId: string): string {
   return ALL_MODELS.find(m => m.id === modelId)?.label ?? modelId;
 }
 
+/**
+ * True se o modelo aceita imagens (visão). Usado para avisar o usuário antes
+ * de mandar uma imagem que o modelo não conseguiria analisar.
+ */
+export function modelSupportsVision(modelId: string): boolean {
+  const id = modelId.toLowerCase();
+  // OpenAI: família 4o e 4.1 têm visão
+  if (id.startsWith("gpt-4o") || id.startsWith("gpt-4.1") || id.startsWith("o1") || id.startsWith("o3")) return true;
+  // Claude 3.x/4.x são multimodais
+  if (id.startsWith("claude-")) return true;
+  // Gemini é multimodal
+  if (id.startsWith("gemini-")) return true;
+  // Ollama: só alguns modelos têm visão (gemma3, llama3.2-vision, llava, qwen-vl, minicpm-v…)
+  if (id.includes("gemma3") || id.includes("llava") || id.includes("vision") ||
+      id.includes("minicpm") || id.includes("-vl") || id.startsWith("llama3.2")) return true;
+  return false;
+}
+
 export interface ProviderConfig {
   baseUrl: string;
   headers: Record<string, string>;

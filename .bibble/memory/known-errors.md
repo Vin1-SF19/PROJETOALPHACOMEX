@@ -73,3 +73,11 @@
 **Fix:** remover acentos com `.normalize("NFD").replace(/[̀-ͯ]/g, "")` ANTES de qualquer filtro/lowercase. Nunca usar `[^a-z0-9]` para "limpar" string PT-BR sem antes tirar diacríticos.
 **Bônus:** IDs de contrato/cliente são cuid (STRING tipo `cmpfxcy81...`), não Int — em UPDATE manual via SQL, sempre passar como arg parametrizado/aspas, nunca interpolar cru.
 **Adicionado em:** 2026-06-23
+
+---
+
+## Modelo de IA "não lê" imagem anexada no chat
+**Sintoma:** usuário anexa imagem, modelo responde como se não houvesse imagem (ou descreve genérico). Logs mostram a imagem indo como texto tipo "[imagem disponível em: url]".
+**Causa:** a imagem estava sendo passada como TEXTO (link/descrição) no content da mensagem. Modelos de visão precisam receber a imagem como conteúdo multimodal real.
+**Fix:** (Bibble/OpenAI-compat) o `content` do user vira array `[{type:"text",text},{type:"image_url",image_url:{url:"data:image/...;base64,..."}}]`. (Onyx) upload via POST /api/chat/file → passar `file_descriptors` no send-chat-message. Sempre checar se o modelo TEM visão antes (`modelSupportsVision`) — Mistral/DeepSeek/Phi/Llama-básico/Qwen não têm; avisar o usuário pra trocar.
+**Adicionado em:** 2026-06-23
