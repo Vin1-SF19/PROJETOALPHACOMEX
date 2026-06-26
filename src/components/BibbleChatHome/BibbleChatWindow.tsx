@@ -86,6 +86,7 @@ export default function BibbleChatWindow({
   tema,
 }: BibbleChatWindowProps) {
   const hasMessages = messages.length > 0;
+  const ac = tema?.accent ?? "99, 102, 241";
 
   const handleSuggestion = useCallback((prompt: string) => {
     onInputChange(prompt);
@@ -148,6 +149,7 @@ export default function BibbleChatWindow({
             activeAgentName={activeAgentName}
             activeAgentAvatarUrl={activeAgentAvatarUrl}
             onClearAgent={onClearAgent}
+            tema={tema}
           />
         </div>
       ) : (
@@ -159,10 +161,10 @@ export default function BibbleChatWindow({
               className="h-8 w-8 grid place-items-center rounded-lg transition-all duration-200 hover:scale-105"
               title={sidebarOpen ? "Recolher painel" : "Abrir painel"}
               style={{
-                background: sidebarOpen ? "transparent" : "rgba(79,70,229,0.15)",
-                border: sidebarOpen ? "none" : "1px solid rgba(99,102,241,0.3)",
-                color: "#4f6272",
-                boxShadow: sidebarOpen ? "none" : "0 2px 12px rgba(99,102,241,0.12)",
+                background: sidebarOpen ? "transparent" : `rgba(${ac},0.15)`,
+                border: sidebarOpen ? "none" : `1px solid rgba(${ac},0.3)`,
+                color: sidebarOpen ? "#4f6272" : `rgba(${ac},1)`,
+                boxShadow: sidebarOpen ? "none" : `0 2px 12px rgba(${ac},0.12)`,
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

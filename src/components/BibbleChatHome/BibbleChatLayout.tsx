@@ -875,6 +875,7 @@ export default function BibbleChatLayout({
             fixados={fixadosSidebar}
             onPickFixado={handlePickFixado}
             activeAgentId={selectedAgent?.id ?? null}
+            tema={tema}
           />
         </div>
       </div>
@@ -955,6 +956,7 @@ export default function BibbleChatLayout({
         onAddToConversation={adicionarAgenteNaConversa}
         fixadosIds={fixadosIds}
         onToggleFixar={handleToggleFixar}
+        accent={tema.accent}
       />
     </div>
   );

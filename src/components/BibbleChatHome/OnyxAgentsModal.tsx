@@ -33,6 +33,8 @@ interface OnyxAgentsModalProps {
   fixadosIds: number[];
   /** Fixa/desfixa um agente */
   onToggleFixar: (agent: OnyxAgent) => void;
+  /** Cor do tema do usuário (string "R, G, B") — colore destaques do modal */
+  accent?: string;
 }
 
 const EMPTY_FORM: AgentFormData = {
@@ -63,8 +65,9 @@ const SKILL_PLACEHOLDER = `{
 
 export default function OnyxAgentsModal({
   open, onClose, isAdmin, onConverse, onQuemEhVoce, onAddToConversation, selectedAgentId,
-  fixadosIds, onToggleFixar,
+  fixadosIds, onToggleFixar, accent,
 }: OnyxAgentsModalProps) {
+  const ac = accent ?? "99, 102, 241";
   const [tab, setTab] = useState<Tab>("agentes");
   const [view, setView] = useState<View>("list");
 
@@ -386,13 +389,13 @@ export default function OnyxAgentsModal({
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}>
       <div
         className="w-full max-w-3xl max-h-[88vh] flex flex-col rounded-3xl overflow-hidden"
-        style={{ background: "#0a1020", border: "1px solid rgba(99,102,241,0.25)", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}
+        style={{ background: "#0a1020", border: `1px solid rgba(${ac},0.25)`, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid rgba(99,102,241,0.15)" }}>
+        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: `1px solid rgba(${ac},0.15)` }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl grid place-items-center" style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)" }}>
-              <Sparkles size={15} style={{ color: "#a5b4fc" }} />
+            <div className="w-8 h-8 rounded-xl grid place-items-center" style={{ background: `rgba(${ac},0.15)`, border: `1px solid rgba(${ac},0.3)` }}>
+              <Sparkles size={15} style={{ color: `rgba(${ac},1)` }} />
             </div>
             <div>
               <h2 className="text-[14px] font-black" style={{ color: "#f1f5f9" }}>Agentes de IA</h2>
@@ -413,9 +416,9 @@ export default function OnyxAgentsModal({
                 onClick={() => setTab(key)}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold transition-all"
                 style={{
-                  background: tab === key ? "rgba(79,70,229,0.2)" : "transparent",
-                  border: tab === key ? "1px solid rgba(99,102,241,0.35)" : "1px solid transparent",
-                  color: tab === key ? "#a5b4fc" : "#6b7fa0",
+                  background: tab === key ? `rgba(${ac},0.2)` : "transparent",
+                  border: tab === key ? `1px solid rgba(${ac},0.35)` : "1px solid transparent",
+                  color: tab === key ? `rgba(${ac},1)` : "#6b7fa0",
                 }}
               >
                 <Icon size={13} />
@@ -443,8 +446,8 @@ export default function OnyxAgentsModal({
             <>
               <button
                 onClick={openNew}
-                className="w-full flex items-center justify-center gap-2 py-3 mb-3 rounded-xl text-[12px] font-black uppercase tracking-widest transition-all duration-150 cursor-pointer hover:brightness-125 hover:border-[rgba(99,102,241,0.7)] hover:shadow-[0_0_18px_rgba(99,102,241,0.25)] active:scale-[0.98]"
-                style={{ background: "rgba(79,70,229,0.2)", border: "1px dashed rgba(99,102,241,0.4)", color: "#a5b4fc" }}
+                className="w-full flex items-center justify-center gap-2 py-3 mb-3 rounded-xl text-[12px] font-black uppercase tracking-widest transition-all duration-150 cursor-pointer hover:brightness-125 active:scale-[0.98]"
+                style={{ background: `rgba(${ac},0.2)`, border: `1px dashed rgba(${ac},0.4)`, color: `rgba(${ac},1)` }}
               >
                 <Plus size={14} /> Novo agente
               </button>

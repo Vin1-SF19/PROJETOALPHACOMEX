@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PROVIDER_MODELS, getModelLabel, type Provider, type ModelEntry } from "@/lib/bibble/client";
 import { agentAvatarUrl } from "@/lib/onyx/browser";
+import { type TemaAlpha } from "@/lib/temas";
 import Image from "next/image";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,6 +57,8 @@ interface BibbleSidebarPanelProps {
   onPickFixado?: (id: number) => void;
   /** id do agente ativo na conversa (destaca o fixado correspondente) */
   activeAgentId?: number | null;
+  /** tema do usuário — colore botões/destaques na cor do esquema escolhido */
+  tema?: TemaAlpha;
 }
 
 // ─── Provider icon SVGs ───────────────────────────────────────────────────────
@@ -593,7 +596,10 @@ export default function BibbleSidebarPanel({
   fixados = [],
   onPickFixado,
   activeAgentId,
+  tema,
 }: BibbleSidebarPanelProps) {
+  // Cor do tema (string "R, G, B"); fallback no indigo original.
+  const ac = tema?.accent ?? "99, 102, 241";
   const [tab, setTab]                   = useState<SidebarTab>("chat");
   const [search, setSearch]             = useState("");
   const [modelOpen, setModelOpen]       = useState(false);
@@ -737,10 +743,10 @@ export default function BibbleSidebarPanel({
           onClick={onOpenAgents}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-widest transition-all active:scale-[0.98]"
           style={{
-            background: "linear-gradient(135deg, rgba(99,102,241,0.22) 0%, rgba(79,70,229,0.22) 100%)",
-            border: "1px solid rgba(99,102,241,0.4)",
-            color: "#c7d2fe",
-            boxShadow: "0 2px 12px rgba(99,102,241,0.15)",
+            background: `linear-gradient(135deg, rgba(${ac},0.22) 0%, rgba(${ac},0.14) 100%)`,
+            border: `1px solid rgba(${ac},0.4)`,
+            color: `rgba(${ac},1)`,
+            boxShadow: `0 2px 12px rgba(${ac},0.15)`,
           }}
         >
           <Bot size={14} strokeWidth={2.5} />
@@ -750,12 +756,12 @@ export default function BibbleSidebarPanel({
         {activeAgentName && (
           <div
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-            style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)" }}
+            style={{ background: `rgba(${ac},0.12)`, border: `1px solid rgba(${ac},0.3)` }}
           >
-            <Bot size={11} className="shrink-0" style={{ color: "#a5b4fc" }} />
-            <span className="flex-1 text-[10.5px] font-bold truncate" style={{ color: "#c7d2fe" }}>{activeAgentName}</span>
+            <Bot size={11} className="shrink-0" style={{ color: `rgba(${ac},1)` }} />
+            <span className="flex-1 text-[10.5px] font-bold truncate" style={{ color: `rgba(${ac},1)` }}>{activeAgentName}</span>
             {onClearAgent && (
-              <button onClick={onClearAgent} title="Voltar ao Bibble padrão" className="shrink-0 opacity-70 hover:opacity-100 transition-opacity" style={{ color: "#a5b4fc" }}>
+              <button onClick={onClearAgent} title="Voltar ao Bibble padrão" className="shrink-0 opacity-70 hover:opacity-100 transition-opacity" style={{ color: `rgba(${ac},1)` }}>
                 <X size={11} strokeWidth={2.5} />
               </button>
             )}
@@ -819,7 +825,8 @@ export default function BibbleSidebarPanel({
 
             <button
               onClick={() => onNew(activeProjectId)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[rgba(79,70,229,0.2)] border border-[rgba(99,102,241,0.35)] text-[#a5b4fc] text-[12px] font-black uppercase tracking-widest hover:bg-[rgba(79,70,229,0.3)] active:scale-[0.98] transition-all"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-widest active:scale-[0.98] transition-all hover:brightness-125"
+              style={{ background: `rgba(${ac},0.2)`, border: `1px solid rgba(${ac},0.35)`, color: `rgba(${ac},1)` }}
             >
               <Plus size={12} strokeWidth={2.5} />
               Nova conversa
@@ -852,20 +859,19 @@ export default function BibbleSidebarPanel({
                           onClick={() => { if (renamingId !== s.id) onSelect(s.id); }}
                           className={cn(
                             "group flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 select-none relative",
-                            s.id === activeId
-                              ? "bg-[rgba(79,70,229,0.12)]"
-                              : "hover:bg-[rgba(30,45,74,0.6)]",
+                            s.id !== activeId && "hover:bg-[rgba(30,45,74,0.6)]",
                           )}
+                          style={s.id === activeId ? { background: `rgba(${ac},0.12)` } : undefined}
                         >
                           {s.id === activeId && (
                             <div
                               className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r"
-                              style={{ background: "#6366f1" }}
+                              style={{ background: `rgba(${ac},1)` }}
                             />
                           )}
                           {s.id === activeId
-                            ? <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#6366f1" }} />
-                            : <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "rgba(99,102,241,0.2)" }} />
+                            ? <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: `rgba(${ac},1)` }} />
+                            : <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: `rgba(${ac},0.2)` }} />
                           }
 
                           {renamingId === s.id ? (
@@ -880,7 +886,7 @@ export default function BibbleSidebarPanel({
                                 else if (e.key === "Escape") setRenamingId(null);
                               }}
                               className="flex-1 min-w-0 text-[12.5px] font-medium leading-tight rounded-md px-1.5 py-0.5 outline-none"
-                              style={{ background: "rgba(15,23,42,0.9)", border: "1px solid rgba(99,102,241,0.5)", color: "#f1f5f9" }}
+                              style={{ background: "rgba(15,23,42,0.9)", border: `1px solid rgba(${ac},0.5)`, color: "#f1f5f9" }}
                             />
                           ) : (
                             <span

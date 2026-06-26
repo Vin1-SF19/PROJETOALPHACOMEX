@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import Image from "next/image";
 import { Bot, X } from "lucide-react";
+import { type TemaAlpha } from "@/lib/temas";
 
 interface BibbleChatHeaderProps {
   title: string;
@@ -13,6 +14,7 @@ interface BibbleChatHeaderProps {
   activeAgentName?: string | null;
   activeAgentAvatarUrl?: string | null;
   onClearAgent?: () => void;
+  tema?: TemaAlpha;
 }
 
 export default function BibbleChatHeader({
@@ -24,7 +26,9 @@ export default function BibbleChatHeader({
   activeAgentName,
   activeAgentAvatarUrl,
   onClearAgent,
+  tema,
 }: BibbleChatHeaderProps) {
+  const ac = tema?.accent ?? "99, 102, 241";
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
 
@@ -63,8 +67,8 @@ export default function BibbleChatHeader({
             autoFocus
             className="w-full bg-[#111111] text-sm font-bold text-[#f4f6fb] px-3 py-1.5 rounded-lg outline-none transition-shadow duration-200"
             style={{
-              border: "1px solid rgba(99,102,241,0.5)",
-              boxShadow: "0 0 0 1px rgba(99,102,241,0.3), 0 0 12px rgba(99,102,241,0.15)",
+              border: `1px solid rgba(${ac},0.5)`,
+              boxShadow: `0 0 0 1px rgba(${ac},0.3), 0 0 12px rgba(${ac},0.15)`,
             }}
           />
         ) : (
@@ -85,18 +89,18 @@ export default function BibbleChatHeader({
       {activeAgentName && !isEditing && (
         <div
           className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-md shrink-0"
-          style={{ background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.4)" }}
+          style={{ background: `rgba(${ac},0.2)`, border: `1px solid rgba(${ac},0.4)` }}
         >
-          <div className="w-5 h-5 rounded grid place-items-center overflow-hidden shrink-0 relative" style={{ background: "rgba(99,102,241,0.25)" }}>
+          <div className="w-5 h-5 rounded grid place-items-center overflow-hidden shrink-0 relative" style={{ background: `rgba(${ac},0.25)` }}>
             {activeAgentAvatarUrl ? (
               <Image src={activeAgentAvatarUrl} alt={activeAgentName} fill unoptimized className="object-cover" />
             ) : (
-              <Bot size={11} style={{ color: "#a5b4fc" }} />
+              <Bot size={11} style={{ color: `rgba(${ac},1)` }} />
             )}
           </div>
-          <span className="text-[11px] font-bold truncate max-w-[120px]" style={{ color: "#c7d2fe" }}>{activeAgentName}</span>
+          <span className="text-[11px] font-bold truncate max-w-[120px]" style={{ color: `rgba(${ac},1)` }}>{activeAgentName}</span>
           {onClearAgent && (
-            <button onClick={onClearAgent} className="opacity-70 hover:opacity-100 transition-opacity" title="Voltar ao Bibble padrão" style={{ color: "#a5b4fc" }}>
+            <button onClick={onClearAgent} className="opacity-70 hover:opacity-100 transition-opacity" title="Voltar ao Bibble padrão" style={{ color: `rgba(${ac},1)` }}>
               <X size={11} strokeWidth={2.5} />
             </button>
           )}
@@ -108,9 +112,9 @@ export default function BibbleChatHeader({
         <span
           className="text-xs font-semibold tracking-wide px-2 py-0.5 rounded-md shrink-0 transition-opacity duration-200"
           style={{
-            background: "rgba(74,98,246,.12)",
-            border: "1px solid rgba(74,98,246,.3)",
-            color: "#a5b4fc",
+            background: `rgba(${ac},.12)`,
+            border: `1px solid rgba(${ac},.3)`,
+            color: `rgba(${ac},1)`,
           }}
         >
           {model.split(":")[0].toUpperCase()}
@@ -121,10 +125,10 @@ export default function BibbleChatHeader({
       {onToggleSidebar && (
         <button
           onClick={onToggleSidebar}
-          className="h-8 w-8 grid place-items-center rounded-lg shrink-0 transition-all duration-150 hover:scale-105"
+          className="h-8 w-8 grid place-items-center rounded-lg shrink-0 transition-all duration-150 hover:scale-105 hover:bg-white/5"
           title={sidebarOpen ? "Recolher painel" : "Abrir painel"}
           style={{
-            color: "#4f6272",
+            color: `rgba(${ac},0.9)`,
             background: "transparent",
           }}
         >

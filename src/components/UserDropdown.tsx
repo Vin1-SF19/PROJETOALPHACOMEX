@@ -8,8 +8,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Shield, Activity, Fingerprint, ShieldCheck, SlidersHorizontal, Zap } from "lucide-react";
+import { User, ShieldCheck } from "lucide-react";
 import LogoutButton from "./LogoutUser";
+import { SeletorTemaSubmenu } from "./SeletorTemaSubmenu";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
@@ -97,21 +98,7 @@ export function UserDropdown({ userName, userRole }: UserDropdownProps) {
                         <span className="text-[10px] font-black uppercase tracking-widest italic">Meu Dossiê</span>
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                        onClick={() => navigateTo("/PainelAlpha/InfosPerfil/Preferencias", "Interface Alpha")}
-                        className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-indigo-500/30 hover:bg-indigo-600/10 hover:text-indigo-400 focus:bg-indigo-600/10 focus:text-indigo-400 transition-all duration-300 group outline-none"
-                    >
-                        <SlidersHorizontal size={16} className="text-blue-500 group-hover:scale-110 transition-transform" />
-                        <span className="text-[10px] font-black uppercase tracking-widest italic">Interface Alpha</span>
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                        onClick={() => navigateTo("/PainelAlpha/InfosPerfil/Atalhos", "Atalhos Rápidos")}
-                        className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-amber-500/30 hover:bg-amber-600/10 hover:text-amber-400 focus:bg-amber-600/10 focus:text-amber-400 transition-all duration-300 group outline-none"
-                    >
-                        <Zap size={16} className="text-amber-500 group-hover:animate-pulse" />
-                        <span className="text-[10px] font-black uppercase tracking-widest italic">Atalhos Rápidos</span>
-                    </DropdownMenuItem>
+                    <SeletorTemaSubmenu />
                 </div>
 
 

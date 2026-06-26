@@ -11,7 +11,7 @@ import {
   Megaphone, Trophy, Landmark, FileSearch, ScanSearch,
   Scale, FileText, GraduationCap, BookOpen, KeyRound,
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
-  X, PanelLeft, User, SlidersHorizontal, Pin, ChevronLeft, ChevronRight,
+  X, PanelLeft, User, Pin, ChevronLeft, ChevronRight,
   Instagram, Activity, Handshake,
   type LucideIcon,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import LogoutButton from '@/components/LogoutUser';
+import { SeletorTemaSubmenu } from '@/components/SeletorTemaSubmenu';
 import { MODULOS_REGISTRY, CATEGORIAS } from '@/lib/modulos-registry';
 import { ModalBroadcast } from '@/components/ModalBroadcast';
 import { getTema } from '@/lib/temas';
@@ -406,13 +407,7 @@ export default function GlobalSidebar({
                 <span className="text-[10px] font-black uppercase tracking-widest italic">Meu Dossiê</span>
               </DropdownMenuItem>
 
-              <DropdownMenuItem
-                onClick={() => onOpenTab?.('/PainelAlpha/InfosPerfil/Preferencias', 'Interface Alpha')}
-                className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-indigo-500/30 hover:bg-indigo-600/10 hover:text-indigo-400 focus:bg-indigo-600/10 focus:text-indigo-400 transition-all duration-300 group outline-none"
-              >
-                <SlidersHorizontal size={16} className="text-blue-500 group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-black uppercase tracking-widest italic">Interface Alpha</span>
-              </DropdownMenuItem>
+              <SeletorTemaSubmenu />
             </div>
 
             {isAdmin && (
