@@ -10,6 +10,7 @@ import {
 import { buildAgentSystemContext, buildUserIdentityBlock } from "@/lib/onyx/system-knowledge";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
+import db from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -43,6 +44,8 @@ interface ChatInput {
   message: string;
   agentId: number;
   onyxSessionId?: string | null;
+  /** id da BibbleSession do Painel — para vincular o onyxSessionId a ela. */
+  painelSessionId?: string | null;
   pageContext?: string | null;
   files?: AttachedFile[];
   history?: HistoryMessage[];
@@ -177,7 +180,7 @@ export async function POST(req: NextRequest) {
           return { blob: await r.blob(), name: img.name };
         }),
       );
-      fileDescriptors = await uploadChatFiles(blobs);
+      fileDescriptors = await uploadChatFiles(blobs, userToken);
     } catch (err) {
       console.error("[ONYX] Falha ao subir imagens pro chat:", err);
     }
@@ -236,6 +239,18 @@ export async function POST(req: NextRequest) {
         if (!onyxSessionId) {
           const created = await createChatSession(agentId, "PainelAlpha", userToken);
           onyxSessionId = created.chat_session_id;
+
+          // Vincula a sessão Onyx à BibbleSession do Painel (ownership por userId),
+          // para reidratar o histórico do Onyx ao reabrir a conversa.
+          const painelSessionId = input.painelSessionId;
+          if (painelSessionId) {
+            await db.bibbleSession
+              .updateMany({
+                where: { id: painelSessionId, userId: Number(session.user.id) },
+                data: { onyxSessionId },
+              })
+              .catch(() => {});
+          }
         }
         // Informa o id ao cliente para reutilizar nas próximas mensagens
         send({ type: "session", onyxSessionId });
@@ -300,7 +315,15 @@ export async function POST(req: NextRequest) {
                   // Servimos a imagem pelo proxy autenticado (file_id) ou a URL direta
                   const src = img.file_id ? `/api/onyx/file/${img.file_id}` : (img.url ?? "");
                   if (src) {
-                    const alt = (img.revised_prompt ?? "imagem gerada").replace(/[[\]]/g, "");
+                    // Alt SEMPRE curto e sanitizado: o revised_prompt pode ter
+                    // quebras de linha, [], () — que quebram o markdown ![alt](url)
+                    // e impedem a imagem de renderizar. Reduz a uma linha segura.
+                    const alt = (img.revised_prompt ?? "imagem gerada")
+                      .replace(/[\r\n]+/g, " ")   // sem quebras de linha
+                      .replace(/[[\]()]/g, "")    // sem colchetes/parênteses
+                      .replace(/\s+/g, " ")
+                      .trim()
+                      .slice(0, 80) || "imagem gerada";
                     send({ type: "text", text: `\n\n![${alt}](${src})\n\n` });
                   }
                 }

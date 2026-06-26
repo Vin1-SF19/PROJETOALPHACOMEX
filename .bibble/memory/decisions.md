@@ -36,3 +36,15 @@
 **Decisão:** `src/lib/shared/painelalpha-knowledge.ts` é fonte única de verdade dos processos/vocabulário, injetada no system-prompt do Bibble E no system-knowledge dos agentes Onyx. Para dados vivos, usam-se tools em tempo real (Onyx via `AGENT_TOOLS` registry já existente; Bibble ganhou `consultar_base_onyx` via `askOnyxOneShot`).
 **Alternativas rejeitadas:** RAG vetorizado / Knowledge Graph / Pinecone (over-engineering — Onyx já é RAG nativo; vetor de dados vivos desatualiza no segundo seguinte).
 **Consequências:** Atualizar um processo em `painelalpha-knowledge.ts` propaga às duas IAs. `consultar_base_onyx` é exclusiva do Bibble (não no AGENT_TOOLS) para evitar loop. Base inicial inferida do código — exige revisão humana dos processos reais.
+
+### 2026-06-26 — Identidade Onyx por usuário via token_onyx (PAT no banco)
+**Contexto:** Cada usuário do Painel deveria falar com o Onyx como ele mesmo, não pela conta de serviço admin. Onyx não tem SSO configurado com o Painel.
+**Decisão:** Campo `token_onyx String?` (nullable) em `usuarios`. Helper `getUserOnyxToken` resolve pelo id da sessão; client Onyx usa esse token quando presente, senão cai no PAT de serviço (ONYX_API_KEY). Aplicado a chat + todas as operações de agente. Token NUNCA volta ao client (só booleano `tem_token_onyx`); edição só admin/CEO.
+**Alternativas rejeitadas:** SSO/OAuth (mais seguro/correto, mas é infra no servidor Onyx — fora do escopo do código do Painel).
+**Consequências:** Provado real (Onyx /api/me + owner do agente = usuário certo). Tokens são credenciais no banco — exigem cuidado (já corrigido vazamento em get-user.ts). IMPORTANTE: app usa Turso direto via adapter (não dev.db) — mudanças de schema exigem ALTER TABLE manual no Turso.
+
+### 2026-06-26 — Onyx como fonte de verdade do histórico de conversas com agente
+**Contexto:** Imagens (enviadas e geradas) sumiam ao recarregar — histórico local (Prisma) só guardava texto. Onyx já persiste texto + anexos por mensagem.
+**Decisão:** Conversas com agente Onyx leem o histórico do Onyx (`GET /chat/get-chat-session/{id}`) via rota `/api/onyx/session/[id]`. Salva-se só o `onyxSessionId` na BibbleSession. Conversas Bibble/Ollama seguem no histórico local.
+**Alternativas rejeitadas:** Persistir anexos no Prisma (duplicaria o que o Onyx já faz; risco de dessincronizar).
+**Consequências:** Conversa volta completa com imagens ao reabrir. Depende do Onyx estar no ar. Lightbox de imagem DEVE usar createPortal (backdrop-filter da bolha prende position:fixed). Upload de imagem usa `/api/user/projects/file/upload` com `user_file_id` no descriptor (o antigo `/api/chat/file` dá 307).

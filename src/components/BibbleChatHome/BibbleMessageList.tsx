@@ -10,12 +10,16 @@ interface BibbleMessageListProps {
   agentActive?: boolean;
   agentAvatarUrl?: string | null;
   agentName?: string | null;
+  /** Edita uma mensagem do usuário e reenvia a conversa a partir dela. */
+  onEditMessage?: (messageId: string, novoTexto: string) => void;
+  /** true enquanto há streaming — desabilita edição. */
+  isStreaming?: boolean;
 }
 
 const BOTTOM_THRESHOLD = 120;
 
 export default function BibbleMessageList({
-  messages, userName, agentActive, agentAvatarUrl, agentName,
+  messages, userName, agentActive, agentAvatarUrl, agentName, onEditMessage, isStreaming,
 }: BibbleMessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -66,6 +70,8 @@ export default function BibbleMessageList({
               agentActive={agentActive}
               agentAvatarUrl={agentAvatarUrl}
               agentName={agentName}
+              onEdit={onEditMessage}
+              isStreaming={isStreaming}
             />
           ))}
           <div ref={sentinelRef} style={{ height: 1 }} />

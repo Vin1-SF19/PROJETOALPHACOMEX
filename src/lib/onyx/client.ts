@@ -245,34 +245,56 @@ export function getChatFile(fileId: string, signal?: AbortSignal): Promise<Respo
 }
 
 export interface OnyxFileDescriptor {
+  /** user_files[].id — OBRIGATÓRIO para o Onyx tratar como user file (não project). */
+  user_file_id: string;
+  /** user_files[].file_id — id do blob no file store. */
   id: string;
   type: string; // "image" | "document" | "plain_text"
   name?: string;
 }
 
+/** Item retornado pelo upload novo do Onyx. */
+interface OnyxUserFile {
+  id: string;            // user_file_id
+  file_id: string;       // id do blob
+  name: string;
+  chat_file_type: string; // "image" | "document" | ...
+}
+
 /**
- * Faz upload de um arquivo de chat pro Onyx (multipart) e retorna os descriptors,
- * que devem ser passados como `file_descriptors` no send-chat-message para o
- * agente "enxergar" a imagem/documento.
+ * Faz upload de arquivo(s) de chat pro Onyx (multipart) e retorna os descriptors
+ * prontos para `file_descriptors` no send-chat-message — com user_file_id, que é
+ * o que faz o Onyx acionar OCR/visão para o agente "enxergar" a imagem.
+ *
+ * Endpoint NOVO: /api/user/projects/file/upload. O antigo /api/chat/file (POST)
+ * responde 307 e falha — por isso o agente não recebia as imagens.
  */
-export async function uploadChatFiles(files: Array<{ blob: Blob; name: string }>): Promise<OnyxFileDescriptor[]> {
+export async function uploadChatFiles(
+  files: Array<{ blob: Blob; name: string }>,
+  userToken?: string | null,
+): Promise<OnyxFileDescriptor[]> {
   if (!isOnyxConfigured()) throw new OnyxError("Onyx não configurado.", 503);
   if (files.length === 0) return [];
 
   const form = new FormData();
   for (const f of files) form.append("files", f.blob, f.name);
 
-  const res = await fetch(`${ONYX_BASE}/api/chat/file`, {
+  const res = await fetch(`${ONYX_BASE}/api/user/projects/file/upload`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${API_KEY}` },
+    headers: { Authorization: `Bearer ${userToken?.trim() || API_KEY}` },
     body: form,
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
   }
-  const data = (await res.json()) as { files?: OnyxFileDescriptor[] };
-  return data.files ?? [];
+  const data = (await res.json()) as { user_files?: OnyxUserFile[] };
+  return (data.user_files ?? []).map((uf) => ({
+    user_file_id: uf.id,
+    id: uf.file_id,
+    type: uf.chat_file_type || "image",
+    name: uf.name,
+  }));
 }
 
 // ─── Modelos de geração de imagem ────────────────────────────────────────────
@@ -343,6 +365,45 @@ export function createChatSession(
     method: "POST",
     userToken,
     body: JSON.stringify({ persona_id: personaId, description: description ?? null }),
+  });
+}
+
+// ─── Reidratação de histórico (fonte de verdade = Onyx) ──────────────────────
+
+/** Arquivo anexado a uma mensagem no histórico do Onyx. */
+export interface OnyxSessionFile {
+  id: string;
+  type: string; // "image" | "document" | "plain_text"
+  name?: string | null;
+}
+
+/** Mensagem como o Onyx devolve em get-chat-session. */
+export interface OnyxSessionMessage {
+  message_id: number;
+  message: string;
+  message_type: "user" | "assistant" | string;
+  parent_message: number | null;
+  files?: OnyxSessionFile[];
+}
+
+export interface OnyxChatSession {
+  chat_session_id?: string;
+  messages: OnyxSessionMessage[];
+}
+
+/**
+ * Recarrega o histórico COMPLETO de uma sessão Onyx (texto + anexos por mensagem).
+ * É a fonte de verdade ao reabrir/atualizar uma conversa com agente: cada mensagem
+ * traz seus `files`, de onde reidratamos as imagens (enviadas e geradas).
+ */
+export function getChatSession(
+  sessionId: string,
+  userToken?: string | null,
+): Promise<OnyxChatSession> {
+  return onyxJson<OnyxChatSession>(`/chat/get-chat-session/${encodeURIComponent(sessionId)}`, {
+    method: "GET",
+    userToken,
+    timeoutMs: 30_000,
   });
 }
 

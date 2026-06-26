@@ -3,9 +3,10 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronDown, ChevronUp, FileText, Image as ImageIcon,
-  Video, File, Copy, Check, Lightbulb, Download, X, Maximize2,
+  Video, File, Copy, Check, Lightbulb, Download, X, Maximize2, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -295,6 +296,55 @@ async function baixarArquivo(url: string, nome: string) {
 
 // ── Anexos (imagem inline com lightbox + doc como chip) ─────────────────────────
 
+// Lightbox renderizado via PORTAL no <body> — escapa do containing block da
+// bolha (que tem backdrop-filter/overflow), garantindo centralização real na tela.
+function ImageLightbox({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; // trava o scroll do fundo
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(6px)" }}
+      onClick={onClose}
+    >
+      <div className="absolute top-4 right-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => void baixarArquivo(url, name)}
+          className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[12px] font-bold flex items-center gap-1.5"
+        >
+          <Download size={15} /> Baixar
+        </button>
+        <button
+          onClick={onClose}
+          aria-label="Fechar"
+          className="w-10 h-10 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 text-white"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- imagem ampliada (blob/proxy) */}
+      <img
+        src={url}
+        alt={name}
+        className="max-w-[92vw] max-h-[88vh] w-auto h-auto object-contain rounded-lg"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>,
+    document.body,
+  );
+}
+
 function AnexoPreview({
   files,
 }: {
@@ -304,14 +354,6 @@ function AnexoPreview({
 
   const imagens = files.filter(f => f.type.startsWith("image/") && f.url);
   const outros = files.filter(f => !f.type.startsWith("image/"));
-
-  // Fecha o lightbox com ESC
-  useEffect(() => {
-    if (!lightbox) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [lightbox]);
 
   if (imagens.length === 0 && outros.length === 0) return null;
 
@@ -323,15 +365,15 @@ function AnexoPreview({
           {imagens.map((img, idx) => (
             <div
               key={idx}
-              className="group/img relative rounded-xl overflow-hidden cursor-pointer"
-              style={{ border: "1px solid rgba(99,102,241,0.25)", maxHeight: 260 }}
+              className="group/img relative rounded-xl overflow-hidden cursor-pointer flex items-center justify-center"
+              style={{ border: "1px solid rgba(99,102,241,0.25)", background: "rgba(10,15,30,0.6)" }}
               onClick={() => setLightbox({ url: img.url!, name: img.name })}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- imagem de anexo (blob externo) */}
               <img
                 src={img.url}
                 alt={img.name}
-                className="w-full h-full object-cover"
+                className="max-w-full object-contain"
                 style={{ maxHeight: 260 }}
               />
               {/* Overlay com ações no hover */}
@@ -376,37 +418,9 @@ function AnexoPreview({
         </div>
       ))}
 
-      {/* Lightbox (modal full no próprio chat — sem nova aba) */}
+      {/* Lightbox via portal (centralizado na viewport, fora da bolha) */}
       {lightbox && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(4px)" }}
-          onClick={() => setLightbox(null)}
-        >
-          {/* Barra de ações */}
-          <div className="absolute top-4 right-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => void baixarArquivo(lightbox.url, lightbox.name)}
-              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[12px] font-bold flex items-center gap-1.5"
-            >
-              <Download size={15} /> Baixar
-            </button>
-            <button
-              onClick={() => setLightbox(null)}
-              className="w-10 h-10 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 text-white"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          {/* eslint-disable-next-line @next/next/no-img-element -- imagem ampliada (blob externo) */}
-          <img
-            src={lightbox.url}
-            alt={lightbox.name}
-            className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-[12px] font-medium">{lightbox.name}</p>
-        </div>
+        <ImageLightbox url={lightbox.url} name={lightbox.name} onClose={() => setLightbox(null)} />
       )}
     </div>
   );
@@ -464,6 +478,25 @@ const PROSE_CLASSES = cn(
   "prose-thead:border-b-[#334155] prose-tr:border-b-[rgba(30,45,74,0.5)]",
 );
 
+// ── Sanitização de imagens em markdown ────────────────────────────────────────
+// O agente pode emitir ![alt](url) com alt gigante e multi-linha (o prompt
+// inteiro). Markdown não aceita alt com quebra de linha → a imagem não renderiza.
+// Esta função reescreve qualquer ![...](url) para um alt curto e seguro, sem
+// quebras nem caracteres que confundam o parser. Roda antes do ReactMarkdown.
+const IMG_MD_RE = /!\[([\s\S]*?)\]\((\/api\/onyx\/file\/[^\s)]+|https?:\/\/[^\s)]+|\/[^\s)]+)\)/g;
+
+function sanitizeImageMarkdown(content: string): string {
+  return content.replace(IMG_MD_RE, (_full, alt: string, url: string) => {
+    const altLimpo = String(alt)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/[[\]]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80) || "imagem";
+    return `![${altLimpo}](${url})`;
+  });
+}
+
 // ── Markdown components (módulo-level para refs estáveis — evita loop) ────────
 
 const REMARK_PLUGINS = [remarkGfm] as Parameters<typeof ReactMarkdown>[0]["remarkPlugins"];
@@ -485,28 +518,20 @@ const MARKDOWN_COMPONENTS: Parameters<typeof ReactMarkdown>[0]["components"] = {
   },
 };
 
-// Imagem dentro da resposta do assistente: inline + lightbox (sem nova aba) + baixar
+// Imagem dentro da resposta do assistente: inline + lightbox (portal) + baixar
 function ImagemRespostaMarkdown({ url, alt }: { url: string; alt: string }) {
   const [aberto, setAberto] = useState(false);
-
-  useEffect(() => {
-    if (!aberto) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setAberto(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [aberto]);
-
   const nome = alt && alt !== "imagem" ? alt : "imagem-gerada.png";
 
   return (
     <>
       <div
-        className="group/genimg relative inline-block my-2 rounded-xl overflow-hidden cursor-pointer"
-        style={{ border: "1px solid rgba(99,102,241,0.2)", maxWidth: 420 }}
+        className="group/genimg relative inline-flex items-center justify-center my-2 rounded-xl overflow-hidden cursor-pointer"
+        style={{ border: "1px solid rgba(99,102,241,0.2)", maxWidth: 420, background: "rgba(10,15,30,0.6)" }}
         onClick={() => setAberto(true)}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- imagem da resposta (proxy onyx/blob) */}
-        <img src={url} alt={alt} className="rounded-xl" style={{ width: "100%", height: "auto", display: "block" }} />
+        <img src={url} alt={alt} className="rounded-xl object-contain" style={{ maxWidth: "100%", maxHeight: 420, height: "auto", display: "block" }} />
         <div className="absolute inset-0 bg-black/0 group-hover/genimg:bg-black/25 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover/genimg:opacity-100">
           <span className="p-2 rounded-lg bg-black/50 text-white"><Maximize2 size={16} /></span>
           <button
@@ -519,28 +544,122 @@ function ImagemRespostaMarkdown({ url, alt }: { url: string; alt: string }) {
         </div>
       </div>
 
-      {aberto && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(4px)" }}
-          onClick={() => setAberto(false)}
-        >
-          <div className="absolute top-4 right-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => void baixarArquivo(url, nome)}
-              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[12px] font-bold flex items-center gap-1.5"
-            >
-              <Download size={15} /> Baixar
-            </button>
-            <button onClick={() => setAberto(false)} className="w-10 h-10 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 text-white">
-              <X size={18} />
-            </button>
-          </div>
-          {/* eslint-disable-next-line @next/next/no-img-element -- imagem ampliada */}
-          <img src={url} alt={alt} className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
-        </div>
-      )}
+      {aberto && <ImageLightbox url={url} name={nome} onClose={() => setAberto(false)} />}
     </>
+  );
+}
+
+// ── User bubble (com edição inline) ───────────────────────────────────────────
+
+function UserBubble({
+  message, initials, timeStr, attachedFiles, textoExibido, podeEditar, onEdit,
+}: {
+  message: Message;
+  initials: string;
+  timeStr: string;
+  attachedFiles: Array<{ name: string; type: string; url?: string; size?: number }>;
+  textoExibido: string;
+  podeEditar: boolean;
+  onEdit?: (messageId: string, novoTexto: string) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [rascunho, setRascunho] = useState(textoExibido);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  const abrirEdicao = () => {
+    setRascunho(textoExibido);
+    setEditando(true);
+    setTimeout(() => {
+      const ta = taRef.current;
+      if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }, 0);
+  };
+
+  const confirmar = () => {
+    const t = rascunho.trim();
+    if (t && t !== textoExibido) onEdit?.(message.id, t);
+    setEditando(false);
+  };
+
+  return (
+    <div
+      className="flex justify-end items-start gap-2.5 group"
+      style={{ animation: "msgSlideIn 180ms ease-out" }}
+    >
+      <div className="max-w-[76%] relative">
+        {/* Botão de editar — aparece no hover */}
+        {podeEditar && !editando && (
+          <button
+            onClick={abrirEdicao}
+            title="Editar mensagem"
+            aria-label="Editar mensagem"
+            className="absolute -left-9 top-1.5 p-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-white/5 opacity-0 group-hover:opacity-100 transition-all"
+          >
+            <Pencil size={13} />
+          </button>
+        )}
+
+        <div
+          style={{
+            background: "rgba(30,64,175,0.18)",
+            border: "1px solid rgba(59,130,246,0.28)",
+            borderRadius: "18px 18px 4px 18px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div className="px-4 py-2.5 space-y-2">
+            {attachedFiles.length > 0 && <AnexoPreview files={attachedFiles} />}
+
+            {editando ? (
+              <div className="space-y-2 min-w-[260px]">
+                <textarea
+                  ref={taRef}
+                  value={rascunho}
+                  onChange={(e) => setRascunho(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); confirmar(); }
+                    if (e.key === "Escape") setEditando(false);
+                  }}
+                  rows={Math.min(8, Math.max(1, rascunho.split("\n").length))}
+                  className="w-full bg-black/30 text-[14px] text-slate-100 rounded-lg p-2 outline-none resize-none border border-indigo-500/30 focus:border-indigo-400/60"
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setEditando(false)}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmar}
+                    disabled={!rascunho.trim() || rascunho.trim() === textoExibido}
+                    className="flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Check size={12} /> Enviar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              textoExibido.trim() && (
+                <p className="text-[14px] whitespace-pre-wrap leading-relaxed" style={{ color: "#f1f5f9" }}>
+                  {textoExibido}
+                </p>
+              )
+            )}
+          </div>
+        </div>
+        {timeStr && !editando && (
+          <time
+            className="absolute -bottom-5 right-1 text-[10px] opacity-0 group-hover:opacity-60 select-none pointer-events-none transition-opacity"
+            style={{ color: "#94a3b8" }}
+          >
+            {timeStr}
+          </time>
+        )}
+      </div>
+      <UserAvatar initials={initials} />
+    </div>
   );
 }
 
@@ -552,12 +671,16 @@ export default function BibbleMessageBubble({
   agentActive,
   agentAvatarUrl,
   agentName,
+  onEdit,
+  isStreaming,
 }: {
   message: Message;
   userName: string;
   agentActive?: boolean;
   agentAvatarUrl?: string | null;
   agentName?: string | null;
+  onEdit?: (messageId: string, novoTexto: string) => void;
+  isStreaming?: boolean;
 }) {
   const isUser   = message.role === "user";
   const initials = userName.substring(0, 2).toUpperCase();
@@ -589,44 +712,18 @@ export default function BibbleMessageBubble({
   // ── Mensagem do usuário ─────────────────────────────────────────────────
 
   if (isUser) {
+    const textoExibido = cleanedContent.replace(/\[Arquivos:.*?\]/, "") || message.content;
+    const podeEditar = !!onEdit && !isStreaming && !message.streaming;
     return (
-      <div
-        className="flex justify-end items-start gap-2.5 group"
-        style={{ animation: "msgSlideIn 180ms ease-out" }}
-      >
-        <div className="max-w-[76%] relative">
-          <div
-            style={{
-              background: "rgba(30,64,175,0.18)",
-              border: "1px solid rgba(59,130,246,0.28)",
-              borderRadius: "18px 18px 4px 18px",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-              backdropFilter: "blur(8px)",
-            }}
-          >
-            <div className="px-4 py-2.5 space-y-2">
-              {attachedFiles.length > 0 && <AnexoPreview files={attachedFiles} />}
-              {cleanedContent.trim() && (
-                <p
-                  className="text-[14px] whitespace-pre-wrap leading-relaxed"
-                  style={{ color: "#f1f5f9" }}
-                >
-                  {cleanedContent.replace(/\[Arquivos:.*?\]/, "") || message.content}
-                </p>
-              )}
-            </div>
-          </div>
-          {timeStr && (
-            <time
-              className="absolute -bottom-5 right-1 text-[10px] opacity-0 group-hover:opacity-60 select-none pointer-events-none transition-opacity"
-              style={{ color: "#94a3b8" }}
-            >
-              {timeStr}
-            </time>
-          )}
-        </div>
-        <UserAvatar initials={initials} />
-      </div>
+      <UserBubble
+        message={message}
+        initials={initials}
+        timeStr={timeStr}
+        attachedFiles={attachedFiles}
+        textoExibido={textoExibido}
+        podeEditar={podeEditar}
+        onEdit={onEdit}
+      />
     );
   }
 
@@ -679,7 +776,7 @@ export default function BibbleMessageBubble({
 
             <div className={PROSE_CLASSES}>
               <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-                {message.content}
+                {sanitizeImageMarkdown(message.content)}
               </ReactMarkdown>
 
               {/* Cursor piscante ao final do texto */}
@@ -735,7 +832,7 @@ export default function BibbleMessageBubble({
 
               <div className={PROSE_CLASSES}>
                 <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
-                  {message.content}
+                  {sanitizeImageMarkdown(message.content)}
                 </ReactMarkdown>
               </div>
 

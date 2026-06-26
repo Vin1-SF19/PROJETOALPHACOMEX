@@ -38,6 +38,7 @@ interface BibbleChatWindowProps {
   onInputChange: (v: string) => void;
   onSend: () => void;
   onStop: () => void;
+  onEditMessage?: (messageId: string, novoTexto: string) => void;
   onRenameSession: (title: string) => void;
   activeAgentName?: string | null;
   activeAgentAvatarUrl?: string | null;
@@ -67,6 +68,7 @@ export default function BibbleChatWindow({
   onInputChange,
   onSend,
   onStop,
+  onEditMessage,
   onRenameSession,
   activeAgentName,
   activeAgentAvatarUrl,
@@ -183,6 +185,8 @@ export default function BibbleChatWindow({
             agentActive={hasActiveAgent}
             agentAvatarUrl={activeAgentAvatarUrl}
             agentName={activeAgentName}
+            onEditMessage={onEditMessage}
+            isStreaming={isStreaming}
           />
 
           <BibbleChatInput

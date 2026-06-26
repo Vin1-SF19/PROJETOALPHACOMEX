@@ -148,6 +148,12 @@ export default function BibbleChatLayout({
   });
   const abortRef                              = useRef<AbortController | null>(null);
   const messagesRef                           = useRef<Message[]>([]);
+  // Texto e arquivos do último envio — restaurados na caixa se o usuário interromper.
+  const lastSentRef                           = useRef<{ text: string; files: UploadedFile[] } | null>(null);
+  // Sinaliza que o stream foi interrompido pelo usuário (não salvar resposta parcial).
+  const interruptedRef                        = useRef(false);
+  // Ref para o handleSend atual — usado por handleEditMessage sem dependência circular.
+  const handleSendRef                         = useRef<(() => Promise<void>) | null>(null);
   const [uploadFiles, setUploadFiles]         = useState<UploadedFile[]>([]);
   const [showFiles, setShowFiles]           = useState(false);
 
@@ -241,6 +247,44 @@ export default function BibbleChatLayout({
   const loadSession = useCallback(async (id: string) => {
     setActiveSessionId(id);
     setMessages([]);
+    onyxSessionRef.current = null;
+
+    // 1. Tenta reidratar do Onyx (fonte de verdade quando a conversa é de agente:
+    //    traz texto + imagens enviadas e geradas, que o histórico local não guarda).
+    try {
+      const onyxRes = await fetch(`/api/onyx/session/${id}`);
+      if (onyxRes.ok) {
+        const onyxData = (await onyxRes.json()) as {
+          onyx: boolean;
+          messages: Array<{
+            id: string;
+            role: "user" | "assistant";
+            content: string;
+            images: Array<{ id: string; name: string; src: string }>;
+          }>;
+        };
+
+        if (onyxData.onyx) {
+          setMessages(
+            onyxData.messages.map(m => {
+              // Embute as imagens como markdown — o bubble já renderiza ![](src).
+              const imgMd = m.images
+                .map(img => `\n\n![${img.name.replace(/[[\]]/g, "")}](${img.src})`)
+                .join("");
+              if (m.role === "user") {
+                const { display } = splitPersisted(m.content);
+                return { id: m.id, role: "user" as const, content: display + imgMd };
+              }
+              const { content, thinkContent } = splitThink(m.content);
+              return { id: m.id, role: "assistant" as const, content: content + imgMd, thinkContent };
+            })
+          );
+          return;
+        }
+      }
+    } catch { /* cai no histórico local */ }
+
+    // 2. Conversa Bibble/Ollama → histórico local (Prisma).
     try {
       const res = await fetch(`/api/bibble/sessions/${id}`);
       if (!res.ok) return;
@@ -249,8 +293,6 @@ export default function BibbleChatLayout({
       };
       setMessages(
         data.messages.map(m => {
-          // Mensagens do usuário podem conter o bloco de arquivos anexados:
-          // separa o que aparece na bolha do que vai para a IA (fullContent).
           if (m.role === "user") {
             const { display, full } = splitPersisted(m.content);
             return {
@@ -379,6 +421,10 @@ export default function BibbleChatLayout({
     const text = inputValue.trim();
     if (!text && uploadFiles.length === 0) return;
 
+    // Guarda para restaurar na caixa caso o usuário interrompa este envio.
+    lastSentRef.current = { text, files: uploadFiles };
+    interruptedRef.current = false;
+
     setInputValue("");
 
     const readyFiles = uploadFiles.filter(f => !f.uploading && !f.error);
@@ -477,6 +523,7 @@ export default function BibbleChatLayout({
               message: text,
               agentId: agente.id,
               onyxSessionId: onyxSessionRef.current,
+              painelSessionId: sessionId,
               pageContext: typeof window !== "undefined" ? window.location.pathname : null,
               files: filesForChat.length > 0 ? filesForChat : undefined,
               history,
@@ -506,6 +553,13 @@ export default function BibbleChatLayout({
       }
     }
 
+    // Interrompido pelo usuário: o handleStop já restaurou o texto e removeu o
+    // par de mensagens. Não recriar nem salvar nada.
+    if (interruptedRef.current) {
+      abortRef.current = null;
+      return;
+    }
+
     const { content: finalContent, thinkContent: finalThink } = splitThink(fullResponse);
     setMessages(prev =>
       prev.map(m =>
@@ -524,6 +578,9 @@ export default function BibbleChatLayout({
       await saveMessages(sessionId, persistedContent, fullResponse);
     }
   }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream]);
+
+  // Mantém o ref do handleSend atualizado para uso pelo handleEditMessage.
+  useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
 
   /* ── Conversar (vazio): ativa o agente e abre uma conversa NOVA sem mensagens ── */
   const conversarVazio = useCallback((agent: OnyxAgent) => {
@@ -570,6 +627,7 @@ export default function BibbleChatLayout({
           message: introText,
           agentId: agent.id,
           onyxSessionId: null,
+          painelSessionId: sessionId,
           pageContext: typeof window !== "undefined" ? window.location.pathname : null,
         }),
       });
@@ -616,14 +674,58 @@ export default function BibbleChatLayout({
     else adicionarAgenteNaConversa(ag);
   }, [agentesCache, messages.length, conversarVazio, adicionarAgenteNaConversa]);
 
+  /* ── Editar mensagem do usuário (lápis → reenvia) ────────── */
+  const handleEditMessage = useCallback((messageId: string, novoTexto: string) => {
+    const texto = novoTexto.trim();
+    if (!texto || isStreaming) return;
+
+    // Remove a mensagem editada e TUDO que veio depois (resposta + turnos seguintes),
+    // igual ChatGPT/Onyx: a conversa é "rebobinada" até antes da mensagem editada.
+    setMessages(prev => {
+      const idx = prev.findIndex(m => m.id === messageId);
+      return idx === -1 ? prev : prev.slice(0, idx);
+    });
+
+    // Onyx mantém histórico próprio; ao reenviar, força nova sessão para não
+    // duplicar a mensagem antiga no encadeamento do agente.
+    if (selectedAgentRef.current) onyxSessionRef.current = null;
+
+    // Coloca o texto na caixa e dispara o envio no próximo tick (estado já aplicado).
+    setInputValue(texto);
+    setTimeout(() => { void handleSendRef.current?.(); }, 0);
+  }, [isStreaming]);
+
   /* ── Stop ───────────────────────────────────────────────── */
   const handleStop = useCallback(() => {
+    interruptedRef.current = true;
     abortRef.current?.abort();
     setIsStreaming(false);
     setStreamStatus("idle");
-    setMessages(prev =>
-      prev.map(m => m.streaming ? { ...m, streaming: false } : m)
-    );
+
+    // Restaura o texto e os arquivos enviados de volta para a caixa (igual ChatGPT).
+    const last = lastSentRef.current;
+    if (last) {
+      setInputValue(last.text);
+      if (last.files.length > 0) {
+        setUploadFiles(last.files);
+        setShowFiles(true);
+      }
+    }
+
+    // Remove o par (mensagem do usuário + resposta vazia) deste turno interrompido.
+    setMessages(prev => {
+      const next = [...prev];
+      // último item é o placeholder do assistente em streaming
+      if (next.length && next[next.length - 1].role === "assistant" && next[next.length - 1].streaming) {
+        next.pop();
+        // e o anterior é a mensagem do usuário que acabou de ser enviada
+        if (next.length && next[next.length - 1].role === "user") next.pop();
+      } else {
+        // fallback: só desliga o streaming
+        return prev.map(m => (m.streaming ? { ...m, streaming: false } : m));
+      }
+      return next;
+    });
   }, []);
 
   /* ── New session ────────────────────────────────────────── */
@@ -721,6 +823,7 @@ export default function BibbleChatLayout({
         onInputChange={setInputValue}
         onSend={handleSend}
         onStop={handleStop}
+        onEditMessage={handleEditMessage}
         onRenameSession={handleRenameSession}
         activeAgentName={selectedAgent?.name ?? null}
         activeAgentAvatarUrl={selectedAgent?.uploaded_image_id ? agentAvatarUrl(selectedAgent.id) : null}

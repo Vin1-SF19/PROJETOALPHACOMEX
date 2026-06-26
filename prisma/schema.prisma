@@ -91,6 +91,7 @@ model usuarios {
   parceirosCriados  Parceiro[]
   indicacoesCriadas Indicacao[]     @relation("IndicacaoAutor")
   parceiroAcessos   ParceiroAcesso[]
+  convitesParceiroCriados ConviteParceiro[] @relation("ConvitesCriados")
 }
 
 model OnboardingTemplate {
@@ -1325,6 +1326,10 @@ model BibbleSession {
   userId    Int
   title     String          @default("Nova conversa")
   projectId String?
+  // Sessão Onyx vinculada (quando a conversa é com um agente Onyx). É a fonte de
+  // verdade do histórico dessa conversa — texto + imagens vêm do Onyx via
+  // GET /chat/get-chat-session/{id}. NULL = conversa Bibble/Ollama (histórico local).
+  onyxSessionId String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   messages  BibbleMessage[]
@@ -1413,6 +1418,7 @@ model Parceiro {
   responsaveis  ParceiroResponsavel[]
   representantes ParceiroRepresentante[]
   indicacoes    Indicacao[]
+  convitesGerados ConviteParceiro[]   @relation("ConvitesPorParceiro")
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -1518,4 +1524,69 @@ model ParceiroTermo {
   updatedAt   DateTime @updatedAt
 
   @@map("parceiro_termo")
+}
+
+// ─── Convite de parceiro (link temporário) ────────────────────────────────────
+// Gera um link público com token; o convidado preenche o form → vira PreCadastro.
+model ConviteParceiro {
+  id          Int       @id @default(autoincrement())
+  token       String    @unique          // token do link (randomUUID)
+  status      String    @default("PENDENTE") // PENDENTE | USADO | REVOGADO | EXPIRADO
+  expiraEm    DateTime                    // validade do link
+  usoUnico    Boolean   @default(true)
+  // Quem gerou: um usuário do Painel OU um parceiro existente (indicação).
+  criadoPorUserId    Int?
+  criadoPorParceiroId Int?
+  criadoPorUser      usuarios?  @relation("ConvitesCriados", fields: [criadoPorUserId], references: [id], onDelete: SetNull)
+  criadoPorParceiro  Parceiro?  @relation("ConvitesPorParceiro", fields: [criadoPorParceiroId], references: [id], onDelete: SetNull)
+  preCadastros PreCadastroParceiro[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([token])
+  @@index([status])
+  @@map("convite_parceiro")
+}
+
+// Respostas do formulário público (espelho do Google Forms). Fica como
+// pré-cadastro até um admin aprovar e converter em Parceiro de verdade.
+model PreCadastroParceiro {
+  id            Int      @id @default(autoincrement())
+  conviteId     Int?
+  convite       ConviteParceiro? @relation(fields: [conviteId], references: [id], onDelete: SetNull)
+  // Campos do formulário
+  email         String
+  nomeCompleto  String
+  cpf           String?
+  uf            String
+  municipio     String?
+  telefone      String
+  areasAtuacao  String?             // CSV das áreas selecionadas
+  nomeEmpresa   String?
+  cnpj          String?
+  sobre         String?             // "fale mais sobre você/empresa"
+  // Aceite do termo (versão capturada no momento do aceite)
+  termoVersao   String
+  termoAceito   Boolean  @default(true)
+  termoAceitoEm DateTime @default(now())
+  // Fluxo de aprovação
+  status        String   @default("PENDENTE") // PENDENTE | APROVADO | REJEITADO
+  parceiroId    Int?                // preenchido quando aprovado (vira Parceiro)
+  aprovadoPorId Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([conviteId])
+  @@map("pre_cadastro_parceiro")
+}
+
+// Config singleton do módulo Parceiros (1 linha). Controla flags globais.
+model ParceiroConfig {
+  id                       Int      @id @default(1)
+  permitirParceiroConvidar Boolean  @default(false)
+  validadeConvitePadraoDias Int     @default(7)
+  updatedAt                DateTime @updatedAt
+
+  @@map("parceiro_config")
 }

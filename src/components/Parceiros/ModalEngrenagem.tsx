@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Settings, Loader2, Pencil, Trash2, Shield } from "lucide-react";
+import { X, Settings, Loader2, Pencil, Trash2, Shield, Link2 } from "lucide-react";
 import { listarAcessosParceiros, salvarAcessoParceiro } from "@/actions/parceiros";
+import { obterConfigParceiros, togglePermitirParceiroConvidar } from "@/actions/convites-parceiro";
 
 type Usuario = { id: number; nome: string; email: string; role: string };
 type Acesso = { userId: number; podeEditar: boolean; podeExcluir: boolean };
@@ -19,20 +20,31 @@ export default function ModalEngrenagem({
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [parceiroConvida, setParceiroConvida] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
-    listarAcessosParceiros()
-      .then(({ acessos, usuarios }) => {
+    Promise.all([listarAcessosParceiros(), obterConfigParceiros()])
+      .then(([{ acessos, usuarios }, cfg]) => {
         setUsuarios(usuarios);
         const map: Record<number, Acesso> = {};
         for (const a of acessos) map[a.userId] = { userId: a.userId, podeEditar: a.podeEditar, podeExcluir: a.podeExcluir };
         setAcessos(map);
+        setParceiroConvida(cfg.permitirParceiroConvidar);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [open]);
+
+  const toggleConfigConvite = async () => {
+    const novo = !parceiroConvida;
+    setParceiroConvida(novo);
+    setSavingConfig(true);
+    await togglePermitirParceiroConvidar(novo);
+    setSavingConfig(false);
+  };
 
   if (!open) return null;
 
@@ -74,6 +86,28 @@ export default function ModalEngrenagem({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
+          {/* Config: permitir que parceiros convidem */}
+          <div className="flex items-center gap-3 px-3 py-3 mb-2 rounded-xl" style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}>
+            <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0" style={{ background: "rgba(59,130,246,0.15)" }}>
+              <Link2 size={15} className="text-blue-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-bold text-slate-200">Parceiros podem convidar</p>
+              <p className="text-[10px] text-slate-500">Permite que parceiros existentes gerem links de convite.</p>
+            </div>
+            {savingConfig && <Loader2 size={13} className="animate-spin text-slate-500" />}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={parceiroConvida}
+              onClick={toggleConfigConvite}
+              className="relative w-11 h-6 rounded-full transition-colors shrink-0"
+              style={{ background: parceiroConvida ? "#3b82f6" : "rgba(255,255,255,0.12)" }}
+            >
+              <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform" style={{ transform: parceiroConvida ? "translateX(20px)" : "translateX(0)" }} />
+            </button>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-10"><Loader2 size={22} className="animate-spin" style={{ color: `rgba(${accent},1)` }} /></div>
           ) : filtrados.map(u => {

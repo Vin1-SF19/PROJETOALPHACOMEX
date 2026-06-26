@@ -358,3 +358,76 @@ Chat (Bibble e agentes Onyx) não lia imagens — imagem virava só texto-link p
 
 ### Refletido também em
 - known-errors.md: imagem como texto-link não funciona (precisa content multimodal).
+
+---
+
+## [2026-06-26] — Identidade Onyx por usuário (token_onyx)
+
+**Tags:** #feature #security #auth #prisma #integration
+**Agentes envolvidos:** Bibble → Vault → Echo → Anubis
+**Arquivos tocados:**
+- `prisma/schema.prisma` (campo token_onyx em usuarios)
+- `src/lib/onyx/client.ts`, `src/lib/onyx/user-token.ts` *(CRIADO)*
+- `src/app/api/onyx/chat/route.ts`, `src/app/api/onyx/agents/route.ts`, `src/app/api/onyx/agents/[id]/route.ts`, `src/app/api/onyx/agents/upload-image/route.ts`
+- `src/actions/CreateAction.ts`, `src/actions/ColaboradorRH.ts`, `src/actions/get-user.ts`
+- `src/components/FormCadastro.tsx`, `src/components/Colaboradores/ModalPerfilColaborador.tsx`
+
+### Contexto
+Usuário queria que cada usuário do Painel falasse com o Onyx pela conta DELE (não pela conta de serviço admin ti@alpha-comex.com). Diagnóstico: modelo era conta de serviço única (PAT em ONYX_API_KEY); só a memória era separada via texto.
+
+### O que foi feito
+- Campo `token_onyx String?` (opcional) em `usuarios`. Helper `getUserOnyxToken(sessionUserId)` resolve o token pelo id da SESSÃO (nunca do corpo).
+- Client Onyx (`authHeaders`/`onyxFetch`) aceita `userToken` que sobrescreve o PAT de serviço. Propagado em chat, createAgent, updateAgent, deleteAgent, uploadAgentImage, uploadChatFiles.
+- Campo no cadastro (FormCadastro) E na edição (ModalPerfilColaborador). Token NUNCA volta ao cliente — só booleano `tem_token_onyx`. Edição só admin/CEO.
+- Anubis achou e corrigiu vazamento PRÉ-EXISTENTE em `get-user.ts` (findMany sem select expunha senha/reset_token/token_onyx ao client).
+
+### Decisões tomadas
+- **PAT por usuário guardado no banco** (escolha do usuário) em vez de SSO/OAuth (mais correto mas é infra no servidor Onyx, fora do código).
+- **Provado por teste real**: token individual → Onyx `/api/me` retorna o usuário certo; criar agente → `owner` é o usuário, não admin. Backend 100% funcional.
+- **Operações admin globais** (criar skill custom, modelo de imagem global) seguem no token de serviço — não fazem sentido por usuário.
+
+### Problemas encontrados / resolvidos
+- Diagnóstico crítico: o app NÃO usa o `dev.db` (DATABASE_URL) — usa adapter `PrismaLibSql` direto no Turso via `TURSO_DATABASE_URL`. `prisma db push` atinge só o dev.db local (vazio). Para produção, ALTER TABLE manual no Turso.
+
+### Pendências
+- **Rodar no Turso**: `ALTER TABLE usuarios ADD COLUMN token_onyx TEXT;`
+
+---
+
+## [2026-06-26] — Imagens no chat: reidratação, upload (307), lightbox + edição/interrupção
+
+**Tags:** #feature #bugfix #integration #critical
+**Agentes envolvidos:** Bibble → Scout → Vault → Echo → Nova → Forge
+**Arquivos tocados:**
+- `prisma/schema.prisma` (onyxSessionId em BibbleSession)
+- `src/lib/onyx/client.ts` (getChatSession, uploadChatFiles novo endpoint)
+- `src/app/api/onyx/session/[id]/route.ts` *(CRIADO)*, `src/app/api/onyx/chat/route.ts`
+- `src/components/BibbleChatHome/BibbleChatLayout.tsx`, `BibbleMessageBubble.tsx`, `BibbleMessageList.tsx`, `BibbleChatWindow.tsx`
+
+### Contexto
+Múltiplas dores de imagem no chat com agentes Onyx: conversa volta vazia ao recarregar; agente não lê imagem enviada; imagem gerada não renderiza; lightbox preso na bolha; pedido de editar mensagem e interromper.
+
+### O que foi feito
+- **Reidratação (CR#2)**: `onyxSessionId` na BibbleSession (Onyx = fonte de verdade). Rota `GET /api/onyx/session/[id]` lê histórico do Onyx (texto + imagens via files[]) e reidrata ao reabrir. Imagens viram markdown `![](/api/onyx/file/{id})`.
+- **Upload quebrado (CR#1, a principal)**: `POST /api/chat/file` dá 307 (descontinuado). Trocado para `POST /api/user/projects/file/upload`; parsing `user_files`; descriptor agora carrega `user_file_id` (obrigatório, senão Onyx rejeita "no project_id"). VALIDADO por teste real: agente passa a ler a imagem.
+- **Markdown de imagem quebrado**: alt com prompt gigante multi-linha quebrava `![](url)`. `sanitizeImageMarkdown` (front) + alt curto no backend.
+- **Lightbox preso na bolha**: backdrop-filter da bolha criava containing block, prendendo o `position:fixed`. Componente `ImageLightbox` via `createPortal` no body. Preview `object-cover`→`object-contain`.
+- **Editar mensagem (lápis)**: rebobina conversa até a msg, reenvia. **Interromper**: texto/arquivos voltam pra caixa, remove o par de mensagens.
+
+### Decisões tomadas
+- **Onyx = fonte de verdade do histórico** de conversas com agente (não duplicar no Prisma). Salva só onyxSessionId no Painel.
+- **Defesa em 2 camadas** para markdown de imagem: backend sanitiza ao emitir, front sanitiza ao renderizar (cobre agente que ecoa o markdown no texto).
+- **Lightbox via portal** é obrigatório quando o ancestral tem backdrop-filter/transform/overflow.
+
+### Problemas encontrados / resolvidos
+- 307 no upload → endpoint novo (catalogado em known-errors).
+- Markdown de imagem com alt multi-linha → sanitização.
+- `position:fixed` preso → portal.
+
+### Pendências
+- **Rodar no Turso**: `ALTER TABLE bibble_session ADD COLUMN onyxSessionId TEXT;`
+- Reiniciar `npm run dev` para validar end-to-end (matei processos node na sessão).
+
+### Refletido também em
+- decisions.md: Onyx fonte de verdade do histórico; lightbox via portal.
+- known-errors.md: upload 307 do Onyx.

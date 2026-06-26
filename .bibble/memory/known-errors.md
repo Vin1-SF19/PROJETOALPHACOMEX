@@ -41,6 +41,13 @@
 **Contexto:** Enviar binário (PUT/POST) via fetch no server-side.
 **Adicionado em:** 2026-06-19
 
+### Onyx upload de imagem — 307 no /api/chat/file (agente não lê imagem)
+**Sintoma:** Agente Onyx não "vê" a imagem enviada; responde alucinando link do Qwen (`chat.qwen.ai/s/d/.../user_id`). OCR/visão nunca dispara.
+**Causa:** `POST /api/chat/file` foi descontinuado na versão atual do Onyx — responde **307** (redirect p/ rota GET). Upload falha silenciosamente → `file_descriptors` vazio → agente não recebe a imagem.
+**Fix:** Usar o endpoint NOVO `POST /api/user/projects/file/upload` (multipart, campo `files`). Resposta tem `user_files[]` com `id` (=user_file_id), `file_id`, `chat_file_type`. No `file_descriptors` do send-chat-message, incluir **`user_file_id`** (= `user_files[].id`) — sem ele o Onyx rejeita com "Project files provided but no project_id specified". Implementado em `uploadChatFiles` (`src/lib/onyx/client.ts`).
+**Contexto:** Qualquer envio de imagem do usuário para agentes Onyx.
+**Adicionado em:** 2026-06-26
+
 ### Prisma update P2025 em rotas idempotentes (heartbeat)
 **Sintoma:** `PrismaClientKnownRequestError P2025: No record was found for an update` em log recorrente.
 **Causa:** `.update()` lança quando o `where` não acha registro. Ex.: sessão JWT válida com email de usuário já removido/renomeado.

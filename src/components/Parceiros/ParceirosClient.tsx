@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText } from "lucide-react";
+import { Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText, Link2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import ParceiroCard, { type CardParceiro } from "./ParceiroCard";
 import ModalNovaIndicacao from "./ModalNovaIndicacao";
 import ModalEngrenagem from "./ModalEngrenagem";
 import ModalTermo from "./ModalTermo";
+import ModalConvidarParceiro from "./ModalConvidarParceiro";
+import ModalPreCadastros from "./ModalPreCadastros";
 import { excluirParceiros } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
 
@@ -30,6 +32,8 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
   const [novaIndicacaoOpen, setNovaIndicacaoOpen] = useState(false);
   const [engrenagemOpen, setEngrenagemOpen] = useState(false);
   const [termoOpen, setTermoOpen] = useState(false);
+  const [convidarOpen, setConvidarOpen] = useState(false);
+  const [preCadastrosOpen, setPreCadastrosOpen] = useState(false);
   const [modoExclusao, setModoExclusao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -106,6 +110,24 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
               </button>
             )}
 
+            {/* Pré-cadastros (respostas dos convites) — quem tem acesso ao módulo */}
+            {permissao.podeEditar && (
+              <button onClick={() => setPreCadastrosOpen(true)}
+                className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-200"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <UserPlus size={14} /> Pré-cadastros
+              </button>
+            )}
+
+            {/* Convidar parceiro (gera link) — quem tem acesso ao módulo */}
+            {permissao.podeEditar && (
+              <button onClick={() => setConvidarOpen(true)}
+                className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-200"
+                style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)" }}>
+                <Link2 size={14} /> Convidar
+              </button>
+            )}
+
             {/* Nova Indicação — quem pode editar */}
             {permissao.podeEditar && (
               <button onClick={() => setNovaIndicacaoOpen(true)}
@@ -179,6 +201,8 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
       <ModalNovaIndicacao open={novaIndicacaoOpen} onClose={() => setNovaIndicacaoOpen(false)} onDone={() => router.refresh()} accent={accent} />
       <ModalEngrenagem open={engrenagemOpen} onClose={() => setEngrenagemOpen(false)} accent={accent} />
       <ModalTermo open={termoOpen} onClose={() => setTermoOpen(false)} accent={accent} />
+      <ModalConvidarParceiro open={convidarOpen} onClose={() => setConvidarOpen(false)} />
+      <ModalPreCadastros open={preCadastrosOpen} onClose={() => setPreCadastrosOpen(false)} isAdmin={permissao.isAdmin} onAprovado={() => router.refresh()} />
 
       {/* Confirmação de exclusão */}
       {confirmOpen && (
