@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isAdminOrCeo(role: string) {
-    return role === "FINANCEIRO" || role === "Lider Comercial" || role === "Admin" || role === "CEO";   
+    return role === "FINANCEIRO" || role === "Lider Comercial" || role === "Admin" || role === "CEO" || role === "COMERCIAL";   
 }
 
 /**
@@ -26,7 +26,7 @@ function servicoContaComoVenda(servico: string | null | undefined): boolean {
 }
 
 function isComercialOrAdmin(role: string) {
-    return role === "FINANCEIRO" || role === "Lider Comercial" || role === "Admin" || role === "CEO";
+    return role === "FINANCEIRO" || role === "Lider Comercial" || role === "Admin" || role === "CEO" || role === "COMERCIAL";
 }
 
 // ─── Schemas Zod ─────────────────────────────────────────────────────────────

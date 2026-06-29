@@ -48,6 +48,13 @@
 **Contexto:** Qualquer envio de imagem do usuário para agentes Onyx.
 **Adicionado em:** 2026-06-26
 
+### Imagem do agente Onyx some ao recarregar a conversa
+**Sintoma:** Imagens (geradas e enviadas) aparecem durante o chat mas somem ao atualizar a página.
+**Causa (dupla):** (1) Imagem GERADA: o Onyx persiste no texto da mensagem como `![alt](file://{uuid})` — esquema `file://` não renderiza no browser, e `files[]` da mensagem fica vazio. (2) Imagem ENVIADA: vem em `files[]` na reidratação, MAS a bolha do USUÁRIO renderiza texto puro (não markdown), então embutir como markdown não funciona.
+**Fix:** Na rota `/api/onyx/session/[id]`, reescrever `file://{uuid}` → `/api/onyx/file/{uuid}` no `content`. No `loadSession` (BibbleChatLayout): mensagem do usuário recebe imagens via `message.files` (AnexoPreview renderiza); mensagem do assistente recebe via markdown no content (ReactMarkdown renderiza).
+**Contexto:** Reidratação de conversas com agente Onyx. Sessões antigas (pré-fix do upload 307) não têm a imagem enviada salva — irrecuperável.
+**Adicionado em:** 2026-06-26
+
 ### Prisma update P2025 em rotas idempotentes (heartbeat)
 **Sintoma:** `PrismaClientKnownRequestError P2025: No record was found for an update` em log recorrente.
 **Causa:** `.update()` lança quando o `where` não acha registro. Ex.: sessão JWT válida com email de usuário já removido/renomeado.

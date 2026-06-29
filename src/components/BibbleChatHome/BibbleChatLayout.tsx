@@ -267,15 +267,24 @@ export default function BibbleChatLayout({
         if (onyxData.onyx) {
           setMessages(
             onyxData.messages.map(m => {
-              // Embute as imagens como markdown — o bubble já renderiza ![](src).
+              if (m.role === "user") {
+                // Bolha do usuário renderiza anexos via files[] (AnexoPreview),
+                // não markdown — então a imagem enviada vai como file.
+                const { display } = splitPersisted(m.content);
+                return {
+                  id: m.id,
+                  role: "user" as const,
+                  content: display,
+                  files: m.images.map(img => ({ name: img.name, type: "image/png", url: img.src })),
+                };
+              }
+              // Bolha do assistente renderiza markdown — imagens (geradas) já vêm
+              // embutidas no content como ![](/api/onyx/file/...); as de files[]
+              // (raras no assistente) são anexadas como markdown.
+              const { content, thinkContent } = splitThink(m.content);
               const imgMd = m.images
                 .map(img => `\n\n![${img.name.replace(/[[\]]/g, "")}](${img.src})`)
                 .join("");
-              if (m.role === "user") {
-                const { display } = splitPersisted(m.content);
-                return { id: m.id, role: "user" as const, content: display + imgMd };
-              }
-              const { content, thinkContent } = splitThink(m.content);
               return { id: m.id, role: "assistant" as const, content: content + imgMd, thinkContent };
             })
           );

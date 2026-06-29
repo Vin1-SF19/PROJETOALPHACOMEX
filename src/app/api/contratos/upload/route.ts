@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const role = user.role ?? "";
-    const isPermitido = role === "Admin" || role === "CEO" || role === "FINANCEIRO" || role === "Lider Comercial";
+    const isPermitido = role === "Admin" || role === "CEO" || role === "FINANCEIRO" || role === "Lider Comercial" || role === "COMERCIAL";
     if (!isPermitido) {
         return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
     }

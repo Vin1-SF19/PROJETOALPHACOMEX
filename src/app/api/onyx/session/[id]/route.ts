@@ -45,15 +45,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const messages = (data.messages ?? [])
       // Ignora mensagens de sistema/vazias sem arquivos
       .filter((m) => m.message?.trim() || (m.files?.length ?? 0) > 0)
-      .map((m) => ({
-        id: String(m.message_id),
-        role: m.message_type === "user" ? ("user" as const) : ("assistant" as const),
-        content: m.message ?? "",
-        // Anexos de imagem → URL do proxy autenticado.
-        images: (m.files ?? [])
-          .filter((f) => f.type === "image")
-          .map((f) => ({ id: f.id, name: f.name ?? "imagem", src: `/api/onyx/file/${f.id}` })),
-      }));
+      .map((m) => {
+        // O Onyx embute imagens geradas no texto como ![alt](file://{uuid}).
+        // Reescreve para o proxy autenticado /api/onyx/file/{uuid} (file:// não
+        // renderiza no browser). Cobre tanto links markdown quanto file:// solto.
+        const content = (m.message ?? "")
+          .replace(/file:\/\/([a-f0-9-]+)/gi, "/api/onyx/file/$1");
+
+        return {
+          id: String(m.message_id),
+          role: m.message_type === "user" ? ("user" as const) : ("assistant" as const),
+          content,
+          // Anexos de imagem em files[] → URL do proxy autenticado.
+          images: (m.files ?? [])
+            .filter((f) => f.type === "image")
+            .map((f) => ({ id: f.id, name: f.name ?? "imagem", src: `/api/onyx/file/${f.id}` })),
+        };
+      });
 
     return NextResponse.json({ onyx: true, messages });
   } catch (err) {
