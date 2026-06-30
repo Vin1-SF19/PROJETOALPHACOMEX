@@ -31,6 +31,7 @@ interface BibbleChatWindowProps {
   sessionTitle: string;
   messages: Message[];
   userName: string;
+  userImage?: string | null;
   model: string;
   streamStatus: StreamStatus;
   inputValue: string;
@@ -62,6 +63,7 @@ export default function BibbleChatWindow({
   sessionTitle,
   messages,
   userName,
+  userImage,
   model,
   streamStatus,
   inputValue,
@@ -186,6 +188,7 @@ export default function BibbleChatWindow({
           <BibbleMessageList
             messages={messages}
             userName={userName}
+            userImage={userImage}
             agentActive={hasActiveAgent}
             agentAvatarUrl={activeAgentAvatarUrl}
             agentName={activeAgentName}

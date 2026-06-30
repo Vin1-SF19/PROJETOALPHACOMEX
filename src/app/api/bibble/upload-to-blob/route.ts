@@ -5,7 +5,7 @@ import { extractTextFromBuffer } from "@/lib/bibble/tika";
 
 export const dynamic = "force-dynamic";
 
-const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_SIZE = 100 * 1024 * 1024; // 100MB
 
 const ALLOWED_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",

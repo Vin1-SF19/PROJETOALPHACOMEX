@@ -14,6 +14,7 @@ import { getTema } from "@/lib/temas";
 interface BibbleChatLayoutProps {
   userId: number;
   userName: string;
+  userImage?: string | null;
   role?: string;
   sessoesIniciais: SessionSummary[];
   temaName?: string;
@@ -70,6 +71,7 @@ function splitPersisted(raw: string): { display: string; full: string } {
 
 export default function BibbleChatLayout({
   userName,
+  userImage,
   role,
   sessoesIniciais,
   temaName,
@@ -179,7 +181,7 @@ export default function BibbleChatLayout({
 
   /* ── Add & upload files ─────────────────────────────────── */
   const handleAddFiles = useCallback((newFiles: File[]) => {
-    const MAX_SIZE = 50 * 1024 * 1024;
+    const MAX_SIZE = 100 * 1024 * 1024;
     const ALLOWED = [
       "image/jpeg","image/png","image/gif","image/webp","image/svg+xml",
       "video/mp4","video/webm","video/quicktime",
@@ -884,6 +886,7 @@ export default function BibbleChatLayout({
         sessionTitle={activeSession?.title ?? "Nova conversa"}
         messages={messages}
         userName={userName}
+        userImage={userImage}
         model={model}
         streamStatus={streamStatus}
         inputValue={inputValue}

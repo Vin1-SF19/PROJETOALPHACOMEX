@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import {
   X, Bot, Wrench, Plus, Trash2, Pencil, MessageSquare,
-  Loader2, Check, AlertTriangle, ArrowLeft, Sparkles, ImagePlus,
+  Loader2, Check, AlertTriangle, ArrowLeft, Sparkles, ImagePlus, Wand2,
   Globe, Lock, User, Users, Search, LayoutGrid, Pin, HelpCircle,
 } from "lucide-react";
 import {
@@ -86,6 +86,7 @@ export default function OnyxAgentsModal({
   const [saving, setSaving] = useState(false);
   const [imgPreview, setImgPreview] = useState<string | null>(null); // object URL ou avatar URL
   const [imgUploading, setImgUploading] = useState(false);
+  const [imgGenerating, setImgGenerating] = useState(false);
   const [loadingPrompt, setLoadingPrompt] = useState(false); // carrega o detalhe (system_prompt)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -181,6 +182,31 @@ export default function OnyxAgentsModal({
   const removeImage = () => {
     setForm(f => ({ ...f, uploaded_image_id: null, remove_image: true }));
     setImgPreview(null);
+  };
+
+  const generateAvatar = async () => {
+    if (!form.system_prompt.trim()) return;
+    setError(null);
+    setImgGenerating(true);
+    try {
+      const res = await fetch("/api/onyx/agents/generate-avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: form.description,
+          system_prompt: form.system_prompt,
+          tool_ids: form.tool_ids ?? [],
+        }),
+      });
+      const data = (await res.json()) as { uploaded_image_id?: string; previewDataUrl?: string; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? `Erro ${res.status}`);
+      setForm(f => ({ ...f, uploaded_image_id: data.uploaded_image_id ?? null, remove_image: false }));
+      setImgPreview(data.previewDataUrl ?? null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setImgGenerating(false);
+    }
   };
 
   const saveAgent = async () => {
@@ -575,15 +601,30 @@ export default function OnyxAgentsModal({
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={imgUploading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-50"
-                    style={{ background: "rgba(79,70,229,0.18)", border: "1px solid rgba(99,102,241,0.3)", color: "#a5b4fc" }}
-                  >
-                    <ImagePlus size={13} /> {imgPreview ? "Trocar imagem" : "Adicionar imagem"}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={imgUploading || imgGenerating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-50"
+                      style={{ background: "rgba(79,70,229,0.18)", border: "1px solid rgba(99,102,241,0.3)", color: "#a5b4fc" }}
+                    >
+                      <ImagePlus size={13} /> {imgPreview ? "Trocar imagem" : "Adicionar imagem"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={generateAvatar}
+                      disabled={!form.system_prompt.trim() || imgUploading || imgGenerating}
+                      title={!form.system_prompt.trim() ? "Preencha o system prompt para gerar avatar" : "Gerar avatar com IA"}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40"
+                      style={{ background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.3)", color: "#c4b5fd" }}
+                    >
+                      {imgGenerating
+                        ? <><Loader2 size={13} className="animate-spin" /> Gerando…</>
+                        : <><Wand2 size={13} /> Gerar imagem</>
+                      }
+                    </button>
+                  </div>
                   {imgPreview && (
                     <button type="button" onClick={removeImage} className="text-[10px] font-bold text-left transition-colors hover:text-red-400" style={{ color: "#6b7fa0" }}>
                       Remover imagem

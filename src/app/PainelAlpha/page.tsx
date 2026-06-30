@@ -15,6 +15,7 @@ export default async function PainelAlpha() {
     (session.user as { nome?: string; name?: string }).nome ||
     (session.user as { nome?: string; name?: string }).name ||
     "Operador";
+  const userImage = (session.user as { imagemUrl?: string }).imagemUrl || null;
 
   const userRecord = await db.usuarios.findUnique({
     where: { id: userId },
@@ -34,6 +35,7 @@ export default async function PainelAlpha() {
       <BibbleChatLayout
         userId={userId}
         userName={nome}
+        userImage={userImage}
         role={session.user.role as string | undefined}
         temaName={temaName}
         sessoesIniciais={sessoesIniciais.map(s => ({

@@ -244,13 +244,17 @@ function AgentAvatar({ avatarUrl, name, streaming }: { avatarUrl?: string | null
   );
 }
 
-function UserAvatar({ initials }: { initials: string }) {
+function UserAvatar({ initials, imageUrl }: { initials: string; imageUrl?: string | null }) {
   return (
     <div
-      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+      className="w-7 h-7 rounded-lg overflow-hidden grid place-items-center shrink-0 relative"
       style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)" }}
     >
-      <span className="font-black text-[10px]" style={{ color: "#a5b4fc" }}>{initials}</span>
+      {imageUrl ? (
+        <Image src={imageUrl} alt={initials} fill unoptimized className="object-cover" />
+      ) : (
+        <span className="font-black text-[10px]" style={{ color: "#a5b4fc" }}>{initials}</span>
+      )}
     </div>
   );
 }
@@ -553,10 +557,11 @@ function ImagemRespostaMarkdown({ url, alt }: { url: string; alt: string }) {
 // ── User bubble (com edição inline) ───────────────────────────────────────────
 
 function UserBubble({
-  message, initials, timeStr, attachedFiles, textoExibido, podeEditar, onEdit,
+  message, initials, imageUrl, timeStr, attachedFiles, textoExibido, podeEditar, onEdit,
 }: {
   message: Message;
   initials: string;
+  imageUrl?: string | null;
   timeStr: string;
   attachedFiles: Array<{ name: string; type: string; url?: string; size?: number }>;
   textoExibido: string;
@@ -659,7 +664,7 @@ function UserBubble({
           </time>
         )}
       </div>
-      <UserAvatar initials={initials} />
+      <UserAvatar initials={initials} imageUrl={imageUrl} />
     </div>
   );
 }
@@ -669,6 +674,7 @@ function UserBubble({
 export default function BibbleMessageBubble({
   message,
   userName,
+  userImage,
   agentActive,
   agentAvatarUrl,
   agentName,
@@ -678,6 +684,7 @@ export default function BibbleMessageBubble({
 }: {
   message: Message;
   userName: string;
+  userImage?: string | null;
   agentActive?: boolean;
   agentAvatarUrl?: string | null;
   agentName?: string | null;
@@ -721,6 +728,7 @@ export default function BibbleMessageBubble({
       <UserBubble
         message={message}
         initials={initials}
+        imageUrl={userImage}
         timeStr={timeStr}
         attachedFiles={attachedFiles}
         textoExibido={textoExibido}

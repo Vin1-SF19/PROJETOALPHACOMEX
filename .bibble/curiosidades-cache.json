@@ -355,7 +355,7 @@
     "entries": [
       {
         "text": "Os tentáculos dos polvos são incrivelmente inteligentes; eles podem usar ferramentas e abrir fechaduras simples. Além disso, eles mudam a cor e camuflagem quase instantaneamente com células especializadas chamadas cromatóforos.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -651,6 +651,14 @@
     "entries": [
       {
         "text": "O recorde mundial de altitude nunca foi alcançado por um ser humano vivo na estratosfera (a camada onde voam os balões meteorológicos). Astronautas já realizaram passeios orbitais, mas a Altitude Recorde é um feito distinto.",
+        "shown": 1
+      }
+    ]
+  },
+  "navios cargueiros": {
+    "entries": [
+      {
+        "text": "O Galeão de Manila, antes dos atuais carregadores, era um tipo de navio muito importante. Ele transportava prata da América para a China e voltava com porcelana de luxo.",
         "shown": 1
       }
     ]

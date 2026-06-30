@@ -7,6 +7,7 @@ import BibbleScrollToBottom from "./BibbleScrollToBottom";
 interface BibbleMessageListProps {
   messages: Message[];
   userName: string;
+  userImage?: string | null;
   agentActive?: boolean;
   agentAvatarUrl?: string | null;
   agentName?: string | null;
@@ -21,7 +22,7 @@ interface BibbleMessageListProps {
 const BOTTOM_THRESHOLD = 120;
 
 export default function BibbleMessageList({
-  messages, userName, agentActive, agentAvatarUrl, agentName, onEditMessage, isStreaming, accent,
+  messages, userName, userImage, agentActive, agentAvatarUrl, agentName, onEditMessage, isStreaming, accent,
 }: BibbleMessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -69,6 +70,7 @@ export default function BibbleMessageList({
               key={msg.id}
               message={msg}
               userName={userName}
+              userImage={userImage}
               agentActive={agentActive}
               agentAvatarUrl={agentAvatarUrl}
               agentName={agentName}

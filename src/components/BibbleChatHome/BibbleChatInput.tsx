@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Square, Paperclip, X, FileText, Image, Video, File, Palette, ChevronDown, Check } from "lucide-react";
 import { type StreamStatus } from "./BibbleChatLayout";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,16 @@ export default function BibbleChatInput({
   onVozUsada,
 }: BibbleChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [focused, setFocused] = useState(false);
+
+  // Auto-resize: cresce com o conteúdo até ~10 linhas, depois rola.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [value]);
 
   // ── Seletor de modelo de imagem (default GLOBAL no Onyx, admin only) ──
   const [imgModels, setImgModels] = useState<OnyxImageModel[] | null>(null);
@@ -322,19 +331,20 @@ export default function BibbleChatInput({
 
           {/* Textarea */}
           <textarea
+            ref={textareaRef}
             value={value}
             onChange={e => onChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             onKeyDown={e => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
                 handleSend();
               }
             }}
             placeholder={isStreaming ? "..." : placeholder}
             disabled={disabled || isStreaming}
-            className="w-full bg-transparent text-[13px] text-slate-100 placeholder:text-slate-600 resize-none outline-none leading-relaxed min-h-[36px] sm:min-h-[40px] max-h-[160px] overflow-y-auto mt-1.5"
+            className="w-full bg-transparent text-[13px] text-slate-100 placeholder:text-slate-600 resize-none outline-none leading-relaxed min-h-[36px] sm:min-h-[40px] max-h-[264px] overflow-y-auto mt-1.5"
             style={{ caretColor: isStreaming ? "#475569" : `rgba(${ac}, 1)` }}
             rows={1}
           />
