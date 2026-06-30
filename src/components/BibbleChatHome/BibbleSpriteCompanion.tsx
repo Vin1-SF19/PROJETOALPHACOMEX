@@ -384,6 +384,8 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
               height={72}
               className="object-contain"
               style={{
+                width: 72,
+                height: 72,
                 filter: "drop-shadow(0 2px 12px rgba(99,102,241,0.45))",
               }}
               priority

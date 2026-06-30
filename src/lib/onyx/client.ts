@@ -506,3 +506,444 @@ export async function askOnyxOneShot(
     clearTimeout(timer);
   }
 }
+
+// ─── Voz (Omni Voice) ─────────────────────────────────────────────────────────
+
+export interface VoiceStatus {
+  stt_enabled: boolean;
+  tts_enabled: boolean;
+}
+
+/** Status do serviço de voz (TTS/STT habilitados ou não). */
+export function getVoiceStatus(): Promise<VoiceStatus> {
+  return onyxJson<VoiceStatus>("/voice/status", { method: "GET", timeoutMs: 8_000 });
+}
+
+/**
+ * TTS: sintetiza fala a partir de texto. Retorna a Response BRUTA do Onyx —
+ * a rota proxy decide como repassar o áudio ao browser (binário ou JSON).
+ */
+export function synthesizeVoice(
+  params: { text: string; voice?: string; speed?: number; userToken?: string | null },
+): Promise<Response> {
+  return onyxFetch("/voice/synthesize", {
+    method: "POST",
+    timeoutMs: 60_000,
+    userToken: params.userToken,
+    body: JSON.stringify({
+      text: params.text,
+      ...(params.voice ? { voice: params.voice } : {}),
+      ...(params.speed ? { speed: params.speed } : {}),
+    }),
+  });
+}
+
+/**
+ * STT: transcreve áudio para texto (multipart, campo "audio").
+ * Retorna a Response BRUTA do Onyx (JSON com o texto transcrito).
+ */
+export async function transcribeAudio(audio: Blob, filename: string, userToken?: string | null): Promise<Response> {
+  if (!isOnyxConfigured()) throw new OnyxError("Onyx não configurado.", 503);
+  const form = new FormData();
+  form.append("audio", audio, filename);
+  return fetch(`${ONYX_BASE}/api/voice/transcribe`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${userToken?.trim() || API_KEY}` },
+    body: form,
+  });
+}
+
+// ─── Conectores (Connectors / CC-pairs / Credentials / Document Sets) ─────────
+//
+// No Onyx, uma "fonte de conhecimento" (RAG) é um par Connector + Credential
+// (chamado CC-pair). A UI de Conectores gerencia: o estado de indexação de cada
+// fonte, criação/edição/pausa/exclusão, reindexação forçada (run-once), as
+// credenciais e os document sets (agrupamentos de fontes para busca).
+//
+// IMPORTANTE: tudo aqui afeta o RAG GLOBAL do Onyx (todos os agentes). As rotas
+// /api/onyx/connectors/* restringem a Admin/CEO + permissão conectoresIAlpha.
+
+/** Status de uma fonte de conhecimento (CC-pair). */
+export type CCPairStatus = "ACTIVE" | "PAUSED" | "DELETING" | "INVALID";
+
+/** Resultado da última tentativa de indexação. */
+export type IndexStatus =
+  | "not_started"
+  | "in_progress"
+  | "success"
+  | "canceled"
+  | "failed"
+  | "completed_with_errors"
+  | "invalid";
+
+/** Uma fonte de conhecimento como aparece na tabela de status. */
+export interface ConnectorIndexingStatus {
+  cc_pair_id: number;
+  name: string | null;
+  source: string;
+  access_type: string;
+  cc_pair_status: CCPairStatus;
+  in_progress: boolean;
+  in_repeated_error_state: boolean;
+  last_finished_status: IndexStatus | null;
+  last_status: IndexStatus | null;
+  last_success: string | null;
+  is_editable: boolean;
+  docs_indexed: number;
+  latest_index_attempt_docs_indexed?: number | null;
+}
+
+/** Resumo por tipo de fonte (cabeçalho de cada grupo). */
+export interface ConnectorSourceSummary {
+  total_connectors: number;
+  active_connectors: number;
+  public_connectors: number;
+  total_docs_indexed: number;
+}
+
+/** Grupo de fontes do mesmo tipo (a resposta de indexing-status é paginada/agrupada). */
+export interface ConnectorIndexingGroup {
+  source: string;
+  summary: ConnectorSourceSummary;
+  current_page: number;
+  total_pages: number;
+  indexing_statuses: ConnectorIndexingStatus[];
+}
+
+/**
+ * Lista o estado de indexação de TODAS as fontes, agrupado por tipo.
+ * Endpoint é POST (não GET) e aceita paginação. Sem corpo = primeira página
+ * de cada grupo.
+ */
+export function listConnectorIndexingStatus(
+  body: { secondary_index?: boolean } = {},
+): Promise<ConnectorIndexingGroup[]> {
+  return onyxJson<ConnectorIndexingGroup[]>("/manage/admin/connector/indexing-status", {
+    method: "POST",
+    timeoutMs: 30_000,
+    body: JSON.stringify({ secondary_index: body.secondary_index ?? false }),
+  });
+}
+
+/** Detalhe completo de um CC-pair (página de detalhe da fonte). */
+export interface CCPairFullInfo {
+  id: number;
+  name: string;
+  status: CCPairStatus;
+  in_repeated_error_state: boolean;
+  num_docs_indexed: number;
+  connector: OnyxConnector;
+  credential: OnyxCredential | null;
+  number_of_index_attempts: number;
+  last_index_attempt_status: IndexStatus | null;
+  access_type: string;
+  is_editable_for_current_user: boolean;
+  indexing: boolean;
+  creator_email?: string | null;
+  last_indexed?: string | null;
+  last_pruned?: string | null;
+  overall_indexing_speed?: number | null;
+  latest_checkpoint_description?: string | null;
+  supports_targeted_reindex?: boolean;
+}
+
+export function getCCPair(ccPairId: number): Promise<CCPairFullInfo> {
+  return onyxJson<CCPairFullInfo>(`/manage/admin/cc-pair/${ccPairId}`, { method: "GET" });
+}
+
+/** Pausa ou reativa uma fonte. */
+export async function setCCPairStatus(ccPairId: number, status: CCPairStatus): Promise<void> {
+  await onyxJson<void>(`/manage/admin/cc-pair/${ccPairId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
+}
+
+/** Renomeia uma fonte. */
+export async function renameCCPair(ccPairId: number, name: string): Promise<void> {
+  await onyxJson<void>(`/manage/admin/cc-pair/${ccPairId}/name?new_name=${encodeURIComponent(name)}`, {
+    method: "PUT",
+  });
+}
+
+/** Força uma reindexação agora (run-once). */
+export async function runConnectorOnce(
+  connectorId: number,
+  credentialIds: number[],
+  fromBeginning = false,
+): Promise<void> {
+  await onyxJson<void>("/manage/admin/connector/run-once", {
+    method: "POST",
+    body: JSON.stringify({
+      connector_id: connectorId,
+      credential_ids: credentialIds,
+      from_beginning: fromBeginning,
+    }),
+  });
+}
+
+/** Agenda a exclusão de uma fonte (connector + credential pair). */
+export async function deleteCCPair(connectorId: number, credentialId: number): Promise<void> {
+  await onyxJson<void>("/manage/admin/deletion-attempt", {
+    method: "POST",
+    body: JSON.stringify({ connector_id: connectorId, credential_id: credentialId }),
+  });
+}
+
+// ─── Connector (definição da fonte, sem credencial) ───────────────────────────
+
+export interface OnyxConnector {
+  id: number;
+  name: string;
+  source: string;
+  input_type: string;
+  connector_specific_config: Record<string, unknown>;
+  refresh_freq: number | null;
+  prune_freq: number | null;
+  indexing_start: string | null;
+  credential_ids?: number[];
+  time_created?: string;
+  time_updated?: string;
+}
+
+export interface CreateConnectorInput {
+  name: string;
+  source: string;
+  input_type: string;
+  connector_specific_config: Record<string, unknown>;
+  access_type?: string;
+  refresh_freq?: number | null;
+  prune_freq?: number | null;
+}
+
+export function createConnector(input: CreateConnectorInput): Promise<OnyxConnector> {
+  return onyxJson<OnyxConnector>("/manage/admin/connector", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      source: input.source,
+      input_type: input.input_type,
+      connector_specific_config: input.connector_specific_config,
+      access_type: input.access_type ?? "public",
+      refresh_freq: input.refresh_freq ?? null,
+      prune_freq: input.prune_freq ?? null,
+      groups: [],
+    }),
+  });
+}
+
+export function updateConnector(
+  connectorId: number,
+  input: CreateConnectorInput,
+): Promise<OnyxConnector> {
+  return onyxJson<OnyxConnector>(`/manage/admin/connector/${connectorId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: input.name,
+      source: input.source,
+      input_type: input.input_type,
+      connector_specific_config: input.connector_specific_config,
+      access_type: input.access_type ?? "public",
+      refresh_freq: input.refresh_freq ?? null,
+      prune_freq: input.prune_freq ?? null,
+      groups: [],
+    }),
+  });
+}
+
+/** Liga um connector a uma credencial, criando o CC-pair com nome de exibição. */
+export async function linkConnectorCredential(
+  connectorId: number,
+  credentialId: number,
+  name: string,
+  accessType = "public",
+): Promise<void> {
+  await onyxJson<void>(`/manage/connector/${connectorId}/credential/${credentialId}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, access_type: accessType, groups: [] }),
+  });
+}
+
+// ─── Credentials ──────────────────────────────────────────────────────────────
+
+export interface OnyxCredential {
+  id: number;
+  name: string | null;
+  source: string;
+  credential_json: Record<string, unknown>;
+  admin_public: boolean;
+  curator_public: boolean;
+  user_email?: string | null;
+  time_created?: string;
+  time_updated?: string;
+}
+
+export function listCredentials(): Promise<OnyxCredential[]> {
+  return onyxJson<OnyxCredential[]>("/manage/credential", { method: "GET" });
+}
+
+export interface CreateCredentialInput {
+  name?: string;
+  source: string;
+  credential_json: Record<string, unknown>;
+  admin_public?: boolean;
+  curator_public?: boolean;
+}
+
+export function createCredential(input: CreateCredentialInput): Promise<OnyxCredential> {
+  return onyxJson<OnyxCredential>("/manage/credential", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name ?? null,
+      source: input.source,
+      credential_json: input.credential_json,
+      admin_public: input.admin_public ?? true,
+      curator_public: input.curator_public ?? true,
+      groups: [],
+    }),
+  });
+}
+
+export async function deleteCredential(credentialId: number): Promise<void> {
+  await onyxJson<void>(`/manage/credential/${credentialId}`, { method: "DELETE" });
+}
+
+// ─── Document Sets ──────────────────────────────────────────────────────────
+
+export interface OnyxDocumentSet {
+  id: number;
+  name: string;
+  description: string;
+  is_public: boolean;
+  is_up_to_date?: boolean;
+  cc_pair_descriptors?: Array<{ id: number; name: string | null }>;
+}
+
+export function listDocumentSets(): Promise<OnyxDocumentSet[]> {
+  return onyxJson<OnyxDocumentSet[]>("/manage/document-set", { method: "GET" });
+}
+
+export interface CreateDocumentSetInput {
+  name: string;
+  description: string;
+  cc_pair_ids: number[];
+  is_public?: boolean;
+}
+
+export function createDocumentSet(input: CreateDocumentSetInput): Promise<number> {
+  return onyxJson<number>("/manage/admin/document-set", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      description: input.description,
+      cc_pair_ids: input.cc_pair_ids,
+      is_public: input.is_public ?? true,
+      users: [],
+      groups: [],
+      federated_connectors: [],
+    }),
+  });
+}
+
+export async function updateDocumentSet(input: {
+  id: number;
+  description: string;
+  cc_pair_ids: number[];
+  is_public?: boolean;
+}): Promise<void> {
+  await onyxJson<void>("/manage/admin/document-set", {
+    method: "PATCH",
+    body: JSON.stringify({
+      id: input.id,
+      description: input.description,
+      cc_pair_ids: input.cc_pair_ids,
+      is_public: input.is_public ?? true,
+      users: [],
+      groups: [],
+      federated_connectors: [],
+    }),
+  });
+}
+
+export async function deleteDocumentSet(documentSetId: number): Promise<void> {
+  await onyxJson<void>(`/manage/admin/document-set/${documentSetId}`, { method: "DELETE" });
+}
+
+// ─── Upload de arquivos para conector File ────────────────────────────────────
+
+export interface UploadedFileRef {
+  /** caminho/id retornado pelo Onyx, usado em connector_specific_config.file_locations */
+  file_paths: string[];
+  file_names: string[];
+}
+
+/**
+ * Faz upload de arquivos para criar/alimentar um conector do tipo "file".
+ * Retorna os file_paths que vão em connector_specific_config.file_locations.
+ */
+export async function uploadConnectorFiles(
+  files: Array<{ blob: Blob; name: string }>,
+): Promise<UploadedFileRef> {
+  if (!isOnyxConfigured()) throw new OnyxError("Onyx não configurado.", 503);
+  if (files.length === 0) return { file_paths: [], file_names: [] };
+
+  const form = new FormData();
+  for (const f of files) form.append("files", f.blob, f.name);
+
+  const res = await fetch(`${ONYX_BASE}/api/manage/admin/connector/file/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${API_KEY}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new OnyxError(body || `Onyx respondeu ${res.status}`, res.status);
+  }
+  const data = (await res.json()) as { file_paths?: string[]; file_names?: string[] };
+  return {
+    file_paths: data.file_paths ?? [],
+    file_names: data.file_names ?? files.map((f) => f.name),
+  };
+}
+
+// ─── Google (Gmail / Drive) — fluxo de conta de serviço dedicado ──────────────
+//
+// O Onyx NÃO cria a credencial Google pelo /manage/credential genérico. São dois
+// passos próprios:
+//   1) PUT .../{gmail|google-drive}/service-account-key  → guarda o JSON da
+//      conta de serviço no servidor (a "chave do app").
+//   2) PUT .../{gmail|google-drive}/service-account-credential → recebe só o
+//      google_primary_admin (e-mail do admin a impersonar) e RETORNA o
+//      credential_id já pronto, combinando com a chave guardada.
+// Por isso o google_primary_admin nunca vai dentro do credential_json.
+
+export type GoogleSource = "gmail" | "google-drive";
+
+/** Passo 1: guarda o JSON da conta de serviço no servidor. */
+export async function setGoogleServiceAccountKey(
+  source: GoogleSource,
+  serviceAccountKey: Record<string, unknown>,
+): Promise<void> {
+  await onyxJson<void>(`/manage/admin/connector/${source}/service-account-key`, {
+    method: "PUT",
+    body: JSON.stringify(serviceAccountKey),
+  });
+}
+
+/** Passo 2: cria a credencial com o admin a impersonar; retorna o credential_id. */
+export async function createGoogleServiceAccountCredential(
+  source: GoogleSource,
+  googlePrimaryAdmin: string,
+): Promise<number> {
+  // O Onyx retorna o id da credencial em `id` (não `credential_id`).
+  const res = await onyxJson<{ id?: number; credential_id?: number }>(
+    `/manage/admin/connector/${source}/service-account-credential`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ google_primary_admin: googlePrimaryAdmin }),
+    },
+  );
+  const id = res.id ?? res.credential_id;
+  if (id == null) throw new OnyxError("Onyx não retornou o id da credencial Google.", 502);
+  return id;
+}

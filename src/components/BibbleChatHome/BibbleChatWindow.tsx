@@ -46,6 +46,7 @@ interface BibbleChatWindowProps {
   onClearAgent?: () => void;
   isAdmin?: boolean;
   imageGenAvailable?: boolean;
+  onVozUsada?: () => void;
   uploadFiles: UploadedFile[];
   onFilesChange: (files: UploadedFile[]) => void;
   showFiles: boolean;
@@ -76,6 +77,7 @@ export default function BibbleChatWindow({
   onClearAgent,
   isAdmin,
   imageGenAvailable,
+  onVozUsada,
   uploadFiles,
   onFilesChange,
   showFiles,
@@ -189,6 +191,7 @@ export default function BibbleChatWindow({
             agentName={activeAgentName}
             onEditMessage={onEditMessage}
             isStreaming={isStreaming}
+            accent={ac}
           />
 
           <BibbleChatInput
@@ -204,6 +207,7 @@ export default function BibbleChatWindow({
             showFiles={showFiles}
             onToggleFiles={onToggleFiles}
             onSelectFiles={onSelectFiles}
+            onVozUsada={onVozUsada}
             tema={tema}
             isAdmin={isAdmin}
             imageGenAvailable={imageGenAvailable}
@@ -231,6 +235,7 @@ export default function BibbleChatWindow({
             showFiles={showFiles}
             onToggleFiles={onToggleFiles}
             onSelectFiles={onSelectFiles}
+            onVozUsada={onVozUsada}
             tema={tema}
             isAdmin={isAdmin}
             imageGenAvailable={imageGenAvailable}

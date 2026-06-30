@@ -6,6 +6,7 @@ import { type StreamStatus } from "./BibbleChatLayout";
 import { cn } from "@/lib/utils";
 import type { UploadedFile } from "./BibbleFileUpload";
 import { type TemaAlpha } from "@/lib/temas";
+import { BotaoMicrofone } from "./BotaoMicrofone";
 import {
   fetchImageModels, setDefaultImageModel, imageModelLabel, detectsImageIntent,
   type OnyxImageModel,
@@ -30,6 +31,8 @@ interface BibbleChatInputProps {
   isAdmin?: boolean;
   /** true quando o agente ativo tem a skill de geração de imagem */
   imageGenAvailable?: boolean;
+  /** Chamado quando o texto foi ditado por voz (para falar a resposta automaticamente) */
+  onVozUsada?: () => void;
 }
 
 const CHAR_COUNTER_THRESHOLD = 800;
@@ -52,6 +55,7 @@ export default function BibbleChatInput({
   tema,
   isAdmin,
   imageGenAvailable,
+  onVozUsada,
 }: BibbleChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
@@ -277,6 +281,13 @@ export default function BibbleChatInput({
             >
               <Paperclip size={15} />
             </button>
+
+            {/* Microfone — voz → texto (aparece só se o STT estiver ativo no Onyx) */}
+            <BotaoMicrofone
+              accent={ac}
+              disabled={isStreaming}
+              onTranscrito={(texto) => { onChange(value ? `${value} ${texto}` : texto); onVozUsada?.(); }}
+            />
 
             <div className="flex items-center gap-2">
               {showFiles && !isStreaming && (

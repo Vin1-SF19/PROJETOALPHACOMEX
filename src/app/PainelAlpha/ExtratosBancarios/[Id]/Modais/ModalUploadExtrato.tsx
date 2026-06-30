@@ -4,11 +4,10 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, Upload, Loader2, Check,
-    ChevronRight, Save, Search, ExternalLink,
+    ChevronRight, Save, Search,
     Files, Trash2, Minus, Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { ProcessarExtratoIA } from '@/actions/ocr';
 import { SalvarTransacoesLote } from '@/actions/transacao';
 
 interface Transacao {
@@ -54,7 +53,6 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
         setProgresso({ atual: 0, total: arquivos.length });
 
         let todasAsLinhas: any[] = [];
-        let dataParaOProximo = "";
 
         try {
             for (let i = 0; i < arquivos.length; i++) {
@@ -63,23 +61,28 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
                 const formData = new FormData();
                 formData.append("file", arquivos[i]);
                 formData.append("bancoId", String(dadosContexto?.bancoId));
-                formData.append("layoutAlvo", String(dadosContexto?.banco || ""));
-                formData.append("ultimaData", i === 0 ? "" : dataParaOProximo);
 
-                const res = await ProcessarExtratoIA(formData);
+                const res = await fetch("/api/onyx/extrato", {
+                    method: "POST",
+                    body: formData,
+                });
 
-                if (res.success && Array.isArray(res.data)) {
-                    dataParaOProximo = res.ultimaDataEncontrada || dataParaOProximo;
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({})) as { error?: string };
+                    throw new Error(err.error || `Erro ${res.status}`);
+                }
 
-                    const formatados = res.data.map((item: any, idx: number) => ({
+                const dados = await res.json() as { success: boolean; data?: any[]; error?: string };
+
+                if (dados.success && Array.isArray(dados.data)) {
+                    const formatados = dados.data.map((item: any, idx: number) => ({
                         id: `new-${i}-${idx}-${Date.now()}-${Math.random()}`,
                         data: item.data ? String(item.data).trim() : "",
                         descricao: item.descricao?.trim() || "LANÇAMENTO",
-                        valor: parseMoeda(item.valor), 
+                        valor: parseMoeda(item.valor),
                         selecionado: true,
-                        origem: arquivos[i].name
+                        origem: arquivos[i].name,
                     }));
-
                     todasAsLinhas = [...todasAsLinhas, ...formatados];
                 }
             }
@@ -88,7 +91,7 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
             setStatus('reviewing');
             setArquivos([]);
         } catch (error) {
-            toast.error("Erro no processamento");
+            toast.error((error as Error).message || "Erro no processamento");
             setStatus('idle');
         }
     };
@@ -182,16 +185,12 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
                         {status === 'idle' && (
                             <div className="h-full grid grid-cols-1 lg:grid-cols-2">
                                 <div className="p-12 flex flex-col items-center justify-center border-r border-white/5">
-                                    <a href="https://www.ilovepdf.com/pt/pdf_para_jpg" target="_blank" rel="noopener noreferrer" className="mb-8 flex items-center gap-3 px-6 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all group">
-                                        <ExternalLink size={14} className="group-hover:rotate-12 transition-transform" />
-                                        Converter PDF no iLovePDF
-                                    </a>
                                     <div onClick={() => fileInputRef.current?.click()} className="group w-full aspect-square max-w-[320px] border-2 border-dashed border-white/10 rounded-[3rem] bg-white/5 flex flex-col items-center justify-center gap-6 cursor-pointer hover:border-indigo-500/50 transition-all">
-                                        <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*" onChange={(e) => e.target.files && setArquivos(prev => [...prev, ...Array.from(e.target.files!)])} />
+                                        <input type="file" ref={fileInputRef} className="hidden" multiple accept=".pdf,application/pdf" onChange={(e) => e.target.files && setArquivos(prev => [...prev, ...Array.from(e.target.files!)])} />
                                         <div className="h-20 w-20 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-all"><Upload size={32} /></div>
                                         <div className="text-center px-6">
-                                            <h3 className="text-sm font-black text-white uppercase italic">Selecionar Imagens</h3>
-                                            <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest mt-2">Arraste as páginas do extrato aqui</p>
+                                            <h3 className="text-sm font-black text-white uppercase italic">Selecionar PDFs</h3>
+                                            <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest mt-2">Arraste os PDFs do extrato aqui</p>
                                         </div>
                                     </div>
                                 </div>
@@ -225,7 +224,7 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
                                     </div>
                                     {arquivos.length > 0 && (
                                         <button onClick={processarLote} className="mt-8 w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-lg">
-                                            Iniciar Processamento OCR <ChevronRight size={16} />
+                                            Processar com Agentes IA <ChevronRight size={16} />
                                         </button>
                                     )}
                                 </div>
@@ -235,7 +234,7 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
                         {status === 'scanning' && (
                             <div className="h-full flex flex-col items-center justify-center gap-6">
                                 <Loader2 size={80} className="text-indigo-500 animate-spin" />
-                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em]">Lendo página {progresso.atual} de {progresso.total}</p>
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em]">Processando arquivo {progresso.atual} de {progresso.total} via IA</p>
                             </div>
                         )}
 

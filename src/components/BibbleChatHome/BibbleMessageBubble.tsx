@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { BotaoFalarMensagem } from "./BotaoFalarMensagem";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -673,6 +674,7 @@ export default function BibbleMessageBubble({
   agentName,
   onEdit,
   isStreaming,
+  accent = "99, 102, 241",
 }: {
   message: Message;
   userName: string;
@@ -681,6 +683,7 @@ export default function BibbleMessageBubble({
   agentName?: string | null;
   onEdit?: (messageId: string, novoTexto: string) => void;
   isStreaming?: boolean;
+  accent?: string;
 }) {
   const isUser   = message.role === "user";
   const initials = userName.substring(0, 2).toUpperCase();
@@ -821,7 +824,10 @@ export default function BibbleMessageBubble({
                   {agentActive ? (agentName ?? "Agente") : "Bibble"}
                 </span>
               </div>
-              <CopyButton text={message.content} label="Copiar resposta" />
+              <div className="flex items-center gap-3">
+                <BotaoFalarMensagem texto={message.content} accent={accent} />
+                <CopyButton text={message.content} label="Copiar resposta" />
+              </div>
             </div>
 
             {/* Conteúdo */}

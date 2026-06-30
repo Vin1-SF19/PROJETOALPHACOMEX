@@ -27,6 +27,7 @@ interface BibbleEmptyStateProps {
   tema?: TemaAlpha;
   isAdmin?: boolean;
   imageGenAvailable?: boolean;
+  onVozUsada?: () => void;
 }
 
 export default function BibbleEmptyState({
@@ -47,6 +48,7 @@ export default function BibbleEmptyState({
   tema,
   isAdmin,
   imageGenAvailable,
+  onVozUsada,
 }: BibbleEmptyStateProps) {
   const [nameHovered, setNameHovered] = useState(false);
   const ac = tema?.accent ?? "99, 102, 241";
@@ -260,6 +262,7 @@ export default function BibbleEmptyState({
             showFiles={showFiles}
             onToggleFiles={onToggleFiles}
             onSelectFiles={onSelectFiles}
+            onVozUsada={onVozUsada}
             tema={tema}
             isAdmin={isAdmin}
             imageGenAvailable={imageGenAvailable}

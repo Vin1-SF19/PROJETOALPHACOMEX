@@ -431,3 +431,72 @@ Múltiplas dores de imagem no chat com agentes Onyx: conversa volta vazia ao rec
 ### Refletido também em
 - decisions.md: Onyx fonte de verdade do histórico; lightbox via portal.
 - known-errors.md: upload 307 do Onyx.
+
+---
+
+## [2026-06-29] — Módulo Conectores IAlpha (UI de gestão de RAG do Onyx)
+
+**Tags:** #feature #integration #onyx #nextjs
+**Agentes envolvidos:** Scout → Echo → Nova/Iris → Forge → Probe → Anubis → Lens → Scribe
+
+### Contexto
+Pedido: UI completa e funcional no PainelAlpha para os Conectores do Onyx (192.168.35.113:3000 / onyx.alpha-comex.com), com as mesmas funcionalidades. Decisões do usuário: escopo CRUD completo · acesso via módulo próprio com permissão · rota dedicada /PainelAlpha/Conectores.
+
+### O que foi feito
+- **API do Onyx mapeada** via openapi.json (743KB). Descobertas-chave: indexing-status é POST (não GET), agrupado por source; reindex = run-once (connector_id + credential_ids); criar = credencial→connector→link (PUT connector/cred)→run-once; upload em /manage/admin/connector/file/upload.
+- **client.ts** (+~330 linhas): seção Conectores — listConnectorIndexingStatus, getCCPair, setCCPairStatus, renameCCPair, runConnectorOnce, deleteCCPair, createConnector/updateConnector, linkConnectorCredential, listCredentials/createCredential/deleteCredential, listDocumentSets/createDocumentSet/updateDocumentSet/deleteDocumentSet, uploadConnectorFiles.
+- **Guard** `connectors-guard.ts`: authorizeConnectors() — auth() + Admin/CEO ou permissão conectoresIAlpha. Usado em todas as rotas.
+- **Rotas** `/api/onyx/connectors/{route,[ccPairId],credentials,document-sets,upload}` — proxy autorizado; PAT só no server.
+- **Registry**: 1 entrada conectoresIAlpha (categoria admin, allowedRoles Admin/CEO, iconName Cable). Ícone Cable somado ao import + ICON_MAP da GlobalSidebar.
+- **UI** `ConectoresClient.tsx`: abas (Conectores/Document Sets/Credenciais), tabela com status colorido + polling 15s, ações reindex/pause/resume/excluir, modais de detalhe/criação (File/Web/QNAP)/document-set. Página server com guard de permissão.
+
+### Decisões tomadas
+- **Criação focada em File/Web/QNAP** (tipos reais do servidor); gestão funciona p/ qualquer conector existente. OAuth (Drive/Slack) fora — exige redirect no servidor Onyx.
+- **Acesso por permissão de módulo** conectoresIAlpha (não só admin) — afeta RAG global, por isso restrito.
+- **Helper client separado** (connectors-browser.ts) com tipos espelhados — nunca importa client.ts (sem PAT no bundle).
+
+### Problemas encontrados / resolvidos
+- **indexing-status dava 405** com GET → é POST. Descoberto via openapi.json.
+- **Tailwind v4: classes dinâmicas** `bg-${cor}-600/15` não são geradas → trocado por classes estáticas via prop `box`.
+- **react-hooks/set-state-in-effect** (React Compiler) barrava o fetch+polling no useEffect → aplicada a convenção do projeto (eslint-disable-next-line com comentário), como em ChatChamado/PainelLayoutClient/ModalTermo etc.
+- **EPERM no `prisma generate`** durante build (DLL travada pelo dev server, erro conhecido) → rodado `npx next build` direto. Build EXIT=0, rota /PainelAlpha/Conectores compilada.
+
+### Aprendizado importante (Scribe)
+- **CLAUDE.md desatualizado**: integração de módulo virou MODULOS_REGISTRY único (1 entrada), não os 3 arrays manuais (FormCadastro/Atalhos/PainelAlphaClient). FormCadastro não tem mais lista inline; Atalhos não tem MODULOS_BASE. Registrado na memória Claude (project_modulos_registry).
+
+### Pendências
+- Testar criação real de conector Web/QNAP end-to-end (File já é o padrão usado).
+- Considerar trocar alert()/confirm() por toasts do projeto (não-bloqueante).
+- Tsc tem 4 erros PRÉ-EXISTENTES (validator.ts, HabilitacaoRadar:494, DetalheParceiroPage órfão) — não desta feature.
+
+---
+
+## [2026-06-29] — Conectores IAlpha: galeria visual estilo Onyx (logos de marca + guia por conector)
+
+**Tags:** #feature #ui #onyx #nextjs
+**Agentes envolvidos:** Scout → Nova/Iris → Forge → Probe → Lens → Scribe
+
+### Contexto
+Usuário pediu que os conectores ficassem visíveis como no Onyx (Gmail, Drive, Discord, etc.), porque usuários leigos não entendem só os 3 tipos do form. Decisões: mostrar TODOS (~60), ícones de marca reais, e ao clicar explicar o que precisa ter no arquivo e como configurar + formulário funcional.
+
+### O que foi feito
+- **simple-icons** instalado (npm) para logos de marca reais. Componente `src/components/Conectores/BrandIcon.tsx` — renderiza o SVG da marca (import named tree-shakeable) ou um ícone lucide colorido de fallback (Slack/Salesforce/SharePoint/Teams/S3/Oracle não existem no simple-icons → fallback).
+- **CONNECTOR_CATALOG** (connectors-browser.ts): ~60 sources do Onyx, cada um com label, categoria, brandSlug, cor, availability (ready/credential/server), descrição, requisitos, formato, passos, configFields, credentialFields. + CONNECTOR_CATEGORIES + availabilityMeta().
+- **Galeria** no modal "Conectar uma fonte" (ConectoresClient): grid de cards com logo + selo de disponibilidade + busca + filtro por categoria. Ao clicar → `DetalheConector`: guia ("O que você precisa ter" / "Como o conteúdo deve estar" / "Passo a passo") + formulário funcional. SourceIcon da tabela também passou a usar catálogo+BrandIcon.
+
+### Decisões tomadas
+- **OAuth desabilitado no servidor** (confirmado via /api/connector/oauth/details/{source} → oauth_enabled:false para todos). Logo, conectores Google/Slack/etc. exigem credencial manual (token/JSON), não botão "conectar com Google". A UI marca como "server"/"credential" e explica como obter.
+- **simple-icons em vez de 60 PNGs**: sem versionar assets; logos coloridos por hex da marca.
+- **Mostrar todos (~60)** mas com selo honesto de disponibilidade — não promete criar na hora o que precisa do time técnico.
+
+### Problemas encontrados / resolvidos
+- Vários slugs simple-icons inexistentes (Slack, Salesforce, SharePoint, Teams, S3, Oracle — removidos por marca registrada) → BrandIcon cai no fallback lucide colorido.
+- IDs duplicados/errados no catálogo por copy rápido (Discourse com id zendesk, Gong com id freshdesk, Egnyte-Sharepoint lixo) → corrigidos para o DocumentSource real.
+- Build: EPERM no prisma generate (conhecido) → `npx next build` direto. EXIT=0, rota compilada.
+
+### Gate
+- Forge: tsc (só 4 erros PRÉ-EXISTENTES), lint limpo, build EXIT=0. ✅
+- Probe/Lens: galeria integrada ao modal existente; sem novo integration point.
+
+### Pendências
+- Validar criação real de um conector "credential" (ex: Notion/Slack) com token de verdade end-to-end.

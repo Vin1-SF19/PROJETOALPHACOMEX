@@ -14,12 +14,14 @@ interface BibbleMessageListProps {
   onEditMessage?: (messageId: string, novoTexto: string) => void;
   /** true enquanto há streaming — desabilita edição. */
   isStreaming?: boolean;
+  /** Cor do tema (string "R, G, B") — usada nos botões de voz. */
+  accent?: string;
 }
 
 const BOTTOM_THRESHOLD = 120;
 
 export default function BibbleMessageList({
-  messages, userName, agentActive, agentAvatarUrl, agentName, onEditMessage, isStreaming,
+  messages, userName, agentActive, agentAvatarUrl, agentName, onEditMessage, isStreaming, accent,
 }: BibbleMessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -72,6 +74,7 @@ export default function BibbleMessageList({
               agentName={agentName}
               onEdit={onEditMessage}
               isStreaming={isStreaming}
+              accent={accent}
             />
           ))}
           <div ref={sentinelRef} style={{ height: 1 }} />

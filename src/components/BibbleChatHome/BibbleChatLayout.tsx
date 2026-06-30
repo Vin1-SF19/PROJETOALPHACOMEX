@@ -154,6 +154,8 @@ export default function BibbleChatLayout({
   const interruptedRef                        = useRef(false);
   // Ref para o handleSend atual — usado por handleEditMessage sem dependência circular.
   const handleSendRef                         = useRef<(() => Promise<void>) | null>(null);
+  // true quando a mensagem atual foi ditada por voz → fala a resposta automaticamente.
+  const vozUsadaRef                           = useRef(false);
   const [uploadFiles, setUploadFiles]         = useState<UploadedFile[]>([]);
   const [showFiles, setShowFiles]           = useState(false);
 
@@ -425,6 +427,50 @@ export default function BibbleChatLayout({
     return fullResponse;
   }, []);
 
+  /* ── Fala automática da resposta (quando a pergunta foi por voz) ── */
+  const falarResposta = useCallback(async (texto: string) => {
+    const limpo = texto
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/[#*_`>~]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!limpo) return;
+
+    // Tenta Onyx TTS; se falhar (timeout/erro), usa Web Speech API nativa.
+    const falarNativo = () => {
+      if (typeof window === "undefined" || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(limpo.slice(0, 5000));
+      utter.lang = "pt-BR";
+      utter.rate = 1.05;
+      window.speechSynthesis.speak(utter);
+    };
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8_000);
+      const res = await fetch("/api/onyx/voice/synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: limpo.slice(0, 5000) }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) { falarNativo(); return; }
+      const ct = res.headers.get("content-type") ?? "";
+      const url = ct.includes("application/json")
+        ? ((await res.json()) as { url?: string }).url
+        : URL.createObjectURL(await res.blob());
+      if (url) {
+        const audio = new Audio(url);
+        if (url.startsWith("blob:")) audio.onended = () => URL.revokeObjectURL(url);
+        void audio.play().catch(() => {});
+      }
+    } catch { falarNativo(); }
+  }, []);
+
   /* ── Send message ───────────────────────────────────────── */
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
@@ -581,12 +627,18 @@ export default function BibbleChatLayout({
     setStreamStatus("idle");
     abortRef.current = null;
 
+    // Se a mensagem foi ditada por voz, fala a resposta automaticamente.
+    if (vozUsadaRef.current && finalContent.trim()) {
+      void falarResposta(finalContent);
+    }
+    vozUsadaRef.current = false;
+
     if (fullResponse && sessionId) {
       // Persiste o conteúdo COMPLETO (com texto dos PDFs) para a IA reenxergar
       // o documento ao recarregar a sessão e em perguntas futuras.
       await saveMessages(sessionId, persistedContent, fullResponse);
     }
-  }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream]);
+  }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream, falarResposta]);
 
   // Mantém o ref do handleSend atualizado para uso pelo handleEditMessage.
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);
@@ -840,6 +892,7 @@ export default function BibbleChatLayout({
         onClearAgent={() => setSelectedAgent(null)}
         isAdmin={isAdmin}
         imageGenAvailable={!!selectedAgent?.tools?.some(t => t.name === "generate_image")}
+        onVozUsada={() => { vozUsadaRef.current = true; }}
         uploadFiles={uploadFiles}
         onFilesChange={setUploadFiles}
         showFiles={showFiles}
