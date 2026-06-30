@@ -179,6 +179,68 @@ export async function setDefaultImageModel(imageProviderId: string): Promise<voi
   if (!res.ok) throw new Error(await parseError(res));
 }
 
+// ─── LLM Models ──────────────────────────────────────────────────────────────
+
+export interface OnyxLlmModelPublic {
+  id: number;
+  name: string;
+  displayName: string;
+  supportsImage: boolean;
+  providerId: number;
+  providerName: string;
+}
+
+export interface OnyxLlmState {
+  models: OnyxLlmModelPublic[];
+  activeModelName: string | null;
+}
+
+export async function fetchOnyxLlmModels(): Promise<OnyxLlmState> {
+  const res = await fetch("/api/onyx/llm-models");
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = (await res.json()) as { providers: Array<{
+    id: number;
+    name: string;
+    model_configurations: Array<{
+      id: number;
+      name: string;
+      display_name: string | null;
+      is_visible: boolean;
+      supports_image_input: boolean;
+    }>;
+  }> };
+
+  const models: OnyxLlmModelPublic[] = [];
+
+  for (const provider of data.providers) {
+    for (const m of provider.model_configurations) {
+      if (!m.is_visible) continue;
+      models.push({
+        id: m.id,
+        name: m.name,
+        displayName: m.display_name ?? m.name,
+        supportsImage: m.supports_image_input,
+        providerId: provider.id,
+        providerName: provider.name,
+      });
+    }
+  }
+
+  // O Onyx define o padrão pela posição: o primeiro modelo visível da lista é o ativo.
+  const activeModelName = models.length > 0 ? models[0].name : null;
+
+  return { models, activeModelName };
+}
+
+export async function setOnyxDefaultModel(providerId: number, modelName: string): Promise<void> {
+  const res = await fetch("/api/onyx/llm-models", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ providerId, modelName }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}
+
 /** Detecta intenção de gerar imagem no texto do usuário. */
 export function detectsImageIntent(text: string): boolean {
   const t = text.toLowerCase();

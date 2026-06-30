@@ -638,5 +638,21 @@
         "shown": 1
       }
     ]
+  },
+  "correntes marítimas": {
+    "entries": [
+      {
+        "text": "A Fossa das Marianas possui as correntes mais densas conhecidas, podendo transportar águas profundas por milhares de quilômetros. Esses fluxos submarinos são cruciais para regular a temperatura global do planeta.",
+        "shown": 1
+      }
+    ]
+  },
+  "corrida espacial": {
+    "entries": [
+      {
+        "text": "O recorde mundial de altitude nunca foi alcançado por um ser humano vivo na estratosfera (a camada onde voam os balões meteorológicos). Astronautas já realizaram passeios orbitais, mas a Altitude Recorde é um feito distinto.",
+        "shown": 1
+      }
+    ]
   }
 }

@@ -8,7 +8,7 @@ import BibbleSettingsPanel from "./BibbleSettingsPanel";
 import OnyxAgentsModal from "./OnyxAgentsModal";
 import { type Message } from "./BibbleMessageBubble";
 import type { UploadedFile } from "./BibbleFileUpload";
-import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, type OnyxAgent, type AgenteFixado } from "@/lib/onyx/browser";
+import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, fetchOnyxLlmModels, type OnyxAgent, type AgenteFixado } from "@/lib/onyx/browser";
 import { getTema } from "@/lib/temas";
 
 interface BibbleChatLayoutProps {
@@ -22,7 +22,7 @@ interface BibbleChatLayoutProps {
 let msgCounter = 0;
 const newId = () => `msg-${++msgCounter}-${Date.now()}`;
 
-const DEFAULT_MODEL = "gemma4:e4b";
+const DEFAULT_MODEL = "";
 
 export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem";
 
@@ -87,6 +87,13 @@ export default function BibbleChatLayout({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Inicializa com o modelo ativo do Onyx
+  useEffect(() => {
+    fetchOnyxLlmModels()
+      .then(({ activeModelName }) => { if (activeModelName) setModel(activeModelName); })
+      .catch(() => { /* silencioso — usa DEFAULT_MODEL vazio */ });
+  }, []);
 
   // ── Onyx (agentes de IA) ──
   const [onyxModalOpen, setOnyxModalOpen] = useState(false);

@@ -297,6 +297,65 @@ export async function uploadChatFiles(
   }));
 }
 
+// ─── Modelos LLM (Onyx global) ───────────────────────────────────────────────
+
+export interface OnyxLlmModelConfig {
+  id: number;
+  name: string;
+  display_name: string | null;
+  is_visible: boolean;
+  supports_image_input: boolean;
+  max_input_tokens: number | null;
+}
+
+export interface OnyxLlmProvider {
+  id: number;
+  name: string;
+  provider: string;
+  api_base: string | null;
+  is_public: boolean;
+  is_auto_mode: boolean;
+  model_configurations: OnyxLlmModelConfig[];
+  custom_config: Record<string, unknown>;
+  api_key: string | null;
+  api_version: string | null;
+  deployment_name: string | null;
+  groups: unknown[];
+  personas?: unknown[];
+}
+
+export async function listOnyxLlmProviders(): Promise<OnyxLlmProvider[]> {
+  const data = await onyxJson<{ providers: OnyxLlmProvider[] }>("/admin/llm/provider");
+  return data.providers ?? [];
+}
+
+/**
+ * Define o modelo padrão do Onyx reordenando model_configurations para que o
+ * modelo escolhido fique primeiro — o Onyx usa o primeiro modelo visível como padrão
+ * quando is_auto_mode=true. Os campos default_model_name/is_default_provider não
+ * existem nesta versão da API.
+ */
+export async function setOnyxDefaultModel(
+  provider: OnyxLlmProvider,
+  modelName: string,
+): Promise<void> {
+  const target = provider.model_configurations.find((m) => m.name === modelName);
+  if (!target) throw new OnyxError(`Modelo "${modelName}" não encontrado no provider.`, 404);
+
+  const rest = provider.model_configurations.filter((m) => m.name !== modelName);
+  const reordered = [target, ...rest];
+
+  const body = { ...provider, model_configurations: reordered };
+  const res = await onyxFetch("/admin/llm/provider", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new OnyxError(detail || "Falha ao atualizar modelo padrão.", res.status);
+  }
+}
+
 // ─── Modelos de geração de imagem ────────────────────────────────────────────
 
 export interface OnyxImageModel {
