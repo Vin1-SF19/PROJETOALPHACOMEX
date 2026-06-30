@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
-import { getOllamaHeaders } from "@/lib/bibble/client";
+import { askOnyxOneShot } from "@/lib/onyx/client";
 
 export const runtime = "nodejs";
 
@@ -66,55 +66,21 @@ export async function GET() {
     return NextResponse.json({ curiosidade: entry.text, topic, cached: true });
   }
 
-  // ── Busca nova via Ollama ─────────────────────────────────────────────────
-  const ollamaUrl = process.env.BIBBLE_OLLAMA_URL ?? "http://localhost:11434";
-  const model     = process.env.BIBBLE_CURIOSIDADE_MODEL ?? "gemma4:e4b";
-
-  let r: Response;
+  // ── Busca nova via Onyx (mesmo modelo do dropdown) ───────────────────────
+  let curiosidade: string;
   try {
-    r = await fetch(`${ollamaUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: getOllamaHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você é um gerador de curiosidades concisas. Responda APENAS com a curiosidade, sem saudação, sem 'Sabia que', sem markdown, sem bullet. Máximo 2 frases curtas em português brasileiro.",
-          },
-          {
-            role: "user",
-            content: `Diga uma curiosidade surpreendente e pouco conhecida sobre: ${topic}`,
-          },
-        ],
-        stream: false,
-        temperature: 0.92,
-        max_tokens: 110,
-      }),
-      signal: AbortSignal.timeout(28_000),
-    });
+    const prompt = `Diga uma curiosidade surpreendente e pouco conhecida sobre: ${topic}. Responda APENAS com a curiosidade, sem saudação, sem "Sabia que", sem markdown, sem bullet. Máximo 2 frases curtas em português brasileiro.`;
+    const raw = await askOnyxOneShot(prompt, 0, 25_000);
+    curiosidade = raw
+      .replace(/^[-*•]\s*/gm, "")
+      .replace(/\*\*/g, "")
+      .replace(/<\/?think>/g, "")
+      .replace(/\n+/g, " ")
+      .trim();
   } catch (err) {
-    console.error("[BIBBLE/CURIOSIDADE] Ollama unreachable:", err);
-    return NextResponse.json({ error: "Ollama indisponível" }, { status: 502 });
+    console.error("[BIBBLE/CURIOSIDADE] Onyx unreachable:", err);
+    return NextResponse.json({ error: "Onyx indisponível" }, { status: 502 });
   }
-
-  if (!r.ok) {
-    const body = await r.text().catch(() => "");
-    console.error("[BIBBLE/CURIOSIDADE] Ollama error:", r.status, body);
-    return NextResponse.json({ error: "Falha no Ollama" }, { status: 502 });
-  }
-
-  const data = (await r.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const raw = data.choices?.[0]?.message?.content?.trim() ?? "";
-  const curiosidade = raw
-    .replace(/^[-*•]\s*/gm, "")
-    .replace(/\*\*/g, "")
-    .replace(/\n+/g, " ")
-    .trim();
 
   if (!curiosidade) {
     return NextResponse.json({ error: "Resposta vazia" }, { status: 500 });

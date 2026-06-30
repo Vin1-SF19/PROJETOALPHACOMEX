@@ -32,6 +32,10 @@ export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem
  * Lida com o caso de stream parcial: se a tag <think> abriu mas ainda não
  * fechou, todo o conteúdo após <think> é tratado como think (em progresso).
  */
+// Limite de chars guardados em thinkContent — evita acumular reasoning infinito
+// no estado React (modelos como qwen3 podem gerar 100k+ chars de raciocínio).
+const THINK_STATE_MAX = 6000;
+
 function splitThink(raw: string): { content: string; thinkContent?: string } {
   const openIdx = raw.indexOf("<think>");
   if (openIdx === -1) return { content: raw };
@@ -41,18 +45,26 @@ function splitThink(raw: string): { content: string; thinkContent?: string } {
     // think ainda aberto (streaming): tudo após <think> é raciocínio
     const before = raw.slice(0, openIdx);
     const think = raw.slice(openIdx + "<think>".length);
+    // Trunca para não explodir o estado React com reasoning infinito
+    const thinkTruncated = think.length > THINK_STATE_MAX
+      ? think.slice(0, THINK_STATE_MAX)
+      : think;
     return {
       content: before.trim(),
-      thinkContent: think.length ? think : undefined,
+      thinkContent: thinkTruncated.length ? thinkTruncated : undefined,
     };
   }
 
   // think fechado: extrai e remove do content
   const think = raw.slice(openIdx + "<think>".length, closeIdx);
   const content = (raw.slice(0, openIdx) + raw.slice(closeIdx + "</think>".length)).trim();
+  const thinkTrimmed = think.trim();
+  const thinkFinal = thinkTrimmed.length > THINK_STATE_MAX
+    ? thinkTrimmed.slice(0, THINK_STATE_MAX)
+    : thinkTrimmed;
   return {
     content,
-    thinkContent: think.trim().length ? think.trim() : undefined,
+    thinkContent: thinkFinal.length ? thinkFinal : undefined,
   };
 }
 
@@ -576,39 +588,25 @@ export default function BibbleChatLayout({
 
       console.log("[BIBBLE] Sending message with files:", filesForChat.map(f => f.name));
 
-      // Se um agente Onyx está selecionado, conversa vai pelo Onyx; senão, fluxo Bibble/Ollama
+      // Toda conversa passa pelo Onyx: agente selecionado usa seu id, Bibble usa agentId=0
+      // (Default AI do Onyx). O modelo escolhido no dropdown controla ambos.
       const agente = selectedAgentRef.current;
-      const res = agente
-        ? await fetch("/api/onyx/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: ctrl.signal,
-            body: JSON.stringify({
-              message: text,
-              agentId: agente.id,
-              onyxSessionId: onyxSessionRef.current,
-              painelSessionId: sessionId,
-              pageContext: typeof window !== "undefined" ? window.location.pathname : null,
-              files: filesForChat.length > 0 ? filesForChat : undefined,
-              history,
-            }),
-          })
-        : await fetch("/api/bibble/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: ctrl.signal,
-            body: JSON.stringify({
-              message: msgContent,
-              history,
-              model,
-              sessionId,
-              files: filesForChat.length > 0 ? filesForChat : undefined,
-              temperature,
-              computerAccess,
-              contextWindow,
-              ...(globalSystemPrompt.trim() ? { globalSystemPrompt } : {}),
-            }),
-          });
+      const res = await fetch("/api/onyx/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          message: agente ? text : msgContent,
+          agentId: agente ? agente.id : 0,
+          onyxSessionId: onyxSessionRef.current,
+          painelSessionId: sessionId,
+          pageContext: typeof window !== "undefined" ? window.location.pathname : null,
+          files: filesForChat.length > 0 ? filesForChat : undefined,
+          history,
+          // Bibble mode: passa contexto extra para injetar system prompt do Bibble
+          ...(!agente && globalSystemPrompt.trim() ? { globalSystemPrompt } : {}),
+        }),
+      });
 
       fullResponse = await consumeChatStream(res, assistantMsg.id);
     } catch (err) {
@@ -647,7 +645,7 @@ export default function BibbleChatLayout({
       // o documento ao recarregar a sessão e em perguntas futuras.
       await saveMessages(sessionId, persistedContent, fullResponse);
     }
-  }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream, falarResposta]);
+  }, [inputValue, uploadFiles, activeSessionId, activeProjectId, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream, falarResposta]);
 
   // Mantém o ref do handleSend atualizado para uso pelo handleEditMessage.
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);

@@ -161,24 +161,22 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
 
 // ── Thinking block ────────────────────────────────────────────────────────────
 
-const THINK_COLLAPSED_CHAR_LIMIT = 500;
+// Máximo de chars exibidos no raciocínio expandido — evita travar a UI com
+// reasoning infinito de modelos como qwen3/deepseek.
+const THINK_MAX_CHARS = 4000;
 
 function ThinkingBlock({ content, streaming }: { content: string; streaming?: boolean }) {
-  const [open, setOpen] = useState(!!streaming);
-  const wasStreamingRef = useRef(!!streaming);
-
-  useEffect(() => {
-    if (wasStreamingRef.current && !streaming) setOpen(false);
-    wasStreamingRef.current = !!streaming;
-  }, [streaming]);
+  // Durante streaming fica fechado — não mostra o raciocínio em tempo real.
+  // Ao terminar, permanece fechado (usuário abre se quiser).
+  const [open, setOpen] = useState(false);
 
   const trimmed = content.trim();
   if (!trimmed) return null;
 
-  const displayText =
-    !open && trimmed.length > THINK_COLLAPSED_CHAR_LIMIT
-      ? trimmed.slice(0, THINK_COLLAPSED_CHAR_LIMIT) + "…"
-      : trimmed;
+  // Trunca para evitar render pesado com reasonings de 100k chars
+  const truncated = trimmed.length > THINK_MAX_CHARS
+    ? trimmed.slice(0, THINK_MAX_CHARS) + "\n\n… [raciocínio truncado]"
+    : trimmed;
 
   return (
     <div
@@ -191,15 +189,27 @@ function ThinkingBlock({ content, streaming }: { content: string; streaming?: bo
         style={{ color: "#818cf8" }}
       >
         <Lightbulb size={12} />
-        <span className="text-[10px] font-bold uppercase tracking-widest">Raciocínio</span>
-        {open ? <ChevronUp size={12} className="ml-auto opacity-60" /> : <ChevronDown size={12} className="ml-auto opacity-60" />}
+        <span className="text-[10px] font-bold uppercase tracking-widest">
+          {streaming ? "Raciocínando…" : "Raciocínio"}
+        </span>
+        {streaming && (
+          <span
+            className="ml-1 w-1.5 h-1.5 rounded-full"
+            style={{ background: "#818cf8", animation: "cursorBlink 1s ease-in-out infinite" }}
+          />
+        )}
+        {!streaming && (
+          open
+            ? <ChevronUp size={12} className="ml-auto opacity-60" />
+            : <ChevronDown size={12} className="ml-auto opacity-60" />
+        )}
       </button>
-      {open && (
+      {open && !streaming && (
         <div
-          className="px-3 pb-3 text-[11px] font-mono whitespace-pre-wrap leading-relaxed"
+          className="px-3 pb-3 text-[11px] font-mono whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto"
           style={{ color: "#64748b", borderTop: "1px solid rgba(99,102,241,0.08)" }}
         >
-          {displayText}
+          {truncated}
         </div>
       )}
     </div>

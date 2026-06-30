@@ -7,7 +7,8 @@ import {
   OnyxError,
   type OnyxFileDescriptor,
 } from "@/lib/onyx/client";
-import { buildAgentSystemContext, buildUserIdentityBlock } from "@/lib/onyx/system-knowledge";
+import { buildUserIdentityBlock } from "@/lib/onyx/system-knowledge";
+import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 import db from "@/lib/prisma";
@@ -49,6 +50,8 @@ interface ChatInput {
   pageContext?: string | null;
   files?: AttachedFile[];
   history?: HistoryMessage[];
+  /** Persona customizada (Bibble mode: agentId=0). Sobrepõe o system prompt padrão. */
+  globalSystemPrompt?: string | null;
 }
 
 const MAX_FILE_CHARS = 25000;
@@ -206,23 +209,6 @@ export async function POST(req: NextRequest) {
     email: userTyped.email ?? "",
   });
 
-  const systemContext = buildAgentSystemContext({
-    userName: userTyped.nome ?? userTyped.name ?? "Usuário",
-    role: userTyped.role ?? "",
-    permissoes: userTyped.permissoes ?? [],
-    pageContext: input.pageContext ?? null,
-  });
-
-  // O Onyx mantém o próprio histórico via onyxSessionId. Só reforçamos o
-  // histórico quando a sessão Onyx é nova (zerou) mas a conversa já tem trocas —
-  // assim o agente não perde o fio ao trocar de agente ou recarregar.
-  const historyContext = !onyxSessionId ? buildHistoryContext(input.history ?? []) : "";
-  const baseContext = historyContext
-    ? `${systemContext}\n\n${historyContext}`
-    : systemContext;
-  // Identidade vai SEMPRE no topo, em toda mensagem (estável p/ memory/{user_id}).
-  const additionalContext = `${identityBlock}\n\n${baseContext}`;
-
   const enc = new TextEncoder();
   const providerCtrl = new AbortController();
 
@@ -236,7 +222,8 @@ export async function POST(req: NextRequest) {
         send({ type: "status", state: "thinking" });
 
         // 1. Garante uma sessão Onyx (cria na primeira mensagem da conversa)
-        if (!onyxSessionId) {
+        const isFirstMessage = !onyxSessionId;
+        if (isFirstMessage) {
           const created = await createChatSession(agentId, "PainelAlpha", userToken);
           onyxSessionId = created.chat_session_id;
 
@@ -253,11 +240,39 @@ export async function POST(req: NextRequest) {
           }
         }
         // Informa o id ao cliente para reutilizar nas próximas mensagens
-        send({ type: "session", onyxSessionId });
+        send({ type: "session", onyxSessionId: onyxSessionId! });
+
+        // additional_context só na primeira mensagem.
+        // - agentId=0 (Bibble mode): injeta o system prompt do Bibble + identidade.
+        // - agentes reais: só identidade (agentes têm system prompt próprio no Onyx).
+        let additionalContext: string | undefined;
+        if (isFirstMessage) {
+          const historyContext = buildHistoryContext(input.history ?? []);
+          const isBibbleMode = agentId === 0;
+
+          if (isBibbleMode) {
+            const persona = input.globalSystemPrompt?.trim() || BIBBLE_SYSTEM_PROMPT;
+            const userRole = userTyped.role ?? "";
+            const isAdmin = userRole === "Admin" || userRole === "CEO";
+            const userName = userTyped.nome ?? userTyped.name ?? "Usuário";
+            const permissoes = (userTyped.permissoes ?? []) as string[];
+            const permCtx = isAdmin
+              ? `Usuário: ${userName} | Role: ${userRole} | Acesso: TOTAL (admin)`
+              : `Usuário: ${userName} | Role: ${userRole} | Módulos: ${permissoes.length > 0 ? permissoes.join(", ") : "nenhum"}`;
+            const systemBlock = `${persona}\n\n## CONTEXTO DO USUÁRIO\n${permCtx}`;
+            additionalContext = historyContext
+              ? `${systemBlock}\n\n${identityBlock}\n\n${historyContext}`
+              : `${systemBlock}\n\n${identityBlock}`;
+          } else {
+            additionalContext = historyContext
+              ? `${identityBlock}\n\n${historyContext}`
+              : identityBlock;
+          }
+        }
 
         // 2. Envia a mensagem e faz streaming (com o conhecimento do sistema)
         const res = await sendChatMessageStream({
-          chatSessionId: onyxSessionId,
+          chatSessionId: onyxSessionId!,
           message: finalMessage,
           additionalContext,
           fileDescriptors,

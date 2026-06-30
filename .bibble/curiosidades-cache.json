@@ -35,7 +35,7 @@
     "entries": [
       {
         "text": "Neil Armstrong deixou sua marca na Lua, mas ele também passou por um incidente médico sério. Foi diagnosticado com problemas visuais durante a missão Apollo 17.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -99,7 +99,7 @@
     "entries": [
       {
         "text": "Uma supernova é tão brilhante que pode rivalizar com a luminosidade de galáxias inteiras. O evento libera elementos químicos pesados, como ouro e urânio, espalhando o material necessário para futuras estrelas e planetas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -131,7 +131,7 @@
     "entries": [
       {
         "text": "Monges copistas copiavam livros raros usando pigmentos de ocre feitos de minerais locais. Eles também desenvolveram técnicas sofisticadas de iluminação para os manuscritos que se tornaram símbolos de prestígio intelectual.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -211,7 +211,7 @@
     "entries": [
       {
         "text": "Alguns cometas podem apresentar cores vibrantes no seu rabo devido a diferentes gases liberados ao aquecerem. Esses halos coloridos são causados pela ionização desses elementos pelo Sol.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -267,7 +267,7 @@
     "entries": [
       {
         "text": "A missão Perseverance estava coletando amostras de rochas antigas no planeta Marte. Essas amostras serão trazidas para a Terra décadas depois para análise científica avançada.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -275,7 +275,7 @@
     "entries": [
       {
         "text": "Na substância mais básica de tudo, existe a possibilidade real de um átomo se transformar completamente em outro elemento químico diferente. Esse processo é conhecido como transmutação nuclear e ocorre com grande energia.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -491,7 +491,7 @@
     "entries": [
       {
         "text": "Júpiter possui um Grande Mancha Vermelha, uma tempestade gigantesca que dura há séculos. É o maior planeta do nosso sistema solar.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -579,7 +579,7 @@
     "entries": [
       {
         "text": "A Mata Atlântica já foi uma floresta densa e contínua, cobrindo o litoral brasileiro. Hoje, é um dos biomas mais devastados do planeta, mas ainda abriga uma imensa biodiversidade adaptada.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -651,7 +651,7 @@
     "entries": [
       {
         "text": "O recorde mundial de altitude nunca foi alcançado por um ser humano vivo na estratosfera (a camada onde voam os balões meteorológicos). Astronautas já realizaram passeios orbitais, mas a Altitude Recorde é um feito distinto.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -675,6 +675,46 @@
     "entries": [
       {
         "text": "O sangue das girafas é naturalmente mais espesso para ajudar a manter a pressão arterial alta, compensando seu pescoço tubular. Esse mecanismo ajuda a bombear o sangue até o cérebro mesmo com a altura impressionante.",
+        "shown": 1
+      }
+    ]
+  },
+  "lâmpada elétrica": {
+    "entries": [
+      {
+        "text": "As primeiras lâmpadas comerciais de filamento eram extremamente fracas e tinham vida útil muito curta. O aumento dramático na durabilidade veio com a substituição dos materiais por novos metais em reatores mais eficientes.",
+        "shown": 1
+      }
+    ]
+  },
+  "logística internacional": {
+    "entries": [
+      {
+        "text": "O transporte marítimo depende de sincronizações complexas entre navios, portos e alfândegas. Os sistemas de rastreamento modernos monitoram mercadorias em tempo real, garantindo o fluxo global contínuo.",
+        "shown": 1
+      }
+    ]
+  },
+  "microprocessadores": {
+    "entries": [
+      {
+        "text": "O primeiro uso comercial do microprocessador foi no calculador Busicom de 1970. Eles pavimentaram o caminho para a era digital, permitindo computação portátil e avançada.",
+        "shown": 1
+      }
+    ]
+  },
+  "história dos alimentos": {
+    "entries": [
+      {
+        "text": "O pão era consumido pelos romanos com azeite ou vinho diluído para torná-lo mais saboroso. Antigamente, aditivos como assexoras eram adicionados ao alimento para disfarçar o mau gosto de matérias-primas.",
+        "shown": 1
+      }
+    ]
+  },
+  "mamutes": {
+    "entries": [
+      {
+        "text": "Viviam exclusivamente nos períodos glaciais do Pleistoceno. Alguns tipos de mamutes eram maiores e mais robustos que os conhecidos hoje.",
         "shown": 1
       }
     ]
