@@ -3,6 +3,7 @@
 import { auth } from "../../auth";
 import db from "@/lib/prisma";
 import type { Session } from "next-auth";
+import { SETOR_GERAL } from "@/lib/pop-acessos";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ async function getSetoresAcessiveis(userId: number): Promise<string[]> {
   if (ehAdmin(user.role)) return ["*"];
 
   const extras = await db.popAcesso.findMany({
-    where: { usuarioId: userId, podeVer: true },
+    where: { usuarioId: userId, podeVer: true, setor: { not: SETOR_GERAL } },
     select: { setor: true },
   });
 
@@ -107,6 +108,10 @@ export type UsuarioMatriz = {
   role: string;
   setorProprio: string;
   acessos: { setor: string; podeVer: boolean; podeUpload: boolean; podeGerenciar: boolean }[];
+  /** Acesso geral ao botão "Upload" do header do POP (GerenciamentoArquivos). */
+  podeUploadGeral: boolean;
+  /** Acesso geral ao botão "Gerenciar" do header do POP (HistoricoArquivos). */
+  podeGerenciarGeral: boolean;
 };
 
 export async function getMatrizAcessos(): Promise<{ success: boolean; data?: UsuarioMatriz[]; error?: string }> {
@@ -127,13 +132,18 @@ export async function getMatrizAcessos(): Promise<{ success: boolean; data?: Usu
     orderBy: { nome: "asc" },
   });
 
-  const data: UsuarioMatriz[] = usuarios.map((u) => ({
-    id: u.id,
-    nome: u.nome,
-    role: u.role,
-    setorProprio: u.role.toUpperCase().trim(),
-    acessos: u.popAcessos,
-  }));
+  const data: UsuarioMatriz[] = usuarios.map((u) => {
+    const linhaGeral = u.popAcessos.find((a) => a.setor === SETOR_GERAL);
+    return {
+      id: u.id,
+      nome: u.nome,
+      role: u.role,
+      setorProprio: u.role.toUpperCase().trim(),
+      acessos: u.popAcessos.filter((a) => a.setor !== SETOR_GERAL),
+      podeUploadGeral: linhaGeral?.podeUpload ?? false,
+      podeGerenciarGeral: linhaGeral?.podeGerenciar ?? false,
+    };
+  });
 
   return { success: true, data };
 }
@@ -180,6 +190,7 @@ export async function salvarAcessos(
   const setorMap = new Map(usuariosDB.map((u) => [u.id, u.role.toUpperCase().trim()]));
 
   for (const item of payload) {
+    if (item.setor === SETOR_GERAL) continue; // linha reservada — não é setor de conteúdo
     const setorProprio = setorMap.get(item.usuarioId);
     if (setorProprio && item.setor.toUpperCase().trim() === setorProprio) {
       return { success: false, error: `Setor próprio não pode ser alterado via PopAcesso (usuário ${item.usuarioId})` };

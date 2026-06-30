@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, RefreshCw, Save, Shield } from "lucide-react";
+import { X, Search, RefreshCw, Save, Shield, Upload, History } from "lucide-react";
 import { toast } from "sonner";
 import {
   getMatrizAcessos,
@@ -10,6 +10,7 @@ import {
   type UsuarioMatriz,
   type AcessoPayload,
 } from "@/actions/PopAcessos";
+import { SETOR_GERAL } from "@/lib/pop-acessos";
 
 const SETORES_EXTRAS = [
   "T.I",
@@ -27,6 +28,7 @@ interface Props {
 }
 
 type AcessosLocais = Record<number, Set<string>>;
+type AcessosGeraisLocais = Record<number, { podeUpload: boolean; podeGerenciar: boolean }>;
 
 export default function ModalGerenciamentoAcessos({ onClose }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioMatriz[]>([]);
@@ -35,6 +37,7 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroProprio, setFiltroProprio] = useState("");
   const [acessosLocais, setAcessosLocais] = useState<AcessosLocais>({});
+  const [acessosGeraisLocais, setAcessosGeraisLocais] = useState<AcessosGeraisLocais>({});
   const [modificados, setModificados] = useState<Set<number>>(new Set());
 
   const carregar = useCallback(async () => {
@@ -44,10 +47,13 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
       if (res.success && res.data) {
         setUsuarios(res.data);
         const inicial: AcessosLocais = {};
+        const iniciaisGerais: AcessosGeraisLocais = {};
         for (const u of res.data) {
           inicial[u.id] = new Set(u.acessos.filter((a) => a.podeVer).map((a) => a.setor));
+          iniciaisGerais[u.id] = { podeUpload: u.podeUploadGeral, podeGerenciar: u.podeGerenciarGeral };
         }
         setAcessosLocais(inicial);
+        setAcessosGeraisLocais(iniciaisGerais);
         setModificados(new Set());
       } else {
         toast.error(res.error ?? "Erro ao carregar");
@@ -76,6 +82,14 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
     setModificados((prev) => new Set(prev).add(usuarioId));
   };
 
+  const toggleAcessoGeral = (usuarioId: number, campo: "podeUpload" | "podeGerenciar") => {
+    setAcessosGeraisLocais((prev) => {
+      const atual = prev[usuarioId] ?? { podeUpload: false, podeGerenciar: false };
+      return { ...prev, [usuarioId]: { ...atual, [campo]: !atual[campo] } };
+    });
+    setModificados((prev) => new Set(prev).add(usuarioId));
+  };
+
   const handleSalvar = async () => {
     if (modificados.size === 0) {
       toast.info("Nenhuma alteração detectada");
@@ -97,6 +111,18 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
           if (acessosDessesUsuario.has(setor)) {
             payloadFinal.push({ usuarioId: userId, setor, podeVer: true, podeUpload: false, podeGerenciar: false });
           }
+        }
+
+        // Linha reservada com os acessos GERAIS aos botões Upload/Gerenciar do header
+        const geral = acessosGeraisLocais[userId] ?? { podeUpload: false, podeGerenciar: false };
+        if (geral.podeUpload || geral.podeGerenciar) {
+          payloadFinal.push({
+            usuarioId: userId,
+            setor: SETOR_GERAL,
+            podeVer: true,
+            podeUpload: geral.podeUpload,
+            podeGerenciar: geral.podeGerenciar,
+          });
         }
       }
 
@@ -135,7 +161,7 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
           initial={{ opacity: 0, scale: 0.96, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96 }}
-          className="w-full max-w-5xl bg-slate-900 border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+          className="w-full max-w-7xl bg-slate-900 border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/5">
@@ -217,6 +243,12 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
                         {s.split(" ")[0]}
                       </th>
                     ))}
+                    <th className="text-center px-3 py-3 text-[9px] font-black uppercase tracking-widest text-blue-400 whitespace-nowrap border-l border-white/10">
+                      <span className="flex items-center justify-center gap-1"><Upload size={11} /> Upload</span>
+                    </th>
+                    <th className="text-center px-3 py-3 text-[9px] font-black uppercase tracking-widest text-blue-400 whitespace-nowrap">
+                      <span className="flex items-center justify-center gap-1"><History size={11} /> Gerenciar</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -274,6 +306,40 @@ export default function ModalGerenciamentoAcessos({ onClose }: Props) {
                             </td>
                           );
                         })}
+                        {/* Acesso geral ao botão "Upload" do header (GerenciamentoArquivos) */}
+                        <td className="text-center px-3 py-3 border-l border-white/10">
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => toggleAcessoGeral(u.id, "podeUpload")}
+                              className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                                (acessosGeraisLocais[u.id]?.podeUpload ?? false)
+                                  ? "bg-blue-500/20 border-blue-500/50 hover:bg-blue-500/30"
+                                  : "bg-white/5 border-white/10 hover:border-white/20"
+                              }`}
+                            >
+                              {(acessosGeraisLocais[u.id]?.podeUpload ?? false) && (
+                                <div className="w-2.5 h-2.5 rounded-sm bg-blue-400" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        {/* Acesso geral ao botão "Gerenciar" do header (HistoricoArquivos) */}
+                        <td className="text-center px-3 py-3">
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => toggleAcessoGeral(u.id, "podeGerenciar")}
+                              className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                                (acessosGeraisLocais[u.id]?.podeGerenciar ?? false)
+                                  ? "bg-blue-500/20 border-blue-500/50 hover:bg-blue-500/30"
+                                  : "bg-white/5 border-white/10 hover:border-white/20"
+                              }`}
+                            >
+                              {(acessosGeraisLocais[u.id]?.podeGerenciar ?? false) && (
+                                <div className="w-2.5 h-2.5 rounded-sm bg-blue-400" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}

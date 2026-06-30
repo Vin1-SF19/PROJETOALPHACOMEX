@@ -299,7 +299,7 @@
     "entries": [
       {
         "text": "As cores exibidas variam dependendo da altitude de onde são observadas. Elas não ocorrem apenas no céu noturno, mas também podem ser vistas durante o dia se houver atividade solar muito intensa.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -659,6 +659,22 @@
     "entries": [
       {
         "text": "O Galeão de Manila, antes dos atuais carregadores, era um tipo de navio muito importante. Ele transportava prata da América para a China e voltava com porcelana de luxo.",
+        "shown": 1
+      }
+    ]
+  },
+  "criaturas abissais": {
+    "entries": [
+      {
+        "text": "Alguns organismos abissais não possuem olhos visíveis e dependem de quimiorrecepção para caçar na escuridão total. Eles também podem sobreviver a pressões extremas que esmagariam a maioria das formas de vida terrestre.",
+        "shown": 1
+      }
+    ]
+  },
+  "girafas": {
+    "entries": [
+      {
+        "text": "O sangue das girafas é naturalmente mais espesso para ajudar a manter a pressão arterial alta, compensando seu pescoço tubular. Esse mecanismo ajuda a bombear o sangue até o cérebro mesmo com a altura impressionante.",
         "shown": 1
       }
     ]
