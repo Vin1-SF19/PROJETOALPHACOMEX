@@ -1,27 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
-import { processarExtratoPorAgentes } from "@/lib/onyx/extrato-agents";
-import { OnyxError } from "@/lib/onyx/client";
+import { extractTextFromBuffer } from "@/lib/bibble/tika";
+import { obterParser } from "@/lib/extrato/parsers";
+import db from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-// Extratos longos são divididos em vários trechos processados em sequência
-// (cada um com até 2 tentativas), e PDFs sem texto extraível acionam OCR via
-// PDF24 (job assíncrono que pode levar vários minutos) — soma alta.
+// PDFs sem texto extraível acionam OCR via PDF24 (job assíncrono que pode
+// levar vários minutos) — sem isso o timeout padrão é curto demais.
 export const maxDuration = 800;
+
+/** Considera "sem texto útil" descontando os marcadores de página do pdf-parse ("-- N of M --"). */
+function textoInsuficiente(texto: string): boolean {
+  return texto.replace(/--\s*\d+\s*of\s*\d+\s*--/gi, "").trim().length < 20;
+}
 
 /**
  * POST /api/onyx/extrato
  *
- * Recebe um PDF de extrato bancário (multipart, campo "file") e processa em 2 etapas:
- *   1. Apache Tika (local, sem IA): extrai o texto bruto do PDF
- *   2. Agente 32 (Organizador de Extratos Bancários): o texto é dividido em
- *      trechos menores e cada um é enviado ao agente, que devolve as
- *      movimentações daquele trecho; os resultados são agregados no final
+ * Recebe um PDF de extrato bancário (multipart, campo "file") e processa em 2 etapas,
+ * sem IA — determinístico:
+ *   1. Extração de texto: Apache Tika → pdf-parse → OCR via PDF24 (fallback em cascata,
+ *      ver src/lib/bibble/tika.ts)
+ *   2. Parsing: um parser dedicado por banco (regex sobre o layout de tabela conhecido
+ *      daquele banco, ver src/lib/extrato/parsers/) organiza o texto em transações
  *
  * Retorna: { success: true, data: TransacaoNormalizada[] }
  *
- * O campo "bancoId" e "layoutAlvo" são aceitos no FormData mas não usados
- * internamente — são preservados para compatibilidade com o ModalUploadExtrato.
+ * O campo "bancoId" recebido é o id numérico do registro BancosVinculados — é usado
+ * para descobrir o TIPO do banco (campo bancoId String desse registro, ex: "bradesco")
+ * e assim escolher o parser certo.
  */
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -51,11 +58,47 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const bancoIdRegistro = form.get("bancoId");
+
   try {
     console.log(`[POST /api/onyx/extrato] iniciando — arquivo: ${file.name} (${file.size} bytes)`);
-    const pdfBlob = new Blob([await file.arrayBuffer()], { type: file.type || "application/pdf" });
-    console.log("[POST /api/onyx/extrato] chamando processarExtratoPorAgentes...");
-    const transacoes = await processarExtratoPorAgentes(pdfBlob, file.name);
+
+    // Descobre o TIPO do banco (ex: "bradesco") a partir do id numérico do registro
+    let tipoBanco: string | null = null;
+    const idNumerico = Number(bancoIdRegistro);
+    if (bancoIdRegistro && Number.isFinite(idNumerico)) {
+      const registro = await db.bancosVinculados.findUnique({
+        where: { id: idNumerico },
+        select: { bancoId: true },
+      });
+      tipoBanco = registro?.bancoId ?? null;
+      if (!tipoBanco) {
+        console.warn(`[POST /api/onyx/extrato] BancosVinculados id=${idNumerico} não encontrado — usando parser genérico.`);
+      }
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const { text: textoExtrato, source } = await extractTextFromBuffer(
+      buffer,
+      file.type || "application/pdf",
+      file.name,
+    );
+
+    if (textoInsuficiente(textoExtrato)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Não foi possível extrair texto do PDF. O arquivo pode estar corrompido, protegido, ou ser um PDF de imagem sem camada de texto (scan sem OCR).",
+        },
+        { status: 422 },
+      );
+    }
+
+    console.log(`[POST /api/onyx/extrato] texto extraído via ${source} — ${textoExtrato.length} chars, banco=${tipoBanco ?? "desconhecido (parser genérico)"}`);
+
+    const parser = obterParser(tipoBanco);
+    const transacoes = parser.parse(textoExtrato);
+
     console.log(`[POST /api/onyx/extrato] concluído — ${transacoes.length} transações`);
 
     if (transacoes.length === 0) {
@@ -74,9 +117,8 @@ export async function POST(req: NextRequest) {
       ultimaDataEncontrada: ultimaData,
     });
   } catch (err) {
-    const status = err instanceof OnyxError ? err.status : 500;
     const message = (err as Error).message || "Erro ao processar extrato.";
     console.error("[POST /api/onyx/extrato]", message);
-    return NextResponse.json({ success: false, error: message }, { status });
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

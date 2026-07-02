@@ -308,15 +308,15 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
     // Linha tem altura FIXA (rowHeight) — a pill nunca ultrapassa esse valor,
     // senão a lista cresce além da tela e volta o scroll. Um teto (160px) evita
     // que, com poucos colaboradores, as pills fiquem gigantes e grudadas.
-    const gap = Math.min(24, Math.max(6, Math.round(rowHeight * 0.12)));
-    const barHeight = Math.max(46, Math.min(160, rowHeight - gap));
-    const avatarDiam = Math.min(barHeight + 14, rowHeight - 4);
+    const gap = Math.min(28, Math.max(8, Math.round(rowHeight * 0.16)));
+    const barHeight = Math.max(38, Math.min(128, rowHeight - gap));
+    const avatarDiam = Math.min(barHeight + 10, rowHeight - 4);
     const avatarRad = avatarDiam / 2;
 
-    const fontVendas = Math.max(20, Math.round(barHeight * 0.42));
-    const fontNome   = Math.max(13, Math.round(barHeight * 0.22));
-    const fontStatus = Math.max(8,  Math.round(barHeight * 0.10));
-    const fontRank   = Math.max(15, Math.round(barHeight * 0.32));
+    const fontVendas = Math.max(17, Math.round(barHeight * 0.38));
+    const fontNome   = Math.max(12, Math.round(barHeight * 0.20));
+    const fontStatus = Math.max(8,  Math.round(barHeight * 0.095));
+    const fontRank   = Math.max(13, Math.round(barHeight * 0.28));
 
     return (
         <div
