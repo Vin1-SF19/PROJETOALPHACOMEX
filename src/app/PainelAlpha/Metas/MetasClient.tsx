@@ -875,6 +875,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
     const [modoTV, setModoTV] = useState(false);
     const [modalGerenciamentoAberto, setModalGerenciamentoAberto] = useState(false);
     const [rowHeight, setRowHeight] = useState(120);
+    const scoreboardRef = useRef<HTMLDivElement>(null);
 
     // Alerta de venda / pagamento
     const [alertaVenda, setAlertaVenda] = useState<{
@@ -975,17 +976,22 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
     };
     const HEADER_HEIGHT = isTV ? 56 : 72;
     useEffect(() => {
+        const el = scoreboardRef.current;
+        if (!el) return;
         const calc = () => {
             if (colaboradores.length === 0) { setRowHeight(isTV ? 160 : 120); return; }
-            // Divide o espaço disponível igualmente — cada linha recebe altura FIXA.
-            // Sem scroll: soma das linhas == altura disponível, sempre cabe tudo (notebook ou TV).
-            const alturaDisponivel = window.innerHeight - HEADER_HEIGHT;
+            // Mede a altura REAL do container (não window.innerHeight — dentro de iframe
+            // o tamanho da janela pode não bater com a área que o iframe realmente ocupa).
+            // Cada linha recebe altura FIXA: soma das linhas == altura disponível, sem scroll.
+            const alturaDisponivel = el.clientHeight;
+            if (alturaDisponivel <= 0) return;
             setRowHeight(Math.floor(alturaDisponivel / colaboradores.length));
         };
         calc();
-        window.addEventListener("resize", calc);
-        return () => window.removeEventListener("resize", calc);
-    }, [colaboradores.length, isTV, HEADER_HEIGHT]);
+        const observer = new ResizeObserver(calc);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [colaboradores.length, isTV]);
 
     const metaEquipePct = metaEquipe > 0 ? Math.min((totalVendas / metaEquipe) * 100, 100) : 0;
     const equipeBateuMeta = metaEquipe > 0 && totalVendas >= metaEquipe;
@@ -1136,7 +1142,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
             </header>}
 
             {/* ── Scoreboard — altura de cada linha é fixa (rowHeight), sem scroll: sempre cabe tudo ── */}
-            <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
+            <div ref={scoreboardRef} className="relative z-10 flex-1 flex flex-col overflow-hidden">
                 {colaboradores.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-5 opacity-30">
                         <TrendingUp size={72} className="text-slate-700" strokeWidth={1} />

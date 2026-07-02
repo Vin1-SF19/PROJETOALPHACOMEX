@@ -4,53 +4,62 @@ import {
   sendChatMessageStream,
   OnyxError,
 } from "@/lib/onyx/client";
-import { extractTextFromBuffer } from "@/lib/bibble/tika";
+import { ocrViaPdf24, isPdf24Configured } from "@/lib/bibble/pdf24-ocr";
 import type { TransacaoNormalizada } from "@/types/extrato";
 
 const AGENT_ORGANIZADOR_ID = Number(process.env.ONYX_AGENT_ORGANIZADOR_ID ?? "32");
 
-// O modelo do agente (qwen3) aborta o reasoning sem responder quando recebe
-// o texto inteiro de extratos longos de uma vez (~37k chars já é demais).
-// Chunk menor também reduz erro de leitura (descrição truncada/incompleta)
-// em páginas muito densas — trecho mais curto = menos chance de o modelo
-// "perder o fio" no meio do texto.
-const TAMANHO_MAX_CHUNK = 3500;
-
-/**
- * Divide o texto do extrato em pedaços processáveis pelo agente.
- * Preferência: quebrar por página (form-feed \f, que o Tika preserva entre
- * páginas de PDF). Se um "pedaço de página" ainda for maior que o limite
- * (página muito densa) ou não houver form-feed nenhum, quebra por tamanho de
- * caracteres, tentando não cortar no meio de uma linha.
- */
-function dividirEmChunks(texto: string, tamanhoMax = TAMANHO_MAX_CHUNK): string[] {
-  const paginas = texto.split("\f").map((p) => p.trim()).filter(Boolean);
-  const blocos = paginas.length > 1 ? paginas : [texto];
-
-  const chunks: string[] = [];
-  for (const bloco of blocos) {
-    if (bloco.length <= tamanhoMax) {
-      chunks.push(bloco);
-      continue;
-    }
-    // Bloco denso demais — quebra por linhas, agrupando até o limite
-    const linhas = bloco.split("\n");
-    let atual = "";
-    for (const linha of linhas) {
-      if (atual.length + linha.length + 1 > tamanhoMax && atual) {
-        chunks.push(atual);
-        atual = linha;
-      } else {
-        atual = atual ? `${atual}\n${linha}` : linha;
-      }
-    }
-    if (atual) chunks.push(atual);
-  }
-  return chunks;
+/** Considera "sem texto útil" um trecho com menos de 20 chars reais. */
+function textoInsuficiente(texto: string): boolean {
+  return texto.trim().length < 20;
 }
 
-const PROMPT_ORGANIZACAO = (textoExtrato: string) => `Abaixo está um trecho do texto extraído via OCR (Apache Tika) de um extrato bancário em PDF.
-Identifique TODAS as movimentações bancárias encontradas neste trecho e organize-as em um JSON válido.
+/**
+ * Extrai o texto de cada página do PDF via pdf-parse (nativo, preserva a
+ * separação real de página — diferente de cortar o texto corrido por tamanho
+ * de caractere, que corta transações ao meio).
+ * Se nenhuma página tiver texto útil (PDF de scan/imagem sem camada de texto),
+ * tenta OCR real via PDF24 (ocrViaPdf24) e reprocessa o resultado.
+ * Retorna [] se não for possível extrair texto de forma alguma.
+ */
+async function extrairPaginas(buffer: Buffer, fileName: string): Promise<string[]> {
+  const { PDFParse } = await import("pdf-parse");
+
+  const extrairViaPdfParse = async (buf: Buffer): Promise<string[]> => {
+    const parser = new PDFParse({ data: buf, verbosity: 0 });
+    const result = await parser.getText();
+    await parser.destroy();
+    return result.pages
+      .map((p: { num: number; text: string }) => p.text.trim())
+      .filter((texto: string) => !textoInsuficiente(texto));
+  };
+
+  let paginasUteis = await extrairViaPdfParse(buffer);
+  console.log(`[extrato-agents] pdf-parse: páginas com texto útil = ${paginasUteis.length}`);
+
+  if (paginasUteis.length === 0) {
+    if (!isPdf24Configured()) {
+      console.warn("[extrato-agents] nenhuma página com texto e PDF24 não configurado — sem fallback disponível.");
+      return [];
+    }
+
+    try {
+      console.log(`[extrato-agents] nenhuma página com texto útil — acionando OCR via PDF24 para ${fileName}...`);
+      const bufferOcr = await ocrViaPdf24(buffer, fileName);
+      paginasUteis = await extrairViaPdfParse(bufferOcr);
+      console.log(`[extrato-agents] após OCR: páginas com texto útil = ${paginasUteis.length}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[extrato-agents] falha no fallback PDF24-OCR: ${msg}`);
+      return [];
+    }
+  }
+
+  return paginasUteis;
+}
+
+const PROMPT_ORGANIZACAO = (textoPagina: string) => `Abaixo está o texto de UMA PÁGINA de um extrato bancário em PDF (extraído via OCR/parsing local).
+Identifique TODAS as movimentações bancárias encontradas nesta página e organize-as em um JSON válido.
 
 O JSON deve ser um array onde cada objeto tem exatamente os campos:
 - data: string no formato DD/MM/YYYY (complete o ano se estiver abreviado, usando o ano atual como referência)
@@ -58,17 +67,17 @@ O JSON deve ser um array onde cada objeto tem exatamente os campos:
 - valor: número (float), negativo para débitos/saídas, positivo para créditos/entradas
 
 Regras:
-- Este é apenas um TRECHO do extrato — pode começar/terminar no meio de uma movimentação truncada; ignore linhas incompletas que não tenham data+descrição+valor claros.
+- Esta é apenas UMA PÁGINA do extrato — pode começar/terminar no meio de uma movimentação truncada; ignore linhas incompletas que não tenham data+descrição+valor claros.
 - A descricao deve ser a linha COMPLETA de identificação da movimentação, exatamente como está no texto — nunca corte ou abrevie o nome do favorecido/histórico no meio de uma palavra.
 - Não inclua linhas de saldo, cabeçalhos, totais ou resumos.
 - Remova entradas com valor zero ou descrição vazia.
 - Não invente dados — preserve exatamente o que veio do extrato.
 - Cada movimentação aparece SOMENTE UMA VEZ no JSON de saída — não repita a mesma linha.
-- Se não houver nenhuma movimentação neste trecho, retorne um array vazio [].
+- Se não houver nenhuma movimentação nesta página, retorne um array vazio [].
 - Retorne APENAS o JSON puro, sem markdown, sem blocos de código, sem explicações.
 
-TRECHO DO EXTRATO:
-${textoExtrato}`;
+TEXTO DA PÁGINA:
+${textoPagina}`;
 
 interface OnyxPkt {
   obj?: {
@@ -190,31 +199,32 @@ function parseTransacoes(textoResposta: string): TransacaoNormalizada[] {
 }
 
 /**
- * Envia um trecho do extrato para o Agente Organizador e devolve as transações
- * encontradas nele. O modelo do agente (qwen3) por vezes aborta o reasoning sem
- * responder — até 2 tentativas em sessões novas antes de desistir deste trecho.
+ * Envia o texto de UMA página do extrato para o Agente Organizador e devolve
+ * as transações encontradas nela. O modelo do agente (qwen3) por vezes aborta
+ * o reasoning sem responder — até 2 tentativas em sessões novas antes de
+ * desistir desta página.
  */
-async function organizarChunk(chunk: string, indice: number): Promise<TransacaoNormalizada[]> {
+async function organizarPagina(textoPagina: string, indicePagina: number): Promise<TransacaoNormalizada[]> {
   const MAX_TENTATIVAS = 2;
   let textoOrganizado = "";
 
   for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
-    const sessao = await createChatSession(AGENT_ORGANIZADOR_ID, `Organização de Extrato — trecho ${indice + 1}`);
+    const sessao = await createChatSession(AGENT_ORGANIZADOR_ID, `Organização de Extrato — página ${indicePagina + 1}`);
     const stream = await sendChatMessageStream({
       chatSessionId: sessao.chat_session_id,
-      message: PROMPT_ORGANIZACAO(chunk),
+      message: PROMPT_ORGANIZACAO(textoPagina),
       additionalContext: CTX_SEM_TOOLS,
       maxTokens: 8192,
     });
-    textoOrganizado = await coletarResposta(stream, `agente-organizador-trecho${indice + 1}-tentativa${tentativa}`);
+    textoOrganizado = await coletarResposta(stream, `agente-organizador-pagina${indicePagina + 1}-tentativa${tentativa}`);
 
     if (textoOrganizado) break;
-    console.warn(`[extrato-agents] trecho ${indice + 1}, tentativa ${tentativa} sem resposta do agente organizador.`);
+    console.warn(`[extrato-agents] página ${indicePagina + 1}, tentativa ${tentativa} sem resposta do agente organizador.`);
   }
 
   if (!textoOrganizado) {
     throw new OnyxError(
-      `O agente organizador não conseguiu processar o trecho ${indice + 1} do extrato após múltiplas tentativas.`,
+      `O agente organizador não conseguiu processar a página ${indicePagina + 1} do extrato após múltiplas tentativas.`,
       502,
     );
   }
@@ -223,61 +233,48 @@ async function organizarChunk(chunk: string, indice: number): Promise<TransacaoN
     return parseTransacoes(textoOrganizado);
   } catch {
     throw new OnyxError(
-      `Não foi possível interpretar o JSON retornado pelo agente organizador (trecho ${indice + 1}).`,
+      `Não foi possível interpretar o JSON retornado pelo agente organizador (página ${indicePagina + 1}).`,
       502,
     );
   }
 }
 
 /**
- * Processa um PDF de extrato bancário: OCR puro via Tika + Agente Onyx único.
- * Tika (local): extrai o texto bruto do PDF — sem IA.
- * O texto é dividido em trechos menores (por página, ou por tamanho quando
- * necessário) porque o modelo do agente não processa extratos inteiros de
- * uma vez de forma confiável. Cada trecho é enviado ao Agente Organizador de
- * Extratos Bancários (ID 32), que devolve as transações daquele trecho; os
- * resultados são agregados no final.
+ * Processa um PDF de extrato bancário: extração de texto por página real
+ * (pdf-parse, com fallback OCR via PDF24 se o PDF não tiver texto nativo) +
+ * Agente Onyx único.
+ * Cada página vira UMA chamada ao Agente Organizador de Extratos Bancários
+ * (ID 32) — evita cortar uma transação no meio (o que acontecia ao dividir o
+ * texto corrido por tamanho de caractere). Os resultados de todas as páginas
+ * são agregados no final, com deduplicação de segurança.
  */
 export async function processarExtratoPorAgentes(
   pdfBlob: Blob,
   nomeArquivo: string,
 ): Promise<TransacaoNormalizada[]> {
-  // 1. Extrai texto do PDF localmente via Tika (com fallback pdf-parse)
+  // 1. Extrai o texto de cada página real do PDF
   const buffer = Buffer.from(await pdfBlob.arrayBuffer());
-  const { text: textoExtrato, source } = await extractTextFromBuffer(
-    buffer,
-    "application/pdf",
-    nomeArquivo,
-  );
+  const paginas = await extrairPaginas(buffer, nomeArquivo);
 
-  // Texto muito curto (ex: só marcadores de página "-- 1 of N --") indica que
-  // o PDF não tem camada de texto extraível — provavelmente é um PDF de
-  // imagem/scan sem OCR aplicado, ou foi gerado a partir de um recorte que
-  // perdeu o texto original.
-  if (!textoExtrato || textoExtrato.replace(/--\s*\d+\s*of\s*\d+\s*--/gi, "").trim().length < 20) {
+  if (paginas.length === 0) {
     throw new OnyxError(
       "Não foi possível extrair texto do PDF. O arquivo pode estar corrompido, protegido, ou ser um PDF de imagem sem camada de texto (scan sem OCR).",
       422,
     );
   }
 
-  console.log(`[extrato-agents] PDF extraído via ${source} — ${textoExtrato.length} chars`);
+  console.log(`[extrato-agents] ${paginas.length} página(s) com texto útil — enviando ao Agente Organizador`);
 
-  // 2. Divide em trechos processáveis e envia cada um ao Agente Organizador
-  const chunks = dividirEmChunks(textoExtrato);
-  console.log(`[extrato-agents] texto dividido em ${chunks.length} trecho(s)`);
-
+  // 2. Agente Organizador — 1 chamada por página
   const transacoesBrutas: TransacaoNormalizada[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const doTrecho = await organizarChunk(chunks[i], i);
-    console.log(`[extrato-agents] trecho ${i + 1}/${chunks.length}: ${doTrecho.length} transação(ões)`);
-    transacoesBrutas.push(...doTrecho);
+  for (let i = 0; i < paginas.length; i++) {
+    const daPagina = await organizarPagina(paginas[i], i);
+    console.log(`[extrato-agents] página ${i + 1}/${paginas.length}: ${daPagina.length} transação(ões)`);
+    transacoesBrutas.push(...daPagina);
   }
 
-  // 3. Remove duplicatas: a sobreposição entre o fim de um trecho e o início
-  // do próximo (mesma linha do extrato cortada ao meio) pode fazer o mesmo
-  // lançamento aparecer em 2 chunks. Uma transação idêntica (mesma data +
-  // descrição + valor) não se repete de verdade num extrato bancário real.
+  // 3. Deduplicação de segurança — não deve disparar na prática (páginas não
+  // se sobrepõem), mas é barato manter como salvaguarda.
   const vistos = new Set<string>();
   const transacoes = transacoesBrutas.filter((t) => {
     const chave = `${t.data}|${t.descricao}|${t.valor}`;
@@ -288,7 +285,7 @@ export async function processarExtratoPorAgentes(
 
   const duplicatasRemovidas = transacoesBrutas.length - transacoes.length;
   if (duplicatasRemovidas > 0) {
-    console.log(`[extrato-agents] ${duplicatasRemovidas} duplicata(s) removida(s) (sobreposição entre trechos)`);
+    console.log(`[extrato-agents] ${duplicatasRemovidas} duplicata(s) removida(s)`);
   }
 
   return transacoes;
