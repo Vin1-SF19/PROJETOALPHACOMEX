@@ -305,17 +305,24 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
     const progresso = colab.meta > 0 ? Math.min((colab.vendas / colab.meta) * 100, 100) : 0;
     const accentRgb = tema.accent;
 
-    const barHeight = Math.max(72, Math.min(160, rowHeight - 28));
-    const avatarDiam = barHeight + 36;
+    // Linha tem altura FIXA (rowHeight) — a pill nunca ultrapassa esse valor,
+    // senão a lista cresce além da tela e volta o scroll. Um teto (160px) evita
+    // que, com poucos colaboradores, as pills fiquem gigantes e grudadas.
+    const gap = Math.min(24, Math.max(6, Math.round(rowHeight * 0.12)));
+    const barHeight = Math.max(46, Math.min(160, rowHeight - gap));
+    const avatarDiam = Math.min(barHeight + 14, rowHeight - 4);
     const avatarRad = avatarDiam / 2;
 
-    const fontVendas = Math.max(26, Math.round(barHeight * 0.52));
-    const fontNome   = Math.max(14, Math.round(barHeight * 0.26));
-    const fontStatus = Math.max(9,  Math.round(barHeight * 0.115));
-    const fontRank   = Math.max(18, Math.round(barHeight * 0.38));
+    const fontVendas = Math.max(20, Math.round(barHeight * 0.42));
+    const fontNome   = Math.max(13, Math.round(barHeight * 0.22));
+    const fontStatus = Math.max(8,  Math.round(barHeight * 0.10));
+    const fontRank   = Math.max(15, Math.round(barHeight * 0.32));
 
     return (
-        <div className="flex items-center px-6 lg:px-10 py-2.5">
+        <div
+            className="flex items-center px-6 lg:px-10 shrink-0"
+            style={{ height: `${rowHeight}px`, paddingTop: `${gap / 2}px`, paddingBottom: `${gap / 2}px` }}
+        >
 
             {/* ── Avatar — fica na frente e "morde" a pill ── */}
             <div
@@ -967,18 +974,18 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
         window.parent.postMessage({ type: 'ALPHA_TV_MODE', active: next }, '*');
     };
     const HEADER_HEIGHT = isTV ? 56 : 72;
-    const MIN_ROW = isTV ? 130 : 100;
-    const MAX_ROW = isTV ? 260 : 190;
-
     useEffect(() => {
         const calc = () => {
             if (colaboradores.length === 0) { setRowHeight(isTV ? 160 : 120); return; }
-            setRowHeight(Math.max(MIN_ROW, Math.min(MAX_ROW, Math.floor((window.innerHeight - HEADER_HEIGHT) / colaboradores.length))));
+            // Divide o espaço disponível igualmente — cada linha recebe altura FIXA.
+            // Sem scroll: soma das linhas == altura disponível, sempre cabe tudo (notebook ou TV).
+            const alturaDisponivel = window.innerHeight - HEADER_HEIGHT;
+            setRowHeight(Math.floor(alturaDisponivel / colaboradores.length));
         };
         calc();
         window.addEventListener("resize", calc);
         return () => window.removeEventListener("resize", calc);
-    }, [colaboradores.length]);
+    }, [colaboradores.length, isTV, HEADER_HEIGHT]);
 
     const metaEquipePct = metaEquipe > 0 ? Math.min((totalVendas / metaEquipe) * 100, 100) : 0;
     const equipeBateuMeta = metaEquipe > 0 && totalVendas >= metaEquipe;
@@ -1128,8 +1135,8 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                 </div>
             </header>}
 
-            {/* ── Scoreboard ── */}
-            <div className="relative z-10 flex-1 flex flex-col overflow-y-auto py-3">
+            {/* ── Scoreboard — altura de cada linha é fixa (rowHeight), sem scroll: sempre cabe tudo ── */}
+            <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
                 {colaboradores.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-5 opacity-30">
                         <TrendingUp size={72} className="text-slate-700" strokeWidth={1} />

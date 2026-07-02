@@ -500,3 +500,39 @@ Usuário pediu que os conectores ficassem visíveis como no Onyx (Gmail, Drive, 
 
 ### Pendências
 - Validar criação real de um conector "credential" (ex: Notion/Slack) com token de verdade end-to-end.
+
+---
+
+## [2026-07-02 00:00] — Extratos Bancários: pipeline de 2 agentes IA → 1 agente único (Organizador)
+
+**Tags:** #refactor #integration #onyx
+**Agentes envolvidos:** Scout, Echo, Forge
+**Arquivos tocados:** `src/lib/onyx/extrato-agents.ts`, `src/app/api/onyx/extrato/route.ts`, `.env.local`, `.bibble/memory/decisions.md`
+
+### Contexto
+Usuário pediu para remover os agentes de IA do trabalho de extração/classificação de extratos bancários, usar Tika puro (OCR sem IA) para extrair o texto, e deixar o agente novo "Organizador de Extratos Bancários" (criado por ele no Onyx, ID 32) como único responsável por interpretar o texto do Tika e classificar cada valor na coluna correta.
+
+### O que foi feito
+- Removidas as constantes `AGENT_EXTRATOR_ID` (25) e `AGENT_NORMALIZADOR_ID` (26) — agentes já deletados do Onyx pelo usuário.
+- Criada `AGENT_ORGANIZADOR_ID` (env `ONYX_AGENT_ORGANIZADOR_ID`, default `32`).
+- Fundidos `PROMPT_EXTRACAO` + `PROMPT_NORMALIZACAO` em um único `PROMPT_ORGANIZACAO`.
+- `processarExtratoPorAgentes` agora faz só 2 passos: Tika extrai texto bruto (inalterado) → 1 chamada ao agente Organizador → parse do JSON final.
+- JSDoc de `src/app/api/onyx/extrato/route.ts` atualizado para refletir o novo fluxo.
+- `ONYX_AGENT_ORGANIZADOR_ID=32` adicionado ao `.env.local`.
+
+### Decisões tomadas
+- Manter o nome da função `processarExtratoPorAgentes` (plural) para não quebrar o import na rota — decisão de mínima fricção, não trocado por singular.
+- Contrato de saída (`[{data, descricao, valor}]`) mantido idêntico — zero mudança no frontend (`ModalUploadExtrato.tsx`, `SalvarTransacoesLote`).
+
+### Problemas encontrados / resolvidos
+- `npm run build` falhou com EPERM no Prisma Client DLL (processo `node.exe` antigo segurando o arquivo). Resolvido matando os processos Node.js fora do Cursor, com autorização explícita do usuário — depois `build` passou limpo.
+
+### Gate
+- Forge: tsc limpo nos arquivos alterados (3 erros pré-existentes em módulos não relacionados), eslint limpo, build EXIT=0 com `/api/onyx/extrato` compilado. ✅
+- Sem mudança de schema Prisma → Vault não acionado. Sem mudança de UI/menu/permissões → Probe não acionado.
+
+### Pendências
+- Testar com um PDF de extrato real (múltiplas páginas) para confirmar que o agente único aguenta o volume de texto sem degradar a extração.
+
+### Refletido também em
+- `decisions.md`: entrada "2026-07-02 — Pipeline de Extratos Bancários: Tika puro (OCR) + 1 agente único (Organizador)".

@@ -22,10 +22,13 @@ const ResponsavelSchema = z.object({
   cpf: z.string().min(11),
   dataNascimento: z.string().min(1),
   cargo: z.string().optional(),
+  email: z.string().optional(),
+  telefone: z.string().optional(),
 });
 
 const ParceiroSchema = z.object({
   tipo: z.enum(["PF", "PJ"]),
+  tipoParceiro: z.enum(["PADRAO", "SEM_COMISSAO", "ESPECIAL"]).default("PADRAO"),
   documento: z.string().min(11),
   nome: z.string().min(2),
   nomeFantasia: z.string().optional(),
@@ -34,6 +37,9 @@ const ParceiroSchema = z.object({
   telefone2: z.string().optional(),
   chavePix: z.string().optional(),
   tipoChavePix: z.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional(),
+  nomeBanco: z.string().optional(),
+  agencia: z.string().optional(),
+  conta: z.string().optional(),
   nivel: z.enum(["GOLD", "PLATINUM", "BLACK"]).default("GOLD"),
   comissaoPercentual: z.number().min(0).max(100).optional(),
   dadosConsulta: z.string().optional(),
@@ -65,7 +71,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
       return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     }
 
-    const { tipo, documento, nome, nomeFantasia, email, telefone, telefone2, chavePix, tipoChavePix, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis } = parsed.data;
+    const { tipo, tipoParceiro, documento, nome, nomeFantasia, email, telefone, telefone2, chavePix, tipoChavePix, nomeBanco, agencia, conta, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis } = parsed.data;
 
     const docLimpo = documento.replace(/\D/g, "");
 
@@ -80,9 +86,13 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
     const senhaGerada = gerarSenhaSegura();
     const senhaHash = hashSync(senhaGerada, 10);
 
+    // SEM_COMISSAO nunca guarda override manual — a comissão fica sempre indefinida.
+    const comissaoFinal = tipoParceiro === "SEM_COMISSAO" ? null : (comissaoPercentual ?? null);
+
     const parceiro = await db.parceiro.create({
       data: {
         tipo,
+        tipoParceiro,
         documento: docLimpo,
         nome,
         nomeFantasia: nomeFantasia || null,
@@ -91,8 +101,11 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
         telefone2: telefone2 || null,
         chavePix: chavePix || null,
         tipoChavePix: tipoChavePix || null,
+        nomeBanco: nomeBanco || null,
+        agencia: agencia || null,
+        conta: conta || null,
         nivel,
-        comissaoPercentual: comissaoPercentual ?? null,
+        comissaoPercentual: comissaoFinal,
         dadosConsulta: dadosConsulta || null,
         loginEmail: email,
         senhaHash,
@@ -111,12 +124,15 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
           },
         }),
         ...(respValidos.length > 0 && {
-          responsaveis: {
+          representantes: {
             create: respValidos.map(r => ({
+              tipo: "PF",
+              documento: r.cpf.replace(/\D/g, ""),
               nome: r.nome,
-              cpf: r.cpf.replace(/\D/g, ""),
               dataNascimento: r.dataNascimento,
               cargo: r.cargo || null,
+              email: r.email || null,
+              telefone: r.telefone || null,
             })),
           },
         }),
@@ -162,15 +178,55 @@ export async function listarParceiros(busca?: string, nivel?: string) {
   return { parceiros };
 }
 
+const COMISSAO_POR_NIVEL: Record<string, number> = { GOLD: 5, PLATINUM: 10, BLACK: 15 };
+const DIA_MS_COMISSAO = 1000 * 60 * 60 * 24;
+
+/**
+ * Reconstrói o NÍVEL HISTÓRICO do parceiro no momento de cada contratação — uma
+ * empresa contratada quando o parceiro ainda era GOLD sempre gera comissão de
+ * GOLD, mesmo que o parceiro depois tenha subido para PLATINUM/BLACK com novas
+ * contratações. Mesma regra de transição usada para o nível atual (1ª=GOLD,
+ * 2ª em ≤60d=PLATINUM, 3ª em ≤60d=BLACK, gap>60d reinicia em GOLD), mas retorna
+ * o nível válido EM CADA PONTO da timeline, indexado por CNPJ.
+ */
+function calcularNivelPorContratacaoHistorico(
+  contratacoes: { cnpj: string; data: Date }[],
+): Map<string, string> {
+  const ordenadas = [...contratacoes].sort((a, b) => a.data.getTime() - b.data.getTime());
+  const nivelPorCnpj = new Map<string, string>();
+
+  let nivel = "GOLD";
+  let nivelDate: Date | null = null;
+
+  ordenadas.forEach((c, i) => {
+    if (i === 0) {
+      nivel = "GOLD";
+      nivelDate = c.data;
+    } else {
+      const gap = (c.data.getTime() - nivelDate!.getTime()) / DIA_MS_COMISSAO;
+      if (gap <= 60) {
+        if (nivel === "GOLD") nivel = "PLATINUM";
+        else if (nivel === "PLATINUM") nivel = "BLACK";
+      } else {
+        nivel = "GOLD";
+      }
+      nivelDate = c.data;
+    }
+    nivelPorCnpj.set(c.cnpj, nivel);
+  });
+
+  return nivelPorCnpj;
+}
+
 export async function buscarParceiro(id: number) {
   const session = await auth();
   if (!session?.user) return null;
 
-  return db.parceiro.findUnique({
+  const parceiro = await db.parceiro.findUnique({
     where: { id },
     include: {
       endereco: true,
-      responsaveis: true,
+      representantes: true,
       indicacoes: {
         where: { status: "ATIVA" },
         include: {
@@ -185,6 +241,72 @@ export async function buscarParceiro(id: number) {
       },
     },
   });
+  if (!parceiro) return null;
+
+  // Serviço contratado + valor do contrato (ContratoComercial vinculado só por CNPJ,
+  // sem FK — pega o contrato FECHADO mais recente de cada CNPJ indicado).
+  const cnpjs = parceiro.indicacoes.map((ind) => ind.cliente.cnpj);
+  const contratos = cnpjs.length
+    ? await db.contratoComercial.findMany({
+        where: { cnpj: { in: cnpjs }, status: "FECHADO" },
+        orderBy: { createdAt: "desc" },
+        select: { cnpj: true, servico: true, valorContrato: true },
+      })
+    : [];
+  const contratoPorCnpj = new Map<string, { servico: string; valorContrato: number }>();
+  for (const c of contratos) {
+    if (!contratoPorCnpj.has(c.cnpj)) contratoPorCnpj.set(c.cnpj, { servico: c.servico, valorContrato: c.valorContrato });
+  }
+
+  // Comissão que o parceiro recebe por empresa indicada — mesma regra do portal:
+  // SEM_COMISSAO nunca calcula; ESPECIAL usa sempre a % fixa do cadastro; PADRAO usa
+  // o override manual se existir, senão a % do NÍVEL HISTÓRICO daquela contratação
+  // (não o nível atual — uma empresa contratada no GOLD sempre rende comissão de GOLD).
+  const semComissao = parceiro.tipoParceiro === "SEM_COMISSAO";
+  const ehEspecial = parceiro.tipoParceiro === "ESPECIAL";
+  const TOTAL_TRIBUTOS_PCT = 19.53;
+
+  const contratacoesParaTimeline = parceiro.indicacoes
+    .filter((ind) => ind.cliente.dataContratacao)
+    .map((ind) => {
+      const data = new Date(ind.cliente.dataContratacao!);
+      return isNaN(data.getTime()) ? null : { cnpj: ind.cliente.cnpj, data };
+    })
+    .filter((c): c is { cnpj: string; data: Date } => c !== null);
+  const nivelHistoricoPorCnpj = calcularNivelPorContratacaoHistorico(contratacoesParaTimeline);
+
+  const comissaoPercentualFixaEspecial = ehEspecial ? parceiro.comissaoPercentual ?? null : null;
+
+  return {
+    ...parceiro,
+    indicacoes: parceiro.indicacoes.map((ind) => {
+      const contrato = contratoPorCnpj.get(ind.cliente.cnpj);
+      const valorContrato = contrato?.valorContrato ?? null;
+
+      const nivelHistorico = nivelHistoricoPorCnpj.get(ind.cliente.cnpj) ?? null;
+      const comissaoPercentualEmpresa = semComissao
+        ? null
+        : ehEspecial
+          ? comissaoPercentualFixaEspecial
+          : parceiro.comissaoPercentual ?? (nivelHistorico ? COMISSAO_POR_NIVEL[nivelHistorico] : null) ?? null;
+
+      const receitaLiquida = !semComissao && valorContrato !== null ? valorContrato * (1 - TOTAL_TRIBUTOS_PCT / 100) : null;
+      const comissaoValor = receitaLiquida !== null && comissaoPercentualEmpresa !== null
+        ? receitaLiquida * (comissaoPercentualEmpresa / 100)
+        : null;
+      return {
+        ...ind,
+        cliente: {
+          ...ind.cliente,
+          servico: contrato?.servico ?? null,
+          valorContrato,
+          receitaLiquida,
+          comissaoValor,
+          comissaoPercentual: comissaoPercentualEmpresa,
+        },
+      };
+    }),
+  };
 }
 
 // ─── Permissões do módulo (Admin/CEO sempre full; outros via ParceiroAcesso) ──
@@ -248,34 +370,42 @@ export async function salvarAcessoParceiro(userId: number, podeEditar: boolean, 
 const DIA_MS = 86_400_000;
 
 /**
- * Recalcula o nível do parceiro a partir da linha do tempo das indicações ativas.
- * Regras: 1ª indicação=GOLD(5%); 2ª em até 60d=PLATINUM(10%); 3ª em até 60d=BLACK(15%);
+ * Recalcula o nível do parceiro a partir da linha do tempo das CONTRATAÇÕES (não das
+ * vinculações) — o parceiro só sobe de nível quando a empresa indicada é efetivamente
+ * contratada (cliente.dataContratacao preenchida no CS&NPS). Indicações ativas cujo
+ * cliente ainda não tem dataContratacao são ignoradas neste cálculo (mas continuam
+ * aparecendo normalmente na lista de empresas indicadas).
+ * Regras: 1ª contratação=GOLD(5%); 2ª em até 60d=PLATINUM(10%); 3ª em até 60d=BLACK(15%);
  * BLACK renova a janela; gap >60d reinicia em GOLD; PLATINUM/BLACK inativo >60d → GOLD.
  */
 export async function recalcularNivel(parceiroId: number): Promise<string> {
   const indicacoes = await db.indicacao.findMany({
     where: { parceiroId, status: "ATIVA" },
-    orderBy: { dataIndicacao: "asc" },
-    select: { dataIndicacao: true },
+    select: { cliente: { select: { dataContratacao: true } } },
   });
+
+  const datasContratacao = indicacoes
+    .map((i) => (i.cliente.dataContratacao ? new Date(i.cliente.dataContratacao) : null))
+    .filter((d): d is Date => d !== null && !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
 
   let nivel = "GOLD";
   let nivelDate: Date | null = null;
 
-  if (indicacoes.length > 0) {
-    nivelDate = indicacoes[0].dataIndicacao;
-    for (let i = 1; i < indicacoes.length; i++) {
-      const gap = (indicacoes[i].dataIndicacao.getTime() - nivelDate.getTime()) / DIA_MS;
+  if (datasContratacao.length > 0) {
+    nivelDate = datasContratacao[0];
+    for (let i = 1; i < datasContratacao.length; i++) {
+      const gap = (datasContratacao[i].getTime() - nivelDate.getTime()) / DIA_MS;
       if (gap <= 60) {
         if (nivel === "GOLD") nivel = "PLATINUM";
         else if (nivel === "PLATINUM") nivel = "BLACK";
-        nivelDate = indicacoes[i].dataIndicacao; // sobe (ou renova BLACK)
+        nivelDate = datasContratacao[i]; // sobe (ou renova BLACK)
       } else {
         nivel = "GOLD"; // passou de 60 dias → reinicia a contagem
-        nivelDate = indicacoes[i].dataIndicacao;
+        nivelDate = datasContratacao[i];
       }
     }
-    // Rebaixamento por inatividade: PLATINUM/BLACK sem nova indicação há mais de 60 dias
+    // Rebaixamento por inatividade: PLATINUM/BLACK sem nova contratação há mais de 60 dias
     if (nivel !== "GOLD" && nivelDate && (Date.now() - nivelDate.getTime()) / DIA_MS > 60) {
       nivel = "GOLD";
     }
@@ -360,8 +490,26 @@ export async function listarParceirosSimples() {
   const session = await auth();
   if (!session?.user) return [];
   return db.parceiro.findMany({
-    select: { id: true, nome: true, nomeFantasia: true, documento: true, nivel: true },
+    select: {
+      id: true, nome: true, nomeFantasia: true, documento: true, nivel: true,
+      representantes: { select: { nome: true } },
+    },
     orderBy: { nome: "asc" },
+  });
+}
+
+/** Dados completos do parceiro para confirmação visual (ex: ao selecionar "Indicação Parceiro" em Novo Cliente). Somente leitura. */
+export async function buscarParceiroDetalheSimples(id: number) {
+  const session = await auth();
+  if (!session?.user) return null;
+  return db.parceiro.findUnique({
+    where: { id },
+    select: {
+      id: true, tipo: true, documento: true, nome: true, nomeFantasia: true,
+      email: true, telefone: true, telefone2: true, nivel: true,
+      endereco: { select: { cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, uf: true } },
+      representantes: { select: { nome: true, documento: true, cargo: true, email: true, telefone: true } },
+    },
   });
 }
 
@@ -375,6 +523,10 @@ const EditarParceiroSchema = z.object({
   telefone2: z.string().optional().nullable(),
   chavePix: z.string().optional().nullable(),
   tipoChavePix: z.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional().nullable(),
+  nomeBanco: z.string().optional().nullable(),
+  agencia: z.string().optional().nullable(),
+  conta: z.string().optional().nullable(),
+  tipoParceiro: z.enum(["PADRAO", "SEM_COMISSAO", "ESPECIAL"]).optional(),
   comissaoPercentual: z.number().min(0).max(100).optional().nullable(),
   endereco: EnderecoSchema.optional(),
   responsaveis: z.array(ResponsavelSchema).optional(),
@@ -388,6 +540,22 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
   const d = parsed.data;
 
+  // Se o admin mudar Pix ou dados bancários, a confirmação anterior do parceiro
+  // não vale mais para o novo valor — precisa reconfirmar pelo portal.
+  const atual = await db.parceiro.findUnique({
+    where: { id },
+    select: { chavePix: true, tipoChavePix: true, nomeBanco: true, agencia: true, conta: true },
+  });
+  const dadosBancariosMudaram =
+    (atual?.chavePix ?? null) !== (d.chavePix ?? null) ||
+    (atual?.tipoChavePix ?? null) !== (d.tipoChavePix ?? null) ||
+    (atual?.nomeBanco ?? null) !== (d.nomeBanco ?? null) ||
+    (atual?.agencia ?? null) !== (d.agencia ?? null) ||
+    (atual?.conta ?? null) !== (d.conta ?? null);
+
+  // SEM_COMISSAO nunca guarda override manual — a comissão fica sempre indefinida.
+  const comissaoFinal = d.tipoParceiro === "SEM_COMISSAO" ? null : (d.comissaoPercentual ?? null);
+
   try {
     await db.parceiro.update({
       where: { id },
@@ -400,7 +568,12 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
         telefone2: d.telefone2 ?? null,
         chavePix: d.chavePix ?? null,
         tipoChavePix: d.tipoChavePix ?? null,
-        comissaoPercentual: d.comissaoPercentual ?? null,
+        nomeBanco: d.nomeBanco ?? null,
+        agencia: d.agencia ?? null,
+        conta: d.conta ?? null,
+        ...(dadosBancariosMudaram && { pixConfirmado: false, pixConfirmadoEm: null }),
+        ...(d.tipoParceiro && { tipoParceiro: d.tipoParceiro }),
+        comissaoPercentual: comissaoFinal,
         ...(d.endereco && {
           endereco: {
             upsert: {
@@ -410,12 +583,20 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
           },
         }),
         ...(d.responsaveis && {
-          // Substitui o conjunto de responsáveis (deleta os antigos e recria)
-          responsaveis: {
+          // Substitui o conjunto de representantes (deleta os antigos e recria)
+          representantes: {
             deleteMany: {},
             create: d.responsaveis
               .filter(r => r.nome.trim() && r.cpf.replace(/\D/g, "").length >= 11)
-              .map(r => ({ nome: r.nome, cpf: r.cpf.replace(/\D/g, ""), dataNascimento: r.dataNascimento, cargo: r.cargo || null })),
+              .map(r => ({
+                tipo: "PF",
+                documento: r.cpf.replace(/\D/g, ""),
+                nome: r.nome,
+                dataNascimento: r.dataNascimento,
+                cargo: r.cargo || null,
+                email: r.email || null,
+                telefone: r.telefone || null,
+              })),
           },
         }),
       },

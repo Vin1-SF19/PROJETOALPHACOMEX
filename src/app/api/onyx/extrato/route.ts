@@ -4,15 +4,19 @@ import { processarExtratoPorAgentes } from "@/lib/onyx/extrato-agents";
 import { OnyxError } from "@/lib/onyx/client";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// Extratos longos são divididos em vários trechos processados em sequência
+// (cada um com até 2 tentativas), e PDFs sem texto extraível acionam OCR via
+// PDF24 (job assíncrono que pode levar vários minutos) — soma alta.
+export const maxDuration = 800;
 
 /**
  * POST /api/onyx/extrato
  *
- * Recebe um PDF de extrato bancário (multipart, campo "file"), faz upload
- * pro Onyx e orquestra dois agentes:
- *   - Agente 25 (Extrator): lê o PDF via Apache Tika e extrai as movimentações
- *   - Agente 26 (Normalizador): padroniza datas, valores e descrições
+ * Recebe um PDF de extrato bancário (multipart, campo "file") e processa em 2 etapas:
+ *   1. Apache Tika (local, sem IA): extrai o texto bruto do PDF
+ *   2. Agente 32 (Organizador de Extratos Bancários): o texto é dividido em
+ *      trechos menores e cada um é enviado ao agente, que devolve as
+ *      movimentações daquele trecho; os resultados são agregados no final
  *
  * Retorna: { success: true, data: TransacaoNormalizada[] }
  *

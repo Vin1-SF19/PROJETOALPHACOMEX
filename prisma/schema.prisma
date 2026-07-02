@@ -1392,12 +1392,18 @@ model OnyxAgenteFixado {
 model Parceiro {
   id            Int                  @id @default(autoincrement())
   tipo          String               // "PF" | "PJ"
+  tipoParceiro  String               @default("PADRAO") // "PADRAO" | "SEM_COMISSAO" | "ESPECIAL"
   documento     String               @unique
   nome          String
   nomeFantasia  String?
   email         String
+  nomeBanco     String?
+  agencia       String?
+  conta         String?
   chavePix      String?
   tipoChavePix  String?
+  pixConfirmado   Boolean   @default(false)
+  pixConfirmadoEm DateTime?
   nivel             String               @default("GOLD")
   nivelAtualizadoEm DateTime?            // base da janela de 60 dias (promoção/rebaixamento)
   comissaoPercentual Float?              // override manual opcional (lógica futura)

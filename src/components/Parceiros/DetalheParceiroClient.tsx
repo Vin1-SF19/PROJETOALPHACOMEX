@@ -6,15 +6,17 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, User, Mail, Phone, MapPin, CreditCard, ShieldCheck,
   Pencil, X, Loader2, Save, Sparkles, Unlink, ChevronDown, Receipt, FileCheck2, Calendar,
+  CheckCircle2, Clock, TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { editarParceiro, desvincularIndicacao } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
+import { TRIBUTOS } from "@/lib/tributos";
 import TrocarSenhaParceiro from "./TrocarSenhaParceiro";
 import ModalComprovante from "./ModalComprovante";
 
 type Endereco = { cep: string; logradouro: string; numero: string | null; complemento: string | null; bairro: string; cidade: string; uf: string };
-type Responsavel = { nome: string; cpf: string; dataNascimento: string; cargo: string | null };
+type Representante = { tipo: string; documento: string; nome: string; dataNascimento: string | null; cargo: string | null; email: string | null; telefone: string | null };
 type Indicacao = {
   id: number;
   comprovanteUrl: string | null;
@@ -25,15 +27,20 @@ type Indicacao = {
   cliente: {
     id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string;
     dataConstituicao: string | null; dataContratacao: string | null; uf: string | null; regimeTributario: string | null; status: string | null;
+    servico: string | null; valorContrato: number | null; receitaLiquida: number | null; comissaoValor: number | null;
+    comissaoPercentual: number | null;
   };
 };
 
 export type DetalheParceiro = {
   id: number; tipo: string; documento: string; nome: string; nomeFantasia: string | null;
   email: string; telefone: string | null; telefone2: string | null;
-  chavePix: string | null; tipoChavePix: string | null; nivel: string;
+  chavePix: string | null; tipoChavePix: string | null;
+  nomeBanco: string | null; agencia: string | null; conta: string | null;
+  pixConfirmado: boolean; nivel: string;
+  tipoParceiro: string;
   comissaoPercentual: number | null; loginEmail: string;
-  endereco: Endereco | null; responsaveis: Responsavel[]; indicacoes: Indicacao[];
+  endereco: Endereco | null; representantes: Representante[]; indicacoes: Indicacao[];
 };
 
 const NIVEL_COLOR: Record<string, string> = {
@@ -54,6 +61,10 @@ function fmtDataBR(valor: string | null | undefined): string {
     return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
   }
   return v;
+}
+
+function fmtBRL(valor: number): string {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export default function DetalheParceiroClient({
@@ -83,7 +94,23 @@ export default function DetalheParceiroClient({
   const [telefone2, setTelefone2] = useState(parceiro.telefone2 ?? "");
   const [chavePix, setChavePix] = useState(parceiro.chavePix ?? "");
   const [tipoChavePix, setTipoChavePix] = useState(parceiro.tipoChavePix ?? "");
-  const [comissao, setComissao] = useState(parceiro.comissaoPercentual != null ? String(parceiro.comissaoPercentual) : "");
+  const [nomeBanco, setNomeBanco] = useState(parceiro.nomeBanco ?? "");
+  const [agencia, setAgencia] = useState(parceiro.agencia ?? "");
+  const [conta, setConta] = useState(parceiro.conta ?? "");
+  const [tipoParceiro, setTipoParceiro] = useState<"PADRAO" | "SEM_COMISSAO" | "ESPECIAL">(
+    (parceiro.tipoParceiro as "PADRAO" | "SEM_COMISSAO" | "ESPECIAL") ?? "PADRAO",
+  );
+  const comissaoFixaInicial = parceiro.tipoParceiro === "ESPECIAL" && parceiro.comissaoPercentual != null ? parceiro.comissaoPercentual : null;
+  const [comissaoFixaOpcao, setComissaoFixaOpcao] = useState<string>(
+    comissaoFixaInicial !== null && ["5", "10", "15", "20", "25", "30"].includes(String(comissaoFixaInicial))
+      ? String(comissaoFixaInicial)
+      : comissaoFixaInicial !== null ? "outro" : "5",
+  );
+  const [comissaoFixaOutro, setComissaoFixaOutro] = useState(
+    comissaoFixaInicial !== null && !["5", "10", "15", "20", "25", "30"].includes(String(comissaoFixaInicial))
+      ? String(comissaoFixaInicial)
+      : "",
+  );
   const [end, setEnd] = useState<Endereco>(parceiro.endereco ?? { cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "" });
 
   function fmtDoc(doc: string): string {
@@ -93,17 +120,33 @@ export default function DetalheParceiroClient({
     return doc;
   }
 
-  const comissaoEfetiva = parceiro.comissaoPercentual ?? COMISSAO_POR_NIVEL[parceiro.nivel] ?? 5;
+  const comissaoEfetiva = parceiro.tipoParceiro === "SEM_COMISSAO"
+    ? null
+    : parceiro.comissaoPercentual ?? COMISSAO_POR_NIVEL[parceiro.nivel] ?? 5;
+
+  const TIPO_PARCEIRO_LABEL: Record<string, string> = { PADRAO: "Padrão", SEM_COMISSAO: "Sem Comissão", ESPECIAL: "Especial" };
 
   const salvar = async () => {
     if (!nome.trim() || !email.trim()) { toast.error("Nome e e-mail são obrigatórios"); return; }
+    if (tipoParceiro === "ESPECIAL" && comissaoFixaOpcao === "outro" && !comissaoFixaOutro) {
+      toast.error("Informe o valor da comissão fixa");
+      return;
+    }
+    const comissaoPercentual = tipoParceiro === "ESPECIAL"
+      ? Number(comissaoFixaOpcao === "outro" ? comissaoFixaOutro : comissaoFixaOpcao)
+      : null;
+
     setSalvando(true);
     const res = await editarParceiro(parceiro.id, {
       nome, nomeFantasia: nomeFantasia || null, email,
       telefone: telefone || null, telefone2: telefone2 || null,
       chavePix: chavePix || null,
       tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || null,
-      comissaoPercentual: comissao ? Number(comissao) : null,
+      nomeBanco: nomeBanco || null,
+      agencia: agencia || null,
+      conta: conta || null,
+      tipoParceiro,
+      comissaoPercentual,
       endereco: end.cep && end.logradouro && end.bairro && end.cidade && end.uf
         ? { cep: end.cep, logradouro: end.logradouro, numero: end.numero || undefined, complemento: end.complemento || undefined, bairro: end.bairro, cidade: end.cidade, uf: end.uf }
         : undefined,
@@ -135,8 +178,13 @@ export default function DetalheParceiroClient({
             <h1 className="text-xl font-black uppercase italic tracking-tight text-white line-clamp-1">{parceiro.nome}</h1>
             <div className="flex items-center gap-2 mt-0.5">
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${NIVEL_COLOR[parceiro.nivel] ?? NIVEL_COLOR.GOLD}`}>
-                {NIVEL_ICON[parceiro.nivel] ?? "★"} {parceiro.nivel} · {comissaoEfetiva}%
+                {NIVEL_ICON[parceiro.nivel] ?? "★"} {parceiro.nivel}{comissaoEfetiva !== null ? ` · ${comissaoEfetiva}%` : ""}
               </span>
+              {parceiro.tipoParceiro !== "PADRAO" && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest text-slate-300 border-white/20 bg-white/5">
+                  {TIPO_PARCEIRO_LABEL[parceiro.tipoParceiro] ?? parceiro.tipoParceiro}
+                </span>
+              )}
             </div>
           </div>
           {/* Lápis — só quem pode editar */}
@@ -213,20 +261,37 @@ export default function DetalheParceiroClient({
                     {aberto && (
                       <div className="px-3 pb-3 pt-2 border-t grid grid-cols-2 gap-x-4 gap-y-2.5" style={{ borderColor: "rgba(99,102,241,0.15)" }}>
                         {[
-                          ["CNPJ", formatarDoc(c.cnpj), true, false],
-                          ["Razão Social", c.razaoSocial, false, true],
-                          ["Nome Fantasia", c.nomeFantasia || "—", false, false],
-                          ["Data de Constituição", fmtDataBR(c.dataConstituicao) || "—", false, false],
-                          ["Data Contratação", dtContratacao || "—", false, false],
-                          ["UF", c.uf || "—", false, false],
-                          ["Regime Tributário", c.regimeTributario || "—", false, false],
-                          ["Status (CS&NPS)", c.status || "—", false, false],
-                        ].map(([rotulo, valor, mono, full], i) => (
-                          <div key={i} className={full ? "col-span-2" : ""}>
+                          ["CNPJ", formatarDoc(c.cnpj), true],
+                          ["Razão Social", c.razaoSocial, false],
+                          ["Nome Fantasia", c.nomeFantasia || "—", false],
+                          ["Data de Constituição", fmtDataBR(c.dataConstituicao) || "—", false],
+                          ["Data Contratação", dtContratacao || "—", false],
+                          ["UF", c.uf || "—", false],
+                          ["Regime Tributário", c.regimeTributario || "—", false],
+                          ["Status (CS&NPS)", c.status || "—", false],
+                          ["Serviço Contratado", c.servico || "—", false],
+                          ["Valor do Contrato", c.valorContrato != null ? fmtBRL(c.valorContrato) : "—", false],
+                        ].map(([rotulo, valor, mono], i) => (
+                          <div key={i}>
                             <p className="text-[8.5px] text-slate-600 uppercase tracking-widest font-bold">{rotulo as string}</p>
                             <p className={`text-[12px] font-bold text-slate-200 ${mono ? "font-mono" : ""}`}>{valor as string}</p>
                           </div>
                         ))}
+
+                        {/* Comissão que o parceiro recebe por essa indicação — usa o nível que ele tinha
+                            NO MOMENTO desta contratação (não o nível atual), em destaque com tooltip */}
+                        {c.valorContrato !== null && c.receitaLiquida !== null && c.comissaoValor !== null && c.comissaoPercentual !== null && (
+                          <div className="col-span-2">
+                            <ComissaoParceiroDetalhe
+                              valorContrato={c.valorContrato}
+                              receitaLiquida={c.receitaLiquida}
+                              comissaoValor={c.comissaoValor}
+                              servico={c.servico}
+                              comissaoPercentual={c.comissaoPercentual}
+                              accent={tema.accent}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -255,20 +320,14 @@ export default function DetalheParceiroClient({
               </div>
               {parceiro.telefone && (
                 <div>
-                  <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Telefone 1</p>
+                  <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Telefone</p>
                   <p className="font-bold text-white">{parceiro.telefone}</p>
                 </div>
               )}
               {parceiro.telefone2 && (
                 <div>
-                  <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Telefone 2</p>
+                  <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Whatsapp</p>
                   <p className="font-bold text-white">{parceiro.telefone2}</p>
-                </div>
-              )}
-              {parceiro.chavePix && (
-                <div className="col-span-2">
-                  <p className={`${labelCls} flex items-center gap-1`}><CreditCard size={9} /> Chave Pix ({parceiro.tipoChavePix})</p>
-                  <p className="font-mono font-bold text-white">{parceiro.chavePix}</p>
                 </div>
               )}
             </div>
@@ -278,9 +337,90 @@ export default function DetalheParceiroClient({
               {parceiro.tipo === "PJ" && <div><p className={labelCls}>Nome Fantasia</p><input value={nomeFantasia} onChange={e => setNomeFantasia(e.target.value)} className={inputCls} /></div>}
               <div><p className={labelCls}>E-mail</p><input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><p className={labelCls}>Telefone 1</p><input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
-                <div><p className={labelCls}>Telefone 2</p><input value={telefone2} onChange={e => setTelefone2(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
+                <div><p className={labelCls}>Telefone</p><input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
+                <div><p className={labelCls}>Whatsapp</p><input value={telefone2} onChange={e => setTelefone2(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
               </div>
+              <div>
+                <p className={labelCls}>Tipo de Parceiro</p>
+                <select value={tipoParceiro} onChange={e => setTipoParceiro(e.target.value as typeof tipoParceiro)} className={inputCls}>
+                  <option value="PADRAO">Padrão</option>
+                  <option value="SEM_COMISSAO">Sem Comissão</option>
+                  <option value="ESPECIAL">Especial</option>
+                </select>
+              </div>
+              {tipoParceiro === "ESPECIAL" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className={labelCls}>Comissão fixa (%)</p>
+                    <select value={comissaoFixaOpcao} onChange={e => setComissaoFixaOpcao(e.target.value)} className={inputCls}>
+                      {["5", "10", "15", "20", "25", "30", "outro"].map(v => (
+                        <option key={v} value={v}>{v === "outro" ? "Outro valor" : `${v}%`}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {comissaoFixaOpcao === "outro" && (
+                    <div>
+                      <p className={labelCls}>Valor (%)</p>
+                      <input type="number" min={0} max={100} step="0.5" value={comissaoFixaOutro} onChange={e => setComissaoFixaOutro(e.target.value)} placeholder="Ex: 12.5" className={inputCls} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Dados Bancários — Pix + banco/agência/conta (complementares) */}
+        <div className={cardCls}>
+          <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><CreditCard size={10} /> Dados Bancários</p>
+          {!editando ? (
+            (parceiro.chavePix || parceiro.nomeBanco || parceiro.agencia || parceiro.conta) ? (
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                {parceiro.nomeBanco && (
+                  <div className="col-span-2">
+                    <p className={labelCls}>Banco</p>
+                    <p className="font-bold text-white">{parceiro.nomeBanco}</p>
+                  </div>
+                )}
+                {parceiro.agencia && (
+                  <div>
+                    <p className={labelCls}>Agência</p>
+                    <p className="font-mono font-bold text-white">{parceiro.agencia}</p>
+                  </div>
+                )}
+                {parceiro.conta && (
+                  <div>
+                    <p className={labelCls}>Conta</p>
+                    <p className="font-mono font-bold text-white">{parceiro.conta}</p>
+                  </div>
+                )}
+                {parceiro.chavePix && (
+                  <div className="col-span-2">
+                    <p className={`${labelCls} flex items-center gap-1`}>Chave Pix ({parceiro.tipoChavePix})</p>
+                    <p className="font-mono font-bold text-white">{parceiro.chavePix}</p>
+                  </div>
+                )}
+                <div className="col-span-2">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest ${
+                      parceiro.pixConfirmado
+                        ? "text-emerald-400 border-emerald-500/40 bg-emerald-500/10"
+                        : "text-amber-400 border-amber-500/40 bg-amber-500/10"
+                    }`}
+                  >
+                    {parceiro.pixConfirmado ? <CheckCircle2 size={10} /> : <Clock size={10} />}
+                    {parceiro.pixConfirmado ? "Dados bancários confirmados pelo parceiro" : "Aguardando confirmação do parceiro"}
+                  </span>
+                </div>
+              </div>
+            ) : <p className="text-xs text-slate-600">Sem dados bancários cadastrados.</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className={labelCls}>Nome do Banco</p><input value={nomeBanco} onChange={e => setNomeBanco(e.target.value)} className={inputCls} /></div>
+                <div><p className={labelCls}>Agência</p><input value={agencia} onChange={e => setAgencia(e.target.value)} className={inputCls} /></div>
+              </div>
+              <div><p className={labelCls}>Conta</p><input value={conta} onChange={e => setConta(e.target.value)} className={inputCls} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><p className={labelCls}>Chave Pix</p><input value={chavePix} onChange={e => setChavePix(e.target.value)} className={inputCls} /></div>
                 <div><p className={labelCls}>Tipo Pix</p>
@@ -289,7 +429,6 @@ export default function DetalheParceiroClient({
                   </select>
                 </div>
               </div>
-              <div><p className={labelCls}>Comissão (%) — opcional</p><input type="number" min={0} max={100} step="0.5" value={comissao} onChange={e => setComissao(e.target.value)} placeholder={`Padrão do nível: ${COMISSAO_POR_NIVEL[parceiro.nivel] ?? 5}%`} className={inputCls} /></div>
             </div>
           )}
         </div>
@@ -327,16 +466,16 @@ export default function DetalheParceiroClient({
         {parceiro.tipo === "PJ" && (
           <div className={cardCls}>
             <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
-              Responsáveis Físicos{parceiro.responsaveis.length > 1 ? ` (${parceiro.responsaveis.length})` : ""}
+              Representantes{parceiro.representantes.length > 1 ? ` (${parceiro.representantes.length})` : ""}
             </p>
-            {parceiro.responsaveis.length === 0 ? (
+            {parceiro.representantes.length === 0 ? (
               <p className="text-xs text-slate-600">Sem responsável.</p>
             ) : (
               <div className="space-y-2.5">
-                {parceiro.responsaveis.map((r, i) => (
+                {parceiro.representantes.map((r, i) => (
                   <div key={i} className="rounded-xl p-3 grid grid-cols-2 gap-3 text-sm" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
                     <div className="col-span-2"><p className={labelCls}>Nome</p><p className="font-black text-white">{r.nome}</p></div>
-                    <div><p className={labelCls}>CPF</p><p className="font-mono font-bold text-slate-300">{r.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</p></div>
+                    <div><p className={labelCls}>CPF</p><p className="font-mono font-bold text-slate-300">{r.documento.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</p></div>
                     <div><p className={labelCls}>Nascimento</p><p className="font-bold text-slate-300">{r.dataNascimento}</p></div>
                     {r.cargo && <div className="col-span-2"><p className={labelCls}>Cargo</p><p className="font-bold text-slate-300">{r.cargo}</p></div>}
                   </div>
@@ -371,5 +510,93 @@ export default function DetalheParceiroClient({
         />
       )}
     </main>
+  );
+}
+
+/** Comissão que o parceiro recebe por uma indicação — mesmo estilo/cálculo do portal do parceiro. */
+function ComissaoParceiroDetalhe({
+  valorContrato,
+  receitaLiquida,
+  comissaoValor,
+  servico,
+  comissaoPercentual,
+  accent,
+}: {
+  valorContrato: number;
+  receitaLiquida: number;
+  comissaoValor: number;
+  servico: string | null;
+  comissaoPercentual: number;
+  accent: string;
+}) {
+  const tributosDetalhe = ([
+    { label: "IRPJ", pct: TRIBUTOS.irpj },
+    { label: "Ad. de IRPJ", pct: TRIBUTOS.adicionalIrpj },
+    { label: "CSLL", pct: TRIBUTOS.csll },
+    { label: "PIS", pct: TRIBUTOS.pis },
+    { label: "COFINS", pct: TRIBUTOS.cofins },
+    { label: "ISS", pct: TRIBUTOS.iss },
+  ] as const).map((t) => ({ ...t, valor: valorContrato * (t.pct / 100) }));
+  const totalTributosPct = tributosDetalhe.reduce((s, t) => s + t.pct, 0);
+  const totalTributosValor = tributosDetalhe.reduce((s, t) => s + t.valor, 0);
+
+  return (
+    <div className="relative group">
+      <div
+        className="flex items-center justify-between px-4 py-3.5 rounded-2xl cursor-help"
+        style={{ background: `rgba(${accent}, 0.12)`, border: `1.5px solid rgba(${accent}, 0.4)` }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: `rgba(${accent}, 0.18)`, color: `rgb(${accent})` }}>
+            <TrendingUp size={17} />
+          </div>
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: `rgb(${accent})` }}>
+              Comissão do parceiro ({comissaoPercentual}%)
+            </p>
+            <p className="text-[11px] text-slate-500 font-medium">{servico}</p>
+          </div>
+        </div>
+        <p className="text-xl font-black italic" style={{ color: `rgb(${accent})` }}>
+          {fmtBRL(comissaoValor)}
+        </p>
+      </div>
+
+      {/* Tooltip com o detalhamento fiscal completo */}
+      <div className="absolute left-0 right-0 top-full mt-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all pointer-events-none">
+        <div
+          className="rounded-2xl px-4 py-4 text-[11.5px] leading-relaxed shadow-2xl space-y-1"
+          style={{ background: "#0a0a12", border: `1px solid rgba(${accent}, 0.35)`, color: "#e2e8f0" }}
+        >
+          <div className="flex justify-between gap-4">
+            <span className="text-slate-400">Receita Bruta:</span>
+            <span className="font-bold text-white">{fmtBRL(valorContrato)}</span>
+          </div>
+
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 pt-2">Tributos incidentes</p>
+          {tributosDetalhe.map((t) => (
+            <div key={t.label} className="flex justify-between gap-4 text-slate-400">
+              <span>{t.label} ({t.pct.toFixed(2).replace(".", ",")}%):</span>
+              <span className="font-mono">{fmtBRL(t.valor)}</span>
+            </div>
+          ))}
+
+          <div className="flex justify-between gap-4 pt-1 border-t border-white/10 font-bold text-amber-400">
+            <span>Total de tributos ({totalTributosPct.toFixed(2).replace(".", ",")}%):</span>
+            <span>{fmtBRL(totalTributosValor)}</span>
+          </div>
+
+          <div className="flex justify-between gap-4 pt-2 border-t border-white/10 font-black text-white uppercase tracking-wide">
+            <span>Receita Líquida:</span>
+            <span>{fmtBRL(receitaLiquida)}</span>
+          </div>
+
+          <div className="flex justify-between gap-4 font-black uppercase tracking-wide" style={{ color: `rgb(${accent})` }}>
+            <span>Comissão ({comissaoPercentual}%):</span>
+            <span>{fmtBRL(comissaoValor)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

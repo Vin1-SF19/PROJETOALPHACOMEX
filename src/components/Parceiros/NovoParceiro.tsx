@@ -22,6 +22,12 @@ type OnboardingTemplate = { id: number; nome: string; mensagem: string };
 type Credenciais = { loginEmail: string; senhaGerada: string; nomeParceiro: string };
 
 const TIPO_PIX = ["cpf", "cnpj", "email", "telefone", "aleatoria"] as const;
+const TIPO_PARCEIRO = [
+  { valor: "PADRAO", label: "Padrão" },
+  { valor: "SEM_COMISSAO", label: "Sem Comissão" },
+  { valor: "ESPECIAL", label: "Especial" },
+] as const;
+const COMISSAO_FIXA_OPCOES = ["5", "10", "15", "20", "25", "30", "outro"] as const;
 
 function formatarDocumento(v: string, tipo: "PF" | "PJ"): string {
   const d = v.replace(/\D/g, "");
@@ -55,6 +61,10 @@ export default function NovoParceiro({
   const [consultaDone, setConsultaDone] = useState(false);
   const [consultaErro, setConsultaErro] = useState("");
 
+  const [tipoParceiro, setTipoParceiro] = useState<"PADRAO" | "SEM_COMISSAO" | "ESPECIAL">("PADRAO");
+  const [comissaoFixaOpcao, setComissaoFixaOpcao] = useState<string>("5");
+  const [comissaoFixaOutro, setComissaoFixaOutro] = useState("");
+
   const [nome, setNome] = useState("");
   const [nomeFantasia, setNomeFantasia] = useState("");
   const [email, setEmail] = useState("");
@@ -62,7 +72,9 @@ export default function NovoParceiro({
   const [telefone2, setTelefone2] = useState("");
   const [chavePix, setChavePix] = useState("");
   const [tipoChavePix, setTipoChavePix] = useState("");
-  const [comissao, setComissao] = useState("");
+  const [nomeBanco, setNomeBanco] = useState("");
+  const [agencia, setAgencia] = useState("");
+  const [conta, setConta] = useState("");
   const [dadosConsultaBrutos, setDadosConsultaBrutos] = useState("");
 
   // Responsáveis físicos (vários) — em "gaveta": só um aberto por vez
@@ -153,11 +165,20 @@ export default function NovoParceiro({
       toast.error("Preencha ao menos um responsável físico (obrigatório para PJ)");
       return;
     }
+    if (tipoParceiro === "ESPECIAL" && comissaoFixaOpcao === "outro" && !comissaoFixaOutro) {
+      toast.error("Informe o valor da comissão fixa");
+      return;
+    }
+
+    const comissaoPercentual = tipoParceiro === "ESPECIAL"
+      ? Number(comissaoFixaOpcao === "outro" ? comissaoFixaOutro : comissaoFixaOpcao)
+      : undefined;
 
     setSalvando(true);
     try {
       const result = await criarParceiro({
         tipo,
+        tipoParceiro,
         documento: docLimpo,
         nome,
         nomeFantasia: nomeFantasia || undefined,
@@ -166,7 +187,10 @@ export default function NovoParceiro({
         telefone2: telefone2 || undefined,
         chavePix: chavePix || undefined,
         tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || undefined,
-        comissaoPercentual: comissao ? Number(comissao) : undefined,
+        nomeBanco: nomeBanco || undefined,
+        agencia: agencia || undefined,
+        conta: conta || undefined,
+        comissaoPercentual,
         dadosConsulta: dadosConsultaBrutos || undefined,
         endereco: endereco ?? undefined,
         responsaveis: tipo === "PJ"
@@ -252,6 +276,21 @@ export default function NovoParceiro({
 
                 {consultaDone && <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold"><CheckCircle2 size={14} /> Consulta realizada</div>}
                 {consultaErro && <div className="flex items-center gap-2 text-red-400 text-xs font-bold"><AlertCircle size={14} /> {consultaErro}</div>}
+
+                <div className="space-y-1">
+                  <Label className={labelCls}>Tipo de Parceiro</Label>
+                  <Select value={tipoParceiro} onValueChange={(v) => setTipoParceiro(v as typeof tipoParceiro)}>
+                    <SelectTrigger className="bg-black/40 border-white/10 rounded-2xl h-12 text-xs font-black uppercase"><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
+                      {TIPO_PARCEIRO.map(t => <SelectItem key={t.valor} value={t.valor} className="text-xs uppercase font-bold py-3">{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[9px] text-slate-600">
+                    {tipoParceiro === "SEM_COMISSAO" && "Este parceiro não recebe comissão — nada relacionado a valores aparece no portal dele."}
+                    {tipoParceiro === "ESPECIAL" && "Comissão fixa, definida abaixo — independente do nível GOLD/PLATINUM/BLACK."}
+                    {tipoParceiro === "PADRAO" && "Comissão segue o nível: GOLD 5%, PLATINUM 10%, BLACK 15%."}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -287,6 +326,58 @@ export default function NovoParceiro({
                 </div>
               </div>
 
+              {/* Comissão fixa — só para tipo ESPECIAL */}
+              {tipoParceiro === "ESPECIAL" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className={labelCls}>Comissão fixa (%)</Label>
+                    <Select value={comissaoFixaOpcao} onValueChange={setComissaoFixaOpcao}>
+                      <SelectTrigger className="bg-black/40 border-white/10 rounded-2xl h-12 text-xs font-black uppercase"><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
+                        {COMISSAO_FIXA_OPCOES.map(v => (
+                          <SelectItem key={v} value={v} className="text-xs uppercase font-bold py-3">
+                            {v === "outro" ? "Outro valor" : `${v}%`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {comissaoFixaOpcao === "outro" && (
+                    <div className="space-y-1">
+                      <Label className={labelCls}>Valor (%)</Label>
+                      <Input type="number" min={0} max={100} step="0.5" value={comissaoFixaOutro}
+                        onChange={e => setComissaoFixaOutro(e.target.value)} placeholder="Ex: 12.5" className={inputCls} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Endereço */}
+              <Button type="button" variant="outline" onClick={() => setModalEnderecoOpen(true)}
+                className={`w-full h-12 rounded-2xl border font-black uppercase text-xs tracking-widest gap-2 transition-all ${endereco ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" : "border-white/10 text-slate-400 hover:border-indigo-500/50"}`}>
+                <MapPin size={13} />
+                {endereco ? `${endereco.logradouro}, ${endereco.numero || "S/N"} — ${endereco.cidade}/${endereco.uf}` : "Endereço para brindes e presentes"}
+                {!endereco && <Plus size={11} />}
+              </Button>
+            </div>
+
+            {/* Dados Bancários — Pix + banco/agência/conta (complementares, tudo opcional) */}
+            <div className="p-8 border-b border-white/5 space-y-4">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">3. Dados Bancários</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className={labelCls}>Nome do Banco</Label>
+                  <Input value={nomeBanco} onChange={e => setNomeBanco(e.target.value)} placeholder="Ex: Banco do Brasil" className={inputCls} />
+                </div>
+                <div className="space-y-1">
+                  <Label className={labelCls}>Agência</Label>
+                  <Input value={agencia} onChange={e => setAgencia(e.target.value)} placeholder="0000" className={inputCls} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className={labelCls}>Conta</Label>
+                <Input value={conta} onChange={e => setConta(e.target.value)} placeholder="00000-0" className={inputCls} />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className={labelCls}>Chave Pix</Label>
@@ -302,28 +393,13 @@ export default function NovoParceiro({
                   </Select>
                 </div>
               </div>
-
-              {/* Comissão (opcional) */}
-              <div className="space-y-1">
-                <Label className={labelCls}>Comissão (%) <span className="text-slate-600 normal-case">— opcional</span></Label>
-                <Input type="number" min={0} max={100} step="0.5" value={comissao} onChange={e => setComissao(e.target.value)}
-                  placeholder="Deixe vazio para usar a do nível" className={inputCls} />
-              </div>
-
-              {/* Endereço */}
-              <Button type="button" variant="outline" onClick={() => setModalEnderecoOpen(true)}
-                className={`w-full h-12 rounded-2xl border font-black uppercase text-xs tracking-widest gap-2 transition-all ${endereco ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" : "border-white/10 text-slate-400 hover:border-indigo-500/50"}`}>
-                <MapPin size={13} />
-                {endereco ? `${endereco.logradouro}, ${endereco.numero || "S/N"} — ${endereco.cidade}/${endereco.uf}` : "Endereço para brindes e presentes"}
-                {!endereco && <Plus size={11} />}
-              </Button>
             </div>
 
             {/* Responsáveis Físicos (PJ) — gaveta, vários */}
             {tipo === "PJ" && (
               <div className="p-8 border-b border-white/5 space-y-3">
                 <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
-                  3. Responsáveis Físicos <span className="text-slate-600">(ao menos um para PJ)</span>
+                  4. Responsáveis Físicos <span className="text-slate-600">(ao menos um para PJ)</span>
                 </p>
 
                 {responsaveis.map((r, i) => {

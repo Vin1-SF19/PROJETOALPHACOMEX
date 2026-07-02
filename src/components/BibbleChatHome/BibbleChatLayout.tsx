@@ -588,25 +588,39 @@ export default function BibbleChatLayout({
 
       console.log("[BIBBLE] Sending message with files:", filesForChat.map(f => f.name));
 
-      // Toda conversa passa pelo Onyx: agente selecionado usa seu id, Bibble usa agentId=0
-      // (Default AI do Onyx). O modelo escolhido no dropdown controla ambos.
+      // Agentes Onyx → /api/onyx/chat | Bibble → /api/bibble/chat com modelo do dropdown
       const agente = selectedAgentRef.current;
-      const res = await fetch("/api/onyx/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          message: agente ? text : msgContent,
-          agentId: agente ? agente.id : 0,
-          onyxSessionId: onyxSessionRef.current,
-          painelSessionId: sessionId,
-          pageContext: typeof window !== "undefined" ? window.location.pathname : null,
-          files: filesForChat.length > 0 ? filesForChat : undefined,
-          history,
-          // Bibble mode: passa contexto extra para injetar system prompt do Bibble
-          ...(!agente && globalSystemPrompt.trim() ? { globalSystemPrompt } : {}),
-        }),
-      });
+      const res = agente
+        ? await fetch("/api/onyx/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: ctrl.signal,
+            body: JSON.stringify({
+              message: text,
+              agentId: agente.id,
+              onyxSessionId: onyxSessionRef.current,
+              painelSessionId: sessionId,
+              pageContext: typeof window !== "undefined" ? window.location.pathname : null,
+              files: filesForChat.length > 0 ? filesForChat : undefined,
+              history,
+            }),
+          })
+        : await fetch("/api/bibble/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: ctrl.signal,
+            body: JSON.stringify({
+              message: msgContent,
+              history,
+              model,
+              sessionId,
+              files: filesForChat.length > 0 ? filesForChat : undefined,
+              temperature,
+              computerAccess,
+              contextWindow,
+              ...(globalSystemPrompt.trim() ? { globalSystemPrompt } : {}),
+            }),
+          });
 
       fullResponse = await consumeChatStream(res, assistantMsg.id);
     } catch (err) {
@@ -645,7 +659,7 @@ export default function BibbleChatLayout({
       // o documento ao recarregar a sessão e em perguntas futuras.
       await saveMessages(sessionId, persistedContent, fullResponse);
     }
-  }, [inputValue, uploadFiles, activeSessionId, activeProjectId, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream, falarResposta]);
+  }, [inputValue, uploadFiles, activeSessionId, activeProjectId, model, temperature, computerAccess, contextWindow, globalSystemPrompt, createSession, saveMessages, consumeChatStream, falarResposta]);
 
   // Mantém o ref do handleSend atualizado para uso pelo handleEditMessage.
   useEffect(() => { handleSendRef.current = handleSend; }, [handleSend]);

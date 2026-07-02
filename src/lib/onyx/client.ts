@@ -479,6 +479,13 @@ export function sendChatMessageStream(
     fileDescriptors?: OnyxFileDescriptor[];
     userToken?: string | null;
     signal?: AbortSignal;
+    /**
+     * Limita tokens de reasoning/output para evitar loop infinito em modelos
+     * como qwen3. O Onyx repassa esse campo ao LLM como max_tokens.
+     * Default 1024 — aumentar em respostas que exigem output longo (ex: JSON
+     * com muitas linhas), senão o modelo esgota o limite só no reasoning.
+     */
+    maxTokens?: number;
   },
 ): Promise<Response> {
   return onyxFetch("/chat/send-chat-message", {
@@ -495,6 +502,7 @@ export function sendChatMessageStream(
         ? { file_descriptors: params.fileDescriptors }
         : {}),
       stream: true,
+      llm_override: { max_tokens: params.maxTokens ?? 1024 },
     }),
   });
 }

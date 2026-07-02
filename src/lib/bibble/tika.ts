@@ -4,10 +4,19 @@
  * Suporta PDF, DOCX, XLSX, PPTX, ODF, e dezenas de outros formatos.
  * Fallback automático para pdf-parse v2 se o Tika estiver indisponível
  * (cobre o caso do túnel Cloudflare estar fora do ar — PDFs continuam sendo lidos).
+ * Se ainda assim não sair texto (PDF de imagem/scan sem camada de texto),
+ * fallback final via OCR real na API PDF24 — ver pdf24-ocr.ts.
  */
+
+import { ocrViaPdf24, isPdf24Configured } from "./pdf24-ocr";
 
 const TIKA_URL = (process.env.TIKA_SERVER_URL ?? "http://192.168.35.113:9998").replace(/\/+$/, "");
 const TIKA_TIMEOUT_MS = 30_000;
+
+/** Considera "sem texto útil" descontando os marcadores de página do pdf-parse ("-- N of M --"). */
+function textoInsuficiente(texto: string): boolean {
+  return texto.replace(/--\s*\d+\s*of\s*\d+\s*--/gi, "").trim().length < 20;
+}
 
 /**
  * Envia um Buffer para o Tika e retorna o texto extraído.
@@ -60,7 +69,7 @@ export async function extractTextFromBuffer(
   buffer: Buffer,
   mimeType: string,
   fileName = "arquivo",
-): Promise<{ text: string; source: "tika" | "pdf-parse" | "unsupported" }> {
+): Promise<{ text: string; source: "tika" | "pdf-parse" | "pdf24-ocr" | "unsupported" }> {
   // Tipos que o Tika manipula bem; outros são binários opacos
   const SUPPORTED = [
     "application/pdf",
@@ -91,7 +100,7 @@ export async function extractTextFromBuffer(
   // Tenta Tika primeiro
   try {
     const text = await extractViaTika(buffer, mimeType || "application/octet-stream");
-    if (text) {
+    if (text && !textoInsuficiente(text)) {
       console.log(`[TIKA] ${fileName}: ${text.length} chars extraídos`);
       return { text, source: "tika" };
     }
@@ -104,11 +113,31 @@ export async function extractTextFromBuffer(
   if (isPdf) {
     try {
       const text = await extractViaPdfParse(buffer);
-      console.log(`[PDF-PARSE fallback] ${fileName}: ${text.length} chars extraídos`);
-      return { text, source: "pdf-parse" };
+      if (text && !textoInsuficiente(text)) {
+        console.log(`[PDF-PARSE fallback] ${fileName}: ${text.length} chars extraídos`);
+        return { text, source: "pdf-parse" };
+      }
+      console.warn(`[PDF-PARSE fallback] ${fileName}: texto insuficiente (${text.length} chars). Tentando OCR...`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[PDF-PARSE fallback] Falha em ${fileName}: ${msg}`);
+    }
+
+    // Último recurso: PDF sem camada de texto (scan/imagem) — OCR real via PDF24
+    if (isPdf24Configured()) {
+      try {
+        console.log(`[PDF24-OCR] ${fileName}: sem texto extraível, acionando OCR...`);
+        const bufferOcr = await ocrViaPdf24(buffer, fileName);
+        const text = await extractViaTika(bufferOcr, "application/pdf");
+        if (text && !textoInsuficiente(text)) {
+          console.log(`[PDF24-OCR] ${fileName}: ${text.length} chars extraídos após OCR`);
+          return { text, source: "pdf24-ocr" };
+        }
+        console.warn(`[PDF24-OCR] ${fileName}: OCR concluído mas ainda sem texto útil.`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[PDF24-OCR] Falha em ${fileName}: ${msg}`);
+      }
     }
   }
 
@@ -124,7 +153,7 @@ export async function extractTextFromUrl(
   mimeType: string,
   fileName = "arquivo",
   timeoutMs = 15_000,
-): Promise<{ text: string; source: "tika" | "pdf-parse" | "unsupported" }> {
+): Promise<{ text: string; source: "tika" | "pdf-parse" | "pdf24-ocr" | "unsupported" }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 

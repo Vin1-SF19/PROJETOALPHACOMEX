@@ -290,6 +290,11 @@ export async function POST(req: NextRequest) {
         let buf = "";
         let reasoningOpen = false;
         let answerStarted = false;
+        let reasoningChars = 0;
+        // Limite de chars de reasoning antes de abortar o bloco e forçar a resposta.
+        // Modelos como qwen3 entram em loop infinito de <think>; após 8k chars
+        // fechamos o bloco e aguardamos a resposta real chegar.
+        const REASONING_CHAR_LIMIT = 8000;
 
         const handlePacket = (pkt: OnyxPacket) => {
           const obj = pkt.obj;
@@ -297,10 +302,22 @@ export async function POST(req: NextRequest) {
           switch (obj.type) {
             case "reasoning_start":
               reasoningOpen = true;
+              reasoningChars = 0;
               send({ type: "text", text: "<think>" });
               break;
             case "reasoning_delta":
-              if (obj.reasoning) send({ type: "text", text: obj.reasoning });
+              if (obj.reasoning && reasoningOpen) {
+                // Só emite até o limite — depois descarta silenciosamente
+                if (reasoningChars < REASONING_CHAR_LIMIT) {
+                  send({ type: "text", text: obj.reasoning });
+                  reasoningChars += obj.reasoning.length;
+                  if (reasoningChars >= REASONING_CHAR_LIMIT) {
+                    // Fecha o bloco de reasoning na UI; o stream continua
+                    send({ type: "text", text: "\n…[raciocínio truncado]</think>\n\n" });
+                    reasoningOpen = false;
+                  }
+                }
+              }
               break;
             case "reasoning_done":
               if (reasoningOpen) {

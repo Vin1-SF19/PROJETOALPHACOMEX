@@ -22,7 +22,7 @@ import {
     restaurarContrato,
     criarObservacaoContrato,
 } from "@/actions/ContratoComercial";
-import { listarParceirosSimples } from "@/actions/parceiros";
+import { listarParceirosSimples, buscarParceiroDetalheSimples } from "@/actions/parceiros";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
 
@@ -32,6 +32,20 @@ interface UsuarioSimples {
     id: number;
     nome: string;
     imagemUrl: string | null;
+}
+
+interface ParceiroDetalheSimples {
+    id: number;
+    tipo: string;
+    documento: string;
+    nome: string;
+    nomeFantasia: string | null;
+    email: string;
+    telefone: string | null;
+    telefone2: string | null;
+    nivel: string;
+    endereco: { cep: string; logradouro: string; numero: string | null; complemento: string | null; bairro: string; cidade: string; uf: string } | null;
+    representantes: { nome: string; documento: string; cargo: string | null; email: string | null; telefone: string | null }[];
 }
 
 interface ObservacaoContrato {
@@ -208,7 +222,10 @@ function FormNovoContrato({
     const [canalAquisicao, setCanalAquisicao] = useState(initialData?.canalAquisicao ?? "");
     const [canalOutro, setCanalOutro] = useState((initialData as { canalOutro?: string | null } | undefined)?.canalOutro ?? "");
     const [indicadoPorParceiroId, setIndicadoPorParceiroId] = useState<number | null>((initialData as { indicadoPorParceiroId?: number | null } | undefined)?.indicadoPorParceiroId ?? null);
-    const [parceirosLista, setParceirosLista] = useState<{ id: number; nome: string; nivel: string }[]>([]);
+    const [parceirosLista, setParceirosLista] = useState<{ id: number; nome: string; nomeFantasia: string | null; nivel: string; representantes: string[] }[]>([]);
+    const [parceiroDetalhe, setParceiroDetalhe] = useState<ParceiroDetalheSimples | null>(null);
+    const [carregandoParceiroDetalhe, setCarregandoParceiroDetalhe] = useState(false);
+    const [parceiroDetalheAberto, setParceiroDetalheAberto] = useState(false);
     const [closerNome, setCloserNome] = useState(initialData?.closerNome ?? nomeUsuario ?? "");
     const [closerCustom, setCloserCustom] = useState("");
     const [mostraCloserCustom, setMostraCloserCustom] = useState(false);
@@ -219,10 +236,32 @@ function FormNovoContrato({
     useEffect(() => {
         if (canalAquisicao === "Indicação Parceiro" && parceirosLista.length === 0) {
             listarParceirosSimples()
-                .then(ps => setParceirosLista(ps.map(p => ({ id: p.id, nome: p.nome, nivel: p.nivel }))))
+                .then(ps => setParceirosLista(ps.map(p => ({
+                    id: p.id,
+                    nome: p.nome,
+                    nomeFantasia: p.nomeFantasia,
+                    nivel: p.nivel,
+                    representantes: p.representantes.map(r => r.nome),
+                }))))
                 .catch(() => {});
         }
     }, [canalAquisicao, parceirosLista.length]);
+
+    // Carrega os dados completos do parceiro selecionado (confirmação visual, só leitura)
+    // — abre a gaveta automaticamente assim que os dados chegam.
+    useEffect(() => {
+        setParceiroDetalhe(null); // eslint-disable-line react-hooks/set-state-in-effect -- reseta ao trocar de parceiro
+        setParceiroDetalheAberto(false);
+        if (!indicadoPorParceiroId) return;
+        setCarregandoParceiroDetalhe(true);
+        buscarParceiroDetalheSimples(indicadoPorParceiroId)
+            .then(p => {
+                setParceiroDetalhe(p);
+                if (p) setParceiroDetalheAberto(true);
+            })
+            .catch(() => {})
+            .finally(() => setCarregandoParceiroDetalhe(false));
+    }, [indicadoPorParceiroId]);
 
     const ativarConstituicao = (ativo: boolean) => {
         setEmpresaEmConstituicao(ativo);
@@ -647,10 +686,81 @@ function FormNovoContrato({
                                 className={inputCls}
                             >
                                 <option value="">Selecione o parceiro...</option>
-                                {parceirosLista.map((p) => (
-                                    <option key={p.id} value={p.id}>{p.nome} ({p.nivel})</option>
-                                ))}
+                                {parceirosLista.map((p) => {
+                                    const label = `${p.nome}${p.nomeFantasia ? ` (${p.nomeFantasia})` : ""}${p.representantes.length ? ` - ${p.representantes.join(" / ")}` : ""}`;
+                                    return <option key={p.id} value={p.id}>{label}</option>;
+                                })}
                             </select>
+
+                            {/* Confirmação visual dos dados do parceiro selecionado — gaveta, só leitura */}
+                            {indicadoPorParceiroId && (
+                                <div className="mt-2 rounded-xl overflow-hidden" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setParceiroDetalheAberto(v => !v)}
+                                        disabled={!parceiroDetalhe}
+                                        className="w-full flex items-center gap-2 px-3 py-2.5 text-left disabled:opacity-60"
+                                    >
+                                        {carregandoParceiroDetalhe ? (
+                                            <Loader2 size={14} className="animate-spin text-slate-400 shrink-0" />
+                                        ) : (
+                                            <Users size={14} className="text-slate-400 shrink-0" />
+                                        )}
+                                        <span className="flex-1 min-w-0 text-[11px] font-bold text-slate-300 truncate">
+                                            {carregandoParceiroDetalhe ? "Carregando dados do parceiro..." : (parceiroDetalhe?.nome ?? "Parceiro")}
+                                        </span>
+                                        {parceiroDetalhe && (
+                                            <ChevronDown size={14} className={`shrink-0 text-slate-500 transition-transform ${parceiroDetalheAberto ? "rotate-180" : ""}`} />
+                                        )}
+                                    </button>
+
+                                    {parceiroDetalheAberto && parceiroDetalhe && (
+                                        <div className="px-3 pb-3 pt-2 border-t grid grid-cols-2 gap-x-4 gap-y-2.5 text-[11px]" style={{ borderColor: "rgba(99,102,241,0.15)" }}>
+                                            <div>
+                                                <p className="text-[8.5px] text-slate-600 uppercase tracking-widest font-bold">{parceiroDetalhe.tipo === "PJ" ? "CNPJ" : "CPF"}</p>
+                                                <p className="font-mono font-bold text-slate-200">{parceiroDetalhe.documento}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8.5px] text-slate-600 uppercase tracking-widest font-bold">Nível</p>
+                                                <p className="font-bold text-slate-200">{parceiroDetalhe.nivel}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className="text-[8.5px] text-slate-600 uppercase tracking-widest font-bold">E-mail</p>
+                                                <p className="font-bold text-slate-200">{parceiroDetalhe.email}</p>
+                                            </div>
+                                            {(parceiroDetalhe.telefone || parceiroDetalhe.telefone2) && (
+                                                <div className="col-span-2">
+                                                    <p className="text-[8.5px] text-slate-600 uppercase tracking-widest font-bold">Telefone</p>
+                                                    <p className="font-bold text-slate-200">{[parceiroDetalhe.telefone, parceiroDetalhe.telefone2].filter(Boolean).join(" · ")}</p>
+                                                </div>
+                                            )}
+                                            {parceiroDetalhe.endereco && (
+                                                <div className="col-span-2">
+                                                    <p className="text-[8.5px] text-slate-600 uppercase tracking-widest font-bold">Endereço</p>
+                                                    <p className="font-bold text-slate-200">
+                                                        {parceiroDetalhe.endereco.logradouro}{parceiroDetalhe.endereco.numero ? `, ${parceiroDetalhe.endereco.numero}` : ""} — {parceiroDetalhe.endereco.bairro}, {parceiroDetalhe.endereco.cidade}/{parceiroDetalhe.endereco.uf}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {parceiroDetalhe.representantes.length > 0 && (
+                                                <div className="col-span-2">
+                                                    <p className="text-[8.5px] text-slate-600 uppercase tracking-widest font-bold mb-1">
+                                                        Representantes ({parceiroDetalhe.representantes.length})
+                                                    </p>
+                                                    <div className="space-y-1.5">
+                                                        {parceiroDetalhe.representantes.map((r, i) => (
+                                                            <div key={i} className="rounded-lg px-2.5 py-1.5" style={{ background: "rgba(99,102,241,0.06)" }}>
+                                                                <p className="font-bold text-slate-200">{r.nome}{r.cargo ? ` · ${r.cargo}` : ""}</p>
+                                                                <p className="text-slate-500 font-mono">{r.documento}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

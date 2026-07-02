@@ -20,6 +20,13 @@
 
 ## Erros Catalogados
 
+### "use server" file can only export async functions, found object
+**Sintoma:** `npm run build` falha com `Failed to collect page data for /rota` → causa raiz: `A "use server" file can only export async functions, found object.`
+**Causa:** Um arquivo com `"use server"` no topo (Server Actions) exportou uma constante não-função (ex: objeto de configuração, array, número) além das funções async. Next.js proíbe qualquer export que não seja `async function` nesses arquivos.
+**Fix:** Mover a constante para um arquivo separado SEM `"use server"` (ex: `lib/tributos.ts`) e importar dos dois lados (do arquivo de actions e dos componentes que precisam do valor).
+**Contexto:** Acontece ao tentar reexportar constantes (percentuais, configs, enums) de um arquivo de Server Actions para reuso no frontend — parece funcionar em `tsc`/dev, só quebra no `next build`.
+**Adicionado em:** 2026-07-01
+
 ### InfoSimples CPF — data_nascimento formato errado
 **Sintoma:** Consulta CPF retorna erro "CPF não encontrado" mesmo com dados corretos.
 **Causa:** `<input type="date">` envia `YYYY-MM-DD`; InfoSimples `receita-federal/cpf` exige `DD/MM/YYYY`.
@@ -87,6 +94,44 @@
 **Fix:** remover acentos com `.normalize("NFD").replace(/[̀-ͯ]/g, "")` ANTES de qualquer filtro/lowercase. Nunca usar `[^a-z0-9]` para "limpar" string PT-BR sem antes tirar diacríticos.
 **Bônus:** IDs de contrato/cliente são cuid (STRING tipo `cmpfxcy81...`), não Int — em UPDATE manual via SQL, sempre passar como arg parametrizado/aspas, nunca interpolar cru.
 **Adicionado em:** 2026-06-23
+
+---
+
+## Agente Onyx (qwen3) retorna 502 "não retornou dados" — reasoning aborta sem gerar resposta em prompt grande
+**Sintoma:** `POST /api/onyx/extrato` (ou qualquer rota usando `sendChatMessageStream`) retorna 502. Log mostra o stream recebendo só `reasoning_start` → `reasoning_delta` (às vezes com 1 palavra tipo "Here") → `reasoning_done`, e nunca um `message_start`/`message_delta` — resultado fica com 0 chars. Acontece de forma **consistente/determinística** com o mesmo arquivo grande (não é flakiness — retry simples nas mesmas condições falha sempre).
+**Causa:** O modelo **qwen3** (modelo padrão configurado no agente no Onyx) não processa de forma confiável prompts de entrada muito grandes (~37k chars de texto de extrato + instruções). Ele aborta o bloco de reasoning quase instantaneamente e o turno termina sem nunca emitir a resposta final. NÃO é limite de `max_tokens` de output (aumentar `maxTokens` sozinho não resolve — testado, erro idêntico). NÃO é intermitência (retry com o texto completo, sem reduzir tamanho, falhou 2/2 vezes de forma idêntica).
+**Fix real:** dividir o texto extraído pelo Tika em **trechos menores** (`dividirEmChunks` em `src/lib/onyx/extrato-agents.ts`, ~6000 chars cada, preferindo cortar em quebras de página `\f` do PDF) e enviar cada trecho como uma chamada separada ao agente, agregando as transações de todos os trechos no final. Retry por trecho (até 2 tentativas) continua existindo como proteção adicional, mas o que resolveu de fato foi reduzir o tamanho do prompt de entrada. `maxDuration` da rota subiu de 120 para 300 (processar N trechos em sequência leva mais tempo).
+**Contexto:** Qualquer agente Onyx usando modelo qwen3 via `sendChatMessageStream` com prompt de entrada grande (>~6-10k chars). Se um agente Onyx some sem responder e o texto de entrada for grande, suspeitar do tamanho do prompt ANTES de max_tokens ou de bug no parser do stream.
+**Adicionado em:** 2026-07-02
+
+### Chunking por trecho gera transações duplicadas/truncadas (extrato bancário)
+**Sintoma:** Extrato de 18 páginas retornou 458 transações (muito acima do esperado — extratos normais têm dezenas). Algumas descrições vieram cortadas no meio da palavra (ex: `"DISTRESSED FUNDO DE 1"`, `"TEKA TECELAGEM KUEHNR"`).
+**Causa:** Ao dividir o texto do Tika em chunks (`dividirEmChunks`) sem overlap controlado, uma linha de movimentação que cai exatamente na fronteira de dois chunks pode aparecer inteira (ou truncada) nos dois trechos adjacentes — o agente processa cada trecho isoladamente e não sabe que já viu aquela linha. Chunk grande demais também aumenta a chance do modelo "perder o fio" da linha e cortar/abreviar a descrição.
+**Fix:** (1) Deduplicação por chave `data|descricao|valor` após agregar os resultados de todos os trechos (`processarExtratoPorAgentes` em `src/lib/onyx/extrato-agents.ts`) — uma transação idêntica não se repete de verdade num extrato real. (2) Reduzido `TAMANHO_MAX_CHUNK` de 6000 para 3500 chars. (3) Prompt reforçado: "descricao deve ser a linha COMPLETA... nunca corte no meio de uma palavra" e "cada movimentação aparece SOMENTE UMA VEZ".
+**Contexto:** Qualquer pipeline que divide texto grande em chunks processados independentemente por um LLM e depois agrega os resultados — duplicação na fronteira dos chunks é um risco estrutural, não um bug pontual.
+**Adicionado em:** 2026-07-02
+
+### Extrato de páginas recortadas/exportadas retorna 0 transações silenciosamente
+**Sintoma:** Upload de um PDF "recortado" (ex: só as 3 primeiras páginas de um extrato maior, exportado por alguma ferramenta de split de PDF) processa sem erro mas retorna 0 transações. Log mostra `[PDF-PARSE fallback] ... 44 chars extraídos` e o texto bruto é só `-- 1 of 3 --  -- 2 of 3 --  -- 3 of 3 --` (marcadores de página do pdf-parse, sem nenhum conteúdo real).
+**Causa:** Algumas ferramentas de recorte/split de PDF rasterizam as páginas (convertem em imagem) em vez de preservar a camada de texto original. Nem o Tika nem o fallback pdf-parse conseguem extrair texto de um PDF assim — não é bug do pipeline, é o arquivo de entrada que não tem texto extraível. O agente Organizador respondeu corretamente `[]` porque de fato não recebeu nenhuma movimentação.
+**Fix:** `processarExtratoPorAgentes` (`src/lib/onyx/extrato-agents.ts`) agora valida o texto extraído removendo os marcadores `-- N of M --` do pdf-parse antes de checar o tamanho — se sobrar menos de 20 chars reais, lança erro 422 claro ("PDF pode ser scan sem OCR ou ter perdido a camada de texto") em vez de silenciosamente processar um texto vazio e devolver 0 transações.
+**Contexto:** Sempre testar o pipeline de extração com o PDF ORIGINAL (não um recorte feito por ferramenta externa) — recortes podem introduzir esse problema que não existe no arquivo fonte.
+**Adicionado em:** 2026-07-02
+
+### API PDF24 (Cross Service Solutions) — path real do endpoint difere da documentação do widget
+**Sintoma:** `POST {PDF24_OCR_API_URL}/api/` retorna `404 {"message":"Cannot POST /solutions/api/"}`. A documentação do widget mostra "POST /api/ 67" com um número solto ao lado, sem indicar claramente que faz parte do path.
+**Causa:** O "67" na documentação é o **id da solução/produto** ("PDF OCR") dentro da plataforma multi-produto Cross Service Solutions — o endpoint real de criação de job é `POST /api/{solutionId}`, ou seja `POST /api/67`, não `POST /api/`. Confirmado testando incrementalmente contra a API real (curl) até achar o path que retornava 201 em vez de 404.
+**Fix:** `src/lib/bibble/pdf24-ocr.ts` usa `PDF24_SOLUTION_ID = "67"` e monta a URL como `${PDF24_URL}/api/${PDF24_SOLUTION_ID}` tanto para criar o job (POST) quanto consultar (GET .../{jobId} continua sendo só o id numérico do job, não da solução).
+**Contexto:** Documentação de "widgets" white-label (PDF24 by Cross Service Solutions, e provavelmente outras integrações da mesma plataforma) pode omitir que um número aparentemente solto no exemplo de rota é na verdade parte obrigatória do path. Quando a doc de uma API externa parecer incompleta/ambígua, validar incrementalmente com curl antes de assumir o path.
+**Adicionado em:** 2026-07-02
+
+### API PDF24 — critério de "job concluído" e tempo de processamento real
+**Sintoma:** Achava-se que `output: null` no job significava "ainda processando" e `output` preenchido significava concluído. Na prática, `output` já vem preenchido com `{result: "<p>please download your PDF</p>", files: []}` desde o status `pending`/`in_progress` — só quando `status` vira `"done"` é que `output.files[]` recebe o arquivo de verdade.
+**Causa:** A API retorna um placeholder de "output" genérico durante todo o processamento, não `null`. O sinal confiável de conclusão é `output.files.length > 0` (ou `status === "done"`), não a mera presença do campo `output`.
+**Fix:** `aguardarJobOcr` em `pdf24-ocr.ts` verifica `output?.files && files.length > 0` como sinal de sucesso, e trata `status` em `{error, failed, failure, cancelled, canceled}` como falha explícita (aborta o polling cedo em vez de esperar o timeout inteiro).
+**Tempo real observado:** Um PDF de 3 páginas de scan levou **mais de 8 minutos** para o job concluir (`status: "done"`) nesse serviço. `PDF24_POLL_TIMEOUT_MS` foi ajustado de 120_000 para 480_000 (8 min), e `maxDuration` da rota `/api/onyx/extrato` subiu de 300 para 800 para acomodar. Esse tempo pode variar (fila do serviço, tamanho do arquivo) — não é um SLA garantido, é só o que foi observado num teste real.
+**Contexto:** Qualquer uso de `ocrViaPdf24`. Se o guard de texto insuficiente em `extrato-agents.ts` disparar 422 mesmo com PDF24 configurado, o job pode ter estourado o timeout de polling — checar logs `[PDF24-OCR]` para confirmar.
+**Adicionado em:** 2026-07-02
 
 ---
 
