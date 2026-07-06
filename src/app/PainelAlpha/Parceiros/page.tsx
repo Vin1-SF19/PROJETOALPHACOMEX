@@ -2,6 +2,7 @@ import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
 import db from "@/lib/prisma";
 import { listarParceiros, getPermissaoParceiros } from "@/actions/parceiros";
+import { getTemplateParadaoConvite } from "@/actions/onboarding";
 import ParceirosClient from "@/components/Parceiros/ParceirosClient";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,10 @@ export default async function ParceirosPage({
   const temaName = rec?.tema_interface ?? "blue";
 
   const { busca, nivel } = await searchParams;
-  const [{ parceiros }, permissao] = await Promise.all([
+  const [{ parceiros }, permissao, templateConvite] = await Promise.all([
     listarParceiros(busca, nivel),
     getPermissaoParceiros(),
+    getTemplateParadaoConvite(),
   ]);
 
   return (
@@ -33,6 +35,7 @@ export default async function ParceirosPage({
       busca={busca}
       nivel={nivel}
       permissao={permissao}
+      templateConvite={templateConvite}
     />
   );
 }

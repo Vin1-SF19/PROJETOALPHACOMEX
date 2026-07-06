@@ -36,6 +36,18 @@ https://painel-alpha-projeto.vercel.app/parceiros
 ⚠️ Importante:
 Guarde estas credenciais com segurança. Em caso de dúvidas, entre em contato com nossa equipe comercial.`;
 
+const DEFAULT_MENSAGEM_CONVITE = `🤝 Bem-vindo ao nosso programa de parceiros!
+
+Para iniciar seu cadastro, acesse o link abaixo e informe o PIN de acesso:
+
+🔗 Link:
+[LINK]
+
+🔑 PIN de acesso:
+[PIN]
+
+Estamos ansiosos para firmar essa parceria!`;
+
 const DEFAULT_MENSAGEM = `🎉 Seja muito bem-vindo ao Painel Alpha!
 
 Aqui centralizamos os principais softwares internos da Alpha Comex & Compliance para facilitar o acesso e a utilização no dia a dia. 💻⚙️
@@ -75,15 +87,29 @@ function FormularioTemplate({
   const [form, setForm] = useState<FormState>(inicial);
   const [expandido, setExpandido] = useState(true);
 
+  const DEFAULTS_POR_TIPO: Record<string, string> = {
+    USUARIO: DEFAULT_MENSAGEM,
+    PARCEIRO: DEFAULT_MENSAGEM_PARCEIRO,
+    CONVITE: DEFAULT_MENSAGEM_CONVITE,
+  };
+
   useEffect(() => {
-    if (form.tipo === "PARCEIRO" && (form.mensagem === "" || form.mensagem === DEFAULT_MENSAGEM)) {
-      setForm((f) => ({ ...f, mensagem: DEFAULT_MENSAGEM_PARCEIRO }));
-    }
-    if (form.tipo === "USUARIO" && (form.mensagem === "" || form.mensagem === DEFAULT_MENSAGEM_PARCEIRO)) {
-      setForm((f) => ({ ...f, mensagem: DEFAULT_MENSAGEM }));
+    const mensagemAtualEhAlgumDefault = Object.values(DEFAULTS_POR_TIPO).includes(form.mensagem);
+    const novoDefault = DEFAULTS_POR_TIPO[form.tipo];
+    if (novoDefault && (form.mensagem === "" || mensagemAtualEhAlgumDefault) && form.mensagem !== novoDefault) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForm((f) => ({ ...f, mensagem: novoDefault }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.tipo]);
+
+  const PLACEHOLDERS_POR_TIPO: Record<string, string[]> = {
+    USUARIO: ["[NOME]", "[LOGIN]", "[SENHA]", "[EMAIL]", "[SETOR]", "[LINK]"],
+    PARCEIRO: ["[NOME]", "[LOGIN]", "[SENHA]", "[EMAIL]", "[SETOR]", "[LINK]"],
+    CONVITE: ["[LINK]", "[PIN]"],
+    CLIENTE: ["[NOME]", "[LOGIN]", "[SENHA]", "[EMAIL]", "[SETOR]", "[LINK]"],
+  };
+  const placeholdersDisponiveis = PLACEHOLDERS_POR_TIPO[form.tipo] ?? PLACEHOLDERS_POR_TIPO.USUARIO;
 
   const inserirPlaceholder = (ph: string) => {
     setForm((f) => ({ ...f, mensagem: f.mensagem + ph }));
@@ -146,6 +172,9 @@ function FormularioTemplate({
                 <SelectItem value="PARCEIRO" className="text-xs focus:bg-indigo-600">
                   🤝 Parceiro
                 </SelectItem>
+                <SelectItem value="CONVITE" className="text-xs focus:bg-indigo-600">
+                  📨 Convite de Parceiro
+                </SelectItem>
                 <SelectItem value="CLIENTE" className="text-xs focus:bg-indigo-600">
                   🏢 Cliente (em breve)
                 </SelectItem>
@@ -157,7 +186,7 @@ function FormularioTemplate({
             <div className="flex items-center justify-between">
               <Label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Mensagem</Label>
               <div className="flex flex-wrap gap-1">
-                {["[NOME]", "[LOGIN]", "[SENHA]", "[EMAIL]", "[SETOR]", "[LINK]"].map((ph) => (
+                {placeholdersDisponiveis.map((ph) => (
                   <button
                     key={ph}
                     type="button"
@@ -354,6 +383,11 @@ export default function GestaoOnboardingClient({ templates: initialTemplates }: 
                     {t.tipo === "PARCEIRO" && (
                       <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase">
                         🤝 Parceiro
+                      </span>
+                    )}
+                    {t.tipo === "CONVITE" && (
+                      <span className="px-2 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[8px] font-black uppercase">
+                        📨 Convite
                       </span>
                     )}
                     {t.tipo === "CLIENTE" && (

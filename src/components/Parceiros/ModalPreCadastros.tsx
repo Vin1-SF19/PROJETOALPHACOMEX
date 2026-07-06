@@ -10,11 +10,21 @@ type PreCadastro = {
   email: string;
   nomeCompleto: string;
   cpf: string | null;
+  dataNascimento: string | null;
   uf: string;
   municipio: string | null;
   telefone: string;
+  whatsapp: string | null;
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
   areasAtuacao: string | null;
   nomeEmpresa: string | null;
+  razaoSocial: string | null;
+  nomeFantasia: string | null;
   cnpj: string | null;
   sobre: string | null;
   termoVersao: string;
@@ -91,16 +101,22 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado }
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <h3 className="text-[14px] font-black text-white">{p.nomeCompleto}</h3>
-                    {p.nomeEmpresa && <p className="text-[11px] text-slate-400">{p.nomeEmpresa}</p>}
+                    {(p.razaoSocial || p.nomeEmpresa) && (
+                      <p className="text-[11px] text-slate-400">
+                        {p.razaoSocial ?? p.nomeEmpresa}
+                        {p.nomeFantasia && p.nomeFantasia !== (p.razaoSocial ?? p.nomeEmpresa) && ` (${p.nomeFantasia})`}
+                      </p>
+                    )}
                   </div>
                   <span className="text-[9px] text-slate-600 shrink-0">{new Date(p.createdAt).toLocaleDateString("pt-BR")}</span>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-1.5 text-[11px] text-slate-400 mb-3">
                   <Info icon={<Mail size={11} />} v={p.email} />
-                  <Info icon={<Phone size={11} />} v={p.telefone} />
-                  <Info icon={<MapPin size={11} />} v={`${p.municipio ?? "—"} / ${p.uf}`} />
+                  <Info icon={<Phone size={11} />} v={p.whatsapp ? `${p.telefone} · WhatsApp ${p.whatsapp}` : p.telefone} />
+                  <Info icon={<MapPin size={11} />} v={enderecoResumo(p)} />
                   <Info icon={<Building2 size={11} />} v={p.cnpj ? `CNPJ ${p.cnpj}` : p.cpf ? `CPF ${p.cpf}` : "sem documento"} />
+                  {p.dataNascimento && <Info icon={<UserPlus size={11} />} v={`Nascimento: ${p.dataNascimento}`} />}
                 </div>
 
                 {p.areasAtuacao && (
@@ -140,6 +156,16 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado }
       </div>
     </div>
   );
+}
+
+function enderecoResumo(p: PreCadastro): string {
+  if (p.logradouro && p.cidade) {
+    const numero = p.numero ? `, ${p.numero}` : "";
+    const complemento = p.complemento ? ` - ${p.complemento}` : "";
+    const bairro = p.bairro ? ` - ${p.bairro}` : "";
+    return `${p.logradouro}${numero}${complemento}${bairro} - ${p.cidade}/${p.uf}`;
+  }
+  return `${p.municipio ?? "—"} / ${p.uf}`;
 }
 
 function Info({ icon, v }: { icon: React.ReactNode; v: string }) {

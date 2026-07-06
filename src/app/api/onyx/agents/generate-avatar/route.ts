@@ -106,8 +106,14 @@ export async function POST(req: NextRequest) {
     const tempPersona = await createAgent(
       {
         name: `__avatar_gen_${Date.now()}__`,
-        description: "Persona temporária para geração de avatar",
-        system_prompt: "You are an image generation assistant. When asked, generate images based on the description provided.",
+        description: "Persona temporária para geração de avatar de agente IA",
+        system_prompt: [
+          "You are a creative character designer specialized in creating fictional mascot avatars for AI agents.",
+          "Your job is to invent a unique fictional character that visually represents the agent's personality, role, and purpose.",
+          "Always generate a portrait-style illustration of a single fictional character — never generic icons, symbols, logos, or abstract art.",
+          "The character must look like it belongs in a modern app: stylized, expressive, and memorable.",
+          "The character should feel like the 'face' of the AI agent — someone a user would want to talk to.",
+        ].join(" "),
         task_prompt: "",
         tool_ids: [imageToolId],
         is_public: false,
@@ -123,19 +129,25 @@ export async function POST(req: NextRequest) {
       userToken,
     );
 
-    // 3. Monta prompt descrevendo o avatar ideal
-    const agentContext = [
-      description.trim() ? `Descrição: ${description.trim()}` : null,
-      `Função: ${system_prompt.trim().slice(0, 600)}`,
-    ].filter(Boolean).join("\n");
+    // 3. Monta prompt rico para geração do personagem fictício
+    const agentDesc = description.trim();
+    const agentPrompt = system_prompt.trim().slice(0, 800);
 
     const prompt = [
-      `Generate a square avatar icon image for an AI agent with the following characteristics:`,
+      `Create a fictional character avatar for an AI agent with the following identity:`,
       ``,
-      agentContext,
+      agentDesc ? `Agent description: ${agentDesc}` : null,
+      `Agent role and personality (from system prompt): ${agentPrompt}`,
       ``,
-      `Style: minimalist, professional, modern app icon style. Simple or gradient background. No text in the image. Clean and symbolic visual that represents the agent's function and personality.`,
-    ].join("\n");
+      `Instructions:`,
+      `- Invent a unique fictional character that embodies this agent's role and personality.`,
+      `- Draw a portrait or bust of this character as the avatar image.`,
+      `- The character can be human, humanoid, creature, robot, or any fantastical being — choose what best fits the agent's identity.`,
+      `- Style: digital illustration, vibrant colors, expressive face, modern stylized art. Clean background (solid color or subtle gradient).`,
+      `- Square composition (1:1). The character's face/upper body should fill most of the frame.`,
+      `- No text, no labels, no UI elements. Just the character portrait.`,
+      `- The visual style should feel like a polished app mascot — friendly, memorable, and personality-driven.`,
+    ].filter(Boolean).join("\n");
 
     // 4. Envia mensagem e parseia o stream NDJSON
     const streamResponse = await sendChatMessageStream({

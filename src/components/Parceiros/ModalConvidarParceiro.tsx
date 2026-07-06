@@ -24,13 +24,23 @@ type ConviteItem = {
   _count: { preCadastros: number };
 };
 
-export default function ModalConvidarParceiro({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function ModalConvidarParceiro({
+  open,
+  onClose,
+  onConviteGerado,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConviteGerado: (dados: { link: string; pin: string }) => void;
+}) {
   const [validade, setValidade] = useState(7);
   const [gerando, setGerando] = useState(false);
   const [convites, setConvites] = useState<ConviteItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [copiado, setCopiado] = useState<string | null>(null);
   const [agora, setAgora] = useState(0); // timestamp capturado no fetch (evita Date.now no render)
+  const [pinRecemGerado, setPinRecemGerado] = useState<{ token: string; pin: string } | null>(null);
+  const [pinCopiado, setPinCopiado] = useState(false);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -58,11 +68,22 @@ export default function ModalConvidarParceiro({ open, onClose }: { open: boolean
     if (res.success && res.convite) {
       const link = linkDe(res.convite.token);
       await navigator.clipboard.writeText(link).catch(() => {});
+      if (res.convite.pin) {
+        setPinRecemGerado({ token: res.convite.token, pin: res.convite.pin });
+        onConviteGerado({ link, pin: res.convite.pin });
+      }
+      setPinCopiado(false);
       toast.success("Link gerado e copiado!");
       recarregar();
     } else {
       toast.error(res.error ?? "Falha ao gerar convite");
     }
+  };
+
+  const copiarPin = async (pin: string) => {
+    await navigator.clipboard.writeText(pin).catch(() => {});
+    setPinCopiado(true);
+    setTimeout(() => setPinCopiado(false), 1800);
   };
 
   const copiar = async (token: string) => {
@@ -120,6 +141,19 @@ export default function ModalConvidarParceiro({ open, onClose }: { open: boolean
             {gerando ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
             Gerar link de convite
           </button>
+
+          {pinRecemGerado && (
+            <div className="mt-3 flex items-center justify-between gap-2 p-3 rounded-xl" style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.3)" }}>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400">PIN deste convite</p>
+                <p className="text-[16px] font-black text-white tracking-[0.3em]">{pinRecemGerado.pin}</p>
+                <p className="text-[9.5px] text-slate-500 mt-0.5">Repasse junto com o link — necessário para a busca automática de CPF.</p>
+              </div>
+              <button onClick={() => copiarPin(pinRecemGerado.pin)} className="p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-white/5 transition-all shrink-0" title="Copiar PIN">
+                {pinCopiado ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Lista de convites */}

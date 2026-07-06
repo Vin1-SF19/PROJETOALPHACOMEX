@@ -77,10 +77,12 @@ export async function gerarConvite(input: z.infer<typeof GerarConviteSchema>) {
 
   const expiraEm = new Date(Date.now() + parsed.data.validadeDias * 86_400_000);
   const token = randomUUID();
+  // PIN de 4 dígitos — protege a busca automática de CPF (custo por chamada na InfoSimples).
+  const pin = String(Math.floor(1000 + Math.random() * 9000));
 
   const convite = await db.conviteParceiro.create({
-    data: { token, expiraEm, criadoPorUserId: ctx.userId },
-    select: { id: true, token: true, expiraEm: true, status: true },
+    data: { token, expiraEm, pin, criadoPorUserId: ctx.userId },
+    select: { id: true, token: true, expiraEm: true, status: true, pin: true },
   });
 
   revalidatePath("/PainelAlpha/Parceiros");
@@ -151,12 +153,24 @@ const PreCadastroSchema = z.object({
   email: z.string().email("E-mail inválido").max(200),
   nomeCompleto: z.string().min(2, "Informe o nome completo").max(200),
   cpf: z.string().max(20).optional(),
+  dataNascimento: z.string().max(20).optional(),
+  dadosConsultaCpf: z.string().optional(),
   uf: z.string().length(2, "Selecione o estado"),
   municipio: z.string().max(120).optional(),
   telefone: z.string().min(8, "Informe o telefone").max(30),
+  whatsapp: z.string().max(30).optional(),
+  cep: z.string().max(9).optional(),
+  logradouro: z.string().max(150).optional(),
+  numero: z.string().max(30).optional(),
+  complemento: z.string().max(30).optional(),
+  bairro: z.string().max(150).optional(),
+  cidade: z.string().max(150).optional(),
   areasAtuacao: z.array(z.string().max(60)).max(15).optional(),
   nomeEmpresa: z.string().max(200).optional(),
+  razaoSocial: z.string().max(200).optional(),
+  nomeFantasia: z.string().max(200).optional(),
   cnpj: z.string().max(20).optional(),
+  dadosConsultaCnpj: z.string().optional(),
   sobre: z.string().max(3000).optional(),
   termoAceito: z.boolean().refine((v) => v === true, { message: "É necessário aceitar os termos" }),
 });
@@ -195,12 +209,24 @@ export async function submeterConvitePublico(input: z.infer<typeof PreCadastroSc
         email: d.email.trim(),
         nomeCompleto: d.nomeCompleto.trim(),
         cpf: d.cpf?.replace(/\D/g, "") || null,
+        dataNascimento: d.dataNascimento?.trim() || null,
+        dadosConsultaCpf: d.dadosConsultaCpf || null,
         uf: d.uf.toUpperCase(),
         municipio: d.municipio?.trim() || null,
         telefone: d.telefone.trim(),
+        whatsapp: d.whatsapp?.trim() || null,
+        cep: d.cep?.replace(/\D/g, "") || null,
+        logradouro: d.logradouro?.trim() || null,
+        numero: d.numero?.trim() || null,
+        complemento: d.complemento?.trim() || null,
+        bairro: d.bairro?.trim() || null,
+        cidade: d.cidade?.trim() || null,
         areasAtuacao: d.areasAtuacao && d.areasAtuacao.length > 0 ? d.areasAtuacao.join(",") : null,
         nomeEmpresa: d.nomeEmpresa?.trim() || null,
+        razaoSocial: d.razaoSocial?.trim() || null,
+        nomeFantasia: d.nomeFantasia?.trim() || null,
         cnpj: d.cnpj?.replace(/\D/g, "") || null,
+        dadosConsultaCnpj: d.dadosConsultaCnpj || null,
         sobre: d.sobre?.trim() || null,
         termoVersao: termo?.versao ?? "sem-versao",
         termoAceito: true,
@@ -227,8 +253,10 @@ export async function listarPreCadastros(status: "PENDENTE" | "APROVADO" | "REJE
     orderBy: { createdAt: "desc" },
     take: 200,
     select: {
-      id: true, email: true, nomeCompleto: true, cpf: true, uf: true, municipio: true,
-      telefone: true, areasAtuacao: true, nomeEmpresa: true, cnpj: true, sobre: true,
+      id: true, email: true, nomeCompleto: true, cpf: true, dataNascimento: true, uf: true, municipio: true,
+      telefone: true, whatsapp: true, cep: true, logradouro: true, numero: true,
+      complemento: true, bairro: true, cidade: true,
+      areasAtuacao: true, nomeEmpresa: true, razaoSocial: true, nomeFantasia: true, cnpj: true, sobre: true,
       termoVersao: true, termoAceitoEm: true, status: true, createdAt: true,
     },
   });
@@ -263,14 +291,48 @@ export async function aprovarPreCadastro(preCadastroId: number) {
     return { success: false as const, error: "Pré-cadastro sem CPF/CNPJ válido — peça o documento antes de aprovar" };
   }
 
+  // Endereço estruturado só é enviado se todos os campos obrigatórios do
+  // EnderecoSchema (parceiros.ts) estiverem presentes — campos são opcionais
+  // no pré-cadastro (wizard pode não ter passado por essa etapa em respostas antigas).
+  const enderecoCompleto =
+    pc.cep && pc.logradouro && pc.bairro && pc.cidade && pc.uf
+      ? {
+          cep: pc.cep,
+          logradouro: pc.logradouro,
+          numero: pc.numero ?? undefined,
+          complemento: pc.complemento ?? undefined,
+          bairro: pc.bairro,
+          cidade: pc.cidade,
+          uf: pc.uf,
+        }
+      : undefined;
+
+  // Dados brutos das duas consultas automáticas (CPF via InfoSimples, CNPJ via
+  // ReceitaFederal) combinados num único payload — evita reconsultar na aprovação.
+  const dadosConsultaCombinado =
+    pc.dadosConsultaCpf || pc.dadosConsultaCnpj
+      ? JSON.stringify({
+          cpf: pc.dadosConsultaCpf ? JSON.parse(pc.dadosConsultaCpf) : null,
+          cnpj: pc.dadosConsultaCnpj ? JSON.parse(pc.dadosConsultaCnpj) : null,
+        })
+      : undefined;
+
   const resultado = await criarParceiro({
     tipo,
     documento,
-    nome: pc.nomeCompleto,
-    nomeFantasia: pc.nomeEmpresa ?? undefined,
+    // Razão social (empresa) tem prioridade; sem ela, usa o nome da pessoa (PF sem empresa).
+    nome: pc.razaoSocial ?? pc.nomeCompleto,
+    nomeFantasia: pc.nomeFantasia ?? pc.nomeEmpresa ?? undefined,
     email: pc.email,
     telefone: pc.telefone,
+    telefone2: pc.whatsapp ?? undefined,
     nivel: "GOLD",
+    endereco: enderecoCompleto,
+    dadosConsulta: dadosConsultaCombinado,
+    // Termo já foi aceito no wizard do convite — o parceiro nasce com o aceite registrado.
+    termoAceito: true,
+    termoAceitoEm: pc.termoAceitoEm,
+    termoVersao: pc.termoVersao,
   });
 
   if (!resultado.success || !resultado.parceiro) {

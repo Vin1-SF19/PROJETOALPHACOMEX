@@ -36,11 +36,13 @@ Ao criar um novo módulo, verificar e registrar:
 
 ### Template de Onboarding — Campo `tipo`
 
-**Adicionado em:** 2026-06-18 por Scribe (sessão Bibble)
+**Adicionado em:** 2026-06-18 por Scribe (sessão Bibble). **Estendido em:** 2026-07-06 (tipo CONVITE).
 
-**Descrição:** Discriminador de destino dos templates de onboarding. Permite que o admin crie templates específicos por audiência (colaborador, parceiro, cliente futuro) e que o sistema exiba o template correto em cada fluxo.
+**Descrição:** Discriminador de destino dos templates de onboarding. Permite que o admin crie templates específicos por audiência (colaborador, parceiro, cliente futuro, convite de parceiro) e que o sistema exiba o template correto em cada fluxo.
 
-**Valores válidos:** `USUARIO | PARCEIRO | CLIENTE`
+**Valores válidos:** `USUARIO | PARCEIRO | CLIENTE | CONVITE`
+
+**⚠️ Armadilha já sofrida (2026-07-06):** o campo `tipo` foi adicionado ao `schema.prisma` em 2026-06-18, mas a migration NUNCA foi aplicada de fato no Turso de produção — só existia no schema, gerando `The column tipo does not exist` em toda tentativa de criar template. Corrigido via `ALTER TABLE onboarding_template ADD COLUMN tipo TEXT DEFAULT 'USUARIO'` direto no Turso. **Toda vez que uma coluna nova for adicionada ao schema, CONFIRME com `PRAGMA table_info` no Turso real — não confie que "está no schema.prisma" significa "está em produção"** (ver `decisions.md` sobre `prisma db push` não alcançar o Turso).
 
 **Schema:**
 ```prisma
@@ -109,6 +111,110 @@ Admin cria template tipo=PARCEIRO em /GestaoOnboarding
   → NovoParceiro → ModalCredenciais exibe a mensagem com [LOGIN]/[SENHA] substituídos
 ```
 
+---
+
+### Template de Convite — Integração com ModalMensagemConvite
+
+**Adicionado em:** 2026-07-06 por Scribe (sessão Bibble)
+
+**Descrição:** Ao gerar um link de convite de parceiro (`ModalConvidarParceiro.tsx`, dentro de `/PainelAlpha/Parceiros`), um novo modal `ModalMensagemConvite.tsx` exibe a mensagem de boas-vindas do template tipo `CONVITE` padrão, com `[LINK]` e `[PIN]` já substituídos — pronta para copiar e enviar ao futuro parceiro. Se não houver template CONVITE ativo, usa mensagem de fallback hardcoded (mesmo padrão do `ModalCredenciais`).
+
+**Placeholders deste tipo:** `[LINK]` (URL completa do convite) e `[PIN]` (4 dígitos) — NÃO usa `[LOGIN]`/`[SENHA]`/`[NOME]` (ainda não existe parceiro cadastrado neste momento do fluxo).
+
+**Arquivos envolvidos:**
+- `src/lib/onboarding-placeholders.ts` — helper **compartilhado** `substituirPlaceholders(mensagem, valores)`, extraído da função que antes vivia só dentro de `ModalCredenciais.tsx`. Genérico: aceita qualquer `Record<string,string>`, usado tanto para `{LOGIN,SENHA}` quanto `{LINK,PIN}`.
+- `src/actions/onboarding.ts` — `getTemplateParadaoConvite()`, espelho exato de `getTemplateParadaoParceiro()` trocando o filtro para `tipo: "CONVITE"`.
+- `src/app/PainelAlpha/Parceiros/page.tsx` — busca `getTemplateParadaoConvite()` em paralelo, passa como prop `templateConvite` para `ParceirosClient`.
+- `src/components/Parceiros/ModalMensagemConvite.tsx` (novo) — recebe `{ open, onClose, link, pin, template }`, monta a mensagem final e exibe com botão de copiar.
+
+**Fluxo completo:**
+```
+Admin cria template tipo=CONVITE em /GestaoOnboarding (placeholders sugeridos: [LINK] [PIN])
+  → page.tsx de /PainelAlpha/Parceiros busca getTemplateParadaoConvite() em paralelo
+  → passa como prop templateConvite até ParceirosClient
+  → Admin clica "Convidar parceiro" → ModalConvidarParceiro gera o link+pin
+  → ModalConvidarParceiro chama onConviteGerado({ link, pin }) — NÃO renderiza o modal de mensagem ele mesmo
+  → ParceirosClient guarda em estado (mensagemConvite) e monta <ModalMensagemConvite /> como irmão independente
+  → ModalMensagemConvite substitui [LINK]/[PIN] e exibe a mensagem pronta pra copiar
+```
+
+**⚠️ Padrão a NUNCA repetir (bug real desta sessão):** a primeira versão tentou renderizar `ModalMensagemConvite` (que usa `Dialog` do Radix, com hooks internos) **condicionalmente dentro do próprio `ModalConvidarParceiro`**, que tem um early-return `if (!open) return X`. Isso causou `Rendered more hooks than during the previous render` — dois caminhos de render com quantidade de hooks/estrutura de árvore diferente dentro do mesmo componente. **Regra geral: nunca monte um modal filho com Dialog/hooks próprios dentro de um componente que tem early-return condicional baseado em prop — sempre eleve o estado do modal filho para o componente pai** (callback tipo `onConviteGerado`, e o pai decide se/quando montar o filho).
+
 **Editado quando:** Novo tipo de parceiro precisar de template customizado.
 
 **Última atualização:** 2026-06-18 por Scribe
+
+---
+
+### Wizard de Convite de Parceiro — multi-tela (7 telas)
+
+**Adicionado em:** 2026-07-06 por Scribe (sessão Bibble)
+
+**Descrição:** O convite público de parceiro (`/convite/parceiro/[token]`) era um form single-page (`FormConviteParceiro.tsx`, deletado) e virou um wizard de 7 telas, no mesmo espírito do onboarding multi-step do portal AlphaParceiros.
+
+**Fluxo completo (geração → PIN → preenchimento com busca automática → aprovação):**
+```
+1. Admin/equipe abre ModalConvidarParceiro.tsx (dentro de /PainelAlpha/Parceiros)
+   → gerarConvite({ validadeDias }) cria ConviteParceiro (token randomUUID, PIN de 4 dígitos, status PENDENTE)
+   → link copiado automaticamente; PIN exibido na tela (só neste momento — listarConvites NUNCA retorna o pin)
+   → quem convida repassa link + PIN manualmente ao convidado (WhatsApp, e-mail etc)
+
+2. Convidado abre o link → src/app/convite/parceiro/[token]/page.tsx (Server Component)
+   → validarConvitePublico(token) checa status/expiração, busca ParceiroTermo ativo
+   → se inválido: <ConviteInvalido motivo={...} /> (NAO_ENCONTRADO|EXPIRADO|USADO|REVOGADO)
+   → se válido: <ConviteWizard token={token} termo={resultado.termo} />
+
+3. ConviteWizard.tsx (src/components/Parceiros/Convite/) orquestra o wizard via 1 useState:
+   Step -1 StepPin — pede os 4 dígitos do PIN (só valida FORMATO aqui; a validação real
+            do PIN acontece no backend, na primeira consulta de CPF tentada no Step 1)
+   Step 0  Apresentação (texto institucional + e-mail — SEM campo de senha, removido)
+   Step 1  StepDadosPessoais — CPF + lupa (busca CPF+dataNascimento via InfoSimples,
+           rota pública protegida pelo PIN), Data de Nascimento, Nome, Telefone, WhatsApp
+   Step 2  StepEndereco (CEP com busca ViaCEP, endereço opcional mas completo-ou-nada)
+   Step 3  StepAreaAtuacao (multi-select de 8 áreas fixas)
+   Step 4  StepEmpresa — CNPJ + lupa (busca via ReceitaFederal, JÁ pública, sem custo,
+           SEM precisar de PIN), Razão Social, Nome Fantasia, campo "sobre"
+   Step 5  StepTermos (só aparece se houver ParceiroTermo ativo; senão pula direto pro submit)
+   Step 6  StepSucesso
+   → submissão final chama submeterConvitePublico(...) (convites-parceiro.ts)
+
+4. submeterConvitePublico cria PreCadastroParceiro (status PENDENTE) + marca convite USADO
+   — grava inclusive os payloads BRUTOS das duas consultas (dadosConsultaCpf/dadosConsultaCnpj),
+   mesmo os campos que não aparecem na tela, para não precisar reconsultar na aprovação
+
+5. Admin abre ModalPreCadastros.tsx (lista PENDENTE, mostra whatsapp + endereço completo +
+   razaoSocial/nomeFantasia + dataNascimento)
+   → aprovarPreCadastro(id): monta objeto `endereco` só se cep+logradouro+bairro+cidade+uf
+     estiverem TODOS presentes → combina dadosConsultaCpf+dadosConsultaCnpj num único JSON
+     → chama criarParceiro() repassando telefone2=whatsapp, nome=razaoSocial‖nomeCompleto,
+     nomeFantasia=nomeFantasia‖nomeEmpresa(legado), dadosConsulta=combinado, e
+     termoAceito/termoAceitoEm/termoVersao (o parceiro nasce com o termo já aceito)
+```
+
+**Segurança da rota de consulta de CPF (`/api/convite/consulta-cpf`):** pública (sem `auth()`),
+protegida pelo PIN do convite. Valida nesta ordem antes de gastar a chamada paga na InfoSimples:
+token existe → status PENDENTE → não expirou → `convite.pin` não é null → pin bate exatamente.
+Convites gerados ANTES desta feature (pin=null) são bloqueados explicitamente, não recebem
+passe livre. **PENDÊNCIA DE SEGURANÇA CONHECIDA:** não há rate-limit nem contador de tentativas
+— ver `decisions.md` (decisão de risco aceito conscientemente pelo usuário).
+
+**Arquivos envolvidos:**
+- `prisma/schema.prisma` — `ConviteParceiro.pin` (nullable); `PreCadastroParceiro` +whatsapp/endereço (rodada anterior) +dataNascimento/dadosConsultaCpf/razaoSocial/nomeFantasia/dadosConsultaCnpj (esta rodada)
+- `src/actions/convites-parceiro.ts` — `gerarConvite` (gera PIN), `PreCadastroSchema`, `submeterConvitePublico`, `aprovarPreCadastro`, `listarPreCadastros`
+- `src/actions/parceiros.ts` — `ParceiroSchema` ganhou `termoAceito`/`termoAceitoEm` (`z.coerce.date()`)/`termoVersao` opcionais
+- `src/app/api/convite/consulta-cpf/route.ts` — rota pública nova, espelha `ConsultaCpf/route.ts` mas sem `auth()`, protegida por PIN
+- `src/app/api/ReceitaFederal/route.ts` (`getReceitaData`) — reaproveitada AS-IS para a busca de CNPJ (já era pública, sem custo)
+- `src/components/Parceiros/Convite/` — `ConviteWizard.tsx`, `StepPin.tsx` (novo), `StepApresentacao.tsx`, `StepDadosPessoais.tsx`, `StepEndereco.tsx`, `StepAreaAtuacao.tsx`, `StepEmpresa.tsx`, `StepTermos.tsx`, `StepSucesso.tsx`, `shared.tsx`
+- `src/app/convite/parceiro/[token]/page.tsx` — renderiza `ConviteWizard` no lugar do form antigo
+- `src/components/Parceiros/ModalConvidarParceiro.tsx` — exibe o PIN junto ao link ao gerar
+- `src/components/Parceiros/ModalPreCadastros.tsx` — exibe whatsapp/endereço/razaoSocial/nomeFantasia/dataNascimento
+
+**Como adicionar uma nova tela ao wizard no futuro:**
+1. Criar `Step[Nome].tsx` em `src/components/Parceiros/Convite/`, seguindo a assinatura `{ ...dados, onChange, onBack, onNext }`
+2. Adicionar o campo(s) correspondentes em `ConviteFormData`/`CONVITE_FORM_VAZIO` (`shared.tsx`)
+3. Adicionar a entrada no array `STEPS_LABEL` do `ConviteWizard.tsx` (controla o stepper visual) e o `{step === N && <StepNovo .../>}`
+4. Se o campo precisa persistir, adicionar coluna em `PreCadastroParceiro` (ver decisão sobre migration no Turso em `decisions.md`) + repassar em `submeterConvitePublico`/`aprovarPreCadastro`
+
+**Editado quando:** Nova etapa de coleta de dados no convite público, ou mudança no fluxo de aprovação de pré-cadastro.
+
+**Última atualização:** 2026-07-06 por Scribe

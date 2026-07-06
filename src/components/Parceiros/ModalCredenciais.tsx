@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Check, Copy, Eye, EyeOff, KeyRound, Mail, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { substituirPlaceholders } from "@/lib/onboarding-placeholders";
 
 type TemplateOnboarding = {
   id: number;
@@ -21,14 +22,6 @@ type Props = {
   template?: TemplateOnboarding | null;
 };
 
-function substituir(texto: string, login: string, senha: string): string {
-  return texto
-    .replace(/\{login\}/g, login)
-    .replace(/\{senha\}/g, senha)
-    .replace(/\[LOGIN\]/g, login)
-    .replace(/\[SENHA\]/g, senha);
-}
-
 export default function ModalCredenciais({ open, onClose, loginEmail, senhaGerada, nomeParceiro, template }: Props) {
   const [copiouSenha, setCopiouSenha] = useState(false);
   const [copiouLogin, setCopiouLogin] = useState(false);
@@ -42,7 +35,7 @@ export default function ModalCredenciais({ open, onClose, loginEmail, senhaGerad
   }
 
   const mensagemFinal = template
-    ? substituir(template.mensagem, loginEmail, senhaGerada)
+    ? substituirPlaceholders(template.mensagem, { LOGIN: loginEmail, SENHA: senhaGerada })
     : `Bem-vindo ao sistema de parceiros, ${nomeParceiro}!\n\nSeu acesso:\nLogin: ${loginEmail}\nSenha: ${senhaGerada}\n\nGuarde estas informações com segurança.`;
 
   return (

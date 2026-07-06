@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SalvarTransacoesLote } from '@/actions/transacao';
+import type { PaginaComErro } from '@/types/extrato';
 
 interface Transacao {
     id: string;
@@ -19,6 +20,12 @@ interface Transacao {
     origem?: string;
 }
 
+interface TransacaoBruta {
+    data?: string;
+    descricao?: string;
+    valor?: number | string;
+}
+
 export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }: any) {
     const [arquivos, setArquivos] = useState<File[]>([]);
     const [status, setStatus] = useState<'idle' | 'scanning' | 'reviewing'>('idle');
@@ -26,6 +33,8 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
     const [filtro, setFiltro] = useState("");
     const [ordenacao, setOrdenacao] = useState("data-desc");
     const [progresso, setProgresso] = useState({ atual: 0, total: 0 });
+    const [paginasComErro, setPaginasComErro] = useState<PaginaComErro[]>([]);
+    const [reprocessando, setReprocessando] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -35,6 +44,8 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
             setStatus('idle');
             setProgresso({ atual: 0, total: 0 });
             setFiltro("");
+            setPaginasComErro([]);
+            setReprocessando(false);
         }
     }, [isOpen]);
 
@@ -53,6 +64,7 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
         setProgresso({ atual: 0, total: arquivos.length });
 
         let todasAsLinhas: any[] = [];
+        let todasAsPaginasComErro: PaginaComErro[] = [];
 
         try {
             for (let i = 0; i < arquivos.length; i++) {
@@ -72,10 +84,10 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
                     throw new Error(err.error || `Erro ${res.status}`);
                 }
 
-                const dados = await res.json() as { success: boolean; data?: any[]; error?: string };
+                const dados = await res.json() as { success: boolean; data?: TransacaoBruta[]; error?: string; paginasComErro?: PaginaComErro[] };
 
                 if (dados.success && Array.isArray(dados.data)) {
-                    const formatados = dados.data.map((item: any, idx: number) => ({
+                    const formatados = dados.data.map((item: TransacaoBruta, idx: number) => ({
                         id: `new-${i}-${idx}-${Date.now()}-${Math.random()}`,
                         data: item.data ? String(item.data).trim() : "",
                         descricao: item.descricao?.trim() || "LANÇAMENTO",
@@ -85,14 +97,68 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
                     }));
                     todasAsLinhas = [...todasAsLinhas, ...formatados];
                 }
+
+                if (Array.isArray(dados.paginasComErro) && dados.paginasComErro.length > 0) {
+                    todasAsPaginasComErro = [...todasAsPaginasComErro, ...dados.paginasComErro];
+                }
             }
 
             setLinhasExtraidas(todasAsLinhas);
+            setPaginasComErro(todasAsPaginasComErro);
+            if (todasAsPaginasComErro.length > 0) {
+                toast.warning(`${todasAsPaginasComErro.length} página(s) não foram processadas. Você pode tentar reprocessá-las.`);
+            }
             setStatus('reviewing');
             setArquivos([]);
         } catch (error) {
             toast.error((error as Error).message || "Erro no processamento");
             setStatus('idle');
+        }
+    };
+
+    const reprocessarPaginasComErro = async () => {
+        if (paginasComErro.length === 0) return;
+
+        setReprocessando(true);
+        try {
+            const res = await fetch("/api/onyx/extrato/reprocessar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paginas: paginasComErro }),
+            });
+
+            const dados = await res.json() as { success: boolean; data?: TransacaoBruta[]; error?: string; paginasComErro?: PaginaComErro[] };
+
+            if (!res.ok || !dados.success) {
+                throw new Error(dados.error || `Erro ${res.status}`);
+            }
+
+            const novasLinhas = (dados.data ?? []).map((item: TransacaoBruta, idx: number) => ({
+                id: `retry-${idx}-${Date.now()}-${Math.random()}`,
+                data: item.data ? String(item.data).trim() : "",
+                descricao: item.descricao?.trim() || "LANÇAMENTO",
+                valor: parseMoeda(item.valor),
+                selecionado: true,
+                origem: 'reprocessado',
+            }));
+
+            setLinhasExtraidas(prev => [...prev, ...novasLinhas]);
+
+            const aindaComErro = dados.paginasComErro ?? [];
+            setPaginasComErro(aindaComErro);
+
+            const recuperadas = paginasComErro.length - aindaComErro.length;
+            if (aindaComErro.length === 0) {
+                toast.success(`Todas as páginas foram reprocessadas com sucesso (${novasLinhas.length} transações recuperadas).`);
+            } else if (recuperadas > 0) {
+                toast.warning(`${recuperadas} página(s) recuperada(s). ${aindaComErro.length} ainda com erro.`);
+            } else {
+                toast.error(`Nenhuma das ${aindaComErro.length} página(s) pôde ser reprocessada.`);
+            }
+        } catch (error) {
+            toast.error((error as Error).message || "Erro ao reprocessar páginas");
+        } finally {
+            setReprocessando(false);
         }
     };
 
@@ -258,6 +324,22 @@ export default function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onS
                                         <option value="valor-asc">💰 Menores Valores</option>
                                     </select>
                                 </div>
+
+                                {paginasComErro.length > 0 && (
+                                    <div className="mx-4 mt-4 p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between gap-4">
+                                        <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wide">
+                                            {paginasComErro.length} página(s) não processada(s). Algumas transações podem estar faltando.
+                                        </p>
+                                        <button
+                                            onClick={reprocessarPaginasComErro}
+                                            disabled={reprocessando}
+                                            className="cursor-pointer shrink-0 px-6 py-3 bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
+                                        >
+                                            {reprocessando ? <Loader2 size={14} className="animate-spin" /> : null}
+                                            {reprocessando ? 'Reprocessando...' : 'Reprocessar páginas com erro'}
+                                        </button>
+                                    </div>
+                                )}
 
                                 <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-black/20 rounded-3xl border border-white/5 m-4">
                                     <div className="grid grid-cols-12 gap-4 px-9 py-4 border-b border-white/5 bg-white/[0.02] text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] items-center">

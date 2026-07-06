@@ -45,6 +45,11 @@ const ParceiroSchema = z.object({
   dadosConsulta: z.string().optional(),
   endereco: EnderecoSchema.optional(),
   responsaveis: z.array(ResponsavelSchema).optional(),
+  // Aceite do termo — usado quando o parceiro já aceitou no wizard do convite
+  // público. Não obrigatório: cadastro manual pelo admin continua sem aceite.
+  termoAceito: z.boolean().optional(),
+  termoAceitoEm: z.coerce.date().optional(),
+  termoVersao: z.string().optional(),
 });
 
 function gerarSenhaSegura(): string {
@@ -71,7 +76,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
       return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     }
 
-    const { tipo, tipoParceiro, documento, nome, nomeFantasia, email, telefone, telefone2, chavePix, tipoChavePix, nomeBanco, agencia, conta, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis } = parsed.data;
+    const { tipo, tipoParceiro, documento, nome, nomeFantasia, email, telefone, telefone2, chavePix, tipoChavePix, nomeBanco, agencia, conta, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis, termoAceito, termoAceitoEm, termoVersao } = parsed.data;
 
     const docLimpo = documento.replace(/\D/g, "");
 
@@ -110,6 +115,11 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
         loginEmail: email,
         senhaHash,
         criadoPorId: Number(userId),
+        ...(termoAceito && {
+          termoAceito: true,
+          termoAceitoEm: termoAceitoEm ?? new Date(),
+          termoVersao: termoVersao ?? null,
+        }),
         ...(endereco && {
           endereco: {
             create: {

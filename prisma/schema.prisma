@@ -1540,6 +1540,10 @@ model ConviteParceiro {
   status      String    @default("PENDENTE") // PENDENTE | USADO | REVOGADO | EXPIRADO
   expiraEm    DateTime                    // validade do link
   usoUnico    Boolean   @default(true)
+  // PIN de 4 dígitos — protege a consulta automática de CPF (custo por chamada
+  // na InfoSimples). Nullable: convites gerados antes desta feature não têm PIN
+  // e por isso NÃO liberam a busca automática (ver rota /api/convite/consulta-cpf).
+  pin         String?
   // Quem gerou: um usuário do Painel OU um parceiro existente (indicação).
   criadoPorUserId    Int?
   criadoPorParceiroId Int?
@@ -1564,12 +1568,25 @@ model PreCadastroParceiro {
   email         String
   nomeCompleto  String
   cpf           String?
+  dataNascimento String?            // usada na consulta automática de CPF (InfoSimples)
+  dadosConsultaCpf String?          // JSON bruto da resposta InfoSimples (CPF)
   uf            String
   municipio     String?
   telefone      String
+  whatsapp      String?
+  // Endereço estruturado (wizard multi-tela com busca de CEP)
+  cep           String?
+  logradouro    String?
+  numero        String?
+  complemento   String?
+  bairro        String?
+  cidade        String?
   areasAtuacao  String?             // CSV das áreas selecionadas
-  nomeEmpresa   String?
+  nomeEmpresa   String?             // campo legado — mantido por compatibilidade
+  razaoSocial   String?             // preenchido pela consulta automática de CNPJ
+  nomeFantasia  String?             // preenchido pela consulta automática de CNPJ
   cnpj          String?
+  dadosConsultaCnpj String?         // JSON bruto da resposta ReceitaFederal (CNPJ)
   sobre         String?             // "fale mais sobre você/empresa"
   // Aceite do termo (versão capturada no momento do aceite)
   termoVersao   String

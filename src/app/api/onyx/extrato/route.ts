@@ -19,7 +19,11 @@ export const maxDuration = 800;
  *      chamada ao agente, que devolve as movimentações daquela página; os
  *      resultados de todas as páginas são agregados no final
  *
- * Retorna: { success: true, data: TransacaoNormalizada[] }
+ * Falha pontual em uma página não aborta as demais — a página problemática
+ * volta em `paginasComErro` (com o texto dela) para o frontend poder
+ * reprocessar via POST /api/onyx/extrato/reprocessar sem re-upload do PDF.
+ *
+ * Retorna: { success: true, data: TransacaoNormalizada[], paginasComErro?: PaginaComErro[] }
  *
  * O campo "bancoId" e "layoutAlvo" são aceitos no FormData mas não usados
  * internamente — são preservados para compatibilidade com o ModalUploadExtrato.
@@ -56,10 +60,10 @@ export async function POST(req: NextRequest) {
     console.log(`[POST /api/onyx/extrato] iniciando — arquivo: ${file.name} (${file.size} bytes)`);
     const pdfBlob = new Blob([await file.arrayBuffer()], { type: file.type || "application/pdf" });
     console.log("[POST /api/onyx/extrato] chamando processarExtratoPorAgentes...");
-    const transacoes = await processarExtratoPorAgentes(pdfBlob, file.name);
-    console.log(`[POST /api/onyx/extrato] concluído — ${transacoes.length} transações`);
+    const { transacoes, paginasComErro } = await processarExtratoPorAgentes(pdfBlob, file.name);
+    console.log(`[POST /api/onyx/extrato] concluído — ${transacoes.length} transações, ${paginasComErro.length} página(s) com erro`);
 
-    if (transacoes.length === 0) {
+    if (transacoes.length === 0 && paginasComErro.length === 0) {
       return NextResponse.json({
         success: true,
         data: [],
@@ -73,6 +77,7 @@ export async function POST(req: NextRequest) {
       success: true,
       data: transacoes,
       ultimaDataEncontrada: ultimaData,
+      ...(paginasComErro.length > 0 ? { paginasComErro } : {}),
     });
   } catch (err) {
     const status = err instanceof OnyxError ? err.status : 500;

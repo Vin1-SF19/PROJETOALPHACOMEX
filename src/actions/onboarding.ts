@@ -141,6 +141,18 @@ export async function getTemplateParadaoParceiro(): Promise<OnboardingTemplate |
   }
 }
 
+export async function getTemplateParadaoConvite(): Promise<OnboardingTemplate | null> {
+  try {
+    const template = await onboardingTemplateModel.findFirst({
+      where: { ativo: true, tipo: "CONVITE" },
+      orderBy: [{ padrao: "desc" }, { createdAt: "desc" }],
+    });
+    return template ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function salvarOnboardingLog(dados: {
   usuarioId: number;
   templateId?: number;

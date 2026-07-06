@@ -97,6 +97,24 @@
 
 ---
 
+## `prisma db push` / `migrate` não aplicam mudança de schema no Turso (só no SQLite local)
+**Sintoma:** `npx prisma db push` roda e reporta sucesso ("Your database is now in sync"), mas as colunas/tabelas novas não aparecem no banco de produção real — app continua funcionando com o schema antigo em runtime, ou pior, quebra achando que a coluna existe.
+**Causa:** `datasource db` do `schema.prisma` aponta pro `DATABASE_URL` (`file:./prisma/dev.db`, SQLite local). O app em runtime, porém, conecta ao Turso remoto via um adapter separado (`PrismaLibSql`, lendo `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` em `src/lib/prisma.ts`). O Prisma CLI só enxerga o `datasource` declarado no schema — nunca o adapter usado em runtime. Os dois caminhos de conexão são desacoplados.
+**Fix:** Depois de `prisma generate` (regenerar tipos/client), aplicar a mudança direto no Turso via script pontual em Node com `@libsql/client/web`, lendo as mesmas envs (`TURSO_DATABASE_URL` com `libsql://` trocado por `https://`, `TURSO_AUTH_TOKEN`), rodando `ALTER TABLE ... ADD COLUMN ...` manual. Confirmar com `PRAGMA table_info(tabela)` antes/depois. Script fica na raiz do projeto (resolve `@libsql/client` do `node_modules` local), roda uma vez, e é apagado — nunca commitado. Ver decisão completa em `decisions.md` (2026-07-06).
+**Contexto:** Qualquer sessão que altere `prisma/schema.prisma` neste projeto. Vault deve ser acionado antes do `ALTER TABLE` em produção, independente do mecanismo.
+
+---
+
+## "Application error: Rendered more hooks than during the previous render" ao acessar /PainelAlpha/Parceiros direto
+**Sintoma:** Acessar `http://localhost:3000/PainelAlpha/Parceiros` diretamente como navegação de topo (URL colada na barra, refresh direto) no dev server quebra com "Application error" — overlay do Next mostra "Runtime Error: Rendered more hooks than during the previous render", stack trace aponta para dentro do próprio `Router` do Next.js (`app-router.tsx`), não para código da aplicação.
+**Causa:** Não identificada (bug de hidratação do App Router do Next.js 16 em dev mode, aparentemente específico dessa rota quando acessada fora do fluxo normal via iframe do painel — o sistema renderiza módulos como `/PainelAlpha/[Modulo]` dentro de um `<iframe>` a partir de `/PainelAlpha`, e a navegação direta parece expor um caminho de render diferente). Confirmado via `git stash` que o erro é PRÉ-EXISTENTE — já ocorria antes de qualquer mudança da sessão de 2026-07-06 (convite de parceiro, onboarding). NÃO afeta produção: `npm run build` compila limpo, o erro só aparece em dev.
+**Fix:** Nenhum aplicado ainda — fora do escopo das sessões que o encontraram. Para testar mudanças em `/PainelAlpha/Parceiros` em dev, prefira navegar via o fluxo real do painel (clicar no módulo a partir de `/PainelAlpha`) em vez de colar a URL direto/dar F5 nela. Se o erro persistir mesmo via navegação normal, investigar `GlobalSidebar.tsx` (apareceu em alguns stack traces relacionados) e o mecanismo de iframe em `PainelLayoutClient.tsx`.
+**Contexto:** Só reproduzido em dev server (Turbopack). Build de produção não afetado.
+**Adicionado em:** 2026-07-06
+**Adicionado em:** 2026-07-06
+
+---
+
 ## Agente Onyx (qwen3) retorna 502 "não retornou dados" — reasoning aborta sem gerar resposta em prompt grande
 **Sintoma:** `POST /api/onyx/extrato` (ou qualquer rota usando `sendChatMessageStream`) retorna 502. Log mostra o stream recebendo só `reasoning_start` → `reasoning_delta` (às vezes com 1 palavra tipo "Here") → `reasoning_done`, e nunca um `message_start`/`message_delta` — resultado fica com 0 chars. Acontece de forma **consistente/determinística** com o mesmo arquivo grande (não é flakiness — retry simples nas mesmas condições falha sempre).
 **Causa:** O modelo **qwen3** (modelo padrão configurado no agente no Onyx) não processa de forma confiável prompts de entrada muito grandes (~37k chars de texto de extrato + instruções). Ele aborta o bloco de reasoning quase instantaneamente e o turno termina sem nunca emitir a resposta final. NÃO é limite de `max_tokens` de output (aumentar `maxTokens` sozinho não resolve — testado, erro idêntico). NÃO é intermitência (retry com o texto completo, sem reduzir tamanho, falhou 2/2 vezes de forma idêntica).

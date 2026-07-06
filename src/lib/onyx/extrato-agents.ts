@@ -5,7 +5,7 @@ import {
   OnyxError,
 } from "@/lib/onyx/client";
 import { ocrViaPdf24, isPdf24Configured } from "@/lib/bibble/pdf24-ocr";
-import type { TransacaoNormalizada } from "@/types/extrato";
+import type { TransacaoNormalizada, PaginaComErro } from "@/types/extrato";
 
 const AGENT_ORGANIZADOR_ID = Number(process.env.ONYX_AGENT_ORGANIZADOR_ID ?? "32");
 
@@ -204,7 +204,7 @@ function parseTransacoes(textoResposta: string): TransacaoNormalizada[] {
  * o reasoning sem responder — até 2 tentativas em sessões novas antes de
  * desistir desta página.
  */
-async function organizarPagina(textoPagina: string, indicePagina: number): Promise<TransacaoNormalizada[]> {
+export async function organizarPagina(textoPagina: string, indicePagina: number): Promise<TransacaoNormalizada[]> {
   const MAX_TENTATIVAS = 2;
   let textoOrganizado = "";
 
@@ -247,11 +247,17 @@ async function organizarPagina(textoPagina: string, indicePagina: number): Promi
  * (ID 32) — evita cortar uma transação no meio (o que acontecia ao dividir o
  * texto corrido por tamanho de caractere). Os resultados de todas as páginas
  * são agregados no final, com deduplicação de segurança.
+ *
+ * Falha em UMA página NÃO aborta o processamento das demais — a página que
+ * falhar (mesmo após as tentativas internas de `organizarPagina`) entra em
+ * `paginasComErro` (com o texto dela, pra permitir reprocessar depois sem
+ * reler o PDF) e o loop continua. Só lança erro fatal se não houver NENHUMA
+ * página com texto extraível (nada para processar).
  */
 export async function processarExtratoPorAgentes(
   pdfBlob: Blob,
   nomeArquivo: string,
-): Promise<TransacaoNormalizada[]> {
+): Promise<{ transacoes: TransacaoNormalizada[]; paginasComErro: PaginaComErro[] }> {
   // 1. Extrai o texto de cada página real do PDF
   const buffer = Buffer.from(await pdfBlob.arrayBuffer());
   const paginas = await extrairPaginas(buffer, nomeArquivo);
@@ -265,12 +271,19 @@ export async function processarExtratoPorAgentes(
 
   console.log(`[extrato-agents] ${paginas.length} página(s) com texto útil — enviando ao Agente Organizador`);
 
-  // 2. Agente Organizador — 1 chamada por página
+  // 2. Agente Organizador — 1 chamada por página; falha pontual não aborta as demais
   const transacoesBrutas: TransacaoNormalizada[] = [];
+  const paginasComErro: PaginaComErro[] = [];
   for (let i = 0; i < paginas.length; i++) {
-    const daPagina = await organizarPagina(paginas[i], i);
-    console.log(`[extrato-agents] página ${i + 1}/${paginas.length}: ${daPagina.length} transação(ões)`);
-    transacoesBrutas.push(...daPagina);
+    try {
+      const daPagina = await organizarPagina(paginas[i], i);
+      console.log(`[extrato-agents] página ${i + 1}/${paginas.length}: ${daPagina.length} transação(ões)`);
+      transacoesBrutas.push(...daPagina);
+    } catch (err) {
+      const motivo = err instanceof Error ? err.message : String(err);
+      console.warn(`[extrato-agents] página ${i + 1}/${paginas.length} falhou, continuando: ${motivo}`);
+      paginasComErro.push({ pagina: i + 1, texto: paginas[i], motivo });
+    }
   }
 
   // 3. Deduplicação de segurança — não deve disparar na prática (páginas não
@@ -288,5 +301,5 @@ export async function processarExtratoPorAgentes(
     console.log(`[extrato-agents] ${duplicatasRemovidas} duplicata(s) removida(s)`);
   }
 
-  return transacoes;
+  return { transacoes, paginasComErro };
 }

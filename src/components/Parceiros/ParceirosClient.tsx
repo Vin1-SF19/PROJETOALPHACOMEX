@@ -14,11 +14,13 @@ import ModalNovaIndicacao from "./ModalNovaIndicacao";
 import ModalEngrenagem from "./ModalEngrenagem";
 import ModalTermo from "./ModalTermo";
 import ModalConvidarParceiro from "./ModalConvidarParceiro";
+import ModalMensagemConvite from "./ModalMensagemConvite";
 import ModalPreCadastros from "./ModalPreCadastros";
 import { excluirParceiros } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
+type TemplateOnboarding = { id: number; nome: string; mensagem: string };
 
 type Props = {
   parceiros: CardParceiro[];
@@ -26,9 +28,10 @@ type Props = {
   busca?: string;
   nivel?: string;
   permissao: Permissao;
+  templateConvite: TemplateOnboarding | null;
 };
 
-export default function ParceirosClient({ parceiros, temaName, busca, nivel, permissao }: Props) {
+export default function ParceirosClient({ parceiros, temaName, busca, nivel, permissao, templateConvite }: Props) {
   const tema = getTema(temaName);
   const accent = tema.accent;
   const router = useRouter();
@@ -37,6 +40,7 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
   const [engrenagemOpen, setEngrenagemOpen] = useState(false);
   const [termoOpen, setTermoOpen] = useState(false);
   const [convidarOpen, setConvidarOpen] = useState(false);
+  const [mensagemConvite, setMensagemConvite] = useState<{ link: string; pin: string } | null>(null);
   const [preCadastrosOpen, setPreCadastrosOpen] = useState(false);
   const [modoExclusao, setModoExclusao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
@@ -266,7 +270,20 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
       <ModalNovaIndicacao open={novaIndicacaoOpen} onClose={() => setNovaIndicacaoOpen(false)} onDone={() => router.refresh()} accent={accent} />
       <ModalEngrenagem open={engrenagemOpen} onClose={() => setEngrenagemOpen(false)} accent={accent} />
       <ModalTermo open={termoOpen} onClose={() => setTermoOpen(false)} accent={accent} />
-      <ModalConvidarParceiro open={convidarOpen} onClose={() => setConvidarOpen(false)} />
+      <ModalConvidarParceiro
+        open={convidarOpen}
+        onClose={() => setConvidarOpen(false)}
+        onConviteGerado={(dados) => setMensagemConvite(dados)}
+      />
+      {mensagemConvite && (
+        <ModalMensagemConvite
+          open
+          onClose={() => setMensagemConvite(null)}
+          link={mensagemConvite.link}
+          pin={mensagemConvite.pin}
+          template={templateConvite}
+        />
+      )}
       <ModalPreCadastros open={preCadastrosOpen} onClose={() => setPreCadastrosOpen(false)} isAdmin={permissao.isAdmin} onAprovado={() => router.refresh()} />
 
       {/* Confirmação de exclusão */}

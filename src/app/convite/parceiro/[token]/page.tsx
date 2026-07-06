@@ -1,5 +1,5 @@
 import { validarConvitePublico } from "@/actions/convites-parceiro";
-import FormConviteParceiro from "@/components/Parceiros/FormConviteParceiro";
+import ConviteWizard from "@/components/Parceiros/Convite/ConviteWizard";
 import ConviteInvalido from "@/components/Parceiros/ConviteInvalido";
 
 export const dynamic = "force-dynamic";
@@ -21,5 +21,5 @@ export default async function ConviteParceiroPage({
     return <ConviteInvalido motivo={resultado.motivo} />;
   }
 
-  return <FormConviteParceiro token={token} termo={resultado.termo} />;
+  return <ConviteWizard token={token} termo={resultado.termo} />;
 }
