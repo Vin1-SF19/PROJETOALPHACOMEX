@@ -316,6 +316,7 @@ export default function BibbleSidebarPanel({
   activeId,
   activeProjectId,
   model,
+  isAdmin,
   onSelect,
   onNew,
   onDelete,
@@ -781,36 +782,38 @@ export default function BibbleSidebarPanel({
         </div>
       )}
 
-      {/* ── Model selector footer ─────────────────────────────── */}
-      <div className="shrink-0 px-3 py-3 relative" style={{ borderTop: "1px solid #1e2d4a" }}>
-        <ModelDropdown
-          model={model}
-          open={modelOpen}
-          onClose={() => setModelOpen(false)}
-          onSelect={onModelChange}
-        />
-
-        <button
-          onClick={() => setModelOpen(p => !p)}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all duration-150"
-          style={{
-            background: modelOpen ? "rgba(30,45,74,0.8)" : "rgba(30,45,74,0.3)",
-            borderColor: modelOpen ? "#1e2d4a" : "rgba(30,45,74,0.5)",
-            color: modelOpen ? "#cbd5e1" : "#64748b",
-          }}
-        >
-          <span style={{ color: "#6366f1" }} className="shrink-0">
-            {ONYX_ICON}
-          </span>
-          <span className="flex-1 text-[11px] font-medium truncate text-left">
-            {model || "Modelo"}
-          </span>
-          <ChevronDown
-            size={11}
-            className={cn("shrink-0 transition-transform duration-150", modelOpen && "rotate-180")}
+      {/* ── Model selector footer (somente admin) ─────────────── */}
+      {isAdmin && (
+        <div className="shrink-0 px-3 py-3 relative" style={{ borderTop: "1px solid #1e2d4a" }}>
+          <ModelDropdown
+            model={model}
+            open={modelOpen}
+            onClose={() => setModelOpen(false)}
+            onSelect={onModelChange}
           />
-        </button>
-      </div>
+
+          <button
+            onClick={() => setModelOpen(p => !p)}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all duration-150"
+            style={{
+              background: modelOpen ? "rgba(30,45,74,0.8)" : "rgba(30,45,74,0.3)",
+              borderColor: modelOpen ? "#1e2d4a" : "rgba(30,45,74,0.5)",
+              color: modelOpen ? "#cbd5e1" : "#64748b",
+            }}
+          >
+            <span style={{ color: "#6366f1" }} className="shrink-0">
+              {ONYX_ICON}
+            </span>
+            <span className="flex-1 text-[11px] font-medium truncate text-left">
+              {model || "Modelo"}
+            </span>
+            <ChevronDown
+              size={11}
+              className={cn("shrink-0 transition-transform duration-150", modelOpen && "rotate-180")}
+            />
+          </button>
+        </div>
+      )}
 
       {/* ── Modal de confirmação de exclusão ──────────────────── */}
       {confirmDelete && (

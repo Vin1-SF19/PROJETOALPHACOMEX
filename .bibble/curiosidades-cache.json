@@ -47,7 +47,7 @@
       },
       {
         "text": "Neil Armstrong nunca pisou na Lua; ele foi filmado se preparando para descer o módulo lunar em um plano de fundo simulado. Muitos dos vídeos históricos que mostram a descida são dublagens ou reconstituições posteriores.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1463,6 +1463,14 @@
     "entries": [
       {
         "text": "A passagem é tão vital que, em 1967, seu fechamento por causa da Guerra dos Seis Dias causou um impacto econômico global gigantesco. Sua profundidade foi redesenhada para permitir a passagem segura de navios cada vez maiores.",
+        "shown": 1
+      }
+    ]
+  },
+  "países curiosos": {
+    "entries": [
+      {
+        "text": "A Islândia tem uma das maiores fontes termais do planeta, o Geothermal Energy. Ela usa esse calor natural para aquecer casas e produzir eletricidade de forma sustentável.",
         "shown": 1
       }
     ]
