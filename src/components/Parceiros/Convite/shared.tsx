@@ -11,6 +11,13 @@ export const AREAS = [
   "Consultoria Empresarial", "Trade", "Digital Influencer", "Outros",
 ] as const;
 
+export interface RepresentanteExtra {
+  nome: string;
+  cpf: string;
+  dataNascimento: string;
+  cargo: string;
+}
+
 export interface ConviteFormData {
   pin: string;
   email: string;
@@ -18,7 +25,6 @@ export interface ConviteFormData {
   cpf: string;
   dataNascimento: string;
   dadosConsultaCpf: string;
-  telefone: string;
   whatsapp: string;
   cep: string;
   logradouro: string;
@@ -28,6 +34,9 @@ export interface ConviteFormData {
   cidade: string;
   uf: string;
   areasAtuacao: string[];
+  tipoRecebimento: "PF" | "PJ" | "";
+  souRepresentante: boolean;
+  representantesExtra: RepresentanteExtra[];
   nomeEmpresa: string;
   razaoSocial: string;
   nomeFantasia: string;
@@ -44,7 +53,6 @@ export const CONVITE_FORM_VAZIO: ConviteFormData = {
   cpf: "",
   dataNascimento: "",
   dadosConsultaCpf: "",
-  telefone: "",
   whatsapp: "",
   cep: "",
   logradouro: "",
@@ -54,6 +62,9 @@ export const CONVITE_FORM_VAZIO: ConviteFormData = {
   cidade: "",
   uf: "",
   areasAtuacao: [],
+  tipoRecebimento: "",
+  souRepresentante: true,
+  representantesExtra: [],
   nomeEmpresa: "",
   razaoSocial: "",
   nomeFantasia: "",

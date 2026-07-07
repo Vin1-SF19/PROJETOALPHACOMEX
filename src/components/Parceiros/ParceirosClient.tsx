@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText, Link2, UserPlus,
-  MoreHorizontal, Search, Crown, Gem, Square, Users,
+  MoreHorizontal, Search, Crown, Gem, Square, Users, Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 import ParceiroCard, { type CardParceiro } from "./ParceiroCard";
@@ -16,8 +16,10 @@ import ModalTermo from "./ModalTermo";
 import ModalConvidarParceiro from "./ModalConvidarParceiro";
 import ModalMensagemConvite from "./ModalMensagemConvite";
 import ModalPreCadastros from "./ModalPreCadastros";
+import ModalCredenciais from "./ModalCredenciais";
 import { excluirParceiros } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
+import { useParceirosPreCadastroNotifications, type PreCadastroNotificacao } from "@/hooks/useParceirosPreCadastroNotifications";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
@@ -29,9 +31,13 @@ type Props = {
   nivel?: string;
   permissao: Permissao;
   templateConvite: TemplateOnboarding | null;
+  templateParceiro: TemplateOnboarding | null;
+  preCadastrosPendentesInicial: number;
 };
 
-export default function ParceirosClient({ parceiros, temaName, busca, nivel, permissao, templateConvite }: Props) {
+export default function ParceirosClient({
+  parceiros, temaName, busca, nivel, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial,
+}: Props) {
   const tema = getTema(temaName);
   const accent = tema.accent;
   const router = useRouter();
@@ -42,12 +48,33 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
   const [convidarOpen, setConvidarOpen] = useState(false);
   const [mensagemConvite, setMensagemConvite] = useState<{ link: string; pin: string } | null>(null);
   const [preCadastrosOpen, setPreCadastrosOpen] = useState(false);
+  const [preCadastroIdFoco, setPreCadastroIdFoco] = useState<number | undefined>(undefined);
+  const [credenciaisAprovado, setCredenciaisAprovado] = useState<{ loginEmail: string; senhaGerada: string; nomeParceiro: string } | null>(null);
   const [modoExclusao, setModoExclusao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const [notificacoesOpen, setNotificacoesOpen] = useState(false);
+  const [pendentesCount, setPendentesCount] = useState(preCadastrosPendentesInicial);
+  const [pendentesRecentes, setPendentesRecentes] = useState<PreCadastroNotificacao[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useParceirosPreCadastroNotifications(permissao.isAdmin, (payload) => {
+    setPendentesCount((c) => c + 1);
+    setPendentesRecentes((prev) => [payload, ...prev].slice(0, 10));
+  });
+
+  useEffect(() => {
+    if (!notificacoesOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotificacoesOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [notificacoesOpen]);
 
   // Fecha o menu de ações ao clicar fora
   useEffect(() => {
@@ -127,6 +154,60 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
 
             {/* Ações */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Notificação de pré-cadastro pendente — pulsa quando há itens */}
+              {permissao.isAdmin && (
+                <div className={`relative ${notificacoesOpen ? "z-50" : ""}`} ref={notifRef}>
+                  <motion.button
+                    onClick={() => setNotificacoesOpen((o) => !o)}
+                    title="Pré-cadastros pendentes"
+                    className="relative h-11 w-11 grid place-items-center rounded-2xl transition-all text-amber-300/90 hover:text-amber-300"
+                    style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)" }}
+                    animate={pendentesCount > 0 ? { boxShadow: ["0 0 0 rgba(245,158,11,0.4)", "0 0 14px rgba(245,158,11,0.7)", "0 0 0 rgba(245,158,11,0.4)"] } : undefined}
+                    transition={pendentesCount > 0 ? { duration: 1.8, repeat: Infinity, repeatType: "mirror" } : undefined}
+                  >
+                    <Bell size={16} />
+                    {pendentesCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black grid place-items-center">
+                        {pendentesCount > 99 ? "99+" : pendentesCount}
+                      </span>
+                    )}
+                  </motion.button>
+
+                  {notificacoesOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-2 w-72 z-50 rounded-2xl overflow-hidden p-1.5 max-h-80 overflow-y-auto"
+                      style={{ background: "#0a1020", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 16px 50px rgba(0,0,0,0.6)" }}
+                    >
+                      {pendentesRecentes.length === 0 ? (
+                        <p className="text-[11px] text-slate-600 text-center py-4">Nenhuma notificação recente.</p>
+                      ) : (
+                        pendentesRecentes.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              setPreCadastroIdFoco(p.id);
+                              setPreCadastrosOpen(true);
+                              setNotificacoesOpen(false);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5"
+                          >
+                            <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0 bg-amber-500/10">
+                              <UserPlus size={13} className="text-amber-400" />
+                            </div>
+                            <span className="text-[12px] text-slate-200 truncate">
+                              <span className="font-bold">{p.nomeCompleto}</span> completou o formulário
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+              )}
+
               {/* Modo exclusão (entra direto, fora do menu, por ser destrutivo) */}
               {permissao.podeExcluir && !modoExclusao && (
                 <button onClick={() => setModoExclusao(true)} title="Excluir parceiros"
@@ -159,7 +240,7 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
                       )}
                       {permissao.podeEditar && (
                         <MenuItem icon={<UserPlus size={15} />} label="Pré-cadastros" hint="Aprovar respostas"
-                          onClick={() => { setPreCadastrosOpen(true); setMenuOpen(false); }} accent={accent} />
+                          onClick={() => { setPreCadastroIdFoco(undefined); setPreCadastrosOpen(true); setMenuOpen(false); }} accent={accent} />
                       )}
                       {permissao.isAdmin && (
                         <MenuItem icon={<FileText size={15} />} label="Atualizar termo"
@@ -273,7 +354,14 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
       <ModalConvidarParceiro
         open={convidarOpen}
         onClose={() => setConvidarOpen(false)}
-        onConviteGerado={(dados) => setMensagemConvite(dados)}
+        onConviteGerado={(dados) => {
+          setConvidarOpen(false);
+          setMensagemConvite(dados);
+        }}
+        onReabrirMensagem={(dados) => {
+          setConvidarOpen(false);
+          setMensagemConvite(dados);
+        }}
       />
       {mensagemConvite && (
         <ModalMensagemConvite
@@ -284,7 +372,29 @@ export default function ParceirosClient({ parceiros, temaName, busca, nivel, per
           template={templateConvite}
         />
       )}
-      <ModalPreCadastros open={preCadastrosOpen} onClose={() => setPreCadastrosOpen(false)} isAdmin={permissao.isAdmin} onAprovado={() => router.refresh()} />
+      <ModalPreCadastros
+        open={preCadastrosOpen}
+        onClose={() => setPreCadastrosOpen(false)}
+        isAdmin={permissao.isAdmin}
+        preCadastroIdFoco={preCadastroIdFoco}
+        onAprovado={(parceiro) => {
+          setPreCadastrosOpen(false);
+          setPendentesCount((c) => Math.max(0, c - 1));
+          setPendentesRecentes((prev) => prev.filter((p) => p.nomeCompleto !== parceiro.nome));
+          setCredenciaisAprovado({ loginEmail: parceiro.loginEmail, senhaGerada: parceiro.senhaGerada, nomeParceiro: parceiro.nome });
+          router.refresh();
+        }}
+      />
+      {credenciaisAprovado && (
+        <ModalCredenciais
+          open
+          onClose={() => setCredenciaisAprovado(null)}
+          loginEmail={credenciaisAprovado.loginEmail}
+          senhaGerada={credenciaisAprovado.senhaGerada}
+          nomeParceiro={credenciaisAprovado.nomeParceiro}
+          template={templateParceiro}
+        />
+      )}
 
       {/* Confirmação de exclusão */}
       {confirmOpen && (

@@ -2,7 +2,7 @@ export const BIBBLE_OLLAMA_URL =
   process.env.BIBBLE_OLLAMA_URL ?? "http://192.168.35.113:11434";
 
 export const BIBBLE_MODEL =
-  process.env.BIBBLE_MODEL ?? "qwen3.6:35b";
+  process.env.BIBBLE_MODEL ?? "qwen3:14b";
 
 export type Provider = "ollama" | "openai" | "anthropic" | "google";
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Instagram, Globe, Star } from "lucide-react";
 import { Campo, inputCls, CardSecao, BotoesNavegacao } from "./shared";
 
@@ -22,6 +23,10 @@ export default function StepApresentacao({ email, onChange, onNext }: Props) {
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-5">
+      <div className="flex justify-center">
+        <Image src="/Logotipo-1.png" alt="Alpha Comex & Compliance" width={200} height={70} priority className="h-auto w-[200px]" />
+      </div>
+
       <header
         className="rounded-3xl p-6 text-center"
         style={{ background: "linear-gradient(135deg, rgba(30,64,175,0.25), rgba(15,23,42,0.7))", border: "1px solid rgba(59,130,246,0.25)" }}

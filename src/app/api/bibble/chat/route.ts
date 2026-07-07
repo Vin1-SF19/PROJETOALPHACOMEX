@@ -1,12 +1,10 @@
 import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
-import { getProvider, getProviderConfig, modelSupportsVision, getModelLabel, ALL_MODELS } from "@/lib/bibble/client";
+import { getProvider, getProviderConfig, modelSupportsVision, getModelLabel } from "@/lib/bibble/client";
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { BIBBLE_TOOLS, type OllamaTool } from "@/lib/bibble/tools";
 import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
-import { createChatSession, sendChatMessageStream, OnyxError } from "@/lib/onyx/client";
-import { getUserOnyxToken } from "@/lib/onyx/user-token";
 import db from "@/lib/prisma";
 
 // ─── File content extraction ──────────────────────────────────────────────────
@@ -407,19 +405,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const activeModel = modelOverride?.trim() || (process.env.BIBBLE_MODEL ?? "");
-
-  // Detecta se o modelo escolhido não é um provider local conhecido.
-  // Modelos do Onyx (ex: "qwen3-coder:latest", "llama3.3:latest") não estão
-  // na lista de providers locais — nesse caso delega para o Onyx (persona_id=0).
-  const isOnyxModel = activeModel
-    ? !ALL_MODELS.some(m => m.id === activeModel) &&
-      !activeModel.startsWith("gpt-") &&
-      !activeModel.startsWith("claude-") &&
-      !activeModel.startsWith("gemini-") &&
-      !activeModel.startsWith("o1") &&
-      !activeModel.startsWith("o3")
-    : true; // sem modelo definido → usa Onyx
+  const activeModel = modelOverride?.trim() || (process.env.BIBBLE_MODEL ?? "qwen3:14b");
 
   // ── Formatar mensagem com arquivos — extrair conteúdo real ──
   let userContent = message.trim();
@@ -530,93 +516,6 @@ REGRA ABSOLUTA: Quando o usuário pedir para criar, copiar, mover, apagar ou lis
     ...trimmedHistory,
     userMessage,
   ];
-
-  // ── Modelo Onyx: delega para persona_id=0 com system prompt do Bibble ──────
-  if (isOnyxModel) {
-    const userToken = await getUserOnyxToken(userId);
-    const enc = new TextEncoder();
-    const providerCtrl = new AbortController();
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        const send = (ev: { type: string; [k: string]: unknown }) => {
-          try { controller.enqueue(enc.encode(`data: ${JSON.stringify(ev)}\n\n`)); } catch { /* fechado */ }
-        };
-
-        try {
-          send({ type: "status", state: "thinking" });
-          const { chat_session_id } = await createChatSession(0, "Bibble", userToken);
-          send({ type: "session", onyxSessionId: chat_session_id });
-
-          const historyContext = trimmedHistory.map(m =>
-            `${m.role === "assistant" ? "Assistente" : "Usuário"}: ${typeof m.content === "string" ? m.content : ""}`
-          ).join("\n\n");
-
-          const additionalContext = historyContext
-            ? `${finalSystemPrompt}\n\n---\nHistórico:\n${historyContext}`
-            : finalSystemPrompt;
-
-          const res = await sendChatMessageStream({
-            chatSessionId: chat_session_id,
-            message: userContentWithPage,
-            additionalContext,
-            userToken,
-            signal: providerCtrl.signal,
-          });
-
-          if (!res.ok || !res.body) throw new OnyxError(`Onyx ${res.status}`, res.status);
-
-          const reader = res.body.getReader();
-          const dec = new TextDecoder();
-          let buf = "";
-          let reasoningChars = 0;
-          let reasoningOpen = false;
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += dec.decode(value, { stream: true });
-            const lines = buf.split("\n");
-            buf = lines.pop() ?? "";
-            for (const line of lines) {
-              const t = line.trim();
-              if (!t) continue;
-              try {
-                const pkt = JSON.parse(t) as { obj?: { type: string; content?: string; reasoning?: string } };
-                const obj = pkt.obj;
-                if (!obj) continue;
-                if (obj.type === "reasoning_start") { reasoningOpen = true; send({ type: "text", text: "<think>" }); }
-                else if (obj.type === "reasoning_delta" && obj.reasoning && reasoningOpen) {
-                  if (reasoningChars < 8000) {
-                    send({ type: "text", text: obj.reasoning });
-                    reasoningChars += obj.reasoning.length;
-                    if (reasoningChars >= 8000) { send({ type: "text", text: "\n…</think>\n\n" }); reasoningOpen = false; }
-                  }
-                }
-                else if (obj.type === "reasoning_done") { if (reasoningOpen) { reasoningOpen = false; send({ type: "text", text: "</think>\n\n" }); } }
-                else if (obj.type === "message_start") send({ type: "status", state: "respondendo" });
-                else if (obj.type === "message_delta" && obj.content) send({ type: "text", text: obj.content });
-              } catch { /* linha parcial */ }
-            }
-          }
-          send({ type: "done" });
-        } catch (err) {
-          if (!providerCtrl.signal.aborted) {
-            console.error("[BIBBLE/ONYX]", err);
-            send({ type: "error", message: "Tive um problema. Tenta de novo." });
-            send({ type: "done" });
-          }
-        } finally {
-          try { controller.close(); } catch { /* ignore */ }
-        }
-      },
-      cancel() { providerCtrl.abort(); },
-    });
-
-    return new Response(stream, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
-    });
-  }
 
   // ── Provider local (Ollama / OpenAI / Anthropic / Google) ───────────────────
   const providerCtrl = new AbortController();

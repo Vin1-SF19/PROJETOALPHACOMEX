@@ -10,6 +10,7 @@ import StepApresentacao from "./StepApresentacao";
 import StepDadosPessoais from "./StepDadosPessoais";
 import StepEndereco from "./StepEndereco";
 import StepAreaAtuacao from "./StepAreaAtuacao";
+import StepTipoPessoa from "./StepTipoPessoa";
 import StepEmpresa from "./StepEmpresa";
 import StepTermos from "./StepTermos";
 import StepSucesso from "./StepSucesso";
@@ -19,10 +20,12 @@ interface Props {
   termo: { versao: string; conteudo: string } | null;
 }
 
-const STEPS_LABEL = ["Dados", "Endereço", "Atuação", "Empresa", "Termos"] as const;
+// -1=PIN, 0=Apresentação, 1=DadosPessoais, 2=Endereço, 3=AreaAtuacao,
+// 4=TipoPessoa, 5=Empresa (só PJ), 6=Termos, 7=Sucesso
+const STEPS_LABEL = ["Dados", "Endereço", "Atuação", "Tipo", "Empresa", "Termos"] as const;
 
 export default function ConviteWizard({ token, termo }: Props) {
-  const [step, setStep] = useState(-1); // -1=PIN, 0=apresentação, 1..5=steps com stepper, 6=sucesso
+  const [step, setStep] = useState(-1);
   const [direction, setDirection] = useState(1); // 1=avançando, -1=voltando (define o sentido da transição)
   const [form, setForm] = useState<ConviteFormData>(CONVITE_FORM_VAZIO);
   const [enviando, setEnviando] = useState(false);
@@ -36,7 +39,7 @@ export default function ConviteWizard({ token, termo }: Props) {
     setStep(novoStep);
   }
 
-  const stepperIndex = step - 1; // 0..4 quando step está entre 1 e 5
+  const stepperIndex = step - 1; // 0..5 quando step está entre 1 e 6
 
   async function handleSubmit() {
     setErro(null);
@@ -51,15 +54,20 @@ export default function ConviteWizard({ token, termo }: Props) {
         dadosConsultaCpf: form.dadosConsultaCpf || undefined,
         uf: form.uf,
         municipio: form.cidade || undefined,
-        telefone: form.telefone,
-        whatsapp: form.whatsapp || undefined,
-        cep: form.cep || undefined,
-        logradouro: form.logradouro || undefined,
-        numero: form.numero || undefined,
-        complemento: form.complemento || undefined,
-        bairro: form.bairro || undefined,
-        cidade: form.cidade || undefined,
+        whatsapp: form.whatsapp,
+        cep: form.cep,
+        logradouro: form.logradouro,
+        numero: form.numero,
+        complemento: form.complemento,
+        bairro: form.bairro,
+        cidade: form.cidade,
         areasAtuacao: form.areasAtuacao.length > 0 ? form.areasAtuacao : undefined,
+        tipoRecebimento: form.tipoRecebimento as "PF" | "PJ",
+        souRepresentante: form.tipoRecebimento === "PJ" ? form.souRepresentante : undefined,
+        representantesExtra:
+          form.tipoRecebimento === "PJ" && !form.souRepresentante && form.representantesExtra.length > 0
+            ? form.representantesExtra
+            : undefined,
         razaoSocial: form.razaoSocial || undefined,
         nomeFantasia: form.nomeFantasia || undefined,
         cnpj: form.cnpj || undefined,
@@ -68,7 +76,7 @@ export default function ConviteWizard({ token, termo }: Props) {
         termoAceito: form.termoAceito as true,
       });
       if (res.success) {
-        irPara(6);
+        irPara(7);
       } else {
         setErro(res.error);
       }
@@ -79,17 +87,28 @@ export default function ConviteWizard({ token, termo }: Props) {
     }
   }
 
-  // Sem termo ativo: a etapa de Termos é pulada — o envio acontece ao concluir a etapa de Empresa.
+  // Sem termo ativo: a etapa de Termos é pulada — o envio acontece ao concluir a etapa anterior.
   function handleConcluirEmpresa() {
     if (termo) {
-      irPara(5);
+      irPara(6);
     } else {
       void handleSubmit();
     }
   }
 
+  function handleConcluirTipoPessoa() {
+    if (form.tipoRecebimento === "PF") {
+      handleConcluirEmpresa();
+    } else {
+      irPara(5);
+    }
+  }
+
   return (
-    <main className="min-h-screen py-8 px-4 relative overflow-hidden" style={{ background: "#020617" }}>
+    <main
+      className={`min-h-screen py-8 px-4 relative overflow-hidden ${step === -1 ? "flex flex-col items-center justify-center" : ""}`}
+      style={{ background: "#020617" }}
+    >
       {/* Glows de fundo — "Radar Vivo" */}
       <div aria-hidden className="absolute inset-0 pointer-events-none overflow-hidden">
         <motion.div
@@ -107,7 +126,7 @@ export default function ConviteWizard({ token, termo }: Props) {
       </div>
 
       <div className="relative z-10">
-        {step >= 1 && step <= 5 && (
+        {step >= 1 && step <= 6 && (
           <div className="w-full max-w-2xl mx-auto mb-8">
             <div className="flex items-center gap-2 sm:gap-3">
               {STEPS_LABEL.map((label, i) => {
@@ -161,6 +180,7 @@ export default function ConviteWizard({ token, termo }: Props) {
           >
             {step === -1 && (
               <StepPin
+                token={token}
                 pin={form.pin}
                 onChange={patch}
                 onNext={() => irPara(0)}
@@ -180,7 +200,6 @@ export default function ConviteWizard({ token, termo }: Props) {
                 nomeCompleto={form.nomeCompleto}
                 cpf={form.cpf}
                 dataNascimento={form.dataNascimento}
-                telefone={form.telefone}
                 whatsapp={form.whatsapp}
                 onChange={patch}
                 onBack={() => irPara(0)}
@@ -210,28 +229,38 @@ export default function ConviteWizard({ token, termo }: Props) {
               />
             )}
             {step === 4 && (
+              <StepTipoPessoa
+                tipoRecebimento={form.tipoRecebimento}
+                onChange={patch}
+                onBack={() => irPara(3)}
+                onNext={handleConcluirTipoPessoa}
+              />
+            )}
+            {step === 5 && (
               <StepEmpresa
                 cnpj={form.cnpj}
                 razaoSocial={form.razaoSocial}
                 nomeFantasia={form.nomeFantasia}
                 sobre={form.sobre}
+                souRepresentante={form.souRepresentante}
+                representantesExtra={form.representantesExtra}
                 onChange={patch}
-                onBack={() => irPara(3)}
+                onBack={() => irPara(4)}
                 onNext={handleConcluirEmpresa}
               />
             )}
-            {step === 5 && termo && (
+            {step === 6 && termo && (
               <StepTermos
                 termo={termo}
                 aceito={form.termoAceito}
                 onChange={patch}
-                onBack={() => irPara(4)}
+                onBack={() => irPara(5)}
                 onSubmit={handleSubmit}
                 enviando={enviando}
                 erro={erro}
               />
             )}
-            {step === 6 && <StepSucesso />}
+            {step === 7 && <StepSucesso />}
           </motion.div>
         </AnimatePresence>
 

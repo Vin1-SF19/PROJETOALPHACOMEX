@@ -7,7 +7,7 @@ import {
   ChevronRight, FileText, AlertTriangle, Settings, Bot, Pin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { agentAvatarUrl, fetchOnyxLlmModels, setOnyxDefaultModel, type OnyxLlmModelPublic } from "@/lib/onyx/browser";
+import { agentAvatarUrl } from "@/lib/onyx/browser";
 import { type TemaAlpha } from "@/lib/temas";
 import Image from "next/image";
 
@@ -128,56 +128,45 @@ const ONYX_ICON = (
   </svg>
 );
 
+interface OllamaModelPublic {
+  id: string;
+  label: string;
+  paramSize: string | null;
+  family: string | null;
+}
+
 function ModelDropdown({
   model,
   open,
   onClose,
   onSelect,
-  isAdmin,
 }: {
   model: string;
   open: boolean;
   onClose: () => void;
   onSelect: (m: string) => void;
-  isAdmin: boolean;
 }) {
-  const [onyxModels, setOnyxModels] = useState<OnyxLlmModelPublic[]>([]);
-  const [activeOnyxModel, setActiveOnyxModel] = useState<string | null>(null);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelPublic[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     setError(null);
-    fetchOnyxLlmModels()
-      .then(({ models, activeModelName }) => {
-        setOnyxModels(models);
-        setActiveOnyxModel(activeModelName);
-        // sincroniza o model do layout com o ativo do Onyx na abertura
-        if (activeModelName) onSelect(activeModelName);
+    fetch("/api/bibble/models")
+      .then(res => res.json())
+      .then((data: { models: OllamaModelPublic[]; error?: string }) => {
+        setOllamaModels(data.models ?? []);
+        if (data.error) setError(data.error);
       })
-      .catch(() => setError("Não foi possível carregar os modelos do Onyx."))
+      .catch(() => setError("Não foi possível carregar os modelos do Ollama."))
       .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const handleSelect = async (m: OnyxLlmModelPublic) => {
-    if (!isAdmin) return;
-    if (m.name === activeOnyxModel) { onClose(); return; }
-    setSaving(true);
-    setError(null);
-    try {
-      await setOnyxDefaultModel(m.providerId, m.name);
-      setActiveOnyxModel(m.name);
-      onSelect(m.name);
-      onClose();
-    } catch {
-      setError("Erro ao salvar o modelo. Tente novamente.");
-    } finally {
-      setSaving(false);
-    }
+  const handleSelect = (m: OllamaModelPublic) => {
+    onSelect(m.id);
+    onClose();
   };
 
   if (!open) return null;
@@ -193,14 +182,8 @@ function ModelDropdown({
         <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: "1px solid rgba(30,45,74,0.6)" }}>
           <span style={{ color: "#6366f1" }}>{ONYX_ICON}</span>
           <span className="text-[9px] font-black uppercase tracking-[0.2em] flex-1" style={{ color: "#475569" }}>
-            Modelo Onyx
+            Modelo
           </span>
-          {!isAdmin && (
-            <span className="text-[9px]" style={{ color: "#1e3a5f" }}>somente leitura</span>
-          )}
-          {saving && (
-            <div className="w-3 h-3 rounded-full border-[1.5px] border-t-transparent animate-spin" style={{ borderColor: "#6366f1", borderTopColor: "transparent" }} />
-          )}
         </div>
 
         <div className="overflow-y-auto custom-scrollbar max-h-[300px] p-1.5 space-y-0.5">
@@ -220,27 +203,25 @@ function ModelDropdown({
             </div>
           )}
 
-          {!loading && !error && onyxModels.length === 0 && (
+          {!loading && !error && ollamaModels.length === 0 && (
             <div className="px-3 py-4 text-[10px] text-center" style={{ color: "#334155" }}>
-              Nenhum modelo configurado no Onyx.
+              Nenhum modelo encontrado no Ollama.
             </div>
           )}
 
-          {!loading && onyxModels.map(m => {
-            const isActive = m.name === activeOnyxModel;
+          {!loading && ollamaModels.map(m => {
+            const isActive = m.id === model;
             return (
               <button
                 key={m.id}
                 onClick={() => handleSelect(m)}
-                disabled={saving || !isAdmin}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] transition-all text-left"
                 style={{
                   color: isActive ? "#f1f5f9" : "#64748b",
                   background: isActive ? "rgba(99,102,241,0.12)" : "transparent",
-                  cursor: isAdmin ? "pointer" : "default",
-                  opacity: saving ? 0.6 : 1,
+                  cursor: "pointer",
                 }}
-                onMouseEnter={e => { if (isAdmin && !isActive) (e.currentTarget as HTMLButtonElement).style.background = "rgba(30,45,74,0.5)"; }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "rgba(30,45,74,0.5)"; }}
                 onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
               >
                 <Check
@@ -248,12 +229,7 @@ function ModelDropdown({
                   className="shrink-0"
                   style={{ color: "#6366f1", opacity: isActive ? 1 : 0 }}
                 />
-                <span className="font-medium flex-1 truncate">{m.displayName}</span>
-                {m.supportsImage && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded-md shrink-0" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>
-                    visão
-                  </span>
-                )}
+                <span className="font-medium flex-1 truncate">{m.label}</span>
                 {isActive && (
                   <span className="text-[8px] px-1.5 py-0.5 rounded-md shrink-0" style={{ background: "rgba(34,197,94,0.12)", color: "#4ade80" }}>
                     ativo
@@ -263,14 +239,6 @@ function ModelDropdown({
             );
           })}
         </div>
-
-        {isAdmin && (
-          <div className="px-3 py-2" style={{ borderTop: "1px solid rgba(30,45,74,0.5)" }}>
-            <p className="text-[9px]" style={{ color: "#1e3a5f" }}>
-              Trocar o modelo afeta todos os usuários do sistema.
-            </p>
-          </div>
-        )}
       </div>
     </>
   );
@@ -348,7 +316,6 @@ export default function BibbleSidebarPanel({
   activeId,
   activeProjectId,
   model,
-  isAdmin,
   onSelect,
   onNew,
   onDelete,
@@ -821,7 +788,6 @@ export default function BibbleSidebarPanel({
           open={modelOpen}
           onClose={() => setModelOpen(false)}
           onSelect={onModelChange}
-          isAdmin={isAdmin}
         />
 
         <button
@@ -837,7 +803,7 @@ export default function BibbleSidebarPanel({
             {ONYX_ICON}
           </span>
           <span className="flex-1 text-[11px] font-medium truncate text-left">
-            {model || "Modelo Onyx"}
+            {model || "Modelo"}
           </span>
           <ChevronDown
             size={11}

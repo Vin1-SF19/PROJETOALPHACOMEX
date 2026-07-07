@@ -8,7 +8,7 @@ import BibbleSettingsPanel from "./BibbleSettingsPanel";
 import OnyxAgentsModal from "./OnyxAgentsModal";
 import { type Message } from "./BibbleMessageBubble";
 import type { UploadedFile } from "./BibbleFileUpload";
-import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, fetchOnyxLlmModels, type OnyxAgent, type AgenteFixado } from "@/lib/onyx/browser";
+import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, type OnyxAgent, type AgenteFixado } from "@/lib/onyx/browser";
 import { getTema } from "@/lib/temas";
 
 interface BibbleChatLayoutProps {
@@ -23,7 +23,7 @@ interface BibbleChatLayoutProps {
 let msgCounter = 0;
 const newId = () => `msg-${++msgCounter}-${Date.now()}`;
 
-const DEFAULT_MODEL = "";
+const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "qwen3:14b";
 
 export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem";
 
@@ -101,13 +101,6 @@ export default function BibbleChatLayout({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  // Inicializa com o modelo ativo do Onyx
-  useEffect(() => {
-    fetchOnyxLlmModels()
-      .then(({ activeModelName }) => { if (activeModelName) setModel(activeModelName); })
-      .catch(() => { /* silencioso — usa DEFAULT_MODEL vazio */ });
-  }, []);
 
   // ── Onyx (agentes de IA) ──
   const [onyxModalOpen, setOnyxModalOpen] = useState(false);
@@ -403,6 +396,7 @@ export default function BibbleChatLayout({
     const decoder = new TextDecoder();
     let buf = "";
     let fullResponse = "";
+    let receivedAnyEvent = false;
 
     outer: while (true) {
       const { done, value } = await reader.read();
@@ -423,6 +417,7 @@ export default function BibbleChatLayout({
             onyxSessionId?: string;
           };
 
+          receivedAnyEvent = true;
           if (event.type === "session" && event.onyxSessionId) {
             onyxSessionRef.current = event.onyxSessionId;
           } else if (event.type === "status" && event.state) {
@@ -444,6 +439,9 @@ export default function BibbleChatLayout({
           }
         } catch { /* malformed chunk */ }
       }
+    }
+    if (!receivedAnyEvent || !fullResponse.trim()) {
+      return fullResponse.trim() || "Tive um problema. Tenta de novo.";
     }
     return fullResponse;
   }, []);

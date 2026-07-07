@@ -477,6 +477,7 @@ export default function DetalheParceiroClient({
                     <div className="col-span-2"><p className={labelCls}>Nome</p><p className="font-black text-white">{r.nome}</p></div>
                     <div><p className={labelCls}>CPF</p><p className="font-mono font-bold text-slate-300">{r.documento.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</p></div>
                     <div><p className={labelCls}>Nascimento</p><p className="font-bold text-slate-300">{r.dataNascimento}</p></div>
+                    {r.telefone && <div><p className={labelCls}>WhatsApp</p><p className="font-bold text-slate-300">{r.telefone}</p></div>}
                     {r.cargo && <div className="col-span-2"><p className={labelCls}>Cargo</p><p className="font-bold text-slate-300">{r.cargo}</p></div>}
                   </div>
                 ))}

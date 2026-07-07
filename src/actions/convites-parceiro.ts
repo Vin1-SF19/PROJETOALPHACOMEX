@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { criarParceiro } from "@/actions/parceiros";
+import { pusherServer } from "@/lib/pusher-server.ts";
 
 // ─── Helpers de contexto/permissão ────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export async function listarConvites() {
     orderBy: { createdAt: "desc" },
     take: 100,
     select: {
-      id: true, token: true, status: true, expiraEm: true, createdAt: true,
+      id: true, token: true, status: true, expiraEm: true, createdAt: true, pin: true,
       criadoPorUser: { select: { nome: true } },
       criadoPorParceiro: { select: { nome: true } },
       _count: { select: { preCadastros: true } },
@@ -147,6 +148,13 @@ export async function validarConvitePublico(token: string): Promise<
   return { valido: true, termo };
 }
 
+const RepresentanteExtraSchema = z.object({
+  nome: z.string().min(2, "Informe o nome do representante"),
+  cpf: z.string().min(11, "CPF do representante inválido"),
+  dataNascimento: z.string().min(1, "Informe a data de nascimento do representante"),
+  cargo: z.string().max(80).optional(),
+});
+
 // Validação rígida do formulário público (espelho do Google Forms).
 const PreCadastroSchema = z.object({
   token: z.string().min(10),
@@ -157,15 +165,17 @@ const PreCadastroSchema = z.object({
   dadosConsultaCpf: z.string().optional(),
   uf: z.string().length(2, "Selecione o estado"),
   municipio: z.string().max(120).optional(),
-  telefone: z.string().min(8, "Informe o telefone").max(30),
-  whatsapp: z.string().max(30).optional(),
-  cep: z.string().max(9).optional(),
-  logradouro: z.string().max(150).optional(),
-  numero: z.string().max(30).optional(),
-  complemento: z.string().max(30).optional(),
-  bairro: z.string().max(150).optional(),
-  cidade: z.string().max(150).optional(),
+  whatsapp: z.string().min(8, "Informe o WhatsApp").max(30),
+  cep: z.string().min(8, "Informe o CEP").max(9),
+  logradouro: z.string().min(1, "Informe o logradouro").max(150),
+  numero: z.string().min(1, "Informe o número").max(30),
+  complemento: z.string().min(1, "Informe o complemento").max(30),
+  bairro: z.string().min(1, "Informe o bairro").max(150),
+  cidade: z.string().min(1, "Informe a cidade").max(150),
   areasAtuacao: z.array(z.string().max(60)).max(15).optional(),
+  tipoRecebimento: z.enum(["PF", "PJ"], { message: "Selecione como deseja receber as comissões" }),
+  souRepresentante: z.boolean().optional(),
+  representantesExtra: z.array(RepresentanteExtraSchema).max(10).optional(),
   nomeEmpresa: z.string().max(200).optional(),
   razaoSocial: z.string().max(200).optional(),
   nomeFantasia: z.string().max(200).optional(),
@@ -173,7 +183,10 @@ const PreCadastroSchema = z.object({
   dadosConsultaCnpj: z.string().optional(),
   sobre: z.string().max(3000).optional(),
   termoAceito: z.boolean().refine((v) => v === true, { message: "É necessário aceitar os termos" }),
-});
+}).refine(
+  (d) => d.tipoRecebimento !== "PJ" || d.souRepresentante !== false || (d.representantesExtra && d.representantesExtra.length > 0),
+  { message: "Adicione ao menos um representante da empresa", path: ["representantesExtra"] },
+);
 
 /**
  * Submete o formulário público → cria um PreCadastroParceiro (PENDENTE).
@@ -202,8 +215,9 @@ export async function submeterConvitePublico(input: z.infer<typeof PreCadastroSc
     select: { versao: true },
   });
 
-  await db.$transaction([
+  const [preCadastroCriado] = await db.$transaction([
     db.preCadastroParceiro.create({
+      select: { id: true, nomeCompleto: true },
       data: {
         conviteId: convite.id,
         email: d.email.trim(),
@@ -213,15 +227,22 @@ export async function submeterConvitePublico(input: z.infer<typeof PreCadastroSc
         dadosConsultaCpf: d.dadosConsultaCpf || null,
         uf: d.uf.toUpperCase(),
         municipio: d.municipio?.trim() || null,
-        telefone: d.telefone.trim(),
-        whatsapp: d.whatsapp?.trim() || null,
-        cep: d.cep?.replace(/\D/g, "") || null,
-        logradouro: d.logradouro?.trim() || null,
-        numero: d.numero?.trim() || null,
-        complemento: d.complemento?.trim() || null,
-        bairro: d.bairro?.trim() || null,
-        cidade: d.cidade?.trim() || null,
+        // telefone é legado (NOT NULL no banco) — WhatsApp é o único campo coletado
+        // na UI a partir desta versão; espelhamos o valor para não quebrar a coluna.
+        telefone: d.whatsapp.trim(),
+        whatsapp: d.whatsapp.trim(),
+        cep: d.cep.replace(/\D/g, ""),
+        logradouro: d.logradouro.trim(),
+        numero: d.numero.trim(),
+        complemento: d.complemento.trim(),
+        bairro: d.bairro.trim(),
+        cidade: d.cidade.trim(),
         areasAtuacao: d.areasAtuacao && d.areasAtuacao.length > 0 ? d.areasAtuacao.join(",") : null,
+        tipoRecebimento: d.tipoRecebimento,
+        souRepresentante: d.souRepresentante ?? true,
+        representantesExtra: d.representantesExtra && d.representantesExtra.length > 0
+          ? JSON.stringify(d.representantesExtra)
+          : null,
         nomeEmpresa: d.nomeEmpresa?.trim() || null,
         razaoSocial: d.razaoSocial?.trim() || null,
         nomeFantasia: d.nomeFantasia?.trim() || null,
@@ -237,6 +258,15 @@ export async function submeterConvitePublico(input: z.infer<typeof PreCadastroSc
       data: { status: convite.usoUnico ? "USADO" : "PENDENTE" },
     }),
   ]);
+
+  try {
+    await pusherServer.trigger("private-parceiros-precadastros", "novo-pre-cadastro", {
+      id: preCadastroCriado.id,
+      nomeCompleto: preCadastroCriado.nomeCompleto,
+    });
+  } catch (pusherErr) {
+    console.error("[Pusher] Falha ao disparar evento novo-pre-cadastro:", pusherErr);
+  }
 
   return { success: true as const };
 }
@@ -272,7 +302,8 @@ export async function contarPreCadastrosPendentes() {
 
 /**
  * Aprova um pré-cadastro → cria o Parceiro de verdade via criarParceiro().
- * Determina PF/PJ pelo documento informado (CNPJ tem prioridade se houver).
+ * Usa o tipo explícito escolhido no wizard (tipoRecebimento); pré-cadastros
+ * antigos (antes desta feature, tipoRecebimento null) caem no fallback por CNPJ.
  */
 export async function aprovarPreCadastro(preCadastroId: number) {
   const ctx = await getCtx();
@@ -284,11 +315,38 @@ export async function aprovarPreCadastro(preCadastroId: number) {
 
   const cnpj = pc.cnpj?.replace(/\D/g, "") ?? "";
   const cpf = pc.cpf?.replace(/\D/g, "") ?? "";
-  const tipo = cnpj.length === 14 ? "PJ" : "PF";
+  const tipo: "PF" | "PJ" = pc.tipoRecebimento === "PF" || pc.tipoRecebimento === "PJ"
+    ? pc.tipoRecebimento
+    : (cnpj.length === 14 ? "PJ" : "PF");
   const documento = tipo === "PJ" ? cnpj : cpf;
 
   if (!documento || documento.length < 11) {
     return { success: false as const, error: "Pré-cadastro sem CPF/CNPJ válido — peça o documento antes de aprovar" };
+  }
+
+  // PJ exige ao menos um representante físico para criarParceiro aceitar (ver
+  // ParceiroSchema/respValidos em actions/parceiros.ts). Monta a partir dos
+  // dados que o próprio preenchedor já informou (souRepresentante=true) ou da
+  // lista de representantes extras coletada no wizard (souRepresentante=false).
+  type RepresentanteWizard = { nome: string; cpf: string; dataNascimento: string; cargo?: string };
+  let responsaveis: RepresentanteWizard[] | undefined;
+  if (tipo === "PJ") {
+    if (pc.souRepresentante && pc.cpf && pc.dataNascimento) {
+      responsaveis = [{ nome: pc.nomeCompleto, cpf: pc.cpf, dataNascimento: pc.dataNascimento }];
+    } else if (!pc.souRepresentante && pc.representantesExtra) {
+      try {
+        const extras = JSON.parse(pc.representantesExtra) as RepresentanteWizard[];
+        if (Array.isArray(extras) && extras.length > 0) responsaveis = extras;
+      } catch {
+        // JSON inválido — cai para o fallback abaixo (erro claro ao invés de crash)
+      }
+    }
+    if (!responsaveis || responsaveis.length === 0) {
+      return {
+        success: false as const,
+        error: "Pré-cadastro PJ sem representante válido — complete os dados do representante antes de aprovar",
+      };
+    }
   }
 
   // Endereço estruturado só é enviado se todos os campos obrigatórios do
@@ -328,6 +386,7 @@ export async function aprovarPreCadastro(preCadastroId: number) {
     telefone2: pc.whatsapp ?? undefined,
     nivel: "GOLD",
     endereco: enderecoCompleto,
+    responsaveis,
     dadosConsulta: dadosConsultaCombinado,
     // Termo já foi aceito no wizard do convite — o parceiro nasce com o aceite registrado.
     termoAceito: true,

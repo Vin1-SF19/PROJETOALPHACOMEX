@@ -4,20 +4,25 @@ import { useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { Campo, inputCls, CardSecao, BotoesNavegacao } from "./shared";
 
+function formatarCpf(v: string): string {
+  return v.replace(/\D/g, "").slice(0, 11)
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3}\.\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3}\.\d{3}\.\d{3})(\d)/, "$1-$2");
+}
+
 interface Props {
   token: string;
   pin: string;
   nomeCompleto: string;
   cpf: string;
   dataNascimento: string;
-  telefone: string;
   whatsapp: string;
   onChange: (patch: {
     nomeCompleto?: string;
     cpf?: string;
     dataNascimento?: string;
     dadosConsultaCpf?: string;
-    telefone?: string;
     whatsapp?: string;
   }) => void;
   onBack: () => void;
@@ -30,7 +35,6 @@ export default function StepDadosPessoais({
   nomeCompleto,
   cpf,
   dataNascimento,
-  telefone,
   whatsapp,
   onChange,
   onBack,
@@ -40,7 +44,7 @@ export default function StepDadosPessoais({
   const [buscando, setBuscando] = useState(false);
   const [erroBusca, setErroBusca] = useState<string | null>(null);
 
-  const valido = nomeCompleto.trim().length >= 2 && telefone.trim().length >= 8;
+  const valido = nomeCompleto.trim().length >= 2 && whatsapp.trim().length >= 8;
 
   function handleContinuar() {
     setTentouAvancar(true);
@@ -91,8 +95,9 @@ export default function StepDadosPessoais({
             <div className="flex gap-2">
               <input
                 type="text"
+                inputMode="numeric"
                 value={cpf}
-                onChange={(e) => onChange({ cpf: e.target.value })}
+                onChange={(e) => onChange({ cpf: formatarCpf(e.target.value) })}
                 className={inputCls}
                 placeholder="000.000.000-00"
               />
@@ -109,11 +114,10 @@ export default function StepDadosPessoais({
 
           <Campo label="Data de Nascimento" dica="Necessária para a busca automática pelo CPF.">
             <input
-              type="text"
+              type="date"
               value={dataNascimento}
               onChange={(e) => onChange({ dataNascimento: e.target.value })}
               className={inputCls}
-              placeholder="DD/MM/AAAA"
             />
           </Campo>
         </div>
@@ -131,29 +135,18 @@ export default function StepDadosPessoais({
           )}
         </Campo>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Campo label="Telefone" obrigatorio dica="Por gentileza, preencha com seu melhor telefone.">
-            <input
-              type="tel"
-              value={telefone}
-              onChange={(e) => onChange({ telefone: e.target.value })}
-              className={inputCls}
-              placeholder="(00) 00000-0000"
-            />
-            {tentouAvancar && telefone.trim().length < 8 && (
-              <p className="text-[11px] text-rose-400 mt-1">Informe um telefone válido.</p>
-            )}
-          </Campo>
-          <Campo label="WhatsApp" dica="Opcional, se for diferente do telefone.">
-            <input
-              type="tel"
-              value={whatsapp}
-              onChange={(e) => onChange({ whatsapp: e.target.value })}
-              className={inputCls}
-              placeholder="(00) 00000-0000"
-            />
-          </Campo>
-        </div>
+        <Campo label="WhatsApp" obrigatorio dica="Por gentileza, preencha com seu WhatsApp.">
+          <input
+            type="tel"
+            value={whatsapp}
+            onChange={(e) => onChange({ whatsapp: e.target.value })}
+            className={inputCls}
+            placeholder="(00) 00000-0000"
+          />
+          {tentouAvancar && whatsapp.trim().length < 8 && (
+            <p className="text-[11px] text-rose-400 mt-1">Informe um WhatsApp válido.</p>
+          )}
+        </Campo>
       </CardSecao>
 
       <BotoesNavegacao onBack={onBack} onNext={handleContinuar} />

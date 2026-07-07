@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, UserPlus, Loader2, Check, Ban, Mail, Phone, MapPin, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { listarPreCadastros, aprovarPreCadastro, rejeitarPreCadastro } from "@/actions/convites-parceiro";
@@ -31,15 +31,19 @@ type PreCadastro = {
   createdAt: string | Date;
 };
 
-export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado }: {
+type ParceiroAprovado = { id: number; loginEmail: string; senhaGerada: string; nome: string };
+
+export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, preCadastroIdFoco }: {
   open: boolean;
   onClose: () => void;
   isAdmin: boolean;
-  onAprovado?: () => void;
+  onAprovado?: (parceiro: ParceiroAprovado) => void;
+  preCadastroIdFoco?: number;
 }) {
   const [lista, setLista] = useState<PreCadastro[]>([]);
   const [loading, setLoading] = useState(false);
   const [processando, setProcessando] = useState<number | null>(null);
+  const itemFocoRef = useRef<HTMLDivElement | null>(null);
 
   const recarregar = () => {
     setLoading(true);
@@ -53,16 +57,21 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado }
     if (open) recarregar();
   }, [open]);
 
+  useEffect(() => {
+    if (open && preCadastroIdFoco && itemFocoRef.current) {
+      itemFocoRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [open, preCadastroIdFoco, lista]);
+
   if (!open) return null;
 
   const handleAprovar = async (id: number) => {
     setProcessando(id);
     const res = await aprovarPreCadastro(id);
     setProcessando(null);
-    if (res.success) {
-      toast.success(`Parceiro criado! Login: ${res.parceiro?.loginEmail}`);
+    if (res.success && res.parceiro) {
       setLista((prev) => prev.filter((p) => p.id !== id));
-      onAprovado?.();
+      onAprovado?.(res.parceiro);
     } else {
       toast.error(res.error ?? "Falha ao aprovar");
     }
@@ -96,8 +105,19 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado }
           ) : lista.length === 0 ? (
             <p className="text-[13px] text-slate-600 py-10 text-center">Nenhum pré-cadastro pendente.</p>
           ) : (
-            lista.map((p) => (
-              <div key={p.id} className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            lista.map((p) => {
+              const emFoco = preCadastroIdFoco === p.id;
+              return (
+                <div
+                  key={p.id}
+                  ref={emFoco ? itemFocoRef : undefined}
+                  className="rounded-2xl p-4 transition-all"
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: emFoco ? "1px solid rgba(245,158,11,0.6)" : "1px solid rgba(255,255,255,0.07)",
+                    boxShadow: emFoco ? "0 0 0 3px rgba(245,158,11,0.15)" : undefined,
+                  }}
+                >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
                     <h3 className="text-[14px] font-black text-white">{p.nomeCompleto}</h3>
@@ -149,8 +169,9 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado }
                     </button>
                   </div>
                 </div>
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
         </div>
       </div>

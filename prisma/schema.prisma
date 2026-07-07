@@ -1544,6 +1544,10 @@ model ConviteParceiro {
   // na InfoSimples). Nullable: convites gerados antes desta feature não têm PIN
   // e por isso NÃO liberam a busca automática (ver rota /api/convite/consulta-cpf).
   pin         String?
+  // Rate-limit de tentativas de PIN — compartilhado entre StepPin (entrada no
+  // wizard) e a consulta automática de CPF. 5 tentativas erradas suspende por 1min.
+  tentativasPin Int      @default(0)
+  suspensoAte   DateTime?
   // Quem gerou: um usuário do Painel OU um parceiro existente (indicação).
   criadoPorUserId    Int?
   criadoPorParceiroId Int?
@@ -1588,6 +1592,9 @@ model PreCadastroParceiro {
   cnpj          String?
   dadosConsultaCnpj String?         // JSON bruto da resposta ReceitaFederal (CNPJ)
   sobre         String?             // "fale mais sobre você/empresa"
+  tipoRecebimento String?           // "PF" | "PJ" — escolha explícita feita no wizard (Step Tipo). Null = pré-cadastros antigos, cai no fallback por CNPJ.
+  souRepresentante Boolean @default(true) // se PJ: true = o próprio preenchedor (nomeCompleto/cpf/dataNascimento) é o representante; false = usa representantesExtra
+  representantesExtra String?       // JSON stringificado de { nome, cpf, dataNascimento, cargo }[] — só quando souRepresentante=false
   // Aceite do termo (versão capturada no momento do aceite)
   termoVersao   String
   termoAceito   Boolean  @default(true)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import db from "@/lib/prisma";
+import { validarPinComRateLimit } from "@/lib/convite-pin";
 
 export const dynamic = "force-dynamic";
 
@@ -36,26 +36,9 @@ export async function POST(req: NextRequest) {
     }
     const { token, pin, cpf, dataNascimento } = parsed.data;
 
-    const convite = await db.conviteParceiro.findUnique({
-      where: { token },
-      select: { status: true, expiraEm: true, pin: true },
-    });
-
-    if (!convite) return NextResponse.json({ error: "Convite inválido" }, { status: 404 });
-    if (convite.status !== "PENDENTE") {
-      return NextResponse.json({ error: "Este convite não está mais disponível" }, { status: 403 });
-    }
-    if (convite.expiraEm.getTime() < Date.now()) {
-      return NextResponse.json({ error: "Este convite expirou" }, { status: 403 });
-    }
-    if (!convite.pin) {
-      return NextResponse.json(
-        { error: "Este link de convite não suporta busca automática — preencha manualmente" },
-        { status: 403 }
-      );
-    }
-    if (convite.pin !== pin) {
-      return NextResponse.json({ error: "PIN incorreto" }, { status: 401 });
+    const resultadoPin = await validarPinComRateLimit(token, pin, false);
+    if (!resultadoPin.ok) {
+      return NextResponse.json({ error: resultadoPin.error }, { status: resultadoPin.status });
     }
 
     const cpfLimpo = cpf.replace(/\D/g, "");

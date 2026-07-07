@@ -3,7 +3,7 @@ import { auth } from "../../../../../auth";
 import { pusherServer } from "@/lib/pusher-server.ts";
 
 const ADMIN_ROLES = ["Admin", "CEO"];
-const ADMIN_CHANNELS = ["private-admin-chamados"];
+const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts"];
 const CHECKLIST_ROLES = ["Admin", "CEO", "OPERACIONAL"];
 const CHECKLIST_CHANNELS = ["private-checklist-docs"];

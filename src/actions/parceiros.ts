@@ -112,7 +112,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
         nivel,
         comissaoPercentual: comissaoFinal,
         dadosConsulta: dadosConsulta || null,
-        loginEmail: email,
+        loginEmail: email.toLowerCase().trim(),
         senhaHash,
         criadoPorId: Number(userId),
         ...(termoAceito && {
@@ -573,7 +573,7 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
         nome: d.nome,
         nomeFantasia: d.nomeFantasia ?? null,
         email: d.email,
-        loginEmail: d.email,
+        loginEmail: d.email.toLowerCase().trim(),
         telefone: d.telefone ?? null,
         telefone2: d.telefone2 ?? null,
         chavePix: d.chavePix ?? null,

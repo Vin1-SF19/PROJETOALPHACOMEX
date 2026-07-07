@@ -53,23 +53,22 @@ export default function StepEndereco({ cep, logradouro, numero, complemento, bai
     }
   }
 
-  // Endereço é opcional — mas se o usuário começou a preencher, exige os campos essenciais.
-  const comecouAPreencher = [cep, logradouro, bairro, cidade, uf].some((v) => v.trim().length > 0);
-  const enderecoCompleto = cep.trim() && logradouro.trim() && bairro.trim() && cidade.trim() && uf.trim();
-  const valido = !comecouAPreencher || enderecoCompleto;
+  const enderecoCompleto =
+    cep.trim() && logradouro.trim() && numero.trim() && complemento.trim() && bairro.trim() && cidade.trim() && uf.trim();
 
   function handleContinuar() {
     setTentouAvancar(true);
-    if (valido) onNext();
+    if (enderecoCompleto) onNext();
   }
+
+  const erroCampo = (v: string) => tentouAvancar && !v.trim();
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-5">
       <CardSecao>
-        <h2 className="text-[13px] font-black uppercase tracking-wider text-slate-300">Endereço</h2>
-        <p className="text-[11px] text-slate-500 -mt-2">Opcional — se preferir, avance sem preencher.</p>
+        <h2 className="text-[13px] font-black uppercase tracking-wider text-slate-300">Endereço para receber brindes e presentes</h2>
 
-        <Campo label="CEP">
+        <Campo label="CEP" obrigatorio>
           <div className="flex gap-2">
             <input
               type="text"
@@ -89,34 +88,40 @@ export default function StepEndereco({ cep, logradouro, numero, complemento, bai
             </button>
           </div>
           {erroCep && <p className="text-[11px] text-rose-400 mt-1">{erroCep}</p>}
+          {erroCampo(cep) && <p className="text-[11px] text-rose-400 mt-1">Informe o CEP.</p>}
         </Campo>
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="sm:col-span-2">
-            <Campo label="Logradouro">
+            <Campo label="Logradouro" obrigatorio>
               <input type="text" value={logradouro} onChange={(e) => onChange({ logradouro: e.target.value })} className={inputCls} placeholder="Rua / Av." />
+              {erroCampo(logradouro) && <p className="text-[11px] text-rose-400 mt-1">Informe o logradouro.</p>}
             </Campo>
           </div>
-          <Campo label="Número">
+          <Campo label="Número" obrigatorio>
             <input type="text" value={numero} onChange={(e) => onChange({ numero: e.target.value })} className={inputCls} placeholder="Nº" />
+            {erroCampo(numero) && <p className="text-[11px] text-rose-400 mt-1">Informe o número.</p>}
           </Campo>
         </div>
 
-        <Campo label="Complemento">
+        <Campo label="Complemento" obrigatorio>
           <input type="text" value={complemento} onChange={(e) => onChange({ complemento: e.target.value })} className={inputCls} placeholder="Apto, sala, bloco..." />
+          {erroCampo(complemento) && <p className="text-[11px] text-rose-400 mt-1">Informe o complemento.</p>}
         </Campo>
 
-        <Campo label="Bairro">
+        <Campo label="Bairro" obrigatorio>
           <input type="text" value={bairro} onChange={(e) => onChange({ bairro: e.target.value })} className={inputCls} />
+          {erroCampo(bairro) && <p className="text-[11px] text-rose-400 mt-1">Informe o bairro.</p>}
         </Campo>
 
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="sm:col-span-2">
-            <Campo label="Cidade">
+            <Campo label="Cidade" obrigatorio>
               <input type="text" value={cidade} onChange={(e) => onChange({ cidade: e.target.value })} className={inputCls} />
+              {erroCampo(cidade) && <p className="text-[11px] text-rose-400 mt-1">Informe a cidade.</p>}
             </Campo>
           </div>
-          <Campo label="UF">
+          <Campo label="UF" obrigatorio>
             <div className="relative">
               <select
                 value={uf}
@@ -128,14 +133,9 @@ export default function StepEndereco({ cep, logradouro, numero, complemento, bai
               </select>
               <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
             </div>
+            {erroCampo(uf) && <p className="text-[11px] text-rose-400 mt-1">Selecione a UF.</p>}
           </Campo>
         </div>
-
-        {tentouAvancar && !valido && (
-          <p className="text-[11px] text-rose-400">
-            Complete o endereço (CEP, logradouro, bairro, cidade e UF) ou apague todos os campos para pular esta etapa.
-          </p>
-        )}
       </CardSecao>
 
       <BotoesNavegacao onBack={onBack} onNext={handleContinuar} />

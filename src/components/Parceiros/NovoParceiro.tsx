@@ -68,8 +68,7 @@ export default function NovoParceiro({
   const [nome, setNome] = useState("");
   const [nomeFantasia, setNomeFantasia] = useState("");
   const [email, setEmail] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [telefone2, setTelefone2] = useState("");
+  const [whatsappPF, setWhatsappPF] = useState("");
   const [chavePix, setChavePix] = useState("");
   const [tipoChavePix, setTipoChavePix] = useState("");
   const [nomeBanco, setNomeBanco] = useState("");
@@ -78,8 +77,8 @@ export default function NovoParceiro({
   const [dadosConsultaBrutos, setDadosConsultaBrutos] = useState("");
 
   // Responsáveis físicos (vários) — em "gaveta": só um aberto por vez
-  type Resp = { nome: string; cpf: string; dataNascimento: string; cargo: string };
-  const respVazio = (): Resp => ({ nome: "", cpf: "", dataNascimento: "", cargo: "" });
+  type Resp = { nome: string; cpf: string; dataNascimento: string; cargo: string; whatsapp: string };
+  const respVazio = (): Resp => ({ nome: "", cpf: "", dataNascimento: "", cargo: "", whatsapp: "" });
   const [responsaveis, setResponsaveis] = useState<Resp[]>([respVazio()]);
   const [respAbertoIdx, setRespAbertoIdx] = useState<number>(0); // qual está expandido
 
@@ -131,7 +130,6 @@ export default function NovoParceiro({
         setNome(d.razaoSocial || "");
         setNomeFantasia(d.nomeFantasia || "");
         setEmail(d.email || "");
-        if (d.telefone) setTelefone(d.telefone);
         setDadosConsultaBrutos(JSON.stringify(d));
       } else {
         const r = await fetch("/api/ConsultaCpf", {
@@ -160,6 +158,7 @@ export default function NovoParceiro({
     if (tipo === "PJ" && docLimpo.length !== 14) { toast.error("CNPJ inválido"); return; }
     if (tipo === "PF" && docLimpo.length !== 11) { toast.error("CPF inválido"); return; }
     if (!nome || !email) { toast.error("Nome e e-mail são obrigatórios"); return; }
+    if (tipo === "PF" && !whatsappPF.trim()) { toast.error("WhatsApp é obrigatório"); return; }
     const respValidos = responsaveis.filter(respCompleto);
     if (tipo === "PJ" && respValidos.length === 0) {
       toast.error("Preencha ao menos um responsável físico (obrigatório para PJ)");
@@ -183,8 +182,7 @@ export default function NovoParceiro({
         nome,
         nomeFantasia: nomeFantasia || undefined,
         email,
-        telefone: telefone || undefined,
-        telefone2: telefone2 || undefined,
+        telefone2: tipo === "PF" ? whatsappPF || undefined : undefined,
         chavePix: chavePix || undefined,
         tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || undefined,
         nomeBanco: nomeBanco || undefined,
@@ -194,7 +192,7 @@ export default function NovoParceiro({
         dadosConsulta: dadosConsultaBrutos || undefined,
         endereco: endereco ?? undefined,
         responsaveis: tipo === "PJ"
-          ? respValidos.map(r => ({ nome: r.nome, cpf: r.cpf.replace(/\D/g, ""), dataNascimento: r.dataNascimento, cargo: r.cargo || undefined }))
+          ? respValidos.map(r => ({ nome: r.nome, cpf: r.cpf.replace(/\D/g, ""), dataNascimento: r.dataNascimento, cargo: r.cargo || undefined, telefone: r.whatsapp || undefined }))
           : undefined,
       });
 
@@ -315,16 +313,12 @@ export default function NovoParceiro({
                 <Input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {tipo === "PF" && (
                 <div className="space-y-1">
-                  <Label className={labelCls}>Telefone 1</Label>
-                  <Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                  <Label className={labelCls}>WhatsApp *</Label>
+                  <Input value={whatsappPF} onChange={e => setWhatsappPF(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
                 </div>
-                <div className="space-y-1">
-                  <Label className={labelCls}>Telefone 2</Label>
-                  <Input value={telefone2} onChange={e => setTelefone2(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
-                </div>
-              </div>
+              )}
 
               {/* Comissão fixa — só para tipo ESPECIAL */}
               {tipoParceiro === "ESPECIAL" && (
@@ -415,7 +409,7 @@ export default function NovoParceiro({
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-[12.5px] font-bold text-slate-200 truncate">{r.nome || `Responsável ${i + 1}`}</p>
-                            {completo && <p className="text-[10px] text-slate-500 truncate font-mono">{r.cpf}{r.cargo ? ` · ${r.cargo}` : ""}</p>}
+                            {completo && <p className="text-[10px] text-slate-500 truncate font-mono">{r.cpf}{r.cargo ? ` · ${r.cargo}` : ""}{r.whatsapp ? ` · ${r.whatsapp}` : ""}</p>}
                           </div>
                           <ChevronDown size={15} className={`shrink-0 text-slate-500 transition-transform ${aberto ? "rotate-180" : ""}`} />
                         </button>
@@ -443,9 +437,15 @@ export default function NovoParceiro({
                               <Input type="date" value={r.dataNascimento} onChange={e => updateResp(i, "dataNascimento", e.target.value)} className={inputCls} />
                             </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label className={labelCls}>Cargo / Relação</Label>
-                            <Input value={r.cargo} onChange={e => updateResp(i, "cargo", e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className={labelCls}>Cargo / Relação</Label>
+                              <Input value={r.cargo} onChange={e => updateResp(i, "cargo", e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className={labelCls}>WhatsApp</Label>
+                              <Input value={r.whatsapp} onChange={e => updateResp(i, "whatsapp", e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                            </div>
                           </div>
                           {/* Botão "salvar" abaixo: fecha a gaveta se estiver completo */}
                           <Button type="button" variant="outline" disabled={!completo}

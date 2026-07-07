@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Link2, Copy, Check, Loader2, Trash2, Clock } from "lucide-react";
+import { X, Link2, Copy, Check, Loader2, Trash2, Clock, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
 import { gerarConvite, listarConvites, revogarConvite } from "@/actions/convites-parceiro";
 
@@ -19,6 +19,7 @@ type ConviteItem = {
   status: string;
   expiraEm: string | Date;
   createdAt: string | Date;
+  pin: string | null;
   criadoPorUser: { nome: string } | null;
   criadoPorParceiro: { nome: string } | null;
   _count: { preCadastros: number };
@@ -28,10 +29,12 @@ export default function ModalConvidarParceiro({
   open,
   onClose,
   onConviteGerado,
+  onReabrirMensagem,
 }: {
   open: boolean;
   onClose: () => void;
   onConviteGerado: (dados: { link: string; pin: string }) => void;
+  onReabrirMensagem: (dados: { link: string; pin: string }) => void;
 }) {
   const [validade, setValidade] = useState(7);
   const [gerando, setGerando] = useState(false);
@@ -178,6 +181,15 @@ export default function ModalConvidarParceiro({
                       por {c.criadoPorUser?.nome ?? c.criadoPorParceiro?.nome ?? "—"} · {c._count.preCadastros} resposta(s)
                     </p>
                   </div>
+                  {c.pin && (
+                    <button
+                      onClick={() => onReabrirMensagem({ link: linkDe(c.token), pin: c.pin as string })}
+                      className="p-2 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-white/5 transition-all"
+                      title="Ver mensagem deste convite"
+                    >
+                      <MessageSquareText size={14} />
+                    </button>
+                  )}
                   {status === "ATIVO" && (
                     <button onClick={() => copiar(c.token)} className="p-2 rounded-lg text-slate-400 hover:text-blue-400 hover:bg-white/5 transition-all" title="Copiar link">
                       {copiado === c.token ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
