@@ -1,5 +1,5 @@
 import "server-only";
-import "@/lib/bibble/pdfjs-polyfill";
+import { pdfjsWorkerReady } from "@/lib/bibble/pdfjs-polyfill";
 import {
   createChatSession,
   sendChatMessageStream,
@@ -24,6 +24,7 @@ function textoInsuficiente(texto: string): boolean {
  * Retorna [] se não for possível extrair texto de forma alguma.
  */
 async function extrairPaginas(buffer: Buffer, fileName: string): Promise<string[]> {
+  await pdfjsWorkerReady;
   const { PDFParse } = await import("pdf-parse");
 
   const extrairViaPdfParse = async (buf: Buffer): Promise<string[]> => {

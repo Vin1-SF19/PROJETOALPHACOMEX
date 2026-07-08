@@ -8,7 +8,7 @@
  * fallback final via OCR real na API PDF24 — ver pdf24-ocr.ts.
  */
 
-import "./pdfjs-polyfill";
+import { pdfjsWorkerReady } from "./pdfjs-polyfill";
 import { ocrViaPdf24, isPdf24Configured } from "./pdf24-ocr";
 
 const TIKA_URL = (process.env.TIKA_SERVER_URL ?? "http://192.168.35.113:9998").replace(/\/+$/, "");
@@ -51,6 +51,7 @@ async function extractViaTika(buffer: Buffer, mimeType: string): Promise<string>
  * Fallback: pdf-parse v2 para quando o Tika não estiver disponível.
  */
 async function extractViaPdfParse(buffer: Buffer): Promise<string> {
+  await pdfjsWorkerReady;
   const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: buffer, verbosity: 0 });
   const result = await parser.getText();
