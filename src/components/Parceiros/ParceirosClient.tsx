@@ -21,6 +21,7 @@ import { excluirParceiros } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
 import { useParceirosPreCadastroNotifications, type PreCadastroNotificacao } from "@/hooks/useParceirosPreCadastroNotifications";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
@@ -154,8 +155,14 @@ export default function ParceirosClient({
 
   return (
     <main className="relative min-h-screen bg-[#020617] text-slate-200 p-6 lg:p-10 overflow-hidden">
-      {/* Fundo vivo — glows lentos + partículas flutuantes (mesmo espírito do alphaparceiros) */}
+      {/* Fundo vivo — shader animado (WebGL) + glows lentos + partículas flutuantes */}
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        {!reduceMotion && (
+          <div className="absolute inset-0 opacity-70">
+            <AnimatedShaderBackground />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-[#020617]/60" />
         <motion.div
           className="absolute -top-40 -left-32 w-[560px] h-[560px] rounded-full"
           style={{ background: `rgba(${accent},0.16)`, filter: "blur(140px)" }}
