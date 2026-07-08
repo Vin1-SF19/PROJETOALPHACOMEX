@@ -8,9 +8,18 @@ import {
 
 type ParceiroSimples = { id: number; nome: string; nomeFantasia: string | null; documento: string; nivel: string };
 type ClienteOpt = {
-  id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string;
+  id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string; status: string;
   indicacao: { parceiroId: number; status: string } | null;
 };
+
+// Valores reais observados em produção (clientes.status) — sem enum formal no schema.
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  "Deferido": { bg: "rgba(16,185,129,0.15)", color: "#34d399" },
+  "Em Andamento": { bg: "rgba(245,158,11,0.15)", color: "#fbbf24" },
+  "Stand By": { bg: "rgba(148,163,184,0.15)", color: "#cbd5e1" },
+  "Arquivado": { bg: "rgba(100,116,139,0.15)", color: "#94a3b8" },
+};
+const STATUS_STYLE_DEFAULT = { bg: "rgba(239,68,68,0.15)", color: "#f87171" }; // cancelados e outros não mapeados
 
 export default function ModalNovaIndicacao({
   open, onClose, onDone, accent,
@@ -106,6 +115,7 @@ export default function ModalNovaIndicacao({
               ) : clientes.map(c => {
                 const jaVinculada = c.indicacao?.status === "ATIVA";
                 const ativo = clienteId === c.id;
+                const statusStyle = STATUS_STYLE[c.status] ?? STATUS_STYLE_DEFAULT;
                 return (
                   <button key={c.id} type="button" disabled={jaVinculada} onClick={() => setClienteId(c.id)}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -117,6 +127,12 @@ export default function ModalNovaIndicacao({
                         <span className="font-mono">{c.cnpj}</span>{c.nomeFantasia ? ` · ${c.nomeFantasia}` : ""}
                       </p>
                     </div>
+                    <span
+                      className="text-[9px] font-black uppercase px-2 py-1 rounded-lg shrink-0"
+                      style={{ background: statusStyle.bg, color: statusStyle.color }}
+                    >
+                      {c.status}
+                    </span>
                     {jaVinculada && <span className="text-[9px] font-black uppercase text-amber-400 shrink-0">Já vinculada</span>}
                     {ativo && <Check size={15} style={{ color: `rgba(${accent},1)` }} />}
                   </button>

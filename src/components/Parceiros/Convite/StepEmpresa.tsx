@@ -69,7 +69,7 @@ export default function StepEmpresa({
     }
   }
 
-  const respVazio = (): RepresentanteExtra => ({ nome: "", cpf: "", dataNascimento: "", cargo: "" });
+  const respVazio = (): RepresentanteExtra => ({ nome: "", cpf: "", dataNascimento: "", cargo: "", telefone: "" });
   const updateResp = (i: number, campo: keyof RepresentanteExtra, valor: string) =>
     onChange({ representantesExtra: representantesExtra.map((r, idx) => (idx === i ? { ...r, [campo]: valor } : r)) });
   const addResp = () => {
@@ -201,9 +201,14 @@ export default function StepEmpresa({
                           <input type="date" value={r.dataNascimento} onChange={(e) => updateResp(i, "dataNascimento", e.target.value)} className={inputCls} />
                         </Campo>
                       </div>
-                      <Campo label="Cargo / Relação">
-                        <input value={r.cargo} onChange={(e) => updateResp(i, "cargo", e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
-                      </Campo>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Campo label="Cargo / Relação">
+                          <input value={r.cargo} onChange={(e) => updateResp(i, "cargo", e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
+                        </Campo>
+                        <Campo label="WhatsApp">
+                          <input value={r.telefone} onChange={(e) => updateResp(i, "telefone", e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                        </Campo>
+                      </div>
                       <button
                         type="button"
                         disabled={!completo}

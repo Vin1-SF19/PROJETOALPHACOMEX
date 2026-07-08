@@ -287,10 +287,25 @@ export async function listarPreCadastros(status: "PENDENTE" | "APROVADO" | "REJE
       telefone: true, whatsapp: true, cep: true, logradouro: true, numero: true,
       complemento: true, bairro: true, cidade: true,
       areasAtuacao: true, nomeEmpresa: true, razaoSocial: true, nomeFantasia: true, cnpj: true, sobre: true,
-      termoVersao: true, termoAceitoEm: true, status: true, createdAt: true,
+      termoVersao: true, termoAceitoEm: true, status: true, createdAt: true, updatedAt: true,
+      parceiroId: true, aprovadoPorId: true,
     },
   });
-  return { preCadastros };
+
+  // aprovadoPorId não tem @relation formal no schema — resolve o nome à parte
+  // (evita join implícito e mantém a select acima simples/estável).
+  const aprovadorIds = [...new Set(preCadastros.map((p) => p.aprovadoPorId).filter((id): id is number => id != null))];
+  const aprovadores = aprovadorIds.length
+    ? await db.usuarios.findMany({ where: { id: { in: aprovadorIds } }, select: { id: true, nome: true } })
+    : [];
+  const nomeAprovadorPorId = new Map(aprovadores.map((u) => [u.id, u.nome]));
+
+  return {
+    preCadastros: preCadastros.map((p) => ({
+      ...p,
+      aprovadoPorNome: p.aprovadoPorId ? (nomeAprovadorPorId.get(p.aprovadoPorId) ?? null) : null,
+    })),
+  };
 }
 
 /** Conta pré-cadastros pendentes (badge na UI). */
@@ -311,7 +326,10 @@ export async function aprovarPreCadastro(preCadastroId: number) {
 
   const pc = await db.preCadastroParceiro.findUnique({ where: { id: preCadastroId } });
   if (!pc) return { success: false as const, error: "Pré-cadastro não encontrado" };
-  if (pc.status !== "PENDENTE") return { success: false as const, error: "Pré-cadastro já processado" };
+  // PENDENTE (fluxo normal) ou REJEITADO (reversão de uma rejeição feita sem
+  // querer) podem ser aprovados. Já APROVADO não pode reaprovar (evita duplicar
+  // criarParceiro() e criar um segundo Parceiro para o mesmo pré-cadastro).
+  if (pc.status === "APROVADO") return { success: false as const, error: "Pré-cadastro já foi aprovado" };
 
   const cnpj = pc.cnpj?.replace(/\D/g, "") ?? "";
   const cpf = pc.cpf?.replace(/\D/g, "") ?? "";
@@ -328,11 +346,13 @@ export async function aprovarPreCadastro(preCadastroId: number) {
   // ParceiroSchema/respValidos em actions/parceiros.ts). Monta a partir dos
   // dados que o próprio preenchedor já informou (souRepresentante=true) ou da
   // lista de representantes extras coletada no wizard (souRepresentante=false).
-  type RepresentanteWizard = { nome: string; cpf: string; dataNascimento: string; cargo?: string };
+  type RepresentanteWizard = { nome: string; cpf: string; dataNascimento: string; cargo?: string; telefone?: string; email?: string };
   let responsaveis: RepresentanteWizard[] | undefined;
   if (tipo === "PJ") {
     if (pc.souRepresentante && pc.cpf && pc.dataNascimento) {
-      responsaveis = [{ nome: pc.nomeCompleto, cpf: pc.cpf, dataNascimento: pc.dataNascimento }];
+      // O preenchedor já informou WhatsApp e e-mail no Step 1 (pc.whatsapp/pc.email)
+      // — reaproveita aqui em vez de exigir que ele digite de novo como representante.
+      responsaveis = [{ nome: pc.nomeCompleto, cpf: pc.cpf, dataNascimento: pc.dataNascimento, telefone: pc.whatsapp ?? undefined, email: pc.email ?? undefined }];
     } else if (!pc.souRepresentante && pc.representantesExtra) {
       try {
         const extras = JSON.parse(pc.representantesExtra) as RepresentanteWizard[];
@@ -381,6 +401,10 @@ export async function aprovarPreCadastro(preCadastroId: number) {
     // Razão social (empresa) tem prioridade; sem ela, usa o nome da pessoa (PF sem empresa).
     nome: pc.razaoSocial ?? pc.nomeCompleto,
     nomeFantasia: pc.nomeFantasia ?? pc.nomeEmpresa ?? undefined,
+    // Data de nascimento é do PARCEIRO PESSOA FÍSICA — para PJ, pc.dataNascimento é
+    // do preenchedor (pode não ser o representante), não da empresa; não propaga.
+    dataNascimento: tipo === "PF" ? (pc.dataNascimento ?? undefined) : undefined,
+    sobre: pc.sobre ?? undefined,
     email: pc.email,
     telefone: pc.telefone,
     telefone2: pc.whatsapp ?? undefined,

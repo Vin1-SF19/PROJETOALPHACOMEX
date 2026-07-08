@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, UserPlus, Loader2, Check, Ban, Mail, Phone, MapPin, Building2 } from "lucide-react";
+import { X, UserPlus, Loader2, Check, Ban, Mail, Phone, MapPin, Building2, RotateCcw, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { listarPreCadastros, aprovarPreCadastro, rejeitarPreCadastro } from "@/actions/convites-parceiro";
+
+type StatusPreCadastro = "PENDENTE" | "APROVADO" | "REJEITADO";
 
 type PreCadastro = {
   id: number;
@@ -29,7 +32,18 @@ type PreCadastro = {
   sobre: string | null;
   termoVersao: string;
   createdAt: string | Date;
+  updatedAt: string | Date;
+  status: StatusPreCadastro;
+  parceiroId: number | null;
+  aprovadoPorId: number | null;
+  aprovadoPorNome: string | null;
 };
+
+const ABAS: { valor: StatusPreCadastro; label: string }[] = [
+  { valor: "PENDENTE", label: "Pendentes" },
+  { valor: "APROVADO", label: "Aprovados" },
+  { valor: "REJEITADO", label: "Rejeitados" },
+];
 
 type ParceiroAprovado = { id: number; loginEmail: string; senhaGerada: string; nome: string };
 
@@ -40,22 +54,23 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
   onAprovado?: (parceiro: ParceiroAprovado) => void;
   preCadastroIdFoco?: number;
 }) {
+  const [aba, setAba] = useState<StatusPreCadastro>("PENDENTE");
   const [lista, setLista] = useState<PreCadastro[]>([]);
   const [loading, setLoading] = useState(false);
   const [processando, setProcessando] = useState<number | null>(null);
   const itemFocoRef = useRef<HTMLDivElement | null>(null);
 
-  const recarregar = () => {
+  const recarregar = (status: StatusPreCadastro) => {
     setLoading(true);
-    listarPreCadastros("PENDENTE")
+    listarPreCadastros(status)
       .then(({ preCadastros }) => setLista(preCadastros as PreCadastro[]))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (open) recarregar();
-  }, [open]);
+    if (open) recarregar(aba);
+  }, [open, aba]);
 
   useEffect(() => {
     if (open && preCadastroIdFoco && itemFocoRef.current) {
@@ -70,6 +85,7 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
     const res = await aprovarPreCadastro(id);
     setProcessando(null);
     if (res.success && res.parceiro) {
+      toast.success(aba === "REJEITADO" ? "Pré-cadastro revertido e aprovado" : "Pré-cadastro aprovado");
       setLista((prev) => prev.filter((p) => p.id !== id));
       onAprovado?.(res.parceiro);
     } else {
@@ -99,11 +115,33 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
           <button onClick={onClose} className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all"><X size={16} /></button>
         </div>
 
+        {/* Abas: Pendentes / Aprovados / Rejeitados */}
+        <div className="flex items-center gap-1.5 px-6 py-3 border-b border-white/5">
+          {ABAS.map((a) => (
+            <button
+              key={a.valor}
+              onClick={() => setAba(a.valor)}
+              className="px-3.5 h-8 rounded-lg text-[10.5px] font-black uppercase tracking-widest transition-all"
+              style={
+                aba === a.valor
+                  ? { background: "rgba(245,158,11,0.15)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.4)" }
+                  : { background: "transparent", color: "#64748b", border: "1px solid transparent" }
+              }
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
           {loading ? (
             <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-slate-500" /></div>
           ) : lista.length === 0 ? (
-            <p className="text-[13px] text-slate-600 py-10 text-center">Nenhum pré-cadastro pendente.</p>
+            <p className="text-[13px] text-slate-600 py-10 text-center">
+              {aba === "PENDENTE" && "Nenhum pré-cadastro pendente."}
+              {aba === "APROVADO" && "Nenhum pré-cadastro aprovado ainda."}
+              {aba === "REJEITADO" && "Nenhum pré-cadastro rejeitado."}
+            </p>
           ) : (
             lista.map((p) => {
               const emFoco = preCadastroIdFoco === p.id;
@@ -150,23 +188,50 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
                 {p.sobre && <p className="text-[11px] text-slate-500 italic mb-3 line-clamp-3">&ldquo;{p.sobre}&rdquo;</p>}
 
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
-                  <span className="text-[9px] text-slate-600">Termo {p.termoVersao}</span>
+                  <span className="text-[9px] text-slate-600">
+                    Termo {p.termoVersao}
+                    {aba !== "PENDENTE" && ` · ${new Date(p.updatedAt).toLocaleDateString("pt-BR")}`}
+                    {aba === "APROVADO" && p.aprovadoPorNome && ` · por ${p.aprovadoPorNome}`}
+                  </span>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleRejeitar(p.id)}
-                      disabled={processando === p.id}
-                      className="flex items-center gap-1 px-3 h-8 rounded-lg border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase hover:bg-rose-500/10 transition-all disabled:opacity-50"
-                    >
-                      <Ban size={12} /> Rejeitar
-                    </button>
-                    <button
-                      onClick={() => handleAprovar(p.id)}
-                      disabled={processando === p.id || !isAdmin}
-                      title={!isAdmin ? "Apenas administradores aprovam" : undefined}
-                      className="flex items-center gap-1 px-4 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {processando === p.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Aprovar
-                    </button>
+                    {aba === "PENDENTE" && (
+                      <>
+                        <button
+                          onClick={() => handleRejeitar(p.id)}
+                          disabled={processando === p.id}
+                          className="flex items-center gap-1 px-3 h-8 rounded-lg border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase hover:bg-rose-500/10 transition-all disabled:opacity-50"
+                        >
+                          <Ban size={12} /> Rejeitar
+                        </button>
+                        <button
+                          onClick={() => handleAprovar(p.id)}
+                          disabled={processando === p.id || !isAdmin}
+                          title={!isAdmin ? "Apenas administradores aprovam" : undefined}
+                          className="flex items-center gap-1 px-4 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {processando === p.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Aprovar
+                        </button>
+                      </>
+                    )}
+                    {aba === "REJEITADO" && (
+                      <button
+                        onClick={() => handleAprovar(p.id)}
+                        disabled={processando === p.id || !isAdmin}
+                        title={!isAdmin ? "Apenas administradores aprovam" : "Reverte a rejeição e aprova o pré-cadastro"}
+                        className="flex items-center gap-1 px-4 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {processando === p.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Reverter p/ aprovado
+                      </button>
+                    )}
+                    {aba === "APROVADO" && p.parceiroId && (
+                      <Link
+                        href={`/PainelAlpha/Parceiros/${p.parceiroId}`}
+                        onClick={onClose}
+                        className="flex items-center gap-1 px-3 h-8 rounded-lg border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase hover:bg-emerald-500/10 transition-all"
+                      >
+                        <ExternalLink size={12} /> Ver parceiro
+                      </Link>
+                    )}
                   </div>
                 </div>
                 </div>

@@ -16,6 +16,7 @@ export interface RepresentanteExtra {
   cpf: string;
   dataNascimento: string;
   cargo: string;
+  telefone: string;
 }
 
 export interface ConviteFormData {

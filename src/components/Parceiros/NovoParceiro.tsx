@@ -181,6 +181,7 @@ export default function NovoParceiro({
         documento: docLimpo,
         nome,
         nomeFantasia: nomeFantasia || undefined,
+        dataNascimento: tipo === "PF" ? dataNascPF || undefined : undefined,
         email,
         telefone2: tipo === "PF" ? whatsappPF || undefined : undefined,
         chavePix: chavePix || undefined,

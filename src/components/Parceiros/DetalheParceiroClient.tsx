@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, User, Mail, Phone, MapPin, CreditCard, ShieldCheck,
   Pencil, X, Loader2, Save, Sparkles, Unlink, ChevronDown, Receipt, FileCheck2, Calendar,
-  CheckCircle2, Clock, TrendingUp,
+  CheckCircle2, Clock, TrendingUp, MessageSquareText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { editarParceiro, desvincularIndicacao } from "@/actions/parceiros";
@@ -34,6 +34,8 @@ type Indicacao = {
 
 export type DetalheParceiro = {
   id: number; tipo: string; documento: string; nome: string; nomeFantasia: string | null;
+  dataNascimento: string | null;
+  sobre: string | null;
   email: string; telefone: string | null; telefone2: string | null;
   chavePix: string | null; tipoChavePix: string | null;
   nomeBanco: string | null; agencia: string | null; conta: string | null;
@@ -89,6 +91,8 @@ export default function DetalheParceiroClient({
   // form
   const [nome, setNome] = useState(parceiro.nome);
   const [nomeFantasia, setNomeFantasia] = useState(parceiro.nomeFantasia ?? "");
+  const [dataNascimento, setDataNascimento] = useState(parceiro.dataNascimento ?? "");
+  const [sobre, setSobre] = useState(parceiro.sobre ?? "");
   const [email, setEmail] = useState(parceiro.email);
   const [telefone, setTelefone] = useState(parceiro.telefone ?? "");
   const [telefone2, setTelefone2] = useState(parceiro.telefone2 ?? "");
@@ -138,7 +142,10 @@ export default function DetalheParceiroClient({
 
     setSalvando(true);
     const res = await editarParceiro(parceiro.id, {
-      nome, nomeFantasia: nomeFantasia || null, email,
+      nome, nomeFantasia: nomeFantasia || null,
+      dataNascimento: parceiro.tipo === "PF" ? (dataNascimento || null) : null,
+      sobre: sobre || null,
+      email,
       telefone: telefone || null, telefone2: telefone2 || null,
       chavePix: chavePix || null,
       tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || null,
@@ -306,6 +313,10 @@ export default function DetalheParceiroClient({
           <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Dados cadastrais</p>
           {!editando ? (
             <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="col-span-2">
+                <p className={`${labelCls} flex items-center gap-1`}>{parceiro.tipo === "PJ" ? <Building2 size={9} /> : <User size={9} />} {parceiro.tipo === "PJ" ? "Razão Social" : "Nome"}</p>
+                <p className="font-black text-white">{parceiro.nome}</p>
+              </div>
               <div>
                 <p className={`${labelCls} flex items-center gap-1`}>{parceiro.tipo === "PJ" ? <Building2 size={9} /> : <User size={9} />} Tipo</p>
                 <p className="font-black text-white">{parceiro.tipo === "PJ" ? "Pessoa Jurídica" : "Pessoa Física"}</p>
@@ -314,16 +325,16 @@ export default function DetalheParceiroClient({
                 <p className={`${labelCls} flex items-center gap-1`}><ShieldCheck size={9} /> Documento</p>
                 <p className="font-mono font-bold text-white">{fmtDoc(parceiro.documento)}</p>
               </div>
+              {parceiro.tipo === "PF" && parceiro.dataNascimento && (
+                <div>
+                  <p className={`${labelCls} flex items-center gap-1`}><Calendar size={9} /> Nascimento</p>
+                  <p className="font-bold text-white">{fmtDataBR(parceiro.dataNascimento)}</p>
+                </div>
+              )}
               <div className="col-span-2">
                 <p className={`${labelCls} flex items-center gap-1`}><Mail size={9} /> E-mail</p>
                 <p className="font-bold text-white">{parceiro.email}</p>
               </div>
-              {parceiro.telefone && (
-                <div>
-                  <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Telefone</p>
-                  <p className="font-bold text-white">{parceiro.telefone}</p>
-                </div>
-              )}
               {parceiro.telefone2 && (
                 <div>
                   <p className={`${labelCls} flex items-center gap-1`}><Phone size={9} /> Whatsapp</p>
@@ -335,10 +346,10 @@ export default function DetalheParceiroClient({
             <div className="space-y-3">
               <div><p className={labelCls}>{parceiro.tipo === "PJ" ? "Razão Social" : "Nome"}</p><input value={nome} onChange={e => setNome(e.target.value)} className={inputCls} /></div>
               {parceiro.tipo === "PJ" && <div><p className={labelCls}>Nome Fantasia</p><input value={nomeFantasia} onChange={e => setNomeFantasia(e.target.value)} className={inputCls} /></div>}
+              {parceiro.tipo === "PF" && <div><p className={labelCls}>Data de Nascimento</p><input type="date" value={dataNascimento} onChange={e => setDataNascimento(e.target.value)} className={inputCls} /></div>}
               <div><p className={labelCls}>E-mail</p><input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><p className={labelCls}>Telefone</p><input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
-                <div><p className={labelCls}>Whatsapp</p><input value={telefone2} onChange={e => setTelefone2(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
+                 <div><p className={labelCls}>Whatsapp</p><input value={telefone2} onChange={e => setTelefone2(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} /></div>
               </div>
               <div>
                 <p className={labelCls}>Tipo de Parceiro</p>
@@ -369,6 +380,24 @@ export default function DetalheParceiroClient({
             </div>
           )}
         </div>
+
+        {/* Sobre — texto livre herdado do pré-cadastro ("fale mais sobre você/sua empresa") */}
+        {(editando || parceiro.sobre) && (
+          <div className={cardCls}>
+            <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-1.5"><MessageSquareText size={10} /> Sobre</p>
+            {!editando ? (
+              <p className="text-sm text-slate-300 whitespace-pre-wrap">{parceiro.sobre}</p>
+            ) : (
+              <textarea
+                value={sobre}
+                onChange={e => setSobre(e.target.value)}
+                rows={4}
+                placeholder="Fale mais sobre o parceiro/sua empresa..."
+                className={`${inputCls} h-auto py-2.5 resize-none`}
+              />
+            )}
+          </div>
+        )}
 
         {/* Dados Bancários — Pix + banco/agência/conta (complementares) */}
         <div className={cardCls}>
@@ -476,7 +505,10 @@ export default function DetalheParceiroClient({
                   <div key={i} className="rounded-xl p-3 grid grid-cols-2 gap-3 text-sm" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
                     <div className="col-span-2"><p className={labelCls}>Nome</p><p className="font-black text-white">{r.nome}</p></div>
                     <div><p className={labelCls}>CPF</p><p className="font-mono font-bold text-slate-300">{r.documento.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</p></div>
-                    <div><p className={labelCls}>Nascimento</p><p className="font-bold text-slate-300">{r.dataNascimento}</p></div>
+                    <div>
+                      <p className={labelCls}>Nascimento</p><p className="font-bold text-slate-300">{r.dataNascimento}</p>
+                      <p className={labelCls}>E-mail</p><p className="font-bold text-slate-300">{r.email}</p>
+                    </div>
                     {r.telefone && <div><p className={labelCls}>WhatsApp</p><p className="font-bold text-slate-300">{r.telefone}</p></div>}
                     {r.cargo && <div className="col-span-2"><p className={labelCls}>Cargo</p><p className="font-bold text-slate-300">{r.cargo}</p></div>}
                   </div>

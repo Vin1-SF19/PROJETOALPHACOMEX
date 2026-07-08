@@ -32,6 +32,8 @@ const ParceiroSchema = z.object({
   documento: z.string().min(11),
   nome: z.string().min(2),
   nomeFantasia: z.string().optional(),
+  dataNascimento: z.string().optional(),
+  sobre: z.string().optional(),
   email: z.string().email(),
   telefone: z.string().optional(),
   telefone2: z.string().optional(),
@@ -76,7 +78,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
       return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     }
 
-    const { tipo, tipoParceiro, documento, nome, nomeFantasia, email, telefone, telefone2, chavePix, tipoChavePix, nomeBanco, agencia, conta, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis, termoAceito, termoAceitoEm, termoVersao } = parsed.data;
+    const { tipo, tipoParceiro, documento, nome, nomeFantasia, dataNascimento, sobre, email, telefone, telefone2, chavePix, tipoChavePix, nomeBanco, agencia, conta, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis, termoAceito, termoAceitoEm, termoVersao } = parsed.data;
 
     const docLimpo = documento.replace(/\D/g, "");
 
@@ -101,6 +103,8 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
         documento: docLimpo,
         nome,
         nomeFantasia: nomeFantasia || null,
+        dataNascimento: dataNascimento || null,
+        sobre: sobre || null,
         email,
         telefone: telefone || null,
         telefone2: telefone2 || null,
@@ -472,27 +476,36 @@ export async function desvincularIndicacao(indicacaoId: number) {
   return { success: true };
 }
 
-/** Empresas do CS&NPS para o modal de indicação (mostra se já têm parceiro). */
+/** Empresas do CS&NPS para o modal de indicação (mostra se já têm parceiro e o status do processo). */
 export async function listarClientesParaIndicacao(busca?: string) {
   const session = await auth();
   if (!session?.user) return [];
-  return db.clientes.findMany({
-    where: busca
+
+  // `contains` já é case-insensitive neste adapter (LibSQL) — confirmado. O bug
+  // real era `cnpj: { contains: "" }` quando a busca não tinha dígitos: string
+  // vazia SEMPRE bate no Prisma, fazendo o OR inteiro devolver tudo e ignorar
+  // o filtro por nome. Só inclui o termo de CNPJ quando há dígito de verdade.
+  const buscaLimpa = busca?.trim() ?? "";
+  const cnpjDigitos = buscaLimpa.replace(/\D/g, "");
+
+  const clientes = await db.clientes.findMany({
+    where: buscaLimpa
       ? {
           OR: [
-            { razaoSocial: { contains: busca } },
-            { nomeFantasia: { contains: busca } },
-            { cnpj: { contains: busca.replace(/\D/g, "") } },
+            { razaoSocial: { contains: buscaLimpa } },
+            { nomeFantasia: { contains: buscaLimpa } },
+            ...(cnpjDigitos ? [{ cnpj: { contains: cnpjDigitos } }] : []),
           ],
         }
       : {},
     select: {
-      id: true, razaoSocial: true, nomeFantasia: true, cnpj: true,
+      id: true, razaoSocial: true, nomeFantasia: true, cnpj: true, status: true,
       indicacao: { select: { parceiroId: true, status: true } },
     },
     take: 30,
     orderBy: { razaoSocial: "asc" },
   });
+  return clientes;
 }
 
 /** Lista enxuta de parceiros para selects (modais, Metas). */
@@ -528,6 +541,8 @@ export async function buscarParceiroDetalheSimples(id: number) {
 const EditarParceiroSchema = z.object({
   nome: z.string().min(2),
   nomeFantasia: z.string().optional().nullable(),
+  dataNascimento: z.string().optional().nullable(),
+  sobre: z.string().optional().nullable(),
   email: z.string().email(),
   telefone: z.string().optional().nullable(),
   telefone2: z.string().optional().nullable(),
@@ -572,6 +587,8 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
       data: {
         nome: d.nome,
         nomeFantasia: d.nomeFantasia ?? null,
+        dataNascimento: d.dataNascimento ?? null,
+        sobre: d.sobre ?? null,
         email: d.email,
         loginEmail: d.email.toLowerCase().trim(),
         telefone: d.telefone ?? null,
@@ -640,6 +657,32 @@ export async function redefinirSenhaParceiro(parceiroId: number, novaSenha: stri
     return { success: true };
   } catch {
     return { success: false, error: "Erro ao redefinir a senha" };
+  }
+}
+
+/**
+ * Ativa/desativa o acesso do parceiro ao portal (AlphaParceiros), sem excluir o
+ * cadastro. Parceiro desativado tem o login bloqueado (ver findParceiroByCredentials
+ * no projeto alphaparceiros). Admin only.
+ */
+export async function alternarAcessoParceiro(parceiroId: number, ativo: boolean) {
+  const ctx = await getCtx();
+  if (!ctx?.isAdmin) return { success: false, error: "Apenas administradores podem ativar/desativar acesso" };
+
+  try {
+    await db.parceiro.update({
+      where: { id: parceiroId },
+      data: {
+        ativo,
+        desativadoEm: ativo ? null : new Date(),
+        desativadoPorId: ativo ? null : ctx.userId,
+      },
+    });
+    revalidatePath("/PainelAlpha/Parceiros");
+    revalidatePath(`/PainelAlpha/Parceiros/${parceiroId}`);
+    return { success: true };
+  } catch {
+    return { success: false, error: "Erro ao alterar o acesso do parceiro" };
   }
 }
 

@@ -1396,6 +1396,8 @@ model Parceiro {
   documento     String               @unique
   nome          String
   nomeFantasia  String?
+  dataNascimento String?             // só preenchido quando tipo=PF
+  sobre         String?             // "fale mais sobre você/sua empresa" — herdado do pré-cadastro (convite)
   email         String
   nomeBanco     String?
   agencia       String?
@@ -1418,6 +1420,10 @@ model Parceiro {
   termoAceito        Boolean   @default(false)
   termoAceitoEm      DateTime?
   termoVersao        String?
+  // ─── Ativação de acesso (admin pode desativar sem excluir o cadastro) ──────
+  ativo           Boolean   @default(true)
+  desativadoEm    DateTime?
+  desativadoPorId Int?
   criadoPorId   Int
   criadoPor     usuarios             @relation(fields: [criadoPorId], references: [id])
   endereco      ParceiroEndereco?

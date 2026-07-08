@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { useRouter, usePathname } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText, Link2, UserPlus,
   MoreHorizontal, Search, Crown, Gem, Square, Users, Bell,
@@ -20,9 +20,21 @@ import ModalCredenciais from "./ModalCredenciais";
 import { excluirParceiros } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
 import { useParceirosPreCadastroNotifications, type PreCadastroNotificacao } from "@/hooks/useParceirosPreCadastroNotifications";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
+
+// Partículas do fundo vivo — posições fixas em % + timing variado (evita padrão robótico)
+const PARTICULAS_FUNDO = [
+  { x: 8, y: 15, duracao: 5.5, delay: 0 },
+  { x: 88, y: 12, duracao: 6.2, delay: 0.8 },
+  { x: 15, y: 62, duracao: 5.8, delay: 1.4 },
+  { x: 92, y: 55, duracao: 6.6, delay: 0.4 },
+  { x: 45, y: 85, duracao: 5.2, delay: 1.8 },
+  { x: 70, y: 30, duracao: 6.0, delay: 2.2 },
+  { x: 30, y: 40, duracao: 5.6, delay: 1.0 },
+] as const;
 
 type Props = {
   parceiros: CardParceiro[];
@@ -41,6 +53,27 @@ export default function ParceirosClient({
   const tema = getTema(temaName);
   const accent = tema.accent;
   const router = useRouter();
+  const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
+
+  // Filtro live — aplica direto na URL (via router.push), sem botão "Filtrar".
+  // Mantém deep-linking: busca/nivel continuam vindo de searchParams no Server Component.
+  const [buscaInput, setBuscaInput] = useState(busca ?? "");
+  const aplicarFiltro = useCallback((novaBusca: string, novoNivel: string) => {
+    const params = new URLSearchParams();
+    if (novaBusca.trim()) params.set("busca", novaBusca.trim());
+    if (novoNivel) params.set("nivel", novoNivel);
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  }, [router, pathname]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (buscaInput !== (busca ?? "")) aplicarFiltro(buscaInput, nivel ?? "");
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buscaInput]);
 
   const [novaIndicacaoOpen, setNovaIndicacaoOpen] = useState(false);
   const [engrenagemOpen, setEngrenagemOpen] = useState(false);
@@ -120,8 +153,33 @@ export default function ParceirosClient({
   const selecionadosNomes = parceiros.filter(p => selecionados.has(p.id)).map(p => p.nome);
 
   return (
-    <main className="min-h-screen bg-[#020617] text-slate-200 p-6 lg:p-10">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <main className="relative min-h-screen bg-[#020617] text-slate-200 p-6 lg:p-10 overflow-hidden">
+      {/* Fundo vivo — glows lentos + partículas flutuantes (mesmo espírito do alphaparceiros) */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <motion.div
+          className="absolute -top-40 -left-32 w-[560px] h-[560px] rounded-full"
+          style={{ background: `rgba(${accent},0.16)`, filter: "blur(140px)" }}
+          animate={reduceMotion ? { opacity: 0.5 } : { scale: [1, 1.08, 1], opacity: [0.4, 0.6, 0.4] }}
+          transition={reduceMotion ? undefined : { duration: 9, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute -bottom-32 -right-24 w-[500px] h-[500px] rounded-full"
+          style={{ background: "rgba(99,102,241,0.12)", filter: "blur(130px)" }}
+          animate={reduceMotion ? { opacity: 0.5 } : { scale: [1, 1.1, 1], opacity: [0.35, 0.55, 0.35] }}
+          transition={reduceMotion ? undefined : { duration: 11, repeat: Infinity, repeatType: "mirror", ease: "easeInOut", delay: 1.2 }}
+        />
+        {!reduceMotion && PARTICULAS_FUNDO.map((p, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 rounded-full"
+            style={{ left: `${p.x}%`, top: `${p.y}%`, background: `rgba(${accent},0.5)`, boxShadow: `0 0 8px rgba(${accent},0.5)` }}
+            animate={{ y: [0, -18, 0], opacity: [0.2, 0.7, 0.2] }}
+            transition={{ duration: p.duracao, repeat: Infinity, repeatType: "mirror", ease: "easeInOut", delay: p.delay }}
+          />
+        ))}
+      </div>
+
+      <div className="relative max-w-7xl mx-auto space-y-8">
 
         {/* Header repaginado — banner com gradiente + stats vivos */}
         <motion.header
@@ -301,22 +359,30 @@ export default function ParceirosClient({
           </div>
         )}
 
-        {/* Filtros */}
+        {/* Filtros — live, sem botão "Filtrar": aplica ao digitar (debounce) ou trocar o nível */}
         {!modoExclusao && (
-          <form method="GET" className="flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap gap-2.5">
             <div className="relative flex-1 min-w-[220px]">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
-              <input name="busca" defaultValue={busca ?? ""} placeholder="Buscar por nome, documento ou e-mail..."
-                className="w-full h-11 bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-white/25 transition-colors" />
+              <input
+                value={buscaInput}
+                onChange={(e) => setBuscaInput(e.target.value)}
+                placeholder="Buscar por nome, documento ou e-mail..."
+                className="w-full h-11 bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-white/25 transition-colors"
+              />
             </div>
-            <select name="nivel" defaultValue={nivel ?? ""} className="h-11 bg-black/40 border border-white/10 rounded-2xl px-4 text-xs text-slate-400 uppercase font-black focus:outline-none focus:border-white/25 cursor-pointer transition-colors">
-              <option value="">Todos os Níveis</option>
-              <option value="GOLD">★ GOLD</option>
-              <option value="PLATINUM">◆ PLATINUM</option>
-              <option value="BLACK">■ BLACK</option>
-            </select>
-            <button type="submit" className="h-11 px-5 text-white font-black uppercase text-xs tracking-widest rounded-2xl transition-all hover:brightness-110" style={{ background: `rgba(${accent}, 0.85)` }}>Filtrar</button>
-          </form>
+            <Select value={nivel ?? "TODOS"} onValueChange={(v) => aplicarFiltro(buscaInput, v === "TODOS" ? "" : v)}>
+              <SelectTrigger className="h-11 min-w-[170px] bg-black/40 border-white/10 rounded-2xl px-4 text-xs text-slate-300 uppercase font-black hover:bg-black/50 focus:ring-0 focus:border-white/25 [&>svg]:text-slate-500">
+                <SelectValue placeholder="Todos os Níveis" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0a1020] border-white/10 text-slate-200">
+                <SelectItem value="TODOS" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Todos os Níveis</SelectItem>
+                <SelectItem value="GOLD" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">★ GOLD</SelectItem>
+                <SelectItem value="PLATINUM" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">◆ PLATINUM</SelectItem>
+                <SelectItem value="BLACK" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">■ BLACK</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {/* Lista */}
@@ -340,7 +406,7 @@ export default function ParceirosClient({
                 key={p.id}
                 variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } } }}
               >
-                <ParceiroCard parceiro={p} selecionavel={modoExclusao} selecionado={selecionados.has(p.id)} onToggleSelect={toggleSelect} />
+                <ParceiroCard parceiro={p} selecionavel={modoExclusao} selecionado={selecionados.has(p.id)} onToggleSelect={toggleSelect} podeDesativar={permissao.isAdmin} />
               </motion.div>
             ))}
           </motion.div>
