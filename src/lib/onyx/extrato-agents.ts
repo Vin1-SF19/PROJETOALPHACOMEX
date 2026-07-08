@@ -1,4 +1,5 @@
 import "server-only";
+import "@/lib/bibble/pdfjs-polyfill";
 import {
   createChatSession,
   sendChatMessageStream,

@@ -8,6 +8,7 @@
  * fallback final via OCR real na API PDF24 — ver pdf24-ocr.ts.
  */
 
+import "./pdfjs-polyfill";
 import { ocrViaPdf24, isPdf24Configured } from "./pdf24-ocr";
 
 const TIKA_URL = (process.env.TIKA_SERVER_URL ?? "http://192.168.35.113:9998").replace(/\/+$/, "");
