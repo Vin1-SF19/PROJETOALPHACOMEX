@@ -28,6 +28,16 @@ const nextConfig = {
         protocol: "https",
         hostname: "*.blob.vercel-storage.com",
       },
+      // Logos de bancos no catálogo do módulo de Extratos (src/components/Extratos/lib/bancos-catalogo.ts)
+      { protocol: "https", hostname: "assets.hgbrasil.com" },
+      { protocol: "https", hostname: "encrypted-tbn0.gstatic.com" },
+      { protocol: "https", hostname: "media.licdn.com" },
+      { protocol: "https", hostname: "pbs.twimg.com" },
+      { protocol: "https", hostname: "play-lh.googleusercontent.com" },
+      { protocol: "https", hostname: "s3.amazonaws.com" },
+      { protocol: "https", hostname: "*.fna.fbcdn.net" },
+      { protocol: "https", hostname: "www.bancopan.com.br" },
+      { protocol: "https", hostname: "yt3.googleusercontent.com" },
     ],
   },
 

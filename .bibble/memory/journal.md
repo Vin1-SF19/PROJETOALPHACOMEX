@@ -536,3 +536,49 @@ Usuário pediu para remover os agentes de IA do trabalho de extração/classific
 
 ### Refletido também em
 - `decisions.md`: entrada "2026-07-02 — Pipeline de Extratos Bancários: Tika puro (OCR) + 1 agente único (Organizador)".
+
+---
+
+## [2026-07-09 00:00] — Reescrita completa do módulo de Extratos Bancários
+
+**Tags:** #feature #refactor #bugfix #critical #security #decision
+**Agentes envolvidos:** Scout, Vault, Echo, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `src/actions/{Extratos,transacao,bancos,periodos}.ts`, `src/lib/validations/extrato.ts` (novo), `src/lib/onyx/extrato-agents.ts`, `src/components/Extratos/*` (9 arquivos novos), `src/components/ui/animated-shader-background.tsx`, `src/app/PainelAlpha/ExtratosBancarios/page.tsx` e `[Id]/page.tsx`, `next.config.ts`
+
+### Contexto
+Usuário pediu para refazer o módulo de Extratos Bancários "de cabo a rabo" (páginas, modais, pipeline OCR/IA, background animado novo) após meses tentando acertar o sistema, delegando as decisões de arquitetura ao squad com o único critério "quero funcionando". Precedeu esta reescrita, na mesma sessão, o fix de 2 bugs em produção do pipeline OCR (polyfill de `DOMMatrix` + worker do `pdfjs-dist` ausente no bundle da Vercel — já commitados e deployados antes da reescrita começar).
+
+### O que foi feito
+- **Vault**: migrou `Transacao.data` de `String` para `DateTime?` + `dataOriginalTexto` direto em produção (Turso), com backup completo prévio (1015 registros em JSON+SQL).
+- **Echo**: reescreveu as 4 Server Actions com Zod + paginação real (`skip`/`take`) + `auth()` (faltava em `bancos.ts`/`periodos.ts`); reforçou o prompt do agente Onyx contra confundir "saldo do dia" com transação; adicionou validação Zod item-a-item da resposta da IA.
+- **Nova**: reescreveu 9 componentes em `src/components/Extratos/`, deletando a estrutura antiga (`[Id]/Modais/*`, `ModalCadastros/`); criou o primeiro componente de paginação server-side real do painel (`TabelaTransacoesPaginada`); integrou background shader Three.js (aurora); primeira adoção de `AlertDialog`/`Badge` do shadcn no projeto inteiro; trocou `<img>` por `next/image`.
+- **Forge/Probe**: `tsc`/`lint`/`build` limpos; confirmado zero regressão de integração (menu/rotas/permissões via `MODULOS_REGISTRY` intactos).
+- **Anubis**: 1 achado corrigido (log de dados financeiros reais — descrição/valor de transação — no console de `extrato-agents.ts`).
+- **Lens**: 2 achados corrigidos (duplicação de lógica de exibição de data entre dois caminhos de código; floating promises em handlers de `ExtratoDetalhe.tsx`).
+- **Sage**: testou edge cases contra o banco real de produção — 2 riscos confirmados e corrigidos.
+- **Verificação E2E via browser**: 1 bug real encontrado e corrigido (canvas do shader nascia com `width:0` dentro do iframe de módulo do painel).
+- **Scribe**: `codebase-map.md` preenchido pela primeira vez com estrutura real do projeto (estava só com template vazio desde a criação).
+
+### Decisões tomadas
+- **Arquitetura do pipeline OCR/IA**: mantida a extração determinística (Tika→pdf-parse→PDF24) + interpretação por IA (não voltou a parsers regex por banco, já rejeitados explicitamente pelo usuário em 2026-07-02) — reforçada com prompt few-shot e validação Zod estrita em vez de trocar de arquitetura pela 4ª vez.
+- **Schema**: `Transacao.data` virou `DateTime?` (nullable), não `DateTime` obrigatório — decisão puxada pelos dados reais: 272 registros de produção (26,8%) não tinham ano recuperável (`mesReferencia` vazio, formato "DD/MM" só) e o usuário optou por preservar como texto (`dataOriginalTexto`) em vez de inventar um ano.
+- **11 registros malformados excluídos**: linhas de "Saldo do dia" que a IA confundiu com transação em execuções passadas — aprovado explicitamente pelo usuário antes da exclusão.
+- **Ordenação de transações com data nula**: `nulls: "last"` no Prisma — dados incertos vão para o fim da lista, não poluem a visão do analista.
+
+### Problemas encontrados / resolvidos
+- **`prisma generate` travando (EPERM)**: servidor `next dev` do próprio usuário segurando a DLL do Prisma Client — resolvido parando o processo com autorização explícita, regenerando o client, e subindo um novo servidor depois.
+- **Ordenação SQL colocava dados "incertos" no topo**: confirmado contra o Turso real (`SELECT ... ORDER BY data ASC` retorna `NULL` primeiro no SQLite) — corrigido com `nulls: "last"`.
+- **Paginação não se ajustava após exclusão em lote**: se a página atual ficasse além do novo total, a UI mostrava "nenhum resultado" em vez de voltar para a última página válida — corrigido em `TabelaTransacoesPaginada.tsx`.
+- **Canvas Three.js com `width:0`**: `ResizeObserver` sozinho não bastou dentro do iframe de módulo do painel — corrigido com leitura de garantia via `requestAnimationFrame` complementar.
+
+### Pendências
+- **Nenhum commit/push feito ainda** — toda a reescrita está no working tree. Próximo passo natural: revisar o diff e acionar DevOps para commit/push (exclusivo dele, conforme regra do projeto).
+- Baixar/hospedar localmente os logos de banco (hoje seguem como URLs externas de terceiros, só migradas para `next/image` com `remotePatterns` — ainda não removida a fragilidade da fonte externa).
+- `/api/onyx/extrato/reprocessar` não valida o formato de `PaginaComErro[]` com Zod (pré-existente, fora do escopo desta sessão).
+
+### Refletido também em
+- `decisions.md`: 2 entradas novas ("2026-07-08 — Reescrita completa... decisão delegada a Bibble" e "2026-07-09 — Migration de Transacao.data executada").
+- `architecture.md`: schema atualizado do módulo Extratos, nota sobre `data` nullable.
+- `components.md`: catálogo do novo módulo, com destaque para `TabelaTransacoesPaginada` e `AnimatedShaderBackground`.
+- `known-errors.md`: 3 entradas novas (DOMMatrix/worker do pdf-parse na Vercel — 2 partes; canvas Three.js width:0 em iframe).
+- `codebase-map.md`: reescrito do zero (estava vazio), com padrão de módulo documentado usando Extratos como referência.

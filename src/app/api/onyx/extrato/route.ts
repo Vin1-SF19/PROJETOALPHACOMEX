@@ -8,20 +8,29 @@ export const dynamic = "force-dynamic";
 // levar vários minutos) — sem isso o timeout padrão é curto demais.
 export const maxDuration = 800;
 
+/** Extensões de arquivo aceitas para upload de extrato. */
+const EXTENSOES_ACEITAS = [".pdf", ".docx"];
+
+function temExtensaoAceita(nomeArquivo: string): boolean {
+  const nome = nomeArquivo.trim().toLowerCase();
+  return EXTENSOES_ACEITAS.some((ext) => nome.endsWith(ext));
+}
+
 /**
  * POST /api/onyx/extrato
  *
- * Recebe um PDF de extrato bancário (multipart, campo "file") e processa em 2 etapas:
+ * Recebe um extrato bancário em PDF ou Word (.docx) (multipart, campo "file")
+ * e processa em 2 etapas:
  *   1. Extração de texto por página real: pdf-parse (nativo, preserva a separação
  *      de página do PDF) — com fallback OCR via PDF24 se o PDF não tiver texto
- *      nativo (scan/imagem)
+ *      nativo (scan/imagem); mammoth para .docx (documento inteiro como 1 página)
  *   2. Agente 32 (Organizador de Extratos Bancários): cada página vira UMA
  *      chamada ao agente, que devolve as movimentações daquela página; os
  *      resultados de todas as páginas são agregados no final
  *
  * Falha pontual em uma página não aborta as demais — a página problemática
  * volta em `paginasComErro` (com o texto dela) para o frontend poder
- * reprocessar via POST /api/onyx/extrato/reprocessar sem re-upload do PDF.
+ * reprocessar via POST /api/onyx/extrato/reprocessar sem re-upload do arquivo.
  *
  * Retorna: { success: true, data: TransacaoNormalizada[], paginasComErro?: PaginaComErro[] }
  *
@@ -47,6 +56,13 @@ export async function POST(req: NextRequest) {
   const file = form.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Campo 'file' ausente ou inválido." }, { status: 400 });
+  }
+
+  if (!temExtensaoAceita(file.name)) {
+    return NextResponse.json(
+      { error: "Formato não suportado. Envie um arquivo PDF ou Word (.docx)." },
+      { status: 400 },
+    );
   }
 
   if (file.size > 20 * 1024 * 1024) {

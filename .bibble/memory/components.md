@@ -49,6 +49,12 @@
 **Uso:** `substituirPlaceholders(mensagem, { LOGIN: "...", SENHA: "..." })` ou `substituirPlaceholders(mensagem, { LINK: "...", PIN: "..." })`
 **Notas:** Substitui `[CHAVE]` (formato atual) E `{chave}` minúsculo (formato legado, retrocompatibilidade). Usado por `ModalCredenciais.tsx` e `ModalMensagemConvite.tsx`. Se um novo tipo de template precisar de novos placeholders, basta passar o `Record<string,string>` correspondente — não precisa alterar o helper.
 
+### Módulo Extratos Bancários (reescrito em 2026-07-09)
+**Arquivo:** `src/components/Extratos/` (ExtratosListagem.tsx, ExtratoDetalhe.tsx, ModalNovaEmpresa.tsx, ModalVincularBanco.tsx, ModalNovoPeriodo.tsx, ModalUploadExtrato.tsx, ModalConferencia.tsx, ModalTransacoesSalvas.tsx, TabelaTransacoesPaginada.tsx, lib/{exportar-excel,bancos-catalogo,formatters}.ts)
+**Tipo:** Client Components
+**Uso:** `src/app/PainelAlpha/ExtratosBancarios/page.tsx` e `[Id]/page.tsx` ficam finos, só renderizam `<ExtratosListagem />`/`<ExtratoDetalhe extratoId={Id} />`.
+**Notas:** Substitui completamente a estrutura antiga em `[Id]/Modais/` e `ModalCadastros/` (deletada). Primeiro módulo do painel a usar `AlertDialog` (exclusão de banco) e `Badge` (indicador "data incerta") do shadcn — ambos existiam mas nunca tinham sido adotados. `TabelaTransacoesPaginada` é o primeiro componente do painel com paginação server-side real (skip/take via Prisma) — reutilizável para outros módulos que precisem do mesmo padrão. `AnimatedShaderBackground` (`src/components/ui/animated-shader-background.tsx`) é o background de aurora shader (Three.js) usado atrás da listagem — pausa quando a aba não está visível, usa `ResizeObserver`, cores calibradas em indigo/slate. `Transacao.data` agora é `DateTime | null` — qualquer novo código que exiba transações deve tratar null com fallback pra `dataOriginalTexto` (ver `formatarDataTransacao` em `lib/formatters.ts`).
+
 ### enderecoResumo (helper local)
 **Arquivo:** `src/components/Parceiros/ModalPreCadastros.tsx`
 **Tipo:** função pura (não componente)

@@ -168,6 +168,13 @@
 
 ---
 
+## Canvas Three.js dentro de container `absolute` fica com width:0 (dentro de iframe do painel)
+**Sintoma:** Background/canvas WebGL renderizado dentro de um container `position: absolute` (comum para backgrounds decorativos atrás de conteúdo) fica com `canvas.style.width: 0px` permanentemente — nada aparece, mesmo o container pai tendo largura correta. Mais provável de reproduzir quando o componente é montado dentro do iframe de módulo do painel (`PainelLayoutClient.tsx`).
+**Causa:** `renderer.setSize(container.clientWidth, ...)` roda de forma síncrona no `useEffect`, no instante exato do mount — nesse momento o container `absolute` pode ainda reportar `clientWidth: 0` porque o browser não terminou de computar o layout do elemento pai. O `ResizeObserver` deveria corrigir isso no callback inicial (a spec garante 1 disparo ao chamar `.observe()`), mas se o container "já nasce" com o tamanho final do ponto de vista do CSS (não há uma mudança de tamanho real depois do mount), esse callback de garantia pode não chegar a tempo/não disparar de novo no ambiente do iframe — o canvas fica preso no `width:0` do primeiro frame.
+**Fix:** Além do `ResizeObserver`, adicionar uma segunda leitura forçada via `requestAnimationFrame` logo após `resizeObserver.observe(container)`, chamando a mesma função de ajuste de tamanho (que já tem guard `container.clientWidth === 0 → return` para não aplicar um tamanho inválido). Implementado em `src/components/ui/animated-shader-background.tsx`. Lembrar de limpar o `requestAnimationFrame` no cleanup do efeito (`cancelAnimationFrame`).
+**Contexto:** Qualquer componente Three.js/canvas com container `position: absolute` (background decorativo) neste projeto — especialmente se for renderizado dentro do iframe de módulo do PainelAlpha. Confirmado via `preview_eval` inspecionando `canvas.style` diretamente (não visível em screenshot, que trava com canvas WebGL animado em ambiente headless — usar `preview_eval` para inspecionar propriedades do canvas em vez de depender só de screenshot nesses casos).
+**Adicionado em:** 2026-07-09
+
 ## Modelo de IA "não lê" imagem anexada no chat
 **Sintoma:** usuário anexa imagem, modelo responde como se não houvesse imagem (ou descreve genérico). Logs mostram a imagem indo como texto tipo "[imagem disponível em: url]".
 **Causa:** a imagem estava sendo passada como TEXTO (link/descrição) no content da mensagem. Modelos de visão precisam receber a imagem como conteúdo multimodal real.

@@ -7,12 +7,29 @@ import {
 } from "@/lib/onyx/client";
 import { ocrViaPdf24, isPdf24Configured } from "@/lib/bibble/pdf24-ocr";
 import type { TransacaoNormalizada, PaginaComErro } from "@/types/extrato";
+import { transacaoOnyxSchema, transacoesOnyxArraySchema } from "@/lib/validations/extrato";
 
 const AGENT_ORGANIZADOR_ID = Number(process.env.ONYX_AGENT_ORGANIZADOR_ID ?? "32");
 
 /** Considera "sem texto útil" um trecho com menos de 20 chars reais. */
 function textoInsuficiente(texto: string): boolean {
   return texto.trim().length < 20;
+}
+
+function isDocx(fileName: string): boolean {
+  return /\.docx$/i.test(fileName.trim());
+}
+
+/**
+ * Extrai o texto de um .docx via mammoth. Documentos Word não têm o conceito
+ * de "página" real (o layout é reflow, não paginado como PDF) — por isso o
+ * documento inteiro é tratado como UMA única "página" para o Agente
+ * Organizador, em vez de dividir artificialmente.
+ */
+async function extrairDocx(buffer: Buffer): Promise<string[]> {
+  const mammoth = await import("mammoth");
+  const { value: texto } = await mammoth.extractRawText({ buffer });
+  return textoInsuficiente(texto) ? [] : [texto.trim()];
 }
 
 /**
@@ -24,6 +41,12 @@ function textoInsuficiente(texto: string): boolean {
  * Retorna [] se não for possível extrair texto de forma alguma.
  */
 async function extrairPaginas(buffer: Buffer, fileName: string): Promise<string[]> {
+  if (isDocx(fileName)) {
+    const paginasDocx = await extrairDocx(buffer);
+    console.log(`[extrato-agents] mammoth (.docx): texto útil = ${paginasDocx.length > 0}`);
+    return paginasDocx;
+  }
+
   await pdfjsWorkerReady;
   const { PDFParse } = await import("pdf-parse");
 
@@ -60,7 +83,7 @@ async function extrairPaginas(buffer: Buffer, fileName: string): Promise<string[
   return paginasUteis;
 }
 
-const PROMPT_ORGANIZACAO = (textoPagina: string) => `Abaixo está o texto de UMA PÁGINA de um extrato bancário em PDF (extraído via OCR/parsing local).
+const PROMPT_ORGANIZACAO = (textoPagina: string) => `Abaixo está o texto de UMA PÁGINA de um extrato bancário em PDF (extraído via OCR/parsing local — o texto pode ter ruído de reconhecimento: letras trocadas, palavras coladas, ou colunas de uma tabela linearizadas em texto corrido).
 Identifique TODAS as movimentações bancárias encontradas nesta página e organize-as em um JSON válido.
 
 O JSON deve ser um array onde cada objeto tem exatamente os campos:
@@ -69,14 +92,27 @@ O JSON deve ser um array onde cada objeto tem exatamente os campos:
 - valor: número (float), negativo para débitos/saídas, positivo para créditos/entradas
 
 Regras:
-- Esta é apenas UMA PÁGINA do extrato — pode começar/terminar no meio de uma movimentação truncada; ignore linhas incompletas que não tenham data+descrição+valor claros.
-- A descricao deve ser a linha COMPLETA de identificação da movimentação, exatamente como está no texto — nunca corte ou abrevie o nome do favorecido/histórico no meio de uma palavra.
-- Não inclua linhas de saldo, cabeçalhos, totais ou resumos.
+- Esta é apenas UMA PÁGINA do extrato — pode começar/terminar no meio de uma movimentação truncada; ignore linhas incompletas que não tenham descrição+valor claros.
+- CRÍTICO — DATA AGRUPADA POR DIA: muitos extratos bancários (ex: Bradesco Net Empresa) mostram a data SOMENTE na primeira linha de cada dia — todas as movimentações seguintes daquele mesmo dia NÃO repetem a data na tabela, ficando com a célula de data vazia. Quando você encontrar uma linha de movimentação SEM data explícita, USE a última data válida encontrada nas linhas anteriores (herde a data de cima) — NÃO descarte a linha e NÃO deixe o campo "data" vazio só porque a data não veio repetida naquela linha específica.
+- A descricao deve ser a linha COMPLETA de identificação da movimentação, exatamente como está no texto — nunca corte ou abrevie o nome do favorecido/histórico no meio de uma palavra. Se o texto de OCR estiver visivelmente corrompido/ilegível numa palavra (ex: letras trocadas tipo "MED ETEIDO DIST" em vez de "TED-TRANSF"), preserve a descrição como veio — não tente "corrigir" ou adivinhar o texto original, apenas não invente palavras que não estão lá.
+- CRÍTICO — NUNCA inclua linhas de "SALDO DO DIA", "SALDO ANTERIOR", "SALDO ATUAL", cabeçalhos, totais ou resumos como se fossem movimentações. Uma linha de saldo não é uma transação, mesmo que tenha data e valor. Se a linha contém a palavra "SALDO" e não descreve uma operação real (PIX, TED, compra, pagamento, transferência, etc.), DESCARTE-A.
+- CRÍTICO — CADA LINHA DE MOVIMENTAÇÃO TEM EXATAMENTE UM VALOR (crédito OU débito, nunca os dois). Se você identificar múltiplos números em uma linha (ex: um valor de crédito/débito E um valor de saldo acumulado ao final), o valor da movimentação é o PRIMEIRO número monetário após a descrição — o ÚLTIMO número da linha costuma ser o SALDO ACUMULADO da conta após aquela movimentação, NÃO o valor da transação. Nunca confunda saldo acumulado com o valor da movimentação.
 - Remova entradas com valor zero ou descrição vazia.
 - Não invente dados — preserve exatamente o que veio do extrato.
 - Cada movimentação aparece SOMENTE UMA VEZ no JSON de saída — não repita a mesma linha.
 - Se não houver nenhuma movimentação nesta página, retorne um array vazio [].
 - Retorne APENAS o JSON puro, sem markdown, sem blocos de código, sem explicações.
+
+Exemplo de entrada e saída esperada (note a data agrupada por dia e o saldo acumulado no fim de cada linha):
+ENTRADA:
+"15/03/2026 PIX RECEBIDO JOAO DA SILVA 1.250,00 8.430,50
+Saldo do dia: R$ 8.430,50
+PAGAMENTO BOLETO ENERGISA -340,22 8.090,28"
+
+SAÍDA:
+[{"data":"15/03/2026","descricao":"PIX RECEBIDO JOAO DA SILVA","valor":1250.00},{"data":"15/03/2026","descricao":"PAGAMENTO BOLETO ENERGISA","valor":-340.22}]
+
+(Note que: a linha "Saldo do dia" foi OMITIDA; a segunda movimentação HERDOU a data 15/03/2026 mesmo sem repeti-la no texto; o número "8.430,50"/"8.090,28" ao final de cada linha é o SALDO acumulado, não o valor da movimentação — foi corretamente ignorado.)
 
 TEXTO DA PÁGINA:
 ${textoPagina}`;
@@ -160,44 +196,144 @@ async function coletarResposta(response: Response, label: string): Promise<strin
 
   // Prefere a resposta final do agente; cai na saída de tools como fallback
   const resultado = respostaFinal.trim() || saidaTools.trim();
-  console.log(`[extrato-agents][${label}] resultado (${resultado.length} chars):`, resultado.slice(0, 300));
+  // Não logar o conteúdo (dados financeiros reais do cliente) — só o tamanho.
+  console.log(`[extrato-agents][${label}] resultado: ${resultado.length} chars`);
   return resultado;
 }
 
-/** Extrai o JSON da resposta do agente, removendo blocos markdown se presentes. */
+/**
+ * Extrai o array de transações da resposta do agente, removendo blocos markdown
+ * se presentes. O agente às vezes ignora o formato pedido no prompt e devolve um
+ * OBJETO na raiz (ex: `{"bank":..., "transactions":[...]}`) em vez do array puro
+ * solicitado — provavelmente por causa de uma instrução de sistema própria da
+ * persona configurada na plataforma Onyx, fora do controle deste código. Por
+ * isso extraímos o array de dentro de qualquer objeto que o contenha, em vez de
+ * assumir que a raiz já é o array.
+ */
 function extrairJSON(texto: string): string {
   const match = texto.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (match) return match[1].trim();
-  const inicio = texto.indexOf("[");
-  const fim = texto.lastIndexOf("]");
-  if (inicio !== -1 && fim !== -1 && fim > inicio) {
-    return texto.slice(inicio, fim + 1);
+  const bruto = match ? match[1].trim() : texto;
+
+  try {
+    const parsed = JSON.parse(bruto) as unknown;
+    if (Array.isArray(parsed)) return bruto;
+    if (parsed && typeof parsed === "object") {
+      // Formato alternativo observado: {bank, account, ..., transactions:[...]}
+      const possivelArray = (parsed as Record<string, unknown>).transactions
+        ?? (parsed as Record<string, unknown>).movimentacoes
+        ?? (parsed as Record<string, unknown>).data;
+      if (Array.isArray(possivelArray)) return JSON.stringify(possivelArray);
+    }
+  } catch {
+    // bruto não é JSON válido sozinho — cai no fallback de recorte por colchetes abaixo
   }
-  return texto;
+
+  const inicio = bruto.indexOf("[");
+  const fim = bruto.lastIndexOf("]");
+  if (inicio !== -1 && fim !== -1 && fim > inicio) {
+    return bruto.slice(inicio, fim + 1);
+  }
+  return bruto;
 }
 
 const CTX_SEM_TOOLS =
   "INSTRUÇÃO DO SISTEMA: Responda DIRETAMENTE com o JSON solicitado. NÃO use ferramentas (Python, search, open_url). NÃO faça buscas. Apenas processe o conteúdo recebido e retorne o JSON.";
 
-/** Converte o JSON bruto devolvido pelo agente em transações validadas. */
-function parseTransacoes(textoResposta: string): TransacaoNormalizada[] {
+/** Detecta linhas de saldo que a IA eventualmente confunde com movimentação (bug real observado em produção). */
+function pareceLinhaDeSaldo(descricao: string): boolean {
+  return /\bSALDO\s*(DO\s*DIA|ANTERIOR|ATUAL|DISPON[IÍ]VEL|EM\s*CONTA)?\b/i.test(descricao) &&
+    !/\b(PIX|TED|DOC|BOLETO|COMPRA|PAGAMENTO|TRANSFER[EÊ]NCIA|SAQUE|DEP[OÓ]SITO)\b/i.test(descricao);
+}
+
+/** Converte string monetária BR ("1.234,56" ou "-1.234,56") em number. Aceita também number já pronto. */
+function paraNumero(valor: unknown): number {
+  if (typeof valor === "number") return valor;
+  if (typeof valor !== "string") return NaN;
+  const limpo = valor.replace(/\./g, "").replace(",", ".");
+  return Number(limpo);
+}
+
+/**
+ * Normaliza UM item bruto do agente para o formato interno {data, descricao, valor}.
+ * O agente devolve ora o formato pedido no prompt (data/descricao/valor), ora um
+ * formato alternativo próprio da persona Onyx (date/description/amount/type) —
+ * ver comentário em extrairJSON. Aceita ambos sem exigir mudança de comportamento
+ * do agente (que está fora do nosso controle, configurado na plataforma Onyx).
+ */
+function normalizarItemAgente(item: unknown): { data: string; descricao: string; valor: number } | null {
+  if (!item || typeof item !== "object") return null;
+  const obj = item as Record<string, unknown>;
+
+  // Formato esperado (pedido no PROMPT_ORGANIZACAO)
+  const direto = transacaoOnyxSchema.safeParse(obj);
+  if (direto.success) {
+    return { data: direto.data.data.trim(), descricao: direto.data.descricao.trim(), valor: direto.data.valor };
+  }
+
+  // Formato alternativo: date/description/amount(+type)
+  const data = obj.date ?? obj.data;
+  const descricaoBruta = obj.description ?? obj.descricao ?? obj.desc;
+  const valorBruto = obj.amount ?? obj.valor ?? obj.value;
+  if (typeof data !== "string" || typeof descricaoBruta !== "string" || (typeof valorBruto !== "string" && typeof valorBruto !== "number")) {
+    return null;
+  }
+
+  let valor = paraNumero(valorBruto);
+  if (!Number.isFinite(valor)) return null;
+
+  // Quando o formato alternativo separa sinal em "type" (credit/debit) em vez
+  // de usar valor negativo diretamente, aplica o sinal correto.
+  const tipo = typeof obj.type === "string" ? obj.type.toLowerCase() : "";
+  if (tipo === "debit" && valor > 0) valor = -valor;
+  if (tipo === "credit" && valor < 0) valor = Math.abs(valor);
+
+  return { data: data.trim(), descricao: descricaoBruta.trim(), valor };
+}
+
+/**
+ * Converte o JSON bruto devolvido pelo agente em transações validadas.
+ * Valida/normaliza item a item — um item malformado é descartado individualmente
+ * (logado), sem invalidar a página inteira. Também filtra linhas de saldo que
+ * a IA eventualmente inclui por engano (ver PROMPT_ORGANIZACAO).
+ */
+function parseTransacoes(textoResposta: string, labelPagina: string): TransacaoNormalizada[] {
   const jsonLimpo = extrairJSON(textoResposta);
-  const parsed = JSON.parse(jsonLimpo) as unknown[];
-  return parsed
-    .filter(
-      (item): item is { data: string; descricao: string; valor: number } =>
-        typeof item === "object" &&
-        item !== null &&
-        "data" in item &&
-        "descricao" in item &&
-        "valor" in item,
-    )
-    .map((item) => ({
-      data: String(item.data ?? "").trim(),
-      descricao: String(item.descricao ?? "").trim().toUpperCase(),
-      valor: Number(item.valor) || 0,
-    }))
-    .filter((t) => t.descricao && t.valor !== 0);
+  const parsedBruto = JSON.parse(jsonLimpo) as unknown;
+  const arrayValidado = transacoesOnyxArraySchema.parse(parsedBruto);
+
+  const resultado: TransacaoNormalizada[] = [];
+  let descartadosValidacao = 0;
+  let descartadosSaldo = 0;
+
+  for (const item of arrayValidado) {
+    const normalizado = normalizarItemAgente(item);
+    if (!normalizado) {
+      descartadosValidacao++;
+      continue;
+    }
+
+    const descricao = normalizado.descricao.toUpperCase();
+    const valor = Number(normalizado.valor) || 0;
+    const data = normalizado.data;
+
+    if (!descricao || valor === 0) continue;
+
+    if (pareceLinhaDeSaldo(descricao)) {
+      descartadosSaldo++;
+      continue;
+    }
+
+    resultado.push({ data, descricao, valor });
+  }
+
+  if (descartadosValidacao > 0) {
+    console.warn(`[extrato-agents][${labelPagina}] ${descartadosValidacao} item(ns) descartado(s) por falha de validação/normalização`);
+  }
+  if (descartadosSaldo > 0) {
+    console.warn(`[extrato-agents][${labelPagina}] ${descartadosSaldo} item(ns) descartado(s) por parecer linha de saldo, não transação`);
+  }
+
+  return resultado;
 }
 
 /**
@@ -232,7 +368,7 @@ export async function organizarPagina(textoPagina: string, indicePagina: number)
   }
 
   try {
-    return parseTransacoes(textoOrganizado);
+    return parseTransacoes(textoOrganizado, `pagina${indicePagina + 1}`);
   } catch {
     throw new OnyxError(
       `Não foi possível interpretar o JSON retornado pelo agente organizador (página ${indicePagina + 1}).`,
@@ -242,9 +378,9 @@ export async function organizarPagina(textoPagina: string, indicePagina: number)
 }
 
 /**
- * Processa um PDF de extrato bancário: extração de texto por página real
- * (pdf-parse, com fallback OCR via PDF24 se o PDF não tiver texto nativo) +
- * Agente Onyx único.
+ * Processa um extrato bancário (PDF ou Word .docx): extração de texto por
+ * página real (pdf-parse, com fallback OCR via PDF24 se o PDF não tiver texto
+ * nativo; mammoth para .docx, tratado como uma única "página") + Agente Onyx único.
  * Cada página vira UMA chamada ao Agente Organizador de Extratos Bancários
  * (ID 32) — evita cortar uma transação no meio (o que acontecia ao dividir o
  * texto corrido por tamanho de caractere). Os resultados de todas as páginas
@@ -253,20 +389,22 @@ export async function organizarPagina(textoPagina: string, indicePagina: number)
  * Falha em UMA página NÃO aborta o processamento das demais — a página que
  * falhar (mesmo após as tentativas internas de `organizarPagina`) entra em
  * `paginasComErro` (com o texto dela, pra permitir reprocessar depois sem
- * reler o PDF) e o loop continua. Só lança erro fatal se não houver NENHUMA
+ * reler o arquivo) e o loop continua. Só lança erro fatal se não houver NENHUMA
  * página com texto extraível (nada para processar).
  */
 export async function processarExtratoPorAgentes(
-  pdfBlob: Blob,
+  arquivoBlob: Blob,
   nomeArquivo: string,
 ): Promise<{ transacoes: TransacaoNormalizada[]; paginasComErro: PaginaComErro[] }> {
-  // 1. Extrai o texto de cada página real do PDF
-  const buffer = Buffer.from(await pdfBlob.arrayBuffer());
+  // 1. Extrai o texto de cada página real do arquivo (PDF) ou do documento inteiro (.docx)
+  const buffer = Buffer.from(await arquivoBlob.arrayBuffer());
   const paginas = await extrairPaginas(buffer, nomeArquivo);
 
   if (paginas.length === 0) {
     throw new OnyxError(
-      "Não foi possível extrair texto do PDF. O arquivo pode estar corrompido, protegido, ou ser um PDF de imagem sem camada de texto (scan sem OCR).",
+      isDocx(nomeArquivo)
+        ? "Não foi possível extrair texto do documento Word. O arquivo pode estar corrompido, protegido, ou vazio."
+        : "Não foi possível extrair texto do PDF. O arquivo pode estar corrompido, protegido, ou ser um PDF de imagem sem camada de texto (scan sem OCR).",
       422,
     );
   }

@@ -24,11 +24,23 @@
 
 ## Schema do Banco (tabelas principais)
 
-<!-- Preencher com as tabelas do Prisma schema -->
-
+### Módulo Extratos Bancários (reescrito em 2026-07-09)
+```prisma
+model Extratos {
+  id, cnpj (unique), razaoSocial, nomeFantasia?, dataConstituicao?,
+  municipio?, uf?, regimeTributario?, criadoPorNome?, analistaResponsavel?
+  periodos PeriodosAnalise[]
+  @@index([criadoPorNome]) @@index([razaoSocial])
+}
+model PeriodosAnalise { id, mes, ano, extratoId → Extratos, bancos BancosVinculados[] }
+model BancosVinculados { id, bancoId, nomeBanco, logo, descricao?, anotacao?, periodoId → PeriodosAnalise, transacoes Transacao[] }
+model Transacao {
+  id, data DateTime?, dataOriginalTexto String?, descricao, valor Float,
+  bancoId, mesReferencia, origemArquivo?, BancosVinculadosId → BancosVinculados
+  @@index([BancosVinculadosId, data])
+}
 ```
-// Adicionar aqui as entidades principais e suas relações
-```
+**IMPORTANTE — `Transacao.data` é `DateTime?` (nullable), NÃO `String`.** Migrado em 2026-07-09 (ver `decisions.md`). 273 registros legados têm `data = null` e o texto original preservado em `dataOriginalTexto` (formato "DD/MM" sem ano, sem como recuperar o ano com confiança). Qualquer código que itere transações DEVE tratar `data: null` (exibir "data desconhecida" ou ordenar por último) — nunca assumir que `data` sempre existe.
 
 ---
 

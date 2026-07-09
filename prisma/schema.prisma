@@ -473,6 +473,7 @@ model Extratos {
   updatedAt DateTime @updatedAt
 
   @@index([criadoPorNome])
+  @@index([razaoSocial])
   @@map("Extratos")
 }
 
@@ -513,17 +514,20 @@ model PeriodosAnalise {
 }
 
 model Transacao {
-  id            String   @id @default(cuid())
-  data          String
-  descricao     String
-  valor         Float
-  bancoId       String
-  mesReferencia String
-  origemArquivo String?
-  createdAt     DateTime @default(now())
+  id                String    @id @default(cuid())
+  data              DateTime?
+  dataOriginalTexto String?
+  descricao         String
+  valor             Float
+  bancoId           String
+  mesReferencia     String
+  origemArquivo     String?
+  createdAt         DateTime  @default(now())
 
   BancosVinculadosId Int
   BancosVinculados   BancosVinculados @relation(fields: [BancosVinculadosId], references: [id], onDelete: Cascade)
+
+  @@index([BancosVinculadosId, data])
 }
 
 model Tarefa {
