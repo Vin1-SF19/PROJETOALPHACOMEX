@@ -1,6 +1,6 @@
 import { Component, Suspense, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, OrbitControls } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { Objeto3dComponente } from "@/lib/validations/slide-componentes";
 import { useVisibilidadeIframe } from "./useVisibilidadeIframe";
@@ -13,6 +13,9 @@ class LimiteDeErroGlb extends Component<{ children: ReactNode; fallback: ReactNo
   }
   static getDerivedStateFromError() {
     return { comErro: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("[ObjetoGlbRender] Falha ao carregar modelo .glb", error);
   }
   render() {
     return this.state.comErro ? this.props.fallback : this.props.children;
@@ -60,7 +63,6 @@ function Cena({ componente }: { componente: Objeto3dComponente }) {
           <ModeloGlb url={componente.url} autoRotacao={componente.autoRotacao} escala={componente.escala} />
         </Suspense>
       </LimiteDeErroGlb>
-      <OrbitControls enableZoom={false} enablePan={false} />
     </>
   );
 }

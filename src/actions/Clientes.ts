@@ -92,6 +92,42 @@ export async function buscarClientes() {
   }
 }
 
+/**
+ * Busca todos os Contratos Comerciais (módulo Metas/Comercial) daquele CNPJ,
+ * mais recente primeiro. Um mesmo CNPJ pode ter vários contratos (serviços
+ * diferentes vendidos em momentos diferentes) — no Comercial eles continuam
+ * como linhas separadas; aqui mesclamos só para exibição no card do CS&NPS.
+ * Casamento por CNPJ normalizado (só dígitos), pois os dois lados podem salvar
+ * o CNPJ com/sem máscara.
+ */
+export async function buscarServicosContratados(cnpj: string) {
+  const cnpjLimpo = cnpj.replace(/\D/g, "");
+  if (!cnpjLimpo) return [];
+
+  try {
+    const contratos = await db.contratoComercial.findMany({
+      where: { arquivado: false },
+      select: {
+        id: true,
+        cnpj: true,
+        servico: true,
+        valorContrato: true,
+        formaPagamento: true,
+        closerNome: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return contratos
+      .filter((c) => c.cnpj.replace(/\D/g, "") === cnpjLimpo)
+      .map(({ cnpj: _cnpj, ...resto }) => resto);
+  } catch (error: any) {
+    console.error("ERRO buscarServicosContratados:", error?.message ?? error);
+    return [];
+  }
+}
+
 export async function salvarLogCS(clienteId: number, dados: { sentimento: string, observacao: string, data_registro: string }) {
   try {
     const colaborador = await getColaboradorNome();

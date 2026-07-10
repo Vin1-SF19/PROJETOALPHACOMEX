@@ -2,7 +2,7 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-07-09 (reescrita do módulo Extratos Bancários)
+> Última atualização: 2026-07-10 (Alpha Presentation Studio — Onda 5, motor de IA — backend apenas)
 
 ---
 
@@ -57,7 +57,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Comercial | Alpha Marketing | `/PainelAlpha/ControleLeads/Marketing` | `marketing` |
 | Comercial | Instagram Studio | `/PainelAlpha/Marketing` | `instagramStudio` |
 | Comercial | Alpha Metas | `/PainelAlpha/Metas` | `metas` (role: Lider Comercial) |
-| Comercial | Alpha Presentation Studio | `/PainelAlpha/Apresentacoes` | `apresentacoes` ← Ondas 1-3 de 6 entregues, 2026-07-09 (Dashboard + Editor completo + Temas/Animações/Timeline; faltam Onda 4 3D, Onda 5 IA, Onda 6 Apresentação/Export/Publicação/Colaboração) |
+| Comercial | Alpha Presentation Studio | `/PainelAlpha/Apresentacoes` | `apresentacoes` ← Ondas 1-5 de 6 entregues, 2026-07-10 (Dashboard + Editor completo + Temas/Animações/Timeline + Componentes 3D + Motor de IA completo com UI; falta Onda 6 Apresentação/Export/Publicação/Colaboração) |
 | **Financeiro** | **Extratos Bancários** | **`/PainelAlpha/ExtratosBancarios`** | **`Extratos`** ← reescrito 2026-07-09 |
 | Financeiro | Pré Análise | `/PainelAlpha/SistemaPreAnalise` | `analise` |
 | Financeiro | Consulta RADAR | `/PainelAlpha/HabilitacaoRadar` | `radar` |
@@ -123,6 +123,7 @@ Actions de listagem aceitam `{ page?, pageSize?, busca? }` e retornam `{ success
 | `@prisma/adapter-libsql` + `@libsql/client` | ^7.8.0 / ^0.17.3 | Runtime conecta no **Turso remoto** via adapter (`src/lib/prisma.ts`), NÃO via `DATABASE_URL` do schema — ver `decisions.md` sobre migrations |
 | `tailwindcss` | ^4.1.18 | Estilização (config via `@theme` no CSS, sem `tailwind.config.js`) |
 | `three` | ^0.185.1 | Backgrounds/gráficos WebGL (ex: `animated-shader-background.tsx`) |
+| `@react-three/fiber` + `@react-three/drei` | ^9.6.1 / ^10.7.7 | Renderizador React p/ three.js — componentes 3D do Alpha Presentation Studio (Globo/Partículas/Objeto3D, Onda 4) |
 | `zod` | — | Validação de input em toda Server Action/rota |
 | `sonner` | ^2.0.7 | Toasts |
 | `framer-motion` | ^12.38.0 | Animações de modal/transição |

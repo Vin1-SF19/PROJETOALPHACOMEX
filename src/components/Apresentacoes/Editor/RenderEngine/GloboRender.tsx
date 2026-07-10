@@ -1,11 +1,32 @@
-import { Suspense, useRef } from "react";
+import { Component, Suspense, useRef, type ReactNode } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, useTexture } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import type { GloboComponente } from "@/lib/validations/slide-componentes";
 import { useVisibilidadeIframe } from "./useVisibilidadeIframe";
 
-/** Converte lat/lng em posição 3D na superfície de uma esfera de raio `raio`. */
+/** useTexture lança (throw) se a URL for inválida/não for uma imagem carregável — isola isso do resto do slide. */
+class LimiteDeErroTextura extends Component<{ children: ReactNode; fallback: ReactNode }, { comErro: boolean }> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { comErro: false };
+  }
+  static getDerivedStateFromError() {
+    return { comErro: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("[GloboRender] Falha ao carregar textura", error);
+  }
+  render() {
+    return this.state.comErro ? this.props.fallback : this.props.children;
+  }
+}
+
+/**
+ * Converte lat/lng em posição 3D na superfície de uma esfera de raio `raio`.
+ * phi = colatitude (ângulo a partir do polo norte), theta = longitude ajustada
+ * para a orientação padrão de textura equirretangular usada em globos three.js.
+ */
 function latLngParaVetor3(lat: number, lng: number, raio: number): [number, number, number] {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lng + 180) * (Math.PI / 180);
@@ -32,9 +53,11 @@ function Cena({ componente }: { componente: GloboComponente }) {
         <mesh>
           <sphereGeometry args={[1, 48, 48]} />
           {componente.texturaUrl ? (
-            <Suspense fallback={<meshStandardMaterial color={componente.corBase ?? "#4f46e5"} />}>
-              <EsferaComTextura url={componente.texturaUrl} />
-            </Suspense>
+            <LimiteDeErroTextura fallback={<meshStandardMaterial color={componente.corBase ?? "#4f46e5"} />}>
+              <Suspense fallback={<meshStandardMaterial color={componente.corBase ?? "#4f46e5"} />}>
+                <EsferaComTextura url={componente.texturaUrl} />
+              </Suspense>
+            </LimiteDeErroTextura>
           ) : (
             <meshStandardMaterial color={componente.corBase ?? "#4f46e5"} />
           )}
@@ -49,7 +72,6 @@ function Cena({ componente }: { componente: GloboComponente }) {
           );
         })}
       </group>
-      <OrbitControls enableZoom={false} enablePan={false} />
     </>
   );
 }

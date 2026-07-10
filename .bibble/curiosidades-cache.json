@@ -7,7 +7,7 @@
       },
       {
         "text": "A tecnologia permite imprimir objetos em materiais maleáveis como alimentos e joias. Em breve, máquinas poderão criar qualquer peça sob demanda com precisão inédita.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -31,7 +31,7 @@
       },
       {
         "text": "A palavra \"etimologia\" deriva do grego antigo *etymon*, combinando *epi* (sobre) com *timē* (nome). Significa literalmente o estudo do nome ou da origem das palavras.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -140,6 +140,10 @@
       {
         "text": "Elas podem \"simular\" a morte quando há perigo para desorientar predadores. Algumas espécies conseguem transportar até 50 vezes o seu próprio peso corporal.",
         "shown": 4
+      },
+      {
+        "text": "Algumas espécies de formigas conseguem \"cortar\" os caminhos por seus feromônios, criando trilhas que confundem ou guiam outras formigas. Elas também possuem um sistema complexo de comunicação visual através das antenas.",
+        "shown": 1
       }
     ]
   },
@@ -227,7 +231,7 @@
       },
       {
         "text": "Muitos castelos medievais eram construídos em locais strategicamente elevados para garantir visibilidade e defesa máxima. A localização muitas vezes definia quem detinha o poder e controle da região circundante.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -267,7 +271,7 @@
       },
       {
         "text": "O império romano utilizava um sistema de aquedutos incrivelmente avançado para abastecer suas cidades. Eles conseguiam transportar água potável por longas distâncias com impressionante engenharia hidráulica.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -587,7 +591,7 @@
       },
       {
         "text": "Na Itália, o pão não é mais consumido como acompanhamento principal. Ele é incorporado em pratos salgados e doces de maneiras inesperadas.",
-        "shown": 1
+        "shown": 3
       }
     ]
   },
@@ -735,7 +739,7 @@
       },
       {
         "text": "O Coliseu de Roma não só era um palco para lutas de gladiadores, mas também recebia espetáculos teatrais complexos. Ele foi adaptado ao longo dos séculos para diversas funções, incluindo depósito e residência.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -959,7 +963,7 @@
       },
       {
         "text": "A alfândega moderna é um sistema complexo de controle de mercadorias transfronteiriças. Ela também realiza a fiscalização para evitar o contrabando de itens ilegais ou restritos.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1031,7 +1035,7 @@
       },
       {
         "text": "O navio mais pesado já flutuante é o Sea-Lift Giant de 1980. Ele consegue içar equipamentos gigantescos como pontes inteiras ou até pequenos prédios.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1091,7 +1095,7 @@
       },
       {
         "text": "O primeiro microprocessador comercial foi o Intel 4004, criado para ser mais eficiente que outros componentes da época. Ele estabeleceu a base arquitetônica para todos os chips de computador modernos.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1411,7 +1415,7 @@
       },
       {
         "text": "A expressão \"pão-duro\" não só significa algo difícil de obter, mas também pode se referir a pães incrivelmente secos. Em algumas regiões, ela é usada para descrever conversas monótonas ou sem graça.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1768,6 +1772,10 @@
       {
         "text": "Piratas não usavam necessariamente roupas escuras como nos filmes. Muitos deles adaptavam trajes com base na região onde interceptavam navios.",
         "shown": 4
+      },
+      {
+        "text": "Muitos \"piratas\" famosos eram na verdade mercenários ou corsários pagos por governos. Eles exploravam as rotas comerciais, mas muitas vezes sob licença real.",
+        "shown": 2
       }
     ]
   },
@@ -1859,7 +1867,7 @@
     "entries": [
       {
         "text": "Durante o Império Romano, os gladiadores eram considerados espetáculos de entretenimento mais do que meros combatentes. O circo era um centro social complexo, refletindo hierarquias sociais da época.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1935,7 +1943,7 @@
     "entries": [
       {
         "text": "Suas copas podem ultrapassar as nuvens, e são árvores vivas que monitoram o tempo geológico por milhares de anos. Elas crescem muito lentamente, mas alcançam tamanhos monumentais quase impossíveis de serem replicados em qualquer outro lugar.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2071,7 +2079,7 @@
     "entries": [
       {
         "text": "O primeiro ciclismo moderno circulou em veículos de dois pedais, mas não era o que conhecemos hoje. Os modelos vikings, muito populares no século XIX, eram mais robustos e frequentemente equipados com suspensão rudimentar.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2127,7 +2135,7 @@
     "entries": [
       {
         "text": "Em 1946, os EUA retiraram as tropas do Japão drasticamente; a devastação econômica e civil ainda levou anos para ser completamente reconstruída. O governo impôs um controle rigoroso sobre o setor energético que manteve a economia em estado semi-m",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2191,7 +2199,7 @@
     "entries": [
       {
         "text": "Muitas espécies de plantas nas florestas tropicais não têm raízes diretamente no solo. Elas dependem de estruturas aéreas para absorver nutrientes, como o epífitismo.",
-        "shown": 1
+        "shown": 3
       }
     ]
   }

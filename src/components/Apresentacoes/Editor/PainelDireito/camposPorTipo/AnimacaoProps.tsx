@@ -27,7 +27,7 @@ interface AnimacaoPropsProps {
 /** Seção COMUM a todos os tipos de componente — sempre anexada após o formulário específico do tipo. */
 export function AnimacaoProps({ componente, onChange }: AnimacaoPropsProps) {
   const anim = componente.animacao?.entrada;
-  const ehContainer = componente.tipo === "card" || componente.tipo === "grid";
+  const ehContainer = componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container";
   const ehTexto = componente.tipo === "texto";
 
   function atualizarAnimacao(patch: Partial<ConfigAnimacao> | null) {

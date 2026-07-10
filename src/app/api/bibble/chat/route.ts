@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
-import { getProvider, getProviderConfig, modelSupportsVision, getModelLabel } from "@/lib/bibble/client";
+import { modelSupportsVision, getModelLabel } from "@/lib/bibble/client";
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { BIBBLE_TOOLS, type OllamaTool } from "@/lib/bibble/tools";
 import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
+import { callCompletion, encodeSSE, type ChatMessage, type ContentPart, type StreamChunk } from "@/lib/bibble/completion";
 import db from "@/lib/prisma";
 
 // ─── File content extraction ──────────────────────────────────────────────────
@@ -124,42 +125,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-// Conteúdo multimodal (OpenAI-compat): texto + imagens. Quando só texto, content é string.
-type ContentPart =
-  | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
-
-interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string | ContentPart[];
-  tool_calls?: ToolCallRaw[];
-  tool_call_id?: string;
-}
-
-interface ToolCallRaw {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
-}
-
-interface CompletionResponse {
-  choices: Array<{
-    message: {
-      role: string;
-      content: string;
-      tool_calls?: ToolCallRaw[];
-    };
-    finish_reason: string;
-  }>;
-}
-
-interface StreamChunk {
-  choices: Array<{
-    delta: { content?: string };
-    finish_reason: string | null;
-  }>;
-}
+// ChatMessage/ContentPart/CompletionResponse/StreamChunk vivem em @/lib/bibble/completion
+// (extraídos para reuso — ver Onda 5 do Alpha Presentation Studio).
 
 type SSEEvent =
   | { type: "status"; state: string }
@@ -197,72 +164,6 @@ interface ChatInput {
   contextWindow?: number;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function encode(event: SSEEvent, enc: TextEncoder): Uint8Array {
-  return enc.encode(`data: ${JSON.stringify(event)}\n\n`);
-}
-
-async function callCompletion(
-  msgs: ChatMessage[],
-  tools: OllamaTool[],
-  model: string,
-  signal: AbortSignal,
-  stream: false,
-  temperature?: number,
-  contextWindow?: number,
-): Promise<CompletionResponse>;
-async function callCompletion(
-  msgs: ChatMessage[],
-  tools: OllamaTool[],
-  model: string,
-  signal: AbortSignal,
-  stream: true,
-  temperature?: number,
-  contextWindow?: number,
-): Promise<Response>;
-async function callCompletion(
-  msgs: ChatMessage[],
-  tools: OllamaTool[],
-  model: string,
-  signal: AbortSignal,
-  streamMode: boolean,
-  temperature?: number,
-  contextWindow?: number,
-): Promise<CompletionResponse | Response> {
-  const provider = getProvider(model);
-  const { baseUrl, headers } = getProviderConfig(provider);
-
-  const body: Record<string, unknown> = {
-    model,
-    messages: msgs,
-    stream: streamMode,
-  };
-  if (temperature !== undefined) body.temperature = temperature;
-  if (provider === "ollama" && contextWindow && contextWindow > 0) {
-    body.options = { num_ctx: contextWindow };
-    console.log(`[BIBBLE] num_ctx enviado: ${contextWindow}`);
-  }
-  if (!streamMode && tools.length > 0) {
-    body.tools = tools;
-  }
-
-  const res = await fetch(baseUrl, {
-    method: "POST",
-    headers,
-    signal,
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.status.toString());
-    throw new Error(`Provider error ${res.status}: ${text}`);
-  }
-
-  if (streamMode) return res;
-  return res.json() as Promise<CompletionResponse>;
-}
-
 // ─── Core streaming runner ────────────────────────────────────────────────────
 
 async function runStream(
@@ -277,7 +178,7 @@ async function runStream(
   contextWindow?: number,
 ): Promise<void> {
   const send = (event: SSEEvent) => {
-    try { controller.enqueue(encode(event, enc)); } catch { /* stream closed */ }
+    try { controller.enqueue(encodeSSE(event, enc)); } catch { /* stream closed */ }
   };
 
   try {

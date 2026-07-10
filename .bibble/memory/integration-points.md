@@ -335,3 +335,119 @@ passe livre. **PENDÊNCIA DE SEGURANÇA CONHECIDA:** não há rate-limit nem con
 **Editado quando:** Onda 4 concluir.
 
 **Última atualização:** 2026-07-09 por Scribe
+
+---
+
+### Alpha Presentation Studio — Onda 4 (Componentes 3D via React Three Fiber)
+
+**Adicionado em:** 2026-07-10 por Scribe (sessão Bibble)
+
+**Descrição:** 3 novos tipos de componente no editor: `globo` (esfera com textura opcional, marcadores de lat/lng, rotação automática), `particulas` (campo de pontos animados), `objeto3d` (carrega modelo `.glb`/`.gltf` externo via URL). Todos renderizados via `@react-three/fiber` (R3F) + `@react-three/drei`, instalados nesta onda — primeira vez que R3F entra no projeto (`three` puro já era usado, sem R3F, em `animated-shader-background.tsx`). Compatibilidade de versão confirmada por Scout antes de instalar: `@react-three/fiber@9.6.1` exige `react >=19 <19.3`/`three >=0.156` (projeto: React 19.2.3, Three 0.185.1 — compatível); `@react-three/drei@10.7.7` exige `react ^19`/`@react-three/fiber ^9.0.0`.
+
+**Checklist de integração (Onda 4):**
+- [x] 3 novos tipos aparecem na sidebar de componentes com ícones corretos (`Globe`, `Orbit`, `Box` do lucide-react) — **confirmado em browser real (Probe)**
+- [x] `<canvas>` WebGL renderiza com dimensões válidas (não `width:0`) dentro do Editor — **confirmado**: `rectWidth`/`rectHeight` batem com `w`/`h` do componente
+- [x] Painel de Propriedades mostra os campos corretos por tipo (`GloboProps`/`ParticulasProps`/`ObjetoGlbProps`) — **confirmado**
+- [x] Edição de campo + autosave + persistência sobrevive a reload — **confirmado ponta a ponta**: editada cor de um componente Partículas existente, `POST .../editor` (Server Action `AtualizarSlide`) retornou 200, reload confirmou o valor novo persistido
+- [x] Zero regressão nos 7 tipos de componente das Ondas 1-3 — **confirmado** (componente "Texto" existente no mesmo slide de teste continuou funcionando normalmente após a mudança)
+- [x] Console sem erros de WebGL/Three.js/R3F — único erro presente é o hydration mismatch pré-existente do Radix (`id` de `DropdownMenuTrigger`, SSR vs client), não relacionado a esta onda
+
+**Arquivos envolvidos (Onda 4):**
+- `src/lib/validations/slide-componentes.ts` — `globoComponenteSchema` (`corBase?`, `texturaUrl?`, `velocidadeRotacao` 0-5 default 0.5, `marcadores[]` com `lat` `.min(-90).max(90)`/`lng` `.min(-180).max(180)`/`label?`/`cor?`), `particulasComponenteSchema` (`quantidade` 10-2000 default 300, `cor?`, `tamanho` 0.5-10 default 2, `velocidade` 0-5 default 1), `objeto3dComponenteSchema` (`url` obrigatório — string vazia é o valor "sem conteúdo ainda", mesmo padrão do componente Imagem; `autoRotacao` default true; `escala` 0.1-10 default 1). Os 3 adicionados ao `discriminatedUnion` e ao `type ComponenteSlide`.
+- `src/components/Apresentacoes/Editor/registry/componentes-registry.ts` — 3 entradas novas (`globo`: ícone `Globe`, w/h 300x300; `particulas`: ícone `Orbit` (escolhido em vez de `CircleDot`/`Sparkles` para não confundir com o ícone do tipo `icone`), w/h 400x300; `objeto3d`: ícone `Box`, w/h 300x300).
+- `src/components/Apresentacoes/Editor/RenderEngine/useVisibilidadeIframe.ts` (novo) — hook compartilhado via `IntersectionObserver`, usado pelos 3 componentes 3D para alternar `frameloop` do `<Canvas>` entre `"always"`/`"never"` conforme visibilidade real dentro do iframe do painel (R3F resolve resize via `ResizeObserver` interno sozinho, mas NÃO resolve visibilidade — `document.visibilityState` não reflete o iframe, mesma limitação do `animated-shader-background.tsx`, ver `known-errors.md`).
+- `src/components/Apresentacoes/Editor/RenderEngine/GloboRender.tsx` (novo) — `latLngParaVetor3` converte lat/lng em posição 3D na superfície da esfera; rotação automática via `useFrame`; textura opcional via `useTexture` do drei, protegida por Error Boundary de classe `LimiteDeErroTextura` (textura 404/inválida não derruba o slide).
+- `src/components/Apresentacoes/Editor/RenderEngine/ParticulasRender.tsx` (novo) — `<Points>`/`<PointMaterial>` do drei, posições geradas via `useMemo`.
+- `src/components/Apresentacoes/Editor/RenderEngine/ObjetoGlbRender.tsx` (novo) — `useGLTF` do drei dentro de `Suspense`, protegido por Error Boundary de classe `LimiteDeErroGlb` (mesmo padrão de `LimiteDeErroTextura`); placeholder de cubo wireframe quando `url` vazia ou load falha.
+- `src/components/Apresentacoes/Editor/RenderEngine/RenderComponente.tsx` (editado) — 3 novos `case` no switch, delegando para os componentes acima dentro do mesmo `AnimacaoWrapper` já usado pelos outros 10 tipos. RenderEngine continua puro.
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/{GloboProps,ParticulasProps,ObjetoGlbProps}.tsx` (novos) — seguem exatamente o padrão visual/estrutural de `ImagemProps.tsx`; registrados em `PainelPropriedades.tsx`.
+
+**Decisão de arquitetura chave:** Nenhum `OrbitControls` dentro do Editor — testado e removido (Lens) porque competia com o `pointerdown`/`pointermove` do drag/resize do canvas 2D (`useCanvasDragResize.ts`). Rotação automática via `useFrame` já dá vida visual sem exigir controle manual do usuário. Se o futuro Modo Apresentação (Onda 6) quiser permitir o usuário final girar a câmera manualmente, isso deve ser condicional a um modo "não-editor" (prop explícita), nunca ligado por padrão dentro do Editor.
+
+**Padrão estabelecido — Error Boundary de classe para asset loading assíncrono:** Primeira vez que o projeto usa Error Boundary de classe (React ainda não tem hook nativo equivalente). `LimiteDeErroTextura`/`LimiteDeErroGlb` seguem o mesmo template minúsculo (`getDerivedStateFromError` + `componentDidCatch` para log + render condicional de fallback) — reaproveitar esse template se outro caso de asset externo carregado via hook-que-lança (`useTexture`/`useGLTF`/similar) aparecer no futuro, em vez de reinventar.
+
+**Pendências de segurança registradas (Anubis), relevantes só quando a Onda 6 (View pública) existir:**
+1. `texturaUrl` (Globo) e `url` (Objeto3D) são strings livres sem validação de protocolo/domínio — hoje SEM RISCO real porque o fetch roda 100% client-side, no browser do próprio usuário autenticado com ownership da apresentação (mesmo padrão já aceito desde a Onda 2 em `imagemComponenteSchema.url`). Reavaliar se qualquer parte da renderização passar a rodar server-side (export/thumbnail via headless browser) ou se o Modo Apresentação expuser essas URLs a visitantes anônimos — nesse ponto, considerar allowlist de domínio ou proxy de asset.
+2. Sem limite de tamanho de arquivo para texturas/modelos `.glb` — hoje só o próprio usuário se prejudica (autossabotagem); relevante quando terceiros passarem a visualizar via Export/Publicação pública.
+
+Ver `decisions.md` (2026-07-10) para o registro completo dessas duas pendências, junto das outras 2 já catalogadas (hash de senha bcrypt, CSS injection de `tokensJson`) — total de 4 pendências acumuladas para auditoria obrigatória na Onda 6.
+
+**Nota de performance (Lens):** cada componente 3D monta seu próprio `<Canvas>` R3F independente (WebGL contexts são caros, browsers têm limite prático de ~8-16 simultâneos). Não é hard-limitado por UI — ver nota em `known-errors.md` caso um usuário reporte componente 3D "sumindo" em slides com muitos outros componentes 3D.
+
+**Editado quando:** Onda 5 concluir.
+
+**Última atualização:** 2026-07-10 por Scribe
+
+---
+
+### Alpha Presentation Studio — Onda 5 (Motor de IA para geração de conteúdo de slide)
+
+**Adicionado em:** 2026-07-10 por Scribe (sessão Bibble)
+
+**✅ STATUS: COMPLETA (backend + UI).** Backend testado com 4 gerações reais via Ollama. UI (`ModalGerarComIA.tsx`) construída, revisada por Lens/Sage (2 bugs reais encontrados e corrigidos, ver abaixo), tsc/lint/build aprovados por Forge. **Ressalva:** o teste visual automatizado em browser (cliques reais, confirmação de preview renderizado) não pôde ser executado nesta sessão por instabilidade da ferramenta de preview (limitação de ambiente, não de código) — task de teste manual delegada (`task_99054ff9`). Recomenda-se confirmação humana no navegador antes de considerar 100% validado visualmente, mas o código foi revisado linha a linha e os fluxos de erro/estado foram corrigidos por leitura cuidadosa.
+
+**Descrição:** Motor de IA que gera o conteúdo de 1 slide a partir de um prompt em texto livre. A IA escolhe 1 de 5 templates de layout FIXOS pré-definidos no código e preenche só o conteúdo textual — nunca desenha coordenadas x/y/w/h livres (decisão deliberada para evitar saída visualmente quebrada). Streaming SSE real, reaproveitando o mesmo padrão de eventos já usado no chat do Bibble.
+
+**Descoberta de arquitetura importante desta onda:** O CLAUDE.md raiz do projeto documenta `@anthropic-ai/sdk` (`new Anthropic()`) como "padrão futuro" para IA — mas isso **nunca foi implementado**. O Bibble (assistente do painel) usa desde sempre um client multi-provedor próprio (`src/lib/bibble/client.ts`) que chama múltiplos provedores (Ollama/OpenAI/Anthropic/Google) via formato REST OpenAI-compatible (`/v1/chat/completions`), não o SDK oficial nem o formato nativo `/v1/messages` da Anthropic. O usuário confirmou explicitamente: reaproveitar esse client existente, não instalar o SDK novo. **Esta é a arquitetura real de IA do projeto — o texto do CLAUDE.md sobre `@anthropic-ai/sdk` está desatualizado/nunca-implementado, não confiar nele sem verificar o código.**
+
+**Segunda descoberta importante:** o modelo padrão de IA do projeto é **Ollama local** (`BIBBLE_MODEL` default `gemma4:e4b`, servidor `ollama.alpha-comex.com` em produção), **não Anthropic direta** — não há `ANTHROPIC_API_KEY` configurada no ambiente. Echo inicialmente fixou `claude-sonnet-4-6` como padrão (baseado numa leitura literal do nome da onda "Claude API"), o que gerou 401 em teste real do Probe. Corrigido para `process.env.BIBBLE_MODEL ?? "gemma4:e4b"` — mesmo default do chat do Bibble. Ver `decisions.md` (2026-07-10) para o registro completo dessa correção.
+
+**Checklist de integração (Onda 5):**
+- [x] Route Handler `POST /api/apresentacoes/gerar-slide` existe e responde
+- [x] Auth → Zod → ownership → SÓ DEPOIS chama IA (ordem confirmada por leitura de código E teste real — nenhum caminho pula a checagem antes do custo de IA)
+- [x] Streaming SSE real confirmado (44 eventos ao longo de 2.7s num teste real, não resposta instantânea)
+- [x] 3 dos 5 templates testados com geração real bem-sucedida (`titulo-subtitulo`, `titulo-tres-cards`, `citacao`) — os outros 2 (`titulo-paragrafo`, `imagem-texto`) não foram testados individualmente mas usam o mesmo mecanismo, risco de quebra isolada é baixo
+- [x] 401 sem autenticação, 400 com Zod claro em campos faltando — confirmados
+- [x] **Botão/modal "Gerar com IA" no Editor** — `ModalGerarComIA.tsx` construído, botão na Barra Superior (ícone `WandSparkles` — `Wand2` não existe na versão instalada do lucide-react, confirmado via grep). Preview do slide via `RenderComponente` real, escalado com CSS `transform`. **Teste visual humano recomendado** antes de considerar 100% confirmado (ferramenta de preview instável nesta sessão).
+
+**Arquivos envolvidos (Onda 5):**
+- `src/lib/bibble/completion.ts` (novo) — `callCompletion` extraída de `src/app/api/bibble/chat/route.ts` (refatoração pura, mesma lógica/assinatura, confirmada sem regressão por Forge). Também ganhou `encodeSSE<T>()`, helper genérico de frame SSE, reaproveitado tanto pelo chat do Bibble quanto pela geração de slide.
+- `src/app/api/bibble/chat/route.ts` (editado) — importa `callCompletion`/`encodeSSE`/tipos do helper extraído, sem mudança de comportamento.
+- `src/lib/apresentacoes-ia/templates-layout.ts` (novo) — 5 templates fixos (`titulo-subtitulo`, `titulo-paragrafo`, `titulo-tres-cards`, `imagem-texto`, `citacao`), cada um com `descricao`/`camposEsperados`/`preencher(conteudo)`. Helper `cardComTexto()` evita duplicar a estrutura dos 3 cards do template `titulo-tres-cards`.
+- `src/lib/apresentacoes-ia/prompts.ts` (novo) — `montarSystemPromptGeracaoSlide()`, lista os templates dinamicamente (nunca hardcoda a lista — se um 6º template for adicionado em `templates-layout.ts`, o prompt já reflete automaticamente). Exige JSON puro na resposta: `{"template": "nome", "conteudo": {"CAMPO": "texto"}}`.
+- `src/lib/apresentacoes-ia/gerar-slide.ts` (novo) — `gerarSlideStream()` (async generator, consome o stream do provedor e repassa deltas) + `validarESlideDoTexto()` (função pura separada, parseia/valida o JSON acumulado, testável isoladamente). `MODELO_GERACAO_SLIDE` = `process.env.BIBBLE_MODEL ?? "gemma4:e4b"`. Guard defensivo contra chaves `__proto__`/`constructor`/`prototype` no conteúdo vindo da IA. Loga (não bloqueia) quando a IA omite um campo esperado do template escolhido.
+- `src/app/api/apresentacoes/gerar-slide/route.ts` (novo) — Route Handler POST, `auth()` → Zod (`apresentacaoId`, `prompt` max 2000 chars) → `checarOwnershipApresentacao` (mesmo padrão de `slides.ts`) → só então monta o `ReadableStream` SSE.
+- `src/components/Apresentacoes/Editor/BarraSuperior/ModalGerarComIA.tsx` (novo) — Dialog com textarea de prompt, consome o SSE via `fetch`+`ReadableStream.getReader()` no client, preview do slide gerado via `RenderComponente` (escalado com `transform: scale()`), botões Aplicar/Gerar outro/Descartar.
+- `src/components/Apresentacoes/Editor/BarraSuperior/BarraSuperiorEditor.tsx` (editado) — novo botão "Gerar com IA" (ícone `WandSparkles`), abre o modal.
+- `src/components/Apresentacoes/Editor/ApresentacaoEditor.tsx` (editado) — `handleSlideGeradoAplicado` itera os componentes retornados chamando `adicionarComponente` (Zustand) um a um — decisão deliberada de ADICIONAR ao slide ativo, nunca substituir o que já existe (menos destrutivo).
+
+**⚠️ Duas armadilhas reais encontradas nesta rodada de revisão — ficam registradas para não repetir em futuros consumidores de SSE no client:**
+1. **Fechar um modal de streaming precisa limpar TODO o estado local**, não só abortar o fetch — senão reabrir mostra a sessão anterior (preview/erro "fantasma"). `ModalGerarComIA.tsx` corrigido: `fecharEAbortar(false)` agora chama `resetar()` + limpa `prompt`/`gerando` além do `AbortController.abort()`.
+2. **Respostas de erro HTTP simples (400/401/403) não são SSE** — um endpoint de streaming pode responder com JSON cru de erro ANTES de começar o stream (ex: falha de auth/Zod/ownership). Um client que só sabe ler `data: {...}\n\n` vai **ignorar silenciosamente** essa resposta (nenhuma linha começa com `data: `), deixando o usuário sem feedback nenhum. Fix: sempre checar `!res.ok` e ler o corpo como JSON simples ANTES de tentar `res.body.getReader()` no modo stream. Qualquer novo componente que consuma um endpoint SSE no projeto deve replicar esse guard.
+
+**Decisão de arquitetura chave:** Templates de layout são FIXOS no código (não gerados pela IA) — a IA só escolhe qual template usar e preenche o texto. Isso elimina o risco de coordenadas x/y/w/h inconsistentes/sobrepostas que uma IA "desenhando" livremente produziria. Se a Onda 6 ou uma sessão futura quiser mais variedade visual, adicionar um 6º/7º template em `templates-layout.ts` (a lista em `prompts.ts` se atualiza sozinha) é mais seguro que dar liberdade de coordenadas à IA.
+
+**Pendência de segurança registrada (Anubis) — risco aceito por ora:** sem rate-limit em `/api/apresentacoes/gerar-slide`. Diferente do CPF/convite (API paga InfoSimples, custo financeiro direto por chamada — pendência crítica registrada separadamente), esta rota usa Ollama próprio/interno, sem custo de terceiro por chamada — risco é só de consumo de recurso de infraestrutura própria. **Reavaliar se o modelo padrão for trocado no futuro para um provedor pago** (Anthropic/OpenAI) — nesse momento a ausência de rate-limit deixa de ser aceitável. Ver `decisions.md` (2026-07-10).
+
+**Pendências residuais (baixa prioridade):**
+1. Teste visual humano no navegador (task `task_99054ff9`) — confirmar cliques reais, preview renderizado, aplicar/descartar de ponta a ponta.
+2. Testar os 2 templates que não foram exercitados individualmente em teste real (`titulo-paragrafo`, `imagem-texto`) — usam o mesmo mecanismo dos 3 já testados, risco de quebra isolada é baixo.
+
+**Editado quando:** Onda 6 concluir.
+
+**Última atualização:** 2026-07-10 por Scribe
+
+---
+
+### Alpha Presentation Studio — Frente 1 (Expansão de Componentes, pós-Onda 5)
+
+**Adicionado em:** 2026-07-10 por Scribe (sessão Bibble)
+
+**Descrição:** Fora da sequência das 6 ondas originais — inserida entre a Onda 5 e a retomada da Onda 6, motivada por feedback direto do usuário de que a biblioteca de componentes (10 tipos) estava muito aquém do prompt original. Expandiu para **24 tipos** (14 novos). Ver detalhe completo em `components.md` (entrada "Frente 1") e `decisions.md` (2026-07-10, unificação por variante).
+
+**Checklist de integração:**
+- [x] Todos os 14 novos tipos aparecem na sidebar, agrupados por categoria (`CATEGORIAS_COMPONENTE`) — Básicos/Dados/Business/IA
+- [x] Todos têm painel de propriedades (`camposPorTipo/*.tsx`) registrado em `PainelPropriedades.tsx`
+- [x] `container` (recursivo) reconhecido em todos os pontos que já tratavam `card`/`grid`: `ComponenteNoCanvas.tsx`, `useEditorStore.ts` (`ehContainerComFilhos`), `PainelPropriedades.tsx` (`buscarNaArvore`), `AnimacaoProps.tsx` (elegibilidade de stagger)
+- [x] Zero regressão nos 10 tipos existentes (Forge: tsc/lint/build limpos; Sage: edge cases graciosos)
+- [x] `npm install @xyflow/react` — nova dependência, usada exclusivamente em `RenderBusiness.tsx`
+
+**Arquivos envolvidos:** ver lista completa em `components.md` — resumo: `slide-componentes{-base,-basicos,-3d,-dados,-business,-ia}.ts` (validações fatiadas), `registry/{registry-tipos,registry-basicos,registry-3d,registry-dados,registry-business,registry-ia,componentes-registry}.ts` (registry fatiado), `RenderEngine/{nucleo.tsx,RenderComponente.tsx,render/*.tsx}` (RenderEngine fatiado), 14 `camposPorTipo/*.tsx` novos, `SidebarComponentes.tsx` reescrito.
+
+**⚠️ Dívida técnica que CRESCEU nesta frente (Lens) — atualiza a nota já registrada na Onda 2:** a duplicação de renderização de containers entre `RenderComponente.tsx` (RenderEngine puro, usado no Modo Apresentação/preview) e `ComponenteNoCanvas.tsx`/`RenderComponenteContainer` (Editor, com seleção) — aceita desde a Onda 2 para `card`/`grid` — agora também cobre o novo tipo `container` (4 variações de `layout: grid/flex-row/flex-col/stack`). A mesma lógica condicional de `styleLayout` precisa ficar sincronizada em 2 arquivos para 3 tipos de container. **Prioridade de resolução subiu**: candidata a extrair `styleLayout` para uma função compartilhada (mesmo padrão de `posicionamento.ts`, extraído com sucesso na Onda 6 Fase 1 para o problema análogo de posicionamento absoluto). Resolver antes de uma eventual Frente 3/Onda 7, para não deixar a duplicação crescer para um 4º tipo de container.
+
+**Fix aplicado (Sage):** `GrafoProps.tsx` — `removerNo` agora filtra `conexoes` órfãs ao remover um nó (evita lixo acumulando no JSON salvo).
+
+**Editado quando:** Frente 2 (motor de IA com liberdade de composição) ou nova expansão de componentes ocorrer.
+
+**Última atualização:** 2026-07-10 por Scribe

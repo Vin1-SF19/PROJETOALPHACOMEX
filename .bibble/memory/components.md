@@ -93,6 +93,49 @@
 - **Limitações conhecidas, ficam para expansão futura**: efeitos avançados do prompt original (morph, glitch, liquid, portal, curtain, book, parallax) não implementados; transições ENTRE slides (`Slide.transicaoEntrada`) ainda sem UI de escolha nem renderização real (depende do Modo Apresentação, Onda 6); câmera virtual não iniciada.
 - **⚠️ Lacuna de UX registrada por Lens**: `ComponenteNoCanvas.tsx` (Onda 2) não replica a lógica de `stagger` que `FilhosContainer` dentro do `RenderComponente.tsx` puro ganhou nesta onda — um Card/Grid configurado com animação `stagger` não mostra a cascata visualmente DENTRO do Editor (só vai aparecer no Modo Apresentação/Export, Onda 6, que usa o RenderComponente puro direto). Não é bug, mas é uma lacuna que o usuário vai notar ("configurei stagger e não vejo nada"). **Resolver antes ou durante a Onda 6** — ou fazer `ComponenteNoCanvas` também aplicar stagger visualmente, ou adicionar um preview/aviso explícito no Editor.
 
+### Módulo Alpha Presentation Studio — Componentes 3D (Onda 4, 2026-07-10)
+**Arquivo:** `src/components/Apresentacoes/Editor/RenderEngine/{useVisibilidadeIframe.ts,GloboRender.tsx,ParticulasRender.tsx,ObjetoGlbRender.tsx}`, `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/{GloboProps,ParticulasProps,ObjetoGlbProps}.tsx`
+**Tipo:** Client Components
+**Uso:** integrados via `RenderComponente.tsx` (case `"globo"`/`"particulas"`/`"objeto3d"`) e `PainelPropriedades.tsx` — nunca importados diretamente fora do RenderEngine.
+**Notas:**
+- **`useVisibilidadeIframe<T>()`** — hook genérico (`{ ref, visivel }`) via `IntersectionObserver`, usado pelos 3 componentes de Canvas para pausar o `frameloop` do R3F (`"always"`/`"never"`) quando o componente está fora de tela dentro do iframe do painel.
+- **`GloboRender`** — `props: { componente: GloboComponente }`. Esfera com textura opcional (`useTexture`, protegida por Error Boundary `LimiteDeErroTextura`), marcadores lat/lng convertidos para posição 3D (`latLngParaVetor3`), rotação automática via `useFrame`. Sem `OrbitControls` (removido — competia com drag do canvas 2D).
+- **`ParticulasRender`** — `props: { componente: ParticulasComponente }`. `<Points>`/`<PointMaterial>` do drei, posições aleatórias via `useMemo`.
+- **`ObjetoGlbRender`** — `props: { componente: Objeto3dComponente }`. `useGLTF` do drei dentro de `Suspense`, protegido por Error Boundary `LimiteDeErroGlb` (mesmo template de `LimiteDeErroTextura`); placeholder de cubo wireframe se `url` vazia ou load falhar.
+- **Padrão novo no projeto**: Error Boundary de classe (`LimiteDeErroTextura`/`LimiteDeErroGlb`) — primeira vez que o projeto precisa disso (React não tem hook nativo equivalente). Template minúsculo e reaproveitável: `getDerivedStateFromError` + `componentDidCatch` (log) + render condicional de fallback.
+- **`GloboProps`/`ParticulasProps`/`ObjetoGlbProps`** — seguem exatamente o padrão visual/estrutural de `ImagemProps.tsx` (labels + inputs com a mesma classe Tailwind). `GloboProps` tem um mini-editor de lista para `marcadores[]` (adicionar/remover, campos lat/lng/cor).
+- **Limitação conhecida**: cada componente 3D monta seu próprio `<Canvas>` R3F independente — WebGL contexts são caros, sem hard-limit de UI para quantos componentes 3D cabem por slide (ver `known-errors.md`).
+
+### ModalGerarComIA (Onda 5, 2026-07-10)
+**Arquivo:** `src/components/Apresentacoes/Editor/BarraSuperior/ModalGerarComIA.tsx`
+**Tipo:** Client Component
+**Props:** `open: boolean`, `onOpenChange: (open: boolean) => void`, `apresentacaoId: string`, `onAplicar: (componentes: ComponenteSlide[]) => void`
+**Uso:** `<ModalGerarComIA open onOpenChange={...} apresentacaoId={...} onAplicar={...} />` — montado em `BarraSuperiorEditor.tsx`, aberto pelo botão "Gerar com IA" (ícone `WandSparkles`).
+**Notas:**
+- Consome `POST /api/apresentacoes/gerar-slide` via `fetch`+`ReadableStream.getReader()` no client, parseando frames `data: {...}\n\n` manualmente (mesmo estilo do server, mas implementação própria no client — 3ª/4ª cópia dessa lógica no projeto, candidata a hook compartilhado `useSSEStream` se um 3º consumidor client-side aparecer).
+- Preview do slide gerado renderizado com `RenderComponente` REAL (não uma simulação) — escalado visualmente via CSS `transform: scale()` a partir do tamanho real do canvas (`CANVAS_DIMENSOES`). Funciona também com componentes 3D (R3F renderiza na resolução real do container antes da escala CSS — funciona, mas gasta mais GPU que o necessário para um preview pequeno; não relevante hoje porque os 5 templates de IA só geram texto/imagem/card/grid).
+- `AbortController` cancela o fetch em andamento se o modal for fechado no meio da geração.
+- **Aplicar ADICIONA os componentes ao slide ativo, nunca substitui** — decisão documentada em `ApresentacaoEditor.tsx` (`handleSlideGeradoAplicado`), consistente com o comportamento de "adicionar componente" já usado no resto do Editor.
+- **2 bugs reais encontrados e corrigidos nesta rodada de revisão** (Lens + Sage) — ver detalhe em `integration-points.md` seção Onda 5: (1) fechar o modal não limpava estado local, causando preview/erro "fantasma" ao reabrir; (2) erro HTTP 400/401/403 do backend (resposta JSON simples, não SSE) era silenciosamente ignorado pelo parser de stream, sem feedback ao usuário.
+
+### Alpha Presentation Studio — Frente 1: Expansão de Componentes (24 tipos, 2026-07-10)
+**Arquivo:** validações fatiadas em `src/lib/validations/slide-componentes{-base,-basicos,-3d,-dados,-business,-ia}.ts` (+ combinador `slide-componentes.ts`); registry fatiado em `src/components/Apresentacoes/Editor/registry/{registry-tipos,registry-basicos,registry-3d,registry-dados,registry-business,registry-ia,componentes-registry}.ts`; RenderEngine fatiado em `RenderEngine/{nucleo.tsx,RenderComponente.tsx,render/RenderBasicos.tsx,render/RenderDados.tsx,render/RenderBusiness.tsx,render/RenderIA.tsx}`; 14 novos `PainelDireito/camposPorTipo/*.tsx`
+**Tipo:** Client Components
+**Notas:**
+- Motivada por feedback do usuário de que a entrega (10 tipos) estava muito aquém do prompt original (dezenas de tipos pedidos). Biblioteca cresceu de 10 para **24 tipos**, agrupados em 5 categorias na sidebar (`CATEGORIAS_COMPONENTE`, accordion `<details>`/`<summary>` nativo, "Básicos" aberta por padrão).
+- **14 tipos novos**: `video` (Básicos), `container` (Básicos — substitui a ideia de Colunas/Stack/Flex separados, único tipo com `layout: "grid"|"flex-row"|"flex-col"|"stack"`, recursivo como `card`/`grid`), `grafico`/`tabela`/`kpi`/`progresso`/`roadmap`/`comparacao`/`faq`/`checklist` (Dados, categoria nova), `grafo`/`diagrama` (Business, categoria nova), `chatIlustrativo` (IA, decorativo).
+- **`grafo`** unifica organograma/fluxograma/mapa mental num único tipo (`estilo: "organograma"|"fluxograma"|"mapamental"`, só muda cor/aparência padrão), renderizado via **`@xyflow/react@12.11.2`** (nova dependência) em `RenderBusiness.tsx`. `nodesDraggable={false}`/`nodesConnectable={false}`/`panOnDrag={false}` no preview — é visualização, não editável por drag; edição é via `GrafoProps.tsx` com lista simples de nós/conexões.
+- **`diagrama`** unifica SWOT/matriz2x2/pirâmide/funil via `formato`. SWOT/matriz2x2 usam `itens.slice(0, 4)` (mais de 4 itens são ignorados silenciosamente — risco de UX conhecido, não bloqueante). Pirâmide/funil protegidos contra divisão por zero (`itens.length || 1`).
+- **`grafico`** usa Recharts (já instalado, mesma lib do resto do projeto) — barra/linha/pizza, gracioso com `dados: []`.
+- **Extensão do `globo`** (Onda 4): novo campo `rotas: {origemIndex, destinoIndex, cor?}[]` desenha linha conectando 2 marcadores pelo índice — reaproveita o componente 3D existente para mapas de rotas/comex em vez de criar tipo novo.
+- **`nucleo.tsx`**: `FilhosContainer` (usado por `card`/`grid`/`container`) recebe `renderFilho: (filho) => ReactNode` como callback em vez de importar `RenderComponente` diretamente — evita import circular (`RenderComponente.tsx` importa de `nucleo.tsx`).
+- **`RenderFaq`** usa `useState` local (`abertoIndex`) para o accordion — estado de interação, não persiste no schema (intencional).
+- **SVG só via URL**, nunca inline/`dangerouslySetInnerHTML` — mesma decisão de segurança do tipo `imagem`.
+- **⚠️ Dívida técnica que CRESCEU nesta frente (Lens)**: a duplicação de renderização de containers entre `RenderComponente.tsx` (RenderEngine puro) e `ComponenteNoCanvas.tsx` (Editor, com seleção) já existia desde a Onda 2 (Card/Grid). Com o novo tipo `container` (4 variações de `layout`), a mesma lógica condicional de `styleLayout` agora precisa ficar sincronizada em 2 arquivos para 3 tipos de container (card/grid/container) — complexidade de manutenção maior que antes. Candidata a unificação futura (extrair `styleLayout` para função compartilhada, mesmo espírito de `posicionamento.ts` extraído na Onda 6 Fase 1). Ver detalhe em `integration-points.md`.
+- **Limitação conhecida (Lens)**: `TabelaProps.tsx` edita colunas/linhas via mini-DSL de texto com separador "|" — frágil se o texto de uma célula contiver "|" literal. Aceitável para v1.
+- **Fix aplicado (Sage)**: `GrafoProps.tsx` — `removerNo` agora também filtra `conexoes` que referenciam o nó removido, evitando conexões órfãs acumulando no JSON salvo (o `@xyflow/react` não valida integridade referencial entre `nos`/`conexoes`, apenas ignora silenciosamente arestas órfãs).
+- Pipeline completo: Vault (aprovado, sem mudança de schema) → Echo → Forge (tsc/lint/build limpos) → Lens (aprovado, 2 sugestões não-bloqueantes) → Sage (aprovado, 1 fix aplicado) → Scribe.
+
 ### enderecoResumo (helper local)
 **Arquivo:** `src/components/Parceiros/ModalPreCadastros.tsx`
 **Tipo:** função pura (não componente)

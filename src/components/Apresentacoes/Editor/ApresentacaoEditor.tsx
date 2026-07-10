@@ -93,6 +93,15 @@ export function ApresentacaoEditor({
     adicionarComponente(novoComponente);
   }
 
+  /**
+   * Componentes gerados por IA são ADICIONADOS ao slide ativo, nunca substituem o que já existe —
+   * menos destrutivo (usuário pode limpar manualmente se quiser um slide do zero) e consistente com
+   * o mesmo comportamento de "adicionar componente" usado no resto do Editor.
+   */
+  function handleSlideGeradoAplicado(componentesGerados: ComponenteSlide[]) {
+    for (const c of componentesGerados) adicionarComponente(c);
+  }
+
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[#020617] text-slate-200">
@@ -101,6 +110,7 @@ export function ApresentacaoEditor({
           apresentacaoId={apresentacaoId}
           temaAtualId={tema?.id ?? null}
           onTemaAplicado={setTema}
+          onSlideGeradoAplicado={handleSlideGeradoAplicado}
         />
         <div className="flex flex-1 overflow-hidden">
           <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-slate-950/60">

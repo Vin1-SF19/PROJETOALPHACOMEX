@@ -1,59 +1,61 @@
 import { z } from "zod";
-import { configAnimacaoCompletaSchema } from "./animacao";
+import { baseComponenteSchema } from "./slide-componentes-base";
+import {
+  textoComponenteSchema,
+  imagemComponenteSchema,
+  videoComponenteSchema,
+  botaoComponenteSchema,
+  iconeComponenteSchema,
+  divisorComponenteSchema,
+} from "./slide-componentes-basicos";
+import {
+  globoComponenteSchema,
+  particulasComponenteSchema,
+  objeto3dComponenteSchema,
+} from "./slide-componentes-3d";
+import {
+  graficoComponenteSchema,
+  tabelaComponenteSchema,
+  kpiComponenteSchema,
+  progressoComponenteSchema,
+  roadmapComponenteSchema,
+  comparacaoComponenteSchema,
+  faqComponenteSchema,
+  checklistComponenteSchema,
+} from "./slide-componentes-dados";
+import {
+  grafoComponenteSchema,
+  diagramaComponenteSchema,
+} from "./slide-componentes-business";
+import { chatIlustrativoComponenteSchema } from "./slide-componentes-ia";
 
-const baseComponenteSchema = z.object({
-  id: z.string().min(1),
-  x: z.number(),
-  y: z.number(),
-  w: z.number().min(1),
-  h: z.number().min(1),
-  zIndex: z.number().default(0),
-  rotacao: z.number().default(0),
-  /** Tipado na Onda 3 — dados anteriores (Ondas 1/2) têm animacao: undefined, compatível sem migração. */
-  animacao: configAnimacaoCompletaSchema,
-});
+export {
+  textoComponenteSchema,
+  imagemComponenteSchema,
+  videoComponenteSchema,
+  botaoComponenteSchema,
+  iconeComponenteSchema,
+  divisorComponenteSchema,
+  globoComponenteSchema,
+  particulasComponenteSchema,
+  objeto3dComponenteSchema,
+  graficoComponenteSchema,
+  tabelaComponenteSchema,
+  kpiComponenteSchema,
+  progressoComponenteSchema,
+  roadmapComponenteSchema,
+  comparacaoComponenteSchema,
+  faqComponenteSchema,
+  checklistComponenteSchema,
+  grafoComponenteSchema,
+  diagramaComponenteSchema,
+  chatIlustrativoComponenteSchema,
+};
 
-export const textoComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("texto"),
-  texto: z.string(),
-  tag: z.enum(["h1", "h2", "p", "span"]),
-  corTexto: z.string().optional(),
-  fontSize: z.number().optional(),
-  fontWeight: z.enum(["normal", "bold"]).optional(),
-  alinhamento: z.enum(["left", "center", "right"]).optional(),
-});
-
-export const imagemComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("imagem"),
-  url: z.string(),
-  alt: z.string().optional(),
-  objectFit: z.enum(["cover", "contain"]).optional(),
-});
-
-export const botaoComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("botao"),
-  texto: z.string(),
-  corFundo: z.string().optional(),
-  corTexto: z.string().optional(),
-  borderRadius: z.number().optional(),
-  href: z.string().optional(),
-});
-
-export const iconeComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("icone"),
-  nomeIcone: z.string(),
-  cor: z.string().optional(),
-  tamanhoIcone: z.number().optional(),
-});
-
-export const divisorComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("divisor"),
-  cor: z.string().optional(),
-  espessura: z.number().optional(),
-});
-
-// Card e Grid são containers recursivos — precisam de z.lazy() porque referenciam
-// o próprio union (componenteSchema) antes dele existir.
+// Card/Grid/Container são containers recursivos — ficam aqui (não nos arquivos satélites)
+// porque usam z.lazy() referenciando componenteSchema, que só existe depois de todos os
+// tipos serem declarados. O getter só é avaliado quando usado (lazy de verdade), então a
+// referência a `componenteSchema` (declarada mais abaixo) funciona por hoisting de `const`.
 export const cardComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("card"),
   corFundo: z.string().optional(),
@@ -73,52 +75,49 @@ export const gridComponenteSchema = baseComponenteSchema.extend({
   },
 });
 
-export const globoComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("globo"),
-  corBase: z.string().optional(),
-  texturaUrl: z.string().optional(),
-  velocidadeRotacao: z.number().min(0).max(5).default(0.5),
-  marcadores: z.array(z.object({
-    lat: z.number(),
-    lng: z.number(),
-    label: z.string().optional(),
-    cor: z.string().optional(),
-  })).default([]),
-});
-
-export const particulasComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("particulas"),
-  quantidade: z.number().min(10).max(2000).default(300),
-  cor: z.string().optional(),
-  tamanho: z.number().min(0.5).max(10).default(2),
-  velocidade: z.number().min(0).max(5).default(1),
-});
-
-export const objeto3dComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("objeto3d"),
-  url: z.string(),
-  autoRotacao: z.boolean().default(true),
-  escala: z.number().min(0.1).max(10).default(1),
+/** Substitui a antiga separação Colunas/Stack/Flex — um único tipo com `layout` variável. */
+export const containerComponenteSchema = baseComponenteSchema.extend({
+  tipo: z.literal("container"),
+  layout: z.enum(["grid", "flex-row", "flex-col", "stack"]).default("flex-col"),
+  colunas: z.number().int().min(1).optional(),
+  gap: z.number().optional(),
+  corFundo: z.string().optional(),
+  get filhos() {
+    return z.array(componenteSchema);
+  },
 });
 
 export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion("tipo", [
   textoComponenteSchema,
   imagemComponenteSchema,
+  videoComponenteSchema,
   botaoComponenteSchema,
   cardComponenteSchema,
   gridComponenteSchema,
+  containerComponenteSchema,
   iconeComponenteSchema,
   divisorComponenteSchema,
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
+  graficoComponenteSchema,
+  tabelaComponenteSchema,
+  kpiComponenteSchema,
+  progressoComponenteSchema,
+  roadmapComponenteSchema,
+  comparacaoComponenteSchema,
+  faqComponenteSchema,
+  checklistComponenteSchema,
+  grafoComponenteSchema,
+  diagramaComponenteSchema,
+  chatIlustrativoComponenteSchema,
 ]);
 
-/** Coleta todos os ids da árvore (recursivo em card/grid.filhos) — usado para checar unicidade. */
+/** Coleta todos os ids da árvore (recursivo em containers) — usado para checar unicidade. */
 function coletarIds(lista: ComponenteSlide[], acc: string[] = []): string[] {
   for (const c of lista) {
     acc.push(c.id);
-    if (c.tipo === "card" || c.tipo === "grid") coletarIds(c.filhos, acc);
+    if (c.tipo === "card" || c.tipo === "grid" || c.tipo === "container") coletarIds(c.filhos, acc);
   }
   return acc;
 }
@@ -130,17 +129,30 @@ export const dadosSlideSchema = z.object({
     const ids = coletarIds(dados.componentes);
     return new Set(ids).size === ids.length;
   },
-  { message: "Todos os componentes do slide (incluindo filhos de card/grid) devem ter ids únicos." },
+  { message: "Todos os componentes do slide (incluindo filhos de containers) devem ter ids únicos." },
 );
 
 export type TextoComponente = z.infer<typeof textoComponenteSchema>;
 export type ImagemComponente = z.infer<typeof imagemComponenteSchema>;
+export type VideoComponente = z.infer<typeof videoComponenteSchema>;
 export type BotaoComponente = z.infer<typeof botaoComponenteSchema>;
 export type IconeComponente = z.infer<typeof iconeComponenteSchema>;
 export type DivisorComponente = z.infer<typeof divisorComponenteSchema>;
 export type GloboComponente = z.infer<typeof globoComponenteSchema>;
 export type ParticulasComponente = z.infer<typeof particulasComponenteSchema>;
 export type Objeto3dComponente = z.infer<typeof objeto3dComponenteSchema>;
+export type GraficoComponente = z.infer<typeof graficoComponenteSchema>;
+export type TabelaComponente = z.infer<typeof tabelaComponenteSchema>;
+export type KpiComponente = z.infer<typeof kpiComponenteSchema>;
+export type ProgressoComponente = z.infer<typeof progressoComponenteSchema>;
+export type RoadmapComponente = z.infer<typeof roadmapComponenteSchema>;
+export type ComparacaoComponente = z.infer<typeof comparacaoComponenteSchema>;
+export type FaqComponente = z.infer<typeof faqComponenteSchema>;
+export type ChecklistComponente = z.infer<typeof checklistComponenteSchema>;
+export type GrafoComponente = z.infer<typeof grafoComponenteSchema>;
+export type DiagramaComponente = z.infer<typeof diagramaComponenteSchema>;
+export type ChatIlustrativoComponente = z.infer<typeof chatIlustrativoComponenteSchema>;
+
 export interface CardComponente extends z.infer<typeof baseComponenteSchema> {
   tipo: "card";
   corFundo?: string;
@@ -154,17 +166,38 @@ export interface GridComponente extends z.infer<typeof baseComponenteSchema> {
   gap?: number;
   filhos: ComponenteSlide[];
 }
+export interface ContainerComponente extends z.infer<typeof baseComponenteSchema> {
+  tipo: "container";
+  layout: "grid" | "flex-row" | "flex-col" | "stack";
+  colunas?: number;
+  gap?: number;
+  corFundo?: string;
+  filhos: ComponenteSlide[];
+}
 
 export type ComponenteSlide =
   | TextoComponente
   | ImagemComponente
+  | VideoComponente
   | BotaoComponente
   | CardComponente
   | GridComponente
+  | ContainerComponente
   | IconeComponente
   | DivisorComponente
   | GloboComponente
   | ParticulasComponente
-  | Objeto3dComponente;
+  | Objeto3dComponente
+  | GraficoComponente
+  | TabelaComponente
+  | KpiComponente
+  | ProgressoComponente
+  | RoadmapComponente
+  | ComparacaoComponente
+  | FaqComponente
+  | ChecklistComponente
+  | GrafoComponente
+  | DiagramaComponente
+  | ChatIlustrativoComponente;
 
 export type DadosSlide = z.infer<typeof dadosSlideSchema>;

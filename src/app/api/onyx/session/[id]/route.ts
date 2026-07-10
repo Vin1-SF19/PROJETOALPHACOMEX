@@ -8,11 +8,19 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/onyx/session/[id] — reidrata o histórico de uma conversa com agente
- * Onyx. `id` é o id da BibbleSession do Painel; resolvemos o onyxSessionId
- * vinculado e lemos o histórico COMPLETO (texto + imagens) direto do Onyx.
+ * Onyx. `id` é o id da BibbleSession do Painel.
  *
- * Cada imagem é servida pelo proxy autenticado /api/onyx/file/{fileId}, então a
- * conversa volta completa ao reabrir/atualizar.
+ * Fonte primária: BibbleMessage local (Prisma). O front já salva, ao fim de
+ * cada streaming, o par user/assistant com o content BRUTO — inclusive o
+ * markdown ![alt](/api/onyx/file/{id}) de imagens geradas (ver saveMessages em
+ * BibbleChatLayout.tsx). Isso é necessário porque o Onyx NÃO persiste imagens
+ * geradas: get-chat-session devolve files:[] e o texto sem o markdown da
+ * imagem para a mensagem que gerou a imagem (confirmado inspecionando a
+ * resposta bruta do Onyx). Também não garante ordem cronológica no array
+ * devolvido (mensagens de usuário vêm todas antes das de assistente).
+ *
+ * Fallback: get-chat-session do Onyx, só para sessões antigas sem nenhuma
+ * BibbleMessage local salva (ex.: criadas antes deste fix).
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -38,6 +46,25 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ onyx: false, messages: [] });
   }
 
+  // ── Fonte primária: histórico local (ordem correta + imagens preservadas) ──
+  const localMessages = await db.bibbleMessage.findMany({
+    where: { sessionId: id },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (localMessages.length > 0) {
+    return NextResponse.json({
+      onyx: true,
+      messages: localMessages.map((m) => ({
+        id: m.id,
+        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+        content: m.content,
+        images: [] as Array<{ id: string; name: string; src: string }>,
+      })),
+    });
+  }
+
+  // ── Fallback: sessão antiga sem BibbleMessage local — busca no Onyx ────────
   try {
     const userToken = await getUserOnyxToken(session.user.id);
     const data = await getChatSession(bibbleSession.onyxSessionId, userToken);
@@ -45,6 +72,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const messages = (data.messages ?? [])
       // Ignora mensagens de sistema/vazias sem arquivos
       .filter((m) => m.message?.trim() || (m.files?.length ?? 0) > 0)
+      // O Onyx não garante a ordem cronológica no array de get-chat-session
+      // (é uma árvore via parent_message, não uma lista linear). message_id é
+      // sempre auto-incremental na criação, então ordenar por ele restaura a
+      // ordem real da conversa — sem isso, mensagens do usuário e do assistente
+      // podem vir agrupadas por tipo em vez de intercaladas.
+      .sort((a, b) => a.message_id - b.message_id)
       .map((m) => {
         // O Onyx embute imagens geradas no texto como ![alt](file://{uuid}).
         // Reescreve para o proxy autenticado /api/onyx/file/{uuid} (file:// não

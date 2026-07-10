@@ -31,11 +31,15 @@ interface EditorStore {
   setSaving: (saving: boolean) => void;
 }
 
-/** Busca recursiva (profundidade primeiro) por id dentro da árvore de componentes, incluindo filhos de card/grid. */
+function ehContainerComFilhos(c: ComponenteSlide): c is Extract<ComponenteSlide, { tipo: "card" | "grid" | "container" }> {
+  return (c.tipo === "card" || c.tipo === "grid" || c.tipo === "container") && c.filhos.length > 0;
+}
+
+/** Busca recursiva (profundidade primeiro) por id dentro da árvore de componentes, incluindo filhos de containers. */
 function atualizarNaArvore(lista: ComponenteSlide[], id: string, patch: Partial<ComponenteSlide>): ComponenteSlide[] {
   return lista.map((c) => {
     if (c.id === id) return { ...c, ...patch } as ComponenteSlide;
-    if ((c.tipo === "card" || c.tipo === "grid") && c.filhos.length > 0) {
+    if (ehContainerComFilhos(c)) {
       return { ...c, filhos: atualizarNaArvore(c.filhos, id, patch) };
     }
     return c;
@@ -46,7 +50,7 @@ function removerDaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide[
   return lista
     .filter((c) => c.id !== id)
     .map((c) => {
-      if ((c.tipo === "card" || c.tipo === "grid") && c.filhos.length > 0) {
+      if (ehContainerComFilhos(c)) {
         return { ...c, filhos: removerDaArvore(c.filhos, id) };
       }
       return c;

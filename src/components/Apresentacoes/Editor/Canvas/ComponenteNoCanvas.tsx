@@ -33,7 +33,7 @@ export function ComponenteNoCanvas({ componente, dentroDeContainer = false }: { 
     componente.h,
   );
 
-  const ehContainer = componente.tipo === "card" || componente.tipo === "grid";
+  const ehContainer = componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container";
 
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -85,8 +85,8 @@ export function ComponenteNoCanvas({ componente, dentroDeContainer = false }: { 
   );
 }
 
-/** Card/Grid com filhos navegáveis individualmente (não usa RenderComponente.card/grid puro, que é só leitura). */
-function RenderComponenteContainer({ componente }: { componente: Extract<ComponenteSlide, { tipo: "card" | "grid" }> }) {
+/** Card/Grid/Container com filhos navegáveis individualmente (não usa RenderComponente.* puro, que é só leitura). */
+function RenderComponenteContainer({ componente }: { componente: Extract<ComponenteSlide, { tipo: "card" | "grid" | "container" }> }) {
   if (componente.tipo === "card") {
     return (
       <div
@@ -101,6 +101,33 @@ function RenderComponenteContainer({ componente }: { componente: Extract<Compone
       >
         {componente.filhos.map((filho) => (
           <div key={filho.id} style={{ position: "absolute", left: filho.x, top: filho.y, width: filho.w, height: filho.h }}>
+            <ComponenteNoCanvas componente={filho} dentroDeContainer />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (componente.tipo === "container") {
+    const styleLayout: React.CSSProperties =
+      componente.layout === "grid"
+        ? { display: "grid", gridTemplateColumns: `repeat(${componente.colunas ?? 2}, 1fr)`, gap: componente.gap ?? 0 }
+        : componente.layout === "flex-row"
+          ? { display: "flex", flexDirection: "row", gap: componente.gap ?? 0 }
+          : componente.layout === "stack"
+            ? { position: "relative" }
+            : { display: "flex", flexDirection: "column", gap: componente.gap ?? 0 };
+    return (
+      <div style={{ width: "100%", height: "100%", background: componente.corFundo ?? "transparent", ...styleLayout }}>
+        {componente.filhos.map((filho) => (
+          <div
+            key={filho.id}
+            style={
+              componente.layout === "stack"
+                ? { position: "absolute", left: filho.x, top: filho.y, width: filho.w, height: filho.h }
+                : { position: "relative", width: filho.w, height: filho.h }
+            }
+          >
             <ComponenteNoCanvas componente={filho} dentroDeContainer />
           </div>
         ))}

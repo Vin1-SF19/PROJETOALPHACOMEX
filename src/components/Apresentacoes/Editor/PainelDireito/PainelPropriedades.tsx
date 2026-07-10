@@ -11,12 +11,25 @@ import { DivisorProps } from "./camposPorTipo/DivisorProps";
 import { GloboProps } from "./camposPorTipo/GloboProps";
 import { ParticulasProps } from "./camposPorTipo/ParticulasProps";
 import { ObjetoGlbProps } from "./camposPorTipo/ObjetoGlbProps";
+import { VideoProps } from "./camposPorTipo/VideoProps";
+import { ContainerProps } from "./camposPorTipo/ContainerProps";
+import { GraficoProps } from "./camposPorTipo/GraficoProps";
+import { TabelaProps } from "./camposPorTipo/TabelaProps";
+import { KpiProps } from "./camposPorTipo/KpiProps";
+import { ProgressoProps } from "./camposPorTipo/ProgressoProps";
+import { RoadmapProps } from "./camposPorTipo/RoadmapProps";
+import { ComparacaoProps } from "./camposPorTipo/ComparacaoProps";
+import { FaqProps } from "./camposPorTipo/FaqProps";
+import { ChecklistProps } from "./camposPorTipo/ChecklistProps";
+import { GrafoProps } from "./camposPorTipo/GrafoProps";
+import { DiagramaProps } from "./camposPorTipo/DiagramaProps";
+import { ChatIlustrativoProps } from "./camposPorTipo/ChatIlustrativoProps";
 import { AnimacaoProps } from "./camposPorTipo/AnimacaoProps";
 
 function buscarNaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide | null {
   for (const c of lista) {
     if (c.id === id) return c;
-    if ((c.tipo === "card" || c.tipo === "grid") && c.filhos.length > 0) {
+    if ((c.tipo === "card" || c.tipo === "grid" || c.tipo === "container") && c.filhos.length > 0) {
       const achado = buscarNaArvore(c.filhos, id);
       if (achado) return achado;
     }
@@ -114,6 +127,19 @@ export function PainelPropriedades() {
       {componente.tipo === "globo" && <GloboProps componente={componente} onChange={onChange} />}
       {componente.tipo === "particulas" && <ParticulasProps componente={componente} onChange={onChange} />}
       {componente.tipo === "objeto3d" && <ObjetoGlbProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "video" && <VideoProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "container" && <ContainerProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "grafico" && <GraficoProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "tabela" && <TabelaProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "kpi" && <KpiProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "progresso" && <ProgressoProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "roadmap" && <RoadmapProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "comparacao" && <ComparacaoProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "faq" && <FaqProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "checklist" && <ChecklistProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "grafo" && <GrafoProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "diagrama" && <DiagramaProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "chatIlustrativo" && <ChatIlustrativoProps componente={componente} onChange={onChange} />}
 
       <AnimacaoProps componente={componente} onChange={onChange} />
     </div>

@@ -2,19 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette } from "lucide-react";
+import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette, WandSparkles, Play } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import { SeletorTema } from "./SeletorTema";
+import { ModalGerarComIA } from "./ModalGerarComIA";
 import type { TemaResumo } from "../ApresentacaoEditor";
+import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 
 interface BarraSuperiorEditorProps {
   titulo: string;
   apresentacaoId: string;
   temaAtualId: string | null;
   onTemaAplicado: (tema: TemaResumo | null) => void;
+  onSlideGeradoAplicado: (componentes: ComponenteSlide[]) => void;
 }
 
-export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTemaAplicado }: BarraSuperiorEditorProps) {
+export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTemaAplicado, onSlideGeradoAplicado }: BarraSuperiorEditorProps) {
   const router = useRouter();
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
@@ -22,6 +25,7 @@ export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTem
   const isSaving = useEditorStore((s) => s.isSaving);
   const [tituloLocal, setTituloLocal] = useState(titulo);
   const [seletorTemaAberto, setSeletorTemaAberto] = useState(false);
+  const [modalIAAberto, setModalIAAberto] = useState(false);
 
   return (
     <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-slate-950/80 px-4">
@@ -42,6 +46,22 @@ export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTem
       </div>
 
       <div className="flex items-center gap-4">
+        <button
+          onClick={() => router.push(`/PainelAlpha/Apresentacoes/${apresentacaoId}/apresentar`)}
+          aria-label="Apresentar em tela cheia"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-500"
+        >
+          <Play size={13} aria-hidden="true" /> Apresentar
+        </button>
+
+        <button
+          onClick={() => setModalIAAberto(true)}
+          aria-label="Gerar slide com IA"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
+        >
+          <WandSparkles size={13} aria-hidden="true" /> Gerar com IA
+        </button>
+
         <button
           onClick={() => setSeletorTemaAberto(true)}
           aria-label="Escolher tema"
@@ -89,6 +109,13 @@ export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTem
         apresentacaoId={apresentacaoId}
         temaAtualId={temaAtualId}
         onTemaAplicado={onTemaAplicado}
+      />
+
+      <ModalGerarComIA
+        open={modalIAAberto}
+        onOpenChange={setModalIAAberto}
+        apresentacaoId={apresentacaoId}
+        onAplicar={onSlideGeradoAplicado}
       />
     </div>
   );
