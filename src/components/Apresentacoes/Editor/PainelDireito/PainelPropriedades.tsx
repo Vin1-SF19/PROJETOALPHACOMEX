@@ -8,6 +8,9 @@ import { CardProps } from "./camposPorTipo/CardProps";
 import { GridProps } from "./camposPorTipo/GridProps";
 import { IconeProps } from "./camposPorTipo/IconeProps";
 import { DivisorProps } from "./camposPorTipo/DivisorProps";
+import { GloboProps } from "./camposPorTipo/GloboProps";
+import { ParticulasProps } from "./camposPorTipo/ParticulasProps";
+import { ObjetoGlbProps } from "./camposPorTipo/ObjetoGlbProps";
 import { AnimacaoProps } from "./camposPorTipo/AnimacaoProps";
 
 function buscarNaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide | null {
@@ -108,6 +111,9 @@ export function PainelPropriedades() {
       {componente.tipo === "grid" && <GridProps componente={componente} onChange={onChange} />}
       {componente.tipo === "icone" && <IconeProps componente={componente} onChange={onChange} />}
       {componente.tipo === "divisor" && <DivisorProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "globo" && <GloboProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "particulas" && <ParticulasProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "objeto3d" && <ObjetoGlbProps componente={componente} onChange={onChange} />}
 
       <AnimacaoProps componente={componente} onChange={onChange} />
     </div>

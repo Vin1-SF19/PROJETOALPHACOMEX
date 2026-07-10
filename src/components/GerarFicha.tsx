@@ -147,8 +147,14 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: any, use
 
         <View style={styles.table}>
           <View style={styles.row}>
-            <View style={[styles.cell, { flex: 3 }]}><Text style={styles.label}>NOME DO RESPONSÁVEL DA EMPRESA</Text><Text style={styles.value}>{dados.extra?.nomeResponsavel || "_________________________________"}</Text></View>
+            <View style={[styles.cell, { flex: 2.5 }]}><Text style={styles.label}>NOME DO RESPONSÁVEL DA EMPRESA</Text><Text style={styles.value}>{dados.extra?.nomeResponsavel || "_________________________________"}</Text></View>
             <View style={[styles.cell, { flex: 1.5 }]}><Text style={styles.label}>TELEFONE</Text><Text style={styles.value}>{dados.extra?.telefone || "(__) _____-____"}</Text>
+            </View>
+            <View style={[styles.cell, { flex: 2 }]}>
+              <Text style={styles.label}>E-MAIL</Text>
+              <Text style={styles.value}>
+                {dados.extra?.email || "____________________________"}
+              </Text>
             </View>
           </View>
           <View style={styles.row}>
@@ -253,12 +259,12 @@ export const FichaAlphaPDF = ({ dados, userLogado, logoPath }: { dados: any, use
                 <Text style={styles.optionText}>REGIME NORMAL</Text>
               </View>
 
-                <View style={[styles.optionRow, { marginTop: 4 }]}>
-                  <Text style={[styles.optionText, { color: '#666' }]}>Obs: </Text>
-              {(regime.includes("REAL") || regime.includes("PRESUMIDO")) && (
+              <View style={[styles.optionRow, { marginTop: 4 }]}>
+                <Text style={[styles.optionText, { color: '#666' }]}>Obs: </Text>
+                {(regime.includes("REAL") || regime.includes("PRESUMIDO")) && (
                   <Text style={styles.optionText}>{eq.regimeEA}</Text>
                 )}
-                </View>
+              </View>
 
             </View>
           </View>

@@ -4,6 +4,9 @@ import { Sparkles, type LucideIcon } from "lucide-react";
 import { motion, useMotionValue, useTransform, animate, type Variants, type TargetAndTransition, type Transition } from "framer-motion";
 import type { ComponenteSlide, TextoComponente } from "@/lib/validations/slide-componentes";
 import type { ConfigAnimacao } from "@/lib/validations/animacao";
+import { GloboRender } from "./GloboRender";
+import { ParticulasRender } from "./ParticulasRender";
+import { ObjetoGlbRender } from "./ObjetoGlbRender";
 
 interface VariantsResultado {
   initial: TargetAndTransition;
@@ -265,6 +268,27 @@ export function RenderComponente({ componente }: { componente: ComponenteSlide }
       return (
         <AnimacaoWrapper animacao={anim}>
           <div style={{ width: "100%", height: componente.espessura ?? 2, background: componente.cor ?? "#ffffff33" }} />
+        </AnimacaoWrapper>
+      );
+
+    case "globo":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <GloboRender componente={componente} />
+        </AnimacaoWrapper>
+      );
+
+    case "particulas":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <ParticulasRender componente={componente} />
+        </AnimacaoWrapper>
+      );
+
+    case "objeto3d":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <ObjetoGlbRender componente={componente} />
         </AnimacaoWrapper>
       );
 

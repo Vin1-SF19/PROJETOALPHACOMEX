@@ -423,7 +423,7 @@
       },
       {
         "text": "O módulo lunar Apollo mais baixo foi deixado para trás na Lua. Ele continha equipamentos de pesquisa que foram incorporados ao conhecimento científico atual.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -679,7 +679,7 @@
       },
       {
         "text": "As baleias-jubarte não cantam apenas para atrair parceiros; esses sons complexos podem ajudar a mapear correntes oceânicas. A comunicação delas é um fator crucial de navegação nessas gigantes marinhas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -824,6 +824,10 @@
       {
         "text": "O cheiro de algumas flores funciona como um mapa para as abelhas, guiando-as diretamente ao néctar mesmo em meio a muitas outras espécies. A dança das abelhas não serve apenas para comunicar a localização; ela também mostra a distância exata do local da fonte de alimento.",
         "shown": 4
+      },
+      {
+        "text": "A rainha de mel é capaz de pôr mais de 2 mil ovos por dia, sendo o número maior registrado entre qualquer inseto. Ela pode viver por várias décadas e emitir feromônios complexos para manter a colmeia organizada.",
+        "shown": 1
       }
     ]
   },
@@ -952,6 +956,10 @@
       {
         "text": "A taxa aduaneira de itens caros como joias pode ser negociada por despachantes especializados, exigindo um profundo conhecimento das legislações internacionais. O processo não é apenas fiscal; ele envolve a verificação rigorosa da procedência e do valor declarado dos bens importados ou exportados.",
         "shown": 4
+      },
+      {
+        "text": "A alfândega moderna é um sistema complexo de controle de mercadorias transfronteiriças. Ela também realiza a fiscalização para evitar o contrabando de itens ilegais ou restritos.",
+        "shown": 1
       }
     ]
   },
@@ -1552,6 +1560,10 @@
       {
         "text": "Alguns grãos de café são cultivados em altitudes muito elevadas, o que confere um sabor mais complexo ao produto final. O processo de torra influencia drasticamente não apenas a cor, mas também os níveis de acidez e amargor da bebida.",
         "shown": 4
+      },
+      {
+        "text": "O café era antes um luxo para reis e nobres europeus. A rota de comércio do grão foi historicamente associada a guerras, espionagem e grandes fortunas.",
+        "shown": 1
       }
     ]
   },
@@ -1967,7 +1979,7 @@
     "entries": [
       {
         "text": "O primeiro contêiner padronizado surgiu nos Estados Unidos na década de 1950. Essa invenção revolucionou o comércio global, tornando a logística portuária muito mais rápida e barata.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2099,7 +2111,7 @@
     "entries": [
       {
         "text": "A Sequoia gigante é tão maciça que seus troncos são comparáveis a pequenos edifícios de concreto. O tamanho dessas árvores reflete milhares de anos de crescimento lento e resiliente em ambientes únicos.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2115,7 +2127,7 @@
     "entries": [
       {
         "text": "Em 1946, os EUA retiraram as tropas do Japão drasticamente; a devastação econômica e civil ainda levou anos para ser completamente reconstruída. O governo impôs um controle rigoroso sobre o setor energético que manteve a economia em estado semi-m",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2163,7 +2175,7 @@
     "entries": [
       {
         "text": "O Hubble tinha um problema de correção óptica inicial. Ele precisou ser enviado para reparos e atualizações em órbita.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2172,6 +2184,14 @@
       {
         "text": "O Porto de Sisal na Índia foi um centro vital de comércio têxtil por séculos. Antigamente, ele operava com sistemas complexos de arrecadação e distribuição de carga marítima.",
         "shown": 2
+      }
+    ]
+  },
+  "florestas tropicais": {
+    "entries": [
+      {
+        "text": "Muitas espécies de plantas nas florestas tropicais não têm raízes diretamente no solo. Elas dependem de estruturas aéreas para absorver nutrientes, como o epífitismo.",
+        "shown": 1
       }
     ]
   }

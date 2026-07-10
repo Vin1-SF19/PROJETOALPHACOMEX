@@ -175,6 +175,9 @@
 **Contexto:** Qualquer componente Three.js/canvas com container `position: absolute` (background decorativo) neste projeto — especialmente se for renderizado dentro do iframe de módulo do PainelAlpha. Confirmado via `preview_eval` inspecionando `canvas.style` diretamente (não visível em screenshot, que trava com canvas WebGL animado em ambiente headless — usar `preview_eval` para inspecionar propriedades do canvas em vez de depender só de screenshot nesses casos).
 **Adicionado em:** 2026-07-09
 
+**Nota adicional (Onda 4 — Apresentation Studio, componentes 3D via React Three Fiber):** `@react-three/fiber`'s `<Canvas>` já resolve o problema de RESIZE internamente (usa `ResizeObserver` por baixo dos panos) — não é necessário replicar manualmente o fix de `requestAnimationFrame` acima para os componentes `globo`/`particulas`/`objeto3d`. PORÉM, R3F **não resolve** o problema de VISIBILIDADE dentro do iframe do painel: `document.visibilityState` continua não refletindo a visibilidade real do módulo quando ele está "escondido" dentro do iframe de `PainelLayoutClient.tsx` (mesma limitação do `animated-shader-background.tsx`). Sem tratar isso, o `frameloop` do R3F continua rodando (consumindo GPU/CPU) mesmo com o módulo fora de tela. Fix planejado: hook compartilhado `useVisibilidadeIframe.ts` baseado em `IntersectionObserver`, usado para alternar a prop `frameloop` do `<Canvas>` entre `"always"` e `"never"` conforme a visibilidade real do componente — a ser implementado por Nova junto dos componentes de renderização 3D.
+**Adicionado em:** 2026-07-10
+
 ## Modelo de IA "não lê" imagem anexada no chat
 **Sintoma:** usuário anexa imagem, modelo responde como se não houvesse imagem (ou descreve genérico). Logs mostram a imagem indo como texto tipo "[imagem disponível em: url]".
 **Causa:** a imagem estava sendo passada como TEXTO (link/descrição) no content da mensagem. Modelos de visão precisam receber a imagem como conteúdo multimodal real.

@@ -73,6 +73,34 @@ export const gridComponenteSchema = baseComponenteSchema.extend({
   },
 });
 
+export const globoComponenteSchema = baseComponenteSchema.extend({
+  tipo: z.literal("globo"),
+  corBase: z.string().optional(),
+  texturaUrl: z.string().optional(),
+  velocidadeRotacao: z.number().min(0).max(5).default(0.5),
+  marcadores: z.array(z.object({
+    lat: z.number(),
+    lng: z.number(),
+    label: z.string().optional(),
+    cor: z.string().optional(),
+  })).default([]),
+});
+
+export const particulasComponenteSchema = baseComponenteSchema.extend({
+  tipo: z.literal("particulas"),
+  quantidade: z.number().min(10).max(2000).default(300),
+  cor: z.string().optional(),
+  tamanho: z.number().min(0.5).max(10).default(2),
+  velocidade: z.number().min(0).max(5).default(1),
+});
+
+export const objeto3dComponenteSchema = baseComponenteSchema.extend({
+  tipo: z.literal("objeto3d"),
+  url: z.string(),
+  autoRotacao: z.boolean().default(true),
+  escala: z.number().min(0.1).max(10).default(1),
+});
+
 export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion("tipo", [
   textoComponenteSchema,
   imagemComponenteSchema,
@@ -81,6 +109,9 @@ export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion
   gridComponenteSchema,
   iconeComponenteSchema,
   divisorComponenteSchema,
+  globoComponenteSchema,
+  particulasComponenteSchema,
+  objeto3dComponenteSchema,
 ]);
 
 /** Coleta todos os ids da árvore (recursivo em card/grid.filhos) — usado para checar unicidade. */
@@ -107,6 +138,9 @@ export type ImagemComponente = z.infer<typeof imagemComponenteSchema>;
 export type BotaoComponente = z.infer<typeof botaoComponenteSchema>;
 export type IconeComponente = z.infer<typeof iconeComponenteSchema>;
 export type DivisorComponente = z.infer<typeof divisorComponenteSchema>;
+export type GloboComponente = z.infer<typeof globoComponenteSchema>;
+export type ParticulasComponente = z.infer<typeof particulasComponenteSchema>;
+export type Objeto3dComponente = z.infer<typeof objeto3dComponenteSchema>;
 export interface CardComponente extends z.infer<typeof baseComponenteSchema> {
   tipo: "card";
   corFundo?: string;
@@ -128,6 +162,9 @@ export type ComponenteSlide =
   | CardComponente
   | GridComponente
   | IconeComponente
-  | DivisorComponente;
+  | DivisorComponente
+  | GloboComponente
+  | ParticulasComponente
+  | Objeto3dComponente;
 
 export type DadosSlide = z.infer<typeof dadosSlideSchema>;

@@ -10,18 +10,18 @@ const HTML_TAG_LEAK_RE = /<?\/?(?:blockquote|quote|p|br|div|span|b|i|em|strong|u
 
 // ── Cache ────────────────────────────────────────────────────────────────────
 
-const CACHE_PATH = path.join(process.cwd(), ".bibble", "curiosidades-cache.json");
-const MAX_SHOWN  = 4; // repete cada curiosidade até N vezes antes de buscar nova
+const CACHE_PATH = path.join(process.cwd(), ".bibble", "piadas-cache.json");
+const MAX_SHOWN  = 4; // repete cada piada até N vezes antes de buscar nova
 
 interface CacheEntry { text: string; shown: number; }
-interface Cache { [topic: string]: { entries: CacheEntry[] } }
+interface Cache { entries: CacheEntry[] }
 
 async function readCache(): Promise<Cache> {
   try {
     const raw = await readFile(CACHE_PATH, "utf-8");
     return JSON.parse(raw) as Cache;
   } catch {
-    return {};
+    return { entries: [] };
   }
 }
 
@@ -35,38 +35,15 @@ async function writeCache(cache: Cache): Promise<void> {
 // ── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET() {
-  // ── Lê tópicos (aceita "- " e "* ") ─────────────────────────────────────
-  let content: string;
-  try {
-    content = await readFile(path.join(process.cwd(), "bibble-topicos.md"), "utf-8");
-  } catch {
-    return NextResponse.json({ error: "bibble-topicos.md não encontrado" }, { status: 404 });
-  }
-
-  const topics = content
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith("- ") || l.startsWith("* "))
-    .map((l) => l.slice(2).trim())
-    .filter(Boolean);
-
-  if (topics.length === 0) {
-    return NextResponse.json({ error: "Nenhum tópico configurado" }, { status: 404 });
-  }
-
-  const topic = topics[Math.floor(Math.random() * topics.length)];
-
   // ── Verifica cache ────────────────────────────────────────────────────────
   const cache = await readCache();
-  const topicData = cache[topic] ?? { entries: [] };
-  const available = topicData.entries.filter((e) => e.shown < MAX_SHOWN);
+  const available = cache.entries.filter((e) => e.shown < MAX_SHOWN);
 
   if (available.length > 0) {
     const entry = available[Math.floor(Math.random() * available.length)];
     entry.shown++;
-    cache[topic] = topicData;
     void writeCache(cache); // non-blocking
-    return NextResponse.json({ curiosidade: entry.text, topic, cached: true });
+    return NextResponse.json({ piada: entry.text, cached: true });
   }
 
   // ── Busca nova via Ollama ─────────────────────────────────────────────────
@@ -84,27 +61,27 @@ export async function GET() {
           {
             role: "system",
             content:
-              "Você é um gerador de curiosidades concisas. Responda APENAS com a curiosidade, sem saudação, sem 'Sabia que', sem markdown, sem bullet. Máximo 2 frases curtas em português brasileiro.",
+              "Você é um gerador de piadas curtas e propositalmente bestas/ruins (aquelas tão sem graça que acabam sendo engraçadas — tipo piada de pai, trocadilho bobo). Responda APENAS com a piada, sem saudação, sem explicação, sem markdown, sem bullet. Máximo 2 frases curtas em português brasileiro.",
           },
           {
             role: "user",
-            content: `Diga uma curiosidade surpreendente e pouco conhecida sobre: ${topic}`,
+            content: "Conta uma piada curta e besta, dessas ruins de propósito.",
           },
         ],
         stream: false,
-        temperature: 0.92,
-        max_tokens: 110,
+        temperature: 1.0,
+        max_tokens: 90,
       }),
       signal: AbortSignal.timeout(28_000),
     });
   } catch (err) {
-    console.error("[BIBBLE/CURIOSIDADE] Ollama unreachable:", err);
+    console.error("[BIBBLE/PIADA] Ollama unreachable:", err);
     return NextResponse.json({ error: "Ollama indisponível" }, { status: 502 });
   }
 
   if (!r.ok) {
     const body = await r.text().catch(() => "");
-    console.error("[BIBBLE/CURIOSIDADE] Ollama error:", r.status, body);
+    console.error("[BIBBLE/PIADA] Ollama error:", r.status, body);
     return NextResponse.json({ error: "Falha no Ollama" }, { status: 502 });
   }
 
@@ -113,21 +90,20 @@ export async function GET() {
   };
 
   const raw = data.choices?.[0]?.message?.content?.trim() ?? "";
-  const curiosidade = raw
+  const piada = raw
     .replace(/^[-*•]\s*/gm, "")
     .replace(/\*\*/g, "")
     .replace(HTML_TAG_LEAK_RE, "")
     .replace(/\n+/g, " ")
     .trim();
 
-  if (!curiosidade) {
+  if (!piada) {
     return NextResponse.json({ error: "Resposta vazia" }, { status: 500 });
   }
 
   // ── Salva no cache com shown = 1 ──────────────────────────────────────────
-  if (!cache[topic]) cache[topic] = { entries: [] };
-  cache[topic].entries.push({ text: curiosidade, shown: 1 });
+  cache.entries.push({ text: piada, shown: 1 });
   void writeCache(cache);
 
-  return NextResponse.json({ curiosidade, topic });
+  return NextResponse.json({ piada });
 }

@@ -34,7 +34,7 @@ export default function PdfPreviewPage() {
 
   return (
     <PDFViewer style={{ width: '100%', height: '100vh' }}>
-      <FichaAlphaPDF dados={dadosMock} userLogado="ANDERSON" />
+      <FichaAlphaPDF dados={dadosMock} userLogado="VINICIUS" />
     </PDFViewer>
   );
 }

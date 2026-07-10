@@ -20,6 +20,7 @@ export const ModalPDF = ({ dados, radarDados, user, isOpen, onClose }: Props) =>
         horaSituacao: "",
         mesProtocolo: "",
         telefone: "",
+        email: "",
         nomeResponsavel: "",
         observacoes: "",
         origemLead: "",
@@ -119,6 +120,17 @@ export const ModalPDF = ({ dados, radarDados, user, isOpen, onClose }: Props) =>
                                     placeholder="(00) 00000-0000"
                                     value={dadosManuais.telefone}
                                     onChange={(e) => setDadosManuais({ ...dadosManuais, telefone: e.target.value })}
+                                    className={campoClass}
+                                />
+                            </div>
+
+                            <div>
+                                <label className={labelClass}>E-mail</label>
+                                <input
+                                    type="email"
+                                    placeholder="nome@gmail.com"
+                                    value={dadosManuais.email}
+                                    onChange={(e) => setDadosManuais({ ...dadosManuais, email: e.target.value })}
                                     className={campoClass}
                                 />
                             </div>

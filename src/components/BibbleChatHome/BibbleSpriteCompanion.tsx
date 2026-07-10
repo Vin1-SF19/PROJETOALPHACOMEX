@@ -36,10 +36,12 @@ const SPRITE_MAP: Record<string, string> = {
   "bravo-naomais":   "/assets/bibble/sprites/bravo/naoqueromais.png",
   "bravo-affs":      "/assets/bibble/sprites/bravo/affs.png",
 
-  // EXCLUSIVO do tema "Copa 2026" — moods copa-* (pasta copa)
-  "copa-tranquilo":  "/assets/bibble/sprites/copa/tranquilo.png",
-  "copa-serio":      "/assets/bibble/sprites/copa/serio.png",
+  // EXCLUSIVO do modo "Piadista" — sprites do palhaço, usados só ao contar piada
+  "piada-bobo":      "/assets/bibble/sprites/palhaco/bobo.png",
+  "piada-bobo-2":     "/assets/bibble/sprites/palhaco/bobo-2.png",
 };
+
+const PIADA_MOODS = ["piada-bobo", "piada-bobo-2"] as const;
 
 function spriteFor(mood: string): string {
   return SPRITE_MAP[mood] ?? SPRITE_MAP.relaxando;
@@ -186,6 +188,10 @@ const CURIOSIDADE_LOOP_MS      = 2 * 60_000;
 const CURIOSIDADE_MIN_SHOW_MS  = 35_000;
 const CURIOSIDADE_MOODS        = ["pensando", "happy", "relaxando"] as const;
 
+const PIADA_INITIAL_MS         = 50_000;
+const PIADA_LOOP_MS            = 3 * 60_000;
+const PIADA_MIN_SHOW_MS        = 30_000;
+
 // Falas exibidas enquanto a IA está gerando resposta
 const STREAMING_FALAS: Fala[] = [
   { mood: "pensando",  fala: "Deixa eu ver isso com calma..." },
@@ -206,7 +212,6 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
   const [side] = useState<"left" | "right">(() => Math.random() > 0.5 ? "right" : "left");
 
   const [baseFalas, setBaseFalas] = useState<Fala[]>(FALLBACK_FALAS);
-  const [copaFalas, setCopaFalas] = useState<Fala[]>([]);
   const [allFalas,  setAllFalas]  = useState<Fala[]>(FALLBACK_FALAS);
   const [index,     setIndex]     = useState(0);
   const [blink,     setBlink]     = useState(false);
@@ -218,6 +223,13 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
   const [curiosidade, setCuriosidade] = useState<Fala | null>(null);
   const curiosidadeActive         = useRef(false);
   const curiosidadeShownAt        = useRef<number | null>(null);
+
+  // Piada — mesma lógica da curiosidade, cor âmbar e sprites do palhaço
+  const pendingPiada              = useRef<Fala | null>(null);
+  const [piada, setPiada]         = useState<Fala | null>(null);
+  const piadaActive               = useRef(false);
+  const piadaShownAt              = useRef<number | null>(null);
+
   const blinkTimeout              = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Falas base (API) ──────────────────────────────────────────────────────
@@ -233,48 +245,21 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
     return () => { active = false; };
   }, []);
 
-  // ── Falas da Copa 2026 (API, com data do próximo jogo) ────────────────────
-  // Busca algumas variações distintas para não repetir sempre a mesma.
-
-  useEffect(() => {
-    let active = true;
-    const carregar = async () => {
-      try {
-        const respostas = await Promise.all(
-          Array.from({ length: 4 }, () =>
-            fetch("/api/bibble/copa").then(r => r.ok ? r.json() : null).catch(() => null),
-          ),
-        );
-        if (!active) return;
-        const falas = respostas
-          .filter((d): d is { mood: string; fala: string } => !!d?.fala)
-          .map(d => ({ mood: d.mood, fala: d.fala }));
-        // dedup por texto
-        const unicas = Array.from(new Map(falas.map(f => [f.fala, f])).values());
-        if (unicas.length) setCopaFalas(unicas);
-      } catch { /* sem copa */ }
-    };
-    void carregar();
-    const id = setInterval(() => { void carregar(); }, 15 * 60 * 1000);
-    return () => { active = false; clearInterval(id); };
-  }, []);
-
-  // ── Contexto clima + hora (+ Copa) ────────────────────────────────────────
+  // ── Contexto clima + hora ──────────────────────────────────────────────────
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       const ctx = await fetchCtx();
       if (!active) return;
-      // Copa entra junto do contexto: 1 fala da Copa a cada ~3 falas base
-      const contexto = [...buildContextFalas(ctx), ...copaFalas];
+      const contexto = buildContextFalas(ctx);
       setAllFalas(interleaveFalas(baseFalas, contexto, 2));
       setIndex(0);
     };
     void load();
     const id = setInterval(() => { void load(); }, 10 * 60 * 1000);
     return () => { active = false; clearInterval(id); };
-  }, [baseFalas, copaFalas]);
+  }, [baseFalas]);
 
   // ── Fetch de curiosidades ─────────────────────────────────────────────────
 
@@ -298,6 +283,29 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
 
     return () => { clearTimeout(initId); clearInterval(loopId); };
   }, [fetchCuriosidade]);
+
+  // ── Fetch de piadas ────────────────────────────────────────────────────────
+
+  const fetchPiada = useCallback(async () => {
+    try {
+      const r = await fetch("/api/bibble/piada");
+      if (!r.ok) return;
+      const data = await r.json() as { piada?: string };
+      if (!data.piada?.trim()) return;
+      const mood = PIADA_MOODS[Math.floor(Math.random() * PIADA_MOODS.length)];
+      pendingPiada.current = { mood, fala: data.piada.trim() };
+    } catch { /* silencioso */ }
+  }, []);
+
+  useEffect(() => {
+    let loopId: ReturnType<typeof setInterval>;
+    const initId = setTimeout(() => {
+      void fetchPiada();
+      loopId = setInterval(() => { void fetchPiada(); }, PIADA_LOOP_MS);
+    }, PIADA_INITIAL_MS);
+
+    return () => { clearTimeout(initId); clearInterval(loopId); };
+  }, [fetchPiada]);
 
   // Mantém ref de isStreaming sincronizado para uso dentro do interval
   useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
@@ -328,11 +336,24 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
           setCuriosidade(null);
           setIndex(p => (p + 1) % allFalas.length);
         }
+      } else if (piadaActive.current) {
+        const elapsed = Date.now() - (piadaShownAt.current ?? 0);
+        if (elapsed >= PIADA_MIN_SHOW_MS) {
+          piadaActive.current = false;
+          piadaShownAt.current = null;
+          setPiada(null);
+          setIndex(p => (p + 1) % allFalas.length);
+        }
       } else if (pendingCuriosidade.current) {
         curiosidadeActive.current = true;
         curiosidadeShownAt.current = Date.now();
         setCuriosidade(pendingCuriosidade.current);
         pendingCuriosidade.current = null;
+      } else if (pendingPiada.current) {
+        piadaActive.current = true;
+        piadaShownAt.current = Date.now();
+        setPiada(pendingPiada.current);
+        pendingPiada.current = null;
       } else {
         setIndex(p => (p + 1) % allFalas.length);
       }
@@ -348,14 +369,15 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
 
   const streamingFala = STREAMING_FALAS[streamingFalaIndex % STREAMING_FALAS.length];
   const isCuriosidade = !isStreaming && curiosidade !== null;
+  const isPiada       = !isStreaming && !isCuriosidade && piada !== null;
   const current       = isStreaming
     ? streamingFala
-    : (isCuriosidade ? curiosidade : (allFalas[index] ?? FALLBACK_FALAS[0]));
+    : (isCuriosidade ? curiosidade : (isPiada ? piada : (allFalas[index] ?? FALLBACK_FALAS[0])));
   const sprite        = spriteFor(current.mood);
   const bubbleText    = current.fala;
   const bubbleKey     = isStreaming
     ? `s-${streamingFalaIndex}`
-    : `${isCuriosidade ? "c" : "f"}-${current.fala.slice(0, 8)}-${index}`;
+    : `${isCuriosidade ? "c" : isPiada ? "j" : "f"}-${current.fala.slice(0, 8)}-${index}`;
   const isRight       = side === "right";
 
   return (
@@ -405,20 +427,24 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
               transition={{ duration: 0.25, ease: "easeOut" }}
               className="rounded-2xl px-3 py-2 relative"
               style={{
-                background: isCuriosidade
+                background: isCuriosidade || isPiada
                   ? "rgba(15,10,40,0.95)"
                   : "rgba(10,14,30,0.92)",
                 border: isCuriosidade
                   ? "1px solid rgba(139,92,246,0.55)"
-                  : "1px solid rgba(79,70,229,0.35)",
+                  : isPiada
+                    ? "1px solid rgba(245,158,11,0.55)"
+                    : "1px solid rgba(79,70,229,0.35)",
                 boxShadow: isCuriosidade
                   ? "0 0 18px rgba(139,92,246,0.20), 0 2px 10px rgba(0,0,0,0.4)"
-                  : "0 2px 12px rgba(0,0,0,0.35)",
+                  : isPiada
+                    ? "0 0 18px rgba(245,158,11,0.20), 0 2px 10px rgba(0,0,0,0.4)"
+                    : "0 2px 12px rgba(0,0,0,0.35)",
                 backdropFilter: "blur(8px)",
                 WebkitBackdropFilter: "blur(8px)",
               }}
             >
-              {/* Label curiosidade */}
+              {/* Label curiosidade / piada */}
               {isCuriosidade && (
                 <div className="flex items-center gap-1 mb-1">
                   <span style={{ fontSize: 10 }}>💡</span>
@@ -427,12 +453,20 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
                   </span>
                 </div>
               )}
+              {isPiada && (
+                <div className="flex items-center gap-1 mb-1">
+                  <span style={{ fontSize: 10 }}>🤡</span>
+                  <span style={{ fontSize: 9, color: "#fbbf24", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                    piada
+                  </span>
+                </div>
+              )}
 
               <span
                 style={{
                   fontSize: 11,
                   lineHeight: 1.45,
-                  color: isCuriosidade ? "#d8b4fe" : "#94a3b8",
+                  color: isCuriosidade ? "#d8b4fe" : isPiada ? "#fde68a" : "#94a3b8",
                   display: "block",
                 }}
               >
@@ -464,12 +498,12 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
                   <span aria-hidden style={{
                     position: "absolute", right: -7, bottom: 12,
                     borderTop: "7px solid transparent", borderBottom: "7px solid transparent",
-                    borderLeft: `7px solid ${isCuriosidade ? "rgba(139,92,246,0.55)" : "rgba(79,70,229,0.35)"}`,
+                    borderLeft: `7px solid ${isCuriosidade ? "rgba(139,92,246,0.55)" : isPiada ? "rgba(245,158,11,0.55)" : "rgba(79,70,229,0.35)"}`,
                   }} />
                   <span aria-hidden style={{
                     position: "absolute", right: -5, bottom: 13,
                     borderTop: "6px solid transparent", borderBottom: "6px solid transparent",
-                    borderLeft: `6px solid ${isCuriosidade ? "rgba(15,10,40,0.95)" : "rgba(10,14,30,0.92)"}`,
+                    borderLeft: `6px solid ${isCuriosidade || isPiada ? "rgba(15,10,40,0.95)" : "rgba(10,14,30,0.92)"}`,
                   }} />
                 </>
               ) : (
@@ -477,12 +511,12 @@ export default function BibbleSpriteCompanion({ isStreaming = false }: BibbleSpr
                   <span aria-hidden style={{
                     position: "absolute", left: -7, bottom: 12,
                     borderTop: "7px solid transparent", borderBottom: "7px solid transparent",
-                    borderRight: `7px solid ${isCuriosidade ? "rgba(139,92,246,0.55)" : "rgba(79,70,229,0.35)"}`,
+                    borderRight: `7px solid ${isCuriosidade ? "rgba(139,92,246,0.55)" : isPiada ? "rgba(245,158,11,0.55)" : "rgba(79,70,229,0.35)"}`,
                   }} />
                   <span aria-hidden style={{
                     position: "absolute", left: -5, bottom: 13,
                     borderTop: "6px solid transparent", borderBottom: "6px solid transparent",
-                    borderRight: `6px solid ${isCuriosidade ? "rgba(15,10,40,0.95)" : "rgba(10,14,30,0.92)"}`,
+                    borderRight: `6px solid ${isCuriosidade || isPiada ? "rgba(15,10,40,0.95)" : "rgba(10,14,30,0.92)"}`,
                   }} />
                 </>
               )}
