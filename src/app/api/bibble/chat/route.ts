@@ -355,7 +355,7 @@ async function runStream(
     const msg = err instanceof Error ? err.message : "Erro interno";
     console.error("[BIBBLE CHAT]", msg);
     try {
-      send({ type: "error", message: "Tive um problema aqui. Tenta de novo." });
+      send({ type: "error", message: "Tive um problema aqui. Tenta de novo!!." });
       send({ type: "done" });
     } catch { /* ignore */ }
   } finally {

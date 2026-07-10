@@ -92,6 +92,10 @@ model usuarios {
   indicacoesCriadas Indicacao[]     @relation("IndicacaoAutor")
   parceiroAcessos   ParceiroAcesso[]
   convitesParceiroCriados ConviteParceiro[] @relation("ConvitesCriados")
+
+  apresentacoesCriadas     Apresentacao[]
+  apresentacaoColaboracoes ApresentacaoColaborador[]
+  apresentacaoComentarios  ApresentacaoComentario[]
 }
 
 model OnboardingTemplate {
@@ -1629,4 +1633,115 @@ model ParceiroConfig {
   updatedAt                DateTime @updatedAt
 
   @@map("parceiro_config")
+}
+
+// ─── Alpha Presentation Studio ────────────────────────────────────────────────
+// Editor de apresentações HTML interativas. Conteúdo de cada slide é guardado
+// como JSON (Slide.dadosJson) — não relacional — decisão registrada em
+// decisions.md (2026-07-09, "arquitetura de dados do slide").
+
+model Apresentacao {
+  id           String    @id @default(cuid())
+  titulo       String
+  clienteNome  String?
+  autorId      Int
+  autor        usuarios  @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  status       String    @default("DRAFT") // DRAFT | PUBLICADA | ARQUIVADA
+  temaId       String?
+  tema         ApresentacaoTema? @relation(fields: [temaId], references: [id])
+  thumbnailUrl String?
+  slugPublico  String?   @unique
+  senhaAcesso  String?
+  expiraEm     DateTime?
+  slides       Slide[]
+  assets       ApresentacaoAsset[]
+  versoes      ApresentacaoVersao[]
+  colaboradores ApresentacaoColaborador[]
+  comentarios  ApresentacaoComentario[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([autorId])
+  @@index([status])
+}
+
+model Slide {
+  id               String   @id @default(cuid())
+  apresentacaoId   String
+  apresentacao     Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  ordem            Int
+  nome             String?
+  transicaoEntrada String?
+  duracaoAutoplay  Int?
+  dadosJson        Json
+  comentarios      ApresentacaoComentario[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([apresentacaoId, ordem])
+}
+
+model ApresentacaoTema {
+  id              String   @id @default(cuid())
+  nome            String
+  corPrimaria     String
+  corSecundaria   String
+  corAccent       String
+  radius          String?
+  fontePrimaria   String?
+  fonteSecundaria String?
+  tokensJson      Json
+  isTemplate      Boolean  @default(false)
+  criadoPorId     Int?
+  apresentacoes   Apresentacao[]
+  createdAt       DateTime @default(now())
+}
+
+model ApresentacaoAsset {
+  id             String   @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  tipo           String   // IMAGEM | VIDEO | MODELO_3D | AUDIO | FONTE
+  url            String
+  nomeOriginal   String
+  tamanhoBytes   Int
+  createdAt      DateTime @default(now())
+
+  @@index([apresentacaoId])
+}
+
+model ApresentacaoVersao {
+  id             String   @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  dadosJson      Json
+  criadoPorId    Int
+  label          String?
+  createdAt      DateTime @default(now())
+
+  @@index([apresentacaoId, createdAt])
+}
+
+model ApresentacaoColaborador {
+  id             String   @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  userId         Int
+  user           usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  papel          String   @default("EDITOR") // EDITOR | VISUALIZADOR | COMENTARISTA
+
+  @@unique([apresentacaoId, userId])
+}
+
+model ApresentacaoComentario {
+  id             String   @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  slideId        String?
+  slide          Slide?   @relation(fields: [slideId], references: [id], onDelete: SetNull)
+  autorId        Int
+  autor          usuarios @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  texto          String
+  resolvido      Boolean  @default(false)
+  createdAt      DateTime @default(now())
 }

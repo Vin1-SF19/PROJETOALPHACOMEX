@@ -57,6 +57,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Comercial | Alpha Marketing | `/PainelAlpha/ControleLeads/Marketing` | `marketing` |
 | Comercial | Instagram Studio | `/PainelAlpha/Marketing` | `instagramStudio` |
 | Comercial | Alpha Metas | `/PainelAlpha/Metas` | `metas` (role: Lider Comercial) |
+| Comercial | Alpha Presentation Studio | `/PainelAlpha/Apresentacoes` | `apresentacoes` ← Ondas 1-3 de 6 entregues, 2026-07-09 (Dashboard + Editor completo + Temas/Animações/Timeline; faltam Onda 4 3D, Onda 5 IA, Onda 6 Apresentação/Export/Publicação/Colaboração) |
 | **Financeiro** | **Extratos Bancários** | **`/PainelAlpha/ExtratosBancarios`** | **`Extratos`** ← reescrito 2026-07-09 |
 | Financeiro | Pré Análise | `/PainelAlpha/SistemaPreAnalise` | `analise` |
 | Financeiro | Consulta RADAR | `/PainelAlpha/HabilitacaoRadar` | `radar` |

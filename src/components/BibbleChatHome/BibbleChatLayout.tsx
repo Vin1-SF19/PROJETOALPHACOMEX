@@ -23,7 +23,7 @@ interface BibbleChatLayoutProps {
 let msgCounter = 0;
 const newId = () => `msg-${++msgCounter}-${Date.now()}`;
 
-const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "qwen3:14b";
+const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "gemma4:e4b";
 
 export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem";
 

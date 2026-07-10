@@ -2,7 +2,7 @@ export const BIBBLE_OLLAMA_URL =
   process.env.BIBBLE_OLLAMA_URL ?? "http://192.168.35.113:11434";
 
 export const BIBBLE_MODEL =
-  process.env.BIBBLE_MODEL ?? "qwen3:14b";
+  process.env.BIBBLE_MODEL ?? "gemma4:e4b";
 
 export type Provider = "ollama" | "openai" | "anthropic" | "google";
 
@@ -14,14 +14,13 @@ export interface ModelEntry {
 
 export const PROVIDER_MODELS: Record<Provider, ModelEntry[]> = {
   ollama: [
+    { id: "gemma4:e4b",      label: "Gemma 4 · E4B",     provider: "ollama" },
+    { id: "qwen3:14b",       label: "Qwen 3 · 14B",      provider: "ollama" },
     { id: "qwen3.6:35b",     label: "Qwen 3.6 · 35B",    provider: "ollama" },
-    { id: "qwen2.5:14b",     label: "Qwen 2.5 · 14B",    provider: "ollama" },
-    { id: "llama3.2",        label: "Llama 3.2",          provider: "ollama" },
-    { id: "llama3.1:8b",     label: "Llama 3.1 · 8B",    provider: "ollama" },
-    { id: "mistral",         label: "Mistral 7B",         provider: "ollama" },
-    { id: "gemma3:12b",      label: "Gemma 3 · 12B",     provider: "ollama" },
-    { id: "deepseek-r1:7b",  label: "DeepSeek R1 · 7B",  provider: "ollama" },
-    { id: "phi4-mini",       label: "Phi 4 Mini",         provider: "ollama" },
+    { id: "qwen3.6:latest",  label: "Qwen 3.6 · Latest", provider: "ollama" },
+    { id: "qwen3.5:35b-a3b", label: "Qwen 3.5 · 35B A3B", provider: "ollama" },
+    { id: "qwen3-coder:30b", label: "Qwen 3 Coder · 30B", provider: "ollama" },
+    { id: "qwen3-coder:30b-oc", label: "Qwen 3 Coder · 30B OC", provider: "ollama" },
   ],
   openai: [
     { id: "gpt-4o",       label: "GPT-4o",       provider: "openai" },
@@ -67,8 +66,9 @@ export function modelSupportsVision(modelId: string): boolean {
   if (id.startsWith("claude-")) return true;
   // Gemini é multimodal
   if (id.startsWith("gemini-")) return true;
-  // Ollama: só alguns modelos têm visão (gemma3, llama3.2-vision, llava, qwen-vl, minicpm-v…)
-  if (id.includes("gemma3") || id.includes("llava") || id.includes("vision") ||
+  // Ollama: só alguns modelos têm visão (qwen3.6/3.5, gemma3, llava, qwen-vl, minicpm-v…)
+  if (id.startsWith("qwen3.6") || id.startsWith("qwen3.5") ||
+      id.includes("gemma3") || id.includes("llava") || id.includes("vision") ||
       id.includes("minicpm") || id.includes("-vl") || id.startsWith("llama3.2")) return true;
   return false;
 }
