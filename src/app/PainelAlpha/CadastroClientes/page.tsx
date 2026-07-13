@@ -14,11 +14,12 @@ import {
     User,
     Calendar,
     CheckCircle2,
-    AlertCircle
+    AlertCircle,
+    Layers
 } from "lucide-react";
 
 import ModalCadastroCliente from "./ModalCadastro/modal";
-import { buscarClientes } from "@/actions/Clientes";
+import { buscarClientes, type ClienteCS } from "@/actions/Clientes";
 import ModalGestaoCliente from './ModalCadastro/modalDados';
 import ModalFiltros from './ModalCadastro/modalFiltros';
 import ModalLogAuditoria from './ModalCadastro/modalLogAuditoria';
@@ -32,9 +33,9 @@ export default function CadastroCliente() {
 
     const { data: session } = useSession();
 
-    const [clientes, setClientes] = useState<any[]>([]);
+    const [clientes, setClientes] = useState<ClienteCS[]>([]);
     const [carregando, setCarregando] = useState(true);
-    const [clienteSelecionado, setClienteSelecionado] = useState<any>(null);
+    const [clienteSelecionado, setClienteSelecionado] = useState<ClienteCS[] | null>(null);
     const [modalGestaoAberto, setModalGestaoAberto] = useState(false);
 
     const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
@@ -44,10 +45,35 @@ export default function CadastroCliente() {
     const [clienteParaLog, setClienteParaLog] = useState<any>(null);
     const [termoBusca, setTermoBusca] = useState("");
 
-    const clientesProcessados = useMemo(() => {
-        const filtrados = clientes.filter((c:
+    /**
+     * Agrupa os registros por CNPJ — um mesmo CNPJ pode ter N registros
+     * (um por serviço contratado, ver decisions.md 2026-07-13). O registro
+     * "principal" exibido na linha da tabela é o de createdAt mais recente do
+     * grupo; os demais ficam disponíveis em `servicos` para o modal de
+     * detalhe mostrar todos os serviços mesclados daquele CNPJ.
+     */
+    const gruposPorCnpj = useMemo(() => {
+        const mapa = new Map<string, ClienteCS[]>();
+        for (const c of clientes) {
+            const chave = c.cnpj || `sem-cnpj-${c.id}`;
+            const grupo = mapa.get(chave);
+            if (grupo) grupo.push(c);
+            else mapa.set(chave, [c]);
+        }
 
-            any) => {
+        return Array.from(mapa.values()).map((registros) => {
+            const ordenadosPorData = [...registros].sort((a, b) => {
+                const dataA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const dataB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return dataB - dataA;
+            });
+            return { principal: ordenadosPorData[0], servicos: ordenadosPorData };
+        });
+    }, [clientes]);
+
+    const clientesProcessados = useMemo(() => {
+        const filtrados = gruposPorCnpj.filter((grupo) => {
+            const c = grupo.principal;
             const busca = termoBusca.toLowerCase();
             const cnpjLimpo = busca.replace(/\D/g, "");
 
@@ -60,15 +86,16 @@ export default function CadastroCliente() {
         });
 
         return [...filtrados].sort((a, b) => {
-            let valA = a[ordenacao.campo];
-            let valB = b[ordenacao.campo];
+            const campo = ordenacao.campo as keyof ClienteCS;
+            let valA: string | number = String(a.principal[campo] ?? "");
+            let valB: string | number = String(b.principal[campo] ?? "");
 
             if (ordenacao.campo.toLowerCase().includes('data')) {
                 valA = valA ? new Date(valA).getTime() : 0;
                 valB = valB ? new Date(valB).getTime() : 0;
             } else {
-                valA = valA ? valA.toString().toLowerCase() : "";
-                valB = valB ? valB.toString().toLowerCase() : "";
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
             }
 
             if (ordenacao.direcao === 'asc') {
@@ -77,7 +104,7 @@ export default function CadastroCliente() {
                 return valA < valB ? 1 : -1;
             }
         });
-    }, [termoBusca, clientes, ordenacao]);
+    }, [termoBusca, gruposPorCnpj, ordenacao]);
 
 
 
@@ -166,7 +193,6 @@ export default function CadastroCliente() {
                                 const respondentes = clientes.filter(c =>
                                     c.nps !== null &&
                                     c.nps !== undefined &&
-                                    c.nps !== "" &&
                                     !isNaN(Number(c.nps))
                                 );
 
@@ -220,7 +246,10 @@ export default function CadastroCliente() {
                                 ) : clientesProcessados.length === 0 ? (
                                     <tr><td colSpan={9} className="py-20 text-center text-slate-600 font-bold uppercase text-[10px] tracking-[0.3em]">Nenhum registro encontrado</td></tr>
                                 ) : (
-                                    clientesProcessados.map((c) => (
+                                    clientesProcessados.map((grupo) => {
+                                        const c = grupo.principal;
+                                        const temMultiplosServicos = grupo.servicos.length > 1;
+                                        return (
                                         <tr key={c.id} className="hover:bg-indigo-500/[0.02] transition-colors group">
                                             {/* STATUS */}
                                             <td className="px-6 py-4">
@@ -239,12 +268,20 @@ export default function CadastroCliente() {
 
                                             {/* RAZÃO SOCIAL */}
                                             <td className="px-6 py-4">
-                                                <div className="flex flex-col">
+                                                <div className="flex flex-col gap-1">
                                                     <span
-                                                        onClick={() => { setClienteSelecionado(c); setModalGestaoAberto(true); }}
+                                                        onClick={() => { setClienteSelecionado(grupo.servicos); setModalGestaoAberto(true); }}
                                                         className="cursor-pointer text-sm font-bold text-white group-hover:text-indigo-400 transition-colors uppercase truncate max-w-[220px]">
                                                         {c.razaoSocial || "Razão Social não informada"}
                                                     </span>
+                                                    {temMultiplosServicos && (
+                                                        <span
+                                                            title={grupo.servicos.map((s: ClienteCS) => s.servicos).filter(Boolean).join(" • ")}
+                                                            className="w-fit flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest"
+                                                        >
+                                                            <Layers size={10} /> {grupo.servicos.length} serviços
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
 
@@ -347,7 +384,8 @@ export default function CadastroCliente() {
                                                 )}
                                             </td>
                                         </tr>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </tbody>
 
@@ -361,7 +399,7 @@ export default function CadastroCliente() {
 
                 <div className="flex items-center gap-2">
                     <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                    <span>Total: <span className="text-slate-300">{clientes.length}</span> Clientes</span>
+                    <span>Total: <span className="text-slate-300">{gruposPorCnpj.length}</span> Clientes ({clientes.length} serviços)</span>
                 </div>
             </footer>
 

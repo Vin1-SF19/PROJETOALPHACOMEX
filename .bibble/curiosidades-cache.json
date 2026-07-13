@@ -7,6 +7,18 @@
       },
       {
         "text": "A tecnologia permite imprimir objetos em materiais maleáveis como alimentos e joias. Em breve, máquinas poderão criar qualquer peça sob demanda com precisão inédita.",
+        "shown": 4
+      },
+      {
+        "text": "O processo de impressão faz um objeto camada por camada, sendo extremamente detalhado até o nível microscópico. Isso permite a criação de próteses médicas complexas que se adaptam perfeitamente ao corpo humano.",
+        "shown": 4
+      },
+      {
+        "text": "As impressoras 3D usam milhares de microcamadas para construir objetos em camadas sucessivas. Elas são usadas para criar protótipos complexos e até implantes médicos personalizados.",
+        "shown": 4
+      },
+      {
+        "text": "As máquinas podem soldar metais com precisão de microns, permitindo a criação de peças nunca antes possíveis. Essa tecnologia revolucionou setores como medicina e aeroespacial ao possibilitar protótipos complexos.",
         "shown": 3
       }
     ]
@@ -19,7 +31,15 @@
       },
       {
         "text": "O recorde mundial de mais pessoas na fila foi estabelecido no Derby em 1960 com um trajeto que superou a capacidade de fluxo da época. A organização precisa de milhares de voluntários para validar todos os registros, garantindo o rigor científico e ético das medições.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O recorde mundial mais estranho é o de quem consegue comer mais pimenta em um curto período. Os eventos muitas vezes exigem habilidades motoras e resistência que fogem do comum.",
+        "shown": 4
+      },
+      {
+        "text": "O livro não é um registro de feitos por si só; ele faz parte da empresa guinness. Os recordes mais antigos datam do século XIX, focando em eventos esportivos como corridas.",
+        "shown": 4
       }
     ]
   },
@@ -31,7 +51,15 @@
       },
       {
         "text": "A palavra \"etimologia\" deriva do grego antigo *etymon*, combinando *epi* (sobre) com *timē* (nome). Significa literalmente o estudo do nome ou da origem das palavras.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "A palavra \"etimologia\" vem do grego *etymon*, signicando a origem de uma palavra. Ela descreve o estudo das raízes históricas de vocabulários linguísticos.",
+        "shown": 4
+      },
+      {
+        "text": "A palavra \"curiosidade\" vem do latim *curiositas*, derivado de um termo que originalmente se referia a algo escondido ou misterioso. Por isso, o conceito carrega em si a ideia de desvendar segredos.",
+        "shown": 2
       }
     ]
   },
@@ -44,6 +72,18 @@
       {
         "text": "Alguns exoplanetas têm temperaturas tão altas que a pressão atmosférica de vapor d'água é extrema. Os cientistas suspeitam que alguns desses mundos podem ter ciclos de chuva altamente violentos, compostos por metais pesados.",
         "shown": 4
+      },
+      {
+        "text": "Alguns planetas podem ter atmosferas compostas por elementos incrivelmente densos, como enxofre ou até mesmo metal líquido. Esses gases exotérmicos poderiam abrigar formas de vida baseadas em química não-carbono.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns exoplanetas são \"Júpiter quentes\", gigantes gasosos que orbitam extremamente perto de suas estrelas anãs. Esse calor intenso pode causar efeitos climáticos extremos na atmosfera deles.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns exoplanetas são classificados como \"Júpiteres quentes\", planetas gasosos enormes que orbitam extremamente próximos de suas estrelas. A proximidade extrema faz com que eles percam sua atmosfera rapidamente, um processo conhecido como fotoevaporação.",
+        "shown": 3
       }
     ]
   },
@@ -56,6 +96,22 @@
       {
         "text": "Neil Armstrong nunca pisou na Lua; ele foi filmado se preparando para descer o módulo lunar em um plano de fundo simulado. Muitos dos vídeos históricos que mostram a descida são dublagens ou reconstituições posteriores.",
         "shown": 4
+      },
+      {
+        "text": "Neil Armstrong não conseguiu ver o pouso da Apollo 11; ele ficou mais preocupado com a nave do que com os equipamentos de transmissão. A Missão Gemini, pioneira em voos espaciais americanos, utilizou técnicas de combate simuladas para treinar seus tripulantes.",
+        "shown": 4
+      },
+      {
+        "text": "Neil Armstrong não era um especialista em voo espacial; ele era largamente conhecido por ser um excelente piloto militar na Segunda Guerra Mundial. Essa experiência lhe deu a confiança necessária para enfrentar os desafios inéditos do pouso lunar.",
+        "shown": 4
+      },
+      {
+        "text": "Neil Armstrong foi o primeiro ser humano a pisar na Lua. Ele disse \"um pequeno passo para um homem gigante\", marcando o início da exploração espacial moderna.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro astronauta americano foi um piloto de teste chamado Alan Shepard. Ele voou no espaço apenas três semanas depois do primeiro homem do espaço, Yuri Gagarin.",
+        "shown": 1
       }
     ]
   },
@@ -67,7 +123,19 @@
       },
       {
         "text": "Algumas espécies de cactos são tão resistentes que germinam em superfícies metálicas ou plásticas. Eles conseguem sobreviver em ambientes extremamente secos, mesmo sem solo adequado.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Alguns tipos de cacto são perigosamente venenosos, possuindo espinhos que podem causar reações alérgicas graves. Eles também armazenam água em estruturas macias para sobreviver longos períodos de seca no deserto.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns cactos perdem suas folhas para sobreviver a períodos de seca intensa. Eles também conseguem armazenar água em diversas partes do corpo, funcionando como verdadeiras esponjas biológicas.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns cactos conseguem induzir flores coloridas fora de estação, mesmo quando o clima não é ideal para reprodução. Eles possuem um sistema de sobrevivência que permite armazenar água por meses inteiros após períodos longos de seca.",
+        "shown": 4
       }
     ]
   },
@@ -79,7 +147,15 @@
       },
       {
         "text": "Robôs já foram testados para tocar um gato. Os resultados mostraram dificuldade em calcular o toque suave necessário.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Robôs não só manipulam objetos; eles já são programados para antecipar movimentos humanos. Alguns avançados modelos podem prever a trajetória de um braço antes que ele se complete.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns robôs-aspiradores domésticos são programados para mapear a casa de forma inteligente, otimizando rotas. Eles usam sensores ópticos para evitar objetos e calcular o melhor caminho até cada canto.",
+        "shown": 4
       }
     ]
   },
@@ -91,6 +167,14 @@
       },
       {
         "text": "Os cavalos dos cavaleiros eram treinados para saltar por grandes distâncias com precisão militar. Eles usavam um distintivo símbolo de cruz que carregavam como sinal de fé e união.",
+        "shown": 4
+      },
+      {
+        "text": "Os cavaleiros templários não eram apenas guerreiros; formavam um sistema financeiro poderoso na Idade Média. Eles acumulavam vastas riquezas através do comércio, tornando-se influentes política e economicamente no Ocidente.",
+        "shown": 4
+      },
+      {
+        "text": "Os Templários não eram apenas cavaleiros religiosos; eles operavam como uma poderosa força financeira global na Idade Média. Seu conhecimento de contabilidade avançada garantiu seu poder além das fronteiras militares.",
         "shown": 4
       }
     ]
@@ -107,7 +191,11 @@
       },
       {
         "text": "Alguns peixes-bola utilizam um gás de baixa densidade para flutuar a profundidades extremas sem usar energia, o que economiza muito seu metabolismo. Essa habilidade os permite habitar zonas abissais onde a vida é extremamente desafiadora.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A lula-vampira possui um aparato de sucção único que pode sugar o sangue das vítimas. Seu corpo gelatinoso permite-lhe sobreviver em profundidades extremas sem sistemas vitais complexos.",
+        "shown": 3
       }
     ]
   },
@@ -116,6 +204,10 @@
       {
         "text": "Um meteoroide é um pedaço de rocha no espaço, mas o rastro de luz que vemos na atmosfera é chamado meteoro. É a abrasão intensa desse corpo por gases atmosféricos que gera esse espetáculo luminoso.",
         "shown": 4
+      },
+      {
+        "text": "Meteoros são pedaços de rocha espacial que queimam na atmosfera terrestre devido ao atrito com o ar. A luz que vemos é a energia liberada por esse superaquecimento, não a própria pedra brilhando.",
+        "shown": 2
       }
     ]
   },
@@ -127,7 +219,15 @@
       },
       {
         "text": "O chá verde japonês pode ser cozido em água fria por horas, um método chamado *cold brew* que intensifica seu sabor. Esse processo preserva nutrientes sensíveis ao calor e resulta em um chá menos amargo.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O chá verde japonês pode ser fermentado para transformar o sabor, criando variedades únicas como o hojicha. Em algumas culturas, ele é usado medicamente para ajudar na digestão e circulação sanguínea.",
+        "shown": 4
+      },
+      {
+        "text": "Chás podem ser usados como tônico natural para o intestino, facilitando o trânsito intestinal. Alguns tipos de chás são tradicionalmente utilizados para estimular a digestão e reduzir inchaços.",
+        "shown": 4
       }
     ]
   },
@@ -143,7 +243,11 @@
       },
       {
         "text": "Algumas espécies de formigas conseguem \"cortar\" os caminhos por seus feromônios, criando trilhas que confundem ou guiam outras formigas. Elas também possuem um sistema complexo de comunicação visual através das antenas.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Alguns fungos de formiga são cultivados dentro do corpo da formiga-cupinzeira para torná-la resistente a doenças. Elas também podem manipular o crescimento vegetal, induzindo plantas a crescerem em seus ninhos para melhor defesa e alimento.",
+        "shown": 2
       }
     ]
   },
@@ -155,7 +259,15 @@
       },
       {
         "text": "O brilho de uma supernova pode superar o da galáxia inteira por um período breve. Em alguns casos, ela pode até produzir elementos mais pesados que o ferro, como ouro e urânio.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Uma supernova pode iluminar um céu mais do que toda a população de estrelas na Via Láctea por breve tempo. Esse evento é o mecanismo final de explosão para algumas estrelas muito massivas, dispersando elementos pesados pelo cosmos.",
+        "shown": 4
+      },
+      {
+        "text": "O brilho de uma supernova pode superar o poder de galáxias inteiras por um período curto. É um evento que ajuda a disseminar elementos pesados, como ouro e urânio pelo cosmos.",
+        "shown": 1
       }
     ]
   },
@@ -167,7 +279,15 @@
       },
       {
         "text": "Eles não são sugadores de tudo; a força gravitacional só é extrema perto do horizonte de eventos. Qualquer coisa que cruze essa barreira escapa inevitavelmente, mesmo para a luz.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "A observação de um evento de \"flare\" (rajada) pode indicar a absorção de matéria por um buraco negro, criando ondas gravitacionais detectáveis à distância. Alguns modelos teorizam que eles possam ser restos colapsados de estrelas massivas ou até mesmo entidades de natureza ainda desconhecida.",
+        "shown": 4
+      },
+      {
+        "text": "Eles não possuem um centro físico; o colapso de matéria cria uma singularidade na raiz. A gravidade extrema dobra até mesmo a luz que passa perto, distorcendo nosso entendimento do espaço-tempo.",
+        "shown": 2
       }
     ]
   },
@@ -179,7 +299,19 @@
       },
       {
         "text": "O recorde de mais rápido corredor nunca é simplesmente sobre velocidade pura. Alguns registros são baseados em eventos esportivos específicos que alteram radicalmente o tipo de performance exigida.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O recorde mundial de peso morto foi superado por atletas usando equipamentos de suporte, o que gera discussões éticas na comunidade esportiva. Esses casos forçam a evolução das regras para garantir a competição justa.",
+        "shown": 4
+      },
+      {
+        "text": "O recorde de maior número de picles degustados em um dia pertence a um homem que tentou imitar o desafio do \"Most Days in a Row\" (maiores dias consecutivos) com cada picle. Não há, na verdade, um título oficial para esse nicho de performance absurda.",
+        "shown": 4
+      },
+      {
+        "text": "O recorde mundial de mais itens no corpo é o do homem que conseguiu colocar um número recorde por baixo da língua, usando palitos descartáveis cola. Este é o único feito classificado como recorde masculino no Guinness Book.",
+        "shown": 1
       }
     ]
   },
@@ -195,6 +327,10 @@
       },
       {
         "text": "Possui um sistema de anéis tênues e complexos, além dos famosos quatro satélites galileanos. Suas tempestades gigantescas são observadas há décadas, mas ainda incompreendidas em sua totalidade.",
+        "shown": 4
+      },
+      {
+        "text": "Suas luas estão cheias de atividade geológica intensa, como o vulcanismo suspeito em Io. Essa energia é causada pela força das marés exercida por Júpiter.",
         "shown": 1
       }
     ]
@@ -208,6 +344,18 @@
       {
         "text": "Os mouros eram artesãos de altíssimo nível no período medieval na península Ibérica. Eles influenciaram o desenvolvimento da arquitetura, ciência e agricultura local por séculos.",
         "shown": 4
+      },
+      {
+        "text": "As flores de lis eram um símbolo real muito utilizado na França durante a Idade Média e até a época moderna. Originalmente, o motivo representava a Virgindade e a pureza da rainha.",
+        "shown": 4
+      },
+      {
+        "text": "Em alguns castelos medievais mais avançados, os nobres podiam encontrar banquetes com pratos de animais exóticos como pavões e até peixes salgados de água doce. Muitos jornais tentam retratar a época apenas pela violência, ignorando a complexidade de suas artes e gastronomia sofisticada.",
+        "shown": 4
+      },
+      {
+        "text": "As figuras masculinas do vestuário medieval não eram limitadas a um único padrão; diferentes profissões exigiam tecidos e cortes específicos para maior mobilidade ou proteção. Alguns homens até usavam capacetes com detalhes altamente personalizáveis, podendo indicar sua patente política em batalha.",
+        "shown": 1
       }
     ]
   },
@@ -219,7 +367,19 @@
       },
       {
         "text": "O panda vermelho é menor e mais ágil que o panda gigante. Ele vive predominantemente nas florestas de bambu do sudeste da China.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Estão na Ásia e não são os pandas gigantes famosos. Alguns grupos vivem de forma insular e muito difícil de serem monitorados.",
+        "shown": 4
+      },
+      {
+        "text": "São considerados subespécies do panda gigante, habitando regiões montanhosas chinesas. Suas manchas vermelhas vibrantes os diferenciam dos parentes mais conhecidos.",
+        "shown": 4
+      },
+      {
+        "text": "São menores que o panda gigante e vivem principalmente em áreas montanhosas chinesas. Devido à destruição de seu habitat, estão classificados como ameaçados de extinção.",
+        "shown": 2
       }
     ]
   },
@@ -231,7 +391,19 @@
       },
       {
         "text": "Muitos castelos medievais eram construídos em locais strategicamente elevados para garantir visibilidade e defesa máxima. A localização muitas vezes definia quem detinha o poder e controle da região circundante.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Alguns castelos medievais tinham sistemas complexos de fossos secos ou cheios para dificultar a abordagem inimiga. Esses sistemas variavam conforme a topografia, adaptando-se à defesa natural do local.",
+        "shown": 4
+      },
+      {
+        "text": "Muitos castelos europeus foram construídos com paredes muito mais grossas do que o necessário para defesa. Essa robustez era, na verdade, um símbolo ostensivo de poder e riqueza da nobreza local.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns castelos medievais eram projetados com mecanismos complexos de defesa hidráulica. Eles podiam inundar fossos para travar invasores ou desestabilizar equipamentos de assalto.",
+        "shown": 1
       }
     ]
   },
@@ -243,7 +415,19 @@
       },
       {
         "text": "O primeiro trem a rodar sobre trilhos foi movido por vapor, mas operou em um sistema de linhas simples e não comerciais. Foi pioneiro na ideia da locomotiva motorizada, sendo crucial para o desenvolvimento dos transportes modernos.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O trem mais rápido já construído atingiu velocidades superiores a 500 km/h. Estes hiper-trens usam materiais avançados para reduzir drasticamente o atrito aerodinâmico.",
+        "shown": 4
+      },
+      {
+        "text": "Um trem de carga pode puxar mais de mil toneladas. Alguns recordes apontam para trens que movimentaram até 40 mil toneladas por dia inteiramente em um único trecho.",
+        "shown": 4
+      },
+      {
+        "text": "Um trem de carga consegue puxar mais de mil toneladas apenas com a tração dos motores. Essa força permite que ele cruze terrenos variados, superando obstáculos sem parar.",
+        "shown": 2
       }
     ]
   },
@@ -255,7 +439,15 @@
       },
       {
         "text": "O alfabeto fenício era um sistema consonantal altamente prático, usado para transações comerciais pelo Mediterrâneo. Ele influenciou diretamente o desenvolvimento do grego, que foi responsável por adicionar vogais.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O alfabeto fenício utilizava marcas simples para representar sons, e não consoantes como na maioria dos sistemas. Foi um grande catalisador que permitiu o desenvolvimento de outros alfabetos importantes no Mediterrâneo.",
+        "shown": 4
+      },
+      {
+        "text": "O alfabeto fenício não tinha letras dedicadas a vogais, mas usava um sistema de consoantes que o tornava altamente prático para a escrita comercial. Este modelo influenciou diretamente o desenvolvimento dos 알파벳 grego e latino.",
+        "shown": 4
       }
     ]
   },
@@ -271,7 +463,19 @@
       },
       {
         "text": "O império romano utilizava um sistema de aquedutos incrivelmente avançado para abastecer suas cidades. Eles conseguiam transportar água potável por longas distâncias com impressionante engenharia hidráulica.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Os maias possuíam um avançado conhecimento de astronomia e matemática. Eles utilizavam um calendário complexo que combinava ciclos solares, lunares e agrícolas com notável precisão.",
+        "shown": 4
+      },
+      {
+        "text": "Os egípcios usavam cílios postiços elaborados no ritual maquiagem funerária. Acredita-se que esses adornos ajudassem a proteger os olhos da luz intensa na vida após a morte.",
+        "shown": 4
+      },
+      {
+        "text": "O Egito Antigo utilizava um sistema de cálculo baseado em cotoveladas para medir grandes distâncias. Isso demonstra como as precisões eram adaptáveis à vasta engenharia das construções monumentais.",
+        "shown": 1
       }
     ]
   },
@@ -283,7 +487,19 @@
       },
       {
         "text": "O camomila contém um composto chamado apigenina que pode ajudar a induzir o sono profundo. Ela também é usada tradicionalmente para reduzir processos inflamatórios gastrointestinais suaves.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O uso de plantas foi essencial na história da farmacologia. Algumas propriedades medicinais são potencializadas por óleos essenciais, extraídos destas mesmas ervas.",
+        "shown": 4
+      },
+      {
+        "text": "Algumas folhas de goiabeira são usadas na medicina tradicional para tratar problemas digestivos. Elas também contêm substâncias que ajudam a reduzir inflamações no organismo.",
+        "shown": 4
+      },
+      {
+        "text": "O chá de hibisco é um potente diurético natural e ajuda a controlar a pressão arterial. Além disso, ele pode ser usado para reduzir os níveis de triglicerídeos no sangue.",
+        "shown": 1
       }
     ]
   },
@@ -291,7 +507,23 @@
     "entries": [
       {
         "text": "O ENIAC foi um dos primeiros computadores eletrônicos digitais de propósito geral a ser criado nos EUA. Ele pesava cerca de 30 toneladas e ocupava um cômodo inteiro, exigindo milhares de válvulas operacionais.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O ENIAC era enorme e pesava cerca de 30 toneladas. Ele utilizava milhões de componentes a vácuo, que o faziam consumir muita energia elétrica.",
+        "shown": 4
+      },
+      {
+        "text": "O ENIAC foi tão massivo que pesava cerca de 30 toneladas e ocupava um cômodo inteiro. Ele utilizava milhares de válvulas a vácuo, consumindo muita energia elétrica.",
+        "shown": 4
+      },
+      {
+        "text": "O ENIAC era enorme o suficiente para ocupar uma sala inteira. Ele continha mais de 17.000 válvulas a vácuo, componentes complexos que geravam muito calor.",
+        "shown": 4
+      },
+      {
+        "text": "O ENIAC pesava cerca de 30 toneladas e ocupava uma sala inteira. Ele continha mais de 17.000 válvulas a vácuo, um componente grande e quente.",
+        "shown": 1
       }
     ]
   },
@@ -303,6 +535,10 @@
       },
       {
         "text": "Os olhos dos cavalos são grandes o suficiente para verem tanto em diferentes direções. Isso lhes confere um campo de visão panorâmico impressionante, crucial para a sobrevivência do bando.",
+        "shown": 4
+      },
+      {
+        "text": "Os cavalos podiam mudar a direção correndo colinas, um truque atlético chamado galope de cone. Eles também possuem uma excelente audição, capaz de detectar mudanças na frequência dos sons para avaliar o ambiente.",
         "shown": 2
       }
     ]
@@ -315,7 +551,15 @@
       },
       {
         "text": "O Rio Amazonas extravasa seu volume de água anualmente, fazendo com que o nível do rio flutue em vários trechos. Essa dinâmica hídrica cria habitats únicos e imprevisíveis para a vida aquática amazônica.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O Rio Amazonas é mais caudaloso que os cinco maiores rios da Europa juntos. Ele deságua em um sistema de manguezais complexo, não diretamente no oceano.",
+        "shown": 4
+      },
+      {
+        "text": "O Rio Amazonas é tão extenso em sua bacia hidrográfica que deságua por um delta imenso nos Andes do Pacífico. Esse ecossistema único mistura águas de diferentes origens, criando espécies adaptadas ao encontro dos biomas.",
+        "shown": 4
       }
     ]
   },
@@ -327,7 +571,11 @@
       },
       {
         "text": "A cola de um cometa não é feita de gás dissolvido, mas sim por poeira e gelo vaporizados pelo Sol. Esse processo cria a cauda brilhante que o torna visível do espaço.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Alguns cometas podem ter mais de 100 mil anos-luz de distância, o que significa que vemos a luz deles como era milhões de anos atrás. Ao se aproximarem do Sol, seu gelo e poeira sublimam, formando um rastro brilhante chamado coma.",
+        "shown": 3
       }
     ]
   },
@@ -343,7 +591,19 @@
       },
       {
         "text": "Os egípcios acreditavam que o calor do deserto era vital para a preservação dos corpos, transformando o deserto num amortecedor eterno. O Rio Nilo não só fornecia água, como também mantinha a fertilidade mágica por meio de suas cheias anuais.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Os egípcios usavam maquiagem (kohl) não apenas para beleza, mas também para proteger os olhos do sol e de infecções. Eles acreditavam que o olho de Hórus oferecia proteção mágica contra o mal dos invejosos.",
+        "shown": 4
+      },
+      {
+        "text": "Os faraós egípcios realinhavam seus sarcófagos para ficarem voltados para o norte geograficamente. Essa prática era um ritual complexo de proteção espiritual do corpo após a morte.",
+        "shown": 4
+      },
+      {
+        "text": "Os egípcios acreditavam que o calor do deserto era mais frio à noite. Por isso, ele era visto como um local de passagem para a vida após a morte.",
+        "shown": 4
       }
     ]
   },
@@ -359,7 +619,7 @@
       },
       {
         "text": "São incrivelmente inteligentes e podem resolver problemas complexos usando ferramentas de forma planejada. Eles também são capazes de se comunicar por meio de sons que imitam vozes humanas, o que é notável em aves.",
-        "shown": 1
+        "shown": 4
       }
     ]
   },
@@ -371,6 +631,18 @@
       },
       {
         "text": "Algumas espécies de bambu atingem alturas impressionantes em poucos meses. Eles também são usados para carregar matéria-prima resistente a cupins e umidade.",
+        "shown": 4
+      },
+      {
+        "text": "As raízes do bambu podem se espalhar por quilômetros subterrâneossem um sistema de rizomas que o torna incrivelmente resistente a doenças. Ele pode crescer em taxas verticais comparáveis às de árvores, mas em frações de tempo.",
+        "shown": 4
+      },
+      {
+        "text": "O bambu é incrivelmente resistente à flexão e ao impacto, quase comparável ao aço em certos aspectos. Além de ser um ótimo material de construção, suas raízes subterrâneas formam sistemas densos que ajudam a estabilizar o solo.",
+        "shown": 4
+      },
+      {
+        "text": "O bambu é um tipo de gramínea, não sendo tecnicamente uma árvore. Ele pode crescer a alturas incríveis com grande velocidade, tornando-o um dos materiais mais ecológicos disponíveis.",
         "shown": 2
       }
     ]
@@ -383,6 +655,14 @@
       },
       {
         "text": "Estrelas de nêutrons giram muito rápido, algumas atingem frações da velocidade da luz. Esse giro intenso é o que causa poderosos pulsos de radiação eletromagnética detectáveis na Terra como pulsares.",
+        "shown": 4
+      },
+      {
+        "text": "As estrelas de nêutrons giram tão rápido quanto alguns planetas do sistema solar. Esse giro gera campos elétricos intensíssimos que podem desorientar qualquer equipamento eletrônico próximo.",
+        "shown": 4
+      },
+      {
+        "text": "Estrelas de nêutrons giram tão rápido que algumas produzem campos magnéticos mais potentes do que qualquer coisa na Terra. Elas podem emitir poderosos pulsos de radiação eletromagnética, como faróis cósmicos.",
         "shown": 3
       }
     ]
@@ -395,6 +675,10 @@
       },
       {
         "text": "Algumas águas-vivas possuem células urticantes capazes de causar dor intensa, mesmo para mamíferos que não são predadores naturais. Seu sistema nervoso é relativamente simples, mas altamente eficiente na coordenação do movimento em grupo.",
+        "shown": 4
+      },
+      {
+        "text": "Muitas espécies de água-viva têm tentáculos com células urticantes que imitam nematocistos, mas funcionam de maneiras completamente diferentes. Essa capacidade confere a elas um arsenal complexo de defesa química.",
         "shown": 1
       }
     ]
@@ -411,7 +695,11 @@
       },
       {
         "text": "Os tornados podem se formar em vários tipos de tempestades, não apenas em frentes frias. Eles têm um sistema de classificação chamado Fujita Aperfeiçoada ou Enhanced Fujita (EF) para medir a intensidade do impacto destrutivo.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Em áreas planas, os princípios de rotação do ar elevam o risco de torções mais fortes. Cientistas sugerem que a topografia molda drasticamente a intensidade dos ventos rotacionais.",
+        "shown": 4
       }
     ]
   },
@@ -428,6 +716,14 @@
       {
         "text": "O módulo lunar Apollo mais baixo foi deixado para trás na Lua. Ele continha equipamentos de pesquisa que foram incorporados ao conhecimento científico atual.",
         "shown": 4
+      },
+      {
+        "text": "O telescópio Hubble não vê o universo como ele é hoje; sua visão está limitada pelo tempo que detecta, mostrando luz de estrelas há milhões ou bilhões de anos. Ele funciona como uma máquina do tempo cósmico iluminando eventos passados.",
+        "shown": 4
+      },
+      {
+        "text": "A trajetória de voo do ônibus espacial foi calculada com altíssima precisão para otimizar o tempo na atmosfera. Um desvio mínimo poderia ter causado falha catastrófica no pouso em terra.",
+        "shown": 1
       }
     ]
   },
@@ -439,7 +735,15 @@
       },
       {
         "text": "Um átomo pode ser composto por partículas subatômicas como prótons e nêutrons, além de elétrons. O vazio dentro dos átomos é tão vasto que os elétrons se movem em altitudes extremas nesse espaço interno.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Os átomos não são partículas sólidas; eles passam a maior parte do tempo no vácuo. Essa \"ausência\" de localização é um aspecto central da mecânica quântica.",
+        "shown": 4
+      },
+      {
+        "text": "Os elétrons de um átomo não são estáticos; eles existem em movimento constante ao redor do núcleo. Essa energia em perpétuo fluxo é o que confere à matéria suas características únicas.",
+        "shown": 2
       }
     ]
   },
@@ -455,7 +759,15 @@
       },
       {
         "text": "O raio é basicamente um descarregamento gigante de eletricidade estática entre nuvens ou nuvem e terra. Essa descarga pode atingir milhões de volts, sendo a maior manifestação natural de alta voltagem.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A energia elétrica circula por um fluxo de elétrons. Esses pequenos carreadores de carga podem viajar a velocidades próximas à da luz em condutores metálicos.",
+        "shown": 4
+      },
+      {
+        "text": "A luz não é energia pura, mas sim um fóton — partícula de luz. O raio é apenas a forma mais violenta de descarga elétrica natural da Terra.",
+        "shown": 3
       }
     ]
   },
@@ -467,7 +779,19 @@
       },
       {
         "text": "Antigamente, algumas culturas exerciam rituais de \"último adeus\" onde o falecido era enterrado com pertences da vida futura; acredite, eram até roupas e ferramentas. Esses objetos tinham um papel simbólico, garantindo a passagem pacífica para o próximo plano existencial.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Na ilha de Páscoa, os moai eram esculpidos por um grupo social cujo destino final é desconhecido. Acredita-se que eles representavam ancestrais divinizados ou líderes importantes da comunidade polinésia.",
+        "shown": 4
+      },
+      {
+        "text": "Em algumas culturas, o uso de cores específicas em rituais determina o status social do participante. Por exemplo, tons vibrantes podem indicar poder ou ligação espiritual durante festivais religiosos.",
+        "shown": 4
+      },
+      {
+        "text": "Antiga Roma fazia um ritual onde os homens podiam se banhar com o sangue de animais para purificação. Eles acreditavam que esse contato físico com o sangue trazia sorte e força espiritual.",
+        "shown": 4
       }
     ]
   },
@@ -480,6 +804,18 @@
       {
         "text": "As cores da aurora podem ser causadas pela colisão de partículas solares com gases atmosféricos específicos. Essa dança de luz é um espetáculo visual que ocorre quando o vento solar interage com a magnetosfera terrestre.",
         "shown": 4
+      },
+      {
+        "text": "O brilho das auroras boreais pode ser visto de forma indireta por satélites na órbita terrestre. Elas são a manifestação visual da interação entre o vento solar e os campos magnéticos da Terra.",
+        "shown": 4
+      },
+      {
+        "text": "A Estação Internacional de Astronautas (ISS) permite aos astronautas verem a aurora boreal com intensidade épica do espaço. É um espetáculo que não só ilumina o céu, mas também comprova fenômenos eletromagnéticos complexos da Terra.",
+        "shown": 4
+      },
+      {
+        "text": "A deslumbrante dança de luzes é um resquício do campo magnético terrestre interagindo com partículas solares carregadas. Esse fenômeno ocorre quando o Sol expele esse fluxo constante de energia espacial.",
+        "shown": 1
       }
     ]
   },
@@ -492,6 +828,14 @@
       {
         "text": "São excelentes nadadores, mas não são desenhados para voar. Seus ossos são projetados para serem densos e pesados, ideais para a vida aquática fria.",
         "shown": 4
+      },
+      {
+        "text": "Pinguins de imperatriz constroem ninhos com cascas de caracol e gravetos, materiais que ajudam a manter o ninho isolado do frio extremo. Eles também são nadadores incrivelmente ágeis, capazes de atingir alta velocidade em ambientes marinhos.",
+        "shown": 4
+      },
+      {
+        "text": "Eles têm melanina nas asas, um pigmento usado para defesa contra predadores como tubarões. Essa característica os ajuda a se misturarem na água fria.",
+        "shown": 3
       }
     ]
   },
@@ -500,6 +844,18 @@
       {
         "text": "Diamantes de sangue são extremamente raros e não se formam na natureza. Muitas vezes, seu corante vermelho vem de processos de laboratório avançados.",
         "shown": 4
+      },
+      {
+        "text": "O diamante azul natural é um dos mais raros e valiosos gemas conhecidas. Sua cor incomum, causada por traços de elementos químicos profundos, eleva seu valor a patamares estratosféricos.",
+        "shown": 4
+      },
+      {
+        "text": "Diamantes de sangue valem milhões devido à sua raridade natural. Eles são formados em ambientes específicos da Terra, conferindo-lhes um valor histórico e geológico único.",
+        "shown": 4
+      },
+      {
+        "text": "Diamantes de sangue são considerados os mais raros diamantes. Eles possuem uma cor vermelha intensa causada por traços de cristal de cromóforo natural.",
+        "shown": 3
       }
     ]
   },
@@ -511,7 +867,19 @@
       },
       {
         "text": "Os gatos podem usar o vibrissas (bigodes) para sentir mudanças sutis no ar e até mesmo detectar campos eletromagnéticos. Eles também são incrivelmente resistentes ao tédio, sendo mestres em criar suas próprias formas de entretenimento.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Os gatos não conseguem sentir o cheiro de seus próprios dejetos, um mecanismo que os ajuda a ignorar substâncias desagradáveis. Eles também têm um formato ósseo único que lhes permite esticar-se e se encaixar em espaços incrivelmente apertados.",
+        "shown": 4
+      },
+      {
+        "text": "Os ronronares dos gatos são mais complexos do que apenas um sinal de contentamento. Eles também podem ser utilizados para se comunicar em momentos de dor ou quando estão com medo.",
+        "shown": 4
+      },
+      {
+        "text": "Os gatos não ronronam só por felicidade; o som também ajuda a curar ossos e tecidos. Eles utilizam este mecanismo auditivo misterioso para se acalmarem ou quando estão feridos.",
+        "shown": 1
       }
     ]
   },
@@ -519,6 +887,10 @@
     "entries": [
       {
         "text": "Algumas línguas indígenas nunca foram escritas. Sua preservação depende exclusivamente da memória oral de seus falantes mais velhos.",
+        "shown": 4
+      },
+      {
+        "text": "O crioulo haitiano é um exemplo fascinante de língua resultante do contato forçado entre diversas culturas. Ele mistura francês, espanhol, inglês e línguas africanas, criando algo completamente novo a partir da necessidade de comunicação.",
         "shown": 4
       }
     ]
@@ -531,7 +903,15 @@
       },
       {
         "text": "O tempo não é um fluxo constante; ele está ligado ao espaço formando o contínuo chamado espaço-tempo. A velocidade com que você se move afeta a sua percepção do tempo, fazendo-o passar mais devagar em relação a quem está parado.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O tempo e o espaço não são absolutos, como se pensava antes. Eles formam uma estrutura de quatro dimensões chamada espaço-tempo flexível.",
+        "shown": 4
+      },
+      {
+        "text": "O tempo não é absoluto; ele desacelera para quem está se movendo muito rápido em relação a um observador fixo. Essa dilatação temporal faz parte do tecido mais complexo das leis físicas conhecidas.",
+        "shown": 4
       }
     ]
   },
@@ -543,7 +923,19 @@
       },
       {
         "text": "Comem até impressionantes 18 quilos de bambu por dia. Eles passam a maior parte do tempo se alimentando para economizar energia, já que digerir o material é um processo lento.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Panda não adora bamboo; ele é um carnívoro adaptado à vegetação fibrosa. Suas patinhas são quase indistinguíveis de outras macacos asiáticos, perdendo os dedos para uma dieta rica em células vegetais.",
+        "shown": 4
+      },
+      {
+        "text": "Eles são aracnídeos e não mamíferos. Além disso, a dieta deles é mais variada do que se imagina, incluindo raízes e folhas de outras espécies além do bambu.",
+        "shown": 4
+      },
+      {
+        "text": "Eles dormem por periodos muito longos de tempo para economizar energia. Esse sono pode durar semanas ou até meses seguidos.",
+        "shown": 3
       }
     ]
   },
@@ -556,6 +948,14 @@
       {
         "text": "São capazes de mudar completamente a cor e a textura da pele instantaneamente para se camuflar. Além disso, possuem um sistema nervoso descentralizado que permite que cada braço pense quase de forma independente.",
         "shown": 4
+      },
+      {
+        "text": "Polvos possuem capacidade de mudar a cor e até a textura da sua pele para se camuflarem em segundos. Eles também utilizam um sistema de jatos de tinta misturados ao plasma bioluminescente como defesa.",
+        "shown": 4
+      },
+      {
+        "text": "Polvos possuem três corações — dois para filtrar sangue por suas brânquias e um para o sistema circadúvio. Eles também mudam a cor da pele instantaneamente, usando células chamadas cromatóforos.",
+        "shown": 4
       }
     ]
   },
@@ -567,6 +967,22 @@
       },
       {
         "text": "A Batalha de Cannae foi tão devastadora que Hannibal Barca utilizou táticas avançadas para aniquilar um exército romano superior em número. Essa manobra quase desorganizou completamente o poder militar da República Romana por anos.",
+        "shown": 4
+      },
+      {
+        "text": "Em batalhas medievais, o choque de escudos era tão violento que os soldados ficavam com ossos quebrados ou até deformações permanentes. Os cavalos também sofriam muito, muitas vezes carregando ferimentos graves por passarem por combate intenso e lama.",
+        "shown": 4
+      },
+      {
+        "text": "Na Batalha de Canas, a principal tática romana foi envolvê-los com forças laterais desarmadas quando tentaram fugir, garantindo um cerco total. Esse manobra encurraladora levou à quase aniquilação do exército romano em seu auge.",
+        "shown": 4
+      },
+      {
+        "text": "Durante a Primeira Guerra Mundial, os tanques eram tão lentos e previsíveis que muitos soldados ainda preferiam atravessar as trincheiras andando a pé. Eles representavam uma mudança tática lenta para um poder bélico avassalador.",
+        "shown": 4
+      },
+      {
+        "text": "Na Batalha de Canas, o exército romano avançou em um formato de ferradura para flanquear os romanos e cerca seus homens. Essa tática manobrista levou ao colapso quase total das legiões romanas.",
         "shown": 1
       }
     ]
@@ -579,6 +995,14 @@
       },
       {
         "text": "Os samurais não vestiam armaduras luxuosas sempre; eles usavam roupas práticas de acordo com o ambiente. Muitos deles eram excelentes arqueiros, técnica que era mais valorizada no início do período samurai.",
+        "shown": 4
+      },
+      {
+        "text": "Os samurais não eram apenas guerreiros; eles também governavam grande parte do Japão feudal por séculos. Sua cultura de disciplina e código honorário, o Bushidō, moldou profundamente a identidade japonesa.",
+        "shown": 4
+      },
+      {
+        "text": "Os samurais não eram apenas guerreiros de elite; eles também detinham o dever social do Bushido. Esse código de honra ditava a vida pessoal, estendendo-se para além da batalha em todas as áreas sociais.",
         "shown": 1
       }
     ]
@@ -591,7 +1015,15 @@
       },
       {
         "text": "Na Itália, o pão não é mais consumido como acompanhamento principal. Ele é incorporado em pratos salgados e doces de maneiras inesperadas.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Em algumas partes da Itália, o consumo de café após as refeições é tabu socialmente, sendo preferido um digestivo ou chá quente. A tradição manda que bebidas alcoólicas só sejam consumidas após o prato principal, nunca antes dele.",
+        "shown": 4
+      },
+      {
+        "text": "O óleo de coco era usado pelos antigos egípcios não só em pratos, mas também como base em remédios medicinais. Antigamente, o mel era tão valioso que, além de alimento, funcionava como moeda de troca.",
+        "shown": 4
       }
     ]
   },
@@ -607,7 +1039,11 @@
       },
       {
         "text": "Algumas espécies de aranhas podem gerar teias bioluminescentes para atrair presas. Elas utilizam variações complexas nessas luzes para confundir ou até mesmo incapacitar suas vítimas.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Algumas espécies de aranhas possuem teias eletrostáticas, capazes de capturar pequenos insetos à distância. Elas também usam suas redes para desorientar presas antes de atacar o alvo principal.",
+        "shown": 3
       }
     ]
   },
@@ -619,7 +1055,19 @@
       },
       {
         "text": "Seus pés são capazes de detectar variações mínimas na pressão do solo. Eles também têm a capacidade de emitir sons complexos que viajam por longas distâncias subterrâneas.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Os pés dos elefantes não são como os de outros animais; eles têm almofadas musculares e calcanhares que suportam toneladas de peso. Essa estrutura única lhes permite caminhar em quase qualquer terreno sem se machucar.",
+        "shown": 4
+      },
+      {
+        "text": "O rugido mais alto dos machos pode ser percebido a longas distâncias, mas na verdade, eles se comunicam muito mais por baixo do chão. Eles utilizam frequências infrassônicas que viajam em grandes distâncias pelo ar e pela água.",
+        "shown": 4
+      },
+      {
+        "text": "Os elefantes possuem um órgão chamado cólon pseudo-cerebral que também funciona como memória; por isso, são considerados animais de altíssima capacidade cognitiva. Estão doentes de sífilis em taxas elevadas e a doença pode ser transmitida entre indivíduos.",
+        "shown": 3
       }
     ]
   },
@@ -631,7 +1079,15 @@
       },
       {
         "text": "A floresta armazena biomassa suficiente para gerar energia elétrica de até UHE Delft. Sua biodiversidade é tão grande que o conhecimento científico ainda não catalogou milhões de espécies amazônicas.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O Rio Negro é um dos rios mais ácidos do mundo, o que impede a decomposição normal da matéria orgânica. Essa acidez confere ao rio um tom escuro e único em comparação com outros grandes rios amazônicos.",
+        "shown": 4
+      },
+      {
+        "text": "Existe um ecossistema aquático chamado \"várzea\" que inunda sazonalmente a floresta, permitindo a vida de espécies únicas adaptadas tanto à terra quanto à água doce. Essa dinâmica fluvial é vital para o ciclo reprodutivo da fauna e flora amazônica.",
+        "shown": 3
       }
     ]
   },
@@ -643,7 +1099,15 @@
       },
       {
         "text": "O cérebro gera eletricidade suficiente para acender várias lâmpadas pequenas. Ele também usa cerca de 20% da energia total do corpo, apesar de pesar apenas alguns quilos.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O cérebro gera energia suficiente para acender uma lâmpada de baixa potência por meses. Ele é um órgão altamente plástico, o que significa que pode se reorganizar e criar novas conexões neurais ao longo da vida.",
+        "shown": 4
+      },
+      {
+        "text": "O cérebro gera energia suficiente para acender uma lâmpada de baixa potência por um dia inteiro. Consumir cafeína aumenta o estado de alerta, mas pode diminuir a capacidade do córtex pré-frontal de planejar tarefas complexas.",
+        "shown": 2
       }
     ]
   },
@@ -655,6 +1119,18 @@
       },
       {
         "text": "Os romanos usavam tradicionalmente o banho público não só para higiene, mas também como um complexo centro social de negócios e fofocas. As termas eram verdadeiros espaços de convivência onde as pessoas podiam se exercitar e trocar informações.",
+        "shown": 4
+      },
+      {
+        "text": "Os gladiadores não apenas lutavam; eles eram peças de propaganda política. Vencer era essencial para garantir o apoio do povo ao imperador que os patrocinava.",
+        "shown": 4
+      },
+      {
+        "text": "O Coliseu era usado para mais do que lutas de gladiadores; também realizavam simulações de caçadas épicas, chamadas venationes. Em alguns casos, é possível identificar traços de mágica e entretenimento em seus espetáculos.",
+        "shown": 4
+      },
+      {
+        "text": "O Coliseu originalmente não era para eventos de gladiadores; ele foi construído como um centro multifuncional para festivais públicos maiores. As pessoas podiam assistir a shows dramáticos, corridas de carros e batalhas simuladas nesse local gigantesco.",
         "shown": 1
       }
     ]
@@ -672,6 +1148,22 @@
       {
         "text": "O DNA não é apenas um código de instruções; ele carrega também informações para a produção de energia celular. A capacidade de certos organismos se adaptarem rapidamente é quase mágica, mas tem raízes genéticas profundas.",
         "shown": 4
+      },
+      {
+        "text": "O DNA contém instruções não apenas para características visíveis do corpo, mas também podem determinar como o organismo reage a toxinas ou venenos. Essa \"genética bioquímica\" permite à natureza adaptar seres vivos a ambientes perigosos.",
+        "shown": 4
+      },
+      {
+        "text": "Cada pessoa carrega o código genético de seus avós e bisavós, um processo chamado recombinação genética. Isso significa que parte do DNA que você possui não é exclusivamente seu.",
+        "shown": 4
+      },
+      {
+        "text": "O código genético é quase redundante; o mesmo aminoácido pode ser codificado por mais de um códon. Isso demonstra que a função biológica é mais importante que a sequência exata do DNA.",
+        "shown": 4
+      },
+      {
+        "text": "Nem todos os genes definem características; muitos genes interagem complexamente com o ambiente para expressar traços. Isso significa que estilo de vida e dieta têm um impacto maior na saúde do que se pensa.",
+        "shown": 3
       }
     ]
   },
@@ -683,6 +1175,14 @@
       },
       {
         "text": "As baleias-jubarte não cantam apenas para atrair parceiros; esses sons complexos podem ajudar a mapear correntes oceânicas. A comunicação delas é um fator crucial de navegação nessas gigantes marinhas.",
+        "shown": 4
+      },
+      {
+        "text": "As baleias-jubarte não conseguem rosnar, apesar de alguns cientistas terem comparado seus vocalizações a um rugido profundo. Elas possuem habilidades de canção complexas, que são usadas para comunicação em grupos sociais.",
+        "shown": 4
+      },
+      {
+        "text": "O canto das baleias-jubarte pode ser ouvido a distâncias de mais de mil quilômetros. Estima-se que os sons dessas megafaunas sejam projetados para viajar em grandes volumes d'água.",
         "shown": 3
       }
     ]
@@ -692,6 +1192,18 @@
       {
         "text": "O submarino mais profundo já construído é feito de titânio de liga especial. Ele consegue resistir a pressões extremas, tornando-o um recordista tecnológico submersível.",
         "shown": 4
+      },
+      {
+        "text": "O primeiro submarino tripulado foi um modelo experimental chamado \"Turtle\", construído por engenheiros e soldados na Guerra de Independência Americana. Ele navegava rasante do fundo para minar navios inimigos sem ser detectado.",
+        "shown": 4
+      },
+      {
+        "text": "O Design original do Triângulo Atômico era feito para mergulhar até o fundo de um oceano. Ele tem um sistema avançado de propulsão que permite operações muito além da capacidade de qualquer navio moderno.",
+        "shown": 4
+      },
+      {
+        "text": "O Triângulo das Bermudas é famoso por lendas de navios sumidos, mas a maioria desses incidentes pode ser explicada por condições climáticas adversas. Os oceanos profundos contêm formas de vida desconhecidas que permanecem invisíveis para a nossa tecnologia atual.",
+        "shown": 4
       }
     ]
   },
@@ -700,6 +1212,14 @@
       {
         "text": "A pressão em suas profundezas é suficiente para esmagar a maioria dos materiais conhecidos na Terra. Por isso, ela abriga formas de vida únicas em ambientes extremos.",
         "shown": 4
+      },
+      {
+        "text": "As profundezas do abismo merecem esse nome por serem o ponto mais fundo conhecido na Terra. A pressão lá é tão intensa que desestabiliza a maioria dos materiais biológicos conhecidos.",
+        "shown": 4
+      },
+      {
+        "text": "A profundidade da Fossa das Marianas é tão extrema que a pressão ali alcança pontos de ebulição para água, mas o frio mantém o oceano líquido. Essa região guarda organismos únicos adaptados a condições extremas e escuridão total.",
+        "shown": 1
       }
     ]
   },
@@ -711,7 +1231,7 @@
       },
       {
         "text": "A tripulação não vislumbrou a Terra azul do Módulo Lunar durante a órbita inicial, por estar alinhado de forma que o mar era mais perceptível na direção oposta. Eles viram apenas um céu profundo e estrelas inconfundíveis em volta da Lua.",
-        "shown": 1
+        "shown": 4
       }
     ]
   },
@@ -727,7 +1247,15 @@
       },
       {
         "text": "A Via Láctea não é uma constelação, mas sim um braço espiral de bilhões de estrelas que faz parte da nossa galáxia. Olhar para o céu noturno em áreas remotas permite ver a estrutura completa do nosso caminho galáctico.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "A constelação",
+        "shown": 4
+      },
+      {
+        "text": "A Ursa Maior não é apenas um conjunto de estrelas; ela também aponta para a Estrela Polar. Este ponto celeste ajuda os navegadores há milênios a determinar o norte verdadeiro, independentemente da época do ano ou do clima.",
+        "shown": 3
       }
     ]
   },
@@ -739,7 +1267,23 @@
       },
       {
         "text": "O Coliseu de Roma não só era um palco para lutas de gladiadores, mas também recebia espetáculos teatrais complexos. Ele foi adaptado ao longo dos séculos para diversas funções, incluindo depósito e residência.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O Império Romano manteve estruturas de saneamento complexas que ainda inspiram arquitetura moderna. Muitas cidades europeias foram fundadas sobre rotas comerciais antigas, mantendo vestígios romanos incríveis.",
+        "shown": 4
+      },
+      {
+        "text": "Em algumas cidades coloniais do Brasil, os traçados originais eram ditados pelo poder religioso. Muitas ruas estreitas foram projetadas para otimizar o fluxo de pessoas em procissões religiosas.",
+        "shown": 4
+      },
+      {
+        "text": "O Coliseu de Roma já foi usado como jaula para animais selvagens e local de execuções. Além disso, era tão imponente que influenciava o planejamento urbano da arquitetura romana bem depois da sua construção original.",
+        "shown": 4
+      },
+      {
+        "text": "Em muitas cidades coloniais brasileiras o traçado original não seguia a grade reta ideal. O desenho espontâneo das vielas reflete a evolução orgânica do povoado ao longo dos séculos.",
+        "shown": 1
       }
     ]
   },
@@ -751,7 +1295,15 @@
       },
       {
         "text": "Modelos de IA linguística podem ser treinados para imitar estilos literários",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Alguns modelos de IA podem \"alucinar\", ou seja, inventar fatos convincentes sem base na realidade. Eles fazem isso processando padrões e não necessariamente a verdade factual.",
+        "shown": 4
+      },
+      {
+        "text": "Algoritmos atuais já conseguem reconhecer padrões complexos de voz humanos com alta precisão, mesmo se houver ruído de fundo intenso. Isso permite sistemas de reconhecimento de fala em ambientes caóticos, como ruas movimentadas ou fábricas barulhentas.",
+        "shown": 1
       }
     ]
   },
@@ -764,6 +1316,14 @@
       {
         "text": "Mercúrio tem um \"dia\" de 59 dias terrestres, mas seu ano é muito mais rápido que o da Terra. Essa diferença extrema entre dia e ano resulta em calor extremo.",
         "shown": 4
+      },
+      {
+        "text": "Júpiter possui uma Grande Mancha Vermelha, uma tempestade colossal que persiste por séculos. Ela é tão grande que poderia engolir a Terra inteira.",
+        "shown": 4
+      },
+      {
+        "text": "Mercúrio não possui atmosfera significativa, o que causa enormes variações de temperatura entre seus lados. Um dia no planeta dura apenas cerca de cinco horas terrestres.",
+        "shown": 4
       }
     ]
   },
@@ -775,7 +1335,27 @@
       },
       {
         "text": "O número pi não possui um padrão de repetição finito ou previsível. Ele é considerado um número irracional, significando que seus dígitos nunca terminam nem se repetem em sequência.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O número 7 é considerado um número de sorte mundialmente; ele aparece frequentemente por razões psicológicas. Culturalmente, o sete está ligado à perfeição, como nas cores do arco-íris ou os dias da semana.",
+        "shown": 4
+      },
+      {
+        "text": "O número Pi nunca termina de se repetir, gerando uma sequência infinita de dígitos. É usado para calcular a razão entre a circunferência de um círculo e seu diâmetro.",
+        "shown": 4
+      },
+      {
+        "text": "O número ouro (Phi) aparece repetidamente na natureza e artes. Ele é a razão matemática entre dois segmentos de reta cujas proporções definem o crescimento ideal.",
+        "shown": 4
+      },
+      {
+        "text": "O número 37 é um primo de Sophie Germain e também faz parte da sequência de primos gargalhantes (whimsical primes). Ele é o menor número ímpar sem fator divisível por 2, 3 ou 5.",
+        "shown": 4
+      },
+      {
+        "text": "O número 42 é conhecido como a resposta para a vida, o universo e tudo mais na ficção científica. Isso se deve à obra de Douglas Adams, onde ele foi estabelecido por um computador alienígena.",
+        "shown": 3
       }
     ]
   },
@@ -791,7 +1371,15 @@
       },
       {
         "text": "As asas de algumas espécies de borboletas são revestidas por escamas microscópicas. Essas escamas não apenas dão cor, mas também desempenham um papel crucial na termorregulação do inseto.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "As asas das borboletas não são feitas de matéria sólida, mas sim de milhões de microesculturas chamadas escamas. É essa combinação que lhes confere cores vibrantes e o efeito iridescente característico.",
+        "shown": 4
+      },
+      {
+        "text": "A maioria das borboletas não consegue voar se seus casulos forem removidos de forma muito brusca. Elas também passam por um processo de metamorfose que as transforma em espécies completamente diferentes do seu estado larval.",
+        "shown": 3
       }
     ]
   },
@@ -803,7 +1391,19 @@
       },
       {
         "text": "O mapa da China Antiga continha um código de criptografia usado para esconder rotas comerciais secretas. Decifrá-lo foi crucial para entender o comércio real das dinastias passadas.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O artefato mais antigo já catalogado de ouro é um mini-coração humano datado de pelo menos 30 mil anos na Caverna de Lascaux, França. Ele não era apenas decorativo, mas possivelmente tinha conotação ritualística para o tribal.",
+        "shown": 4
+      },
+      {
+        "text": "O Museu Britânico possui ouro maciço do Benin que foi saqueado durante um conflito colonial inglês. Esse grupo de peças, fundamental para a história africana, ainda gera debates éticos intensos até hoje.",
+        "shown": 4
+      },
+      {
+        "text": "As ruínas de Pompeia foram preservadas por cinzas vulcânicas que agiram como um molde natural perfeito. Elas capturaram detalhes da vida cotidiana, incluindo as poses congeladas das vítimas ao redor de suas atividades diárias.",
+        "shown": 1
       }
     ]
   },
@@ -815,7 +1415,15 @@
       },
       {
         "text": "O primeiro sistema operacional gráfico foi o Xerox Alto, muito antes do Windows ser comercializado. Muitos recursos fundamentais da Microsoft foram inspirados por pesquisas de outras instituições pioneiras.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O logotipo do Windows mudou de design diversas vezes ao longo da história até chegar à aparência atual. A Microsoft já lançou versões com interfaces gráficas muito diferentes, como o \"Program Manager\" inicial.",
+        "shown": 4
+      },
+      {
+        "text": "O sistema operacional Windows nunca foi feito para ser usado sozinho; sempre exigiu um hardware específico ao longo de sua história. As primeiras versões eram usadas por empresários, não pelo público geral.",
+        "shown": 4
       }
     ]
   },
@@ -831,7 +1439,15 @@
       },
       {
         "text": "A rainha de mel é capaz de pôr mais de 2 mil ovos por dia, sendo o número maior registrado entre qualquer inseto. Ela pode viver por várias décadas e emitir feromônios complexos para manter a colmeia organizada.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "As abelhas coletam néctar até mesmo de flores que não são as mais doces. Elas também usam um tipo de dança complexa para orientar a colmeia sobre a localização exata das fontes de alimento.",
+        "shown": 4
+      },
+      {
+        "text": "Suas vibrções ao voar podem polinizar flores mesmo quando ela não toca na planta. Um zumbido de abelha é um sinal acústico que pode comunicar informações às rainhas.",
+        "shown": 2
       }
     ]
   },
@@ -844,6 +1460,18 @@
       {
         "text": "O avião mais rápido já construído não voava com combustíveis fósseis. Ele era movido por um motor a ar alimentado por vácuo, atingindo velocidade recorde em testes de altitude controlada.",
         "shown": 4
+      },
+      {
+        "text": "O avião decola mais rápido ao voar em ângulo ascendente. Os pilotos ajustam a força para otimizar o consumo de combustível durante a subida inicial.",
+        "shown": 4
+      },
+      {
+        "text": "O voo mais rápido já registrado por um ser humano foi feito em velocidade supersônica usando um avião a jato. A turbulência é real, pois as mudanças rápidas na pressão do ar podem causar náuseas e desconforto físico nos passageiros.",
+        "shown": 4
+      },
+      {
+        "text": "O avião era voado por um operário de trem antes dos motores a jato serem comuns no transporte rápido. O primeiro ônibus movido a gasolina foi só um caminhão com assentos adaptados para cobrir grandes distâncias de forma mais eficiente que o cavalo.",
+        "shown": 2
       }
     ]
   },
@@ -856,6 +1484,18 @@
       {
         "text": "O cérebro continua processando informações enquanto você dorme. Ele consolida memórias e \"limpa\" toxinas metabólicas acumuladas durante o dia.",
         "shown": 4
+      },
+      {
+        "text": "O cérebro continua trabalhando durante o sono, consolidando memórias. Por isso, é comum acordar sentindo que sua mente está \"processando\" informações do dia.",
+        "shown": 4
+      },
+      {
+        "text": "O cérebro continua ativo durante o sono, consolidando memórias e processando informações. Essa atividade é crucial para a saúde mental e física do indivíduo.",
+        "shown": 4
+      },
+      {
+        "text": "O cérebro continua processando memórias durante o sono REM, fortalecendo conexões neurais. Esse processo ajuda na consolidação do aprendizado e na resolução de problemas complexos.",
+        "shown": 1
       }
     ]
   },
@@ -867,7 +1507,15 @@
       },
       {
         "text": "O primeiro programa de rádio transmitido não foi música, mas sim o desfile real de membros da família real britânica. Inicialmente, as transmissões eram extremamente caras e exclusivas para poucos ouvintes abastados.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O primeiro programa de rádio não foi música; era um drama radiofônico. Esses programas moldaram o entretenimento popular durante décadas, antes do advento da televisão.",
+        "shown": 4
+      },
+      {
+        "text": "Os primeiros transmissões de rádio eram muitas vezes feitas por balões e até mesmo em navios, adaptando a tecnologia marinha para o ar. A voz e a música viajam através de ondas eletromagnéticas invisíveis que preenchem a atmosfera.",
+        "shown": 2
       }
     ]
   },
@@ -879,7 +1527,11 @@
       },
       {
         "text": "A floresta é coberta por um sistema de rios navegáveis que formam a maior bacia hidrográfica do mundo. A biodiversidade amazônica sustenta conhecimentos medicinais há milhares de anos, vitais para o desenvolvimento científico moderno.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A floresta amazônica abriga mais biodiversidade do que qualquer outro bioma conhecido. Estima-se que ela tenha um papel fundamental na regulação climática global, funcionando como um pulmão vital para o planeta.",
+        "shown": 3
       }
     ]
   },
@@ -892,6 +1544,18 @@
       {
         "text": "O músculo cardíaco não fica parado; ele pulsa com um ritmo elétrico complexo gerado por células especializadas. Esse sistema elétrico é tão eficiente que permite o bombeamento contínuo mesmo em repouso prolongado do corpo.",
         "shown": 4
+      },
+      {
+        "text": "O músculo cardíaco é o único tipo de músculo do corpo capaz de se contrair ritmicamente por conta própria. Ele possui células especializadas que geram um potencial elétrico constante, mantendo a circulação sem depender diretamente da função nervosa.",
+        "shown": 4
+      },
+      {
+        "text": "O músculo cardíaco não para nunca de bater quando você está acordado, funcionando incansavelmente por décadas. Ele é um órgão resistente que pode compensar o desgaste natural com a força do exercício físico.",
+        "shown": 4
+      },
+      {
+        "text": "O músculo cardíaco é mais forte do que um motor de carro popular equivalente na mesma potência. Ele continua batendo mesmo quando desconectado do corpo por alguns minutos, mantido pela energia armazenada nos tecidos circundantes.",
+        "shown": 2
       }
     ]
   },
@@ -911,7 +1575,11 @@
       },
       {
         "text": "A Caatinga é o único bioma exclusivamente brasileiro. Ela se destaca pela vegetação xerófila adaptada ao semiárido do Nordeste.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "A Mata Atlântica foi um dos biomas mais devastados do mundo antes de iniciar seu processo lento de recuperação florestal. Hoje, ela abriga uma biodiversidade crucial para o nosso abastecimento hídrico e a manutenção climática costeira.",
+        "shown": 4
       }
     ]
   },
@@ -923,7 +1591,11 @@
       },
       {
         "text": "Alguns cães conseguem rir de verdade, um som característico chamado guincho. Esse comportamento é um sinal de excitação ou brincadeira entre os animais.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Algumas raças de cães têm um olfato extremamente aguçado, podendo detectar substâncias microscópicas como narcóticos e tipos específicos de câncer. Esse talento é usado profissionalmente em serviços de busca e salvamento ou na detecção forense.",
+        "shown": 3
       }
     ]
   },
@@ -939,7 +1611,15 @@
       },
       {
         "text": "Algumas orquídeas são tão raras que demoram anos para florescer na natureza. Elas possuem mecanismos de polinização extremamente complexos, muitas vezes envolvendo insetos específicos.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Algumas plantas amazônicas só florescem por um período de tempo muito curto, muitas vezes exigindo condições climáticas específicas para reprodução. Sua bioluminescência noturna ajuda na atração de polinizadores em ambientes escuros.",
+        "shown": 4
+      },
+      {
+        "text": "O jade é considerado um pseudocacto por ter folhas carnosas que lembram as cactáceas. Ele consegue sobreviver em ambientes com pouca água, sendo ideal para quem esquece de regar.",
+        "shown": 3
       }
     ]
   },
@@ -951,7 +1631,11 @@
       },
       {
         "text": "Possui um sistema de anéis complexíssimo composto principalmente por gelo de água. A força gravitacional dele é responsável por manter esses anéis perfeitamente orbitados.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Os anéis de Saturno são tão vastos que possuem mais massa combinada do que todos os planetas do sistema solar juntos. Eles são compostos principalmente por bilhões de partículas de gelo e poeira rochosa.",
+        "shown": 2
       }
     ]
   },
@@ -963,6 +1647,18 @@
       },
       {
         "text": "A alfândega moderna é um sistema complexo de controle de mercadorias transfronteiriças. Ela também realiza a fiscalização para evitar o contrabando de itens ilegais ou restritos.",
+        "shown": 4
+      },
+      {
+        "text": "A primeira alfândega documentada foi na Grécia Antiga, usada para taxar mercadorias que entravam pelas portas da cidade. Na Inglaterra moderna, a Receita Alfandegária (HMRC) é responsável por cobrar impostos sobre bens importados e exportados no Reino Unido.",
+        "shown": 4
+      },
+      {
+        "text": "Em alguns países caribenhos, funcionava um sistema de controle alfandegário que taxava até mesmo o ar rarefeito por ser considerado um bem exótico. Em outros locais, se tentasse passar produtos agrícolas sem declarar, você poderia enfrentar não só multas, mas também o apreensão do seu veículo.",
+        "shown": 4
+      },
+      {
+        "text": "A função alfandegária foi crucial para o desenvolvimento urbano de cidades portuárias históricas. Muitas tarifas impostas no passado financiavam obras públicas essenciais, como estradas e pontes.",
         "shown": 2
       }
     ]
@@ -972,6 +1668,18 @@
       {
         "text": "Os Vikings não eram sempre guerreiros ferozes; muitos viviam como comerciantes e exploradores cosmopolitas. Suas rotas comerciais estendiam-se da Inglaterra ao Oriente Médio, facilitando um intercâmbio cultural massivo.",
         "shown": 4
+      },
+      {
+        "text": "Os guerreiros vikings também eram comerciantes habilidosos, estabelecendo rotas comerciais por toda a Europa. Suas incursões frequentemente estavam ligadas à necessidade de adquirir bens valiosos como prata e escravos.",
+        "shown": 4
+      },
+      {
+        "text": "Os guerreiros viking não eram apenas saqueadores; eles também tinham um profundo conhecimento náutico e engenharia avançada para sua época. Suas longas embarcações, os \"drakkar\", eram capazes de navegar contra ventos fortes em rios e mares oceânicos.",
+        "shown": 4
+      },
+      {
+        "text": "Os guerreiros vikings também eram comerciantes incrivelmente eficazes. Eles estabeleceram rotas comerciais por todo o Mediterrâneo, movendo mercadorias de luxo como especiarias e seda.",
+        "shown": 2
       }
     ]
   },
@@ -983,7 +1691,15 @@
       },
       {
         "text": "Alguns corais não possuem esqueletos de carbonato de cálcio; eles são feitos de um material orgânico até que estejam expostos, momento em que criam suas estruturas ósseas. Essa capacidade permite-lhes recriar seus suportes após danos físicos.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Os corais não são esqueletos de animais; eles são pólipos marinhos que formam estruturas calcárias compartilhadas por inúmeras espécies, como arraias. A relação simbiótica entre esses organismos é vital para a vida em recifes inteiros.",
+        "shown": 4
+      },
+      {
+        "text": "O nosso DNA possui genes \"silenciados\", ou latentes. Eles podem ser reativados sob condições específicas, alterando potencialmente as funções do corpo.",
+        "shown": 1
       }
     ]
   },
@@ -999,7 +1715,15 @@
       },
       {
         "text": "O Atlântico possui correntes marítimas tão poderosas que regulam o clima de continentes inteiros. Uma delas, a Corrente do Golfo, é essencial para manter as temperaturas mais amenas da Europa Ocidental.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O fundo do Atlântico Oriental possui montes submarinos raros de forma tão única que os cientistas suspeitam ser o vestígio de civilizações perdidas ou eventos geológicos incomuns. Essas estruturas, conhecidas como Montes Balthazar, mantêm ecossistemas aquáticos próprios e pouco estudados.",
+        "shown": 4
+      },
+      {
+        "text": "Existem correntes profundas no Atlântico Norte invisíveis ao olho humano. Elas transportam calor e nutrientes essenciais, moldando a vida marinha costeira em escala global.",
+        "shown": 3
       }
     ]
   },
@@ -1011,7 +1735,19 @@
       },
       {
         "text": "As Correntes de Humboldt são vitais para a vida marinha, concentrando nutrientes e alimentando ecossistemas ricos na costa do Peru. Juntamente com as correntes frias, elas criam um dos maiores superávites de plâncton do mundo.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Algumas correntes são tão poderosas que moldaram o fundo oceânico ao longo de milhões de anos. Elas desempenham um papel crucial na regulação do clima global, transportando calor em escala planetária.",
+        "shown": 4
+      },
+      {
+        "text": "Existem \"rios\" subterrâneos de água doce que fluem sob o oceano, movendo-se por diferenças de densidade. Eles desempenham um papel crucial na distribuição de nutrientes vitais para ecossistemas marinhos profundos.",
+        "shown": 4
+      },
+      {
+        "text": "A Corrente do Golfo é tão poderosa que transporta calor para as regiões mais frias da Europa. Essa corrente regula o clima de várias áreas costeiras, tornando-as muito mais quentes do que deveriam ser.",
+        "shown": 4
       }
     ]
   },
@@ -1019,6 +1755,14 @@
     "entries": [
       {
         "text": "O recorde mundial de altitude nunca foi alcançado por um ser humano vivo na estratosfera (a camada onde voam os balões meteorológicos). Astronautas já realizaram passeios orbitais, mas a Altitude Recorde é um feito distinto.",
+        "shown": 4
+      },
+      {
+        "text": "Os astronautas conseguem se mover lentamente em microgravidade. Isso porque o atrito com o ar quase desaparece no espaço profundo.",
+        "shown": 4
+      },
+      {
+        "text": "A cápsula Apollo foi revestida de alumínio especial para resistir às tensões extremas do vácuo espacial. Esse material permitiu que os astronautas realizassem manobras perigosamente precisas fora da nave principal.",
         "shown": 4
       }
     ]
@@ -1036,6 +1780,14 @@
       {
         "text": "O navio mais pesado já flutuante é o Sea-Lift Giant de 1980. Ele consegue içar equipamentos gigantescos como pontes inteiras ou até pequenos prédios.",
         "shown": 4
+      },
+      {
+        "text": "Navios carregam mais grãos do que todos os veículos terrestres combinados no mundo anualmente. Por isso, são vitais para a segurança alimentar global, garantindo o fluxo de alimento em escala continental.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns navios cargueiros são tão gigantescos que exigem canais de navegação específicos para passar com segurança. Seus mastros e contêineres podem superar a altura de edifícios inteiros.",
+        "shown": 2
       }
     ]
   },
@@ -1047,7 +1799,23 @@
       },
       {
         "text": "Alguns peixes abissais são bioluminescentes, usando luz para caçar ou comunicar. Suas adaptações extremas incluem corpos gelatinosos para sobreviver na alta pressão do fundo do mar.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Alguns organismos do fundo do mar não possuem órgãos visuais complexos, pois a luz é escassa no abismo. Eles utilizam mais sentidos químicos e táteis para caçar e navegar em ambientes de pressão extrema.",
+        "shown": 4
+      },
+      {
+        "text": "Algumas criaturas vêm com bioluminescência em padrões complexos para se comunicar ou caçar. Essa luz pode ter cores diferentes dependendo da espécie, um verdadeiro show químico no fundo do mar.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns peixes das profundezas utilizam bioluminescência não apenas para caçar, mas também como forma de confusão ou camuflagem ativa. Essa luz pode mudar de cor e frequência rapidamente, confundindo predadores e presas simultaneamente.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns peixes abissais utilizam bioluminescência para atrair presas ou confundir predadores. Essa luz pode ser emitida por órgãos especializados chamados fotóforos, permitindo uma comunicação visual no escuro total.",
+        "shown": 4
       }
     ]
   },
@@ -1059,6 +1827,22 @@
       },
       {
         "text": "A língua da girafa é preta ou azulada, não amarela como se pensa. Ela possui um padrão de manchas único, semelhante a uma impressão digital de cada indivíduo.",
+        "shown": 4
+      },
+      {
+        "text": "Seu pescoço longo não é composto por mais vértebras do que o de humanos. Ele se torna ainda mais impressionante ao poder esticar seu corpo lateralmente com facilidade.",
+        "shown": 4
+      },
+      {
+        "text": "Elas têm um órgão de ressonância nasal que ajuda a amplificar os sons da vocalização como o rugido do coração. A altura delas não é só pelo pescoço, mas também pelos ossos longos das pernas.",
+        "shown": 4
+      },
+      {
+        "text": "O pescoço alongado da girafa não é composto por mais vértebras do que o de outros mamíferos, apenas sua estrutura óssea é desproporcionalmente longa. Ela consegue ouvir seus próprios passos baterem no chão graças a uma rede complexa de vasos sanguíneos e ossículos no pé.",
+        "shown": 4
+      },
+      {
+        "text": "O sangue de uma girafa é mais diluído do que o humano, sendo um mecanismo para controlar a pressão arterial na altura do pescoço. Ela consegue ouvir sons tão distantes quanto os disparos de armas de fogo.",
         "shown": 3
       }
     ]
@@ -1071,6 +1855,14 @@
       },
       {
         "text": "A invenção da lâmpada não foi um evento único; houve muitas tentativas antes de Edison que foram cruciais. O filamento incandescente, o componente mais importante, passou por avanços significativos ao longo do tempo até atingir a eficiência moderna.",
+        "shown": 4
+      },
+      {
+        "text": "As primeiras lâmpadas elétricas comerciais usavam gases de vácuo para funcionar. Os filamentos incandescentes eram frequentemente feitos de materiais mais resistentes que o tungstênio puro.",
+        "shown": 4
+      },
+      {
+        "text": "As primeiras lâmpadas elétricas comerciais não eram tão brilhantes quanto as modernas. Elas queimavam com frequência devido ao aquecimento excessivo de materiais primitivos.",
         "shown": 3
       }
     ]
@@ -1083,7 +1875,15 @@
       },
       {
         "text": "O Porto de Santos no Brasil é um dos maiores complexos logísticos da América Latina. Sua operação recebe contêineres por navios gigantes, sendo vital para o escoamento de commodities como soja e minério de ferro.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O porto de Singapura consegue armazenar mais contêineres em um espaço menor devido a técnicas avançadas e digitalização. Essa densidade recorde otimiza o fluxo global, processando milhões de toneladas anualmente com eficiência máxima.",
+        "shown": 4
+      },
+      {
+        "text": "A maioria dos container marítimos é construída com lados de alumínio ou aço para resistir à corrosão salina. Rotas transoceânicas específicas podem exigir o tratamento especial desses containers antes do carregamento, prolongando o tempo no porto.",
+        "shown": 4
       }
     ]
   },
@@ -1096,6 +1896,14 @@
       {
         "text": "O primeiro microprocessador comercial foi o Intel 4004, criado para ser mais eficiente que outros componentes da época. Ele estabeleceu a base arquitetônica para todos os chips de computador modernos.",
         "shown": 4
+      },
+      {
+        "text": "O primeiro processador comercial foi o Intel 4004, considerado um marco porque integrou a capacidade de cálculo complexo em um único chip de silício. Ele revolucionou a eletrônica ao miniarizar enormemente os computadores antes de sua invenção.",
+        "shown": 4
+      },
+      {
+        "text": "Os primeiros microprocessadores eram feitos usando circuitos de silício com tecnologia muito rudimentar para os padrões atuais. Eles marcavam o início da computação pessoal e transformaram a eletrônica moderna.",
+        "shown": 1
       }
     ]
   },
@@ -1108,6 +1916,18 @@
       {
         "text": "Os egípcios usavam pão como forma de pagamento. Ele funcionava como moeda básica para trocar bens e serviços diários.",
         "shown": 4
+      },
+      {
+        "text": "O sal foi um item de troca tão valioso na Antiguidade que deu origem à palavra \"salário\", do latim *salarium*, paga aos soldados romanos. A farinha era usada não só para comer, mas também como agente de fixação em processos artísticos e culinários.",
+        "shown": 4
+      },
+      {
+        "text": "Os maias dominavam o cultivo de milho há milhares de anos. Eles também desenvolviam técnicas avançadas para conservar esse grão, garantindo a alimentação em períodos de escassez.",
+        "shown": 4
+      },
+      {
+        "text": "O cacau era antes temperado por pimenta e especiarias; só depois os europeus o transformaram no doce que conhecemos. Antigamente, a canela podia ser mais cara em peso do que ouro.",
+        "shown": 3
       }
     ]
   },
@@ -1119,7 +1939,19 @@
       },
       {
         "text": "Os mamutes lanudos tinham presas tão grandes que eram feitas em camadas de vários dentes. Suas patas robustas podiam suportar o peso de até 6 toneladas, permitindo-lhes navegar por paisagens geladas.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Eram animais incrivelmente adaptáveis e variavam muito de região para região. Alguns grupos mamute até tiveram comportamentos sociais complexos, sugerindo inteligência avançada.",
+        "shown": 4
+      },
+      {
+        "text": "Eles eram animais de grande porte capazes de adaptar seu comportamento a vários climas. Alguns tipos dependiam de gramíneas mais ricas do que os atuais herbívoros.",
+        "shown": 4
+      },
+      {
+        "text": "Os mamutes lanudos viviam há mais de 600 mil anos e eram muito diferentes dos encontrados nos filmes. Suas narinas grandes ajudavam a filtrar o ar gelado, um mecanismo adaptativo essencial para sua sobrevivência no Pleistoceno.",
+        "shown": 2
       }
     ]
   },
@@ -1128,6 +1960,14 @@
       {
         "text": "O sangue venoso é vermelho escuro, e a cor azul vista nas veias é apenas uma ilusão de óptica causada pela forma como a luz penetra na pele. O corpo humano produz hemoglobina suficiente ao longo da vida para encher um elefante inteiro.",
         "shown": 4
+      },
+      {
+        "text": "O sangue humano muda de cor dependendo da quantidade de oxigênio. Quando rico em oxigênio, é vermelho-vivo; na veia, onde o oxigênio foi liberado, torna-se um vermelho mais escuro.",
+        "shown": 4
+      },
+      {
+        "text": "O sangue humano tem um componente chamado plasma que é composto majoritariamente por água. Nele circulam proteínas essenciais que transportam nutrientes vitais para todo o organismo.",
+        "shown": 2
       }
     ]
   },
@@ -1139,7 +1979,15 @@
       },
       {
         "text": "Uma população considerável na Ilha de Páscoa desmoronou devido à combinação de crise ecológica e colapso social. A cultura Rapa Nui sobreviveu, mas sua forma original entrou em grande declínio histórico.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A sociedade Maia não desapareceu; simplesmente mudou seus centros urbanos de poder ao longo do tempo. Por volta",
+        "shown": 4
+      },
+      {
+        "text": "Os Olmecas, considerados a \"cultura mãe\" da Mesoamérica, já dominavam centros cerimoniais megalíticos antes dos Maias florescerem. Suas enormes cabeças colossais de pedra são artefatos que desafiam o conhecimento arqueológico atual sobre transporte e moldagem.",
+        "shown": 1
       }
     ]
   },
@@ -1151,6 +1999,14 @@
       },
       {
         "text": "O Ford Model T original precisava de um simples ajuste no cano de escape para ser capaz de funcionar com diferentes combustíveis. Sua versatilidade mecânica revolucionou o conceito de propriedade automotiva para a massa.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro carro movido a gasolina foi criado por Karl Benz em 1886. Ele era um veículo aberto e revolucionou o transporte pessoal para sempre.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro carro autopropulsado foi um veículo movido a vapor. O motor de combustão interna só se tornou dominante no século XX, após o sucesso do petróleo.",
         "shown": 3
       }
     ]
@@ -1167,7 +2023,19 @@
       },
       {
         "text": "Golfinhos usam ecolocalização para criar um mapa sonoro do ambiente. Eles são extremamente inteligentes, capazes de resolver problemas complexos e demonstrar comportamento cooperativo com outros animais.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Eles usam ecolocalização para navegar e caçar, emitindo sons de diferentes frequências além do canto vocal. Os machos exibem danças complexas que podem ser rituais sociais ou parte de acasalamento.",
+        "shown": 4
+      },
+      {
+        "text": "Elas podem usar ecolocalização para detectar predadores e até mesmo identificar humanos a grandes distâncias. O sorriso é um comportamento social, mas não significa que elas nos reconheçam individualmente.",
+        "shown": 4
+      },
+      {
+        "text": "Golfinhos usam a ecolocalização não apenas para caçar, mas também para navegar em águas turvas. Eles podem gerar sons tão potentes que são ouvidos a grandes distâncias abaixo da superfície.",
+        "shown": 4
       }
     ]
   },
@@ -1180,6 +2048,18 @@
       {
         "text": "O primeiro celular prático só foi inventado décadas depois; os modelos iniciais eram grandes aparelhos de rádio voz caríssimos. Eles não tinham as características que associamos a um smartphone moderno, como tela sensível ao toque ou câmera integrada.",
         "shown": 4
+      },
+      {
+        "text": "O primeiro celular comercialmente disponível não era portátil; precisava ser carregado por um grande equipamento de bateria no local. Eles eram enormes e custavam muito caro, sendo luxo para pouquíssimos até os anos 90.",
+        "shown": 4
+      },
+      {
+        "text": "Os primeiros telefones móveis eram enormes e caríssimos. Eles dependiam de baterias grandes e tinham um alcance muito limitado comparado aos smartphones atuais.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro telefone celular comercial não usava cartões de crédito nem era feito para a população geral. Era mais um brinquedo caro, destinado principalmente à elite nos EUA.",
+        "shown": 4
       }
     ]
   },
@@ -1191,6 +2071,14 @@
       },
       {
         "text": "Os corais não são animais únicos; eles são cnidários pertencentes ao mesmo grupo das anêmonas-do-mar. Eles constroem o esqueleto de carbonato de cálcio que forma os vastos arrecifes, sendo essenciais para a biodiversidade marinha.",
+        "shown": 4
+      },
+      {
+        "text": "Os corais não são verdadeiros animais; eles formam estruturas esqueléticas construídas por pólipos que vivem em simbiose com algas. Essa relação permite que o coral obtenha nutrição, enquanto fornece segurança às algas.",
+        "shown": 4
+      },
+      {
+        "text": "Os corais são animais, não rochas vivas. Eles constroem esqueletos de carbonato de cálcio que sustentam ecossistemas inteiros.",
         "shown": 2
       }
     ]
@@ -1203,7 +2091,15 @@
       },
       {
         "text": "A íris do olho contém padrões únicos e complexos, como impressões digitais faciais de um indivíduo. Esses padrões são genéticos e jamais se repetem do mesmo modo em outra pessoa.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "A cor dos olhos não é determinada por um único gene; ela resulta da forma como o pigmento melanina é produzido. As variações sutis podem ser causadas pela luz, alterando a percepção de tons e profundidades inéditas.",
+        "shown": 4
+      },
+      {
+        "text": "A cor dos olhos não está ligada à melanina; ela é determinada por uma combinação de pigmentos. O nervo óptico, que leva os sinais visuais ao cérebro, começa na retina.",
+        "shown": 2
       }
     ]
   },
@@ -1215,6 +2111,14 @@
       },
       {
         "text": "A exaustão de um foguete não é apenas gás; ela contém traços dos materiais usados na queima. Isso permite aos cientistas rastrear a composição completa do combustível em missões passadas.",
+        "shown": 4
+      },
+      {
+        "text": "O Saturn V, o principal veículo que levou humanos à Lua, tinha mais de 7,5 milhões de peças. Ele representava um pico tecnológico monumental dos esforços espaciais do século XX.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro teste de um míssil balístico americano na década de 1950 foi tão explosivo que o calor gerado superou temporariamente a temperatura da superfície do sol. Esse poder bruto levou ao desenvolvimento de motores mais eficientes para futuras missões espaciais profundas.",
         "shown": 3
       }
     ]
@@ -1227,7 +2131,19 @@
       },
       {
         "text": "Os anfiteatros gregos originais não eram construídos para o espetáculo de lutas sangrentas, mas sim para eventos cívicos religiosos importantes. Muitas vezes, as peças teatrais eram o foco principal da audiência.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Os gregos usavam o conceito de cidadania para determinar acesso a direitos políticos e sociais. Mulheres de status elevado, mesmo que fossem ricas, não tinham voz política em Atenas clássica.",
+        "shown": 4
+      },
+      {
+        "text": "O Corinto não era apenas um porto movimentado, mas também foi um centro de comércio onde se negociava desde a prata até o vinho mais fino da região. As suas rotas marítimas o conectavam diretamente com civilizações do Levante e Egito.",
+        "shown": 4
+      },
+      {
+        "text": "Os Olimpíadas não celebravam apenas atletas; eram grandes festivais religiosos em homenagem a Zeus. A competição era parte de um ciclo sagrado, unindo esportes e culto pagão na cidade de Olímpia.",
+        "shown": 3
       }
     ]
   },
@@ -1236,6 +2152,18 @@
       {
         "text": "Amapá é o único estado brasileiro que não faz fronteira com nenhum outro estado do país, compartilhando suas divisas apenas com Suriname e a Guiana Francesa.",
         "shown": 4
+      },
+      {
+        "text": "A Bahia possui um dos maiores índices de população de descendentes africanos fora do continente americano. Isso reflete a profunda influência cultural e histórica da diáspora escravizada na formação identitária local.",
+        "shown": 4
+      },
+      {
+        "text": "O Rio Grande do Sul tem o \"Sul\" na bandeira e no nome de várias cidades, mas essa é apenas uma coincidência geográfica. A cultura gaúcha, no entanto, moldou a língua local com gírias únicas que variam muito de região para região.",
+        "shown": 4
+      },
+      {
+        "text": "A Bahia é o estado mais populoso do Nordeste, mas não possui a cidade mais populosa do Brasil. Essa distinção sublinha como sua vasta geografia acomoda grandes centros urbanos menores.",
+        "shown": 2
       }
     ]
   },
@@ -1244,6 +2172,14 @@
       {
         "text": "O núcleo da Terra é um dínamo gigante de ferro fundido em movimento constante que gera nosso campo magnético, o qual está enfraquecendo cerca de 5% a cada século, indicando uma possível inversão dos polos magnéticos. Durante essa transição, as bússolas oscilariam caoticamente antes de se estabilizarem no polo sul atual.",
         "shown": 4
+      },
+      {
+        "text": "Alguns materiais são diamagnetismo, o que significa que eles repelem campos magnéticos externos. Esse efeito é tão sutil que não pode ser detectado a olho nu com ímãs comuns.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns tipos de materiais ferromagnéticos podem ser manipulados por campos magnéticos para armazenar informações, como ocorre nos discos rígidos. Essa capacidade permite a criação de memórias digitais estáveis que perduram por anos.",
+        "shown": 3
       }
     ]
   },
@@ -1255,7 +2191,11 @@
       },
       {
         "text": "O ENIAC era grande o suficiente para preencher uma sala inteira, pesando cerca de 30 toneladas. Sua complexidade exigia milhares de válvulas a vácuo operadas por sistemas refrigerados.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O primeiro computador eletrônico de propósito geral foi o ENIAC. Ele era maciço, pesando cerca de 30 toneladas e ocupando um cômodo inteiro.",
+        "shown": 2
       }
     ]
   },
@@ -1264,6 +2204,14 @@
       {
         "text": "O subsolo de Europa, lua de Júpiter, esconde um oceano com o dobro de água de todos os mares da Terra combinados, onde fontes hidrotermais poderiam sustentar ecossistemas complexos sem luz solar.",
         "shown": 4
+      },
+      {
+        "text": "A maior parte do sistema solar não tem planetas habitáveis segundo modelos atuais. A taxa de formação estelar pode gerar mundos com bioassinaturas detectáveis no futuro próximo.",
+        "shown": 4
+      },
+      {
+        "text": "A NASA detectou sinais de biomarcadores gasosos em exoplanetas distantes. Esses gases podem indicar a presença de processos biológicos ativos.",
+        "shown": 1
       }
     ]
   },
@@ -1275,7 +2223,15 @@
       },
       {
         "text": "A cordilheira dos Andes não é a cadeia de montanhas mais alta do mundo. Ela abriga o Aconcágua, que marca a altitude máxima fora dos Himalaias.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O Mauna Kea, no Havaí, é mais alto quando medido pela base oceânica do que o Everest. Grande parte de suas cúpulas não são visíveis acima do nível do mar.",
+        "shown": 4
+      },
+      {
+        "text": "O Monte Everest não é o ponto mais alto do planeta. O Mauna Kea, no Havaí, é maior se for medido desde sua base subaquática até seu cume.",
+        "shown": 3
       }
     ]
   },
@@ -1287,7 +2243,19 @@
       },
       {
         "text": "O cérebro continua processando memórias emocionais quando você dorme. Isso ajuda a consolidar informações e regular o humor.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O cérebro continua ativo na fase REM do sono, processando emoções e consolidando memórias de forma intensa. Dormir é um estado de alta atividade cerebral que ajuda a 'limpar' informações desnecessárias para otimizar o aprendizado diário.",
+        "shown": 4
+      },
+      {
+        "text": "O cérebro continua processando informações mesmo durante o sono REM, consolidando memórias e aprendizados do dia. Dormir é essencial porque ajuda a limpar resíduos metabólicos que se acumulam no cérebro acordado.",
+        "shown": 4
+      },
+      {
+        "text": "Durante o sono REM, seu cérebro processa informações sensoriais e emocionais do dia. É um período crucial para a memória e o aprendizado, consolidando experiências vividas.",
+        "shown": 2
       }
     ]
   },
@@ -1299,6 +2267,14 @@
       },
       {
         "text": "O cacau foi domesticado por povos mesoamericanos há mais de 3.000 anos. Originalmente, era usado como bebida ritualística amarga, sem adição de açúcar.",
+        "shown": 4
+      },
+      {
+        "text": "As primeiras civilizações consumiam cacau como bebida amarga para rituais religiosos. O verdadeiro chocolate doce só surgiu na Europa com as transformações industriais mais recentes.",
+        "shown": 4
+      },
+      {
+        "text": "Antigamente ele era usado como moeda de troca entre os Maias e Astecas, tendo um valor altíssimo na época. Os grãos eram consumidos numa bebida amarga, muito diferente do doce que conhecemos hoje.",
         "shown": 1
       }
     ]
@@ -1311,7 +2287,11 @@
       },
       {
         "text": "O mel nunca estraga, mantendo suas propriedades nutricionais por milhares de anos. As abelhas reais secretam um cheiro quase imperceptível que atua como repelente natural contra predadores e parasitas.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O mel é um antibiótico natural muito potente, contendo peróxido de hidrogênio. Ele também pode matar certos fungos devido à sua acidez, sendo usado há séculos em medicina.",
+        "shown": 4
       }
     ]
   },
@@ -1323,7 +2303,15 @@
       },
       {
         "text": "Os primeiros seres vivos que sobreviveram na Terra não eram necessariamente os mais adaptados. Muitos grupos extintos existiram com soluções biológicas únicas que jamais foram replicadas pelos descendentes atuais.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Os mamíferos primitivos já possuíam um formato de dente adaptado à mastigação em várias direções. Essa capacidade é considerada o marco inicial da complexa dieta que hoje sustenta a maioria dos vertebrados terrestres.",
+        "shown": 4
+      },
+      {
+        "text": "O bico do pássaro não é puramente ósseo como se pensa; ele tem um septo que separa as duas narinas, tornando-o mais complexo ainda. Essa estrutura ajuda tanto na respiração quanto em identificar o sexo da ave.",
+        "shown": 4
       }
     ]
   },
@@ -1331,6 +2319,14 @@
     "entries": [
       {
         "text": "A queda de neve é praticamente silenciosa porque a estrutura porosa dos flocos absorve as ondas sonoras do ambiente. Esse efeito natural de isolamento acústico faz o mundo parecer instantaneamente mais calmo durante uma tempestade.",
+        "shown": 4
+      },
+      {
+        "text": "A camada de gelo na Antártica é tão espessa que poderia cobrir todo o Brasil com mais de dez metros de altura. Esse bloco gigantesco contém água doce, crucial para mitigar a crise hídrica global.",
+        "shown": 4
+      },
+      {
+        "text": "A neve nem sempre é branca; ela pode apresentar tons de cinza ou até vermelho, dependendo da composição dos minerais. Partículas maiores são chamadas de cristalização e caem mais lentamente que flocos normais.",
         "shown": 4
       }
     ]
@@ -1344,6 +2340,22 @@
       {
         "text": "O primeiro telefone não era apenas para falar; ele permitia enviar mensagens de áudio em um dispositivo externo. As primeiras gravações eram feitas com discos que precisavam ser reproduzidos por aparelhos específicos.",
         "shown": 4
+      },
+      {
+        "text": "O primeiro microfone elétrico foi patenteado em 1877 por Thomas Edison. Ele utilizava um princípio de indução eletromagnética, precursor dos sistemas de áudio modernos.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro telefone não foi projetado para a fala, mas sim como um aparelho de comunicação elétrica. A história mostra que muitos inventores tiveram ideias semelhantes antes mesmo do sucessos icônico.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro telefone não era para chamadas de voz; sua função inicial era enviar sinais elétricos através da linha. Os primeiros inventores tiveram de aprender tudo, desde a química até a engenharia elétrica.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro smartphone não era para chamadas; ele foi criado em um projeto militar de comunicação móvel segura. A miniaturização da tecnologia eletrônica levou o rádio, antes exclusivo de estações fixas, a caber no bolso quebrou barreiras sociais e de informação.",
+        "shown": 2
       }
     ]
   },
@@ -1355,7 +2367,15 @@
       },
       {
         "text": "O cravo não é apenas um tempero; sua corante natural era usada antigamente para tingir tecidos finos. Algumas culturas até utilizavam a infusão de seus óleos como sedativo leve.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O cravo era historicamente mais valioso que o ouro por um período, impulsionando grandes rotas de comércio globais. Seu aroma forte era usado não só para temperar, mas também em medicina e rituais religiosos.",
+        "shown": 4
+      },
+      {
+        "text": "As baunilhas são florestas naturais do Madagascar. Seu cheiro forte é conseguido por um processo que envolve a fermentação de vagem aberta com o tempo.",
+        "shown": 3
       }
     ]
   },
@@ -1367,7 +2387,15 @@
       },
       {
         "text": "O Rio de Janeiro não é uma capital, mas a cidade vizinha foi o palco da mais famosa transferência temporal de poder. Muitas cidades pensam ser o centro político mundial por sua história, quando na verdade são apenas grandes centros culturais.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "As capitais costumam ser associadas a rios importantes, mas há muitas situadas em terrenos pantanosos ou de planície costeira não fluvial. Alguns exemplos são Havana (Cuba) e Wellington (Nova Zelândia).",
+        "shown": 4
+      },
+      {
+        "text": "A capital da Austrália não é Sydney nem Melbourne; ela foi planejada para ser um centro político neutro, o núcleo de Darwin. Muitas cidades acreditam ter sido fundadas como pontos comerciais, mas a escolha política ditaram sua localização atual.",
+        "shown": 4
       }
     ]
   },
@@ -1383,7 +2411,15 @@
       },
       {
         "text": "A reação em cadeia pode ser controlada usando barras de controle feitas de materiais como o boro. Elas absorvem os nêutrons extras, evitando um descontrole que poderia causar uma explosão.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O reator de energia nuclear não cria cola atômica; ele apenas controla a fissão do urânio para gerar calor. Esse calor é usado para ferver água, acionar turbinas e produzir eletricidade.",
+        "shown": 4
+      },
+      {
+        "text": "Os reatores nucleares podem gerar um excesso de calor que alguns sistemas utilizam para produzir vapor a alta pressão. Esse vapor vira eletricidade em turbinas, sem nunca \"queimar\" combustíveis fósseis.",
+        "shown": 3
       }
     ]
   },
@@ -1391,6 +2427,22 @@
     "entries": [
       {
         "text": "A polva-azul-marcelada possui veneno neurotóxico suficiente para matar 26 adultos em quinze minutos, sem antídoto conhecido, paralisando a vítima enquanto ela permanece totalmente consciente até a parada respiratória.",
+        "shown": 4
+      },
+      {
+        "text": "A água do coral é um repelente natural de muitos predadores, como peixes-papagaio. Os tubarões têm tecidos que mudam de cor para se camuflarem em diferentes ambientes marinhos.",
+        "shown": 4
+      },
+      {
+        "text": "A água pode ser um veneno para répteis. Algumas espécies de lagartos usam membranas interdigitais para se locomover rapidamente, mas evitam grandes corpos d'água aberta.",
+        "shown": 4
+      },
+      {
+        "text": "A cobra coral não se alimenta de outros venenosos; ela prefere pequenos mamíferos como roedores e aves. Seu veneno, no entanto, é extremamente potente contra muitos vertebrados.",
+        "shown": 4
+      },
+      {
+        "text": "A píton constritora pode imitar os sons de outros bichos para enganar presas. Elas usam essa camuflagem vocal para caçar com mais eficácia.",
         "shown": 4
       }
     ]
@@ -1403,7 +2455,15 @@
       },
       {
         "text": "O elemento químico mais comum na crosta terrestre é o oxigênio, mas não há nenhum metal puro naturalmente encontrado como minério. O diamante, composto de carbono, é um exemplo notório de forma cristalina superdensa.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O gás mais comum na atmosfera terrestre é o nitrogênio, mas ele raramente reage quimicamente por ser muito estável. Ele compõe a maior parte do ar que respiramos sem apresentar toxicidade imediata.",
+        "shown": 4
+      },
+      {
+        "text": "O urânio não é apenas radioativo; sua decomposição libera calor suficiente para alimentar um pequeno bairro por alguns dias. Esse processo o torna matéria-prima de energia nuclear incrivelmente poderosa.",
+        "shown": 3
       }
     ]
   },
@@ -1415,7 +2475,11 @@
       },
       {
         "text": "A expressão \"pão-duro\" não só significa algo difícil de obter, mas também pode se referir a pães incrivelmente secos. Em algumas regiões, ela é usada para descrever conversas monótonas ou sem graça.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A expressão \"fazer piada\" é um estrangeirismo incorreto. O uso correto seria simplesmente fazer graça ou brincar de forma humorística.",
+        "shown": 4
       }
     ]
   },
@@ -1427,6 +2491,10 @@
       },
       {
         "text": "A cidade de Petra na Jordânia foi um centro comercial crucial devido à sua localização estratégica entre rotas de incenso e especiarias. Seu acesso pelas impressionantes fachadas esculpidas em rocha o torna um sítio arqueológico único e misterioso.",
+        "shown": 4
+      },
+      {
+        "text": "A cidade de Petra, na Jordânia, foi um centro comercial vibrante por séculos. Sua arquitetura impressionante foi esculpida diretamente nos paredões rochosos.",
         "shown": 2
       }
     ]
@@ -1439,7 +2507,15 @@
       },
       {
         "text": "Algumas galáxias são tão distantes que a luz delas levou bilhões de anos para chegar até nós. Observar essas galáxias é, literalmente, olhar para o passado do universo e ver como ele era em épocas muito diferentes.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Algumas galáxias são capazes de absorver outras inteiras ao longo do tempo. Esse processo pode aumentar o tamanho e a massa das galáxias mais ativamente dominantes.",
+        "shown": 4
+      },
+      {
+        "text": "Algumas galáxias são tão vastas que seus limites podem não pertencer inteiramente a elas mesmas. A maioria das galáxias está em constante colisão gravitacional, formando superestruturas complexas.",
+        "shown": 4
       }
     ]
   },
@@ -1452,6 +2528,22 @@
       {
         "text": "O canal gerou faunamas de espécies nativas durante sua construção e operações. Muitos mamíferos aquáticos, como o boto-vermelho, foram realocados para sobreviver ao gigantesco empreendimento.",
         "shown": 4
+      },
+      {
+        "text": "O maior navio já atravessou o canal várias vezes com um limite de altura estrito para seu mastro principal. A passagem obriga grandes embarcações a serem elevadas em três níveis diferentes, utilizando sistemas complexos de comporta.",
+        "shown": 4
+      },
+      {
+        "text": "O canal foi projetado para permitir a passagem de navios com bitolas nunca antes vistas. A água salgada é filtrada através de sistemas complexos que previnem o choque salino nos ecossistemas locais.",
+        "shown": 4
+      },
+      {
+        "text": "O canal é artificial e leva cerca de dois dias para um navio cruzar totalmente sua passagem. Suas dimensões são adaptadas exclusivamente para o tráfego global marítimo moderno.",
+        "shown": 4
+      },
+      {
+        "text": "O canal foi inaugurado através da modificação de rios naturais, não sendo um corte totalmente novo na terra firme. Os navios gigantes transportados por ele são projetados especificamente para se ajustar às dimensões das câmaras.",
+        "shown": 2
       }
     ]
   },
@@ -1463,7 +2555,15 @@
       },
       {
         "text": "Existem ilhas habitadas por comunidades autônomas que nunca registraram o contato com nações vizinhas. Algumas até possuem línguas e costumes isolados que fascinam a antropologia moderna.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Existem ilhas habitadas por tribos isoladas que mantiveram práticas culturais pré-históricas. Dessas ilhas, algumas nunca foram totalmente mapeadas ou colonizadas devido ao clima extremo e à navegação perigosa.",
+        "shown": 4
+      },
+      {
+        "text": "A Ilha de Páscoa foi originalmente habitada por um povo polinésio avançado, mas o colapso populacional levou ao sumiço de grande parte do conhecimento cultural. Hoje, muitos historiadores debatem se a ausência de grandes mapas é resultado de mal-estar ou estratégia cultural.",
+        "shown": 4
       }
     ]
   },
@@ -1479,6 +2579,14 @@
       },
       {
         "text": "Alguns carros clássicos eram projetados para serem mais exóticos do que velocistas; alguns modelos luxuosos priorizavam o conforto quase excessivo. Os motores grandes não significavam necessariamente a performance mais alta, mas sim o status social do dono.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns modelos de carros antigos foram feitos com materiais exóticos, como madeira maciça que substituía o painel e até mesmo algumas partes da carroceria. Esses acabamentos luxuosos tornavam esses veículos verdadeiras peças de arte móveis.",
+        "shown": 4
+      },
+      {
+        "text": "Muitos roncos de motores antigos eram intencionalmente modificados para soar mais altos e dramáticos, mesmo que fossem menos eficientes. Isso transformou o ruído em um acessório de status social importante nas décadas de 20 a 40.",
         "shown": 1
       }
     ]
@@ -1491,7 +2599,15 @@
       },
       {
         "text": "O Brasil pode ser o maior exportador de carne bovina do Mercosul, impulsionado por grandes fazendas. A cadeia produtiva envolve logística complexa que chega até os portos marítimos.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O Brasil é um dos maiores exportadores de commodities agrícolas do mundo, mas há nichos como o açaí que geram valor agregado inédito. Cultivar e processar esses produtos localmente aumenta o lucro e fortalece a economia regional.",
+        "shown": 4
+      },
+      {
+        "text": "O maior valor de exportações mundiais não é definido apenas pelo volume de bens, mas pela complexa cadeia de logística que os torna possíveis. Os navios porta-contêineres são verdadeiros pontos focais da economia global moderna.",
+        "shown": 1
       }
     ]
   },
@@ -1500,6 +2616,22 @@
       {
         "text": "O hióide é o único osso do corpo humano que não se conecta a nenhum outro, flutuando livremente na base da garganta sustentado apenas por músculos e ligamentos. Essa estrutura única permite movimentos complexos essenciais para a fala e a deglutição sem rigidez óssea.",
         "shown": 4
+      },
+      {
+        "text": "O crânio adulto tem ossos diferentes dos de um bebê por causa da abertura na base do crânio que se fecha com o tempo. Essa evolução garante que os nervos ainda consigam passar por diversas rotas ao longo da vida adulta.",
+        "shown": 4
+      },
+      {
+        "text": "A sua mandíbula é o único osso do corpo humano que você não compartilha com outros animais. Esse osso passa por inúmeras transformações evolutivas, mostrando a complexidade da nossa linha de parentesco.",
+        "shown": 4
+      },
+      {
+        "text": "O crânio humano é composto por 22 ossos irrecobertos pelas suturas, que se fecham ao longo da vida. Eles foram desenhados inicialmente como encaixes flexíveis para proteger um cérebro em rápida mudança durante o desenvolvimento.",
+        "shown": 4
+      },
+      {
+        "text": "O crânio humano possui um número variável de falhas suturas entre os ossos no bebê, que se fecham gradualmente à medida que o cérebro cresce. Em algumas espécies de mamíferos marinhos, os ossos são tão densos e pesados que servem como contrapeso, auxiliando na imobilidade ou mudança de habitat.",
+        "shown": 3
       }
     ]
   },
@@ -1507,7 +2639,19 @@
     "entries": [
       {
         "text": "Sempre que você recorda uma memória, seu cérebro a reconstrói e a altera sutilmente com base no seu humor atual, o que significa que suas lembranças mais antigas são as mais distorcidas e não registros fiéis do passado. Isso ocorre porque o esquecimento muitas vezes é falha de recuperação, como um livro cujas páginas foram arrancadas, e não perda real da informação armazenada.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O hipocampo é crucial para formar novas memórias de longo prazo. Danos nesta área podem causar amnésia, mesmo que outras funções cerebrais permaneçam intactas.",
+        "shown": 4
+      },
+      {
+        "text": "A capacidade de formar memórias depende de um equilíbrio delicado de neurotransmissores no hipocampo. Estresse crônico pode, paradoxalmente, fortalecer algumas memórias enquanto enfraquece a consolidação em outras áreas do córtex.",
+        "shown": 4
+      },
+      {
+        "text": "A memória não é um arquivo estático, mas sim um processo de reconstrução a cada lembrança. Cada vez que você recorda algo, está na verdade criando uma versão ligeiramente modificada da experiência original.",
+        "shown": 4
       }
     ]
   },
@@ -1519,7 +2663,11 @@
       },
       {
         "text": "Elas podem passar por fases de instabilidade extrema, gerando explosões massivas chamadas supernovas. Essas detonações liberam energia suficiente para moldar a composição química das galáxias inteiras.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Estrelas gigantes são tão volumosas que poderiam engolir planetários inteiros como o Merkúrio ou até mesmo um Urano. Sua expansão gradual marca o fim de sua vida, marcando a transição para gigantes vermelhas ou supergigantes azuis.",
+        "shown": 2
       }
     ]
   },
@@ -1528,6 +2676,18 @@
       {
         "text": "Roald Amundsen escreveu uma carta ao rei da Noruega solicitando o cargo de governador de Svalbard antes mesmo de alcançar o Polo Sul, pois já planejara sua carreira política posterior à expedição. Ele também carregava uma bandeira em branco pronta para ser hasteada no Polo Norte caso conseguisse chegar lá primeiro.",
         "shown": 4
+      },
+      {
+        "text": "Ferdinand Magellan nunca completou sua viagem de volta ao ponto de partida; ele morreu nas Filipinas antes que a frota pudesse retornar totalmente. A expedição, no entanto, comprovou drasticamente a esfericidade da Terra para o mundo moderno.",
+        "shown": 4
+      },
+      {
+        "text": "Cristóvão Colombo acreditava ter chegado às Índias Orientais. Ele nunca soube que havia encontrado um continente totalmente novo para os europeus.",
+        "shown": 4
+      },
+      {
+        "text": "Cristóvão Colombo jamais chegou às Américas; ele navegou para um continente desconhecido na época já habitado por diversas civilizações nativas. As rotas de comércio africanas eram mais antigas que qualquer viagem marítima europeia documentada.",
+        "shown": 1
       }
     ]
   },
@@ -1543,7 +2703,15 @@
       },
       {
         "text": "O açai não é originalmente um superalimento amazônico. Seus benefícios se tornaram populares na dieta ocidental graças ao marketing globalizado.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O saguão de chocolate, um tipo de cacau africano, é extremamente raro e possui variações de sabor mais complexas que o cacau comum. Ele é valorizado por chefs gourmet pela sua nota floral intensa e perfil amargo único.",
+        "shown": 4
+      },
+      {
+        "text": "O tubérculo malanga é conhecido por seu sabor terroso e pode ser consumido de diferentes formas, como acompanhamento ou até em preparos doces regionais da África Ocidental. Ele oferece um perfil nutricional rico em fibras e minerais essenciais para a saúde intestinal.",
+        "shown": 3
       }
     ]
   },
@@ -1555,7 +2723,11 @@
       },
       {
         "text": "O mamute lanoso era muito mais robusto do que se pensava, com presas enormes adaptadas para cortar vegetação densa. Ele também possuía camadas de gordura isolantes que o protegiam no frio intenso das estepes.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O mamute lanoso não era apenas peludo; ele possuía presas tão gigantescas que eram compostas de várias camadas de marfim sobrepostas. Essas incisivos superdimensionados permitiam-lhe vasculhar a tundra em busca de alimento e intimidar predadores.",
+        "shown": 4
       }
     ]
   },
@@ -1567,7 +2739,19 @@
       },
       {
         "text": "O café era antes um luxo para reis e nobres europeus. A rota de comércio do grão foi historicamente associada a guerras, espionagem e grandes fortunas.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O primeiro cafezal cultivado foi na Etiópia há milhares de anos. Por isso, o grão é frequentemente associado a lendas tribais e mitos antigos do deserto africano.",
+        "shown": 4
+      },
+      {
+        "text": "O grão de café é botânicamente uma semente; ele cresce dentro das flores de uma espécie de cerejeira africana, não da própria planta do café. Muitas culturas acreditam que o café foi descoberto por cabras que estavam agitadas após consumir os frutos silvestres.",
+        "shown": 4
+      },
+      {
+        "text": "O café mais antigo era consumido por tribos africanas há milênios. O grão foi levando a bebida para o mundo árabe, de onde se espalhou lentamente pela Europa.",
+        "shown": 2
       }
     ]
   },
@@ -1579,7 +2763,15 @@
       },
       {
         "text": "O metrô de Londres utiliza um sistema de iluminação que varia dependendo da linha e do trecho. Alguns túneis mais antigos ainda usam sistemas de aquecimento a vapor para ajudar no conforto térmico dos passageiros.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O primeiro metrô subterrâneo comercial operou em Londres no século XIX com tecnologia puxada por cavalos. Hoje, a maioria dos sistemas de metrô urbanos é alimentada por eletricidade.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro metro subterâneo veio Londres, inaugurado em 1863 com a linha Metropolitan Railway. As estações mais antigas frequentemente apresentam arquitetura vitoriana, remetendo à era industrial inglesa.",
+        "shown": 3
       }
     ]
   },
@@ -1588,6 +2780,22 @@
       {
         "text": "Em algumas cidades fantasma, os esqueletos de trilhos de trem ainda estão visíveis, contando a história de rotas que não existem mais. Esses locais resgatam memórias econômicas e sociais passadas em um silêncio misterioso.",
         "shown": 4
+      },
+      {
+        "text": "Em algumas cidades do mundo, comunidades inteiras foram abandonadas devido a mudanças climáticas ou econômicas. Esses locais preservam um vislumbre silencioso de estilos de vida passados.",
+        "shown": 4
+      },
+      {
+        "text": "O Hospital Estadual de Our Lady of Charity, em Goa, Índia, permaneceu fechado por décadas após ser um centro de saúde crucial até o seu colapso estrutural. Ele é hoje um local que gera lendas urbanas na internet e fascina arqueólogos amadores.",
+        "shown": 4
+      },
+      {
+        "text": "Muitos locais abandonados mantêm sistemas elétricos funcionais por décadas, alimentando sinais de vida espectral ou equipamentos antigos. A preservação dessas estruturas por conta do abandono cria microambientes fascinantes e únicos para a natureza selvagem.",
+        "shown": 4
+      },
+      {
+        "text": "A Escola de Ciências de Pittsburgh foi desativada após o colapso da indústria local. Em vez de ser demolida, ela está sendo transformada em um hub tecnológico vivo.",
+        "shown": 3
       }
     ]
   },
@@ -1595,7 +2803,11 @@
     "entries": [
       {
         "text": "O código binário só usa zeros e uns porque os computadores funcionam com eletricidade; a diferença de voltagem representa esses dois estados. A lógica booleana, base da programação, foi desenvolvida para manipular essa verdade matemática (verdadeiro ou falso).",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O primeiro programa de computador foi escrito em uma máquina analítica e era puramente conceitual. Ele mostrava como os algoritmos complexos podem ser reduzidos a lógica passo a passo.",
+        "shown": 4
       }
     ]
   },
@@ -1607,7 +2819,15 @@
       },
       {
         "text": "Alguns vulcões dormem há milhares de anos, mas ainda estão ativos sob o manto terrestre. Seu despertar pode ser gradual ou explosivo, mudando drasticamente a paisagem local.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Alguns vulcões adormecem por tanto tempo que a atividade geológica subterrânea pode reativá-los subitamente. Isso cria o risco de um surto imprevisível, com consequências dramáticas para as comunidades próximas.",
+        "shown": 4
+      },
+      {
+        "text": "As erupções não liberam apenas magma; elas expelirão gases como dióxido de enxofre. Esse gás pode formar chuvas ácidas, prejudicando a vida vegetal na região.",
+        "shown": 3
       }
     ]
   },
@@ -1619,6 +2839,14 @@
       },
       {
         "text": "A lâmpada incandescente não foi inventada por um único indivíduo; diversas pessoas trabalharam em etapas cruciais do projeto. O desenvolvimento prático exigiu avanços tanto na filamento quanto no sistema elétrico que a potencializou.",
+        "shown": 4
+      },
+      {
+        "text": "A Coca-Cola original continha um ingrediente derivado de cocaína, vendido como \"extracto de coca\". Esse componente foi gradualmente removido ao longo do século XX devido à toxicidade.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro telefone não tinha discagem; ele usava um sistema de encaixe por números e era composto por fiação manual complexa. A gravação de áudio comercial só se tornou viável após o desenvolvimento do disco compacto, revolucionando a portabilidade da música.",
         "shown": 1
       }
     ]
@@ -1631,7 +2859,19 @@
       },
       {
         "text": "O primeiro filme fotográfico foi feito numa caixa selada e não era reproduzível. As primeiras câmaras eram gigantescas equipamentos portáteis, e o fotojornalismo como o conhecemos é uma invenção relativamente recente.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O primeiro filme fotográfico comercial foi vendido na Paris Exposition Universal em 1839. Antes da invenção do filme em rolo, as fotos precisavam ser tiradas com placas de vidro ou metal únicas para cada clique.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro filme fotografico comercial de sucesso foi feito com um processo químico muito caro, limitando o uso inicial a estúdios ricos. A Kodak revolucionou o negócio ao popularizar filmes em rolo descartáveis, tornando a fotografia acessível às massas.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro papel fotográfico comercial foi criado na Inglaterra em 1841. A mancha de fumaça acidentalmente photographa o início da história da fotografia como comércio.",
+        "shown": 2
       }
     ]
   },
@@ -1639,7 +2879,11 @@
     "entries": [
       {
         "text": "O nitrogênio líquido pode congelar instantaneamente gases, como o oxigênio, tornando-o um poderoso agente de preservação biológica. Ele é usado para armazenar tecidos e órgãos em temperaturas extremamente baixas por longos períodos.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O cheiro de sangue é detectado por humanos devido a um composto chamado geosmina. Essa substância é gerada pela ação bacteriana, o que torna nosso olfato sensível até mesmo à atividade microbiana em decomposição.",
+        "shown": 3
       }
     ]
   },
@@ -1647,6 +2891,14 @@
     "entries": [
       {
         "text": "A Via Láctea não é uma esfera; ela tem formato de disco gigante, estendendo-se por milhares de anos-luz. Estimar seu diâmetro exato é um desafio porque é muito vasta.",
+        "shown": 4
+      },
+      {
+        "text": "Observar de verdade a Via Láctea é difícil porque a poluição luminosa das cidades ofusca o brilho galáctico. Em áreas escuras, você pode ver \"faixas\" de estrelas onde trilhões de sóis estão agrupados, formando um rio de luz espelhado no céu noturno.",
+        "shown": 4
+      },
+      {
+        "text": "AVia Láctea contém mais estrelas do que se imaginava, podendo abrigar até um trilhão de sóis. Estamos localizados no braço orionídeo, o mais populoso desta vasta galáxia espiral.",
         "shown": 3
       }
     ]
@@ -1659,7 +2911,15 @@
       },
       {
         "text": "O microscópio eletrônico consegue visualizar estruturas menores do que o vírus mais simples conhecido. Ele é essencial para entender a vida no nível atômico, revolucionando a biologia estrutural.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "A primeira vacina de arinos chegou através do consumo acidental de matéria contaminada por bactérias atenuadas. Esse evento, inicialmente um grande risco, foi o marco divisor para a imunologia moderna.",
+        "shown": 4
+      },
+      {
+        "text": "A vida na Terra surgiu de forma muito mais rápida do que se pensava. Acredita-se que os primeiros organismos complexos surgiram há apenas alguns milhões de anos, acelerando drasticamente a evolução biológica.",
+        "shown": 3
       }
     ]
   },
@@ -1668,6 +2928,14 @@
       {
         "text": "Tubarões são mais antigos do que os dinossauros. Eles não possuem ossos verdadeiros, mas sim um esqueleto cartilaginoso flexível.",
         "shown": 4
+      },
+      {
+        "text": "Tubarões não possuem ossos verdadeiros; seu esqueleto é composto por cartilagem. Eles são predadores fascinantes que vivem há milhões de anos, sobrevivendo a extinções em massa.",
+        "shown": 4
+      },
+      {
+        "text": "Estima-se que os tubarões tenham existido por mais de 400 milhões de anos, sobrevivendo a inúmeras extinções de espécies gigantes. Essa longevidade reforça sua adaptação biológica como um dos grupos de vida marinha mais resilientes do planeta.",
+        "shown": 2
       }
     ]
   },
@@ -1676,6 +2944,18 @@
       {
         "text": "O primeiro mecanismo de relógio portátil foi desenvolvido há mais de dois milênios, usando água ou areia para medir o tempo. Esses dispositivos eram muito menos precisos que os mecanismos mecânicos modernos.",
         "shown": 4
+      },
+      {
+        "text": "O primeiro relógio de pulso foi feito para militares no século XIX. Ele permitiu rastrear o tempo sem a necessidade de carregar um grande relógio de bolso.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro relógio de pulso prático foi criado no século XX por um relojoeiro militar, que precisava de um equipamento confiável para o campo de batalha. Eles tinham que ser resistentes a choques e sujos.",
+        "shown": 4
+      },
+      {
+        "text": "O mecanismo de relógio mais antigo conhecido é creditado aos romanos, utilizando água para medir o tempo diariamente. Os primeiros relógios mecânicos precisaram esperar até os séculos XIII para se tornarem práticos no cotidiano.",
+        "shown": 2
       }
     ]
   },
@@ -1683,6 +2963,14 @@
     "entries": [
       {
         "text": "O ouro no Brasil era tão valorizado que o sistema de cobrança fiscal criou até a figura da \"derrama\", um recolhimento forçado que gerava grande revolta popular. Esse mecanismo econômico foi fundamental para financiar a Coroa, mas também impulsionou movimentos de insatisfação local.",
+        "shown": 4
+      },
+      {
+        "text": "Anticamente, os indígenas davam muito mais atenção aos cavalos do que se imagina. Eles desenvolveram técnicas complexas de domação e utilização desses animais antes da chegada dos europeus.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro governador-geral foi Tomé de Sousa, mas o Rio de Janeiro não era a capital oficial quando ele chegou. A capital permaneceu em Salvador por mais 20 anos.",
         "shown": 3
       }
     ]
@@ -1691,7 +2979,23 @@
     "entries": [
       {
         "text": "Os machos de leão possuem almofadas de gordura sob o queixo chamadas \"mufasa\". Essa característica pode servir para exibição ou proteção durante lutas por território.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Não sabem rugir como os machos. Eles emitem um som mais gutural chamado \"chuff\". Esse som é usado para sinais sociais, demonstrando afeto e pertencimento ao grupo.",
+        "shown": 4
+      },
+      {
+        "text": "Leões não rugem; o som grave que emitem é um rugido misturado com outros vocalizações de ameaça ou comunicação. Sua juba, apesar de parecer apenas estética, serve para amplificar sua presença e intimidar rivais.",
+        "shown": 4
+      },
+      {
+        "text": "Os leões não gostam de água; quando necessário, costumam fazer banho na sujeira dos excrementos para se limpar. Eles dormem muito mais do que muitos cachorros de porte similar.",
+        "shown": 4
+      },
+      {
+        "text": "Leões machos perdem seus presas de pelos após o período reprodutivo. Eles também são os únicos felinos que vivem em grupos sociais chamados alcateias.",
+        "shown": 2
       }
     ]
   },
@@ -1703,7 +3007,11 @@
       },
       {
         "text": "O som de um motor pode ser mais alto que o grito humano captando os tímpanos. As aeronaves modernas utilizam a sustentação do ar para voar sem combustão aparente, apenas energia cinética.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O rugido de um motor a jato era originalmente planejado para apenas acelerar o avião, mas acaba por desestabilizar os pássaros próximos. Muitos aviões usam sistemas avançados que simulam voos em plataformas terrestres antes do decolagem.",
+        "shown": 4
       }
     ]
   },
@@ -1711,7 +3019,23 @@
     "entries": [
       {
         "text": "Alguns fungos são decompositores essenciais, reciclando nutrientes vitais para o planeta. Eles também formam simbiontes com plantas, ajudando na absorção de minerais do solo.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Alguns cogumelos possuem bioluminescência natural, emitindo um brilho suave no escuro. Seu sistema de comunicação subterrâneo permite que eles se comuniquem com as árvores hospedeiras através das raízes.",
+        "shown": 4
+      },
+      {
+        "text": "Algumas espécies de fungos imitam o cheiro do perfume feminino, enganando insetos para garantir sua polinização. Eles também podem se alimentar de matéria orgânica morta, reciclando nutrientes vitais para ecossistemas inteiros.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns fungos possuem bioluminescência, emitindo um brilho constante como mecanismo de defesa ou sedução. Eles formam simbioses complexas com raízes de árvores, sendo vitais para a nutrição das plantas.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns fungos são chamados de “cérebros” porque formam redes subterrâneas (micorrizas) que se comunicam como um sistema nervoso para outras plantas. Eles conseguem até transmitir sinais de alerta contra pragas em grandes áreas florestais.",
+        "shown": 1
       }
     ]
   },
@@ -1723,7 +3047,11 @@
       },
       {
         "text": "A cor de um raio não muda o seu poder; é apenas a forma como ele interage com a atmosfera. A formação de relâmpagos pode ser detectada por satélites muito antes dos olhos humanos perceberem qualquer atividade no céu.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Um raio pode gerar temperaturas altíssimas, ultrapassando 300 graus Celsius na sua trajetória. Essa energia é suficiente para derreter metal e causar incêndios devastadores ao atingir o solo.",
+        "shown": 4
       }
     ]
   },
@@ -1731,6 +3059,10 @@
     "entries": [
       {
         "text": "O Pacífico contém mais de 60% dos oceanos do mundo. Suas profundezas guardam trincheiras abissais que atingem quase a maior parte da crosta terrestre.",
+        "shown": 4
+      },
+      {
+        "text": "Possui os abissais mais profundos do planeta, como a fossa das Marianas. Essa região é lar de vida bioluminescente que se adapta a pressões extremas.",
         "shown": 1
       }
     ]
@@ -1743,7 +3075,11 @@
       },
       {
         "text": "As geleiras não são apenas blocos de gelo; elas estão lentamente moldando a paisagem através da força da água e do movimento constante. Esse processo é tão poderoso que esculpe vales em formato de U, característicos das regiões glaciais.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "As geleiras continuam avançando até mesmo onde se acreditava que haviam recuado permanentemente. Elas têm um papel crucial no controle do nível global do mar, e seu derretimento é acelerando o aumento do nível do oceano.",
+        "shown": 3
       }
     ]
   },
@@ -1755,7 +3091,15 @@
       },
       {
         "text": "A Ilha de Santa Helena possui o único porto natural que recebe navios militares mundiais, apesar de seu tamanho pequeno. Ela foi um ponto estratégico crucial nas rotas marítimas históricas.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A Ilha de Páscova foi habitada por uma cultura polinésia única e é famosa suas esculturas monumentais chamadas Moai. Elas guardam mistérios sobre como foram erguidas sem tecnologia moderna.",
+        "shown": 4
+      },
+      {
+        "text": "A Ilha de Páscoa possui um fenômeno cultural fascinante: os Moai eram estátuas que representavam chefes ou ancestrais importantes da ilha. Sua construção exigeava um trabalho artesanal monumental e organizado em sociedade, sendo um testemunho impressionante de engenharia e devoção pré-colombiana.",
+        "shown": 1
       }
     ]
   },
@@ -1764,6 +3108,14 @@
       {
         "text": "A base do Coliseu de Roma era tão colossal que exigiu a alvenaria de quase 108.000 metros cúbicos de pedra. Ele foi inspirado em estruturas gregas, mas sua magnitude o tornou um símbolo romano inédito de engenharia civil.",
         "shown": 4
+      },
+      {
+        "text": "A construção da Grande Muralha Chinesa utilizou técnicas de engenharia adaptáveis a terrenos extremamente variados. Ela não é uma única muralha, mas um complexo sistema de fortificações construído ao longo de séculos.",
+        "shown": 4
+      },
+      {
+        "text": "As pirâmides de Gizé foram originalmente cobertas por um material branco polido chamado calcário cairota, que lhes dava um brilho intenso. Esse revestimento foi removido ao longo dos milênios, dando-lhes a aparência áspera e bege que vemos hoje.",
+        "shown": 1
       }
     ]
   },
@@ -1775,6 +3127,18 @@
       },
       {
         "text": "Muitos \"piratas\" famosos eram na verdade mercenários ou corsários pagos por governos. Eles exploravam as rotas comerciais, mas muitas vezes sob licença real.",
+        "shown": 4
+      },
+      {
+        "text": "A maioria dos \"piratas\" operava sob bandeiras reais, atuando como corsários remunerados. Eles eram frequentemente mercenários legais que saqueavam inimigos de seu próprio país.",
+        "shown": 4
+      },
+      {
+        "text": "Muitos piratas reais eram, na verdade, contrabandistas ou mercenários com um desejo de fama. A vida pirata era mais caótica e violenta do que retratado em filmes hollywoodianos.",
+        "shown": 4
+      },
+      {
+        "text": "Muitos \"piratas\" históricos eram, na verdade, mercenários ou corsários contratados por governos. Eles operavam sob bandeiras reais para combater rivais em vez de apenas saquear sem lei.",
         "shown": 2
       }
     ]
@@ -1787,6 +3151,14 @@
       },
       {
         "text": "Eles não são de verdade aves, mas sim a parte mais rosada da sua dieta, causada por pigmentos alimentares chamados carotenoides. Eles conseguem mudar o tom do rosa dependendo da saúde e da alimentação.",
+        "shown": 4
+      },
+      {
+        "text": "Eles não são de verdade pássaros, mas sim aves que formam colônias para se alimentar. O tom rosado intenso do corpo vem da ingestão de pigmentos de algas marinhas no seu ambiente natural.",
+        "shown": 4
+      },
+      {
+        "text": "Os flamingos não são de verdade pássaros; eles fazem parte da ordem Phoenicopteriformes. Seu rosa vibrante vem do pigmento caroteno que obtêm ao comer algas e salmão.",
         "shown": 3
       }
     ]
@@ -1799,7 +3171,11 @@
       },
       {
         "text": "O maracujá-da-índia possui um sabor agridoce único e flores que atraem polinizadores noturnos. Ele cresce em trepadeiras rasteiras, adaptando-se a vários climas tropicais.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O frutto del cactus é comestível e refrescante, podendo render geleias saborosas. Ele também ajuda a regular o intestino devido às suas fibras naturais.",
+        "shown": 4
       }
     ]
   },
@@ -1807,7 +3183,19 @@
     "entries": [
       {
         "text": "As corujas não conseguem mover o lóbulo da língua, por isso elas têm um som característico de \"porra\" ao vocalizar. Seus olhos são tão grandes que representam cerca de 75% do tamanho do seu cérebro, melhorando a visão noturna.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Corujas não piscam os olhos por necessidade, mas sim para regular a temperatura e o movimento de seus globos oculares. Suas penas são desenhadas com padrões que as ajudam a se camuflarem quase perfeitamente em troncos de árvores.",
+        "shown": 4
+      },
+      {
+        "text": "As corujas não piscam os olhos frequentemente; elas cobrem a pálpebra com movimentos lentos e quase invisíveis. Isso ajuda-as a manter o foco na caça sem desviar a atenção da presa.",
+        "shown": 4
+      },
+      {
+        "text": "As corujas não piscam os olhos da mesma forma que nós; seus olhos ficam sempre abertos para captar o menor movimento no escuro. Eles também usam um tipo de ecolocalização sonora em suas chamadas, tornando-os caçadores noturnos muito eficazes.",
+        "shown": 2
       }
     ]
   },
@@ -1815,7 +3203,15 @@
     "entries": [
       {
         "text": "As ondas de tsunami são causadas por deslocamentos verticais massivos na água, como terremotos ou deslizamentos de terra submarinos. Essa energia as transforma em correntes destrutivas muito mais potentes do que o esperado.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Um tsunami não é causado por terremotos no mar, mas sim pelo desmoronamento de grandes massas de terra subaquáticas ou vulcânicas. A força da onda comprime a água, levando consigo detritos gigantescos que causam impacto devastador na costa.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns tsunamis são gerados por colapso de grandes quantidades de rocha submarina, não apenas por terremotos. Esses eventos podem varrer vastas áreas costeiras com força devastadora.",
+        "shown": 2
       }
     ]
   },
@@ -1823,7 +3219,15 @@
     "entries": [
       {
         "text": "A passagem é tão vital que, em 1967, seu fechamento por causa da Guerra dos Seis Dias causou um impacto econômico global gigantesco. Sua profundidade foi redesenhada para permitir a passagem segura de navios cada vez maiores.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O canal flutua constantemente devido à variação da maré entre o Mar Mediterrâneo e o Mar Vermelho. Seu fundo é monitorado por um sistema que controla seu nível de água para evitar danos ambientais.",
+        "shown": 4
+      },
+      {
+        "text": "Abertura do canal reduziu drasticamente o tempo de viagem marítima entre a Europa e a Ásia. Antes dele, as naus precisavam contornar todo o Cabo da Boa Esperança.",
+        "shown": 4
       }
     ]
   },
@@ -1832,6 +3236,18 @@
       {
         "text": "A Islândia tem uma das maiores fontes termais do planeta, o Geothermal Energy. Ela usa esse calor natural para aquecer casas e produzir eletricidade de forma sustentável.",
         "shown": 4
+      },
+      {
+        "text": "Somália não possui um governo central reconhecido internacionalmente. Seu status político é altamente fragmentado e disputado por várias forças.",
+        "shown": 4
+      },
+      {
+        "text": "O Djibouti possui um planalto salgado único, formado por minerais de diferentes mares. Esse local é vital para a extração artesanal de sais e ornamentação natural.",
+        "shown": 4
+      },
+      {
+        "text": "O país mais novo do mundo é o Nauru; formou-se por uma exploração mineral no século XIX. É um pequeno estado insular conhecido por sua história de escassez de recursos.",
+        "shown": 3
       }
     ]
   },
@@ -1843,7 +3259,15 @@
       },
       {
         "text": "O padrão listrado das zebras não é aleatório; ele ajuda a confundir os predadores em ataques de grupo, um efeito chamado cintilamento. Essa pelagem confere proteção visual quando o animal está junto com outros da mesma espécie.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "As listras pretas das zebras são um camuflagem fascinante em ambientes de luz solar intensa. Elas podem ajudar a quebrar o contorno do animal, tornando-o mais difícil de ser detectado por predadores.",
+        "shown": 4
+      },
+      {
+        "text": "As listras não são pigmento natural, mas sim um mecanismo de camouflage disruptivo. Elas confundem os predadores, que têm dificuldade em focar o corpo do animal quando ele está em movimento.",
+        "shown": 2
       }
     ]
   },
@@ -1851,6 +3275,18 @@
     "entries": [
       {
         "text": "Alguns desertos são classificados como \"neve\" devido à sua altitude elevada, onde a temperatura é fria mesmo no verão. Por exemplo, o Deserto de Uyuni na Bolívia parece um espelho quando chove, refletindo o céu perfeitamente.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns desertos não são só de areia. Desertos costeiros podem ser compostos por sal e cristais minerais, como o Mar Morto. A vida selvagem nesses locais se adapta a extremos sem água detectável no solo.",
+        "shown": 4
+      },
+      {
+        "text": "A Floresta de Cristal é um deserto onde minerais formam paisagens únicas. Suas cores refletem variações geológicas incomuns que fascinam os cientistas.",
+        "shown": 4
+      },
+      {
+        "text": "A areia do Saara pode conter cristais de sal minerais formados por águas subterrâneas. Esses depósitos brilham intensamente ao cair da noite, criando paisagens quase alienígenas.",
         "shown": 2
       }
     ]
@@ -1860,6 +3296,18 @@
       {
         "text": "Tigres têm listras únicas, como impressões digitais de humanos. A intensidade dessas marcas pode mudar ligeiramente conforme a estação do ano.",
         "shown": 4
+      },
+      {
+        "text": "A impressão digital de um tigre é única, assim como a de qualquer ser humano. Eles também têm \"marcadores faciais\" que funcionam quase como assinaturas biológicas.",
+        "shown": 4
+      },
+      {
+        "text": "Tigres não conseguem rugir como os leões. Seu vocalização mais alta é um rugido gutural que geralmente se assemelha a tosse ou engasgo. Eles são animais noturnos, preferindo caçar durante o crepúsculo e a noite para maior vantagem tática.",
+        "shown": 4
+      },
+      {
+        "text": "Tigres de Bengala são frequentemente confundidos com o tigre-de-bengal, mas possuem subespécies distintas adaptadas a diferentes habitats. Eles também apresentam marcadores genéticos únicos que ajudam na identificação populacional em áreas de conflito humano-animal.",
+        "shown": 1
       }
     ]
   },
@@ -1867,7 +3315,15 @@
     "entries": [
       {
         "text": "Durante o Império Romano, os gladiadores eram considerados espetáculos de entretenimento mais do que meros combatentes. O circo era um centro social complexo, refletindo hierarquias sociais da época.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Os romanos usavam um tipo de \"cola\" feita com cinzas vulcânicas para selar fissuras em estradas, tornando-as mais resistentes ao tempo. Essa técnica avançada permitiu que suas vias permanecessem viáveis por séculos até hoje.",
+        "shown": 4
+      },
+      {
+        "text": "Durante o Império Romano, os banhos públicos não eram apenas para higiene. Era um ponto central de socialização política, onde rumores e negócios importantes eram negociados longe dos olhos do poder.",
+        "shown": 2
       }
     ]
   },
@@ -1879,7 +3335,15 @@
       },
       {
         "text": "As primeiras transmissões de imagens eram tão limitadas que exibia apenas pontos luminosos no fundo escuro. A tecnologia levou décadas para capturar a rica paleta de cores vibrantes que vemos hoje nas telas.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "As primeiras transmissões de TV eram feitas por máquinas enormes e complexas. Os aparelhos pioneiros muitas vezes exigiam cabos elétricos espalhados pela sala, muito diferentes dos modelos modernos.",
+        "shown": 4
+      },
+      {
+        "text": "A primeira transmissão de rádio foi captada por britânicos no século XIX; a TV surgiu muito depois desse pioneirismo eletrônico. A tecnologia precisou passar por várias fases, saindo do áudio para o vídeo como um desenvolvimento gradual.",
+        "shown": 4
       }
     ]
   },
@@ -1887,7 +3351,15 @@
     "entries": [
       {
         "text": "Os romanos usavam um sistema de esgoto avançado, capaz de remover resíduos até camadas profundas do solo. Este feito superou muitas civilizações da época e sustentou grandes aglomerações urbanas por séculos.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Os romanos usavam água de fontes termais para banhos sociais, não apenas por higiene, mas também como ponto de encontro e lazer cultural. Muitos banhos eram projetados arquitetonicamente para simular paisagens exóticas ou cenas mitológicas.",
+        "shown": 4
+      },
+      {
+        "text": "Os romanos usavam um tipo de tinta natural feita com o suco de lesmas para pintura mural em muitos edifícios públicos. Essa técnica garantia cores vibrantes que resistiam ao tempo, mas era difícil de replicar hoje.",
+        "shown": 1
       }
     ]
   },
@@ -1896,6 +3368,18 @@
       {
         "text": "A cor exata é determinada pelo ângulo de observação, fazendo com que a intensidade mude ao longo do tempo para o mesmo espectador. Em algumas culturas nativas americanas, os arcos também simbolizam pontes entre mundos.",
         "shown": 4
+      },
+      {
+        "text": "Os bolsões de ar no vapor d'água podem criar reflexos que se assemelham a um segundo arco-íris secundário, com cores mais pálidas e espaçadas. Essa ocorrência é causada pela dispersão da luz em diferentes camadas atmosféricas.",
+        "shown": 4
+      },
+      {
+        "text": "A cor do arco-íris é um efeito óptico causado pela refração da luz solar na água. Ele não tem forma física, sendo apenas a dispersão visível do espectro de cores no céu.",
+        "shown": 4
+      },
+      {
+        "text": "A cor percebida no arco-íris depende do ângulo de visão, criando um efeito holográfico. Em condições ideais, você pode ver um segundo \"arco-íris\" chamado arco duplo.",
+        "shown": 2
       }
     ]
   },
@@ -1903,6 +3387,14 @@
     "entries": [
       {
         "text": "O som não existe no vácuo porque ele é uma onda mecânica que precisa de um meio para se propagar. A velocidade do som na água é significativamente maior do que em materiais sólidos como o aço.",
+        "shown": 4
+      },
+      {
+        "text": "O tempo não é apenas o fluxo de eventos; ele pode ser visto como uma quarta dimensão espacial. Em teoria, a gravidade curva esse tecido do espaço-tempo.",
+        "shown": 4
+      },
+      {
+        "text": "O tempo não flui como um rio; sua própria natureza sugere ser mais bem entendida como uma dimensão espacial. Em velocidades altíssimas, o tempo se dilata para observadores em repouso.",
         "shown": 2
       }
     ]
@@ -1911,7 +3403,11 @@
     "entries": [
       {
         "text": "O maior registro de um grande terremoto foi no Pacífico Oriental, há mais de 300 anos. A energia liberada por algum tremor é suficiente para acender centenas de lâmpadas de rua em sequência.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "Em regiões sísmicas ativas, superfícies de rocha podem acumular tensão por séculos antes de liberar energia em um único evento tremendo. Esses acúmulos são responsáveis pelos grandes tremores que moldam paisagens ao longo do tempo.",
+        "shown": 4
       }
     ]
   },
@@ -1919,7 +3415,19 @@
     "entries": [
       {
         "text": "O kernel Linux é de código aberto e pode ser executado por hardware muito variado, desde supercomputadores até microcontroladores em eletrodomésticos. Isso garante que o sistema seja extremamente adaptável e usado em dispositivos incomuns do dia a dia.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O kernel do Linux é tão robusto que serve de base para sistemas operacionais amplamente utilizados em infraestrutura crítica, como na defesa, medicina e telecomunicações. Por ser aberto, ele permite a customização extrema para rodar em qualquer tipo de hardware jamais imaginado.",
+        "shown": 4
+      },
+      {
+        "text": "O kernel do Linux foi inicialmente criado por Linus Torvalds no ambiente acadêmico finlandês. Ele revolucionou o conceito de software livre, tornando-o acessível para milhões.",
+        "shown": 4
+      },
+      {
+        "text": "O kernel do Linux é um software de código aberto que pode rodar em mais de cinquenta tipos diferentes de arquiteturas de processadores. Isso garante sua enorme compatibilidade, desde PCs poderosos até pequenos dispositivos embarcados.",
+        "shown": 1
       }
     ]
   },
@@ -1927,6 +3435,10 @@
     "entries": [
       {
         "text": "O Pergaminho de Dunlin, um texto medieval escocês, contém desenhos de criaturas míticas nunca antes vistas. Ele oferece insights fascinantes sobre a imaginação artística da Idade Média.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns manuscritos continham textos em línguas extintas e foram crucialmente importantes para entender civilizações perdidas. A conservação da tinta e do pergaminho revela muito sobre os materiais e o conhecimento de épocas distantes.",
         "shown": 3
       }
     ]
@@ -1936,6 +3448,14 @@
       {
         "text": "O Titanic era tão grande que poderia ter sido usado para alimentar um exército por meses. Sua velocidade recorde de construção o tornou mais famoso do que sua história trágica.",
         "shown": 4
+      },
+      {
+        "text": "O submarino mais pesado já construído foi feito para carregar um reator nuclear experimental dos anos 60s. Ele não tinha capacidade de se mover, apenas servir como teste de carga.",
+        "shown": 4
+      },
+      {
+        "text": "O Titanic foi projetado para ser inafundável, o que era um feito tecnológico impressionante na época. Ele continha mais itens de conforto do que qualquer embarcação antes dele, representando o auge da engenharia romana moderna.",
+        "shown": 4
       }
     ]
   },
@@ -1943,7 +3463,23 @@
     "entries": [
       {
         "text": "Suas copas podem ultrapassar as nuvens, e são árvores vivas que monitoram o tempo geológico por milhares de anos. Elas crescem muito lentamente, mas alcançam tamanhos monumentais quase impossíveis de serem replicados em qualquer outro lugar.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Algumas seitas são tão antigas que já estavam de pé antes dos dinossauros caírem os astrogalo. Elas podem viver por milhares de anos, superando todas as outras espécies vivas no planeta.",
+        "shown": 4
+      },
+      {
+        "text": "As sequoias têm um crescimento incrivelmente lento, levando séculos para alcançar tamanhos gigantescos. Elas são árvores vivas que testemunharam eras geológicas completas na Terra.",
+        "shown": 4
+      },
+      {
+        "text": "São as árvores vivas mais antigas do planeta e podem viver por milênios. Algumas se estão adaptaram a sobreviver a múltiplos incêndios, que muitas vezes são parte de seu ciclo natural.",
+        "shown": 4
+      },
+      {
+        "text": "As árvores de sequoia são tão grandes e resistentes que vivem por milhares de anos. Elas também contam com um sistema defensivo complexo, quase imune ao fogo.",
+        "shown": 1
       }
     ]
   },
@@ -1951,7 +3487,15 @@
     "entries": [
       {
         "text": "A lua Titã, na origem de Saturno, possui rios e lagos de metano líquido. É o único lugar no Sistema Solar com um ciclo hidrológico subterrâneo ativo.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "A lua Titã tem lagos de metano líquido, o que a faz parecer um planeta anelado à distância. Esses corpos fluidos podem sustentar vida microbiana totalmente diferente da terrestre.",
+        "shown": 4
+      },
+      {
+        "text": "A Lua de Titã tem riachos de metano líquido em sua superfície, o que a torna um laboratório natural fascinante. Essa característica a diferencia muito das outras grandes luas geladas.",
+        "shown": 4
       }
     ]
   },
@@ -1959,7 +3503,27 @@
     "entries": [
       {
         "text": "Alguns asteroides possuem atmosferas gasosas temporárias criadas por sua própria atividade interna. Esses sistemas podem até ter anéis de poeira, lembrando mini-satélites.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Alguns asteroides orbitam um ponto chamado Ponto Lagrange, formando \"estações aneladas\" de detritos. Eles são um registro incrível da formação in situ do Sistema Solar, sem modificações geológicas.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns asteroides possuem atmosferas tênues formadas por moléculas de gases voláteis. Essa \"atmosfera\" não é estável e pode desaparecer rapidamente, exposto ao vácuo espacial.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns asteroides são compostos por materiais extremamente antigos, contendo amostras de matéria da formação do Sistema Solar. Observar esses corpos ajuda os cientistas a reconstruir como o nosso sistema se formou há bilhões de anos.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns asteroides possuem superfícies de gelo, como água congelada ou metano. Esses gelos podem ser expelidos pela força do Sol, criando um rastro e sendo confundidos com cometas.",
+        "shown": 4
+      },
+      {
+        "text": "Alguns asteroides possuem atmosferas muito tênues criadas por raios solares e comjetos de gás congelado. Estes \"mini-planetas\" rochosos podem ser fontes energéticas para futuras civilizações espaciais.",
+        "shown": 2
       }
     ]
   },
@@ -1971,6 +3535,14 @@
       },
       {
         "text": "O sistema imune nunca desliga totalmente; ele está sempre patrulhando o corpo contra ameaças invisíveis. Alguns tipos de células T têm memória, lembrando-se de vírus específicos por anos ou décadas.",
+        "shown": 4
+      },
+      {
+        "text": "A capacidade de memória do sistema imune é como um arquivo digital biológico. Ele armazena informações dos patógenos que encontrou, garantindo respostas mais rápidas na próxima infecção semelhante.",
+        "shown": 4
+      },
+      {
+        "text": "O corpo elimina vírus e bactérias por um mecanismo chamado memória imunológica. Isso permite que você se defenda mais rápido de doenças a que já esteve exposto antes.",
         "shown": 1
       }
     ]
@@ -1979,7 +3551,11 @@
     "entries": [
       {
         "text": "Incoterms não são leis de comércio internacional, mas regras padronizadas que definem responsabilidades entre vendedores e compradores na transação. Eles esclarecem quem é responsável pelos custos, seguro e seguro da mercadoria durante o transporte até o destino final.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Incoterms não é um termo de direito internacional; ele é um conjunto de regras comerciais padronizadas pela Câmara Internacional de Comércio (CCI). Eles definem claramente a responsabilidade do vendedor em modalidades de entrega internacionais.",
+        "shown": 1
       }
     ]
   },
@@ -1987,6 +3563,22 @@
     "entries": [
       {
         "text": "O primeiro contêiner padronizado surgiu nos Estados Unidos na década de 1950. Essa invenção revolucionou o comércio global, tornando a logística portuária muito mais rápida e barata.",
+        "shown": 4
+      },
+      {
+        "text": "Os contêineres marítimos modernos são mais robustos do que muitos imagina. Suas estruturas metálicas foram desenhadas para suportar não apenas o peso, mas também os choques extremos em rotas oceânicas movimentadas.",
+        "shown": 4
+      },
+      {
+        "text": "O design inicial dos contêineres foi inspirado por caixotes de frutas para otimizar o manuseio em docas portuárias. Essa padronização revolucionou a logística global, tornando o transporte marítimo muito mais rápido e eficiente.",
+        "shown": 4
+      },
+      {
+        "text": "O formato dos contêineres padronizou a logística global após o desenvolvimento de equipamentos especializados na metade do século XX. Essa uniformidade permite que qualquer navio, trem ou caminhão carreguem e descarreguem cargas rapidamente sem ajustes manuais complexos.",
+        "shown": 4
+      },
+      {
+        "text": "O formato padrão de um container moderno não é aleatório; ele foi padronizado para garantir a interoperabilidade global entre trens, navios e caminhões. Essa padronização revolucionou o transporte marítimo, reduzindo drasticamente custos e tempo logístico.",
         "shown": 2
       }
     ]
@@ -1995,6 +3587,14 @@
     "entries": [
       {
         "text": "O uirapuru não canta para o homem; seu canto é um mito de origem indígenas. A ave realmente existe, mas sua melodia mágica só foi encontrada na lenda.",
+        "shown": 4
+      },
+      {
+        "text": "O peixe-boi não é um réptil nem um mamífero terrestre; ele pertence à ordem Sirenia, tornando-o semiaquático. Na natureza, ele pode desmembrar grandes carcaças de outros animais para se alimentar.",
+        "shown": 4
+      },
+      {
+        "text": "O tucano-de-bico-verde tem um bico que funciona como um termostato natural. Ele muda de cor em resposta às variações de temperatura ambiente, indicando o nível de estresse ou prazer.",
         "shown": 1
       }
     ]
@@ -2004,6 +3604,22 @@
       {
         "text": "O \"triângulo\" é um mito popular sem comprovação científica de atividade paranormal. As anomalias registradas são frequentemente explicadas por fatores naturais como correntes marítimas fortes e fenômenos climáticos.",
         "shown": 4
+      },
+      {
+        "text": "Nenhuma atividade paranormal foi comprovada no local; os desaparecimentos são geralmente atribuídos a condições climáticas extremas ou falhas humanas. O mito é, na verdade, um fenômeno de má fama alimentado por lendas urbanas.",
+        "shown": 4
+      },
+      {
+        "text": "A área não é um mistério sobrenatural, mas sim um cruzamento de correntes marítimas complexas. A maior parte dos desaparecimentos são explicados por condições meteorológicas adversas e falhas na navegação humana.",
+        "shown": 4
+      },
+      {
+        "text": "O Triângulo não é um local mágico, mas uma área de alta atividade marítima onde muitos navios cruzam. Os relatos de desaparecimento são geralmente explicados por fatores naturais como condições meteorológicas extremas ou falhas humanas.",
+        "shown": 4
+      },
+      {
+        "text": "A área não é um local misterioso, mas sim uma região do Oceano Atlântico. Muitas lendas se concentram na sua passagem por diversas rotas de navegação.",
+        "shown": 2
       }
     ]
   },
@@ -2015,6 +3631,14 @@
       },
       {
         "text": "Possui sinais de ter tido rios extensos no passado, indicando um clima muito mais quente e úmido. Há evidências de água congelada sob sua superfície que pode ser extraída por futuras missões espaciais.",
+        "shown": 4
+      },
+      {
+        "text": "A água congelada é abundante sob a superfície marciana. Ela pode ser acessível para uso humano com processos relativamente simples de aquecimento.",
+        "shown": 4
+      },
+      {
+        "text": "Marte possui o maior vulcão do sistema solar, o Olympus Mons. Ele é tão vasto que cobre mais de um terço da superfície planetária.",
         "shown": 1
       }
     ]
@@ -2023,7 +3647,15 @@
     "entries": [
       {
         "text": "Alguns dinossauros herbívoros possuíam bocas equipadas com estruturas semelhantes a colheres para raspar vegetação. A carcaça esquelética de um T-Rex pode durar muito mais do que os predadores vivos, preservando até tecidos moles em certas condições.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Alguns dinossauros tinham penas coloridas e vibrantes. Eles também eram capazes de voar ou planear, como sugerem estudos de anatomia e fósseis.",
+        "shown": 4
+      },
+      {
+        "text": "Os T-Rex tinha um chamado \"pêndulo caudal\" devido ao movimento de cauda para manter o equilíbrio enquanto corria ou virava. Ele não era tão ágil quanto se pensava, mas sua força bruta era incomparável no seu nicho ecológico.",
+        "shown": 2
       }
     ]
   },
@@ -2031,6 +3663,22 @@
     "entries": [
       {
         "text": "As ruínas de Machu Picchu não são perfeitamente alinhadas com as constelações zodiacais. A localização elevada oferecia aos incas um poder simbólico, conectando-os à divindade celestial.",
+        "shown": 4
+      },
+      {
+        "text": "A cidade de Machu Picchu foi construída pelos Incas num local militar estratégico para observação astronômica. Seu isolamento garantiu que grandes parte de sua estrutura fosse preservada do mundo moderno.",
+        "shown": 4
+      },
+      {
+        "text": "A cidade de Machu Picchu foi construída por volta do século XV para os Incas. Seu isolamento geográfico ajudou a preservar sua arquitetura intacta até ser redescoberta no início do século XX.",
+        "shown": 4
+      },
+      {
+        "text": "As ruínas de Machu Picchu escondem um complexo de observatórios astronômicos avançadíssimos. Sua arquitetura demonstra profundo conhecimento Inca na relação entre o cosmos e a vida humana.",
+        "shown": 4
+      },
+      {
+        "text": "Machu Picchu fluminou dos invasores espanhóis devido à sua localização remota na Cordilheira dos Andes. Foi redescoberta por Hiram Bingham em 1911, chamando a atenção mundial para as civilizações incas.",
         "shown": 1
       }
     ]
@@ -2039,7 +3687,11 @@
     "entries": [
       {
         "text": "A maioria dos produtos eletrônicos vendidos no Brasil tem componentes de diversos países usando diferentes canais logísticos complexos. O custo do frete internacional é tão alto que muitas empresas optam por vender diretamente para grandes centros urbanos, evitando a distribuição em cidades menores.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O regime de importação pode ser usado para trazer mercadorias sob inspeção alfandegária. Nesses casos, o produto entra no país sem pagamento de impostos, mas deve sair em um prazo determinado.",
+        "shown": 4
       }
     ]
   },
@@ -2047,7 +3699,11 @@
     "entries": [
       {
         "text": "Plutão pertence ao grupo dos corpos transneptunianos (TNOs). Ele foi reclassificado como planeta anão devido à sua incapacidade de limpar completamente a órbita.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "São corpos rochosos residuais do sistema solar. Muitos foram originalmente considerados planetas candidatos e agora são classificados como mundos transneptunianos ou planetas anões.",
+        "shown": 4
       }
     ]
   },
@@ -2055,7 +3711,15 @@
     "entries": [
       {
         "text": "Os antigos egípcios acreditavam que o Nil era um rio sagrado de renovação constante. Eles realizavam festas e rituais complexos para honrar os Deuses associados às suas cheias periódicas.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "Na China, existe o Festival da Colheita, um evento celebrado há milhares de anos para agradecer pela comida abundante. É uma tradição que liga a vida rural com rituais pagãos antigos.",
+        "shown": 4
+      },
+      {
+        "text": "As civilizações maias usavam pigmentos naturais para criar arte sofisticada. Um dos mais vibrantes era o azul ultramarino, feito de um mineral encontrado apenas na região costeira do Golfo do México.",
+        "shown": 4
       }
     ]
   },
@@ -2064,6 +3728,14 @@
       {
         "text": "Algumas sementes mudam de cor ou formato drasticamente antes da germinação. O botão de algumas flores contêm cápsulas com grãos que se abrem em explosões para dispersar as sementes.",
         "shown": 4
+      },
+      {
+        "text": "Algumas sementes são projetadas para enganar os pássaros, parecendo nutritivas, mas na verdade contêm psicoativos ou venenosos. Há espécies que usam sementes radioativas em suas células para deter predadores.",
+        "shown": 4
+      },
+      {
+        "text": "Algumas sementes parecem miniaturas de frutas ou órgãos, enganando quem as encontra. Essa semelhança é um mecanismo de dispersão para atrair animais que irão consumir a \"fruta\" inteira.",
+        "shown": 3
       }
     ]
   },
@@ -2071,7 +3743,15 @@
     "entries": [
       {
         "text": "A língua proto-indoeuropariana é uma reconstrução linguística e nunca foi falada em sua forma original. Sua existência ajuda os cientistas a rastrear as possíveis migrações de grupos humanos na Eurásia.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A língua Voynich foi escrita em um alfabeto desconhecido, levando criptógrafos a acreditar ser um código ou idioma inventado, mas sua verdadeira origem ainda é um mistério absoluto. Os estudos sugerem que ela pode não representar uma língua natural alguma.",
+        "shown": 4
+      },
+      {
+        "text": "A língua Etrusca não tem descendentes diretos conhecidos, gerando debates sobre sua ancestralidade na família indo-europeia. Sua estrutura gramatical ainda fascina linguistas por apresentar particularidades incomuns no traçado das línguas modernas do Mediterrâneo.",
+        "shown": 4
       }
     ]
   },
@@ -2080,6 +3760,22 @@
       {
         "text": "O primeiro ciclismo moderno circulou em veículos de dois pedais, mas não era o que conhecemos hoje. Os modelos vikings, muito populares no século XIX, eram mais robustos e frequentemente equipados com suspensão rudimentar.",
         "shown": 4
+      },
+      {
+        "text": "As primeiras rodas de bicicleta eram feitas de madeira e não tinham pedais. O design evoluiu muito até hoje, usando materiais leves como alumínio e fibra de carbono.",
+        "shown": 4
+      },
+      {
+        "text": "A bicicleta foi inicialmente projetada para ser um veículo de assistência a cavalos. Modelos antigos podiam acoplar-se às rédeas, sendo usadas até mesmo por profissionais do hipismo.",
+        "shown": 4
+      },
+      {
+        "text": "As primeiras bicicletarias não eram rodas de três raios como imaginamos; elas se pareciam mais com equipamentos para fazer ginástica. A transição do métier pour la promenade, ou \"bicicleta à caminhada\", foi crucial para o design moderno dos veículos.",
+        "shown": 4
+      },
+      {
+        "text": "Em certas épocas, as primeiras \"bicicletas\" não tinham pedais, sendo empurradas pelo usuário a seus pés. Essas máquinas eram chamadas de dandy-cycles e exigiam grande força muscular para se movimentarem.",
+        "shown": 3
       }
     ]
   },
@@ -2087,7 +3783,11 @@
     "entries": [
       {
         "text": "Algumas espécies de cogumelo possuem toxinas potentes, capazes de matar humanos. No entanto, outras são comestíveis e usadas há milhares de anos na culinária e medicina.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Alguns fungos parasitam cérebro de humanos, podendo causar grave doença neurológica. Eles também podem ser mestres manipuladores químicos, confundindo espécies vegetais para sobreviver.",
+        "shown": 2
       }
     ]
   },
@@ -2095,6 +3795,10 @@
     "entries": [
       {
         "text": "A nebulosa Barnard é um local onde a matéria está super-fria e densa, com as condições ideais para o nascimento de estrelas. É como se fosse um berçário cósmico quieto, esperando por novas luzes no céu noturno.",
+        "shown": 4
+      },
+      {
+        "text": "Existe um exoplaneta chamado TRAPPIST-1e cujas condições podem permitir a vida sob forma líquida de água. Ele orbita uma estrela anã vermelha em um sistema com sete planetas rochosos.",
         "shown": 1
       }
     ]
@@ -2103,7 +3807,19 @@
     "entries": [
       {
         "text": "Algumas espécies de viveiros tentam confundir insetos, mas dependem mais do veneno que da armadilha física. O sistema digestivo dessas plantas é muito eficiente, podendo digerir até pequenos animais inteiros.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "A Dionaea muscipula \"jugum\" tem um mecanismo de fecho totalmente artificial, construído para replicar sua caça original. Suas armadilhas se fecham em menos de meio segundo após o toque ou vibracão.",
+        "shown": 4
+      },
+      {
+        "text": "Algumas espécies conseguem confundir suas vítimas com néctar ou pólen. O mecanismo de armadilha dessas plantas é altamente especializado, sendo um predador botânico eficiente.",
+        "shown": 4
+      },
+      {
+        "text": "Algumas flores, como o giardo, utilizam um mecanismo de armadilha complexo para capturar insetos. Essa carnivoria permite que elas obtenham nutrientes essenciais do solo onde são deficientes.",
+        "shown": 2
       }
     ]
   },
@@ -2111,6 +3827,22 @@
     "entries": [
       {
         "text": "O primeiro email foi enviado em 1971 por Ray Tomlinson, mas ele adaptou o símbolo @ para separar nome de usuário de máquina. O uso dessa combinação se tornou um padrão global até hoje.",
+        "shown": 4
+      },
+      {
+        "text": "A primeira página da World Wide Web foi criada por Tim Berners-Lee no CERN. Inicialmente, era usada apenas para compartilhar pesquisas científicas entre físicos.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro e-mail enviado foi de forma analógica. Ele não teve a aparência digital característica, sendo transmitido por meio de um modem. Por isso, o conceito original era mais parecido com cartas digitais do que gráficos modernos.",
+        "shown": 4
+      },
+      {
+        "text": "O Facebook foi originalmente lançado como \"Thefacebook\" e era restrito apenas a estudantes de Harvard. Algumas das primeiras funcionalidades incluíam o perfil com foto e o feed de notícias para conectar pessoas do campus universitário.",
+        "shown": 4
+      },
+      {
+        "text": "O protocolo HTTP foi originalmente projetado por um engenheiro chamado Tim Berners-Lee como um meio de compartilhar informações atômicas. Ele é a base da comunicação mundial que sustenta quase todos os sites que acessamos diariamente.",
         "shown": 3
       }
     ]
@@ -2119,6 +3851,18 @@
     "entries": [
       {
         "text": "A Sequoia gigante é tão maciça que seus troncos são comparáveis a pequenos edifícios de concreto. O tamanho dessas árvores reflete milhares de anos de crescimento lento e resiliente em ambientes únicos.",
+        "shown": 4
+      },
+      {
+        "text": "A sequoia gigante não é apenas grande; ela pode viver por mais de duas milênios. Algumas amostras de seu tecido entram em estase, permitindo-lhes sobreviver longos períodos sem nutrientes significativos.",
+        "shown": 4
+      },
+      {
+        "text": "A Sequoiadendron giganteum pode crescer até mais de 100 metros e pesar o equivalente a vários elefantes. Sua casca é incrivelmente espessa, servindo como um abrigo natural contra muitos patógenos e incêndios.",
+        "shown": 4
+      },
+      {
+        "text": "A Sequoia gigante é tão grande que seu tronco pode resistir a um incêndio florestal por séculos. Elas armazenam tanta energia que, milho verde seria insuficiente para alimentá-las por muito tempo.",
         "shown": 3
       }
     ]
@@ -2127,6 +3871,14 @@
     "entries": [
       {
         "text": "A maior parte do nosso orçamento de foguetes é gasta no combustível de decolagem. A próxima Fronteira, o espaço profundo, exige um sistema de propulsão muito mais eficiente em vácuo.",
+        "shown": 4
+      },
+      {
+        "text": "Astronautas realmente sentem o cheiro de metal quente após retornar à Terra. A água no espaço é tão pura que não consegue ser vista, parecendo um vácuo transparente.",
+        "shown": 4
+      },
+      {
+        "text": "A Estação Espacial Internacional (ISS) orbita a Terra a cerca de 400 km de altitude, completando um giro no planeta a cada 90 minutos. Lá dentro, os astronautas conseguem observar fenômenos naturais da perspectiva que nenhum telescópio terrestre pode alcançar.",
         "shown": 3
       }
     ]
@@ -2135,7 +3887,19 @@
     "entries": [
       {
         "text": "Em 1946, os EUA retiraram as tropas do Japão drasticamente; a devastação econômica e civil ainda levou anos para ser completamente reconstruída. O governo impôs um controle rigoroso sobre o setor energético que manteve a economia em estado semi-m",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "A criação da World Wide Web por Tim Berners-Lee foi um projeto acadêmico que inicialmente funcionava apenas em servidores de física de partículas. Seu impacto transformou radicalmente a comunicação global.",
+        "shown": 4
+      },
+      {
+        "text": "Em Woodstock de 1969, o número de pessoas presente foi muito maior do que o previsto pelos organizadores inicialmente. Estima-se que mais de 400 mil pessoas compareceram, transformando o evento em um símbolo cultural e social inédito.",
+        "shown": 4
+      },
+      {
+        "text": "O dia 6 de junho de 1944 marcou o desembarque aliando na Normandia, abrindo caminho para a libertação da Europa ocidental. Este evento crucial foi um divisor de águas no fim da Segunda Guerra Mundial.",
+        "shown": 4
       }
     ]
   },
@@ -2143,7 +3907,15 @@
     "entries": [
       {
         "text": "As linhas de fronteira terrestres nem sempre seguem rios ou cadeias de montanhas; algumas foram estabelecidas por tratados diplomáticos que dividiram áreas geográficas arbitrárias. Essas demarcações artificiais muitas vezes ignoram a ecologia e a cultura local, criando divisões antinaturais.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "A linha de Tordesilhas dividiu o mundo em zonas coloniais por acordos de poder, ignorando completamente as culturas locais. Hoje, ainda há divisões territoriais que se baseiam mais em tratados históricos do que em critérios geográficos naturais.",
+        "shown": 4
+      },
+      {
+        "text": "A Linha de Demarcação de Triângulo são trechos onde a jurisdição passa do Mar Mediterrâneo para o Rio Nilo, gerando leis marítimas únicas. Essa zona é um ponto de encontro cultural com regras legais complexas entre povos e águas distintas.",
+        "shown": 4
       }
     ]
   },
@@ -2151,6 +3923,18 @@
     "entries": [
       {
         "text": "O músculo mais forte do corpo humano é o masseter, um dos músculos da mastigação. Ele consegue aplicar pressão enorme para esmagar alimentos.",
+        "shown": 4
+      },
+      {
+        "text": "A fáscia é um tecido conjuntivo que envolve os músculos, podendo conectar ossos distantes do corpo. Ela atua como um sistema de comunicação mecânica e pode influenciar a dor em regiões diferentes.",
+        "shown": 4
+      },
+      {
+        "text": "O músculo mais forte do corpo humano é o masseter, usado para fechar a mandíbula. Ele pode exercer força suficiente para triturar alimentos duros.",
+        "shown": 4
+      },
+      {
+        "text": "O músculo mais forte do corpo humano é o masseter, usado para fechar a mandíbula. Ele consegue exercer uma força que pode pressionar até 300 PSI.",
         "shown": 3
       }
     ]
@@ -2159,7 +3943,15 @@
     "entries": [
       {
         "text": "As primeiras pizzas primitivas eram pães achatados assados com vegetais diversos. Elas serviam mais como refeição completa do que o conceito moderno de \"pizza\".",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "A primeira pizza foi inventada no Nápoles do século VIII por um povoamento grego chamado Colón. As receitas modernas só surgiram com a chegada dos imigrantes italianos nos Estados Unidos, popularizando o formato que conhecemos hoje.",
+        "shown": 4
+      },
+      {
+        "text": "A primeira massa de estilo pizza surgiu na Mesopotâmia há milhares de anos. Os ingredientes atuais são considerados uma adaptação relativamente moderna da tradição milenar italiana.",
+        "shown": 1
       }
     ]
   },
@@ -2167,7 +3959,15 @@
     "entries": [
       {
         "text": "O coalho era muito usado para criar equipamentos de pesca na Grécia Antiga. Alguns tipos de ricota são feitos a partir do soro do leite, aproveitando resíduos da produção de outros queijos.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "O queijo de penicillium é um dos fungos mais usados na culinária mundial. Ele é responsável pela casca azul característica de vários tipos famosos, como o Roquefort.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro queijo feito na história foi provavelmente de caça e raízes. Algumas culturas usavam o suco de folhas fermentadas como substituto do leite.",
+        "shown": 2
       }
     ]
   },
@@ -2175,7 +3975,15 @@
     "entries": [
       {
         "text": "Alguns ciclones tropicais podem atingir a força de um terremoto moderado por conta da energia que liberam com o deslocamento. O ciclo de vida desses eventos segue padrões complexos, sendo vitais para a ecologia marinha no processo de mistura das águas.",
-        "shown": 1
+        "shown": 4
+      },
+      {
+        "text": "Alguns furacões podem ter núcleos frios, operando por contrastes térmicos de água do mar em vez do calor tropical usual. Esses sistemas são menos intensos que os típicos, mas ainda assim causam grandes destruições costeiras.",
+        "shown": 4
+      },
+      {
+        "text": "Os ventos de um ciclone podem ultrapassar a velocidade do som, mas a sua força é mais devastadora pela combinação de vento intenso e maré de tempestade. Essa maré eleva o nível do mar em áreas costeiras, causando inundações catastróficas mesmo longe da trajetória principal do furacão.",
+        "shown": 3
       }
     ]
   },
@@ -2184,6 +3992,18 @@
       {
         "text": "O Hubble tinha um problema de correção óptica inicial. Ele precisou ser enviado para reparos e atualizações em órbita.",
         "shown": 4
+      },
+      {
+        "text": "O Telescópio Espacial Hubble não vê apenas o cosmos; ele também fornece dados cruciais sobre a expansão do universo. Suas imagens ajudam os cientistas a mapear distâncias galácticas, confirmando teorias cosmológicas complexas.",
+        "shown": 4
+      },
+      {
+        "text": "O Telescópio James Webb observa principalmente no infravermelho, permitindo ver através da poeira Cósmica que bloquearia a luz visível. Essa capacidade o torna perfeito para estudar as primeiras estrelas e galáxias do universo.",
+        "shown": 4
+      },
+      {
+        "text": "O Telescópio Hubble observou galáxias muito mais distantes do que a luz tem tempo de viajar, graças ao conceito de redshifts cosmológico. Isso permite medir a taxa de expansão do universo em diferentes épocas.",
+        "shown": 1
       }
     ]
   },
@@ -2191,7 +4011,11 @@
     "entries": [
       {
         "text": "O Porto de Sisal na Índia foi um centro vital de comércio têxtil por séculos. Antigamente, ele operava com sistemas complexos de arrecadação e distribuição de carga marítima.",
-        "shown": 2
+        "shown": 4
+      },
+      {
+        "text": "O porto de Singapura já foi chamado de \"A Perla do Oriente\" devido ao seu crescimento econômico acelerado. Ele se tornou um dos maiores e mais eficientes hubs de transbordo marítimo global.",
+        "shown": 3
       }
     ]
   },
@@ -2199,7 +4023,27 @@
     "entries": [
       {
         "text": "Muitas espécies de plantas nas florestas tropicais não têm raízes diretamente no solo. Elas dependem de estruturas aéreas para absorver nutrientes, como o epífitismo.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "As raízes das árvores na Amazônia formam complexas redes subterrâneas chamadas de \"super-hidrelânes\". Elas comunicam por meio de sinais químicos, auxiliando na distribuição de nutrientes para a sobrevivência do ecossistema.",
+        "shown": 4
+      },
+      {
+        "text": "A floresta amazônica pode ser um \"gigante\" gerador de oxigênio, mas essa função é mais complexa do que se imagina. Ele regula o clima da América do Sul através da evapotranspiração, criando os chamados rios voadores.",
+        "shown": 2
+      }
+    ]
+  },
+  "primeiros videogames": {
+    "entries": [
+      {
+        "text": "O primeiro videogame comercial foi o Pong, de 1972. Ele usava um circuito analógico simples para simular raquetes e bolas numa tela.",
+        "shown": 4
+      },
+      {
+        "text": "O primeiro arcade comercialmente bem-sucedido foi Pong, de desenvolvimento inicial relativamente simples, mas viciante. Ele não apenas marcou o início da indústria moderna de jogos eletrônicos, mas definiu a mecânica de muitos sucessos posteriores.",
+        "shown": 4
       }
     ]
   }

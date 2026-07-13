@@ -4,6 +4,7 @@ import { z } from "zod";
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
 import { revalidatePath } from "next/cache";
+import { criarRegistroClienteAPartirDeContrato } from "./Clientes";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -43,8 +44,11 @@ const CriarContratoSchema = z.object({
     cnpj: z.string().min(14).max(18),
     razaoSocial: z.string().min(1),
     nomeFantasia: z.string().optional(),
+    dataConstituicao: z.string().optional(),
+    regimeTributario: z.string().optional(),
+    uf: z.string().optional(),
     valorContrato: z.number().positive(),
-    formaPagamento: z.enum(["ENTRADA_EXITO", "PARCELADO_CC", "INTEGRAL_PIX", "OUTRO"]),
+    formaPagamento: z.string().min(1),
     servico: z.string().min(1),
     canalAquisicao: z.string().min(1),
     canalOutro: z.string().optional(),
@@ -60,8 +64,11 @@ const AtualizarContratoSchema = z.object({
     cnpj: z.string().min(14).max(18),
     razaoSocial: z.string().min(1),
     nomeFantasia: z.string().optional(),
+    dataConstituicao: z.string().optional(),
+    regimeTributario: z.string().optional(),
+    uf: z.string().optional(),
     valorContrato: z.number().positive(),
-    formaPagamento: z.enum(["ENTRADA_EXITO", "PARCELADO_CC", "INTEGRAL_PIX", "OUTRO"]),
+    formaPagamento: z.string().min(1),
     servico: z.string().min(1),
     canalAquisicao: z.string().min(1),
     canalOutro: z.string().optional(),
@@ -108,6 +115,9 @@ export async function criarContrato(raw: unknown) {
                 cnpj: d.cnpj.replace(/\D/g, ""),
                 razaoSocial: d.razaoSocial,
                 nomeFantasia: d.nomeFantasia ?? null,
+                dataConstituicao: d.dataConstituicao ?? null,
+                regimeTributario: d.regimeTributario ?? null,
+                uf: d.uf ?? null,
                 valorContrato: d.valorContrato,
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
@@ -121,6 +131,11 @@ export async function criarContrato(raw: unknown) {
                 usuarioId: Number(userId),
             },
         });
+
+        // Sincronização com o CS&NPS NÃO acontece na criação do contrato — só na
+        // confirmação de pagamento (`confirmarFechamento`), decisão de 2026-07-13
+        // (ver decisions.md, "sincronização move de criação do contrato para
+        // confirmação de pagamento").
 
         revalidatePath("/PainelAlpha/Metas");
         return { success: true as const, contrato };
@@ -155,6 +170,9 @@ export async function atualizarContrato(raw: unknown) {
                 cnpj: d.cnpj.replace(/\D/g, ""),
                 razaoSocial: d.razaoSocial,
                 nomeFantasia: d.nomeFantasia ?? null,
+                dataConstituicao: d.dataConstituicao ?? null,
+                regimeTributario: d.regimeTributario ?? null,
+                uf: d.uf ?? null,
                 valorContrato: d.valorContrato,
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
@@ -223,86 +241,53 @@ export async function confirmarFechamento(raw: unknown) {
             },
         });
 
-        // Auto-cria cliente no painel CS/NPS se ainda não existir
-        // CNPJ duplicado = não cria no CS/NPS mas SEMPRE conta como venda
+        // Sincroniza com o CS&NPS na confirmação de pagamento (efeito colateral
+        // resiliente — nunca reverte o fechamento do contrato). Ver decisions.md
+        // 2026-07-13 ("sincronização move de criação do contrato para confirmação
+        // de pagamento"). Dados fiscais (nomeFantasia/dataConstituicao/regimeTributario/uf)
+        // já vêm salvos no contrato desde a criação — não reconsulta a Receita Federal.
         try {
-            const existeCliente = await db.clientes.findFirst({
-                where: { cnpj: atualizado.cnpj },
-                select: { id: true },
+            type SocioJson = { nome?: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string };
+            const sociosJson = ((atualizado.socios ?? []) as SocioJson[])
+                .filter((s) => s.nome?.trim())
+                .map((s) => ({ nome: s.nome!, telefone: s.telefone, dataNascimento: s.dataNascimento, vinculo: s.vinculo, obs: s.obs }));
+
+            const resultadoSync = await criarRegistroClienteAPartirDeContrato({
+                cnpj: atualizado.cnpj,
+                razaoSocial: atualizado.razaoSocial,
+                servico: atualizado.servico,
+                nomeFantasia: atualizado.nomeFantasia,
+                dataConstituicao: atualizado.dataConstituicao,
+                regimeTributario: atualizado.regimeTributario,
+                uf: atualizado.uf,
+                dataContratacao: atualizado.pagamentoConfirmadoEm
+                    ? atualizado.pagamentoConfirmadoEm.toISOString()
+                    : new Date().toISOString(),
+                socios: sociosJson,
             });
 
-            if (!existeCliente) {
-                type SocioJson = { nome?: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string };
-                const sociosJson = ((atualizado.socios ?? []) as SocioJson[]).filter((s) => s.nome?.trim());
-
-                // Busca dados complementares na Receita Federal
-                let dataConstituicao = "";
-                let uf = "";
-                let regimeTributario = "";
+            // Vínculo de indicação de parceiro: só faz sentido na PRIMEIRA criação real
+            // do registro (não em reativação nem quando já existia ativo).
+            if (resultadoSync.criado && atualizado.indicadoPorParceiroId) {
                 try {
-                    const { getReceitaData } = await import("@/app/api/ReceitaFederal/route");
-                    const receita = await getReceitaData(atualizado.cnpj);
-                    if (receita) {
-                        dataConstituicao = receita.dataConstituicao ?? "";
-                        uf = receita.uf ?? "";
-                        regimeTributario = receita.regimeTributario ?? "";
-                    }
-                } catch {
-                    // dados complementares opcionais — falha silenciosa
-                }
-
-                const novoCliente = await db.clientes.create({
-                    data: {
-                        cnpj: atualizado.cnpj,
-                        razaoSocial: atualizado.razaoSocial,
-                        nomeFantasia: atualizado.nomeFantasia ?? "",
-                        servicos: atualizado.servico,
-                        analistaResponsavel: "SEM ATRIBUIÇÃO",
-                        origemLead: atualizado.canalAquisicao || null,
-                        canalAquisicao: atualizado.canalAquisicao || null,
-                        canalOutro: atualizado.canalOutro || null,
-                        dataConstituicao: dataConstituicao || null,
-                        uf: uf || null,
-                        regimeTributario: regimeTributario || null,
-                        dataContratacao: atualizado.pagamentoConfirmadoEm
-                            ? atualizado.pagamentoConfirmadoEm.toISOString()
-                            : new Date().toISOString(),
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                        socios: {
-                            create: sociosJson.map((s) => ({
-                                nome: s.nome!,
-                                telefone: s.telefone ?? "",
-                                obs: s.obs ?? "",
-                                dataNascimento: s.dataNascimento ?? "",
-                                vinculo: s.vinculo ?? "",
-                            })),
+                    await db.indicacao.create({
+                        data: {
+                            parceiroId: atualizado.indicadoPorParceiroId,
+                            clienteId: resultadoSync.clienteId,
+                            criadoPorId: userId,
                         },
-                    },
-                });
-
-                // Vínculo de indicação: liga o parceiro indicador à empresa criada
-                if (atualizado.indicadoPorParceiroId) {
-                    try {
-                        await db.indicacao.create({
-                            data: {
-                                parceiroId: atualizado.indicadoPorParceiroId,
-                                clienteId: novoCliente.id,
-                                criadoPorId: userId,
-                            },
-                        });
-                        const { recalcularNivel } = await import("@/actions/parceiros");
-                        await recalcularNivel(atualizado.indicadoPorParceiroId);
-                        revalidatePath("/PainelAlpha/Parceiros");
-                    } catch (indErr) {
-                        console.error("vincular indicação parceiro:", indErr);
-                    }
+                    });
+                    const { recalcularNivel } = await import("@/actions/parceiros");
+                    await recalcularNivel(atualizado.indicadoPorParceiroId);
+                    revalidatePath("/PainelAlpha/Parceiros");
+                } catch (indErr) {
+                    console.error("vincular indicação parceiro:", indErr);
                 }
-
-                revalidatePath("/PainelAlpha/CadastroClientes");
             }
+
+            revalidatePath("/PainelAlpha/CadastroClientes");
         } catch (clienteErr) {
-            console.error("auto-create cliente CS/NPS:", clienteErr);
+            console.error("sincronizar cliente CS/NPS na confirmação:", clienteErr);
         }
 
         revalidatePath("/PainelAlpha/Metas");

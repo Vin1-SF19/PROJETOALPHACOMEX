@@ -202,6 +202,9 @@ function FormNovoContrato({
     const [dadosEmpresa, setDadosEmpresa] = useState({
         razaoSocial: initialData?.razaoSocial ?? "",
         nomeFantasia: initialData?.nomeFantasia ?? "",
+        dataConstituicao: (initialData as { dataConstituicao?: string | null } | undefined)?.dataConstituicao ?? "",
+        regimeTributario: (initialData as { regimeTributario?: string | null } | undefined)?.regimeTributario ?? "",
+        uf: (initialData as { uf?: string | null } | undefined)?.uf ?? "",
     });
     const [consultado, setConsultado] = useState(isEdicao);
     const [empresaEmConstituicao, setEmpresaEmConstituicao] = useState(eConstituicaoInicial);
@@ -211,7 +214,7 @@ function FormNovoContrato({
 
     const [valorContrato, setValorContrato] = useState(initialData?.valorContrato ?? 0);
     const [formaPagamento, setFormaPagamento] = useState<string>(initialData ? padraoFormaPag(initialData.formaPagamento) : "");
-    const [formaPagamentoCustom, setFormaPagamentoCustom] = useState("");
+    const [formaPagamentoCustom, setFormaPagamentoCustom] = useState(isCustomPag ? (initialData?.formaPagamento ?? "") : "");
     const [mostraFormaPagCustom, setMostraFormaPagCustom] = useState(isCustomPag);
     const [servico, setServico] = useState(initialData?.servico ?? "");
     const [novoServico, setNovoServico] = useState("");
@@ -267,11 +270,11 @@ function FormNovoContrato({
         setEmpresaEmConstituicao(ativo);
         if (ativo) {
             setCnpj("00.000.000/0000-00");
-            setDadosEmpresa({ razaoSocial: "Em constituição", nomeFantasia: "" });
+            setDadosEmpresa({ razaoSocial: "Em constituição", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
             setConsultado(true);
         } else {
             setCnpj("");
-            setDadosEmpresa({ razaoSocial: "", nomeFantasia: "" });
+            setDadosEmpresa({ razaoSocial: "", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
             setConsultado(false);
         }
     };
@@ -285,7 +288,7 @@ function FormNovoContrato({
         setConsultando(true);
         try {
             const res = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
-            const data = await res.json() as { razaoSocial?: string; nomeFantasia?: string; error?: string };
+            const data = await res.json() as { razaoSocial?: string; nomeFantasia?: string; dataConstituicao?: string; regimeTributario?: string; uf?: string; error?: string };
             if (data.error) {
                 toast.error(data.error);
                 return;
@@ -293,6 +296,9 @@ function FormNovoContrato({
             setDadosEmpresa({
                 razaoSocial: data.razaoSocial ?? "",
                 nomeFantasia: data.nomeFantasia ?? "",
+                dataConstituicao: data.dataConstituicao ?? "",
+                regimeTributario: data.regimeTributario ?? "",
+                uf: data.uf ?? "",
             });
             setConsultado(true);
             toast.success("Dados importados!");
@@ -312,7 +318,7 @@ function FormNovoContrato({
     };
 
     const closerFinal = mostraCloserCustom ? closerCustom : closerNome;
-    const formaPagamentoFinal = mostraFormaPagCustom ? "OUTRO" : formaPagamento;
+    const formaPagamentoFinal = mostraFormaPagCustom ? formaPagamentoCustom.trim() : formaPagamento;
 
     const handleSalvar = async () => {
         if (!consultado) { toast.error("Consulte o CNPJ primeiro"); return; }
@@ -335,8 +341,11 @@ function FormNovoContrato({
                 cnpj: cnpj.replace(/\D/g, ""),
                 razaoSocial: dadosEmpresa.razaoSocial,
                 nomeFantasia: dadosEmpresa.nomeFantasia || undefined,
+                dataConstituicao: dadosEmpresa.dataConstituicao || undefined,
+                regimeTributario: dadosEmpresa.regimeTributario || undefined,
+                uf: dadosEmpresa.uf || undefined,
                 valorContrato,
-                formaPagamento: formaPagamentoFinal as "ENTRADA_EXITO" | "PARCELADO_CC" | "INTEGRAL_PIX" | "OUTRO",
+                formaPagamento: formaPagamentoFinal,
                 servico,
                 canalAquisicao,
                 canalOutro: canalAquisicao === "Outro" ? (canalOutro.trim() || undefined) : undefined,

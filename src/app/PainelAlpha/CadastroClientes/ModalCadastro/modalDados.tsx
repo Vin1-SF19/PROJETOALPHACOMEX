@@ -2,12 +2,30 @@
 
 import React, { useEffect, useState } from 'react';
 import { fmtDate, fmtDateTime } from "@/lib/format-date";
-import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, User, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle } from "lucide-react";
-import { adicionarSocio, atualizarLogCS, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, salvarAlteracoesGeral, salvarAlteracoesGestao, salvarLogCS, salvarLogFeedback } from '@/actions/Clientes';
+import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle, Briefcase, Wallet, CreditCard, UserCircle2 } from "lucide-react";
+import { adicionarSocio, atualizarLogCS, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, salvarAlteracoesGeral, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
 import { toast } from 'sonner';
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { getTema } from '@/lib/temas';
+import { DropdownSelecaoComCriacao } from './DropdownSelecaoComCriacao';
+import { ModalSelecionarUsuario } from './ModalSelecionarUsuario';
+import { FORMAS_PAGAMENTO, FORMAS_LABEL, formatarFormaPagamento } from './formas-pagamento';
+
+/**
+ * `dataContratacao` é salva como `.toISOString()` de uma data "só o dia" (sem
+ * hora relevante, ex: vinda de `<input type="date">`) — representa meia-noite
+ * UTC, que em fusos negativos (America/Sao_Paulo, UTC-3) "volta" 1 dia ao
+ * formatar com `fmtDate` (que já usa timeZone correto, mas a data de entrada
+ * já nasceu deslocada). Mesmo padrão de correção já usado em `page.tsx` para
+ * "Data de Êxito" — compensa o offset antes de formatar.
+ */
+function fmtDataSemHora(value: string | Date | null | undefined): string {
+    if (!value) return "---";
+    const d = new Date(value);
+    const dataCorrigida = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+    return fmtDate(dataCorrigida);
+}
 
 
 interface ModalDadosProps {
@@ -32,9 +50,76 @@ interface ModalDadosProps {
 
 
 
-export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar }: any) {
+interface ModalGestaoClienteProps {
+    isOpen: boolean;
+    onClose: (refresh?: boolean) => void;
+    cliente: ClienteCS[] | ClienteCS | null;
+    aoSalvar?: () => void | Promise<void>;
+}
+
+export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGrupo, aoSalvar }: ModalGestaoClienteProps) {
     const { data: session } = useSession();
     const style = getTema((session?.user as any)?.tema_interface || "blue");
+
+    /**
+     * `clienteGrupo` é a lista de TODOS os registros do mesmo CNPJ (um por
+     * serviço contratado, mais recente primeiro — ver page.tsx). `cliente`
+     * segue representando o registro PRINCIPAL (mais recente), usado para
+     * preencher todos os campos editáveis já existentes neste modal.
+     * `outrosServicos` são os demais registros do mesmo CNPJ, exibidos na
+     * seção "Serviços Contratados" mais abaixo.
+     */
+    const cliente = Array.isArray(clienteGrupo) ? clienteGrupo[0] : clienteGrupo;
+    const outrosServicos: ClienteCS[] = Array.isArray(clienteGrupo) ? clienteGrupo.slice(1) : [];
+    /** Normaliza `clienteGrupo` para array sempre — usado pela seção "Serviços Contratados", que deve
+     * exibir mesmo quando há apenas 1 registro (todo cliente tem no mínimo 1 serviço). */
+    const registrosDoServicosSecao: ClienteCS[] = cliente ? [cliente, ...outrosServicos] : [];
+
+    /**
+     * Estado de gestão POR CARD (Status Atual, Data Contratação, Data de Êxito,
+     * Analista Responsável, Embasamento, Origem do Lead) — cada registro de
+     * serviço tem seu próprio formulário independente, salvo individualmente
+     * via `handleSalvarCard`. Visibilidade de edição continua controlada pelo
+     * único `editandoDados` global (mesmo botão "Editar Dados" do topo libera
+     * TODOS os cards ao mesmo tempo — decisão do usuário, ver decisions.md).
+     */
+    interface FormGestaoCard {
+        status: string;
+        dataContratacao: string;
+        dataExitoManual: string;
+        analistaResponsavel: string;
+        embasamento: string;
+        origemLead: string;
+        formaPagamento: string;
+        valorContrato: string;
+        closerNome: string;
+    }
+    const [formPorCard, setFormPorCard] = useState<Record<number, FormGestaoCard>>({});
+    const [salvandoCard, setSalvandoCard] = useState<number | null>(null);
+    const [salvandoDadosFiscais, setSalvandoDadosFiscais] = useState(false);
+
+    function formInicialDoRegistro(registro: ClienteCS): FormGestaoCard {
+        return {
+            status: registro.status || "Em Andamento",
+            dataContratacao: registro.dataContratacao || "",
+            dataExitoManual: registro.dataExito
+                ? new Date(registro.dataExito).toISOString().split("T")[0]
+                : "",
+            analistaResponsavel: registro.analistaResponsavel || "",
+            embasamento: registro.embasamento || "",
+            origemLead: registro.origemLead || "",
+            formaPagamento: registro.formaPagamento || "",
+            valorContrato: registro.valorContrato != null ? String(registro.valorContrato) : "",
+            closerNome: registro.closerNome || "",
+        };
+    }
+
+    function atualizarFormCard(registroId: number, patch: Partial<FormGestaoCard>) {
+        setFormPorCard((prev) => ({
+            ...prev,
+            [registroId]: { ...prev[registroId], ...patch },
+        }));
+    }
 
     const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
     const [analistaSelecionado, setAnalistaSelecionado] = useState("");
@@ -56,28 +141,32 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
     const [listaLogsFeedback, setListaLogsFeedback] = useState<any[]>(cliente?.logFeedback ?? []);
     const [editandoDados, setEditandoDados] = useState(false);
 
-    const [dataContratacao, setDataContratacao] = useState(cliente?.dataContratacao || "");
-
-    const [analistaResponsavel, setAnalistaResponsavel] = useState(cliente?.analistaResponsavel || "");
-
     const [showServicos, setShowServicos] = useState(false);
-    const [showAnalistas, setShowAnalistas] = useState(false);
     const [isCriandoServico, setIsCriandoServico] = useState(false);
     const [novoServicoNome, setNovoServicoNome] = useState("");
-    const [isCriandoAnalista, setIsCriandoAnalista] = useState(false);
-    const [novoAnalistaNome, setNovoAnalistaNome] = useState("");
 
     const listaServicos = ["Habilitação RADAR - 50K", "Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO", "TTD 409", "Recuperação AFRMM", "Outras Recuperaçoes Tributarias"];
-    const listaAnalistas = ["Vitor", "Maria", "Kaline", "Marcelo", "Heline"];
     const SERVICOS_COM_EMBASAMENTO = ["Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO"];
-    const embasamentoDesbloqueado = SERVICOS_COM_EMBASAMENTO.some(s => servicosSelecionados.includes(s));
-
-
-    const [embasamento, setEmbasamento] = useState(cliente?.embasamento || "");
-    const [origemLead, setOrigemLead] = useState(cliente?.origemLead || "");
 
     const listaEmbasamentos = ["Disponibilidade Financeira", "Início ou Retomada", "Receita Bruta (DAS)", "Receita Bruta (CPRB)"];
     const listaOrigensLead = ["Tráfego Pago (Meta - Instagram)", "Tráfego Pago (Google)", "Indicação Parceiro", "Indicação Cliente", "Evento", "China"];
+
+    /**
+     * Analista/Closer passam a listar usuários REAIS do banco (não mais lista
+     * fixa) — busca uma vez ao montar o modal, reutilizada por TODOS os cards
+     * de "Serviços Contratados" (mesma lista para todos, ver decisions.md
+     * 2026-07-13). `campoModalUsuario` guarda qual card+campo está com o
+     * `ModalSelecionarUsuario` aberto no momento (escape hatch para escolher
+     * usuário de qualquer setor, fora do role padrão do campo).
+     */
+    const [listaAnalistas, setListaAnalistas] = useState<string[]>([]);
+    const [listaClosersUsuarios, setListaClosersUsuarios] = useState<string[]>([]);
+    const [campoModalUsuario, setCampoModalUsuario] = useState<{ registroId: number; campo: "analistaResponsavel" | "closerNome" } | null>(null);
+
+    useEffect(() => {
+        buscarUsuariosPorRole(["OPERACIONAL"]).then((usuarios) => setListaAnalistas(usuarios.map((u) => u.nome)));
+        buscarUsuariosPorRole(["COMERCIAL", "Lider Comercial"]).then((usuarios) => setListaClosersUsuarios(usuarios.map((u) => u.nome)));
+    }, []);
 
     const [dataCS, setDataCS] = useState(new Date().toISOString().split('T')[0]);
     const [dataFeedback, setDataFeedback] = useState(new Date().toISOString().split('T')[0]);
@@ -92,11 +181,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
     const [dataConstituicao, setDataConstituicao] = useState(cliente?.dataConstituicao || "");
     const [regimeTributario, setRegimeTributario] = useState(cliente?.regimeTributario || "");
     const [uf, setUf] = useState(cliente?.uf || "");
-    const [dataExitoManual, setDataExitoManual] = useState(
-        cliente?.dataExito
-            ? new Date(cliente.dataExito).toISOString().split("T")[0]
-            : ""
-    );
+    const [municipio, setMunicipio] = useState(cliente?.municipio || "");
 
 
     const [listaLogsCS, setListaLogsCS] = useState<any[]>([]);
@@ -125,7 +210,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
             setCnpj(cliente.cnpj || "");
             setRazaoSocial(cliente.razaoSocial || "");
             setServicosSelecionados(cliente.servicos?.split(",") || []);
-            setAnalistaSelecionado(cliente.analista || "");
+            setAnalistaSelecionado(cliente.analistaResponsavel || "");
         }
     }, [cliente]);
 
@@ -148,7 +233,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
             data_registro: dataSelecionada
         };
 
-        const res = await salvarLogCS(cliente.id, novoLog);
+        const res = await salvarLogCS(cliente!.id, novoLog);
 
         if (res.success) {
             toast.success("CS registrado!");
@@ -199,7 +284,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
     const handleAdicionarSocio = async () => {
         if (!novoSocio.nome) return toast.error("Nome é obrigatório");
 
-        const res = await adicionarSocio(cliente.id, novoSocio);
+        const res = await adicionarSocio(cliente!.id, novoSocio);
 
         if (res.success) {
             toast.success("Sócio adicionado!");
@@ -268,11 +353,30 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
         setSalvandoCS(false);
     };
 
+    // Inicializa o formulário de gestão de CADA card (registro) quando o modal abre/o grupo muda.
     useEffect(() => {
-        if (status === "Deferido" && !dataExitoManual) {
-            setDataExitoManual(new Date().toISOString().split('T')[0]);
+        if (isOpen && registrosDoServicosSecao.length > 0) {
+            const inicial: Record<number, FormGestaoCard> = {};
+            for (const registro of registrosDoServicosSecao) {
+                inicial[registro.id] = formInicialDoRegistro(registro);
+            }
+            setFormPorCard(inicial);
         }
-    }, [status]);
+        return () => setFormPorCard({});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [clienteGrupo, isOpen]);
+
+    // Auto-preenche a Data de Êxito do CARD quando o Status daquele card vira "Deferido".
+    function handleMudarStatusCard(registroId: number, novoStatus: string) {
+        const form = formPorCard[registroId];
+        atualizarFormCard(registroId, {
+            status: novoStatus,
+            dataExitoManual:
+                novoStatus === "Deferido" && !form?.dataExitoManual
+                    ? new Date().toISOString().split("T")[0]
+                    : form?.dataExitoManual ?? "",
+        });
+    }
 
     useEffect(() => {
         if (cliente) {
@@ -282,6 +386,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
             setDataConstituicao(cliente.dataConstituicao || "");
             setRegimeTributario(cliente.regimeTributario || "");
             setUf(cliente.uf || "");
+            setMunicipio(cliente.municipio || "");
             setEditandoDados(false);
         }
     }, [cliente]);
@@ -296,8 +401,8 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
     useEffect(() => {
         if (isOpen && cliente?.id) {
             const logsDoCliente = [...(cliente.log_cs || [])].sort((a, b) => {
-                const dataA = new Date(a.dataRegistro || a.data_registro).getTime();
-                const dataB = new Date(b.dataRegistro || b.data_registro).getTime();
+                const dataA = new Date(a.dataRegistro).getTime();
+                const dataB = new Date(b.dataRegistro).getTime();
                 return dataB - dataA;
             });
             setListaLogsCS(logsDoCliente);
@@ -312,28 +417,59 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
             setNps(cliente.nps || 0);
             setFeedbackSim(cliente.feedbackGoogle || false);
             setNomeFeedback(cliente.nomeGoogle || "");
-            setDataContratacao(cliente.dataContratacao || "");
         }
     }, [cliente, isOpen]);
 
     useEffect(() => {
         if (cliente && isOpen) {
-            setAnalistaResponsavel(cliente.analistaResponsavel || "");
-            setDataContratacao(cliente.dataContratacao || "");
-
             setCnpj(cliente.cnpj || "");
             setRazaoSocial(cliente.razaoSocial || "");
             setNomeFantasia(cliente.nomeFantasia || "");
             setDataConstituicao(cliente.dataConstituicao || "");
             setRegimeTributario(cliente.regimeTributario || "");
             setUf(cliente.uf || "");
-            setEmbasamento(cliente.embasamento || "");
-            setOrigemLead(cliente.origemLead || "");
+            setMunicipio(cliente.municipio || "");
             setServicosSelecionados(cliente.servicos ? cliente.servicos.split(",").map((s: string) => s.trim()) : []);
 
             setEditandoDados(false);
         }
     }, [cliente, isOpen]);
+
+    // Dados do Painel de Metas (Forma de Pagamento, Valor do Contrato, Closer) por serviço mesclado
+    const [contratosPorRegistro, setContratosPorRegistro] = useState<Record<number, {
+        servico: string;
+        valorContrato: number;
+        formaPagamento: string;
+        closerNome: string;
+        createdAt: Date;
+    } | null>>({});
+    const [carregandoContratos, setCarregandoContratos] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen || !cliente) {
+            setContratosPorRegistro({});
+            return;
+        }
+
+        const registrosDoGrupo: ClienteCS[] = Array.isArray(clienteGrupo) ? clienteGrupo : (cliente ? [cliente] : []);
+        let cancelado = false;
+
+        (async () => {
+            setCarregandoContratos(true);
+            const entradas = await Promise.all(
+                registrosDoGrupo.map(async (registro) => {
+                    const contrato = await buscarServicoContratadoPorCliente(registro.cnpj, registro.servicos);
+                    return [registro.id, contrato] as const;
+                })
+            );
+            if (!cancelado) {
+                setContratosPorRegistro(Object.fromEntries(entradas));
+                setCarregandoContratos(false);
+            }
+        })();
+
+        return () => { cancelado = true; };
+    }, [clienteGrupo, cliente, isOpen]);
 
 
 
@@ -362,7 +498,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
             data_registro: dataSelecionada
         };
 
-        const res = await salvarLogFeedback(cliente.id, novoLog);
+        const res = await salvarLogFeedback(cliente!.id, novoLog);
 
         if (res.success) {
             toast.success("Pedido registrado!");
@@ -403,26 +539,37 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
     };
 
 
-    const handleSalvarGeral = async () => {
+    /**
+     * Salva SÓ os dados fiscais da empresa (Section A: CNPJ/Razão Social/Nome
+     * Fantasia/Data Constituição/Regime/UF) do registro PRINCIPAL — botão
+     * "Salvar Alterações" do rodapé do modal. `salvarAlteracoesGeral` faz um
+     * update incondicional em TODAS as colunas de gestão também, então
+     * preservamos os valores atuais do registro principal (não editados aqui)
+     * para não sobrescrevê-los com vazio/NaN.
+     */
+    const handleSalvarDadosFiscais = async () => {
+        if (salvandoDadosFiscais) return;
+        setSalvandoDadosFiscais(true);
         const res = await salvarAlteracoesGeral(
-            cliente.id,
+            cliente!.id,
             {
-                analistaResponsavel: analistaResponsavel,
-                dataContratacao: dataContratacao,
-                status: status,
-                nps: nps,
+                analistaResponsavel: cliente!.analistaResponsavel,
+                dataContratacao: cliente!.dataContratacao,
+                status: cliente!.status,
+                nps: cliente!.nps,
                 feedbackGoogle: feedbackSim,
                 nomeGoogle: nomeFeedback,
-                dataExito: dataExitoManual,
+                dataExito: cliente!.dataExito,
                 cnpj: cnpj,
                 razaoSocial: razaoSocial,
                 nomeFantasia: nomeFantasia,
                 dataConstituicao: dataConstituicao,
                 regimeTributario: regimeTributario,
                 uf: uf,
+                municipio: municipio,
                 servicos: servicosSelecionados,
-                embasamento: embasamentoDesbloqueado ? embasamento || null : null,
-                origemLead: origemLead || null,
+                embasamento: cliente!.embasamento,
+                origemLead: cliente!.origemLead,
             }
         );
 
@@ -431,7 +578,53 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
             setEditandoDados(false);
             if (aoSalvar) await aoSalvar();
             onClose();
+        } else {
+            toast.error("Erro ao salvar alterações.");
+            setSalvandoDadosFiscais(false);
         }
+    };
+
+    /**
+     * Salva os campos de gestão (Status/Data Contratação/Data de Êxito/
+     * Analista/Embasamento/Origem do Lead) de UM card/registro específico —
+     * botão Salvar de dentro de cada card em "Serviços Contratados".
+     */
+    const handleSalvarCard = async (registro: ClienteCS) => {
+        const form = formPorCard[registro.id];
+        if (!form) return;
+
+        setSalvandoCard(registro.id);
+        const desbloqueado = SERVICOS_COM_EMBASAMENTO.includes(registro.servicos || "");
+
+        const res = await salvarAlteracoesGeral(registro.id, {
+            analistaResponsavel: form.analistaResponsavel,
+            dataContratacao: form.dataContratacao,
+            status: form.status,
+            nps: registro.nps,
+            feedbackGoogle: registro.feedbackGoogle,
+            nomeGoogle: registro.nomeGoogle,
+            dataExito: form.dataExitoManual,
+            cnpj: registro.cnpj,
+            razaoSocial: registro.razaoSocial,
+            nomeFantasia: registro.nomeFantasia,
+            dataConstituicao: registro.dataConstituicao,
+            regimeTributario: registro.regimeTributario,
+            uf: registro.uf,
+            servicos: registro.servicos,
+            embasamento: desbloqueado ? form.embasamento || null : null,
+            origemLead: form.origemLead || null,
+            formaPagamento: form.formaPagamento || null,
+            valorContrato: form.valorContrato ? Number(form.valorContrato) : null,
+            closerNome: form.closerNome || null,
+        });
+
+        if (res.success) {
+            toast.success("Serviço atualizado!");
+            if (aoSalvar) await aoSalvar();
+        } else {
+            toast.error("Erro ao salvar serviço.");
+        }
+        setSalvandoCard(null);
     };
 
     const handleOcultarCliente = async (id: number) => {
@@ -558,22 +751,37 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                             />
                         </div>
 
-                        <div className="md:col-span-9 space-y-1 relative">
-                            <label className="text-[9px] font-black uppercase text-slate-500 ml-1 tracking-widest">
-                                Serviço Contratado
+                        <div className="md:col-span-3 space-y-1">
+                            <label className="text-[9px] font-black uppercase text-slate-500 ml-1 tracking-widest">Cidade</label>
+                            <input
+                                disabled={!editandoDados}
+                                value={municipio}
+                                onChange={(e) => setMunicipio(e.target.value)}
+                                className={`w-full bg-slate-950/50 border rounded-xl py-3.5 px-4 text-sm transition-all outline-none ${editandoDados ? "border-alpha/30 text-white focus:border-alpha" : "border-white/5 text-slate-500 cursor-not-allowed"}`}
+                            />
+                        </div>
+
+                    </section>
+
+
+
+                    <section className="pt-6 border-t border-white/5">
+                        <div className="space-y-1 relative max-w-md">
+                            <label className="text-[10px] font-black uppercase text-indigo-400 ml-1 tracking-widest">
+                                Serviço Contratado Recentemente
                             </label>
 
                             {editandoDados ? (
                                 <button
                                     type="button"
                                     onClick={() => setShowServicos(!showServicos)}
-                                    className="w-full bg-slate-950/50 border border-alpha/30 rounded-xl py-3.5 px-4 text-sm font-black text-white hover:border-alpha transition-all text-left flex justify-between items-center italic uppercase group"
+                                    className="w-full bg-slate-950/50 border border-alpha/30 rounded-xl py-3 px-4 text-sm font-black text-white hover:border-alpha transition-all text-left flex justify-between items-center italic uppercase group"
                                 >
                                     {servicosSelecionados.length > 0 ? servicosSelecionados.join(" + ") : "SELECIONAR SERVIÇO"}
-                                    <Plus size={14} className="text-alpha group-hover:scale-125 transition-transform" />
+                                    <Plus size={14} className="text-alpha group-hover:scale-125 transition-transform shrink-0 ml-2" />
                                 </button>
                             ) : (
-                                <div className={`w-full bg-slate-950/30 border border-white/5 rounded-xl py-3.5 px-4 text-sm font-black ${servicosSelecionados.length > 0 ? style.text : "text-slate-600"} italic uppercase`}>
+                                <div className={`w-full bg-slate-900/30 border border-slate-800/50 rounded-xl py-3 px-4 text-sm font-black ${servicosSelecionados.length > 0 ? style.text : "text-slate-600"} italic uppercase truncate`}>
                                     {servicosSelecionados.length > 0 ? servicosSelecionados.join(" + ") : "NENHUM SERVIÇO DEFINIDO"}
                                 </div>
                             )}
@@ -604,192 +812,260 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
 
 
 
-                    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 pt-6 border-t border-white/5">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-indigo-400 ml-1 tracking-widest">Status Atual</label>
-                            <select
-                                value={status}
-                                onChange={(e) => setStatus(e.target.value)}
-                                className="cursor-pointer w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-sm text-white focus:border-indigo-500 outline-none transition-all hover:bg-black"
-                            >
-                                <option value="Em Andamento">Em Andamento</option>
-                                <option value="Deferido">Deferido</option>
-                                <option value="Stand By">Stand By</option>
-                                <option value="Cancelado - Indeferimento">Cancelado - Indeferimento</option>
-                                <option value="Cancelado - Troca de Empresa">Cancelado - Troca de Empresa</option>
-                            </select>
-                        </div>
+                    {/* SEÇÃO SERVIÇOS CONTRATADOS (mesclagem por CNPJ + dados do Painel de Metas) */}
+                    {/*
+                        Renderiza sempre que houver ao menos 1 registro — todo cliente tem
+                        no mínimo 1 serviço contratado. Antes ficava condicionada a
+                        `length > 1`, o que escondia os dados do Painel de Metas (Forma de
+                        Pagamento/Valor/Closer) até para clientes com contrato real
+                        correspondente, só porque tinham apenas 1 serviço (bug real
+                        encontrado por Probe/usuário — ver known-errors.md).
+                    */}
+                    {cliente && (
+                        <section className="space-y-4 pt-6 border-t border-white/5">
+                            <div className="flex items-center gap-2">
+                                <div className="h-4 w-1 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                <h3 className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] flex items-center gap-2">
+                                    <Briefcase size={14} className="text-indigo-400" /> Serviços Contratados ({registrosDoServicosSecao.length})
+                                </h3>
+                            </div>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Data Contratação</label>
-                            {editandoDados ? (
-                                <input
-                                    type="date"
-                                    value={dataContratacao ? new Date(dataContratacao).toISOString().split('T')[0] : ""}
-                                    onChange={(e) => setDataContratacao(e.target.value)}
-                                    className="w-full bg-indigo-500/5 border border-indigo-500/20 p-2.5 rounded-xl text-sm font-bold text-indigo-400 outline-none cursor-pointer appearance-none"
-                                    style={{ colorScheme: 'dark' }}
-                                />
-                            ) : (
-                                <div className="bg-slate-900/30 border border-slate-800/50 p-3 rounded-xl text-sm text-slate-400 font-mono">
-                                    {cliente.dataContratacao ? fmtDate(cliente.dataContratacao) : "---"}
-                                </div>
-                            )}
-                        </div>
+                            <div className="grid grid-cols-1 gap-4">
+                                {registrosDoServicosSecao.map((registro: ClienteCS) => {
+                                    const contrato = contratosPorRegistro[registro.id];
+                                    const form = formPorCard[registro.id];
+                                    const ehPrincipal = registro.id === cliente.id;
+                                    const embasamentoDesbloqueadoCard = SERVICOS_COM_EMBASAMENTO.includes(registro.servicos || "");
 
-                        {/* DATA ÊXITO */}
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Data de Êxito</label>
-                            {status === "Deferido" ? (
-                                <input
-                                    type="date"
-                                    value={dataExitoManual ? new Date(dataExitoManual).toISOString().split('T')[0] : ""}
-                                    onChange={(e) => setDataExitoManual(e.target.value)}
-                                    className="w-full bg-emerald-500/5 border border-emerald-500/20 p-2.5 rounded-xl text-sm font-bold text-emerald-400 outline-none cursor-pointer"
-                                    style={{ colorScheme: 'dark' }}
-                                />
-                            ) : (
-                                <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-xs text-slate-700 font-bold uppercase italic tracking-tighter">
-                                    Aguardando Deferimento
-                                </div>
-                            )}
-                        </div>
+                                    return (
+                                        <div
+                                            key={registro.id}
+                                            className={`p-5 rounded-2xl border space-y-4 ${ehPrincipal ? "bg-indigo-500/5 border-indigo-500/20" : "bg-slate-950/50 border-white/5"}`}
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <span className="text-sm font-black text-white uppercase italic tracking-tight">
+                                                    {registro.servicos || "Serviço não definido"}
+                                                </span>
+                                                <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-1 rounded-full border ${getStatusColor(registro.status)}`}>
+                                                    {registro.status || "Em Andamento"}
+                                                </span>
+                                            </div>
 
-                        {/* ANALISTA RESPONSÁVEL*/}
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Analista Responsável</label>
-                            {editandoDados ? (
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAnalistas((v) => !v)}
-                                        className="w-full bg-indigo-500/5 border border-indigo-500/20 p-3 rounded-xl text-sm font-bold text-indigo-400 outline-none transition-all focus:border-indigo-500 flex items-center justify-between hover:border-indigo-500/50"
-                                    >
-                                        <span className={analistaResponsavel ? "uppercase italic" : "text-indigo-900/40"}>
-                                            {analistaResponsavel || "SELECIONAR ANALISTA"}
-                                        </span>
-                                        <User size={14} className="text-indigo-500 shrink-0" />
-                                    </button>
-                                    {showAnalistas && (
-                                        <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-white/10 rounded-2xl p-3 z-30 shadow-2xl">
-                                            <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                                                {listaAnalistas.map((a) => (
-                                                    <button
-                                                        key={a}
-                                                        type="button"
-                                                        onClick={() => { setAnalistaResponsavel(a); setShowAnalistas(false); setIsCriandoAnalista(false); }}
-                                                        className={`w-full text-left p-3 rounded-xl text-xs font-bold transition-all ${
-                                                            analistaResponsavel === a
-                                                                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
-                                                                : "hover:bg-white/5 text-slate-400"
-                                                        }`}
-                                                    >
-                                                        {a}
-                                                    </button>
-                                                ))}
+                                            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                                <Calendar size={12} className="text-indigo-400" />
+                                                Contratado em {contrato?.createdAt ? fmtDate(contrato.createdAt) : fmtDataSemHora(registro.dataContratacao)}
+                                            </div>
 
-                                                {/* OPÇÃO NOVO ANALISTA */}
-                                                {!isCriandoAnalista ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIsCriandoAnalista(true)}
-                                                        className="w-full text-left p-3 rounded-xl text-[10px] font-black text-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-2 border-t border-white/5 mt-2 pt-3"
-                                                    >
-                                                        <Plus size={14} /> NOVO ANALISTA
-                                                    </button>
-                                                ) : (
-                                                    <div className="mt-2 p-2 border-t border-white/5 space-y-2 animate-in slide-in-from-top-2">
-                                                        <input
-                                                            autoFocus
-                                                            type="text"
-                                                            placeholder="Nome do analista..."
-                                                            value={novoAnalistaNome}
-                                                            onChange={(e) => setNovoAnalistaNome(e.target.value)}
-                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-white outline-none focus:border-emerald-500"
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-white/5">
+                                                {editandoDados && form ? (
+                                                    <>
+                                                        <DropdownSelecaoComCriacao
+                                                            label="Forma Pagto."
+                                                            valorAtual={formatarFormaPagamento(form.formaPagamento) === "---" ? "" : formatarFormaPagamento(form.formaPagamento)}
+                                                            opcoes={FORMAS_PAGAMENTO.map((f) => FORMAS_LABEL[f])}
+                                                            onSelecionar={(label) => {
+                                                                const codigo = FORMAS_PAGAMENTO.find((f) => FORMAS_LABEL[f] === label) || label;
+                                                                atualizarFormCard(registro.id, { formaPagamento: codigo === form.formaPagamento ? "" : codigo });
+                                                            }}
+                                                            disabled={!editandoDados}
+                                                            placeholder="Não definido"
                                                         />
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    if (novoAnalistaNome) {
-                                                                        setAnalistaResponsavel(novoAnalistaNome);
-                                                                        setShowAnalistas(false);
-                                                                        setIsCriandoAnalista(false);
-                                                                        setNovoAnalistaNome("");
-                                                                    }
-                                                                }}
-                                                                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black p-2 rounded-lg uppercase transition-colors"
-                                                            >
-                                                                Confirmar
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setIsCriandoAnalista(false)}
-                                                                className="bg-slate-800 hover:bg-slate-700 text-slate-400 text-[9px] font-black p-2 rounded-lg uppercase transition-colors"
-                                                            >
-                                                                Cancelar
-                                                            </button>
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black uppercase text-indigo-400 ml-1 tracking-widest">Valor Contrato</label>
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                value={form.valorContrato}
+                                                                onChange={(e) => atualizarFormCard(registro.id, { valorContrato: e.target.value })}
+                                                                placeholder="0,00"
+                                                                className="w-full bg-indigo-500/5 border border-indigo-500/20 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-indigo-500"
+                                                            />
                                                         </div>
+                                                        <DropdownSelecaoComCriacao
+                                                            label="Closer"
+                                                            valorAtual={form.closerNome}
+                                                            opcoes={listaClosersUsuarios}
+                                                            onSelecionar={(v) => atualizarFormCard(registro.id, { closerNome: v })}
+                                                            disabled={!editandoDados}
+                                                            permiteCriarNovo
+                                                            placeholder="SELECIONAR CLOSER"
+                                                            onAbrirModalOutro={() => setCampoModalUsuario({ registroId: registro.id, campo: "closerNome" })}
+                                                            textoBotaoOutro="OUTRO CLOSER"
+                                                        />
+                                                    </>
+                                                ) : carregandoContratos ? (
+                                                    <div className="sm:col-span-3 text-[10px] text-slate-600 uppercase font-black tracking-widest italic animate-pulse">
+                                                        Consultando Painel de Metas...
+                                                    </div>
+                                                ) : (form?.formaPagamento || form?.valorContrato || form?.closerNome) ? (
+                                                    <>
+                                                        <div className="space-y-1">
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                                                                <CreditCard size={11} /> Forma Pagto.
+                                                            </span>
+                                                            <p className="text-xs font-bold text-slate-200">{formatarFormaPagamento(form?.formaPagamento)}</p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                                                                <Wallet size={11} /> Valor Contrato
+                                                            </span>
+                                                            <p className="text-xs font-bold text-emerald-400">
+                                                                {form?.valorContrato ? Number(form.valorContrato).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "---"}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                                                                <UserCircle2 size={11} /> Closer
+                                                            </span>
+                                                            <p className="text-xs font-bold text-slate-200">{form?.closerNome || "---"}</p>
+                                                        </div>
+                                                    </>
+                                                ) : contrato ? (
+                                                    <>
+                                                        <div className="space-y-1">
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                                                                <CreditCard size={11} /> Forma Pagto.
+                                                            </span>
+                                                            <p className="text-xs font-bold text-slate-200">{formatarFormaPagamento(contrato.formaPagamento)}</p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                                                                <Wallet size={11} /> Valor Contrato
+                                                            </span>
+                                                            <p className="text-xs font-bold text-emerald-400">
+                                                                {contrato.valorContrato.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="flex items-center gap-1 text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                                                                <UserCircle2 size={11} /> Closer
+                                                            </span>
+                                                            <p className="text-xs font-bold text-slate-200">{contrato.closerNome || "---"}</p>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="sm:col-span-3 text-[10px] text-slate-700 uppercase font-black tracking-widest italic">
+                                                        Sem contrato vinculado no Painel de Metas
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {form && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-white/5">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-indigo-400 ml-1 tracking-widest">Status Atual</label>
+                                                        <select
+                                                            disabled={!editandoDados}
+                                                            value={form.status}
+                                                            onChange={(e) => handleMudarStatusCard(registro.id, e.target.value)}
+                                                            className={`w-full border rounded-xl py-3 px-4 text-sm outline-none transition-all ${editandoDados ? "cursor-pointer bg-slate-950 border-slate-800 text-white focus:border-indigo-500 hover:bg-black" : "bg-slate-900/20 border-slate-800/30 text-slate-500 cursor-not-allowed"}`}
+                                                        >
+                                                            <option value="Em Andamento">Em Andamento</option>
+                                                            <option value="Deferido">Deferido</option>
+                                                            <option value="Stand By">Stand By</option>
+                                                            <option value="Cancelado - Indeferimento">Cancelado - Indeferimento</option>
+                                                            <option value="Cancelado - Troca de Empresa">Cancelado - Troca de Empresa</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Data Contratação</label>
+                                                        {editandoDados ? (
+                                                            <input
+                                                                type="date"
+                                                                value={form.dataContratacao ? new Date(form.dataContratacao).toISOString().split('T')[0] : ""}
+                                                                onChange={(e) => atualizarFormCard(registro.id, { dataContratacao: e.target.value })}
+                                                                className="w-full bg-indigo-500/5 border border-indigo-500/20 p-2.5 rounded-xl text-sm font-bold text-indigo-400 outline-none cursor-pointer appearance-none"
+                                                                style={{ colorScheme: 'dark' }}
+                                                            />
+                                                        ) : (
+                                                            <div className="bg-slate-900/30 border border-slate-800/50 p-3 rounded-xl text-sm text-slate-400 font-mono">
+                                                                {fmtDataSemHora(registro.dataContratacao)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Data de Êxito</label>
+                                                        {form.status === "Deferido" ? (
+                                                            <input
+                                                                type="date"
+                                                                disabled={!editandoDados}
+                                                                value={form.dataExitoManual ? new Date(form.dataExitoManual).toISOString().split('T')[0] : ""}
+                                                                onChange={(e) => atualizarFormCard(registro.id, { dataExitoManual: e.target.value })}
+                                                                className="w-full bg-emerald-500/5 border border-emerald-500/20 p-2.5 rounded-xl text-sm font-bold text-emerald-400 outline-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                                                                style={{ colorScheme: 'dark' }}
+                                                            />
+                                                        ) : (
+                                                            <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl text-xs text-slate-700 font-bold uppercase italic tracking-tighter">
+                                                                Aguardando Deferimento
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <DropdownSelecaoComCriacao
+                                                        label="Analista Responsável"
+                                                        valorAtual={form.analistaResponsavel}
+                                                        opcoes={listaAnalistas}
+                                                        onSelecionar={(v) => atualizarFormCard(registro.id, { analistaResponsavel: v })}
+                                                        disabled={!editandoDados}
+                                                        permiteCriarNovo
+                                                        placeholder="SELECIONAR ANALISTA"
+                                                        onAbrirModalOutro={() => setCampoModalUsuario({ registroId: registro.id, campo: "analistaResponsavel" })}
+                                                        textoBotaoOutro="OUTRO ANALISTA"
+                                                    />
+
+                                                    <DropdownSelecaoComCriacao
+                                                        label="Embasamento"
+                                                        valorAtual={form.embasamento}
+                                                        opcoes={listaEmbasamentos}
+                                                        onSelecionar={(v) => atualizarFormCard(registro.id, { embasamento: v })}
+                                                        disabled={!editandoDados || !embasamentoDesbloqueadoCard}
+                                                        placeholder="Não definido"
+                                                        labelDesbloqueio={!embasamentoDesbloqueadoCard ? "150K/Ilimitado" : undefined}
+                                                    />
+
+                                                    <div>
+                                                        <DropdownSelecaoComCriacao
+                                                            label="Origem do Lead"
+                                                            valorAtual={form.origemLead}
+                                                            opcoes={listaOrigensLead}
+                                                            onSelecionar={(v) => atualizarFormCard(registro.id, { origemLead: v })}
+                                                            disabled={!editandoDados}
+                                                            placeholder="Não definido"
+                                                        />
+
+                                                        {/* Indicado por (parceiro) — só no card principal, é propriedade da empresa/CNPJ */}
+                                                        {ehPrincipal && cliente?.indicacao?.parceiro && (
+                                                            <div className="flex items-center gap-2 px-3 py-2 rounded-xl mt-1" style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)" }}>
+                                                                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300/70">Indicado por</span>
+                                                                <span className="text-[12px] font-bold text-indigo-200">{cliente.indicacao.parceiro.nome}</span>
+                                                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded" style={{ background: "rgba(99,102,241,0.2)", color: "#c7d2fe" }}>{cliente.indicacao.parceiro.nivel}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {editandoDados && (
+                                                        <div className="md:col-span-2 lg:col-span-3 flex justify-end">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleSalvarCard(registro)}
+                                                                disabled={salvandoCard === registro.id}
+                                                                className="cursor-pointer flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                <Save size={14} />
+                                                                {salvandoCard === registro.id ? "Salvando..." : "Salvar Serviço"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="bg-slate-900/30 border border-slate-800/50 p-3 rounded-xl text-sm text-indigo-400/70 font-black uppercase tracking-tighter truncate italic">
-                                    {cliente.analistaResponsavel || "Não Atribuído"}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* EMBASAMENTO */}
-                        <div className="space-y-2">
-                            <label className={`text-[10px] font-black uppercase ml-1 tracking-widest flex items-center gap-1 ${embasamentoDesbloqueado ? "text-indigo-400" : "text-slate-600"}`}>
-                                Embasamento
-                                {!embasamentoDesbloqueado && <span className="text-[7px] bg-slate-800 px-1.5 py-0.5 rounded-full text-slate-600">150K/Ilimitado</span>}
-                            </label>
-                            <select
-                                disabled={!editandoDados || !embasamentoDesbloqueado}
-                                value={embasamento}
-                                onChange={(e) => setEmbasamento(e.target.value)}
-                                className={`w-full border rounded-xl p-3 text-sm outline-none transition-all appearance-none ${editandoDados && embasamentoDesbloqueado ? "bg-indigo-500/5 border-indigo-500/20 text-indigo-400 focus:border-indigo-500 cursor-pointer" : "bg-slate-900/20 border-slate-800/30 text-slate-600 cursor-not-allowed"}`}
-                            >
-                                <option value="">Não definido</option>
-                                {listaEmbasamentos.map(e => <option key={e} value={e} className="bg-slate-900">{e}</option>)}
-                                {embasamento && !listaEmbasamentos.includes(embasamento) && (
-                                    <option value={embasamento} className="bg-slate-900">{embasamento}</option>
-                                )}
-                            </select>
-                        </div>
-
-                        {/* ORIGEM DO LEAD */}
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-indigo-400 ml-1 tracking-widest">Origem do Lead</label>
-                            <select
-                                disabled={!editandoDados}
-                                value={origemLead}
-                                onChange={(e) => setOrigemLead(e.target.value)}
-                                className={`w-full border rounded-xl p-3 text-sm outline-none transition-all appearance-none ${editandoDados ? "bg-indigo-500/5 border-indigo-500/20 text-indigo-400 focus:border-indigo-500 cursor-pointer" : "bg-slate-900/30 border-slate-800/50 text-indigo-400/70"}`}
-                            >
-                                <option value="">Não definido</option>
-                                {listaOrigensLead.map(o => <option key={o} value={o} className="bg-slate-900">{o}</option>)}
-                                {origemLead && !listaOrigensLead.includes(origemLead) && (
-                                    <option value={origemLead} className="bg-slate-900">{origemLead}</option>
-                                )}
-                            </select>
-
-                            {/* Indicado por (parceiro) */}
-                            {cliente?.indicacao?.parceiro && (
-                                <div className="flex items-center gap-2 px-3 py-2 rounded-xl mt-1" style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.3)" }}>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300/70">Indicado por</span>
-                                    <span className="text-[12px] font-bold text-indigo-200">{cliente.indicacao.parceiro.nome}</span>
-                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded" style={{ background: "rgba(99,102,241,0.2)", color: "#c7d2fe" }}>{cliente.indicacao.parceiro.nivel}</span>
-                                </div>
-                            )}
-                        </div>
-
-                    </section>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    )}
 
 
 
@@ -1279,16 +1555,18 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                 <div className="p-8 border-t border-white/5 flex justify-end gap-6">
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => onClose()}
                         className="cursor-pointer flex items-center gap-2 px-10 py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all">
                         <X size={18} /> Cancelar
                     </button>
 
                     <button
                         type="button"
-                        onClick={handleSalvarGeral}
-                        className="cursor-pointer flex items-center gap-2 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all">
-                        <Save size={18} /> Salvar Alterações
+                        onClick={handleSalvarDadosFiscais}
+                        disabled={salvandoDadosFiscais}
+                        className="cursor-pointer flex items-center gap-2 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Save size={18} className={salvandoDadosFiscais ? "animate-spin" : ""} />
+                        {salvandoDadosFiscais ? "Salvando..." : "Salvar Alterações"}
                     </button>
                 </div>
 
@@ -1598,7 +1876,16 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente, aoSalvar 
                 </div>
             )}
 
-
+            <ModalSelecionarUsuario
+                open={campoModalUsuario !== null}
+                onClose={() => setCampoModalUsuario(null)}
+                titulo={campoModalUsuario?.campo === "closerNome" ? "Selecionar Closer" : "Selecionar Analista"}
+                onSelecionar={(nome) => {
+                    if (campoModalUsuario) {
+                        atualizarFormCard(campoModalUsuario.registroId, { [campoModalUsuario.campo]: nome });
+                    }
+                }}
+            />
         </div>
     );
 }

@@ -136,6 +136,24 @@
 - **Fix aplicado (Sage)**: `GrafoProps.tsx` — `removerNo` agora também filtra `conexoes` que referenciam o nó removido, evitando conexões órfãs acumulando no JSON salvo (o `@xyflow/react` não valida integridade referencial entre `nos`/`conexoes`, apenas ignora silenciosamente arestas órfãs).
 - Pipeline completo: Vault (aprovado, sem mudança de schema) → Echo → Forge (tsc/lint/build limpos) → Lens (aprovado, 2 sugestões não-bloqueantes) → Sage (aprovado, 1 fix aplicado) → Scribe.
 
+### formas-pagamento (helpers compartilhados)
+**Arquivo:** `src/app/PainelAlpha/CadastroClientes/ModalCadastro/formas-pagamento.ts`
+**Tipo:** módulo de constantes/função pura (não componente)
+**Uso:** `formatarFormaPagamento(valor)` → label legível; `FORMAS_PAGAMENTO`/`FORMAS_LABEL` para dropdowns
+**Notas:** Replica (não importa) os mesmos valores usados no Painel de Metas (`ModalGerenciamentoLeads.tsx`) — decisão deliberada de não acoplar CS&NPS ao módulo comercial, já que são domínios diferentes com o mesmo vocabulário de negócio. Usado em `modal.tsx` (cadastro manual) e `modalDados.tsx` (exibição nos cards de "Serviços Contratados").
+
+### DropdownSelecaoComCriacao
+**Arquivo:** `src/app/PainelAlpha/CadastroClientes/ModalCadastro/DropdownSelecaoComCriacao.tsx`
+**Tipo:** Client Component
+**Props:** `label: string`, `valorAtual: string`, `opcoes: string[]`, `onSelecionar: (valor: string) => void`, `disabled?: boolean`, `permiteCriarNovo?: boolean`, `placeholder?: string`, `labelDesbloqueio?: string`
+**Uso:** `<DropdownSelecaoComCriacao label="Analista Responsável" valorAtual={form.analistaResponsavel} opcoes={listaAnalistas} onSelecionar={(v) => ...} disabled={!editandoDados} permiteCriarNovo />`
+**Notas:** Extraído de `modalDados.tsx` (2026-07-13) para evitar triplicar ~50 linhas de JSX (dropdown com opção "criar novo") ao migrar Analista/Embasamento/Origem do Lead para dentro de cada card de "Serviços Contratados" (múltiplos cards por CNPJ). Estilo indigo padrão do CS&NPS. `labelDesbloqueio` mostra um badge pequeno ao lado do label quando `disabled` (ex: "150K/Ilimitado" no campo Embasamento).
+
+### Módulo CS&NPS — mesclagem de registros por CNPJ (2026-07-13)
+**Arquivo:** `src/app/PainelAlpha/CadastroClientes/page.tsx` (agrupamento) + `ModalCadastro/modalDados.tsx` (seção "Serviços Contratados")
+**Tipo:** Client Components
+**Notas:** Primeira vez que este módulo permite múltiplos registros de `clientes` para o mesmo CNPJ (um por serviço contratado — ver `decisions.md` 2026-07-13). `page.tsx` agrupa client-side via `useMemo` (`gruposPorCnpj`), escolhendo o registro de `createdAt` mais recente como "principal" na linha da tabela; badge `Layers` + contagem aparece quando há >1 serviço. `ModalGestaoCliente` (`modalDados.tsx`) recebe agora `cliente` como ARRAY do grupo inteiro (não mais um objeto único) — internamente deriva `cliente = clienteGrupo[0]` (principal, preenche os campos editáveis já existentes) e `outrosServicos`. Nova seção "Serviços Contratados (N)" (só aparece quando há >1 registro) lista cada serviço com status/data individual + card de dados do Painel de Metas (Forma de Pagamento, Valor do Contrato, Closer), resolvidos via `buscarServicoContratadoPorCliente` (Server Action) num `useEffect` disparado pela abertura do modal — não é fetch de rede, é Server Action, padrão já aceito no projeto para popular estado local a partir de props. Campo "Serviço Contratado" também foi reposicionado para o topo do bloco de status/analista/embasamento (pedido do usuário), grid mudou de `xl:grid-cols-6` para `xl:grid-cols-7` com o campo ocupando `xl:col-span-2`.
+
 ### enderecoResumo (helper local)
 **Arquivo:** `src/components/Parceiros/ModalPreCadastros.tsx`
 **Tipo:** função pura (não componente)

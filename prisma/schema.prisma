@@ -88,6 +88,8 @@ model usuarios {
   onyxAgents OnyxAgentOwner[]
   onyxAgentesFixados OnyxAgenteFixado[]
 
+  historicoAlteracoesCliente HistoricoAlteracaoCliente[]
+
   parceirosCriados  Parceiro[]
   indicacoesCriadas Indicacao[]     @relation("IndicacaoAutor")
   parceiroAcessos   ParceiroAcesso[]
@@ -236,16 +238,20 @@ model documentos {
 model clientes {
   id                  Int            @id @default(autoincrement())
   status              String         @default("Em Andamento")
-  cnpj                String         @unique
+  cnpj                String
   razaoSocial         String
   nomeFantasia        String?
   dataConstituicao    String?
   uf                  String?
+  municipio           String?
   regimeTributario    String?
   servicos            String?
   analistaResponsavel String?
   dataContratacao     String?
   dataExito           String?
+  formaPagamento      String?
+  valorContrato       Float?
+  closerNome          String?
   ultimoCs            Int?           @default(0)
   nps                 Int?
   feedbackGoogle      Boolean        @default(false)
@@ -255,6 +261,7 @@ model clientes {
   socios              socios[]
   logFeedback         logFeedback[]
   logAlteracao        logAlteracao[]
+  historicoAlteracoes HistoricoAlteracaoCliente[]
   nomeGoogle          String?
   embasamento         String?
   origemLead          String?
@@ -267,6 +274,7 @@ model clientes {
   crm_oportunidades crm_oportunidades[]
   crm_contatos      crm_contatos[]
 
+  @@unique([cnpj, servicos])
   @@map("clientes")
 }
 
@@ -318,6 +326,29 @@ model logAlteracao {
   clientes        clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 
   @@map("logAlteracao")
+}
+
+/// Reconstrução do log de auditoria do CS&NPS (2026-07-13, ver decisions.md).
+/// Substitui `logAlteracao` (desativado, sem gravação nova) por granularidade
+/// por campo: cada campo alterado em 1 "Salvar" vira 1 linha, agrupadas por
+/// `loteId`. Reversão é por linha/campo específico, nunca o cliente inteiro.
+model HistoricoAlteracaoCliente {
+  id                 String    @id @default(cuid())
+  loteId             String // agrupa todas as linhas de 1 mesma ação de "Salvar"
+  clienteId          Int
+  cliente            clientes  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  campo              String // nome do campo alterado (ex: "status", "analistaResponsavel")
+  valorAnterior      String?
+  valorNovo          String?
+  userId             Int?
+  usuario            usuarios? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  nomeUsuarioNaEpoca String // snapshot do nome no momento da ação
+  acao               String    @default("EDICAO") // "EDICAO" | "REVERSAO"
+  criadoEm           DateTime  @default(now())
+
+  @@index([clienteId, criadoEm])
+  @@index([loteId])
+  @@map("historico_alteracao_cliente")
 }
 
 model ordemPastas {
@@ -1053,6 +1084,9 @@ model ContratoComercial {
   cnpj         String
   razaoSocial  String
   nomeFantasia String?
+  dataConstituicao String?
+  regimeTributario String?
+  uf               String?
 
   valorContrato  Float
   formaPagamento String
