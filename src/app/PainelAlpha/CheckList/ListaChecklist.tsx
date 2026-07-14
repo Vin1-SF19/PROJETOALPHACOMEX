@@ -1,230 +1,267 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Plus, ArrowUpRight, Building2, Calendar, ScanSearch, History } from "lucide-react";
-import { motion, Variants } from "framer-motion";
+import { useRouter } from "next/navigation";
+import {
+  Building2, ChevronDown, ChevronUp, Edit3, Filter,
+  FolderOpen, FolderPlus, History, Loader2, Plus, Save, Search, Settings2, X,
+} from "lucide-react";
+import {
+  atualizarEmpresaChecklist, criarPastaChecklist, type DadosEmpresaChecklist,
+  type EmpresaComProgresso, type PastaChecklistResumo,
+} from "@/actions/checklist";
 import Velocimetro from "@/components/Checklist/Velocimetro";
-import ModalCadastroCliente from "./Modais/CadastroCliente";
-import { TIPO_LABELS, TIPO_CORES } from "@/lib/checklist/items";
-import { getTema } from "@/lib/temas";
-import type { EmpresaComProgresso } from "@/actions/checklist";
 import ChecklistNotificacoesWidget from "@/components/Checklist/ChecklistNotificacoesWidget";
+import { TIPO_LABELS } from "@/lib/checklist/items";
+import { getTema } from "@/lib/temas";
+import ModalCadastroCliente from "./Modais/CadastroCliente";
 
-type TipoEmbasamento =
-  | "RECEITA_BRUTA_DAS"
-  | "RECEITA_BRUTA_CPRB"
-  | "INICIO_RETOMADA"
-  | "DISPONIBILIDADE_FINANCEIRA";
+type TipoEmbasamento = NonNullable<EmpresaComProgresso["tipo"]>;
 
-// ─── STATUS GLOW ─────────────────────────────────────────────────────────────
+const TIPOS = Object.keys(TIPO_LABELS) as TipoEmbasamento[];
+const STATUS_EMPRESA = ["ATIVO", "PENDENTE", "FINALIZADO"];
 
-const STATUS_CONFIG: Record<string, { text: string; glow: string; dot: string }> = {
-  ATIVO:      { text: "text-emerald-400", glow: "0 0 12px rgba(52,211,153,0.35)", dot: "#34d399" },
-  PENDENTE:   { text: "text-amber-400",   glow: "0 0 12px rgba(251,191,36,0.35)",  dot: "#fbbf24" },
-  FINALIZADO: { text: "text-blue-400",    glow: "0 0 12px rgba(96,165,250,0.35)",  dot: "#60a5fa" },
-};
+function texto(valor: string | null) {
+  return valor ?? "";
+}
 
-// ─── ANIMATION VARIANTS ───────────────────────────────────────────────────────
-
-const containerVariants: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.07 } },
-};
-
-const cardVariants: Variants = {
-  hidden:  { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-};
-
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
+function dadosDoCard(empresa: EmpresaComProgresso): DadosEmpresaChecklist {
+  return {
+    empresaId: empresa.id,
+    razaoSocial: empresa.razaoSocial,
+    nomeFantasia: empresa.nomeFantasia,
+    cnpj: empresa.cnpj,
+    status: empresa.status,
+    embasamento: empresa.embasamento,
+    tipo: empresa.tipo,
+    pastaChecklistId: empresa.pastaChecklistId,
+    mesProtocolo: empresa.mesProtocolo,
+    linkGrupo: empresa.linkGrupo,
+    situacaoRadar: empresa.situacaoRadar,
+    submodalidade: empresa.submodalidade,
+    dataSituacao: empresa.dataSituacao,
+    municipio: empresa.municipio,
+    uf: empresa.uf,
+    regimeTributario: empresa.regimeTributario,
+    capitalSocial: empresa.capitalSocial,
+    dataConstituicao: empresa.dataConstituicao,
+    contribuinte: empresa.contribuinte,
+  };
+}
 
 export default function ListaChecklist({
   empresas,
+  pastas: pastasIniciais,
   clientesAcesso = [],
   tema: temaNome = "blue",
   role = "",
 }: {
   empresas: EmpresaComProgresso[];
+  pastas: PastaChecklistResumo[];
   clientesAcesso?: { id: string; nome: string; email: string }[];
   tema?: string;
   role?: string;
 }) {
   const tema = getTema(temaNome);
-  const accentRgb = tema.accent;
-
   const [busca, setBusca] = useState("");
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const [modoEdicao, setModoEdicao] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<TipoEmbasamento | "TODOS">("TODOS");
+  const [filtroStatus, setFiltroStatus] = useState("TODOS");
+  const [filtroPasta, setFiltroPasta] = useState("TODAS");
+  const [filtroChecklist, setFiltroChecklist] = useState("TODOS");
+  const [ordem, setOrdem] = useState("RECENTES");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pastas, setPastas] = useState(pastasIniciais);
+  const [novaPasta, setNovaPasta] = useState("");
+  const [criandoPasta, setCriandoPasta] = useState(false);
 
-  const listaFiltrada = useMemo(
-    () =>
-      empresas.filter((e) => {
-        const matchBusca =
-          e.razaoSocial.toLowerCase().includes(busca.toLowerCase()) ||
-          e.cnpj.includes(busca);
-        const matchTipo = filtroTipo === "TODOS" || e.tipo === filtroTipo;
-        return matchBusca && matchTipo;
-      }),
-    [busca, filtroTipo, empresas]
-  );
+  const listaFiltrada = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    const lista = empresas.filter((empresa) => {
+      const matchBusca = !termo ||
+        empresa.razaoSocial.toLowerCase().includes(termo) ||
+        empresa.nomeFantasia?.toLowerCase().includes(termo) ||
+        empresa.cnpj.includes(termo);
+      const matchTipo = filtroTipo === "TODOS" || empresa.tipo === filtroTipo;
+      const matchStatus = filtroStatus === "TODOS" || empresa.status === filtroStatus;
+      const matchPasta = filtroPasta === "TODAS" ||
+        (filtroPasta === "SEM_PASTA" ? !empresa.pastaChecklistId : empresa.pastaChecklistId === filtroPasta);
+      const matchChecklist = filtroChecklist === "TODOS" ||
+        (filtroChecklist === "COM_CHECKLIST" ? empresa.temChecklist : !empresa.temChecklist);
+      return matchBusca && matchTipo && matchStatus && matchPasta && matchChecklist;
+    });
 
-  const concluidos = empresas.filter((e) => e.progressoReal === 100).length;
+    return [...lista].sort((a, b) => {
+      if (ordem === "NOME") return a.razaoSocial.localeCompare(b.razaoSocial, "pt-BR");
+      if (ordem === "PROGRESSO") return b.progressoReal - a.progressoReal;
+      if (ordem === "PASTA") return (a.pastaChecklistNome ?? "ZZZ").localeCompare(b.pastaChecklistNome ?? "ZZZ", "pt-BR");
+      return 0;
+    });
+  }, [busca, empresas, filtroChecklist, filtroPasta, filtroStatus, filtroTipo, ordem]);
+
+  const criarPasta = async () => {
+    if (!novaPasta.trim()) return;
+    setCriandoPasta(true);
+    const resposta = await criarPastaChecklist(novaPasta);
+    setCriandoPasta(false);
+    if (!resposta.data) return;
+    setPastas((atual) => [...atual.filter((p) => p.id !== resposta.data?.id), resposta.data!]
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")));
+    setNovaPasta("");
+  };
+
+  const concluidos = empresas.filter((empresa) => empresa.progressoReal === 100).length;
+  const pastaSelecionada = pastas.find((pasta) => pasta.id === filtroPasta);
 
   return (
-    <div className="relative min-h-screen pb-24">
+    <div className="min-h-screen px-6 pb-24 pt-8 text-slate-200 md:px-8">
+      <header className="mb-8 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: "rgb(" + tema.accent + ")" }}>
+            Módulo operacional
+          </p>
+          <h1 className="text-4xl font-black uppercase italic tracking-tighter text-white md:text-5xl">
+            Checklist <span style={{ color: "rgb(" + tema.accent + ")" }}>RADAR</span>
+          </h1>
+          <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-500">
+            Gestão de documentação, embasamento e organização por empresa
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Resumo titulo="Total" valor={empresas.length} />
+          <Resumo titulo="Concluídos" valor={concluidos} sucesso />
+          {["Admin", "CEO", "OPERACIONAL"].includes(role) && <ChecklistNotificacoesWidget role={role} />}
+        </div>
+      </header>
 
-      {/* ── CONTEÚDO ── */}
-      <div className="relative z-10 px-6 md:px-8 pt-8 space-y-8">
-
-        {/* HEADER */}
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
-          <div>
-            <motion.p
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="text-[10px] font-black uppercase tracking-[0.3em] mb-2"
-              style={{ color: `rgb(${accentRgb})` }}
-            >
-              Módulo Operacional
-            </motion.p>
-            <motion.h1
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-4xl md:text-5xl font-black text-white tracking-tighter italic uppercase"
-            >
-              Checklist <span style={{ color: `rgb(${accentRgb})` }}>RADAR</span>
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.18 }}
-              className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2"
-            >
-              Gestão de documentação e embasamento por empresa
-            </motion.p>
+      <section className="mb-5 rounded-[2rem] border border-white/5 bg-slate-950/50 p-4 backdrop-blur-xl">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            <input
+              value={busca}
+              onChange={(event) => setBusca(event.target.value)}
+              placeholder="Buscar empresa, nome fantasia ou CNPJ..."
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.04] py-3 pl-11 pr-4 text-sm text-white outline-none transition focus:border-blue-400/50"
+            />
           </div>
-
-          {/* Counters + sino */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.15 }}
-            className="flex items-center gap-3"
+          <button
+            onClick={() => setFiltrosAbertos((aberto) => !aberto)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 transition hover:border-blue-400/40 hover:text-white"
           >
-            <div
-              className="px-5 py-3 rounded-2xl border"
-              style={{
-                background: `rgba(${accentRgb}, 0.06)`,
-                borderColor: `rgba(${accentRgb}, 0.2)`,
-              }}
-            >
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Total</p>
-              <p className="text-3xl font-black text-white leading-none mt-0.5 tabular-nums">
-                {empresas.length}
-              </p>
-            </div>
-            <div className="px-5 py-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
-              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Concluídos</p>
-              <p className="text-3xl font-black text-emerald-400 leading-none mt-0.5 tabular-nums">
-                {concluidos}
-              </p>
-            </div>
-            {/* Notificações de documentos de clientes */}
-            {['Admin', 'CEO', 'OPERACIONAL'].includes(role) && (
-              <ChecklistNotificacoesWidget role={role} />
-            )}
-          </motion.div>
-        </header>
+            <Filter size={15} /> Filtros {filtrosAbertos ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          <button
+            onClick={() => setModoEdicao((ativo) => !ativo)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-blue-500"
+          >
+            {modoEdicao ? <X size={15} /> : <Edit3 size={15} />}
+            {modoEdicao ? "Encerrar edição" : "Editar empresas"}
+          </button>
+          <Link
+            href="/PainelAlpha/CheckList/Historico"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-rose-300 transition hover:bg-rose-500/20"
+          >
+            <History size={15} /> Histórico
+          </Link>
+          <Link
+            href="/PainelAlpha/CheckList/Embasamentos"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-400/25 bg-violet-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-violet-200 transition hover:bg-violet-500/20"
+          >
+            <Settings2 size={15} /> Configurar embasamentos
+          </Link>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white"
+            style={{ background: "rgb(" + tema.accent + ")" }}
+          >
+            <Plus size={15} /> Nova empresa
+          </button>
+        </div>
 
-        {/* CONTROLES */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between"
-        >
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            {/* Busca */}
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
-              <input
-                type="text"
-                placeholder="Buscar empresa ou CNPJ..."
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                className="w-full rounded-2xl py-3 pl-11 pr-4 text-sm outline-none text-white placeholder:text-slate-700 transition-all"
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: `1px solid rgba(${accentRgb}, 0.15)`,
-                }}
-                onFocus={(e) => (e.currentTarget.style.borderColor = `rgba(${accentRgb}, 0.5)`)}
-                onBlur={(e) => (e.currentTarget.style.borderColor = `rgba(${accentRgb}, 0.15)`)}
-              />
-            </div>
-
-            {/* Filtro tipo */}
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value as TipoEmbasamento | "TODOS")}
-              className="rounded-2xl py-3 px-4 text-sm text-white outline-none appearance-none cursor-pointer transition-all"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: `1px solid rgba(${accentRgb}, 0.15)`,
-              }}
-            >
-              <option value="TODOS" className="bg-slate-900">Todos os tipos</option>
-              {Object.entries(TIPO_LABELS).map(([k, v]) => (
-                <option key={k} value={k} className="bg-slate-900">{v}</option>
-              ))}
-            </select>
+        {filtrosAbertos && (
+          <div className="mt-4 grid grid-cols-1 gap-3 border-t border-white/5 pt-4 sm:grid-cols-2 xl:grid-cols-5">
+            <FiltroSelect valor={filtroTipo} onChange={(valor) => setFiltroTipo(valor as TipoEmbasamento | "TODOS")} opcoes={[["TODOS", "Todos os embasamentos"], ...TIPOS.map((tipo) => [tipo, TIPO_LABELS[tipo]])]} />
+            <FiltroSelect valor={filtroStatus} onChange={setFiltroStatus} opcoes={[["TODOS", "Todos os status"], ...STATUS_EMPRESA.map((status) => [status, status])]} />
+            <FiltroSelect valor={filtroPasta} onChange={setFiltroPasta} opcoes={[["TODAS", "Todas as pastas"], ["SEM_PASTA", "Sem pasta"], ...pastas.map((pasta) => [pasta.id, pasta.nome])]} />
+            <FiltroSelect valor={filtroChecklist} onChange={(valor) => setFiltroChecklist(valor as "TODOS" | "COM_CHECKLIST" | "SEM_CHECKLIST")} opcoes={[["TODOS", "Todo andamento"], ["COM_CHECKLIST", "Com checklist"], ["SEM_CHECKLIST", "Sem checklist"]]} />
+            <FiltroSelect valor={ordem} onChange={(valor) => setOrdem(valor as "RECENTES" | "NOME" | "PROGRESSO" | "PASTA")} opcoes={[["RECENTES", "Mais recentes"], ["NOME", "Nome"], ["PROGRESSO", "Maior progresso"], ["PASTA", "Pasta"]]} />
           </div>
-
-          <div className="flex items-center gap-3">
-            {/* Histórico de excluídos */}
-            <Link
-              href="/PainelAlpha/CheckList/Historico"
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-rose-500/25 bg-rose-500/8 text-[10px] font-black uppercase tracking-wider text-rose-400 hover:border-rose-500/50 hover:bg-rose-500/15 transition-all"
-            >
-              <History size={14} />
-              Histórico
-            </Link>
-
-            {/* Botão Nova Empresa */}
-            <MagneticButton accentRgb={accentRgb} onClick={() => setIsModalOpen(true)}>
-              <Plus size={16} />
-              Nova Empresa
-            </MagneticButton>
-          </div>
-        </motion.div>
-
-        {/* GRID DE CARDS */}
-        {listaFiltrada.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-32 gap-4"
-          >
-            <Building2 size={40} className="text-slate-700" />
-            <p className="text-slate-600 text-xs font-black uppercase tracking-widest">
-              Nenhuma empresa encontrada
-            </p>
-          </motion.div>
-        ) : (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"
-          >
-            {listaFiltrada.map((emp, i) => (
-              <EmpresaCard key={emp.id} emp={emp} accentRgb={accentRgb} index={i} />
-            ))}
-          </motion.div>
         )}
-      </div>
+      </section>
+
+      {pastas.length > 0 && (
+        <section className="mb-5 rounded-[2rem] border border-white/5 bg-slate-950/40 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Visualizar por pasta</p>
+              <p className="mt-1 text-xs text-slate-400">Selecione uma pasta para exibir somente as empresas dela.</p>
+            </div>
+            {pastaSelecionada && <button onClick={() => setFiltroPasta("TODAS")} className="text-[10px] font-black uppercase tracking-widest text-blue-300 hover:text-blue-200">Limpar visão</button>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <PastaAtalho ativo={filtroPasta === "TODAS"} nome="Todas as empresas" quantidade={empresas.length} onClick={() => setFiltroPasta("TODAS")} />
+            {pastas.map((pasta) => (
+              <PastaAtalho
+                key={pasta.id}
+                ativo={filtroPasta === pasta.id}
+                nome={pasta.nome}
+                quantidade={empresas.filter((empresa) => empresa.pastaChecklistId === pasta.id).length}
+                onClick={() => setFiltroPasta(pasta.id)}
+              />
+            ))}
+            <PastaAtalho ativo={filtroPasta === "SEM_PASTA"} nome="Sem pasta" quantidade={empresas.filter((empresa) => !empresa.pastaChecklistId).length} onClick={() => setFiltroPasta("SEM_PASTA")} />
+          </div>
+        </section>
+      )}
+
+      {modoEdicao && (
+        <section className="mb-5 flex flex-col gap-3 rounded-[2rem] border border-blue-400/20 bg-blue-500/5 p-4 lg:flex-row lg:items-center">
+          <div className="flex-1">
+            <p className="text-xs font-black uppercase tracking-widest text-blue-300">Modo de edição global ativo</p>
+            <p className="mt-1 text-[11px] text-slate-400">Cada card agora permite alterar os dados da empresa, a pasta e o tipo do checklist.</p>
+          </div>
+          <div className="flex flex-1 gap-2">
+            <input
+              value={novaPasta}
+              onChange={(event) => setNovaPasta(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") void criarPasta(); }}
+              placeholder="Nome da nova pasta"
+              className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2.5 text-xs text-white outline-none focus:border-blue-400/50"
+            />
+            <button
+              onClick={() => void criarPasta()}
+              disabled={criandoPasta || !novaPasta.trim()}
+              className="inline-flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-blue-200 disabled:opacity-50"
+            >
+              {criandoPasta ? <Loader2 size={14} className="animate-spin" /> : <FolderPlus size={14} />}
+              Criar pasta
+            </button>
+          </div>
+        </section>
+      )}
+
+      {pastaSelecionada && (
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-blue-400/20 bg-blue-500/[0.06] px-5 py-4">
+          <FolderOpen size={18} className="text-blue-300" />
+          <div><p className="text-xs font-black uppercase tracking-widest text-blue-100">Pasta: {pastaSelecionada.nome}</p><p className="mt-1 text-[11px] text-slate-400">{listaFiltrada.length} empresa(s) nesta visualização</p></div>
+        </div>
+      )}
+
+      {listaFiltrada.length === 0 ? (
+        <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-[2rem] border border-white/5 bg-slate-950/40">
+          <Building2 size={40} className="text-slate-700" />
+          <p className="text-xs font-black uppercase tracking-widest text-slate-500">Nenhuma empresa encontrada</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          {listaFiltrada.map((empresa) => (
+            <EmpresaCard key={empresa.id} empresa={empresa} pastas={pastas} editando={modoEdicao} />
+          ))}
+        </div>
+      )}
 
       <ModalCadastroCliente
         isOpen={isModalOpen}
@@ -235,226 +272,138 @@ export default function ListaChecklist({
   );
 }
 
-// ─── EMPRESA CARD ─────────────────────────────────────────────────────────────
-
-function EmpresaCard({
-  emp,
-  accentRgb,
-  index,
-}: {
-  emp: EmpresaComProgresso;
-  accentRgb: string;
-  index: number;
-}) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const glowRef = useRef<HTMLDivElement>(null);
-
-  const statusCfg = STATUS_CONFIG[emp.status] ?? STATUS_CONFIG.PENDENTE;
-
-  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current || !glowRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    glowRef.current.style.opacity = "1";
-    glowRef.current.style.background = `radial-gradient(circle 260px at ${x}px ${y}px, rgba(${accentRgb}, 0.14), transparent 65%)`;
-  };
-
-  const onMouseLeave = () => {
-    if (glowRef.current) glowRef.current.style.opacity = "0";
-  };
-
+function Resumo({ titulo, valor, sucesso = false }: { titulo: string; valor: number; sucesso?: boolean }) {
   return (
-    <motion.div
-      ref={cardRef}
-      variants={cardVariants}
-      whileHover={{ y: -5, transition: { duration: 0.2, ease: "easeOut" } }}
-      onMouseMove={onMouseMove}
-      onMouseLeave={onMouseLeave}
-      className="relative overflow-hidden rounded-[1.75rem] flex flex-col"
-      style={{
-        background: "rgba(10,14,30,0.75)",
-        backdropFilter: "blur(24px)",
-        border: `1px solid rgba(255,255,255,0.06)`,
-        boxShadow: "0 4px 24px rgba(0,0,0,0.3)",
-        transition: "box-shadow 0.2s ease",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(${accentRgb}, 0.15)`;
-      }}
-      onMouseOut={(e) => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.3)";
-      }}
-    >
-      {/* Spotlight layer */}
-      <div
-        ref={glowRef}
-        className="absolute inset-0 pointer-events-none"
-        style={{ opacity: 0, transition: "opacity 0.3s ease" }}
-      />
-
-      {/* Linha superior accent */}
-      <div
-        className="absolute top-0 left-0 right-0 h-px"
-        style={{ background: `linear-gradient(90deg, transparent, rgba(${accentRgb}, 0.4), transparent)` }}
-      />
-
-      <div className="relative z-10 p-6 flex flex-col gap-5">
-
-        {/* Row 1: Tipo + Status */}
-        <div className="flex items-start justify-between gap-2">
-          {emp.tipo ? (
-            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${TIPO_CORES[emp.tipo]}`}>
-              {TIPO_LABELS[emp.tipo]}
-            </span>
-          ) : (
-            <span className="text-[10px] text-slate-600 font-bold italic uppercase">Sem tipo</span>
-          )}
-          <div className="flex items-center gap-1.5">
-            <span
-              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: statusCfg.dot, boxShadow: statusCfg.glow }}
-            />
-            <span className={`text-[10px] font-black uppercase tracking-wide ${statusCfg.text}`}>
-              {emp.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Row 2: Nome + velocímetro */}
-        <div className="flex items-center gap-4">
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-base font-black text-white italic uppercase tracking-tight leading-tight truncate">
-              {emp.razaoSocial}
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
-              {emp.nomeFantasia || emp.clienteNome}
-            </p>
-          </div>
-
-          {/* Velocímetro com anel de glow */}
-          <div className="flex-shrink-0 relative">
-            {/* Anel de glow radial atrás do velocímetro */}
-            <div
-              className="absolute inset-0 rounded-full"
-              style={{
-                background: `radial-gradient(circle at 50% 70%, rgba(${accentRgb}, 0.18), transparent 65%)`,
-                transform: "scale(1.4)",
-              }}
-            />
-            <Velocimetro
-              percent={emp.progressoReal}
-              size="sm"
-              accentRgb={accentRgb}
-            />
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-
-        {/* Row 3: CNPJ + dados */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">CNPJ</p>
-            <p className="text-[11px] font-mono text-slate-300 mt-0.5">{emp.cnpj}</p>
-          </div>
-          <div>
-            <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Situação RADAR</p>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
-              {emp.submodalidade || "—"}
-            </p>
-          </div>
-          {emp.mesProtocolo && (
-            <div className="col-span-2 flex items-center gap-1.5">
-              <Calendar size={10} className="text-slate-600 flex-shrink-0" />
-              <p className="text-[10px] text-slate-500 font-medium italic">
-                Protocolo: {emp.mesProtocolo}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* CTA */}
-        <Link
-          href={`/PainelAlpha/CheckList/${emp.id}`}
-          className="group flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200"
-          style={{
-            background: `rgba(${accentRgb}, 0.08)`,
-            border: `1px solid rgba(${accentRgb}, 0.15)`,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.background = `rgba(${accentRgb}, 0.16)`;
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = `rgba(${accentRgb}, 0.35)`;
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.background = `rgba(${accentRgb}, 0.08)`;
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = `rgba(${accentRgb}, 0.15)`;
-          }}
-        >
-          <span
-            className="text-[11px] font-black uppercase tracking-widest"
-            style={{ color: `rgb(${accentRgb})` }}
-          >
-            Ver Checklist
-          </span>
-          <ArrowUpRight
-            size={14}
-            className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-            style={{ color: `rgb(${accentRgb})` }}
-          />
-        </Link>
-      </div>
-    </motion.div>
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3">
+      <p className={"text-[9px] font-black uppercase tracking-widest " + (sucesso ? "text-emerald-400" : "text-slate-500")}>{titulo}</p>
+      <p className={"mt-0.5 text-3xl font-black leading-none " + (sucesso ? "text-emerald-300" : "text-white")}>{valor}</p>
+    </div>
   );
 }
 
-// ─── MAGNETIC BUTTON ─────────────────────────────────────────────────────────
+function FiltroSelect({ valor, onChange, opcoes }: { valor: string; onChange: (valor: string) => void; opcoes: string[][] }) {
+  return (
+    <select
+      value={valor}
+      onChange={(event) => onChange(event.target.value)}
+      className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-blue-400/50"
+    >
+      {opcoes.map(([valorOpcao, rotulo]) => <option key={valorOpcao} value={valorOpcao}>{rotulo}</option>)}
+    </select>
+  );
+}
 
-function MagneticButton({
-  children,
-  accentRgb,
-  onClick,
-}: {
-  children: React.ReactNode;
-  accentRgb: string;
-  onClick: () => void;
-}) {
-  const btnRef = useRef<HTMLButtonElement>(null);
+function PastaAtalho({ ativo, nome, quantidade, onClick }: { ativo: boolean; nome: string; quantidade: number; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={"inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-widest transition " + (ativo ? "border-blue-400/50 bg-blue-500/15 text-blue-100" : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-white")}>
+      <FolderOpen size={14} /> {nome}<span className="rounded-full bg-black/20 px-1.5 py-0.5 text-[9px]">{quantidade}</span>
+    </button>
+  );
+}
 
-  const onMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    const dx = (e.clientX - (rect.left + rect.width / 2)) * 0.2;
-    const dy = (e.clientY - (rect.top + rect.height / 2)) * 0.2;
-    btnRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+function EmpresaCard({ empresa, pastas, editando }: { empresa: EmpresaComProgresso; pastas: PastaChecklistResumo[]; editando: boolean }) {
+  const router = useRouter();
+  const [dados, setDados] = useState<DadosEmpresaChecklist>(() => dadosDoCard(empresa));
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const atualizar = (campo: keyof DadosEmpresaChecklist, valor: string | null) => {
+    setDados((atual) => ({ ...atual, [campo]: valor }));
   };
 
-  const onMouseLeave = () => {
-    if (btnRef.current) btnRef.current.style.transform = "translate(0,0)";
+  const salvar = async () => {
+    setSalvando(true);
+    setErro("");
+    const resposta = await atualizarEmpresaChecklist(dados);
+    setSalvando(false);
+    if (resposta.error) {
+      setErro(resposta.error);
+      return;
+    }
+    router.refresh();
   };
 
   return (
-    <button
-      ref={btnRef}
-      onClick={onClick}
-      onMouseMove={onMouseMove}
-      onMouseLeave={onMouseLeave}
-      className="cursor-pointer flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm text-white whitespace-nowrap"
-      style={{
-        background: `rgb(${accentRgb})`,
-        boxShadow: `0 4px 20px rgba(${accentRgb}, 0.35)`,
-        transition: "transform 0.15s ease, box-shadow 0.2s ease",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 32px rgba(${accentRgb}, 0.55)`;
-      }}
-      onMouseOut={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 4px 20px rgba(${accentRgb}, 0.35)`;
-      }}
-    >
-      {children}
-    </button>
+    <article className="overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/65 p-6 shadow-2xl shadow-black/20">
+      {!editando ? (
+        <>
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate text-lg font-black uppercase italic tracking-tight text-white">{empresa.razaoSocial}</p>
+              <p className="mt-1 truncate text-xs text-slate-500">{empresa.nomeFantasia || empresa.clienteNome}</p>
+            </div>
+            <Velocimetro percent={empresa.progressoReal} size="sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 border-y border-white/5 py-4 text-xs">
+            <Info titulo="CNPJ" valor={empresa.cnpj} />
+            <Info titulo="Status" valor={empresa.status} />
+            <Info titulo="Embasamento" valor={empresa.tipo ? TIPO_LABELS[empresa.tipo] : "Não definido"} />
+            <Info titulo="Pasta" valor={empresa.pastaChecklistNome ?? "Sem pasta"} />
+          </div>
+          <Link
+            href={"/PainelAlpha/CheckList/" + empresa.id}
+            className="mt-5 flex items-center justify-center rounded-xl bg-blue-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-blue-300 transition hover:bg-blue-500/20"
+          >
+            Ver checklist
+          </Link>
+        </>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-black uppercase tracking-widest text-blue-300">Editar empresa</p>
+            <span className="text-[10px] font-bold text-slate-500">{empresa.clienteNome}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Campo label="Razão social" value={dados.razaoSocial} onChange={(valor) => atualizar("razaoSocial", valor)} />
+            <Campo label="Nome fantasia" value={texto(dados.nomeFantasia)} onChange={(valor) => atualizar("nomeFantasia", valor || null)} />
+            <Campo label="CNPJ" value={dados.cnpj} onChange={(valor) => atualizar("cnpj", valor)} />
+            <Campo label="Status" value={dados.status} onChange={(valor) => atualizar("status", valor)} opcoes={[...new Set([...STATUS_EMPRESA, dados.status])]} />
+            <Campo label="Tipo do checklist" value={dados.tipo ?? ""} onChange={(valor) => atualizar("tipo", valor || null)} opcoes={["", ...TIPOS]} formatar={(valor) => valor ? TIPO_LABELS[valor as TipoEmbasamento] : "Não definido"} />
+            <Campo label="Pasta" value={dados.pastaChecklistId ?? ""} onChange={(valor) => atualizar("pastaChecklistId", valor || null)} opcoes={["", ...pastas.map((pasta) => pasta.id)]} formatar={(valor) => valor ? pastas.find((pasta) => pasta.id === valor)?.nome ?? valor : "Sem pasta"} />
+            <Campo label="Embasamento cadastral" value={dados.embasamento} onChange={(valor) => atualizar("embasamento", valor)} />
+            <Campo label="Mês de protocolo" value={texto(dados.mesProtocolo)} onChange={(valor) => atualizar("mesProtocolo", valor || null)} />
+            <Campo label="Situação RADAR" value={texto(dados.situacaoRadar)} onChange={(valor) => atualizar("situacaoRadar", valor || null)} />
+            <Campo label="Submodalidade" value={texto(dados.submodalidade)} onChange={(valor) => atualizar("submodalidade", valor || null)} />
+            <Campo label="Município" value={texto(dados.municipio)} onChange={(valor) => atualizar("municipio", valor || null)} />
+            <Campo label="UF" value={texto(dados.uf)} onChange={(valor) => atualizar("uf", valor || null)} />
+            <Campo label="Regime tributário" value={texto(dados.regimeTributario)} onChange={(valor) => atualizar("regimeTributario", valor || null)} />
+            <Campo label="Capital social" value={texto(dados.capitalSocial)} onChange={(valor) => atualizar("capitalSocial", valor || null)} />
+            <Campo label="Data de constituição" value={texto(dados.dataConstituicao)} onChange={(valor) => atualizar("dataConstituicao", valor || null)} />
+            <Campo label="Contribuinte" value={texto(dados.contribuinte)} onChange={(valor) => atualizar("contribuinte", valor || null)} />
+          </div>
+          <Campo label="Link do grupo" value={texto(dados.linkGrupo)} onChange={(valor) => atualizar("linkGrupo", valor || null)} />
+          {erro && <p className="text-xs font-bold text-rose-300">{erro}</p>}
+          <button
+            onClick={() => void salvar()}
+            disabled={salvando}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
+          >
+            {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Salvar empresa
+          </button>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function Info({ titulo, valor }: { titulo: string; valor: string }) {
+  return <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-600">{titulo}</p><p className="mt-1 truncate font-medium text-slate-300">{valor}</p></div>;
+}
+
+function Campo({ label, value, onChange, opcoes, formatar }: {
+  label: string; value: string; onChange: (valor: string) => void; opcoes?: string[]; formatar?: (valor: string) => string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+      {opcoes ? (
+        <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-400/50">
+          {opcoes.map((opcao) => <option key={opcao || "vazio"} value={opcao}>{formatar ? formatar(opcao) : opcao}</option>)}
+        </select>
+      ) : (
+        <input value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-400/50" />
+      )}
+    </label>
   );
 }

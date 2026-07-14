@@ -17,7 +17,6 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
 
     const [form, setForm] = useState({
         cnpj: '',
-        embasamento: '',
         razaoSocial: '',
         nomeFantasia: '',
         nomeCliente: '',
@@ -136,7 +135,7 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
 
                 <div className="p-8 space-y-6">
                     {/* Seção Empresa */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">CNPJ da Empresa</label>
                             <div className="flex gap-2">
@@ -151,19 +150,6 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
                                     {loadingConsulta ? <Loader2 className="animate-spin" size={18} /> : <Search size={18} />}
                                 </button>
                             </div>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Embasamento</label>
-                            <select
-                                value={form.embasamento}
-                                onChange={(e) => setForm({ ...form, embasamento: e.target.value })}
-                                className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-6 text-sm text-white outline-none focus:border-blue-500/50 appearance-none"
-                            >
-                                <option value="" className="bg-slate-900">Selecione o motivo...</option>
-                                <option value="EmbasamentoFinanceiro" className="bg-slate-900">Disponibilidade financeira</option>
-                                <option value="EmbasamentoRetomada" className="bg-slate-900">Início ou Retomada</option>
-                                <option value="EmbasamentoDAS" className="bg-slate-900">Receita Bruta DAS</option>
-                            </select>
                         </div>
                     </div>
 

@@ -2,7 +2,7 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-07-10 (Alpha Presentation Studio — Onda 5, motor de IA — backend apenas)
+> Última atualização: 2026-07-14 (Alpha CheckList — edição, pastas e exportação ZIP)
 
 ---
 
@@ -73,6 +73,24 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Admin | Gestão de Protocolos | `/PainelAlpha/GestaoProtocolos` | roles Admin/CEO/Suporte |
 | Admin | Onboarding | `/PainelAlpha/GestaoOnboarding` | admin only |
 | Admin | Conectores IAlpha | `/PainelAlpha/Conectores` | admin only |
+
+### Alpha CheckList — organização operacional (2026-07-14)
+
+O módulo continua em `src/app/PainelAlpha/CheckList/`, com as Server Actions em
+`src/actions/checklist.ts`. A listagem (`ListaChecklist.tsx`) concentra edição
+global, filtros e vínculo opcional com `PastaChecklist`; o detalhe
+(`ChecklistView.tsx`) permite trocar o embasamento ativo sem apagar os checklists
+anteriores. O download de documentos passa pela rota autenticada
+`/api/checklist/[empresaId]/documentos/zip`, que reúne somente documentos ativos.
+O model `OperacionalClientes` tem a relação opcional `pastaChecklistId`; toda
+alteração estrutural deste módulo no Turso deve seguir o script pontual idempotente
+e a confirmação por `PRAGMA`, conforme a regra de migrations remotas.
+
+Os documentos-base são configuráveis em
+`src/app/PainelAlpha/CheckList/Embasamentos/`, persistidos em
+`ModeloItemChecklist`. Um item com `tipo = null` é global; o preenchimento de um
+novo `Checklist` copia os modelos globais e os do tipo selecionado, sem modificar
+checklists existentes.
 
 ---
 

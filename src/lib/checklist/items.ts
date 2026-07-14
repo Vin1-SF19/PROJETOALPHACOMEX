@@ -311,8 +311,6 @@ export const STATUS_LABELS: Record<string, string> = {
   EM_ANALISE: "Em Análise",
   AGUARDANDO_DOCUMENTOS: "Aguardando Docs",
   PRIORIDADE: "Prioridade",
-  FALAR_DR_EDVAN: "Falar Dr. Edvan",
-  FALAR_ANDREW: "Falar Andrew",
 };
 
 export const STATUS_CORES: Record<string, string> = {
@@ -325,8 +323,6 @@ export const STATUS_CORES: Record<string, string> = {
   EM_ANALISE: "text-purple-400 bg-purple-500/10 border-purple-500/20",
   AGUARDANDO_DOCUMENTOS: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
   PRIORIDADE: "text-red-400 bg-red-500/10 border-red-500/20",
-  FALAR_DR_EDVAN: "text-pink-400 bg-pink-500/10 border-pink-500/20",
-  FALAR_ANDREW: "text-pink-400 bg-pink-500/10 border-pink-500/20",
 };
 
 export const STATUS_CONCLUIDOS = new Set([

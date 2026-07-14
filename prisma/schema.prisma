@@ -937,10 +937,21 @@ model OperacionalClientes {
 
   clienteId  String
   cliente    ClienteOperacional @relation(fields: [clienteId], references: [id])
+  pastaChecklistId String?
+  pastaChecklist   PastaChecklist? @relation(fields: [pastaChecklistId], references: [id])
   documentos DocumentoUnidade[]
   checklists Checklist[]
 
+  @@index([pastaChecklistId])
   @@map("operacional_clientes")
+}
+
+model PastaChecklist {
+  id          String                @id @default(cuid())
+  nome        String                @unique
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  empresas    OperacionalClientes[]
 }
 
 model DocumentoUnidade {
@@ -982,8 +993,6 @@ enum StatusItemChecklist {
   EM_ANALISE
   AGUARDANDO_DOCUMENTOS
   PRIORIDADE
-  FALAR_DR_EDVAN
-  FALAR_ANDREW
 }
 
 model Checklist {
@@ -998,10 +1007,25 @@ model Checklist {
   @@unique([empresaId, tipo])
 }
 
+model ModeloItemChecklist {
+  id          String            @id @default(cuid())
+  tipo        TipoEmbasamento?
+  codigo      String
+  nome        String
+  descricao   String?
+  secao       String
+  obrigatorio Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([tipo, secao])
+}
+
 model ItemChecklist {
   id           String              @id @default(cuid())
   checklistId  String
   checklist    Checklist           @relation(fields: [checklistId], references: [id])
+  modeloItemId String?
   codigo       String
   secao        String
   descricao    String
@@ -1011,6 +1035,8 @@ model ItemChecklist {
   obrigatorio  Boolean             @default(true)
   documentos   DocumentoChecklist[]
   atualizadoEm DateTime            @updatedAt
+
+  @@index([modeloItemId])
 }
 
 model DocumentoChecklist {

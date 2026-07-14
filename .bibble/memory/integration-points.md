@@ -55,6 +55,32 @@ Ao criar um novo módulo, verificar e registrar:
 
 ---
 
+### Alpha CheckList — edição, pastas e exportação de documentos
+
+**Atualizado em:** 2026-07-14 por Scribe.
+
+**Rotas:** a listagem e o detalhe existentes permanecem em
+`/PainelAlpha/CheckList` e `/PainelAlpha/CheckList/[empresaId]`; o download usa
+`GET /api/checklist/[empresaId]/documentos/zip`.
+
+**Menu e permissão:** não há nova entrada de menu nem nova permissão. O módulo
+continua registrado como `checkList` em `src/lib/modulos-registry.ts`.
+
+**Dados:** `OperacionalClientes.pastaChecklistId` aponta opcionalmente para
+`PastaChecklist`; mudanças de embasamento preservam o checklist anterior para não
+perder documentos e ativam/criam o checklist do novo tipo.
+
+**Segurança do ZIP:** manter autenticação, limitar a documentos não excluídos e
+validar URL HTTPS, nome de arquivo e tamanho antes de buscar conteúdo remoto.
+
+**Modelos de embasamento:** o botão da listagem abre
+`/PainelAlpha/CheckList/Embasamentos`; as subrotas
+`/PainelAlpha/CheckList/Embasamentos/[tipo]` devem validar o tipo e manter a
+mesma autenticação do módulo. Novos checklists sempre consultam
+`ModeloItemChecklist` (específico + global), não uma lista fixa de itens no código.
+
+---
+
 ### Template de Onboarding — Campo `tipo`
 
 **Adicionado em:** 2026-06-18 por Scribe (sessão Bibble). **Estendido em:** 2026-07-06 (tipo CONVITE).

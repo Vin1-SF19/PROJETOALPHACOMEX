@@ -1,6 +1,6 @@
 import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
-import { getEmpresasChecklist } from "@/actions/checklist";
+import { getEmpresasChecklist, getPastasChecklist } from "@/actions/checklist";
 import db from "@/lib/prisma";
 import ListaChecklist from "./ListaChecklist";
 
@@ -10,8 +10,9 @@ export default async function CheckListPage() {
 
   const userId = Number((session.user as any)?.id);
 
-  const [result, clientesAcesso, userDb] = await Promise.all([
+  const [result, pastasResult, clientesAcesso, userDb] = await Promise.all([
     getEmpresasChecklist(),
+    getPastasChecklist(),
     db.clienteOperacional.findMany({ select: { id: true, nome: true, email: true } }),
     db.usuarios.findUnique({
       where: { id: userId },
@@ -25,7 +26,7 @@ export default async function CheckListPage() {
 
   return (
     <div className="relative min-h-screen text-slate-200 overflow-x-hidden">
-      <ListaChecklist empresas={empresas} clientesAcesso={clientesAcesso} tema={tema} role={role} />
+      <ListaChecklist empresas={empresas} pastas={pastasResult.data ?? []} clientesAcesso={clientesAcesso} tema={tema} role={role} />
     </div>
   );
 }

@@ -36,7 +36,8 @@ export async function vincularEmpresaAoCliente(formData: any) {
       cnpj: cnpjLimpo,
       razaoSocial: (formData.razaoSocial || "").toUpperCase(),
       nomeFantasia: (formData.nomeFantasia || "").toUpperCase(),
-      embasamento: formData.embasamento,
+      // Campo legado obrigatorio no banco; a escolha real ocorre no primeiro checklist.
+      embasamento: "",
       clienteId: formData.clienteId,
 
       situacaoRadar: formData.situacaoRadar,

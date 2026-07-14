@@ -3,8 +3,8 @@
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
 import { revalidatePath } from "next/cache";
-import { TipoEmbasamento, StatusItemChecklist } from "@prisma/client";
-import { CHECKLIST_TEMPLATES, calcularProgressoItens } from "@/lib/checklist/items";
+import { Prisma, TipoEmbasamento, StatusItemChecklist } from "@prisma/client";
+import { calcularProgressoItens } from "@/lib/checklist/items";
 import { z } from "zod";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -19,12 +19,25 @@ export type EmpresaComProgresso = {
   tipo: TipoEmbasamento | null;
   progresso: number;
   mesProtocolo: string | null;
+  linkGrupo: string | null;
   situacaoRadar: string | null;
   submodalidade: string | null;
+  dataSituacao: string | null;
+  municipio: string | null;
+  uf: string | null;
+  regimeTributario: string | null;
+  capitalSocial: string | null;
+  dataConstituicao: string | null;
+  contribuinte: string | null;
   clienteNome: string;
   checklistId: string | null;
   progressoReal: number;
+  temChecklist: boolean;
+  pastaChecklistId: string | null;
+  pastaChecklistNome: string | null;
 };
+
+export type PastaChecklistResumo = { id: string; nome: string };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -44,6 +57,7 @@ export async function getEmpresasChecklist(): Promise<{ data?: EmpresaComProgres
       orderBy: { createdAt: "desc" },
       include: {
         cliente: { select: { nome: true } },
+        pastaChecklist: { select: { id: true, nome: true } },
         checklists: {
           include: {
             itens: { select: { status: true, obrigatorio: true } },
@@ -68,15 +82,60 @@ export async function getEmpresasChecklist(): Promise<{ data?: EmpresaComProgres
         tipo: e.tipo,
         progresso: e.progresso,
         mesProtocolo: e.mesProtocolo,
+        linkGrupo: e.linkGrupo,
         situacaoRadar: e.situacaoRadar,
         submodalidade: e.submodalidade,
+        dataSituacao: e.dataSituacao,
+        municipio: e.municipio,
+        uf: e.uf,
+        regimeTributario: e.regimeTributario,
+        capitalSocial: e.capitalSocial,
+        dataConstituicao: e.dataConstituicao,
+        contribuinte: e.contribuinte,
         clienteNome: e.cliente.nome,
         checklistId: checklist?.id ?? null,
         progressoReal,
+        temChecklist: e.checklists.length > 0,
+        pastaChecklistId: e.pastaChecklist?.id ?? null,
+        pastaChecklistNome: e.pastaChecklist?.nome ?? null,
       };
     });
 
     return { data };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+export async function getPastasChecklist(): Promise<{ data?: PastaChecklistResumo[]; error?: string }> {
+  try {
+    await requireSession();
+    const pastas = await db.pastaChecklist.findMany({
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    });
+    return { data: pastas };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+const criarPastaChecklistSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome da pasta").max(80),
+});
+
+export async function criarPastaChecklist(nome: string): Promise<{ data?: PastaChecklistResumo; error?: string }> {
+  try {
+    await requireSession();
+    const parsed = criarPastaChecklistSchema.parse({ nome });
+    const pasta = await db.pastaChecklist.upsert({
+      where: { nome: parsed.nome },
+      update: {},
+      create: { nome: parsed.nome },
+      select: { id: true, nome: true },
+    });
+    revalidatePath("/PainelAlpha/CheckList");
+    return { data: pasta };
   } catch (err: any) {
     return { error: err.message };
   }
@@ -114,52 +173,176 @@ export async function getEmpresaChecklist(empresaId: string) {
 // ─── CRIAR CHECKLIST (popula itens do template) ──────────────────────────────
 
 const TIPOS_VALIDOS = ["RECEITA_BRUTA_DAS", "RECEITA_BRUTA_CPRB", "INICIO_RETOMADA", "DISPONIBILIDADE_FINANCEIRA"] as const;
-const STATUS_VALIDOS = ["PENDENTE", "OK", "IRREGULAR", "PARCIALMENTE_IRREGULAR", "REVISAR", "DESNECESSARIO", "EM_ANALISE", "AGUARDANDO_DOCUMENTOS", "PRIORIDADE", "FALAR_DR_EDVAN", "FALAR_ANDREW"] as const;
+const STATUS_VALIDOS = ["PENDENTE", "OK", "IRREGULAR", "PARCIALMENTE_IRREGULAR", "REVISAR", "DESNECESSARIO", "EM_ANALISE", "AGUARDANDO_DOCUMENTOS", "PRIORIDADE"] as const;
 
 const criarChecklistSchema = z.object({
   empresaId: z.string().min(1),
   tipo: z.enum(TIPOS_VALIDOS),
 });
 
+async function itensDoModelo(tx: Prisma.TransactionClient, tipo: TipoEmbasamento) {
+  const modelos = await tx.modeloItemChecklist.findMany({
+    where: { OR: [{ tipo }, { tipo: null }] },
+    orderBy: [{ secao: "asc" }, { createdAt: "asc" }],
+  });
+  const agora = new Date();
+  return modelos.map((modelo) => ({
+    modeloItemId: modelo.id,
+    codigo: modelo.codigo,
+    secao: modelo.secao,
+    descricao: modelo.nome,
+    complemento: modelo.descricao,
+    obrigatorio: modelo.obrigatorio,
+    status: "PENDENTE" as StatusItemChecklist,
+    atualizadoEm: agora,
+  }));
+}
+
 export async function criarChecklist(empresaId: string, tipo: TipoEmbasamento) {
   try {
     await requireSession();
     const { empresaId: eId, tipo: t } = criarChecklistSchema.parse({ empresaId, tipo });
 
-    const existente = await db.checklist.findUnique({
-      where: { empresaId_tipo: { empresaId: eId, tipo: t } },
-    });
-    if (existente) return { data: existente };
-
-    const template = CHECKLIST_TEMPLATES[t];
-    const agora = new Date();
-
-    const checklist = await db.checklist.create({
-      data: {
-        empresaId: eId,
-        tipo: t,
-        itens: {
-          create: template.map((item) => ({
-            codigo: item.codigo,
-            secao: item.secao,
-            descricao: item.descricao,
-            complemento: item.complemento ?? null,
-            obrigatorio: item.obrigatorio,
-            status: "PENDENTE" as StatusItemChecklist,
-            atualizadoEm: agora,
-          })),
-        },
-      },
-      include: { itens: { include: { documentos: true } } },
-    });
-
-    await db.operacionalClientes.update({
-      where: { id: eId },
-      data: { tipo: t },
+    const checklist = await db.$transaction(async (tx) => {
+      const existente = await tx.checklist.findUnique({
+        where: { empresaId_tipo: { empresaId: eId, tipo: t } },
+        include: { itens: { include: { documentos: true } } },
+      });
+      const selecionado = existente ?? await tx.checklist.create({
+        data: { empresaId: eId, tipo: t, itens: { create: await itensDoModelo(tx, t) } },
+        include: { itens: { include: { documentos: true } } },
+      });
+      await tx.operacionalClientes.update({ where: { id: eId }, data: { tipo: t } });
+      return selecionado;
     });
 
     revalidatePath(`/PainelAlpha/CheckList/${eId}`);
     revalidatePath("/PainelAlpha/CheckList");
+    return { data: checklist };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+const atualizarEmpresaChecklistSchema = z.object({
+  empresaId: z.string().min(1),
+  razaoSocial: z.string().trim().min(1).max(180),
+  nomeFantasia: z.string().trim().max(180).nullable(),
+  cnpj: z.string().trim().min(14).max(24),
+  status: z.string().trim().min(1).max(40),
+  embasamento: z.string().trim().max(120),
+  tipo: z.enum(TIPOS_VALIDOS).nullable(),
+  pastaChecklistId: z.string().min(1).nullable(),
+  mesProtocolo: z.string().trim().max(40).nullable(),
+  linkGrupo: z.string().trim().max(1000).nullable(),
+  situacaoRadar: z.string().trim().max(120).nullable(),
+  submodalidade: z.string().trim().max(120).nullable(),
+  dataSituacao: z.string().trim().max(40).nullable(),
+  municipio: z.string().trim().max(120).nullable(),
+  uf: z.string().trim().max(8).nullable(),
+  regimeTributario: z.string().trim().max(120).nullable(),
+  capitalSocial: z.string().trim().max(80).nullable(),
+  dataConstituicao: z.string().trim().max(40).nullable(),
+  contribuinte: z.string().trim().max(120).nullable(),
+});
+
+export type DadosEmpresaChecklist = z.infer<typeof atualizarEmpresaChecklistSchema>;
+
+export async function atualizarEmpresaChecklist(dados: DadosEmpresaChecklist) {
+  try {
+    await requireSession();
+    const parsed = atualizarEmpresaChecklistSchema.parse(dados);
+
+    if (parsed.pastaChecklistId) {
+      const pasta = await db.pastaChecklist.findUnique({
+        where: { id: parsed.pastaChecklistId },
+        select: { id: true },
+      });
+      if (!pasta) return { error: "Pasta não encontrada" };
+    }
+
+    await db.$transaction(async (tx) => {
+      const empresa = await tx.operacionalClientes.findUnique({
+        where: { id: parsed.empresaId },
+        select: { tipo: true },
+      });
+      if (!empresa) throw new Error("Empresa não encontrada");
+
+      if (parsed.tipo && parsed.tipo !== empresa.tipo) {
+        const checklistExistente = await tx.checklist.findUnique({
+          where: { empresaId_tipo: { empresaId: parsed.empresaId, tipo: parsed.tipo } },
+          select: { id: true },
+        });
+        if (!checklistExistente) {
+          await tx.checklist.create({
+            data: {
+              empresaId: parsed.empresaId,
+              tipo: parsed.tipo,
+              itens: { create: await itensDoModelo(tx, parsed.tipo) },
+            },
+          });
+        }
+      }
+
+      await tx.operacionalClientes.update({
+        where: { id: parsed.empresaId },
+        data: {
+          razaoSocial: parsed.razaoSocial,
+          nomeFantasia: parsed.nomeFantasia || null,
+          cnpj: parsed.cnpj,
+          status: parsed.status,
+          embasamento: parsed.embasamento,
+          tipo: parsed.tipo,
+          pastaChecklistId: parsed.pastaChecklistId,
+          mesProtocolo: parsed.mesProtocolo || null,
+          linkGrupo: parsed.linkGrupo || null,
+          situacaoRadar: parsed.situacaoRadar || null,
+          submodalidade: parsed.submodalidade || null,
+          dataSituacao: parsed.dataSituacao || null,
+          municipio: parsed.municipio || null,
+          uf: parsed.uf || null,
+          regimeTributario: parsed.regimeTributario || null,
+          capitalSocial: parsed.capitalSocial || null,
+          dataConstituicao: parsed.dataConstituicao || null,
+          contribuinte: parsed.contribuinte || null,
+        },
+      });
+    });
+
+    revalidatePath("/PainelAlpha/CheckList");
+    revalidatePath("/PainelAlpha/CheckList/" + parsed.empresaId);
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+export async function trocarEmbasamentoChecklist(empresaId: string, tipo: TipoEmbasamento) {
+  try {
+    await requireSession();
+    const parsed = criarChecklistSchema.parse({ empresaId, tipo });
+    const checklist = await db.$transaction(async (tx) => {
+      const existente = await tx.checklist.findUnique({
+        where: { empresaId_tipo: { empresaId: parsed.empresaId, tipo: parsed.tipo } },
+        include: { itens: { include: { documentos: true } } },
+      });
+      const selecionado = existente ?? await tx.checklist.create({
+        data: {
+          empresaId: parsed.empresaId,
+          tipo: parsed.tipo,
+          itens: { create: await itensDoModelo(tx, parsed.tipo) },
+        },
+        include: { itens: { include: { documentos: true } } },
+      });
+      await tx.operacionalClientes.update({
+        where: { id: parsed.empresaId },
+        data: { tipo: parsed.tipo },
+      });
+      return selecionado;
+    });
+
+    revalidatePath("/PainelAlpha/CheckList");
+    revalidatePath("/PainelAlpha/CheckList/" + parsed.empresaId);
     return { data: checklist };
   } catch (err: any) {
     return { error: err.message };

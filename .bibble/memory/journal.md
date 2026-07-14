@@ -632,3 +632,61 @@ Usuário pediu para refazer o módulo de Extratos Bancários "de cabo a rabo" (p
 - `components.md`: catálogo do novo módulo, com destaque para `TabelaTransacoesPaginada` e `AnimatedShaderBackground`.
 - `known-errors.md`: 3 entradas novas (DOMMatrix/worker do pdf-parse na Vercel — 2 partes; canvas Three.js width:0 em iframe).
 - `codebase-map.md`: reescrito do zero (estava vazio), com padrão de módulo documentado usando Extratos como referência.
+---
+
+## [2026-07-14 10:47] — Alpha CheckList: edição, pastas e documentos ZIP
+
+**Tags:** #feature #integration #prisma #nextjs #security #auth
+**Agentes envolvidos:** Scout, Vault, Anubis, Forge, Sage, Scribe, Kowalski
+**Arquivos tocados:** `prisma/schema.prisma`, `src/actions/checklist.ts`, `src/app/PainelAlpha/CheckList/*`, `src/app/api/checklist/[empresaId]/documentos/zip/route.ts`, `src/lib/checklist/items.ts`, `docs/stories/story-checklist-organizacao-e-edicao.md`
+
+### Contexto
+Usuário pediu edição global de empresas, alteração posterior de embasamento, filtros, pastas, remoção de dois status operacionais e download dos documentos em ZIP.
+
+### O que foi feito
+- Criado `PastaChecklist` e vínculo opcional em `OperacionalClientes`; migration aditiva foi aplicada e confirmada no Turso.
+- Implementados edição global, filtros, criação/vínculo de pasta, troca de embasamento que preserva checklists e documentos anteriores, e rota autenticada de ZIP.
+- Removidos `FALAR_ANDREW` e `FALAR_DR_EDVAN` do schema e da UI; registros legados foram normalizados para `PENDENTE` (nenhum existente).
+
+### Decisões tomadas
+- Troca de tipo ativa/cria o checklist correspondente e preserva o anterior: evita perda de documentos históricos.
+- ZIP reúne somente documentos ativos, com limites de tamanho, nomes seguros e bloqueio de URLs não HTTPS/privadas.
+
+### Problemas encontrados / resolvidos
+- `npm run typecheck` não existe; o `tsc` encontra três erros preexistentes fora do módulo. `npm run build` continua bloqueado pela DLL do Prisma presa pelo servidor dev; build direto já havia passado.
+
+### Pendências
+- Fazer validação autenticada de ponta a ponta dos fluxos de edição e download quando houver sessão de teste disponível.
+
+### Refletido também em
+- `codebase-map.md`: Alpha CheckList atualizado.
+- `integration-points.md`: rota ZIP, dados e permissões documentados.
+
+---
+
+## [2026-07-14 10:00] — Alpha CheckList: modelos configuráveis de embasamento
+
+**Tags:** #feature #prisma #nextjs #security #integration
+**Agentes envolvidos:** Scout, Vault, Anubis, Forge, Scribe, Kowalski
+**Arquivos tocados:** `prisma/schema.prisma`, `src/actions/checklist{-modelos}.ts`, `src/app/PainelAlpha/CheckList/Embasamentos/*`, `src/lib/checklist/modelos.ts`
+
+### Contexto
+Usuário pediu que o responsável crie os documentos de cada embasamento pela interface, incluindo documentos globais, em vez de depender de uma lista fixa no código.
+
+### O que foi feito
+- Criado `ModeloItemChecklist`, inicialmente sem itens, e aplicada migration aditiva confirmada no Turso.
+- Adicionada a área de configuração com quatro cards de embasamento e formulário de código, nome, descrição, seção, obrigatoriedade e escopo global/específico.
+- Criação/troca de checklist passa a copiar os modelos persistidos do tipo escolhido e os globais, preservando checklists históricos.
+
+### Decisões tomadas
+- Modelo global usa `tipo = null`: o mesmo registro entra em todos os quatro embasamentos sem duplicação.
+
+### Problemas encontrados / resolvidos
+- A build inicial detectou Prisma gerado sem o adaptador; cliente foi regenerado normalmente com o servidor parado e a build passou.
+
+### Pendências
+- O responsável precisa cadastrar os primeiros documentos nos modelos; nenhum item padrão foi inserido.
+
+### Refletido também em
+- `codebase-map.md`: configuração de modelos documentada.
+- `integration-points.md`: novas rotas e regra de cópia documentadas.

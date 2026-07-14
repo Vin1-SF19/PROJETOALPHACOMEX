@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 type Size = "sm" | "md" | "lg";
 
@@ -47,7 +47,16 @@ export default function Velocimetro({
   }, [clampedPercent, raw]);
 
   const offset = useTransform(spring, (v) => circumference - (v / 100) * circumference);
-  const needleDeg = useTransform(spring, (v) => -90 + (v / 100) * 180);
+  const needleLength = r - sw - 2;
+  const needleX = useTransform(
+    spring,
+    (v) => cx + needleLength * Math.cos((1 - v / 100) * Math.PI)
+  );
+  const needleY = useTransform(
+    spring,
+    (v) => cy - needleLength * Math.sin((1 - v / 100) * Math.PI)
+  );
+  const needlePath = useMotionTemplate`M ${cx} ${cy} L ${needleX} ${needleY}`;
 
   // Cor: usa tema se fornecido, senão segue progresso
   const arcColor = accentRgb ? `rgb(${accentRgb})` : getArcColor(clampedPercent);
@@ -105,19 +114,12 @@ export default function Velocimetro({
         />
 
         {/* Agulha */}
-        <motion.line
-          x1={cx}
-          y1={cy}
-          x2={cx}
-          y2={cy - r + sw}
+        <motion.path
+          d={needlePath}
+          fill="none"
           stroke={needleColor}
           strokeWidth={size === "lg" ? 2.5 : 2}
           strokeLinecap="round"
-          style={{
-            transformBox: "fill-box",
-            transformOrigin: `${cx}px ${cy}px`,
-            rotate: needleDeg,
-          }}
         />
 
         {/* Ponto central */}

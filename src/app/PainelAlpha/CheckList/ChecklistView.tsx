@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, FileText, CheckCircle2,
   ChevronDown, ChevronUp, BarChart3, Sparkles,
-  ExternalLink, Trash2, Clock, History,
+  Download, ExternalLink, Trash2, Clock, History, RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Velocimetro from "@/components/Checklist/Velocimetro";
-import { criarChecklist, atualizarItemChecklist, atualizarObservacaoDocumento, excluirDocumentoAnalista } from "@/actions/checklist";
+import {
+  criarChecklist, atualizarItemChecklist, atualizarObservacaoDocumento,
+  excluirDocumentoAnalista, trocarEmbasamentoChecklist,
+} from "@/actions/checklist";
 import ChecklistNotificacoesWidget from "@/components/Checklist/ChecklistNotificacoesWidget";
 import {
   TIPO_LABELS, TIPO_CORES, STATUS_LABELS, STATUS_CORES,
@@ -33,9 +36,7 @@ type StatusItemChecklist =
   | "DESNECESSARIO"
   | "EM_ANALISE"
   | "AGUARDANDO_DOCUMENTOS"
-  | "PRIORIDADE"
-  | "FALAR_DR_EDVAN"
-  | "FALAR_ANDREW";
+  | "PRIORIDADE";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ interface Empresa {
 const STATUS_OPTIONS: StatusItemChecklist[] = [
   "PENDENTE", "OK", "IRREGULAR", "PARCIALMENTE_IRREGULAR",
   "REVISAR", "DESNECESSARIO", "EM_ANALISE", "AGUARDANDO_DOCUMENTOS",
-  "PRIORIDADE", "FALAR_DR_EDVAN", "FALAR_ANDREW",
+  "PRIORIDADE",
 ];
 const TIPOS: TipoEmbasamento[] = [
   "RECEITA_BRUTA_DAS", "RECEITA_BRUTA_CPRB", "INICIO_RETOMADA", "DISPONIBILIDADE_FINANCEIRA",
@@ -109,12 +110,15 @@ export default function ChecklistView({
   const accentRgb = tema.accent;
 
   const [criandoChecklist, setCriandoChecklist] = useState(false);
+  const [mudandoEmbasamento, setMudandoEmbasamento] = useState(false);
   const [tipoSelecionado, setTipoSelecionado] = useState<TipoEmbasamento | null>(
     empresaInicial.tipo ?? null
   );
   const [secaoAtiva, setSecaoAtiva] = useState<string>(SECOES.CONSTITUICAO);
 
-  const checklistBase = empresaInicial.checklists[0] ?? null;
+  const checklistBase = empresaInicial.checklists.find(
+    (checklist) => checklist.tipo === empresaInicial.tipo
+  ) ?? empresaInicial.checklists[0] ?? null;
   const [itens, setItens] = useState<Item[]>(checklistBase?.itens ?? []);
 
   const progresso = calcularProgressoItens(itens);
@@ -131,6 +135,14 @@ export default function ChecklistView({
     } finally {
       setCriandoChecklist(false);
     }
+  };
+
+  const handleTrocarEmbasamento = async () => {
+    if (!tipoSelecionado) return;
+    setMudandoEmbasamento(true);
+    const res = await trocarEmbasamentoChecklist(empresaInicial.id, tipoSelecionado);
+    setMudandoEmbasamento(false);
+    if (res.data) router.refresh();
   };
 
   const handleStatusChange = (itemId: string, status: StatusItemChecklist) => {
@@ -183,6 +195,14 @@ export default function ChecklistView({
             )}
             <Velocimetro percent={progresso} size="sm" showLabel={false} />
             <span className="text-sm font-black text-white tabular-nums">{progresso}%</span>
+            <a
+              href={"/api/checklist/" + empresaInicial.id + "/documentos/zip"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-400/25 bg-blue-500/10 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-blue-300 transition hover:bg-blue-500/20"
+              title="Baixar documentos ativos em ZIP"
+            >
+              <Download size={13} />
+              ZIP
+            </a>
             {['Admin', 'CEO', 'OPERACIONAL'].includes(role) && (
               <ChecklistNotificacoesWidget role={role} />
             )}
@@ -232,6 +252,32 @@ export default function ChecklistView({
             </div>
           </div>
         </GlowCard>
+
+        {checklistBase && (
+          <GlowCard accentRgb={accentRgb} className="rounded-[1.5rem] border border-blue-400/15 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-300">Trocar embasamento</p>
+                <p className="mt-1 text-[11px] text-slate-400">O checklist anterior fica preservado com seus documentos; o novo tipo passa a ser o checklist ativo.</p>
+              </div>
+              <select
+                value={tipoSelecionado ?? ""}
+                onChange={(event) => setTipoSelecionado(event.target.value as TipoEmbasamento)}
+                className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-400/50"
+              >
+                {TIPOS.map((tipo) => <option key={tipo} value={tipo}>{TIPO_LABELS[tipo]}</option>)}
+              </select>
+              <button
+                onClick={() => void handleTrocarEmbasamento()}
+                disabled={!tipoSelecionado || tipoSelecionado === checklistBase.tipo || mudandoEmbasamento}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-40"
+              >
+                {mudandoEmbasamento ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : <RefreshCw size={13} />}
+                Aplicar troca
+              </button>
+            </div>
+          </GlowCard>
+        )}
 
         {/* ── SEM CHECKLIST — escolher tipo ── */}
         {!checklistBase && (
@@ -490,7 +536,6 @@ function ChecklistItem({
     item.status === "AGUARDANDO_DOCUMENTOS" ? "#eab308" :
     item.status === "EM_ANALISE" ? "#a855f7" :
     item.status === "REVISAR" ? "#3b82f6" :
-    item.status === "FALAR_DR_EDVAN" || item.status === "FALAR_ANDREW" ? "#ec4899" :
     "#475569";
 
   return (
