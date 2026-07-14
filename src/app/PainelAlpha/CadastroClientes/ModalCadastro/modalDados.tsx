@@ -577,6 +577,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             toast.success("DADOS ATUALIZADOS COM SUCESSO");
             setEditandoDados(false);
             if (aoSalvar) await aoSalvar();
+            setSalvandoDadosFiscais(false);
             onClose();
         } else {
             toast.error("Erro ao salvar alterações.");
