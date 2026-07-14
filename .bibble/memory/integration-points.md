@@ -1,5 +1,26 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Padrão reutilizável: Vídeo Introdutório por módulo (estreado em Parceiros, 2026-07-14)
+
+Como plugar em um módulo novo (ver `decisions.md` para o design completo):
+
+1. No Server Component da página do módulo, buscar `obterVideoIntrodutorioConfig("id-do-modulo")` (mesmo `Promise.all` das outras queries da página) — `id-do-modulo` deve bater com o `id` em `MODULOS_REGISTRY`.
+2. Passar a config como prop para o Client Component do módulo.
+3. Renderizar `<BotaoVideoIntrodutorio modulo="id-do-modulo" isAdmin={...} />` no header/topo da tela (`src/components/VideoIntrodutorio/`).
+4. Nenhuma migration nova é necessária — o model `VideoIntrodutorioConfig` já é genérico (`modulo: String @unique`), só precisa de 1 linha nova quando o Admin ativar pela primeira vez naquele módulo.
+5. Se o módulo tiver regra de permissão diferente de "Admin/CEO" (padrão `isAdminRole()`), avaliar se `ativarVideoIntrodutorio` precisa de parâmetro de autorização customizado antes de reutilizar.
+
+## Checkpoint obrigatório: mudança estrutural na tabela `clientes`
+
+Antes de finalizar qualquer migration que renomeie, recrie, ou mude índice/constraint da tabela `clientes` (model CS&NPS), verificar OBRIGATORIAMENTE (ver `architecture.md` e `decisions.md` 2026-07-13):
+
+- [ ] `PRAGMA foreign_key_list` rodado em TODAS as tabelas do banco, não só nas do módulo em foco
+- [ ] `socios`, `log_cs`, `logFeedback`, `historico_alteracao_cliente` (CS&NPS) — FK íntegra para `clientes`
+- [ ] `indicacoes` (Parceiros) — FK íntegra, teste manual de "criar nova indicação" funcionando
+- [ ] `crm_oportunidades`, `crm_contatos` (CRM) — FK íntegra
+- [ ] Fluxo de sincronização Metas→CS&NPS (`criarRegistroClienteAPartirDeContrato`, chamado em `confirmarFechamento`) testado ponta a ponta após a migration
+- [ ] Vault não aprova a migration sem essa checklist cumprida
+
 > Mantido por: Scribe (cartógrafo) e Probe (integration tester)
 > Todo novo módulo DEVE registrar seus integration points aqui.
 

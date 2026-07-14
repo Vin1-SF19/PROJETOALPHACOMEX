@@ -32,6 +32,56 @@
 
 <!-- Kowalski adiciona aqui ao final de cada sessão -->
 
+## [2026-07-13] — CS&NPS: multi-serviço por CNPJ, usuários reais, e reconstrução do log de auditoria (com incidente de perda de dados)
+
+**Tags:** #feature #bugfix #decision #prisma #critical #integration
+**Agentes envolvidos:** Scout (2x) → Echo (2x) → Vault (2x, 🟢🟢) → Nova (2x) → correções diretas do Bibble
+**Arquivos tocados:**
+- `prisma/schema.prisma` — `clientes.cnpj @unique` → `@@unique([cnpj, servicos])`; novo model `HistoricoAlteracaoCliente`
+- `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx` — reposicionamento de campo, cards absorvendo bloco de gestão, edição inline, loading state do botão salvar
+- `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx` — cadastro manual: UF separado do Regime, 3 campos novos, uso do `ModalSelecionarUsuario`
+- `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalLogAuditoria.tsx` — reescrito por completo (agrupamento por lote, reversão por campo, `AlertDialog`)
+- `src/components/ModalSelecionarUsuario.tsx` *(CRIADO)* — modal reutilizável de seleção de usuário real por role
+- `src/components/DropdownSelecaoComCriacao.tsx` — extensão com prop `onAbrirModalOutro`
+- `src/actions/clientes.ts` (ou equivalente) — `reverterCampoHistorico` (nova), `salvarAlteracoesGestao` e `restaurarVersaoCliente` removidas
+- Painel de Metas: `ModalGerenciamentoLeads.tsx` — fix de Zod em Forma de Pagamento
+
+### Contexto
+Sessão longa no módulo CS&NPS: permitir CNPJ duplicado por serviço diferente, sincronizar dados do Metas na confirmação de pagamento, resolver vários ajustes de UX/schema, trocar campos de texto livre (Analista/Closer) por seleção de usuários reais do banco, e — no meio do caminho — descobrir e responder a um incidente real de perda de dados causado por uma migration anterior desta mesma sessão.
+
+### O que foi feito
+- Campo "Serviço Contratado" reposicionado para o topo do bloco de gestão no modal de detalhe.
+- CNPJ duplicado permitido quando o serviço contratado é diferente: migration `clientes.cnpj @unique` → `@@unique([cnpj, servicos])`, aplicada em produção (Vault, com backup, 238 registros preservados), com mesclagem visual por CNPJ na listagem.
+- Sincronização Metas→CS&NPS movida da criação do contrato para a confirmação de pagamento, com reativação correta de registros arquivados.
+- 5 ajustes de UX/schema: fix de timezone (-1 dia) na Data Contratação, campo Cidade/município no modal de detalhe, UF separado do Regime no cadastro manual, 3 campos manuais novos (Forma de Pagamento/Valor do Contrato/Closer), formatação de Forma de Pagamento nos cards igual ao Metas.
+- Cards de "Serviços Contratados" absorveram o bloco de gestão (Status/Data Contratação/Data Êxito/Analista/Embasamento/Origem do Lead), cada card com botão Salvar próprio; "Editar Dados" ainda libera edição de tudo simultaneamente.
+- Analista Responsável e Closer agora listam usuários reais do banco (filtrados por role — OPERACIONAL / COMERCIAL+Líder Comercial), com `ModalSelecionarUsuario.tsx` reutilizável para escolher "outro usuário" de qualquer setor, tanto no cadastro manual quanto na edição por card.
+- Fix: toggle de Forma de Pagamento não deselecionava ao clicar de novo.
+- Forma Pagto./Valor Contrato/Closer viraram editáveis dentro dos cards (antes sempre readonly), com prioridade de exibição: dado próprio editado > dado do Metas > vazio.
+- Fix real no Painel de Metas: ao escolher "outro" em Forma de Pagamento, o texto digitado nunca era salvo (gravava sempre a string fixa "OUTRO") — Zod trocado de `z.enum` para `z.string().min(1)` + payload corrigido.
+- Botão "Salvar Alterações" do rodapé do modal de detalhe ganhou loading state (`salvandoDadosFiscais`) para evitar clique duplo.
+
+### Decisões tomadas
+- Constraint composta `@@unique([cnpj, servicos])` em vez de `cnpj` sozinho: permite mesmo CNPJ com serviços diferentes, mesclado visualmente na listagem.
+- Reconstruir o sistema de log de auditoria do zero (não restaurar o antigo), com granularidade por campo alterado (não mais snapshot JSON do cliente inteiro), `userId` real + `nomeUsuarioNaEpoca` congelado, agrupamento por `loteId`, e reversão por campo específico gerando nova linha `acao: "REVERSAO"` (preserva a cadeia de auditoria em vez de sobrescrever).
+- `salvarAlteracoesGestao` (código morto confirmado) e `restaurarVersaoCliente` (sistema antigo) removidos em vez de migrados.
+- Regra permanente adotada: sempre rodar `PRAGMA foreign_key_list` em TODAS as tabelas do banco antes de qualquer `DROP TABLE` em produção — não só nas tabelas que a migration pretende tocar.
+
+### Problemas encontrados / resolvidos
+- **INCIDENTE GRAVE (perda de dados):** a migration da constraint composta (rename `clientes`→`clientes_old`, drop) deixou FKs fantasma de 4 tabelas satélite (`logAlteracao`, `socios`, `log_cs`, `logFeedback`) apontando para o nome `clientes_old`. O `DROP TABLE clientes_old` cascateou e apagou TODO o conteúdo dessas 4 tabelas (confirmado: 239 clientes reais, 0 registros nas 4 satélites). Não havia backup dessas tabelas — dado histórico de sócios e logs de CS/feedback/alteração perdido permanentemente. Só a FK de `logAlteracao` foi corrigida nesta sessão (recriação de tabela com FK apontando para `clientes`); `socios`/`log_cs`/`logFeedback` continuam com a mesma FK fantasma, mas vazias (sem risco de nova perda).
+- `prisma generate` travado por EPERM (DLL bloqueada) — resolvido matando `node.exe`.
+- `tsc --noEmit` final: zero erros novos; só os 3 pré-existentes já catalogados (`validator.ts`, `HabilitacaoRadar/page.tsx:494`, `ModalPerfilColaborador.tsx:191`).
+
+### Pendências
+- Segurança JÁ registrada, ainda NÃO resolvida: dados financeiros do Metas (valorContrato/formaPagamento/closerNome) expostos no CS&NPS sem restrição de role — usuário adiou a decisão explicitamente.
+- Corrigir a mesma FK fantasma para `clientes_old` em `socios`/`log_cs`/`logFeedback` (mesmo padrão usado em `logAlteracao`), numa próxima sessão.
+- Pipeline formal de Forge/Anubis/Lens/Sage sobre TODO o escopo desta sessão ainda não rodou por completo (rodou parcialmente) — retomar se o usuário pedir revisão formal completa.
+
+### Refletido também em
+- `decisions.md`: 2 entradas novas em 2026-07-13 (incidente de perda de dados + reconstrução do log de auditoria com model `HistoricoAlteracaoCliente`)
+
+---
+
 ## 2026-06-11 — Responsividade, Tema e Ajustes Visuais do Chat
 
 ### O que foi feito

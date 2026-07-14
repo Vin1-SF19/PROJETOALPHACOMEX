@@ -18,13 +18,16 @@ import ModalMensagemConvite from "./ModalMensagemConvite";
 import ModalPreCadastros from "./ModalPreCadastros";
 import ModalCredenciais from "./ModalCredenciais";
 import { excluirParceiros } from "@/actions/parceiros";
+import type { obterVideoIntrodutorioConfig } from "@/actions/video-introdutorio";
 import { getTema } from "@/lib/temas";
 import { useParceirosPreCadastroNotifications, type PreCadastroNotificacao } from "@/hooks/useParceirosPreCadastroNotifications";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
+import { BotaoVideoIntrodutorio } from "@/components/VideoIntrodutorio/BotaoVideoIntrodutorio";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
+type VideoIntrodutorioConfig = Awaited<ReturnType<typeof obterVideoIntrodutorioConfig>>["data"];
 
 // Partículas do fundo vivo — posições fixas em % + timing variado (evita padrão robótico)
 const PARTICULAS_FUNDO = [
@@ -46,10 +49,11 @@ type Props = {
   templateConvite: TemplateOnboarding | null;
   templateParceiro: TemplateOnboarding | null;
   preCadastrosPendentesInicial: number;
+  videoIntrodutorioConfig: VideoIntrodutorioConfig;
 };
 
 export default function ParceirosClient({
-  parceiros, temaName, busca, nivel, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial,
+  parceiros, temaName, busca, nivel, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, videoIntrodutorioConfig,
 }: Props) {
   const tema = getTema(temaName);
   const accent = tema.accent;
@@ -281,6 +285,9 @@ export default function ParceirosClient({
                   <Trash2 size={16} />
                 </button>
               )}
+
+              {/* Vídeo Introdutório — Admin sempre vê; demais usuários só enquanto ativo (7 dias) */}
+              <BotaoVideoIntrodutorio modulo="parceiros" isAdmin={permissao.isAdmin} configInicial={videoIntrodutorioConfig} />
 
               {/* Menu de ações secundárias — desafoga o header */}
               {(permissao.isAdmin || permissao.podeEditar) && (

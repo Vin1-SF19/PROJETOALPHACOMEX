@@ -4,6 +4,7 @@ import db from "@/lib/prisma";
 import { listarParceiros, getPermissaoParceiros } from "@/actions/parceiros";
 import { getTemplateParadaoConvite, getTemplateParadaoParceiro } from "@/actions/onboarding";
 import { contarPreCadastrosPendentes } from "@/actions/convites-parceiro";
+import { obterVideoIntrodutorioConfig } from "@/actions/video-introdutorio";
 import ParceirosClient from "@/components/Parceiros/ParceirosClient";
 
 export const dynamic = "force-dynamic";
@@ -23,12 +24,13 @@ export default async function ParceirosPage({
   const temaName = rec?.tema_interface ?? "blue";
 
   const { busca, nivel } = await searchParams;
-  const [{ parceiros }, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial] = await Promise.all([
+  const [{ parceiros }, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, videoIntrodutorio] = await Promise.all([
     listarParceiros(busca, nivel),
     getPermissaoParceiros(),
     getTemplateParadaoConvite(),
     getTemplateParadaoParceiro(),
     contarPreCadastrosPendentes(),
+    obterVideoIntrodutorioConfig("parceiros"),
   ]);
 
   return (
@@ -41,6 +43,7 @@ export default async function ParceirosPage({
       templateConvite={templateConvite}
       templateParceiro={templateParceiro}
       preCadastrosPendentesInicial={preCadastrosPendentesInicial}
+      videoIntrodutorioConfig={videoIntrodutorio.data}
     />
   );
 }

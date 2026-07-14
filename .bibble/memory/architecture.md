@@ -1,5 +1,18 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## ⚠️ Acoplamento crítico: Parceiros ↔ Metas ↔ CS&NPS via `clientes`
+
+`clientes` (módulo CS&NPS) é o **hub central** referenciado por FK de múltiplos módulos que, à primeira vista, parecem independentes:
+
+| Módulo | Tabela | Coluna FK → `clientes.id` |
+|---|---|---|
+| CS&NPS (satélites) | `socios`, `log_cs`, `logFeedback`, `logAlteracao` (desativado), `historico_alteracao_cliente` | `clienteId` |
+| Parceiros | `indicacoes` | `clienteId` |
+| CRM | `crm_oportunidades`, `crm_contatos` | `clienteId` |
+| Metas/Comercial | `ContratoComercial` → sincroniza para `clientes` via `criarRegistroClienteAPartirDeContrato` (não é FK direta, é escrita programática no fluxo de `confirmarFechamento`) | — |
+
+**Qualquer migration estrutural em `clientes` (rename, recriação, mudança de índice/constraint) exige checar TODAS as tabelas acima antes de considerar concluída** — ver regra permanente em `decisions.md` (2026-07-13, "Parceiros ↔ Metas ↔ CS&NPS são módulos acoplados via `clientes`"). Um incidente real já ocorreu: uma migration de `clientes` (rename→create→drop `clientes_old`) deixou 6 tabelas (as 6 da tabela acima, exceto `historico_alteracao_cliente` que é posterior ao incidente) com FK fantasma para o nome antigo, zerando o conteúdo de todas silenciosamente.
+
 > Mantido por: Echo (backend) e Scribe (cartógrafo)
 > Atualizar sempre que novos endpoints, actions ou schemas forem criados.
 

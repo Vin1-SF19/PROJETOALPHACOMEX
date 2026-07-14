@@ -98,6 +98,8 @@ model usuarios {
   apresentacoesCriadas     Apresentacao[]
   apresentacaoColaboracoes ApresentacaoColaborador[]
   apresentacaoComentarios  ApresentacaoComentario[]
+
+  videosIntrodutorioAtivados VideoIntrodutorioConfig[]
 }
 
 model OnboardingTemplate {
@@ -684,7 +686,23 @@ model videos {
   presets    Preset[]         @relation("PresetVideos")
   progressos ProgressoVideo[]
 
+  configsIntrodutorio VideoIntrodutorioConfig[]
+
   @@map("videos")
+}
+
+model VideoIntrodutorioConfig {
+  id            String    @id @default(cuid())
+  modulo        String    @unique
+  videoId       String?
+  video         videos?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  ativadoEm     DateTime?
+  ativadoPorId  Int?
+  ativadoPor    usuarios? @relation(fields: [ativadoPorId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("video_introdutorio_config")
 }
 
 model modulos {
