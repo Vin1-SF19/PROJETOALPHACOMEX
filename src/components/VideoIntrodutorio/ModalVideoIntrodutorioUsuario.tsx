@@ -38,7 +38,7 @@ export function ModalVideoIntrodutorioUsuario({ open, onClose, videoUrl, videoTi
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-5">
-          <PlayerVideo url={videoUrl} className="max-h-[65vh]" />
+          <PlayerVideo url={videoUrl} className="aspect-video max-h-[65vh]" />
         </div>
       </div>
     </div>

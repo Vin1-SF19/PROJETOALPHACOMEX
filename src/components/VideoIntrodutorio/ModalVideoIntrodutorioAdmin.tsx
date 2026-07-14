@@ -119,7 +119,7 @@ export function ModalVideoIntrodutorioAdmin({ open, onClose, modulo, configAtual
               <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Preview</span>
               {videoSelecionadoUrl ? (
                 <>
-                  <PlayerVideo url={videoSelecionadoUrl} className="aspect-video" />
+                  <PlayerVideo url={videoSelecionadoUrl} />
                   <p className="text-[11px] font-bold text-slate-300 truncate">{videoSelecionadoTitulo}</p>
                 </>
               ) : (

@@ -13,10 +13,22 @@ type AnimatedShaderBackgroundProps = {
    * Default "sutil" para não quebrar usos existentes que não passem a prop.
    */
   variant?: "hero" | "sutil";
+  /**
+   * Pausa o loop de renderização (sem desmontar o WebGLRenderer) enquanto
+   * `true`. O IntersectionObserver já pausa quando o elemento sai da
+   * viewport, mas não detecta ser coberto por um modal `fixed` por cima —
+   * um shader Three.js rodando a 60fps por trás de um modal com `<video>`
+   * compete pelo mesmo pipeline de GPU/compositor e causa stuttering real de
+   * decode de vídeo (frame congelado). Passe `true` enquanto qualquer modal
+   * com player de vídeo estiver aberto na mesma página.
+   */
+  pausado?: boolean;
 };
 
-export default function AnimatedShaderBackground({ className, intensidade = 0.9, variant = "sutil" }: AnimatedShaderBackgroundProps) {
+export default function AnimatedShaderBackground({ className, intensidade = 0.9, variant = "sutil", pausado = false }: AnimatedShaderBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const pausadoRef = useRef(pausado);
+  pausadoRef.current = pausado;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -127,7 +139,7 @@ export default function AnimatedShaderBackground({ className, intensidade = 0.9,
     let elementoVisivel = false;
 
     const animate = () => {
-      if (elementoVisivel) {
+      if (elementoVisivel && !pausadoRef.current) {
         material.uniforms.iTime.value += 0.016;
         renderer.render(scene, camera);
       }

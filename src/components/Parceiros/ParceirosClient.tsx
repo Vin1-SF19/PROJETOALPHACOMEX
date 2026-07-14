@@ -80,6 +80,7 @@ export default function ParceirosClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buscaInput]);
 
+  const [videoIntrodutorioModalOpen, setVideoIntrodutorioModalOpen] = useState(false);
   const [novaIndicacaoOpen, setNovaIndicacaoOpen] = useState(false);
   const [engrenagemOpen, setEngrenagemOpen] = useState(false);
   const [termoOpen, setTermoOpen] = useState(false);
@@ -163,23 +164,27 @@ export default function ParceirosClient({
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
         {!reduceMotion && (
           <div className="absolute inset-0 opacity-70">
-            <AnimatedShaderBackground />
+            <AnimatedShaderBackground pausado={videoIntrodutorioModalOpen} />
           </div>
         )}
         <div className="absolute inset-0 bg-[#020617]/60" />
+        {/* Glows/partículas em loop competem por GPU com o <video> do modal de
+            Vídeo Introdutório (blur(140px) + shader WebGL + <video> decode no
+            mesmo compositor causa frame congelado) — pausadas junto com o
+            shader enquanto esse modal está aberto, mesmo padrão de reduceMotion. */}
         <motion.div
           className="absolute -top-40 -left-32 w-[560px] h-[560px] rounded-full"
           style={{ background: `rgba(${accent},0.16)`, filter: "blur(140px)" }}
-          animate={reduceMotion ? { opacity: 0.5 } : { scale: [1, 1.08, 1], opacity: [0.4, 0.6, 0.4] }}
-          transition={reduceMotion ? undefined : { duration: 9, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+          animate={reduceMotion || videoIntrodutorioModalOpen ? { opacity: 0.5 } : { scale: [1, 1.08, 1], opacity: [0.4, 0.6, 0.4] }}
+          transition={reduceMotion || videoIntrodutorioModalOpen ? undefined : { duration: 9, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
         />
         <motion.div
           className="absolute -bottom-32 -right-24 w-[500px] h-[500px] rounded-full"
           style={{ background: "rgba(99,102,241,0.12)", filter: "blur(130px)" }}
-          animate={reduceMotion ? { opacity: 0.5 } : { scale: [1, 1.1, 1], opacity: [0.35, 0.55, 0.35] }}
-          transition={reduceMotion ? undefined : { duration: 11, repeat: Infinity, repeatType: "mirror", ease: "easeInOut", delay: 1.2 }}
+          animate={reduceMotion || videoIntrodutorioModalOpen ? { opacity: 0.5 } : { scale: [1, 1.1, 1], opacity: [0.35, 0.55, 0.35] }}
+          transition={reduceMotion || videoIntrodutorioModalOpen ? undefined : { duration: 11, repeat: Infinity, repeatType: "mirror", ease: "easeInOut", delay: 1.2 }}
         />
-        {!reduceMotion && PARTICULAS_FUNDO.map((p, i) => (
+        {!reduceMotion && !videoIntrodutorioModalOpen && PARTICULAS_FUNDO.map((p, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 rounded-full"
@@ -287,7 +292,12 @@ export default function ParceirosClient({
               )}
 
               {/* Vídeo Introdutório — Admin sempre vê; demais usuários só enquanto ativo (7 dias) */}
-              <BotaoVideoIntrodutorio modulo="parceiros" isAdmin={permissao.isAdmin} configInicial={videoIntrodutorioConfig} />
+              <BotaoVideoIntrodutorio
+                modulo="parceiros"
+                isAdmin={permissao.isAdmin}
+                configInicial={videoIntrodutorioConfig}
+                aoAlternarModal={setVideoIntrodutorioModalOpen}
+              />
 
               {/* Menu de ações secundárias — desafoga o header */}
               {(permissao.isAdmin || permissao.podeEditar) && (

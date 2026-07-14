@@ -31,11 +31,6 @@ export function PainelSelecaoVideoSkills({ videoSelecionadoId, onSelecionar }: P
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Reseta para página 1 quando qualquer filtro muda
-  useEffect(() => {
-    setPage(1);
-  }, [moduloNome, cursoNome, videoNome]);
-
   useEffect(() => {
     let cancelado = false;
     const timer = setTimeout(async () => {
@@ -68,11 +63,14 @@ export function PainelSelecaoVideoSkills({ videoSelecionadoId, onSelecionar }: P
   const podeVoltar = page > 1;
   const podeAvancar = page < totalPages;
 
+  // Cada onChange já reseta a página para 1 no próprio evento que altera o
+  // filtro — evita o antipadrão de "efeito observando estado só para
+  // resetar outro estado" (React 19 bloqueia setState síncrono em useEffect).
   const campos = useMemo(
     () => [
-      { label: "Módulo", valor: moduloNome, onChange: setModuloNome, placeholder: "Nome do módulo..." },
-      { label: "Curso", valor: cursoNome, onChange: setCursoNome, placeholder: "Nome do curso..." },
-      { label: "Vídeo", valor: videoNome, onChange: setVideoNome, placeholder: "Nome do vídeo..." },
+      { label: "Módulo", valor: moduloNome, onChange: (v: string) => { setModuloNome(v); setPage(1); }, placeholder: "Nome do módulo..." },
+      { label: "Curso", valor: cursoNome, onChange: (v: string) => { setCursoNome(v); setPage(1); }, placeholder: "Nome do curso..." },
+      { label: "Vídeo", valor: videoNome, onChange: (v: string) => { setVideoNome(v); setPage(1); }, placeholder: "Nome do vídeo..." },
     ],
     [moduloNome, cursoNome, videoNome],
   );
