@@ -759,3 +759,59 @@ Após concluir e formatar a exportação completa do CS & NPS, o usuário pediu 
 - `codebase-map.md`: módulo de importação, componentes, serviços e testes documentados pelo Scribe.
 - `integration-points.md`: novas rotas, autorização compartilhada, transação e hardening do XLSX documentados pelo Scribe.
 - `docs/stories/story-cs-nps-importacao-em-lote.md`: critérios, evidências, gates, limites e File List completos.
+
+---
+
+## [2026-07-15 15:50] — IAlpha: sistema solar astronômico realista no background
+
+**Tags:** #frontend #visual #ialpha #astronomia #css
+**Agentes envolvidos:** Scout, Nova, Forge, Probe, Scribe, Kowalski
+**Arquivos tocados:** `src/components/BibbleChatHome/IAlphaCosmicBackground.tsx`, `docs/stories/story-ialpha-background-sideral.md`, `.bibble/memory/components.md`
+
+### Contexto
+O usuário achou o background sideral anterior "quase bom" e pediu duas evoluções: (1) sistema solar inspirado em imagem de referência, sem linhas de órbita, sol fora do centro, azul Alpha, com posições dos planetas conforme data/hora real; (2) realismo visual — os planetas pareciam esferas lisas de ilustração básica.
+
+### O que foi feito
+- **Efemérides reais sem API externa:** os 8 planetas usam elementos orbitais keplerianos J2000 do JPL (válidos 1800–2050). Equação de Kepler resolvida por ponto fixo, longitude heliocêntrica verdadeira por planeta, recalculada a cada minuto via `useSyncExternalStore` (SSR sem planetas → cliente assume após hidratação, sem mismatch).
+- **Validação astronômica:** Terra em 292,9° para 15/jul — confere com o esperado (~293°).
+- **Realismo em CSS puro (stack mantida — NÃO é Three.js):** iluminação direcional coerente com o sol da cena (highlight + terminador via atan2), texturas procedurais SVG feTurbulence inline animadas (rotação própria, tilt axial, Vênus retrógrado), faixas de gás anisotrópicas em Júpiter/Saturno, Grande Mancha, anéis de Saturno em gradiente com divisão de Cassini, nuvens da Terra em camada própria, rim atmosférico via inset box-shadow, profundidade por blur+dessaturação, estrelas com temperatura de cor variada, lua da Terra no ângulo real.
+
+### Decisões tomadas
+- Cálculo local (Kepler/JPL) > API externa para posições planetárias: zero latência, zero dependência, funciona offline. Registrar como padrão para qualquer feature astronômica futura.
+- Texturas por SVG feTurbulence data-URI > imagens em /public: sem requests, sem licença, sem costura, tileável para animar rotação.
+- `useSyncExternalStore` com server snapshot null > setState em useEffect: exigência do React Compiler (regra `react-hooks/set-state-in-effect` reprova o padrão antigo).
+
+### Verificação
+- Forge: eslint limpo no arquivo; `tsc --noEmit` sem nenhum erro novo (persistem 4 preexistentes já catalogados).
+- Probe: verificação visual real no dev server (:3000) — desktop e mobile 375px, centro legível, sem erros novos no console.
+
+### Pendências
+- Hydration mismatch preexistente de Radix DropdownMenu (ids `radix-*`) no layout — fora do escopo, aparece como "1 Issue" no overlay do Next dev.
+
+---
+
+## [2026-07-15 16:20] — IAlpha: rotação própria dos planetas ancorada no relógio real
+
+**Tags:** #frontend #visual #ialpha #astronomia #fix
+**Agentes envolvidos:** Nova, Forge, Probe, Scribe, Kowalski
+**Arquivos tocados:** `src/components/BibbleChatHome/IAlphaCosmicBackground.tsx`, `docs/stories/story-ialpha-background-sideral.md`, `.bibble/memory/components.md`
+
+### Contexto
+Usuário cobrou: "a rotação está funcionando conforme o horário?? tem que funcionar". Diagnóstico honesto: a translação (posição orbital) já era real, mas o giro das texturas era animação decorativa que começava do zero a cada load, com velocidades inventadas.
+
+### O que foi feito
+- Substituído `spinDuration/spinDirection` arbitrários por `rotationPeriodHours` com os períodos siderais reais (Mercúrio 1407,6h; Vênus −5832,5h; Terra 23,93h; Marte 24,62h; Júpiter 9,93h; Saturno 10,66h; Urano −17,24h; Netuno 16,11h; negativo = retrógrado).
+- `SPIN_TIME_LAPSE = 900` (1s real = 15min simulados) torna o giro perceptível mantendo as proporções reais entre planetas.
+- Fase determinística de `Date.now()`: keyframes CSS `ialpha-planet-spin` + `animation-delay` negativo posicionam cada planeta na face correta para o momento atual. CSS usa o timeline do documento → mantém sincronia com o relógio mesmo com aba em background (melhor que framer/rAF).
+- Trocado framer-motion por CSS animation nessas camadas; `useReducedMotion` mostra a fase estática correta sem animar.
+
+### Decisões tomadas
+- Períodos reais + fator de aceleração fixo > velocidades inventadas: "conforme o horário" vale para translação E rotação; mesma data/hora → mesma face visível em qualquer máquina.
+- `useState(() => Date.now())` para a época do spin (uma vez no mount) — evita reinício da animação a cada tick do minuto.
+
+### Verificação
+- Forge: eslint limpo; tsc sem erros novos.
+- Probe (browser, getComputedStyle nos 8 planetas): durações exatas (Júpiter 39,7s ... Vênus 23330s), delays de fase não-nulos, Vênus/Urano em `reverse`. Tudo ✅.
+
+### Aprendizado técnico
+- O conteúdo do PainelAlpha renderiza dentro de um iframe no preview — `javascript_tool` precisa consultar `iframe.contentDocument`, não o document externo.

@@ -18,6 +18,7 @@ interface BibbleChatLayoutProps {
   role?: string;
   sessoesIniciais: SessionSummary[];
   temaName?: string;
+  initialHour: number;
 }
 
 let msgCounter = 0;
@@ -87,6 +88,7 @@ export default function BibbleChatLayout({
   role,
   sessoesIniciais,
   temaName,
+  initialHour,
 }: BibbleChatLayoutProps) {
   const tema    = getTema(temaName);
   const isAdmin = role === "Admin" || role === "ADMIN";
@@ -921,6 +923,7 @@ export default function BibbleChatLayout({
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(p => !p)}
         tema={tema}
+        currentHour={initialHour}
       />
 
       {/* Sidebar direita — desktop: inline com animação de largura */}

@@ -20,6 +20,17 @@ Este arquivo define as instrucoes do projeto para o Codex CLI.
 - Atualize checklist e file list da story antes de concluir
 <!-- AIOX-MANAGED-END: quality -->
 
+## Database Safety and Backup Policy (NON-NEGOTIABLE)
+
+- Acione o agente `Vault` antes de qualquer alteracao de estrutura ou migracao de banco: tabelas, colunas, indices, chaves, relacionamentos, constraints, tipos, seeds/backfills e operacoes em massa.
+- Antes de executar, apresente ao usuario, em linguagem clara e detalhada: ambiente e banco afetados, comandos/steps planejados, impacto, riscos de perda ou indisponibilidade, alternativa nao destrutiva e plano de rollback.
+- Sempre solicite confirmacao explicita do usuario antes da alteracao. Silencio, contexto anterior ou aprovacao generica nao contam como consentimento.
+- Exija backup completo, verificado e criado antes da alteracao. O backup deve ter no maximo 48 horas; se estiver vencido, vazio, corrompido ou sem evidencia verificavel, bloqueie e gere um novo.
+- Use `database-backups/pre-change/` para backups ligados a mudancas e `database-backups/daily/` para backups automaticos. Nunca versione dumps, tokens ou dados reais no Git.
+- O backup diario deve rodar as 02:00 no horario local do projeto (`America/Sao_Paulo`). Remova apenas backups diarios com mais de 7 dias, e somente depois de um novo backup ser criado e validado com sucesso. Backups `pre-change` nao entram nessa limpeza automatica.
+- Uma rotina CRUD normal do aplicativo nao exige backup por operacao; esta regra cobre mudancas de estrutura/migracao e mutacoes em massa ou de risco elevado.
+- Nenhuma migration ou alteracao de banco e executada sem o relatorio `Vault`, evidencia do backup e confirmacao do usuario.
+
 <!-- AIOX-MANAGED-START: codebase -->
 ## Project Map
 

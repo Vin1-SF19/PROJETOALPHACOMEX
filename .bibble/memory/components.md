@@ -161,6 +161,13 @@
 **Uso:** `<CsNpsHero3DCard />`, `<CsNpsSurface3DCard />`, `<CsNpsModal3DShell />` em cards e modais do CS&NPS.
 **Notas:** Wrappers Framer Motion de profundidade 3D sutil para dar aspecto vivo ao card principal, tabela e modais do CS&NPS sem alterar lógica de formulário/listagem. Segue o padrão "Aurora Financeira" de tilt leve e entrada spring.
 
+### IAlphaCosmicBackground
+**Arquivo:** `src/components/BibbleChatHome/IAlphaCosmicBackground.tsx`
+**Tipo:** Client Component
+**Props:** `accent: string`, `currentHour: number`
+**Uso:** `<IAlphaCosmicBackground accent={tema.accent} currentHour={currentHour} />` dentro de `BibbleChatWindow`.
+**Notas:** Sistema solar sideral da página principal do IAlpha. Os 8 planetas ficam nas **longitudes heliocêntricas reais** do momento atual, calculadas com elementos orbitais keplerianos J2000 do JPL (válidos 1800–2050) — sem API externa; recalcula a cada minuto via `useSyncExternalStore` (SSR renderiza sem planetas, cliente assume após hidratação). Realismo por CSS puro: iluminação direcional coerente com o sol da cena (highlight + terminador calculados por `atan2` da posição relativa), texturas procedurais SVG `feTurbulence` inline (tileáveis) com **rotação própria ancorada no relógio real**: períodos siderais reais por planeta (Júpiter 9,93h o mais rápido; Vênus e Urano retrógrados) acelerados por `SPIN_TIME_LAPSE` (1s = 15min simulados), fase determinística de `Date.now()` aplicada via `animation-delay` negativo em keyframes CSS (mesma data/hora → mesma face visível; timeline do documento mantém sincronia mesmo com aba em background), faixas de gás em Júpiter/Saturno com noise anisotrópico, Grande Mancha, anéis de Saturno em gradiente translúcido com divisão de Cassini, nuvens da Terra em camada própria com velocidade diferente, rim atmosférico via `inset box-shadow` apontando para o sol, profundidade por blur+dessaturação+contraste conforme a metade da elipse, estrelas com variação de temperatura de cor. Lua da Terra na fase/ângulo real. Não intercepta cliques, respeita `useReducedMotion`, usa a cor do tema como nebulosa e mantém vinheta central para legibilidade do chat.
+
 ### Importação em lote do CS & NPS
 **Diretório:** `src/app/PainelAlpha/CadastroClientes/importacao/`
 **Tipo:** conjunto de Client Components e helpers puros

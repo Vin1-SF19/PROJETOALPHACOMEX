@@ -7,6 +7,7 @@ import BibbleMessageList from "./BibbleMessageList";
 import BibbleChatInput from "./BibbleChatInput";
 import BibbleEmptyState from "./BibbleEmptyState";
 import BibbleSpriteCompanion from "./BibbleSpriteCompanion";
+import { IAlphaCosmicBackground } from "./IAlphaCosmicBackground";
 import { type Message } from "./BibbleMessageBubble";
 import { type StreamStatus } from "./BibbleChatLayout";
 import type { UploadedFile } from "./BibbleFileUpload";
@@ -56,6 +57,7 @@ interface BibbleChatWindowProps {
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   tema?: TemaAlpha;
+  currentHour: number;
 }
 
 export default function BibbleChatWindow({
@@ -88,6 +90,7 @@ export default function BibbleChatWindow({
   sidebarOpen,
   onToggleSidebar,
   tema,
+  currentHour,
 }: BibbleChatWindowProps) {
   const hasMessages = messages.length > 0;
   const ac = tema?.accent ?? "99, 102, 241";
@@ -97,16 +100,8 @@ export default function BibbleChatWindow({
   }, [onInputChange]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background min-w-0 relative">
-      {/* Background radial glow */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none z-0"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 40%, rgba(99,102,241,0.07) 0%, transparent 60%), radial-gradient(circle at 80% 90%, rgba(124,58,237,0.04) 0%, transparent 50%)",
-        }}
-      />
+    <div className="flex-1 flex flex-col h-full bg-[#020617] min-w-0 relative overflow-hidden">
+      <IAlphaCosmicBackground accent={ac} currentHour={currentHour} />
 
       {/* Decorativos de fundo — só quando há mensagens */}
       {hasMessages && (

@@ -1,19 +1,22 @@
 # Task: DB Backup
 
 **Agente:** Vault (detecta necessidade) / DataEngineer (executa)  
-**Quando usar:** OBRIGATÓRIO antes de qualquer migration destrutiva em produção  
+**Quando usar:** OBRIGATÓRIO antes de qualquer alteração estrutural, migration, seed/backfill ou mutação em massa no PainelAlpha
 **Output:** Arquivo de backup confirmado  
 
 ---
 
 ## Objetivo
 
-Criar backup do banco de dados antes de operações destrutivas. Nenhuma migration que afeta dados existentes roda sem backup confirmado.
+Criar e verificar backup completo antes de operações no escopo. Nenhuma alteração roda sem backup anterior de no máximo 48 horas, relatório detalhado de riscos/rollback e confirmação explícita do usuário.
+
+Também manter backup completo diário às 02:00 (`America/Sao_Paulo`) em `database-backups/daily/`, com retenção de 7 dias. A limpeza só ocorre após o backup atual ser validado e nunca atinge `database-backups/pre-change/`.
 
 ## Pré-condições
 
 - Acesso ao ambiente de produção (ou staging que será afetado)
-- Vault identificou que a migration é destrutiva
+- Vault identificou a operação, explicou plano/riscos/rollback e obteve confirmação específica
+- Backup completo do banco real foi criado antes da operação e tem no máximo 48 horas
 
 ## Detecção Automática (Vault)
 

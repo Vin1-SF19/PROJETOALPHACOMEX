@@ -22,6 +22,13 @@ export default async function PainelAlpha() {
     select: { tema_interface: true },
   });
   const temaName = userRecord?.tema_interface ?? "blue";
+  const currentHour = Number(
+    new Intl.DateTimeFormat("pt-BR", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date())
+  );
 
   const sessoesIniciais = await db.bibbleSession.findMany({
     where: { userId },
@@ -38,6 +45,7 @@ export default async function PainelAlpha() {
         userImage={userImage}
         role={session.user.role as string | undefined}
         temaName={temaName}
+        initialHour={currentHour}
         sessoesIniciais={sessoesIniciais.map(s => ({
           ...s,
           projectId: s.projectId ?? null,

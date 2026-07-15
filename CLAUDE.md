@@ -76,7 +76,7 @@ Todos os agentes estão em `.claude/skills/bibble-squad/`. Ative com `/nome-do-a
 | Echo | `/echo` | Backend: API routes, Server Actions, banco de dados |
 | Anubis | `/anubis` | Segurança: OWASP, auth, AI security, prompt injection |
 | **Forge** | `/forge` | ⚡ **Roda `tsc`, `lint`, `build` — pega erros objetivos antes da revisão qualitativa** |
-| **Vault** | `/vault` | 🔒 **Guardião do banco — bloqueia migrations destrutivas, exige backup antes de operações em produção** |
+| **Vault** | `/vault` | 🔒 **Guardião do banco — exige backup completo e confirmação antes de qualquer alteração estrutural ou migration** |
 | Lens | `/lens` | Revisão de código (DEPOIS de Forge aprovar) — classificação 🔴🟡🟢 |
 | Sage | `/sage` | Testes, edge cases, validações |
 | Flux | `/flux` | SEO, Core Web Vitals, bundle, cache, SSR/ISR |
@@ -204,6 +204,17 @@ PainelAlpha é um sistema de gestão/painel interno com:
    - Route handler em `app/api/bibble/chat/route.ts` com streaming SSE
    - SEMPRE usar Claude API (Anthropic) — Gemini será removido
 
+### Política obrigatória de backup e alterações de banco
+
+1. **Escopo:** qualquer mudança em tabela, coluna, índice, chave, relacionamento, constraint, tipo, migration, seed/backfill ou atualização/exclusão em massa aciona o Vault antes da execução. CRUD normal do aplicativo fica fora deste gate.
+2. **Explicação obrigatória:** antes de pedir autorização, o agente descreve detalhadamente o banco e ambiente afetados, o que pretende executar, o motivo, impacto esperado, janela de indisponibilidade, riscos, alternativa não destrutiva, validações e rollback.
+3. **Confirmação explícita:** o agente sempre pergunta e espera uma resposta inequívoca do usuário. Aprovação antiga, genérica ou implícita não autoriza uma nova alteração.
+4. **Backup prévio:** toda alteração do escopo exige backup completo, não vazio, verificável e anterior à execução. Ele deve ter no máximo 48 horas; na dúvida ou se vencido, crie outro. Sempre prefira um backup fresco imediatamente antes da mudança.
+5. **Pastas:** salve backups associados a mudanças em `database-backups/pre-change/` e backups automáticos em `database-backups/daily/`. Dumps e dados reais nunca entram no Git.
+6. **Rotina diária:** execute backup completo do Turso remoto todos os dias às 02:00 (`America/Sao_Paulo`). Após validar o novo arquivo, apague somente backups de `daily/` com mais de 7 dias. Se o backup falhar, não apague nada e reporte a falha com detalhes, sem expor segredos ou conteúdo do banco.
+7. **Retenção especial:** backups em `pre-change/` não são removidos pela limpeza diária. A remoção deles exige decisão explícita do usuário.
+8. **Ambiente real:** neste projeto, confirme `TURSO_DATABASE_URL`; não trate uma cópia de `prisma/dev.db` como backup da produção.
+
 ---
 
 ## FLUXO PADRÃO DE EXECUÇÃO
@@ -213,7 +224,7 @@ Para QUALQUER tarefa de implementação:
 1. **Scout PRIMEIRO** — lê o código, mapeia integration points (menu, atalhos, permissões, rotas), entrega blueprint
 2. **Leia** rules/ e memory/ antes de agir
 3. **Implemente** seguindo o blueprint do Scout (sem pular itens da checklist)
-4. **Vault 🔒** — SE houve mudança em `prisma/schema.prisma` ou operação em banco: analisa diff, classifica statements, EXIGE backup antes de operações destrutivas em produção. Sem aprovação de Vault, NENHUMA migration roda.
+4. **Vault 🔒** — ANTES de qualquer alteração estrutural, migration ou mutação em massa: analisa o diff, explica plano/riscos/rollback, exige backup completo válido (máximo 48h), pergunta e aguarda confirmação explícita. Sem relatório do Vault + backup verificado + confirmação, NENHUMA alteração roda.
 5. **Forge ⚡** — roda `tsc --noEmit`, `npm run lint`, `npm run build`. Reprovou? Volta para correção.
 5. **Probe verifica** — todos os integration points foram cumpridos? Feature aparece onde deveria?
 6. **Anubis audita** se houve auth/API/AI/inputs
@@ -272,6 +283,8 @@ A partir do próximo pedido, a regra é aplicada automaticamente pelos agentes r
 - **NUNCA** hardcode segredos — sempre `process.env`
 - **NUNCA** exponha `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` etc no cliente
 - **NUNCA** execute tool do Bibble sem validar ownership por `userId`
+- **NUNCA** altere estrutura ou rode migration/backfill/operação em massa sem Vault, backup completo válido e confirmação explícita do usuário
+- **SEMPRE** explique detalhadamente plano, impacto, riscos, alternativa segura e rollback antes de pedir autorização para alterar o banco
 - **SEMPRE** valide inputs com Zod antes de processar
 - **SEMPRE** verifique sessão com `auth()` em rotas protegidas
 - **SEMPRE** passe por Anubis em código de auth/API/AI

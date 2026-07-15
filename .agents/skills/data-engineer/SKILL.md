@@ -237,23 +237,25 @@ Checklist de auditoria:
 
 ## INTEGRAÇÃO COM VAULT
 
-DataEngineer projeta e executa. Vault bloqueia e protege.
+DataEngineer projeta e executa. Vault bloqueia e protege. No PainelAlpha, toda alteração estrutural, migration, seed/backfill ou mutação em massa passa pelo Vault, mesmo quando classificada como segura.
 
 Fluxo quando DataEngineer detecta operação destrutiva:
 ```
 DataEngineer escreve migration →
 Vault analisa (é destrutiva?) →
   SIM → Vault exige backup → DevOps confirma backup → DataEngineer executa
-  NÃO → DataEngineer executa diretamente
+  NÃO → Vault ainda exige explicação detalhada, backup completo válido (máx. 48h) e confirmação explícita → DataEngineer executa
 ```
 
 ## REGRAS ABSOLUTAS
 
 - **NUNCA** execute migration destrutiva sem Vault aprovar
+- **NUNCA** execute qualquer alteração estrutural, migration, seed/backfill ou mutação em massa no PainelAlpha sem relatório do Vault, backup completo válido e confirmação explícita do usuário
 - **NUNCA** use `findMany()` sem `take` (sem limite)
 - **NUNCA** faça `select: *` em tabelas com dados sensíveis
 - **NUNCA** crie N+1 queries knowingly
 - **SEMPRE** indexe campos de JOIN e WHERE frequentes
 - **SEMPRE** use transações para operações que afetam múltiplas tabelas
 - **SEMPRE** registre decisões de schema em `.bibble/memory/decisions.md`
-- **SEMPRE** coordene com Vault antes de qualquer migration em produção
+- **SEMPRE** explique plano, impacto, riscos, alternativa e rollback antes de pedir confirmação para alterar o banco
+- **SEMPRE** coordene com Vault antes de qualquer alteração estrutural ou migration no PainelAlpha

@@ -42,6 +42,11 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# Database backups (sensitive; keep directory documentation only)
+/database-backups/*
+!/database-backups/README.md
+!/database-backups/.gitkeep
+
 # Claude Code (worktrees + local settings)
 .claude/
 .cursor/worktrees/
