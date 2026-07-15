@@ -111,7 +111,7 @@
       },
       {
         "text": "O primeiro astronauta americano foi um piloto de teste chamado Alan Shepard. Ele voou no espaço apenas três semanas depois do primeiro homem do espaço, Yuri Gagarin.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -176,6 +176,10 @@
       {
         "text": "Os Templários não eram apenas cavaleiros religiosos; eles operavam como uma poderosa força financeira global na Idade Média. Seu conhecimento de contabilidade avançada garantiu seu poder além das fronteiras militares.",
         "shown": 4
+      },
+      {
+        "text": "Os cavaleiros reais eram guardiões de um vasto conhecimento científico e filosófico. Eles não apenas lutavam; também patrocinaram o aprendizado médico, arquitetônico e astronômico na Idade Média.",
+        "shown": 1
       }
     ]
   },
@@ -355,7 +359,7 @@
       },
       {
         "text": "As figuras masculinas do vestuário medieval não eram limitadas a um único padrão; diferentes profissões exigiam tecidos e cortes específicos para maior mobilidade ou proteção. Alguns homens até usavam capacetes com detalhes altamente personalizáveis, podendo indicar sua patente política em batalha.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -643,7 +647,7 @@
       },
       {
         "text": "O bambu é um tipo de gramínea, não sendo tecnicamente uma árvore. Ele pode crescer a alturas incríveis com grande velocidade, tornando-o um dos materiais mais ecológicos disponíveis.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -935,7 +939,7 @@
       },
       {
         "text": "Eles dormem por periodos muito longos de tempo para economizar energia. Esse sono pode durar semanas ou até meses seguidos.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1107,7 +1111,7 @@
       },
       {
         "text": "O cérebro gera energia suficiente para acender uma lâmpada de baixa potência por um dia inteiro. Consumir cafeína aumenta o estado de alerta, mas pode diminuir a capacidade do córtex pré-frontal de planejar tarefas complexas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1204,6 +1208,10 @@
       {
         "text": "O Triângulo das Bermudas é famoso por lendas de navios sumidos, mas a maioria desses incidentes pode ser explicada por condições climáticas adversas. Os oceanos profundos contêm formas de vida desconhecidas que permanecem invisíveis para a nossa tecnologia atual.",
         "shown": 4
+      },
+      {
+        "text": "Os U-boats alemães da Segunda Guerra Mundial usavam um sistema de camuflagem para confundir radares inimigos. Essa tecnologia revolucionou o design dos navios submersíveis após o conflito.",
+        "shown": 1
       }
     ]
   },
@@ -1355,7 +1363,7 @@
       },
       {
         "text": "O número 42 é conhecido como a resposta para a vida, o universo e tudo mais na ficção científica. Isso se deve à obra de Douglas Adams, onde ele foi estabelecido por um computador alienígena.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1379,7 +1387,7 @@
       },
       {
         "text": "A maioria das borboletas não consegue voar se seus casulos forem removidos de forma muito brusca. Elas também passam por um processo de metamorfose que as transforma em espécies completamente diferentes do seu estado larval.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1555,7 +1563,7 @@
       },
       {
         "text": "O músculo cardíaco é mais forte do que um motor de carro popular equivalente na mesma potência. Ele continua batendo mesmo quando desconectado do corpo por alguns minutos, mantido pela energia armazenada nos tecidos circundantes.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1723,7 +1731,7 @@
       },
       {
         "text": "Existem correntes profundas no Atlântico Norte invisíveis ao olho humano. Elas transportam calor e nutrientes essenciais, moldando a vida marinha costeira em escala global.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -1951,7 +1959,7 @@
       },
       {
         "text": "Os mamutes lanudos viviam há mais de 600 mil anos e eram muito diferentes dos encontrados nos filmes. Suas narinas grandes ajudavam a filtrar o ar gelado, um mecanismo adaptativo essencial para sua sobrevivência no Pleistoceno.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1987,7 +1995,7 @@
       },
       {
         "text": "Os Olmecas, considerados a \"cultura mãe\" da Mesoamérica, já dominavam centros cerimoniais megalíticos antes dos Maias florescerem. Suas enormes cabeças colossais de pedra são artefatos que desafiam o conhecimento arqueológico atual sobre transporte e moldagem.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2036,6 +2044,10 @@
       {
         "text": "Golfinhos usam a ecolocalização não apenas para caçar, mas também para navegar em águas turvas. Eles podem gerar sons tão potentes que são ouvidos a grandes distâncias abaixo da superfície.",
         "shown": 4
+      },
+      {
+        "text": "Golfinhos usam ecolocalização não só para caçar, mas também para se comunicar com a matilha. Esse som pode ser ajustado para passar informações complexas sobre localização e intenções.",
+        "shown": 1
       }
     ]
   },
@@ -2099,7 +2111,7 @@
       },
       {
         "text": "A cor dos olhos não está ligada à melanina; ela é determinada por uma combinação de pigmentos. O nervo óptico, que leva os sinais visuais ao cérebro, começa na retina.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2211,7 +2223,7 @@
       },
       {
         "text": "A NASA detectou sinais de biomarcadores gasosos em exoplanetas distantes. Esses gases podem indicar a presença de processos biológicos ativos.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2255,7 +2267,7 @@
       },
       {
         "text": "Durante o sono REM, seu cérebro processa informações sensoriais e emocionais do dia. É um período crucial para a memória e o aprendizado, consolidando experiências vividas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2711,7 +2723,7 @@
       },
       {
         "text": "O tubérculo malanga é conhecido por seu sabor terroso e pode ser consumido de diferentes formas, como acompanhamento ou até em preparos doces regionais da África Ocidental. Ele oferece um perfil nutricional rico em fibras e minerais essenciais para a saúde intestinal.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2847,7 +2859,7 @@
       },
       {
         "text": "O primeiro telefone não tinha discagem; ele usava um sistema de encaixe por números e era composto por fiação manual complexa. A gravação de áudio comercial só se tornou viável após o desenvolvimento do disco compacto, revolucionando a portabilidade da música.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2935,7 +2947,7 @@
       },
       {
         "text": "Estima-se que os tubarões tenham existido por mais de 400 milhões de anos, sobrevivendo a inúmeras extinções de espécies gigantes. Essa longevidade reforça sua adaptação biológica como um dos grupos de vida marinha mais resilientes do planeta.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -3735,7 +3747,7 @@
       },
       {
         "text": "Algumas sementes parecem miniaturas de frutas ou órgãos, enganando quem as encontra. Essa semelhança é um mecanismo de dispersão para atrair animais que irão consumir a \"fruta\" inteira.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -3843,7 +3855,7 @@
       },
       {
         "text": "O protocolo HTTP foi originalmente projetado por um engenheiro chamado Tim Berners-Lee como um meio de compartilhar informações atômicas. Ele é a base da comunicação mundial que sustenta quase todos os sites que acessamos diariamente.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -3935,7 +3947,7 @@
       },
       {
         "text": "O músculo mais forte do corpo humano é o masseter, usado para fechar a mandíbula. Ele consegue exercer uma força que pode pressionar até 300 PSI.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },

@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import { X, SortAsc, Calendar, User, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { CsNpsModal3DShell } from "../CsNpsMotion";
 
 export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao }: any) {
     if (!isOpen) return null;
@@ -17,7 +18,7 @@ export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao 
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-[#0b1220] border border-white/10 w-full max-w-md rounded-[2rem] shadow-3xl overflow-hidden">
+            <CsNpsModal3DShell className="relative bg-[#0b1220] border border-white/10 w-full max-w-md rounded-[2rem] shadow-3xl overflow-hidden">
                 <div className="p-6 border-b border-white/5 flex justify-between items-center">
                     <h2 className="text-sm font-black text-white uppercase tracking-widest italic">Filtros Avançados</h2>
                     <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><X size={20} /></button>
@@ -53,7 +54,7 @@ export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao 
                         Aplicar Filtros
                     </button>
                 </div>
-            </div>
+            </CsNpsModal3DShell>
         </div>
     );
 }

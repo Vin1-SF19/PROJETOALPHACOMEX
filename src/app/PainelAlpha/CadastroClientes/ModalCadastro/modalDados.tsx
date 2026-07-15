@@ -11,6 +11,7 @@ import { getTema } from '@/lib/temas';
 import { DropdownSelecaoComCriacao } from './DropdownSelecaoComCriacao';
 import { ModalSelecionarUsuario } from './ModalSelecionarUsuario';
 import { FORMAS_PAGAMENTO, FORMAS_LABEL, formatarFormaPagamento } from './formas-pagamento';
+import { CsNpsModal3DShell } from "../CsNpsMotion";
 
 /**
  * `dataContratacao` é salva como `.toISOString()` de uma data "só o dia" (sem
@@ -654,7 +655,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 overflow-y-auto">
-            <div className="bg-[#0b1220] border border-white/10 w-full max-w-6xl rounded-[2.5rem] shadow-2xl relative custom-scrollbar max-h-[95vh] overflow-y-auto">
+            <CsNpsModal3DShell className="bg-[#0b1220] border border-white/10 w-full max-w-6xl rounded-[2.5rem] shadow-2xl relative custom-scrollbar max-h-[95vh] overflow-y-auto">
 
                 {/* HEADER */}
                 <div className="sticky top-0 bg-[#0b1220]/95 backdrop-blur-md p-8 border-b border-white/5 flex justify-between items-center z-20 rounded-t-[2.5rem]">
@@ -1573,7 +1574,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                 {showNovoCS && (
                     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-                        <div className="bg-slate-900 border border-white/10 w-full max-w-md rounded-[2rem] p-8 shadow-3xl animate-in zoom-in-95 duration-200">
+                        <CsNpsModal3DShell className="relative bg-slate-900 border border-white/10 w-full max-w-md rounded-[2rem] p-8 shadow-3xl">
                             <div className="flex justify-between items-center mb-6">
                                 <h4 className="text-lg font-black text-white uppercase">Novo <span className="text-emerald-500">CS</span></h4>
                                 <button onClick={() => setShowNovoCS(false)}><X size={20} className="cursor-pointer text-slate-500" /></button>
@@ -1676,16 +1677,16 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                     </button>
                                 </div>
                             </div>
-                        </div>
+                        </CsNpsModal3DShell>
                     </div>
                 )}
-            </div>
+            </CsNpsModal3DShell>
 
 
             {/* MODAL PEQUENO: NOVO PEDIDO DE FEEDBACK */}
             {showNovoFeedback && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
-                    <div className="bg-[#0f172a] border border-blue-500/20 w-full max-w-md rounded-[2.5rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                    <CsNpsModal3DShell className="relative bg-[#0f172a] border border-blue-500/20 w-full max-w-md rounded-[2.5rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                         <div className="flex justify-between items-center mb-8">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-blue-500/20 rounded-xl"><TrendingUp className="text-blue-400 w-5 h-5" /></div>
@@ -1757,13 +1758,13 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </CsNpsModal3DShell>
                 </div>
             )}
 
             {showEditCS && csEditando && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-                    <div className="bg-slate-900 border border-white/10 w-full max-w-md rounded-[2rem] p-8 shadow-3xl animate-in zoom-in-95 duration-200">
+                    <CsNpsModal3DShell className="relative bg-slate-900 border border-white/10 w-full max-w-md rounded-[2rem] p-8 shadow-3xl">
                         <div className="flex justify-between items-center mb-6">
                             <h4 className="text-lg font-black text-white uppercase">Editar <span className="text-emerald-500">CS</span></h4>
                             <button onClick={() => { setShowEditCS(false); setCsEditando(null); }}><X size={20} className="cursor-pointer text-slate-500" /></button>
@@ -1842,13 +1843,13 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </CsNpsModal3DShell>
                 </div>
             )}
 
             {showConfirmarOcultar && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-slate-900 border border-rose-500/30 w-full max-w-sm rounded-[2rem] p-8 shadow-2xl shadow-rose-900/20 text-center">
+                    <CsNpsModal3DShell className="relative bg-slate-900 border border-rose-500/30 w-full max-w-sm rounded-[2rem] p-8 shadow-2xl shadow-rose-900/20 text-center">
                         <div className="flex justify-center mb-6">
                             <div className="p-4 bg-rose-500/10 rounded-full animate-pulse">
                                 <AlertTriangle size={40} className="text-rose-500" />
@@ -1873,7 +1874,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 Cancelar e Voltar
                             </button>
                         </div>
-                    </div>
+                    </CsNpsModal3DShell>
                 </div>
             )}
 

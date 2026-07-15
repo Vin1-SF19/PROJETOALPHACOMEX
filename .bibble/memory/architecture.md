@@ -82,6 +82,10 @@ model ApresentacaoComentario { id (cuid), apresentacaoId → Apresentacao, slide
 | Tipo | Caminho | Método | Auth | Descrição |
 |------|---------|--------|------|-----------|
 | Route Handler | `/api/...` | GET | Sim | |
+| Route Handler | `/api/cs-nps/exportar` | GET | Sim, permissão efetiva `Cliente` | Exporta clientes ativos e arquivados e suas relações diretas confirmadas em workbook `.xlsx`, com uma aba por entidade. |
+| Route Handler | `/api/cs-nps/importar/modelo` | GET | Sim, usuário ativo Admin/CEO + permissão efetiva `Cliente` | Gera o modelo `.xlsx` com `Instrucoes` e as abas `Socios`, `CS` e/ou `Feedbacks` escolhidas em `tipos`. |
+| Route Handler | `/api/cs-nps/importar/previsualizar` | POST multipart | Sim, usuário ativo Admin/CEO + permissão efetiva `Cliente` | Faz preflight ZIP streaming, parseia até 2.000 linhas e resolve candidatos de empresa/serviço sem gravar dados. |
+| Route Handler | `/api/cs-nps/importar/salvar` | POST JSON | Sim, usuário ativo Admin/CEO + permissão efetiva `Cliente` | Revalida o `clienteId` de cada linha e grava sócios/CS/feedbacks e auditoria em uma única transação. |
 | Server Action | `src/actions/apresentacoes.ts` | — | Sim | `ListarApresentacoes`, `CriarApresentacao`, `DuplicarApresentacao`, `ExcluirApresentacao`, `AtualizarStatusApresentacao` — ownership: autor ou Admin/CEO |
 | Server Action | `src/actions/slides.ts` (Onda 2) | — | Sim | `ListarSlides`, `ObterSlide`, `CriarSlide`, `AtualizarSlide`, `ReordenarSlides`, `ExcluirSlide`, `DuplicarSlide` — ownership sempre sobe até `Apresentacao.autorId`/`colaboradores` via `checarOwnershipApresentacao()` (nunca confia no `Slide.id` isolado). `AtualizarSlide` valida `dadosJson` com `dadosSlideSchema` (Zod) antes de salvar. `ExcluirSlide` bloqueia se for o último slide da apresentação (regra de negócio confirmada com o usuário, ver `decisions.md`). |
 | Server Action | `src/actions/apresentacao-temas.ts` (Onda 3) | — | Sim | `ListarTemas` (templates do sistema + temas próprios do usuário), `CriarTema`, `AtualizarTema` (templates só editáveis por Admin/CEO, temas próprios só pelo dono), `AplicarTema` (seta `Apresentacao.temaId`, ownership via `checarOwnershipApresentacao`). `ApresentacaoTema` (model existente desde a Onda 1) recebeu seu primeiro uso real: 5 templates seedados no Turso (Alpha Premium, Dark Glass, Corporate, Minimalista, Apple-style — `isTemplate: true`, `criadoPorId: null`). |
@@ -107,6 +111,20 @@ model clientes {
 **`ContratoComercial` ganhou `dataConstituicao`/`regimeTributario`/`uf` (2026-07-13, migration ADD COLUMN nullable):** capturados pelo formulário do Metas (`ModalGerenciamentoLeads.tsx`) na mesma consulta `/api/ReceitaFederal` que já fazia (antes só usava razaoSocial/nomeFantasia da resposta) — sem chamada nova à API externa.
 
 **⚠️ PENDÊNCIA DE SEGURANÇA REGISTRADA (Anubis, 2026-07-13):** a seção "Serviços Contratados" do modal do CS&NPS expõe `valorContrato`/`formaPagamento`/`closerNome` (dados do Metas) para qualquer usuário com a permissão `Cliente`, mas esses dados hoje só são visíveis no módulo Metas restrito a `allowedRoles: ['Lider Comercial']` (`modulos-registry.ts`). Decisão sobre restringir ou manter aberto foi **adiada explicitamente pelo usuário** — ver `decisions.md`. Não é permissão para deixar como está permanentemente.
+
+### Módulo CS&NPS — arquitetura da importação em lote (2026-07-15)
+
+A importação usa um pipeline em duas fases: `previsualizar` interpreta o workbook e devolve linhas tipadas/candidatos sem persistência; `salvar` recebe somente as linhas mantidas pelo usuário, revalida todos os schemas e repete a resolução do destino antes de gravar. Isso permite remover linhas e resolver ambiguidades na UI sem tornar a prévia uma fonte de confiança.
+
+Como `clientes` permite o mesmo CNPJ em serviços diferentes, a razão social ou o CNPJ identificam um conjunto de candidatos, enquanto `clienteId` identifica o destino relacional definitivo. O `clienteId` enviado pela UI só é aceito se ainda pertencer ao conjunto calculado a partir do identificador original; assim, um valor adulterado ou um destino que mudou entre prévia e confirmação é rejeitado. A confirmação consulta novamente `usuarios` dentro de `db.$transaction`, grava `socios`, `log_cs`, `logFeedback` e `auditoria`, e reverte o conjunto inteiro em qualquer falha. Não houve mudança de schema Prisma.
+
+O contrato do arquivo é allowlist: `Instrucoes` opcional, `Socios(cnpj, razaoSocial, nome, telefone, observacao, dataNascimento, vinculo)`, `CS(cnpj, razaoSocial, colaborador, sentimento, observacao, dataRegistro)` e `Feedbacks` com as mesmas colunas de CS. O gerador inclui somente as abas selecionadas; o parser rejeita abas, cabeçalhos, colunas, fórmulas e macros fora desse contrato. Múltiplos sócios usam linhas repetidas para a mesma empresa.
+
+Antes do parse completo por ExcelJS, `preflight-xlsx.ts` percorre as entradas via `yauzl` em streaming e mede o conteúdo realmente descompactado. Os limites são: arquivo de 10 MB, 2.000 linhas, 256 entradas ZIP, 20 MB descompactados por entrada, 50 MB no total e razão máxima 100:1. A prévia também possui rate limit em memória por instância (`userId + IP`, cinco/minuto e uma execução concorrente); ele não coordena réplicas. Idempotência persistente da confirmação não foi implementada e permanece fora deste escopo: repetir um `POST /salvar` válido pode criar registros duplicados.
+
+A autorização administrativa comum foi extraída para `src/lib/cs-nps/autorizacao.ts` e é usada por exportação e pelas três rotas de importação: sessão válida, usuário ainda `ATIVO`, role atual `admin`/`ceo` e permissão efetiva `Cliente`. Os contratos puros e de persistência têm cobertura Vitest em `tests/cs-nps/importar-dados.test.ts`, `calculos.test.ts` e `preflight-xlsx.test.ts`.
+
+**Última atualização:** 2026-07-15 por Scribe
 
 ## Variáveis de Ambiente
 

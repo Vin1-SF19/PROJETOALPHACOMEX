@@ -154,6 +154,25 @@
 **Tipo:** Client Components
 **Notas:** Primeira vez que este módulo permite múltiplos registros de `clientes` para o mesmo CNPJ (um por serviço contratado — ver `decisions.md` 2026-07-13). `page.tsx` agrupa client-side via `useMemo` (`gruposPorCnpj`), escolhendo o registro de `createdAt` mais recente como "principal" na linha da tabela; badge `Layers` + contagem aparece quando há >1 serviço. `ModalGestaoCliente` (`modalDados.tsx`) recebe agora `cliente` como ARRAY do grupo inteiro (não mais um objeto único) — internamente deriva `cliente = clienteGrupo[0]` (principal, preenche os campos editáveis já existentes) e `outrosServicos`. Nova seção "Serviços Contratados (N)" (só aparece quando há >1 registro) lista cada serviço com status/data individual + card de dados do Painel de Metas (Forma de Pagamento, Valor do Contrato, Closer), resolvidos via `buscarServicoContratadoPorCliente` (Server Action) num `useEffect` disparado pela abertura do modal — não é fetch de rede, é Server Action, padrão já aceito no projeto para popular estado local a partir de props. Campo "Serviço Contratado" também foi reposicionado para o topo do bloco de status/analista/embasamento (pedido do usuário), grid mudou de `xl:grid-cols-6` para `xl:grid-cols-7` com o campo ocupando `xl:col-span-2`.
 
+### CsNpsMotion
+**Arquivo:** `src/app/PainelAlpha/CadastroClientes/CsNpsMotion.tsx`
+**Tipo:** Client Component
+**Props:** `children: ReactNode`, `className?: string`, `delay?: number`
+**Uso:** `<CsNpsHero3DCard />`, `<CsNpsSurface3DCard />`, `<CsNpsModal3DShell />` em cards e modais do CS&NPS.
+**Notas:** Wrappers Framer Motion de profundidade 3D sutil para dar aspecto vivo ao card principal, tabela e modais do CS&NPS sem alterar lógica de formulário/listagem. Segue o padrão "Aurora Financeira" de tilt leve e entrada spring.
+
+### Importação em lote do CS & NPS
+**Diretório:** `src/app/PainelAlpha/CadastroClientes/importacao/`
+**Tipo:** conjunto de Client Components e helpers puros
+**Uso:** `<BotaoImportarLote onImportado={carregarDados} />`, renderizado ao lado das ações administrativas em `page.tsx`.
+**Notas:** `BotaoImportarLote` controla somente a abertura. `ModalImportacaoLote` orquestra quatro etapas e concentra os estados de tipos selecionados, arquivo, prévia, destinos escolhidos, linhas mantidas e resultado. `SelecaoTiposImportacao` permite qualquer combinação de Sócios/CS/Feedbacks; `EtapaArquivoImportacao` baixa o modelo e envia o `.xlsx`; `ResumoImportacao` agrupa por empresa/serviço, filtra e renderiza `LinhaImportacaoCard`; cada cartão mostra os dados, mensagens, destino e a ação de remover; `ResultadoImportacao` apresenta totais e linhas de origem por empresa após a transação. O callback `onImportado` recarrega a listagem somente depois do salvamento bem-sucedido.
+
+**Helpers associados:** `api-importacao.ts` encapsula os três contratos HTTP e normaliza respostas de erro; `calculos.ts` recalcula status/totais após escolhas ou remoções e constrói somente linhas válidas para salvar; `constantes.ts` mantém rótulos semânticos. Os contratos compartilhados ficam em `src/lib/cs-nps/importacao-tipos.ts` para que servidor e client concordem sobre tipos, candidatos, status e resumo.
+
+**Regra de destino:** o seletor aparece quando a empresa tem mais de um cadastro/serviço possível. A UI guarda o `clienteId`, mas essa escolha não é considerada autorização; o servidor refaz o matching no `POST /salvar`. Linhas inválidas nunca entram no payload construído por `calculos.ts`, e o botão de confirmação permanece bloqueado enquanto houver linha ambígua ou inválida entre as linhas mantidas.
+
+**Última atualização:** 2026-07-15 por Scribe
+
 ### enderecoResumo (helper local)
 **Arquivo:** `src/components/Parceiros/ModalPreCadastros.tsx`
 **Tipo:** função pura (não componente)

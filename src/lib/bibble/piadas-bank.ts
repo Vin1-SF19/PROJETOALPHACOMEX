@@ -1,0 +1,133 @@
+// Banco curado de piadas do modo "Piadista" do Bibble.
+// Substituiu a geração via Ollama, que produzia sempre as mesmas piadas
+// (dezenas de variações de "o livro de matemática estava triste").
+// A rota /api/bibble/piada sorteia daqui SEM repetir até o banco inteiro circular.
+// Para adicionar piadas novas: basta apendar strings neste array.
+
+export const PIADAS_BANK: readonly string[] = [
+  // ── Animais ────────────────────────────────────────────────────────────────
+  "O que o pato disse para a pata? Vem quá!",
+  "Por que o jacaré tirou o filho da escola? Porque ele réptil de ano.",
+  "Qual é o animal mais antigo do mundo? A zebra, porque ainda é em preto e branco.",
+  "Qual é o bicho que anda com a pata? O pato.",
+  "Por que o galo canta de olhos fechados? Porque ele sabe a música de cor.",
+  "Qual é o peixe mais engraçado do oceano? O peixe-palhaço.",
+  "Qual é a rede social favorita dos peixes? O Cardume.",
+  "Por que o pernilongo é um péssimo cantor? Porque ele só canta no ouvido.",
+  "O que a abelha disse para a flor? Oi, flor!",
+  "Para onde as abelhas vão depois do casamento? Para a lua de mel.",
+  "Por que a minhoca caiu do prédio e não se machucou? Porque ela já vivia no chão.",
+  "Por que a vaca foi para o espaço? Para conhecer a Via Láctea.",
+  "Por que o cachorro entrou na igreja? Porque a porta estava aberta.",
+  "O que o pintinho foi fazer na igreja? Assistir à missa do galo.",
+  "Por que o lobo mau usa GPS? Para não se perder da vovó.",
+  "Por que o ovo não conta piadas? Porque pode rachar de rir.",
+
+  // ── Objetos e casa ─────────────────────────────────────────────────────────
+  "O que uma impressora disse para a outra? Essa folha é sua ou é impressão minha?",
+  "O que um tijolo falou para o outro? Há um cimento muito forte entre nós.",
+  "O que uma parede disse para a outra? Te encontro no canto.",
+  "Por que o menino jogou o relógio pela janela? Porque queria ver o tempo voar.",
+  "Por que o relógio foi preso? Porque matou o tempo.",
+  "O que o semáforo disse para o carro? Não olha agora que eu tô me trocando.",
+  "Por que o telefone passou a usar óculos? Porque perdeu todos os contatos.",
+  "O que um ventilador disse para o outro? Bora dar uma volta?",
+  "Por que a geladeira foi à terapia? Porque tratava todo mundo com frieza.",
+  "Por que a panela de pressão é a mais estressada da cozinha? Porque qualquer coisinha ela já apita.",
+  "Qual é o utensílio mais fofoqueiro da cozinha? A colher, porque vive mexendo onde não deve.",
+  "Por que a cadeira foi ao médico? Porque estava com dor nas costas.",
+  "Por que a escada é tão otimista? Porque está sempre subindo na vida.",
+  "Qual é a dança favorita da tesoura? O corta-jaca.",
+  "Por que o dado foi ao psicólogo? Porque estava se sentindo jogado.",
+  "Por que o fósforo vive estressado? Porque qualquer atrito ele já pega fogo.",
+  "Por que a borracha é tão confiante? Porque ela não tem medo de errar.",
+  "Qual é o calçado mais educado? O sapato social.",
+  "Por que o sapato ficou triste? Porque a meia deu o cano.",
+
+  // ── Charadas clássicas ─────────────────────────────────────────────────────
+  "O que nasce grande e morre pequeno? O lápis.",
+  "O que fica maior quanto mais você tira? O buraco.",
+  "Qual é o contrário de papelada? Papel em pé.",
+  "Qual é o contrário de volátil? Vem cá, sobrinho.",
+  "O que o zero disse para o oito? Que cinto maneiro!",
+  "Qual é o número mais risonho? O oito, porque é uma risada deitada.",
+  "Qual é o mês mais curto do ano? Maio, porque só tem quatro letras.",
+  "O que está no meio do ovo? A letra V.",
+  "Qual é o último dente a nascer? O postiço.",
+  "Por que o círculo nunca entra em brigas? Porque ele não fica do lado de ninguém.",
+
+  // ── Comida ─────────────────────────────────────────────────────────────────
+  "Qual é o rei dos queijos? O reiqueijão.",
+  "Qual é a comida que liga e desliga? O estrogonofe: strog-ON, strog-OFF.",
+  "Por que o tomate ficou vermelho? Porque viu a salada se vestindo.",
+  "O que o café disse para o açúcar? Sem você, minha vida é amarga.",
+  "Por que o suco de laranja é um bom aluno? Porque ele é muito concentrado.",
+  "Por que o brigadeiro é o doce mais respeitado? Porque tem patente militar.",
+  "Qual é a comida mais forte da academia? A barra... de cereal.",
+  "Por que o pão foi ao psicólogo? Porque estava se sentindo amassado.",
+  "O que o milho disse para a pipoca? Filha, você explodiu de sucesso!",
+  "Qual é a comida favorita do pedreiro? Massa!",
+  "A pizza chegou no médico e disse: doutor, estou me sentindo muito dividida.",
+  "Qual é o queijo mais sofrido? O ralado, porque vive despedaçado.",
+  "Por que a laranja parou no meio da rua? Porque ficou sem suco.",
+  "Por que o aluno comeu a prova? Porque a professora disse que era canja.",
+
+  // ── Profissões ─────────────────────────────────────────────────────────────
+  "Como o espantalho ganhou o prêmio de melhor funcionário? Porque era excelente no seu campo.",
+  "Por que o carteiro foi embora da empresa? Porque recebeu uma carta de demissão.",
+  "Por que o professor usava óculos escuros na sala? Porque os alunos eram muito brilhantes.",
+  "Por que o pintor foi preso? Porque pintou o sete.",
+  "Por que o palhaço foi ao médico? Porque estava se sentindo engraçado.",
+  "Onde o jogador de futebol guarda o dinheiro? No banco de reservas.",
+  "Por que o goleiro guardou o dinheiro na luva? Porque queria segurar as economias.",
+  "Qual é o carro preferido do padre? O Fiat Lux.",
+  "Por que o astronauta terminou o namoro? Porque precisava de espaço.",
+  "O que a bola disse para o jogador? Para de me chutar, eu não te fiz nada!",
+
+  // ── Cúmulos ────────────────────────────────────────────────────────────────
+  "Qual é o cúmulo do fotógrafo? Revelar um segredo.",
+  "Qual é o cúmulo do mágico? Fazer a paciência desaparecer.",
+  "Qual é o cúmulo do jardineiro? Chamar a filha de Rosa e deixar ela plantada.",
+  "Qual é o cúmulo do eletricista? Ficar chocado com a conta de luz.",
+  "Qual é o cúmulo do cabeleireiro? Cortar o cabelo do milho.",
+  "Qual é o cúmulo do costureiro? Fazer bainha em saia justa.",
+  "Qual é o cúmulo do dentista? Obturar a boca do túnel.",
+  "Qual é o cúmulo da força? Quebrar o silêncio.",
+  "Qual é o cúmulo da agilidade? Pular o café da manhã.",
+  "Qual é o cúmulo da sorte? Ser atropelado por uma ambulância.",
+  "Qual é o cúmulo do azar? Ser atropelado por um carrinho de bebê.",
+  "Qual é o cúmulo da preguiça? Sonhar que está trabalhando e acordar cansado.",
+  "Qual é o cúmulo da rapidez? Correr atrás do prejuízo e alcançar.",
+  "Qual é o cúmulo do detetive? Descobrir o paradeiro da meia que sumiu na máquina de lavar.",
+  "Qual é o cúmulo da economia? Dormir rápido para gastar menos o travesseiro.",
+  "Qual é o cúmulo da vaidade? Pedir para o espelho tirar uma selfie sua.",
+
+  // ── Natureza e espaço ──────────────────────────────────────────────────────
+  "Por que o Sol nunca foi à faculdade? Porque já tinha milhões de graus.",
+  "Por que a Lua foi ao banco? Porque estava sem um quarto.",
+  "O que o Oceano Atlântico disse para o Pacífico? Nada.",
+  "O que o mar faz quando encontra a praia? Acena.",
+  "O que acontece quando chove no Reino Unido? Vira Reino Úmido.",
+  "Por que a nuvem terminou com o vento? Porque precisava de um tempo.",
+  "Por que a plantinha não foi atendida no hospital? Porque só tinha médico de plantão.",
+  "Por que o elétron nunca é convidado para as festas? Porque ele é muito negativo.",
+
+  // ── Fantasia e heróis ──────────────────────────────────────────────────────
+  "Por que o fantasma é um péssimo mentiroso? Porque dá para ver através dele.",
+  "Por que a múmia não tem amigos? Porque ela é muito enrolada.",
+  "Por que o vampiro foi ao dentista? Para consertar a mordida.",
+  "Por que o esqueleto não brigou com ninguém? Porque não tinha estômago para isso.",
+  "Por que o Batman fez seguro do Batmóvel? Porque tinha medo que Roubin.",
+  "Por que o Hulk é um ótimo jardineiro? Porque já nasceu com o dedo verde.",
+
+  // ── Tecnologia ─────────────────────────────────────────────────────────────
+  "Por que o computador foi preso? Porque executou um programa.",
+  "Por que o computador foi ao médico? Porque estava com vírus.",
+  "Por que o Wi-Fi terminou com o celular? Porque sentiu que a conexão já não era a mesma.",
+  "Qual é o lanche favorito do programador? O cookie.",
+  "Por que o programador não gosta de acampar? Porque tem bug demais.",
+  "O que o HTML disse para o CSS? Sem você, eu não tenho estilo.",
+  "Por que o banco de dados foi à terapia? Porque guardava registros demais do passado.",
+  "Qual é o conto de fadas favorito dos programadores? A Bela e o Backend.",
+  "Por que o dicionário foi ao psicólogo? Porque tinha perdido o sentido das palavras.",
+];

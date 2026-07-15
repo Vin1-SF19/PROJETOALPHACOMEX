@@ -9,6 +9,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { CsNpsModal3DShell } from "../CsNpsMotion";
 
 type HistoricoAlteracaoCliente = ClienteCS["historicoAlteracoes"][number];
 
@@ -86,7 +87,7 @@ export default function ModalLogAuditoria({ isOpen, onClose, cliente, aoSalvar }
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
 
-      <div className="bg-[#0b1220] border border-white/10 w-full max-w-3xl rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col relative overflow-hidden">
+      <CsNpsModal3DShell className="bg-[#0b1220] border border-white/10 w-full max-w-3xl rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col relative overflow-hidden">
 
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
 
@@ -217,7 +218,7 @@ export default function ModalLogAuditoria({ isOpen, onClose, cliente, aoSalvar }
             Sistema de Auditoria Alpha Comex • Imutável
           </p>
         </div>
-      </div>
+      </CsNpsModal3DShell>
 
       <AlertDialog open={!!linhaParaReverter} onOpenChange={(open) => !open && setLinhaParaReverter(null)}>
         <AlertDialogContent>

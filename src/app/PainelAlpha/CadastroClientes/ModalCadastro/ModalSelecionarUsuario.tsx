@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, Search, UserCircle2 } from "lucide-react";
 import { BuscarTodosUsuarios } from "@/actions/RecursosHumanos";
+import { CsNpsModal3DShell } from "../CsNpsMotion";
 
 type Usuario = Awaited<ReturnType<typeof BuscarTodosUsuarios>>["data"][number];
 
@@ -51,7 +52,7 @@ export function ModalSelecionarUsuario({ open, onClose, onSelecionar, titulo = "
 
     return (
         <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="bg-[#0b1220] border border-white/10 w-full max-w-md max-h-[80vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden">
+            <CsNpsModal3DShell className="bg-[#0b1220] border border-white/10 w-full max-w-md max-h-[80vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden">
                 <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
                     <h3 className="text-lg font-black text-white uppercase tracking-tighter">{titulo}</h3>
                     <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-slate-400 hover:text-white">
@@ -102,7 +103,7 @@ export function ModalSelecionarUsuario({ open, onClose, onSelecionar, titulo = "
                         </div>
                     )}
                 </div>
-            </div>
+            </CsNpsModal3DShell>
         </div>
     );
 }

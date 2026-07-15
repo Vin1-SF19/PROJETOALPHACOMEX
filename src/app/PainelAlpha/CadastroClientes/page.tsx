@@ -24,6 +24,9 @@ import ModalGestaoCliente from './ModalCadastro/modalDados';
 import ModalFiltros from './ModalCadastro/modalFiltros';
 import ModalLogAuditoria from './ModalCadastro/modalLogAuditoria';
 import { useSession } from "next-auth/react";
+import { BotaoExportarDados } from "./BotaoExportarDados";
+import { BotaoImportarLote } from "./importacao/BotaoImportarLote";
+import { CsNpsHero3DCard, CsNpsSurface3DCard } from "./CsNpsMotion";
 
 export const dynamic = 'force-dynamic';
 
@@ -137,10 +140,10 @@ export default function CadastroCliente() {
 
 
     return (
-        <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-indigo-500/30">
+        <div className="min-h-screen bg-transparent text-slate-200 font-sans selection:bg-indigo-500/30">
             <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8 space-y-8">
 
-                <header className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 p-8 rounded-[2rem] bg-slate-900/40 border border-white/5 backdrop-blur-md shadow-2xl">
+                <CsNpsHero3DCard className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 p-8 rounded-[2rem] bg-slate-950/60 border border-white/5 backdrop-blur-xl shadow-2xl overflow-hidden">
                     <div className="space-y-2">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-indigo-500/10 rounded-lg">
@@ -158,10 +161,10 @@ export default function CadastroCliente() {
                     <div className="flex items-center gap-3 flex-wrap">
                         <div className="h-8 w-[1px] bg-slate-800 mx-2 hidden md:block" />
                     </div>
-                </header>
+                </CsNpsHero3DCard>
 
                 {/* BARRA DE AÇÕES */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center bg-slate-900/20 p-4 rounded-2xl border border-white/5">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center bg-slate-950/45 p-4 rounded-2xl border border-white/5 backdrop-blur-lg">
                     <div className="lg:col-span-4 relative group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
                         <input
@@ -179,6 +182,13 @@ export default function CadastroCliente() {
                         >
                             <Plus size={16} /> Novo Cliente
                         </button>
+
+                        {(session?.user?.role === "Admin" || session?.user?.role === "CEO") && (
+                            <>
+                                <BotaoImportarLote onImportado={carregarDados} />
+                                <BotaoExportarDados />
+                            </>
+                        )}
 
                         <button
                             onClick={() => setModalFiltroAberto(true)}
@@ -223,7 +233,7 @@ export default function CadastroCliente() {
                     </div>
                 </div>
 
-                <div className="bg-slate-900/30 border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+                <CsNpsSurface3DCard className="relative bg-slate-950/55 border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl backdrop-blur-xl">
                     <div className="overflow-x-auto custom-scrollbar">
                         <table className="w-full text-left border-separate border-spacing-0">
                             <thead>
@@ -391,7 +401,7 @@ export default function CadastroCliente() {
 
                         </table>
                     </div>
-                </div>
+                </CsNpsSurface3DCard>
             </div>
 
             <footer className="max-w-[1600px] mx-auto px-8 py-6 text-slate-600 text-[10px] uppercase font-black tracking-[0.3em] flex justify-between border-t border-white/5 mt-auto">

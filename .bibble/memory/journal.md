@@ -690,3 +690,72 @@ Usuário pediu que o responsável crie os documentos de cada embasamento pela in
 ### Refletido também em
 - `codebase-map.md`: configuração de modelos documentada.
 - `integration-points.md`: novas rotas e regra de cópia documentadas.
+
+---
+
+## [2026-07-14 14:30] — Modo Piadista do Bibble: banco curado substitui Ollama
+
+**Tags:** #fix #bibble #api
+**Agentes envolvidos:** Scout, Nova/Echo, Forge, Probe, Kowalski
+**Arquivos tocados:** `src/lib/bibble/piadas-bank.ts` (novo), `src/app/api/bibble/piada/route.ts`, `.bibble/piadas-cache.json`
+
+### Contexto
+Usuário reclamou que as piadas do modo Piadista eram repetitivas e sem graça. Diagnóstico: o Ollama (gemma) gerava quase sempre a mesma piada — o cache tinha ~250 entradas, mais de 60 delas variações de "o livro de matemática estava triste" — e cada piada ainda repetia 4 vezes (MAX_SHOWN).
+
+### O que foi feito
+- Criado `src/lib/bibble/piadas-bank.ts` com **109 piadas curadas e distintas** em pt-BR (animais, objetos, charadas, comida, profissões, cúmulos, fantasia, tecnologia). Para adicionar novas, basta apendar strings no array.
+- Rota `/api/bibble/piada` reescrita: sorteia do banco com **rotação sem repetição** — cache guarda índices `vistos` e uma piada só volta depois que o banco inteiro circular (e nunca duas vezes seguidas na virada do ciclo).
+- Removida a dependência do Ollama nessa rota (resposta agora é instantânea).
+- Cache antigo (`entries`) resetado para o formato novo (`{"vistos":[]}`); leitura tolera formato antigo.
+
+### Decisões tomadas
+- Banco estático curado > geração via LLM local para piadas: qualidade e variedade garantidas, zero latência, zero dependência de o Ollama estar de pé.
+- Contrato da resposta mantido (`{ piada: string }`) — nenhuma mudança no front (`BibbleSpriteCompanion.tsx`).
+
+### Verificação
+- Forge: `tsc --noEmit` sem erros novos (4 erros pré-existentes em ExclusaoFiscal/HabilitacaoRadar/ModalPerfilColaborador, não relacionados); eslint limpo nos arquivos tocados.
+- Probe: 6 chamadas reais na rota do dev server → 6 piadas distintas, cache rotacionando corretamente.
+
+### Pendências
+- Erros pré-existentes de typecheck citados acima seguem no projeto (fora do escopo desta sessão).
+
+---
+
+## [2026-07-15 12:59] — CS & NPS: importação em lote segura e revisável
+
+**Tags:** #feature #integration #nextjs #prisma #security #auth
+**Agentes envolvidos:** Scout, River, Echo, Nova, Anubis, Sage, Forge, Probe, Lens, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/CadastroClientes/page.tsx`, `src/app/PainelAlpha/CadastroClientes/importacao/*`, `src/app/api/cs-nps/{exportar,importar}/*`, `src/lib/cs-nps/*`, `tests/cs-nps/*`, `scripts/smoke-cs-nps-zip-streaming.mjs`, `vitest.config.ts`, `package.json`, `package-lock.json`, `docs/stories/story-cs-nps-importacao-em-lote.md`
+
+### Contexto
+Após concluir e formatar a exportação completa do CS & NPS, o usuário pediu uma importação em lote de Sócios, CS e Feedbacks, combináveis livremente, com modelo de planilha, suporte a vários sócios por empresa, revisão detalhada e confirmação explícita antes de gravar.
+
+### O que foi feito
+- Criado modal em quatro etapas: seleção dos tipos, download/upload do modelo combinado, prévia revisável e resultado final. O modelo usa CNPJ ou razão social e representa múltiplos sócios em linhas separadas com o identificador da empresa repetido.
+- A prévia classifica cada linha, mostra destino e serviço, permite remover itens e exige resolução manual quando há mais de um cadastro candidato; nenhuma empresa é criada automaticamente.
+- As três entidades são persistidas em uma única transação Prisma, com revalidação do destino, allowlists, rollback total, resumo por empresa/tipo e auditoria somente de metadados.
+- A autorização foi centralizada e aplicada à exportação, modelo, prévia e confirmação: sessão válida, usuário ativo, papel atual Admin/CEO e permissão efetiva `Cliente`.
+- O upload recebeu limites explícitos, validação de origem/headers, bloqueio concorrente, rate limit por instância e preflight XLSX/ZIP com `yauzl` por streaming, contando bytes descompactados reais para bloquear zip bomb e metadados falsificados.
+- Adicionados Vitest e smoke dedicado; 19/19 testes passaram, incluindo modelo, múltiplos sócios, ambiguidade, ID adulterado, rollback e arquivos hostis.
+
+### Decisões tomadas
+- Uma linha por sócio, com CNPJ/razão repetidos: preserva todos os sócios sem exigir colunas numeradas ou alterar o schema.
+- Matching exato e escolha manual em ambiguidades: evita vincular dados ao serviço errado quando a empresa possui múltiplos registros.
+- Prévia somente no cliente e gravação atômica no servidor: mantém o fluxo removível sem criar rascunhos persistentes ou sucessos parciais.
+- Sem migration e sem idempotência persistente nesta entrega: a importação cria apenas filhos nos modelos existentes; uma nova confirmação manual válida pode repetir registros.
+- Rate limit em memória por instância como defesa em profundidade: não foi tratado como limite distribuído nem como garantia de idempotência.
+
+### Problemas encontrados / resolvidos
+- Metadados ZIP podem mentir sobre o tamanho descompactado: o preflight passou a ler cada entrada por streaming e interromper ao exceder limites reais.
+- `npm run typecheck` segue com três erros preexistentes fora do módulo e `npm run build` falhou no `prisma generate` por DLL bloqueada no Windows; os 19 testes, o smoke e `npx next build` passaram, sem erro novo da feature.
+- Não havia navegador com sessão Admin/CEO para executar o fluxo visual autenticado; a integração foi validada por código, testes e build, e o teste visual ficou explícito para revisão manual.
+
+### Pendências
+- Executar o fluxo visual completo com uma sessão autenticada de Admin/CEO.
+- Considerar idempotência persistente por lote se o produto passar a exigir proteção contra reimportações manuais independentes.
+- Trocar o rate limit por armazenamento compartilhado caso a aplicação opere com múltiplas instâncias e precise de limitação distribuída.
+
+### Refletido também em
+- `codebase-map.md`: módulo de importação, componentes, serviços e testes documentados pelo Scribe.
+- `integration-points.md`: novas rotas, autorização compartilhada, transação e hardening do XLSX documentados pelo Scribe.
+- `docs/stories/story-cs-nps-importacao-em-lote.md`: critérios, evidências, gates, limites e File List completos.

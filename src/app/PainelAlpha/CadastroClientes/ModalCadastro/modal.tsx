@@ -1,13 +1,12 @@
 "use client";
 
-"use client";
-
 import React, { useEffect, useState } from 'react';
 import { X, Search, Laptop, UserCheck, Calendar as CalendarIcon, Plus, Trash2, CheckCircle2, AlertTriangle, Wallet, CreditCard } from "lucide-react";
 import { toast } from 'sonner';
 import { CadastrarCliente, verificarCNPJDuplicado, buscarUsuariosPorRole } from "@/actions/Clientes";
 import { FORMAS_PAGAMENTO, FORMAS_LABEL } from "./formas-pagamento";
 import { ModalSelecionarUsuario } from "./ModalSelecionarUsuario";
+import { CsNpsModal3DShell } from "../CsNpsMotion";
 
 export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
 
@@ -156,7 +155,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
 
     const ModalDuplicata = () => (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <div className="bg-[#0b1220] border border-amber-500/30 rounded-[2rem] p-8 max-w-sm w-full mx-4 shadow-2xl shadow-amber-900/20">
+            <CsNpsModal3DShell className="relative bg-[#0b1220] border border-amber-500/30 rounded-[2rem] p-8 max-w-sm w-full mx-4 shadow-2xl shadow-amber-900/20">
                 <div className="flex flex-col items-center text-center gap-4">
                     <div className="p-4 bg-amber-500/10 rounded-full border border-amber-500/20">
                         <AlertTriangle size={36} className="text-amber-400" />
@@ -186,14 +185,14 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
                         </button>
                     </div>
                 </div>
-            </div>
+            </CsNpsModal3DShell>
         </div>
     );
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300">
             {modalDuplicata.aberto && <ModalDuplicata />}
-            <div className="bg-[#0b1220] border border-white/10 w-full max-w-5xl max-h-[95vh] overflow-y-auto rounded-[2.5rem] shadow-2xl relative custom-scrollbar">
+            <CsNpsModal3DShell className="bg-[#0b1220] border border-white/10 w-full max-w-5xl max-h-[95vh] overflow-y-auto rounded-[2.5rem] shadow-2xl relative custom-scrollbar">
 
                 {/* HEADER */}
                 <div className="sticky top-0 bg-[#0b1220]/95 backdrop-blur-md p-8 border-b border-white/5 flex justify-between items-center z-20">
@@ -674,7 +673,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
                             )}
                         </button></div>
                 </div>
-            </div>
+            </CsNpsModal3DShell>
 
             <ModalSelecionarUsuario
                 open={campoSelecionandoUsuario !== null}

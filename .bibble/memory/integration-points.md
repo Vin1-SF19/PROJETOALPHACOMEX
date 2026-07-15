@@ -427,6 +427,98 @@ Ver `decisions.md` (2026-07-10) para o registro completo dessas duas pendências
 
 ---
 
+### Exportação completa do CS & NPS
+
+**Arquivos:** `src/app/PainelAlpha/CadastroClientes/page.tsx`, `src/app/PainelAlpha/CadastroClientes/BotaoExportarDados.tsx`, `src/app/api/cs-nps/exportar/route.ts`, `src/lib/cs-nps/exportar-dados.ts`
+
+**Propósito:** exportar em `.xlsx` todas as empresas do CS & NPS e as relações explicitamente selecionadas no helper ExcelJS, mantendo `clienteId` nas abas satélite.
+
+**Editado quando:** um campo ou relacionamento ligado a `clientes` passar a fazer parte da exportação; a role/permissão do módulo mudar; o botão de ação do CS & NPS for reorganizado; ou o contrato HTTP de download mudar.
+
+**Como adicionar um novo relacionamento:**
+
+```typescript
+const clienteSelect = {
+  // campos existentes
+  novaRelacao: { select: { id: true, clienteId: true, campo: true } },
+} as const;
+
+const sheets = [
+  // abas existentes
+  {
+    name: "Nova Relacao",
+    headers: Object.keys(clienteSelect.novaRelacao.select),
+    rows: clientes.flatMap((cliente) => cliente.novaRelacao),
+  },
+];
+```
+
+Ao evoluir o exportador, atualizar em conjunto o `select` Prisma, a lista de abas/headers e os testes da rota/helper. Não usar `include: true` ou serialização irrestrita: a seleção explícita evita vazar colunas futuras ou dados não aprovados. Relações opcionais 1:1 devem ser convertidas para zero/uma linha, como `indicacao ? [indicacao] : []`.
+
+Para sócios, manter as duas representações complementares: `quantidadeSocios` + `sociosResumo` na aba `Empresas` para leitura consolidada e uma linha por registro na aba `Socios`. Esta aba deve conservar `clienteId` e o contexto humano `clienteRazaoSocial`, `clienteCnpj` e `clienteServico`, para que o vínculo permaneça identificável sem cruzamento manual obrigatório.
+
+**Contrato de autorização:**
+
+```typescript
+const acesso = await verificarAcessoAdministrativoCsNps();
+if (!acesso.autorizado) return resposta401Ou403(acesso);
+```
+
+A verificação visual de `Admin`/`CEO` em `page.tsx` nunca substitui `verificarAcessoAdministrativoCsNps()` de `src/lib/cs-nps/autorizacao.ts`, compartilhado com a importação. Manter 401 para sessão inválida, 403 para usuário inativo/role/permissão insuficiente, 404 quando não houver clientes e 500 genérico sem detalhes internos. Toda exportação bem-sucedida deve continuar gerando a ação de auditoria `EXPORTAR_CS_NPS_COMPLETO`.
+
+**Contrato de segurança do arquivo:** neutralizar formula injection antes de inserir valores no Excel; entregar com `Content-Type` de XLSX, `Content-Disposition: attachment`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` e `X-Robots-Tag: noindex, nofollow, noarchive`. O client deve usar `credentials: "same-origin"`, `cache: "no-store"`, validar `response.ok` antes do blob e revogar o `ObjectURL` após iniciar o download.
+
+**Abas atuais:** `Empresas`, `Socios`, `CS`, `Feedbacks`, `Log Alteracoes`, `Historico Cliente`, `Indicacoes`, `CRM Oportunidades`, `CRM Contatos`.
+
+**Contrato visual:** aplicar em todas as abas cabeçalho destacado, bordas, zebra, autofiltro, primeira linha congelada, `wrapText`, ajuste de largura por tipo/conteúdo e altura compatível com células multilinha. Na aba `Empresas`, preservar as cores semânticas: `feedbackGoogle` com `SIM` verde e `NÃO` vermelho; `status` com `Deferido` verde, prefixo `Cancelado` vermelho, `Stand By` amarelo, `Em andamento` azul e `Arquivado` cinza. Novos valores de status devem ter sua semântica definida explicitamente antes de receber uma cor.
+
+**Contrato de datas (18 colunas explícitas):** declarar cada campo em `dateColumns`; não inferir formatação pelo nome da coluna. Usar `date-only` e formato Excel `dd/mm/yyyy`, sem conversão de timezone, para `Empresas.dataConstituicao`, `Empresas.dataContratacao`, `Empresas.dataExito`, `Socios.dataNascimento` e `CRM Oportunidades.dataFechamento`. Usar `date-time` e formato Excel `dd/mm/yyyy hh:mm`, convertido para `America/Sao_Paulo`, para `Empresas.createdAt`, `Empresas.updatedAt`, `CS.dataRegistro`, `Feedbacks.dataRegistro`, `Log Alteracoes.dataAlteracao`, `Historico Cliente.criadoEm`, `Indicacoes.dataIndicacao`, `Indicacoes.comprovanteEnviadoEm`, `Indicacoes.createdAt`, `CRM Oportunidades.createdAt`, `CRM Oportunidades.updatedAt`, `CRM Contatos.createdAt` e `CRM Contatos.updatedAt`. Manter nulos como células vazias e entradas não reconhecidas ou inválidas como texto original, sem normalização automática.
+
+**Última atualização:** 2026-07-15 por Scribe
+
+---
+
+### Importação em lote do CS & NPS
+
+**Arquivos:** `src/app/PainelAlpha/CadastroClientes/page.tsx`, `src/app/PainelAlpha/CadastroClientes/importacao/`, `src/app/api/cs-nps/importar/{modelo,previsualizar,salvar}/route.ts`, `src/lib/cs-nps/{autorizacao,importacao-tipos,importacao-rate-limit,importar-dados,preflight-xlsx}.ts`, `tests/cs-nps/`
+
+**Propósito:** importar sócios, registros de CS e feedbacks Google em qualquer combinação, sempre com prévia removível e seleção explícita do cadastro/serviço de destino antes da transação final.
+
+**Editado quando:** um campo persistido de `socios`, `log_cs` ou `logFeedback` mudar; o modelo de planilha mudar; a regra `clientes.cnpj + servicos` mudar; roles/permissões do CS & NPS mudarem; limites de upload/ZIP mudarem; ou outra entidade passar a ser importável.
+
+**Como adicionar um novo tipo importável:** manter sincronizados, no mesmo change set, o tipo em `TIPOS_IMPORTACAO`, nome da aba/cabeçalhos e parser em `importar-dados.ts`, schemas discriminados de preview/save, criação transacional, contadores/resumo, seleção e rótulos da UI e os testes Vitest. Nunca aceitar o objeto da planilha como `data` Prisma irrestrito; mapear cada campo explicitamente.
+
+**Contrato atual das abas:**
+
+| Tipo | Aba | Cabeçalhos exatos |
+|---|---|---|
+| Sócios | `Socios` | `cnpj`, `razaoSocial`, `nome`, `telefone`, `observacao`, `dataNascimento`, `vinculo` |
+| CS | `CS` | `cnpj`, `razaoSocial`, `colaborador`, `sentimento`, `observacao`, `dataRegistro` |
+| Feedbacks | `Feedbacks` | `cnpj`, `razaoSocial`, `colaborador`, `sentimento`, `observacao`, `dataRegistro` |
+
+O workbook sempre pode conter `Instrucoes` e contém somente as abas escolhidas no modal. CNPJ ou razão social é obrigatório; quando ambos forem fornecidos, precisam apontar para o mesmo conjunto. Vários sócios são representados repetindo a empresa em uma linha por sócio. `sentimento` aceita somente `pos`, `neg` ou `na`; datas aceitam `DD/MM/AAAA`, `AAAA-MM-DD` ou célula de data do Excel e são normalizadas pelo parser.
+
+**Resolução de destino:** `clientes.cnpj` não é único; o vínculo definitivo é `clienteId`. A prévia devolve todos os candidatos com `clienteId`, CNPJ, razão social, serviço e status. Uma correspondência sugere automaticamente o destino; várias deixam a linha ambígua para escolha de empresa/serviço; nenhuma torna a linha inválida. No `POST /salvar`, o servidor refaz o matching pelo identificador original e rejeita qualquer `clienteId` que não continue entre os candidatos. Não confiar na seleção enviada pelo client sem essa revalidação.
+
+**Autorização compartilhada:** as três rotas e a exportação usam `verificarAcessoAdministrativoCsNps()` de `src/lib/cs-nps/autorizacao.ts`, que exige sessão, usuário ainda `ATIVO` no banco, role atual normalizada `admin`/`ceo` e permissão efetiva `Cliente`. A confirmação também revalida role/status dentro da transação. A condição visual em `page.tsx` é apenas conveniência.
+
+```typescript
+const acesso = await verificarAcessoAdministrativoCsNps();
+if (!acesso.autorizado) return resposta401Ou403(acesso);
+```
+
+**Transação e auditoria:** `salvarImportacao()` faz `createMany` em `socios`, `log_cs` e/ou `logFeedback` e cria `IMPORTAR_CS_NPS_SALVO` em `auditoria` dentro do mesmo `db.$transaction`. Qualquer falha reverte dados e auditoria de sucesso. Modelo, prévia, recusas e falhas usam ações de auditoria best-effort nas rotas, sem expor conteúdo sensível da planilha.
+
+**Contrato de upload/preflight:** manter `.xlsx` apenas, 10 MB por arquivo e 2.000 linhas somadas. Antes de `ExcelJS.load`, `preflight-xlsx.ts` percorre o ZIP em streaming com `yauzl`, verifica tamanho real e restringe a 256 entradas, 20 MB por entrada descompactada, 50 MB no total e razão de compressão 100:1. Macros, ZIP criptografado, fórmulas, abas/cabeçalhos inesperados, caminhos inseguros e metadados/tamanhos incoerentes devem continuar bloqueados. A rota de prévia valida `Origin`/`Sec-Fetch-Site`, `Content-Type` e `Content-Length` antes de materializar o formulário.
+
+**Rate limit e idempotência:** `importacao-rate-limit.ts` mantém no máximo cinco prévias por minuto por `userId + IP` e uma prévia simultânea por chave. É uma defesa em memória por instância, não um limite distribuído; mover para Redis/KV se houver várias réplicas. A confirmação não possui chave persistente de idempotência nesta versão; um replay válido pode duplicar registros. Não declarar a operação idempotente sem adicionar uma chave única persistida e tratamento transacional de repetição — isso está fora do escopo atual.
+
+**Testes obrigatórios ao evoluir:** executar os testes Vitest de `tests/cs-nps/importar-dados.test.ts`, `calculos.test.ts` e `preflight-xlsx.test.ts`, cobrindo ao menos abas selecionadas, múltiplos sócios, conflito/ambiguidade de empresa, datas, fórmulas, `clienteId` adulterado, rollback/auditoria, remoção da prévia e ZIP bomb/tamanho real.
+
+**Última atualização:** 2026-07-15 por Scribe
+
+---
+
 ### Alpha Presentation Studio — Onda 5 (Motor de IA para geração de conteúdo de slide)
 
 **Adicionado em:** 2026-07-10 por Scribe (sessão Bibble)
