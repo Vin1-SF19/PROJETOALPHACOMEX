@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { getTema } from "@/lib/temas";
 
 import ModalButtons from "@/components/ComponentesRadar/BotoesModal";
@@ -9,13 +10,13 @@ import LoadingImport from "@/components/ComponentesRadar/ImportacaoLoading";
 import ImportarPlanilha from "@/components/ComponentesRadar/ImportacaoLote";
 import { ModalDetalhesEmpresa } from "@/components/ModalDetalhesEmpresa";
 import ModalOpcoesReconsulta from "@/components/ComponentesRadar/BotaoReconsulta/BotaoReconsulta";
+import { CardComScan } from "@/components/ComponentesRadar/CardComScan";
 import {
   deletarRegistrosBanco,
   salvarConsultaIndividual,
   salvarPlanilhaCompleta,
   verificarCnpjsExistentes,
 } from "@/actions/RadarAction";
-import { prepararReconsultaLote } from "@/app/api/Reconsulta/ReconsultaRadar";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { BarChart3, Loader2, Search, ShieldCheck, WifiOff } from "lucide-react";
@@ -63,6 +64,10 @@ const fmtBRL = (v: any) => {
   if (!num || isNaN(num)) return "—";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
 };
+
+// Altura estimada de cada linha da tabela (usada pelo virtualizador) — linhas densas,
+// texto text-[9px]/text-[10px] + padding p-2. Overscan generoso absorve pequenas variações.
+const ALTURA_LINHA_ESTIMADA = 34;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -186,9 +191,13 @@ export function HabilitacaoRadarClient() {
     const deferidas = empresas.filter((e) =>
       ["DEFERIDA", "HABILITADA"].includes((e.situacao || "").toUpperCase())
     ).length;
-    const falhas = empresas.filter(
-      (e) => e.situacao === "ERRO" || e.razaoSocial === "NÃO ENCONTRADO"
-    ).length;
+    const falhas = empresas.filter((e) => {
+      const s = (e.situacao || "").toUpperCase().trim();
+      return (
+        ["ERRO", "ERRO NA CONSULTA", "ERRO NA API", "PENDENTE RADAR", "NÃO LOCALIZADO"].includes(s) ||
+        e.razaoSocial === "NÃO ENCONTRADO"
+      );
+    }).length;
     const sincronizados = empresas.filter((e) => e.salvo).length;
     const concluido =
       total > 0
@@ -220,6 +229,15 @@ export function HabilitacaoRadarClient() {
       ),
     [selecionados, empresas]
   );
+
+  // ── Virtualização da tabela (lotes de milhares de CNPJs deixavam o navegador lento) ──
+  const tabelaScrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: empresasExibidas.length,
+    getScrollElement: () => tabelaScrollRef.current,
+    estimateSize: () => ALTURA_LINHA_ESTIMADA,
+    overscan: 12,
+  });
 
   const [excluindoDoBanco, setExcluindoDoBanco] = useState(false);
   const [progressoExclusao, setProgressoExclusao] = useState({ atual: 0, total: 0 });
@@ -387,10 +405,11 @@ export function HabilitacaoRadarClient() {
     });
   }
 
-  const handleReconsultarErros = async () => {
+  const handleReconsultar = async (tipo: "ERROS" | "NAO_HABILITADOS") => {
     setShowModalReconsulta(false);
     const alvo = empresas.filter((e) => {
       const s = (e.situacao || "").toUpperCase().trim();
+      if (tipo === "NAO_HABILITADOS") return s === "NÃO HABILITADA";
       return (
         !e.razaoSocial ||
         s === "" ||
@@ -399,7 +418,13 @@ export function HabilitacaoRadarClient() {
         s === "ERRO NA CONSULTA"
       );
     });
-    if (!alvo.length) return toast.info("Nenhum erro pendente.");
+    if (!alvo.length) {
+      return toast.info(
+        tipo === "NAO_HABILITADOS"
+          ? "Nenhum registro não habilitado pendente."
+          : "Nenhum erro pendente."
+      );
+    }
 
     setProcessando(true);
     setLoading(true);
@@ -822,8 +847,9 @@ export function HabilitacaoRadarClient() {
           { label: "Falhas", value: stats.falhas, color: "#f87171", sub: "com erro" },
           { label: "Sincronizados", value: stats.sincronizados, color: "#c084fc", sub: "no banco" },
         ].map((c) => (
-          <div
+          <CardComScan
             key={c.label}
+            accentRgb={visual.accent}
             className="bg-slate-950/60 rounded-2xl p-4 flex flex-col border"
             style={{ borderColor: `rgba(${visual.accent},0.15)` }}
           >
@@ -834,12 +860,13 @@ export function HabilitacaoRadarClient() {
               {c.value}
             </span>
             <span className="text-[9px] text-slate-600 uppercase mt-0.5">{c.sub}</span>
-          </div>
+          </CardComScan>
         ))}
       </section>
 
       {/* Submodalidade breakdown */}
-      <div
+      <CardComScan
+        accentRgb={visual.accent}
         className="grid grid-cols-3 gap-3 p-4 rounded-2xl border"
         style={{ borderColor: `rgba(${visual.accent},0.12)`, background: "rgba(2,6,23,0.5)" }}
       >
@@ -857,13 +884,14 @@ export function HabilitacaoRadarClient() {
             </span>
           </div>
         ))}
-      </div>
+      </CardComScan>
 
       {/* ── Consulta + Monitor ─────────────────────────────────────────────── */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* Consulta individual + importar */}
-        <div
+        <CardComScan
+          accentRgb={visual.accent}
           className="space-y-4 bg-slate-950/60 rounded-3xl p-6 shadow-lg border"
           style={{ borderColor: `rgba(${visual.accent},0.15)` }}
         >
@@ -913,10 +941,11 @@ export function HabilitacaoRadarClient() {
             processadas={processadas}
             totalLote={totalLote}
           />
-        </div>
+        </CardComScan>
 
         {/* Monitor de processamento */}
-        <div
+        <CardComScan
+          accentRgb={visual.accent}
           className="bg-slate-950/60 rounded-3xl p-6 shadow-lg border flex flex-col gap-4"
           style={{ borderColor: `rgba(${visual.accent},0.15)` }}
         >
@@ -988,7 +1017,7 @@ export function HabilitacaoRadarClient() {
               setLoading(false);
             }}
           />
-        </div>
+        </CardComScan>
       </section>
 
       {/* ── Action bar ─────────────────────────────────────────────────────── */}
@@ -996,7 +1025,7 @@ export function HabilitacaoRadarClient() {
         onImportarHistorico={handleImportarHistorico}
         onLimparTabela={limparTabela}
         onExportarExcel={exportarExcel}
-        onReconsultarErros={handleReconsultarErros}
+        onReconsultarErros={() => handleReconsultar("ERROS")}
         processando={processando}
         onSalvarBanco={handleSalvarNoBanco}
         empresas={empresas}
@@ -1032,7 +1061,7 @@ export function HabilitacaoRadarClient() {
       <ModalOpcoesReconsulta
         isOpen={showModalReconsulta}
         onClose={() => setShowModalReconsulta(false)}
-        onExecutar={handleReconsultarErros}
+        onExecutar={handleReconsultar}
       />
 
       {/* ── Tabela ─────────────────────────────────────────────────────────── */}
@@ -1058,9 +1087,9 @@ export function HabilitacaoRadarClient() {
           )}
         </div>
 
-        <div className="overflow-x-auto">
+        <div ref={tabelaScrollRef} className="overflow-x-auto overflow-y-auto max-h-[70vh]">
           <table className="w-full border-collapse text-center">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr
                 className="text-[9px] uppercase tracking-widest"
                 style={{ background: "rgba(15,23,42,0.6)", borderBottom: `1px solid rgba(${visual.accent},0.12)` }}
@@ -1089,7 +1118,7 @@ export function HabilitacaoRadarClient() {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-white/[0.04]">
+            <tbody className="divide-y divide-white/[0.04]" style={{ position: "relative" }}>
               {empresasExibidas.length === 0 ? (
                 <tr>
                   <td colSpan={16} className="py-20 text-slate-600 text-sm italic">
@@ -1097,82 +1126,110 @@ export function HabilitacaoRadarClient() {
                   </td>
                 </tr>
               ) : (
-                empresasExibidas.map((empresa, index) => (
-                  <tr
-                    key={empresa.cnpj}
-                    onClick={() => setEmpresaSelecionada(empresa)}
-                    className="cursor-pointer transition-all text-[9px] md:text-[10px]"
-                    style={{
-                      background: selecionados.has(empresa.cnpj)
-                        ? `rgba(${visual.accent},0.08)`
-                        : empresa.salvo
-                        ? "rgba(147,51,234,0.06)"
-                        : undefined,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!selecionados.has(empresa.cnpj))
-                        (e.currentTarget as HTMLTableRowElement).style.background =
-                          "rgba(255,255,255,0.03)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLTableRowElement).style.background = selecionados.has(
-                        empresa.cnpj
-                      )
-                        ? `rgba(${visual.accent},0.08)`
-                        : empresa.salvo
-                        ? "rgba(147,51,234,0.06)"
-                        : "";
-                    }}
-                  >
-                    <td className="p-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="cursor-pointer"
-                        style={{ accentColor: `rgb(${visual.accent})` }}
-                        checked={selecionados.has(empresa.cnpj)}
-                        onChange={() => toggleSelecionarUm(empresa.cnpj)}
-                      />
-                    </td>
-                    <td className="p-2 text-slate-600">{index + 1}</td>
-                    <td className="p-2 text-slate-400">{fmtDisplay(empresa.dataConsulta)}</td>
-                    <td
-                      className="p-2 font-bold"
-                      style={{ color: `rgb(${visual.accent})` }}
-                    >
-                      {empresa.cnpj}
-                    </td>
-                    <td className="p-2 truncate max-w-[80px] text-slate-300">
-                      {empresa.contribuinte}
-                    </td>
-                    <td className="p-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[8px] font-black ${statusBadge(empresa.situacao)}`}
-                      >
-                        {empresa.situacao || "SEM STATUS"}
-                      </span>
-                    </td>
-                    <td className="p-2 text-slate-400">{fmtDisplay(empresa.dataSituacao)}</td>
-                    <td className="p-2 text-slate-300 truncate max-w-[100px]">
-                      {empresa.submodalidade}
-                    </td>
-                    <td className="p-2 truncate max-w-[120px] text-slate-200">
-                      {empresa.razaoSocial}
-                    </td>
-                    <td className="p-2 truncate max-w-[80px] text-slate-400">
-                      {empresa.nomeFantasia}
-                    </td>
-                    <td className="p-2 text-slate-400">{empresa.municipio}</td>
-                    <td className="p-2 text-slate-500">{empresa.uf}</td>
-                    <td className="p-2 text-slate-400">
-                      {fmtDisplay(empresa.dataConstituicao)}
-                    </td>
-                    <td className="p-2 text-slate-400">{empresa.regimeTributario}</td>
-                    <td className="p-2 text-slate-400">
-                      {fmtDisplay(empresa.data_opcao || "N/A")}
-                    </td>
-                    <td className="p-2 text-slate-400 whitespace-nowrap">{fmtBRL(empresa.capitalSocial)}</td>
-                  </tr>
-                ))
+                (() => {
+                  const virtualRows = rowVirtualizer.getVirtualItems();
+                  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+                  const paddingBottom =
+                    virtualRows.length > 0
+                      ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+                      : 0;
+
+                  return (
+                    <>
+                      {paddingTop > 0 && (
+                        <tr aria-hidden>
+                          <td colSpan={16} style={{ height: paddingTop, padding: 0, border: "none" }} />
+                        </tr>
+                      )}
+                      {virtualRows.map((virtualRow) => {
+                        const empresa = empresasExibidas[virtualRow.index];
+                        return (
+                          <tr
+                            key={empresa.cnpj}
+                            data-index={virtualRow.index}
+                            ref={rowVirtualizer.measureElement}
+                            onClick={() => setEmpresaSelecionada(empresa)}
+                            className="cursor-pointer transition-all text-[9px] md:text-[10px]"
+                            style={{
+                              background: selecionados.has(empresa.cnpj)
+                                ? `rgba(${visual.accent},0.08)`
+                                : empresa.salvo
+                                ? "rgba(147,51,234,0.06)"
+                                : undefined,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!selecionados.has(empresa.cnpj))
+                                (e.currentTarget as HTMLTableRowElement).style.background =
+                                  "rgba(255,255,255,0.03)";
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLTableRowElement).style.background = selecionados.has(
+                                empresa.cnpj
+                              )
+                                ? `rgba(${visual.accent},0.08)`
+                                : empresa.salvo
+                                ? "rgba(147,51,234,0.06)"
+                                : "";
+                            }}
+                          >
+                            <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                className="cursor-pointer"
+                                style={{ accentColor: `rgb(${visual.accent})` }}
+                                checked={selecionados.has(empresa.cnpj)}
+                                onChange={() => toggleSelecionarUm(empresa.cnpj)}
+                              />
+                            </td>
+                            <td className="p-2 text-slate-600">{virtualRow.index + 1}</td>
+                            <td className="p-2 text-slate-400">{fmtDisplay(empresa.dataConsulta)}</td>
+                            <td
+                              className="p-2 font-bold"
+                              style={{ color: `rgb(${visual.accent})` }}
+                            >
+                              {empresa.cnpj}
+                            </td>
+                            <td className="p-2 truncate max-w-[80px] text-slate-300">
+                              {empresa.contribuinte}
+                            </td>
+                            <td className="p-2">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[8px] font-black ${statusBadge(empresa.situacao)}`}
+                              >
+                                {empresa.situacao || "SEM STATUS"}
+                              </span>
+                            </td>
+                            <td className="p-2 text-slate-400">{fmtDisplay(empresa.dataSituacao)}</td>
+                            <td className="p-2 text-slate-300 truncate max-w-[100px]">
+                              {empresa.submodalidade}
+                            </td>
+                            <td className="p-2 truncate max-w-[120px] text-slate-200">
+                              {empresa.razaoSocial}
+                            </td>
+                            <td className="p-2 truncate max-w-[80px] text-slate-400">
+                              {empresa.nomeFantasia}
+                            </td>
+                            <td className="p-2 text-slate-400">{empresa.municipio}</td>
+                            <td className="p-2 text-slate-500">{empresa.uf}</td>
+                            <td className="p-2 text-slate-400">
+                              {fmtDisplay(empresa.dataConstituicao)}
+                            </td>
+                            <td className="p-2 text-slate-400">{empresa.regimeTributario}</td>
+                            <td className="p-2 text-slate-400">
+                              {fmtDisplay(empresa.data_opcao || "N/A")}
+                            </td>
+                            <td className="p-2 text-slate-400 whitespace-nowrap">{fmtBRL(empresa.capitalSocial)}</td>
+                          </tr>
+                        );
+                      })}
+                      {paddingBottom > 0 && (
+                        <tr aria-hidden>
+                          <td colSpan={16} style={{ height: paddingBottom, padding: 0, border: "none" }} />
+                        </tr>
+                      )}
+                    </>
+                  );
+                })()
               )}
             </tbody>
           </table>

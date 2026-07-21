@@ -58,7 +58,7 @@ async function getRadarData(cnpj: string) {
       dados?.situacao_habilitacao ||
       dados?.descricao_situacao ||
       dados?.status ||
-      "NÃO LOCALIZADO",
+      "NÃO HABILITADA",
     dataSituacao:
       dados?.data_situacao ||
       dados?.situacao_data ||
@@ -119,15 +119,74 @@ export async function GET(req: Request) {
     // Receita Federal é obrigatória
     if (receitaResult.status === "rejected") {
       console.error("Receita Federal falhou:", receitaResult.reason);
-      return NextResponse.json(
-        { error: "Receita Federal fora do ar ou CNPJ não encontrado" },
-        { status: 502 }
+
+      // Não sobrescreve dado bom já salvo por causa de uma falha transitória (ex: reconsulta).
+      const existenteAntesDoErro = await db.consultas_radar.findUnique({
+        where: { cnpj },
+        select: { razao_social: true },
+      });
+      const jaTemDadosReais = !!(
+        existenteAntesDoErro?.razao_social &&
+        existenteAntesDoErro.razao_social !== "" &&
+        existenteAntesDoErro.razao_social !== "ERRO NA CONSULTA" &&
+        existenteAntesDoErro.razao_social !== "NÃO ENCONTRADO"
       );
+
+      if (jaTemDadosReais) {
+        return NextResponse.json(
+          { error: "Receita Federal fora do ar ou CNPJ não encontrado" },
+          { status: 502 }
+        );
+      }
+
+      // Sem dado bom prévio: salva um placeholder de ERRO para o registro aparecer na
+      // tabela e ficar elegível para reconsulta — sem isso, a falha some silenciosamente.
+      const payloadErro = {
+        cnpj,
+        razao_social: "ERRO NA CONSULTA",
+        nome_fantasia: "",
+        situacao_radar: "ERRO NA CONSULTA",
+        submodalidade: "",
+        data_situacao: null,
+        municipio: "",
+        uf: "",
+        regime_tributario: "",
+        data_opcao: null,
+        capital_social: "0",
+        data_constituicao: null,
+        contribuinte: "",
+        fonte: forcar ? "Reconsulta (erro Receita)" : "API Externa (erro Receita)",
+        json_completo: JSON.stringify({
+          erro: String((receitaResult as PromiseRejectedResult).reason?.message || (receitaResult as PromiseRejectedResult).reason),
+        }),
+        data_consulta: new Date().toISOString(),
+      };
+
+      const salvoErro = await db.consultas_radar.upsert({
+        where: { cnpj },
+        update: payloadErro,
+        create: payloadErro,
+      });
+
+      return NextResponse.json({
+        ...salvoErro,
+        razaoSocial:      salvoErro.razao_social,
+        nomeFantasia:     salvoErro.nome_fantasia,
+        situacao:         salvoErro.situacao_radar,
+        dataSituacao:     salvoErro.data_situacao,
+        dataConstituicao: salvoErro.data_constituicao,
+        regimeTributario: salvoErro.regime_tributario,
+        capitalSocial:    salvoErro.capital_social,
+        dataConsulta:     salvoErro.data_consulta,
+      });
     }
 
     const receita = receitaResult.value;
 
-    // RADAR é opcional — se falhar, usa defaults
+    // RADAR é opcional — se falhar de verdade (timeout, HTTP não-200, config ausente),
+    // marca como ERRO NA CONSULTA (elegível para reconsulta) em vez de fingir "NÃO HABILITADA".
+    // Se a chamada teve sucesso mas voltou sem dados, isso é uma resposta de negócio
+    // válida e fiel à API — não mexer nesse caminho.
     let radar = {
       situacao: "NÃO HABILITADA",
       submodalidade: "N/A",
@@ -138,6 +197,12 @@ export async function GET(req: Request) {
       radar = radarResult.value;
     } else {
       console.error("RADAR falhou:", radarResult.reason?.message);
+      radar = {
+        situacao: "ERRO NA CONSULTA",
+        submodalidade: "",
+        contribuinte: "",
+        dataSituacao: "",
+      };
     }
 
     const payload = {

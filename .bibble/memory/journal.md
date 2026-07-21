@@ -885,3 +885,36 @@ Duas causas raiz reais encontradas e corrigidas:
 2. `handleBuscar` (consulta individual) nunca marcava `salvo: true` no registro local — `temSelecionadoNoBanco` ficava sempre `false` para CNPJs consultados um a um (o fluxo mais comum), desabilitando o botão silenciosamente.
 
 Redesenho pedido pelo usuário: botão agora mostra a quantidade (`Excluir do banco (N)`), modal de 3 fases (confirmar com contagem → barra de progresso processando CNPJ por CNPJ → resumo final), e a exclusão real **não remove mais a linha da tabela** (só marca `salvo:false`), permitindo reconsulta posterior. `BotoesModal.tsx` ganhou 3 estados locais (`modalExcluirBancoAberto`, `iniciouExclusao`) com a fase derivada no render (evitando `useEffect` + `setState` síncrono, que o lint acusou como novo erro `react-hooks/set-state-in-effect` na primeira tentativa).
+
+### Atualização (mesma sessão, rodada 3) — fundo vivo próprio + bug de mascaramento de erro
+
+**Pipeline:** Scout → Iris (3 opções visuais, usuário escolheu "Varredura Sonar") → Nova → Echo → Forge → Lens (achou 1 gap, corrigido) → Probe (✅) → Scribe.
+
+**Visual:** `RadarBackground.tsx` (novo) — anéis concêntricos + linha de sweep rotativa (`conic-gradient`) + blips piscando, 100% Framer Motion, mesma arquitetura de `ChecklistBackground.tsx` mas identidade própria (sonar, não céu estrelado). `CardComScan.tsx` (novo, reutilizável) — linha de scan vertical no hover, usado em 7 cards do módulo. Descoberta no caminho: já existia um `layout.tsx` no módulo (só `Toaster`+metadata) — mesclado, não sobrescrito, para não perder o `Toaster` do qual todo o módulo depende.
+
+**Bug real corrigido em `ConsultaCompleta/route.ts`:** falha técnica na chamada ao RADAR (timeout/HTTP não-200/config ausente) caía num default `"NÃO HABILITADA"`, mascarando erro real como resposta de negócio válida — o filtro de reconsulta já procurava literalmente por `"ERRO NA CONSULTA"`, mas nada no pipeline produzia essa string, então esses registros nunca eram reconsultados. Mesmo problema quando a Receita Federal falhava: retornava 502 sem salvar nada, registro nunca aparecia na tabela pra reconsultar. Corrigido nos dois casos — agora grava `"ERRO NA CONSULTA"` (com guard para não sobrescrever dado bom prévio por falha transitória). Lens pegou um gap na revisão: `stats.falhas` não contava a nova string — corrigido antes de fechar.
+
+**Decisão preservada de propósito:** RADAR responder com sucesso mas sem dados continua sendo `"NÃO LOCALIZADO"`/`"NÃO HABILITADO"` (resposta de negócio válida, fiel à API) — não é erro, não mexer nesse caminho.
+
+### Atualização (mesma sessão, rodada 4) — virtualização da tabela (performance com milhares de CNPJs)
+
+**Contexto:** usuário reportou que lotes reais já chegaram a 8 mil CNPJs e a tabela renderizava tudo de uma vez, deixando o navegador lento. Bibble apresentou 2 opções (virtualização vs. paginação simples client-side); usuário escolheu virtualização.
+
+**O que foi feito:** instalada `@tanstack/react-virtual@3.14.7` (primeira virtualização do projeto, compatibilidade com React 19 confirmada antes de instalar). Tabela `HabilitacaoRadarClient.tsx` reescrita com técnica de padding-rows (2 `<tr>` de altura calculada simulando linhas fora da janela visível) preservando o `<table>` HTML nativo — evita quebrar alinhamento de colunas que aconteceria com posicionamento absoluto. `<thead>` ganhou `sticky top-0`; container ganhou scroll próprio (`max-h-[70vh]`, `overflow-y-auto`).
+
+**Confirmado sem regressão:** `handleSelecionarTudo`, `exportarExcel` e os filtros operam sobre os arrays completos em memória, nunca dependeram de quantas linhas o DOM tinha montadas — corretos mesmo com só ~30-40 `<tr>` renderizados por vez.
+
+**Aceito conscientemente:** 1 warning de lint novo (`react-hooks/incompatible-library`, o `useVirtualizer` é conhecidamente incompatível com o otimizador do React Compiler) — irrelevante aqui, o projeto não tem `experimental.reactCompiler` ativado.
+
+**Pendência:** não foi possível testar visualmente em navegador real com um lote de milhares de linhas carregado — recomendado ao usuário validar scroll/performance real antes de considerar fechado.
+
+### Atualização (mesma sessão, rodada 5) — "NÃO HABILITADA" corrigido de vez + reconsulta restaurada
+
+**Contexto:** usuário percebeu que "não habilitados" ainda estavam virando "NÃO LOCALIZADO" (a correção da rodada 2 tratou só a falha técnica do RADAR, não esse caso) e que o botão de reconsultar "não habilitados" tinha sido removido do modal de reconsulta.
+
+**O que foi feito:**
+- Fallback de `getRadarData` corrigido de `"NÃO LOCALIZADO"` para `"NÃO HABILITADA"` quando o RADAR responde com sucesso mas sem registro de habilitação (empresa existe, só não é habilitada) — string canônica usada em todo o resto do sistema.
+- Achada função órfã `prepararReconsultaLote` (2 cópias, `RadarAction.ts` e `ReconsultaRadar.ts`) que dependia de apagar registros + um "robô" externo não localizado no projeto — importada mas nunca chamada. Em vez de reativar, generalizada `handleReconsultarErros` → `handleReconsultar(tipo)`, reaproveitando o motor de reconsulta ao vivo já funcional.
+- `BotaoReconsulta.tsx`: props tipadas (eram `any`), 2º botão "Reconsultar Não Habilitados" restaurado.
+
+**Decisão:** não revivi o mecanismo antigo (delete + robô externo) por confiabilidade incerta — generalizei o mecanismo atual, que já funciona e é auditável. `prepararReconsultaLote` (as 2 cópias) ficou 100% morta — não removida, decisão do usuário se quer limpar.
