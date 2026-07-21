@@ -126,6 +126,33 @@ A autorização administrativa comum foi extraída para `src/lib/cs-nps/autoriza
 
 **Última atualização:** 2026-07-15 por Scribe
 
+## Módulo Calendário Alpha (Domain-Wide Delegation — 2026-07-17, v2)
+
+**Arquitetura mudou dentro da mesma sessão**: começou como OAuth por usuário (tokens criptografados), foi reconstruída para Domain-Wide Delegation (Service Account impersona `usuarios.email` via `google.auth.JWT`). Schema v2, sem nenhum token por usuário:
+
+```prisma
+model GoogleCalendarConexao {
+  id, userId (Int, @unique) → usuarios,
+  status (ATIVA|DESATIVADA), ativadoEm, desativadoEm?, ultimaSincronizacaoEm?
+}
+model GoogleCalendarSelecionado { id, conexaoId → GoogleCalendarConexao, googleCalendarId, nome, corHex?, timezone, papelAcesso, visivel, gravavel, syncToken?, ultimaSincronizacaoEm?
+  @@unique([conexaoId, googleCalendarId]) }
+model GoogleCalendarEventoCache { id, calendarioId → GoogleCalendarSelecionado, googleEventId, status, titulo?, inicioEm?, fimEm?, diaInteiro, etag, atualizadoGoogleEm
+  @@unique([calendarioId, googleEventId]) @@index([calendarioId, inicioEm]) }
+```
+`GoogleCalendarOAuthNonce` (existia na v1) foi **removida** — sem OAuth, sem state, sem nonce. Duas migrations reais aplicadas no Turso via script pontual (`@libsql/client/web`), cada uma com backup pré-mudança validado em `database-backups/pre-change/` e confirmação explícita do usuário. Nenhuma coluna nova em `usuarios`.
+
+| Tipo | Caminho | Auth | Descrição |
+|------|---------|------|-----------|
+| Server Action | `src/actions/google-calendar-conexao.ts` | Sim | `obterStatusConexaoCalendarioAlpha`, `ativarCalendarioAlpha`/`desativarCalendarioAlpha` — puramente local, sem chamada ao Google (a autorização real já existe via Domain-Wide Delegation). |
+| Server Action | `src/actions/google-calendar-eventos.ts` | Sim | Seleção de calendário, sync (full/incremental via `syncToken`), CRUD de evento (etag para detectar conflito), FreeBusy. Toda chamada ao Google usa `emailUsuario` resolvido via `usuario-google.ts` (sempre `usuarios.email` da sessão, nunca do payload do cliente). |
+
+**Sem Route Handlers** — o fluxo OAuth (`/api/calendario-alpha/oauth/{connect,callback}`) foi removido por completo.
+
+**Pré-requisito fora do código:** Service Account com Domain-Wide Delegation autorizada pelo Super Admin do Google Workspace (Admin Console → Security → API Controls → Domain-wide Delegation), com o Client ID numérico da Service Account e os escopos de `scopes.ts`. Ver `codebase-map.md` para o passo a passo completo.
+
+---
+
 ## Variáveis de Ambiente
 
 <!-- Listar as env vars necessárias -->
@@ -134,3 +161,5 @@ A autorização administrativa comum foi extraída para `src/lib/cs-nps/autoriza
 |----------|-----|
 | `DATABASE_URL` | Conexão com banco |
 | `ANTHROPIC_API_KEY` | API Claude (Bibble) |
+| `GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL` | `client_email` da Service Account com Domain-Wide Delegation (Calendário Alpha) |
+| `GOOGLE_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY` | `private_key` da mesma Service Account (com `\n` literais) — nunca em banco, só nesta env var |

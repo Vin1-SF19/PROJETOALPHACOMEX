@@ -831,6 +831,189 @@ export async function executarTool(
       }
     }
 
+    // ── Calendário Alpha (Google Calendar) ─────────────────────────────────────
+
+    case "listar_eventos_calendario": {
+      if (!temPermissao(ctx, "calendarioAlpha")) return negado("Calendário Alpha");
+
+      const { listarCalendariosSelecionados, listarEventosDoCalendario } = await import(
+        "@/actions/google-calendar-eventos"
+      );
+
+      const diasAFrente = Math.min(Math.max(Number(params.dias_a_frente) || 7, 1), 60);
+      const agora = new Date();
+      const fim = new Date(agora.getTime() + diasAFrente * 24 * 60 * 60 * 1000);
+
+      const calendariosResultado = await listarCalendariosSelecionados();
+      if (!calendariosResultado.success) return calendariosResultado.error;
+      const calendariosVisiveis = calendariosResultado.data.filter((c) => c.visivel);
+      if (!calendariosVisiveis.length) return "Nenhum calendário selecionado no Calendário Alpha ainda.";
+
+      const todosEventos: {
+        titulo: string | null;
+        inicio: Date | null;
+        fim: Date | null;
+        dia_inteiro: boolean;
+        link_meet: string | null;
+        calendario: string;
+        google_event_id: string;
+      }[] = [];
+
+      for (const calendario of calendariosVisiveis) {
+        const resultado = await listarEventosDoCalendario(calendario.id, agora.toISOString(), fim.toISOString());
+        if (!resultado.success) continue;
+        for (const evento of resultado.data) {
+          todosEventos.push({
+            titulo: evento.titulo,
+            inicio: evento.inicioEm,
+            fim: evento.fimEm,
+            dia_inteiro: evento.diaInteiro,
+            link_meet: evento.linkMeet,
+            calendario: calendario.nome,
+            google_event_id: evento.googleEventId,
+          });
+        }
+      }
+
+      if (!todosEventos.length) return `Nenhum evento encontrado nos próximos ${diasAFrente} dias.`;
+      todosEventos.sort((a, b) => (a.inicio?.getTime() ?? 0) - (b.inicio?.getTime() ?? 0));
+
+      return JSON.stringify({ periodo_dias: diasAFrente, total: todosEventos.length, eventos: todosEventos });
+    }
+
+    case "criar_evento_calendario": {
+      if (!temPermissao(ctx, "calendarioAlpha")) return negado("Calendário Alpha");
+
+      const titulo = String(params.titulo || "").trim();
+      if (!titulo) return "Informe o título do evento.";
+
+      const diaInteiro = Boolean(params.dia_inteiro);
+      const dataInicioRaw = String(params.data_inicio || "");
+      const inicio = new Date(diaInteiro && dataInicioRaw.length === 10 ? `${dataInicioRaw}T00:00:00` : dataInicioRaw);
+      if (Number.isNaN(inicio.getTime())) return "Data de início inválida.";
+
+      let fim: Date;
+      if (params.data_fim) {
+        const dataFimRaw = String(params.data_fim);
+        fim = new Date(diaInteiro && dataFimRaw.length === 10 ? `${dataFimRaw}T00:00:00` : dataFimRaw);
+      } else {
+        fim = new Date(inicio.getTime() + (diaInteiro ? 24 : 1) * 60 * 60 * 1000);
+      }
+      if (Number.isNaN(fim.getTime())) return "Data de fim inválida.";
+
+      const calendarioGravavel = await db.googleCalendarSelecionado.findFirst({
+        where: { conexao: { userId }, gravavel: true },
+        orderBy: { nome: "asc" },
+      });
+      if (!calendarioGravavel) {
+        return "Você não tem nenhum calendário gravável configurado no Calendário Alpha. Configure um calendário próprio primeiro.";
+      }
+
+      const participantes = params.participantes
+        ? String(params.participantes)
+            .split(",")
+            .map((email) => email.trim())
+            .filter(Boolean)
+        : [];
+
+      const { criarEventoNoCalendario } = await import("@/actions/google-calendar-eventos");
+      const resultado = await criarEventoNoCalendario({
+        calendarId: calendarioGravavel.googleCalendarId,
+        titulo,
+        descricaoGoogle: params.descricao ? String(params.descricao) : undefined,
+        localizacao: params.local ? String(params.local) : undefined,
+        timezone: "America/Sao_Paulo",
+        diaInteiro,
+        inicio,
+        fim,
+        participantes,
+        criarMeet: Boolean(params.criar_meet),
+      });
+
+      if (!resultado.success) return resultado.error;
+      return JSON.stringify({ ok: true, google_event_id: resultado.data.googleEventId, calendario: calendarioGravavel.nome });
+    }
+
+    case "cancelar_evento_calendario": {
+      if (!temPermissao(ctx, "calendarioAlpha")) return negado("Calendário Alpha");
+
+      const googleEventId = String(params.google_event_id || "").trim();
+      if (!googleEventId) return "Informe o ID do evento a cancelar (use listar_eventos_calendario antes).";
+
+      const cache = await db.googleCalendarEventoCache.findFirst({
+        where: { googleEventId, calendario: { conexao: { userId } } },
+        include: { calendario: true },
+      });
+      if (!cache) return "Evento não encontrado na sua agenda.";
+
+      const { cancelarEventoNoCalendario } = await import("@/actions/google-calendar-eventos");
+      const resultado = await cancelarEventoNoCalendario({
+        calendarId: cache.calendario.googleCalendarId,
+        googleEventId,
+      });
+      if (!resultado.success) return resultado.error;
+      return "Evento cancelado com sucesso.";
+    }
+
+    case "consultar_disponibilidade_calendario": {
+      if (!temPermissao(ctx, "calendarioAlpha")) return negado("Calendário Alpha");
+
+      const inicio = new Date(String(params.data_inicio || ""));
+      const fim = new Date(String(params.data_fim || ""));
+      if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return "Datas inválidas.";
+
+      const { listarCalendariosSelecionados, consultarDisponibilidade } = await import(
+        "@/actions/google-calendar-eventos"
+      );
+      const calendariosResultado = await listarCalendariosSelecionados();
+      if (!calendariosResultado.success) return calendariosResultado.error;
+      const googleCalendarIds = calendariosResultado.data.filter((c) => c.visivel).map((c) => c.googleCalendarId);
+      if (!googleCalendarIds.length) return "Nenhum calendário selecionado no Calendário Alpha ainda.";
+
+      const resultado = await consultarDisponibilidade({ googleCalendarIds, inicio, fim });
+      if (!resultado.success) return resultado.error;
+      return JSON.stringify(resultado.data);
+    }
+
+    case "consultar_agenda_colega": {
+      if (!temPermissao(ctx, "calendarioAlpha")) return negado("Calendário Alpha");
+
+      const nomeOuEmail = String(params.nome_ou_email || "").trim();
+      if (!nomeOuEmail) return "Informe o nome ou e-mail do colega.";
+
+      const colega = await db.usuarios.findFirst({
+        where: {
+          status: "ATIVO",
+          id: { not: userId },
+          OR: [{ nome: { contains: nomeOuEmail } }, { email: { equals: nomeOuEmail.toLowerCase() } }],
+        },
+        select: { id: true, nome: true },
+      });
+      if (!colega) return `Nenhum colaborador ativo encontrado com "${nomeOuEmail}".`;
+
+      const diasAFrente = Math.min(Math.max(Number(params.dias_a_frente) || 7, 1), 60);
+      const agora = new Date();
+      const fim = new Date(agora.getTime() + diasAFrente * 24 * 60 * 60 * 1000);
+
+      const { listarEventosDeColega } = await import("@/actions/google-calendar-colegas");
+      const resultado = await listarEventosDeColega(colega.id, agora.toISOString(), fim.toISOString());
+      if (!resultado.success) return resultado.error;
+
+      if (!resultado.data.length) {
+        return `${colega.nome} não tem eventos nos próximos ${diasAFrente} dias (ou a agenda está vazia).`;
+      }
+
+      const eventos = resultado.data.map((e) => ({
+        titulo: e.titulo,
+        inicio: e.inicioEm,
+        fim: e.fimEm,
+        dia_inteiro: e.diaInteiro,
+        link_meet: e.linkMeet,
+      }));
+
+      return JSON.stringify({ colega: colega.nome, periodo_dias: diasAFrente, total: eventos.length, eventos });
+    }
+
     default:
       return `Tool desconhecida: ${nome}`;
   }

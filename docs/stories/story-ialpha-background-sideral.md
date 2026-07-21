@@ -52,6 +52,16 @@
 - [x] Nuvens da Terra com fase propria (periodo 0.68x) tambem ancorada no relogio.
 - [x] Prova no browser: os 8 planetas com duracao exata do periodo esperado, delays de fase nao-nulos e direcoes corretas (verificado via getComputedStyle).
 
+### Iteracao 5 — Orbitas visiveis com tempo acelerado (2026-07-15)
+
+- [x] Problema: com tempo 100% real, planetas parecem fixos (Mercurio anda ~4°/DIA). Solucao padrao planetario: cena abre no ceu real de agora e o tempo avanca acelerado (ORBIT_TIME_LAPSE = 80000).
+- [x] Movimento medido (viewport 1280x800): Mercurio 7.3px/s (volta em ~1.6min), Venus 4.6px/s, Terra 3.6px/s, Marte 1.9px/s, Jupiter 0.5px/s (~1.3h), Netuno quase estatico (~18h) — hierarquia real preservada.
+- [x] Lua orbita a Terra em ~29s.
+- [x] Tick de cena a cada 2s + transition CSS linear em left/top = movimento continuo sem saltos; iluminacao/terminador recalculados por tick.
+- [x] SPIN_TIME_LAPSE 900 → 3600: rotacao das texturas perceptivel (Terra gira em ~24s, Jupiter ~10s).
+- [x] Recarregar a pagina ressincroniza com o ceu real do momento; prefers-reduced-motion desliga a aceleracao (tempo real, estatico).
+- [ ] Verificacao visual in-app pendente: a sessao de login do preview expirou durante os testes (heartbeat/pusher 401 → app cai em "Application error", bug preexistente registrado). Mecanica provada por script com a matematica exata do componente.
+
 ## Verificacao (iteracoes 2 e 3)
 
 - [x] `npx eslint src/components/BibbleChatHome/IAlphaCosmicBackground.tsx` sem erros.

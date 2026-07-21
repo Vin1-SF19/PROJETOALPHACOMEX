@@ -72,12 +72,12 @@ model usuarios {
   crm_oportunidades crm_oportunidades[] @relation("CrmOportunidadesResponsavel")
   crm_atividades    crm_atividades[]    @relation("CrmAtividadesAutor")
 
-  holeritesColaborador     Holerite[]                 @relation("HoleriteColaborador")
-  holeriteUploads          Holerite[]                 @relation("HoleriteUploader")
-  popAcessos               PopAcesso[]                @relation("PopAcessoUsuario")
-  permissaoOverrides       UsuarioPermissaoOverride[]
-  contratosComerciais      ContratoComercial[]        @relation("ContratosComerciais")
-  holeriteAlertas          HoleriteAlertaHistorico[]
+  holeritesColaborador Holerite[]                 @relation("HoleriteColaborador")
+  holeriteUploads      Holerite[]                 @relation("HoleriteUploader")
+  popAcessos           PopAcesso[]                @relation("PopAcessoUsuario")
+  permissaoOverrides   UsuarioPermissaoOverride[]
+  contratosComerciais  ContratoComercial[]        @relation("ContratosComerciais")
+  holeriteAlertas      HoleriteAlertaHistorico[]
 
   senhaTemporaria  Boolean   @default(false)
   primeiroAcessoEm DateTime?
@@ -85,14 +85,14 @@ model usuarios {
   bibbleSessions BibbleSession[]
   bibbleProjects BibbleProject[]
 
-  onyxAgents OnyxAgentOwner[]
+  onyxAgents         OnyxAgentOwner[]
   onyxAgentesFixados OnyxAgenteFixado[]
 
   historicoAlteracoesCliente HistoricoAlteracaoCliente[]
 
-  parceirosCriados  Parceiro[]
-  indicacoesCriadas Indicacao[]     @relation("IndicacaoAutor")
-  parceiroAcessos   ParceiroAcesso[]
+  parceirosCriados        Parceiro[]
+  indicacoesCriadas       Indicacao[]       @relation("IndicacaoAutor")
+  parceiroAcessos         ParceiroAcesso[]
   convitesParceiroCriados ConviteParceiro[] @relation("ConvitesCriados")
 
   apresentacoesCriadas     Apresentacao[]
@@ -100,6 +100,12 @@ model usuarios {
   apresentacaoComentarios  ApresentacaoComentario[]
 
   videosIntrodutorioAtivados VideoIntrodutorioConfig[]
+
+  googleCalendarConexao GoogleCalendarConexao?
+
+  colegasQueEuVejo GoogleCalendarColegaVisivel[] @relation("ColegaViewer")
+  colegasQueMeVeem GoogleCalendarColegaVisivel[] @relation("ColegaDono")
+  permissaoColegasCalendario GoogleCalendarPermissaoColegas? @relation("PermissaoColegasCalendario")
 }
 
 model OnboardingTemplate {
@@ -109,9 +115,10 @@ model OnboardingTemplate {
   mensagem  String
   ativo     Boolean  @default(true)
   padrao    Boolean  @default(false)
-  tipo      String   @default("USUARIO")  // USUARIO | PARCEIRO | CLIENTE
+  tipo      String   @default("USUARIO") // USUARIO | PARCEIRO | CLIENTE
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@map("onboarding_template")
 }
 
@@ -124,8 +131,9 @@ model OnboardingLog {
   telefone    String?
   email       String?
   enviadoEm   DateTime @default(now())
-  @@map("onboarding_log")
+
   @@index([usuarioId])
+  @@map("onboarding_log")
 }
 
 model chamados {
@@ -171,8 +179,8 @@ model WhatsAppLog {
   enviadoPorId Int
   createdAt    DateTime @default(now())
 
-  @@map("whatsapp_log")
   @@index([chamadoId])
+  @@map("whatsapp_log")
 }
 
 model consultas_radar {
@@ -238,8 +246,8 @@ model documentos {
 }
 
 model clientes {
-  id                  Int            @id @default(autoincrement())
-  status              String         @default("Em Andamento")
+  id                  Int                         @id @default(autoincrement())
+  status              String                      @default("Em Andamento")
   cnpj                String
   razaoSocial         String
   nomeFantasia        String?
@@ -254,11 +262,11 @@ model clientes {
   formaPagamento      String?
   valorContrato       Float?
   closerNome          String?
-  ultimoCs            Int?           @default(0)
+  ultimoCs            Int?                        @default(0)
   nps                 Int?
-  feedbackGoogle      Boolean        @default(false)
-  createdAt           String?        @default("")
-  updatedAt           String?        @default("")
+  feedbackGoogle      Boolean                     @default(false)
+  createdAt           String?                     @default("")
+  updatedAt           String?                     @default("")
   log_cs              log_cs[]
   socios              socios[]
   logFeedback         logFeedback[]
@@ -269,9 +277,9 @@ model clientes {
   origemLead          String?
 
   // Canal de aquisição (Painel de Metas) + indicação por parceiro
-  canalAquisicao      String?
-  canalOutro          String?
-  indicacao           Indicacao?
+  canalAquisicao String?
+  canalOutro     String?
+  indicacao      Indicacao?
 
   crm_oportunidades crm_oportunidades[]
   crm_contatos      crm_contatos[]
@@ -692,15 +700,15 @@ model videos {
 }
 
 model VideoIntrodutorioConfig {
-  id            String    @id @default(cuid())
-  modulo        String    @unique
-  videoId       String?
-  video         videos?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
-  ativadoEm     DateTime?
-  ativadoPorId  Int?
-  ativadoPor    usuarios? @relation(fields: [ativadoPorId], references: [id], onDelete: SetNull)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  modulo       String    @unique
+  videoId      String?
+  video        videos?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  ativadoEm    DateTime?
+  ativadoPorId Int?
+  ativadoPor   usuarios? @relation(fields: [ativadoPorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@map("video_introdutorio_config")
 }
@@ -930,28 +938,28 @@ model OperacionalClientes {
   dataConstituicao String?
   contribuinte     String?
 
-  tipo         TipoEmbasamento?
+  tipo TipoEmbasamento?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  clienteId  String
-  cliente    ClienteOperacional @relation(fields: [clienteId], references: [id])
+  clienteId        String
+  cliente          ClienteOperacional @relation(fields: [clienteId], references: [id])
   pastaChecklistId String?
-  pastaChecklist   PastaChecklist? @relation(fields: [pastaChecklistId], references: [id])
-  documentos DocumentoUnidade[]
-  checklists Checklist[]
+  pastaChecklist   PastaChecklist?    @relation(fields: [pastaChecklistId], references: [id])
+  documentos       DocumentoUnidade[]
+  checklists       Checklist[]
 
   @@index([pastaChecklistId])
   @@map("operacional_clientes")
 }
 
 model PastaChecklist {
-  id          String                @id @default(cuid())
-  nome        String                @unique
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  empresas    OperacionalClientes[]
+  id        String                @id @default(cuid())
+  nome      String                @unique
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  empresas  OperacionalClientes[]
 }
 
 model DocumentoUnidade {
@@ -960,7 +968,7 @@ model DocumentoUnidade {
   nomeArquivo     String
   urlBlob         String
   status          String  @default("PENDENTE")
-  observacao      String? 
+  observacao      String?
 
   empresaId String
   empresa   OperacionalClientes @relation(fields: [empresaId], references: [id])
@@ -996,45 +1004,45 @@ enum StatusItemChecklist {
 }
 
 model Checklist {
-  id            String              @id @default(cuid())
-  empresaId     String
-  empresa       OperacionalClientes @relation(fields: [empresaId], references: [id])
-  tipo          TipoEmbasamento
-  itens         ItemChecklist[]
-  criadoEm      DateTime            @default(now())
-  atualizadoEm  DateTime            @updatedAt
+  id           String              @id @default(cuid())
+  empresaId    String
+  empresa      OperacionalClientes @relation(fields: [empresaId], references: [id])
+  tipo         TipoEmbasamento
+  itens        ItemChecklist[]
+  criadoEm     DateTime            @default(now())
+  atualizadoEm DateTime            @updatedAt
 
   @@unique([empresaId, tipo])
 }
 
 model ModeloItemChecklist {
-  id          String            @id @default(cuid())
+  id          String           @id @default(cuid())
   tipo        TipoEmbasamento?
   codigo      String
   nome        String
   descricao   String?
   secao       String
-  obrigatorio Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  obrigatorio Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@index([tipo, secao])
 }
 
 model ItemChecklist {
-  id           String              @id @default(cuid())
+  id           String               @id @default(cuid())
   checklistId  String
-  checklist    Checklist           @relation(fields: [checklistId], references: [id])
+  checklist    Checklist            @relation(fields: [checklistId], references: [id])
   modeloItemId String?
   codigo       String
   secao        String
   descricao    String
   complemento  String?
-  status       StatusItemChecklist @default(PENDENTE)
+  status       StatusItemChecklist  @default(PENDENTE)
   observacao   String?
-  obrigatorio  Boolean             @default(true)
+  obrigatorio  Boolean              @default(true)
   documentos   DocumentoChecklist[]
-  atualizadoEm DateTime            @updatedAt
+  atualizadoEm DateTime             @updatedAt
 
   @@index([modeloItemId])
 }
@@ -1072,8 +1080,8 @@ model crm_oportunidades {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  responsavel usuarios          @relation("CrmOportunidadesResponsavel", fields: [responsavelId], references: [id])
-  cliente     clientes?         @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  responsavel usuarios         @relation("CrmOportunidadesResponsavel", fields: [responsavelId], references: [id])
+  cliente     clientes?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   atividades  crm_atividades[]
 
   @@map("crm_oportunidades")
@@ -1092,20 +1100,20 @@ model crm_contatos {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cliente    clientes?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  cliente    clientes?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   atividades crm_atividades[]
 
   @@map("crm_contatos")
 }
 
 model crm_atividades {
-  id             Int      @id @default(autoincrement())
+  id             Int     @id @default(autoincrement())
   tipo           String
   titulo         String
   descricao      String?
   dataPrevista   String?
   dataRealizada  String?
-  concluida      Boolean  @default(false)
+  concluida      Boolean @default(false)
   oportunidadeId Int?
   clienteId      Int?
   contatoId      Int?
@@ -1123,27 +1131,27 @@ model crm_atividades {
 // ─── Alpha Metas ──────────────────────────────────────────────────────────────
 
 model ContratoComercial {
-  id           String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  cnpj         String
-  razaoSocial  String
-  nomeFantasia String?
+  cnpj             String
+  razaoSocial      String
+  nomeFantasia     String?
   dataConstituicao String?
   regimeTributario String?
   uf               String?
 
-  valorContrato  Float
-  formaPagamento String
-  servico        String
-  canalAquisicao String
-  canalOutro     String? // texto livre quando canal = "Outro"
+  valorContrato         Float
+  formaPagamento        String
+  servico               String
+  canalAquisicao        String
+  canalOutro            String? // texto livre quando canal = "Outro"
   indicadoPorParceiroId Int? // parceiro indicador quando canal = "Indicação Parceiro"
 
   closerNome String
 
   status String @default("ENVIADO")
 
-  pagamentoConfirmado   Boolean  @default(false)
+  pagamentoConfirmado   Boolean   @default(false)
   pagamentoConfirmadoEm DateTime?
 
   contratoAssinado Boolean @default(false)
@@ -1159,9 +1167,9 @@ model ContratoComercial {
   mes Int
   ano Int
 
-  usuarioId    Int
-  usuario      usuarios             @relation("ContratosComerciais", fields: [usuarioId], references: [id], onDelete: Cascade)
-  observacoes  ObservacaoContrato[]
+  usuarioId   Int
+  usuario     usuarios             @relation("ContratosComerciais", fields: [usuarioId], references: [id], onDelete: Cascade)
+  observacoes ObservacaoContrato[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1173,20 +1181,20 @@ model ContratoComercial {
 }
 
 model ObservacaoContrato {
-  id         String             @id @default(cuid())
+  id         String            @id @default(cuid())
   contratoId String
-  contrato   ContratoComercial  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  contrato   ContratoComercial @relation(fields: [contratoId], references: [id], onDelete: Cascade)
   texto      String
-  tipo       String             @default("NA")
-  criadoEm   DateTime           @default(now())
+  tipo       String            @default("NA")
+  criadoEm   DateTime          @default(now())
 
   @@index([contratoId])
   @@map("observacoes_contratos")
 }
 
 model ServicosComerciais {
-  id   Int     @id @default(autoincrement())
-  nome String  @unique
+  id    Int     @id @default(autoincrement())
+  nome  String  @unique
   ativo Boolean @default(true)
 
   @@map("servicos_comerciais")
@@ -1254,7 +1262,7 @@ model UsuarioPermissaoOverride {
   id        Int      @id @default(autoincrement())
   usuarioId Int
   modulo    String
-  acao      String   // "ADD" | "REMOVE"
+  acao      String // "ADD" | "REMOVE"
   motivo    String?
   criadoPor Int
   createdAt DateTime @default(now())
@@ -1268,18 +1276,18 @@ model UsuarioPermissaoOverride {
 // ─── Alpha Holerites ──────────────────────────────────────────────────────────
 
 model Holerite {
-  id            Int       @id @default(autoincrement())
+  id            Int    @id @default(autoincrement())
   colaboradorId Int
   mes           Int
   ano           Int
   competencia   String
 
-  arquivoUrl      String
-  arquivoNome     String
-  arquivoTamanho  Int
+  arquivoUrl     String
+  arquivoNome    String
+  arquivoTamanho Int
 
-  assinado    Boolean   @default(false)
-  assinadoEm  DateTime?
+  assinado   Boolean   @default(false)
+  assinadoEm DateTime?
 
   status         String    @default("PENDENTE")
   validadoPor    Int?
@@ -1302,7 +1310,7 @@ model Holerite {
 
 model HoleriteAlertaHistorico {
   id           Int      @id @default(autoincrement())
-  tipo         String   // "INICIAL" | "FINAL"
+  tipo         String // "INICIAL" | "FINAL"
   disparadoPor Int
   disparadoEm  DateTime @default(now())
 
@@ -1347,16 +1355,16 @@ model ModalidadeContrato {
 }
 
 model ContratoColaborador {
-  id              String   @id @default(cuid())
-  usuarioId       Int
-  usuario         usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  usuarioId Int
+  usuario   usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   tipo            String
   modalidade      String
   dataInicio      DateTime
   dataFim         DateTime?
-  renovacaoNumero Int      @default(0)
-  status          String   @default("EXPERIENCIA")
+  renovacaoNumero Int       @default(0)
+  status          String    @default("EXPERIENCIA")
   contratoUrl     String?
   observacoes     String?
 
@@ -1369,22 +1377,22 @@ model ContratoColaborador {
 }
 
 model ChecklistDocumental {
-  id                    String   @id @default(cuid())
-  usuarioId             Int      @unique
-  usuario               usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  usuarioId Int      @unique
+  usuario   usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
-  carteiraTrabalho      Boolean  @default(false)
-  pis                   Boolean  @default(false)
-  identidade            Boolean  @default(false)
-  cpfDoc                Boolean  @default(false)
-  cnh                   Boolean  @default(false)
-  tituloEleitor         Boolean  @default(false)
-  reservista            Boolean  @default(false)
-  comprovanteResidencia Boolean  @default(false)
-  certidao              Boolean  @default(false)
-  foto3x4               Boolean  @default(false)
-  exameAdmissional      Boolean  @default(false)
-  escolaridade          Boolean  @default(false)
+  carteiraTrabalho      Boolean @default(false)
+  pis                   Boolean @default(false)
+  identidade            Boolean @default(false)
+  cpfDoc                Boolean @default(false)
+  cnh                   Boolean @default(false)
+  tituloEleitor         Boolean @default(false)
+  reservista            Boolean @default(false)
+  comprovanteResidencia Boolean @default(false)
+  certidao              Boolean @default(false)
+  foto3x4               Boolean @default(false)
+  exameAdmissional      Boolean @default(false)
+  escolaridade          Boolean @default(false)
 
   updatedAt DateTime @updatedAt
 
@@ -1408,19 +1416,19 @@ model BibbleProject {
 }
 
 model BibbleSession {
-  id        String          @id @default(cuid())
-  userId    Int
-  title     String          @default("Nova conversa")
-  projectId String?
+  id            String          @id @default(cuid())
+  userId        Int
+  title         String          @default("Nova conversa")
+  projectId     String?
   // Sessão Onyx vinculada (quando a conversa é com um agente Onyx). É a fonte de
   // verdade do histórico dessa conversa — texto + imagens vêm do Onyx via
   // GET /chat/get-chat-session/{id}. NULL = conversa Bibble/Ollama (histórico local).
   onyxSessionId String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  messages  BibbleMessage[]
-  user      usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project   BibbleProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  messages      BibbleMessage[]
+  user          usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       BibbleProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([projectId])
@@ -1476,49 +1484,49 @@ model OnyxAgenteFixado {
 // ─── Parceiros ────────────────────────────────────────────────────────────────
 
 model Parceiro {
-  id            Int                  @id @default(autoincrement())
-  tipo          String               // "PF" | "PJ"
-  tipoParceiro  String               @default("PADRAO") // "PADRAO" | "SEM_COMISSAO" | "ESPECIAL"
-  documento     String               @unique
-  nome          String
-  nomeFantasia  String?
-  dataNascimento String?             // só preenchido quando tipo=PF
-  sobre         String?             // "fale mais sobre você/sua empresa" — herdado do pré-cadastro (convite)
-  email         String
-  nomeBanco     String?
-  agencia       String?
-  conta         String?
-  chavePix      String?
-  tipoChavePix  String?
-  pixConfirmado   Boolean   @default(false)
-  pixConfirmadoEm DateTime?
-  nivel             String               @default("GOLD")
-  nivelAtualizadoEm DateTime?            // base da janela de 60 dias (promoção/rebaixamento)
-  comissaoPercentual Float?              // override manual opcional (lógica futura)
-  dadosConsulta String?
-  telefone      String?
-  telefone2     String?
-  loginEmail    String
-  senhaHash     String
+  id                 Int                     @id @default(autoincrement())
+  tipo               String // "PF" | "PJ"
+  tipoParceiro       String                  @default("PADRAO") // "PADRAO" | "SEM_COMISSAO" | "ESPECIAL"
+  documento          String                  @unique
+  nome               String
+  nomeFantasia       String?
+  dataNascimento     String? // só preenchido quando tipo=PF
+  sobre              String? // "fale mais sobre você/sua empresa" — herdado do pré-cadastro (convite)
+  email              String
+  nomeBanco          String?
+  agencia            String?
+  conta              String?
+  chavePix           String?
+  tipoChavePix       String?
+  pixConfirmado      Boolean                 @default(false)
+  pixConfirmadoEm    DateTime?
+  nivel              String                  @default("GOLD")
+  nivelAtualizadoEm  DateTime? // base da janela de 60 dias (promoção/rebaixamento)
+  comissaoPercentual Float? // override manual opcional (lógica futura)
+  dadosConsulta      String?
+  telefone           String?
+  telefone2          String?
+  loginEmail         String
+  senhaHash          String
   // ─── Onboarding / termo de adesão (portal AlphaParceiros) ──────────────────
-  senhaTemporaria    Boolean   @default(true)
-  onboardingCompleto Boolean   @default(false)
-  termoAceito        Boolean   @default(false)
+  senhaTemporaria    Boolean                 @default(true)
+  onboardingCompleto Boolean                 @default(false)
+  termoAceito        Boolean                 @default(false)
   termoAceitoEm      DateTime?
   termoVersao        String?
   // ─── Ativação de acesso (admin pode desativar sem excluir o cadastro) ──────
-  ativo           Boolean   @default(true)
-  desativadoEm    DateTime?
-  desativadoPorId Int?
-  criadoPorId   Int
-  criadoPor     usuarios             @relation(fields: [criadoPorId], references: [id])
-  endereco      ParceiroEndereco?
-  responsaveis  ParceiroResponsavel[]
-  representantes ParceiroRepresentante[]
-  indicacoes    Indicacao[]
-  convitesGerados ConviteParceiro[]   @relation("ConvitesPorParceiro")
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  ativo              Boolean                 @default(true)
+  desativadoEm       DateTime?
+  desativadoPorId    Int?
+  criadoPorId        Int
+  criadoPor          usuarios                @relation(fields: [criadoPorId], references: [id])
+  endereco           ParceiroEndereco?
+  responsaveis       ParceiroResponsavel[]
+  representantes     ParceiroRepresentante[]
+  indicacoes         Indicacao[]
+  convitesGerados    ConviteParceiro[]       @relation("ConvitesPorParceiro")
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   @@index([documento])
   @@index([criadoPorId])
@@ -1528,22 +1536,22 @@ model Parceiro {
 // Indicação: vincula um Parceiro a uma empresa do CS&NPS (model `clientes`).
 // Fonte de verdade tanto do fluxo "Nova Indicação" quanto do canal de aquisição no Metas.
 model Indicacao {
-  id            Int      @id @default(autoincrement())
-  parceiroId    Int
-  parceiro      Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
-  clienteId     Int      @unique            // uma empresa é indicada por no máximo 1 parceiro
-  cliente       clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  dataIndicacao DateTime @default(now())
-  status        String   @default("ATIVA")  // "ATIVA" | "DESVINCULADA"
-  criadoPorId   Int
-  criadoPor     usuarios @relation("IndicacaoAutor", fields: [criadoPorId], references: [id])
+  id                    Int       @id @default(autoincrement())
+  parceiroId            Int
+  parceiro              Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  clienteId             Int       @unique // uma empresa é indicada por no máximo 1 parceiro
+  cliente               clientes  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  dataIndicacao         DateTime  @default(now())
+  status                String    @default("ATIVA") // "ATIVA" | "DESVINCULADA"
+  criadoPorId           Int
+  criadoPor             usuarios  @relation("IndicacaoAutor", fields: [criadoPorId], references: [id])
   // Comprovante de comissão (enviado no PainelAlpha, visto no portal do parceiro)
   comprovanteUrl        String?
   comprovanteNome       String?
-  comprovanteTipo       String?   // mime type
+  comprovanteTipo       String? // mime type
   comprovanteEnviadoEm  DateTime?
   comprovanteEnviadoPor String?
-  createdAt     DateTime @default(now())
+  createdAt             DateTime  @default(now())
 
   @@index([parceiroId])
   @@index([clienteId])
@@ -1553,13 +1561,13 @@ model Indicacao {
 // Permissões do módulo de Parceiros (geridas pelo Admin via engrenagem).
 // Admin/CEO sempre têm acesso total e NÃO dependem desta tabela.
 model ParceiroAcesso {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @unique
-  user       usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podeEditar Boolean  @default(false)
-  podeExcluir Boolean @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  user        usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podeEditar  Boolean  @default(false)
+  podeExcluir Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("parceiro_acesso")
 }
@@ -1614,8 +1622,8 @@ model ParceiroRepresentante {
 // versão ATIVA no onboarding do portal. Mantém histórico de versões.
 model ParceiroTermo {
   id          Int      @id @default(autoincrement())
-  versao      String                           // ex: "v1-2026"
-  conteudo    String                           // texto do termo (markdown/plano)
+  versao      String // ex: "v1-2026"
+  conteudo    String // texto do termo (markdown/plano)
   ativo       Boolean  @default(true)
   criadoPorId Int?
   createdAt   DateTime @default(now())
@@ -1627,27 +1635,27 @@ model ParceiroTermo {
 // ─── Convite de parceiro (link temporário) ────────────────────────────────────
 // Gera um link público com token; o convidado preenche o form → vira PreCadastro.
 model ConviteParceiro {
-  id          Int       @id @default(autoincrement())
-  token       String    @unique          // token do link (randomUUID)
-  status      String    @default("PENDENTE") // PENDENTE | USADO | REVOGADO | EXPIRADO
-  expiraEm    DateTime                    // validade do link
-  usoUnico    Boolean   @default(true)
+  id                  Int                   @id @default(autoincrement())
+  token               String                @unique // token do link (randomUUID)
+  status              String                @default("PENDENTE") // PENDENTE | USADO | REVOGADO | EXPIRADO
+  expiraEm            DateTime // validade do link
+  usoUnico            Boolean               @default(true)
   // PIN de 4 dígitos — protege a consulta automática de CPF (custo por chamada
   // na InfoSimples). Nullable: convites gerados antes desta feature não têm PIN
   // e por isso NÃO liberam a busca automática (ver rota /api/convite/consulta-cpf).
-  pin         String?
+  pin                 String?
   // Rate-limit de tentativas de PIN — compartilhado entre StepPin (entrada no
   // wizard) e a consulta automática de CPF. 5 tentativas erradas suspende por 1min.
-  tentativasPin Int      @default(0)
-  suspensoAte   DateTime?
+  tentativasPin       Int                   @default(0)
+  suspensoAte         DateTime?
   // Quem gerou: um usuário do Painel OU um parceiro existente (indicação).
-  criadoPorUserId    Int?
+  criadoPorUserId     Int?
   criadoPorParceiroId Int?
-  criadoPorUser      usuarios?  @relation("ConvitesCriados", fields: [criadoPorUserId], references: [id], onDelete: SetNull)
-  criadoPorParceiro  Parceiro?  @relation("ConvitesPorParceiro", fields: [criadoPorParceiroId], references: [id], onDelete: SetNull)
-  preCadastros PreCadastroParceiro[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  criadoPorUser       usuarios?             @relation("ConvitesCriados", fields: [criadoPorUserId], references: [id], onDelete: SetNull)
+  criadoPorParceiro   Parceiro?             @relation("ConvitesPorParceiro", fields: [criadoPorParceiroId], references: [id], onDelete: SetNull)
+  preCadastros        PreCadastroParceiro[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   @@index([token])
   @@index([status])
@@ -1657,46 +1665,46 @@ model ConviteParceiro {
 // Respostas do formulário público (espelho do Google Forms). Fica como
 // pré-cadastro até um admin aprovar e converter em Parceiro de verdade.
 model PreCadastroParceiro {
-  id            Int      @id @default(autoincrement())
-  conviteId     Int?
-  convite       ConviteParceiro? @relation(fields: [conviteId], references: [id], onDelete: SetNull)
+  id                  Int              @id @default(autoincrement())
+  conviteId           Int?
+  convite             ConviteParceiro? @relation(fields: [conviteId], references: [id], onDelete: SetNull)
   // Campos do formulário
-  email         String
-  nomeCompleto  String
-  cpf           String?
-  dataNascimento String?            // usada na consulta automática de CPF (InfoSimples)
-  dadosConsultaCpf String?          // JSON bruto da resposta InfoSimples (CPF)
-  uf            String
-  municipio     String?
-  telefone      String
-  whatsapp      String?
+  email               String
+  nomeCompleto        String
+  cpf                 String?
+  dataNascimento      String? // usada na consulta automática de CPF (InfoSimples)
+  dadosConsultaCpf    String? // JSON bruto da resposta InfoSimples (CPF)
+  uf                  String
+  municipio           String?
+  telefone            String
+  whatsapp            String?
   // Endereço estruturado (wizard multi-tela com busca de CEP)
-  cep           String?
-  logradouro    String?
-  numero        String?
-  complemento   String?
-  bairro        String?
-  cidade        String?
-  areasAtuacao  String?             // CSV das áreas selecionadas
-  nomeEmpresa   String?             // campo legado — mantido por compatibilidade
-  razaoSocial   String?             // preenchido pela consulta automática de CNPJ
-  nomeFantasia  String?             // preenchido pela consulta automática de CNPJ
-  cnpj          String?
-  dadosConsultaCnpj String?         // JSON bruto da resposta ReceitaFederal (CNPJ)
-  sobre         String?             // "fale mais sobre você/empresa"
-  tipoRecebimento String?           // "PF" | "PJ" — escolha explícita feita no wizard (Step Tipo). Null = pré-cadastros antigos, cai no fallback por CNPJ.
-  souRepresentante Boolean @default(true) // se PJ: true = o próprio preenchedor (nomeCompleto/cpf/dataNascimento) é o representante; false = usa representantesExtra
-  representantesExtra String?       // JSON stringificado de { nome, cpf, dataNascimento, cargo }[] — só quando souRepresentante=false
+  cep                 String?
+  logradouro          String?
+  numero              String?
+  complemento         String?
+  bairro              String?
+  cidade              String?
+  areasAtuacao        String? // CSV das áreas selecionadas
+  nomeEmpresa         String? // campo legado — mantido por compatibilidade
+  razaoSocial         String? // preenchido pela consulta automática de CNPJ
+  nomeFantasia        String? // preenchido pela consulta automática de CNPJ
+  cnpj                String?
+  dadosConsultaCnpj   String? // JSON bruto da resposta ReceitaFederal (CNPJ)
+  sobre               String? // "fale mais sobre você/empresa"
+  tipoRecebimento     String? // "PF" | "PJ" — escolha explícita feita no wizard (Step Tipo). Null = pré-cadastros antigos, cai no fallback por CNPJ.
+  souRepresentante    Boolean          @default(true) // se PJ: true = o próprio preenchedor (nomeCompleto/cpf/dataNascimento) é o representante; false = usa representantesExtra
+  representantesExtra String? // JSON stringificado de { nome, cpf, dataNascimento, cargo }[] — só quando souRepresentante=false
   // Aceite do termo (versão capturada no momento do aceite)
-  termoVersao   String
-  termoAceito   Boolean  @default(true)
-  termoAceitoEm DateTime @default(now())
+  termoVersao         String
+  termoAceito         Boolean          @default(true)
+  termoAceitoEm       DateTime         @default(now())
   // Fluxo de aprovação
-  status        String   @default("PENDENTE") // PENDENTE | APROVADO | REJEITADO
-  parceiroId    Int?                // preenchido quando aprovado (vira Parceiro)
-  aprovadoPorId Int?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status              String           @default("PENDENTE") // PENDENTE | APROVADO | REJEITADO
+  parceiroId          Int? // preenchido quando aprovado (vira Parceiro)
+  aprovadoPorId       Int?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   @@index([status])
   @@index([conviteId])
@@ -1705,10 +1713,10 @@ model PreCadastroParceiro {
 
 // Config singleton do módulo Parceiros (1 linha). Controla flags globais.
 model ParceiroConfig {
-  id                       Int      @id @default(1)
-  permitirParceiroConvidar Boolean  @default(false)
-  validadeConvitePadraoDias Int     @default(7)
-  updatedAt                DateTime @updatedAt
+  id                        Int      @id @default(1)
+  permitirParceiroConvidar  Boolean  @default(false)
+  validadeConvitePadraoDias Int      @default(7)
+  updatedAt                 DateTime @updatedAt
 
   @@map("parceiro_config")
 }
@@ -1719,48 +1727,48 @@ model ParceiroConfig {
 // decisions.md (2026-07-09, "arquitetura de dados do slide").
 
 model Apresentacao {
-  id           String    @id @default(cuid())
-  titulo       String
-  clienteNome  String?
-  autorId      Int
-  autor        usuarios  @relation(fields: [autorId], references: [id], onDelete: Cascade)
-  status       String    @default("DRAFT") // DRAFT | PUBLICADA | ARQUIVADA
-  temaId       String?
-  tema         ApresentacaoTema? @relation(fields: [temaId], references: [id])
-  thumbnailUrl String?
-  slugPublico  String?   @unique
-  senhaAcesso  String?
-  expiraEm     DateTime?
-  slides       Slide[]
-  assets       ApresentacaoAsset[]
-  versoes      ApresentacaoVersao[]
+  id            String                    @id @default(cuid())
+  titulo        String
+  clienteNome   String?
+  autorId       Int
+  autor         usuarios                  @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  status        String                    @default("DRAFT") // DRAFT | PUBLICADA | ARQUIVADA
+  temaId        String?
+  tema          ApresentacaoTema?         @relation(fields: [temaId], references: [id])
+  thumbnailUrl  String?
+  slugPublico   String?                   @unique
+  senhaAcesso   String?
+  expiraEm      DateTime?
+  slides        Slide[]
+  assets        ApresentacaoAsset[]
+  versoes       ApresentacaoVersao[]
   colaboradores ApresentacaoColaborador[]
-  comentarios  ApresentacaoComentario[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  comentarios   ApresentacaoComentario[]
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
 
   @@index([autorId])
   @@index([status])
 }
 
 model Slide {
-  id               String   @id @default(cuid())
+  id               String                   @id @default(cuid())
   apresentacaoId   String
-  apresentacao     Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  apresentacao     Apresentacao             @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
   ordem            Int
   nome             String?
   transicaoEntrada String?
   duracaoAutoplay  Int?
   dadosJson        Json
   comentarios      ApresentacaoComentario[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
   @@index([apresentacaoId, ordem])
 }
 
 model ApresentacaoTema {
-  id              String   @id @default(cuid())
+  id              String         @id @default(cuid())
   nome            String
   corPrimaria     String
   corSecundaria   String
@@ -1769,57 +1777,168 @@ model ApresentacaoTema {
   fontePrimaria   String?
   fonteSecundaria String?
   tokensJson      Json
-  isTemplate      Boolean  @default(false)
+  isTemplate      Boolean        @default(false)
   criadoPorId     Int?
   apresentacoes   Apresentacao[]
-  createdAt       DateTime @default(now())
+  createdAt       DateTime       @default(now())
 }
 
 model ApresentacaoAsset {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   apresentacaoId String
   apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
-  tipo           String   // IMAGEM | VIDEO | MODELO_3D | AUDIO | FONTE
+  tipo           String // IMAGEM | VIDEO | MODELO_3D | AUDIO | FONTE
   url            String
   nomeOriginal   String
   tamanhoBytes   Int
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([apresentacaoId])
 }
 
 model ApresentacaoVersao {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   apresentacaoId String
   apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
   dadosJson      Json
   criadoPorId    Int
   label          String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([apresentacaoId, createdAt])
 }
 
 model ApresentacaoColaborador {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   apresentacaoId String
   apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
   userId         Int
-  user           usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
-  papel          String   @default("EDITOR") // EDITOR | VISUALIZADOR | COMENTARISTA
+  user           usuarios     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  papel          String       @default("EDITOR") // EDITOR | VISUALIZADOR | COMENTARISTA
 
   @@unique([apresentacaoId, userId])
 }
 
 model ApresentacaoComentario {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   apresentacaoId String
   apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
   slideId        String?
-  slide          Slide?   @relation(fields: [slideId], references: [id], onDelete: SetNull)
+  slide          Slide?       @relation(fields: [slideId], references: [id], onDelete: SetNull)
   autorId        Int
-  autor          usuarios @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  autor          usuarios     @relation(fields: [autorId], references: [id], onDelete: Cascade)
   texto          String
-  resolvido      Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  resolvido      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+// ─── Calendário Alpha (Google Calendar via Domain-Wide Delegation) — MVP, sem webhook/vínculos internos ───
+// Ver docs/stories/story-calendario-alpha.md. Arquitetura 2026-07-17: Service Account com impersonation
+// (subject = usuarios.email, que é o mesmo e-mail do Google Workspace) — NÃO há OAuth por usuário nem
+// token individual a persistir/criptografar. O acesso real é concedido em bloco pelo Super Admin do
+// Workspace no Admin Console; `status` aqui é só a ativação/preferência do usuário dentro do Painel.
+
+model GoogleCalendarConexao {
+  id     String   @id @default(cuid())
+  userId Int      @unique
+  user   usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status String @default("ATIVA") // ATIVA | DESATIVADA — não revoga o acesso do Service Account, só a exibição/uso no Painel
+
+  ativadoEm    DateTime  @default(now())
+  desativadoEm DateTime?
+
+  ultimaSincronizacaoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  calendarios GoogleCalendarSelecionado[]
+
+  @@index([status])
+}
+
+model GoogleCalendarSelecionado {
+  id        String                @id @default(cuid())
+  conexaoId String
+  conexao   GoogleCalendarConexao @relation(fields: [conexaoId], references: [id], onDelete: Cascade)
+
+  googleCalendarId String
+  nome             String
+  corHex           String?
+  timezone         String
+  papelAcesso      String // owner | writer | reader | freeBusyReader
+
+  visivel  Boolean @default(true)
+  gravavel Boolean @default(false)
+
+  syncToken             String?
+  ultimaSincronizacaoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventos GoogleCalendarEventoCache[]
+
+  @@unique([conexaoId, googleCalendarId])
+}
+
+/// Cache local mínimo por evento sincronizado — só o necessário para renderizar as visões e
+/// suportar sync incremental por syncToken (idempotência via googleEventId). Google Calendar
+/// continua sendo a fonte de verdade; descrição, participantes e link do Meet NÃO são
+/// persistidos aqui e são buscados sob demanda ao abrir o detalhe do evento.
+model GoogleCalendarEventoCache {
+  id           String                    @id @default(cuid())
+  calendarioId String
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  googleEventId String
+  status        String // confirmed | tentative | cancelled
+  titulo        String?
+  inicioEm      DateTime?
+  fimEm         DateTime?
+  diaInteiro    Boolean   @default(false)
+  etag          String
+  linkMeet      String?
+
+  atualizadoGoogleEm DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([calendarioId, googleEventId])
+  @@index([calendarioId, inicioEm])
+}
+
+/// Compartilhamento de agenda entre colegas (cultura interna: todo mundo vê a agenda de todo
+/// mundo para marcar reunião em horário livre). Não é um "convite" que o dono aprova — qualquer
+/// usuário pode adicionar outro à própria lista de visualização (mesmo espírito de confiança
+/// interna descrito pelo usuário). `cor` é atribuída automaticamente na criação, para diferenciar
+/// visualmente cada colega na grade. Admin/CEO enxergam qualquer colega mesmo sem esta linha
+/// existir (ver `verificarAcessoColega` em `colegas.ts`) — esta tabela só controla o "meu mural".
+model GoogleCalendarColegaVisivel {
+  id       String  @id @default(cuid())
+  userId   Int // quem está vendo (o "viewer")
+  colegaId Int // o colega cuja agenda aparece na visão do viewer
+  cor      String // hex atribuído para diferenciar este colega na grade do viewer
+  visivel  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  viewer usuarios @relation("ColegaViewer", fields: [userId], references: [id], onDelete: Cascade)
+  colega usuarios @relation("ColegaDono", fields: [colegaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, colegaId])
+  @@index([colegaId])
+}
+
+/// Permissão administrativa para usar o compartilhamento de agenda entre colegas (Calendário
+/// Alpha). Presença de uma linha = usuário permitido a adicionar/ser adicionado por colegas.
+/// Admin/CEO sempre tem acesso pleno independente desta tabela (ver `isAdminRole`).
+model GoogleCalendarPermissaoColegas {
+  userId       Int      @id
+  user         usuarios @relation("PermissaoColegasCalendario", fields: [userId], references: [id], onDelete: Cascade)
+  concedidoPor Int
+  createdAt    DateTime @default(now())
 }

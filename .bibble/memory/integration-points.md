@@ -590,3 +590,62 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 **Editado quando:** Frente 2 (motor de IA com liberdade de composição) ou nova expansão de componentes ocorrer.
 
 **Última atualização:** 2026-07-10 por Scribe
+
+---
+
+### Calendário Alpha (módulo novo — Domain-Wide Delegation, 2026-07-17)
+
+**Adicionado em:** 2026-07-17 por Scribe (sessão Bibble). Detalhe completo em `codebase-map.md` ("Calendário Alpha — MVP via Domain-Wide Delegation..."). **Atenção:** este módulo passou por uma reconstrução completa de arquitetura na mesma sessão (de OAuth por usuário para Domain-Wide Delegation) — se encontrar referência a "conectar conta Google"/tokens/OAuth em versões antigas de documentação ou commits, está desatualizado.
+
+**Checklist de integração:**
+- [x] Aparece no menu/sidebar/grid/TabBar — via `MODULOS_REGISTRY` (fonte única, confirmado que os 4 consumidores leem do registry, sem array manual)
+- [x] Ícone resolve (`CalendarClock` no `ICON_MAP` de `GlobalSidebar.tsx`)
+- [x] Permissão administrável pelo Admin automaticamente (deriva do registry, mesmo mecanismo do `apresentacoes`/`conectoresIAlpha`)
+- [x] Rota protegida por sessão (`middleware.ts`, prefixo `/PainelAlpha`) E por permissão de módulo (`CalendarioAlpha/page.tsx` chama `getPermissoesEfetivas()` e redireciona)
+- [x] Todas as Server Actions chamam `verificarAcessoCalendarioAlpha()` — **não há mais Route Handlers** desta feature (removidos com o OAuth)
+- [x] Fluxo real com Service Account/Domain-Wide Delegation — **validado em 2026-07-17** com credencial e Service Account reais (`calendario-alpha@projeto-alpha-492917.iam.gserviceaccount.com`, Client ID `116171147796556178597`). `calendar.calendarList.list()` impersonando `ti@alpha-comex.com` retornou os calendários reais da conta. `scripts/calendar-alpha-doctor.mjs` precisou de correção (não carregava `.env.local` via `dotenv` — corrigido, agora carrega `.env` + `.env.local` na mesma ordem de precedência do Next.js). Falta ainda: exercitar o fluxo completo pela UI no navegador (ativar módulo, ver eventos reais, criar/editar/cancelar) — a validação feita foi direto na API, não pela tela.
+
+**Auditoria de segurança:** ativação/desativação do módulo gravam em `Auditoria` via `src/lib/google-calendar/auditoria.ts` (`registrarAuditoriaCalendarioAlpha`, best-effort, mesmo padrão de `cs-nps/autorizacao.ts`). Não há mais eventos de OAuth (state/nonce/callback) para auditar — removidos com a arquitetura antiga.
+
+**Regra de segurança permanente para qualquer código futuro neste módulo:** `emailUsuario` (usado para impersonar no Google) só pode vir de `usuarios.email` resolvido no servidor a partir do `userId` da sessão (`obterUsuarioGoogleAtivo`) — nunca de um campo do payload do cliente. A Service Account pode impersonar qualquer usuário do domínio; aceitar um e-mail externo quebraria o isolamento entre usuários.
+
+**Como adicionar a Fase 2 (webhook + vínculos internos) no futuro:**
+1. Confirmar com o usuário: existe URL pública HTTPS de produção? Existe cron/job real? Sem os dois, webhook não deve ser implementado.
+2. Webhook exige nova tabela de canal (`channelId`/`resourceId`/expiração) — passa por Vault.
+3. Vínculo com Reserva de Salas: **não copiar** o padrão de autorização de `src/actions/Reservas.ts` (auth fraca, sem checagem de permissão efetiva) — replicar o padrão de ownership já usado em `google-calendar-eventos.ts`.
+4. Vínculo com Clientes/Tarefas exige coluna(s) opcionais em `GoogleCalendarEventoCache` + validação de ownership cruzada.
+5. Se precisar voltar a suportar conta Google pessoal (Gmail), será necessário reintroduzir o fluxo OAuth por usuário em paralelo à Domain-Wide Delegation (os dois modelos podem coexistir, mas isso é um projeto à parte — não é um simples ajuste).
+
+**Editado quando:** Fase 2 for confirmada e implementada, ou quando o fluxo real for validado manualmente com Service Account configurada.
+
+**Atualização 2026-07-17 (mesma sessão) — Compartilhamento entre colegas + Admin full-access + Bibble:**
+- Nova tabela `GoogleCalendarColegaVisivel` (4ª migration Vault): qualquer usuário pode adicionar qualquer colaborador ATIVO à própria visão (`userId` viewer, `colegaId` dono, cor automática da paleta de 10 cores, `visivel` para ligar/desligar sem remover). Não é convite aprovado pelo dono — decisão explícita do usuário ("cultura de confiança interna").
+- **Admin/CEO** (`isAdminRole` em `src/lib/google-calendar/colegas.ts`) enxerga **qualquer** colaborador mesmo sem estar na lista de compartilhamento, com **leitura + escrita completa** (`src/actions/google-calendar-admin.ts` — `criarEventoParaColega`/`atualizarEventoParaColega`/`cancelarEventoParaColega`). E-mail do colega-alvo é sempre resolvido do banco via `colegaId` (`resolverAlvoAdmin`), nunca aceito do cliente.
+- Usuário comum só lê a agenda de colegas que adicionou (`listarEventosDeColega` em `src/actions/google-calendar-colegas.ts` — leitura ao vivo, sem cache/syncToken, teto de 10 páginas) — sem escrita.
+- UI: `PainelColegas.tsx` (Sheet — adicionar/remover/cor/switch), botão `Users` no `HeaderCalendario`, eventos de colegas mesclados na grade com `colegaId` marcado em `EventoExibicao` (roteia `DetalhePopover`/`FormularioEvento` para as ações de Admin quando aplicável).
+- Bibble ganhou tools reais neste módulo (`listar_eventos_calendario`, `criar_evento_calendario`, `cancelar_evento_calendario`, `consultar_disponibilidade_calendario`, `consultar_agenda_colega`) — catálogo completo em `bibble-flows.md`. `consultar_agenda_colega` só recebe nome/e-mail em texto livre do modelo, nunca um `colegaId`, tornando IDOR pelo parâmetro da tool estruturalmente impossível — a validação de compartilhamento/admin acontece 100% server-side dentro de `listarEventosDeColega`.
+
+**Atualização 2026-07-17 (mesma sessão, rodada 2) — Gate de permissão para o compartilhamento entre colegas:**
+- 5ª migration Vault: nova tabela `GoogleCalendarPermissaoColegas` (presença de linha = permitido; Admin/CEO sempre permitido sem precisar de linha). Antes disso, QUALQUER usuário ativo podia adicionar QUALQUER outro livremente — agora só quem o Admin liberou explicitamente pode usar a função (dos dois lados: quem adiciona e quem é adicionado).
+- Helper único `temPermissaoCompartilhamento(userId, role)` em `src/actions/google-calendar-colegas.ts` — usado em `listarUsuariosParaCompartilhar`, `adicionarColegaVisivel` e `listarEventosDeColega` (checagem contínua: se o Admin revogar depois, o acesso para de funcionar mesmo com o registro de compartilhamento antigo ainda no banco).
+- **Correção importante (mesmo dia, logo depois da 1ª entrega):** a permissão é **assimétrica** — só quem ADICIONA/CONSULTA (o viewer) precisa estar liberado. O colega-alvo NÃO precisa da permissão para ser adicionado. Motivo real do usuário: ele libera só líderes de setor, que precisam poder adicionar a agenda de colaboradores comuns (que nunca terão essa permissão). A 1ª versão exigia os dois lados liberados e isso quebrava esse caso de uso. Se mexer nesse fluxo de novo, não reintroduza a checagem do lado do `colega`.
+- Novo painel Admin-only `PainelPermissoesColegas.tsx` (botão `ShieldCheck` no `HeaderCalendario.tsx`, visível só se `isAdmin`) com `listarPermissoesColegasTodosUsuarios`/`alternarPermissaoColegas` (ambas Admin-only, checadas via `isAdminRole` na Server Action, nunca só no cliente).
+- Cores agora são personalizáveis (`personalizarCorCalendario`/`personalizarCorColega`, `input[type=color]`) — cuidado ao mexer em `definirCalendarioSelecionado`: o campo `corHex` foi deliberadamente removido do objeto `update` do upsert para não resetar a cor customizada a cada toggle de visibilidade/gravável.
+
+**Última atualização:** 2026-07-17 por Scribe (redesenho de arquitetura)
+
+---
+
+### Consulta RADAR (Habilitação Radar) — gate de permissão + botão "Excluir do banco"
+
+**Adicionado em:** 2026-07-21 por Scribe (sessão Bibble)
+
+**Rota:** `/PainelAlpha/HabilitacaoRadar` (sem mudança de URL). **Menu:** via `MODULOS_REGISTRY` (`id: 'radar'`, sem mudança). **Permissão necessária:** `radar` — **agora efetivamente checada**, o que não acontecia antes desta sessão.
+
+**O que mudou no wiring:**
+- `page.tsx` deixou de ser um Client Component monolítico e virou Server Component fino: `auth()` → se não-admin, `getPermissoesEfetivas(userId)` → redireciona para `/PainelAlpha` se `!perms.includes("radar")`. Renderiza `<HabilitacaoRadarClient />` (`src/components/ComponentesRadar/HabilitacaoRadarClient.tsx`, novo arquivo, todo o conteúdo antigo movido sem alteração de lógica).
+- Botão novo "Excluir do banco" em `BotoesModal.tsx` chama `onDeletarDoBanco` (prop) → `handleDeletarDoBanco` (em `HabilitacaoRadarClient.tsx`) → Server Action `deletarRegistrosBanco` (`src/actions/RadarAction.ts`, já existia, ganhou `auth()`).
+
+**⚠️ Checkpoint para novos módulos/auditorias:** antes desta sessão, `HabilitacaoRadar/page.tsx` era um dos módulos onde a URL era acessível a qualquer usuário logado, sem checar a permissão do módulo (`MODULOS_REGISTRY.permission`) — só o menu escondia o link, não a rota em si. Isso só foi pego porque o Anubis audita toda vez que uma feature nova mexe em algo destrutivo. **Ao tocar em qualquer módulo para adicionar uma capacidade nova (especialmente destrutiva), verificar se a `page.tsx` é um Server Component com o gate de permissão (`auth()` + `getPermissoesEfetivas()`) ou um Client Component monolítico sem esse gate** — o segundo caso é uma lacuna a corrigir, seguindo o padrão de `Apresentacoes/page.tsx`.
+
+**Última atualização:** 2026-07-21 por Scribe

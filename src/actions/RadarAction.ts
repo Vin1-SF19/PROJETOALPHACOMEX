@@ -2,6 +2,7 @@
 
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { auth } from "../../auth";
 
 const parseDateBR = (valor: any): Date | null => {
   if (!valor || valor === "" || valor === "N/A") return null;
@@ -176,13 +177,16 @@ export async function salvarConsultaIndividual(empresa: any) {
 
 export async function deletarRegistrosBanco(cnpjs: string[]) {
   try {
-    await db.consultas_radar.deleteMany({
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado", count: 0 };
+
+    const resultado = await db.consultas_radar.deleteMany({
       where: { cnpj: { in: cnpjs } }
     });
-    revalidatePath("/PainelAlpha/ConsultarRadar");
-    return { success: true };
-  } catch (error) {
-    return { success: false };
+    revalidatePath("/PainelAlpha/HabilitacaoRadar");
+    return { success: true, count: resultado.count };
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Erro ao excluir", count: 0 };
   }
 }
 

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
-    "smoke:cs-nps-importacao": "node --no-warnings scripts/smoke-cs-nps-zip-streaming.mjs"
+    "smoke:cs-nps-importacao": "node --no-warnings scripts/smoke-cs-nps-zip-streaming.mjs",
+    "calendar-alpha:doctor": "node --no-warnings scripts/calendar-alpha-doctor.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-textract": "^3.1014.0",
@@ -56,6 +57,7 @@
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.38.0",
+    "googleapis": "^173.0.0",
     "gsap": "^3.15.0",
     "hostinger-api-sdk": "^0.0.17",
     "jszip": "^3.10.1",

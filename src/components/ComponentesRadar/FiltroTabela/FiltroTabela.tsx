@@ -40,8 +40,6 @@ type Props = {
     setFiltroErro: (v: boolean) => void;
     loading: boolean;
     totalEmpresas: number;
-    temSelecionadoNoBanco: boolean;
-    onDeletarDoBanco: () => void;
 
     filtroSubmodalidade: "todos" | "LIMITADA (ATÉ US$ 50.000)" | "LIMITADA (ATÉ US$ 150.000)" | "ILIMITADA";
     setFiltroSubmodalidade: React.Dispatch<

@@ -815,3 +815,73 @@ Usuário cobrou: "a rotação está funcionando conforme o horário?? tem que fu
 
 ### Aprendizado técnico
 - O conteúdo do PainelAlpha renderiza dentro de um iframe no preview — `javascript_tool` precisa consultar `iframe.contentDocument`, não o document externo.
+
+---
+
+## [2026-07-15 16:55] — IAlpha: órbitas visíveis com tempo acelerado (padrão planetário)
+
+**Tags:** #frontend #visual #ialpha #astronomia #fix
+**Agentes envolvidos:** Nova, Forge, Probe, Scribe, Kowalski
+**Arquivos tocados:** `src/components/BibbleChatHome/IAlphaCosmicBackground.tsx`, `docs/stories/story-ialpha-background-sideral.md`, `.bibble/memory/components.md`
+
+### Contexto
+Usuário: "não está girando, eles estão fixos na tela". Causa: fidelidade astronômica total = imobilidade visual (Mercúrio anda ~4°/DIA; nenhum movimento orbital é perceptível em tempo real).
+
+### O que foi feito
+- Adotado o padrão de planetário: a cena abre nas posições REAIS do céu de agora e o tempo avança acelerado (`ORBIT_TIME_LAPSE = 80000`). Mercúrio orbita em ~1,6min, Terra ~6,6min, Júpiter ~1,3h, Lua em ~29s. Recarregar = ressincronizar com o céu real.
+- Tick de cena a cada 2s (`useSyncExternalStore`) + `transition: left/top 2s linear` interpolando = movimento contínuo sem saltos; iluminação/terminador recalculados a cada tick.
+- `SPIN_TIME_LAPSE` 900 → 3600: rotação das texturas perceptível (Terra ~24s, Júpiter ~10s), proporções reais mantidas.
+- `prefers-reduced-motion` desliga a aceleração (tempo real).
+
+### Verificação
+- Forge: eslint limpo, tsc sem erros novos.
+- Probe: script com a matemática exata mediu o movimento — Mercúrio 7,3px/s, Terra 3,6px/s em viewport 1280x800.
+- ⚠️ Verificação visual in-app bloqueada: a sessão de login do preview expirou no meio dos testes (heartbeat/pusher 401) e o app cai em "Application error" — bug PREEXISTENTE (task registrada para corrigir o redirect gracioso de sessão expirada). Usuário deve validar visualmente após novo login.
+
+### Aprendizados
+- "Posições conforme data/hora" e "movimento visível" são fisicamente incompatíveis sem time-lapse; a solução de planetário concilia os dois.
+- O conteúdo do painel renderiza dentro de iframe no preview — inspecionar via `iframe.contentDocument`.
+- Sessão expirada derruba o cliente no error boundary global em vez de redirecionar limpo — erro conhecido a corrigir.
+
+---
+
+## [2026-07-21] — Habilitação Radar: botão "Excluir do banco" + gate de permissão corrigido
+
+**Tags:** #feature #security #auth #integration
+**Agentes envolvidos:** Scout, Echo, Vault, Nova, Forge, Anubis, Lens, Probe, Scribe
+**Arquivos tocados:** `src/actions/RadarAction.ts`, `src/components/ComponentesRadar/BotoesModal.tsx`, `src/components/ComponentesRadar/FiltroTabela/FiltroTabela.tsx`, `src/app/PainelAlpha/HabilitacaoRadar/page.tsx`, `src/components/ComponentesRadar/HabilitacaoRadarClient.tsx` (novo)
+
+### Contexto
+Usuário pediu um botão "Excluir do banco" (roxo escuro) no módulo Habilitação Radar, ao lado do botão "Excluir" existente — que hoje só limpa a tabela local (React state), nunca apagou de verdade do banco de produção.
+
+### O que foi feito
+- Descoberto que a Server Action de delete real (`deletarRegistrosBanco`) e boa parte do wiring (`temSelecionadoNoBanco`, `handleDeletarDoBanco`) já existiam no código, **órfãos** — nenhum botão os chamava. Reaproveitados em vez de recriados.
+- `deletarRegistrosBanco` ganhou `auth()` (era a única action do arquivo sem checagem de sessão).
+- Novo botão roxo escuro (`bg-purple-950`) em `BotoesModal.tsx`, com `AlertDialog` de confirmação (mesmo padrão de `ExtratoDetalhe.tsx`), desabilitado sem seleção no banco ou durante `loading`.
+- Removidos 2 props mortos (`temSelecionadoNoBanco`/`onDeletarDoBanco`) de `FiltroTabela.tsx`, nunca usados no corpo do componente.
+- `HabilitacaoRadar/page.tsx` reestruturado de Client Component monolítico (~1150 linhas) para Server Component fino com gate de permissão (`auth()` + `getPermissoesEfetivas()`, padrão de `Apresentacoes/page.tsx`). Conteúdo movido, sem alteração de lógica, para `HabilitacaoRadarClient.tsx` (novo).
+
+### Decisões tomadas
+- Vault classificou o `deleteMany` filtrado pela seleção do usuário como 🟢 (CRUD normal, não "exclusão em massa irrestrita") — sem exigência de backup pontual, só a rotina diária já estabelecida.
+- Usuário aprovou corrigir a lacuna de permissão na mesma sessão, em vez de adiar para tarefa separada.
+- `npm run build` não foi executado até o fim (EPERM ambiental no `prisma generate`, processo Node concorrente travando a DLL) — usuário aceitou `tsc`+`lint` limpos como validação suficiente para esta sessão.
+
+### Problemas encontrados / resolvidos
+- **Lacuna de segurança pré-existente encontrada pelo Anubis:** `HabilitacaoRadar/page.tsx` nunca verificava a permissão de módulo `radar` — qualquer usuário autenticado no sistema acessava a URL direto. Corrigida na mesma sessão.
+- Import `@/auth` não existe no projeto (alias não configurado para o arquivo raiz `auth.ts`) — corrigido para `../../auth`, mesmo padrão de `Extratos.ts`.
+
+### Pendências
+- Padrão reutilizável para auditorias futuras: páginas de módulo que são Client Component monolítico sem gate de permissão (mesma classe de lacuna já catalogada para `Apresentacoes` antes de ser corrigida) — vale um passe do Probe/Anubis pelos módulos restantes do painel.
+- `npm run build` completo (prisma generate) não foi validado nesta sessão por conflito de processo — rodar isoladamente antes do próximo deploy, se possível.
+
+### Refletido também em
+- `codebase-map.md`: nova seção "Consulta RADAR (Habilitação Radar) — Excluir do banco + page.tsx virou Server Component"
+- `integration-points.md`: nova seção "Consulta RADAR (Habilitação Radar) — gate de permissão + botão 'Excluir do banco'"
+
+### Atualização (mesma sessão, rodada 2) — usuário reportou "o item continua no banco"
+
+Duas causas raiz reais encontradas e corrigidas:
+1. `deletarRegistrosBanco` usava `deleteMany` em lote único e retornava `{success:true}` mesmo quando `count` era 0 (nenhuma linha casada) — reportava sucesso falso. Agora retorna `{ success, count }` e a UI distingue "excluídos" de "não encontrados no banco".
+2. `handleBuscar` (consulta individual) nunca marcava `salvo: true` no registro local — `temSelecionadoNoBanco` ficava sempre `false` para CNPJs consultados um a um (o fluxo mais comum), desabilitando o botão silenciosamente.
+
+Redesenho pedido pelo usuário: botão agora mostra a quantidade (`Excluir do banco (N)`), modal de 3 fases (confirmar com contagem → barra de progresso processando CNPJ por CNPJ → resumo final), e a exclusão real **não remove mais a linha da tabela** (só marca `salvo:false`), permitindo reconsulta posterior. `BotoesModal.tsx` ganhou 3 estados locais (`modalExcluirBancoAberto`, `iniciouExclusao`) com a fase derivada no render (evitando `useEffect` + `setState` síncrono, que o lint acusou como novo erro `react-hooks/set-state-in-effect` na primeira tentativa).

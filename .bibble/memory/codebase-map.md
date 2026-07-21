@@ -49,6 +49,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Operacional | Tarefas Comercial | `/PainelAlpha/PainelTarefas/PainelTarefaC` | `tarefasComercial` |
 | Operacional | Ger. Tarefas | `/PainelAlpha/PainelTarefas/GerenciarTarefas/...` | `gerenciamentoTarefas` |
 | Operacional | Reserva de Salas | `/PainelAlpha/ReservaSalas` | `Reservas` |
+| Operacional | Calendário Alpha | `/PainelAlpha/CalendarioAlpha` | `calendarioAlpha` ← MVP OAuth Google Calendar, 2026-07-17 (sem webhook/vínculos internos, ver seção própria) |
 | Operacional | Serviços Gerais | `/PainelAlpha/PainelTarefas/painelTarefaSG` | `ServiçosGerais` |
 | Comercial | Alpha CRM | `/PainelAlpha/AlphaCRM` | `crm` |
 | Comercial | CS & NPS | `/PainelAlpha/CadastroClientes` | `Cliente` |
@@ -184,6 +185,42 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 ---
 
+## Calendário Alpha — MVP via Domain-Wide Delegation (Google Workspace)
+
+**Adicionado em:** 2026-07-17 por Scribe (sessão Bibble, a partir de prompt gerado pelo Phantom)
+
+**⚠️ Arquitetura mudou DENTRO da mesma sessão.** A primeira versão implementada era OAuth 2.0 individual (cada usuário clica "Conectar" e autoriza no Google, token criptografado por usuário). Já testada, migrada e auditada, o usuário esclareceu que queria replicar o modelo do Onyx (credencial única, `usuarios.token_onyx`) em vez de consentimento por pessoa. Depois de confirmar que (a) `usuarios.email` é o mesmo e-mail do Google Workspace de cada colaborador e (b) a empresa tem Super Admin do Workspace, a arquitetura foi **totalmente reconstruída** para **Domain-Wide Delegation**: uma Service Account, autorizada uma única vez pelo Super Admin no Admin Console, impersona qualquer usuário do domínio via `google.auth.JWT({ subject: usuarios.email })`. **Não existe mais OAuth por usuário nem token individual armazenado.**
+
+**Consequência aceita conscientemente:** só funciona para contas Google Workspace da empresa — conta pessoal (Gmail) não é mais suportada (a decisão original de aceitar "ambas" foi substituída).
+
+**Escopo do MVP:** seleção de calendários + visões mês/agenda + CRUD de evento + FreeBusy (implementado, sem UI ainda) + sync incremental com cache local. **Fora do MVP:** webhook, vínculo com Reserva de Salas/Clientes/Tarefas, recorrência avançada (série vs. ocorrência), semana/dia como grades dedicadas.
+
+**Arquivos centrais:**
+- `src/lib/google-calendar/` — `client.ts` (`google.auth.JWT` com impersonation — TODA função recebe `emailUsuario`, nunca um token), `sync.ts` (motor de sync full/incremental, reset controlado em `410`), `usuario-google.ts` (resolve `emailUsuario` **sempre** a partir de `usuarios.email` da sessão, nunca de input do cliente — é o ponto crítico de segurança deste módulo), `cache-eventos.ts` (mapeamento evento Google → cache, cobre all-day via `.data`), `autorizacao.ts`, `auditoria.ts`, `errors.ts`, `scopes.ts`, `types.ts`.
+- `src/lib/validations/google-calendar.ts` — Zod (criar/atualizar/cancelar evento, selecionar calendário, FreeBusy).
+- `src/actions/google-calendar-conexao.ts` (ativar/desativar — puramente local, sem chamada ao Google) e `src/actions/google-calendar-eventos.ts` (CRUD, sync, seleção de calendário, FreeBusy).
+- **Sem Route Handlers** — não há mais fluxo OAuth com redirect, então tudo é Server Action.
+- `src/app/PainelAlpha/CalendarioAlpha/page.tsx` + `src/components/CalendarioAlpha/` (Dashboard, EstadoDesconectado ["ativar"], Header, VisaoMes, VisaoAgenda, SeletorCalendarios, FormularioEvento, DetalheEvento, `lib/datas.ts`, `lib/tipos.ts`).
+- `prisma/schema.prisma` — 3 models: `GoogleCalendarConexao` (1:1 com `usuarios`, **sem token nenhum** — só `status`/`ativadoEm`/`desativadoEm`/`ultimaSincronizacaoEm`), `GoogleCalendarSelecionado`, `GoogleCalendarEventoCache`.
+- `scripts/calendar-alpha-doctor.mjs` — valida env vars da Service Account (nunca imprime segredo).
+- `tests/google-calendar/` — 64 testes (errors, validations, cache-eventos, sync com mocks de Prisma/client, usuario-google, datas puras da UI).
+
+**Removidos na reconstrução (não usar como referência):** `crypto.ts` (AES-GCM), `oauth-state.ts` (HMAC state), `nonce.ts` (consumo único), `token-manager.ts` (renovação de access token), `src/app/api/calendario-alpha/oauth/{connect,callback}/route.ts`, model `GoogleCalendarOAuthNonce`. Todos faziam sentido no modelo OAuth-por-usuário; nenhum se aplica a Domain-Wide Delegation.
+
+**Variáveis de ambiente (v2, substituem as do OAuth):** `GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL` (`client_email` da chave JSON da Service Account), `GOOGLE_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY` (`private_key`, com `\n` literais). Pré-requisito manual fora do código: Client ID numérico da Service Account autorizado no Admin Console do Workspace (Security → API Controls → Domain-wide Delegation) com os escopos exatos de `scopes.ts`.
+
+**Decisão de arquitetura chave (segurança):** `emailUsuario` — usado para impersonar qualquer conta do domínio — **NUNCA** pode vir de um valor fornecido pelo cliente. Toda action resolve via `obterUsuarioGoogleAtivo(acesso.userId)`, que lê `usuarios.email` no servidor a partir do `userId` da sessão. Auditado explicitamente por Anubis após o redesenho. Se algum código novo neste módulo aceitar um e-mail vindo de `input`/`dados` do cliente para a impersonation, é uma regressão de segurança grave — bloquear.
+
+**Decisão de arquitetura (dados):** eventos NÃO são espelhados integralmente — `GoogleCalendarEventoCache` guarda só título/horário/status/etag; descrição/participantes/link do Meet ficam só no Google. Google Calendar continua fonte de verdade única.
+
+**Pendências conhecidas, documentadas conscientemente:** sem rate limit em nenhuma action; `consultarDisponibilidade` (FreeBusy) implementada mas ainda não chamada pela UI; sem webhook; sem Service Account real configurada para validar E2E neste ambiente.
+
+**Editado quando:** a Fase 2 (webhook, vínculos internos) for confirmada e implementada, ou se o suporte a conta pessoal (Gmail) precisar voltar (exigiria reintroduzir o fluxo OAuth em paralelo à Domain-Wide Delegation).
+
+**Última atualização:** 2026-07-17 por Scribe
+
+---
+
 ## CS & NPS — Importação em lote
 
 **Adicionado em:** 2026-07-15 por Scribe
@@ -214,3 +251,37 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 **Escopo operacional:** o rate limit atual é em memória e por instância (cinco prévias por minuto por usuário+IP, sem prévias concorrentes para a mesma chave); não é distribuído entre réplicas. Chave persistente de idempotência para impedir uma segunda confirmação idêntica também não faz parte desta implementação; repetir manualmente o `POST /salvar` pode criar duplicatas e requer uma evolução coordenada de schema/infraestrutura.
 
 **Última atualização:** 2026-07-15 por Scribe
+
+---
+
+## Consulta RADAR (Habilitação Radar) — Excluir do banco + page.tsx virou Server Component
+
+**Adicionado em:** 2026-07-21 por Scribe (sessão Bibble)
+
+**Descrição:** O módulo `src/app/PainelAlpha/HabilitacaoRadar/` ganhou um segundo botão de exclusão. O botão "Excluir (N)" original (`BotoesModal.tsx`, `bg-rose-600`) continua só limpando a tabela local (React state) — nenhuma mudança de comportamento. Ao lado dele, um novo botão **"Excluir do banco (N)"** (`bg-purple-950`, roxo escuro, fixo independente do tema, N = quantidade de selecionados que existem no banco) abre um `AlertDialog` de 3 fases (mesmo componente shadcn de `ExtratoDetalhe.tsx`, mas com 3 telas internas em vez de confirmar/cancelar simples):
+1. **Confirmar** — mostra a quantidade exata que será apagada e avisa que é permanente em produção (Turso) e que os itens continuam na tabela (não somem da tela, só param de estar "sincronizados").
+2. **Progresso** — barra de progresso (`atual/total`) processando CNPJ por CNPJ, sequencialmente (não é mais um único `deleteMany` — cada CNPJ chama `deletarRegistrosBanco([cnpj])` individualmente, permitindo diagnosticar exatamente quais falharam).
+3. **Concluído** — resumo com contagem de excluídos vs. não encontrados no banco.
+
+**Correção de diagnóstico (retrabalho na mesma sessão):** a 1ª versão usava `deleteMany` em lote único e não retornava `count`, então um `deleteMany` que não casava nenhuma linha (ex: CNPJ salvo com formatação diferente da usada no delete) reportava sucesso mesmo sem apagar nada — o usuário reportou "cliquei e o item continua no banco". Corrigido: `deletarRegistrosBanco` agora retorna `{ success, count }`; o loop conta separadamente "excluídos" (`count > 0`) vs. "não encontrados" (`count === 0`), e o toast final reflete a realidade em vez de assumir sucesso cego. Também corrigido: `handleBuscar` (consulta individual) não marcava `salvo: true` no estado local mesmo quando o registro já estava/ficava salvo no banco — sem isso, `temSelecionadoNoBanco`/`cnpjsSelecionadosNoBanco` nunca habilitavam o botão para CNPJs consultados um a um (o fluxo mais comum).
+
+**Descoberta principal desta sessão:** a Server Action `deletarRegistrosBanco` (`src/actions/RadarAction.ts`) e o handler `handleDeletarDoBanco` **já existiam no código antes desta sessão**, junto com `temSelecionadoNoBanco` — mas eram órfãos: nenhum botão da UI os chamava (o prop `onDeletarDoBanco` chegava a ser passado até `FiltroTabela.tsx`, que nunca o usava). Foram reaproveitados, não recriados. `deletarRegistrosBanco` ganhou `auth()` (era a única action do arquivo sem essa checagem).
+
+**Reestruturação de `page.tsx` (achado do Anubis, corrigido na mesma sessão):** a página inteira era um único Client Component (`"use client"`, ~1150 linhas) e **nunca verificava a permissão de módulo `radar`** — qualquer usuário autenticado no sistema acessava a URL direto, mesmo sem essa permissão atribuída. Isso já era assim antes, mas o novo botão aumentava o risco (de "ver dado que não deveria" para "poder apagar dado de produção"). Corrigido: `page.tsx` virou Server Component fino (`auth()` + `getPermissoesEfetivas()`, redireciona para `/PainelAlpha` se não-admin sem `radar`), seguindo **exatamente** o padrão de `Apresentacoes/page.tsx`. Todo o conteúdo antigo foi movido, sem alteração de lógica de negócio, para `src/components/ComponentesRadar/HabilitacaoRadarClient.tsx` (named export `HabilitacaoRadarClient`).
+
+**⚠️ Padrão a checar em auditorias futuras:** a memória já registrava que só ~6 de 30 páginas de módulo fazem o check explícito de permissão (`Apresentacoes` foi a primeira). `HabilitacaoRadar` era uma das ~24 que não fazia — agora são ~7. Qualquer página de módulo que seja 100% Client Component (sem um Server Component `page.tsx` fino na frente) é candidata a ter essa mesma lacuna. Vale um passe do Probe/Anubis pelos módulos restantes, especialmente os que ganharem uma capacidade destrutiva nova.
+
+**Decisão do Vault:** `deleteMany({ where: { cnpj: { in: cnpjs } } })` com filtro restritivo pelos CNPJs explicitamente selecionados pelo usuário foi classificado como 🟢 (CRUD normal, não "exclusão em massa irrestrita" — o próprio critério de ativação do Vault distingue os dois casos). `consultas_radar` é cache de consulta à Receita Federal, reconsultável; não exigiu backup pontual além da rotina diária já estabelecida.
+
+**Limpeza:** `src/components/ComponentesRadar/FiltroTabela/FiltroTabela.tsx` tinha 2 props tipados (`temSelecionadoNoBanco`, `onDeletarDoBanco`) nunca usados no corpo do componente — removidos da interface, já que a funcionalidade real vive em `BotoesModal.tsx`.
+
+**Arquivos tocados:**
+- `src/actions/RadarAction.ts` — `deletarRegistrosBanco` ganhou `auth()`
+- `src/components/ComponentesRadar/BotoesModal.tsx` — novo botão + `AlertDialog`
+- `src/components/ComponentesRadar/FiltroTabela/FiltroTabela.tsx` — props mortos removidos
+- `src/app/PainelAlpha/HabilitacaoRadar/page.tsx` — virou Server Component fino
+- `src/components/ComponentesRadar/HabilitacaoRadarClient.tsx` (novo) — conteúdo integral movido de `page.tsx`
+
+**Editado quando:** o mesmo padrão de gate de permissão precisar ser replicado em outro módulo client-monolítico, ou se `consultas_radar` ganhar conceito de ownership por usuário no futuro.
+
+**Última atualização:** 2026-07-21 por Scribe

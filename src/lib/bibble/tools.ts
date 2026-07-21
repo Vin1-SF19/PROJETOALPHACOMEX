@@ -481,4 +481,99 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
       },
     },
   },
+
+  // ── Calendário Alpha (Google Calendar) ──────────────────────────────────
+  {
+    type: "function",
+    function: {
+      name: "listar_eventos_calendario",
+      description:
+        "Lista os próximos eventos da agenda Google do usuário (Calendário Alpha) — todos os calendários que ele marcou como visíveis. Use quando o usuário perguntar o que tem na agenda, o que vai fazer hoje/amanhã/semana, ou pedir um resumo de compromissos.",
+      parameters: {
+        type: "object",
+        properties: {
+          dias_a_frente: {
+            type: "number",
+            description: "Quantos dias a partir de hoje considerar (padrão: 7, máximo: 60).",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "criar_evento_calendario",
+      description:
+        "Cria um evento real na agenda Google do usuário (Calendário Alpha), no primeiro calendário gravável dele. Use quando o usuário pedir para marcar/agendar uma reunião, compromisso ou lembrete.",
+      parameters: {
+        type: "object",
+        properties: {
+          titulo: { type: "string", description: "Título do evento." },
+          data_inicio: {
+            type: "string",
+            description: "Data/hora de início em formato ISO (ex: 2026-07-20T14:00:00-03:00) ou 'AAAA-MM-DD' se for dia inteiro.",
+          },
+          data_fim: {
+            type: "string",
+            description: "Data/hora de fim. Se omitido, assume 1 hora após o início (ou o mesmo dia, se for dia inteiro).",
+          },
+          dia_inteiro: { type: "boolean", description: "Verdadeiro se o evento for de dia inteiro, sem horário." },
+          descricao: { type: "string", description: "Descrição/observação do evento (opcional)." },
+          local: { type: "string", description: "Localização do evento (opcional)." },
+          participantes: { type: "string", description: "E-mails dos participantes, separados por vírgula (opcional)." },
+          criar_meet: { type: "boolean", description: "Verdadeiro para gerar um link do Google Meet (opcional)." },
+        },
+        required: ["titulo", "data_inicio"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "cancelar_evento_calendario",
+      description:
+        "Cancela um evento existente na agenda Google do usuário. Precisa do ID do evento — obtido antes via listar_eventos_calendario.",
+      parameters: {
+        type: "object",
+        properties: {
+          google_event_id: { type: "string", description: "ID do evento no Google, retornado por listar_eventos_calendario." },
+        },
+        required: ["google_event_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_disponibilidade_calendario",
+      description:
+        "Consulta se o usuário está livre ou ocupado num intervalo de tempo, sem revelar título/detalhe dos eventos. Use antes de sugerir um horário de reunião.",
+      parameters: {
+        type: "object",
+        properties: {
+          data_inicio: { type: "string", description: "Início do intervalo, formato ISO." },
+          data_fim: { type: "string", description: "Fim do intervalo, formato ISO." },
+        },
+        required: ["data_inicio", "data_fim"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_agenda_colega",
+      description:
+        "Consulta os próximos eventos da agenda Google de OUTRO colaborador (não do usuário atual). Só funciona se o colaborador já foi adicionado à lista de 'Colegas' do usuário no Calendário Alpha, OU se o usuário atual for Admin/CEO (que pode consultar qualquer colaborador).",
+      parameters: {
+        type: "object",
+        properties: {
+          nome_ou_email: { type: "string", description: "Nome (ou parte do nome) ou e-mail do colaborador." },
+          dias_a_frente: { type: "number", description: "Quantos dias a partir de hoje considerar (padrão: 7, máximo: 60)." },
+        },
+        required: ["nome_ou_email"],
+      },
+    },
+  },
 ];

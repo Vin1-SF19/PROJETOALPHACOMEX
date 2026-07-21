@@ -20,6 +20,17 @@
 
 <!-- Adicionar novas tools aqui conforme o painel cresce -->
 
+### Calendário Alpha (Google Calendar via Domain-Wide Delegation)
+Definidas em `src/lib/bibble/tools.ts`, executadas em `src/lib/bibble/tool-executor.ts`. Todas exigem `temPermissao(ctx, "calendarioAlpha")`.
+
+- **listar_eventos_calendario** — `dias_a_frente?: number` (padrão 7, máx 60). Lista eventos dos calendários visíveis do próprio usuário. Delega para `listarCalendariosSelecionados`/`listarEventosDoCalendario` (`src/actions/google-calendar-eventos.ts`).
+- **criar_evento_calendario** — `titulo, data_inicio, data_fim?, dia_inteiro?, descricao?, local?, participantes?, criar_meet?`. Usa sempre o primeiro calendário gravável do usuário (resolvido via `db.googleCalendarSelecionado.findFirst({conexao:{userId}, gravavel:true})`); delega para `criarEventoNoCalendario`.
+- **cancelar_evento_calendario** — `google_event_id: string`. Resolve o calendário do evento via cache scoped por `userId` (`GoogleCalendarEventoCache.calendario.conexao.userId`) antes de chamar `cancelarEventoNoCalendario` — não aceita `calendarId` do modelo.
+- **consultar_disponibilidade_calendario** — `data_inicio, data_fim`. Delega para `consultarDisponibilidade` (FreeBusy, não revela título do evento).
+- **consultar_agenda_colega** — `nome_ou_email: string`, `dias_a_frente?`. Resolve o colega por nome/e-mail no banco (nunca recebe `colegaId` bruto do modelo — IDOR estruturalmente impossível pelo parâmetro da tool) e delega para `listarEventosDeColega` (`src/actions/google-calendar-colegas.ts`), que já valida server-side se o colega está na lista de compartilhamento do usuário OU se o usuário é Admin/CEO (Admin enxerga qualquer colaborador).
+
+**Ownership:** nenhuma dessas tools aceita `userId` do modelo — vem sempre de `ctx.userId` (injetado pela sessão autenticada) ou é revalidado dentro da própria Server Action via `auth()`.
+
 ---
 
 ## Fluxos de Conversa

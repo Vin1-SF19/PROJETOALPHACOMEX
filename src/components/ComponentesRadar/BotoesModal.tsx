@@ -6,6 +6,10 @@ import { toast } from "sonner";
 import ModalHistorico from "./ModalHistorico";
 import FiltrosTabela from "./FiltroTabela/FiltroTabela";
 import { getTema } from "@/lib/temas";
+import {
+  AlertDialog, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ─── Modal config ─────────────────────────────────────────────────────────────
 
@@ -69,8 +73,10 @@ type Props = {
   onSalvarBanco: (nome: string) => Promise<any>;
   filtroStatus: "todos" | "erro" | "sucesso";
   setFiltroStatus: (v: "todos" | "erro" | "sucesso") => void;
-  temSelecionadoNoBanco: boolean;
-  onDeletarDoBanco: () => void;
+  cnpjsSelecionadosNoBanco: string[];
+  excluindoDoBanco: boolean;
+  progressoExclusao: { atual: number; total: number };
+  onIniciarExclusaoDoBanco: () => void;
   totalSelecionados: number;
   filtroSituacao: "todos" | "DEFERIDA" | "NÃO HABILITADA" | "SUSPENSA" | "SEM STATUS";
   setFiltroSituacao: React.Dispatch<
@@ -121,8 +127,10 @@ export default function ModalButtons({
   setOrdemData,
   filtroStatus,
   setFiltroStatus,
-  temSelecionadoNoBanco,
-  onDeletarDoBanco,
+  cnpjsSelecionadosNoBanco,
+  excluindoDoBanco,
+  progressoExclusao,
+  onIniciarExclusaoDoBanco,
   totalSelecionados,
   filtroSituacao,
   setFiltroSituacao,
@@ -136,6 +144,33 @@ export default function ModalButtons({
   const [modalAberto, setModalAberto] = useState<ModalAberto>(null);
   const [nomeArquivo, setNomeArquivo] = useState("consulta_radar");
   const [enabled, setEnabled] = useState(true);
+  const [modalExcluirBancoAberto, setModalExcluirBancoAberto] = useState(false);
+  const [iniciouExclusao, setIniciouExclusao] = useState(false);
+  const totalNoBanco = cnpjsSelecionadosNoBanco.length;
+  const progressoPercentual =
+    progressoExclusao.total > 0
+      ? Math.round((progressoExclusao.atual / progressoExclusao.total) * 100)
+      : 0;
+  const faseExclusao: "confirmar" | "progresso" | "concluido" = !iniciouExclusao
+    ? "confirmar"
+    : excluindoDoBanco
+    ? "progresso"
+    : "concluido";
+
+  function abrirModalExcluirBanco() {
+    setIniciouExclusao(false);
+    setModalExcluirBancoAberto(true);
+  }
+
+  function confirmarExclusaoDoBanco() {
+    setIniciouExclusao(true);
+    onIniciarExclusaoDoBanco();
+  }
+
+  function fecharModalExcluirBanco() {
+    setModalExcluirBancoAberto(false);
+    setIniciouExclusao(false);
+  }
 
   function fecharTudo() {
     setAcaoModal(null);
@@ -246,8 +281,6 @@ export default function ModalButtons({
           totalEmpresas={empresas.length}
           filtroStatus={filtroStatus}
           setFiltroStatus={setFiltroStatus}
-          temSelecionadoNoBanco={temSelecionadoNoBanco}
-          onDeletarDoBanco={onDeletarDoBanco}
           filtroSituacao={filtroSituacao}
           setOrdem={setOrdem}
           setOrdemData={setOrdemData}
@@ -268,6 +301,96 @@ export default function ModalButtons({
           <Trash2 size={14} />
           Excluir ({totalSelecionados})
         </button>
+
+        <button
+          onClick={abrirModalExcluirBanco}
+          disabled={totalNoBanco === 0 || excluindoDoBanco}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${
+            totalNoBanco > 0 && !excluindoDoBanco
+              ? "bg-purple-950 border-purple-800 text-white shadow-lg hover:bg-purple-900 active:scale-95"
+              : "bg-white/5 border-white/10 text-slate-500 cursor-not-allowed"
+          }`}
+        >
+          <Database size={14} />
+          Excluir do banco ({totalNoBanco})
+        </button>
+
+        <AlertDialog
+          open={modalExcluirBancoAberto}
+          onOpenChange={(open) => {
+            if (!open && faseExclusao !== "progresso") fecharModalExcluirBanco();
+          }}
+        >
+          <AlertDialogContent>
+            {faseExclusao === "confirmar" && (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="text-purple-500" size={20} aria-hidden="true" />
+                    Excluir do banco de dados?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    <strong>{totalNoBanco}</strong> registro{totalNoBanco !== 1 ? "s" : ""}{" "}
+                    será{totalNoBanco !== 1 ? "ão" : ""}{" "}
+                    <strong>excluído{totalNoBanco !== 1 ? "s" : ""} permanentemente</strong> do
+                    banco de dados de produção.
+                    <br />
+                    Os itens continuam na tabela para consulta — só param de estar sincronizados
+                    com o banco.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <button
+                    onClick={confirmarExclusaoDoBanco}
+                    className={`${btnPrimary} !bg-purple-950 hover:!bg-purple-900`}
+                  >
+                    Sim, excluir do banco
+                  </button>
+                </AlertDialogFooter>
+              </>
+            )}
+
+            {faseExclusao === "progresso" && (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluindo do banco...</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {progressoExclusao.atual} / {progressoExclusao.total} processados. Não feche
+                    esta janela.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="w-full bg-black/30 rounded-full h-3 overflow-hidden my-2">
+                  <div
+                    className="h-full bg-purple-600 transition-all duration-300"
+                    style={{ width: `${progressoPercentual}%` }}
+                  />
+                </div>
+              </>
+            )}
+
+            {faseExclusao === "concluido" && (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <Database className="text-purple-500" size={20} aria-hidden="true" />
+                    Exclusão concluída
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {progressoExclusao.atual} de {progressoExclusao.total} registro
+                    {progressoExclusao.total !== 1 ? "s" : ""} processado
+                    {progressoExclusao.total !== 1 ? "s" : ""}. Veja o resumo no aviso da tela.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <button onClick={fecharModalExcluirBanco} className={`${btnPrimary} !bg-purple-950 hover:!bg-purple-900`}>
+                    Fechar
+                  </button>
+                </AlertDialogFooter>
+              </>
+            )}
+          </AlertDialogContent>
+        </AlertDialog>
       </section>
 
       {/* ── Histórico modal ──────────────────────────────────────────────────── */}

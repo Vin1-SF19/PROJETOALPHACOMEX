@@ -434,24 +434,33 @@ function normalizeHour(hour: number) {
 }
 
 // Relógio como external store: SSR renderiza sem planetas (snapshot null) e o
-// cliente assume após a hidratação, reatualizando a cada minuto.
-function subscribeToMinuteClock(onStoreChange: () => void) {
-  const timer = setInterval(onStoreChange, 60_000);
+// cliente assume após a hidratação, reatualizando a cena a cada tick.
+const SCENE_TICK_MS = 2_000;
+
+// Aceleração da translação (padrão planetário): as posições partem do céu REAL
+// do momento do load e o tempo da cena avança acelerado para a órbita ser
+// visível — Mercúrio completa uma volta em ~1,6min, Terra em ~6,6min, Júpiter
+// em ~1,3h e a Lua orbita a Terra em ~30s. Recarregar = ressincronizar com o
+// céu real. Com preferência por menos movimento, o tempo volta a ser real.
+const ORBIT_TIME_LAPSE = 80_000;
+
+function subscribeToSceneClock(onStoreChange: () => void) {
+  const timer = setInterval(onStoreChange, SCENE_TICK_MS);
   return () => clearInterval(timer);
 }
 
-function getMinuteSnapshot(): number | null {
-  return Math.floor(Date.now() / 60_000);
+function getSceneTickSnapshot(): number | null {
+  return Math.floor(Date.now() / SCENE_TICK_MS);
 }
 
-function getServerMinuteSnapshot(): number | null {
+function getServerSceneSnapshot(): number | null {
   return null;
 }
 
 // Rotação própria ancorada no relógio real: a fase é determinística a partir de
 // Date.now() com os períodos siderais reais de cada planeta, acelerados por um
 // fator fixo para serem perceptíveis. Mesma data/hora → mesma face visível.
-const SPIN_TIME_LAPSE = 900; // 1s real = 15min simulados
+const SPIN_TIME_LAPSE = 3_600; // 1s real = 1h simulada (Terra gira em ~24s)
 
 interface SpinState {
   periodSeconds: number;
@@ -493,15 +502,19 @@ export function IAlphaCosmicBackground({ accent, currentHour }: IAlphaCosmicBack
   const isNight = hour >= 18 || hour < 6;
   const starOpacity = isNight ? 0.95 : 0.78;
 
-  const nowMinute = useSyncExternalStore(subscribeToMinuteClock, getMinuteSnapshot, getServerMinuteSnapshot);
-  const scene = useMemo(
-    () => (nowMinute === null ? null : computeCosmicScene(nowMinute * 60_000)),
-    [nowMinute],
-  );
+  const nowTick = useSyncExternalStore(subscribeToSceneClock, getSceneTickSnapshot, getServerSceneSnapshot);
 
-  // Época capturada uma única vez no mount: a animação CSS parte da fase certa
-  // e segue o timeline do documento, sem reiniciar a cada atualização de minuto.
-  const [spinEpochMs] = useState(() => Date.now());
+  // Época capturada uma única vez no mount: âncora da fase de rotação e do
+  // tempo acelerado da cena (que parte do céu real do momento do load).
+  const [epochMs] = useState(() => Date.now());
+
+  const scene = useMemo(() => {
+    if (nowTick === null) return null;
+    const realMs = nowTick * SCENE_TICK_MS;
+    const lapse = reduceMotion ? 1 : ORBIT_TIME_LAPSE;
+    const simulatedMs = epochMs + Math.max(0, realMs - epochMs) * lapse;
+    return computeCosmicScene(simulatedMs);
+  }, [nowTick, epochMs, reduceMotion]);
 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#020617]">
@@ -620,16 +633,23 @@ export function IAlphaCosmicBackground({ accent, currentHour }: IAlphaCosmicBack
         ].filter(Boolean).join(" ");
 
         // Fase de rotação derivada do relógio: mesma data/hora → mesma face.
-        const spin = computeSpin(visual.rotationPeriodHours, spinEpochMs);
+        const spin = computeSpin(visual.rotationPeriodHours, epochMs);
         const cloudSpin = visual.clouds
-          ? computeSpin(visual.rotationPeriodHours * 0.68, spinEpochMs)
+          ? computeSpin(visual.rotationPeriodHours * 0.68, epochMs)
           : null;
 
         return (
           <div
             key={planet.id}
+            data-planet={planet.id}
             className="absolute -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${planet.left}%`, top: `${planet.top}%`, zIndex: planet.zIndex }}
+            style={{
+              left: `${planet.left}%`,
+              top: `${planet.top}%`,
+              zIndex: planet.zIndex,
+              // Interpola entre os ticks da cena: órbita contínua, sem saltos.
+              transition: `left ${SCENE_TICK_MS}ms linear, top ${SCENE_TICK_MS}ms linear`,
+            }}
           >
             <motion.div
               className="relative"
@@ -713,6 +733,7 @@ export function IAlphaCosmicBackground({ accent, currentHour }: IAlphaCosmicBack
                   className="absolute left-1/2 top-1/2 h-1 w-1 rounded-full bg-slate-200/80"
                   style={{
                     transform: `translate(calc(-50% + ${(Math.cos(scene.moonAngleRad) * size * 1.05).toFixed(1)}px), calc(-50% + ${(Math.sin(scene.moonAngleRad) * size * 0.45).toFixed(1)}px))`,
+                    transition: `transform ${SCENE_TICK_MS}ms linear`,
                   }}
                 />
               )}

@@ -1,0 +1,318 @@
+import { calendar_v3, google } from "googleapis";
+
+type ClienteJWT = InstanceType<typeof google.auth.JWT>;
+
+import { classificarErroGoogle, GoogleCalendarError } from "./errors";
+import { ESCOPOS_CALENDARIO_ALPHA } from "./scopes";
+import type {
+  CriarOuAtualizarEventoInput,
+  FreeBusyResultadoDTO,
+  GoogleCalendarioDTO,
+  GoogleEventoDTO,
+  ResultadoPaginaEventos,
+} from "./types";
+
+const MAX_TENTATIVAS_RETRY = 3;
+const JANELA_MAXIMA_CONSULTA_DIAS = 400;
+
+function esperar(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Executa uma chamada à Google Calendar API com retry/backoff apenas para erros retryable (429/5xx). */
+async function executarComRetry<T>(chamada: () => Promise<T>): Promise<T> {
+  let tentativa = 0;
+  for (;;) {
+    try {
+      return await chamada();
+    } catch (erroOriginal) {
+      const erro = classificarErroGoogle(erroOriginal);
+      if (!erro.retryable || tentativa >= MAX_TENTATIVAS_RETRY - 1) {
+        throw erro;
+      }
+      await esperar((erro.retryAfterMs ?? 500) * 2 ** tentativa);
+      tentativa += 1;
+    }
+  }
+}
+
+function obterEnvObrigatoria(nome: string): string {
+  const valor = process.env[nome];
+  if (!valor) throw new Error(`Variável de ambiente ${nome} não configurada.`);
+  return valor;
+}
+
+/**
+ * Credenciais da Service Account com Domain-Wide Delegation. A chave privada é gravada no `.env`
+ * com `\n` literais (padrão de exportação do Google) — decodificados aqui para quebras de linha reais.
+ */
+function obterCredenciaisServiceAccount(): { email: string; chavePrivada: string } {
+  const email = obterEnvObrigatoria("GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL");
+  const chavePrivada = obterEnvObrigatoria("GOOGLE_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
+  return { email, chavePrivada };
+}
+
+/**
+ * Reutiliza o mesmo cliente JWT por `emailUsuario` por alguns minutos — evita uma troca de
+ * token nova a cada chamada (ex: cada página de uma sincronização longa). O próprio
+ * `google.auth.JWT` já cacheia/renova o access token internamente enquanto a instância viver.
+ */
+const CACHE_CLIENTES_TTL_MS = 45 * 60 * 1000; // margem segura abaixo da validade de ~1h do access token
+const clientesImpersonadosCache = new Map<string, { cliente: ClienteJWT; criadoEm: number }>();
+
+/**
+ * Cliente autenticado como a Service Account, impersonando `emailUsuario` (Domain-Wide Delegation).
+ * `emailUsuario` DEVE vir sempre de `usuarios.email` da sessão autenticada no servidor —
+ * nunca de um valor fornecido pelo cliente (isso permitiria impersonar qualquer colaborador).
+ */
+function clienteImpersonado(emailUsuario: string): ClienteJWT {
+  const existente = clientesImpersonadosCache.get(emailUsuario);
+  if (existente && Date.now() - existente.criadoEm < CACHE_CLIENTES_TTL_MS) {
+    return existente.cliente;
+  }
+
+  const { email, chavePrivada } = obterCredenciaisServiceAccount();
+  const cliente = new google.auth.JWT({
+    email,
+    key: chavePrivada,
+    scopes: [...ESCOPOS_CALENDARIO_ALPHA],
+    subject: emailUsuario,
+  });
+  clientesImpersonadosCache.set(emailUsuario, { cliente, criadoEm: Date.now() });
+  return cliente;
+}
+
+function clienteCalendar(emailUsuario: string): calendar_v3.Calendar {
+  return google.calendar({ version: "v3", auth: clienteImpersonado(emailUsuario) });
+}
+
+/** Lista os calendários autorizados do usuário (calendarList, não os metadados completos do calendário). */
+export async function listarCalendarios(emailUsuario: string): Promise<GoogleCalendarioDTO[]> {
+  const calendar = clienteCalendar(emailUsuario);
+  try {
+    const resposta = await executarComRetry(() => calendar.calendarList.list({ maxResults: 250 }));
+    return (resposta.data.items ?? []).map((item) => ({
+      googleCalendarId: item.id ?? "",
+      nome: item.summaryOverride ?? item.summary ?? item.id ?? "Sem nome",
+      corHex: item.backgroundColor ?? null,
+      timezone: item.timeZone ?? "UTC",
+      papelAcesso: (item.accessRole as GoogleCalendarioDTO["papelAcesso"]) ?? "reader",
+      principal: item.primary === true,
+    }));
+  } catch (erroOriginal) {
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
+function paraGoogleEventoDataDTO(data: calendar_v3.Schema$EventDateTime | undefined) {
+  return {
+    dataHora: data?.dateTime ?? undefined,
+    data: data?.date ?? undefined,
+    timezone: data?.timeZone ?? undefined,
+  };
+}
+
+function mapEventoParaDTO(evento: calendar_v3.Schema$Event): GoogleEventoDTO {
+  const linkMeet =
+    evento.conferenceData?.entryPoints?.find((entrada) => entrada.entryPointType === "video")?.uri ?? null;
+
+  return {
+    googleEventId: evento.id ?? "",
+    status: (evento.status as GoogleEventoDTO["status"]) ?? "confirmed",
+    titulo: evento.summary ?? null,
+    descricao: evento.description ?? null,
+    localizacao: evento.location ?? null,
+    inicio: paraGoogleEventoDataDTO(evento.start),
+    fim: paraGoogleEventoDataDTO(evento.end),
+    diaInteiro: Boolean(evento.start?.date && !evento.start?.dateTime),
+    recorrenciaRegras: evento.recurrence ?? null,
+    eventoRecorrenteIdOrigem: evento.recurringEventId ?? null,
+    participantes: (evento.attendees ?? []).map((participante) => ({
+      email: participante.email ?? "",
+      status: (participante.responseStatus as "needsAction" | "accepted" | "declined" | "tentative") ?? "needsAction",
+      organizador: participante.organizer === true,
+    })),
+    linkMeet,
+    etag: evento.etag ?? "",
+    atualizadoEm: evento.updated ?? new Date().toISOString(),
+    visibilidade: (evento.visibility as GoogleEventoDTO["visibilidade"]) ?? "default",
+  };
+}
+
+interface ListarEventosPaginaParams {
+  emailUsuario: string;
+  calendarId: string;
+  pageToken?: string;
+  /** Se presente, faz sync incremental (ignora timeMin/timeMax — regra da própria Google API). */
+  syncToken?: string;
+  timeMin?: string;
+  timeMax?: string;
+}
+
+/** Lista uma página de eventos — full sync (timeMin/timeMax) ou incremental (syncToken), nunca os dois juntos. */
+export async function listarEventosPagina(params: ListarEventosPaginaParams): Promise<ResultadoPaginaEventos> {
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    const resposta = await executarComRetry(() =>
+      calendar.events.list({
+        calendarId: params.calendarId,
+        pageToken: params.pageToken,
+        syncToken: params.syncToken,
+        timeMin: params.syncToken ? undefined : params.timeMin,
+        timeMax: params.syncToken ? undefined : params.timeMax,
+        singleEvents: true,
+        showDeleted: true,
+        maxResults: 250,
+      }),
+    );
+
+    return {
+      eventos: (resposta.data.items ?? []).map(mapEventoParaDTO),
+      proximoPageToken: resposta.data.nextPageToken ?? null,
+      proximoSyncToken: resposta.data.nextSyncToken ?? null,
+    };
+  } catch (erroOriginal) {
+    // 410 (Gone) precisa subir intacto — quem chama decide fazer full sync.
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
+interface ConsultarFreeBusyParams {
+  emailUsuario: string;
+  googleCalendarIds: string[];
+  timeMin: string;
+  timeMax: string;
+}
+
+/** Consulta disponibilidade sem revelar título/descrição — usar sempre que FreeBusy for suficiente. */
+export async function consultarFreeBusy(params: ConsultarFreeBusyParams): Promise<FreeBusyResultadoDTO> {
+  const intervaloMs = new Date(params.timeMax).getTime() - new Date(params.timeMin).getTime();
+  if (intervaloMs <= 0 || intervaloMs > JANELA_MAXIMA_CONSULTA_DIAS * 24 * 60 * 60 * 1000) {
+    throw new GoogleCalendarError("Janela de consulta de disponibilidade inválida.", { kind: "invalid_request" });
+  }
+
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    const resposta = await executarComRetry(() =>
+      calendar.freebusy.query({
+        requestBody: {
+          timeMin: params.timeMin,
+          timeMax: params.timeMax,
+          items: params.googleCalendarIds.map((id) => ({ id })),
+        },
+      }),
+    );
+
+    const resultado: FreeBusyResultadoDTO = {};
+    for (const [calendarId, dados] of Object.entries(resposta.data.calendars ?? {})) {
+      resultado[calendarId] = {
+        ocupado: (dados.busy ?? []).map((intervalo) => ({
+          inicio: intervalo.start ?? "",
+          fim: intervalo.end ?? "",
+        })),
+        erro: dados.errors?.[0]?.reason ?? undefined,
+      };
+    }
+    return resultado;
+  } catch (erroOriginal) {
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
+function paraSchemaEvento(input: CriarOuAtualizarEventoInput): calendar_v3.Schema$Event {
+  const dataInicio = input.diaInteiro
+    ? { date: input.inicio.toISOString().slice(0, 10) }
+    : { dateTime: input.inicio.toISOString(), timeZone: input.timezone };
+  const dataFim = input.diaInteiro
+    ? { date: input.fim.toISOString().slice(0, 10) }
+    : { dateTime: input.fim.toISOString(), timeZone: input.timezone };
+
+  return {
+    summary: input.titulo,
+    description: input.descricaoGoogle,
+    location: input.localizacao,
+    start: dataInicio,
+    end: dataFim,
+    attendees: input.participantes.map((email) => ({ email })),
+    conferenceData: input.criarMeet
+      ? {
+          createRequest: {
+            requestId: `calalpha-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            conferenceSolutionKey: { type: "hangoutsMeet" },
+          },
+        }
+      : undefined,
+  };
+}
+
+interface CriarEventoParams {
+  emailUsuario: string;
+  calendarId: string;
+  evento: CriarOuAtualizarEventoInput;
+}
+
+export async function criarEvento(params: CriarEventoParams): Promise<GoogleEventoDTO> {
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    const resposta = await executarComRetry(() =>
+      calendar.events.insert({
+        calendarId: params.calendarId,
+        requestBody: paraSchemaEvento(params.evento),
+        conferenceDataVersion: params.evento.criarMeet ? 1 : 0,
+      }),
+    );
+    return mapEventoParaDTO(resposta.data);
+  } catch (erroOriginal) {
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
+interface AtualizarEventoParams {
+  emailUsuario: string;
+  calendarId: string;
+  googleEventId: string;
+  evento: CriarOuAtualizarEventoInput;
+}
+
+export async function atualizarEvento(params: AtualizarEventoParams): Promise<GoogleEventoDTO> {
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    const resposta = await executarComRetry(() =>
+      calendar.events.update({
+        calendarId: params.calendarId,
+        eventId: params.googleEventId,
+        requestBody: paraSchemaEvento(params.evento),
+        conferenceDataVersion: params.evento.criarMeet ? 1 : 0,
+      }),
+    );
+    return mapEventoParaDTO(resposta.data);
+  } catch (erroOriginal) {
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
+interface CancelarEventoParams {
+  emailUsuario: string;
+  calendarId: string;
+  googleEventId: string;
+}
+
+/** Idempotente: evento já removido/inexistente (404/410) é tratado como já cancelado, não como erro. */
+export async function cancelarEvento(params: CancelarEventoParams): Promise<{ jaEstavaCancelado: boolean }> {
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    await executarComRetry(() =>
+      calendar.events.delete({
+        calendarId: params.calendarId,
+        eventId: params.googleEventId,
+      }),
+    );
+    return { jaEstavaCancelado: false };
+  } catch (erroOriginal) {
+    const erro = classificarErroGoogle(erroOriginal);
+    if (erro.kind === "not_found" || erro.kind === "gone") {
+      return { jaEstavaCancelado: true };
+    }
+    throw erro;
+  }
+}
