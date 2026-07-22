@@ -254,6 +254,28 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 ---
 
+## CS & NPS — Modal de dados do cliente: botão único de salvar + auth em Clientes.ts
+
+**Adicionado em:** 2026-07-22 por Scribe (sessão Bibble)
+
+**Bug real corrigido:** `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx` tinha vários botões de "salvar" independentes (Dados Fiscais no rodapé, "Salvar Serviço" por card de Serviço Contratado, Sócios, CS, Feedback). A causa raiz: `salvarAlteracoesGeral` (`src/actions/Clientes.ts`) faz um update incondicional de TODAS as colunas de gestão do cliente — e duas seções diferentes (Dados Fiscais + card do serviço principal) chamavam essa mesma action para o MESMO registro, cada uma mandando os campos que a OUTRA gerencia como uma foto desatualizada (lida de `cliente!.campo`, não do estado editado). Quem salvava por último revertia silenciosamente a mudança de quem salvou antes — reproduzido exatamente como o usuário descreveu (editar analista, salvar serviço, salvar dados fiscais embaixo → erro/reversão).
+
+**Decisão do usuário:** consolidar TUDO no modal (não só a parte que quebrava) em um único botão "Salvar Alterações" no rodapé — `handleSalvarTudo`. Adicionar/editar sócio, registrar/editar CS, registrar feedback deixaram de gravar na hora: viram rascunho local (`_pendente: "criar" | "editar"` injetado no item da lista) até o clique único. **Exclusões continuam imediatas** (excluir CS/feedback são ações destrutivas com `confirm()` próprio — decisão consciente de NÃO deferir uma exclusão já confirmada, para não criar a ilusão de que algo foi apagado quando na verdade só ficaria pendente).
+
+**`handleSalvarTudo`:** salva o registro principal (dados fiscais + status/NPS/feedbackGoogle do cliente + seu próprio card de serviço, tudo com valores AO VIVO — corrige de quebra um bug lateral onde NPS/status eram lidos de `cliente!.nps`/`cliente!.status` desatualizados em vez do estado vivo do formulário), depois cada outro serviço contratado do mesmo CNPJ (`outrosServicos`), depois sócios/CS/feedback pendentes. **Falha parcial:** cada operação é tentada independentemente; as que falharem ficam listadas num único toast de erro; as que derem certo têm `_pendente` limpo do estado local (evita duplicar sócio/CS/feedback se o usuário clicar "Salvar Alterações" de novo após uma falha parcial). O modal só fecha (`onClose()`) se **nada** falhar.
+
+**UI:** badge âmbar "Não salvo" nas 3 seções (sócios, CS, feedback) quando `_pendente` está setado — sem isso não haveria nenhuma pista visual de que algo ainda não foi persistido. `handleExcluirCS`/`handleExcluirFeedback` ganharam guard: se o item só existe no rascunho local (nunca foi salvo, `_pendente === "criar"`), remove sem chamar o servidor (evita erro tentando deletar um ID que não existe no banco).
+
+**Achado extra do Anubis, corrigido na mesma sessão:** nenhuma das 8 Server Actions de `src/actions/Clientes.ts` usadas por esse modal (`salvarLogCS`, `salvarLogFeedback`, `salvarAlteracoesGeral`, `adicionarSocio`, `atualizarSocio`, `atualizarLogCS`, `excluirLogCS`, `excluirLogFeedback`) bloqueava requisição sem sessão — `adicionarSocio`/`atualizarSocio`/`atualizarLogCS` nem chamavam `auth()`; `salvarLogCS`/`salvarLogFeedback`/`salvarAlteracoesGeral` chamavam via `getUsuarioSessao()`/`getColaboradorNome()` mas nunca rejeitavam, só usavam fallback silencioso (`"Sistema"`/`userId: null`). Todas as 8 ganharam `if (!session?.user?.id) return { success: false, error: "Não autorizado" }` no início do `try`, mesmo padrão já usado em `Extratos.ts`/`RadarAction.ts`.
+
+**Arquivos tocados:** `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx`, `src/actions/Clientes.ts`.
+
+**Editado quando:** o mesmo padrão de "rascunho local + botão único" precisar ser replicado em outro modal do painel com múltiplas seções editáveis, ou se sócios ganharem exclusão (hoje não existe, só criar/editar).
+
+**Última atualização:** 2026-07-22 por Scribe
+
+---
+
 ## Consulta RADAR (Habilitação Radar) — Excluir do banco + page.tsx virou Server Component
 
 **Adicionado em:** 2026-07-21 por Scribe (sessão Bibble)

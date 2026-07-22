@@ -79,8 +79,9 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     /**
      * Estado de gestão POR CARD (Status Atual, Data Contratação, Data de Êxito,
      * Analista Responsável, Embasamento, Origem do Lead) — cada registro de
-     * serviço tem seu próprio formulário independente, salvo individualmente
-     * via `handleSalvarCard`. Visibilidade de edição continua controlada pelo
+     * serviço tem seu próprio formulário independente, mas todos são salvos
+     * juntos pelo único botão "Salvar Alterações" (`handleSalvarTudo`), não
+     * mais individualmente. Visibilidade de edição continua controlada pelo
      * único `editandoDados` global (mesmo botão "Editar Dados" do topo libera
      * TODOS os cards ao mesmo tempo — decisão do usuário, ver decisions.md).
      */
@@ -96,8 +97,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         closerNome: string;
     }
     const [formPorCard, setFormPorCard] = useState<Record<number, FormGestaoCard>>({});
-    const [salvandoCard, setSalvandoCard] = useState<number | null>(null);
-    const [salvandoDadosFiscais, setSalvandoDadosFiscais] = useState(false);
+    const [salvandoTudo, setSalvandoTudo] = useState(false);
 
     function formInicialDoRegistro(registro: ClienteCS): FormGestaoCard {
         return {
@@ -132,7 +132,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [feedbackCS, setFeedbackCS] = useState<"pos" | "neg" | "na" | null>(null);
     const [sentimentoFeedback, setSentimentoFeedback] = useState<"pos" | "neg" | "na" | null>(null);
     const [obsCS, setObsCS] = useState("");
-    const [enviandoCS, setEnviandoCS] = useState(false);
 
     const [nps, setNps] = useState<number | null>(cliente?.nps ?? null);
     const [feedbackSim, setFeedbackSim] = useState(cliente?.feedbackGoogle ?? false);
@@ -190,12 +189,10 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [listaSocios, setListaSocios] = useState<any[]>([]);
     const [showNovoSocio, setShowNovoSocio] = useState(false);
     const [novoSocio, setNovoSocio] = useState({ nome: "", telefone: "", dataNascimento: "", vinculo: "", obs: "" });
-    const [enviandoFeedback, setEnviandoFeedback] = useState(false);
 
     // Edição inline de sócios
     const [editandoSocioId, setEditandoSocioId] = useState<number | null>(null);
     const [socioEditForm, setSocioEditForm] = useState({ nome: "", telefone: "", dataNascimento: "", vinculo: "", obs: "" });
-    const [salvandoSocio, setSalvandoSocio] = useState(false);
 
     // Edição de log CS
     const [showEditCS, setShowEditCS] = useState(false);
@@ -203,7 +200,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [csEditSentimento, setCsEditSentimento] = useState<"pos" | "neg" | "na" | null>(null);
     const [csEditObs, setCsEditObs] = useState("");
     const [csEditData, setCsEditData] = useState("");
-    const [salvandoCS, setSalvandoCS] = useState(false);
 
 
     useEffect(() => {
@@ -221,39 +217,38 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
 
 
-    const handleSalvarCS = async () => {
+    const handleSalvarCS = () => {
         if (!feedbackCS || obsCS.length < 10) return toast.error("Dados inválidos");
-
-        setEnviandoCS(true);
 
         const dataSelecionada = new Date(`${dataCS}T12:00:00`).toISOString();
 
         const novoLog = {
+            id: -Date.now(),
             sentimento: feedbackCS,
             observacao: obsCS,
-            data_registro: dataSelecionada
+            data_registro: dataSelecionada,
+            _pendente: "criar" as const,
         };
 
-        const res = await salvarLogCS(cliente!.id, novoLog);
+        setListaLogsCS((prev: any[]) => [novoLog, ...prev]);
 
-        if (res.success) {
-            toast.success("CS registrado!");
-
-            setListaLogsCS((prev: any[]) => [novoLog, ...prev]);
-
-            setShowNovoCS(false);
-            setObsCS("");
-            setFeedbackCS(null);
-
-            setDataCS(new Date().toISOString().split('T')[0]);
-
-            if (aoSalvar) aoSalvar();
-        }
-        setEnviandoCS(false);
+        setShowNovoCS(false);
+        setObsCS("");
+        setFeedbackCS(null);
+        setDataCS(new Date().toISOString().split('T')[0]);
+        toast.info("CS adicionado ao rascunho — clique em Salvar Alterações para confirmar.");
     };
 
     const handleExcluirCS = async (logId: number) => {
         if (!confirm("Deseja realmente apagar este relato de CS?")) return;
+
+        // Registro só existe no rascunho local (nunca foi salvo) — remove sem chamar o servidor.
+        const aindaNaoSalvo = listaLogsCS.find((log) => log.id === logId)?._pendente === "criar";
+        if (aindaNaoSalvo) {
+            setListaLogsCS((prev: any[]) => prev.filter((log) => log.id !== logId));
+            toast.success("Relato removido do rascunho!");
+            return;
+        }
 
         try {
             const res = await excluirLogCS(logId);
@@ -282,25 +277,27 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         };
     }, [cliente?.id, isOpen]);
 
-    const handleAdicionarSocio = async () => {
+    /**
+     * Adicionar/editar sócio, CS e feedback deixaram de gravar na hora — ficam
+     * como rascunho local (`_pendente: "criar" | "editar"`) até o usuário clicar
+     * no único botão "Salvar Alterações" do rodapé (`handleSalvarTudo`), que
+     * executa todas as pendências de uma vez. Ver `decisions.md` — unificação
+     * pedida pelo usuário após bug de dados desatualizados sobrescrevendo uns
+     * aos outros entre botões de salvar independentes.
+     */
+    const handleAdicionarSocio = () => {
         if (!novoSocio.nome) return toast.error("Nome é obrigatório");
 
-        const res = await adicionarSocio(cliente!.id, novoSocio);
+        const socioRascunho = {
+            id: -Date.now(),
+            ...novoSocio,
+            _pendente: "criar" as const,
+        };
 
-        if (res.success) {
-            toast.success("Sócio adicionado!");
-
-            const socioRender = {
-                id: Math.random(),
-                ...novoSocio
-            };
-
-            setListaSocios(prev => [...prev, socioRender]);
-            setNovoSocio({ nome: "", telefone: "", dataNascimento: "", vinculo: "", obs: "" });
-            setShowNovoSocio(false);
-
-            if (aoSalvar) await aoSalvar();
-        }
+        setListaSocios(prev => [...prev, socioRascunho]);
+        setNovoSocio({ nome: "", telefone: "", dataNascimento: "", vinculo: "", obs: "" });
+        setShowNovoSocio(false);
+        toast.info("Sócio adicionado ao rascunho — clique em Salvar Alterações para confirmar.");
     };
 
 
@@ -309,19 +306,13 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         setSocioEditForm({ nome: s.nome || "", telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "" });
     };
 
-    const handleSalvarEdicaoSocio = async (socioId: number) => {
+    const handleSalvarEdicaoSocio = (socioId: number) => {
         if (!socioEditForm.nome) return toast.error("Nome é obrigatório");
-        setSalvandoSocio(true);
-        const res = await atualizarSocio(socioId, socioEditForm);
-        if (res.success) {
-            toast.success("Sócio atualizado!");
-            setListaSocios(prev => prev.map(s => s.id === socioId ? { ...s, ...socioEditForm } : s));
-            setEditandoSocioId(null);
-            if (aoSalvar) await aoSalvar();
-        } else {
-            toast.error("Erro ao salvar.");
-        }
-        setSalvandoSocio(false);
+        setListaSocios(prev => prev.map(s => s.id === socioId
+            ? { ...s, ...socioEditForm, _pendente: s._pendente === "criar" ? "criar" as const : "editar" as const }
+            : s));
+        setEditandoSocioId(null);
+        toast.info("Edição de sócio adicionada ao rascunho — clique em Salvar Alterações para confirmar.");
     };
 
     const handleAbrirEditCS = (log: any) => {
@@ -336,22 +327,20 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         setShowEditCS(true);
     };
 
-    const handleSalvarEditCS = async () => {
+    const handleSalvarEditCS = () => {
         if (!csEditSentimento || csEditObs.length < 10) return toast.error("Dados inválidos");
-        setSalvandoCS(true);
-        const res = await atualizarLogCS(csEditando.id, { sentimento: csEditSentimento, observacao: csEditObs, dataRegistro: csEditData });
-        if (res.success) {
-            toast.success("CS atualizado!");
-            setListaLogsCS(prev => prev.map(l => l.id === csEditando.id
-                ? { ...l, sentimento: csEditSentimento, observacao: csEditObs, data_registro: csEditData ? new Date(`${csEditData}T12:00:00`).toISOString() : l.data_registro }
-                : l));
-            setShowEditCS(false);
-            setCsEditando(null);
-            if (aoSalvar) await aoSalvar();
-        } else {
-            toast.error("Erro ao atualizar.");
-        }
-        setSalvandoCS(false);
+        setListaLogsCS(prev => prev.map(l => l.id === csEditando.id
+            ? {
+                ...l,
+                sentimento: csEditSentimento,
+                observacao: csEditObs,
+                data_registro: csEditData ? new Date(`${csEditData}T12:00:00`).toISOString() : l.data_registro,
+                _pendente: l._pendente === "criar" ? "criar" as const : "editar" as const,
+            }
+            : l));
+        setShowEditCS(false);
+        setCsEditando(null);
+        toast.info("Edição de CS adicionada ao rascunho — clique em Salvar Alterações para confirmar.");
     };
 
     // Inicializa o formulário de gestão de CADA card (registro) quando o modal abre/o grupo muda.
@@ -486,44 +475,39 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         }
     };
 
-    const handleSalvarFeedback = async () => {
+    const handleSalvarFeedback = () => {
         if (!sentimentoFeedback || !isTextoValido(obsFeedback)) return;
-
-        setEnviandoFeedback(true);
 
         const dataSelecionada = new Date(`${dataFeedback}T12:00:00`).toISOString();
 
         const novoLog = {
+            id: -Date.now(),
             sentimento: sentimentoFeedback,
             observacao: obsFeedback,
-            data_registro: dataSelecionada
+            data_registro: dataSelecionada,
+            _pendente: "criar" as const,
         };
 
-        const res = await salvarLogFeedback(cliente!.id, novoLog);
+        setListaLogsFeedback((prev: any[]) => [novoLog, ...prev]);
 
-        if (res.success) {
-            toast.success("Pedido registrado!");
-
-            setListaLogsFeedback((prev: any[]) => [
-                { ...novoLog, id: Date.now() },
-                ...prev
-            ]);
-
-            setShowNovoFeedback(false);
-            setObsFeedback("");
-            setSentimentoFeedback(null);
-            setDataFeedback(new Date().toISOString().split('T')[0]);
-
-            if (aoSalvar) aoSalvar();
-        } else {
-            toast.error("Erro ao salvar no banco.");
-        }
-        setEnviandoFeedback(false);
+        setShowNovoFeedback(false);
+        setObsFeedback("");
+        setSentimentoFeedback(null);
+        setDataFeedback(new Date().toISOString().split('T')[0]);
+        toast.info("Pedido de feedback adicionado ao rascunho — clique em Salvar Alterações para confirmar.");
     };
 
     const handleExcluirFeedback = async (logId: number) => {
         if (!logId) return toast.error("ID do log não encontrado");
         if (!confirm("Deseja realmente excluir este pedido de feedback?")) return;
+
+        // Registro só existe no rascunho local (nunca foi salvo) — remove sem chamar o servidor.
+        const aindaNaoSalvo = listaLogsFeedback.find((item) => item.id === logId)?._pendente === "criar";
+        if (aindaNaoSalvo) {
+            setListaLogsFeedback((prev: any[]) => prev.filter(item => item.id !== logId));
+            toast.success("Pedido removido do rascunho!");
+            return;
+        }
 
         try {
             const res = await excluirLogFeedback(logId);
@@ -541,92 +525,159 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
 
     /**
-     * Salva SÓ os dados fiscais da empresa (Section A: CNPJ/Razão Social/Nome
-     * Fantasia/Data Constituição/Regime/UF) do registro PRINCIPAL — botão
-     * "Salvar Alterações" do rodapé do modal. `salvarAlteracoesGeral` faz um
-     * update incondicional em TODAS as colunas de gestão também, então
-     * preservamos os valores atuais do registro principal (não editados aqui)
-     * para não sobrescrevê-los com vazio/NaN.
+     * Salva TUDO que foi editado no modal de uma vez só — dados fiscais do
+     * registro principal, o card de gestão de CADA serviço contratado, e as
+     * pendências locais de sócios/CS/feedback (`_pendente: "criar"|"editar"`).
+     * Único botão de salvar do modal ("Salvar Alterações" no rodapé) — ver
+     * `decisions.md` sobre a unificação. Antes, "Salvar Alterações" e "Salvar
+     * Serviço" eram botões independentes que chamavam `salvarAlteracoesGeral`
+     * para o MESMO registro (quando o serviço é o principal) cada um mandando
+     * uma FOTO DESATUALIZADA dos campos que o outro botão gerenciava — quem
+     * salvava por último apagava a mudança de quem salvou antes. Agora só há
+     * uma chamada por registro, sempre com os valores AO VIVO de todos os
+     * campos (nenhuma leitura de `cliente!.campo` desatualizado).
+     *
+     * Falha parcial: em vez de tudo ou nada, cada pendência é tentada e as que
+     * falharem ficam registradas em `falhas` — as que deram certo têm o
+     * `_pendente` limpo do estado local (senão um clique novo em "Salvar
+     * Alterações" reenviaria sócio/CS/feedback já criados, duplicando). O
+     * modal só fecha se NADA falhar.
      */
-    const handleSalvarDadosFiscais = async () => {
-        if (salvandoDadosFiscais) return;
-        setSalvandoDadosFiscais(true);
-        const res = await salvarAlteracoesGeral(
-            cliente!.id,
-            {
-                analistaResponsavel: cliente!.analistaResponsavel,
-                dataContratacao: cliente!.dataContratacao,
-                status: cliente!.status,
-                nps: cliente!.nps,
-                feedbackGoogle: feedbackSim,
-                nomeGoogle: nomeFeedback,
-                dataExito: cliente!.dataExito,
-                cnpj: cnpj,
-                razaoSocial: razaoSocial,
-                nomeFantasia: nomeFantasia,
-                dataConstituicao: dataConstituicao,
-                regimeTributario: regimeTributario,
-                uf: uf,
-                municipio: municipio,
-                servicos: servicosSelecionados,
-                embasamento: cliente!.embasamento,
-                origemLead: cliente!.origemLead,
-            }
-        );
+    const handleSalvarTudo = async () => {
+        if (salvandoTudo) return;
+        setSalvandoTudo(true);
 
-        if (res.success) {
-            toast.success("DADOS ATUALIZADOS COM SUCESSO");
+        const falhas: string[] = [];
+
+        // 1) Registro principal: dados fiscais + status/NPS/feedback do cliente + seu próprio card de serviço.
+        const formPrincipal = formPorCard[cliente!.id];
+        const desbloqueadoPrincipal = SERVICOS_COM_EMBASAMENTO.includes(cliente!.servicos || "");
+        const resPrincipal = await salvarAlteracoesGeral(cliente!.id, {
+            cnpj,
+            razaoSocial,
+            nomeFantasia,
+            dataConstituicao,
+            regimeTributario,
+            uf,
+            municipio,
+            servicos: servicosSelecionados,
+            nps,
+            feedbackGoogle: feedbackSim,
+            nomeGoogle: nomeFeedback,
+            status: formPrincipal?.status ?? cliente!.status,
+            dataContratacao: formPrincipal?.dataContratacao ?? cliente!.dataContratacao,
+            dataExito: formPrincipal?.dataExitoManual ?? cliente!.dataExito,
+            analistaResponsavel: formPrincipal?.analistaResponsavel ?? cliente!.analistaResponsavel,
+            embasamento: formPrincipal
+                ? (desbloqueadoPrincipal ? formPrincipal.embasamento || null : null)
+                : (cliente!.embasamento ?? null),
+            origemLead: formPrincipal?.origemLead ?? cliente!.origemLead ?? null,
+            formaPagamento: formPrincipal?.formaPagamento || null,
+            valorContrato: formPrincipal?.valorContrato ? Number(formPrincipal.valorContrato) : null,
+            closerNome: formPrincipal?.closerNome || null,
+        });
+        if (!resPrincipal.success) falhas.push("dados do cliente");
+
+        // 2) Demais serviços contratados do mesmo CNPJ — cada um com seu próprio card.
+        for (const registro of outrosServicos) {
+            const form = formPorCard[registro.id];
+            if (!form) continue;
+            const desbloqueado = SERVICOS_COM_EMBASAMENTO.includes(registro.servicos || "");
+            const res = await salvarAlteracoesGeral(registro.id, {
+                analistaResponsavel: form.analistaResponsavel,
+                dataContratacao: form.dataContratacao,
+                status: form.status,
+                nps: registro.nps,
+                feedbackGoogle: registro.feedbackGoogle,
+                nomeGoogle: registro.nomeGoogle,
+                dataExito: form.dataExitoManual,
+                cnpj: registro.cnpj,
+                razaoSocial: registro.razaoSocial,
+                nomeFantasia: registro.nomeFantasia,
+                dataConstituicao: registro.dataConstituicao,
+                regimeTributario: registro.regimeTributario,
+                uf: registro.uf,
+                servicos: registro.servicos,
+                embasamento: desbloqueado ? form.embasamento || null : null,
+                origemLead: form.origemLead || null,
+                formaPagamento: form.formaPagamento || null,
+                valorContrato: form.valorContrato ? Number(form.valorContrato) : null,
+                closerNome: form.closerNome || null,
+            });
+            if (!res.success) falhas.push(`serviço "${registro.servicos || registro.id}"`);
+        }
+
+        // 3) Sócios pendentes (criar/editar).
+        for (const s of listaSocios) {
+            if (s._pendente === "criar") {
+                const res = await adicionarSocio(cliente!.id, {
+                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento, vinculo: s.vinculo, obs: s.obs,
+                });
+                if (res.success && res.data) {
+                    const novoId = res.data.id;
+                    setListaSocios((prev) => prev.map((x) => x.id === s.id ? { ...x, id: novoId, _pendente: undefined } : x));
+                } else {
+                    falhas.push(`sócio "${s.nome}"`);
+                }
+            } else if (s._pendente === "editar") {
+                const res = await atualizarSocio(s.id, {
+                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento, vinculo: s.vinculo, obs: s.obs,
+                });
+                if (res.success) {
+                    setListaSocios((prev) => prev.map((x) => x.id === s.id ? { ...x, _pendente: undefined } : x));
+                } else {
+                    falhas.push(`sócio "${s.nome}"`);
+                }
+            }
+        }
+
+        // 4) Logs de CS pendentes (criar/editar).
+        for (const log of listaLogsCS) {
+            if (log._pendente === "criar") {
+                const res = await salvarLogCS(cliente!.id, {
+                    sentimento: log.sentimento, observacao: log.observacao, data_registro: log.data_registro,
+                });
+                if (res.success) {
+                    setListaLogsCS((prev) => prev.map((l) => l.id === log.id ? { ...l, _pendente: undefined } : l));
+                } else {
+                    falhas.push("registro de CS");
+                }
+            } else if (log._pendente === "editar") {
+                const res = await atualizarLogCS(log.id, {
+                    sentimento: log.sentimento, observacao: log.observacao, dataRegistro: log.data_registro,
+                });
+                if (res.success) {
+                    setListaLogsCS((prev) => prev.map((l) => l.id === log.id ? { ...l, _pendente: undefined } : l));
+                } else {
+                    falhas.push("edição de CS");
+                }
+            }
+        }
+
+        // 5) Logs de Feedback pendentes (só criação — exclusão continua imediata, é ação destrutiva à parte).
+        for (const log of listaLogsFeedback) {
+            if (log._pendente === "criar") {
+                const res = await salvarLogFeedback(cliente!.id, {
+                    sentimento: log.sentimento, observacao: log.observacao, data_registro: log.data_registro,
+                });
+                if (res.success) {
+                    setListaLogsFeedback((prev) => prev.map((l) => l.id === log.id ? { ...l, _pendente: undefined } : l));
+                } else {
+                    falhas.push("pedido de feedback");
+                }
+            }
+        }
+
+        setSalvandoTudo(false);
+
+        if (falhas.length === 0) {
+            toast.success("Todas as alterações foram salvas!");
             setEditandoDados(false);
             if (aoSalvar) await aoSalvar();
-            setSalvandoDadosFiscais(false);
             onClose();
         } else {
-            toast.error("Erro ao salvar alterações.");
-            setSalvandoDadosFiscais(false);
+            toast.error(`Não foi possível salvar: ${falhas.join(", ")}. O restante foi salvo — corrija e clique em Salvar Alterações novamente.`);
         }
-    };
-
-    /**
-     * Salva os campos de gestão (Status/Data Contratação/Data de Êxito/
-     * Analista/Embasamento/Origem do Lead) de UM card/registro específico —
-     * botão Salvar de dentro de cada card em "Serviços Contratados".
-     */
-    const handleSalvarCard = async (registro: ClienteCS) => {
-        const form = formPorCard[registro.id];
-        if (!form) return;
-
-        setSalvandoCard(registro.id);
-        const desbloqueado = SERVICOS_COM_EMBASAMENTO.includes(registro.servicos || "");
-
-        const res = await salvarAlteracoesGeral(registro.id, {
-            analistaResponsavel: form.analistaResponsavel,
-            dataContratacao: form.dataContratacao,
-            status: form.status,
-            nps: registro.nps,
-            feedbackGoogle: registro.feedbackGoogle,
-            nomeGoogle: registro.nomeGoogle,
-            dataExito: form.dataExitoManual,
-            cnpj: registro.cnpj,
-            razaoSocial: registro.razaoSocial,
-            nomeFantasia: registro.nomeFantasia,
-            dataConstituicao: registro.dataConstituicao,
-            regimeTributario: registro.regimeTributario,
-            uf: registro.uf,
-            servicos: registro.servicos,
-            embasamento: desbloqueado ? form.embasamento || null : null,
-            origemLead: form.origemLead || null,
-            formaPagamento: form.formaPagamento || null,
-            valorContrato: form.valorContrato ? Number(form.valorContrato) : null,
-            closerNome: form.closerNome || null,
-        });
-
-        if (res.success) {
-            toast.success("Serviço atualizado!");
-            if (aoSalvar) await aoSalvar();
-        } else {
-            toast.error("Erro ao salvar serviço.");
-        }
-        setSalvandoCard(null);
     };
 
     const handleOcultarCliente = async (id: number) => {
@@ -1047,19 +1098,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                         )}
                                                     </div>
 
-                                                    {editandoDados && (
-                                                        <div className="md:col-span-2 lg:col-span-3 flex justify-end">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleSalvarCard(registro)}
-                                                                disabled={salvandoCard === registro.id}
-                                                                className="cursor-pointer flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Save size={14} />
-                                                                {salvandoCard === registro.id ? "Salvando..." : "Salvar Serviço"}
-                                                            </button>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -1211,9 +1249,8 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                         <div className="flex items-center justify-center gap-2">
                                                             <button
                                                                 onClick={() => handleSalvarEdicaoSocio(s.id)}
-                                                                disabled={salvandoSocio}
                                                                 className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all active:scale-90 disabled:opacity-50"
-                                                                title="Salvar"
+                                                                title="Confirmar (salva junto com Salvar Alterações)"
                                                             >
                                                                 <Check size={14} strokeWidth={3} />
                                                             </button>
@@ -1233,6 +1270,11 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                         <span className="text-sm font-bold text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors">
                                                             {s.nome}
                                                         </span>
+                                                        {s._pendente && (
+                                                            <span className="ml-2 text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 align-middle">
+                                                                Não salvo
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         {s.telefone ? (
@@ -1336,6 +1378,11 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                                                 <td className="px-6 py-4 text-xs font-bold text-white uppercase tracking-tighter">
                                                     {log.colaborador || "---"}
+                                                    {log._pendente && (
+                                                        <span className="ml-2 text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 align-middle">
+                                                            Não salvo
+                                                        </span>
+                                                    )}
                                                 </td>
 
                                                 <td className="px-6 py-4 text-center">
@@ -1515,6 +1562,11 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                 </td>
                                                 <td className="px-6 py-4 text-xs font-bold text-white uppercase">
                                                     {log.colaborador}
+                                                    {log._pendente && (
+                                                        <span className="ml-2 text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 align-middle">
+                                                            Não salvo
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <div className="flex justify-center">
@@ -1564,11 +1616,11 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                     <button
                         type="button"
-                        onClick={handleSalvarDadosFiscais}
-                        disabled={salvandoDadosFiscais}
+                        onClick={handleSalvarTudo}
+                        disabled={salvandoTudo}
                         className="cursor-pointer flex items-center gap-2 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                        <Save size={18} className={salvandoDadosFiscais ? "animate-spin" : ""} />
-                        {salvandoDadosFiscais ? "Salvando..." : "Salvar Alterações"}
+                        <Save size={18} className={salvandoTudo ? "animate-spin" : ""} />
+                        {salvandoTudo ? "Salvando..." : "Salvar Alterações"}
                     </button>
                 </div>
 
@@ -1673,7 +1725,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                         disabled={!isTextoValido(obsCS) || !feedbackCS}
                                         className="cursor-pointer flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        {enviandoCS ? "Salvando..." : "Salvar CS"}
+                                        Adicionar CS
                                     </button>
                                 </div>
                             </div>
@@ -1836,10 +1888,10 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 </button>
                                 <button
                                     onClick={handleSalvarEditCS}
-                                    disabled={!isTextoValido(csEditObs) || !csEditSentimento || salvandoCS}
+                                    disabled={!isTextoValido(csEditObs) || !csEditSentimento}
                                     className="cursor-pointer flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {salvandoCS ? "Salvando..." : "Salvar Edição"}
+                                    Confirmar Edição
                                 </button>
                             </div>
                         </div>

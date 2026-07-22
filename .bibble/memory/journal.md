@@ -896,6 +896,38 @@ Redesenho pedido pelo usuário: botão agora mostra a quantidade (`Excluir do ba
 
 **Decisão preservada de propósito:** RADAR responder com sucesso mas sem dados continua sendo `"NÃO LOCALIZADO"`/`"NÃO HABILITADO"` (resposta de negócio válida, fiel à API) — não é erro, não mexer nesse caminho.
 
+---
+
+## [2026-07-22] — CS & NPS: modal de dados do cliente — botão único de salvar + auth em Clientes.ts
+
+**Tags:** #bugfix #refactor #security #auth
+**Agentes envolvidos:** Scout, Anubis, Probe, Scribe
+**Arquivos tocados:** `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx`, `src/actions/Clientes.ts`
+
+### Contexto
+Usuário reportou erro no modal de dados do cliente (CS & NPS): editar o analista, salvar o serviço no botão próprio do card, depois clicar em "Salvar Alterações" no rodapé — dava erro / às vezes revertia a edição. Pediu para remover todos os botões de salvar soltos, deixando só o do rodapé.
+
+### O que foi feito
+- Causa raiz encontrada: `salvarAlteracoesGeral` faz update incondicional de TODAS as colunas de gestão do cliente; Dados Fiscais (rodapé) e o card de Serviço Contratado principal chamavam essa mesma action para o MESMO registro, cada um mandando os campos que o OUTRO gerencia como foto desatualizada (`cliente!.campo`, não o estado editado) — quem salvava por último revertia o outro.
+- Perguntado sobre o escopo, usuário pediu o mais amplo: consolidar TUDO no modal (não só a parte que quebrava).
+- `handleSalvarTudo` (nova função única) substitui `handleSalvarDadosFiscais` + `handleSalvarCard` — salva registro principal + todos os outros serviços do CNPJ, tudo com valores ao vivo (corrige de quebra um bug lateral de NPS/status lidos desatualizados).
+- Adicionar/editar sócio, registrar/editar CS, registrar feedback viraram rascunho local (`_pendente: "criar"|"editar"`) até o clique único — badge "Não salvo" nas 3 seções.
+- Exclusões (CS/feedback) continuam imediatas — decisão consciente de não deferir uma exclusão já confirmada via `confirm()`.
+- Falha parcial tratada: operações com sucesso têm `_pendente` limpo (evita duplicar num novo clique); modal só fecha se tudo der certo.
+
+### Decisões tomadas
+- Escopo amplo (tudo no modal) em vez de só o bug: decisão explícita do usuário quando perguntado.
+- Exclusões ficam fora da consolidação: destrutivas com confirm() próprio, deferir criaria ilusão de "já apagou" quando não apagou.
+
+### Problemas encontrados / resolvidos
+- Achado extra do Anubis: nenhuma das 8 Server Actions usadas por esse modal (`salvarLogCS`, `salvarLogFeedback`, `salvarAlteracoesGeral`, `adicionarSocio`, `atualizarSocio`, `atualizarLogCS`, `excluirLogCS`, `excluirLogFeedback`) bloqueava requisição sem sessão. Usuário aprovou corrigir na mesma sessão — todas as 8 ganharam `auth()` + rejeição explícita.
+
+### Pendências
+- Nenhuma — Forge, Anubis e Probe aprovaram; não foi possível testar visualmente no navegador (sem acesso a browser nesta sessão).
+
+### Refletido também em
+- `codebase-map.md`: nova seção "CS & NPS — Modal de dados do cliente: botão único de salvar + auth em Clientes.ts"
+
 ### Atualização (mesma sessão, rodada 4) — virtualização da tabela (performance com milhares de CNPJs)
 
 **Contexto:** usuário reportou que lotes reais já chegaram a 8 mil CNPJs e a tabela renderizava tudo de uma vez, deixando o navegador lento. Bibble apresentou 2 opções (virtualização vs. paginação simples client-side); usuário escolheu virtualização.

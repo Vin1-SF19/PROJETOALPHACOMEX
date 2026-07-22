@@ -408,6 +408,9 @@ export async function buscarServicoContratadoPorCliente(cnpj: string, servicos: 
 
 export async function salvarLogCS(clienteId: number, dados: { sentimento: string, observacao: string, data_registro: string }) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     const colaborador = await getColaboradorNome();
     await db.$executeRawUnsafe(
       `INSERT INTO log_cs (colaborador, sentimento, observacao, clienteId, dataRegistro)
@@ -447,6 +450,9 @@ export async function atualizarDadosGestao(clienteId: number, dados: any) {
 
 export async function salvarLogFeedback(clienteId: number, dados: any) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     const colaborador = await getColaboradorNome();
     const sentimento = dados.sentimento || "N/A";
     const observacao = dados.observacao || "";
@@ -472,6 +478,9 @@ export async function salvarLogFeedback(clienteId: number, dados: any) {
 
 export async function salvarAlteracoesGeral(clienteId: number, dadosNovos: any) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     const { userId, nome } = await getUsuarioSessao();
     const estadoAnterior = await db.clientes.findUnique({ where: { id: clienteId } });
 
@@ -622,6 +631,9 @@ export async function reverterCampoHistorico(historicoId: string) {
 
 export async function adicionarSocio(clienteId: number, dadosSocio: { nome: string; telefone?: string; obs?: string, dataNascimento: string, vinculo: string }) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     const novoSocio = await db.socios.create({
       data: {
         clienteId: clienteId,
@@ -643,6 +655,9 @@ export async function adicionarSocio(clienteId: number, dadosSocio: { nome: stri
 
 export async function excluirLogCS(logId: number) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     await db.$executeRawUnsafe(
       `DELETE FROM log_cs WHERE id = ?`,
       logId
@@ -659,8 +674,11 @@ export async function excluirLogCS(logId: number) {
 
 export async function excluirLogFeedback(logId: number) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     await db.$executeRawUnsafe(
-      `DELETE FROM logFeedback WHERE id = ?`, 
+      `DELETE FROM logFeedback WHERE id = ?`,
       logId
     );
 
@@ -674,6 +692,9 @@ export async function excluirLogFeedback(logId: number) {
 
 export async function atualizarSocio(socioId: number, dados: { nome: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string }) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     await db.socios.update({
       where: { id: socioId },
       data: dados,
@@ -687,6 +708,9 @@ export async function atualizarSocio(socioId: number, dados: { nome: string; tel
 
 export async function atualizarLogCS(logId: number, dados: { sentimento: string; observacao: string; dataRegistro?: string }) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
     await db.log_cs.update({
       where: { id: logId },
       data: {
