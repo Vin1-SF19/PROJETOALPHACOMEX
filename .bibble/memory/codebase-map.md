@@ -337,3 +337,31 @@ Lotes reais de usuário já chegaram a 8 mil CNPJs, e a tabela renderizava todas
 **Pendência conhecida, fora de escopo:** `prepararReconsultaLote` continua existindo (duplicada) em `RadarAction.ts`/`ReconsultaRadar.ts`, agora 100% morta (nenhuma referência ativa no projeto). Não removida nesta sessão — decisão de limpar ou não é do usuário.
 
 **Última atualização:** 2026-07-21 por Scribe
+
+---
+
+## POP (Documentos) + Gestão de Equipe — Confirmação de Leitura de Documento
+
+**Adicionado em:** 2026-07-22 por Scribe (sessão Bibble)
+
+**Descrição:** Módulo POP (`src/app/PainelAlpha/DocsAlpha/`) ganhou um botão "Confirmar Leitura" ao lado do nome do documento aberto (nas 2 barras — desktop e mobile), que abre um modal de confirmação e, ao aceitar, grava a leitura e troca o botão pra estado verde "Leitura Confirmada" permanentemente. O módulo Gestão de Equipe (`src/components/cadastro/AbaGestaoEquipe.tsx`) reflete isso no topo do card de cada colaborador: badge "Regimento Interno" (sempre visível, verde se lido/âmbar se não) + badge "Todos os documentos do setor lido" (verde, colapsado) ou "X/Y docs do setor lidos" (âmbar, contador) quando ainda faltam.
+
+**Novo model:** `ConfirmacaoLeituraDocumento` (`id, documentoId, usuarioId, confirmadoEm`, `@@unique([documentoId, usuarioId])`, FK `onDelete: Cascade` pros dois lados). Vault classificou como 🟢 (`CREATE TABLE` puro, nenhuma coluna/tabela existente tocada). Mesmo sendo baixo risco, o usuário pediu um backup fresco antes de aplicar (não só confiar no backup diário de até 48h já existente) — feito via script pontual em `database-backups/pre-change/`, depois a migration (também script pontual, `node+@libsql/client`, confirmada via `PRAGMA table_info`/`PRAGMA index_list`) — mesmo padrão de scripts descartáveis já usado no projeto (`prisma db push`/`migrate` não alcançam o Turso remoto).
+
+**Descoberta-chave que evitou reinventar campo:** `usuarios` não tem coluna `setor` própria — **"setor do usuário" É `usuarios.role`**, a mesma string usada em `documentos.setor` e já tratada como "setor" visualmente em `AbaGestaoEquipe.tsx` (badge do card já mostrava `user.role`). Sem essa descoberta, a feature exigiria um campo novo redundante.
+
+**"Regimento Interno" sem campo de categoria:** não existe flag/tipo de destaque em `documentos` — identificado por `titulo` contendo "REGIMENTO INTERNO" (case-insensitive, `.includes`). Se o título do documento mudar no POP, a checagem para de encontrar — frágil por natureza, documentado conscientemente (não havia alternativa sem migration adicional para um caso de uso tão específico).
+
+**Achado do Anubis, corrigido na mesma sessão:** `buscarStatusLeituraEquipe()` inicialmente só tinha `auth()` básico — qualquer usuário autenticado (não só quem gerencia equipe) podia chamar a action diretamente e ver o status de leitura de TODOS os colaboradores. Corrigido com o mesmo gate de `cadastro/page.tsx` (`ROLES_GESTAO_EQUIPE` ou permissão `"cadastro"` via `getPermissoesEfetivas`).
+
+**Arquivos tocados:**
+- `prisma/schema.prisma` — model novo + 2 relações reversas (`documentos.confirmacoes`, `usuarios.confirmacoesLeituraDocumento`)
+- `src/actions/ConfirmacaoLeituraDocumento.ts` (novo) — `confirmarLeituraDocumento`, `buscarStatusLeituraEquipe`
+- `src/app/PainelAlpha/DocsAlpha/page.tsx` — busca confirmações do usuário logado, passa como prop
+- `src/app/PainelAlpha/DocsAlpha/DocsAlphaClient.tsx` — botão nas 2 barras + estado local
+- `src/app/PainelAlpha/DocsAlpha/_components/PopModalConfirmarLeitura.tsx` (novo)
+- `src/components/cadastro/AbaGestaoEquipe.tsx` — badges no card
+
+**Editado quando:** "Regimento Interno" ganhar um campo de categoria/destaque de verdade (substituiria o `.includes()` por string), ou se outro documento precisar do mesmo tratamento de destaque (nesse caso, vale generalizar para uma lista configurável em vez de um único título hardcoded).
+
+**Última atualização:** 2026-07-22 por Scribe

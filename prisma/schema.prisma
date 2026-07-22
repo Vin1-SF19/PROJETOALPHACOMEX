@@ -106,6 +106,8 @@ model usuarios {
   colegasQueEuVejo GoogleCalendarColegaVisivel[] @relation("ColegaViewer")
   colegasQueMeVeem GoogleCalendarColegaVisivel[] @relation("ColegaDono")
   permissaoColegasCalendario GoogleCalendarPermissaoColegas? @relation("PermissaoColegasCalendario")
+
+  confirmacoesLeituraDocumento ConfirmacaoLeituraDocumento[]
 }
 
 model OnboardingTemplate {
@@ -243,6 +245,27 @@ model documentos {
   criado_por    String?  @default("SISTEMA")
   protecao      String?  @default("ATIVO")
   ordem_manual  Int?     @default(0)
+
+  confirmacoes ConfirmacaoLeituraDocumento[]
+}
+
+/// Confirmação de leitura de um documento do POP por um usuário — 1 linha por
+/// par (documento, usuário). Alimenta o botão "Confirmar Leitura" no POP e o
+/// indicador de documentos lidos no card de cada colaborador em Gestão de
+/// Equipe. Criada via script pontual (Vault aprovou 🟢, CREATE TABLE puro),
+/// não via `prisma db push` (não alcança o Turso remoto neste projeto).
+model ConfirmacaoLeituraDocumento {
+  id           Int      @id @default(autoincrement())
+  documentoId  Int
+  usuarioId    Int
+  confirmadoEm DateTime @default(now())
+
+  documento documentos @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  usuario   usuarios   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([documentoId, usuarioId])
+  @@index([usuarioId])
+  @@index([documentoId])
 }
 
 model clientes {

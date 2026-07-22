@@ -649,3 +649,13 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 **⚠️ Checkpoint para novos módulos/auditorias:** antes desta sessão, `HabilitacaoRadar/page.tsx` era um dos módulos onde a URL era acessível a qualquer usuário logado, sem checar a permissão do módulo (`MODULOS_REGISTRY.permission`) — só o menu escondia o link, não a rota em si. Isso só foi pego porque o Anubis audita toda vez que uma feature nova mexe em algo destrutivo. **Ao tocar em qualquer módulo para adicionar uma capacidade nova (especialmente destrutiva), verificar se a `page.tsx` é um Server Component com o gate de permissão (`auth()` + `getPermissoesEfetivas()`) ou um Client Component monolítico sem esse gate** — o segundo caso é uma lacuna a corrigir, seguindo o padrão de `Apresentacoes/page.tsx`.
 
 **Última atualização:** 2026-07-21 por Scribe
+
+---
+
+### Model novo relacionando com `documentos` ou `usuarios` — relação reversa nos dois lados
+
+**Adicionado em:** 2026-07-22 por Scribe (feature: Confirmação de Leitura de Documento)
+
+Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao criar `ConfirmacaoLeituraDocumento` com FK pra `documentos` e `usuarios`, foi preciso adicionar `confirmacoes ConfirmacaoLeituraDocumento[]` dentro de `documentos` e `confirmacoesLeituraDocumento ConfirmacaoLeituraDocumento[]` dentro de `usuarios` — sem isso, `prisma generate` falha ou o client não expõe os tipos esperados. Ao criar qualquer model novo com FK para `usuarios`/`documentos`/outro model existente, sempre voltar e editar o model-alvo também.
+
+**Também registrado:** mesmo para uma migration classificada 🟢 (CREATE TABLE puro, sem risco), se o usuário pedir explicitamente um backup fresco antes (em vez de aceitar o backup diário já dentro das 48h), gerar via script pontual Node (`@libsql/client`, mesma técnica dos backups diários — dump completo schema+dados por tabela dentro de uma transação de leitura) salvo em `database-backups/pre-change/`, e só then rodar a migration (script pontual separado, descartado depois, confirmado via `PRAGMA`).

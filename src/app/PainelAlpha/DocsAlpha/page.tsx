@@ -10,12 +10,22 @@ export default async function PaginaDocumentos() {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
-  const rows = await db.documentos.findMany({
-    where: {
-      OR: [{ status: "ATIVO" }, { status: null }],
-    },
-    orderBy: { id: 'desc' },
-  })
+  const usuarioId = Number((session.user as { id?: string | number }).id ?? 0)
+
+  const [rows, confirmacoes] = await Promise.all([
+    db.documentos.findMany({
+      where: {
+        OR: [{ status: "ATIVO" }, { status: null }],
+      },
+      orderBy: { id: 'desc' },
+    }),
+    usuarioId
+      ? db.confirmacaoLeituraDocumento.findMany({
+          where: { usuarioId },
+          select: { documentoId: true },
+        })
+      : Promise.resolve([]),
+  ])
 
   const documentos: Documento[] = rows.map(doc => ({
     id: doc.id,
@@ -31,5 +41,12 @@ export default async function PaginaDocumentos() {
     status: doc.status ?? 'ATIVO',
   }))
 
-  return <DocsAlphaClient documentosIniciais={documentos} />
+  const documentosConfirmadosIniciais = confirmacoes.map(c => c.documentoId)
+
+  return (
+    <DocsAlphaClient
+      documentosIniciais={documentos}
+      documentosConfirmadosIniciais={documentosConfirmadosIniciais}
+    />
+  )
 }

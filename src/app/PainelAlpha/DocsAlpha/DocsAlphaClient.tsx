@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Lock, ShieldAlert, Globe, Folder, FileText, Video, ChevronRight, PlayCircle } from 'lucide-react'
+import { Lock, ShieldAlert, Globe, Folder, FileText, Video, ChevronRight, PlayCircle, BookCheck, CheckCircle2 } from 'lucide-react'
 
 import { buscarOrdemPastas, salvarOrdemPastas } from '@/actions/OrdemPastas'
 import { getAcessosDoUsuario } from '@/actions/PopAcessos'
@@ -15,13 +15,15 @@ import { PopSidebarPastas } from './_components/PopSidebarPastas'
 import { PopPdfViewer } from './_components/PopPdfViewer'
 import { PopModalExcluir } from './_components/PopModalExcluir'
 import { PopModalConfigurarPasta } from './_components/PopModalConfigurarPasta'
+import { PopModalConfirmarLeitura } from './_components/PopModalConfirmarLeitura'
 import { EmptyStateDoc } from './_components/EmptyStateDoc'
 
 interface Props {
   documentosIniciais: Documento[]
+  documentosConfirmadosIniciais?: number[]
 }
 
-export default function DocsAlphaClient({ documentosIniciais }: Props) {
+export default function DocsAlphaClient({ documentosIniciais, documentosConfirmadosIniciais = [] }: Props) {
   const { data: session, status } = useSession()
   const [documentos, setDocumentos] = useState<Documento[]>(documentosIniciais)
   const [setorAtivo, setSetorAtivo] = useState("Diretrizes")
@@ -33,6 +35,10 @@ export default function DocsAlphaClient({ documentosIniciais }: Props) {
   const [docParaExcluir, setDocParaExcluir] = useState<Documento | null>(null)
   const [pastaConfig, setPastaConfig] = useState<string | null>(null)
   const [modalAcessosAberto, setModalAcessosAberto] = useState(false)
+  const [docParaConfirmarLeitura, setDocParaConfirmarLeitura] = useState<Documento | null>(null)
+  const [documentosConfirmados, setDocumentosConfirmados] = useState<Set<number>>(
+    new Set(documentosConfirmadosIniciais)
+  )
   const [acessosPop, setAcessosPop] = useState<AcessosPop>({
     setoresAcessiveis: [],
     podeUpload: false,
@@ -133,6 +139,30 @@ export default function DocsAlphaClient({ documentosIniciais }: Props) {
     if (docSelecionado?.id === id) setDocSelecionado(null)
   }
 
+  const handleConfirmarLeituraSuccess = (id: number) => {
+    setDocumentosConfirmados(prev => new Set(prev).add(id))
+    setDocParaConfirmarLeitura(null)
+  }
+
+  function renderBotaoConfirmarLeitura(doc: Documento) {
+    const jaConfirmado = documentosConfirmados.has(doc.id)
+    if (jaConfirmado) {
+      return (
+        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[8px] font-black uppercase tracking-widest whitespace-nowrap">
+          <CheckCircle2 size={12} /> Leitura Confirmada
+        </span>
+      )
+    }
+    return (
+      <button
+        onClick={() => setDocParaConfirmarLeitura(doc)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-400 hover:border-indigo-500/40 hover:text-indigo-400 text-[8px] font-black uppercase tracking-widest transition-all whitespace-nowrap"
+      >
+        <BookCheck size={12} /> Confirmar Leitura
+      </button>
+    )
+  }
+
   const handleRenomearPasta = (nomeAntigo: string, nomeNovo: string) => {
     setDocumentos(prev =>
       prev.map(d =>
@@ -206,9 +236,12 @@ export default function DocsAlphaClient({ documentosIniciais }: Props) {
                 >
                   <ChevronRight size={16} className="rotate-180" /> Voltar
                 </button>
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-white uppercase truncate max-w-[150px]">{docSelecionado.titulo}</p>
-                  <p className="text-[7px] text-slate-500 uppercase">Segurança Ativa</p>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-white uppercase truncate max-w-[150px]">{docSelecionado.titulo}</p>
+                    <p className="text-[7px] text-slate-500 uppercase">Segurança Ativa</p>
+                  </div>
+                  {renderBotaoConfirmarLeitura(docSelecionado)}
                 </div>
               </div>
               <div className="flex-1 overflow-hidden relative">
@@ -249,6 +282,7 @@ export default function DocsAlphaClient({ documentosIniciais }: Props) {
                     }`}>
                       {docSelecionado.titulo}
                     </span>
+                    {renderBotaoConfirmarLeitura(docSelecionado)}
                   </div>
                   <div className="flex items-center gap-2 text-[8px] font-black uppercase">
                     {docSelecionado.protecao === "ATIVO"
@@ -290,6 +324,14 @@ export default function DocsAlphaClient({ documentosIniciais }: Props) {
 
       {modalAcessosAberto && (
         <ModalGerenciamentoAcessos onClose={() => setModalAcessosAberto(false)} />
+      )}
+
+      {docParaConfirmarLeitura && (
+        <PopModalConfirmarLeitura
+          doc={docParaConfirmarLeitura}
+          onClose={() => setDocParaConfirmarLeitura(null)}
+          onSuccess={handleConfirmarLeituraSuccess}
+        />
       )}
 
       {/* Page watermark */}

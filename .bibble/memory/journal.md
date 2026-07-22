@@ -950,3 +950,34 @@ Usuário reportou erro no modal de dados do cliente (CS & NPS): editar o analist
 - `BotaoReconsulta.tsx`: props tipadas (eram `any`), 2º botão "Reconsultar Não Habilitados" restaurado.
 
 **Decisão:** não revivi o mecanismo antigo (delete + robô externo) por confiabilidade incerta — generalizei o mecanismo atual, que já funciona e é auditável. `prepararReconsultaLote` (as 2 cópias) ficou 100% morta — não removida, decisão do usuário se quer limpar.
+
+---
+
+## [2026-07-22] — POP + Gestão de Equipe: Confirmação de Leitura de Documento
+
+**Tags:** #feature #security #decision #integration
+**Agentes envolvidos:** Scout, Vault, Echo, Nova, Anubis, Probe, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `src/actions/ConfirmacaoLeituraDocumento.ts` (novo), `src/app/PainelAlpha/DocsAlpha/page.tsx`, `src/app/PainelAlpha/DocsAlpha/DocsAlphaClient.tsx`, `src/app/PainelAlpha/DocsAlpha/_components/PopModalConfirmarLeitura.tsx` (novo), `src/components/cadastro/AbaGestaoEquipe.tsx`
+
+### Contexto
+Usuário pediu um botão de confirmação de leitura de documento no módulo POP (ao lado do nome do documento aberto), refletindo em Gestão de Equipe: badge por colaborador mostrando se leu o Regimento Interno (sempre destacado) e se leu todos os documentos do setor dele (colapsado num resumo).
+
+### O que foi feito
+- Model novo `ConfirmacaoLeituraDocumento` (documentoId + usuarioId + confirmadoEm, unique composto) — Vault aprovou 🟢 (CREATE TABLE puro), migration via script pontual Node+`@libsql/client` no Turso remoto, confirmada via `PRAGMA`.
+- `confirmarLeituraDocumento`/`buscarStatusLeituraEquipe` (novas Server Actions) + botão/modal no POP + badges em Gestão de Equipe.
+
+### Decisões tomadas
+- "Setor do usuário" não precisou de campo novo — já existe como `usuarios.role` (mesma string usada em `documentos.setor`), descoberto lendo `AbaGestaoEquipe.tsx`.
+- "Regimento Interno" identificado por `titulo.includes("REGIMENTO INTERNO")` — sem campo de categoria hoje, frágil se o título mudar, aceito conscientemente por falta de alternativa sem mais uma migration.
+- Usuário pediu backup fresco extra antes da migration, mesmo o Vault classificando como 🟢 baixo risco e havendo um backup diário já dentro das 48h — feito via script pontual, descartado depois.
+
+### Problemas encontrados / resolvidos
+- Anubis achou que `buscarStatusLeituraEquipe()` só tinha `auth()` básico — qualquer usuário logado (não só quem gerencia equipe) podia ver o status de leitura de todos os colaboradores. Corrigido com o mesmo gate de role/permissão de `cadastro/page.tsx`.
+- `npx prisma generate` travou com EPERM (erro conhecido, processo Node concorrente) — resolvido pedindo ao usuário fechar o dev server.
+
+### Pendências
+- Nenhuma — Forge, Anubis e Probe aprovaram. Não foi possível testar visualmente no navegador.
+
+### Refletido também em
+- `codebase-map.md`: nova seção "POP (Documentos) + Gestão de Equipe — Confirmação de Leitura de Documento"
+- `integration-points.md`: novo ponto sobre relação reversa obrigatória em models novos + padrão de backup fresco pontual mesmo pra migrations 🟢

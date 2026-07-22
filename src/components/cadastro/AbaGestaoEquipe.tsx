@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Search, Pencil, Trash2, Building2, UserCog, Activity, AlertTriangle } from 'lucide-react';
+import { Search, Pencil, Trash2, Building2, UserCog, Activity, AlertTriangle, BookCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { getUsers } from '@/actions/get-user';
 import { deleteUser } from '@/actions/manage-user';
@@ -12,6 +12,7 @@ import ModalGerenciarSetor from './ModalGerenciarSetor';
 import ModalOverrideUser from './ModalOverrideUser';
 import ModalPerfilColaborador from '@/components/Colaboradores/ModalPerfilColaborador';
 import { getContratosVencendo } from '@/actions/ColaboradorRH';
+import { buscarStatusLeituraEquipe, type StatusLeituraUsuario } from '@/actions/ConfirmacaoLeituraDocumento';
 
 interface UserItem {
   id: number;
@@ -48,6 +49,9 @@ export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoE
   // Alertas contratos vencendo
   const [contratosVencendo, setContratosVencendo] = useState<{ id: string; dataFim: Date | null; usuario: { nome: string } }[]>([]);
 
+  // Status de leitura de documentos do POP (Regimento Interno + docs do setor)
+  const [statusLeitura, setStatusLeitura] = useState<Record<number, StatusLeituraUsuario>>({});
+
   async function load() {
     setLoading(true);
     const data = await getUsers();
@@ -60,9 +64,15 @@ export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoE
     if (res.success) setContratosVencendo(res.contratos as typeof contratosVencendo);
   }
 
+  async function loadStatusLeitura() {
+    const res = await buscarStatusLeituraEquipe();
+    if (res.success) setStatusLeitura(res.data);
+  }
+
   useEffect(() => {
     void load();
     void loadAlertas();
+    void loadStatusLeitura();
   }, []);
 
   async function handleDelete() {
@@ -166,6 +176,7 @@ export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoE
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((user, i) => {
             const vencendo = contratosVencendo.some(c => c.usuario.nome === user.nome);
+            const leitura = statusLeitura[user.id];
             return (
               <motion.div
                 key={user.id}
@@ -177,6 +188,29 @@ export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoE
                 {vencendo && (
                   <div className="absolute top-3 right-3">
                     <AlertTriangle size={12} className="text-amber-400" />
+                  </div>
+                )}
+
+                {leitura && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[7px] font-black uppercase border ${
+                      leitura.regimentoInternoLido
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                    }`}>
+                      <BookCheck size={9} /> Regimento Interno
+                    </span>
+                    {leitura.totalDocumentosSetor > 0 && (
+                      leitura.todosDocumentosSetorLidos ? (
+                        <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                          Todos os documentos do setor lido
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase border bg-amber-500/10 border-amber-500/20 text-amber-400">
+                          {leitura.documentosLidosSetor}/{leitura.totalDocumentosSetor} docs do setor lidos
+                        </span>
+                      )
+                    )}
                   </div>
                 )}
 
