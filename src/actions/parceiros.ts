@@ -19,8 +19,8 @@ const EnderecoSchema = z.object({
 
 const ResponsavelSchema = z.object({
   nome: z.string().min(2),
-  cpf: z.string().min(11),
-  dataNascimento: z.string().min(1),
+  cpf: z.string().optional(),
+  dataNascimento: z.string().optional(),
   cargo: z.string().optional(),
   email: z.string().optional(),
   telefone: z.string().optional(),
@@ -85,7 +85,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
     const existente = await db.parceiro.findUnique({ where: { documento: docLimpo } });
     if (existente) return { success: false, error: "Documento já cadastrado como parceiro" };
 
-    const respValidos = (responsaveis ?? []).filter(r => r.nome.trim() && r.cpf.replace(/\D/g, "").length >= 11);
+    const respValidos = (responsaveis ?? []).filter(r => r.nome.trim());
     if (tipo === "PJ" && respValidos.length === 0) {
       return { success: false, error: "Ao menos um responsável físico é obrigatório para Pessoa Jurídica" };
     }
@@ -141,9 +141,9 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
           representantes: {
             create: respValidos.map(r => ({
               tipo: "PF",
-              documento: r.cpf.replace(/\D/g, ""),
+              documento: r.cpf?.replace(/\D/g, "") || "",
               nome: r.nome,
-              dataNascimento: r.dataNascimento,
+              dataNascimento: r.dataNascimento || null,
               cargo: r.cargo || null,
               email: r.email || null,
               telefone: r.telefone || null,
@@ -614,12 +614,12 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
           representantes: {
             deleteMany: {},
             create: d.responsaveis
-              .filter(r => r.nome.trim() && r.cpf.replace(/\D/g, "").length >= 11)
+              .filter(r => r.nome.trim())
               .map(r => ({
                 tipo: "PF",
-                documento: r.cpf.replace(/\D/g, ""),
+                documento: r.cpf?.replace(/\D/g, "") || "",
                 nome: r.nome,
-                dataNascimento: r.dataNascimento,
+                dataNascimento: r.dataNascimento || null,
                 cargo: r.cargo || null,
                 email: r.email || null,
                 telefone: r.telefone || null,

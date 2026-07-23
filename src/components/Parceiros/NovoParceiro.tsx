@@ -82,7 +82,7 @@ export default function NovoParceiro({
   const [responsaveis, setResponsaveis] = useState<Resp[]>([respVazio()]);
   const [respAbertoIdx, setRespAbertoIdx] = useState<number>(0); // qual está expandido
 
-  const respCompleto = (r: Resp) => r.nome.trim() && r.cpf.replace(/\D/g, "").length === 11 && !!r.dataNascimento;
+  const respCompleto = (r: Resp) => r.nome.trim().length >= 2;
   const updateResp = (i: number, campo: keyof Resp, valor: string) =>
     setResponsaveis(prev => prev.map((r, idx) => idx === i ? { ...r, [campo]: valor } : r));
   const addResp = () => {
@@ -193,7 +193,13 @@ export default function NovoParceiro({
         dadosConsulta: dadosConsultaBrutos || undefined,
         endereco: endereco ?? undefined,
         responsaveis: tipo === "PJ"
-          ? respValidos.map(r => ({ nome: r.nome, cpf: r.cpf.replace(/\D/g, ""), dataNascimento: r.dataNascimento, cargo: r.cargo || undefined, telefone: r.whatsapp || undefined }))
+          ? respValidos.map(r => ({
+              nome: r.nome.trim(),
+              cpf: r.cpf ? r.cpf.replace(/\D/g, "") : undefined,
+              dataNascimento: r.dataNascimento || undefined,
+              cargo: r.cargo || undefined,
+              telefone: r.whatsapp || undefined,
+            }))
           : undefined,
       });
 
@@ -394,7 +400,7 @@ export default function NovoParceiro({
             {tipo === "PJ" && (
               <div className="p-8 border-b border-white/5 space-y-3">
                 <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
-                  4. Responsáveis Físicos <span className="text-slate-600">(ao menos um para PJ)</span>
+                  4. Responsáveis Físicos <span className="text-slate-600">(ao menos um para PJ; somente o nome é obrigatório)</span>
                 </p>
 
                 {responsaveis.map((r, i) => {
@@ -430,11 +436,11 @@ export default function NovoParceiro({
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
-                              <Label className={labelCls}>CPF *</Label>
+                              <Label className={labelCls}>CPF</Label>
                               <Input value={r.cpf} onChange={e => updateResp(i, "cpf", formatarDocumento(e.target.value, "PF"))} placeholder="000.000.000-00" className={`${inputCls} font-mono`} />
                             </div>
                             <div className="space-y-1">
-                              <Label className={labelCls}>Data Nasc. *</Label>
+                              <Label className={labelCls}>Data Nasc.</Label>
                               <Input type="date" value={r.dataNascimento} onChange={e => updateResp(i, "dataNascimento", e.target.value)} className={inputCls} />
                             </div>
                           </div>
@@ -448,7 +454,7 @@ export default function NovoParceiro({
                               <Input value={r.whatsapp} onChange={e => updateResp(i, "whatsapp", e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
                             </div>
                           </div>
-                          {/* Botão "salvar" abaixo: fecha a gaveta se estiver completo */}
+                          {/* Fecha a gaveta assim que o único campo obrigatório (nome) estiver válido. */}
                           <Button type="button" variant="outline" disabled={!completo}
                             onClick={() => setRespAbertoIdx(-1)}
                             className="w-full h-10 rounded-xl border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-black uppercase text-[11px] tracking-widest gap-2 disabled:opacity-30">
