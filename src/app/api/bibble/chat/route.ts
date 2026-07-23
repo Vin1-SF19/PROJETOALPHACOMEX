@@ -7,6 +7,7 @@ import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { callCompletion, encodeSSE, type ChatMessage, type ContentPart, type StreamChunk } from "@/lib/bibble/completion";
 import db from "@/lib/prisma";
+import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 
 // ─── File content extraction ──────────────────────────────────────────────────
 
@@ -17,6 +18,17 @@ function fmtBytes(b: number) {
 }
 
 const MAX_CONTENT_CHARS = 25000;
+const MAX_TOOL_CALLS_POR_TURNO = 6;
+const MAX_TOOL_CALLS_POR_REQUISICAO = 12;
+const MAX_MUTACOES_CALENDARIO_POR_REQUISICAO = 3;
+const MUTACOES_CALENDARIO = new Set([
+  "criar_evento_calendario",
+  "editar_evento_calendario",
+  "cancelar_evento_calendario",
+  "criar_evento_calendario_colega",
+  "editar_evento_calendario_colega",
+  "cancelar_evento_calendario_colega",
+]);
 
 function truncate(text: string): string {
   return text.length > MAX_CONTENT_CHARS
@@ -186,6 +198,9 @@ async function runStream(
 
     const msgs: ChatMessage[] = [...baseMessages];
     const MAX_TOOL_TURNS = 5;
+    let totalToolCalls = 0;
+    let totalMutacoesCalendario = 0;
+    const mutacoesExecutadas = new Set<string>();
 
     for (let turn = 0; turn <= MAX_TOOL_TURNS; turn++) {
       const data = await callCompletion(msgs, tools, model, providerCtrl.signal, false, temperature, contextWindow);
@@ -202,13 +217,48 @@ async function runStream(
           tool_calls: toolCalls,
         });
 
-        const results = await Promise.all(
-          toolCalls.map(async (tc) => {
-            const args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
-            const result = await executarTool(tc.function.name, args, userCtx);
-            return { role: "tool" as const, tool_call_id: tc.id, content: result };
-          })
-        );
+        // Tool calls podem alterar o mesmo calendário. Executá-las em sequência preserva a
+        // ordem pedida pelo modelo e evita corridas entre criar/editar/cancelar no mesmo turno.
+        const results: ChatMessage[] = [];
+        for (const [indice, tc] of toolCalls.entries()) {
+          let args: Record<string, unknown>;
+          try {
+            args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+          } catch {
+            args = {};
+          }
+          totalToolCalls += 1;
+          let result: string;
+          if (
+            indice >= MAX_TOOL_CALLS_POR_TURNO ||
+            totalToolCalls > MAX_TOOL_CALLS_POR_REQUISICAO
+          ) {
+            result = JSON.stringify({
+              ok: false,
+              erro: "Limite seguro de ferramentas atingido nesta solicitação.",
+            });
+          } else if (MUTACOES_CALENDARIO.has(tc.function.name)) {
+            totalMutacoesCalendario += 1;
+            const assinatura = `${tc.function.name}:${JSON.stringify(args)}`;
+            if (totalMutacoesCalendario > MAX_MUTACOES_CALENDARIO_POR_REQUISICAO) {
+              result = JSON.stringify({
+                ok: false,
+                erro: "Limite seguro de alterações no calendário atingido nesta solicitação.",
+              });
+            } else if (mutacoesExecutadas.has(assinatura)) {
+              result = JSON.stringify({
+                ok: false,
+                erro: "Alteração duplicada bloqueada nesta solicitação.",
+              });
+            } else {
+              mutacoesExecutadas.add(assinatura);
+              result = await executarTool(tc.function.name, args, userCtx);
+            }
+          } else {
+            result = await executarTool(tc.function.name, args, userCtx);
+          }
+          results.push({ role: "tool", tool_call_id: tc.id, content: result });
+        }
 
         msgs.push(...results);
         send({ type: "status", state: "thinking" });
@@ -276,17 +326,51 @@ export async function POST(req: NextRequest) {
   const userTyped = session.user as {
     nome?: string;
     name?: string;
-    role?: string;
-    permissoes?: string[];
   };
-  const userName = userTyped.nome ?? userTyped.name ?? "Usuário";
-  const userRole = userTyped.role ?? "";
-  const userPermissoes = userTyped.permissoes ?? [];
+  const [usuarioAtual, userPermissoes] = await Promise.all([
+    db.usuarios.findUnique({
+      where: { id: userId },
+      select: { nome: true, role: true, status: true },
+    }),
+    getPermissoesEfetivas(userId),
+  ]);
+  if (!usuarioAtual || usuarioAtual.status !== "ATIVO") {
+    return new Response(JSON.stringify({ error: "Usuário inativo ou não encontrado" }), {
+      status: 403,
+    });
+  }
+  const userName = usuarioAtual.nome || userTyped.nome || userTyped.name || "Usuário";
+  const userRole = usuarioAtual.role;
 
   const userCtx: UserCtx = { userId, userName, role: userRole, permissoes: userPermissoes };
 
   const input: ChatInput = await req.json().catch(() => ({}));
   const { message = "", history = [], context, model: modelOverride, sessionId, files, temperature, computerAccess, globalSystemPrompt, contextWindow } = input;
+  const ultimaMensagemBibble = history.at(-1);
+  const bibblePediuConfirmacaoDeCancelamento =
+    ultimaMensagemBibble?.role === "bibble" &&
+    /(?:confirm|posso|deseja).{0,100}cancel|cancel.{0,100}(?:confirm|posso|deseja)/i.test(
+      ultimaMensagemBibble.text,
+    );
+  const respostaConfirmacao = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[.,!?;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const usuarioConfirmouCancelamento = new Set([
+    "sim",
+    "confirmo",
+    "confirmado",
+    "pode cancelar",
+    "pode sim cancelar",
+    "sim pode cancelar",
+    "cancele",
+    "cancele sim",
+  ]).has(respostaConfirmacao);
+  userCtx.confirmouCancelamentoCalendario =
+    Boolean(bibblePediuConfirmacaoDeCancelamento) && usuarioConfirmouCancelamento;
 
   // Validação: mensagem ou arquivos
   if (!message?.trim() && (!files || files.length === 0)) {
@@ -347,7 +431,17 @@ export async function POST(req: NextRequest) {
     ? `\n\n## CONTEXTO DO USUÁRIO\nUsuário: ${userName} | Role: ${userRole} | Acesso: TOTAL (admin)`
     : `\n\n## CONTEXTO DO USUÁRIO\nUsuário: ${userName} | Role: ${userRole}\nMódulos com acesso: ${userPermissoes.length > 0 ? userPermissoes.join(", ") : "nenhum"}\n\nIMPORTANTE: Se o usuário pedir algo de um módulo que não está na lista acima, informe que ele não tem acesso e sugira contatar um administrador. NÃO tente executar a ação.`;
 
-  let finalSystemPrompt = systemPrompt + permissoesCtx;
+  const agoraSaoPaulo = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(new Date());
+  const contextoTemporal =
+    `\n\n## DATA E HORA ATUAIS\nAgora em America/Sao_Paulo: ${agoraSaoPaulo}. ` +
+    "Converta referências como hoje, amanhã e próxima semana em datas absolutas antes de chamar ferramentas. " +
+    "Para horários, sempre envie ISO 8601 com offset -03:00; não invente data, duração ou participantes ausentes.";
+
+  let finalSystemPrompt = systemPrompt + permissoesCtx + contextoTemporal;
 
   if (globalSystemPrompt?.trim()) {
     finalSystemPrompt = finalSystemPrompt + "\n\n---\n\n## PERSONA CUSTOMIZADA (prioridade máxima)\n\n" + globalSystemPrompt.trim();

@@ -4,6 +4,7 @@ type ClienteJWT = InstanceType<typeof google.auth.JWT>;
 
 import { classificarErroGoogle, GoogleCalendarError } from "./errors";
 import { ESCOPOS_CALENDARIO_ALPHA } from "./scopes";
+import type { AtualizarEventoParcialInput } from "../validations/google-calendar";
 import type {
   CriarOuAtualizarEventoInput,
   FreeBusyResultadoDTO,
@@ -245,6 +246,46 @@ function paraSchemaEvento(input: CriarOuAtualizarEventoInput): calendar_v3.Schem
   };
 }
 
+export type AtualizarEventoParcialGoogleInput = Omit<
+  AtualizarEventoParcialInput,
+  "calendarId" | "googleEventId" | "etagConhecido"
+>;
+
+/**
+ * Constrói o payload de `events.patch` apenas com campos explicitamente informados.
+ * Propriedades ausentes não entram no JSON e, portanto, não apagam dados já existentes no Google.
+ */
+export function paraSchemaEventoParcial(input: AtualizarEventoParcialGoogleInput): calendar_v3.Schema$Event {
+  const evento: calendar_v3.Schema$Event = {};
+
+  if (input.titulo !== undefined) evento.summary = input.titulo;
+  if (input.descricaoGoogle !== undefined) evento.description = input.descricaoGoogle;
+  if (input.localizacao !== undefined) evento.location = input.localizacao;
+  if (input.participantes !== undefined) {
+    evento.attendees = input.participantes.map((email) => ({ email }));
+  }
+
+  if (input.inicio !== undefined && input.fim !== undefined && input.diaInteiro !== undefined) {
+    evento.start = input.diaInteiro
+      ? { date: input.inicio.toISOString().slice(0, 10) }
+      : { dateTime: input.inicio.toISOString(), timeZone: input.timezone };
+    evento.end = input.diaInteiro
+      ? { date: input.fim.toISOString().slice(0, 10) }
+      : { dateTime: input.fim.toISOString(), timeZone: input.timezone };
+  }
+
+  if (input.criarMeet === true) {
+    evento.conferenceData = {
+      createRequest: {
+        requestId: `calalpha-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    };
+  }
+
+  return evento;
+}
+
 interface CriarEventoParams {
   emailUsuario: string;
   calendarId: string;
@@ -291,10 +332,45 @@ export async function atualizarEvento(params: AtualizarEventoParams): Promise<Go
   }
 }
 
+interface AtualizarEventoParcialParams {
+  emailUsuario: string;
+  calendarId: string;
+  googleEventId: string;
+  etagConhecido?: string;
+  evento: AtualizarEventoParcialGoogleInput;
+}
+
+export async function atualizarEventoParcial(params: AtualizarEventoParcialParams): Promise<GoogleEventoDTO> {
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    const resposta = await executarComRetry(() =>
+      calendar.events.patch(
+        {
+          calendarId: params.calendarId,
+          eventId: params.googleEventId,
+          requestBody: paraSchemaEventoParcial(params.evento),
+          // Mantém suporte a conferenceData também quando o Meet existente foi apenas preservado.
+          conferenceDataVersion: 1,
+        },
+        params.etagConhecido
+          ? {
+              headers: { "If-Match": params.etagConhecido },
+            }
+          : undefined,
+      ),
+    );
+    return mapEventoParaDTO(resposta.data);
+  } catch (erroOriginal) {
+    if (erroOriginal instanceof GoogleCalendarError) throw erroOriginal;
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
 interface CancelarEventoParams {
   emailUsuario: string;
   calendarId: string;
   googleEventId: string;
+  etagConhecido?: string;
 }
 
 /** Idempotente: evento já removido/inexistente (404/410) é tratado como já cancelado, não como erro. */
@@ -302,10 +378,17 @@ export async function cancelarEvento(params: CancelarEventoParams): Promise<{ ja
   const calendar = clienteCalendar(params.emailUsuario);
   try {
     await executarComRetry(() =>
-      calendar.events.delete({
-        calendarId: params.calendarId,
-        eventId: params.googleEventId,
-      }),
+      calendar.events.delete(
+        {
+          calendarId: params.calendarId,
+          eventId: params.googleEventId,
+        },
+        params.etagConhecido
+          ? {
+              headers: { "If-Match": params.etagConhecido },
+            }
+          : undefined,
+      ),
     );
     return { jaEstavaCancelado: false };
   } catch (erroOriginal) {

@@ -981,3 +981,39 @@ Usuário pediu um botão de confirmação de leitura de documento no módulo POP
 ### Refletido também em
 - `codebase-map.md`: nova seção "POP (Documentos) + Gestão de Equipe — Confirmação de Leitura de Documento"
 - `integration-points.md`: novo ponto sobre relação reversa obrigatória em models novos + padrão de backup fresco pontual mesmo pra migrations 🟢
+
+---
+
+## [2026-07-23 17:15] — Calendário Alpha integrado ao Bibble/IAlpha
+
+**Tags:** #feature #integration #security #auth #nextjs
+**Agentes envolvidos:** Bibble, Scout, Echo, Cortex, Forge, Probe, Anubis, Lens, Sage, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/bibble/calendar-tools.ts`, `src/lib/bibble/tools.ts`, `src/lib/bibble/tool-executor.ts`, `src/lib/bibble/system-prompt.ts`, `src/app/api/bibble/chat/route.ts`, `src/actions/google-calendar-eventos.ts`, `src/actions/google-calendar-admin.ts`, `src/lib/google-calendar/client.ts`, `src/lib/validations/google-calendar.ts`, `tests/bibble/`, `tests/google-calendar/`, `docs/stories/story-calendario-alpha.md`
+
+### Contexto
+O usuário pediu que o Bibble/IAlpha passasse a consultar a agenda, verificar disponibilidade e criar, editar ou cancelar compromissos e reuniões com todas as capacidades operacionais do Calendário Alpha.
+
+### O que foi feito
+- O IAlpha ganhou 10 tools: listar calendários; listar, criar, editar e cancelar eventos próprios; consultar FreeBusy; consultar agenda de colega; e criar, editar ou cancelar eventos de colega para Admin/CEO.
+- Um helper central passou a validar argumentos, resolver calendário/colega sem seleção silenciosa, aplicar ownership/permissões e normalizar datas em `America/Sao_Paulo`.
+- Edições usam patch parcial com ETag/`If-Match`; cancelamentos exigem confirmação explícita em duas fases; tools executam em sequência com limites de 6 por rodada, 12 por requisição e 3 mutações de calendário.
+
+### Decisões tomadas
+- IDs de usuário/colega/calendário e e-mail de impersonation nunca vêm do modelo: são resolvidos a partir da sessão e do banco.
+- Role e permissões efetivas são relidas por requisição; escrita na agenda de terceiros permanece exclusiva de Admin/CEO.
+- Configurações administrativas de calendário continuam na UI. Não houve alteração de schema, migration ou mutação de banco; Vault não foi necessário.
+
+### Problemas encontrados / resolvidos
+- A integração anterior tinha apenas 5 tools e não cobria edição, seleção segura de calendário nem CRUD de colega; o fluxo foi completado sem duplicar a lógica de autorização do domínio.
+- Concorrência de edição poderia sobrescrever mudanças externas; ETag com `If-Match` agora retorna conflito em vez de gravar sobre uma versão desatualizada.
+- Verificação final: 122 testes, Next build, ESLint escopado e `git diff --check` passaram. Probe e Lens: PASS. Anubis: CONCERNS sem blocker.
+
+### Pendências
+- Dívidas de endurecimento cross-request: rate limit persistente, idempotência persistente de mutações e token persistente/específico para confirmação de cancelamento.
+- O typecheck global conserva 4 erros de baseline fora do diff desta entrega.
+
+### Refletido também em
+- `story-calendario-alpha.md`: extensão conversacional, gates e file list registrados.
+- `bibble-flows.md`: fluxo das 10 tools e salvaguardas documentados.
+- `codebase-map.md`: núcleo `calendar-tools.ts` e integração do chat mapeados.
+- `integration-points.md`: contratos de segurança, ETag, timezone e limites registrados.

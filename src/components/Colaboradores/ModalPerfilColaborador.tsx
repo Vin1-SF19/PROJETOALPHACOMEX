@@ -568,8 +568,13 @@ export default function ModalPerfilColaborador({
                                   options={setoresLista.map(s => ({ value: s, label: s }))} />
                               </Field>
                               <Field label="Status">
-                                <SelectInput value={status} onChange={setStatus}
-                                  options={STATUS_OPTIONS.map(s => ({ value: s, label: s }))} />
+                                <div className="space-y-1.5">
+                                  <SelectInput value={status} onChange={setStatus}
+                                    options={STATUS_OPTIONS.map(s => ({ value: s, label: s }))} />
+                                  <p className="text-[8px] leading-relaxed text-amber-400/80">
+                                    Qualquer status diferente de ATIVO bloqueia o acesso ao Painel Alpha.
+                                  </p>
+                                </div>
                               </Field>
                             </div>
                           </div>

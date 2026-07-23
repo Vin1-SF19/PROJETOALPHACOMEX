@@ -632,7 +632,35 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 - Novo painel Admin-only `PainelPermissoesColegas.tsx` (botão `ShieldCheck` no `HeaderCalendario.tsx`, visível só se `isAdmin`) com `listarPermissoesColegasTodosUsuarios`/`alternarPermissaoColegas` (ambas Admin-only, checadas via `isAdminRole` na Server Action, nunca só no cliente).
 - Cores agora são personalizáveis (`personalizarCorCalendario`/`personalizarCorColega`, `input[type=color]`) — cuidado ao mexer em `definirCalendarioSelecionado`: o campo `corHex` foi deliberadamente removido do objeto `update` do upsert para não resetar a cor customizada a cada toggle de visibilidade/gravável.
 
-**Última atualização:** 2026-07-17 por Scribe (redesenho de arquitetura)
+**Atualização 2026-07-23 — integração Calendário Alpha ↔ Bibble/IAlpha:**
+
+- [x] Registrar cada tool em `src/lib/bibble/tools.ts` e em `CALENDAR_TOOL_NAMES` de `src/lib/bibble/calendar-tools.ts`
+- [x] Rotear tools por `src/lib/bibble/tool-executor.ts`, passando apenas `userId`, role e permissões vindos do servidor
+- [x] Documentar capacidade e regras de esclarecimento/confirmação em `src/lib/bibble/system-prompt.ts`
+- [x] Em `src/app/api/bibble/chat/route.ts`, recarregar usuário `ATIVO`, role e `getPermissoesEfetivas(userId)` do banco; injetar a hora atual de `America/Sao_Paulo`
+- [x] Executar chamadas sequencialmente e manter limites de 6 tools/turno, 12/requisição e 3 mutações de calendário
+- [x] Para edição, consultar antes, carregar `google_event_id` + `etag` e usar patch parcial com `If-Match`
+- [x] Para cancelamento, exigir confirmação em duas fases antes de chamar a action
+- [x] Manter resolução de calendário/colega em allowlists server-side; ambiguidades retornam candidatos
+- [x] Não expor `userId`, `colegaId`, `calendarId` nem e-mail de impersonation nos schemas das tools
+
+**As 10 tools integradas:** `listar_calendarios_calendario`, `listar_eventos_calendario`, `criar_evento_calendario`, `editar_evento_calendario`, `cancelar_evento_calendario`, `consultar_disponibilidade_calendario`, `consultar_agenda_colega`, `criar_evento_calendario_colega`, `editar_evento_calendario_colega` e `cancelar_evento_calendario_colega`.
+
+**Como adicionar ou alterar uma tool de calendário:**
+1. Definir o contrato público em `src/lib/bibble/tools.ts`.
+2. Adicionar nome, schema Zod estrito e executor em `src/lib/bibble/calendar-tools.ts`.
+3. Rotear pelo `tool-executor.ts` sem aceitar identificadores de ownership do modelo.
+4. Atualizar o `system-prompt.ts` quando a capacidade ou regra conversacional mudar.
+5. Cobrir happy path e edge cases em `tests/bibble/`; alterações do cliente Google/edição parcial também exigem testes em `tests/google-calendar/`.
+6. Preservar janela máxima de 60 dias, teto de 200 eventos, timezone SP, execução sequencial, confirmação de cancelamento e ETag/`If-Match`.
+
+**Exemplo seguro:** “Mostre minha agenda de 2026-07-24 a 2026-07-31” consulta por intervalo exato. “Cancele a reunião X” primeiro lista o evento e pede confirmação; somente a resposta afirmativa seguinte permite executar `cancelar_evento_calendario` com id, ETag e `confirmado: true`.
+
+**Regras permanentes:** escrita de colega continua exclusiva de Admin/CEO atual do banco. Configuração do módulo (ativação, calendários visíveis/graváveis, cores e concessão de compartilhamento) continua na UI. Esta integração não altera schema; qualquer mudança futura de banco volta a exigir Vault, backup e confirmação.
+
+**Dívidas não bloqueantes registradas pelo Anubis:** rate limit cross-request, idempotência persistente e token persistente/específico para confirmação. Não confundir os limites/deduplicação da requisição atual com garantias persistentes.
+
+**Última atualização:** 2026-07-23 por Scribe
 
 ---
 

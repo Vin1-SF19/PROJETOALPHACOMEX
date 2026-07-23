@@ -1,22 +1,30 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
-import { auth } from "../../../../auth";
+import { authComEstadoAcesso } from "../../../../auth";
+import { STATUS_USUARIO_ATIVO } from "@/lib/auth/acesso-painel";
 
 export async function POST() {
-  const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Off" }, { status: 401 });
+  const session = await authComEstadoAcesso();
+
+  if (session?.acessoBloqueado) {
+    return NextResponse.json({ error: "Acesso bloqueado" }, { status: 403 });
+  }
+
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Off" }, { status: 401 });
+  }
 
   try {
-    // updateMany não lança P2025 quando o usuário não existe (ex.: sessão JWT
-    // válida mas registro já removido/renomeado no banco) — retorna count: 0.
     const { count } = await db.usuarios.updateMany({
-      where: { email: session.user.email },
-      data: { ultimo_aviso: new Date().toISOString() }
+      where: {
+        email: session.user.email,
+        status: STATUS_USUARIO_ATIVO,
+      },
+      data: { ultimo_aviso: new Date().toISOString() },
     });
 
     if (count === 0) {
-      // Sessão sem usuário correspondente no banco — não é erro de servidor.
-      return NextResponse.json({ success: false, reason: "Usuário não encontrado" }, { status: 404 });
+      return NextResponse.json({ error: "Acesso bloqueado" }, { status: 403 });
     }
 
     return NextResponse.json({ success: true });

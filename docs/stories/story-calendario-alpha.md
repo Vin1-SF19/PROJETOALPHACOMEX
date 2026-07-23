@@ -110,8 +110,32 @@ Sem os passos 1-4 (feitos por vocês no Google), o código não tem como funcion
 
 ---
 
+## Extensão entregue em 2026-07-23 — Calendário Alpha no Bibble/IAlpha
+
+Esta extensão torna o Calendário Alpha operável por conversa no Bibble/IAlpha, sem alterar schema, executar migration ou mudar a configuração de compartilhamento já existente. O acesso continua ancorado na sessão, no usuário `ATIVO`, na role atual e nas permissões efetivas lidas do banco.
+
+- [x] 10 tools de calendário disponíveis: listar calendários; listar, criar, editar e cancelar eventos próprios; consultar FreeBusy; consultar agenda de colega; e criar, editar e cancelar evento de colega para Admin/CEO.
+- [x] Consultas aceitam intervalo exato (`data_inicio` + `data_fim`) ou janela de até 60 dias e limitam a resposta a 200 eventos.
+- [x] O calendário pode ser resolvido por nome; quando há mais de uma opção compatível, o Bibble devolve candidatos e pede escolha em vez de selecionar silenciosamente.
+- [x] Datas com horário exigem ISO 8601 com offset; datas civis usam `America/Sao_Paulo`. A data/hora atual de São Paulo é injetada no contexto de cada requisição.
+- [x] CRUD próprio mantém ownership por `ctx.userId` da sessão. Nenhuma tool aceita `userId`, `colegaId`, `calendarId` ou e-mail de impersonation fornecido pelo modelo.
+- [x] Consulta de colega respeita o compartilhamento existente; Admin/CEO pode consultar qualquer colaborador ativo. Nome/e-mail ambíguo retorna candidatos, sem `findFirst` silencioso.
+- [x] Escrita na agenda de colega é exclusiva de Admin/CEO e resolve o alvo no banco; role e permissões são recarregadas do banco em cada requisição do chat.
+- [x] Edição usa patch parcial e exige `etag`; o cliente envia `If-Match`, preservando campos não editados e sinalizando conflito quando o evento mudou desde a última leitura.
+- [x] Cancelamento próprio ou de colega ocorre em duas fases: o Bibble pede confirmação explícita e a execução exige tanto `confirmado: true` quanto a confirmação reconhecida na conversa atual.
+- [x] Tool calls são executadas sequencialmente. Limites por requisição: até 6 tools por turno, 12 no total e 3 mutações de calendário; mutação idêntica repetida na mesma requisição é bloqueada.
+- [x] Configurações administrativas do módulo — ativar/desativar, selecionar/ocultar calendários, cores e concessão da permissão de compartilhamento — permanecem na UI do Calendário Alpha.
+- [x] Sem alteração de banco nesta extensão; portanto, não houve migration, backup pré-mudança nem acionamento do Vault.
+
+**Quality gates da extensão:** ESLint escopado nos 14 arquivos da entrega PASS; `npm test` PASS (16 arquivos/122 testes); `npx next build` PASS; `git diff --check` PASS. O typecheck global mantém 4 erros de baseline fora do diff: dois artefatos gerados de Exclusão Fiscal, `ModalPerfilColaborador` e `HabilitacaoRadarClient`.
+
+**Revisões:** Probe PASS; Lens PASS; Anubis CONCERNS sem blocker. Dívidas registradas pelo Anubis: rate limit cross-request, idempotência persistente e token persistente/específico para confirmação de cancelamento.
+
+---
+
 ## Change Log
 
+- 2026-07-23 — **Calendário Alpha ampliado no Bibble/IAlpha para 10 tools**: consultas por intervalo exato e seleção segura de calendário; CRUD próprio; FreeBusy; leitura de agenda de colega; CRUD de colega exclusivo de Admin/CEO; edição parcial com ETag/`If-Match`; confirmação de cancelamento em duas fases; timezone `America/Sao_Paulo`; role/permissões atuais do banco; resolução explícita de ambiguidades; execução sequencial e limites de segurança. Novo núcleo `src/lib/bibble/calendar-tools.ts`. Sem schema/migration/Vault. Gates: ESLint escopado PASS, 122 testes PASS, Next build PASS e diff-check PASS; typecheck global conserva 4 erros baseline fora do diff. Probe e Lens PASS; Anubis CONCERNS sem blocker.
 - 2026-07-17 — Story criada (Draft) a partir do prompt gerado pelo Phantom.
 - 2026-07-17 — Scout entregou blueprint de reconhecimento. Riscos identificados: auth de Reserva de Salas é fraca (não copiar), sem criptografia/cron/webhook/`googleapis` no projeto.
 - 2026-07-17 — Usuário confirmou 4 decisões de produto (MVP controlado, OAuth ambas as contas, sem webhook, sem vínculos internos). Status → Ready.
@@ -159,3 +183,25 @@ Sem os passos 1-4 (feitos por vocês no Google), o código não tem como funcion
 **Testes (64):** `tests/google-calendar/{errors,validations,cache-eventos,sync,usuario-google,datas-calendario}.test.ts`
 
 **Dependências:** `googleapis` adicionado ao `package.json`; script `calendar-alpha:doctor` adicionado
+
+### Extensão Bibble/IAlpha de 2026-07-23 — arquivos alterados/novos
+
+**Bibble/IAlpha:**
+- `src/lib/bibble/calendar-tools.ts` — novo núcleo de validação, resolução segura e execução das 10 tools
+- `src/lib/bibble/tools.ts` — contratos das 10 tools expostos ao modelo
+- `src/lib/bibble/tool-executor.ts` — roteamento das tools com contexto autenticado
+- `src/lib/bibble/system-prompt.ts` — capacidades e regras de conversa do calendário
+- `src/app/api/bibble/chat/route.ts` — permissões efetivas atuais, timezone, confirmação em duas fases, execução sequencial e limites
+
+**Google Calendar:**
+- `src/actions/google-calendar-eventos.ts` — edição parcial segura de evento próprio
+- `src/actions/google-calendar-admin.ts` — edição parcial segura de evento de colega por Admin/CEO
+- `src/lib/google-calendar/client.ts` — patch parcial e cancelamento com ETag/`If-Match`
+- `src/lib/validations/google-calendar.ts` — validação estrita da edição parcial
+
+**Testes:**
+- `tests/bibble/calendar-tools.test.ts`
+- `tests/bibble/calendar-tools-edge.test.ts`
+- `tests/google-calendar/client-etag.test.ts`
+- `tests/google-calendar/evento-parcial.test.ts`
+- `tests/google-calendar/validations.test.ts`

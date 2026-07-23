@@ -6,22 +6,26 @@ import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizaca
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import {
   atualizarEvento as atualizarEventoGoogleApi,
+  atualizarEventoParcial as atualizarEventoParcialGoogleApi,
   cancelarEvento as cancelarEventoGoogleApi,
   consultarFreeBusy,
   criarEvento as criarEventoGoogleApi,
   listarCalendarios,
 } from "@/lib/google-calendar/client";
+import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import { sincronizarCalendario } from "@/lib/google-calendar/sync";
-import type { GoogleCalendarioDTO } from "@/lib/google-calendar/types";
+import type { GoogleCalendarioDTO, GoogleEventoDTO } from "@/lib/google-calendar/types";
 import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import {
   atualizarEventoSchema,
+  atualizarEventoParcialSchema,
   cancelarEventoSchema,
   consultarFreeBusySchema,
   corHexSchema,
   criarEventoSchema,
   selecionarCalendarioSchema,
   type AtualizarEventoInput,
+  type AtualizarEventoParcialInput,
   type CancelarEventoInput,
   type ConsultarFreeBusyInput,
   type CriarEventoInput,
@@ -30,6 +34,11 @@ import {
 import db from "@/lib/prisma";
 
 type ResultadoAcao<T> = { success: true; data: T } | { success: false; error: string };
+type ResultadoAtualizacaoParcial = {
+  conflito: boolean;
+  evento: GoogleEventoDTO | null;
+  etag?: string;
+};
 
 function erroMensagemAmigavel(motivo: "sem_conexao" | "desativada"): string {
   return motivo === "desativada"
@@ -47,6 +56,20 @@ function paraInputEventoGoogle(dados: CriarEventoInput | AtualizarEventoInput) {
     descricaoGoogle: dados.descricaoGoogle,
     localizacao: dados.localizacao,
     timezone: dados.timezone,
+    diaInteiro: dados.diaInteiro,
+    inicio: dados.inicio,
+    fim: dados.fim,
+    participantes: dados.participantes,
+    criarMeet: dados.criarMeet,
+  };
+}
+
+function paraInputEventoParcialGoogle(dados: AtualizarEventoParcialInput, timezonePadrao: string) {
+  return {
+    titulo: dados.titulo,
+    descricaoGoogle: dados.descricaoGoogle,
+    localizacao: dados.localizacao,
+    timezone: dados.inicio !== undefined ? (dados.timezone ?? timezonePadrao) : undefined,
     diaInteiro: dados.diaInteiro,
     inicio: dados.inicio,
     fim: dados.fim,
@@ -193,6 +216,20 @@ export async function consultarDisponibilidade(
   const validacao = consultarFreeBusySchema.safeParse(input);
   if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
   const dados = validacao.data;
+  const idsSolicitados = Array.from(new Set(dados.googleCalendarIds));
+  const calendariosAutorizados = await db.googleCalendarSelecionado.findMany({
+    where: {
+      conexao: { userId: acesso.userId },
+      googleCalendarId: { in: idsSolicitados },
+    },
+    select: { googleCalendarId: true },
+  });
+  if (calendariosAutorizados.length !== idsSolicitados.length) {
+    return {
+      success: false,
+      error: "Um ou mais calendários não pertencem à configuração do usuário.",
+    };
+  }
 
   const usuarioGoogle = await obterUsuarioGoogleAtivo(acesso.userId);
   if (!usuarioGoogle.ok) return { success: false, error: erroMensagemAmigavel(usuarioGoogle.motivo) };
@@ -200,7 +237,7 @@ export async function consultarDisponibilidade(
   try {
     const resultado = await consultarFreeBusy({
       emailUsuario: usuarioGoogle.emailUsuario,
-      googleCalendarIds: dados.googleCalendarIds,
+      googleCalendarIds: idsSolicitados,
       timeMin: dados.inicio.toISOString(),
       timeMax: dados.fim.toISOString(),
     });
@@ -299,6 +336,87 @@ export async function atualizarEventoNoCalendario(
   }
 }
 
+/**
+ * Atualização parcial usada pelo IAlpha: só envia ao Google os campos explicitamente informados,
+ * preservando descrição, participantes, conferência e demais detalhes quando forem omitidos.
+ */
+export async function atualizarEventoParcialNoCalendario(
+  input: AtualizarEventoParcialInput,
+): Promise<ResultadoAcao<ResultadoAtualizacaoParcial>> {
+  const acesso = await verificarAcessoCalendarioAlpha();
+  if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
+
+  const validacao = atualizarEventoParcialSchema.safeParse(input);
+  if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
+  const dados = validacao.data;
+
+  const calendario = await db.googleCalendarSelecionado.findFirst({
+    where: { conexao: { userId: acesso.userId }, googleCalendarId: dados.calendarId },
+  });
+  if (!calendario) return { success: false, error: "Calendário não encontrado." };
+  if (!calendario.gravavel) {
+    return { success: false, error: "Este calendário está disponível só para leitura." };
+  }
+
+  const cacheAtual = await db.googleCalendarEventoCache.findUnique({
+    where: {
+      calendarioId_googleEventId: {
+        calendarioId: calendario.id,
+        googleEventId: dados.googleEventId,
+      },
+    },
+  });
+  if (dados.etagConhecido && cacheAtual && cacheAtual.etag !== dados.etagConhecido) {
+    return { success: true, data: { conflito: true, evento: null } };
+  }
+
+  const usuarioGoogle = await obterUsuarioGoogleAtivo(acesso.userId);
+  if (!usuarioGoogle.ok) {
+    return { success: false, error: erroMensagemAmigavel(usuarioGoogle.motivo) };
+  }
+
+  try {
+    const eventoAtualizado = await atualizarEventoParcialGoogleApi({
+      emailUsuario: usuarioGoogle.emailUsuario,
+      calendarId: dados.calendarId,
+      googleEventId: dados.googleEventId,
+      etagConhecido: dados.etagConhecido,
+      evento: paraInputEventoParcialGoogle(dados, calendario.timezone || "America/Sao_Paulo"),
+    });
+
+    const dadosCache = dadosCacheDeEvento(eventoAtualizado);
+    await db.googleCalendarEventoCache.upsert({
+      where: {
+        calendarioId_googleEventId: {
+          calendarioId: calendario.id,
+          googleEventId: dados.googleEventId,
+        },
+      },
+      create: {
+        calendarioId: calendario.id,
+        googleEventId: eventoAtualizado.googleEventId,
+        ...dadosCache,
+      },
+      update: dadosCache,
+    });
+
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return {
+      success: true,
+      data: {
+        conflito: false,
+        evento: eventoAtualizado,
+        etag: eventoAtualizado.etag,
+      },
+    };
+  } catch (erro) {
+    if (erro instanceof GoogleCalendarError && erro.status === 412) {
+      return { success: true, data: { conflito: true, evento: null } };
+    }
+    return { success: false, error: "Não foi possível atualizar o evento no Google Agenda." };
+  }
+}
+
 export async function cancelarEventoNoCalendario(input: CancelarEventoInput): Promise<ResultadoAcao<{ ok: true }>> {
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
@@ -321,6 +439,7 @@ export async function cancelarEventoNoCalendario(input: CancelarEventoInput): Pr
       emailUsuario: usuarioGoogle.emailUsuario,
       calendarId: dados.calendarId,
       googleEventId: dados.googleEventId,
+      etagConhecido: dados.etagConhecido,
     });
 
     // Idempotente: já removido no Google (404/410) ou removido agora — nos dois casos some do cache.
@@ -330,7 +449,13 @@ export async function cancelarEventoNoCalendario(input: CancelarEventoInput): Pr
 
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { ok: true } };
-  } catch {
+  } catch (erro) {
+    if (erro instanceof GoogleCalendarError && erro.status === 412) {
+      return {
+        success: false,
+        error: "O evento mudou desde a última leitura. Liste a agenda novamente antes de cancelar.",
+      };
+    }
     return { success: false, error: "Não foi possível cancelar o evento no Google Agenda." };
   }
 }

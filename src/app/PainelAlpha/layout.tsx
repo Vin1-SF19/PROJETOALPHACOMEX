@@ -6,6 +6,8 @@ import PainelLayoutClient from "@/components/layout/PainelLayoutClient";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { getOnboardingVideo, type OnboardingVideo } from "@/lib/onboarding";
 import db from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import { statusPermiteAcessoPainel } from "@/lib/auth/acesso-painel";
 
 export const metadata: Metadata = {
   title: "Painel Alpha",
@@ -22,6 +24,10 @@ export default async function PainelLayout({
   const userId = Number(user?.id ?? 0);
   const role = user?.role ?? 'User';
 
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    redirect("/?acesso=bloqueado");
+  }
+
   let permissoes: string[] = [];
   let temaName = "blue";
   let onboardingVisto = true;        // default true = não bloqueia se não houver usuário
@@ -29,8 +35,20 @@ export default async function PainelLayout({
   if (userId > 0) {
     const [perms, userRecord] = await Promise.all([
       getPermissoesEfetivas(userId),
-      db.usuarios.findUnique({ where: { id: userId }, select: { tema_interface: true, onboarding_ialpha_visto: true } }),
+      db.usuarios.findUnique({
+        where: { id: userId },
+        select: {
+          status: true,
+          tema_interface: true,
+          onboarding_ialpha_visto: true,
+        },
+      }),
     ]);
+
+    if (!userRecord || !statusPermiteAcessoPainel(userRecord.status)) {
+      redirect("/?acesso=bloqueado");
+    }
+
     permissoes = perms;
     temaName = userRecord?.tema_interface ?? "blue";
     onboardingVisto = userRecord?.onboarding_ialpha_visto ?? false;

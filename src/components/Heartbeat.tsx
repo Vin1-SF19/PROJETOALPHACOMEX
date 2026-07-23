@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { signOut } from "next-auth/react";
 
 export function Heartbeat() {
   useEffect(() => {
@@ -11,13 +12,16 @@ export function Heartbeat() {
 
     const enviarSinal = async () => {
       try {
-        await fetch("/api/heartbeat", {
+        const response = await fetch("/api/heartbeat", {
           method: "POST",
           signal: controller.signal
         });
-      } catch (e: any) {
-        if (e.name !== 'AbortError') {
+
+        if (response.status === 403 && !controller.signal.aborted) {
+          await signOut({ redirectTo: "/" });
         }
+      } catch {
+        return;
       }
     };
 

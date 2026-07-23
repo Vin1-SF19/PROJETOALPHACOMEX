@@ -213,11 +213,27 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 **Decisão de arquitetura (dados):** eventos NÃO são espelhados integralmente — `GoogleCalendarEventoCache` guarda só título/horário/status/etag; descrição/participantes/link do Meet ficam só no Google. Google Calendar continua fonte de verdade única.
 
+### Extensão Bibble/IAlpha — 10 tools de agenda (2026-07-23)
+
+**Adicionado em:** 2026-07-23 por Scribe.
+
+O núcleo conversacional do calendário vive em `src/lib/bibble/calendar-tools.ts`. Ele implementa 10 operações: listar calendários; listar/criar/editar/cancelar eventos próprios; FreeBusy; consultar agenda de colega; e criar/editar/cancelar evento de colega para Admin/CEO. O catálogo externo permanece em `src/lib/bibble/tools.ts`, o roteamento em `src/lib/bibble/tool-executor.ts`, as regras em `src/lib/bibble/system-prompt.ts` e a orquestração HTTP/SSE em `src/app/api/bibble/chat/route.ts`.
+
+**Autorização e isolamento:** o chat recarrega status, role e `getPermissoesEfetivas(userId)` do banco em cada requisição. As tools não aceitam `userId`, `colegaId`, `calendarId` ou e-mail de impersonation do modelo: usuário vem da sessão; colega é resolvido por nome/e-mail com retorno de candidatos em caso ambíguo; calendário é escolhido somente entre a allowlist da conexão. Consulta de colega respeita compartilhamento, enquanto Admin/CEO pode consultar e executar CRUD na agenda de qualquer colaborador ativo.
+
+**Tempo, volume e ordem:** datas com horário exigem ISO 8601 com offset; datas civis são interpretadas em `America/Sao_Paulo`, e o horário atual dessa timezone é injetado no prompt. A janela máxima é 60 dias e cada consulta retorna até 200 eventos. O loop executa tools sequencialmente e limita 6 por turno, 12 por requisição e 3 mutações de calendário.
+
+**Escritas seguras:** edição própria e de colega usa patch parcial em `src/actions/google-calendar-{eventos,admin}.ts`, validado por `src/lib/validations/google-calendar.ts`; `src/lib/google-calendar/client.ts` envia ETag em `If-Match`, evitando sobrescrever mudança concorrente. Cancelamento próprio/de colega exige confirmação em duas fases. Mutações idênticas são deduplicadas dentro da requisição.
+
+**Banco:** esta extensão não alterou schema, não executou migration e não exigiu Vault.
+
+**Qualidade:** ESLint escopado nos 14 arquivos PASS; 16 arquivos/122 testes PASS; Next build PASS; diff-check PASS. O typecheck global preserva 4 erros baseline fora do diff (Exclusão Fiscal x2 gerados, `ModalPerfilColaborador`, `HabilitacaoRadarClient`). Probe e Lens PASS; Anubis CONCERNS sem blocker, com dívidas conhecidas de rate limit cross-request, idempotência persistente e token persistente/específico de confirmação.
+
 **Pendências conhecidas, documentadas conscientemente:** sem rate limit em nenhuma action; `consultarDisponibilidade` (FreeBusy) implementada mas ainda não chamada pela UI; sem webhook; sem Service Account real configurada para validar E2E neste ambiente.
 
 **Editado quando:** a Fase 2 (webhook, vínculos internos) for confirmada e implementada, ou se o suporte a conta pessoal (Gmail) precisar voltar (exigiria reintroduzir o fluxo OAuth em paralelo à Domain-Wide Delegation).
 
-**Última atualização:** 2026-07-17 por Scribe
+**Última atualização:** 2026-07-23 por Scribe
 
 ---
 

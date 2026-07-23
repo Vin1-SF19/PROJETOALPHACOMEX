@@ -1,5 +1,9 @@
 import { compareSync } from "bcryptjs";
 import db from "./prisma";
+import {
+  statusPermiteAcessoPainel,
+  STATUS_USUARIO_ATIVO,
+} from "./auth/acesso-painel";
 
 type User = {
   usuario: string;
@@ -23,13 +27,16 @@ export async function findUserByCredentials(
   senha: string,
 ): Promise<User | null> {
   const user = await db.usuarios.findFirst({
-    where: { email },
+    where: {
+      email,
+      status: STATUS_USUARIO_ATIVO,
+    },
     include: {
       presets: true,
     }
   });
 
-  if (!user) return null;
+  if (!user || !statusPermiteAcessoPainel(user.status)) return null;
 
   const presetId = (user as any).presets?.[0]?.id || null;
   const passwordMatch = await compareSync(senha, user.senha);

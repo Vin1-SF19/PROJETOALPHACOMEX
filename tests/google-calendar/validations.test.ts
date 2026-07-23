@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   atualizarEventoSchema,
+  atualizarEventoParcialSchema,
   cancelarEventoSchema,
   consultarFreeBusySchema,
   criarEventoSchema,
@@ -83,6 +84,114 @@ describe("atualizarEventoSchema", () => {
     expect(
       atualizarEventoSchema.safeParse({ ...BASE_EVENTO, googleEventId: "evt_123" }).success,
     ).toBe(true);
+  });
+});
+
+describe("atualizarEventoParcialSchema", () => {
+  const IDENTIFICADORES = {
+    calendarId: "primary",
+    googleEventId: "evt_123",
+  };
+
+  it("aceita alteração isolada de título sem exigir os demais detalhes do evento", () => {
+    const resultado = atualizarEventoParcialSchema.safeParse({
+      ...IDENTIFICADORES,
+      titulo: "Novo título",
+    });
+
+    expect(resultado.success).toBe(true);
+  });
+
+  it("exige ao menos um campo mutável além dos identificadores e do etag", () => {
+    expect(atualizarEventoParcialSchema.safeParse(IDENTIFICADORES).success).toBe(false);
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        etagConhecido: '"etag-1"',
+      }).success,
+    ).toBe(false);
+  });
+
+  it("exige início, fim e diaInteiro juntos em qualquer mudança temporal", () => {
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        inicio: "2026-07-24T13:00:00Z",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        inicio: "2026-07-24T13:00:00Z",
+        fim: "2026-07-24T14:00:00Z",
+        diaInteiro: false,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("valida intervalo e timezone quando a data é alterada", () => {
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        inicio: "2026-07-24T14:00:00Z",
+        fim: "2026-07-24T13:00:00Z",
+        diaInteiro: false,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        inicio: "2026-07-24T13:00:00Z",
+        fim: "2026-07-24T14:00:00Z",
+        diaInteiro: false,
+        timezone: "Timezone/Inexistente",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("não permite timezone isolado nem criarMeet false", () => {
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        timezone: "America/Sao_Paulo",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        criarMeet: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        criarMeet: true,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("permite limpar descrição, local e participantes de forma explícita", () => {
+    const resultado = atualizarEventoParcialSchema.safeParse({
+      ...IDENTIFICADORES,
+      descricaoGoogle: "",
+      localizacao: "",
+      participantes: [],
+    });
+
+    expect(resultado.success).toBe(true);
+  });
+
+  it("rejeita campos inesperados no payload da IA", () => {
+    expect(
+      atualizarEventoParcialSchema.safeParse({
+        ...IDENTIFICADORES,
+        titulo: "Reunião",
+        emailUsuario: "outra-pessoa@empresa.com",
+      }).success,
+    ).toBe(false);
   });
 });
 

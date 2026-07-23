@@ -1,8 +1,13 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { findUserByCredentials } from "@/lib/user";
+import {
+  bloquearTokenAcesso,
+  revalidarTokenAcesso,
+  STATUS_USUARIO_ATIVO,
+} from "@/lib/auth/acesso-painel";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const nextAuth = NextAuth({
   providers: [
     Credentials({
       credentials: {
@@ -36,6 +41,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           esconderBloqueados: (user as any).esconderBloqueados,
           bibble_ativo: (user as any).bibble_ativo ?? true,
           senhaTemporaria: !!(user as any).senhaTemporaria,
+          statusUsuario: STATUS_USUARIO_ATIVO,
+          acessoBloqueado: false,
         };
       },
     }),
@@ -76,7 +83,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.usuario = (user as any).usuario;
         token.bibble_ativo = (user as any).bibble_ativo ?? true;
         token.senhaTemporaria = !!(user as any).senhaTemporaria;
+        token.statusUsuario = STATUS_USUARIO_ATIVO;
+        token.acessoBloqueado = false;
+      } else {
+        token = await revalidarTokenAcesso(token);
+      }
 
+      if (token.acessoBloqueado) {
+        return bloquearTokenAcesso(token);
       }
 
       if (trigger === "update" && session?.user) {
@@ -93,6 +107,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
 
     async session({ session, token }) {
+      if (token.acessoBloqueado || !token.id) {
+        session.user = undefined as never;
+        session.acessoBloqueado = true;
+        return session;
+      }
+
       if (session.user) {
         session.user.id = token.id as string;
         session.user.nome = token.nome as string;
@@ -110,10 +130,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).usuario = token.usuario;
         (session.user as any).bibble_ativo = token.bibble_ativo ?? true;
         (session.user as any).senhaTemporaria = !!token.senhaTemporaria;
-
+        session.acessoBloqueado = false;
       }
 
       return session;
     },
   },
 });
+
+export const { handlers, signIn, signOut } = nextAuth;
+
+export async function authComEstadoAcesso() {
+  return nextAuth.auth();
+}
+
+export async function auth() {
+  const session = await authComEstadoAcesso();
+
+  if (session?.acessoBloqueado) {
+    return null;
+  }
+
+  return session;
+}

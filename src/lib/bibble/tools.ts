@@ -7,6 +7,7 @@ export interface OllamaTool {
       type: "object";
       properties: Record<string, { type: string; description: string }>;
       required: string[];
+      additionalProperties?: boolean;
     };
   };
 }
@@ -486,18 +487,33 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
   {
     type: "function",
     function: {
+      name: "listar_calendarios_calendario",
+      description:
+        "Lista os calendários configurados pelo usuário, com nome, visibilidade e permissão de escrita. Use antes de criar um evento quando houver dúvida sobre o destino.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "listar_eventos_calendario",
       description:
-        "Lista os próximos eventos da agenda Google do usuário (Calendário Alpha) — todos os calendários que ele marcou como visíveis. Use quando o usuário perguntar o que tem na agenda, o que vai fazer hoje/amanhã/semana, ou pedir um resumo de compromissos.",
+        "Lista eventos da agenda do usuário por intervalo exato ou quantidade de dias. Retorna id e etag para editar ou cancelar. Datas YYYY-MM-DD abrangem o dia inteiro em America/Sao_Paulo.",
       parameters: {
         type: "object",
         properties: {
-          dias_a_frente: {
-            type: "number",
-            description: "Quantos dias a partir de hoje considerar (padrão: 7, máximo: 60).",
-          },
+          dias_a_frente: { type: "number", description: "Dias a partir de agora (padrão 7, máximo 60)." },
+          data_inicio: { type: "string", description: "Início: YYYY-MM-DD ou ISO com offset." },
+          data_fim: { type: "string", description: "Fim: YYYY-MM-DD (dia incluído) ou ISO com offset." },
+          calendario_nome: { type: "string", description: "Nome do calendário; omitir para todos os visíveis." },
         },
         required: [],
+        additionalProperties: false,
       },
     },
   },
@@ -506,26 +522,48 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
     function: {
       name: "criar_evento_calendario",
       description:
-        "Cria um evento real na agenda Google do usuário (Calendário Alpha), no primeiro calendário gravável dele. Use quando o usuário pedir para marcar/agendar uma reunião, compromisso ou lembrete.",
+        "Cria um evento real na agenda do usuário. Se houver vários calendários graváveis sem principal identificável, retorna candidatos e exige calendario_nome.",
       parameters: {
         type: "object",
         properties: {
           titulo: { type: "string", description: "Título do evento." },
-          data_inicio: {
-            type: "string",
-            description: "Data/hora de início em formato ISO (ex: 2026-07-20T14:00:00-03:00) ou 'AAAA-MM-DD' se for dia inteiro.",
-          },
-          data_fim: {
-            type: "string",
-            description: "Data/hora de fim. Se omitido, assume 1 hora após o início (ou o mesmo dia, se for dia inteiro).",
-          },
-          dia_inteiro: { type: "boolean", description: "Verdadeiro se o evento for de dia inteiro, sem horário." },
-          descricao: { type: "string", description: "Descrição/observação do evento (opcional)." },
-          local: { type: "string", description: "Localização do evento (opcional)." },
-          participantes: { type: "string", description: "E-mails dos participantes, separados por vírgula (opcional)." },
-          criar_meet: { type: "boolean", description: "Verdadeiro para gerar um link do Google Meet (opcional)." },
+          data_inicio: { type: "string", description: "ISO com offset para horário ou YYYY-MM-DD para dia inteiro." },
+          data_fim: { type: "string", description: "Fim exclusivo; se omitido, assume 1 hora ou 1 dia." },
+          dia_inteiro: { type: "boolean", description: "true para evento sem horário." },
+          descricao: { type: "string", description: "Descrição opcional." },
+          local: { type: "string", description: "Local opcional." },
+          participantes: { type: "string", description: "E-mails separados por vírgula." },
+          criar_meet: { type: "boolean", description: "true para gerar Google Meet." },
+          calendario_nome: { type: "string", description: "Nome do calendário gravável." },
         },
         required: ["titulo", "data_inicio"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "editar_evento_calendario",
+      description:
+        "Edita evento do usuário pelo id da listagem. Para alterar data/hora, envie data_inicio, data_fim e dia_inteiro juntos. Envie etag para detectar conflito.",
+      parameters: {
+        type: "object",
+        properties: {
+          google_event_id: { type: "string", description: "ID retornado na listagem." },
+          etag: { type: "string", description: "ETag obrigatório da última leitura." },
+          titulo: { type: "string", description: "Novo título." },
+          data_inicio: { type: "string", description: "Novo início." },
+          data_fim: { type: "string", description: "Novo fim." },
+          dia_inteiro: { type: "boolean", description: "Novo tipo do evento." },
+          descricao: { type: "string", description: "Nova descrição; vazio remove." },
+          local: { type: "string", description: "Novo local; vazio remove." },
+          participantes: { type: "string", description: "Lista completa; vazio remove todos." },
+          criar_meet: { type: "boolean", description: "Envie somente true para criar Meet; omitir preserva." },
+          calendario_nome: { type: "string", description: "Nome do calendário se o ID for ambíguo." },
+        },
+        required: ["google_event_id", "etag"],
+        additionalProperties: false,
       },
     },
   },
@@ -534,13 +572,17 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
     function: {
       name: "cancelar_evento_calendario",
       description:
-        "Cancela um evento existente na agenda Google do usuário. Precisa do ID do evento — obtido antes via listar_eventos_calendario.",
+        "Cancela evento do usuário somente após confirmação explícita. Nesse caso, envie confirmado=true.",
       parameters: {
         type: "object",
         properties: {
-          google_event_id: { type: "string", description: "ID do evento no Google, retornado por listar_eventos_calendario." },
+          google_event_id: { type: "string", description: "ID retornado na listagem." },
+          etag: { type: "string", description: "ETag obrigatório da última leitura." },
+          calendario_nome: { type: "string", description: "Nome do calendário se o ID for ambíguo." },
+          confirmado: { type: "boolean", description: "Deve ser true após confirmação explícita." },
         },
-        required: ["google_event_id"],
+        required: ["google_event_id", "etag", "confirmado"],
+        additionalProperties: false,
       },
     },
   },
@@ -549,14 +591,16 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
     function: {
       name: "consultar_disponibilidade_calendario",
       description:
-        "Consulta se o usuário está livre ou ocupado num intervalo de tempo, sem revelar título/detalhe dos eventos. Use antes de sugerir um horário de reunião.",
+        "Consulta FreeBusy do usuário sem revelar detalhes. Datas devem ser ISO com offset.",
       parameters: {
         type: "object",
         properties: {
-          data_inicio: { type: "string", description: "Início do intervalo, formato ISO." },
-          data_fim: { type: "string", description: "Fim do intervalo, formato ISO." },
+          data_inicio: { type: "string", description: "Início em ISO com offset." },
+          data_fim: { type: "string", description: "Fim em ISO com offset." },
+          calendario_nome: { type: "string", description: "Nome; omitir para todos os visíveis." },
         },
         required: ["data_inicio", "data_fim"],
+        additionalProperties: false,
       },
     },
   },
@@ -565,14 +609,84 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
     function: {
       name: "consultar_agenda_colega",
       description:
-        "Consulta os próximos eventos da agenda Google de OUTRO colaborador (não do usuário atual). Só funciona se o colaborador já foi adicionado à lista de 'Colegas' do usuário no Calendário Alpha, OU se o usuário atual for Admin/CEO (que pode consultar qualquer colaborador).",
+        "Consulta eventos de outro colaborador. Usuários comuns só acessam colegas autorizados; Admin/CEO acessam qualquer colaborador ativo. Retorna id e etag.",
       parameters: {
         type: "object",
         properties: {
-          nome_ou_email: { type: "string", description: "Nome (ou parte do nome) ou e-mail do colaborador." },
-          dias_a_frente: { type: "number", description: "Quantos dias a partir de hoje considerar (padrão: 7, máximo: 60)." },
+          nome_ou_email: { type: "string", description: "Nome ou e-mail; ambiguidades retornam candidatos." },
+          dias_a_frente: { type: "number", description: "Dias a partir de agora (padrão 7, máximo 60)." },
+          data_inicio: { type: "string", description: "Início: YYYY-MM-DD ou ISO com offset." },
+          data_fim: { type: "string", description: "Fim: YYYY-MM-DD (dia incluído) ou ISO com offset." },
         },
         required: ["nome_ou_email"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "criar_evento_calendario_colega",
+      description: "Admin/CEO apenas: cria evento na agenda principal de um colaborador.",
+      parameters: {
+        type: "object",
+        properties: {
+          colega_nome_ou_email: { type: "string", description: "Nome ou e-mail do colaborador." },
+          titulo: { type: "string", description: "Título." },
+          data_inicio: { type: "string", description: "ISO com offset ou YYYY-MM-DD." },
+          data_fim: { type: "string", description: "Fim exclusivo." },
+          dia_inteiro: { type: "boolean", description: "true para dia inteiro." },
+          descricao: { type: "string", description: "Descrição." },
+          local: { type: "string", description: "Local." },
+          participantes: { type: "string", description: "E-mails separados por vírgula." },
+          criar_meet: { type: "boolean", description: "true para criar Meet." },
+        },
+        required: ["colega_nome_ou_email", "titulo", "data_inicio"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "editar_evento_calendario_colega",
+      description:
+        "Admin/CEO apenas: edita evento de um colaborador. Para alterar data/hora, envie data_inicio, data_fim e dia_inteiro juntos.",
+      parameters: {
+        type: "object",
+        properties: {
+          colega_nome_ou_email: { type: "string", description: "Nome ou e-mail." },
+          google_event_id: { type: "string", description: "ID retornado na consulta." },
+          etag: { type: "string", description: "ETag obrigatório da última leitura." },
+          titulo: { type: "string", description: "Novo título." },
+          data_inicio: { type: "string", description: "Novo início." },
+          data_fim: { type: "string", description: "Novo fim." },
+          dia_inteiro: { type: "boolean", description: "Novo tipo." },
+          descricao: { type: "string", description: "Nova descrição; vazio remove." },
+          local: { type: "string", description: "Novo local; vazio remove." },
+          participantes: { type: "string", description: "Lista completa; vazio remove todos." },
+          criar_meet: { type: "boolean", description: "Somente true; omitir preserva." },
+        },
+        required: ["colega_nome_ou_email", "google_event_id", "etag"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "cancelar_evento_calendario_colega",
+      description: "Admin/CEO apenas: cancela evento de colega após confirmação explícita.",
+      parameters: {
+        type: "object",
+        properties: {
+          colega_nome_ou_email: { type: "string", description: "Nome ou e-mail." },
+          google_event_id: { type: "string", description: "ID retornado na consulta." },
+          etag: { type: "string", description: "ETag obrigatório da última consulta." },
+          confirmado: { type: "boolean", description: "Deve ser true após confirmação explícita." },
+        },
+        required: ["colega_nome_ou_email", "google_event_id", "etag", "confirmado"],
+        additionalProperties: false,
       },
     },
   },

@@ -16,9 +16,12 @@ export async function middleware(req: NextRequest) {
       : "next-auth.session-token"
   });
 
-  const isLoggedIn = !!token;
+  const isLoggedIn = !!token && token.acessoBloqueado !== true;
 
-  if (pathname === "/" && isLoggedIn) {
+  const retornandoDeBloqueio =
+    req.nextUrl.searchParams.get("acesso") === "bloqueado";
+
+  if (pathname === "/" && isLoggedIn && !retornandoDeBloqueio) {
     return NextResponse.redirect(new URL("/PainelAlpha", req.nextUrl));
   }
 

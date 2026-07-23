@@ -40,6 +40,10 @@
       {
         "text": "O livro não é um registro de feitos por si só; ele faz parte da empresa guinness. Os recordes mais antigos datam do século XIX, focando em eventos esportivos como corridas.",
         "shown": 4
+      },
+      {
+        "text": "O livro de recordes do Guinness não rastreia apenas os feitos humanos; ele também registra primas quebras de limites em categorias diversas como culinária e esportes radicais. Algumas façanhas mais bizarras, porém lendárias, ainda estão documentadas em suas páginas.",
+        "shown": 1
       }
     ]
   },
@@ -747,7 +751,7 @@
       },
       {
         "text": "Os elétrons de um átomo não são estáticos; eles existem em movimento constante ao redor do núcleo. Essa energia em perpétuo fluxo é o que confere à matéria suas características únicas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1392,6 +1396,10 @@
       {
         "text": "A maioria das borboletas não consegue voar se seus casulos forem removidos de forma muito brusca. Elas também passam por um processo de metamorfose que as transforma em espécies completamente diferentes do seu estado larval.",
         "shown": 4
+      },
+      {
+        "text": "O pólen das asas é feito de minúsculos sacos chamados androconial, que funcionam como um perfume sexual para atrair machos. As borboletas não podem voar em correnteza de ar; elas precisam bater suas próprias asas para se manterem no movimento.",
+        "shown": 1
       }
     ]
   },
@@ -1436,6 +1444,10 @@
       {
         "text": "O sistema operacional Windows nunca foi feito para ser usado sozinho; sempre exigiu um hardware específico ao longo de sua história. As primeiras versões eram usadas por empresários, não pelo público geral.",
         "shown": 4
+      },
+      {
+        "text": "A versão original do sistema operacional não tinha o nome \"Windows\". A Apple foi a primeira empresa a usar graficamente menus e janelas, inspirando o conceito posteriormente adotado pela Microsoft.",
+        "shown": 1
       }
     ]
   },
@@ -1567,7 +1579,7 @@
       },
       {
         "text": "O músculo cardíaco é mais forte do que um motor de carro popular equivalente na mesma potência. Ele continua batendo mesmo quando desconectado do corpo por alguns minutos, mantido pela energia armazenada nos tecidos circundantes.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2115,7 +2127,7 @@
       },
       {
         "text": "A cor dos olhos não está ligada à melanina; ela é determinada por uma combinação de pigmentos. O nervo óptico, que leva os sinais visuais ao cérebro, começa na retina.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -3424,6 +3436,10 @@
       {
         "text": "Em regiões sísmicas ativas, superfícies de rocha podem acumular tensão por séculos antes de liberar energia em um único evento tremendo. Esses acúmulos são responsáveis pelos grandes tremores que moldam paisagens ao longo do tempo.",
         "shown": 4
+      },
+      {
+        "text": "O tsunami não é causado apenas por grandes tremores de terra. Deslizamentos massivos de terra também podem gerar ondas gigantes. Esses eventos são particularmente perigosos e imprevisíveis.",
+        "shown": 1
       }
     ]
   },
@@ -3455,7 +3471,7 @@
       },
       {
         "text": "Alguns manuscritos continham textos em línguas extintas e foram crucialmente importantes para entender civilizações perdidas. A conservação da tinta e do pergaminho revela muito sobre os materiais e o conhecimento de épocas distantes.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -3671,7 +3687,7 @@
       },
       {
         "text": "Os T-Rex tinha um chamado \"pêndulo caudal\" devido ao movimento de cauda para manter o equilíbrio enquanto corria ou virava. Ele não era tão ágil quanto se pensava, mas sua força bruta era incomparável no seu nicho ecológico.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },

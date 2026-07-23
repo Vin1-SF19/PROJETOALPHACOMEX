@@ -60,9 +60,96 @@ export const atualizarEventoSchema = refinarIntervalo(
 );
 export type AtualizarEventoInput = z.infer<typeof atualizarEventoSchema>;
 
+const atualizarEventoParcialBaseSchema = z
+  .object({
+    calendarId: z.string().trim().min(1).max(300),
+    googleEventId: z.string().trim().min(1).max(1024),
+    /** ETag conhecido pelo chamador. Quando presente, impede sobrescrita de uma versão mais nova. */
+    etagConhecido: z.string().trim().min(1).max(500).optional(),
+    titulo: z.string().trim().min(1, "Título não pode ficar vazio").max(300).optional(),
+    descricaoGoogle: z.string().trim().max(8000).optional(),
+    localizacao: z.string().trim().max(300).optional(),
+    timezone: timezoneSchema.optional(),
+    diaInteiro: z.boolean().optional(),
+    inicio: z.coerce.date().optional(),
+    fim: z.coerce.date().optional(),
+    participantes: z.array(emailParticipanteSchema).max(MAX_PARTICIPANTES).optional(),
+    /**
+     * A atualização parcial nunca remove uma conferência existente. O campo só pode ser enviado
+     * como `true`; para preservar o Meet atual, basta omiti-lo.
+     */
+    criarMeet: z
+      .boolean()
+      .optional()
+      .refine((valor): boolean => valor !== false, {
+        message: "Para preservar a conferência existente, omita criarMeet; envie apenas true para criar um Meet.",
+      }),
+  })
+  .strict();
+
+export const atualizarEventoParcialSchema = atualizarEventoParcialBaseSchema.superRefine((dados, contexto) => {
+  const camposTemporais = [dados.inicio, dados.fim, dados.diaInteiro];
+  const quantidadeCamposTemporais = camposTemporais.filter((campo) => campo !== undefined).length;
+  const possuiMudancaTemporal = quantidadeCamposTemporais > 0;
+
+  if (possuiMudancaTemporal && quantidadeCamposTemporais !== camposTemporais.length) {
+    for (const campo of ["inicio", "fim", "diaInteiro"] as const) {
+      if (dados[campo] === undefined) {
+        contexto.addIssue({
+          code: "custom",
+          message: "Início, fim e dia inteiro devem ser informados juntos.",
+          path: [campo],
+        });
+      }
+    }
+  }
+
+  if (dados.timezone !== undefined && !possuiMudancaTemporal) {
+    contexto.addIssue({
+      code: "custom",
+      message: "Timezone só pode ser alterado junto com início, fim e dia inteiro.",
+      path: ["timezone"],
+    });
+  }
+
+  if (dados.inicio && dados.fim) {
+    if (dados.fim.getTime() <= dados.inicio.getTime()) {
+      contexto.addIssue({
+        code: "custom",
+        message: "O fim deve ser posterior ao início.",
+        path: ["fim"],
+      });
+    } else if (dados.fim.getTime() - dados.inicio.getTime() > DURACAO_MAXIMA_EVENTO_MS) {
+      contexto.addIssue({
+        code: "custom",
+        message: "Duração máxima do evento é 30 dias.",
+        path: ["fim"],
+      });
+    }
+  }
+
+  const possuiCampoMutavel =
+    dados.titulo !== undefined ||
+    dados.descricaoGoogle !== undefined ||
+    dados.localizacao !== undefined ||
+    dados.participantes !== undefined ||
+    dados.criarMeet === true ||
+    possuiMudancaTemporal;
+
+  if (!possuiCampoMutavel) {
+    contexto.addIssue({
+      code: "custom",
+      message: "Informe ao menos um campo do evento para atualizar.",
+      path: [],
+    });
+  }
+});
+export type AtualizarEventoParcialInput = z.infer<typeof atualizarEventoParcialSchema>;
+
 export const cancelarEventoSchema = z.object({
   calendarId: z.string().trim().min(1).max(300),
   googleEventId: z.string().trim().min(1),
+  etagConhecido: z.string().trim().min(1).max(1024).optional(),
 });
 export type CancelarEventoInput = z.infer<typeof cancelarEventoSchema>;
 
