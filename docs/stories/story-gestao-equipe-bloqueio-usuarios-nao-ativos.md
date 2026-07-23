@@ -72,6 +72,11 @@ quality_gate_tools:
   - [x] Cobrir que a conta `ATIVO` mantém o comportamento existente.
   - [x] Executar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`.
 
+- [x] **Task 6 — Impedir login renderizado dentro de iframe após expiração da sessão** (AC: 4, 5)
+  - [x] Identificar o fluxo de redirecionamento que mantém `/` dentro das abas em iframe.
+  - [x] Fazer a expiração ou revogação da sessão redirecionar a janela principal para o login.
+  - [x] Cobrir o comportamento com teste automatizado sem afetar páginas públicas legítimas.
+
 ## Dev Notes
 
 ### Contexto técnico verificado
@@ -164,6 +169,7 @@ quality_gate_tools:
 |---|---:|---|---|
 | 2026-07-23 | 1.0 | Story criada e validada para desenvolvimento | River (SM) |
 | 2026-07-23 | 1.1 | Regra central de acesso por status, revogação de JWT e heartbeat implementados | Dex (Dev) |
+| 2026-07-23 | 1.2 | Corrigido redirecionamento de sessão expirada dentro das abas em iframe | Dex (Dev) |
 
 ## Dev Agent Record
 
@@ -174,7 +180,8 @@ GPT-5.6 Codex
 ### Debug Log References
 
 - `npx vitest run tests/auth` — 3 arquivos e 24 testes aprovados.
-- `npm test` — 19 arquivos e 146 testes aprovados.
+- `npx vitest run tests/auth` — 4 arquivos e 29 testes aprovados após a correção dos iframes.
+- `npm test` — 20 arquivos e 151 testes aprovados.
 - ESLint focado nos arquivos novos/alterados sem débitos legados — aprovado.
 - `npm run typecheck` — mantém quatro erros preexistentes fora desta implementação.
 - `npm run build` — bloqueado no `prisma generate` por `EPERM` na DLL em uso; `npx next build` aprovado.
@@ -187,6 +194,8 @@ GPT-5.6 Codex
 - O wrapper público de autenticação retorna sessão nula para páginas, APIs e Server Actions quando o token foi bloqueado.
 - O heartbeat responde `403` para sessão revogada e o cliente executa logout/redirecionamento automático.
 - O layout privado faz uma verificação adicional e evita loop de redirecionamento durante a limpeza do cookie.
+- O carregamento de `/` dentro de uma aba em iframe agora encerra a sessão na janela principal imediatamente.
+- O heartbeat diferencia usuário anônimo de uma janela previamente autenticada e trata também expiração natural com `401`.
 - Nenhuma mudança de schema, migration ou mutação em massa foi realizada.
 
 ### File List
@@ -198,11 +207,13 @@ GPT-5.6 Codex
 - `src/components/Colaboradores/ModalPerfilColaborador.tsx`
 - `src/components/Heartbeat.tsx`
 - `src/lib/auth/acesso-painel.ts`
+- `src/lib/auth/navegacao-sessao.ts`
 - `src/lib/user.ts`
 - `src/types/next-auth.d.ts`
 - `tests/auth/acesso-painel.test.ts`
 - `tests/auth/credenciais-status.test.ts`
 - `tests/auth/heartbeat-status.test.ts`
+- `tests/auth/navegacao-sessao.test.ts`
 - `docs/qa/coderabbit-reports/story-gestao-equipe-bloqueio-status.md`
 - `docs/stories/story-gestao-equipe-bloqueio-usuarios-nao-ativos.md`
 

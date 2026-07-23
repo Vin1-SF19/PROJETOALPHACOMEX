@@ -15,6 +15,8 @@ import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
 import BibbleWeatherWidget from '@/components/BibbleChatHome/BibbleWeatherWidget';
 import OnboardingModal from './OnboardingModal';
 import type { OnboardingVideo } from '@/lib/onboarding';
+import { signOut } from 'next-auth/react';
+import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +104,7 @@ export default function PainelLayoutClient({
   const [initIframeLoaded, setInitIframeLoaded] = useState(false);
   const initTabIdRef = useRef<string>('');
   const initialPathnameRef = useRef(pathname);
+  const encerrandoSessaoRef = useRef(false);
 
   // Initialize: restore from localStorage or create from current URL
   useEffect(() => {
@@ -293,8 +296,21 @@ export default function PainelLayoutClient({
                 title={tab.label}
                 className="w-full h-full border-none absolute inset-0"
                 style={{ display: visible ? 'block' : 'none' }}
-                onLoad={() => {
+                onLoad={(event) => {
                   if (isInitTab) setInitIframeLoaded(true);
+                  try {
+                    const href = event.currentTarget.contentWindow?.location.href;
+                    if (
+                      href &&
+                      urlRepresentaLoginDoPainel(href, window.location.origin) &&
+                      !encerrandoSessaoRef.current
+                    ) {
+                      encerrandoSessaoRef.current = true;
+                      void signOut({ redirectTo: '/' });
+                    }
+                  } catch {
+                    // Um iframe cross-origin não participa da autenticação do painel.
+                  }
                 }}
               />
             );

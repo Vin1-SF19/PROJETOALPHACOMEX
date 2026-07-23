@@ -9,6 +9,8 @@ Windows Subsystem for Linux (WSL) não está instalado. A tentativa de executar
 `coderabbit auth status` foi interrompida pelo próprio Windows antes de iniciar
 o CodeRabbit.
 
+O bloqueio foi confirmado novamente após a correção de navegação dos iframes.
+
 | Severidade | Quantidade | Status |
 |---|---:|---|
 | CRITICAL | N/A | Não avaliado |
