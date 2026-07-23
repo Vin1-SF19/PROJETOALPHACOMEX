@@ -406,27 +406,44 @@ export async function buscarServicoContratadoPorCliente(cnpj: string, servicos: 
   );
 }
 
+function normalizarDataRegistro(valor: string): Date {
+  const data = /^\d{4}-\d{2}-\d{2}$/.test(valor)
+    ? new Date(`${valor}T12:00:00`)
+    : new Date(valor);
+
+  if (Number.isNaN(data.getTime())) {
+    throw new Error("Data de registro inválida");
+  }
+
+  return data;
+}
+
+function mensagemDoErro(error: unknown): string {
+  return error instanceof Error ? error.message : "Erro inesperado";
+}
+
 export async function salvarLogCS(clienteId: number, dados: { sentimento: string, observacao: string, data_registro: string }) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
     const colaborador = await getColaboradorNome();
-    await db.$executeRawUnsafe(
-      `INSERT INTO log_cs (colaborador, sentimento, observacao, clienteId, dataRegistro)
-         VALUES (?, ?, ?, ?, ?)`,
-      colaborador,
-      dados.sentimento,
-      dados.observacao,
-      clienteId,
-      dados.data_registro 
-    );
+    const novoLog = await db.log_cs.create({
+      data: {
+        colaborador,
+        sentimento: dados.sentimento,
+        observacao: dados.observacao,
+        clienteId,
+        dataRegistro: normalizarDataRegistro(dados.data_registro),
+      },
+    });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
-    return { success: true };
-  } catch (error: any) {
-    console.error("ERRO NO SQL AO SALVAR CS:", error.message);
-    return { success: false, error: "Erro crítico no banco." };
+    return { success: true, data: novoLog };
+  } catch (error: unknown) {
+    const mensagem = mensagemDoErro(error);
+    console.error("ERRO AO SALVAR CS:", mensagem);
+    return { success: false, error: mensagem };
   }
 }
 
@@ -448,7 +465,10 @@ export async function atualizarDadosGestao(clienteId: number, dados: any) {
   }
 }
 
-export async function salvarLogFeedback(clienteId: number, dados: any) {
+export async function salvarLogFeedback(
+  clienteId: number,
+  dados: { sentimento?: string; observacao?: string; data_registro: string },
+) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
@@ -456,23 +476,22 @@ export async function salvarLogFeedback(clienteId: number, dados: any) {
     const colaborador = await getColaboradorNome();
     const sentimento = dados.sentimento || "N/A";
     const observacao = dados.observacao || "";
-    const dataRegistro = dados.data_registro; 
-
-    await db.$executeRawUnsafe(
-      `INSERT INTO logFeedback (colaborador, sentimento, observacao, clienteId, dataRegistro) 
-       VALUES (?, ?, ?, ?, ?)`,
-      colaborador,
-      sentimento,
-      observacao,
-      Number(clienteId),
-      dataRegistro 
-    );
+    const novoLog = await db.logFeedback.create({
+      data: {
+        colaborador,
+        sentimento,
+        observacao,
+        clienteId: Number(clienteId),
+        dataRegistro: normalizarDataRegistro(dados.data_registro),
+      },
+    });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
-    return { success: true };
-  } catch (error: any) {
-    console.error("ERRO CRÍTICO FEEDBACK:", error.message);
-    return { success: false, error: error.message };
+    return { success: true, data: novoLog };
+  } catch (error: unknown) {
+    const mensagem = mensagemDoErro(error);
+    console.error("ERRO AO SALVAR FEEDBACK:", mensagem);
+    return { success: false, error: mensagem };
   }
 }
 
@@ -711,18 +730,41 @@ export async function atualizarLogCS(logId: number, dados: { sentimento: string;
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    await db.log_cs.update({
+    const logAtualizado = await db.log_cs.update({
       where: { id: logId },
       data: {
         sentimento: dados.sentimento,
         observacao: dados.observacao,
-        ...(dados.dataRegistro ? { dataRegistro: new Date(`${dados.dataRegistro}T12:00:00`) } : {}),
+        ...(dados.dataRegistro ? { dataRegistro: normalizarDataRegistro(dados.dataRegistro) } : {}),
       },
     });
     revalidatePath("/PainelAlpha/CadastroClientes");
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: true, data: logAtualizado };
+  } catch (error: unknown) {
+    return { success: false, error: mensagemDoErro(error) };
+  }
+}
+
+export async function atualizarLogFeedback(
+  logId: number,
+  dados: { sentimento: string; observacao: string; dataRegistro?: string },
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
+    const logAtualizado = await db.logFeedback.update({
+      where: { id: logId },
+      data: {
+        sentimento: dados.sentimento,
+        observacao: dados.observacao,
+        ...(dados.dataRegistro ? { dataRegistro: normalizarDataRegistro(dados.dataRegistro) } : {}),
+      },
+    });
+    revalidatePath("/PainelAlpha/CadastroClientes");
+    return { success: true, data: logAtualizado };
+  } catch (error: unknown) {
+    return { success: false, error: mensagemDoErro(error) };
   }
 }
 

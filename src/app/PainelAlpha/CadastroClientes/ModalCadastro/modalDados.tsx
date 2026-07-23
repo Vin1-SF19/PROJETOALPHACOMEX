@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from "react-dom";
 import { fmtDate, fmtDateTime } from "@/lib/format-date";
-import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle, Briefcase, Wallet, CreditCard, UserCircle2 } from "lucide-react";
-import { adicionarSocio, atualizarLogCS, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, salvarAlteracoesGeral, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
+import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle, Briefcase, Wallet, CreditCard, UserCircle2, Loader2 } from "lucide-react";
+import { adicionarSocio, atualizarLogCS, atualizarLogFeedback, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, salvarAlteracoesGeral, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
 import { toast } from 'sonner';
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -127,16 +128,25 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [showConfirmarOcultar, setShowConfirmarOcultar] = useState(false);
 
     const router = useRouter();
+    const portalTarget = typeof document === "undefined" ? null : document.body;
     const [showNovoCS, setShowNovoCS] = useState(false);
     const [status, setStatus] = useState(cliente?.status || "Em Andamento");
     const [feedbackCS, setFeedbackCS] = useState<"pos" | "neg" | "na" | null>(null);
     const [sentimentoFeedback, setSentimentoFeedback] = useState<"pos" | "neg" | "na" | null>(null);
     const [obsCS, setObsCS] = useState("");
+    const [salvandoNovoCS, setSalvandoNovoCS] = useState(false);
 
     const [nps, setNps] = useState<number | null>(cliente?.nps ?? null);
     const [feedbackSim, setFeedbackSim] = useState(cliente?.feedbackGoogle ?? false);
     const [nomeFeedback, setNomeFeedback] = useState("");
     const [showNovoFeedback, setShowNovoFeedback] = useState(false);
+    const [salvandoFeedback, setSalvandoFeedback] = useState(false);
+    const [showEditFeedback, setShowEditFeedback] = useState(false);
+    const [feedbackEditando, setFeedbackEditando] = useState<ClienteCS["logFeedback"][number] | null>(null);
+    const [feedbackEditSentimento, setFeedbackEditSentimento] = useState<"pos" | "neg" | "na" | null>(null);
+    const [feedbackEditObs, setFeedbackEditObs] = useState("");
+    const [feedbackEditData, setFeedbackEditData] = useState("");
+    const [salvandoEdicaoFeedback, setSalvandoEdicaoFeedback] = useState(false);
 
     const [listaLogsFeedback, setListaLogsFeedback] = useState<any[]>(cliente?.logFeedback ?? []);
     const [editandoDados, setEditandoDados] = useState(false);
@@ -200,6 +210,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [csEditSentimento, setCsEditSentimento] = useState<"pos" | "neg" | "na" | null>(null);
     const [csEditObs, setCsEditObs] = useState("");
     const [csEditData, setCsEditData] = useState("");
+    const [salvandoEdicaoCS, setSalvandoEdicaoCS] = useState(false);
 
 
     useEffect(() => {
@@ -217,26 +228,40 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
 
 
-    const handleSalvarCS = () => {
+    const handleSalvarCS = async () => {
         if (!feedbackCS || obsCS.length < 10) return toast.error("Dados inválidos");
+        if (salvandoNovoCS) return;
 
-        const dataSelecionada = new Date(`${dataCS}T12:00:00`).toISOString();
+        setSalvandoNovoCS(true);
+        try {
+            const dataSelecionada = new Date(`${dataCS}T12:00:00`).toISOString();
+            const res = await salvarLogCS(cliente!.id, {
+                sentimento: feedbackCS,
+                observacao: obsCS,
+                data_registro: dataSelecionada,
+            });
 
-        const novoLog = {
-            id: -Date.now(),
-            sentimento: feedbackCS,
-            observacao: obsCS,
-            data_registro: dataSelecionada,
-            _pendente: "criar" as const,
-        };
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível salvar o CS.");
+                return;
+            }
 
-        setListaLogsCS((prev: any[]) => [novoLog, ...prev]);
-
-        setShowNovoCS(false);
-        setObsCS("");
-        setFeedbackCS(null);
-        setDataCS(new Date().toISOString().split('T')[0]);
-        toast.info("CS adicionado ao rascunho — clique em Salvar Alterações para confirmar.");
+            setListaLogsCS((prev) => [res.data, ...prev]);
+            setShowNovoCS(false);
+            setObsCS("");
+            setFeedbackCS(null);
+            setDataCS(new Date().toISOString().split('T')[0]);
+            toast.success("CS registrado!");
+            try {
+                if (aoSalvar) await aoSalvar();
+            } catch {
+                router.refresh();
+            }
+        } catch {
+            toast.error("Falha na conexão ao salvar o CS.");
+        } finally {
+            setSalvandoNovoCS(false);
+        }
     };
 
     const handleExcluirCS = async (logId: number) => {
@@ -278,12 +303,9 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     }, [cliente?.id, isOpen]);
 
     /**
-     * Adicionar/editar sócio, CS e feedback deixaram de gravar na hora — ficam
-     * como rascunho local (`_pendente: "criar" | "editar"`) até o usuário clicar
-     * no único botão "Salvar Alterações" do rodapé (`handleSalvarTudo`), que
-     * executa todas as pendências de uma vez. Ver `decisions.md` — unificação
-     * pedida pelo usuário após bug de dados desatualizados sobrescrevendo uns
-     * aos outros entre botões de salvar independentes.
+     * Sócios continuam como rascunho local até o botão geral do rodapé.
+     * CS e feedback têm modais próprios e persistem imediatamente em seus
+     * respectivos botões, evitando que o usuário precise salvar duas vezes.
      */
     const handleAdicionarSocio = () => {
         if (!novoSocio.nome) return toast.error("Nome é obrigatório");
@@ -327,20 +349,39 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         setShowEditCS(true);
     };
 
-    const handleSalvarEditCS = () => {
+    const handleSalvarEditCS = async () => {
         if (!csEditSentimento || csEditObs.length < 10) return toast.error("Dados inválidos");
-        setListaLogsCS(prev => prev.map(l => l.id === csEditando.id
-            ? {
-                ...l,
+        if (salvandoEdicaoCS) return;
+
+        setSalvandoEdicaoCS(true);
+        try {
+            const res = await atualizarLogCS(csEditando.id, {
                 sentimento: csEditSentimento,
                 observacao: csEditObs,
-                data_registro: csEditData ? new Date(`${csEditData}T12:00:00`).toISOString() : l.data_registro,
-                _pendente: l._pendente === "criar" ? "criar" as const : "editar" as const,
+                dataRegistro: csEditData,
+            });
+
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível atualizar o CS.");
+                return;
             }
-            : l));
-        setShowEditCS(false);
-        setCsEditando(null);
-        toast.info("Edição de CS adicionada ao rascunho — clique em Salvar Alterações para confirmar.");
+
+            setListaLogsCS(prev => prev.map(l => l.id === csEditando.id
+                ? { ...l, ...res.data }
+                : l));
+            setShowEditCS(false);
+            setCsEditando(null);
+            toast.success("CS atualizado!");
+            try {
+                if (aoSalvar) await aoSalvar();
+            } catch {
+                router.refresh();
+            }
+        } catch {
+            toast.error("Falha na conexão ao atualizar o CS.");
+        } finally {
+            setSalvandoEdicaoCS(false);
+        }
     };
 
     // Inicializa o formulário de gestão de CADA card (registro) quando o modal abre/o grupo muda.
@@ -475,26 +516,95 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         }
     };
 
-    const handleSalvarFeedback = () => {
+    const handleSalvarFeedback = async () => {
         if (!sentimentoFeedback || !isTextoValido(obsFeedback)) return;
+        if (salvandoFeedback) return;
 
-        const dataSelecionada = new Date(`${dataFeedback}T12:00:00`).toISOString();
+        setSalvandoFeedback(true);
+        try {
+            const dataSelecionada = new Date(`${dataFeedback}T12:00:00`).toISOString();
+            const res = await salvarLogFeedback(cliente!.id, {
+                sentimento: sentimentoFeedback,
+                observacao: obsFeedback,
+                data_registro: dataSelecionada,
+            });
 
-        const novoLog = {
-            id: -Date.now(),
-            sentimento: sentimentoFeedback,
-            observacao: obsFeedback,
-            data_registro: dataSelecionada,
-            _pendente: "criar" as const,
-        };
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível salvar o feedback.");
+                return;
+            }
 
-        setListaLogsFeedback((prev: any[]) => [novoLog, ...prev]);
+            setListaLogsFeedback((prev) => [res.data, ...prev]);
+            setShowNovoFeedback(false);
+            setObsFeedback("");
+            setSentimentoFeedback(null);
+            setDataFeedback(new Date().toISOString().split('T')[0]);
+            toast.success("Pedido registrado!");
+            try {
+                if (aoSalvar) await aoSalvar();
+            } catch {
+                router.refresh();
+            }
+        } catch {
+            toast.error("Falha na conexão ao salvar o feedback.");
+        } finally {
+            setSalvandoFeedback(false);
+        }
+    };
 
-        setShowNovoFeedback(false);
-        setObsFeedback("");
-        setSentimentoFeedback(null);
-        setDataFeedback(new Date().toISOString().split('T')[0]);
-        toast.info("Pedido de feedback adicionado ao rascunho — clique em Salvar Alterações para confirmar.");
+    const handleAbrirEditFeedback = (log: ClienteCS["logFeedback"][number]) => {
+        setFeedbackEditando(log);
+        setFeedbackEditSentimento(
+            log.sentimento === "pos" || log.sentimento === "neg" || log.sentimento === "na"
+                ? log.sentimento
+                : null
+        );
+        setFeedbackEditObs(log.observacao || "");
+        const dataRaw = log.dataRegistro;
+        if (dataRaw) {
+            const data = new Date(dataRaw);
+            setFeedbackEditData(!Number.isNaN(data.getTime()) ? data.toISOString().split("T")[0] : "");
+        } else {
+            setFeedbackEditData("");
+        }
+        setShowEditFeedback(true);
+    };
+
+    const handleSalvarEditFeedback = async () => {
+        if (!feedbackEditando || !feedbackEditSentimento || !isTextoValido(feedbackEditObs)) {
+            return toast.error("Dados inválidos");
+        }
+        if (salvandoEdicaoFeedback) return;
+
+        setSalvandoEdicaoFeedback(true);
+        try {
+            const res = await atualizarLogFeedback(feedbackEditando.id, {
+                sentimento: feedbackEditSentimento,
+                observacao: feedbackEditObs,
+                dataRegistro: feedbackEditData,
+            });
+
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível atualizar o feedback.");
+                return;
+            }
+
+            setListaLogsFeedback((prev) => prev.map((log) =>
+                log.id === feedbackEditando.id ? { ...log, ...res.data } : log
+            ));
+            setShowEditFeedback(false);
+            setFeedbackEditando(null);
+            toast.success("Feedback atualizado!");
+            try {
+                if (aoSalvar) await aoSalvar();
+            } catch {
+                router.refresh();
+            }
+        } catch {
+            toast.error("Falha na conexão ao atualizar o feedback.");
+        } finally {
+            setSalvandoEdicaoFeedback(false);
+        }
     };
 
     const handleExcluirFeedback = async (logId: number) => {
@@ -527,7 +637,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     /**
      * Salva TUDO que foi editado no modal de uma vez só — dados fiscais do
      * registro principal, o card de gestão de CADA serviço contratado, e as
-     * pendências locais de sócios/CS/feedback (`_pendente: "criar"|"editar"`).
+     * pendências locais de sócios (`_pendente: "criar"|"editar"`).
      * Único botão de salvar do modal ("Salvar Alterações" no rodapé) — ver
      * `decisions.md` sobre a unificação. Antes, "Salvar Alterações" e "Salvar
      * Serviço" eram botões independentes que chamavam `salvarAlteracoesGeral`
@@ -627,43 +737,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     setListaSocios((prev) => prev.map((x) => x.id === s.id ? { ...x, _pendente: undefined } : x));
                 } else {
                     falhas.push(`sócio "${s.nome}"`);
-                }
-            }
-        }
-
-        // 4) Logs de CS pendentes (criar/editar).
-        for (const log of listaLogsCS) {
-            if (log._pendente === "criar") {
-                const res = await salvarLogCS(cliente!.id, {
-                    sentimento: log.sentimento, observacao: log.observacao, data_registro: log.data_registro,
-                });
-                if (res.success) {
-                    setListaLogsCS((prev) => prev.map((l) => l.id === log.id ? { ...l, _pendente: undefined } : l));
-                } else {
-                    falhas.push("registro de CS");
-                }
-            } else if (log._pendente === "editar") {
-                const res = await atualizarLogCS(log.id, {
-                    sentimento: log.sentimento, observacao: log.observacao, dataRegistro: log.data_registro,
-                });
-                if (res.success) {
-                    setListaLogsCS((prev) => prev.map((l) => l.id === log.id ? { ...l, _pendente: undefined } : l));
-                } else {
-                    falhas.push("edição de CS");
-                }
-            }
-        }
-
-        // 5) Logs de Feedback pendentes (só criação — exclusão continua imediata, é ação destrutiva à parte).
-        for (const log of listaLogsFeedback) {
-            if (log._pendente === "criar") {
-                const res = await salvarLogFeedback(cliente!.id, {
-                    sentimento: log.sentimento, observacao: log.observacao, data_registro: log.data_registro,
-                });
-                if (res.success) {
-                    setListaLogsFeedback((prev) => prev.map((l) => l.id === log.id ? { ...l, _pendente: undefined } : l));
-                } else {
-                    falhas.push("pedido de feedback");
                 }
             }
         }
@@ -1581,10 +1654,20 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                     </p>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <div className="flex items-center justify-center">
+                                                    <div className="flex items-center justify-center gap-1">
                                                         <button
+                                                            type="button"
+                                                            onClick={() => handleAbrirEditFeedback(log)}
+                                                            className="cursor-pointer p-2 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-xl transition-all active:scale-90"
+                                                            title="Editar Feedback"
+                                                        >
+                                                            <Edit3 size={15} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
                                                             onClick={() => handleExcluirFeedback(log.id)}
                                                             className="cursor-pointer p-2 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all active:scale-90"
+                                                            title="Excluir Feedback"
                                                         >
                                                             <Trash2 size={16} />
                                                         </button>
@@ -1624,15 +1707,21 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     </button>
                 </div>
 
-                {showNovoCS && (
+                {showNovoCS && portalTarget && createPortal(
                     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
                         <CsNpsModal3DShell className="relative bg-slate-900 border border-white/10 w-full max-w-md rounded-[2rem] p-8 shadow-3xl">
                             <div className="flex justify-between items-center mb-6">
                                 <h4 className="text-lg font-black text-white uppercase">Novo <span className="text-emerald-500">CS</span></h4>
-                                <button onClick={() => setShowNovoCS(false)}><X size={20} className="cursor-pointer text-slate-500" /></button>
+                                <button type="button" onClick={() => setShowNovoCS(false)}><X size={20} className="cursor-pointer text-slate-500" /></button>
                             </div>
 
-                            <div className="space-y-6">
+                            <form
+                                className="space-y-6"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    void handleSalvarCS();
+                                }}
+                            >
 
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-end px-1">
@@ -1666,6 +1755,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                     <div className="flex justify-between items-center gap-4">
                                         {/* POSITIVO */}
                                         <button
+                                            type="button"
                                             onClick={() => setFeedbackCS("pos")}
                                             className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${feedbackCS === "pos" ? "bg-emerald-500/20 border-emerald-500 text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]" : "bg-slate-950 border-white/5 text-slate-600 hover:text-white"}`}
                                         >
@@ -1674,6 +1764,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                                         {/* NEGATIVO */}
                                         <button
+                                            type="button"
                                             onClick={() => setFeedbackCS("neg")}
                                             className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${feedbackCS === "neg" ? "bg-rose-500/20 border-rose-500 text-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.2)]" : "bg-slate-950 border-white/5 text-slate-600 hover:text-white"}`}
                                         >
@@ -1682,6 +1773,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                                         {/* N/A - SEM RESPOSTA */}
                                         <button
+                                            type="button"
                                             onClick={() => setFeedbackCS("na")}
                                             className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${feedbackCS === "na" ? "bg-slate-700 border-white/30 text-white" : "bg-slate-950 border-white/5 text-slate-600 hover:text-white"}`}
                                         >
@@ -1706,6 +1798,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 <div className="flex gap-3 pt-4">
                                     {/* BOTÃO CANCELAR */}
                                     <button
+                                        type="button"
                                         onClick={() => {
                                             setShowNovoCS(false);
                                             setObsCS("");
@@ -1720,17 +1813,17 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                                     {/* BOTÃO SALVAR CS */}
                                     <button
-
-                                        onClick={handleSalvarCS}
-                                        disabled={!isTextoValido(obsCS) || !feedbackCS}
-                                        className="cursor-pointer flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        type="submit"
+                                        disabled={!isTextoValido(obsCS) || !feedbackCS || salvandoNovoCS}
+                                        className="cursor-pointer flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                                     >
-                                        Adicionar CS
+                                        {salvandoNovoCS ? <><Loader2 size={14} className="animate-spin" /> Salvando...</> : "Salvar CS"}
                                     </button>
                                 </div>
-                            </div>
+                            </form>
                         </CsNpsModal3DShell>
-                    </div>
+                    </div>,
+                    portalTarget,
                 )}
             </CsNpsModal3DShell>
 
@@ -1745,10 +1838,16 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 <h4 className="text-xl font-black text-white uppercase italic tracking-tighter">Solicitar <span className="text-blue-500">Google</span></h4>
                             </div>
 
-                            <button onClick={() => { setShowNovoFeedback(false); setObsFeedback(""); setSentimentoFeedback(null); }} className="cursor-pointer text-slate-500 hover:text-white"><X size={24} /></button>
+                            <button type="button" onClick={() => { setShowNovoFeedback(false); setObsFeedback(""); setSentimentoFeedback(null); }} className="cursor-pointer text-slate-500 hover:text-white"><X size={24} /></button>
                         </div>
 
-                        <div className="space-y-8">
+                        <form
+                            className="space-y-8"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void handleSalvarFeedback();
+                            }}
+                        >
                             {/* BOTÕES DE SENTIMENTO */}
                             <div className="space-y-3">
                                 <label className="text-[10px] font-black uppercase text-slate-500 block text-center tracking-widest">Sentimento do Cliente</label>
@@ -1760,6 +1859,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                     ].map((btn) => (
                                         <button
                                             key={btn.id}
+                                            type="button"
                                             onClick={() => setSentimentoFeedback(btn.id as any)}
                                             className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 
                                                 ${sentimentoFeedback === btn.id
@@ -1800,18 +1900,151 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                             </div>
 
                             <div className="flex gap-4">
-                                <button onClick={() => setShowNovoFeedback(false)} className="cursor-pointer flex-1 py-4 bg-slate-900 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors">Cancelar</button>
+                                <button type="button" onClick={() => setShowNovoFeedback(false)} className="cursor-pointer flex-1 py-4 bg-slate-900 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors">Cancelar</button>
                                 <button
-                                    onClick={handleSalvarFeedback}
-                                    disabled={!isTextoValido(obsFeedback) || !sentimentoFeedback}
-                                    className="cursor-pointer flex-1 py-4 bg-blue-600 disabled:bg-slate-800/50 disabled:text-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-900/20 active:scale-95 transition-all"
+                                    type="submit"
+                                    disabled={!isTextoValido(obsFeedback) || !sentimentoFeedback || salvandoFeedback}
+                                    className="cursor-pointer flex-1 py-4 bg-blue-600 disabled:bg-slate-800/50 disabled:text-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-900/20 active:scale-95 transition-all inline-flex items-center justify-center gap-2"
                                 >
-                                    Confirmar Pedido
+                                    {salvandoFeedback ? <><Loader2 size={14} className="animate-spin" /> Salvando...</> : "Confirmar Pedido"}
                                 </button>
                             </div>
-                        </div>
+                        </form>
                     </CsNpsModal3DShell>
                 </div>
+            )}
+
+            {showEditFeedback && feedbackEditando && portalTarget && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+                    <CsNpsModal3DShell className="relative bg-[#0f172a] border border-blue-500/20 w-full max-w-md rounded-[2.5rem] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                        <div className="flex justify-between items-center mb-8">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500/20 rounded-xl">
+                                    <Edit3 className="text-blue-400 w-5 h-5" />
+                                </div>
+                                <h4 className="text-xl font-black text-white uppercase italic tracking-tighter">
+                                    Editar <span className="text-blue-500">Feedback</span>
+                                </h4>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowEditFeedback(false);
+                                    setFeedbackEditando(null);
+                                }}
+                                className="cursor-pointer text-slate-500 hover:text-white"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <form
+                            className="space-y-8"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void handleSalvarEditFeedback();
+                            }}
+                        >
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase text-slate-500 block text-center tracking-widest">
+                                    Sentimento do Cliente
+                                </label>
+                                <div className="flex justify-between gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFeedbackEditSentimento("pos")}
+                                        className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                                            feedbackEditSentimento === "pos"
+                                                ? "bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg"
+                                                : "bg-slate-950 border-white/5 text-slate-600 hover:border-white/10"
+                                        }`}
+                                    >
+                                        <ThumbsUp size={20} />
+                                        <span className="text-[9px] font-black uppercase">Positivo</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFeedbackEditSentimento("neg")}
+                                        className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                                            feedbackEditSentimento === "neg"
+                                                ? "bg-rose-500/10 border-rose-500 text-rose-400 shadow-lg"
+                                                : "bg-slate-950 border-white/5 text-slate-600 hover:border-white/10"
+                                        }`}
+                                    >
+                                        <ThumbsDown size={20} />
+                                        <span className="text-[9px] font-black uppercase">Negativo</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFeedbackEditSentimento("na")}
+                                        className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                                            feedbackEditSentimento === "na"
+                                                ? "bg-slate-700 border-white/30 text-white shadow-lg"
+                                                : "bg-slate-950 border-white/5 text-slate-600 hover:border-white/10"
+                                        }`}
+                                    >
+                                        <Minus size={20} />
+                                        <span className="text-[9px] font-black uppercase">N/A</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center px-1">
+                                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                                        Observação
+                                    </label>
+                                    <span className={`text-[10px] font-mono font-bold ${
+                                        isTextoValido(feedbackEditObs) ? "text-blue-400" : "text-rose-500"
+                                    }`}>
+                                        {feedbackEditObs.length}/140
+                                    </span>
+                                </div>
+                                <textarea
+                                    value={feedbackEditObs}
+                                    onChange={(event) => setFeedbackEditObs(event.target.value)}
+                                    className={`w-full bg-slate-950 border-2 rounded-2xl p-4 text-sm text-white min-h-[100px] outline-none transition-all resize-none ${
+                                        feedbackEditObs.length > 0 && !isTextoValido(feedbackEditObs)
+                                            ? "border-rose-500/30"
+                                            : "border-slate-800 focus:border-blue-500"
+                                    }`}
+                                    placeholder="Atualize a observação do feedback..."
+                                />
+                            </div>
+
+                            <input
+                                type="date"
+                                value={feedbackEditData}
+                                onChange={(event) => setFeedbackEditData(event.target.value)}
+                                className="w-full bg-slate-950 border-2 border-slate-800 rounded-2xl p-4 text-sm text-white outline-none transition-all focus:border-blue-500 [color-scheme:dark] cursor-pointer font-bold"
+                            />
+
+                            <div className="flex gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowEditFeedback(false);
+                                        setFeedbackEditando(null);
+                                    }}
+                                    disabled={salvandoEdicaoFeedback}
+                                    className="cursor-pointer flex-1 py-4 bg-slate-900 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors disabled:opacity-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!isTextoValido(feedbackEditObs) || !feedbackEditSentimento || salvandoEdicaoFeedback}
+                                    className="cursor-pointer flex-1 py-4 bg-blue-600 disabled:bg-slate-800/50 disabled:text-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-900/20 active:scale-95 transition-all inline-flex items-center justify-center gap-2"
+                                >
+                                    {salvandoEdicaoFeedback
+                                        ? <><Loader2 size={14} className="animate-spin" /> Salvando...</>
+                                        : "Salvar Edição"}
+                                </button>
+                            </div>
+                        </form>
+                    </CsNpsModal3DShell>
+                </div>,
+                portalTarget,
             )}
 
             {showEditCS && csEditando && (
@@ -1819,10 +2052,16 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     <CsNpsModal3DShell className="relative bg-slate-900 border border-white/10 w-full max-w-md rounded-[2rem] p-8 shadow-3xl">
                         <div className="flex justify-between items-center mb-6">
                             <h4 className="text-lg font-black text-white uppercase">Editar <span className="text-emerald-500">CS</span></h4>
-                            <button onClick={() => { setShowEditCS(false); setCsEditando(null); }}><X size={20} className="cursor-pointer text-slate-500" /></button>
+                            <button type="button" onClick={() => { setShowEditCS(false); setCsEditando(null); }}><X size={20} className="cursor-pointer text-slate-500" /></button>
                         </div>
 
-                        <div className="space-y-6">
+                        <form
+                            className="space-y-6"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void handleSalvarEditCS();
+                            }}
+                        >
                             <div className="space-y-3">
                                 <div className="flex justify-between items-end px-1">
                                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
@@ -1847,18 +2086,21 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                 <label className="text-[10px] font-black uppercase text-slate-500 block text-center">Resultado do Feedback</label>
                                 <div className="flex justify-between items-center gap-4">
                                     <button
+                                        type="button"
                                         onClick={() => setCsEditSentimento("pos")}
                                         className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${csEditSentimento === "pos" ? "bg-emerald-500/20 border-emerald-500 text-emerald-500" : "bg-slate-950 border-white/5 text-slate-600 hover:text-white"}`}
                                     >
                                         <ThumbsUp size={22} /> <span className="text-[9px] font-black uppercase">Positivo</span>
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={() => setCsEditSentimento("neg")}
                                         className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${csEditSentimento === "neg" ? "bg-rose-500/20 border-rose-500 text-rose-500" : "bg-slate-950 border-white/5 text-slate-600 hover:text-white"}`}
                                     >
                                         <ThumbsDown size={22} /> <span className="text-[9px] font-black uppercase">Negativo</span>
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={() => setCsEditSentimento("na")}
                                         className={`cursor-pointer flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${csEditSentimento === "na" ? "bg-slate-700 border-white/30 text-white" : "bg-slate-950 border-white/5 text-slate-600 hover:text-white"}`}
                                     >
@@ -1881,20 +2123,21 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
                             <div className="flex gap-3 pt-2">
                                 <button
+                                    type="button"
                                     onClick={() => { setShowEditCS(false); setCsEditando(null); }}
                                     className="cursor-pointer flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                                 >
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={handleSalvarEditCS}
-                                    disabled={!isTextoValido(csEditObs) || !csEditSentimento}
-                                    className="cursor-pointer flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    type="submit"
+                                    disabled={!isTextoValido(csEditObs) || !csEditSentimento || salvandoEdicaoCS}
+                                    className="cursor-pointer flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                                 >
-                                    Confirmar Edição
+                                    {salvandoEdicaoCS ? <><Loader2 size={14} className="animate-spin" /> Salvando...</> : "Salvar Edição"}
                                 </button>
                             </div>
-                        </div>
+                        </form>
                     </CsNpsModal3DShell>
                 </div>
             )}

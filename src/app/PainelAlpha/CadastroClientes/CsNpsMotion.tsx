@@ -84,7 +84,6 @@ export function CsNpsModal3DShell({ children, className }: MotionShellProps) {
         variants={modalVariants}
         initial="hidden"
         animate="visible"
-        whileHover={{ y: -2, rotateX: 0.8, rotateY: -0.8 }}
         transition={springTransition}
         className={cn("transform-gpu [transform-style:preserve-3d]", className)}
       >
