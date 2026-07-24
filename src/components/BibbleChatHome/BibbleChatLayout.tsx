@@ -9,6 +9,7 @@ import OnyxAgentsModal from "./OnyxAgentsModal";
 import { type Message } from "./BibbleMessageBubble";
 import type { UploadedFile } from "./BibbleFileUpload";
 import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, type OnyxAgent, type AgenteFixado } from "@/lib/onyx/browser";
+import { notificarCalendarioAlphaAlterado } from "@/lib/google-calendar/invalidation";
 import { getTema } from "@/lib/temas";
 
 interface BibbleChatLayoutProps {
@@ -434,6 +435,8 @@ export default function BibbleChatLayout({
                   : m
               )
             );
+          } else if (event.type === "calendar_changed") {
+            notificarCalendarioAlphaAlterado();
           } else if (event.type === "error") {
             fullResponse = event.message ?? "Erro ao processar.";
           } else if (event.type === "done") {

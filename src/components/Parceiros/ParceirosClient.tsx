@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 import { BotaoVideoIntrodutorio } from "@/components/VideoIntrodutorio/BotaoVideoIntrodutorio";
 
-type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
+type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
 type VideoIntrodutorioConfig = Awaited<ReturnType<typeof obterVideoIntrodutorioConfig>>["data"];
 
@@ -100,8 +100,9 @@ export default function ParceirosClient({
   const [pendentesCount, setPendentesCount] = useState(preCadastrosPendentesInicial);
   const [pendentesRecentes, setPendentesRecentes] = useState<PreCadastroNotificacao[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
+  const podeVerNotificacoes = permissao.isAdmin || permissao.podeAprovar;
 
-  useParceirosPreCadastroNotifications(permissao.isAdmin, (payload) => {
+  useParceirosPreCadastroNotifications(podeVerNotificacoes, (payload) => {
     setPendentesCount((c) => c + 1);
     setPendentesRecentes((prev) => [payload, ...prev].slice(0, 10));
   });
@@ -229,7 +230,7 @@ export default function ParceirosClient({
             {/* Ações */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Notificação de pré-cadastro pendente — pulsa quando há itens */}
-              {permissao.isAdmin && (
+              {podeVerNotificacoes && (
                 <div className={`relative ${notificacoesOpen ? "z-50" : ""}`} ref={notifRef}>
                   <motion.button
                     onClick={() => setNotificacoesOpen((o) => !o)}
@@ -465,7 +466,7 @@ export default function ParceirosClient({
       <ModalPreCadastros
         open={preCadastrosOpen}
         onClose={() => setPreCadastrosOpen(false)}
-        isAdmin={permissao.isAdmin}
+        isAdmin={podeVerNotificacoes}
         preCadastroIdFoco={preCadastroIdFoco}
         onAprovado={(parceiro) => {
           setPreCadastrosOpen(false);

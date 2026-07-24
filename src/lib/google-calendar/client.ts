@@ -373,8 +373,52 @@ interface CancelarEventoParams {
   etagConhecido?: string;
 }
 
-/** Idempotente: evento já removido/inexistente (404/410) é tratado como já cancelado, não como erro. */
-export async function cancelarEvento(params: CancelarEventoParams): Promise<{ jaEstavaCancelado: boolean }> {
+const MAX_TENTATIVAS_CONFIRMACAO_CANCELAMENTO = 3;
+
+function normalizarErroGoogle(erroOriginal: unknown): GoogleCalendarError {
+  return erroOriginal instanceof GoogleCalendarError
+    ? erroOriginal
+    : classificarErroGoogle(erroOriginal);
+}
+
+async function confirmarEventoCancelado(
+  calendar: calendar_v3.Calendar,
+  params: Pick<CancelarEventoParams, "calendarId" | "googleEventId">,
+): Promise<void> {
+  for (let tentativa = 0; tentativa < MAX_TENTATIVAS_CONFIRMACAO_CANCELAMENTO; tentativa += 1) {
+    try {
+      const resposta = await executarComRetry(() =>
+        calendar.events.get({
+          calendarId: params.calendarId,
+          eventId: params.googleEventId,
+        }),
+      );
+
+      if (resposta.data.status === "cancelled") return;
+    } catch (erroOriginal) {
+      const erro = normalizarErroGoogle(erroOriginal);
+      if (erro.kind === "not_found" || erro.kind === "gone") return;
+      throw erro;
+    }
+
+    if (tentativa < MAX_TENTATIVAS_CONFIRMACAO_CANCELAMENTO - 1) {
+      await esperar(100 * 2 ** tentativa);
+    }
+  }
+
+  throw new GoogleCalendarError(
+    "O Google Calendar não confirmou o cancelamento do evento.",
+    { kind: "unknown" },
+  );
+}
+
+/**
+ * Idempotente: evento já removido/inexistente (404/410) é tratado como já cancelado.
+ * Depois de um DELETE aceito, confirma a ausência (ou o status `cancelled`) antes do sucesso.
+ */
+export async function cancelarEvento(
+  params: CancelarEventoParams,
+): Promise<{ jaEstavaCancelado: boolean; confirmado: true }> {
   const calendar = clienteCalendar(params.emailUsuario);
   try {
     await executarComRetry(() =>
@@ -390,12 +434,14 @@ export async function cancelarEvento(params: CancelarEventoParams): Promise<{ ja
           : undefined,
       ),
     );
-    return { jaEstavaCancelado: false };
   } catch (erroOriginal) {
-    const erro = classificarErroGoogle(erroOriginal);
+    const erro = normalizarErroGoogle(erroOriginal);
     if (erro.kind === "not_found" || erro.kind === "gone") {
-      return { jaEstavaCancelado: true };
+      return { jaEstavaCancelado: true, confirmado: true };
     }
     throw erro;
   }
+
+  await confirmarEventoCancelado(calendar, params);
+  return { jaEstavaCancelado: false, confirmado: true };
 }

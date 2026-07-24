@@ -2,6 +2,7 @@ import db from "@/lib/prisma";
 import { getReceitaData } from "@/app/api/ReceitaFederal/route";
 import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { executarCalendarTool, isCalendarTool } from "@/lib/bibble/calendar-tools";
+import type { EventoCancelamentoPendente } from "@/lib/bibble/calendar-cancellation";
 
 export interface UserCtx {
   userId: number;
@@ -9,6 +10,8 @@ export interface UserCtx {
   role: string;
   permissoes: string[];
   confirmouCancelamentoCalendario?: boolean;
+  solicitouCancelamentoCalendario?: boolean;
+  cancelamentoPendente?: EventoCancelamentoPendente;
 }
 
 // Admin/CEO têm acesso irrestrito a todas as tools

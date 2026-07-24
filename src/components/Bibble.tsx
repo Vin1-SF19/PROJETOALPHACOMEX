@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
+import { notificarCalendarioAlphaAlterado } from "@/lib/google-calendar/invalidation";
 import { getTema } from "@/lib/temas";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -282,6 +283,8 @@ export default function BibbleChat() {
               setMessages((p) => [...p, { role: "bibble", text: ev.text }]);
               setStatus("happy");
               setTimeout(() => setStatus("idle"), 4000);
+            } else if (ev.type === "calendar_changed") {
+              notificarCalendarioAlphaAlterado();
             } else if (ev.type === "error") {
               setMessages((p) => [...p, { role: "bibble", text: ev.message }]);
               setStatus("erro");

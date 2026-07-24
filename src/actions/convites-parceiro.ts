@@ -15,6 +15,7 @@ interface Ctx {
   role: string;
   isAdmin: boolean;
   podeAcessarParceiros: boolean;
+  podeAprovar: boolean;
 }
 
 async function getCtx(): Promise<Ctx | null> {
@@ -25,11 +26,13 @@ async function getCtx(): Promise<Ctx | null> {
   const isAdmin = role === "Admin" || role === "CEO";
   // Acesso ao módulo: admin OU registro em ParceiroAcesso.
   let podeAcessarParceiros = isAdmin;
+  let podeAprovar = isAdmin;
   if (!isAdmin && userId) {
     const acesso = await db.parceiroAcesso.findUnique({ where: { userId } });
     podeAcessarParceiros = !!acesso;
+    podeAprovar = acesso?.podeAprovar ?? false;
   }
-  return { userId, role, isAdmin, podeAcessarParceiros };
+  return { userId, role, isAdmin, podeAcessarParceiros, podeAprovar };
 }
 
 const VALIDADES_PERMITIDAS = [1, 3, 7, 15, 30] as const;
@@ -322,7 +325,7 @@ export async function contarPreCadastrosPendentes() {
  */
 export async function aprovarPreCadastro(preCadastroId: number) {
   const ctx = await getCtx();
-  if (!ctx?.isAdmin) return { success: false as const, error: "Apenas administradores aprovam pré-cadastros" };
+  if (!ctx || (!ctx.isAdmin && !ctx.podeAprovar)) return { success: false as const, error: "Sem permissão para aprovar pré-cadastros" };
 
   const pc = await db.preCadastroParceiro.findUnique({ where: { id: preCadastroId } });
   if (!pc) return { success: false as const, error: "Pré-cadastro não encontrado" };

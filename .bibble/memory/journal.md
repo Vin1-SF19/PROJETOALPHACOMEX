@@ -1017,3 +1017,36 @@ O usuário pediu que o Bibble/IAlpha passasse a consultar a agenda, verificar di
 - `bibble-flows.md`: fluxo das 10 tools e salvaguardas documentados.
 - `codebase-map.md`: núcleo `calendar-tools.ts` e integração do chat mapeados.
 - `integration-points.md`: contratos de segurança, ETag, timezone e limites registrados.
+
+---
+
+## [2026-07-24] — Parceiros: 3º toggle "Aprovar" (podeAprovar) + ícone de notificação liberado
+
+**Tags:** #feature #security #decision
+**Agentes envolvidos:** Scout, Vault, Echo, Forge, Anubis, Lens, Probe, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `src/actions/parceiros.ts`, `src/actions/convites-parceiro.ts`, `src/components/Parceiros/ParceirosClient.tsx`, `src/components/Parceiros/ModalEngrenagem.tsx`, `src/components/Parceiros/ModalPreCadastros.tsx`
+
+### Contexto
+Usuário pediu, no controle de acesso do módulo Parceiros (ao lado de Editar/Excluir), um botão que dá acesso equivalente ao Admin. Relatou também que alguns usuários com acesso ao módulo não veem o ícone de notificação de pré-cadastros, e que quem tiver esse "acesso total" deve poder aprovar/rejeitar convites mesmo sem ser Admin.
+
+### O que foi feito
+- Campo `podeAprovar` adicionado ao model `ParceiroAcesso` (Vault aprovou 🟢 ADD COLUMN nullable/default — migration via script pontual `@libsql/client` no Turso, confirmada via `PRAGMA table_info`, reaproveitando um backup pré-existente da mesma sessão de trabalho em vez de gerar outro).
+- 3º toggle "Aprovar" no `ModalEngrenagem.tsx` (cor emerald, ao lado de Editar/Excluir), persistido via `salvarAcessoParceiro` (assinatura estendida com o 4º argumento).
+- Ícone de notificação (Bell) em `ParceirosClient.tsx` — antes gated só por `isAdmin`, agora por `podeVerNotificacoes = isAdmin || podeAprovar` (aplicado ao hook de Pusher e à prop `isAdmin` do `ModalPreCadastros`).
+- `aprovarPreCadastro` (convites-parceiro.ts) mudou de admin-only para `(!isAdmin && !podeAprovar)`.
+
+### Decisões tomadas
+- Escopo reduzido a um 3º toggle nomeado (`podeAprovar`), não um "acesso total" literal que replicasse todas as permissões de Admin — decisão tomada em uma parte anterior desta mesma sessão (antes de uma compactação de contexto) e honrada ao retomar o trabalho, após verificar via PRAGMA que a coluna ainda não existia no Turso.
+- `salvarAcessoParceiro` (quem CONCEDE o toggle) permanece Admin-only deliberadamente — evita que um usuário com `podeAprovar` conceda mais acesso a si mesmo ou a terceiros.
+- `rejeitarPreCadastro` não precisou de mudança — já era aberto a qualquer usuário com `ParceiroAcesso` (podeAcessarParceiros), o que já satisfazia "pode rejeitar mesmo não sendo admin".
+
+### Problemas encontrados / resolvidos
+- `getCtx()` existe duplicado em `parceiros.ts` e `convites-parceiro.ts` (duas interfaces `Ctx` separadas) — os dois precisaram ser editados independentemente; ambos agora computam `podeAprovar` da mesma forma.
+- Tooltip em `ModalPreCadastros.tsx` ("Apenas administradores aprovam") ficou desatualizado com a mudança de gate — corrigido para "Sem permissão para aprovar".
+
+### Pendências
+- Nenhuma para esta feature — Forge (tsc/lint/build), Anubis e Probe aprovaram.
+- Bug não resolvido de outra sessão/tarefa: usuário relatou falha ao adicionar/editar CS e Feedback no módulo CS&NPS (diagnóstico não iniciado) + pedido de loading nos botões de salvar desses modais.
+
+### Refletido também em
+- `project_parceiros.md` (memória do usuário): nova seção "Acesso Total / podeAprovar (2026-07-24)".

@@ -1589,6 +1589,10 @@ model ParceiroAcesso {
   user        usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
   podeEditar  Boolean  @default(false)
   podeExcluir Boolean  @default(false)
+  /// Pode aprovar/rejeitar pré-cadastros de parceiro (wizard de convite) mesmo
+  /// não sendo Admin/CEO — 3º toggle da tela "Controle de Acesso"
+  /// (ModalEngrenagem.tsx), ao lado de Editar/Excluir.
+  podeAprovar Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

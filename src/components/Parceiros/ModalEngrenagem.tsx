@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Settings, Loader2, Pencil, Trash2, Shield, Link2 } from "lucide-react";
+import { X, Settings, Loader2, Pencil, Trash2, Shield, Link2, CheckCheck } from "lucide-react";
 import { listarAcessosParceiros, salvarAcessoParceiro } from "@/actions/parceiros";
 import { obterConfigParceiros, togglePermitirParceiroConvidar } from "@/actions/convites-parceiro";
 
 type Usuario = { id: number; nome: string; email: string; role: string };
-type Acesso = { userId: number; podeEditar: boolean; podeExcluir: boolean };
+type Acesso = { userId: number; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
 
 export default function ModalEngrenagem({
   open, onClose, accent,
@@ -30,7 +30,7 @@ export default function ModalEngrenagem({
       .then(([{ acessos, usuarios }, cfg]) => {
         setUsuarios(usuarios);
         const map: Record<number, Acesso> = {};
-        for (const a of acessos) map[a.userId] = { userId: a.userId, podeEditar: a.podeEditar, podeExcluir: a.podeExcluir };
+        for (const a of acessos) map[a.userId] = { userId: a.userId, podeEditar: a.podeEditar, podeExcluir: a.podeExcluir, podeAprovar: a.podeAprovar };
         setAcessos(map);
         setParceiroConvida(cfg.permitirParceiroConvidar);
       })
@@ -50,14 +50,14 @@ export default function ModalEngrenagem({
 
   const isAdminRole = (r: string) => r === "Admin" || r === "CEO";
 
-  const toggle = async (userId: number, campo: "podeEditar" | "podeExcluir") => {
-    const atual = acessos[userId] ?? { userId, podeEditar: false, podeExcluir: false };
+  const toggle = async (userId: number, campo: "podeEditar" | "podeExcluir" | "podeAprovar") => {
+    const atual = acessos[userId] ?? { userId, podeEditar: false, podeExcluir: false, podeAprovar: false };
     const novo = { ...atual, [campo]: !atual[campo] };
     // exclusão implica edição liberada (não dá pra excluir sem ver/editar)
     if (campo === "podeExcluir" && novo.podeExcluir) novo.podeEditar = true;
     setAcessos(prev => ({ ...prev, [userId]: novo }));
     setSavingId(userId);
-    await salvarAcessoParceiro(userId, novo.podeEditar, novo.podeExcluir);
+    await salvarAcessoParceiro(userId, novo.podeEditar, novo.podeExcluir, novo.podeAprovar);
     setSavingId(null);
   };
 
@@ -74,7 +74,7 @@ export default function ModalEngrenagem({
             </div>
             <div>
               <h2 className="text-[15px] font-black text-white">Controle de Acesso</h2>
-              <p className="text-[10px] text-slate-500">Quem pode editar e excluir parceiros</p>
+              <p className="text-[10px] text-slate-500">Quem pode editar, excluir e aprovar pré-cadastros</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 grid place-items-center rounded-lg text-slate-500 hover:text-white hover:bg-white/5"><X size={16} /></button>
@@ -112,7 +112,7 @@ export default function ModalEngrenagem({
             <div className="flex items-center justify-center py-10"><Loader2 size={22} className="animate-spin" style={{ color: `rgba(${accent},1)` }} /></div>
           ) : filtrados.map(u => {
             const admin = isAdminRole(u.role);
-            const a = acessos[u.id] ?? { userId: u.id, podeEditar: false, podeExcluir: false };
+            const a = acessos[u.id] ?? { userId: u.id, podeEditar: false, podeExcluir: false, podeAprovar: false };
             return (
               <div key={u.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: "rgba(15,23,42,0.5)", border: "1px solid rgba(99,102,241,0.12)" }}>
                 <div className="flex-1 min-w-0">
@@ -127,16 +127,17 @@ export default function ModalEngrenagem({
                   <span className="text-[9px] font-black uppercase text-emerald-400">Acesso total</span>
                 ) : (
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {([["podeEditar", Pencil, "Editar"], ["podeExcluir", Trash2, "Excluir"]] as const).map(([campo, Icon, label]) => {
+                    {([["podeEditar", Pencil, "Editar"], ["podeExcluir", Trash2, "Excluir"], ["podeAprovar", CheckCheck, "Aprovar"]] as const).map(([campo, Icon, label]) => {
                       const on = a[campo];
+                      const corOn = campo === "podeExcluir" ? "239,68,68" : campo === "podeAprovar" ? "16,185,129" : accent;
                       return (
                         <button key={campo} type="button" onClick={() => toggle(u.id, campo)}
                           title={label}
                           className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all"
                           style={{
-                            background: on ? (campo === "podeExcluir" ? "rgba(239,68,68,0.2)" : `rgba(${accent},0.2)`) : "rgba(255,255,255,0.04)",
-                            border: `1px solid ${on ? (campo === "podeExcluir" ? "rgba(239,68,68,0.5)" : `rgba(${accent},0.5)`) : "rgba(255,255,255,0.1)"}`,
-                            color: on ? (campo === "podeExcluir" ? "#fca5a5" : `rgba(${accent},1)`) : "#64748b",
+                            background: on ? `rgba(${corOn},0.2)` : "rgba(255,255,255,0.04)",
+                            border: `1px solid ${on ? `rgba(${corOn},0.5)` : "rgba(255,255,255,0.1)"}`,
+                            color: on ? `rgba(${corOn},1)` : "#64748b",
                           }}>
                           <Icon size={11} /> {label}
                         </button>

@@ -331,6 +331,7 @@ interface ParceiroCtx {
   isAdmin: boolean;
   podeEditar: boolean;
   podeExcluir: boolean;
+  podeAprovar: boolean;
 }
 
 async function getCtx(): Promise<ParceiroCtx | null> {
@@ -341,19 +342,21 @@ async function getCtx(): Promise<ParceiroCtx | null> {
   const isAdmin = role === "Admin" || role === "CEO";
   let podeEditar = isAdmin;
   let podeExcluir = isAdmin;
+  let podeAprovar = isAdmin;
   if (!isAdmin && userId) {
     const acesso = await db.parceiroAcesso.findUnique({ where: { userId } });
     podeEditar = acesso?.podeEditar ?? false;
     podeExcluir = acesso?.podeExcluir ?? false;
+    podeAprovar = acesso?.podeAprovar ?? false;
   }
-  return { userId, role, isAdmin, podeEditar, podeExcluir };
+  return { userId, role, isAdmin, podeEditar, podeExcluir, podeAprovar };
 }
 
 /** Permissões do usuário atual no módulo — usado pela UI pra liberar/esconder botões. */
 export async function getPermissaoParceiros() {
   const ctx = await getCtx();
-  if (!ctx) return { isAdmin: false, podeEditar: false, podeExcluir: false };
-  return { isAdmin: ctx.isAdmin, podeEditar: ctx.podeEditar, podeExcluir: ctx.podeExcluir };
+  if (!ctx) return { isAdmin: false, podeEditar: false, podeExcluir: false, podeAprovar: false };
+  return { isAdmin: ctx.isAdmin, podeEditar: ctx.podeEditar, podeExcluir: ctx.podeExcluir, podeAprovar: ctx.podeAprovar };
 }
 
 // ─── Engrenagem (Admin): gerenciar quem pode editar/excluir ──────────────────
@@ -368,13 +371,13 @@ export async function listarAcessosParceiros() {
   return { acessos, usuarios };
 }
 
-export async function salvarAcessoParceiro(userId: number, podeEditar: boolean, podeExcluir: boolean) {
+export async function salvarAcessoParceiro(userId: number, podeEditar: boolean, podeExcluir: boolean, podeAprovar: boolean) {
   const ctx = await getCtx();
   if (!ctx?.isAdmin) return { success: false, error: "Apenas administradores" };
   await db.parceiroAcesso.upsert({
     where: { userId },
-    create: { userId, podeEditar, podeExcluir },
-    update: { podeEditar, podeExcluir },
+    create: { userId, podeEditar, podeExcluir, podeAprovar },
+    update: { podeEditar, podeExcluir, podeAprovar },
   });
   return { success: true };
 }

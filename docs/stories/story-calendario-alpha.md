@@ -133,8 +133,41 @@ Esta extensão torna o Calendário Alpha operável por conversa no Bibble/IAlpha
 
 ---
 
+## Tasks / Subtasks — correção de timezone na consulta do Bibble
+
+- [x] Rastrear a serialização dos horários entre Google Calendar, actions e tools do Bibble.
+- [x] Corrigir a apresentação para `America/Sao_Paulo` sem alterar o instante real armazenado no Google.
+- [x] Cobrir eventos com offset, UTC, dia inteiro e limites de data com testes automatizados.
+- [x] Executar regressão e build antes de concluir.
+
+---
+
+## Tasks / Subtasks — confirmar cancelamento real pelo Bibble
+
+- [x] Rastrear o cancelamento entre a tool, Server Action, cliente Google e cache local.
+- [x] Eliminar qualquer resposta de sucesso antes da confirmação da exclusão efetiva.
+- [x] Garantir que o evento cancelado desapareça imediatamente do cache e das consultas seguintes.
+- [x] Cobrir sucesso, conflito de ETag, falha Google e cache com testes automatizados.
+- [x] Executar regressão e build antes de concluir.
+
+---
+
+## Tasks / Subtasks — preservar o alvo entre pedido e confirmação
+
+- [x] Reproduzir com histórico real e comprovar se a tool foi executada.
+- [x] Resolver no servidor o evento confirmado usando somente agenda e sessão do usuário.
+- [x] Executar a exclusão deterministicamente após “Sim”, sem depender de o modelo reter ID/ETag.
+- [x] Bloquear confirmação textual quando nenhuma exclusão real ocorreu.
+- [x] Cobrir resolução, ambiguidade, execução e falso sucesso com testes.
+- [x] Executar regressão e build antes de concluir.
+
+---
+
 ## Change Log
 
+- 2026-07-24 — **Corrigida a causa real do cancelamento falso entre duas mensagens**: o histórico persistia apenas o texto visível e descartava os resultados das tools; depois do pedido de confirmação, o turno “Sim” não possuía mais `googleEventId`/`etag`, e o modelo afirmava sucesso sem executar `cancelar_evento_calendario`. O servidor agora resolve deterministicamente o evento ativo e gravável mais recentemente mencionado na pergunta de confirmação, sempre limitado ao `userId` autenticado, e executa a tool antes de responder. Frases afirmativas completas como “Sim, excluir o evento...” passaram a ser reconhecidas. Respostas que alegam cancelamento sem retorno real `{ ok: true, cancelado: true }` são substituídas por falha explícita. Empates, títulos duplicados ou muito curtos não são escolhidos silenciosamente. Adicionada observabilidade segura do ID do evento. O evento real “Festa de testes” foi conferido como `confirmed`, removido com `If-Match`, confirmado como `cancelled` no Google e teve exatamente 1 linha eliminada do cache. Gates: ESLint escopado PASS, 173 testes PASS, Next build PASS; typecheck mantém somente os mesmos 4 erros de baseline. CodeRabbit novamente bloqueado pela ausência de WSL.
+- 2026-07-24 — **Corrigido falso sucesso visual no cancelamento de eventos pelo Bibble**: após `events.delete`, o cliente agora consulta o mesmo evento e só confirma quando o Google devolve ausência (`404/410`) ou status `cancelled`; evento ainda ativo, conflito de ETag ou falha de verificação não são reportados como sucesso. O resultado bem-sucedido da tool emite `calendar_changed`; os clientes do Bibble notificam os outros iframes via `localStorage` e a própria janela via evento DOM, fazendo o Calendário Alpha aberto executar `router.refresh()` imediatamente. O cache continua sendo removido somente depois da confirmação do Google. Gates: ESLint escopado PASS, 165 testes na regressão completa PASS, `git diff --check` PASS e Next build PASS; typecheck conserva os mesmos 4 erros de baseline e o lint global foi interrompido após não produzir saída, enquanto o escopado passou. CodeRabbit bloqueado porque WSL não está instalado.
+- 2026-07-23 — **Corrigida diferença de 3 horas nas consultas de agenda pelo Bibble**: objetos `Date` do cache eram serializados como UTC (`Z`) antes de chegar ao modelo. As respostas das tools agora normalizam eventos próprios, eventos de colegas e períodos para `America/Sao_Paulo`, com offset explícito (`-03:00` em 2026), preservam datas civis de eventos de dia inteiro e instruem o modelo a não converter o horário novamente. Adicionado `calendar-timezone.ts` e testes de UTC, offset existente, virada de data, dia inteiro e valores inválidos. Gates: ESLint escopado PASS, 157 testes PASS e Next build PASS; typecheck conserva os mesmos 4 erros de baseline.
 - 2026-07-23 — **Calendário Alpha ampliado no Bibble/IAlpha para 10 tools**: consultas por intervalo exato e seleção segura de calendário; CRUD próprio; FreeBusy; leitura de agenda de colega; CRUD de colega exclusivo de Admin/CEO; edição parcial com ETag/`If-Match`; confirmação de cancelamento em duas fases; timezone `America/Sao_Paulo`; role/permissões atuais do banco; resolução explícita de ambiguidades; execução sequencial e limites de segurança. Novo núcleo `src/lib/bibble/calendar-tools.ts`. Sem schema/migration/Vault. Gates: ESLint escopado PASS, 122 testes PASS, Next build PASS e diff-check PASS; typecheck global conserva 4 erros baseline fora do diff. Probe e Lens PASS; Anubis CONCERNS sem blocker.
 - 2026-07-17 — Story criada (Draft) a partir do prompt gerado pelo Phantom.
 - 2026-07-17 — Scout entregou blueprint de reconhecimento. Riscos identificados: auth de Reserva de Salas é fraca (não copiar), sem criptografia/cron/webhook/`googleapis` no projeto.
@@ -187,21 +220,31 @@ Esta extensão torna o Calendário Alpha operável por conversa no Bibble/IAlpha
 ### Extensão Bibble/IAlpha de 2026-07-23 — arquivos alterados/novos
 
 **Bibble/IAlpha:**
+- `src/lib/bibble/calendar-timezone.ts` — normaliza instantes e datas civis para apresentação inequívoca em `America/Sao_Paulo`
+- `src/lib/bibble/calendar-cancellation.ts` — preserva e resolve com segurança o alvo entre pedido e confirmação e bloqueia falso sucesso textual
 - `src/lib/bibble/calendar-tools.ts` — novo núcleo de validação, resolução segura e execução das 10 tools
 - `src/lib/bibble/tools.ts` — contratos das 10 tools expostos ao modelo
 - `src/lib/bibble/tool-executor.ts` — roteamento das tools com contexto autenticado
 - `src/lib/bibble/system-prompt.ts` — capacidades e regras de conversa do calendário
-- `src/app/api/bibble/chat/route.ts` — permissões efetivas atuais, timezone, confirmação em duas fases, execução sequencial e limites
+- `src/app/api/bibble/chat/route.ts` — permissões efetivas atuais, timezone, confirmação em duas fases, execução sequencial, limites e sinal de alteração do calendário
+- `src/components/BibbleChatHome/BibbleChatLayout.tsx` e `src/components/Bibble.tsx` — propagam a invalidação após mutação confirmada
 
 **Google Calendar:**
 - `src/actions/google-calendar-eventos.ts` — edição parcial segura de evento próprio
 - `src/actions/google-calendar-admin.ts` — edição parcial segura de evento de colega por Admin/CEO
-- `src/lib/google-calendar/client.ts` — patch parcial e cancelamento com ETag/`If-Match`
+- `src/lib/google-calendar/client.ts` — patch parcial e cancelamento com ETag/`If-Match` e verificação pós-exclusão
+- `src/lib/google-calendar/invalidation.ts` — sincroniza a atualização entre os iframes persistentes do painel
+- `src/components/CalendarioAlpha/CalendarioAlphaDashboard.tsx` — atualiza a agenda após mutação externa do Bibble
 - `src/lib/validations/google-calendar.ts` — validação estrita da edição parcial
 
 **Testes:**
+- `tests/bibble/calendar-cancellation.test.ts`
+- `tests/bibble/calendar-timezone.test.ts`
 - `tests/bibble/calendar-tools.test.ts`
 - `tests/bibble/calendar-tools-edge.test.ts`
 - `tests/google-calendar/client-etag.test.ts`
+- `tests/google-calendar/invalidation.test.ts`
 - `tests/google-calendar/evento-parcial.test.ts`
 - `tests/google-calendar/validations.test.ts`
+- `docs/qa/coderabbit-reports/story-calendario-alpha-timezone-bibble.md`
+- `docs/qa/coderabbit-reports/story-calendario-alpha-cancelamento-bibble.md`

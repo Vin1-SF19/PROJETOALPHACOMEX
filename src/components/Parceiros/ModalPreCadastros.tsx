@@ -206,7 +206,7 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
                         <button
                           onClick={() => handleAprovar(p.id)}
                           disabled={processando === p.id || !isAdmin}
-                          title={!isAdmin ? "Apenas administradores aprovam" : undefined}
+                          title={!isAdmin ? "Sem permissão para aprovar" : undefined}
                           className="flex items-center gap-1 px-4 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {processando === p.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Aprovar
@@ -217,7 +217,7 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
                       <button
                         onClick={() => handleAprovar(p.id)}
                         disabled={processando === p.id || !isAdmin}
-                        title={!isAdmin ? "Apenas administradores aprovam" : "Reverte a rejeição e aprova o pré-cadastro"}
+                        title={!isAdmin ? "Sem permissão para aprovar" : "Reverte a rejeição e aprova o pré-cadastro"}
                         className="flex items-center gap-1 px-4 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {processando === p.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Reverter p/ aprovado

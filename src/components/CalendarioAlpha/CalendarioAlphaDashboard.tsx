@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -24,6 +24,10 @@ import {
 import { desativarCalendarioAlpha, type StatusConexaoCalendarioAlpha } from "@/actions/google-calendar-conexao";
 import { listarCalendariosGoogleDisponiveis } from "@/actions/google-calendar-eventos";
 import type { GoogleCalendarioDTO } from "@/lib/google-calendar/types";
+import {
+  CALENDARIO_ALPHA_INVALIDATION_EVENT,
+  CALENDARIO_ALPHA_INVALIDATION_KEY,
+} from "@/lib/google-calendar/invalidation";
 import { getTema } from "@/lib/temas";
 
 import { EstadoDesconectado } from "./EstadoDesconectado";
@@ -81,6 +85,23 @@ export function CalendarioAlphaDashboard({
 
   const [permissoesAberto, setPermissoesAberto] = useState(false);
   const [usuariosPermissao, setUsuariosPermissao] = useState<UsuarioPermissaoColegaDTO[]>([]);
+
+  useEffect(() => {
+    function atualizarAgenda() {
+      startTransition(() => router.refresh());
+    }
+
+    function atualizarAposAlteracaoExterna(evento: StorageEvent) {
+      if (evento.key === CALENDARIO_ALPHA_INVALIDATION_KEY) atualizarAgenda();
+    }
+
+    window.addEventListener("storage", atualizarAposAlteracaoExterna);
+    window.addEventListener(CALENDARIO_ALPHA_INVALIDATION_EVENT, atualizarAgenda);
+    return () => {
+      window.removeEventListener("storage", atualizarAposAlteracaoExterna);
+      window.removeEventListener(CALENDARIO_ALPHA_INVALIDATION_EVENT, atualizarAgenda);
+    };
+  }, [router]);
 
   const dataReferencia = new Date(dataReferenciaISO);
 

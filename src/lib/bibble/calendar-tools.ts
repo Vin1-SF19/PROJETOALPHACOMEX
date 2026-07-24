@@ -1,8 +1,12 @@
 import { z } from "zod";
 
 import db from "@/lib/prisma";
+import {
+  formatarDataCalendarioParaBibble,
+  TIMEZONE_CALENDARIO_BIBBLE,
+} from "@/lib/bibble/calendar-timezone";
 
-const TIMEZONE_PADRAO = "America/Sao_Paulo";
+const TIMEZONE_PADRAO = TIMEZONE_CALENDARIO_BIBBLE;
 const MS_DIA = 24 * 60 * 60 * 1000;
 const JANELA_MAXIMA_DIAS = 60;
 const MAX_EVENTOS_RESPOSTA = 200;
@@ -561,9 +565,10 @@ function mapearEventoProprio(
     id: evento.googleEventId,
     etag: evento.etag,
     titulo: evento.titulo,
-    inicio: evento.inicioEm,
-    fim: evento.fimEm,
+    inicio: formatarDataCalendarioParaBibble(evento.inicioEm, evento.diaInteiro),
+    fim: formatarDataCalendarioParaBibble(evento.fimEm, evento.diaInteiro),
     dia_inteiro: evento.diaInteiro,
+    timezone: TIMEZONE_PADRAO,
     link_meet: evento.linkMeet,
     calendario: calendarioNome,
   };
@@ -582,9 +587,10 @@ function mapearEventoColega(evento: {
     id: evento.googleEventId,
     etag: evento.etag,
     titulo: evento.titulo,
-    inicio: evento.inicioEm,
-    fim: evento.fimEm,
+    inicio: formatarDataCalendarioParaBibble(evento.inicioEm, evento.diaInteiro),
+    fim: formatarDataCalendarioParaBibble(evento.fimEm, evento.diaInteiro),
     dia_inteiro: evento.diaInteiro,
+    timezone: TIMEZONE_PADRAO,
     link_meet: evento.linkMeet,
   };
 }
@@ -602,9 +608,16 @@ function mapearEventoGoogle(evento: {
     id: evento.googleEventId,
     etag: evento.etag,
     titulo: evento.titulo,
-    inicio: evento.inicio.dataHora ?? evento.inicio.data ?? null,
-    fim: evento.fim.dataHora ?? evento.fim.data ?? null,
+    inicio: formatarDataCalendarioParaBibble(
+      evento.inicio.dataHora ?? evento.inicio.data ?? null,
+      evento.diaInteiro,
+    ),
+    fim: formatarDataCalendarioParaBibble(
+      evento.fim.dataHora ?? evento.fim.data ?? null,
+      evento.diaInteiro,
+    ),
     dia_inteiro: evento.diaInteiro,
+    timezone: TIMEZONE_PADRAO,
     link_meet: evento.linkMeet,
   };
 }
@@ -700,7 +713,11 @@ export async function executarCalendarTool(
       const totalEventos = eventos.length;
       return json({
         ok: true,
-        periodo: { inicio: inicio.toISOString(), fim_exclusivo: fim.toISOString() },
+        periodo: {
+          inicio: formatarDataCalendarioParaBibble(inicio, false),
+          fim_exclusivo: formatarDataCalendarioParaBibble(fim, false),
+          timezone: TIMEZONE_PADRAO,
+        },
         total: totalEventos,
         truncado: totalEventos > MAX_EVENTOS_RESPOSTA,
         eventos: eventos.slice(0, MAX_EVENTOS_RESPOSTA),
@@ -893,7 +910,11 @@ export async function executarCalendarTool(
       if (!resultado.success) return resultado.error;
       return json({
         ok: true,
-        intervalo: { inicio: inicio.toISOString(), fim: fim.toISOString() },
+        intervalo: {
+          inicio: formatarDataCalendarioParaBibble(inicio, false),
+          fim: formatarDataCalendarioParaBibble(fim, false),
+          timezone: TIMEZONE_PADRAO,
+        },
         calendarios: calendarios.map((item) => item.nome),
         disponibilidade: resultado.data,
       });
@@ -918,7 +939,11 @@ export async function executarCalendarTool(
       return json({
         ok: true,
         colega: { nome: resolucao.colega.nome, email: resolucao.colega.email },
-        periodo: { inicio: inicio.toISOString(), fim_exclusivo: fim.toISOString() },
+        periodo: {
+          inicio: formatarDataCalendarioParaBibble(inicio, false),
+          fim_exclusivo: formatarDataCalendarioParaBibble(fim, false),
+          timezone: TIMEZONE_PADRAO,
+        },
         total: eventos.length,
         truncado: eventos.length > MAX_EVENTOS_RESPOSTA,
         eventos: eventos.slice(0, MAX_EVENTOS_RESPOSTA),

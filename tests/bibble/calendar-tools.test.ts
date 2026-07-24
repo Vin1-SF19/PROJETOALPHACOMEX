@@ -170,7 +170,14 @@ describe("Bibble Calendar tools", () => {
     );
     expect(JSON.parse(resposta)).toMatchObject({
       ok: true,
-      evento: { id: "evt-1", etag: '"v1"', calendario: "Agenda principal" },
+      evento: {
+        id: "evt-1",
+        etag: '"v1"',
+        calendario: "Agenda principal",
+        inicio: "2026-07-24T14:00:00-03:00",
+        fim: "2026-07-24T15:00:00-03:00",
+        timezone: "America/Sao_Paulo",
+      },
     });
   });
 
@@ -224,6 +231,9 @@ describe("Bibble Calendar tools", () => {
           id: "evt-listado",
           etag: '"etag-listado"',
           titulo: "Daily",
+          inicio: "2026-07-24T09:00:00-03:00",
+          fim: "2026-07-24T09:30:00-03:00",
+          timezone: "America/Sao_Paulo",
         },
       ],
     });

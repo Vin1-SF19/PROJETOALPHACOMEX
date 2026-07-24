@@ -4,8 +4,16 @@ import { modelSupportsVision, getModelLabel } from "@/lib/bibble/client";
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { BIBBLE_TOOLS, type OllamaTool } from "@/lib/bibble/tools";
 import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
+import {
+  mensagemConfirmaCancelamentoCalendario,
+  mensagemSolicitaCancelamentoCalendario,
+  protegerRespostaDeFalsoCancelamento,
+  resolverEventoConfirmadoDoUsuario,
+  resultadoCancelamentoConcluido,
+} from "@/lib/bibble/calendar-cancellation";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { callCompletion, encodeSSE, type ChatMessage, type ContentPart, type StreamChunk } from "@/lib/bibble/completion";
+import { resultadoToolAlterouCalendario } from "@/lib/google-calendar/invalidation";
 import db from "@/lib/prisma";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 
@@ -143,6 +151,7 @@ export const maxDuration = 60;
 type SSEEvent =
   | { type: "status"; state: string }
   | { type: "text"; text: string }
+  | { type: "calendar_changed" }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -201,6 +210,57 @@ async function runStream(
     let totalToolCalls = 0;
     let totalMutacoesCalendario = 0;
     const mutacoesExecutadas = new Set<string>();
+    let alteracaoCalendarioNotificada = false;
+    let cancelamentoCalendarioExecutado = false;
+
+    if (
+      userCtx.confirmouCancelamentoCalendario &&
+      userCtx.cancelamentoPendente
+    ) {
+      send({ type: "status", state: "pesquisando" });
+      const alvo = userCtx.cancelamentoPendente;
+      console.info("[BIBBLE CALENDAR] Executando cancelamento confirmado", {
+        userId: userCtx.userId,
+        googleEventId: alvo.googleEventId,
+      });
+      const resultado = await executarTool(
+        "cancelar_evento_calendario",
+        {
+          google_event_id: alvo.googleEventId,
+          etag: alvo.etag,
+          calendario_nome: alvo.calendarioNome,
+          confirmado: true,
+        },
+        userCtx,
+      );
+
+      if (resultadoCancelamentoConcluido("cancelar_evento_calendario", resultado)) {
+        console.info("[BIBBLE CALENDAR] Cancelamento confirmado pelo Google", {
+          userId: userCtx.userId,
+          googleEventId: alvo.googleEventId,
+        });
+        send({ type: "calendar_changed" });
+        send({
+          type: "text",
+          text: `O evento **"${alvo.titulo}"** foi cancelado e removido do seu calendário.`,
+        });
+      } else {
+        console.warn("[BIBBLE CALENDAR] Cancelamento não confirmado", {
+          userId: userCtx.userId,
+          googleEventId: alvo.googleEventId,
+        });
+        let mensagemErro = "Não consegui confirmar a exclusão do evento no Google Agenda.";
+        try {
+          const dados = JSON.parse(resultado) as { erro?: unknown };
+          if (typeof dados.erro === "string") mensagemErro = dados.erro;
+        } catch {
+          if (resultado.trim()) mensagemErro = resultado;
+        }
+        send({ type: "text", text: mensagemErro });
+      }
+      send({ type: "done" });
+      return;
+    }
 
     for (let turn = 0; turn <= MAX_TOOL_TURNS; turn++) {
       const data = await callCompletion(msgs, tools, model, providerCtrl.signal, false, temperature, contextWindow);
@@ -257,6 +317,18 @@ async function runStream(
           } else {
             result = await executarTool(tc.function.name, args, userCtx);
           }
+
+          if (
+            !alteracaoCalendarioNotificada &&
+            resultadoToolAlterouCalendario(tc.function.name, result)
+          ) {
+            send({ type: "calendar_changed" });
+            alteracaoCalendarioNotificada = true;
+          }
+          if (resultadoCancelamentoConcluido(tc.function.name, result)) {
+            cancelamentoCalendarioExecutado = true;
+          }
+
           results.push({ role: "tool", tool_call_id: tc.id, content: result });
         }
 
@@ -273,6 +345,9 @@ async function runStream(
       const reader = streamRes.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
+      let respostaFinalProtegida = "";
+      const protegerRespostaCancelamento =
+        userCtx.solicitouCancelamentoCalendario === true;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -289,9 +364,23 @@ async function runStream(
           try {
             const chunk = JSON.parse(raw) as StreamChunk;
             const delta = chunk.choices[0]?.delta?.content;
-            if (delta) send({ type: "text", text: delta });
+            if (delta) {
+              if (protegerRespostaCancelamento) {
+                respostaFinalProtegida += delta;
+              } else {
+                send({ type: "text", text: delta });
+              }
+            }
           } catch { /* skip malformed chunk */ }
         }
+      }
+
+      if (protegerRespostaCancelamento && respostaFinalProtegida) {
+        const respostaSegura = protegerRespostaDeFalsoCancelamento(
+          respostaFinalProtegida,
+          cancelamentoCalendarioExecutado,
+        );
+        send({ type: "text", text: respostaSegura });
       }
 
       break;
@@ -352,25 +441,23 @@ export async function POST(req: NextRequest) {
     /(?:confirm|posso|deseja).{0,100}cancel|cancel.{0,100}(?:confirm|posso|deseja)/i.test(
       ultimaMensagemBibble.text,
     );
-  const respostaConfirmacao = message
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("pt-BR")
-    .replace(/[.,!?;:]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const usuarioConfirmouCancelamento = new Set([
-    "sim",
-    "confirmo",
-    "confirmado",
-    "pode cancelar",
-    "pode sim cancelar",
-    "sim pode cancelar",
-    "cancele",
-    "cancele sim",
-  ]).has(respostaConfirmacao);
+  const usuarioConfirmouCancelamento =
+    mensagemConfirmaCancelamentoCalendario(message);
   userCtx.confirmouCancelamentoCalendario =
     Boolean(bibblePediuConfirmacaoDeCancelamento) && usuarioConfirmouCancelamento;
+  userCtx.solicitouCancelamentoCalendario =
+    userCtx.confirmouCancelamentoCalendario ||
+    mensagemSolicitaCancelamentoCalendario(message);
+
+  if (
+    userCtx.confirmouCancelamentoCalendario &&
+    ultimaMensagemBibble?.role === "bibble"
+  ) {
+    userCtx.cancelamentoPendente = await resolverEventoConfirmadoDoUsuario(
+      userId,
+      ultimaMensagemBibble.text,
+    ) ?? undefined;
+  }
 
   // Validação: mensagem ou arquivos
   if (!message?.trim() && (!files || files.length === 0)) {
