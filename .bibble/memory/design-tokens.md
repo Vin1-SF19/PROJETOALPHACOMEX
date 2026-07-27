@@ -57,3 +57,18 @@ Substituiu o padrão anterior de fade+scale simples (`initial={{opacity:0,scale:
 - Linhas de tabela: stagger de entrada (`staggerChildren: 0.03`) na primeira carga.
 
 **Contexto da decisão:** usuário rejeitou explicitamente a primeira versão do redesign (shader discreto atrás da tabela, modais com fade simples) como "mudanças mínimas" — pediu "repaginada total", liberdade para "inventar", e citou explicitamente "modelagem com framer-motion 3d". Ver `decisions.md` e `journal.md` (2026-07-09, segunda entrada).
+
+---
+
+## Padrão "Atelier" (Alpha Blueprint, 2026-07-27 — Iris)
+
+Direção visual escolhida para o módulo Alpha Blueprint (central de especificação de sistemas). Mood: estúdio de arquitetura à noite — glass + profundidade sutil, mas contido; o canvas/editor são ferramentas de trabalho, não hero visual.
+
+- **Regra de legibilidade estendida do Aurora Financeira**: canvas e editor NUNCA têm fundo shader atrás — fundo liso `#020617` com gradiente radial estático discreto nos cantos vazios (mesmo tratamento de `ExtratoDetalhe`).
+- **Prioridade não é só cor**: todo indicador de prioridade/status leva ÍCONE + texto, nunca cor isolada (acessibilidade).
+- **Barra de status de salvamento**: sempre ícone + texto (`Salvando.../Salvo/Alterações pendentes/Erro ao salvar`), erro nunca é só um toast que some.
+- **Canvas (`@xyflow/react`)**: seleção de node via borda accent + glow externo sutil (nunca preenchimento sólido); conectores bezier nativos, texto do conector em pill pequeno; frames de wireframe com "barra de título" de janela (3 dots decorativos + nome da tela).
+- **Onboarding**: spotlight com overlay `bg-black/70` + recorte no elemento em foco, tooltip `bg-slate-900/95 backdrop-blur-xl`, progresso via dots (não "3/12" cru), entrada leve (fade+scale 0.96→1, sem spring 3D pesado).
+- **Mobile**: Kanban vira lista vertical (sem drag-and-drop — menu "Mover para..."), canvas avisa "melhor em telas maiores" mas nunca bloqueia.
+
+Ver especificação completa entregue por Iris na fase 03 da fila `prompt-phases/` (arquivada em `journal.md` ao final do projeto).

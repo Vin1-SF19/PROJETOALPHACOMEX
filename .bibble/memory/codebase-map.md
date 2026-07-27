@@ -59,6 +59,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Comercial | Instagram Studio | `/PainelAlpha/Marketing` | `instagramStudio` |
 | Comercial | Alpha Metas | `/PainelAlpha/Metas` | `metas` (role: Lider Comercial) |
 | Comercial | Alpha Presentation Studio | `/PainelAlpha/Apresentacoes` | `apresentacoes` ← Ondas 1-5 de 6 entregues, 2026-07-10 (Dashboard + Editor completo + Temas/Animações/Timeline + Componentes 3D + Motor de IA completo com UI; falta Onda 6 Apresentação/Export/Publicação/Colaboração) |
+| Comercial | Alpha Blueprint | `/PainelAlpha/AlphaBlueprint` | `blueprint` ← MVP completo, 2026-07-27 (Kanban + workspace por projeto + editor Tiptap + canvas xyflow + arquivos + requisitos + perguntas + comentários + IA + onboarding; Camada 2/evolução avançada não implementada — ver seção própria) |
 | **Financeiro** | **Extratos Bancários** | **`/PainelAlpha/ExtratosBancarios`** | **`Extratos`** ← reescrito 2026-07-09 |
 | Financeiro | Pré Análise | `/PainelAlpha/SistemaPreAnalise` | `analise` |
 | Financeiro | Consulta RADAR | `/PainelAlpha/HabilitacaoRadar` | `radar` |
@@ -381,3 +382,64 @@ Lotes reais de usuário já chegaram a 8 mil CNPJs, e a tabela renderizava todas
 **Editado quando:** "Regimento Interno" ganhar um campo de categoria/destaque de verdade (substituiria o `.includes()` por string), ou se outro documento precisar do mesmo tratamento de destaque (nesse caso, vale generalizar para uma lista configurável em vez de um único título hardcoded).
 
 **Última atualização:** 2026-07-22 por Scribe
+
+---
+
+## Alpha Blueprint — Central de especificação de sistemas (módulo novo, MVP completo)
+
+**Adicionado em:** 2026-07-27 por Scribe (sessão Bibble, execução completa da fila de fases via Scout→Vault→Iris→Echo→Nova→Cortex/Pulse→Anubis→Forge→Probe→Lens→Sage)
+
+**Descrição:** Central progressiva de especificação de sistemas — cada projeto reúne Kanban de acompanhamento, editor de texto rico (especificação), canvas visual infinito (fluxos/wireframes), central de arquivos, requisitos estruturados, perguntas/dúvidas, comentários, histórico de atividade e um assistente de IA isolado por projeto. Escopo entregue é a Camada 1 (MVP) do prompt original; Camada 2 (IA proativa avançada, colaboração real-time, versionamento avançado, apresentação em slides, exportações, métricas) foi conscientemente adiada.
+
+**Schema (9 models novos, aprovados por Vault como 🟢, aplicados no Turso via script pontual):**
+```prisma
+model BlueprintProject {
+  id, code (único), title, slug?, summary?, problem?, objective?
+  status (IDEA|PRONTO_ESPECIFICACAO|EM_ESPECIFICACAO|PRONTO_DESENVOLVIMENTO|EM_DESENVOLVIMENTO|EM_REVISAO|CONCLUIDO|ARQUIVADO)
+  priority (BAIXA|NORMAL|ALTA|URGENTE|CRITICA), progress Int, setor String?
+  requesterId/ownerId?/developerId?/createdById/updatedById? → usuarios.id (Int, NÃO String/cuid)
+  dueDate?, coverUrl?, icon?, tagsJson?, archivedAt?
+  documents/boards/files/requirements/questions/comments/members/activities (relations)
+}
+model BlueprintMember { projectId, userId, role (PROPRIETARIO|ADMINISTRADOR|EDITOR|COMENTARISTA|VISUALIZADOR), @@unique([projectId,userId]) }
+model BlueprintDocument { projectId, title, contentJson (Tiptap/ProseMirror), contentText (busca/IA), order }
+model BlueprintBoard { projectId, title, viewportJson?, elementsJson (nodes+edges xyflow), version (controle de conflito otimista) }
+model BlueprintFile { projectId, name, originalName, mimeType, size, url (Vercel Blob), thumbnailUrl?, archivedAt? }
+model BlueprintRequirement { projectId, code (@@unique com projectId), title, type (10 valores), status (7 valores), priority, acceptanceCriteria?, sourceType?/sourceId? (rastreabilidade de onde veio) }
+model BlueprintQuestion { projectId, question, answer?, status (ABERTA|RESPONDIDA|RESOLVIDA|DESCARTADA), authorId, assignedToId? }
+model BlueprintComment { projectId, parentId?, targetType, targetId?, content, authorId, resolved }
+model BlueprintActivity { projectId, userId, action, entityType, entityId?, previousValueJson?, newValueJson?, metadataJson? }
+```
+**⚠️ Divergência corrigida do schema conceitual do prompt original:** toda FK de usuário é `Int` (referencia `usuarios.id`, que é `Int @autoincrement()`), NÃO `String`/cuid como o prompt sugeria inicialmente — corrigido pelo Scout antes de Vault aprovar. `setor` é `String?` livre (= `usuarios.role`, mesmo padrão do resto do projeto), não uma FK — não existe model de Setor dedicado no schema real.
+
+**Arquivos centrais:**
+- `src/lib/validations/blueprint.ts` — todos os schemas Zod do módulo (enums de status/prioridade/tipo, allowlist de MIME type, limites de tamanho de payload de canvas/documento)
+- `src/lib/blueprint/ownership.ts` — `checarAcessoBlueprint`/`exigirAcessoBlueprint`, matriz de permissão por role (`PERMISSOES_POR_ROLE`), Admin/CEO global bypassa a checagem de membro
+- `src/lib/blueprint/ai-context.ts`, `ai-tools.ts`, `ai-executor.ts` — infraestrutura de IA isolada por projeto
+- `src/actions/Blueprint{Projects,Documents,Boards,Files,Requirements,Questions,Comments,Members,Onboarding}.ts` — 9 arquivos de Server Actions
+- `src/app/api/blueprint/upload/route.ts` — upload via Vercel Blob **dedicado** (store próprio, não o `IACHAT_*` do Bibble — ver env vars abaixo)
+- `src/app/api/blueprint/chat/route.ts` — chat contextual da IA, streaming SSE, reaproveita `callCompletion`/`encodeSSE` de `lib/bibble/completion.ts`
+- `src/app/PainelAlpha/AlphaBlueprint/page.tsx` (Dashboard) + `[projectId]/page.tsx` (Workspace) — ambas finas, com `auth()`+`getPermissoesEfetivas` (padrão dos ~7 módulos que já fazem esse check explícito)
+- `src/components/AlphaBlueprint/` — ~25 componentes (ver `components.md` para o catálogo completo)
+- `tests/blueprint/` — 49 testes Vitest (validações, ownership/matriz de permissão, regressão IDOR, transições de Kanban)
+
+**Decisões de arquitetura chave:**
+1. **Upload via Vercel Blob dedicado, não UploadThing.** UploadThing está no `package.json` mas nunca foi configurado/usado no projeto real (achado do Scout) — Vercel Blob é o mecanismo real em produção (mesmo padrão de `/api/bibble/upload-to-blob`). Novas env vars: `BLUEPRINT_STORE_ID`/`BLUEPRINT_READ_WRITE_TOKEN` (store próprio do usuário, adicionado em `.env.local`, seguindo o mesmo padrão de `IACHAT_STORE_ID`/`COMISSOES_STORE_ID` — o `put()` da versão instalada de `@vercel/blob@2.3.1` seleciona o store pelo `token`, não aceita `storeId` como parâmetro).
+2. **Editor rico: Tiptap** (`@tiptap/react` + extensões) — única instalação nova de peso do módulo, não havia editor rico no projeto antes. Conteúdo persistido como JSON nativo do ProseMirror (`contentJson`) + texto plano extraído (`contentText`, usado pela IA).
+3. **Canvas: `@xyflow/react`**, já instalado no projeto (usado em modo visualização pelo Apresentation Studio) — reaproveitado em modo totalmente editável (`nodesDraggable`/`nodesConnectable` true) pela primeira vez.
+4. **IA: infraestrutura real do Bibble (Ollama via `callCompletion`), não Anthropic direta** — apesar do `CLAUDE.md` apontar Claude como "futuro padrão", a implementação real em produção usa Ollama (function-calling clássico `OllamaTool[]`). Tools do Blueprint (`BLUEPRINT_AI_TOOLS`) são isoladas das tools gerais do Bibble — nunca compartilham o mesmo catálogo, e o contexto enviado ao modelo é sempre resolvido a partir do `projectId` do servidor (nunca aceito do cliente/modelo), prevenindo vazamento entre projetos.
+5. **Permissão por projeto é um conceito NOVO no painel** — `BlueprintMember` + matriz de 5 roles (Proprietário/Administrador/Editor/Comentarista/Visualizador) × 14 ações granulares. Nenhum outro módulo do sistema tem esse nível de granularidade de permissão por registro — é um padrão isolado do Blueprint, não generalizado para o resto do painel.
+6. **Onboarding é tour guiado interativo, diferente do onboarding de vídeo do IAlpha** — campo novo `usuarios.onboarding_blueprint_visto` (Boolean, ADD COLUMN aprovado por Vault), separado de `onboarding_ialpha_visto`. Não reaproveita `src/actions/onboarding.ts` (que é sistema de templates de mensagem de boas-vindas, conceito diferente).
+
+**Achados de segurança corrigidos nesta sessão (Anubis):** 6 vulnerabilidades de IDOR cross-project — `AtualizarArquivoBlueprint`/`ArquivarArquivoBlueprint`/`SalvarDocumentoBlueprint`/`ExcluirDocumentoBlueprint`/`SalvarBoardBlueprint`/`ExcluirBoardBlueprint` validavam acesso ao `projectId` informado pelo cliente mas nunca confirmavam que o `fileId`/`documentId`/`boardId` de fato pertencia a esse projeto antes de `update`/`delete`. Corrigido exigindo `entidade.projectId === projectId` antes de qualquer mutação. Regressão coberta em `tests/blueprint/idor-regression.test.ts`.
+
+**Pendências conhecidas, documentadas conscientemente:**
+- Fluxo autenticado ponta-a-ponta (criar projeto na UI, arrastar card, digitar no editor, desenhar no canvas, upload de arquivo real, usar chat de IA) não foi testado por automação de browser nesta sessão — sem credenciais de usuário disponíveis. Recomendado teste manual humano antes de considerar 100% validado (mesma limitação já registrada em outras sessões, ex: Apresentation Studio Onda 2).
+- Sem rate limit em nenhuma action do módulo (mesmo padrão de dívida já aceito em outros módulos do painel).
+- IA (Camada 1): chat contextual + resumo/lacunas/perguntas/sugestão de requisitos implementados; criação automática de elementos no canvas "mediante confirmação" (item do prompt original) NÃO implementada no MVP — fica para a Camada 2.
+- Onboarding cobre o Dashboard (3 passos: novo sistema, filtros, Kanban); não cobre ainda um tour dentro da página interna do projeto (editor/canvas/arquivos) — extensível seguindo o mesmo padrão de `data-onboarding="..."` + array `PASSOS`.
+- Sem projeto demonstrativo/exemplo pré-populado (mencionado no prompt original como "criar opcionalmente") — não implementado no MVP.
+
+**Editado quando:** Camada 2 (evolução avançada) for iniciada, ou se o onboarding for estendido para dentro do workspace do projeto.
+
+**Última atualização:** 2026-07-27 por Scribe

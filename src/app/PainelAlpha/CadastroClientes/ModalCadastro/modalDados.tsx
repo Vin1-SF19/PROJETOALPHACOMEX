@@ -12,6 +12,7 @@ import { getTema } from '@/lib/temas';
 import { DropdownSelecaoComCriacao } from './DropdownSelecaoComCriacao';
 import { ModalSelecionarUsuario } from './ModalSelecionarUsuario';
 import { FORMAS_PAGAMENTO, FORMAS_LABEL, formatarFormaPagamento } from './formas-pagamento';
+import { ORIGENS_LEAD_PADRAO } from './origens-lead';
 import { CsNpsModal3DShell } from "../CsNpsMotion";
 
 /**
@@ -159,7 +160,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const SERVICOS_COM_EMBASAMENTO = ["Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO"];
 
     const listaEmbasamentos = ["Disponibilidade Financeira", "Início ou Retomada", "Receita Bruta (DAS)", "Receita Bruta (CPRB)"];
-    const listaOrigensLead = ["Tráfego Pago (Meta - Instagram)", "Tráfego Pago (Google)", "Indicação Parceiro", "Indicação Cliente", "Evento", "China"];
+    const listaOrigensLead = [...ORIGENS_LEAD_PADRAO];
 
     /**
      * Analista/Closer passam a listar usuários REAIS do banco (não mais lista

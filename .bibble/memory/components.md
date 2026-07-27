@@ -22,6 +22,13 @@
 
 <!-- Adicionar aqui conforme o projeto cresce -->
 
+### ImagemNode (Canvas do Alpha Blueprint)
+**Arquivo:** `src/components/AlphaBlueprint/canvas/CanvasNodes.tsx`
+**Tipo:** Client Component (node customizado do `@xyflow/react`)
+**Props:** `NodeProps<Node<DadosImagemNode>>` — `data: { url?, nomeArquivo?, legenda?, cor? }`
+**Uso:** registrado em `CANVAS_NODE_TYPES.imagemNode`; criado pela toolbar via tipo `"imagem"` em `criarNode()` (`BlueprintCanvas.tsx`).
+**Notas:** upload real (não placeholder) via `POST /api/blueprint/upload`, reaproveitando a mesma rota do `FileUploadDropzone.tsx`. Precisa do `projectId`, fornecido via `CanvasProjectIdContext` (novo Context, provido em `BlueprintCanvas.tsx` ao lado do `CanvasDataChangeContext`) — sem ele o upload falha com 400 (`projectId` ausente), nunca silenciosamente. Estado vazio mostra dropzone clicável; com `data.url` preenchido, mostra a imagem via `next/image` (domínio `*.blob.vercel-storage.com` já liberado em `next.config.ts`) com botão "Substituir" no hover. `descreverCanvasProjeto()` (`ai-context.ts`) tem um case dedicado para `imagemNode` no "Gerar prompt".
+
 ### ConviteWizard (+ Step* + shared)
 **Arquivo:** `src/components/Parceiros/Convite/ConviteWizard.tsx`
 **Tipo:** Client Component
@@ -185,3 +192,46 @@
 **Tipo:** função pura (não componente)
 **Uso:** `enderecoResumo(preCadastro)` — monta endereço completo (`logradouro, número - complemento - bairro - cidade/UF`) se os campos estruturados novos estiverem presentes, com fallback para `município/UF` legado.
 **Notas:** Usada na listagem de pré-cadastros pendentes para o admin ver o endereço coletado no wizard antes de aprovar.
+
+### Alpha Blueprint (módulo novo, MVP completo, 2026-07-27)
+**Arquivo:** `src/components/AlphaBlueprint/` (~25 componentes)
+**Tipo:** Client Components (exceto as 2 páginas Server Component em `src/app/PainelAlpha/AlphaBlueprint/`)
+**Uso:** `<BlueprintDashboard temaName userId onboardingVisto />` (Dashboard/Kanban) e `<ProjectWorkspace projeto temaName userId />` (workspace interno de 1 projeto).
+**Notas:**
+- `BlueprintDashboard.tsx` + `BlueprintKanban.tsx` + `BlueprintColumn.tsx` + `BlueprintProjectCard.tsx` — Kanban de 7 colunas (status `ARQUIVADO` fica fora da visão padrão), drag-and-drop via `@dnd-kit` (mesmo padrão do Kanban do CRM, `PipelineClient.tsx`), com **optimistic update** (`onMoverOtimista`) para o card não "saltar de volta" à coluna original durante o round-trip do servidor.
+- `ProjectWorkspace.tsx` orquestra 8 abas via estado local (`AbaProjeto`): Visão geral, Especificação, Canvas, Arquivos, Requisitos, Comentários, Assistente IA, Atividade (+ Perguntas acessível via badge de pendências).
+- `SpecificationEditor.tsx` — editor Tiptap (`@tiptap/react` + `StarterKit`/`Underline`/`Link`/`Image`/`Placeholder`/`TaskList`/`Table`), toolbar própria, autosave debounce 1.5s, indicador de status (Salvando/Salvo/Pendente/Erro).
+- `BlueprintCanvas.tsx` + `CanvasToolbar.tsx` — canvas via `@xyflow/react` em modo totalmente editável (drag/pan/zoom/conectar), autosave com controle de conflito de versão otimista (`version: { increment: 1 }`, rejeita save se `version` client-side estiver desatualizada).
+- `ProjectFiles.tsx` + `FileUploadDropzone.tsx` — upload drag-and-drop + colar imagem, preview por tipo (imagem via `next/image unoptimized`, ícone para vídeo/áudio/PDF/outros).
+- `RequirementsPanel.tsx`, `QuestionsPanel.tsx`, `CommentsPanel.tsx`, `ProjectActivity.tsx` — CRUD simples por domínio, cada um com seu próprio `useEffect` de carga inicial (padrão `void carregar()` + `// eslint-disable-next-line react-hooks/set-state-in-effect`, ver nota abaixo).
+- `BlueprintAIPanel.tsx` — chat contextual, consome `POST /api/blueprint/chat` via `fetch`+`ReadableStream`, parse manual de frames SSE (mesmo estilo de `ModalGerarComIA.tsx` do Apresentation Studio).
+- `BlueprintOnboarding.tsx` — tour guiado com spotlight (`data-onboarding="..."` como seletor de ancoragem), 3 passos no MVP (cobre só o Dashboard), progresso via dots, `usuarios.onboarding_blueprint_visto` para persistência de "não mostrar novamente".
+- `ProjectMaturity.tsx` — checklist de maturidade da especificação (8 itens), progresso calculado a partir de campos preenchidos/contadores (`_count`), nunca bloqueia o usuário.
+
+**⚠️ Padrão a repetir: `void funcaoAsync(); // eslint-disable-next-line react-hooks/set-state-in-effect`** — a regra de lint do React Compiler (`react-hooks/set-state-in-effect`) bloqueia chamar uma função que faz `setState` diretamente dentro do corpo de um `useEffect`, mesmo através de uma função wrapper (`carregar()`, `carregarDados()`). O fix já era usado em `ApresentacoesDashboard.tsx`/`SeletorTema.tsx` antes deste módulo: prefixar a chamada com `void` E manter o comentário de disable na linha anterior — os dois juntos, não um ou outro.
+
+### Alpha Blueprint — Canvas expandido (melhorias, 2026-07-27)
+**Arquivo:** `src/components/AlphaBlueprint/canvas/` (`tipos-node.ts`, `CanvasNodes.tsx`, `CanvasPropertiesPanel.tsx`)
+**Tipo:** Client Components
+**Notas:**
+- 4 nodes customizados do `@xyflow/react` (`textoNode`, `stickyNode`, `formaNode`, `telaNode`) substituindo o `type: "default"` genérico usado no MVP inicial — todos com edição de texto inline (`<textarea>` auto-altura) e `NodeResizer` para redimensionar por arrasto.
+- **`CanvasDataChangeContext`** (React Context) é como a edição inline chega até o autosave — nunca usar `useReactFlow().updateNodeData()` aqui, pois não dispara `onNodesChange` (ver `known-errors.md`, achado real desta sessão que quebrava a persistência silenciosamente).
+- **Handles nas 4 bordas** (`HandlesQuatroLados`, cada lado com `source`+`target`) são obrigatórios em todo node customizado do xyflow — nodes customizados NÃO herdam os pontos de conexão do `type: "default"` nativo (2ª regressão real encontrada e corrigida nesta sessão, reportada pelo usuário em teste manual). Handles ficam com opacidade 0 e só aparecem no hover (`group-hover`) ou quando o node está selecionado.
+- `CanvasPropertiesPanel.tsx` — painel de ajuste (cor, tamanho de fonte, variante de forma, plataforma da tela, duplicar/excluir), inspirado no `PainelPropriedades.tsx` do Apresentation Studio mas adaptado à API nativa do xyflow.
+- `CanvasToolbar.tsx` expandida de 5 para 8 ferramentas (Texto, Retângulo, Círculo, Losango, Container/Frame, Sticky, Tela Desktop, Tela Mobile).
+
+### Alpha Blueprint — Background "Mesa de Trabalho" (2026-07-27)
+**Arquivo:** `src/components/AlphaBlueprint/BlueprintBackground.tsx` + `src/app/PainelAlpha/AlphaBlueprint/layout.tsx`
+**Tipo:** Client Component + Server Component (layout)
+**Notas:** Variação temática do padrão "fundo vivo por módulo" (ver `ChecklistBackground.tsx`/`patterns.md`) — grade de papel milimetrado estática + "âncoras" (cotas de medição pulsando) + linhas de régua diagonal + glows accent contidos. Aplicado SOMENTE no `layout.tsx` do módulo — o `BlueprintCanvas.tsx` mantém fundo sólido próprio por decisão explícita do usuário (canvas não deve competir visualmente com os elementos). `BlueprintDashboard.tsx`/`ProjectWorkspace.tsx` tiveram `bg-[#020617]` sólido removido para o background do layout aparecer atrás.
+
+### Alpha Blueprint — Responsáveis e prazo editáveis (2026-07-27)
+**Arquivo:** `src/components/AlphaBlueprint/UserSelect.tsx` (novo), `EditProjectDialog.tsx` (novo), `CreateProjectDialog.tsx` (editado)
+**Tipo:** Client Components
+**Notas:**
+- **Achado real:** `ownerId`/`developerId`/`dueDate` já existiam no schema e na Visão Geral (exibidos como "Não definido"), mas nunca tinham campo de preenchimento em lugar nenhum — nem na criação, nem depois. Mesmo problema para `objective`, exibido no checklist de maturidade sem nenhuma UI de edição.
+- `UserSelect.tsx` — dropdown compacto reaproveitando `BuscarTodosUsuarios()` (`src/actions/RecursosHumanos.ts`), com cache em memória simples (módulo-level, evita refetch a cada abertura de diálogo) e filtro por `status === "ATIVO"`. Não é o mesmo componente que `ModalSelecionarUsuario.tsx` (CS&NPS) — aquele é um modal de busca acoplado ao 3D shell daquele módulo e retorna `nome` (string), não `id`; o Blueprint precisa do ID para gravar a FK.
+- `EditProjectDialog.tsx` — modal de edição de dados gerais (resumo, problema, objetivo, setor, prioridade, os 2 responsáveis, prazo), acionado por um botão "Editar" no card "Sobre o projeto" da Visão Geral. Usa `AtualizarProjetoBlueprint` (já suportava esses campos desde o Echo) e `router.refresh()` para atualizar o Server Component pai sem perder a aba ativa do workspace.
+- `dataInputParaDate()` (`tipos.ts`) — helper que interpreta a string `YYYY-MM-DD` de um `<input type="date">` como meio-dia local, evitando o deslocamento de um dia por fuso horário que `new Date("2026-07-30")` puro causaria em fusos negativos.
+
+**Última atualização:** 2026-07-27 por Scribe

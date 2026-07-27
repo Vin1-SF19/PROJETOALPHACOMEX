@@ -12,7 +12,7 @@ import {
   Scale, FileText, GraduationCap, BookOpen, KeyRound,
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
   X, PanelLeft, User, Pin, ChevronLeft, ChevronRight,
-  Instagram, Activity, Handshake, Cable, MonitorPlay, CalendarClock,
+  Instagram, Activity, Handshake, Cable, MonitorPlay, CalendarClock, Compass,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -32,7 +32,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Megaphone, Trophy, Landmark, FileSearch, ScanSearch,
   Scale, FileText, GraduationCap, BookOpen, KeyRound,
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
-  Instagram, Handshake, Cable, MonitorPlay, CalendarClock,
+  Instagram, Handshake, Cable, MonitorPlay, CalendarClock, Compass,
 };
 
 const ACTIVE_BG: Record<string, string> = {

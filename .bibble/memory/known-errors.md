@@ -18,6 +18,40 @@
 
 ---
 
+### ESLint `react-hooks/set-state-in-effect` — chamar Server Action dentro de `useEffect`
+**Sintoma:** `npm run lint` reporta `error: Calling setState synchronously within an effect can trigger cascading renders` apontando para uma linha tipo `carregarDados();` ou `carregar();` dentro de um `useEffect(() => { ... }, [deps])`.
+**Causa:** Regra do React Compiler (via `eslint-config-next/core-web-vitals`) detecta chamar diretamente uma função que internamente faz `setState` (mesmo que seja uma função `async` que popula estado a partir de uma Server Action) dentro do corpo de um efeito — é o padrão universal do projeto para "buscar dados ao montar" (ex: `ApresentacoesDashboard.tsx`, todo o módulo Alpha Blueprint), mas o linter trata como erro bloqueante, não warning.
+**Fix:** Prefixar a chamada com `void` E manter um `// eslint-disable-next-line react-hooks/set-state-in-effect` na linha imediatamente anterior — os DOIS juntos, um sozinho não resolve (`void` sozinho não silencia o lint; o disable sozinho sem `void` deixa a Promise solta sem indicar intenção). Exemplo:
+```tsx
+useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  void carregarDados();
+}, [carregarDados]);
+```
+Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` disparando `setState` direto, sem `async`), usar só o disable comment com justificativa inline (`// eslint-disable-next-line react-hooks/set-state-in-effect -- motivo`), já que não há `Promise` para `void`.
+**Contexto:** Qualquer componente novo que precise popular estado local a partir de uma Server Action ao montar (praticamente todo Dashboard/painel do projeto usa esse padrão). O projeto tem ~178 ocorrências pré-existentes desse erro em código legado (não corrigidas retroativamente) — mas todo código NOVO deve aplicar o fix, pois é um `error` bloqueante do lint, não um warning tolerável.
+**Adicionado em:** 2026-07-27 (Forge, sessão Alpha Blueprint)
+
+---
+
+### `@xyflow/react` — `useReactFlow().updateNodeData()` não aciona autosave (edição parece funcionar mas nunca persiste)
+**Sintoma:** Nenhum erro no console/build. O usuário edita o texto de um node customizado do React Flow, a UI atualiza normalmente, mas ao recarregar a página a edição sumiu — nada foi persistido, mesmo com a lógica de autosave/debounce implementada e aparentemente correta.
+**Causa:** `updateNodeData(id, patch)` (do hook `useReactFlow()`) escreve diretamente no store interno do provider do React Flow, **sem passar pelo callback `onNodesChange`** do componente controlador. Quando o autosave está implementado dentro de `onNodesChange`/`handleNodesChange` (padrão natural: "salvar sempre que os nodes mudarem"), qualquer edição feita via `updateNodeData` fica invisível para esse mecanismo — o React re-renderiza (o dado mudou no store), mas o `useNodesState` do componente pai nunca dispara seu próprio `onChange`.
+**Fix:** Nunca usar `useReactFlow().updateNodeData()` para editar `data` de um node quando o autosave depende de `onNodesChange`. Em vez disso, criar um React Context que carregue um callback do componente controlador (`handleDataChange(nodeId, patch)` que chama `setNodes` real), e prover esse contexto ao redor do `<ReactFlow>`. Cada node customizado consome o contexto (`useContext`) em vez de `useReactFlow()`. Implementado em `src/components/AlphaBlueprint/canvas/CanvasNodes.tsx` (`CanvasDataChangeContext`) — usar como referência para qualquer canvas futuro no projeto que precise de nodes com edição inline.
+**Contexto:** Qualquer implementação de canvas com `@xyflow/react` neste projeto que tenha nodes customizados editáveis (texto, propriedades) E autosave baseado em `onNodesChange`. Também vale o mesmo cuidado para `updateNode`/`updateEdge` do mesmo hook — todos sofrem do mesmo problema de não disparar os callbacks de change.
+**Adicionado em:** 2026-07-27 (Lens, sessão de melhorias do Canvas do Alpha Blueprint)
+
+---
+
+### `@xyflow/react` — node customizado sem `<Handle>` não permite criar conectores (regressão real reportada pelo usuário)
+**Sintoma:** Ao trocar nodes de `type: "default"` (nativo do React Flow) para um componente React customizado (`nodeTypes` prop), o usuário não consegue mais arrastar das bordas do node para criar uma conexão/edge — os pontos de conexão simplesmente somem, mesmo com `onConnect` implementado corretamente no `<ReactFlow>`.
+**Causa:** O node `type: "default"` nativo do xyflow já vem com 2 `<Handle>` embutidos (um `target` em cima, um `source` embaixo). Ao substituir por um componente customizado, esses handles NÃO são herdados automaticamente — é responsabilidade do componente customizado renderizar seus próprios `<Handle>` explicitamente. Esquecer isso é fácil porque nada quebra em tempo de build/типecheck: o node simplesmente renderiza sem pontos de conexão, sem erro nenhum.
+**Fix:** Todo node customizado que deve ser conectável precisa importar `Handle`/`Position` de `@xyflow/react` e renderizar ao menos um `type="target"` e um `type="source"`. Para permitir conectar em qualquer direção (não só topo→baixo), usar 4 pares (top/right/bottom/left, cada um com `source` E `target`, `id` únicos). Implementado como componente compartilhado `HandlesQuatroLados` em `src/components/AlphaBlueprint/canvas/CanvasNodes.tsx`, reaproveitado pelos 4 tipos de node — copiar esse padrão para qualquer node customizado novo do xyflow no projeto. Detalhe de polish: os handles ficam com `opacity-0 group-hover:opacity-100` (visíveis só no hover ou quando o node está selecionado) para não poluir visualmente nodes pequenos — requer a classe `group` no wrapper do node.
+**Contexto:** Qualquer vez que um node do xyflow migrar de `type: "default"`/tipos nativos para um componente customizado neste projeto. Testar explicitamente "consigo arrastar uma conexão das bordas?" depois de qualquer mudança em `nodeTypes` — essa regressão não aparece em nenhuma verificação automatizada (tsc/lint/build), só em teste manual real.
+**Adicionado em:** 2026-07-27 (sessão de melhorias do Canvas do Alpha Blueprint — reportado pelo usuário em teste manual)
+
+---
+
 ## Erros Catalogados
 
 ### "use server" file can only export async functions, found object

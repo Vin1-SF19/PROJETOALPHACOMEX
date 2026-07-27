@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { CadastrarCliente, verificarCNPJDuplicado, buscarUsuariosPorRole } from "@/actions/Clientes";
 import { FORMAS_PAGAMENTO, FORMAS_LABEL } from "./formas-pagamento";
 import { ModalSelecionarUsuario } from "./ModalSelecionarUsuario";
+import { ORIGENS_LEAD_PADRAO } from "./origens-lead";
 import { CsNpsModal3DShell } from "../CsNpsMotion";
 
 export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
@@ -29,7 +30,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
     const [showOrigemLead, setShowOrigemLead] = useState(false);
     const [isCriandoOrigemLead, setIsCriandoOrigemLead] = useState(false);
     const [novaOrigemLeadNome, setNovaOrigemLeadNome] = useState("");
-    const [listaOrigensLead, setListaOrigensLead] = useState(["Tráfego Pago (Meta - Instagram)", "Tráfego Pago (Google)", "Indicação Parceiro", "Indicação Cliente", "Evento", "China"]);
+    const [listaOrigensLead, setListaOrigensLead] = useState<string[]>(() => [...ORIGENS_LEAD_PADRAO]);
     const [cnpj, setCnpj] = useState("");
     const [carregando, setCarregando] = useState(false);
     const [isSaving, setIsSaving] = useState(false);

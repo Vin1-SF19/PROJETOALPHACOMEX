@@ -50,3 +50,6 @@ next-env.d.ts
 # Claude Code (worktrees + local settings)
 .claude/
 .cursor/worktrees/
+
+# Fases de prompt (fila de execução local do Bibble, nunca vai para o git)
+/prompt-phases/

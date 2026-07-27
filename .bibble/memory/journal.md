@@ -32,6 +32,56 @@
 
 <!-- Kowalski adiciona aqui ao final de cada sessão -->
 
+---
+
+## [2026-07-27 12:30] — Alpha Blueprint: novo módulo completo (MVP), execução via fila de fases
+
+**Tags:** #feature #decision #prisma #security #critical #integration #nextjs
+**Agentes envolvidos:** Scout → Vault (x2) → Iris → Echo → Nova → Cortex/Sync → Pulse → Anubis → Forge → Probe → Lens → Sage → Scribe → Kowalski (pipeline serial completo, sem pular etapa)
+**Arquivos tocados:** ~40 arquivos novos (`src/actions/Blueprint*.ts` x9, `src/lib/blueprint/*.ts` x5, `src/lib/validations/blueprint.ts`, `src/components/AlphaBlueprint/*.tsx` x~25, `src/app/PainelAlpha/AlphaBlueprint/**`, `src/app/api/blueprint/{upload,chat}/route.ts`, `tests/blueprint/*.test.ts` x4) + `prisma/schema.prisma` (9 models + 1 coluna em `usuarios`) + `src/lib/modulos-registry.ts` + `src/components/layout/GlobalSidebar.tsx` + `.env.local`
+
+### Contexto
+Usuário pediu um módulo novo completo — "Alpha Blueprint": central progressiva de especificação de sistemas (Kanban + editor de texto rico + canvas visual + arquivos + requisitos/perguntas/comentários + IA + onboarding). Pedido veio como um prompt extenso e detalhado, que foi quebrado em 14 fases sequenciais salvas em `prompt-phases/` (uma por etapa do pipeline da squad) e executado do início ao fim sem pausar, a pedido explícito do usuário ("Execute sem parar").
+
+### O que foi feito
+- **Schema**: 9 models novos (`BlueprintProject`, `BlueprintMember`, `BlueprintDocument`, `BlueprintBoard`, `BlueprintFile`, `BlueprintRequirement`, `BlueprintQuestion`, `BlueprintComment`, `BlueprintActivity`) aplicados no Turso real via script pontual, aprovados por Vault como 🟢 (CREATE TABLE puro). Coluna nova `usuarios.onboarding_blueprint_visto` (ADD COLUMN, também 🟢, aprovada e aplicada na mesma sessão).
+- **Backend**: 9 arquivos de Server Actions com ownership por projeto (`checarAcessoBlueprint`/`exigirAcessoBlueprint`, matriz de 5 roles × 14 ações), upload via Route Handler dedicada, chat de IA via Route Handler com streaming SSE.
+- **Frontend**: Dashboard/Kanban (drag-and-drop `@dnd-kit`, optimistic update), workspace de projeto com 8 abas, editor rico Tiptap (instalado nesta sessão), canvas visual `@xyflow/react` (já instalado, reaproveitado em modo editável), central de arquivos, requisitos/perguntas/comentários, painel de IA, onboarding com tour guiado.
+- **IA**: isolada por projeto, reaproveitando a infraestrutura REAL do Bibble (Ollama via `callCompletion`, não Anthropic — divergência do `CLAUDE.md` identificada e seguida conscientemente pela realidade do código).
+- **Testes**: 49 testes Vitest novos (`tests/blueprint/`) cobrindo validação Zod, matriz de permissão, regressão de IDOR, transições de Kanban.
+- **Verificação**: `tsc --noEmit` limpo (baseline de 4 erros pré-existentes inalterado), lint escopado 0 erros/warnings, `npm run build` 100% sucesso (todas as ~95 rotas do sistema, não só o módulo novo).
+
+### Decisões tomadas
+- FK de usuário em todo o schema novo é `Int` (não `String`/cuid) — corrigindo o schema conceitual do prompt original para bater com `usuarios.id: Int @autoincrement()` real.
+- Upload via Vercel Blob com store DEDICADO (`BLUEPRINT_STORE_ID`/`BLUEPRINT_READ_WRITE_TOKEN`, fornecido pelo usuário no meio da implementação) — não UploadThing (nunca configurado no projeto real, apesar de estar no `package.json`).
+- IA via Ollama real (`callCompletion`/`OllamaTool`), não Anthropic — segue a infraestrutura de produção real, não a arquitetura "futura" descrita no `CLAUDE.md`.
+- Tiptap escolhido e instalado como editor rico (nenhum existia antes); `@xyflow/react` reaproveitado (já instalado, usado pelo Apresentation Studio em modo visualização).
+- Permissão por PROJETO (`BlueprintMember`) é um conceito novo, adicional à permissão de módulo padrão do painel — primeira vez que um módulo tem granularidade de permissão por registro individual.
+
+### Problemas encontrados / resolvidos
+- **6 vulnerabilidades reais de IDOR cross-project** (Anubis): `AtualizarArquivoBlueprint`/`ArquivarArquivoBlueprint`/`SalvarDocumentoBlueprint`/`ExcluirDocumentoBlueprint`/`SalvarBoardBlueprint`/`ExcluirBoardBlueprint` validavam acesso ao `projectId` do cliente mas nunca confirmavam que a entidade (`fileId`/`documentId`/`boardId`) pertencia a esse projeto antes de mutar — corrigido exigindo `entidade.projectId === projectId`, com regressão coberta em teste automatizado.
+- **Race condition no canvas** (Lens): `handleEdgesChange`/`onConnect` em `BlueprintCanvas.tsx` liam `nodes` do closure do render (potencialmente stale) em vez do valor mais atual — corrigido usando `setNodes` funcional para sempre ler o estado atual antes de agendar o autosave.
+- **Falta de optimistic update no Kanban** (Lens): card "saltava de volta" à coluna original durante o round-trip do servidor — corrigido aplicando a mudança de status no estado local imediatamente, revertendo só em caso de falha.
+- **`requesterId` sem validar existência** (Lens): `CriarProjetoBlueprint` aceitava qualquer ID numérico do cliente sem confirmar que o usuário existe — corrigido com `findUnique` antes do `create`.
+- **6 erros ESLint `react-hooks/set-state-in-effect`** (Forge): padrão universal do projeto (chamar Server Action dentro de `useEffect`) precisa do fix `void fn(); // eslint-disable-next-line ...` — documentado em `known-errors.md` para futuras sessões.
+- **Bug de idempotência em `MoverProjetoBlueprint`** (Sage, achado durante os testes): mover para o MESMO status regravava `update`+`activity` desnecessariamente — corrigido com early-return.
+- **EPERM na DLL do Prisma Client** — erro já catalogado, resolvido matando processos `node.exe` antes de `prisma generate`.
+
+### Pendências
+- Fluxo autenticado ponta-a-ponta (criar projeto, arrastar card, editor, canvas, upload real, chat de IA) não testado por automação de browser — sem credenciais de usuário disponíveis nesta sessão. Recomendado teste manual humano.
+- Camada 2 (evolução avançada do prompt original): IA proativa analisando projeto inteiro, geração automática de fluxos/wireframes, colaboração real-time, versionamento avançado (snapshots/branch), apresentação em slides, exportações avançadas, métricas gerenciais — nenhum implementado, conscientemente adiado.
+- Onboarding cobre só o Dashboard (3 passos); não cobre tour dentro do workspace do projeto (editor/canvas/arquivos).
+- Sem projeto demonstrativo/exemplo pré-populado.
+- Sem rate limit em nenhuma action do módulo (mesmo padrão de dívida já aceito em outros módulos do painel).
+
+### Refletido também em
+- `decisions.md`: 2 entradas novas (divergências corrigidas do prompt original; fila de fases `prompt-phases/`)
+- `architecture.md`: endpoints/Server Actions do Blueprint + env vars `BLUEPRINT_STORE_ID`/`BLUEPRINT_READ_WRITE_TOKEN`
+- `codebase-map.md`: seção completa do módulo (schema, arquivos centrais, decisões de arquitetura, pendências)
+- `integration-points.md`: checklist de integração + lição de IDOR para actions com `entityId`+`projectId` separados
+- `components.md`: catálogo dos ~25 componentes + padrão de fix do `set-state-in-effect`
+- `known-errors.md`: erro de lint `react-hooks/set-state-in-effect` documentado com fix exato
+
 ## [2026-07-13] — CS&NPS: multi-serviço por CNPJ, usuários reais, e reconstrução do log de auditoria (com incidente de perda de dados)
 
 **Tags:** #feature #bugfix #decision #prisma #critical #integration

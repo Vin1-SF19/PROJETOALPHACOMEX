@@ -687,3 +687,26 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao criar `ConfirmacaoLeituraDocumento` com FK pra `documentos` e `usuarios`, foi preciso adicionar `confirmacoes ConfirmacaoLeituraDocumento[]` dentro de `documentos` e `confirmacoesLeituraDocumento ConfirmacaoLeituraDocumento[]` dentro de `usuarios` — sem isso, `prisma generate` falha ou o client não expõe os tipos esperados. Ao criar qualquer model novo com FK para `usuarios`/`documentos`/outro model existente, sempre voltar e editar o model-alvo também.
 
 **Também registrado:** mesmo para uma migration classificada 🟢 (CREATE TABLE puro, sem risco), se o usuário pedir explicitamente um backup fresco antes (em vez de aceitar o backup diário já dentro das 48h), gerar via script pontual Node (`@libsql/client`, mesma técnica dos backups diários — dump completo schema+dados por tabela dentro de uma transação de leitura) salvo em `database-backups/pre-change/`, e só then rodar a migration (script pontual separado, descartado depois, confirmado via `PRAGMA`).
+
+---
+
+### Alpha Blueprint — módulo novo (MVP completo)
+
+**Adicionado em:** 2026-07-27 por Scribe (sessão Bibble, execução completa da fila `prompt-phases/`)
+
+**Checklist de integração:**
+- [x] Aparece no menu/sidebar — via `MODULOS_REGISTRY` (`id: 'blueprint'`, ícone `Compass` adicionado ao `ICON_MAP` de `GlobalSidebar.tsx`)
+- [x] Permissão administrável pelo Admin — automática via `MODULOS_GERENCIAVEIS` (deriva do registry em `ModalGerenciarSetor.tsx`/`ModalOverrideUser.tsx`/`PreviewModulosSetor.tsx`, confirmado por leitura direta do código nesta sessão — sem edição manual adicional necessária)
+- [x] Pode ser fixado como atalho — mecanismo de atalhos (`usuarios.atalhos`) referencia módulos pelo `id` do registry, qualifica automaticamente
+- [x] Rota protegida por permissão de módulo — `AlphaBlueprint/page.tsx` chama `auth()` + `getPermissoesEfetivas()` e redireciona se `!perms.includes("blueprint")` (Admin/CEO bypassa), seguindo o padrão dos ~7 módulos que já fazem esse check explícito (ver checkpoint do RADAR acima)
+- [x] Rota do projeto (`/PainelAlpha/AlphaBlueprint/[projectId]`) — ownership por projeto verificado via `ObterProjetoBlueprint` → `exigirAcessoBlueprint`, não apenas permissão de módulo
+
+**Permissão por PROJETO é um conceito novo, além da permissão de módulo:** diferente de todo o resto do painel (que só tem permissão de módulo, tudo-ou-nada), o Blueprint tem uma segunda camada — `BlueprintMember` com 5 roles (Proprietário/Administrador/Editor/Comentarista/Visualizador) × 14 ações granulares (`src/lib/blueprint/ownership.ts`). Ter a permissão de módulo `blueprint` só dá acesso ao Dashboard/Kanban (ver quais projetos existem, criar novo); para abrir/editar um projeto específico é preciso ser membro dele (ou Admin/CEO global). Ao integrar qualquer feature nova que leia/escreva dados de um projeto do Blueprint, **sempre** usar `exigirAcessoBlueprint(projectId, userId, role, acao)` — nunca confiar só na permissão de módulo.
+
+**Upload usa store de Vercel Blob dedicado**, não o `IACHAT_*` compartilhado do Bibble nem UploadThing (que está no `package.json` mas nunca foi configurado no projeto real). Env vars `BLUEPRINT_STORE_ID`/`BLUEPRINT_READ_WRITE_TOKEN` em `.env.local`. Se um módulo futuro precisar de um store de Blob próprio, seguir esse mesmo padrão (token dedicado identifica o store automaticamente no `put()`, sem precisar passar `storeId` — a versão instalada do SDK não aceita esse parâmetro).
+
+**⚠️ Lição de IDOR para toda action que recebe `entityId` + `projectId` como parâmetros separados:** validar acesso ao `projectId` (via `exigirAcessoBlueprint`) NÃO é suficiente — é preciso também confirmar que a entidade (`fileId`/`documentId`/`boardId`/etc) de fato pertence a esse `projectId` antes de `update`/`delete`, senão um usuário com acesso legítimo a QUALQUER projeto pode alterar/apagar entidades de outros projetos. 6 ocorrências desse bug foram encontradas e corrigidas nesta sessão (Anubis) em `BlueprintFiles.ts`/`BlueprintDocuments.ts`/`BlueprintBoards.ts`. O padrão correto (já usado desde o início em `Requirements`/`Questions`/`Comments`/`Members`) é resolver o `projectId` a partir do PRÓPRIO registro buscado por `entityId`, nunca confiar no `projectId` do parâmetro para a mutação em si — só usá-lo para o gate de acesso.
+
+**Editado quando:** Camada 2 (evolução avançada) começar, ou se outro módulo precisar do mesmo padrão de permissão granular por registro.
+
+**Última atualização:** 2026-07-27 por Scribe
