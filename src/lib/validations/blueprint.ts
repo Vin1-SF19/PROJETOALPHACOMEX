@@ -83,6 +83,11 @@ export const moverProjetoSchema = z.object({
   justificativa: z.string().trim().max(1000).optional(),
 });
 
+export const excluirProjetosSchema = z.object({
+  projectIds: z.array(z.string().cuid()).min(1).max(50),
+  senha: z.string().min(1),
+});
+
 export const paginacaoProjetosSchema = z.object({
   page: z.number().int().positive().default(1),
   pageSize: z.number().int().positive().max(100).default(30),

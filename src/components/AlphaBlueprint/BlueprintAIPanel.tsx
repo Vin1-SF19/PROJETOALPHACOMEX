@@ -2,6 +2,23 @@
 
 import { useRef, useState } from "react";
 import { Sparkles, Send, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { cn } from "@/lib/utils";
+
+const PROSE_CLASSES = cn(
+  "prose prose-invert prose-sm max-w-none",
+  "prose-p:my-1.5 prose-p:leading-relaxed prose-p:text-slate-300",
+  "prose-headings:text-white prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1",
+  "prose-h1:text-sm prose-h2:text-sm prose-h3:text-xs",
+  "prose-strong:text-white prose-strong:font-semibold",
+  "prose-ul:my-1.5 prose-ul:pl-4 prose-ol:my-1.5 prose-ol:pl-4",
+  "prose-li:my-0.5 prose-li:text-slate-300 prose-li:leading-relaxed",
+  "prose-code:text-sky-300 prose-code:bg-white/5 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs",
+  "prose-code:before:content-none prose-code:after:content-none",
+  "prose-hr:border-white/10 prose-hr:my-2",
+  "prose-a:text-indigo-300",
+);
 
 interface MensagemChat {
   role: "user" | "assistant";
@@ -105,11 +122,17 @@ export function BlueprintAIPanel({ projectId, accent }: BlueprintAIPanelProps) {
           </div>
         )}
 
-        {mensagens.map((m, i) => (
-          <div key={i} className={`text-sm rounded-xl px-3 py-2 max-w-[90%] ${m.role === "user" ? "ml-auto bg-white/5 text-white" : "bg-transparent text-slate-300"}`}>
-            {m.content}
-          </div>
-        ))}
+        {mensagens.map((m, i) =>
+          m.role === "user" ? (
+            <div key={i} className="text-sm rounded-xl px-3 py-2 max-w-[90%] ml-auto bg-white/5 text-white whitespace-pre-wrap">
+              {m.content}
+            </div>
+          ) : (
+            <div key={i} className={`${PROSE_CLASSES} max-w-[95%]`}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+            </div>
+          ),
+        )}
 
         {carregando && (
           <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -125,6 +148,12 @@ export function BlueprintAIPanel({ projectId, accent }: BlueprintAIPanelProps) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && enviar(input)}
           placeholder="Pergunte algo sobre este projeto..."
+          type="text"
+          name="blueprint-ai-chat-mensagem"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           className="flex-1 rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none"
           disabled={carregando}
         />

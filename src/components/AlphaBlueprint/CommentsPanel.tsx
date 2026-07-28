@@ -67,6 +67,12 @@ export function CommentsPanel({ projectId, accent, userId }: CommentsPanelProps)
           value={novoComentario}
           onChange={(e) => setNovoComentario(e.target.value)}
           placeholder="Escreva um comentário..."
+          type="text"
+          name="blueprint-novo-comentario"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           className="flex-1 rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none"
           onKeyDown={(e) => e.key === "Enter" && criar()}
         />

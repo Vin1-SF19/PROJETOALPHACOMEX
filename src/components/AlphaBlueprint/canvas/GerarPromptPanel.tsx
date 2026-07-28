@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Copy, X, Check, FileText } from "lucide-react";
 import { toast } from "sonner";
 
@@ -100,6 +100,8 @@ export function GerarPromptPanel({ projectId, accent, onFechar }: GerarPromptPan
           <textarea
             readOnly
             value={prompt}
+            name="blueprint-gerar-prompt-resultado"
+            autoComplete="off"
             className="w-full h-full min-h-[60vh] rounded-xl bg-slate-900/60 border border-white/10 p-3 text-xs text-slate-300 font-mono outline-none resize-none"
           />
         )}

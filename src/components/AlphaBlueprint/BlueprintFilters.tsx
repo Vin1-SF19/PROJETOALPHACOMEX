@@ -19,6 +19,12 @@ export function BlueprintFilters({ busca, onBuscaChange, prioridade, onPrioridad
           value={busca}
           onChange={(e) => onBuscaChange(e.target.value)}
           placeholder="Buscar projetos..."
+          type="text"
+          name="blueprint-busca-projetos"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           className="w-full rounded-xl bg-slate-900/60 border border-white/10 pl-8 pr-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-white/20"
         />
       </div>

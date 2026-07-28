@@ -89,6 +89,12 @@ export function RequirementsPanel({ projectId, accent }: RequirementsPanelProps)
             value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
             placeholder="Título do requisito"
+            type="text"
+            name="blueprint-requisito-titulo"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             className="w-full rounded-lg bg-slate-950/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none"
             autoFocus
           />

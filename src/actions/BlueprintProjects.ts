@@ -1,12 +1,14 @@
 "use server";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { compareSync } from "bcryptjs";
 import { auth } from "../../auth";
 import {
   criarProjetoSchema,
   atualizarProjetoSchema,
   moverProjetoSchema,
   paginacaoProjetosSchema,
+  excluirProjetosSchema,
   BLUEPRINT_STATUS,
 } from "@/lib/validations/blueprint";
 import { exigirAcessoBlueprint, isAdminRole } from "@/lib/blueprint/ownership";
@@ -385,6 +387,59 @@ export async function RestaurarProjetoBlueprint(projectId: string) {
     console.error("[RestaurarProjetoBlueprint]", error);
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao restaurar projeto";
     return { success: false, error: msg };
+  }
+}
+
+/**
+ * Exclusão DEFINITIVA (hard delete) de projetos do Alpha Blueprint — apaga em cascata
+ * documentos, canvas, arquivos (metadados), requisitos, perguntas, comentários, membros
+ * e atividades (ver onDelete: Cascade em schema.prisma). Restrita a Admin/CEO GLOBAL
+ * (isAdminRole na sessão) — não é a mesma coisa que a ação "excluir" da matriz de roles
+ * por projeto (PERMISSOES_POR_ROLE), que é para o Proprietário do projeto e não se aplica
+ * aqui. Exige a senha do próprio usuário autenticado (nunca do dono do projeto).
+ */
+export async function ExcluirProjetosBlueprint(dados: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+
+    if (!isAdminRole(session.user.role)) {
+      return { success: false, error: "Apenas Admin ou CEO podem excluir projetos definitivamente" };
+    }
+
+    const parsed = excluirProjetosSchema.safeParse(dados);
+    if (!parsed.success) return { success: false, error: "Dados inválidos" };
+    const { projectIds, senha } = parsed.data;
+
+    const usuarioBanco = await db.usuarios.findUnique({ where: { id: userId }, select: { senha: true } });
+    if (!usuarioBanco) return { success: false, error: "Usuário não encontrado" };
+
+    const senhaCorreta = compareSync(senha, usuarioBanco.senha);
+    if (!senhaCorreta) return { success: false, error: "Senha incorreta" };
+
+    const projetos = await db.blueprintProject.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, title: true, code: true },
+    });
+    if (projetos.length === 0) return { success: false, error: "Nenhum projeto encontrado" };
+
+    const idsEncontrados = projetos.map((p) => p.id);
+
+    // Registrar atividade não faz sentido aqui: BlueprintActivity é apagada em cascata
+    // junto com o próprio BlueprintProject na mesma operação — a auditoria desta ação
+    // vive só no log de servidor abaixo, fora das tabelas que estão sendo excluídas.
+    await db.blueprintProject.deleteMany({ where: { id: { in: idsEncontrados } } });
+
+    console.log(
+      `[ExcluirProjetosBlueprint] userId=${userId} excluiu definitivamente: ${projetos.map((p) => `${p.code} (${p.id})`).join(", ")}`,
+    );
+
+    revalidatePath(ROTA_BASE);
+    return { success: true, data: { excluidos: idsEncontrados.length } };
+  } catch (error) {
+    console.error("[ExcluirProjetosBlueprint]", error);
+    return { success: false, error: "Erro ao excluir projetos" };
   }
 }
 

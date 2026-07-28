@@ -85,6 +85,12 @@ export function QuestionsPanel({ projectId, accent, onFechar }: QuestionsPanelPr
           value={novaPergunta}
           onChange={(e) => setNovaPergunta(e.target.value)}
           placeholder="Registrar uma nova pergunta..."
+          type="text"
+          name="blueprint-nova-pergunta"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           className="flex-1 rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none"
           onKeyDown={(e) => e.key === "Enter" && criarPergunta()}
         />
@@ -111,6 +117,12 @@ export function QuestionsPanel({ projectId, accent, onFechar }: QuestionsPanelPr
                   value={respostas[p.id] ?? ""}
                   onChange={(e) => setRespostas((r) => ({ ...r, [p.id]: e.target.value }))}
                   placeholder="Responder..."
+                  type="text"
+                  name={`blueprint-resposta-${p.id}`}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   className="flex-1 rounded-lg bg-slate-950/60 border border-white/10 px-2.5 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none"
                 />
                 <button onClick={() => responder(p.id)} className="text-xs text-white px-3 py-1.5 rounded-lg" style={{ background: `rgba(${accent},0.9)` }}>

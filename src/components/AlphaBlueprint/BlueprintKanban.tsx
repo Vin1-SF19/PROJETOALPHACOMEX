@@ -14,12 +14,17 @@ import { STATUS_ORDEM, type ProjetoBlueprintCard } from "./tipos";
 interface BlueprintKanbanProps {
   projetos: ProjetoBlueprintCard[];
   accent: string;
+  modoSelecao?: boolean;
+  selecionados?: Set<string>;
+  onToggleSelecionado?: (id: string) => void;
   onAbrirProjeto: (id: string) => void;
   onMoverOtimista: (projectId: string, novoStatus: string) => void;
   onFalhaAoMover: () => void;
 }
 
-export function BlueprintKanban({ projetos, accent, onAbrirProjeto, onMoverOtimista, onFalhaAoMover }: BlueprintKanbanProps) {
+export function BlueprintKanban({
+  projetos, accent, modoSelecao = false, selecionados, onToggleSelecionado, onAbrirProjeto, onMoverOtimista, onFalhaAoMover,
+}: BlueprintKanbanProps) {
   const [ativoId, setAtivoId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -31,10 +36,12 @@ export function BlueprintKanban({ projetos, accent, onAbrirProjeto, onMoverOtimi
   }));
 
   function handleDragStart(event: DragStartEvent) {
+    if (modoSelecao) return;
     setAtivoId(String(event.active.id));
   }
 
   async function handleDragEnd(event: DragEndEvent) {
+    if (modoSelecao) return;
     setAtivoId(null);
     const { active, over } = event;
     if (!over) return;
@@ -72,6 +79,9 @@ export function BlueprintKanban({ projetos, accent, onAbrirProjeto, onMoverOtimi
             status={status}
             projetos={projetosColuna}
             accent={accent}
+            modoSelecao={modoSelecao}
+            selecionados={selecionados}
+            onToggleSelecionado={onToggleSelecionado}
             onAbrirProjeto={onAbrirProjeto}
           />
         ))}

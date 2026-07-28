@@ -108,6 +108,12 @@ export function EditProjectDialog({ open, onOpenChange, projeto, accent, onSalvo
               <input
                 value={setor}
                 onChange={(e) => setSetor(e.target.value)}
+                type="text"
+                name="blueprint-edit-setor"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 className="w-full rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-white/20"
                 maxLength={60}
               />
@@ -146,6 +152,8 @@ export function EditProjectDialog({ open, onOpenChange, projeto, accent, onSalvo
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              name="blueprint-edit-prazo"
+              autoComplete="off"
               className="w-full rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20 [color-scheme:dark]"
             />
           </div>

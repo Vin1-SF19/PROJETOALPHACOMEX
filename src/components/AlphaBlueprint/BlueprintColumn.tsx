@@ -9,11 +9,16 @@ interface BlueprintColumnProps {
   status: string;
   projetos: ProjetoBlueprintCard[];
   accent: string;
+  modoSelecao?: boolean;
+  selecionados?: Set<string>;
+  onToggleSelecionado?: (id: string) => void;
   onAbrirProjeto: (id: string) => void;
 }
 
-export function BlueprintColumn({ status, projetos, accent, onAbrirProjeto }: BlueprintColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+export function BlueprintColumn({
+  status, projetos, accent, modoSelecao = false, selecionados, onToggleSelecionado, onAbrirProjeto,
+}: BlueprintColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: status, disabled: modoSelecao });
 
   return (
     <div className="flex flex-col shrink-0 w-72 snap-start">
@@ -34,7 +39,15 @@ export function BlueprintColumn({ status, projetos, accent, onAbrirProjeto }: Bl
       >
         <SortableContext items={projetos.map((p) => p.id)} strategy={verticalListSortingStrategy}>
           {projetos.map((projeto) => (
-            <BlueprintProjectCard key={projeto.id} projeto={projeto} accent={accent} onAbrir={onAbrirProjeto} />
+            <BlueprintProjectCard
+              key={projeto.id}
+              projeto={projeto}
+              accent={accent}
+              onAbrir={onAbrirProjeto}
+              modoSelecao={modoSelecao}
+              selecionado={selecionados?.has(projeto.id) ?? false}
+              onToggleSelecionado={onToggleSelecionado}
+            />
           ))}
         </SortableContext>
         {projetos.length === 0 && (

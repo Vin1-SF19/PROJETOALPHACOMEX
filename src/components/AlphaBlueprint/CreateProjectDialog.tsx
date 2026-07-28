@@ -79,6 +79,12 @@ export function CreateProjectDialog({ open, onOpenChange, requesterId, accent, o
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Sistema de Gestão de Contratos"
+              type="text"
+              name="blueprint-create-nome-sistema"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               className="w-full rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-white/20"
               maxLength={200}
               autoFocus
@@ -115,6 +121,12 @@ export function CreateProjectDialog({ open, onOpenChange, requesterId, accent, o
                 value={setor}
                 onChange={(e) => setSetor(e.target.value)}
                 placeholder="Ex: Comercial"
+                type="text"
+                name="blueprint-create-setor"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 className="w-full rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-white/20"
                 maxLength={60}
               />
@@ -153,6 +165,8 @@ export function CreateProjectDialog({ open, onOpenChange, requesterId, accent, o
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              name="blueprint-create-prazo"
+              autoComplete="off"
               className="w-full rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20 [color-scheme:dark]"
             />
           </div>

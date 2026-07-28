@@ -12,7 +12,7 @@ export const maxDuration = 60;
 
 const bodySchema = z.object({
   projectId: z.string().min(1),
-  ideia: z.string().trim().min(3).max(2000),
+  ideia: z.string().trim().min(3),
 });
 
 function montarSystemPrompt(): string {

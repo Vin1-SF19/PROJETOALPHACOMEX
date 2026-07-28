@@ -97,8 +97,9 @@ export function GerarLayoutModal({ open, onOpenChange, projectId, accent, onApli
                 onChange={(e) => setIdeia(e.target.value)}
                 placeholder="Ex: fluxo de cadastro de cliente com aprovação, ou grid com as telas de login, dashboard e relatório"
                 rows={4}
+                name="blueprint-gerar-layout-ideia"
+                autoComplete="off"
                 className="w-full rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-white/20 resize-none"
-                maxLength={2000}
                 autoFocus
               />
             </div>

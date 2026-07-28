@@ -5,7 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown, ArrowUp, Minus, AlertTriangle, Siren,
-  Paperclip, ListChecks, HelpCircle, Clock,
+  Paperclip, ListChecks, HelpCircle, Clock, Check,
 } from "lucide-react";
 import { PRIORIDADE_CONFIG, parseTags, type ProjetoBlueprintCard } from "./tipos";
 
@@ -30,12 +30,29 @@ interface BlueprintProjectCardProps {
   projeto: ProjetoBlueprintCard;
   accent: string;
   onAbrir: (id: string) => void;
+  modoSelecao?: boolean;
+  selecionado?: boolean;
+  onToggleSelecionado?: (id: string) => void;
 }
 
-export function BlueprintProjectCard({ projeto, accent, onAbrir }: BlueprintProjectCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: projeto.id });
+export function BlueprintProjectCard({
+  projeto, accent, onAbrir, modoSelecao = false, selecionado = false, onToggleSelecionado,
+}: BlueprintProjectCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: projeto.id,
+    disabled: modoSelecao,
+  });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   const reducedMotion = useReducedMotion();
+
+  function handleClick() {
+    if (isDragging) return;
+    if (modoSelecao) {
+      onToggleSelecionado?.(projeto.id);
+      return;
+    }
+    onAbrir(projeto.id);
+  }
 
   const prioridade = PRIORIDADE_CONFIG[projeto.priority] ?? PRIORIDADE_CONFIG.NORMAL;
   const PrioridadeIcon = PRIORIDADE_ICONS[prioridade.icone] ?? Minus;
@@ -46,16 +63,29 @@ export function BlueprintProjectCard({ projeto, accent, onAbrir }: BlueprintProj
     <motion.div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      onClick={() => !isDragging && onAbrir(projeto.id)}
+      {...(modoSelecao ? {} : attributes)}
+      {...(modoSelecao ? {} : listeners)}
+      onClick={handleClick}
       initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={reducedMotion ? undefined : { y: -2 }}
       transition={{ duration: 0.15 }}
-      className="group cursor-grab active:cursor-grabbing select-none rounded-2xl border border-white/5 bg-slate-800/80 p-3 space-y-2.5 hover:border-white/10 transition-colors"
+      className={`group select-none rounded-2xl border p-3 space-y-2.5 transition-colors ${
+        modoSelecao ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+      } ${
+        selecionado ? "border-rose-400/50 bg-rose-500/[0.08]" : "border-white/5 bg-slate-800/80 hover:border-white/10"
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
+        {modoSelecao && (
+          <span
+            className={`shrink-0 w-4 h-4 rounded-md border flex items-center justify-center mt-0.5 ${
+              selecionado ? "bg-rose-500 border-rose-500" : "border-white/20"
+            }`}
+          >
+            {selecionado && <Check size={11} className="text-white" />}
+          </span>
+        )}
         <p className="text-sm font-semibold text-white leading-tight line-clamp-2">{projeto.title}</p>
         <span className="shrink-0 text-[10px] font-mono text-slate-500">{projeto.code}</span>
       </div>

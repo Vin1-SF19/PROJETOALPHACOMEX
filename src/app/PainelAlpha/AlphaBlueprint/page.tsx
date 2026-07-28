@@ -25,5 +25,5 @@ export default async function AlphaBlueprintPage() {
   const temaName = rec?.tema_interface ?? "blue";
   const onboardingVisto = rec?.onboarding_blueprint_visto ?? false;
 
-  return <BlueprintDashboard temaName={temaName} onboardingVisto={onboardingVisto} userId={userId} />;
+  return <BlueprintDashboard temaName={temaName} onboardingVisto={onboardingVisto} userId={userId} isAdmin={isAdmin} />;
 }

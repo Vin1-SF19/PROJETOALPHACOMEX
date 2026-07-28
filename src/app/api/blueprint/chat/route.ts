@@ -28,9 +28,13 @@ function montarSystemPrompt(contexto: string): string {
     "- Ao sugerir requisitos, fluxos ou estrutura, deixe claro que é uma sugestão para o usuário revisar — você não aplica mudanças automaticamente.",
     "- Responda em português do Brasil, de forma objetiva.",
     "",
-    "Contexto atual do projeto:",
-    contexto || "(projeto ainda sem conteúdo registrado)",
-  ].join("\n");
+    "Formatação da resposta (obrigatório, a resposta é renderizada como Markdown real):",
+    "- Nunca escreva tudo em um único parágrafo corrido. Quebre em seções curtas com linha em branco entre elas.",
+    "- Use um título curto em negrito (ex: **Resumo**) para introduzir cada bloco, sem repetir o nome do campo dentro do texto.",
+    "- Para listar campos/atributos (status, prioridade, setor etc.), use uma lista com `-`, um item por linha — nunca liste vários campos separados só por `*` na mesma linha.",
+    "- Não coloque em negrito o rótulo e o valor ao mesmo tempo (evite `**Status:** PRONTO`); negrito é só para destacar o que é realmente importante.",
+    "- Se algo não está registrado ou está vazio, diga isso em uma frase curta separada, não dentro de parênteses coladas ao resto.",
+  ].join("\n") + "\n\nContexto atual do projeto:\n" + (contexto || "(projeto ainda sem conteúdo registrado)");
 }
 
 export async function POST(req: NextRequest) {
