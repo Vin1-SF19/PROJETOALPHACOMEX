@@ -23,13 +23,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { formatarDataComissao } from "../lib/formatters";
+import { formatarDataComissao, traduzirDivergencia } from "../lib/formatters";
 import {
   ListarDivergencias,
   ResolverDivergencia,
   ReprocessarAposCorrecao,
 } from "@/actions/CommissionDivergences";
 import type { CommissionDivergence } from "@prisma/client";
+
+type DivergenciaComContexto = CommissionDivergence & {
+  contexto: { razaoSocial: string | null; servico: string | null; colaboradorNome: string | null };
+};
 
 type Severidade = "PENDING_REVIEW" | "BLOCKED" | "INTEGRATION_ERROR";
 type FiltroResolvido = "nao-resolvidas" | "resolvidas" | "todas";
@@ -49,7 +53,7 @@ const SEVERIDADE_LABEL: Record<Severidade, string> = {
 const PAGE_SIZE = 25;
 
 export function PainelDivergencias() {
-  const [divergencias, setDivergencias] = useState<CommissionDivergence[]>([]);
+  const [divergencias, setDivergencias] = useState<DivergenciaComContexto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -176,6 +180,8 @@ export function PainelDivergencias() {
             const severidade = divergencia.severidade as Severidade;
             const cores = SEVERIDADE_COR[severidade] ?? SEVERIDADE_COR.PENDING_REVIEW;
             const jaResolvida = divergencia.resolvidoEm !== null;
+            const { titulo, explicacao, comoResolver } = traduzirDivergencia(divergencia.tipo);
+            const { razaoSocial, servico, colaboradorNome } = divergencia.contexto;
 
             return (
               <div
@@ -190,18 +196,24 @@ export function PainelDivergencias() {
                         {SEVERIDADE_LABEL[severidade] ?? severidade}
                       </span>
                     </div>
-                    <p className="mt-1 font-mono text-xs text-slate-500">
-                      {divergencia.tipo} · id={divergencia.id}
-                      {divergencia.eventId && ` · eventId=${divergencia.eventId}`}
-                      {divergencia.entryId && ` · entryId=${divergencia.entryId}`}
-                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-200">{titulo}</p>
+                    {(razaoSocial || servico || colaboradorNome) && (
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {[razaoSocial, servico, colaboradorNome].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
                   </div>
                   <span className="text-xs text-slate-500">
                     {formatarDataComissao(divergencia.createdAt)}
                   </span>
                 </div>
 
-                <p className="mt-2 whitespace-pre-line text-sm text-slate-300">{divergencia.detalhes}</p>
+                <p className="mt-2 text-sm text-slate-300">{explicacao}</p>
+
+                <div className="mt-3 rounded-xl border border-white/5 bg-slate-950/40 p-3">
+                  <p className="text-xs font-medium text-slate-400">Como resolver</p>
+                  <p className="mt-1 text-sm text-slate-300">{comoResolver}</p>
+                </div>
 
                 {jaResolvida ? (
                   <p className="mt-2 text-xs text-emerald-400">

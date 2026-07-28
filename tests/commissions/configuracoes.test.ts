@@ -9,6 +9,7 @@ const prismaMock = vi.hoisted(() => ({
   tariffVersion: { create: vi.fn(), findMany: vi.fn() },
   commissionRule: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   commissionRuleVersion: { create: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+  commissionAuditLog: { create: vi.fn() },
 }));
 
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
@@ -105,6 +106,7 @@ describe("PublicarRegra / CriarVersaoRegra — versionamento imutável", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessaoAdmin();
+    prismaMock.commissionAuditLog.create.mockResolvedValue({});
   });
 
   it("publica uma versão em DRAFT com sucesso", async () => {

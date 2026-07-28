@@ -71,7 +71,7 @@ export async function ListarDivergencias(input?: z.infer<typeof listarDivergenci
       ...(resolvido === false ? { resolvidoEm: null } : {}),
     };
 
-    const [data, total] = await Promise.all([
+    const [registros, total] = await Promise.all([
       db.commissionDivergence.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -80,6 +80,50 @@ export async function ListarDivergencias(input?: z.infer<typeof listarDivergenci
       }),
       db.commissionDivergence.count({ where }),
     ]);
+
+    // Enriquece com contexto legível (razão social/serviço do evento, nome do colaborador)
+    // — a UI nunca deveria precisar mostrar cuid/clienteId cru para o usuário final.
+    const eventIds = [...new Set(registros.map((d) => d.eventId).filter((id): id is string => id !== null))];
+    const entryIds = [...new Set(registros.map((d) => d.entryId).filter((id): id is string => id !== null))];
+
+    const [eventos, entradas] = await Promise.all([
+      eventIds.length > 0
+        ? db.commissionEvent.findMany({
+            where: { id: { in: eventIds } },
+            select: { id: true, razaoSocial: true, servico: true },
+          })
+        : Promise.resolve([]),
+      entryIds.length > 0
+        ? db.commissionEntry.findMany({
+            where: { id: { in: entryIds } },
+            select: { id: true, collaboratorId: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const eventoPorId = new Map(eventos.map((e) => [e.id, e]));
+    const collaboratorIdPorEntry = new Map(entradas.map((e) => [e.id, e.collaboratorId]));
+    const collaboratorIds = [...new Set(entradas.map((e) => e.collaboratorId))];
+
+    const colaboradores = collaboratorIds.length > 0
+      ? await db.usuarios.findMany({ where: { id: { in: collaboratorIds } }, select: { id: true, nome: true } })
+      : [];
+    const nomePorColaboradorId = new Map(colaboradores.map((u) => [u.id, u.nome]));
+
+    const data = registros.map((d) => {
+      const evento = d.eventId ? eventoPorId.get(d.eventId) : undefined;
+      const collaboratorId = d.entryId ? collaboratorIdPorEntry.get(d.entryId) : undefined;
+      const colaboradorNome = collaboratorId !== undefined ? nomePorColaboradorId.get(collaboratorId) : undefined;
+
+      return {
+        ...d,
+        contexto: {
+          razaoSocial: evento?.razaoSocial ?? null,
+          servico: evento?.servico ?? null,
+          colaboradorNome: colaboradorNome ?? null,
+        },
+      };
+    });
 
     return {
       success: true,

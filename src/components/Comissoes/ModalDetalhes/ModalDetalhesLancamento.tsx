@@ -22,9 +22,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { StatusBadge } from "../lib/status-badge";
 import { formatarCentavosBRL, formatarDataComissao } from "../lib/formatters";
-import { BuscarDetalhesLancamento } from "@/actions/CommissionEntries";
+import { BuscarDetalhesLancamento, CriarAjusteManual } from "@/actions/CommissionEntries";
 import { EstornarPagamento, ProgramarPagamento, RegistrarPagamento } from "@/actions/CommissionPayments";
 
 interface ModalDetalhesLancamentoProps {
@@ -50,6 +51,9 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
   const [isPending, startTransition] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [dados, setDados] = useState<Awaited<ReturnType<typeof BuscarDetalhesLancamento>> | null>(null);
+  const [valorAjuste, setValorAjuste] = useState("");
+  const [justificativaAjuste, setJustificativaAjuste] = useState("");
+  const [enviandoAjuste, setEnviandoAjuste] = useState(false);
 
   useEffect(() => {
     if (!entryId) return;
@@ -127,6 +131,36 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
       toast.success("Pagamento estornado.");
       recarregar();
     });
+  }
+
+  function criarAjuste() {
+    if (!dados?.success) return;
+
+    const numero = Number(valorAjuste.replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(numero)) {
+      toast.error("Valor ajustado inválido.");
+      return;
+    }
+
+    setEnviandoAjuste(true);
+    void (async () => {
+      const resultado = await CriarAjusteManual({
+        entryId: dados.data.entry.id,
+        valorAjustadoCents: Math.round(numero * 100),
+        justificativa: justificativaAjuste,
+      });
+      setEnviandoAjuste(false);
+
+      if (!resultado.success) {
+        toast.error(resultado.error ?? "Erro ao criar ajuste manual");
+        return;
+      }
+
+      toast.success("Ajuste manual registrado.");
+      setValorAjuste("");
+      setJustificativaAjuste("");
+      recarregar();
+    })();
   }
 
   return (
@@ -269,7 +303,7 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
                 )}
               </TabsContent>
 
-              <TabsContent value="ajustes" className="space-y-2 text-sm">
+              <TabsContent value="ajustes" className="space-y-3 text-sm">
                 {dados.data.entry.ajustes.length === 0 ? (
                   <p className="text-slate-500">Nenhum ajuste manual registrado.</p>
                 ) : (
@@ -279,8 +313,42 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
                       <p className="mt-1 font-mono tabular-nums text-slate-400">
                         {formatarCentavosBRL(ajuste.valorOriginalCents)} → {formatarCentavosBRL(ajuste.valorAjustadoCents)}
                       </p>
+                      <p className="mt-1 text-slate-500">
+                        {ajuste.aprovadoEm ? "Aprovado" : "Pendente de aprovação"}
+                      </p>
                     </div>
                   ))
+                )}
+
+                {dados.data.entry.status === "Pago" || dados.data.entry.status === "Estornado" ? (
+                  <p className="rounded-xl border border-white/5 bg-slate-900/40 p-3 text-xs text-slate-500">
+                    Lançamento {dados.data.entry.status === "Pago" ? "pago" : "estornado"} — não é possível criar novo ajuste.
+                  </p>
+                ) : (
+                  <div className="space-y-2 rounded-xl border border-white/5 bg-slate-900/40 p-3">
+                    <p className="text-xs font-medium text-slate-300">Novo ajuste manual</p>
+                    <Input
+                      inputMode="decimal"
+                      placeholder="Valor ajustado (ex: 1500,00)"
+                      value={valorAjuste}
+                      onChange={(e) => setValorAjuste(e.target.value)}
+                      className="border-white/10 bg-slate-950 text-sm"
+                    />
+                    <textarea
+                      placeholder="Justificativa (mínimo 10 caracteres)"
+                      value={justificativaAjuste}
+                      onChange={(e) => setJustificativaAjuste(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-md border border-white/10 bg-slate-950 p-2 text-sm text-slate-200 placeholder:text-slate-600"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={enviandoAjuste || !valorAjuste || justificativaAjuste.trim().length < 10}
+                      onClick={criarAjuste}
+                    >
+                      {enviandoAjuste ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : "Registrar ajuste"}
+                    </Button>
+                  </div>
                 )}
               </TabsContent>
 

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SincronizarComissoes } from "@/actions/CommissionSync";
 import { ModalExportarEspelho } from "../Exportacao/ModalExportarEspelho";
+import { ModalNovoLancamento } from "../EventoCard/ModalNovoLancamento";
 import type { TemaAlpha } from "@/lib/temas";
 
 interface CabecalhoComissoesProps {
@@ -16,27 +17,11 @@ interface CabecalhoComissoesProps {
   totalDivergencias?: number;
 }
 
-/** Botão desabilitado com aria-label explicando o motivo — funcionalidades das fases 11-14. */
-function BotaoEmBreve({ icone: Icone, label }: { icone: typeof FileDown; label: string }) {
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled
-      aria-label={`${label} — em breve`}
-      title={`${label} — em breve`}
-      className="gap-2 border-white/10 text-slate-500"
-    >
-      <Icone className="size-4" aria-hidden="true" />
-      {label}
-    </Button>
-  );
-}
-
 export function CabecalhoComissoes({ tema, onSincronizado, totalDivergencias = 0 }: CabecalhoComissoesProps) {
   const [isPending, startTransition] = useTransition();
   const [sincronizando, setSincronizando] = useState(false);
   const [modalExportarAberto, setModalExportarAberto] = useState(false);
+  const [modalNovoLancamentoAberto, setModalNovoLancamentoAberto] = useState(false);
 
   function sincronizar() {
     setSincronizando(true);
@@ -102,7 +87,15 @@ export function CabecalhoComissoes({ tema, onSincronizado, totalDivergencias = 0
           Exportar Espelho
         </Button>
 
-        <BotaoEmBreve icone={Plus} label="Novo Lançamento" />
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2 border-white/10"
+          onClick={() => setModalNovoLancamentoAberto(true)}
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          Novo Lançamento
+        </Button>
 
         <Button size="sm" variant="outline" className="gap-2 border-white/10" asChild>
           <Link href="/PainelAlpha/Comissoes/Configuracoes">
@@ -125,6 +118,11 @@ export function CabecalhoComissoes({ tema, onSincronizado, totalDivergencias = 0
       </div>
 
       <ModalExportarEspelho open={modalExportarAberto} onOpenChange={setModalExportarAberto} />
+      <ModalNovoLancamento
+        open={modalNovoLancamentoAberto}
+        onOpenChange={setModalNovoLancamentoAberto}
+        onCriado={onSincronizado}
+      />
     </header>
   );
 }

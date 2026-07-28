@@ -65,6 +65,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Financeiro | Consulta RADAR | `/PainelAlpha/HabilitacaoRadar` | `radar` |
 | Financeiro | Análise Fiscal | `/PainelAlpha/AlphaConnect` | `Perse` |
 | Financeiro | Alpha Holerites | `/PainelAlpha/Holerites` | `holerites` |
+| Financeiro | Gestão de Comissões e Prêmios | `/PainelAlpha/Comissoes` | `comissoes` (role: Admin/CEO/FINANCEIRO) ← completo, 2026-07-28, ver seção própria |
 | Pessoas | Alpha Schools | `/PainelAlpha/AlphaSchools` | `schools` |
 | Pessoas | Alpha Skills | `/PainelAlpha/AlphaSkills` | `skills` |
 | Pessoas | Alpha Vault | `/PainelAlpha/AlphaVault` | `Senhas` |
@@ -93,6 +94,26 @@ Os documentos-base são configuráveis em
 `ModeloItemChecklist`. Um item com `tipo = null` é global; o preenchimento de um
 novo `Checklist` copia os modelos globais e os do tipo selecionado, sem modificar
 checklists existentes.
+
+### Gestão de Comissões e Prêmios (completo, 2026-07-28)
+
+Módulo de controle de fatos geradores, cálculo de comissão/prêmio/DSR (CLT e PJ), pagamentos, divergências, exportação de espelhos e configurações (cargos/tarifários/regras). Executado via fila `prompt-phases/` (17 fases, arquivadas em `prompt-phases/concluidos/GestaoComissoes/`).
+
+**Backend** (`src/lib/commissions/`): motor de regras (`rule-engine.ts`, `calculators.ts`, `commissionable-base.ts`, `calculation-memory.ts`, `dsr-formula.ts`, `seed-rules.ts`, `cargo-rule-matching.ts`), calendário (`calendar-engine.ts`, `holidays-seed.ts`), resolução de vínculo (`vinculo-resolver.ts`), agenda de pagamento (`payment-schedule.ts`), filtro de exceções (`eligibility-filter.ts`), geração de lançamentos (`entry-generator.ts` — separa COMISSAO/PREMIO/DSR em `EntryComponent`s distintos, nunca soma no mesmo componente), detecção de divergências (`divergence-detector.ts`, 14 checagens), sincronização (`sync-engine.ts` + `adapters/` para CS&NPS/Metas/Colaboradores), exportação (`export/preview-builder.ts`, `export/xlsx-generator.ts`, `export/pdf-generator.tsx`).
+
+**Server Actions** (`src/actions/Commission*.ts` + `EligibilityOverrides.ts`, 12 arquivos): `CommissionSync`, `CommissionEvents` (inclui `RecalcularEvento`, delega para `entry-generator` — nunca duplica lançamento já Pago), `EligibilityOverrides`, `CommissionPayments` (pagamento simples/lote/programado/estorno), `CommissionDashboard`, `CommissionEntries` (inclui `CriarAjusteManual`, adicionado na Fase 16/Sage — cria `ManualAdjustment`+`EntryComponent` tipo AJUSTE via `$transaction`, bloqueia em lançamento Pago/Estornado), `CommissionRules` (`SimularRegra`), `CommissionDivergences`, `CommissionExports`, `CommissionPositions`, `CommissionTariffs`, `CommissionRuleBuilder` (versionamento imutável — nunca sobrescreve versão PUBLISHED).
+
+**Frontend** (`src/components/Comissoes/`): `ComissoesDashboard.tsx` orquestra `CabecalhoComissoes` (Sincronizar/Simulador/Exportar/Configurações/Divergências — "Novo Lançamento" desabilitado, `BotaoEmBreve`), `CardsIndicadores`, `FiltrosComissoes`, `EventoComissaoCard`+`SetorColaboradores`+`ModalPagarTodos` (Big Card por evento), `LancamentoColaboradorCard` (mini card), `ModalDetalhesLancamento` (7 abas: Resumo/Memória/Regra/Pagamentos/Ajustes/Histórico/Auditoria), `SimuladorRegras`, `PainelDivergencias`, `ModalExportarEspelho`+`PreviaEspelho`, `Configuracoes/` (AbaCargos/AbaTarifarios/ConstrutorRegras).
+
+**RBAC:** módulo-inteiro via `permission: 'comissoes'` (`allowedRoles: ['Admin', 'CEO', 'FINANCEIRO']` no registry) — RBAC granular por ação dentro do módulo NÃO implementado (TODO documentado em todos os 12 arquivos de Server Actions).
+
+**Achados de segurança corrigidos (Anubis, Fase 15):** Excel Formula Injection em `xlsx-generator.ts` (`neutralizarFormula()`), auditoria ausente em `CommissionDivergences`/`CommissionRuleBuilder` (corrigido, todas as Server Actions sensíveis gravam `CommissionAuditLog`).
+
+**Pendências conscientes (seção 39 do prompt original — ver `architecture.md` para lista completa):** fórmula definitiva do DSR, natureza do Diretor Operacional, feriados municipais, tratamento de inadimplência, aprovação de ajuste manual (schema pronto, fluxo de aprovação não implementado).
+
+**Testes:** `tests/commissions/` — 152 testes, 17 arquivos.
+
+**Limitação de verificação:** sem credenciais de login disponíveis nas sessões que implementaram o módulo — validação de UI feita via `next build` + testes automatizados, não via clique real no browser autenticado. Recomenda-se teste manual humano antes de uso com dados reais de colaboradores/pagamentos.
 
 ---
 

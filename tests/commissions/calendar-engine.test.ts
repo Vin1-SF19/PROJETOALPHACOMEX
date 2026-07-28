@@ -11,7 +11,6 @@ import {
   ultimoDiaUtil,
 } from "@/lib/commissions/calendar-engine";
 import { feriadosNacionais } from "@/lib/commissions/holidays-seed";
-import type { HolidayRecord } from "@/lib/commissions/calendar-engine";
 
 describe("feriadosNacionais — 2026", () => {
   const feriados = feriadosNacionais(2026);

@@ -22,6 +22,26 @@ async function exigirAcesso() {
   return { ok: true as const, userId: Number(session.user.id) };
 }
 
+async function registrarAuditoria(params: {
+  userId: number;
+  acao: string;
+  entityId: string;
+  before: unknown;
+  after: unknown;
+}) {
+  await db.commissionAuditLog.create({
+    data: {
+      userId: params.userId,
+      acao: params.acao,
+      entityType: "CommissionEntry",
+      entityId: params.entityId,
+      beforeJson: JSON.stringify(params.before),
+      afterJson: JSON.stringify(params.after),
+      correlationId: crypto.randomUUID(),
+    },
+  });
+}
+
 export interface EntryComponentResumo {
   id: string;
   tipo: string;
@@ -209,5 +229,94 @@ export async function BuscarDetalhesLancamento(input: z.infer<typeof buscarEntry
   } catch (error) {
     console.error("[BuscarDetalhesLancamento]", error);
     return { success: false, error: "Erro interno ao buscar detalhes" } as const;
+  }
+}
+
+// ─── Ajuste manual (seção 30 do prompt original — nunca altera componentes originais) ───
+
+const criarAjusteManualSchema = z.object({
+  entryId: z.string().min(1),
+  valorAjustadoCents: z.number().int(),
+  justificativa: z.string().min(10, "Justificativa deve ter ao menos 10 caracteres"),
+});
+
+/**
+ * Registra um ajuste manual sobre um lançamento — NUNCA sobrescreve ou remove os
+ * EntryComponent originais (comissão/prêmio/DSR calculados pelo motor de regras). O ajuste
+ * entra como um EntryComponent adicional do tipo "AJUSTE" (diferença entre o valor atual e
+ * o valor ajustado desejado) e o total do lançamento é recalculado a partir da soma de
+ * todos os componentes. Fica pendente de aprovação (`aprovadoById`/`aprovadoEm` nulos) —
+ * este endpoint apenas registra a solicitação, aprovação é uma ação separada.
+ */
+export async function CriarAjusteManual(input: z.infer<typeof criarAjusteManualSchema>) {
+  const acesso = await exigirAcesso();
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const parsed = criarAjusteManualSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
+  }
+
+  const { entryId, valorAjustadoCents, justificativa } = parsed.data;
+
+  try {
+    const entry = await db.commissionEntry.findUnique({ where: { id: entryId } });
+    if (!entry) return { success: false, error: "Lançamento não encontrado" } as const;
+
+    if (entry.status === "Pago" || entry.status === "Estornado") {
+      return {
+        success: false,
+        error: "Não é possível ajustar um lançamento já pago ou estornado — reverta o pagamento primeiro.",
+      } as const;
+    }
+
+    const valorOriginalCents = entry.totalCents;
+    const diferencaCents = valorAjustadoCents - valorOriginalCents;
+
+    const resultado = await db.$transaction(async (tx) => {
+      const ajuste = await tx.manualAdjustment.create({
+        data: {
+          entryId,
+          valorOriginalCents,
+          valorAjustadoCents,
+          justificativa,
+          createdById: acesso.userId,
+        },
+      });
+
+      await tx.entryComponent.create({
+        data: {
+          entryId,
+          tipo: "AJUSTE",
+          valorCents: diferencaCents,
+          percentual: null,
+          memoriaCalculoJson: JSON.stringify({
+            reason: `Ajuste manual: ${justificativa}`,
+            valorOriginalCents,
+            valorAjustadoCents,
+          }),
+        },
+      });
+
+      const entryAtualizado = await tx.commissionEntry.update({
+        where: { id: entryId },
+        data: { totalCents: valorAjustadoCents },
+      });
+
+      return { ajuste, entryAtualizado };
+    });
+
+    await registrarAuditoria({
+      userId: acesso.userId,
+      acao: "CRIAR_AJUSTE_MANUAL",
+      entityId: entryId,
+      before: { totalCents: valorOriginalCents },
+      after: { totalCents: valorAjustadoCents, justificativa, ajusteId: resultado.ajuste.id },
+    });
+
+    return { success: true, data: resultado } as const;
+  } catch (error) {
+    console.error("[CriarAjusteManual]", error);
+    return { success: false, error: "Erro interno ao criar ajuste manual" } as const;
   }
 }

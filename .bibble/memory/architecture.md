@@ -156,6 +156,54 @@ model GoogleCalendarEventoCache { id, calendarioId → GoogleCalendarSelecionado
 
 ---
 
+## Módulo Gestão de Comissões e Prêmios (2026-07-28)
+
+18 models novos + 4 colunas em `CargoColaborador`, aplicados no Turso via script Node pontual (removido após uso). Todo valor monetário em `Int` (centavos) — nunca `Float`.
+
+```prisma
+model CommissionEvent { id (cuid), eventType (CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL),
+  cnpj, razaoSocial, servico, eventDate, grossContractAmountCents, netContractAmountCents, commissionableBaseCents?, status,
+  sourceSystem, sourceEntity, sourceId, lastSyncAt — entries CommissionEntry[], divergencias CommissionDivergence[] }
+model CommissionEntry { id (cuid), eventId → CommissionEvent, collaboratorId Int, cargoId Int, vinculo ("CLT"|"PJ" resolvido na data do evento),
+  totalCents, status (Pendente|AguardandoAprovacao|Programado|Pago|ParcialmentePago|Vencido|Bloqueado|EmDivergencia|Cancelado|Estornado),
+  contractualDueDate?, operationalSuggestedDate?, scheduledPaymentDate?, actualPaymentDate?
+  componentes EntryComponent[], ajustes ManualAdjustment[], alocacoes PaymentAllocation[] }
+model EntryComponent { id, entryId → CommissionEntry, tipo (COMISSAO|PREMIO|DSR|AJUSTE), valorCents, percentual?, memoriaCalculoJson }
+model ManualAdjustment { id, entryId → CommissionEntry, valorOriginalCents, valorAjustadoCents, justificativa,
+  aprovadoById? aprovadoEm? (fluxo de aprovação existe no schema; Server Action de aprovação ainda NÃO implementada — ver decisions.md), createdById }
+model CommissionRule { id (cuid), name, priority, eventType, benefitType (COMMISSION|BONUS|DSR), cargoId?/setorId?/collaboratorId?, active
+  versions CommissionRuleVersion[] }
+model CommissionRuleVersion { id, ruleId → CommissionRule, version Int, status (DRAFT|PUBLISHED), validFrom, validTo?,
+  conditionsJson, calculationJson, paymentScheduleJson, publishedById?, publishedAt? — NUNCA sobrescrita, sempre nova versão incrementada }
+model EligibilityOverride { — camada de exceção avaliada ANTES do rule-engine, decisão registrada em decisions.md }
+model Payment { id, data, valorCents, meio, tipo (PAGAMENTO|ESTORNO), comprovanteUrl? — allocations PaymentAllocation[] }
+model PaymentAllocation { id, paymentId → Payment, entryId → CommissionEntry, valorCents }
+model TariffVersion { id (cuid), servico, valorCents, dataInicial, formasPagamentoJson — versionado por serviço/data }
+model CommissionDivergence { id, eventId? → CommissionEvent, tipo, severidade (PENDING_REVIEW|BLOCKED|INTEGRATION_ERROR), detalhes, resolvidoEm?, resolvidoById? }
+model ExportDocument / ExportDocumentItem { — trilha de documentos de espelho gerados (XLSX/PDF), itens individuais }
+model Holiday { — feriados nacionais seed, algoritmo de Páscoa de Gauss; feriados MUNICIPAIS não implementados, ver decisions.md }
+model SyncRun / SyncError { — auditoria de execuções de sincronização CS&NPS/Metas/Colaboradores → Comissões }
+model CommissionAuditLog { id, userId, acao, entityType, entityId, beforeJson, afterJson, correlationId — trilha financeira completa }
+```
+
+**`CargoColaborador` ganhou 4 colunas:** `setorId Int?`, `vinculoPadrao String?` ("CLT"|"PJ"), `naturezaRecebimento String?` ("COMISSAO"|"PREMIO"|"AMBOS"), `permiteMultiplosOcupantes Boolean @default(true)`. Decisão de estender o model existente em vez de criar tabela paralela — ver `decisions.md`.
+
+**Motor de regras determinístico** em `src/lib/commissions/` — SEM `eval`/`Function()`, avaliação por `switch/case` explícito (`rule-engine.ts`, 13 operadores de condição). `calculators.ts` cobre 9 `CalculationType` (PERCENTAGE, FIXED, PER_UNIT, ADDITIONAL, DSR, CAP, FLOOR, PROPORTIONAL, SUM_OF_COMPONENTS). `commissionable-base.ts` implementa a regra de preservação do tarifário em desconto ≤10% e as 5 políticas configuráveis para desconto >10% (nunca decide sozinho sem política explícita). `calendar-engine.ts` + `holidays-seed.ts` resolvem 5º dia útil, última sexta, sexta da semana seguinte, último dia civil/útil. `vinculo-resolver.ts` resolve CLT/PJ na data do evento com 4 estados de divergência explícitos (nunca escolhe sozinho em ambiguidade). Simulador (`SimularRegra` em `CommissionRules.ts`) reusa o MESMO motor real, sem duplicação — só simula contra seed-rules, não contra regras publicadas no banco (TODO documentado).
+
+**Fonte de contratação: merge de `ContratoComercial` + `clientes`** (decisão do usuário — nunca escolher uma fonte só, sempre unir para não perder dado). **Êxito (PROCESS_SUCCESS) nasce de `clientes.dataExito` passando de vazio para preenchido** (não vem do Checklist RADAR nem é registro manual) — `exito-detector.ts`, idempotente por design (compara contra `CommissionEvent` já existente do mesmo cliente).
+
+**Pendências conscientemente deixadas configuráveis (seção 39 do prompt original, não decididas por invenção):** fórmula definitiva do DSR (`dsr-formula.ts` tem placeholder documentado), natureza do valor do Diretor Operacional, feriados municipais (só nacionais implementados), tratamento de inadimplência, RBAC granular por ação dentro do módulo (hoje é módulo-inteiro via `permission: 'comissoes'`, TODO em texto nos 12 arquivos de Server Actions), aprovação de `ManualAdjustment` (schema existe, Server Action de aprovação não implementada).
+
+**Rotas:** `/PainelAlpha/Comissoes` (dashboard, Big Card por evento + mini card por colaborador), `/Simulador`, `/Divergencias`, `/Configuracoes` (Cargos/Tarifários/Construtor de Regras). Todas protegidas por `auth()` + bypass Admin/CEO + `getPermissoesEfetivas().includes('comissoes')`.
+
+**Exportação:** `export/xlsx-generator.ts` (ExcelJS, 6 abas) e `export/pdf-generator.tsx` (`@react-pdf/renderer`) — ambos com `neutralizarFormula()` contra Excel Formula Injection (achado de segurança corrigido pelo Anubis, mesmo padrão de `exportar-dados.ts` do CS&NPS).
+
+**Testes:** `tests/commissions/` — 152 testes (17 arquivos), cobrindo motor de regras, calendário, adapters, eventos/lançamentos, pagamentos, divergências, exportação (incluindo teste de segurança de Formula Injection), configurações, e ajuste manual.
+
+**Última atualização:** 2026-07-28 por Scribe
+
+---
+
 ## Variáveis de Ambiente
 
 <!-- Listar as env vars necessárias -->

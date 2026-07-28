@@ -98,7 +98,9 @@ describe("gerarLancamentosParaEvento", () => {
     expect(prismaMock.commissionEntry.create).toHaveBeenCalledTimes(1); // 1 lançamento
     expect(prismaMock.entryComponent.create).toHaveBeenCalledTimes(2); // 2 componentes: COMISSAO + DSR
 
-    const tipos = prismaMock.entryComponent.create.mock.calls.map((call: any) => call[0].data.tipo);
+    const tipos = prismaMock.entryComponent.create.mock.calls.map(
+      (call: Array<{ data: { tipo: string } }>) => call[0].data.tipo,
+    );
     expect(tipos).toContain("COMISSAO");
     expect(tipos).toContain("DSR");
     expect(new Set(tipos).size).toBe(2); // nunca o mesmo tipo duas vezes, nunca somados

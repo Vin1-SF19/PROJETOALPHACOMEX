@@ -55,6 +55,18 @@ Ao criar um novo módulo, verificar e registrar:
 
 ---
 
+### Gestão de Comissões e Prêmios (2026-07-28)
+
+- **Rota:** `/PainelAlpha/Comissoes` (+ `/Simulador`, `/Divergencias`, `/Configuracoes`)
+- **Registry:** entrada `comissoes` em `src/lib/modulos-registry.ts` (`iconName: 'HandCoins'`, `category: 'financeiro'`, `allowedRoles: ['Admin', 'CEO', 'FINANCEIRO']`)
+- **Ícone:** `HandCoins` importado em `ICON_MAP` de `src/components/layout/GlobalSidebar.tsx` (sidebar renderiza a partir do registry, não de lista separada)
+- **Permissão necessária:** `getPermissoesEfetivas(userId).includes('comissoes')`, com bypass para Admin/CEO — checado em TODAS as 4 páginas do módulo, mesmo padrão idêntico
+- **RBAC granular por ação:** NÃO implementado — é módulo-inteiro; TODO documentado em texto nos 12 arquivos de Server Actions (`ROLES_TEMPORARIAMENTE_PERMITIDOS`)
+- **Integração com outros módulos (via `sync-engine.ts` + `adapters/`):** CS&NPS (`clientes` — fonte de êxito via `dataExito`, merge de contratação), Metas (`ContratoComercial` — merge de contratação), Colaboradores (`ContratoColaborador`/`CargoColaborador` — resolução de vínculo CLT/PJ na data do evento)
+- **Adicionado em:** 2026-07-28
+
+---
+
 ### Alpha CheckList — edição, pastas e exportação de documentos
 
 **Atualizado em:** 2026-07-14 por Scribe.

@@ -22,6 +22,32 @@
 
 <!-- Adicionar aqui conforme o projeto cresce -->
 
+### ComissoesDashboard (+ Cabecalho/EventoCard/MiniCard/ModalDetalhes)
+**Arquivo:** `src/components/Comissoes/ComissoesDashboard.tsx`
+**Tipo:** Client Component (orquestrador)
+**Props:** `temaName: string`
+**Uso:** `<ComissoesDashboard temaName={temaName} />` em `src/app/PainelAlpha/Comissoes/page.tsx`
+**Notas:** Orquestra `CabecalhoComissoes` (Sincronizar/Simulador/Exportar/Configurações/Divergências), `CardsIndicadores`, `FiltrosComissoes`, `EventoComissaoCard` (Big Card por evento, agrupa `SetorColaboradores`), `LancamentoColaboradorCard` (mini card por colaborador), `ModalDetalhesLancamento` (7 abas). Padrão "Ledger Vivo" (ver `design-tokens.md`/`patterns.md`). Paginado (`PAGE_SIZE = 25`).
+
+### ModalDetalhesLancamento
+**Arquivo:** `src/components/Comissoes/ModalDetalhes/ModalDetalhesLancamento.tsx`
+**Tipo:** Client Component
+**Props:** `entryId: string | null`, `onOpenChange: (open: boolean) => void`, `onAtualizar?: () => void`
+**Uso:** montado 1x no `ComissoesDashboard`, controlado por `entryIdSelecionado`.
+**Notas:** 7 abas (Resumo/Memória/Regra/Pagamentos/Ajustes/Histórico/Auditoria). Aba Ajustes tem formulário de `CriarAjusteManual` (adicionado Fase 16) — bloqueado quando `entry.status` é "Pago"/"Estornado", mesma regra da Server Action. Ações de pagamento (Marcar como pago/Programar/Estornar) todas com `AlertDialog` de confirmação antes de executar.
+
+### ConstrutorRegras / AbaCargos / AbaTarifarios
+**Arquivo:** `src/components/Comissoes/Configuracoes/`
+**Tipo:** Client Component
+**Uso:** abas de `ConfiguracoesComissoes.tsx` (`/PainelAlpha/Comissoes/Configuracoes`)
+**Notas:** `ConstrutorRegras` monta `CommissionRuleVersion` (condições/cálculo/agenda de pagamento) e chama `SalvarRascunhoRegra`/`PublicarRegra`/`CriarVersaoRegra` — versionamento imutável, nunca sobrescreve versão PUBLISHED. Conversões reais→centavos (`Math.round(parseFloat(...) * 100)`) isoladas na borda de input, nunca circulam como `Float`.
+
+### SimuladorRegras
+**Arquivo:** `src/components/Comissoes/Simulador/SimuladorRegras.tsx`
+**Tipo:** Client Component
+**Uso:** `/PainelAlpha/Comissoes/Simulador`
+**Notas:** Reusa o MESMO motor de regras real (`evaluateRules`/`calculateAmountCents`/`calculateCommissionableBase` via `SimularRegra`), sem duplicar lógica financeira na UI — só simula contra seed-rules, não contra regras publicadas (TODO documentado).
+
 ### ImagemNode (Canvas do Alpha Blueprint)
 **Arquivo:** `src/components/AlphaBlueprint/canvas/CanvasNodes.tsx`
 **Tipo:** Client Component (node customizado do `@xyflow/react`)

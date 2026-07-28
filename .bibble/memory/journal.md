@@ -34,6 +34,49 @@
 
 ---
 
+## [2026-07-28] — Gestão de Comissões e Prêmios: novo módulo completo, execução via fila de 17 fases
+
+**Tags:** #feature #decision #prisma #security #critical #integration #nextjs #financeiro
+**Agentes envolvidos:** Scout → Vault → Iris → Echo (x5 fases) → Nova (x5 fases) → Anubis → Forge → Probe → Lens → Sage → Scribe → Kowalski (pipeline serial completo, 17 fases, sem pular etapa, sem pausar entre fases a pedido explícito do usuário — "sem parar")
+**Arquivos tocados:** ~50 arquivos novos (`src/lib/commissions/**` ~25 arquivos incl. `adapters/` e `export/`, `src/actions/Commission*.ts` x11 + `EligibilityOverrides.ts`, `src/components/Comissoes/**` ~18 arquivos, `src/app/PainelAlpha/Comissoes/**` 4 páginas, `tests/commissions/**` 17 arquivos) + `prisma/schema.prisma` (18 models + 4 colunas em `CargoColaborador`) + `src/lib/modulos-registry.ts` + `src/components/layout/GlobalSidebar.tsx` + `src/components/ui/tabs.tsx` (criado do zero)
+
+### Contexto
+Usuário colou um PROMPT MESTRE extenso pedindo um módulo completo de "Gestão de Comissões e Prêmios": controle de fatos geradores, cálculo de comissão/prêmio/DSR para CLT e PJ, integração com CS&NPS/Metas/Colaboradores, motor de regras versionado, dashboard com Big Cards por evento e mini cards por colaborador, pagamentos, exportação de espelhos (PDF/Excel), configurações (cargos/tarifários/regras), tudo com auditoria completa e proibição explícita de inventar dados/decisões financeiras sensíveis sem confirmação do usuário. Quebrado em 17 fases via `/prompt-phases`, executado sem pausar (exceto os gates de segurança/qualidade, nunca pulados).
+
+### O que foi feito
+- **Schema:** 18 models novos (`CommissionEvent`, `BusinessProcess`, `SyncRun`, `SyncError`, `CommissionRule`, `CommissionRuleVersion`, `EligibilityOverride`, `CommissionEntry`, `EntryComponent`, `ManualAdjustment`, `Payment`, `PaymentAllocation`, `TariffVersion`, `CommissionDivergence`, `ExportDocument`, `ExportDocumentItem`, `Holiday`, `CommissionAuditLog`) + 4 colunas em `CargoColaborador`, aplicados no Turso real via script Node pontual (removido após uso), aprovado por Vault com backup fresco validado.
+- **Motor de regras** (`src/lib/commissions/`): determinístico, sem `eval`/`Function()` — 13 operadores de condição, 9 tipos de cálculo, preservação de tarifário em desconto ≤10%, 5 políticas configuráveis para desconto >10% (nunca decide sozinho), calendário de dias úteis/feriados, resolução de vínculo CLT/PJ com 4 estados de divergência explícitos.
+- **Integração:** adapters para CS&NPS (`clientes`), Metas (`ContratoComercial`) e Colaboradores, com merge de fontes de contratação (decisão do usuário: nunca uma fonte só) e detecção de êxito via `clientes.dataExito`.
+- **Backend:** 12 arquivos de Server Actions cobrindo sincronização, eventos, exceções de elegibilidade, pagamentos (simples/lote/programado/estorno), dashboard, lançamentos, simulador, divergências, exportação, cargos, tarifários e construtor de regras (versionamento imutável — nunca sobrescreve versão PUBLISHED).
+- **Frontend:** dashboard "Ledger Vivo" com Big Card por evento + mini card por colaborador, modal de detalhes com 7 abas, simulador de regras (reusa o motor real, sem duplicação), painel de divergências, exportação com preview real antes de gerar, configurações (cargos/tarifários/construtor visual de regras).
+- **Exportação:** XLSX (ExcelJS, 6 abas) e PDF (`@react-pdf/renderer`) com neutralização de Excel Formula Injection.
+- **Testes:** 152 testes Vitest (`tests/commissions/`, 17 arquivos) cobrindo motor de regras, calendário, adapters, eventos/lançamentos, pagamentos, divergências, exportação (incl. teste de segurança), configurações e ajuste manual.
+- **Verificação final (Fase 16):** `tsc --noEmit` no baseline de 4 erros pré-existentes (zero novo), lint escopado do módulo 100% limpo, `npm run build` sucesso completo com as 4 rotas do módulo, `npm run dev` boot confirmado.
+
+### Decisões tomadas
+- Cargo: `CargoColaborador` estendido (não tabela paralela) — evita duplicar fonte de verdade.
+- Fonte de contratação: merge de `ContratoComercial` + `clientes`, nunca uma só (pedido explícito do usuário).
+- Vínculo CLT/PJ: já literal em `ContratoColaborador.tipo`, confirmado pelo usuário.
+- Êxito nasce de `clientes.dataExito`, não do Checklist RADAR nem registro manual — confirmado pelo usuário.
+- RBAC do módulo é módulo-inteiro (não por ação) — TODO documentado em texto nos 12 arquivos de Server Actions, não implementado nesta entrega.
+- Direção visual "Ledger Vivo" escolhida pelo usuário entre as opções apresentadas por Iris.
+
+### Problemas encontrados / resolvidos
+- **EPERM recorrente no `npx prisma generate`** (arquivo da DLL do query engine travado por processos concorrentes do Cursor/Codex do usuário no Windows) — usuário interrompeu os processos concorrentes; quando volta a ocorrer, `npx next build` direto (sem generate) funciona porque o client já está gerado e válido.
+- **Bug real no filtro de regras seed** (Fase 07): não distinguia cargo real do colaborador — corrigido com mapeamento explícito extraído para `cargo-rule-matching.ts`, compartilhado entre `entry-generator` e o simulador.
+- **Bug real: comissão/DSR/prêmio competiam na mesma precedência** em vez de gerar componentes separados — corrigido avaliando `evaluateRules` separadamente por `benefitType`, gerando um `EntryComponent` por tipo vencedor.
+- **3 achados de segurança reais (Anubis, Fase 15):** Excel Formula Injection no `xlsx-generator.ts` (corrigido com `neutralizarFormula()`, testado com payload malicioso real), auditoria ausente em `CommissionDivergences.ts` e `CommissionRuleBuilder.ts` (corrigido, todas as ações sensíveis agora gravam `CommissionAuditLog`).
+- **2 achados de lint em arquivos de teste (Forge, Fase 16):** import não usado em `calendar-engine.test.ts`, `any` explícito em `entry-generator.test.ts` — corrigidos.
+- **1 lacuna real de escopo (Sage, Fase 16):** `ManualAdjustment` tinha schema e UI de leitura desde fases anteriores, mas nenhuma Server Action de escrita — ao contrário de "Novo Lançamento" (conscientemente marcado `BotaoEmBreve`), este ficou esquecido sem nota. Usuário escolheu implementar imediatamente: `CriarAjusteManual` adicionado com bloqueio em lançamento Pago/Estornado, transação atômica, auditoria — 7 testes novos.
+
+### Pendências para próxima sessão / uso em produção
+- Fórmula definitiva do DSR (placeholder documentado em `dsr-formula.ts`), natureza do valor do Diretor Operacional, feriados municipais (só nacionais implementados), tratamento de inadimplência — todas conscientemente deixadas configuráveis (seção 39 do prompt original), não decididas por invenção.
+- RBAC granular por ação dentro do módulo — hoje é módulo-inteiro.
+- Aprovação de ajuste manual (`aprovadoById`/`aprovadoEm` no schema, sem Server Action de aprovação).
+- Sem teste de login real no browser nesta sessão (sem credenciais disponíveis) — recomenda-se validação manual humana antes de uso com dados reais de colaboradores/pagamentos.
+
+---
+
 ## [2026-07-27 12:30] — Alpha Blueprint: novo módulo completo (MVP), execução via fila de fases
 
 **Tags:** #feature #decision #prisma #security #critical #integration #nextjs

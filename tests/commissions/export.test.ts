@@ -176,6 +176,69 @@ describe("gerarXlsxEspelho — arquivo real", () => {
     const abaLancamentos = workbook.getWorksheet("Lançamentos");
     expect(abaLancamentos?.rowCount).toBeGreaterThan(1); // cabeçalho + pelo menos 1 linha de dado
   });
+
+  it("neutraliza Excel Formula Injection em campos de texto livre (razaoSocial, observacao) — achado de segurança do Anubis, Fase 15", async () => {
+    const preview = {
+      linhas: [
+        {
+          entryId: "entry-malicioso",
+          componenteId: "comp-malicioso",
+          data: new Date("2026-07-15T00:00:00.000Z"),
+          cnpj: "12345678000190",
+          // Payload de Excel Formula Injection — se não neutralizado, o Excel executaria
+          // isso como fórmula ao abrir o arquivo.
+          razaoSocial: "=cmd|'/c calc'!A1",
+          nomeFantasia: "+HYPERLINK(\"http://evil.com\")",
+          servico: "Revisão de RADAR Ilimitado",
+          evento: "CONTRACTING",
+          honorariosCents: null,
+          tarifarioCents: null,
+          baseComissionavelCents: 2_200_000,
+          formaPagamento: "A_VISTA_DESCONTO",
+          percentual: 0.04,
+          valorFixoCents: null,
+          comissaoCents: 88_000,
+          dsrCents: 0,
+          premioCents: 0,
+          ajusteCents: 0,
+          totalCents: 88_000,
+          previsao: null,
+          pagamento: null,
+          status: "Pendente",
+          observacao: "-2+3+cmd|'/c calc'!A1",
+          colaboradorId: 42,
+          colaboradorNome: "@SUM(1+1)*cmd|'/c calc'!A1",
+          cargoNome: "Closer",
+        },
+      ],
+      totais: { comissaoCents: 88_000, dsrCents: 0, premioCents: 0, ajusteCents: 0, totalGeralCents: 88_000 },
+    };
+
+    const buffer = await gerarXlsxEspelho({
+      preview,
+      tipo: "comissoes",
+      periodoInicio: new Date("2026-07-01T00:00:00.000Z"),
+      periodoFim: new Date("2026-07-31T23:59:59.000Z"),
+      codigoVerificacao: "codigo-teste-malicioso",
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
+
+    const abaLancamentos = workbook.getWorksheet("Lançamentos");
+    const linhaDado = abaLancamentos?.getRow(2);
+
+    // Toda célula que começava com =, +, -, @ deve ter sido prefixada com aspas simples
+    // (texto literal), nunca chegar ao Excel como fórmula executável.
+    const razaoSocialCell = String(linhaDado?.getCell("C").value ?? "");
+    const nomeFantasiaCell = String(linhaDado?.getCell("D").value ?? "");
+    expect(razaoSocialCell.startsWith("'")).toBe(true);
+    expect(nomeFantasiaCell.startsWith("'")).toBe(true);
+
+    const abaMemoria = workbook.getWorksheet("Memória de Cálculo");
+    const colaboradorCell = String(abaMemoria?.getRow(2).getCell("B").value ?? "");
+    expect(colaboradorCell.startsWith("'")).toBe(true);
+  });
 });
 
 describe("PreviewExportacao — nunca persiste nada", () => {
