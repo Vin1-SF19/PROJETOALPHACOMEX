@@ -53,3 +53,6 @@ next-env.d.ts
 
 # Fases de prompt (fila de execução local do Bibble, nunca vai para o git)
 /prompt-phases/
+
+# Logs do sync automático com o servidor interno (scripts/sync-servidor.ps1)
+/.sync-logs/
