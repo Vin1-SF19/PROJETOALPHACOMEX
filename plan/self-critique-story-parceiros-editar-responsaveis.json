@@ -1,0 +1,30 @@
+{
+  "subtaskId": "story-parceiros-editar-responsaveis",
+  "critiquedAt": "2026-07-28T17:30:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "Um parceiro PJ antigo sem representantes poderia enviar um array vazio e apagar o conjunto; mitigado por formulário inicial vazio e validação duplicada no cliente e servidor.",
+      "Um parceiro PF poderia alterar representantes por engano; mitigado pela omissão de responsaveis no payload de PF e pelo nested write condicional.",
+      "Falha após deleteMany poderia deixar dados parciais; mitigado pelo deleteMany e create dentro de um único nested update atômico do Prisma."
+    ],
+    "edgeCases": [
+      "PJ sem representante persistido abre uma gaveta vazia e exige somente um nome válido.",
+      "Múltiplos representantes podem ser adicionados, removidos, normalizados e restaurados no cancelamento.",
+      "CPF mascarado e campos opcionais vazios são normalizados sem transformar campos opcionais em obrigatórios."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

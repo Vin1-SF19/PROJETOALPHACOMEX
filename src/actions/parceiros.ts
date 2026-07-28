@@ -572,8 +572,14 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
   // não vale mais para o novo valor — precisa reconfirmar pelo portal.
   const atual = await db.parceiro.findUnique({
     where: { id },
-    select: { chavePix: true, tipoChavePix: true, nomeBanco: true, agencia: true, conta: true },
+    select: { tipo: true, chavePix: true, tipoChavePix: true, nomeBanco: true, agencia: true, conta: true },
   });
+  if (!atual) return { success: false, error: "Parceiro não encontrado" };
+
+  const responsaveisValidos = d.responsaveis?.filter((responsavel) => responsavel.nome.trim().length >= 2);
+  if (atual.tipo === "PJ" && d.responsaveis && responsaveisValidos?.length === 0) {
+    return { success: false, error: "Ao menos um responsável físico é obrigatório para Pessoa Jurídica" };
+  }
   const dadosBancariosMudaram =
     (atual?.chavePix ?? null) !== (d.chavePix ?? null) ||
     (atual?.tipoChavePix ?? null) !== (d.tipoChavePix ?? null) ||
@@ -616,8 +622,7 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
           // Substitui o conjunto de representantes (deleta os antigos e recria)
           representantes: {
             deleteMany: {},
-            create: d.responsaveis
-              .filter(r => r.nome.trim())
+            create: (responsaveisValidos ?? [])
               .map(r => ({
                 tipo: "PF",
                 documento: r.cpf?.replace(/\D/g, "") || "",
@@ -634,7 +639,8 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
     revalidatePath("/PainelAlpha/Parceiros");
     revalidatePath(`/PainelAlpha/Parceiros/${id}`);
     return { success: true };
-  } catch {
+  } catch (error) {
+    console.error("[editarParceiro]", error);
     return { success: false, error: "Erro ao salvar alterações" };
   }
 }

@@ -72,3 +72,20 @@ Direção visual escolhida para o módulo Alpha Blueprint (central de especifica
 - **Mobile**: Kanban vira lista vertical (sem drag-and-drop — menu "Mover para..."), canvas avisa "melhor em telas maiores" mas nunca bloqueia.
 
 Ver especificação completa entregue por Iris na fase 03 da fila `prompt-phases/` (arquivada em `journal.md` ao final do projeto).
+
+---
+
+## Padrão "Ledger Vivo" (Gestão de Comissões e Prêmios, 2026-07-28 — Iris)
+
+Direção visual escolhida para o módulo de Comissões e Prêmios. Mood: terminal financeiro de alta densidade — prioriza escaneabilidade de números sobre efeito visual (o financeiro consulta esta tela várias vezes ao dia). Reutiliza a estrutura real do `GlowCard` (`ChecklistView.tsx:455`, `rgba(15,23,42,0.82)` + `backdrop-blur-24px`, glow radial de 280px seguindo o mouse), que é a implementação real por trás do que o prompt do usuário chamou de "Big Card" — não existe componente literalmente chamado "Big Card" no projeto.
+
+- **Sem fundo vivo/shader animado** — fundo `#020617` liso. Dados financeiros densos não competem com hero visual (mesma regra já aplicada a `ExtratoDetalhe`/canvas do Alpha Blueprint).
+- **Faixa de identificação do tipo de evento**: 4px sólida no topo do card — azul `rgb(37,99,235)` para CONTRATAÇÃO, verde `rgb(16,185,129)` para ÊXITO. Identificação instantânea sem precisar ler o badge de texto.
+- **`EventoComissaoCard`** (nome real do componente equivalente ao "Big Card"): grid `md:grid-cols-[1.2fr_1fr_1fr]` (dados da empresa | Comercial | Operacional) no desktop; empilha verticalmente em mobile (dados → Comercial → Operacional em sequência).
+- **Valores monetários sempre em `tabular-nums`**, alinhados à direita — regra obrigatória em qualquer tela nova que liste dinheiro neste módulo.
+- **`LancamentoColaboradorCard`** (mini card): layout horizontal — avatar/iniciais (28px, circle, cor do accent do tema) à esquerda, nome+cargo ao centro, valores (comissão/DSR/prêmio/total) à direita com o total em destaque. Status SEMPRE como dot colorido + label textual, nunca só cor (regra de acessibilidade já estabelecida no Alpha Blueprint, replicada aqui).
+- **Cores de status** (usar tokens já existentes de `CONFIG_TEMAS`, nunca hex isolado): pago = `emerald-500`, pendente = `amber-500`, vencido/bloqueado/divergente = `rose-500`.
+- **Animação**: entry `fade + y:12→0` com stagger 0.04s entre mini cards (mesmo padrão de tabela do Aurora Financeira); hover no mini card = `translateY(-2px)` + barra de 2px na cor do status na borda esquerda; SEM tilt 3D nem glow-mouse por mini card individual (só o card de evento inteiro herda o glow do `GlowCard` — mini cards densos não devem competir por atenção visual).
+- **Rodapé do card de evento**: barra fina `border-t border-white/5`, total geral à direita em fonte grande `tabular-nums`, botão "Marcar todos como pagos" à esquerda (outline, preenche só no hover).
+
+Ver especificação completa (3 opções apresentadas, A escolhida) na Fase 03 da fila `prompt-phases/`.

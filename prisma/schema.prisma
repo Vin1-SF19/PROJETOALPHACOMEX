@@ -1373,6 +1373,12 @@ model CargoColaborador {
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  // Gestão de Comissões e Prêmios (2026-07-28) — colunas estendidas, não tabela paralela
+  setorId                   Int?
+  vinculoPadrao             String? // "CLT" | "PJ"
+  naturezaRecebimento       String? // "COMISSAO" | "PREMIO" | "AMBOS"
+  permiteMultiplosOcupantes Boolean @default(true)
+
   @@map("cargo_colaborador")
 }
 
@@ -1405,6 +1411,316 @@ model ContratoColaborador {
   @@index([usuarioId])
   @@index([status])
   @@map("contrato_colaborador")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Gestão de Comissões e Prêmios (módulo novo, 2026-07-28)
+// Schema aplicado no Turso via script pontual (Vault, Fase 02 da fila prompt-phases).
+// Dinheiro sempre em centavos (Int). FK de usuário sempre Int (usuarios.id).
+// ═══════════════════════════════════════════════════════════════════════════
+
+model CommissionEvent {
+  id                       String    @id @default(cuid())
+  eventType                String // CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL
+  clienteId                Int?
+  contratoComercialId      String?
+  businessProcessId        String?
+
+  cnpj                     String
+  razaoSocial              String
+  nomeFantasia             String?
+  servico                  String
+  eventDate                DateTime
+
+  grossContractAmountCents Int
+  partnerSpreadCents       Int    @default(0)
+  thirdPartyCostsCents     Int    @default(0)
+  discountAmountCents      Int    @default(0)
+  netContractAmountCents   Int
+  commissionableBaseCents  Int?
+  formaPagamento           String?
+
+  status                   String @default("PENDING_REVIEW") // PENDING_REVIEW|OK|BLOCKED|INTEGRATION_ERROR
+
+  sourceSystem             String
+  sourceEntity             String
+  sourceId                 String
+  sourceUpdatedAt          DateTime?
+  lastSyncAt               DateTime?
+  syncStatus               String @default("SYNCED")
+
+  entries                  CommissionEntry[]
+  divergencias             CommissionDivergence[]
+
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([sourceSystem, sourceEntity, sourceId, eventType])
+  @@index([cnpj])
+  @@index([eventType])
+  @@index([status])
+}
+
+model BusinessProcess {
+  id                        String    @id @default(cuid())
+  clienteId                 Int?
+  contratoComercialId       String?
+  analistaResponsavelId     Int
+  analistaAuxiliarId        Int?
+  auditorId                 Int?
+  diretorId                 Int?
+  dataInicio                DateTime
+  dataProtocolo             DateTime?
+  dataExito                 DateTime?
+  tentativas                Int       @default(1)
+  deferidoPrimeiraTentativa Boolean   @default(false)
+  status                    String    @default("EM_ANDAMENTO")
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@index([clienteId])
+}
+
+model SyncRun {
+  id             String    @id @default(cuid())
+  sourceSystem   String
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  status         String    @default("RUNNING") // RUNNING|SUCCESS|FAILED|PARTIAL
+  triggeredBy    String // "manual" | "scheduled"
+  triggeredById  Int?
+  totalProcessed Int       @default(0)
+  totalErrors    Int       @default(0)
+
+  erros          SyncError[]
+}
+
+model SyncError {
+  id           String   @id @default(cuid())
+  syncRunId    String
+  syncRun      SyncRun  @relation(fields: [syncRunId], references: [id], onDelete: Cascade)
+  sourceEntity String
+  sourceId     String
+  mensagem     String
+  detalhesJson String?
+  createdAt    DateTime @default(now())
+
+  @@index([syncRunId])
+}
+
+model CommissionRule {
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  active           Boolean  @default(true)
+  priority         Int      @default(0)
+  eventType        String
+  benefitType      String // COMMISSION|BONUS|DSR
+  cargoId          Int?
+  setorId          Int?
+  collaboratorId   Int?
+  servico          String?
+  approvalRequired Boolean  @default(false)
+  createdById      Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  versoes          CommissionRuleVersion[]
+}
+
+model CommissionRuleVersion {
+  id                  String    @id @default(cuid())
+  ruleId              String
+  rule                CommissionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  version             Int
+  status              String    @default("DRAFT") // DRAFT|PUBLISHED|INACTIVE
+  validFrom           DateTime
+  validTo             DateTime?
+  conditionsJson      String
+  calculationJson     String
+  paymentScheduleJson String
+  publishedById       Int?
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@unique([ruleId, version])
+}
+
+model EligibilityOverride {
+  id                   String    @id @default(cuid())
+  collaboratorId       Int?
+  cargoId              Int?
+  clienteId            Int?
+  contratoComercialId  String?
+  servico              String?
+  eventType            String?
+  dataInicial          DateTime?
+  dataFinal            DateTime?
+  tipo                 String // BLOQUEIO|SUBSTITUICAO|PERCENTUAL_ESPECIFICO|VALOR_ESPECIFICO|EXCLUSAO
+  percentualEspecifico Float?
+  valorEspecificoCents Int?
+  justificativa        String
+  prioridade           Int       @default(0)
+  approvalRequired     Boolean   @default(false)
+  aprovadoById         Int?
+  aprovadoEm           DateTime?
+  createdById          Int
+  createdAt            DateTime  @default(now())
+}
+
+model CommissionEntry {
+  id                       String    @id @default(cuid())
+  eventId                  String
+  event                    CommissionEvent @relation(fields: [eventId], references: [id])
+  collaboratorId           Int
+  cargoId                  Int
+  vinculo                  String // "CLT" | "PJ" resolvido na data do evento
+  ruleVersionId            String?
+
+  totalCents               Int       @default(0)
+  status                   String    @default("Pendente") // Pendente|AguardandoAprovacao|Programado|Pago|ParcialmentePago|Vencido|Bloqueado|EmDivergencia|Cancelado|Estornado
+
+  contractualDueDate       DateTime?
+  operationalSuggestedDate DateTime?
+  scheduledPaymentDate     DateTime?
+  actualPaymentDate        DateTime?
+
+  componentes              EntryComponent[]
+  ajustes                  ManualAdjustment[]
+  alocacoes                PaymentAllocation[]
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([collaboratorId])
+  @@index([status])
+}
+
+model EntryComponent {
+  id                 String   @id @default(cuid())
+  entryId            String
+  entry              CommissionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  tipo               String // COMISSAO|PREMIO|DSR|AJUSTE
+  valorCents         Int
+  percentual         Float?
+  memoriaCalculoJson String
+  createdAt          DateTime @default(now())
+}
+
+model ManualAdjustment {
+  id                 String    @id @default(cuid())
+  entryId            String
+  entry              CommissionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  valorOriginalCents Int
+  valorAjustadoCents Int
+  justificativa      String
+  aprovadoById       Int?
+  aprovadoEm         DateTime?
+  createdById        Int
+  createdAt          DateTime  @default(now())
+}
+
+model Payment {
+  id                    String   @id @default(cuid())
+  data                  DateTime
+  valorCents            Int
+  meio                  String
+  referencia            String?
+  observacao            String?
+  comprovanteUrl        String?
+  usuarioResponsavelId  Int
+  tipo                  String   @default("PAGAMENTO") // PAGAMENTO|ESTORNO
+  estornoDeId           String?
+  createdAt             DateTime @default(now())
+
+  alocacoes             PaymentAllocation[]
+}
+
+model PaymentAllocation {
+  id         String  @id @default(cuid())
+  paymentId  String
+  payment    Payment @relation(fields: [paymentId], references: [id])
+  entryId    String
+  entry      CommissionEntry @relation(fields: [entryId], references: [id])
+  valorCents Int
+
+  @@index([entryId])
+}
+
+model TariffVersion {
+  id                       String    @id @default(cuid())
+  servico                  String
+  valorCents               Int
+  dataInicial              DateTime
+  dataFinal                DateTime?
+  formasPagamentoJson      String
+  descontoPadraoPercentual Float?
+  condicoesJson            String?
+  createdAt                DateTime  @default(now())
+}
+
+model CommissionDivergence {
+  id            String    @id @default(cuid())
+  eventId       String?
+  event         CommissionEvent? @relation(fields: [eventId], references: [id])
+  entryId       String?
+  tipo          String // as 14 checagens da seção 28 do prompt original
+  severidade    String // PENDING_REVIEW|BLOCKED|INTEGRATION_ERROR
+  detalhes      String
+  resolvidoEm   DateTime?
+  resolvidoById Int?
+  createdAt     DateTime  @default(now())
+}
+
+model ExportDocument {
+  id                String   @id @default(cuid())
+  tipo              String // comissoes|premios|comissao_dsr|todos
+  colaboradorId     Int?
+  periodoInicio     DateTime
+  periodoFim        DateTime
+  formato           String // PDF|XLSX|AMBOS
+  codigoVerificacao String   @unique
+  hash              String
+  geradoPorId       Int
+  createdAt         DateTime @default(now())
+
+  itens             ExportDocumentItem[]
+}
+
+model ExportDocumentItem {
+  id         String  @id @default(cuid())
+  documentId String
+  document   ExportDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  entryId    String?
+  linhaJson  String
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  data      DateTime
+  nome      String
+  escopo    String // NACIONAL|ESTADUAL|MUNICIPAL
+  uf        String?
+  municipio String?
+
+  @@index([data])
+}
+
+model CommissionAuditLog {
+  id            String   @id @default(cuid())
+  userId        Int
+  acao          String
+  entityType    String
+  entityId      String
+  beforeJson    String?
+  afterJson     String?
+  reason        String?
+  ipAddress     String?
+  userAgent     String?
+  correlationId String
+  createdAt     DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([correlationId])
 }
 
 model ChecklistDocumental {

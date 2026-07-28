@@ -41,3 +41,15 @@ Categorias colapsáveis (`<details>`/`<summary>`, mesmo padrão de `CATEGORIAS_C
 ## Padrões de Conteúdo
 
 <!-- Adicionar aqui -->
+
+---
+
+## Estados vazios/erro parametrizados (novo padrão, Gestão de Comissões e Prêmios, 2026-07-28)
+
+Componente único `EstadoVazioComissoes.tsx` parametrizado por `tipo` (`"sem-eventos" |
+"sem-regra" | "integracao-indisponivel" | "divergencia" | "erro-exportacao" |
+"erro-pagamento" | "dados-incompletos"`) — ícone lucide + título + descrição + identificador
+técnico SEMPRE visível (`<code className="text-xs text-slate-500">`, nunca escondido atrás de
+mensagem genérica) + botão de ação quando aplicável. Reaproveitável em qualquer módulo
+financeiro/operacional futuro que precise de múltiplos estados vazios/erro parametrizados em
+vez de 1 componente por estado.

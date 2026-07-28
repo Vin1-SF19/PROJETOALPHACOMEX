@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, User, Mail, Phone, MapPin, CreditCard, ShieldCheck,
   Pencil, X, Loader2, Save, Sparkles, Unlink, ChevronDown, Receipt, FileCheck2, Calendar,
-  CheckCircle2, Clock, TrendingUp, MessageSquareText,
+  CheckCircle2, Clock, TrendingUp, MessageSquareText, Plus, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { editarParceiro, desvincularIndicacao } from "@/actions/parceiros";
@@ -14,9 +14,16 @@ import { getTema } from "@/lib/temas";
 import { TRIBUTOS } from "@/lib/tributos";
 import TrocarSenhaParceiro from "./TrocarSenhaParceiro";
 import ModalComprovante from "./ModalComprovante";
+import {
+  criarFormularioResponsaveis,
+  criarResponsavelVazio,
+  formatarCpf,
+  montarPayloadResponsaveis,
+  type RepresentantePersistido,
+  type ResponsavelForm,
+} from "./responsaveis-form";
 
 type Endereco = { cep: string; logradouro: string; numero: string | null; complemento: string | null; bairro: string; cidade: string; uf: string };
-type Representante = { tipo: string; documento: string; nome: string; dataNascimento: string | null; cargo: string | null; email: string | null; telefone: string | null };
 type Indicacao = {
   id: number;
   comprovanteUrl: string | null;
@@ -42,7 +49,7 @@ export type DetalheParceiro = {
   pixConfirmado: boolean; nivel: string;
   tipoParceiro: string;
   comissaoPercentual: number | null; loginEmail: string;
-  endereco: Endereco | null; representantes: Representante[]; indicacoes: Indicacao[];
+  endereco: Endereco | null; representantes: RepresentantePersistido[]; indicacoes: Indicacao[];
 };
 
 const NIVEL_COLOR: Record<string, string> = {
@@ -94,7 +101,7 @@ export default function DetalheParceiroClient({
   const [dataNascimento, setDataNascimento] = useState(parceiro.dataNascimento ?? "");
   const [sobre, setSobre] = useState(parceiro.sobre ?? "");
   const [email, setEmail] = useState(parceiro.email);
-  const [telefone, setTelefone] = useState(parceiro.telefone ?? "");
+  const [telefone] = useState(parceiro.telefone ?? "");
   const [telefone2, setTelefone2] = useState(parceiro.telefone2 ?? "");
   const [chavePix, setChavePix] = useState(parceiro.chavePix ?? "");
   const [tipoChavePix, setTipoChavePix] = useState(parceiro.tipoChavePix ?? "");
@@ -116,6 +123,41 @@ export default function DetalheParceiroClient({
       : "",
   );
   const [end, setEnd] = useState<Endereco>(parceiro.endereco ?? { cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "" });
+  const [responsaveis, setResponsaveis] = useState<ResponsavelForm[]>(() =>
+    criarFormularioResponsaveis(parceiro.representantes),
+  );
+  const [responsavelAbertoIdx, setResponsavelAbertoIdx] = useState(0);
+
+  const atualizarResponsavel = (indice: number, campo: keyof ResponsavelForm, valor: string) => {
+    setResponsaveis((atuais) =>
+      atuais.map((responsavel, i) => i === indice ? { ...responsavel, [campo]: valor } : responsavel),
+    );
+  };
+
+  const adicionarResponsavel = () => {
+    setResponsaveis((atuais) => [...atuais, criarResponsavelVazio()]);
+    setResponsavelAbertoIdx(responsaveis.length);
+  };
+
+  const removerResponsavel = (indice: number) => {
+    setResponsaveis((atuais) => atuais.filter((_, i) => i !== indice));
+    setResponsavelAbertoIdx(-1);
+  };
+
+  const restaurarResponsaveisPersistidos = () => {
+    setResponsaveis(criarFormularioResponsaveis(parceiro.representantes));
+    setResponsavelAbertoIdx(0);
+  };
+
+  const iniciarEdicao = () => {
+    restaurarResponsaveisPersistidos();
+    setEditando(true);
+  };
+
+  const cancelarEdicao = () => {
+    restaurarResponsaveisPersistidos();
+    setEditando(false);
+  };
 
   function fmtDoc(doc: string): string {
     const d = doc.replace(/\D/g, "");
@@ -132,6 +174,13 @@ export default function DetalheParceiroClient({
 
   const salvar = async () => {
     if (!nome.trim() || !email.trim()) { toast.error("Nome e e-mail são obrigatórios"); return; }
+    const responsaveisParaSalvar = parceiro.tipo === "PJ"
+      ? montarPayloadResponsaveis(responsaveis)
+      : undefined;
+    if (parceiro.tipo === "PJ" && responsaveisParaSalvar?.length === 0) {
+      toast.error("Informe ao menos um responsável com nome");
+      return;
+    }
     if (tipoParceiro === "ESPECIAL" && comissaoFixaOpcao === "outro" && !comissaoFixaOutro) {
       toast.error("Informe o valor da comissão fixa");
       return;
@@ -157,7 +206,7 @@ export default function DetalheParceiroClient({
       endereco: end.cep && end.logradouro && end.bairro && end.cidade && end.uf
         ? { cep: end.cep, logradouro: end.logradouro, numero: end.numero || undefined, complemento: end.complemento || undefined, bairro: end.bairro, cidade: end.cidade, uf: end.uf }
         : undefined,
-      // responsaveis não são editados aqui (preserva os do cadastro); omitir = manter
+      responsaveis: responsaveisParaSalvar,
     });
     setSalvando(false);
     if (res.success) { toast.success("Parceiro atualizado"); setEditando(false); router.refresh(); }
@@ -196,7 +245,7 @@ export default function DetalheParceiroClient({
           </div>
           {/* Lápis — só quem pode editar */}
           {(permissao.podeEditar) && !editando && (
-            <button onClick={() => setEditando(true)} title="Editar"
+            <button onClick={iniciarEdicao} title="Editar"
               className="h-10 px-3 flex items-center gap-1.5 rounded-xl font-black uppercase text-[10px] tracking-widest text-white"
               style={{ background: `rgba(${tema.accent}, 0.85)` }}>
               <Pencil size={13} /> Editar
@@ -204,7 +253,7 @@ export default function DetalheParceiroClient({
           )}
           {editando && (
             <div className="flex items-center gap-2">
-              <button onClick={() => setEditando(false)} className="h-10 px-3 flex items-center gap-1.5 rounded-xl text-[10px] font-bold text-slate-300 bg-white/5"><X size={13} /> Cancelar</button>
+              <button onClick={cancelarEdicao} className="h-10 px-3 flex items-center gap-1.5 rounded-xl text-[10px] font-bold text-slate-300 bg-white/5"><X size={13} /> Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="h-10 px-3 flex items-center gap-1.5 rounded-xl font-black uppercase text-[10px] tracking-widest text-white disabled:opacity-50" style={{ background: `rgba(${tema.accent}, 1)` }}>
                 {salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar
               </button>
@@ -495,9 +544,109 @@ export default function DetalheParceiroClient({
         {parceiro.tipo === "PJ" && (
           <div className={cardCls}>
             <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
-              Representantes{parceiro.representantes.length > 1 ? ` (${parceiro.representantes.length})` : ""}
+              Representantes{(editando ? responsaveis.length : parceiro.representantes.length) > 1
+                ? ` (${editando ? responsaveis.length : parceiro.representantes.length})`
+                : ""}
             </p>
-            {parceiro.representantes.length === 0 ? (
+            {editando ? (
+              <div className="space-y-3">
+                {responsaveis.map((responsavel, i) => {
+                  const aberto = responsavelAbertoIdx === i;
+                  const nomeValido = responsavel.nome.trim().length >= 2;
+
+                  return (
+                    <div
+                      key={i}
+                      className="rounded-2xl overflow-hidden"
+                      style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.2)" }}
+                    >
+                      <div className="flex items-center gap-2 px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setResponsavelAbertoIdx(aberto ? -1 : i)}
+                          className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                        >
+                          <div className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${nomeValido ? "bg-emerald-500/15" : "bg-amber-500/10"}`}>
+                            <User size={13} className={nomeValido ? "text-emerald-400" : "text-amber-400"} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12.5px] font-bold text-slate-200 truncate">
+                              {responsavel.nome || `Responsável ${i + 1}`}
+                            </p>
+                            {nomeValido && (
+                              <p className="text-[10px] text-slate-500 truncate font-mono">
+                                {[responsavel.cpf, responsavel.cargo, responsavel.whatsapp].filter(Boolean).join(" · ")}
+                              </p>
+                            )}
+                          </div>
+                          <ChevronDown size={15} className={`shrink-0 text-slate-500 transition-transform ${aberto ? "rotate-180" : ""}`} />
+                        </button>
+                        {responsaveis.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removerResponsavel(i)}
+                            title="Remover responsável"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {aberto && (
+                        <div className="px-4 pb-4 pt-1 space-y-3 border-t border-amber-500/15">
+                          <div>
+                            <p className={labelCls}>Nome completo *</p>
+                            <input value={responsavel.nome} onChange={e => atualizarResponsavel(i, "nome", e.target.value)} className={inputCls} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className={labelCls}>CPF</p>
+                              <input value={responsavel.cpf} onChange={e => atualizarResponsavel(i, "cpf", formatarCpf(e.target.value))} placeholder="000.000.000-00" className={`${inputCls} font-mono`} />
+                            </div>
+                            <div>
+                              <p className={labelCls}>Data de nascimento</p>
+                              <input type="date" value={responsavel.dataNascimento} onChange={e => atualizarResponsavel(i, "dataNascimento", e.target.value)} className={inputCls} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className={labelCls}>Cargo / relação</p>
+                              <input value={responsavel.cargo} onChange={e => atualizarResponsavel(i, "cargo", e.target.value)} placeholder="Sócio, Diretor..." className={inputCls} />
+                            </div>
+                            <div>
+                              <p className={labelCls}>WhatsApp</p>
+                              <input value={responsavel.whatsapp} onChange={e => atualizarResponsavel(i, "whatsapp", e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                            </div>
+                          </div>
+                          <div>
+                            <p className={labelCls}>E-mail</p>
+                            <input type="email" value={responsavel.email} onChange={e => atualizarResponsavel(i, "email", e.target.value)} className={inputCls} />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={!nomeValido}
+                            onClick={() => setResponsavelAbertoIdx(-1)}
+                            className="w-full h-10 rounded-xl border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-black uppercase text-[10px] tracking-widest disabled:opacity-30"
+                          >
+                            Concluir responsável
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={adicionarResponsavel}
+                  className="w-full h-11 rounded-xl border border-dashed border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+                >
+                  <Plus size={14} /> Adicionar responsável
+                </button>
+                <p className="text-[9px] text-slate-600">Somente o nome é obrigatório.</p>
+              </div>
+            ) : parceiro.representantes.length === 0 ? (
               <p className="text-xs text-slate-600">Sem responsável.</p>
             ) : (
               <div className="space-y-2.5">
