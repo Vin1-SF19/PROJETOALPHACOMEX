@@ -35,7 +35,7 @@ export default function MarketingClient({ iframeUrl }: { iframeUrl: string }) {
         src={iframeUrl}
         title="Instagram Studio"
         className="w-full h-full border-0"
-        sandbox="allow-same-origin allow-scripts allow-forms"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-top-navigation-by-user-activation"
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
       />
