@@ -39,6 +39,7 @@ export interface ProjetoBlueprintCard {
   coverUrl: string | null;
   icon: string | null;
   tagsJson: string | null;
+  premioCents: number | null;
   dueDate: string | Date | null;
   updatedAt: string | Date;
   requester?: { id: number; nome: string } | null;

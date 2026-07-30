@@ -10,6 +10,7 @@ const prismaMock = vi.hoisted(() => ({
   contratoColaborador: { findMany: vi.fn() },
   cargoColaborador: { findUnique: vi.fn() },
   setor: { findUnique: vi.fn() },
+  holiday: { findMany: vi.fn() },
 }));
 
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
@@ -40,6 +41,7 @@ describe("gerarLancamentosParaEvento", () => {
     vi.clearAllMocks();
     prismaMock.eligibilityOverride.findMany.mockResolvedValue([]);
     prismaMock.commissionEntry.findFirst.mockResolvedValue(null);
+    prismaMock.holiday.findMany.mockResolvedValue([]); // sem feriados estaduais/municipais cadastrados por padrão
   });
 
   it("gera lançamento simples para 1 colaborador com regra clara (Auditor Contábil na contratação, valor fixo único)", async () => {
@@ -73,9 +75,7 @@ describe("gerarLancamentosParaEvento", () => {
     expect(componentCall.data.valorCents).toBe(23_652); // R$236,52 fixo do Auditor Contábil
   });
 
-  it("comissão e DSR são gerados como componentes SEPARADOS dentro do MESMO CommissionEntry (Closer na contratação)", async () => {
-    // Closer tem 2 regras seed para CONTRACTING: comissão (PERCENTAGE) e DSR (DSR) —
-    // ambas devem virar EntryComponent distintos no mesmo lançamento, nunca somadas.
+  it("Closer NÃO recebe DSR (decisão do usuário, 2026-07-30) — só o componente COMISSAO", async () => {
     prismaMock.commissionEvent.findUnique.mockResolvedValue(
       eventoBase({ eventType: "CONTRACTING", formaPagamento: "A_VISTA_DESCONTO" }),
     );
@@ -95,15 +95,51 @@ describe("gerarLancamentosParaEvento", () => {
     const result = await gerarLancamentosParaEvento({ eventId: "evento-1", collaboratorIds: [42] });
 
     expect(result.entriesCreated).toBe(1);
-    expect(prismaMock.commissionEntry.create).toHaveBeenCalledTimes(1); // 1 lançamento
-    expect(prismaMock.entryComponent.create).toHaveBeenCalledTimes(2); // 2 componentes: COMISSAO + DSR
+    expect(prismaMock.commissionEntry.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.entryComponent.create).toHaveBeenCalledTimes(1); // só COMISSAO, nunca DSR
+
+    const componentCall = prismaMock.entryComponent.create.mock.calls[0][0];
+    expect(componentCall.data.tipo).toBe("COMISSAO");
+  });
+
+  it("Analista Sênior: comissão e DSR são gerados como componentes SEPARADOS por decomposição do total fixo (R$350)", async () => {
+    // Analista Sênior tem regra TOTAL_FIXO_COM_DSR (R$350) que decompõe em COMISSAO+DSR
+    // usando dias úteis/descanso do mês do evento — nunca soma num único componente.
+    prismaMock.commissionEvent.findUnique.mockResolvedValue(
+      eventoBase({ eventType: "CONTRACTING", eventDate: new Date("2026-06-15T00:00:00.000Z") }),
+    );
+    prismaMock.usuarios.findUnique.mockResolvedValue(usuarioComCargo(3, "Analista Sênior"));
+    prismaMock.contratoColaborador.findMany.mockResolvedValue([
+      { id: "c3", usuarioId: 42, tipo: "CLT", dataInicio: new Date("2026-01-01"), dataFim: null },
+    ]);
+    prismaMock.cargoColaborador.findUnique.mockResolvedValue({
+      id: 3,
+      nome: "Analista Sênior",
+      setorId: null,
+      naturezaRecebimento: null,
+      permiteMultiplosOcupantes: true,
+    });
+    prismaMock.commissionEntry.create.mockResolvedValue({ id: "entry-3" });
+
+    const result = await gerarLancamentosParaEvento({ eventId: "evento-1", collaboratorIds: [42] });
+
+    expect(result.entriesCreated).toBe(1);
+    expect(prismaMock.entryComponent.create).toHaveBeenCalledTimes(2); // COMISSAO + DSR
 
     const tipos = prismaMock.entryComponent.create.mock.calls.map(
       (call: Array<{ data: { tipo: string } }>) => call[0].data.tipo,
     );
     expect(tipos).toContain("COMISSAO");
     expect(tipos).toContain("DSR");
-    expect(new Set(tipos).size).toBe(2); // nunca o mesmo tipo duas vezes, nunca somados
+    expect(new Set(tipos).size).toBe(2);
+
+    // Junho/2026: 24 dias úteis, 6 de descanso (só domingos, sem feriado no período) — R$280+R$70=R$350.
+    const valores = prismaMock.entryComponent.create.mock.calls.map(
+      (call: Array<{ data: { tipo: string; valorCents: number } }>) => call[0].data,
+    );
+    const comissao = valores.find((v) => v.tipo === "COMISSAO");
+    const dsr = valores.find((v) => v.tipo === "DSR");
+    expect(comissao!.valorCents + dsr!.valorCents).toBe(35_000); // nunca diverge do total fixo
   });
 
   it("recálculo não duplica lançamento já PAGO — pula (entriesSkipped)", async () => {

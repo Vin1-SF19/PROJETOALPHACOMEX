@@ -1440,6 +1440,15 @@ model CommissionEvent {
   commissionableBaseCents  Int?
   formaPagamento           String?
 
+  // Closer/analista responsável — FK real (preferível, permite navegar até o usuário) quando
+  // resolvido via ContratoComercial.usuarioId/BusinessProcess.analistaResponsavelId; nome
+  // manual (string, sem FK) quando só existe como texto livre ou foi preenchido à mão porque
+  // nenhuma fonte tinha o dado. Nunca inventar um FK a partir de string sem garantia de match.
+  closerUsuarioId                Int?
+  closerNomeManual               String?
+  analistaResponsavelUsuarioId   Int?
+  analistaResponsavelNomeManual  String?
+
   status                   String @default("PENDING_REVIEW") // PENDING_REVIEW|OK|BLOCKED|INTEGRATION_ERROR
 
   sourceSystem             String
@@ -1721,6 +1730,27 @@ model CommissionAuditLog {
 
   @@index([entityType, entityId])
   @@index([correlationId])
+}
+
+/**
+ * RBAC granular por ação dentro do módulo de Comissões — substitui a checagem hardcoded
+ * `ROLES_TEMPORARIAMENTE_PERMITIDOS` presente em 12 Server Actions. Categoria (não ação
+ * individual — 33 funções reais agrupadas em 6 categorias funcionais, decisão do usuário):
+ * VISUALIZAR (listar/ver detalhes), SINCRONIZAR, PAGAR (registrar/programar/estornar/lote),
+ * APROVAR (eventos/divergências/ajustes), CONFIGURAR (cargos/tarifários/regras/feriados/
+ * exceções), EXPORTAR. Admin/CEO sempre têm acesso total, independente desta tabela
+ * (bypass já existente em todo o módulo, mantido).
+ */
+model CommissionPermission {
+  id        String   @id @default(cuid())
+  userId    Int
+  categoria String // VISUALIZAR|SINCRONIZAR|PAGAR|APROVAR|CONFIGURAR|EXPORTAR
+  permitido Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoria])
+  @@index([userId])
 }
 
 model ChecklistDocumental {
@@ -2322,6 +2352,7 @@ model BlueprintProject {
   coverUrl   String?
   icon       String?
   tagsJson   String?
+  premioCents Int?
 
   createdById Int
   updatedById Int?

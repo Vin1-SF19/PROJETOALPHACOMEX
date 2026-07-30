@@ -27,6 +27,7 @@ import { StatusBadge } from "../lib/status-badge";
 import { formatarCentavosBRL, formatarDataComissao } from "../lib/formatters";
 import { BuscarDetalhesLancamento, CriarAjusteManual } from "@/actions/CommissionEntries";
 import { EstornarPagamento, ProgramarPagamento, RegistrarPagamento } from "@/actions/CommissionPayments";
+import { EditorResponsavel } from "./EditorResponsavel";
 
 interface ModalDetalhesLancamentoProps {
   entryId: string | null;
@@ -200,6 +201,20 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
                   <span className="text-slate-500">Vínculo</span>
                   <span className="text-slate-300">{dados.data.entry.vinculo}</span>
                 </div>
+                <EditorResponsavel
+                  label="Closer"
+                  eventId={dados.data.eventId}
+                  nomeAtual={dados.data.closerNome}
+                  campo="closer"
+                  onAtualizado={recarregar}
+                />
+                <EditorResponsavel
+                  label="Analista Responsável"
+                  eventId={dados.data.eventId}
+                  nomeAtual={dados.data.analistaResponsavelNome}
+                  campo="analistaResponsavel"
+                  onAtualizado={recarregar}
+                />
                 <div className="flex justify-between">
                   <span className="text-slate-500">Total</span>
                   <span className="font-mono tabular-nums text-white">

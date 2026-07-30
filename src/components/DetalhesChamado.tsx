@@ -122,17 +122,17 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setConfirmando(false); setSolucaoInput(""); } }}>
-        <DialogContent className="bg-[#080e1a] border-blue-500/10 text-white max-w-2xl rounded-[2rem] p-0 overflow-hidden">
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-[1.5rem] border-blue-500/10 bg-[#080e1a] p-0 text-white sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)] sm:max-w-4xl sm:rounded-[2rem] lg:max-w-5xl 2xl:max-w-6xl">
 
           {/* Header */}
-          <div className="p-8 border-b border-white/5 bg-gradient-to-b from-blue-600/5 to-transparent">
+          <div className="shrink-0 border-b border-white/5 bg-gradient-to-b from-blue-600/5 to-transparent p-4 pr-12 sm:p-6 sm:pr-14 lg:p-8 lg:pr-16">
             <DialogHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <DialogTitle className="text-2xl font-black uppercase tracking-tighter mb-1">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <DialogTitle className="mb-1 break-words text-xl font-black uppercase leading-tight tracking-tighter sm:text-2xl">
                     {chamado.titulo}
                   </DialogTitle>
-                  <div className="flex items-center gap-2 text-slate-500 text-xs mt-1 font-bold">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold text-slate-500">
                     <Calendar size={13} />
                     {fmtDateTime(chamado.createdAt)}
                     <span className="text-slate-700">•</span>
@@ -140,7 +140,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                     <span>Aberto há {tempoAberto(chamado.createdAt)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0 sm:justify-end">
                   <span className="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 text-xs font-black">
                     #{chamado.id}
                   </span>
@@ -152,17 +152,17 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
             </DialogHeader>
           </div>
 
-          <div className="p-8 space-y-5">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4 sm:p-6 lg:p-8">
             {/* Info grid */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="flex gap-3 p-4 rounded-2xl bg-white/3 border border-white/5">
                 <div className="p-2 rounded-xl bg-blue-600/15 border border-blue-500/20 flex-shrink-0">
                   <User className="text-blue-400 w-4 h-4" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-0.5">Solicitante</p>
-                  <p className="font-bold text-white text-sm">{chamado.solicitante?.nome}</p>
-                  <p className="text-[10px] text-slate-500 font-bold">@{chamado.solicitante?.usuario}</p>
+                  <p className="break-words font-bold text-white text-sm">{chamado.solicitante?.nome}</p>
+                  <p className="break-all text-[10px] text-slate-500 font-bold">@{chamado.solicitante?.usuario}</p>
                 </div>
               </div>
 
@@ -170,9 +170,9 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                 <div className="p-2 rounded-xl bg-purple-600/15 border border-purple-500/20 flex-shrink-0">
                   <Tag className="text-purple-400 w-4 h-4" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-0.5">Categoria</p>
-                  <p className="font-bold text-white text-sm">{chamado.categoria}</p>
+                  <p className="break-words font-bold text-white text-sm">{chamado.categoria}</p>
                 </div>
               </div>
             </div>
@@ -183,7 +183,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                 <MessageSquare size={14} className="text-blue-400" />
                 Ocorrência Relatada
               </h4>
-              <div className="p-5 rounded-2xl bg-slate-900/40 border border-white/5 text-slate-300 text-sm leading-relaxed">
+              <div className="whitespace-pre-wrap break-words p-5 rounded-2xl bg-slate-900/40 border border-white/5 text-slate-300 text-sm leading-relaxed">
                 {chamado.descricao}
               </div>
             </div>
@@ -200,11 +200,11 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                     </span>
                   )}
                 </h4>
-                <p className="text-emerald-100/80 text-sm leading-relaxed">{chamado.solucao}</p>
+                <p className="whitespace-pre-wrap break-words text-emerald-100/80 text-sm leading-relaxed">{chamado.solucao}</p>
                 {chamado.causa && (
                   <div className="pt-2 border-t border-emerald-500/10">
                     <p className="text-[9px] text-emerald-600 font-black uppercase mb-1">Causa identificada:</p>
-                    <p className="text-emerald-200/60 text-sm">{chamado.causa}</p>
+                    <p className="whitespace-pre-wrap break-words text-emerald-200/60 text-sm">{chamado.causa}</p>
                   </div>
                 )}
               </div>
@@ -232,7 +232,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
             {isAdmin && chamado.status !== "CONCLUIDO" && (
               <div className="pt-5 border-t border-white/5 space-y-2">
                 {confirmando ? (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Button
                       variant="ghost"
                       onClick={() => { setConfirmando(false); setSolucaoInput(""); }}
@@ -251,7 +251,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Button
                         onClick={() => handleStatus("EM_ATENDIMENTO")}
                         disabled={carregando || chamado.status === "EM_ATENDIMENTO"}

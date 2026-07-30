@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SetorColaboradores } from "./SetorColaboradores";
 import { ModalPagarTodos } from "./ModalPagarTodos";
-import { EVENT_TYPE_LABELS, formatarCentavosBRL, formatarDataComissao, STATUS_LABELS } from "../lib/formatters";
+import { EVENT_TYPE_LABELS, formatarCentavosBRL, formatarDataComissao, STATUS_LABELS, traduzirDivergencia } from "../lib/formatters";
+import { EditorResponsavel } from "../ModalDetalhes/EditorResponsavel";
+import { GerarLancamentosAutomaticosEvento } from "@/actions/CommissionEvents";
 import type { EventoComLancamentosResult } from "@/actions/CommissionEntries";
 import type { TemaAlpha } from "@/lib/temas";
 
@@ -24,12 +29,29 @@ interface EventoComissaoCardProps {
  */
 export function EventoComissaoCard({ dados, tema, onAbrirDetalhes, onAtualizar }: EventoComissaoCardProps) {
   const [modalPagarTodosAberto, setModalPagarTodosAberto] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   const { event, divergencias, setorComercial, setorOperacional, semSetor, totalGeralCents } = dados;
   const corFaixa = event.eventType === "PROCESS_SUCCESS" ? "bg-emerald-500" : "bg-blue-500";
 
   const todosOsEntryIds = [...setorComercial, ...setorOperacional, ...semSetor].map((e) => e.id);
   const temColaboradores = todosOsEntryIds.length > 0;
+
+  function gerarLancamentos() {
+    startTransition(async () => {
+      const resultado = await GerarLancamentosAutomaticosEvento({ eventId: event.id });
+      if (!resultado.success) {
+        toast.error(resultado.error ?? "Erro ao gerar lançamentos");
+        return;
+      }
+      if (resultado.data.entriesCreated === 0) {
+        toast.warning("Nenhum lançamento novo foi gerado — verifique divergências ou elegibilidade.");
+      } else {
+        toast.success(`${resultado.data.entriesCreated} lançamento(s) gerado(s).`);
+      }
+      onAtualizar?.();
+    });
+  }
 
   return (
     <div className="relative overflow-hidden rounded-[2rem] border border-white/5 bg-slate-900/40">
@@ -81,6 +103,48 @@ export function EventoComissaoCard({ dados, tema, onAbrirDetalhes, onAtualizar }
                 </dd>
               </div>
             )}
+            <EditorResponsavel
+              label="Closer"
+              eventId={event.id}
+              nomeAtual={event.closerNome}
+              campo="closer"
+              onAtualizado={onAtualizar}
+            />
+            <EditorResponsavel
+              label="Analista responsável"
+              eventId={event.id}
+              nomeAtual={event.analistaResponsavelNome}
+              campo="analistaResponsavel"
+              onAtualizado={onAtualizar}
+            />
+
+            {event.eventType === "PROCESS_SUCCESS" && (
+              <>
+                <div className="flex justify-between">
+                  <dt className="text-slate-500">Data do êxito</dt>
+                  <dd className={event.dataExito ? "text-slate-300" : "italic text-slate-600"}>
+                    {event.dataExito ? formatarDataComissao(event.dataExito) : "Não informado"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-slate-500">Tentativas</dt>
+                  <dd className={event.tentativas !== null ? "text-slate-300" : "italic text-slate-600"}>
+                    {event.tentativas ?? "Não informado"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-slate-500">1ª tentativa</dt>
+                  <dd className={event.deferidoPrimeiraTentativa !== null ? "text-slate-300" : "italic text-slate-600"}>
+                    {event.deferidoPrimeiraTentativa === null
+                      ? "Não informado"
+                      : event.deferidoPrimeiraTentativa
+                        ? "Deferido"
+                        : "Não deferido"}
+                  </dd>
+                </div>
+              </>
+            )}
+
             <div className="flex justify-between">
               <dt className="text-slate-500">Status</dt>
               <dd className="text-slate-300">{STATUS_LABELS[event.status] ?? event.status}</dd>
@@ -94,9 +158,15 @@ export function EventoComissaoCard({ dados, tema, onAbrirDetalhes, onAtualizar }
               </p>
               <ul className="mt-1 space-y-0.5 text-[11px] text-rose-300/80">
                 {divergencias.map((d) => (
-                  <li key={d.id}>{d.detalhes}</li>
+                  <li key={d.id}>{traduzirDivergencia(d.tipo).titulo}</li>
                 ))}
               </ul>
+              <Link
+                href="/PainelAlpha/Comissoes/Divergencias"
+                className="mt-1.5 inline-block text-[11px] font-medium text-rose-300 underline decoration-dotted underline-offset-2 hover:text-rose-200"
+              >
+                Ver detalhes e como resolver
+              </Link>
             </div>
           )}
         </div>
@@ -132,6 +202,25 @@ export function EventoComissaoCard({ dados, tema, onAbrirDetalhes, onAtualizar }
             onAbrirDetalhes={onAbrirDetalhes}
             onPagamentoRegistrado={onAtualizar}
           />
+        )}
+
+        {/* Nenhum colaborador ainda — evento sincronizado antes da geração automática existir, ou sem closer/analista resolvido. */}
+        {!temColaboradores && (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center md:col-span-2">
+            <p className="text-xs text-slate-500">
+              Nenhum lançamento gerado para este evento ainda.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-white/10"
+              disabled={isPending}
+              onClick={gerarLancamentos}
+            >
+              {isPending && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+              Gerar Lançamentos
+            </Button>
+          </div>
         )}
       </div>
 

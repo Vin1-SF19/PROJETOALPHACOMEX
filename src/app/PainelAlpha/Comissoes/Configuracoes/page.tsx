@@ -1,11 +1,14 @@
 import { auth } from "../../../../../auth";
 import { redirect } from "next/navigation";
-import db from "@/lib/prisma";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { ConfiguracoesComissoes } from "@/components/Comissoes/Configuracoes/ConfiguracoesComissoes";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Mantida como rota própria para deep-link/bookmark direto, embora o fluxo principal do
+ * usuário agora abra Configurações como modal no dashboard (CabecalhoComissoes.tsx).
+ */
 export default async function ConfiguracoesComissoesPage() {
   const session = await auth();
   if (!session?.user) redirect("/");
@@ -19,11 +22,5 @@ export default async function ConfiguracoesComissoesPage() {
     if (!perms.includes("comissoes")) redirect("/PainelAlpha");
   }
 
-  const setores = await db.setor.findMany({
-    where: { ativo: true },
-    orderBy: { nome: "asc" },
-    select: { id: true, nome: true },
-  });
-
-  return <ConfiguracoesComissoes setores={setores} />;
+  return <ConfiguracoesComissoes />;
 }

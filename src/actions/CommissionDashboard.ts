@@ -4,29 +4,25 @@ import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — Configurações/RBAC granular): mesma verificação de role temporária
- * documentada em `src/actions/CommissionSync.ts`.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 const listarEventosSchema = z.object({
   page: z.number().int().positive().default(1),
   pageSize: z.number().int().positive().max(100).default(25),
   busca: z.string().optional(),
+  /** Filtro de período por mês (seção 1 do desenho do usuário) — "YYYY-MM", filtra por CommissionEvent.eventDate. */
+  mesReferencia: z.string().regex(/^\d{4}-\d{2}$/).optional(),
 });
 
 export interface EventoComissaoResumo {
@@ -42,7 +38,7 @@ export interface EventoComissaoResumo {
 }
 
 export async function ListarEventosComissao(input?: z.infer<typeof listarEventosSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = listarEventosSchema.safeParse(input ?? {});
@@ -50,19 +46,29 @@ export async function ListarEventosComissao(input?: z.infer<typeof listarEventos
     return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
   }
 
-  const { page, pageSize, busca } = parsed.data;
+  const { page, pageSize, busca, mesReferencia } = parsed.data;
 
   try {
-    const where: Prisma.CommissionEventWhereInput = busca?.trim()
-      ? {
-          OR: [
-            { cnpj: { contains: busca } },
-            { razaoSocial: { contains: busca } },
-            { nomeFantasia: { contains: busca } },
-            { servico: { contains: busca } },
-          ],
-        }
-      : {};
+    const where: Prisma.CommissionEventWhereInput = {
+      ...(busca?.trim()
+        ? {
+            OR: [
+              { cnpj: { contains: busca } },
+              { razaoSocial: { contains: busca } },
+              { nomeFantasia: { contains: busca } },
+              { servico: { contains: busca } },
+            ],
+          }
+        : {}),
+      ...(mesReferencia
+        ? (() => {
+            const [ano, mes] = mesReferencia.split("-").map(Number);
+            const inicio = new Date(Date.UTC(ano, mes - 1, 1));
+            const fim = new Date(Date.UTC(ano, mes, 1));
+            return { eventDate: { gte: inicio, lt: fim } };
+          })()
+        : {}),
+    };
 
     const [data, total] = await Promise.all([
       db.commissionEvent.findMany({
@@ -111,7 +117,7 @@ export interface IndicadoresComissao {
 }
 
 export async function CalcularIndicadoresComissao() {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   try {

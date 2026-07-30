@@ -3,30 +3,44 @@
 import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
+import { resolverVinculoNaData } from "@/lib/commissions/vinculo-resolver";
+import type { ContratoColaboradorRecord } from "@/lib/commissions/vinculo-resolver";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — RBAC granular, ver nota no final deste arquivo): mesma verificação de
- * role temporária documentada em `src/actions/CommissionSync.ts`.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 const vinculoPadraoSchema = z.enum(["CLT", "PJ"]);
 const naturezaRecebimentoSchema = z.enum(["COMISSAO", "PREMIO", "AMBOS"]);
 
+/** Setores ativos — usado para popular o formulário de cargos em Configurações. */
+export async function ListarSetores() {
+  const acesso = await exigirAcesso("VISUALIZAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  try {
+    const setores = await db.setor.findMany({
+      where: { ativo: true },
+      orderBy: { nome: "asc" },
+      select: { id: true, nome: true },
+    });
+    return { success: true, data: setores } as const;
+  } catch (error) {
+    console.error("[ListarSetores]", error);
+    return { success: false, error: "Erro interno ao listar setores" } as const;
+  }
+}
+
 export async function ListarCargos() {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   try {
@@ -61,7 +75,7 @@ const criarCargoSchema = z.object({
 });
 
 export async function CriarCargo(input: z.infer<typeof criarCargoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = criarCargoSchema.safeParse(input);
@@ -90,7 +104,7 @@ const atualizarCargoSchema = z.object({
 });
 
 export async function AtualizarCargo(input: z.infer<typeof atualizarCargoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = atualizarCargoSchema.safeParse(input);
@@ -116,7 +130,7 @@ const inativarCargoSchema = z.object({ id: z.number().int().positive() });
 
 /** Nunca DELETE físico — usa o campo `ativo` já existente em CargoColaborador. */
 export async function InativarCargo(input: z.infer<typeof inativarCargoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = inativarCargoSchema.safeParse(input);
@@ -136,6 +150,75 @@ export async function InativarCargo(input: z.infer<typeof inativarCargoSchema>) 
   } catch (error) {
     console.error("[InativarCargo]", error);
     return { success: false, error: "Erro interno ao inativar cargo" } as const;
+  }
+}
+
+export interface ColaboradorComissaoRow {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  setorNome: string | null;
+  vinculo: "CLT" | "PJ" | null;
+  vinculoDivergente: string | null;
+}
+
+/**
+ * Painel de consulta (somente leitura) para a aba "Colaboradores" — mostra cargo/setor/
+ * vínculo relevante para o cálculo de comissão. Edição de cadastro continua no módulo
+ * Gestão de Colaboradores (fora deste módulo, decisão do usuário). Vínculo é resolvido
+ * NA DATA DE HOJE via `ContratoColaborador` — hoje essa tabela está vazia em produção
+ * (0 linhas confirmadas), então a maioria aparecerá como "sem vínculo cadastrado", o que
+ * é esperado, não um bug.
+ */
+export async function ListarColaboradoresParaComissoes() {
+  const acesso = await exigirAcesso("VISUALIZAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  try {
+    const usuarios = await db.usuarios.findMany({
+      where: { status: "ATIVO" },
+      select: { id: true, nome: true, cargo: true },
+      orderBy: { nome: "asc" },
+    });
+
+    const cargoNomes = [...new Set(usuarios.map((u) => u.cargo).filter((c): c is string => !!c))];
+    const cargos = cargoNomes.length > 0
+      ? await db.cargoColaborador.findMany({ where: { nome: { in: cargoNomes } }, select: { nome: true, setorId: true } })
+      : [];
+    const setorIdPorCargo = new Map(cargos.map((c) => [c.nome, c.setorId]));
+
+    const setorIds = [...new Set(cargos.map((c) => c.setorId).filter((id): id is number => id !== null))];
+    const setores = setorIds.length > 0
+      ? await db.setor.findMany({ where: { id: { in: setorIds } }, select: { id: true, nome: true } })
+      : [];
+    const setorNomePorId = new Map(setores.map((s) => [s.id, s.nome]));
+
+    const data: ColaboradorComissaoRow[] = [];
+    const hoje = new Date();
+
+    for (const usuario of usuarios) {
+      const contratos = await db.contratoColaborador.findMany({
+        where: { usuarioId: usuario.id },
+        select: { id: true, usuarioId: true, tipo: true, dataInicio: true, dataFim: true },
+      });
+
+      const resolucao = resolverVinculoNaData(contratos as ContratoColaboradorRecord[], usuario.id, hoje);
+      const setorId = usuario.cargo ? setorIdPorCargo.get(usuario.cargo) ?? null : null;
+
+      data.push({
+        id: usuario.id,
+        nome: usuario.nome,
+        cargo: usuario.cargo,
+        setorNome: setorId ? setorNomePorId.get(setorId) ?? null : null,
+        vinculo: resolucao.status === "RESOLVIDO" ? resolucao.vinculo : null,
+        vinculoDivergente: resolucao.status !== "RESOLVIDO" ? resolucao.status : null,
+      });
+    }
+
+    return { success: true, data } as const;
+  } catch (error) {
+    console.error("[ListarColaboradoresParaComissoes]", error);
+    return { success: false, error: "Erro interno ao listar colaboradores" } as const;
   }
 }
 

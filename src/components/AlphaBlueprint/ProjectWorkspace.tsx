@@ -38,7 +38,9 @@ export function ProjectWorkspace({ projeto, temaName, userId }: ProjectWorkspace
         <ProjectSidebar abaAtiva={aba} onMudarAba={setAba} accent={accent} />
 
         <div className="flex-1 min-w-0 overflow-y-auto p-6">
-          {aba === "visao-geral" && <ProjectOverview projeto={projeto} accent={accent} onNavegar={setAba} />}
+          {aba === "visao-geral" && (
+            <ProjectOverview projeto={projeto} accent={accent} userId={userId} onNavegar={setAba} />
+          )}
           {aba === "especificacao" && <SpecificationEditor projectId={projeto.id} accent={accent} />}
           {aba === "canvas" && <BlueprintCanvas projectId={projeto.id} accent={accent} />}
           {aba === "arquivos" && <ProjectFiles projectId={projeto.id} accent={accent} />}

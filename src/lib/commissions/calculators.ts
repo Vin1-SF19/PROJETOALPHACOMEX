@@ -35,7 +35,7 @@ export function calculateAmountCents(calculation: RuleCalculation, ctx: Calculat
       if (!ctx.dsrInput) {
         throw new Error("Cálculo do tipo DSR requer dsrInput no contexto.");
       }
-      return resolveDsrFormula(calculation.dsrFormulaName ?? "PADRAO_PENDENTE_VALIDACAO", ctx.dsrInput).valorCents;
+      return resolveDsrFormula(calculation.dsrFormulaName ?? "PROPORCIONAL_DIAS_DESCANSO", ctx.dsrInput).valorCents;
     }
     case "CAP": {
       const base = ctx.commissionableBaseCents ?? 0;
@@ -54,6 +54,10 @@ export function calculateAmountCents(calculation: RuleCalculation, ctx: Calculat
     }
     case "SUM_OF_COMPONENTS":
       return (calculation.componentsCents ?? []).reduce((sum, c) => sum + c, 0);
+    case "TOTAL_FIXO_COM_DSR":
+      throw new Error(
+        "TOTAL_FIXO_COM_DSR não deve ser resolvido por calculateAmountCents — é decomposto em COMISSAO+DSR separadamente em entry-generator.ts (via decomporTotalFixoComDsr).",
+      );
     default: {
       const _exhaustive: never = calculation.type;
       return _exhaustive;

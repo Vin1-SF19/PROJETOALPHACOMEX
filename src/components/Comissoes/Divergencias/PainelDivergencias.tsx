@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, RefreshCcw, CheckCircle2 } from "lucide-react";
+import { Loader2, RefreshCcw, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -116,25 +115,12 @@ export function PainelDivergencias() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] px-6 pb-24 pt-8 text-slate-200 md:px-8">
-      <div className="mb-6">
-        <Link
-          href="/PainelAlpha/Comissoes"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Voltar para Comissões
-        </Link>
-      </div>
-
-      <h1 className="text-2xl font-black uppercase italic tracking-tight text-white sm:text-3xl">
-        Divergências
-      </h1>
-      <p className="mt-1 text-sm text-slate-400">
+    <div className="text-slate-200">
+      <p className="text-sm text-slate-400">
         Dados que precisam de revisão antes de gerar/confirmar um cálculo financeiro.
       </p>
 
-      <div className="mt-6 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-wrap gap-3">
         <Select value={filtroSeveridade} onValueChange={(v) => { setFiltroSeveridade(v as Severidade | "TODAS"); setPage(1); }}>
           <SelectTrigger className="w-[220px] border-white/10 bg-slate-900/40 text-slate-200">
             <SelectValue />

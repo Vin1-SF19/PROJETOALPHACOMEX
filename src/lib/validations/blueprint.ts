@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BLUEPRINT_PREMIO_MAX_CENTS } from "@/lib/blueprint/premio";
 
 export const BLUEPRINT_STATUS = [
   "IDEA",
@@ -44,6 +45,7 @@ const MAX_TAGS = 20;
 const MAX_TAG_LEN = 40;
 
 const tagsSchema = z.array(z.string().trim().min(1).max(MAX_TAG_LEN)).max(MAX_TAGS).optional();
+const premioCentsSchema = z.number().int().min(0).max(BLUEPRINT_PREMIO_MAX_CENTS);
 
 export const criarProjetoSchema = z.object({
   title: z.string().trim().min(1, "Nome do sistema é obrigatório").max(200),
@@ -57,6 +59,7 @@ export const criarProjetoSchema = z.object({
   dueDate: z.coerce.date().optional(),
   status: z.enum(BLUEPRINT_STATUS).default("IDEA"),
   tags: tagsSchema,
+  premioCents: premioCentsSchema.optional(),
   membrosIds: z.array(z.number().int().positive()).max(50).optional(),
   relatedProjectId: z.string().cuid().optional(),
 });
@@ -75,6 +78,7 @@ export const atualizarProjetoSchema = z.object({
   icon: z.string().trim().max(60).nullable().optional(),
   coverUrl: z.string().url().nullable().optional(),
   tags: tagsSchema,
+  premioCents: premioCentsSchema.nullable().optional(),
 });
 
 export const moverProjetoSchema = z.object({

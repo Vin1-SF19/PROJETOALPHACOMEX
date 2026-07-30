@@ -8,18 +8,21 @@ import { ProjectMaturity } from "./ProjectMaturity";
 import { EditProjectDialog } from "./EditProjectDialog";
 import type { ProjetoDetalhado } from "./ProjectWorkspace";
 import type { AbaProjeto } from "./ProjectSidebar";
+import { formatarPremioBRL } from "@/lib/blueprint/premio";
 
 interface ProjectOverviewProps {
   projeto: ProjetoDetalhado;
   accent: string;
+  userId: number;
   onNavegar: (aba: AbaProjeto) => void;
 }
 
-export function ProjectOverview({ projeto, accent, onNavegar }: ProjectOverviewProps) {
+export function ProjectOverview({ projeto, accent, userId, onNavegar }: ProjectOverviewProps) {
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const prioridade = PRIORIDADE_CONFIG[projeto.priority] ?? PRIORIDADE_CONFIG.NORMAL;
   const tags = parseTags(projeto.tagsJson);
+  const podeEditarPremio = projeto.createdById === userId;
 
   const checklist = [
     { label: "Problema descrito", completo: !!projeto.problem },
@@ -87,6 +90,28 @@ export function ProjectOverview({ projeto, accent, onNavegar }: ProjectOverviewP
               <p className="text-slate-500">Status</p>
               <p className="text-slate-300">{STATUS_LABELS[projeto.status] ?? projeto.status}</p>
             </div>
+            <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/[0.04] p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-slate-500">Prêmio</p>
+                  <p className="font-medium text-emerald-300">
+                    {projeto.premioCents === null ? "Não definido" : formatarPremioBRL(projeto.premioCents)}
+                  </p>
+                </div>
+                {podeEditarPremio && (
+                  <button
+                    type="button"
+                    onClick={() => setEditando(true)}
+                    className="shrink-0 rounded-lg border border-emerald-400/20 px-2 py-1 text-[10px] font-medium text-emerald-200 hover:bg-emerald-400/10 transition-colors"
+                  >
+                    {projeto.premioCents === null ? "Definir prêmio" : "Editar prêmio"}
+                  </button>
+                )}
+              </div>
+              {!podeEditarPremio && (
+                <p className="mt-1 text-[9px] text-slate-600">Somente o criador do projeto pode alterar.</p>
+              )}
+            </div>
           </div>
 
           {tags.length > 0 && (
@@ -151,6 +176,7 @@ export function ProjectOverview({ projeto, accent, onNavegar }: ProjectOverviewP
         onOpenChange={setEditando}
         projeto={projeto}
         accent={accent}
+        podeEditarPremio={podeEditarPremio}
         onSalvo={() => router.refresh()}
       />
     </div>

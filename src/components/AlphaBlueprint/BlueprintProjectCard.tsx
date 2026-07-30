@@ -5,9 +5,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown, ArrowUp, Minus, AlertTriangle, Siren,
-  Paperclip, ListChecks, HelpCircle, Clock, Check,
+  Paperclip, ListChecks, HelpCircle, Clock, Check, Gift,
 } from "lucide-react";
 import { PRIORIDADE_CONFIG, parseTags, type ProjetoBlueprintCard } from "./tipos";
+import { formatarPremioBRL } from "@/lib/blueprint/premio";
 
 const PRIORIDADE_ICONS: Record<string, typeof ArrowDown> = {
   ArrowDown, Minus, ArrowUp, AlertTriangle, Siren,
@@ -92,6 +93,13 @@ export function BlueprintProjectCard({
 
       {projeto.summary && (
         <p className="text-[11px] text-slate-400 leading-snug line-clamp-2">{projeto.summary}</p>
+      )}
+
+      {projeto.premioCents !== null && (
+        <div className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/15 bg-emerald-400/[0.08] px-2 py-1 text-[10px] font-semibold text-emerald-300">
+          <Gift size={11} aria-hidden="true" />
+          <span>Prêmio: {formatarPremioBRL(projeto.premioCents)}</span>
+        </div>
       )}
 
       {tags.length > 0 && (

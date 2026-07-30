@@ -5,6 +5,24 @@ import { mergeCompanyEvent, chaveDeCasamento } from "./adapters/company-event-me
 import { listarClientesComExitoNaoProcessado } from "./adapters/exito-detector";
 import { buscarClientePorCnpjEServico } from "./adapters/cs-nps-lookup";
 import { persistirDivergenciasDetectadas } from "./divergence-detector";
+import { gerarLancamentosParaEvento } from "./entry-generator";
+
+/**
+ * Gera lançamentos automaticamente só para os responsáveis que o sistema consegue
+ * resolver com confiança (closer via FK, analista responsável via FK) — decisão do
+ * usuário: os demais cargos do Big Card (Coordenadora/Diretora Comercial, Auditor
+ * Contábil, Diretor Operacional) não têm nenhuma fonte de dado hoje para vínculo por
+ * evento, então ficam de fora da geração automática e precisam ser adicionados
+ * manualmente (Novo Lançamento/Recalcular). Nunca falha a sincronização por causa disso
+ * — se não há nenhum colaborador resolvido, o evento fica sem lançamento (card vazio),
+ * mas o evento em si já foi criado com sucesso.
+ */
+async function gerarLancamentosAutomaticos(eventId: string, closerUsuarioId: number | null, analistaResponsavelUsuarioId: number | null) {
+  const collaboratorIds = [...new Set([closerUsuarioId, analistaResponsavelUsuarioId].filter((id): id is number => id !== null))];
+  if (collaboratorIds.length === 0) return;
+
+  await gerarLancamentosParaEvento({ eventId, collaboratorIds });
+}
 
 /**
  * Orquestra a sincronização incremental de eventos financeiros. Idempotência garantida
@@ -89,6 +107,10 @@ export async function sincronizarComissoes(params: {
           sourceUpdatedAt: contrato.updatedAt,
           lastSyncAt: new Date(),
           syncStatus: "SYNCED",
+          // Closer: prioriza FK real (ContratoComercial.usuarioId) — só cai para nome manual
+          // quando não há vínculo formal (ex: só existe registro no CS&NPS).
+          closerUsuarioId: merged.usuarioIdCloser,
+          closerNomeManual: merged.usuarioIdCloser ? null : merged.closerNome,
         },
       });
 
@@ -102,6 +124,10 @@ export async function sincronizarComissoes(params: {
           },
         });
       }
+
+      // Lançamentos automáticos só para closer/analista responsável (únicos resolvidos com
+      // confiança) — demais cargos do Big Card ficam para adição manual.
+      await gerarLancamentosAutomaticos(evento.id, evento.closerUsuarioId, null);
 
       // Detecção sistemática (seção 28) — 14 checagens além do conflito de merge acima.
       await persistirDivergenciasDetectadas(evento.id);
@@ -130,6 +156,20 @@ export async function sincronizarComissoes(params: {
 
       const sourceId = `exito:${clienteId}`;
 
+      // Closer: herdado do evento de CONTRATAÇÃO já sincronizado para o mesmo cliente (já
+      // resolvido lá via merge ContratoComercial+clientes) — evita duplicar a lógica de merge.
+      const eventoContratacao = await db.commissionEvent.findFirst({
+        where: { clienteId, eventType: "CONTRACTING" },
+        select: { closerUsuarioId: true, closerNomeManual: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Analista responsável + dados de tentativas: FK real via BusinessProcess quando existir.
+      const processo = await db.businessProcess.findFirst({
+        where: { clienteId },
+        select: { id: true, analistaResponsavelId: true, tentativas: true, deferidoPrimeiraTentativa: true },
+      });
+
       const evento = await db.commissionEvent.create({
         data: {
           eventType: "PROCESS_SUCCESS",
@@ -148,11 +188,15 @@ export async function sincronizarComissoes(params: {
           sourceId,
           lastSyncAt: new Date(),
           syncStatus: "SYNCED",
+          closerUsuarioId: eventoContratacao?.closerUsuarioId ?? null,
+          closerNomeManual: eventoContratacao?.closerUsuarioId ? null : (eventoContratacao?.closerNomeManual ?? cliente.closerNome),
+          analistaResponsavelUsuarioId: processo?.analistaResponsavelId ?? null,
+          analistaResponsavelNomeManual: processo?.analistaResponsavelId ? null : cliente.analistaResponsavel,
+          businessProcessId: processo?.id ?? null,
         },
       });
 
       // Sem BusinessProcess correspondente: faltam tentativas/responsáveis — divergência.
-      const processo = await db.businessProcess.findFirst({ where: { clienteId }, select: { id: true } });
       if (!processo) {
         await db.commissionDivergence.create({
           data: {
@@ -163,6 +207,10 @@ export async function sincronizarComissoes(params: {
           },
         });
       }
+
+      // Lançamentos automáticos só para closer/analista responsável (únicos resolvidos com
+      // confiança) — demais cargos do Big Card ficam para adição manual.
+      await gerarLancamentosAutomaticos(evento.id, evento.closerUsuarioId, evento.analistaResponsavelUsuarioId);
 
       // Detecção sistemática (seção 28) — 14 checagens além da ausência de BusinessProcess acima.
       await persistirDivergenciasDetectadas(evento.id);

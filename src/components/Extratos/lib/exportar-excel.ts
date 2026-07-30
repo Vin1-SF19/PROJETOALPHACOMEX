@@ -14,6 +14,24 @@ const PALETA_CORES = [
   "FFF5F3FF", "FFFFF7ED", "FFECFEFF",
 ];
 
+const CABECALHO_RELATORIO = ["MÊS REF.", "BANCO", "DATA", "DESCRIÇÃO", "VALOR (R$)", "JUSTIFICATIVA"];
+
+function estilizarCabecalho(row: ExcelJS.Row, repetido = false): void {
+  row.values = CABECALHO_RELATORIO;
+  row.height = 22;
+  row.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "475569" } };
+    cell.font = { bold: true, color: { argb: "FFFFFF" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = {
+      top: { style: repetido ? "thick" : "thin", color: { argb: "FF334155" } },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+}
+
 function converterDataRef(ref: string): string {
   const [mes, ano] = ref.split("/");
   const meses: Record<string, string> = {
@@ -24,11 +42,11 @@ function converterDataRef(ref: string): string {
 }
 
 /** Exporta um lote de transações no template "Relatório Radar" (Portaria Coana nº 72/2020). */
-export async function exportarRelatorioExcel(
+export function criarRelatorioExcel(
   transacoes: TransacaoParaExportar[],
   razaoSocial: string,
   cnpj: string,
-): Promise<void> {
+): ExcelJS.Workbook {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Relatório Radar");
 
@@ -63,13 +81,7 @@ export async function exportarRelatorioExcel(
   [worksheet.getCell("A2"), worksheet.getCell("A3")].forEach((c) => (c.font = { bold: true }));
 
   const headerRow = worksheet.getRow(5);
-  headerRow.values = ["MÊS REF.", "BANCO", "DATA", "DESCRIÇÃO", "VALOR (R$)", "JUSTIFICATIVA"];
-  headerRow.eachCell((cell) => {
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "475569" } };
-    cell.font = { bold: true, color: { argb: "FFFFFF" } };
-    cell.alignment = { horizontal: "center", vertical: "middle" };
-    cell.border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
-  });
+  estilizarCabecalho(headerRow);
 
   const dadosOrdenados = [...transacoes].sort((a, b) => {
     const refA = converterDataRef(a.mesReferencia);
@@ -79,7 +91,22 @@ export async function exportarRelatorioExcel(
     return a.data.localeCompare(b.data);
   });
 
+  const gruposMensais: Array<{ mes: string; inicio: number; fim: number }> = [];
+  let grupoAtual: (typeof gruposMensais)[number] | undefined;
+
   dadosOrdenados.forEach((t) => {
+    if (!grupoAtual || grupoAtual.mes !== t.mesReferencia) {
+      if (grupoAtual) {
+        estilizarCabecalho(worksheet.addRow(CABECALHO_RELATORIO), true);
+      }
+      grupoAtual = {
+        mes: t.mesReferencia,
+        inicio: worksheet.rowCount + 1,
+        fim: worksheet.rowCount + 1,
+      };
+      gruposMensais.push(grupoAtual);
+    }
+
     const nomeBanco = (t.nomeBanco || "BANCO").toUpperCase();
     const corHex = bancoCores[nomeBanco];
 
@@ -108,28 +135,57 @@ export async function exportarRelatorioExcel(
         }
       }
     });
+
+    grupoAtual.fim = row.number;
   });
 
-  let inicioMergeMes = 6;
-  let inicioMergeBanco = 6;
+  gruposMensais.forEach(({ inicio, fim }) => {
+    if (fim > inicio) worksheet.mergeCells(`A${inicio}:A${fim}`);
 
-  for (let i = 6; i <= worksheet.rowCount; i++) {
-    const mesAtual = worksheet.getCell(`A${i}`).value;
-    const mesProximo = i < worksheet.rowCount ? worksheet.getCell(`A${i + 1}`).value : null;
-    const bancoAtual = worksheet.getCell(`B${i}`).value;
-    const bancoProximo = i < worksheet.rowCount ? worksheet.getCell(`B${i + 1}`).value : null;
+    let inicioBanco = inicio;
+    for (let linha = inicio; linha <= fim; linha++) {
+      const bancoAtual = worksheet.getCell(linha, 2).value;
+      const bancoProximo = linha < fim ? worksheet.getCell(linha + 1, 2).value : null;
+      if (bancoAtual !== bancoProximo) {
+        if (linha > inicioBanco) worksheet.mergeCells(`B${inicioBanco}:B${linha}`);
+        inicioBanco = linha + 1;
+      }
+    }
+  });
 
-    if (mesAtual !== mesProximo) {
-      if (i > inicioMergeMes) worksheet.mergeCells(`A${inicioMergeMes}:A${i}`);
-      inicioMergeMes = i + 1;
+  const corDivisor = { argb: "FF334155" };
+  gruposMensais.forEach(({ inicio, fim }) => {
+    for (let coluna = 1; coluna <= 6; coluna++) {
+      const celulaInicio = worksheet.getCell(inicio, coluna);
+      const celulaFim = worksheet.getCell(fim, coluna);
+
+      celulaInicio.border = {
+        ...celulaInicio.border,
+        top: {
+          style: "medium",
+          color: corDivisor,
+        },
+      };
+      celulaFim.border = {
+        ...celulaFim.border,
+        bottom: { style: "medium", color: corDivisor },
+      };
     }
 
-    if (bancoAtual !== bancoProximo || mesAtual !== mesProximo) {
-      if (i > inicioMergeBanco) worksheet.mergeCells(`B${inicioMergeBanco}:B${i}`);
-      inicioMergeBanco = i + 1;
-    }
-  }
+    worksheet.getRow(inicio).height = 24;
+  });
 
+  worksheet.views = [{ state: "frozen", ySplit: 5 }];
+
+  return workbook;
+}
+
+export async function exportarRelatorioExcel(
+  transacoes: TransacaoParaExportar[],
+  razaoSocial: string,
+  cnpj: string,
+): Promise<void> {
+  const workbook = criarRelatorioExcel(transacoes, razaoSocial, cnpj);
   const buffer = await workbook.xlsx.writeBuffer();
   saveAs(new Blob([buffer]), `Relatorio_Radar_${razaoSocial.replace(/\s+/g, "_")}.xlsx`);
 }

@@ -3,23 +3,18 @@
 import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
+import { put } from "@vercel/blob";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — Configurações/RBAC granular): mesma verificação de role temporária
- * documentada em `src/actions/CommissionSync.ts`.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 /**
@@ -57,6 +52,33 @@ async function calcularSaldoPagoCents(entryId: string): Promise<number> {
   return alocacoes.reduce((sum, a) => sum + a.valorCents, 0);
 }
 
+/** Upload do comprovante de pagamento — store dedicado do módulo de Comissões (COMISSOES_COLAB_*). */
+export async function EnviarComprovantePagamento(formData: FormData) {
+  const acesso = await exigirAcesso("PAGAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { success: false, error: "Nenhum arquivo selecionado" } as const;
+  if (file.size > 25 * 1024 * 1024) return { success: false, error: "Arquivo muito grande (máx. 25MB)" } as const;
+
+  const token = process.env.COMISSOES_COLAB_READ_WRITE_TOKEN;
+  if (!token) return { success: false, error: "COMISSOES_COLAB_READ_WRITE_TOKEN não configurado" } as const;
+
+  try {
+    const blob = await put(`comprovantes-pagamento/${crypto.randomUUID()}-${file.name}`, file, {
+      access: "public",
+      addRandomSuffix: true,
+      contentType: file.type || "application/octet-stream",
+      token,
+    });
+
+    return { success: true, url: blob.url } as const;
+  } catch (error) {
+    console.error("[EnviarComprovantePagamento]", error);
+    return { success: false, error: "Erro ao enviar comprovante" } as const;
+  }
+}
+
 // ─── RegistrarPagamento (individual) ───
 
 const registrarPagamentoSchema = z.object({
@@ -70,7 +92,7 @@ const registrarPagamentoSchema = z.object({
 });
 
 export async function RegistrarPagamento(input: z.infer<typeof registrarPagamentoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("PAGAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = registrarPagamentoSchema.safeParse(input);
@@ -200,7 +222,7 @@ async function classificarEntriesParaLote(
 const listaEntryIdsSchema = z.object({ entryIds: z.array(z.string().min(1)).min(1) });
 
 export async function PrepararPagamentoLoteBigCard(input: z.infer<typeof listaEntryIdsSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("PAGAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = listaEntryIdsSchema.safeParse(input);
@@ -227,7 +249,7 @@ const registrarPagamentoLoteSchema = z.object({
 });
 
 export async function RegistrarPagamentoLote(input: z.infer<typeof registrarPagamentoLoteSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("PAGAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = registrarPagamentoLoteSchema.safeParse(input);
@@ -296,7 +318,7 @@ const programarPagamentoSchema = z.object({
 });
 
 export async function ProgramarPagamento(input: z.infer<typeof programarPagamentoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("PAGAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = programarPagamentoSchema.safeParse(input);
@@ -351,7 +373,7 @@ const estornarPagamentoSchema = z.object({
 });
 
 export async function EstornarPagamento(input: z.infer<typeof estornarPagamentoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("PAGAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = estornarPagamentoSchema.safeParse(input);

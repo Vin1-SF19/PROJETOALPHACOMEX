@@ -3,23 +3,17 @@
 import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — Configurações/RBAC granular): mesma verificação de role temporária
- * documentada em `src/actions/CommissionSync.ts`.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 const tipoOverrideSchema = z.enum(["BLOQUEIO", "SUBSTITUICAO", "PERCENTUAL_ESPECIFICO", "VALOR_ESPECIFICO", "EXCLUSAO"]);
@@ -47,7 +41,7 @@ const criarEligibilityOverrideSchema = z
   );
 
 export async function CriarEligibilityOverride(input: z.infer<typeof criarEligibilityOverrideSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = criarEligibilityOverrideSchema.safeParse(input);
@@ -68,7 +62,7 @@ export async function CriarEligibilityOverride(input: z.infer<typeof criarEligib
 }
 
 export async function ListarEligibilityOverrides(filtro?: { collaboratorId?: number; cargoId?: number }) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   try {
@@ -96,7 +90,7 @@ const atualizarEligibilityOverrideSchema = z.object({
 });
 
 export async function AtualizarEligibilityOverride(input: z.infer<typeof atualizarEligibilityOverrideSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("APROVAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = atualizarEligibilityOverrideSchema.safeParse(input);

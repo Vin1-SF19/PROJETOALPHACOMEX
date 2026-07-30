@@ -7,7 +7,11 @@ import { calcularPaymentSchedule } from "./payment-schedule";
 import { buscarColaboradorNaData } from "./adapters/colaboradores-adapter";
 import { resolverEligibilityOverride } from "./eligibility-filter";
 import { regrasSeedDoCargo } from "./cargo-rule-matching";
+import { decomporTotalFixoComDsr } from "./dsr-formula";
+import { contarDiasUteisEDescansoDoMes, toCivilParts } from "./calendar-engine";
+import { feriadosNacionais } from "./holidays-seed";
 import type { CommissionRuleVersionData, FactRecord } from "./types";
+import type { HolidayRecord } from "./calendar-engine";
 import type { EligibilityOverrideRecord } from "./eligibility-filter";
 
 /**
@@ -83,6 +87,31 @@ async function buscarOverridesVigentes(query: {
   });
 
   return rows as unknown as EligibilityOverrideRecord[];
+}
+
+/**
+ * Feriados para o cálculo de DSR (nacional + estadual/municipal cadastrados em
+ * Configurações → Calendários) — combina os nacionais (calculados em memória, nunca
+ * persistidos) com os estaduais/municipais reais do mês. Simplificação: não filtra por
+ * UF/município do colaborador (não existe esse campo no cadastro hoje) — todos os
+ * feriados cadastrados contam igualmente, já que a empresa opera de uma sede única.
+ */
+async function feriadosDoMesParaDsr(year: number, month: number): Promise<HolidayRecord[]> {
+  const nacionais = feriadosNacionais(year);
+  const inicio = new Date(Date.UTC(year, month - 1, 1));
+  const fim = new Date(Date.UTC(year, month, 1));
+
+  const persistidos = await db.holiday.findMany({
+    where: { escopo: { in: ["ESTADUAL", "MUNICIPAL"] }, data: { gte: inicio, lt: fim } },
+  });
+
+  const persistidosRecord: HolidayRecord[] = persistidos.map((h) => ({
+    data: h.data.toISOString().slice(0, 10),
+    nome: h.nome,
+    escopo: h.escopo as HolidayRecord["escopo"],
+  }));
+
+  return [...nacionais, ...persistidosRecord];
 }
 
 export async function gerarLancamentosParaEvento(params: GerarLancamentosParams): Promise<GerarLancamentosResult> {
@@ -182,16 +211,25 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
     }
 
     const facts = toRuleConditionsFacts(event);
+    const { year: anoEvento, month: mesEvento } = toCivilParts(event.eventDate);
+    const feriadosDoMes = await feriadosDoMesParaDsr(anoEvento, mesEvento);
+    const { diasUteis: diasUteisDoMes, diasDescanso: diasDescansoDoMes } = contarDiasUteisEDescansoDoMes(anoEvento, mesEvento, feriadosDoMes);
 
     // Cada benefitType (COMMISSION/DSR/BONUS) é avaliado em um grupo SEPARADO —
     // comissão, DSR e prêmio nunca competem entre si na precedência, e cada um vira
     // um EntryComponent independente (nunca somados). Um único CommissionEntry agrega
     // todos os componentes do colaborador para este evento.
+    // EXCEÇÃO: quando a regra de COMMISSION é do tipo TOTAL_FIXO_COM_DSR (Analista II/
+    // Sênior), ela já gera COMISSAO+DSR decompostos numa única passada — o grupo "DSR"
+    // avaliado separadamente é pulado para este cargo, evitando duplicar o benefício.
     const benefitTypes: Array<CommissionRuleVersionData["benefitType"]> = ["COMMISSION", "BONUS", "DSR"];
     const componentesParaCriar: Array<{ tipo: string; valorCents: number; percentual: number | null; memoriaCalculoJson: string }> = [];
     let divergenciaNesteColaborador: string | null = null;
+    let dsrJaGeradoPorDecomposicao = false;
 
     for (const benefitType of benefitTypes) {
+      if (benefitType === "DSR" && dsrJaGeradoPorDecomposicao) continue;
+
       const regrasDoTipo = regrasDoCargo.filter((r) => r.benefitType === benefitType);
       if (regrasDoTipo.length === 0) continue; // este cargo não tem regra deste tipo para este evento — normal, não é divergência
 
@@ -199,6 +237,41 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
       if (!resultado.matchedRule) continue; // condições não bateram para nenhuma regra deste tipo — normal
 
       const rule = resultado.matchedRule;
+
+      if (benefitType === "COMMISSION" && rule.calculation.type === "TOTAL_FIXO_COM_DSR") {
+        const decomposicao = decomporTotalFixoComDsr({
+          totalFixoCents: rule.calculation.totalFixoComDsrCents ?? 0,
+          diasUteis: diasUteisDoMes,
+          diasNaoUteis: diasDescansoDoMes,
+        });
+
+        componentesParaCriar.push({
+          tipo: "COMISSAO",
+          valorCents: decomposicao.comissaoCents,
+          percentual: null,
+          memoriaCalculoJson: JSON.stringify({
+            ruleName: rule.ruleName,
+            ruleVersion: rule.version,
+            eventType: rule.eventType,
+            calculatedAmountCents: decomposicao.comissaoCents,
+            reason: `Decomposição de total fixo (${rule.calculation.totalFixoComDsrCents} centavos): ${decomposicao.memoriaCalculo.formula}`,
+          }),
+        });
+        componentesParaCriar.push({
+          tipo: "DSR",
+          valorCents: decomposicao.dsrCents,
+          percentual: null,
+          memoriaCalculoJson: JSON.stringify({
+            ruleName: rule.ruleName,
+            ruleVersion: rule.version,
+            eventType: rule.eventType,
+            calculatedAmountCents: decomposicao.dsrCents,
+            reason: `DSR decomposto do total fixo: ${decomposicao.memoriaCalculo.formula}`,
+          }),
+        });
+        dsrJaGeradoPorDecomposicao = true;
+        continue;
+      }
 
       let commissionableBaseCents: number | undefined;
       let baseResult: ReturnType<typeof calculateCommissionableBase> | undefined;
@@ -221,7 +294,7 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
 
       const dsrInput =
         rule.calculation.type === "DSR"
-          ? { baseAmountCents: commissionableBaseCents ?? 0, diasUteis: 22, diasNaoUteis: 9 }
+          ? { baseAmountCents: commissionableBaseCents ?? 0, diasUteis: diasUteisDoMes, diasNaoUteis: diasDescansoDoMes }
           : undefined;
 
       let valorCents: number;

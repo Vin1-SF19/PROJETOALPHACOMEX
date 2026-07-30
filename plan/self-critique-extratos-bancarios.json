@@ -1,0 +1,32 @@
+{
+  "subtaskId": "extratos-bancarios",
+  "critiquedAt": "2026-07-30T11:30:00-03:00",
+  "step5_5": {
+    "predictedBugs": [
+      "O processamento automático poderia ler o estado anterior de arquivos logo após o drop; evitado passando o lote explícito para processarLote.",
+      "Eventos dragenter/dragleave em elementos filhos poderiam piscar o destaque da dropzone; evitado com contador de profundidade.",
+      "A remoção da razão social poderia deixar a descrição do Itaú vazia; evitado retornando a descrição original nesse caso.",
+      "As mesclagens de mês ou banco poderiam atravessar um cabeçalho repetido; evitado limitando cada mesclagem às linhas de dados do respectivo grupo mensal."
+    ],
+    "edgeCases": [
+      "Um lote misto mantém PDFs/DOCX válidos e rejeita individualmente formatos, arquivos vazios e arquivos acima de 20 MB.",
+      "Duplicados já enfileirados e duplicados dentro do mesmo drop são rejeitados sem apagar a fila válida.",
+      "Razão social com diferenças de caixa, acentuação e separadores é removida somente quando o banco é Itaú simples.",
+      "O primeiro mês usa o cabeçalho inicial e cada troca de mês insere exatamente um novo cabeçalho antes das linhas do grupo seguinte."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

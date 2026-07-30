@@ -39,6 +39,7 @@ const TIPOS_CALCULO: Array<{ value: CalculationType; label: string }> = [
   { value: "PER_UNIT", label: "Valor por unidade" },
   { value: "ADDITIONAL", label: "Adicional" },
   { value: "DSR", label: "DSR" },
+  { value: "TOTAL_FIXO_COM_DSR", label: "Total fixo (comissão+DSR decompostos)" },
   { value: "CAP", label: "Teto" },
   { value: "FLOOR", label: "Piso" },
   { value: "PROPORTIONAL", label: "Proporcional" },
@@ -110,6 +111,10 @@ export function ConstrutorRegras() {
           rate: tipoCalculo === "PERCENTAGE" || tipoCalculo === "PROPORTIONAL" ? Number(rate) / 100 : undefined,
           fixedAmountCents:
             tipoCalculo === "FIXED" || tipoCalculo === "ADDITIONAL"
+              ? Math.round(parseFloat(fixedAmountReais.replace(",", ".")) * 100)
+              : undefined,
+          totalFixoComDsrCents:
+            tipoCalculo === "TOTAL_FIXO_COM_DSR"
               ? Math.round(parseFloat(fixedAmountReais.replace(",", ".")) * 100)
               : undefined,
         },
@@ -269,6 +274,25 @@ export function ConstrutorRegras() {
                 placeholder="350,00"
                 className="mt-1 border-white/10 bg-slate-950/60 text-slate-200"
               />
+            </div>
+          )}
+
+          {tipoCalculo === "TOTAL_FIXO_COM_DSR" && (
+            <div>
+              <Label htmlFor="totalFixoComDsr" className="text-slate-400">
+                Valor Total — comissão+DSR (R$)
+              </Label>
+              <Input
+                id="totalFixoComDsr"
+                value={fixedAmountReais}
+                onChange={(e) => setFixedAmountReais(e.target.value)}
+                placeholder="350,00"
+                className="mt-1 border-white/10 bg-slate-950/60 text-slate-200"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Decomposto automaticamente em comissão+DSR usando dias úteis/de descanso do
+                mês do evento — o total nunca diverge do valor informado aqui.
+              </p>
             </div>
           )}
 

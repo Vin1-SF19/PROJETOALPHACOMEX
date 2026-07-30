@@ -118,3 +118,29 @@ export function sextaFeiraDaSemanaSeguinte(date: Date): Date {
 export function mesSeguinte(year: number, month: number): { year: number; month: number } {
   return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
 }
+
+/** Domingo, "dow"=0 (getUTCDay). Sábado NÃO conta como dia de descanso (confirmado pelo usuário — só domingo + feriados). */
+function isDomingo(date: Date): boolean {
+  return date.getUTCDay() === 0;
+}
+
+/**
+ * Conta dias úteis e "dias de descanso" (domingos + feriados nacionais/estaduais/
+ * municipais) de um mês inteiro — usado pela fórmula de DSR (seção do prompt confirmada
+ * pelo usuário: "considera-se domingos e feriados, NÃO se considera sábados"). `holidays`
+ * deve incluir os feriados relevantes para a UF/município do colaborador (ex: Balneário
+ * Camboriú/SC) além dos nacionais — resolvido pelo chamador.
+ */
+export function contarDiasUteisEDescansoDoMes(year: number, month: number, holidays: HolidayRecord[] = []): { diasUteis: number; diasDescanso: number } {
+  const ultimoDia = ultimoDiaCivil(year, month).getUTCDate();
+  let diasDescanso = 0;
+
+  for (let day = 1; day <= ultimoDia; day++) {
+    const data = civilDate(year, month, day);
+    if (isDomingo(data) || isHoliday(data, holidays)) {
+      diasDescanso++;
+    }
+  }
+
+  return { diasUteis: ultimoDia - diasDescanso, diasDescanso };
+}

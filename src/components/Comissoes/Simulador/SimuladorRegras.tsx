@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -118,26 +117,13 @@ export function SimuladorRegras() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] px-6 pb-24 pt-8 text-slate-200 md:px-8">
-      <div className="mb-6">
-        <Link
-          href="/PainelAlpha/Comissoes"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Voltar para Comissões
-        </Link>
-      </div>
-
-      <h1 className="text-2xl font-black uppercase italic tracking-tight text-white sm:text-3xl">
-        Simulador de Regras
-      </h1>
-      <p className="mt-1 text-sm text-slate-400">
+    <div className="text-slate-200">
+      <p className="text-sm text-slate-400">
         Teste combinações de serviço, tarifário, valor, desconto, forma de pagamento e cargo
         contra o motor de regras real — sem gerar nenhum lançamento.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Formulário */}
         <div className="space-y-4 rounded-[2rem] border border-white/5 bg-slate-900/40 p-6">
           <div>

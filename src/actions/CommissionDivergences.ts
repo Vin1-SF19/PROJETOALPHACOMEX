@@ -5,23 +5,17 @@ import { z } from "zod";
 import db from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { detectarDivergenciasDeEvento } from "@/lib/commissions/divergence-detector";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — Configurações/RBAC granular): mesma verificação de role temporária
- * documentada em `src/actions/CommissionSync.ts`.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 async function registrarAuditoria(params: {
@@ -53,7 +47,7 @@ const listarDivergenciasSchema = z.object({
 });
 
 export async function ListarDivergencias(input?: z.infer<typeof listarDivergenciasSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = listarDivergenciasSchema.safeParse(input ?? {});
@@ -145,7 +139,7 @@ const resolverDivergenciaSchema = z.object({
 });
 
 export async function ResolverDivergencia(input: z.infer<typeof resolverDivergenciaSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("APROVAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = resolverDivergenciaSchema.safeParse(input);
@@ -193,7 +187,7 @@ const reprocessarSchema = z.object({ divergenciaId: z.string().min(1) });
  * problema que ainda existe no dado real).
  */
 export async function ReprocessarAposCorrecao(input: z.infer<typeof reprocessarSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("APROVAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = reprocessarSchema.safeParse(input);

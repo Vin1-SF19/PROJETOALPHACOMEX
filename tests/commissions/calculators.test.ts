@@ -47,7 +47,7 @@ describe("calculateAmountCents — tipos de cálculo (seção 16)", () => {
   });
 
   it("DSR delega para a fórmula configurável (nunca percentual fixo hardcoded aqui)", () => {
-    const calc: RuleCalculation = { type: "DSR", benefitType: "DSR", dsrFormulaName: "PADRAO_PENDENTE_VALIDACAO" };
+    const calc: RuleCalculation = { type: "DSR", benefitType: "DSR", dsrFormulaName: "PROPORCIONAL_DIAS_DESCANSO" };
     const result = calculateAmountCents(calc, {
       dsrInput: { baseAmountCents: 35_000, diasUteis: 22, diasNaoUteis: 9 },
     });
@@ -55,22 +55,35 @@ describe("calculateAmountCents — tipos de cálculo (seção 16)", () => {
   });
 
   it("DSR sem dsrInput no contexto lança erro explícito (nunca calcula silenciosamente)", () => {
-    const calc: RuleCalculation = { type: "DSR", benefitType: "DSR", dsrFormulaName: "PADRAO_PENDENTE_VALIDACAO" };
+    const calc: RuleCalculation = { type: "DSR", benefitType: "DSR", dsrFormulaName: "PROPORCIONAL_DIAS_DESCANSO" };
+    expect(() => calculateAmountCents(calc)).toThrow();
+  });
+
+  it("TOTAL_FIXO_COM_DSR nunca deve ser resolvido por calculateAmountCents (decomposto em entry-generator.ts)", () => {
+    const calc: RuleCalculation = { type: "TOTAL_FIXO_COM_DSR", benefitType: "COMMISSION", totalFixoComDsrCents: 35_000 };
     expect(() => calculateAmountCents(calc)).toThrow();
   });
 });
 
-describe("resolveDsrFormula — pendência de validação (seção 39, nunca definitiva)", () => {
-  it("calcula DSR proporcional a dias não úteis / dias úteis, e sinaliza pendingValidation", () => {
-    const result = resolveDsrFormula("PADRAO_PENDENTE_VALIDACAO", {
+describe("resolveDsrFormula — validada com o espelho real (Maria Eduarda, Jun/2026)", () => {
+  it("calcula DSR proporcional a dias de descanso / dias úteis do mês", () => {
+    const result = resolveDsrFormula("PROPORCIONAL_DIAS_DESCANSO", {
       baseAmountCents: 22_000, // R$220,00
       diasUteis: 22,
       diasNaoUteis: 9,
     });
 
     expect(result.valorCents).toBe(Math.round((22_000 / 22) * 9));
-    expect(result.pendingValidation).toBe(true);
-    expect(result.memoriaCalculo.formula).toContain("PENDENTE DE VALIDAÇÃO");
+  });
+
+  it("bate exatamente com o espelho real: R$280 comissão + R$70 DSR (Jun/2026: 24 dias úteis, 6 de descanso)", () => {
+    const result = resolveDsrFormula("PROPORCIONAL_DIAS_DESCANSO", {
+      baseAmountCents: 28_000, // R$280,00
+      diasUteis: 24,
+      diasNaoUteis: 6,
+    });
+
+    expect(result.valorCents).toBe(7_000); // R$70,00
   });
 
   it("fórmula desconhecida lança erro explícito", () => {
@@ -80,11 +93,37 @@ describe("resolveDsrFormula — pendência de validação (seção 39, nunca def
   });
 
   it("diasUteis zero não calcula (evita divisão por zero) e retorna zero explicitamente", () => {
-    const result = resolveDsrFormula("PADRAO_PENDENTE_VALIDACAO", {
+    const result = resolveDsrFormula("PROPORCIONAL_DIAS_DESCANSO", {
       baseAmountCents: 10_000,
       diasUteis: 0,
       diasNaoUteis: 5,
     });
     expect(result.valorCents).toBe(0);
+  });
+});
+
+describe("decomporTotalFixoComDsr — decomposição algébrica do total fixo", () => {
+  it("Analista Sênior: R$350 total, Jun/2026 (24 úteis, 6 descanso) → R$280 comissão + R$70 DSR", async () => {
+    const { decomporTotalFixoComDsr } = await import("@/lib/commissions/dsr-formula");
+    const result = decomporTotalFixoComDsr({ totalFixoCents: 35_000, diasUteis: 24, diasNaoUteis: 6 });
+
+    expect(result.comissaoCents).toBe(28_000);
+    expect(result.dsrCents).toBe(7_000);
+    expect(result.comissaoCents + result.dsrCents).toBe(35_000); // nunca diverge do total fixo configurado
+  });
+
+  it("Analista II: R$250 total nunca diverge da soma comissão+DSR, mesmo com arredondamento", async () => {
+    const { decomporTotalFixoComDsr } = await import("@/lib/commissions/dsr-formula");
+    const result = decomporTotalFixoComDsr({ totalFixoCents: 25_000, diasUteis: 21, diasNaoUteis: 7 });
+
+    expect(result.comissaoCents + result.dsrCents).toBe(25_000);
+  });
+
+  it("diasUteis zero: trata o total fixo como comissão integral, sem quebrar", async () => {
+    const { decomporTotalFixoComDsr } = await import("@/lib/commissions/dsr-formula");
+    const result = decomporTotalFixoComDsr({ totalFixoCents: 35_000, diasUteis: 0, diasNaoUteis: 6 });
+
+    expect(result.comissaoCents).toBe(35_000);
+    expect(result.dsrCents).toBe(0);
   });
 });

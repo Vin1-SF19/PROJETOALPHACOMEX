@@ -1,162 +1,146 @@
 import db from "@/lib/prisma";
 
 /**
- * Monta as linhas do espelho de comissões/prêmios (seção 21-23 do prompt original) a
- * partir de filtros — SEM PERSISTIR NADA. Cada linha reflete os dados reais disponíveis;
- * campos que dependem de infraestrutura ainda não implementada (honorários/tarifário real
- * por serviço, que dependem de `TariffVersion` — ainda não populado até a Fase 14) ficam
- * como `null`, nunca inventados.
+ * Monta as linhas do espelho de comissões/prêmios NO FORMATO REAL usado pela empresa
+ * (validado contra PDFs de referência: "ESPELHO DE COMISSÕES" e "ESPELHO DE PRÊMIOS",
+ * 2026-07-30) — SEM PERSISTIR NADA. Sempre 1 espelho = 1 colaborador (nunca mistura
+ * vários colaboradores numa mesma exportação, diferente do formato técnico anterior).
+ *
+ * Comissão: colunas Data | Empresa | Comissão | DSR | Total.
+ * Prêmio: colunas Data | Empresa | Êxito | De Primeira | Total.
  */
 
-export type TipoEspelho = "comissoes" | "premios" | "comissao_dsr" | "todos";
+export type TipoEspelho = "comissoes" | "premios";
 
 export interface FiltrosPreview {
   tipo: TipoEspelho;
-  colaboradorId?: number;
+  colaboradorId: number;
   periodoInicio: Date;
   periodoFim: Date;
-  status?: string;
 }
 
-export interface LinhaEspelho {
+export interface LinhaEspelhoComissao {
   entryId: string;
-  componenteId: string;
   data: Date;
-  cnpj: string;
-  razaoSocial: string;
-  nomeFantasia: string | null;
-  servico: string;
-  evento: string;
-  honorariosCents: number | null;
-  tarifarioCents: number | null;
-  baseComissionavelCents: number | null;
-  formaPagamento: string | null;
-  percentual: number | null;
-  valorFixoCents: number | null;
+  empresaNome: string;
   comissaoCents: number;
   dsrCents: number;
-  premioCents: number;
-  ajusteCents: number;
   totalCents: number;
-  previsao: Date | null;
-  pagamento: Date | null;
-  status: string;
-  observacao: string | null;
-  colaboradorId: number;
-  colaboradorNome: string;
-  cargoNome: string | null;
+}
+
+export interface LinhaEspelhoPremio {
+  entryId: string;
+  data: Date;
+  empresaNome: string;
+  exitoCents: number;
+  primeiraCents: number;
+  totalCents: number;
 }
 
 export interface PreviewResult {
-  linhas: LinhaEspelho[];
+  tipo: TipoEspelho;
+  colaboradorId: number;
+  colaboradorNome: string;
+  cargoNome: string | null;
+  periodoInicio: Date;
+  periodoFim: Date;
+  linhasComissao: LinhaEspelhoComissao[];
+  linhasPremio: LinhaEspelhoPremio[];
   totais: {
     comissaoCents: number;
     dsrCents: number;
-    premioCents: number;
-    ajusteCents: number;
+    exitoCents: number;
+    primeiraCents: number;
     totalGeralCents: number;
   };
 }
 
-function tiposDeComponenteParaFiltro(tipo: TipoEspelho): string[] {
-  switch (tipo) {
-    case "comissoes":
-      return ["COMISSAO"];
-    case "premios":
-      return ["PREMIO"];
-    case "comissao_dsr":
-      return ["COMISSAO", "DSR"];
-    case "todos":
-      return ["COMISSAO", "PREMIO", "DSR", "AJUSTE"];
-    default: {
-      const _exhaustive: never = tipo;
-      return _exhaustive;
-    }
-  }
-}
-
 export async function construirPreviewEspelho(filtros: FiltrosPreview): Promise<PreviewResult> {
-  const tiposComponente = tiposDeComponenteParaFiltro(filtros.tipo);
+  const usuario = await db.usuarios.findUnique({
+    where: { id: filtros.colaboradorId },
+    select: { nome: true, cargo: true },
+  });
 
   const entries = await db.commissionEntry.findMany({
     where: {
-      ...(filtros.colaboradorId ? { collaboratorId: filtros.colaboradorId } : {}),
-      ...(filtros.status ? { status: filtros.status } : {}),
+      collaboratorId: filtros.colaboradorId,
       createdAt: { gte: filtros.periodoInicio, lte: filtros.periodoFim },
     },
-    include: {
-      componentes: { where: { tipo: { in: tiposComponente } } },
-      ajustes: true,
-      alocacoes: true,
-      event: true,
-    },
+    include: { componentes: true, event: true },
+    orderBy: { createdAt: "asc" },
   });
 
-  const linhas: LinhaEspelho[] = [];
+  const linhasComissao: LinhaEspelhoComissao[] = [];
+  const linhasPremio: LinhaEspelhoPremio[] = [];
 
   for (const entry of entries) {
-    if (entry.componentes.length === 0) continue; // sem componente do tipo filtrado — não entra no espelho
-
-    const usuario = await db.usuarios.findUnique({
-      where: { id: entry.collaboratorId },
-      select: { nome: true, cargo: true },
-    });
-
     const comissaoCents = entry.componentes.filter((c) => c.tipo === "COMISSAO").reduce((s, c) => s + c.valorCents, 0);
     const dsrCents = entry.componentes.filter((c) => c.tipo === "DSR").reduce((s, c) => s + c.valorCents, 0);
     const premioCents = entry.componentes.filter((c) => c.tipo === "PREMIO").reduce((s, c) => s + c.valorCents, 0);
-    const ajusteCents = entry.ajustes.reduce((s, a) => s + (a.valorAjustadoCents - a.valorOriginalCents), 0);
 
-    const componentePercentual = entry.componentes.find((c) => c.percentual !== null);
-    const componenteFixo = entry.componentes.find((c) => c.percentual === null);
+    const empresaNome = entry.event?.razaoSocial ?? "";
+    const data = entry.event?.eventDate ?? entry.createdAt;
 
-    const ultimaAlocacao = entry.alocacoes.length > 0 ? entry.alocacoes[entry.alocacoes.length - 1] : null;
-    const ultimoPagamento = ultimaAlocacao
-      ? await db.payment.findUnique({ where: { id: ultimaAlocacao.paymentId }, select: { data: true } })
-      : null;
+    if (filtros.tipo === "comissoes" && (comissaoCents > 0 || dsrCents > 0)) {
+      linhasComissao.push({
+        entryId: entry.id,
+        data,
+        empresaNome,
+        comissaoCents,
+        dsrCents,
+        totalCents: comissaoCents + dsrCents,
+      });
+    }
 
-    linhas.push({
-      entryId: entry.id,
-      componenteId: entry.componentes[0].id,
-      data: entry.event?.eventDate ?? entry.createdAt,
-      cnpj: entry.event?.cnpj ?? "",
-      razaoSocial: entry.event?.razaoSocial ?? "",
-      nomeFantasia: entry.event?.nomeFantasia ?? null,
-      servico: entry.event?.servico ?? "",
-      evento: entry.event?.eventType ?? "",
-      // Honorários/tarifário real por serviço dependem de TariffVersion — ainda não
-      // populado (Fase 14). Nunca inventar um valor aqui.
-      honorariosCents: null,
-      tarifarioCents: null,
-      baseComissionavelCents: entry.event?.commissionableBaseCents ?? null,
-      formaPagamento: entry.event?.formaPagamento ?? null,
-      percentual: componentePercentual?.percentual ?? null,
-      valorFixoCents: componenteFixo?.valorCents ?? null,
-      comissaoCents,
-      dsrCents,
-      premioCents,
-      ajusteCents,
-      totalCents: entry.totalCents,
-      previsao: entry.contractualDueDate,
-      pagamento: ultimoPagamento?.data ?? null,
-      status: entry.status,
-      observacao: entry.ajustes.map((a) => a.justificativa).join("; ") || null,
-      colaboradorId: entry.collaboratorId,
-      colaboradorNome: usuario?.nome ?? "Colaborador não encontrado",
-      cargoNome: usuario?.cargo ?? null,
-    });
+    if (filtros.tipo === "premios" && premioCents > 0) {
+      // Prêmio de "primeira tentativa" é um componente PREMIO específico da regra
+      // "*-primeira-tentativa" (ver seed-rules.ts) — identificado pela memória de cálculo,
+      // nunca por um valor fixo hardcoded aqui (evita quebrar se o valor da regra mudar).
+      let exitoCents = 0;
+      let primeiraCents = 0;
+      for (const componente of entry.componentes) {
+        if (componente.tipo !== "PREMIO") continue;
+        try {
+          const memoria = JSON.parse(componente.memoriaCalculoJson) as { ruleName?: string };
+          if (memoria.ruleName?.toLowerCase().includes("primeira tentativa")) {
+            primeiraCents += componente.valorCents;
+          } else {
+            exitoCents += componente.valorCents;
+          }
+        } catch {
+          exitoCents += componente.valorCents;
+        }
+      }
+
+      linhasPremio.push({
+        entryId: entry.id,
+        data,
+        empresaNome,
+        exitoCents,
+        primeiraCents,
+        totalCents: exitoCents + primeiraCents,
+      });
+    }
   }
 
-  const totais = linhas.reduce(
-    (acc, l) => ({
-      comissaoCents: acc.comissaoCents + l.comissaoCents,
-      dsrCents: acc.dsrCents + l.dsrCents,
-      premioCents: acc.premioCents + l.premioCents,
-      ajusteCents: acc.ajusteCents + l.ajusteCents,
-      totalGeralCents: acc.totalGeralCents + l.totalCents,
-    }),
-    { comissaoCents: 0, dsrCents: 0, premioCents: 0, ajusteCents: 0, totalGeralCents: 0 },
-  );
+  const totais = {
+    comissaoCents: linhasComissao.reduce((s, l) => s + l.comissaoCents, 0),
+    dsrCents: linhasComissao.reduce((s, l) => s + l.dsrCents, 0),
+    exitoCents: linhasPremio.reduce((s, l) => s + l.exitoCents, 0),
+    primeiraCents: linhasPremio.reduce((s, l) => s + l.primeiraCents, 0),
+    totalGeralCents:
+      linhasComissao.reduce((s, l) => s + l.totalCents, 0) + linhasPremio.reduce((s, l) => s + l.totalCents, 0),
+  };
 
-  return { linhas, totais };
+  return {
+    tipo: filtros.tipo,
+    colaboradorId: filtros.colaboradorId,
+    colaboradorNome: usuario?.nome ?? "Colaborador não encontrado",
+    cargoNome: usuario?.cargo ?? null,
+    periodoInicio: filtros.periodoInicio,
+    periodoFim: filtros.periodoFim,
+    linhasComissao,
+    linhasPremio,
+    totais,
+  };
 }

@@ -43,7 +43,8 @@ export type CalculationType =
   | "CAP"
   | "FLOOR"
   | "PROPORTIONAL"
-  | "SUM_OF_COMPONENTS";
+  | "SUM_OF_COMPONENTS"
+  | "TOTAL_FIXO_COM_DSR";
 
 export interface RuleCalculation {
   type: CalculationType;
@@ -64,6 +65,12 @@ export interface RuleCalculation {
   componentsCents?: number[];
   /** Nome da fórmula de DSR a aplicar — resolvida por dsr-formula.ts, nunca percentual fixo hardcoded aqui. */
   dsrFormulaName?: string;
+  /**
+   * Usado com type === "TOTAL_FIXO_COM_DSR": o valor total (comissão+DSR combinados, ex:
+   * R$350 do Analista Sênior) é decomposto em comissão base + DSR usando
+   * `diasUteis`/`diasDescanso` do mês do evento — nunca um DSR fixo hardcoded separado.
+   */
+  totalFixoComDsrCents?: number;
 }
 
 export interface PaymentSchedule {

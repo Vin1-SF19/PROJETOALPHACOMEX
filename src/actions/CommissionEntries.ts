@@ -3,28 +3,23 @@
 import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — Configurações/RBAC granular): mesma verificação de role temporária
- * documentada em `src/actions/CommissionSync.ts`.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 async function registrarAuditoria(params: {
   userId: number;
   acao: string;
+  entityType: "CommissionEntry" | "CommissionEvent";
   entityId: string;
   before: unknown;
   after: unknown;
@@ -33,13 +28,26 @@ async function registrarAuditoria(params: {
     data: {
       userId: params.userId,
       acao: params.acao,
-      entityType: "CommissionEntry",
+      entityType: params.entityType,
       entityId: params.entityId,
       beforeJson: JSON.stringify(params.before),
       afterJson: JSON.stringify(params.after),
       correlationId: crypto.randomUUID(),
     },
   });
+}
+
+/**
+ * Resolve o nome de exibição de um responsável (closer/analista) a partir de FK real
+ * (preferível — usuário existente, navegável) ou nome manual/texto herdado. Nunca inventa
+ * um nome: se nada estiver preenchido, retorna null e a UI mostra "Não Atribuído".
+ */
+async function resolverNomeResponsavel(usuarioId: number | null, nomeManual: string | null): Promise<{ nome: string | null; viaUsuario: boolean }> {
+  if (usuarioId !== null) {
+    const usuario = await db.usuarios.findUnique({ where: { id: usuarioId }, select: { nome: true } });
+    if (usuario) return { nome: usuario.nome, viaUsuario: true };
+  }
+  return { nome: nomeManual, viaUsuario: false };
 }
 
 export interface EntryComponentResumo {
@@ -80,6 +88,21 @@ export interface EventoComLancamentosResult {
     netContractAmountCents: number;
     commissionableBaseCents: number | null;
     status: string;
+    /** null quando não há closer atribuído nem por FK nem por texto manual — UI deve exibir "Não Atribuído". */
+    closerNome: string | null;
+    /** true quando o nome veio de closerUsuarioId (FK real, navegável); false quando é texto manual/herdado de fonte externa. */
+    closerViaUsuario: boolean;
+    analistaResponsavelNome: string | null;
+    analistaResponsavelViaUsuario: boolean;
+    /**
+     * Campos específicos de evento de êxito (eventType=PROCESS_SUCCESS) — vêm do
+     * BusinessProcess vinculado. null quando não há BusinessProcess correspondente (mesmo
+     * caso que gera a divergência EXITO_SEM_BUSINESS_PROCESS/PRIMEIRA_TENTATIVA_INCONSISTENTE
+     * na sincronização) — UI deve exibir "Não informado", nunca inventar um valor.
+     */
+    dataExito: Date | null;
+    tentativas: number | null;
+    deferidoPrimeiraTentativa: boolean | null;
   };
   divergencias: Array<{ id: string; tipo: string; severidade: string; detalhes: string }>;
   setorComercial: CommissionEntryComColaborador[];
@@ -91,7 +114,7 @@ export interface EventoComLancamentosResult {
 const buscarEventoSchema = z.object({ eventId: z.string().min(1) });
 
 export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEventoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = buscarEventoSchema.safeParse(input);
@@ -103,7 +126,7 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
     const event = await db.commissionEvent.findUnique({ where: { id: parsed.data.eventId } });
     if (!event) return { success: false, error: "Evento não encontrado" } as const;
 
-    const [entries, divergencias] = await Promise.all([
+    const [entries, divergencias, closerResolvido, analistaResolvido, businessProcess] = await Promise.all([
       db.commissionEntry.findMany({
         where: { eventId: event.id },
         include: { componentes: true },
@@ -112,6 +135,14 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
         where: { eventId: event.id, resolvidoEm: null },
         select: { id: true, tipo: true, severidade: true, detalhes: true },
       }),
+      resolverNomeResponsavel(event.closerUsuarioId, event.closerNomeManual),
+      resolverNomeResponsavel(event.analistaResponsavelUsuarioId, event.analistaResponsavelNomeManual),
+      event.businessProcessId
+        ? db.businessProcess.findUnique({
+            where: { id: event.businessProcessId },
+            select: { dataExito: true, tentativas: true, deferidoPrimeiraTentativa: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     const setorComercial: CommissionEntryComColaborador[] = [];
@@ -122,26 +153,35 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
     for (const entry of entries) {
       const usuario = await db.usuarios.findUnique({
         where: { id: entry.collaboratorId },
-        select: { nome: true, cargo: true },
+        select: { nome: true, cargo: true, role: true },
       });
 
-      const cargoRow = usuario?.cargo
-        ? await db.cargoColaborador.findUnique({
-            where: { nome: usuario.cargo },
-            select: { setorId: true },
-          })
-        : null;
+      // Setor: prioriza `usuarios.role` (fonte real usada pelo módulo Gestão de Equipe —
+      // já vem preenchido como "COMERCIAL"/"OPERACIONAL" para todo colaborador). Só cai
+      // para CargoColaborador.setorId (cadastro específico do módulo de Comissões) quando
+      // o role não for um dos dois setores reconhecidos — nunca o contrário, para não
+      // depender de um cadastro paralelo que pode não ter sido preenchido.
+      const roleNormalizado = usuario?.role?.trim().toUpperCase() ?? "";
+      let setorNome: string | null =
+        roleNormalizado === "COMERCIAL" ? "Comercial" : roleNormalizado === "OPERACIONAL" ? "Operacional" : null;
 
-      const setorRow = cargoRow?.setorId
-        ? await db.setor.findUnique({ where: { id: cargoRow.setorId }, select: { nome: true } })
-        : null;
+      if (!setorNome && usuario?.cargo) {
+        const cargoRow = await db.cargoColaborador.findUnique({
+          where: { nome: usuario.cargo },
+          select: { setorId: true },
+        });
+        const setorRow = cargoRow?.setorId
+          ? await db.setor.findUnique({ where: { id: cargoRow.setorId }, select: { nome: true } })
+          : null;
+        setorNome = setorRow?.nome ?? null;
+      }
 
       const entryResumo: CommissionEntryComColaborador = {
         id: entry.id,
         collaboratorId: entry.collaboratorId,
         colaboradorNome: usuario?.nome ?? "Colaborador não encontrado",
         cargoNome: usuario?.cargo ?? null,
-        setorNome: setorRow?.nome ?? null,
+        setorNome,
         vinculo: entry.vinculo,
         totalCents: entry.totalCents,
         status: entry.status,
@@ -160,7 +200,7 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
 
       totalGeralCents += entry.totalCents;
 
-      const setorNormalizado = setorRow?.nome?.trim().toUpperCase() ?? "";
+      const setorNormalizado = setorNome?.trim().toUpperCase() ?? "";
       if (setorNormalizado === "COMERCIAL") {
         setorComercial.push(entryResumo);
       } else if (setorNormalizado === "OPERACIONAL") {
@@ -184,6 +224,13 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
         netContractAmountCents: event.netContractAmountCents,
         commissionableBaseCents: event.commissionableBaseCents,
         status: event.status,
+        closerNome: closerResolvido.nome,
+        closerViaUsuario: closerResolvido.viaUsuario,
+        analistaResponsavelNome: analistaResolvido.nome,
+        analistaResponsavelViaUsuario: analistaResolvido.viaUsuario,
+        dataExito: businessProcess?.dataExito ?? null,
+        tentativas: businessProcess?.tentativas ?? null,
+        deferidoPrimeiraTentativa: businessProcess?.deferidoPrimeiraTentativa ?? null,
       },
       divergencias,
       setorComercial,
@@ -199,12 +246,106 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
   }
 }
 
+// ─── Preenchimento manual de closer/analista responsável ───
+
+const atualizarResponsaveisSchema = z
+  .object({
+    eventId: z.string().min(1),
+    closerUsuarioId: z.number().int().positive().nullable().optional(),
+    closerNomeManual: z.string().min(1).nullable().optional(),
+    analistaResponsavelUsuarioId: z.number().int().positive().nullable().optional(),
+    analistaResponsavelNomeManual: z.string().min(1).nullable().optional(),
+  })
+  .refine(
+    (data) =>
+      data.closerUsuarioId !== undefined ||
+      data.closerNomeManual !== undefined ||
+      data.analistaResponsavelUsuarioId !== undefined ||
+      data.analistaResponsavelNomeManual !== undefined,
+    { message: "Informe ao menos um campo para atualizar." },
+  );
+
+/**
+ * Preenche/corrige manualmente closer e/ou analista responsável de um evento — usado
+ * quando a sincronização automática não trouxe o dado (exibido como "Não Atribuído" na
+ * UI). Ao informar um `*UsuarioId`, o campo `*NomeManual` correspondente é sempre limpo
+ * (nunca guarda os dois ao mesmo tempo — FK real sempre tem precedência sobre texto).
+ */
+export async function AtualizarResponsaveisEvento(input: z.infer<typeof atualizarResponsaveisSchema>) {
+  const acesso = await exigirAcesso("CONFIGURAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const parsed = atualizarResponsaveisSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
+  }
+
+  const { eventId, closerUsuarioId, closerNomeManual, analistaResponsavelUsuarioId, analistaResponsavelNomeManual } = parsed.data;
+
+  try {
+    const event = await db.commissionEvent.findUnique({ where: { id: eventId } });
+    if (!event) return { success: false, error: "Evento não encontrado" } as const;
+
+    if (closerUsuarioId !== undefined && closerUsuarioId !== null) {
+      const usuario = await db.usuarios.findUnique({ where: { id: closerUsuarioId }, select: { id: true } });
+      if (!usuario) return { success: false, error: "Colaborador informado como closer não encontrado" } as const;
+    }
+    if (analistaResponsavelUsuarioId !== undefined && analistaResponsavelUsuarioId !== null) {
+      const usuario = await db.usuarios.findUnique({ where: { id: analistaResponsavelUsuarioId }, select: { id: true } });
+      if (!usuario) return { success: false, error: "Colaborador informado como analista responsável não encontrado" } as const;
+    }
+
+    const data: Record<string, unknown> = {};
+    if (closerUsuarioId !== undefined) {
+      data.closerUsuarioId = closerUsuarioId;
+      data.closerNomeManual = closerUsuarioId !== null ? null : (closerNomeManual ?? event.closerNomeManual);
+    } else if (closerNomeManual !== undefined) {
+      data.closerNomeManual = closerNomeManual;
+      data.closerUsuarioId = null;
+    }
+
+    if (analistaResponsavelUsuarioId !== undefined) {
+      data.analistaResponsavelUsuarioId = analistaResponsavelUsuarioId;
+      data.analistaResponsavelNomeManual = analistaResponsavelUsuarioId !== null ? null : (analistaResponsavelNomeManual ?? event.analistaResponsavelNomeManual);
+    } else if (analistaResponsavelNomeManual !== undefined) {
+      data.analistaResponsavelNomeManual = analistaResponsavelNomeManual;
+      data.analistaResponsavelUsuarioId = null;
+    }
+
+    const atualizado = await db.commissionEvent.update({ where: { id: eventId }, data });
+
+    await registrarAuditoria({
+      userId: acesso.userId,
+      acao: "ATUALIZAR_RESPONSAVEIS_EVENTO",
+      entityType: "CommissionEvent",
+      entityId: eventId,
+      before: {
+        closerUsuarioId: event.closerUsuarioId,
+        closerNomeManual: event.closerNomeManual,
+        analistaResponsavelUsuarioId: event.analistaResponsavelUsuarioId,
+        analistaResponsavelNomeManual: event.analistaResponsavelNomeManual,
+      },
+      after: {
+        closerUsuarioId: atualizado.closerUsuarioId,
+        closerNomeManual: atualizado.closerNomeManual,
+        analistaResponsavelUsuarioId: atualizado.analistaResponsavelUsuarioId,
+        analistaResponsavelNomeManual: atualizado.analistaResponsavelNomeManual,
+      },
+    });
+
+    return { success: true, data: atualizado } as const;
+  } catch (error) {
+    console.error("[AtualizarResponsaveisEvento]", error);
+    return { success: false, error: "Erro interno ao atualizar responsáveis" } as const;
+  }
+}
+
 // ─── Dados auxiliares para o modal de detalhes ───
 
 const buscarEntrySchema = z.object({ entryId: z.string().min(1) });
 
 export async function BuscarDetalhesLancamento(input: z.infer<typeof buscarEntrySchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = buscarEntrySchema.safeParse(input);
@@ -219,13 +360,32 @@ export async function BuscarDetalhesLancamento(input: z.infer<typeof buscarEntry
     });
     if (!entry) return { success: false, error: "Lançamento não encontrado" } as const;
 
-    const auditoria = await db.commissionAuditLog.findMany({
-      where: { entityType: "CommissionEntry", entityId: entry.id },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const [auditoria, event] = await Promise.all([
+      db.commissionAuditLog.findMany({
+        where: { entityType: "CommissionEntry", entityId: entry.id },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      db.commissionEvent.findUnique({ where: { id: entry.eventId } }),
+    ]);
 
-    return { success: true, data: { entry, auditoria } } as const;
+    const [closerResolvido, analistaResolvido] = await Promise.all([
+      event ? resolverNomeResponsavel(event.closerUsuarioId, event.closerNomeManual) : Promise.resolve({ nome: null, viaUsuario: false }),
+      event ? resolverNomeResponsavel(event.analistaResponsavelUsuarioId, event.analistaResponsavelNomeManual) : Promise.resolve({ nome: null, viaUsuario: false }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        entry,
+        auditoria,
+        eventId: entry.eventId,
+        closerNome: closerResolvido.nome,
+        closerViaUsuario: closerResolvido.viaUsuario,
+        analistaResponsavelNome: analistaResolvido.nome,
+        analistaResponsavelViaUsuario: analistaResolvido.viaUsuario,
+      },
+    } as const;
   } catch (error) {
     console.error("[BuscarDetalhesLancamento]", error);
     return { success: false, error: "Erro interno ao buscar detalhes" } as const;
@@ -249,7 +409,7 @@ const criarAjusteManualSchema = z.object({
  * este endpoint apenas registra a solicitação, aprovação é uma ação separada.
  */
 export async function CriarAjusteManual(input: z.infer<typeof criarAjusteManualSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("PAGAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = criarAjusteManualSchema.safeParse(input);
@@ -309,6 +469,7 @@ export async function CriarAjusteManual(input: z.infer<typeof criarAjusteManualS
     await registrarAuditoria({
       userId: acesso.userId,
       acao: "CRIAR_AJUSTE_MANUAL",
+      entityType: "CommissionEntry",
       entityId: entryId,
       before: { totalCents: valorOriginalCents },
       after: { totalCents: valorAjustadoCents, justificativa, ajusteId: resultado.ajuste.id },

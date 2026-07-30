@@ -32,6 +32,9 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
+const gerarLancamentosParaEventoMock = vi.hoisted(() => vi.fn().mockResolvedValue({ entriesCreated: 0, entriesSkipped: 0, divergencesCreated: 0 }));
+vi.mock("@/lib/commissions/entry-generator", () => ({ gerarLancamentosParaEvento: gerarLancamentosParaEventoMock }));
+
 import { sincronizarComissoes } from "@/lib/commissions/sync-engine";
 
 function contratoRow(overrides: Record<string, unknown> = {}) {
@@ -59,6 +62,9 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     prismaMock.syncRun.update.mockResolvedValue({});
     prismaMock.clientes.findMany.mockResolvedValue([]); // sem êxitos pendentes por padrão
     prismaMock.commissionEvent.findMany.mockResolvedValue([]);
+    prismaMock.commissionEvent.findFirst.mockResolvedValue(null); // sem CONTRACTING prévio por padrão
+    prismaMock.businessProcess.findFirst.mockResolvedValue(null); // sem BusinessProcess por padrão
+    gerarLancamentosParaEventoMock.mockResolvedValue({ entriesCreated: 0, entriesSkipped: 0, divergencesCreated: 0 });
   });
 
   it("evento de contratação já existente (idempotência): não cria novo CommissionEvent", async () => {
@@ -85,6 +91,43 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     expect(result.totalErrors).toBe(0);
   });
 
+  it("contratação nova grava closerUsuarioId (FK real) quando ContratoComercial.usuarioId existe — nunca usa nome manual junto com o FK", async () => {
+    prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ usuarioId: 10, closerNome: "Sheila" })]);
+    prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
+    prismaMock.clientes.findFirst.mockResolvedValue(null);
+    prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo" });
+
+    await sincronizarComissoes({ triggeredBy: "manual" });
+
+    expect(prismaMock.commissionEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ closerUsuarioId: 10, closerNomeManual: null }),
+      }),
+    );
+  });
+
+  it("contratação nova com closer resolvido (FK): gera lançamento automático só para o closer", async () => {
+    prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ usuarioId: 10 })]);
+    prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
+    prismaMock.clientes.findFirst.mockResolvedValue(null);
+    prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo", closerUsuarioId: 10 });
+
+    await sincronizarComissoes({ triggeredBy: "manual" });
+
+    expect(gerarLancamentosParaEventoMock).toHaveBeenCalledWith({ eventId: "evento-novo", collaboratorIds: [10] });
+  });
+
+  it("contratação nova sem closer resolvido: NÃO chama geração automática (nada a gerar)", async () => {
+    prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ usuarioId: null as unknown as number, closerNome: null })]);
+    prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
+    prismaMock.clientes.findFirst.mockResolvedValue(null);
+    prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo", closerUsuarioId: null });
+
+    await sincronizarComissoes({ triggeredBy: "manual" });
+
+    expect(gerarLancamentosParaEventoMock).not.toHaveBeenCalled();
+  });
+
   it("dado ausente (falha ao processar 1 contrato) vira SyncError e é registrado, sem derrubar o resto da sincronização", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ id: "contrato-com-erro" })]);
     prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
@@ -101,6 +144,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([]);
     prismaMock.clientes.findMany.mockResolvedValue([{ id: 5 }]); // 1 cliente com dataExito não processado
     prismaMock.commissionEvent.findMany.mockResolvedValue([]); // nenhum evento de êxito já existe
+    prismaMock.commissionEvent.findFirst.mockResolvedValue(null); // sem CONTRACTING prévio para herdar closer
     prismaMock.clientes.findUnique.mockResolvedValue({
       id: 5,
       cnpj: "12345678000190",
@@ -128,6 +172,99 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
       expect.objectContaining({ data: expect.objectContaining({ tipo: "EXITO_SEM_BUSINESS_PROCESS" }) }),
     );
     expect(result.totalProcessed).toBe(1);
+  });
+
+  it("êxito herda closerUsuarioId do evento de CONTRATAÇÃO já sincronizado, e analistaResponsavelUsuarioId do BusinessProcess (FK real)", async () => {
+    prismaMock.contratoComercial.findMany.mockResolvedValue([]);
+    prismaMock.clientes.findMany.mockResolvedValue([{ id: 5 }]);
+    prismaMock.commissionEvent.findMany.mockResolvedValue([]);
+    prismaMock.commissionEvent.findFirst.mockResolvedValue({ closerUsuarioId: 10, closerNomeManual: null });
+    prismaMock.clientes.findUnique.mockResolvedValue({
+      id: 5,
+      cnpj: "12345678000190",
+      razaoSocial: "Alpha Import",
+      nomeFantasia: null,
+      servicos: "Revisão de RADAR Ilimitado",
+      formaPagamento: "A_VISTA_DESCONTO",
+      valorContrato: 22000,
+      closerNome: "Sheila",
+      analistaResponsavel: "Maria",
+      dataContratacao: "2026-07-15",
+      dataExito: "2026-07-20",
+      embasamento: null,
+      origemLead: null,
+    });
+    prismaMock.commissionEvent.create.mockResolvedValue({
+      id: "evento-exito",
+      closerUsuarioId: 10,
+      analistaResponsavelUsuarioId: 42,
+    });
+    prismaMock.businessProcess.findFirst.mockResolvedValue({
+      id: "processo-1",
+      analistaResponsavelId: 42,
+      tentativas: 2,
+      deferidoPrimeiraTentativa: false,
+    });
+
+    await sincronizarComissoes({ triggeredBy: "manual" });
+
+    expect(prismaMock.commissionEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          closerUsuarioId: 10,
+          closerNomeManual: null,
+          analistaResponsavelUsuarioId: 42,
+          analistaResponsavelNomeManual: null,
+          businessProcessId: "processo-1",
+        }),
+      }),
+    );
+    // Com BusinessProcess encontrado, não deve gerar a divergência de ausência.
+    expect(prismaMock.commissionDivergence.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tipo: "EXITO_SEM_BUSINESS_PROCESS" }) }),
+    );
+    // Gera lançamento automático para closer E analista responsável (ambos resolvidos por FK).
+    expect(gerarLancamentosParaEventoMock).toHaveBeenCalledWith({
+      eventId: "evento-exito",
+      collaboratorIds: expect.arrayContaining([10, 42]),
+    });
+  });
+
+  it("êxito sem CONTRACTING prévio nem BusinessProcess: cai para nome manual (clientes.closerNome/analistaResponsavel), nunca inventa FK", async () => {
+    prismaMock.contratoComercial.findMany.mockResolvedValue([]);
+    prismaMock.clientes.findMany.mockResolvedValue([{ id: 5 }]);
+    prismaMock.commissionEvent.findMany.mockResolvedValue([]);
+    prismaMock.commissionEvent.findFirst.mockResolvedValue(null);
+    prismaMock.clientes.findUnique.mockResolvedValue({
+      id: 5,
+      cnpj: "12345678000190",
+      razaoSocial: "Alpha Import",
+      nomeFantasia: null,
+      servicos: "Revisão de RADAR Ilimitado",
+      formaPagamento: "A_VISTA_DESCONTO",
+      valorContrato: 22000,
+      closerNome: "Sheila",
+      analistaResponsavel: "Maria",
+      dataContratacao: "2026-07-15",
+      dataExito: "2026-07-20",
+      embasamento: null,
+      origemLead: null,
+    });
+    prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-exito" });
+    prismaMock.businessProcess.findFirst.mockResolvedValue(null);
+
+    await sincronizarComissoes({ triggeredBy: "manual" });
+
+    expect(prismaMock.commissionEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          closerUsuarioId: null,
+          closerNomeManual: "Sheila",
+          analistaResponsavelUsuarioId: null,
+          analistaResponsavelNomeManual: "Maria",
+        }),
+      }),
+    );
   });
 
   it("êxito já processado (idempotência): listarClientesComExitoNaoProcessado já filtra, não reprocessa", async () => {

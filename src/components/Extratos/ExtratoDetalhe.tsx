@@ -22,6 +22,7 @@ import { ModalUploadExtrato } from "./ModalUploadExtrato";
 import { ModalConferencia } from "./ModalConferencia";
 import { ModalTransacoesSalvas } from "./ModalTransacoesSalvas";
 import { exportarRelatorioExcel, type TransacaoParaExportar } from "./lib/exportar-excel";
+import { prepararTransacaoParaRelatorio } from "./lib/relatorio-extrato";
 import { formatarCnpj } from "./lib/formatters";
 import type { BancoCatalogo } from "./lib/bancos-catalogo";
 import { getTema } from "@/lib/temas";
@@ -152,13 +153,18 @@ export function ExtratoDetalhe({ extratoId, temaName = "blue" }: ExtratoDetalheP
     if (!empresa) return;
     const todasTransacoes: TransacaoParaExportar[] = empresa.periodos.flatMap((p) =>
       p.bancos.flatMap((b) =>
-        b.transacoes.map((t) => ({
-          mesReferencia: `${p.mes}/${p.ano}`,
-          nomeBanco: b.nomeBanco,
-          data: t.data ? new Date(t.data).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "DATA INCERTA",
-          descricao: t.descricao,
-          valor: t.valor,
-        })),
+        b.transacoes.map((t) =>
+          prepararTransacaoParaRelatorio(
+            {
+              mesReferencia: `${p.mes}/${p.ano}`,
+              nomeBanco: b.nomeBanco,
+              data: t.data ? new Date(t.data).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "DATA INCERTA",
+              descricao: t.descricao,
+              valor: t.valor,
+            },
+            empresa.razaoSocial,
+          ),
+        ),
       ),
     );
     setLinhasPreview(todasTransacoes);

@@ -12,6 +12,7 @@ import {
   BLUEPRINT_STATUS,
 } from "@/lib/validations/blueprint";
 import { exigirAcessoBlueprint, isAdminRole } from "@/lib/blueprint/ownership";
+import { podeAlterarPremioBlueprint } from "@/lib/blueprint/premio";
 
 const ROTA_BASE = "/PainelAlpha/AlphaBlueprint";
 
@@ -92,7 +93,7 @@ export async function ListarProjetosBlueprint(params?: unknown) {
         select: {
           id: true, code: true, title: true, summary: true, status: true,
           priority: true, progress: true, setor: true, coverUrl: true, icon: true,
-          tagsJson: true, dueDate: true, updatedAt: true,
+          tagsJson: true, premioCents: true, dueDate: true, updatedAt: true,
           requester: { select: { id: true, nome: true } },
           owner: { select: { id: true, nome: true } },
           developer: { select: { id: true, nome: true } },
@@ -160,6 +161,7 @@ export async function CriarProjetoBlueprint(dados: unknown) {
           priority: campos.priority,
           dueDate: campos.dueDate,
           status: campos.status,
+          premioCents: campos.premioCents,
           tagsJson: campos.tags ? JSON.stringify(campos.tags) : null,
           createdById: userId,
         },
@@ -184,7 +186,11 @@ export async function CriarProjetoBlueprint(dados: unknown) {
           userId,
           action: "CRIACAO",
           entityType: "PROJETO",
-          newValueJson: JSON.stringify({ title: campos.title, status: campos.status }),
+          newValueJson: JSON.stringify({
+            title: campos.title,
+            status: campos.status,
+            premioCents: campos.premioCents ?? null,
+          }),
         },
       });
 
@@ -237,11 +243,16 @@ export async function AtualizarProjetoBlueprint(dados: unknown) {
     const parsed = atualizarProjetoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { projectId, tags, ...campos } = parsed.data;
+    const alterandoPremio = Object.prototype.hasOwnProperty.call(campos, "premioCents");
 
     await exigirAcessoBlueprint(projectId, userId, session.user.role ?? null, "editarDadosGerais");
 
     const anterior = await db.blueprintProject.findUnique({ where: { id: projectId } });
     if (!anterior) return { success: false, error: "Projeto não encontrado" };
+
+    if (alterandoPremio && !podeAlterarPremioBlueprint(anterior.createdById, userId)) {
+      return { success: false, error: "Apenas o criador do projeto pode alterar o prêmio" };
+    }
 
     const atualizado = await db.$transaction(async (tx) => {
       const projeto = await tx.blueprintProject.update({
@@ -259,8 +270,16 @@ export async function AtualizarProjetoBlueprint(dados: unknown) {
           userId,
           action: "ATUALIZACAO",
           entityType: "PROJETO",
-          previousValueJson: JSON.stringify({ title: anterior.title, priority: anterior.priority }),
-          newValueJson: JSON.stringify({ title: projeto.title, priority: projeto.priority }),
+          previousValueJson: JSON.stringify({
+            title: anterior.title,
+            priority: anterior.priority,
+            premioCents: anterior.premioCents,
+          }),
+          newValueJson: JSON.stringify({
+            title: projeto.title,
+            priority: projeto.priority,
+            premioCents: projeto.premioCents,
+          }),
         },
       });
 

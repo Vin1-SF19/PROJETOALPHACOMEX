@@ -3,20 +3,17 @@
 import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/** TODO(Fase 14 — RBAC granular): ver nota em CommissionPositions.ts. */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 const criarTarifarioSchema = z.object({
@@ -37,7 +34,7 @@ const criarTarifarioSchema = z.object({
  * construção, não uma integração nova a implementar.
  */
 export async function CriarTarifario(input: z.infer<typeof criarTarifarioSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = criarTarifarioSchema.safeParse(input);
@@ -57,7 +54,7 @@ export async function CriarTarifario(input: z.infer<typeof criarTarifarioSchema>
 const listarTarifariosSchema = z.object({ servico: z.string().optional() });
 
 export async function ListarTarifarios(input?: z.infer<typeof listarTarifariosSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = listarTarifariosSchema.safeParse(input ?? {});
@@ -87,7 +84,7 @@ const atualizarTarifarioSchema = z.object({
 });
 
 export async function AtualizarTarifario(input: z.infer<typeof atualizarTarifarioSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = atualizarTarifarioSchema.safeParse(input);
@@ -106,5 +103,42 @@ export async function AtualizarTarifario(input: z.infer<typeof atualizarTarifari
   } catch (error) {
     console.error("[AtualizarTarifario]", error);
     return { success: false, error: "Erro interno ao atualizar tarifário" } as const;
+  }
+}
+
+export interface ServicoComTarifarioRow {
+  id: number;
+  nome: string;
+  ativo: boolean;
+  temTarifarioVigente: boolean;
+}
+
+/**
+ * Catálogo somente-leitura da aba "Serviços" — distinto de "Tarifários" (que cadastra o
+ * PREÇO por serviço/data). Aqui é só o catálogo de nomes de serviço (`ServicosComerciais`,
+ * do módulo Metas), cruzado com `TariffVersion` para indicar quais já têm tarifário
+ * cadastrado (ajuda a identificar serviços sem preço, que geram divergência
+ * SERVICO_SEM_TARIFARIO na sincronização).
+ */
+export async function ListarServicosComTarifario() {
+  const acesso = await exigirAcesso("VISUALIZAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  try {
+    const servicos = await db.servicosComerciais.findMany({ orderBy: { nome: "asc" } });
+    const tarifarios = await db.tariffVersion.findMany({ select: { servico: true } });
+    const servicosComTarifario = new Set(tarifarios.map((t) => t.servico));
+
+    const data: ServicoComTarifarioRow[] = servicos.map((s) => ({
+      id: s.id,
+      nome: s.nome,
+      ativo: s.ativo,
+      temTarifarioVigente: servicosComTarifario.has(s.nome),
+    }));
+
+    return { success: true, data } as const;
+  } catch (error) {
+    console.error("[ListarServicosComTarifario]", error);
+    return { success: false, error: "Erro interno ao listar serviços" } as const;
   }
 }

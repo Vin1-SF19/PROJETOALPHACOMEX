@@ -3,20 +3,17 @@
 import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/** TODO(Fase 14 — RBAC granular): ver nota em CommissionPositions.ts — "criar regras"/"publicar regras" são ações desta action que deveriam ser permissões granulares próprias quando o RBAC fino existir. */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 async function registrarAuditoria(params: {
@@ -51,7 +48,7 @@ const conditionSchema = z.object({
 });
 
 const calculationSchema = z.object({
-  type: z.enum(["PERCENTAGE", "FIXED", "PER_UNIT", "ADDITIONAL", "DSR", "CAP", "FLOOR", "PROPORTIONAL", "SUM_OF_COMPONENTS"]),
+  type: z.enum(["PERCENTAGE", "FIXED", "PER_UNIT", "ADDITIONAL", "DSR", "CAP", "FLOOR", "PROPORTIONAL", "SUM_OF_COMPONENTS", "TOTAL_FIXO_COM_DSR"]),
   benefitType: z.enum(["COMMISSION", "BONUS", "DSR"]),
   rate: z.number().min(0).max(1).optional(),
   fixedAmountCents: z.number().int().optional(),
@@ -62,6 +59,7 @@ const calculationSchema = z.object({
   proportion: z.number().min(0).max(1).optional(),
   componentsCents: z.array(z.number().int()).optional(),
   dsrFormulaName: z.string().optional(),
+  totalFixoComDsrCents: z.number().int().optional(),
 });
 
 const paymentScheduleSchema = z.object({
@@ -91,7 +89,7 @@ const salvarRascunhoSchema = z.object({
 
 /** Cria uma CommissionRule nova + sua primeira CommissionRuleVersion em status DRAFT. */
 export async function SalvarRascunhoRegra(input: z.infer<typeof salvarRascunhoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = salvarRascunhoSchema.safeParse(input);
@@ -130,7 +128,7 @@ const publicarRegraSchema = z.object({ versionId: z.string().min(1) });
 
 /** Muda DRAFT→PUBLISHED. Nunca sobrescreve uma versão já publicada — se a versão alvo já estiver PUBLISHED, rejeita (use CriarVersaoRegra para editar). */
 export async function PublicarRegra(input: z.infer<typeof publicarRegraSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("APROVAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = publicarRegraSchema.safeParse(input);
@@ -177,7 +175,7 @@ const criarVersaoSchema = salvarRascunhoSchema
  * versão antiga permanece intacta no histórico até que a nova seja publicada.
  */
 export async function CriarVersaoRegra(input: z.infer<typeof criarVersaoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = criarVersaoSchema.safeParse(input);
@@ -235,7 +233,7 @@ const inativarRegraSchema = z.object({ ruleId: z.string().min(1) });
 
 /** Marca CommissionRule.active=false — preserva TODO o histórico de versões, nunca deleta. */
 export async function InativarRegra(input: z.infer<typeof inativarRegraSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = inativarRegraSchema.safeParse(input);
@@ -274,7 +272,7 @@ const compararVersoesSchema = z.object({
 });
 
 export async function CompararVersoes(input: z.infer<typeof compararVersoesSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = compararVersoesSchema.safeParse(input);

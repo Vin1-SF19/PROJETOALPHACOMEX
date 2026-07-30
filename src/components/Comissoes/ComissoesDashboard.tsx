@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { getTema } from "@/lib/temas";
 import { CabecalhoComissoes } from "./Cabecalho/CabecalhoComissoes";
 import { CardsIndicadores } from "./Indicadores/CardsIndicadores";
-import { FiltrosComissoes } from "./Filtros/FiltrosComissoes";
+import { FiltrosComissoes, mesReferenciaAtual } from "./Filtros/FiltrosComissoes";
 import { EventoComissaoCard } from "./EventoCard/EventoComissaoCard";
 import { ModalDetalhesLancamento } from "./ModalDetalhes/ModalDetalhesLancamento";
 import {
@@ -27,6 +27,7 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
   const [eventosCompletos, setEventosCompletos] = useState<EventoComLancamentosResult[]>([]);
   const [indicadores, setIndicadores] = useState<IndicadoresComissao | null>(null);
   const [busca, setBusca] = useState("");
+  const [mesReferencia, setMesReferencia] = useState<string | undefined>(mesReferenciaAtual);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [carregandoEventos, setCarregandoEventos] = useState(true);
@@ -36,7 +37,7 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
 
   const carregarEventos = useCallback(async () => {
     setCarregandoEventos(true);
-    const resultado = await ListarEventosComissao({ page, pageSize: PAGE_SIZE, busca });
+    const resultado = await ListarEventosComissao({ page, pageSize: PAGE_SIZE, busca, mesReferencia });
 
     if (!resultado.success) {
       setErro(resultado.error);
@@ -57,7 +58,7 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
         .map((r) => r.data),
     );
     setCarregandoEventos(false);
-  }, [page, busca]);
+  }, [page, busca, mesReferencia]);
 
   const carregarIndicadores = useCallback(async () => {
     setCarregandoIndicadores(true);
@@ -96,6 +97,10 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
       <FiltrosComissoes
         onBuscaChange={(novaBusca) => {
           setBusca(novaBusca);
+          setPage(1);
+        }}
+        onMesReferenciaChange={(novoMes) => {
+          setMesReferencia(novoMes);
           setPage(1);
         }}
       />

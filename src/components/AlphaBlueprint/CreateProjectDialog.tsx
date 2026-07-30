@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { CriarProjetoBlueprint } from "@/actions/BlueprintProjects";
 import { UserSelect } from "./UserSelect";
 import { dataInputParaDate } from "./tipos";
+import { formatarPremioParaInput, parsePremioReaisParaCents } from "@/lib/blueprint/premio";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -26,16 +27,22 @@ export function CreateProjectDialog({ open, onOpenChange, requesterId, accent, o
   const [ownerId, setOwnerId] = useState<number | undefined>(undefined);
   const [developerId, setDeveloperId] = useState<number | undefined>(undefined);
   const [dueDate, setDueDate] = useState("");
+  const [premio, setPremio] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   function limpar() {
     setTitle(""); setSummary(""); setProblem(""); setSetor(""); setPriority("NORMAL");
-    setOwnerId(undefined); setDeveloperId(undefined); setDueDate("");
+    setOwnerId(undefined); setDeveloperId(undefined); setDueDate(""); setPremio("");
   }
 
   async function handleSalvar() {
     if (!title.trim()) {
       toast.error("Nome do sistema é obrigatório");
+      return;
+    }
+    const premioParseado = parsePremioReaisParaCents(premio);
+    if (!premioParseado.success) {
+      toast.error(premioParseado.error);
       return;
     }
     setSalvando(true);
@@ -51,6 +58,7 @@ export function CreateProjectDialog({ open, onOpenChange, requesterId, accent, o
         ownerId,
         developerId,
         dueDate: dataInputParaDate(dueDate),
+        premioCents: premioParseado.value ?? undefined,
       });
       if (res.success) {
         toast.success("Projeto criado");
@@ -169,6 +177,35 @@ export function CreateProjectDialog({ open, onOpenChange, requesterId, accent, o
               autoComplete="off"
               className="w-full rounded-xl bg-slate-900/60 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/20 [color-scheme:dark]"
             />
+          </div>
+
+          <div>
+            <label htmlFor="blueprint-create-premio" className="text-xs text-slate-400 mb-1 block">
+              Prêmio
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">R$</span>
+              <input
+                id="blueprint-create-premio"
+                type="text"
+                inputMode="decimal"
+                value={premio}
+                onChange={(e) => setPremio(e.target.value)}
+                onBlur={() => {
+                  const resultado = parsePremioReaisParaCents(premio);
+                  if (resultado.success && resultado.value !== null) {
+                    setPremio(formatarPremioParaInput(resultado.value));
+                  }
+                }}
+                placeholder="0,00"
+                autoComplete="off"
+                className="w-full rounded-xl bg-slate-900/60 border border-white/10 pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-white/20"
+                aria-describedby="blueprint-create-premio-ajuda"
+              />
+            </div>
+            <p id="blueprint-create-premio-ajuda" className="mt-1 text-[10px] text-slate-500">
+              Opcional. Depois de criado, somente você poderá alterar este valor.
+            </p>
           </div>
         </div>
 

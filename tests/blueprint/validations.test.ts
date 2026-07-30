@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   criarProjetoSchema,
+  atualizarProjetoSchema,
   moverProjetoSchema,
   salvarBoardSchema,
   registrarArquivoSchema,
   criarRequisitoSchema,
   BLUEPRINT_MAX_FILE_SIZE,
 } from "@/lib/validations/blueprint";
+import { BLUEPRINT_PREMIO_MAX_CENTS } from "@/lib/blueprint/premio";
 
 describe("criarProjetoSchema", () => {
   it("aceita o mínimo obrigatório (nome + solicitante)", () => {
@@ -69,6 +71,45 @@ describe("criarProjetoSchema", () => {
     const membrosIds = Array.from({ length: 51 }, (_, i) => i + 1);
     const r = criarProjetoSchema.safeParse({ title: "X", requesterId: 1, membrosIds });
     expect(r.success).toBe(false);
+  });
+});
+
+describe("criarProjetoSchema — prêmio", () => {
+  it("aceita prêmio em centavos, inclusive zero e o limite do Int", () => {
+    expect(criarProjetoSchema.safeParse({ title: "X", requesterId: 1, premioCents: 0 }).success).toBe(true);
+    expect(
+      criarProjetoSchema.safeParse({
+        title: "X",
+        requesterId: 1,
+        premioCents: BLUEPRINT_PREMIO_MAX_CENTS,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejeita prêmio negativo, fracionário ou acima do limite do Int", () => {
+    expect(criarProjetoSchema.safeParse({ title: "X", requesterId: 1, premioCents: -1 }).success).toBe(false);
+    expect(criarProjetoSchema.safeParse({ title: "X", requesterId: 1, premioCents: 10.5 }).success).toBe(false);
+    expect(
+      criarProjetoSchema.safeParse({
+        title: "X",
+        requesterId: 1,
+        premioCents: BLUEPRINT_PREMIO_MAX_CENTS + 1,
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("atualizarProjetoSchema — prêmio", () => {
+  const projectId = "clx123456789012345678901234";
+
+  it("aceita remover o prêmio com null", () => {
+    expect(atualizarProjetoSchema.safeParse({ projectId, premioCents: null }).success).toBe(true);
+  });
+
+  it("aceita atualização sem enviar o campo prêmio", () => {
+    const resultado = atualizarProjetoSchema.safeParse({ projectId, summary: "Novo resumo" });
+    expect(resultado.success).toBe(true);
+    expect(resultado.success && Object.hasOwn(resultado.data, "premioCents")).toBe(false);
   });
 });
 

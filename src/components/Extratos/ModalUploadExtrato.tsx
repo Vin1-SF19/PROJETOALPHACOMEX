@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Upload, Loader2, Check, ChevronRight, Save, Search, Files, Trash2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -8,6 +16,7 @@ import { SalvarTransacoesLote } from "@/actions/transacao";
 import type { PaginaComErro } from "@/types/extrato";
 import { parseMoeda } from "./lib/formatters";
 import { modalVariants, MODAL_PERSPECTIVE } from "./lib/modal-variants";
+import { validarArquivosExtrato } from "./lib/upload-extrato";
 
 interface LinhaExtraida {
   id: string;
@@ -40,7 +49,9 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
   const [progresso, setProgresso] = useState({ atual: 0, total: 0 });
   const [paginasComErro, setPaginasComErro] = useState<PaginaComErro[]>([]);
   const [reprocessando, setReprocessando] = useState(false);
+  const [arrastando, setArrastando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -52,24 +63,26 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
       setFiltro("");
       setPaginasComErro([]);
       setReprocessando(false);
+      setArrastando(false);
+      dragCounterRef.current = 0;
     }
   }, [isOpen]);
 
-  const processarLote = async () => {
-    if (arquivos.length === 0) return;
+  const processarLote = async (arquivosParaProcessar: File[] = arquivos) => {
+    if (arquivosParaProcessar.length === 0) return;
 
     setStatus("scanning");
-    setProgresso({ atual: 0, total: arquivos.length });
+    setProgresso({ atual: 0, total: arquivosParaProcessar.length });
 
     let todasAsLinhas: LinhaExtraida[] = [];
     let todasAsPaginasComErro: PaginaComErro[] = [];
 
     try {
-      for (let i = 0; i < arquivos.length; i++) {
+      for (let i = 0; i < arquivosParaProcessar.length; i++) {
         setProgresso((prev) => ({ ...prev, atual: i + 1 }));
 
         const formData = new FormData();
-        formData.append("file", arquivos[i]);
+        formData.append("file", arquivosParaProcessar[i]);
         formData.append("bancoId", String(dadosContexto?.bancoId ?? ""));
 
         const res = await fetch("/api/onyx/extrato", { method: "POST", body: formData });
@@ -93,7 +106,7 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
             descricao: item.descricao?.trim() || "LANÇAMENTO",
             valor: parseMoeda(item.valor),
             selecionado: true,
-            origem: arquivos[i].name,
+            origem: arquivosParaProcessar[i].name,
           }));
           todasAsLinhas = [...todasAsLinhas, ...formatados];
         }
@@ -114,6 +127,66 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
       toast.error((error as Error).message || "Erro no processamento");
       setStatus("idle");
     }
+  };
+
+  const notificarErrosDeArquivo = (erros: string[]) => {
+    if (erros.length === 0) return;
+    const complemento = erros.length > 1 ? ` (+${erros.length - 1} arquivo(s))` : "";
+    toast.error(`${erros[0]}${complemento}`);
+  };
+
+  const selecionarArquivos = (event: ChangeEvent<HTMLInputElement>) => {
+    const candidatos = Array.from(event.target.files ?? []);
+    const { validos, erros } = validarArquivosExtrato(candidatos, arquivos);
+
+    if (validos.length > 0) {
+      setArquivos((prev) => [...prev, ...validos]);
+    }
+    notificarErrosDeArquivo(erros);
+    event.target.value = "";
+  };
+
+  const iniciarArraste = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current += 1;
+    setArrastando(true);
+  };
+
+  const manterArraste = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const encerrarArraste = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setArrastando(false);
+  };
+
+  const soltarArquivos = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dragCounterRef.current = 0;
+    setArrastando(false);
+
+    const candidatos = Array.from(event.dataTransfer.files);
+    const { validos, erros } = validarArquivosExtrato(candidatos, arquivos);
+    notificarErrosDeArquivo(erros);
+
+    if (validos.length === 0) return;
+
+    const loteAutomatico = [...arquivos, ...validos];
+    setArquivos(loteAutomatico);
+    void processarLote(loteAutomatico);
+  };
+
+  const abrirSeletorPorTeclado = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    fileInputRef.current?.click();
   };
 
   const reprocessarPaginasComErro = async () => {
@@ -226,37 +299,55 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
   return (
     <AnimatePresence>
       {isOpen && (
-      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md" style={{ perspective: MODAL_PERSPECTIVE }}>
+      <div
+        className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/95 p-2 backdrop-blur-md sm:p-4"
+        style={{ perspective: MODAL_PERSPECTIVE }}
+      >
         <motion.div
           variants={modalVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
           style={{ transformStyle: "preserve-3d" }}
-          className="bg-[#020617] border border-white/10 w-full max-w-6xl h-[85vh] rounded-[3rem] overflow-hidden flex flex-col shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-upload-extrato-titulo"
+          className="flex h-[calc(100dvh-1rem)] min-h-0 max-h-[calc(100dvh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#020617] shadow-2xl sm:h-[85dvh] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[3rem]"
         >
-          <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-900/20">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/5 bg-slate-900/20 p-4 sm:p-8">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 sm:flex">
                 <Files size={24} aria-hidden="true" />
               </div>
-              <div>
-                <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Novo Upload em Lote</h2>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{dadosContexto?.banco || "BANCO"} • {dadosContexto?.mes || "PERÍODO"}</p>
+              <div className="min-w-0">
+                <h2 id="modal-upload-extrato-titulo" className="truncate text-lg font-black uppercase italic tracking-tighter text-white sm:text-2xl">Novo Upload em Lote</h2>
+                <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500 sm:text-[10px] sm:tracking-widest">{dadosContexto?.banco || "BANCO"} • {dadosContexto?.mes || "PERÍODO"}</p>
               </div>
             </div>
-            <button onClick={onClose} aria-label="Fechar" className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-all">
+            <button onClick={onClose} aria-label="Fechar" className="shrink-0 rounded-full p-2 text-slate-500 transition-all hover:bg-white/5">
               <X size={24} aria-hidden="true" />
             </button>
           </div>
 
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
             {status === "idle" && (
-              <div className="h-full grid grid-cols-1 lg:grid-cols-2">
-                <div className="p-12 flex flex-col items-center justify-center border-r border-white/5">
+              <div className="grid min-h-full grid-cols-1 lg:h-full lg:grid-cols-2">
+                <div className="flex flex-col items-center justify-center border-b border-white/5 p-5 sm:p-8 lg:border-b-0 lg:border-r lg:p-12">
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="group w-full aspect-square max-w-[320px] border-2 border-dashed border-white/10 rounded-[3rem] bg-white/5 flex flex-col items-center justify-center gap-6 cursor-pointer hover:border-indigo-500/50 transition-all"
+                    onKeyDown={abrirSeletorPorTeclado}
+                    onDragEnter={iniciarArraste}
+                    onDragOver={manterArraste}
+                    onDragLeave={encerrarArraste}
+                    onDrop={soltarArquivos}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Arraste extratos para processar automaticamente ou pressione Enter para selecionar arquivos"
+                    className={`group flex min-h-56 w-full max-w-[420px] cursor-pointer flex-col items-center justify-center gap-5 rounded-3xl border-2 border-dashed px-6 py-8 text-center outline-none transition-all focus-visible:ring-2 focus-visible:ring-indigo-400 sm:aspect-square sm:max-w-[320px] sm:gap-6 sm:rounded-[3rem] ${
+                      arrastando
+                        ? "scale-[1.02] border-indigo-400 bg-indigo-500/15 shadow-[0_0_50px_rgba(99,102,241,0.2)]"
+                        : "border-white/10 bg-white/5 hover:border-indigo-500/50"
+                    }`}
                   >
                     <input
                       type="file"
@@ -264,26 +355,33 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
                       className="hidden"
                       multiple
                       accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      onChange={(e) => e.target.files && setArquivos((prev) => [...prev, ...Array.from(e.target.files!)])}
+                      onChange={selecionarArquivos}
                     />
-                    <div className="h-20 w-20 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                    <div className={`flex h-16 w-16 items-center justify-center rounded-full text-indigo-500 transition-all sm:h-20 sm:w-20 ${
+                      arrastando ? "bg-indigo-500 text-white" : "bg-indigo-500/10 group-hover:bg-indigo-500 group-hover:text-white"
+                    }`}>
                       <Upload size={32} aria-hidden="true" />
                     </div>
                     <div className="text-center px-6">
-                      <h3 className="text-sm font-black text-white uppercase italic">Selecionar Arquivos</h3>
-                      <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest mt-2">Arraste PDFs ou Word (.docx) do extrato aqui</p>
+                      <h3 className="text-sm font-black uppercase italic text-white">
+                        {arrastando ? "Solte para processar" : "Arraste ou selecione"}
+                      </h3>
+                      <p className="mt-2 text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                        Arrastar inicia automaticamente • seleção permite revisar a fila
+                      </p>
+                      <p className="mt-2 text-[9px] font-semibold text-slate-600">PDF ou Word (.docx) • até 20 MB por arquivo</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-12 bg-black/20 flex flex-col overflow-hidden">
+                <div className="flex min-h-[320px] flex-col overflow-hidden bg-black/20 p-5 sm:p-8 lg:min-h-0 lg:p-12">
                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Fila de Arquivos ({arquivos.length})</h4>
                   <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                     {arquivos.map((f, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
-                        <div className="flex items-center gap-4">
+                      <div key={`${f.name}-${f.size}-${f.lastModified}`} className="flex items-center justify-between gap-2 rounded-2xl border border-white/5 bg-white/5 p-3 sm:p-4">
+                        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                           <div className="h-10 w-10 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-400 text-[10px] font-black italic">{i + 1}º</div>
-                          <span className="text-[11px] font-bold text-slate-300 truncate max-w-[300px]">{f.name}</span>
+                          <span className="max-w-[180px] truncate text-[11px] font-bold text-slate-300 sm:max-w-[300px]">{f.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex flex-col gap-1">
@@ -322,7 +420,7 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
                     ))}
                   </div>
                   {arquivos.length > 0 && (
-                    <button onClick={processarLote} className="mt-8 w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-lg">
+                    <button onClick={() => void processarLote()} className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-indigo-600 py-4 text-[11px] font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-indigo-500 sm:mt-8 sm:py-5">
                       Processar com Agentes IA <ChevronRight size={16} aria-hidden="true" />
                     </button>
                   )}
@@ -331,15 +429,15 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
             )}
 
             {status === "scanning" && (
-              <div className="h-full flex flex-col items-center justify-center gap-6">
-                <Loader2 size={80} aria-hidden="true" className="text-indigo-500 animate-spin" />
+              <div className="flex h-full min-h-[420px] flex-col items-center justify-center gap-6 px-6 text-center">
+                <Loader2 size={64} aria-hidden="true" className="animate-spin text-indigo-500 sm:h-20 sm:w-20" />
                 <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em]">Processando arquivo {progresso.atual} de {progresso.total} via IA</p>
               </div>
             )}
 
             {status === "reviewing" && (
-              <div className="h-full flex flex-col">
-                <div className="p-4 bg-white/5 border-b border-white/5 flex gap-4">
+              <div className="flex h-full min-h-[540px] flex-col">
+                <div className="flex flex-col gap-3 border-b border-white/5 bg-white/5 p-3 sm:flex-row sm:gap-4 sm:p-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={14} aria-hidden="true" />
                     <input
@@ -355,7 +453,7 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
                     value={ordenacao}
                     onChange={(e) => setOrdenacao(e.target.value)}
                     aria-label="Ordenar resultados"
-                    className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[12px] font-bold text-white uppercase outline-none cursor-pointer hover:border-indigo-500/50 transition-all"
+                    className="w-full cursor-pointer rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-[12px] font-bold uppercase text-white outline-none transition-all hover:border-indigo-500/50 sm:w-auto"
                   >
                     <option value="data-desc">Mais Recentes</option>
                     <option value="data-asc">Mais Antigos</option>
@@ -365,14 +463,14 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
                 </div>
 
                 {paginasComErro.length > 0 && (
-                  <div className="mx-4 mt-4 p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between gap-4">
+                  <div className="mx-3 mt-3 flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 sm:mx-4 sm:mt-4 sm:flex-row sm:items-center sm:p-5">
                     <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wide">
                       {paginasComErro.length} página(s) não processada(s). Algumas transações podem estar faltando.
                     </p>
                     <button
                       onClick={reprocessarPaginasComErro}
                       disabled={reprocessando}
-                      className="cursor-pointer shrink-0 px-6 py-3 bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
+                      className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-500/20 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-amber-400 transition-all hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
                     >
                       {reprocessando ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : null}
                       {reprocessando ? "Reprocessando..." : "Reprocessar páginas com erro"}
@@ -380,8 +478,9 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
                   </div>
                 )}
 
-                <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-black/20 rounded-3xl border border-white/5 m-4">
-                  <div className="grid grid-cols-12 gap-4 px-9 py-4 border-b border-white/5 bg-white/[0.02] text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] items-center">
+                <div className="m-3 flex min-h-0 flex-1 flex-col overflow-auto rounded-2xl border border-white/5 bg-black/20 sm:m-4 sm:rounded-3xl">
+                  <div className="flex min-h-full min-w-[760px] flex-col">
+                    <div className="grid grid-cols-12 items-center gap-4 border-b border-white/5 bg-white/[0.02] px-9 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                     <div className="col-span-1 flex justify-center">
                       <button
                         onClick={toggleSelecionarTodos}
@@ -394,10 +493,10 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
                     <div className="col-span-2">Data</div>
                     <div className="col-span-6">Descrição</div>
                     <div className="col-span-3 text-right">Valor (R$)</div>
-                  </div>
+                    </div>
 
-                  <div className="flex-1 overflow-y-auto p-4 space-y-1">
-                    {linhasFiltradas.map((linha) => (
+                    <div className="flex-1 space-y-1 overflow-y-auto p-4">
+                      {linhasFiltradas.map((linha) => (
                       <motion.div layout key={linha.id} className={`grid grid-cols-12 gap-4 items-center p-2 px-5 rounded-2xl border transition-all ${linha.selecionado ? "bg-indigo-500/10 border-indigo-500/30" : "bg-white/[0.02] border-transparent opacity-60 hover:opacity-100"}`}>
                         <div className="col-span-1 flex justify-center">
                           <button
@@ -424,30 +523,33 @@ export function ModalUploadExtrato({ isOpen, onClose, dadosContexto, onSucesso }
                           />
                         </div>
                       </motion.div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="p-8 bg-slate-900/60 border-t border-white/5 flex justify-between items-center">
+          {status === "reviewing" && (
+            <div className="flex shrink-0 flex-col justify-between gap-3 border-t border-white/5 bg-slate-900/60 p-3 sm:flex-row sm:items-center sm:p-5 lg:p-8">
             <div className="flex gap-10">
               <div>
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Novas Transações</p>
                 <p className="text-xl font-black text-white italic">{linhasFiltradas.length}</p>
               </div>
             </div>
-            <div className="flex gap-4 items-center">
-              <button onClick={() => setLinhasExtraidas((prev) => prev.filter((l) => !l.selecionado))} className="cursor-pointer flex items-center gap-2 px-6 py-4 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/5 rounded-2xl transition-all">
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <button onClick={() => setLinhasExtraidas((prev) => prev.filter((l) => !l.selecionado))} className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[10px] font-black uppercase tracking-widest text-rose-500 transition-all hover:bg-rose-500/5 sm:px-6 sm:py-4">
                 <X size={14} aria-hidden="true" /> Descartar Selecionados
               </button>
-              <div className="w-px h-8 bg-white/10 mx-2" />
-              <button onClick={confirmarImportacao} disabled={linhasExtraidas.length === 0} className="cursor-pointer px-10 py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20">
+              <div className="mx-2 hidden h-8 w-px bg-white/10 sm:block" />
+              <button onClick={confirmarImportacao} disabled={linhasExtraidas.length === 0} className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-900/20 transition-all hover:bg-emerald-500 disabled:opacity-20 sm:px-10 sm:py-4">
                 <Save size={16} aria-hidden="true" /> Salvar Transações
               </button>
             </div>
-          </div>
+            </div>
+          )}
         </motion.div>
       </div>
       )}

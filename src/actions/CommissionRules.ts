@@ -9,23 +9,17 @@ import { buildCalculationMemory, type CalculationMemory } from "@/lib/commission
 import { calcularPaymentSchedule } from "@/lib/commissions/payment-schedule";
 import { regrasSeedDoCargo } from "@/lib/commissions/cargo-rule-matching";
 import type { CommissionRuleVersionData, FactRecord } from "@/lib/commissions/types";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — Configurações/RBAC granular): mesma verificação de role temporária
- * documentada em `src/actions/CommissionSync.ts`.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 const EVENT_TYPES = [
@@ -92,7 +86,7 @@ function factsDaSimulacao(input: SimularRegraInput): FactRecord {
  * ainda não existe — implementar quando a Fase 14 estiver pronta.
  */
 export async function SimularRegra(input: SimularRegraInput) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("VISUALIZAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = simularRegraSchema.safeParse(input);

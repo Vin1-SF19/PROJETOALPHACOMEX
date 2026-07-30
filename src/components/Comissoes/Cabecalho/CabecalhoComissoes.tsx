@@ -1,13 +1,21 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { RefreshCw, FileDown, Plus, Settings, AlertTriangle, Loader2, Calculator } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { SincronizarComissoes } from "@/actions/CommissionSync";
 import { ModalExportarEspelho } from "../Exportacao/ModalExportarEspelho";
 import { ModalNovoLancamento } from "../EventoCard/ModalNovoLancamento";
+import { SimuladorRegras } from "../Simulador/SimuladorRegras";
+import { PainelDivergencias } from "../Divergencias/PainelDivergencias";
+import { ConfiguracoesComissoes } from "../Configuracoes/ConfiguracoesComissoes";
 import type { TemaAlpha } from "@/lib/temas";
 
 interface CabecalhoComissoesProps {
@@ -22,6 +30,9 @@ export function CabecalhoComissoes({ tema, onSincronizado, totalDivergencias = 0
   const [sincronizando, setSincronizando] = useState(false);
   const [modalExportarAberto, setModalExportarAberto] = useState(false);
   const [modalNovoLancamentoAberto, setModalNovoLancamentoAberto] = useState(false);
+  const [modalSimuladorAberto, setModalSimuladorAberto] = useState(false);
+  const [modalConfiguracoesAberto, setModalConfiguracoesAberto] = useState(false);
+  const [modalDivergenciasAberto, setModalDivergenciasAberto] = useState(false);
 
   function sincronizar() {
     setSincronizando(true);
@@ -70,11 +81,14 @@ export function CabecalhoComissoes({ tema, onSincronizado, totalDivergencias = 0
           Sincronizar
         </Button>
 
-        <Button size="sm" variant="outline" className="gap-2 border-white/10" asChild>
-          <Link href="/PainelAlpha/Comissoes/Simulador">
-            <Calculator className="size-4" aria-hidden="true" />
-            Simulador
-          </Link>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2 border-white/10"
+          onClick={() => setModalSimuladorAberto(true)}
+        >
+          <Calculator className="size-4" aria-hidden="true" />
+          Simulador
         </Button>
 
         <Button
@@ -97,23 +111,29 @@ export function CabecalhoComissoes({ tema, onSincronizado, totalDivergencias = 0
           Novo Lançamento
         </Button>
 
-        <Button size="sm" variant="outline" className="gap-2 border-white/10" asChild>
-          <Link href="/PainelAlpha/Comissoes/Configuracoes">
-            <Settings className="size-4" aria-hidden="true" />
-            Configurações
-          </Link>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2 border-white/10"
+          onClick={() => setModalConfiguracoesAberto(true)}
+        >
+          <Settings className="size-4" aria-hidden="true" />
+          Configurações
         </Button>
 
-        <Button size="sm" variant="outline" className="gap-2 border-white/10" asChild>
-          <Link href="/PainelAlpha/Comissoes/Divergencias">
-            <AlertTriangle className="size-4" aria-hidden="true" />
-            Divergências
-            {totalDivergencias > 0 && (
-              <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-rose-400">
-                {totalDivergencias}
-              </span>
-            )}
-          </Link>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2 border-white/10"
+          onClick={() => setModalDivergenciasAberto(true)}
+        >
+          <AlertTriangle className="size-4" aria-hidden="true" />
+          Divergências
+          {totalDivergencias > 0 && (
+            <span className="rounded-full bg-rose-500/20 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-rose-400">
+              {totalDivergencias}
+            </span>
+          )}
         </Button>
       </div>
 
@@ -123,6 +143,39 @@ export function CabecalhoComissoes({ tema, onSincronizado, totalDivergencias = 0
         onOpenChange={setModalNovoLancamentoAberto}
         onCriado={onSincronizado}
       />
+
+      <Dialog open={modalSimuladorAberto} onOpenChange={setModalSimuladorAberto}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-slate-950 sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-slate-200">Simulador de Regras</DialogTitle>
+          </DialogHeader>
+          {modalSimuladorAberto && <SimuladorRegras />}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={modalConfiguracoesAberto} onOpenChange={setModalConfiguracoesAberto}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-slate-950 sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-slate-200">Configurações</DialogTitle>
+          </DialogHeader>
+          {modalConfiguracoesAberto && <ConfiguracoesComissoes />}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={modalDivergenciasAberto}
+        onOpenChange={(open) => {
+          setModalDivergenciasAberto(open);
+          if (!open) onSincronizado?.();
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-slate-950 sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-slate-200">Divergências</DialogTitle>
+          </DialogHeader>
+          {modalDivergenciasAberto && <PainelDivergencias />}
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }

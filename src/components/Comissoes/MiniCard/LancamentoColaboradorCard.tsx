@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "../lib/status-badge";
 import { formatarCentavosBRL, formatarDataComissao } from "../lib/formatters";
-import { RegistrarPagamento } from "@/actions/CommissionPayments";
+import { ModalRegistrarPagamento } from "./ModalRegistrarPagamento";
 import type { CommissionEntryComColaborador } from "@/actions/CommissionEntries";
 import type { TemaAlpha } from "@/lib/temas";
 
@@ -38,31 +37,9 @@ export function LancamentoColaboradorCard({
   onAbrirDetalhes,
   onPagamentoRegistrado,
 }: LancamentoColaboradorCardProps) {
-  const [isPending, startTransition] = useTransition();
-  const [pagando, setPagando] = useState(false);
+  const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
 
   const podePagar = STATUS_PERMITE_PAGAMENTO.includes(entry.status);
-
-  function pagar() {
-    setPagando(true);
-    startTransition(async () => {
-      const resultado = await RegistrarPagamento({
-        entryId: entry.id,
-        data: new Date(),
-        valorCents: entry.totalCents,
-        meio: "PIX",
-      });
-      setPagando(false);
-
-      if (!resultado.success) {
-        toast.error(resultado.error ?? "Erro ao registrar pagamento");
-        return;
-      }
-
-      toast.success(`Pagamento registrado para ${entry.colaboradorNome}.`);
-      onPagamentoRegistrado?.();
-    });
-  }
 
   return (
     <div className="rounded-2xl border border-white/5 bg-slate-950/60 p-3">
@@ -124,8 +101,8 @@ export function LancamentoColaboradorCard({
               type="button"
               size="sm"
               className="h-7 flex-1 text-xs"
-              disabled={!podePagar || isPending || pagando}
-              onClick={pagar}
+              disabled={!podePagar}
+              onClick={() => setModalPagamentoAberto(true)}
               aria-label={podePagar ? "Registrar pagamento" : `Não é possível pagar — status ${entry.status}`}
             >
               Pagar
@@ -133,6 +110,15 @@ export function LancamentoColaboradorCard({
           </div>
         </div>
       </div>
+
+      <ModalRegistrarPagamento
+        open={modalPagamentoAberto}
+        onOpenChange={setModalPagamentoAberto}
+        entryId={entry.id}
+        colaboradorNome={entry.colaboradorNome}
+        totalCents={entry.totalCents}
+        onConfirmado={onPagamentoRegistrado}
+      />
     </div>
   );
 }

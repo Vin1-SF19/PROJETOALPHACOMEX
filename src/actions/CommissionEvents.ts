@@ -4,24 +4,17 @@ import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
 import { gerarLancamentosParaEvento } from "@/lib/commissions/entry-generator";
+import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
-/**
- * TODO(Fase 14 — Configurações/RBAC granular): mesma verificação de role temporária
- * documentada em `src/actions/CommissionSync.ts` — substituir por `getPermissoesEfetivas`
- * + permissão específica do módulo assim que existir.
- */
-const ROLES_TEMPORARIAMENTE_PERMITIDOS = ["Admin", "CEO", "FINANCEIRO"];
-
-async function exigirAcesso() {
+async function exigirAcesso(categoria: CategoriaPermissao) {
   const session = await auth();
   if (!session?.user?.id) return { ok: false as const, error: "Não autenticado" };
 
   const role = (session.user as { role?: string }).role ?? "";
-  if (!ROLES_TEMPORARIAMENTE_PERMITIDOS.includes(role)) {
-    return { ok: false as const, error: "Sem permissão" };
-  }
+  const resultado = await verificarAcessoCategoria(Number(session.user.id), role, categoria);
+  if (!resultado.ok) return { ok: false as const, error: resultado.error ?? "Sem permissão" };
 
-  return { ok: true as const, userId: Number(session.user.id) };
+  return { ok: true as const, userId: resultado.userId! };
 }
 
 const criarEventoManualSchema = z.object({
@@ -35,7 +28,7 @@ const criarEventoManualSchema = z.object({
 });
 
 export async function CriarEventoFinanceiro(input: z.infer<typeof criarEventoManualSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = criarEventoManualSchema.safeParse(input);
@@ -78,7 +71,7 @@ const recalcularEventoSchema = z.object({
 });
 
 export async function RecalcularEvento(input: z.infer<typeof recalcularEventoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = recalcularEventoSchema.safeParse(input);
@@ -95,10 +88,54 @@ export async function RecalcularEvento(input: z.infer<typeof recalcularEventoSch
   }
 }
 
+const gerarLancamentosAutomaticosSchema = z.object({ eventId: z.string().min(1) });
+
+/**
+ * Gera lançamentos para um evento que ainda não tem nenhum, resolvendo automaticamente
+ * closer/analista responsável já gravados no próprio CommissionEvent (mesma lógica usada
+ * na sincronização — ver sync-engine.ts). Usado para retroagir eventos sincronizados ANTES
+ * da conexão automática existir, ou qualquer evento que ficou sem lançamento por algum
+ * motivo. Não inclui os demais cargos do Big Card (Coordenadora/Diretora Comercial,
+ * Auditor Contábil, Diretor Operacional) — esses continuam exigindo adição manual, pois o
+ * sistema não tem fonte de dado para resolvê-los sozinho.
+ */
+export async function GerarLancamentosAutomaticosEvento(input: z.infer<typeof gerarLancamentosAutomaticosSchema>) {
+  const acesso = await exigirAcesso("CONFIGURAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const parsed = gerarLancamentosAutomaticosSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
+  }
+
+  try {
+    const event = await db.commissionEvent.findUnique({
+      where: { id: parsed.data.eventId },
+      select: { closerUsuarioId: true, analistaResponsavelUsuarioId: true },
+    });
+    if (!event) return { success: false, error: "Evento não encontrado" } as const;
+
+    const collaboratorIds = [...new Set([event.closerUsuarioId, event.analistaResponsavelUsuarioId].filter((id): id is number => id !== null))];
+
+    if (collaboratorIds.length === 0) {
+      return {
+        success: false,
+        error: "Este evento não tem closer nem analista responsável atribuídos — clique no lápis ao lado de \"Closer\" ou \"Analista responsável\", acima neste card, para atribuir antes de gerar os lançamentos.",
+      } as const;
+    }
+
+    const resultado = await gerarLancamentosParaEvento({ eventId: parsed.data.eventId, collaboratorIds });
+    return { success: true, data: resultado } as const;
+  } catch (error) {
+    console.error("[GerarLancamentosAutomaticosEvento]", error);
+    return { success: false, error: "Erro interno ao gerar lançamentos" } as const;
+  }
+}
+
 const aprovarEventoSchema = z.object({ eventId: z.string().min(1) });
 
 export async function AprovarEvento(input: z.infer<typeof aprovarEventoSchema>) {
-  const acesso = await exigirAcesso();
+  const acesso = await exigirAcesso("APROVAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   const parsed = aprovarEventoSchema.safeParse(input);
