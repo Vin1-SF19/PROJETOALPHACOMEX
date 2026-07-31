@@ -99,6 +99,9 @@ describe("construirPreviewEspelho — sempre 1 colaborador, formato real do espe
 
     const chamadaWhere = prismaMock.commissionEntry.findMany.mock.calls[0][0];
     expect(chamadaWhere.where.collaboratorId).toBe(99);
+    expect(chamadaWhere.where.event.eventDate.gte).toEqual(new Date("2026-07-01T00:00:00.000Z"));
+    expect(chamadaWhere.where.event.eventDate.lt).toEqual(new Date("2026-08-01T00:00:00.000Z"));
+    expect(chamadaWhere.where.createdAt).toBeUndefined();
   });
 
   it("resolve nome e cargo do colaborador a partir de usuarios", async () => {

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import GlobalSidebar, { SidebarMobileToggle } from './GlobalSidebar';
 import TabBar, { Tab } from './TabBar';
 import { useSidebarState } from '@/hooks/useSidebarState';
-import { useAdminChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
+import { useChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
 import { useChecklistNotifications } from '@/hooks/useChecklistNotifications';
 import NotificationToast from '@/components/chamados/NotificationToast';
 import { HoleriteNotificacaoGlobal } from '@/components/holerites/HoleriteNotificacaoGlobal';
@@ -50,6 +50,7 @@ interface PainelLayoutClientProps {
   children: React.ReactNode;
   permissoes: string[];
   role: string;
+  userId: number;
   nome: string;
   imagemUrl?: string | null;
   temaName?: string;
@@ -63,6 +64,7 @@ export default function PainelLayoutClient({
   children,
   permissoes,
   role,
+  userId,
   nome,
   imagemUrl,
   temaName,
@@ -76,7 +78,7 @@ export default function PainelLayoutClient({
   const [onboardingDone, setOnboardingDone] = useState(false);
   const showOnboarding = !onboardingVisto && !onboardingDone && !!onboardingVideo;
 
-  useAdminChamadosNotifications(role);
+  useChamadosNotifications(role, userId);
   useChecklistNotifications(role);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────

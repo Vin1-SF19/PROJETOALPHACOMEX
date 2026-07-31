@@ -62,6 +62,7 @@ export default async function PainelLayout({
       <PainelLayoutClient
         permissoes={permissoes}
         role={role}
+        userId={userId}
         nome={user?.nome ?? user?.name ?? "Operador"}
         imagemUrl={user?.imagemUrl ?? null}
         temaName={temaName}

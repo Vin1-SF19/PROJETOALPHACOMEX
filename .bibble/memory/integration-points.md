@@ -605,7 +605,7 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 
 ---
 
-### Calendário Alpha (módulo novo — Domain-Wide Delegation, 2026-07-17)
+### Agenda Alpha (rota legada CalendarioAlpha — Domain-Wide Delegation)
 
 **Adicionado em:** 2026-07-17 por Scribe (sessão Bibble). Detalhe completo em `codebase-map.md` ("Calendário Alpha — MVP via Domain-Wide Delegation..."). **Atenção:** este módulo passou por uma reconstrução completa de arquitetura na mesma sessão (de OAuth por usuário para Domain-Wide Delegation) — se encontrar referência a "conectar conta Google"/tokens/OAuth em versões antigas de documentação ou commits, está desatualizado.
 
@@ -621,19 +621,26 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 
 **Regra de segurança permanente para qualquer código futuro neste módulo:** `emailUsuario` (usado para impersonar no Google) só pode vir de `usuarios.email` resolvido no servidor a partir do `userId` da sessão (`obterUsuarioGoogleAtivo`) — nunca de um campo do payload do cliente. A Service Account pode impersonar qualquer usuário do domínio; aceitar um e-mail externo quebraria o isolamento entre usuários.
 
-**Como adicionar a Fase 2 (webhook + vínculos internos) no futuro:**
-1. Confirmar com o usuário: existe URL pública HTTPS de produção? Existe cron/job real? Sem os dois, webhook não deve ser implementado.
-2. Webhook exige nova tabela de canal (`channelId`/`resourceId`/expiração) — passa por Vault.
-3. Vínculo com Reserva de Salas: **não copiar** o padrão de autorização de `src/actions/Reservas.ts` (auth fraca, sem checagem de permissão efetiva) — replicar o padrão de ownership já usado em `google-calendar-eventos.ts`.
-4. Vínculo com Clientes/Tarefas exige coluna(s) opcionais em `GoogleCalendarEventoCache` + validação de ownership cruzada.
-5. Se precisar voltar a suportar conta Google pessoal (Gmail), será necessário reintroduzir o fluxo OAuth por usuário em paralelo à Domain-Wide Delegation (os dois modelos podem coexistir, mas isso é um projeto à parte — não é um simples ajuste).
+**Fase 2A atual — integração operacional flags-off (2026-07-30):**
 
-**Editado quando:** Fase 2 for confirmada e implementada, ou quando o fluxo real for validado manualmente com Service Account configurada.
+- `POST /api/calendario-alpha/webhook` autentica canal/resource/token e apenas enfileira/coalesce; nunca chama Google no request.
+- `GoogleCalendarPushChannel`, `GoogleCalendarPendingOperation` e `GoogleCalendarSyncLease` foram autorizados pelo Vault, aplicados uma única vez no Turso e validados com 7 índices explícitos + 3 unicidades.
+- `src/actions/google-calendar-sync.ts` mantém o sync manual e usa o lock distribuído somente quando a flag correspondente está habilitada.
+- `calendar-alpha:worker`, `calendar-alpha:maintenance`, `calendar-alpha:queue` e `calendar-alpha:doctor` são os pontos CLI-first; nenhuma UI controla fila, lease ou canal.
+- Ao alterar o webhook, atualizar validação/autenticação, coalescência e `tests/google-calendar/webhook.test.ts`.
+- Ao alterar fila/lease, preservar CAS, `claimToken`, owner + fencing e testes SQL/concorrência.
+- Ao alterar canal, preservar token somente em hash, overlap na renovação e lifecycle serializado por lease.
+
+**Runbook:** manter lock/fila/push desligados; verificar doctor e status; ativar lock → fila → push somente após comprovar URL HTTPS pública, WAF/rate limit distribuído, scheduler supervisionado e E2E Google/Turso multi-instância; começar por canário. O rollback desliga push, interrompe/drena worker, desliga fila e por último o lock.
+
+**Pendências externas:** URL HTTPS pública, WAF/rate limit distribuído, scheduler supervisionado, E2E Google/Turso multi-instância e ativação canário. Não registrar nenhuma delas como concluída por testes locais.
+
+**Editado quando:** qualquer contrato de webhook, fila, lease/fencing, worker, maintenance, flags ou rollout da Agenda Alpha mudar.
 
 **Atualização 2026-07-17 (mesma sessão) — Compartilhamento entre colegas + Admin full-access + Bibble:**
 - Nova tabela `GoogleCalendarColegaVisivel` (4ª migration Vault): qualquer usuário pode adicionar qualquer colaborador ATIVO à própria visão (`userId` viewer, `colegaId` dono, cor automática da paleta de 10 cores, `visivel` para ligar/desligar sem remover). Não é convite aprovado pelo dono — decisão explícita do usuário ("cultura de confiança interna").
 - **Admin/CEO** (`isAdminRole` em `src/lib/google-calendar/colegas.ts`) enxerga **qualquer** colaborador mesmo sem estar na lista de compartilhamento, com **leitura + escrita completa** (`src/actions/google-calendar-admin.ts` — `criarEventoParaColega`/`atualizarEventoParaColega`/`cancelarEventoParaColega`). E-mail do colega-alvo é sempre resolvido do banco via `colegaId` (`resolverAlvoAdmin`), nunca aceito do cliente.
-- Usuário comum só lê a agenda de colegas que adicionou (`listarEventosDeColega` em `src/actions/google-calendar-colegas.ts` — leitura ao vivo, sem cache/syncToken, teto de 10 páginas) — sem escrita.
+- Usuário comum só lê a agenda de colegas que adicionou (`listarEventosDeColega` em `src/actions/google-calendar-colegas.ts` — leitura ao vivo, sem cache/syncToken, teto de 10 páginas) e recebe somente blocos **“Ocupado”**, sem título, e-mail, Meet, ETag ou id real; Admin/CEO mantém detalhes e escrita.
 - UI: `PainelColegas.tsx` (Sheet — adicionar/remover/cor/switch), botão `Users` no `HeaderCalendario`, eventos de colegas mesclados na grade com `colegaId` marcado em `EventoExibicao` (roteia `DetalhePopover`/`FormularioEvento` para as ações de Admin quando aplicável).
 - Bibble ganhou tools reais neste módulo (`listar_eventos_calendario`, `criar_evento_calendario`, `cancelar_evento_calendario`, `consultar_disponibilidade_calendario`, `consultar_agenda_colega`) — catálogo completo em `bibble-flows.md`. `consultar_agenda_colega` só recebe nome/e-mail em texto livre do modelo, nunca um `colegaId`, tornando IDOR pelo parâmetro da tool estruturalmente impossível — a validação de compartilhamento/admin acontece 100% server-side dentro de `listarEventosDeColega`.
 
@@ -672,7 +679,21 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 
 **Dívidas não bloqueantes registradas pelo Anubis:** rate limit cross-request, idempotência persistente e token persistente/específico para confirmação. Não confundir os limites/deduplicação da requisição atual com garantias persistentes.
 
-**Última atualização:** 2026-07-23 por Scribe
+**Atualização 2026-07-30 — cache-first, sincronização explícita e UI Agenda Alpha:**
+
+- [x] O rebranding é apenas visual: `MODULOS_REGISTRY` exibe **Agenda Alpha**, mas rota `/PainelAlpha/CalendarioAlpha`, id e permissão `calendarioAlpha` permanecem estáveis.
+- [x] O SSR da rota usa somente cache local. `listarEventosCache` não chama Google; sincronização passa exclusivamente por `sincronizarAgendaAlpha`.
+- [x] O contrato de sync retorna resultado por calendário (`sincronizado`, `cooldown`, `em_andamento`, `erro`), contadores, falhas sanitizadas e última sincronização. Dedupe/cooldown são apenas in-process; não tratá-los como lock distribuído.
+- [x] Cache + `syncToken` são persistidos atomicamente só após todas as páginas. Em `410 Gone`, o full sync de recuperação é obtido antes de substituir o snapshot/cursor anterior.
+- [x] `GoogleCalendarConexao.ultimaSincronizacaoEm` só avança após sucesso integral da conexão; falha parcial não produz marcador falso.
+- [x] Antes de editar, o servidor recarrega detalhes completos com sessão, permissão e ownership. PATCH parcial usa `If-Match`/ETag; descrição, metadados de participantes e Google Meet são preservados quando ausentes do payload.
+- [x] Invalidação entre abas/iframes usa `BroadcastChannel`, fallback `storage`/evento DOM e dedupe/agregação para evitar refresh em loop.
+- [x] Sidebar, status e overlays usam `AgendaSidebar`, `StatusSincronizacao` e `AgendaModal3D`/`AgendaOverlays`; desktop tem profundidade 3D e mobile usa Sheet responsivo, preservando foco e reduced motion.
+- [x] Privacidade DWD de colegas: usuário comum vê apenas disponibilidade “Ocupado”; Admin/CEO conserva detalhes e CRUD.
+
+**Contrato operacional:** agendas compartilhadas continuam fora do cache SSR e são consultadas ao vivo somente após ação explícita. A Fase 2A concluiu fila, lease/fencing, push, webhook, worker, maintenance, CLIs, flags e observabilidade, todos mantidos flags-off. 183 testes Agenda Alpha, Forge build/lint/schema, Probe, Anubis, Lens e Sage passaram; typecheck conserva quatro baselines externos.
+
+**Última atualização:** 2026-07-30 por Scribe
 
 ---
 

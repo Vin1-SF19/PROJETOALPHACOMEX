@@ -130,7 +130,8 @@ export const SEED_RULES: Omit<CommissionRuleVersionData, "cargoId" | "setorId">[
     ruleId: "analista-ii-primeira-tentativa",
     ruleName: "Analista II - Adicional por deferimento na primeira tentativa",
     version: 1,
-    eventType: "FIRST_ATTEMPT_SUCCESS",
+    // O adicional integra o mesmo Big Card financeiro de êxito.
+    eventType: "PROCESS_SUCCESS",
     benefitType: "BONUS",
     priority: 0,
     servico: null,
@@ -172,7 +173,8 @@ export const SEED_RULES: Omit<CommissionRuleVersionData, "cargoId" | "setorId">[
     ruleId: "analista-senior-primeira-tentativa",
     ruleName: "Analista Sênior - Adicional por deferimento na primeira tentativa",
     version: 1,
-    eventType: "FIRST_ATTEMPT_SUCCESS",
+    // O adicional integra o mesmo Big Card financeiro de êxito.
+    eventType: "PROCESS_SUCCESS",
     benefitType: "BONUS",
     priority: 0,
     servico: null,
@@ -186,7 +188,8 @@ export const SEED_RULES: Omit<CommissionRuleVersionData, "cargoId" | "setorId">[
     ruleId: "analista-auxiliar-exito-premio",
     ruleName: "Analista Auxiliar - Prêmio por processo (vínculo vigente)",
     version: 1,
-    eventType: "AUXILIARY_PARTICIPATION",
+    // A participação auxiliar integra o mesmo Big Card financeiro de êxito.
+    eventType: "PROCESS_SUCCESS",
     benefitType: "BONUS",
     priority: 0,
     servico: null,
@@ -246,7 +249,8 @@ export const SEED_RULES: Omit<CommissionRuleVersionData, "cargoId" | "setorId">[
     ruleId: "diretor-operacional-primeira-tentativa",
     ruleName: "Diretor Operacional - Adicional por deferimento na primeira tentativa (comissão, cargo PJ)",
     version: 1,
-    eventType: "FIRST_ATTEMPT_SUCCESS",
+    // O adicional integra o mesmo Big Card financeiro de êxito.
+    eventType: "PROCESS_SUCCESS",
     benefitType: "COMMISSION",
     priority: 0,
     servico: null,

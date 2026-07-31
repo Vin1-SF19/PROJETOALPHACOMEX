@@ -1,15 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { registrarAuditoriaCalendarioAlpha } from "@/lib/google-calendar/auditoria";
 import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizacao";
 import {
-  atualizarEvento as atualizarEventoGoogleApi,
   atualizarEventoParcial as atualizarEventoParcialGoogleApi,
   cancelarEvento as cancelarEventoGoogleApi,
   criarEvento as criarEventoGoogleApi,
   listarCalendarios,
+  obterEvento as obterEventoGoogleApi,
 } from "@/lib/google-calendar/client";
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { isAdminRole } from "@/lib/google-calendar/colegas";
@@ -34,6 +35,16 @@ type ResultadoAtualizacaoParcial = {
   etag?: string;
 };
 
+const detalhesEventoColegaSchema = z
+  .object({
+    calendarId: z.string().trim().min(1).max(300),
+    googleEventId: z.string().trim().min(1).max(1024),
+  })
+  .strict();
+
+export type CarregarDetalhesEventoColegaInput = z.input<typeof detalhesEventoColegaSchema>;
+const colegaIdSchema = z.number().int().positive();
+
 function primeiroErroZod(erro: { issues: { message: string }[] }): string {
   return erro.issues[0]?.message ?? "Dados inválidos.";
 }
@@ -52,7 +63,11 @@ function paraInputEventoGoogle(dados: CriarEventoInput | AtualizarEventoInput) {
   };
 }
 
-function paraInputEventoParcialGoogle(dados: AtualizarEventoParcialInput, timezonePadrao: string) {
+function paraInputEventoParcialGoogle(
+  dados: AtualizarEventoParcialInput | AtualizarEventoInput,
+  timezonePadrao: string,
+  preservarParticipantesQuandoListaVazia = false,
+) {
   return {
     titulo: dados.titulo,
     descricaoGoogle: dados.descricaoGoogle,
@@ -61,7 +76,10 @@ function paraInputEventoParcialGoogle(dados: AtualizarEventoParcialInput, timezo
     diaInteiro: dados.diaInteiro,
     inicio: dados.inicio,
     fim: dados.fim,
-    participantes: dados.participantes,
+    participantes:
+      preservarParticipantesQuandoListaVazia && dados.participantes?.length === 0
+        ? undefined
+        : dados.participantes,
     criarMeet: dados.criarMeet,
   };
 }
@@ -75,6 +93,11 @@ function paraInputEventoParcialGoogle(dados: AtualizarEventoParcialInput, timezo
 async function resolverAlvoAdmin(colegaId: number): Promise<
   { ok: true; adminUserId: number; colegaUserId: number; colegaEmail: string } | { ok: false; error: string }
 > {
+  const colegaIdValidado = colegaIdSchema.safeParse(colegaId);
+  if (!colegaIdValidado.success) {
+    return { ok: false, error: "Colaborador inválido." };
+  }
+
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { ok: false, error: "Não autorizado." };
 
@@ -83,13 +106,26 @@ async function resolverAlvoAdmin(colegaId: number): Promise<
     return { ok: false, error: "Só Admin/CEO pode alterar a agenda de outro colaborador." };
   }
 
-  const colega = await db.usuarios.findUnique({ where: { id: colegaId }, select: { email: true, status: true } });
-  if (!colega || colega.status !== "ATIVO") return { ok: false, error: "Colaborador não encontrado." };
+  const colega = await db.usuarios.findUnique({
+    where: { id: colegaIdValidado.data },
+    select: {
+      email: true,
+      status: true,
+      googleCalendarConexao: { select: { status: true } },
+    },
+  });
+  if (
+    !colega ||
+    colega.status !== "ATIVO" ||
+    colega.googleCalendarConexao?.status !== "ATIVA"
+  ) {
+    return { ok: false, error: "Agenda do colaborador não está ativa." };
+  }
 
   return {
     ok: true,
     adminUserId: acesso.userId,
-    colegaUserId: colegaId,
+    colegaUserId: colegaIdValidado.data,
     colegaEmail: colega.email,
   };
 }
@@ -119,6 +155,47 @@ async function resolverCalendarioGravavelDoColega(
     calendarId: calendario.googleCalendarId,
     timezone: calendario.timezone || "America/Sao_Paulo",
   };
+}
+
+/** Carrega do Google o evento completo de um colega antes da edição Admin/CEO. */
+export async function carregarDetalhesEventoColegaParaEdicao(
+  colegaId: number,
+  input: CarregarDetalhesEventoColegaInput,
+): Promise<ResultadoAcao<GoogleEventoDTO>> {
+  const alvo = await resolverAlvoAdmin(colegaId);
+  if (!alvo.ok) return { success: false, error: alvo.error };
+
+  const validacao = detalhesEventoColegaSchema.safeParse(input);
+  if (!validacao.success) {
+    return { success: false, error: primeiroErroZod(validacao.error) };
+  }
+  const dados = validacao.data;
+
+  try {
+    const calendario = await resolverCalendarioGravavelDoColega(
+      alvo.colegaEmail,
+      dados.calendarId,
+    );
+    if (!calendario.ok) return { success: false, error: calendario.error };
+
+    const evento = await obterEventoGoogleApi({
+      emailUsuario: alvo.colegaEmail,
+      calendarId: calendario.calendarId,
+      googleEventId: dados.googleEventId,
+    });
+    return { success: true, data: evento };
+  } catch (erro) {
+    if (
+      erro instanceof GoogleCalendarError &&
+      (erro.kind === "not_found" || erro.kind === "gone")
+    ) {
+      return { success: false, error: "Evento não encontrado na agenda do colaborador." };
+    }
+    return {
+      success: false,
+      error: "Não foi possível carregar os detalhes do evento do colaborador agora.",
+    };
+  }
 }
 
 export async function criarEventoParaColega(
@@ -167,6 +244,12 @@ export async function atualizarEventoParaColega(
   const validacao = atualizarEventoSchema.safeParse(input);
   if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
   const dados = validacao.data;
+  if (!dados.etagConhecido) {
+    return {
+      success: false,
+      error: "Abra novamente o evento para carregar a versão atual antes de salvar.",
+    };
+  }
 
   try {
     const calendario = await resolverCalendarioGravavelDoColega(
@@ -174,11 +257,12 @@ export async function atualizarEventoParaColega(
       dados.calendarId,
     );
     if (!calendario.ok) return { success: false, error: calendario.error };
-    await atualizarEventoGoogleApi({
+    await atualizarEventoParcialGoogleApi({
       emailUsuario: alvo.colegaEmail,
       calendarId: calendario.calendarId,
       googleEventId: dados.googleEventId,
-      evento: paraInputEventoGoogle(dados),
+      etagConhecido: dados.etagConhecido,
+      evento: paraInputEventoParcialGoogle(dados, calendario.timezone, true),
     });
 
     await registrarAuditoriaCalendarioAlpha(
@@ -189,7 +273,10 @@ export async function atualizarEventoParaColega(
 
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { conflito: false } };
-  } catch {
+  } catch (erro) {
+    if (erro instanceof GoogleCalendarError && erro.status === 412) {
+      return { success: true, data: { conflito: true } };
+    }
     return { success: false, error: "Não foi possível atualizar o evento na agenda do colaborador." };
   }
 }
@@ -236,12 +323,19 @@ export async function atualizarEventoParcialParaColega(
     if (dados.etagConhecido && eventoCache && eventoCache.etag !== dados.etagConhecido) {
       return { success: true, data: { conflito: true, evento: null } };
     }
+    const etagParaPatch = dados.etagConhecido ?? eventoCache?.etag;
+    if (!etagParaPatch) {
+      return {
+        success: false,
+        error: "Abra novamente o evento para carregar a versão atual antes de salvar.",
+      };
+    }
 
     const eventoAtualizado = await atualizarEventoParcialGoogleApi({
       emailUsuario: alvo.colegaEmail,
       calendarId: calendario.calendarId,
       googleEventId: dados.googleEventId,
-      etagConhecido: dados.etagConhecido,
+      etagConhecido: etagParaPatch,
       evento: paraInputEventoParcialGoogle(
         dados,
         calendario.timezone,

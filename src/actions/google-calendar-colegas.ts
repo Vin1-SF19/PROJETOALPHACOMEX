@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizacao";
 import { listarEventosPagina } from "@/lib/google-calendar/client";
@@ -10,6 +11,54 @@ import { corHexSchema } from "@/lib/validations/google-calendar";
 import db from "@/lib/prisma";
 
 const JANELA_MAXIMA_PAGINAS_COLEGA = 10; // teto de segurança — ver sync.ts para o mesmo racional
+const JANELA_MAXIMA_COLEGA_MS = 400 * 24 * 60 * 60 * 1000;
+
+const listarEventosColegaSchema = z
+  .object({
+    colegaId: z.number().int().positive(),
+    inicioISO: z.string().datetime({ offset: true }),
+    fimISO: z.string().datetime({ offset: true }),
+  })
+  .strict()
+  .superRefine((dados, contexto) => {
+    const inicio = new Date(dados.inicioISO).getTime();
+    const fim = new Date(dados.fimISO).getTime();
+    if (fim <= inicio) {
+      contexto.addIssue({
+        code: "custom",
+        message: "O fim deve ser posterior ao início.",
+        path: ["fimISO"],
+      });
+    } else if (fim - inicio > JANELA_MAXIMA_COLEGA_MS) {
+      contexto.addIssue({
+        code: "custom",
+        message: "A janela máxima para consultar a agenda de colega é 400 dias.",
+        path: ["fimISO"],
+      });
+    }
+  });
+
+const colegaIdInputSchema = z
+  .object({ colegaId: z.number().int().positive() })
+  .strict();
+const visibilidadeColegaSchema = z
+  .object({
+    colegaId: z.number().int().positive(),
+    visivel: z.boolean(),
+  })
+  .strict();
+const corColegaSchema = z
+  .object({
+    colegaId: z.number().int().positive(),
+    cor: corHexSchema,
+  })
+  .strict();
+const permissaoColegaSchema = z
+  .object({
+    alvoUserId: z.number().int().positive(),
+    permitir: z.boolean(),
+  })
+  .strict();
 
 type ResultadoAcao<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -71,9 +120,11 @@ export async function adicionarColegaVisivel(colegaId: number): Promise<Resultad
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
 
-  if (!Number.isInteger(colegaId) || colegaId === acesso.userId) {
+  const validacao = colegaIdInputSchema.safeParse({ colegaId });
+  if (!validacao.success || validacao.data.colegaId === acesso.userId) {
     return { success: false, error: "Colega inválido." };
   }
+  const colegaIdValidado = validacao.data.colegaId;
 
   const usuarioAtual = await obterUsuarioAtual(acesso.userId);
   const callerPermitido = await temPermissaoCompartilhamento(acesso.userId, usuarioAtual?.role);
@@ -83,14 +134,27 @@ export async function adicionarColegaVisivel(colegaId: number): Promise<Resultad
 
   // Só quem adiciona precisa estar permitido — o alvo pode ser qualquer colaborador ativo,
   // permitido ou não (ex.: líder liberado adicionando a agenda de alguém do time).
-  const colega = await db.usuarios.findUnique({ where: { id: colegaId }, select: { id: true, status: true } });
+  const colega = await db.usuarios.findUnique({
+    where: { id: colegaIdValidado },
+    select: { id: true, status: true },
+  });
   if (!colega || colega.status !== "ATIVO") return { success: false, error: "Colaborador não encontrado." };
 
   const totalAtual = await db.googleCalendarColegaVisivel.count({ where: { userId: acesso.userId } });
 
   const registro = await db.googleCalendarColegaVisivel.upsert({
-    where: { userId_colegaId: { userId: acesso.userId, colegaId } },
-    create: { userId: acesso.userId, colegaId, cor: proximaCorColega(totalAtual), visivel: true },
+    where: {
+      userId_colegaId: {
+        userId: acesso.userId,
+        colegaId: colegaIdValidado,
+      },
+    },
+    create: {
+      userId: acesso.userId,
+      colegaId: colegaIdValidado,
+      cor: proximaCorColega(totalAtual),
+      visivel: true,
+    },
     update: { visivel: true },
     select: { id: true },
   });
@@ -103,7 +167,12 @@ export async function removerColegaVisivel(colegaId: number): Promise<{ success:
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
 
-  await db.googleCalendarColegaVisivel.deleteMany({ where: { userId: acesso.userId, colegaId } });
+  const validacao = colegaIdInputSchema.safeParse({ colegaId });
+  if (!validacao.success) return { success: false, error: "Colega inválido." };
+
+  await db.googleCalendarColegaVisivel.deleteMany({
+    where: { userId: acesso.userId, colegaId: validacao.data.colegaId },
+  });
   revalidatePath("/PainelAlpha/CalendarioAlpha");
   return { success: true };
 }
@@ -112,9 +181,12 @@ export async function alternarVisibilidadeColega(colegaId: number, visivel: bool
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
 
+  const validacao = visibilidadeColegaSchema.safeParse({ colegaId, visivel });
+  if (!validacao.success) return { success: false, error: "Visibilidade inválida." };
+
   await db.googleCalendarColegaVisivel.updateMany({
-    where: { userId: acesso.userId, colegaId },
-    data: { visivel },
+    where: { userId: acesso.userId, colegaId: validacao.data.colegaId },
+    data: { visivel: validacao.data.visivel },
   });
   revalidatePath("/PainelAlpha/CalendarioAlpha");
   return { success: true };
@@ -125,12 +197,12 @@ export async function personalizarCorColega(colegaId: number, cor: string): Prom
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
 
-  const validacao = corHexSchema.safeParse(cor);
+  const validacao = corColegaSchema.safeParse({ colegaId, cor });
   if (!validacao.success) return { success: false, error: validacao.error.issues[0]?.message ?? "Cor inválida." };
 
   await db.googleCalendarColegaVisivel.updateMany({
-    where: { userId: acesso.userId, colegaId },
-    data: { cor: validacao.data },
+    where: { userId: acesso.userId, colegaId: validacao.data.colegaId },
+    data: { cor: validacao.data.cor },
   });
   revalidatePath("/PainelAlpha/CalendarioAlpha");
   return { success: true };
@@ -170,11 +242,39 @@ export async function listarEventosDeColega(
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
 
+  const validacao = listarEventosColegaSchema.safeParse({
+    colegaId,
+    inicioISO,
+    fimISO,
+  });
+  if (!validacao.success) {
+    return {
+      success: false,
+      error: validacao.error.issues[0]?.message ?? "Consulta de agenda inválida.",
+    };
+  }
+  const dados = validacao.data;
+
   const usuarioAtual = await obterUsuarioAtual(acesso.userId);
   const admin = isAdminRole(usuarioAtual?.role);
 
-  const colega = await db.usuarios.findUnique({ where: { id: colegaId }, select: { id: true, nome: true, email: true } });
-  if (!colega) return { success: false, error: "Colaborador não encontrado." };
+  const colega = await db.usuarios.findUnique({
+    where: { id: dados.colegaId },
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+      status: true,
+      googleCalendarConexao: { select: { status: true } },
+    },
+  });
+  if (
+    !colega ||
+    colega.status !== "ATIVO" ||
+    colega.googleCalendarConexao?.status !== "ATIVA"
+  ) {
+    return { success: false, error: "Agenda do colaborador não está ativa." };
+  }
 
   if (!admin) {
     const callerPermitido = await temPermissaoCompartilhamento(acesso.userId, usuarioAtual?.role);
@@ -206,26 +306,28 @@ export async function listarEventosDeColega(
         emailUsuario: colega.email,
         calendarId: colega.email,
         pageToken,
-        timeMin: inicioISO,
-        timeMax: fimISO,
+        timeMin: dados.inicioISO,
+        timeMax: dados.fimISO,
       });
       paginas += 1;
 
-      for (const evento of pagina.eventos) {
+      for (const [indice, evento] of pagina.eventos.entries()) {
         if (evento.status === "cancelled") continue;
         eventos.push({
-          id: `colega-${colega.id}-${evento.googleEventId}`,
-          googleEventId: evento.googleEventId,
+          id: admin
+            ? `colega-${colega.id}-${evento.googleEventId}`
+            : `ocupado-${colega.id}-${paginas}-${indice}`,
+          googleEventId: admin ? evento.googleEventId : "",
           status: evento.status,
-          titulo: evento.titulo,
+          titulo: admin ? evento.titulo : "Ocupado",
           inicioEm: evento.inicio.dataHora ?? evento.inicio.data ?? null,
           fimEm: evento.fim.dataHora ?? evento.fim.data ?? null,
           diaInteiro: Boolean(evento.inicio.data && !evento.inicio.dataHora),
-          etag: evento.etag,
-          linkMeet: evento.linkMeet,
+          etag: admin ? evento.etag : "",
+          linkMeet: admin ? evento.linkMeet : null,
           colegaId: colega.id,
           colegaNome: colega.nome,
-          colegaEmail: colega.email,
+          colegaEmail: admin ? colega.email : "",
           cor,
           gravavel: admin,
         });
@@ -283,16 +385,19 @@ export async function alternarPermissaoColegas(alvoUserId: number, permitir: boo
   const usuarioAtual = await obterUsuarioAtual(acesso.userId);
   if (!isAdminRole(usuarioAtual?.role)) return { success: false, error: "Só Admin/CEO pode gerenciar essa permissão." };
 
-  if (!Number.isInteger(alvoUserId)) return { success: false, error: "Usuário inválido." };
+  const validacao = permissaoColegaSchema.safeParse({ alvoUserId, permitir });
+  if (!validacao.success) return { success: false, error: "Permissão inválida." };
 
-  if (permitir) {
+  if (validacao.data.permitir) {
     await db.googleCalendarPermissaoColegas.upsert({
-      where: { userId: alvoUserId },
-      create: { userId: alvoUserId, concedidoPor: acesso.userId },
+      where: { userId: validacao.data.alvoUserId },
+      create: { userId: validacao.data.alvoUserId, concedidoPor: acesso.userId },
       update: {},
     });
   } else {
-    await db.googleCalendarPermissaoColegas.deleteMany({ where: { userId: alvoUserId } });
+    await db.googleCalendarPermissaoColegas.deleteMany({
+      where: { userId: validacao.data.alvoUserId },
+    });
   }
 
   revalidatePath("/PainelAlpha/CalendarioAlpha");

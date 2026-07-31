@@ -196,8 +196,20 @@ describe("atualizarEventoParcialSchema", () => {
 });
 
 describe("cancelarEventoSchema", () => {
-  it("exige calendarId e googleEventId não vazios", () => {
-    expect(cancelarEventoSchema.safeParse({ calendarId: "primary", googleEventId: "evt_1" }).success).toBe(true);
+  it("exige calendarId, googleEventId e ETag não vazios", () => {
+    expect(
+      cancelarEventoSchema.safeParse({
+        calendarId: "primary",
+        googleEventId: "evt_1",
+        etagConhecido: '"v1"',
+      }).success,
+    ).toBe(true);
+    expect(
+      cancelarEventoSchema.safeParse({
+        calendarId: "primary",
+        googleEventId: "evt_1",
+      }).success,
+    ).toBe(false);
     expect(cancelarEventoSchema.safeParse({ calendarId: "", googleEventId: "evt_1" }).success).toBe(false);
   });
 });

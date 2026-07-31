@@ -5,15 +5,16 @@ import { Loader2 } from "lucide-react";
 import { getTema } from "@/lib/temas";
 import { CabecalhoComissoes } from "./Cabecalho/CabecalhoComissoes";
 import { CardsIndicadores } from "./Indicadores/CardsIndicadores";
-import { FiltrosComissoes, mesReferenciaAtual } from "./Filtros/FiltrosComissoes";
+import { FiltrosComissoes } from "./Filtros/FiltrosComissoes";
 import { EventoComissaoCard } from "./EventoCard/EventoComissaoCard";
 import { ModalDetalhesLancamento } from "./ModalDetalhes/ModalDetalhesLancamento";
 import {
   CalcularIndicadoresComissao,
   ListarEventosComissao,
   type IndicadoresComissao,
+  type CommissionDashboardFilters,
 } from "@/actions/CommissionDashboard";
-import { BuscarEventoComLancamentos, type EventoComLancamentosResult } from "@/actions/CommissionEntries";
+import { BuscarEventosComLancamentosEmLote, type EventoComLancamentosResult } from "@/actions/CommissionEntries";
 
 interface ComissoesDashboardProps {
   temaName: string;
@@ -26,8 +27,13 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
 
   const [eventosCompletos, setEventosCompletos] = useState<EventoComLancamentosResult[]>([]);
   const [indicadores, setIndicadores] = useState<IndicadoresComissao | null>(null);
-  const [busca, setBusca] = useState("");
-  const [mesReferencia, setMesReferencia] = useState<string | undefined>(mesReferenciaAtual);
+  const [filtros, setFiltros] = useState<CommissionDashboardFilters>(() => {
+    const hoje = new Date();
+    return {
+      periodoInicio: new Date(hoje.getFullYear(), hoje.getMonth(), 1),
+      periodoFim: new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0),
+    };
+  });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [carregandoEventos, setCarregandoEventos] = useState(true);
@@ -37,7 +43,7 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
 
   const carregarEventos = useCallback(async () => {
     setCarregandoEventos(true);
-    const resultado = await ListarEventosComissao({ page, pageSize: PAGE_SIZE, busca, mesReferencia });
+    const resultado = await ListarEventosComissao({ page, pageSize: PAGE_SIZE, ...filtros });
 
     if (!resultado.success) {
       setErro(resultado.error);
@@ -48,26 +54,31 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
     setTotalPages(resultado.totalPages);
     setErro(null);
 
-    const detalhes = await Promise.all(
-      resultado.data.map((evento) => BuscarEventoComLancamentos({ eventId: evento.id })),
-    );
-
-    setEventosCompletos(
-      detalhes
-        .filter((r): r is Extract<typeof r, { success: true }> => r.success)
-        .map((r) => r.data),
-    );
+    if (resultado.data.length === 0) {
+      setEventosCompletos([]);
+      setCarregandoEventos(false);
+      return;
+    }
+    const detalhes = await BuscarEventosComLancamentosEmLote({
+      eventIds: resultado.data.map((evento) => evento.id),
+    });
+    if (!detalhes.success) {
+      setErro(detalhes.error);
+      setEventosCompletos([]);
+    } else {
+      setEventosCompletos(detalhes.data);
+    }
     setCarregandoEventos(false);
-  }, [page, busca, mesReferencia]);
+  }, [page, filtros]);
 
   const carregarIndicadores = useCallback(async () => {
     setCarregandoIndicadores(true);
-    const resultado = await CalcularIndicadoresComissao();
+    const resultado = await CalcularIndicadoresComissao(filtros);
     if (resultado.success) {
       setIndicadores(resultado.data);
     }
     setCarregandoIndicadores(false);
-  }, []);
+  }, [filtros]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -84,6 +95,11 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
     void carregarIndicadores();
   }
 
+  const aplicarFiltros = useCallback((novosFiltros: CommissionDashboardFilters) => {
+    setFiltros(novosFiltros);
+    setPage(1);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#020617] px-6 pb-24 pt-8 text-slate-200 md:px-8">
       <CabecalhoComissoes
@@ -95,14 +111,7 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
       <CardsIndicadores indicadores={indicadores} carregando={carregandoIndicadores} />
 
       <FiltrosComissoes
-        onBuscaChange={(novaBusca) => {
-          setBusca(novaBusca);
-          setPage(1);
-        }}
-        onMesReferenciaChange={(novoMes) => {
-          setMesReferencia(novoMes);
-          setPage(1);
-        }}
+        onFiltrosChange={aplicarFiltros}
       />
 
       {erro && (
@@ -124,7 +133,7 @@ export function ComissoesDashboard({ temaName }: ComissoesDashboardProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="space-y-4">
           {eventosCompletos.map((dados) => (
             <EventoComissaoCard
               key={dados.event.id}

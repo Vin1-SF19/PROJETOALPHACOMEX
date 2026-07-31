@@ -23,6 +23,7 @@ import {
     criarObservacaoContrato,
 } from "@/actions/ContratoComercial";
 import { listarParceirosSimples, buscarParceiroDetalheSimples } from "@/actions/parceiros";
+import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
 
@@ -109,15 +110,6 @@ const CANAIS_AQUISICAO = [
     "Tráfego Pago (Meta - Instagram)", "Tráfego Pago (Google)",
     "Indicação Parceiro", "Indicação Cliente", "WhatsApp", "Instagram",
     "Orgânico", "Evento", "Outro",
-];
-
-const SERVICOS_PADRAO = [
-    "Habilitação RADAR - 50K",
-    "Revisão RADAR - 150K",
-    "Revisão RADAR - ILIMITADO",
-    "TTD 409",
-    "Recuperação AFRMM",
-    "Outras Recuperações Tributárias",
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1442,7 +1434,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
         });
         getServicosComerciais().then((res) => {
             const fromDb = res.success ? res.servicos.map((s) => s.nome) : [];
-            const merged = [...new Set([...SERVICOS_PADRAO, ...fromDb])];
+            const merged = [...new Set([...SERVICOS_COMERCIAIS_PADRAO, ...fromDb])];
             setServicos(merged);
         });
     }, []);

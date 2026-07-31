@@ -1143,3 +1143,75 @@ Usuário pediu, no controle de acesso do módulo Parceiros (ao lado de Editar/Ex
 
 ### Refletido também em
 - `project_parceiros.md` (memória do usuário): nova seção "Acesso Total / podeAprovar (2026-07-24)".
+
+---
+
+## [2026-07-30 16:46] — Agenda Alpha reestruturada com cache-first e sincronização explícita
+
+**Tags:** #feature #refactor #bugfix #integration #security #nextjs
+**Agentes envolvidos:** Bibble, Scout, Nova, Echo, Forge, Anubis, Lens, Sage, Probe, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/CalendarioAlpha/`, `src/components/CalendarioAlpha/`, `src/actions/google-calendar-{eventos,admin,colegas,sync}.ts`, `src/lib/google-calendar/`, `src/lib/modulos-registry.ts`, `tests/google-calendar/`, `docs/stories/story-calendario-alpha.md`, `.bibble/memory/{architecture,codebase-map,integration-points,journal}.md`
+
+### Contexto
+O usuário pediu renomear visualmente Calendário Alpha para Agenda Alpha, corrigir falta de sincronização e regras da sidebar, transformar superfícies em modais 3D e melhorar o módulo inteiro sem quebrar integrações existentes.
+
+### O que foi feito
+- O rebranding preservou rota `/PainelAlpha/CalendarioAlpha`, id e permissão `calendarioAlpha`; a página passou a renderizar cache local no SSR, com sincronização manual explícita, resultados/contadores/status visíveis, dedupe e cooldown por instância.
+- O sync passou a trocar cache e `syncToken` atomicamente depois de todas as páginas, inclusive na recuperação de `410 Gone`; sucesso integral atualiza a conexão sem mascarar falhas.
+- Edição agora carrega detalhes completos, usa PATCH parcial com ETag/`If-Match` e preserva descrição, participantes/metadata e Google Meet. Invalidação cross-tab ganhou `BroadcastChannel` com fallback e dedupe.
+- Sidebar, status e fluxos foram separados em componentes/hooks, com modais 3D acessíveis no desktop e Sheets responsivos no mobile. Em agendas de colegas, usuário comum vê apenas “Ocupado”; detalhes e escrita permanecem com Admin/CEO.
+
+### Decisões tomadas
+- Cache-first no SSR: leitura da rota não chama Google; compartilhadas permanecem live e só são consultadas por ação explícita.
+- Coordenação atual é deliberadamente in-process: não há promessa de lock distribuído entre réplicas.
+- Não houve migration nesta onda; qualquer lock persistente ou mudança de schema futura exige Vault, backup verificado e confirmação.
+
+### Problemas encontrados / resolvidos
+- Renderização e sincronização estavam acopladas, permitindo leituras lentas/inconsistentes; foram separadas em cache-only + comando explícito.
+- `410 Gone`, detalhes parciais e invalidações duplicadas podiam degradar cache, sobrescrever campos ou gerar loops; recuperação atômica, ETag e dedupe fecharam esses caminhos.
+- Verificação final da Agenda: **114 testes PASS**, **build PASS**, **lint escopado PASS** e `git diff --check` PASS; nenhum erro de typecheck atribuível à onda.
+
+### Pendências
+- Implementar lock distribuído somente com infraestrutura persistente aprovada.
+- Executar E2E autenticado no navegador contra Google Calendar real.
+- Avaliar modularização adicional do controller e eventual cache de agendas compartilhadas, sem remover o acionamento explícito.
+
+### Refletido também em
+- `architecture.md`: leitura cache-only, action de sync e limites in-process/cross-tab.
+- `codebase-map.md`: rebranding, fluxo cache-first, componentes, privacidade e riscos.
+- `integration-points.md`: contratos de sync, atomicidade, ETag/Meet, DWD de colegas e shared-live explícita.
+
+---
+
+## [2026-07-30 19:20] — Agenda Alpha Fase 2A: infraestrutura distribuída aplicada com rollout desligado
+
+**Tags:** #feature #integration #security #prisma #critical
+**Agentes envolvidos:** Bibble, Scout, Vault, Echo, Nova, Forge, Lens, Anubis, Sage, Probe, Scribe, Kowalski
+**Arquivos tocados:** `prisma/schema.prisma`, `plan/agenda-alpha-phase2a-migration-preview.sql`, `src/lib/google-calendar/`, `src/app/api/calendario-alpha/webhook/`, `scripts/calendar-alpha-*.mjs`, `tests/google-calendar/`, `docs/stories/story-calendario-alpha.md`
+
+### Contexto
+O usuário autorizou explicitamente, após o relatório Vault, aplicar em produção no Turso somente o DDL da Fase 2A, com rollback pelo backup verificado `painelalpha_turso_pre_change_agenda-alpha-phase2a_2026-07-30T20-13-38Z.sql`.
+
+### O que foi feito
+- O SQL aprovado criou exclusivamente `GoogleCalendarPushChannel`, `GoogleCalendarPendingOperation` e `GoogleCalendarSyncLease`, com 10 índices — 7 comuns e 3 `UNIQUE` — sem `ALTER`, `DROP`, backfill, seed ou mutações em Comissões.
+- A infraestrutura de fila persistente, lease/fencing distribuído, worker, webhook push, manutenção e diagnóstico foi implementada atrás de flags desligadas por padrão.
+- Gates finais: **183 testes PASS**, Prisma validate, lint escopado e build de produção PASS; o Turso respondeu corretamente ao doctor, status da fila e maintenance dry-run sem mutações.
+
+### Decisões tomadas
+- Rollout permanece desligado até existir HTTPS público confiável, WAF/rate limiting, scheduler/worker operacional e E2E canário contra Google real.
+- Cache e cursor só avançam dentro da mesma transação e com fencing válido antes e depois da persistência em lotes.
+
+### Problemas encontrados / resolvidos
+- Claims longos podiam expirar durante processamento: adicionado heartbeat CAS por `id + worker + claimToken`.
+- Lifecycle de canais admitia corrida entre renew/stop: serializado por lease, heartbeat e CAS, com compensação de watch órfão.
+- Erros permanentes do Google eram reprocessados: classificados para DLQ e canal `ERROR`; transitórios continuam em retry.
+- CAS SQL com `BigInt`, `payloadJson = null`, rejeição do heartbeat manual e persistência em lote exigiram normalização explícita.
+- Rate limit do webhook é local por instância; validado como defesa complementar, não substituto de WAF distribuído.
+
+### Pendências
+- Configurar HTTPS público, WAF/rate limit distribuído e scheduler/worker; ativar lock+queue e depois push em canário, observando `claim_lost`, `lease_lost`, DLQ e duplicidade de watches.
+- Executar E2E autenticado com Google Calendar real antes de ampliar o tráfego.
+- O typecheck global conserva 4 erros baseline externos à Agenda Alpha, em arquivos sem alteração nesta fase.
+
+### Refletido também em
+- Nenhum arquivo curado adicional foi alterado neste fechamento; plano, story e testes da Fase 2A já contêm os detalhes operacionais e de aceitação.

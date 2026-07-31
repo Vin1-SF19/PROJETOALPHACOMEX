@@ -6,6 +6,10 @@ import { listarClientesComExitoNaoProcessado } from "./adapters/exito-detector";
 import { buscarClientePorCnpjEServico } from "./adapters/cs-nps-lookup";
 import { persistirDivergenciasDetectadas } from "./divergence-detector";
 import { gerarLancamentosParaEvento } from "./entry-generator";
+import {
+  registrarAmbiguidadesParticipantes,
+  resolverParticipantesAutomaticosEvento,
+} from "./participant-resolver";
 
 /**
  * Gera lançamentos automaticamente só para os responsáveis que o sistema consegue
@@ -17,8 +21,9 @@ import { gerarLancamentosParaEvento } from "./entry-generator";
  * — se não há nenhum colaborador resolvido, o evento fica sem lançamento (card vazio),
  * mas o evento em si já foi criado com sucesso.
  */
-async function gerarLancamentosAutomaticos(eventId: string, closerUsuarioId: number | null, analistaResponsavelUsuarioId: number | null) {
-  const collaboratorIds = [...new Set([closerUsuarioId, analistaResponsavelUsuarioId].filter((id): id is number => id !== null))];
+async function gerarLancamentosAutomaticos(eventId: string) {
+  const { collaboratorIds, ambiguidades } = await resolverParticipantesAutomaticosEvento(eventId);
+  await registrarAmbiguidadesParticipantes(eventId, ambiguidades);
   if (collaboratorIds.length === 0) return;
 
   await gerarLancamentosParaEvento({ eventId, collaboratorIds });
@@ -73,7 +78,10 @@ export async function sincronizarComissoes(params: {
         select: { id: true },
       });
 
-      if (jaExiste) continue; // idempotente — já processado
+      if (jaExiste) {
+        await gerarLancamentosAutomaticos(jaExiste.id);
+        continue;
+      }
 
       const clienteCorrespondente = await buscarClientePorCnpjEServico(contrato.cnpj, contrato.servico);
       const clienteSource = clienteCorrespondente ? await buscarClientePorId(clienteCorrespondente.id) : null;
@@ -127,7 +135,7 @@ export async function sincronizarComissoes(params: {
 
       // Lançamentos automáticos só para closer/analista responsável (únicos resolvidos com
       // confiança) — demais cargos do Big Card ficam para adição manual.
-      await gerarLancamentosAutomaticos(evento.id, evento.closerUsuarioId, null);
+      await gerarLancamentosAutomaticos(evento.id);
 
       // Detecção sistemática (seção 28) — 14 checagens além do conflito de merge acima.
       await persistirDivergenciasDetectadas(evento.id);
@@ -210,7 +218,7 @@ export async function sincronizarComissoes(params: {
 
       // Lançamentos automáticos só para closer/analista responsável (únicos resolvidos com
       // confiança) — demais cargos do Big Card ficam para adição manual.
-      await gerarLancamentosAutomaticos(evento.id, evento.closerUsuarioId, evento.analistaResponsavelUsuarioId);
+      await gerarLancamentosAutomaticos(evento.id);
 
       // Detecção sistemática (seção 28) — 14 checagens além da ausência de BusinessProcess acima.
       await persistirDivergenciasDetectadas(evento.id);
@@ -224,6 +232,29 @@ export async function sincronizarComissoes(params: {
           sourceEntity: "exito",
           sourceId: String(clienteId),
           mensagem: err instanceof Error ? err.message : "Erro desconhecido ao processar êxito.",
+        },
+      });
+    }
+  }
+
+  // Reconcilia eventos de êxito já existentes. Isso permite que vínculos adicionados ao
+  // BusinessProcess (auxiliar/auditor/diretor) passem a aparecer sem recriar o evento.
+  const exitosExistentes = await db.commissionEvent.findMany({
+    where: { eventType: "PROCESS_SUCCESS" },
+    select: { id: true },
+    take: 500,
+  });
+  for (const evento of exitosExistentes) {
+    try {
+      await gerarLancamentosAutomaticos(evento.id);
+    } catch (err) {
+      totalErrors++;
+      await db.syncError.create({
+        data: {
+          syncRunId: syncRun.id,
+          sourceEntity: "reconciliacao-exito",
+          sourceId: evento.id,
+          mensagem: err instanceof Error ? err.message : "Erro ao reconciliar participantes do êxito.",
         },
       });
     }

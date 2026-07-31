@@ -5,6 +5,7 @@ import db from "@/lib/prisma";
 import { auth } from "../../auth";
 import { revalidatePath } from "next/cache";
 import { criarRegistroClienteAPartirDeContrato } from "./Clientes";
+import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -441,16 +442,7 @@ export async function seedServicosIniciais() {
     const role = (session.user as { role?: string }).role ?? "";
     if (!isAdminOrCeo(role)) return;
 
-    const iniciais = [
-        "Habilitação RADAR - 50K",
-        "Revisão RADAR - 150K",
-        "Revisão RADAR - ILIMITADO",
-        "TTD 409",
-        "Recuperação AFRMM",
-        "Outras Recuperações Tributárias",
-    ];
-
-    for (const nome of iniciais) {
+    for (const nome of SERVICOS_COMERCIAIS_PADRAO) {
         await db.servicosComerciais.upsert({
             where: { nome },
             update: {},

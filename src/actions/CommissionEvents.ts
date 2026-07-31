@@ -4,6 +4,10 @@ import { auth } from "../../auth";
 import { z } from "zod";
 import db from "@/lib/prisma";
 import { gerarLancamentosParaEvento } from "@/lib/commissions/entry-generator";
+import {
+  registrarAmbiguidadesParticipantes,
+  resolverParticipantesAutomaticosEvento,
+} from "@/lib/commissions/participant-resolver";
 import { verificarAcessoCategoria, type CategoriaPermissao } from "@/lib/commissions/permissions";
 
 async function exigirAcesso(categoria: CategoriaPermissao) {
@@ -111,16 +115,17 @@ export async function GerarLancamentosAutomaticosEvento(input: z.infer<typeof ge
   try {
     const event = await db.commissionEvent.findUnique({
       where: { id: parsed.data.eventId },
-      select: { closerUsuarioId: true, analistaResponsavelUsuarioId: true },
+      select: { id: true },
     });
     if (!event) return { success: false, error: "Evento não encontrado" } as const;
 
-    const collaboratorIds = [...new Set([event.closerUsuarioId, event.analistaResponsavelUsuarioId].filter((id): id is number => id !== null))];
+    const { collaboratorIds, ambiguidades } = await resolverParticipantesAutomaticosEvento(event.id);
+    await registrarAmbiguidadesParticipantes(event.id, ambiguidades);
 
     if (collaboratorIds.length === 0) {
       return {
         success: false,
-        error: "Este evento não tem closer nem analista responsável atribuídos — clique no lápis ao lado de \"Closer\" ou \"Analista responsável\", acima neste card, para atribuir antes de gerar os lançamentos.",
+        error: "Nenhum participante pôde ser resolvido automaticamente. Atribua os responsáveis no card ou crie o lançamento manual.",
       } as const;
     }
 

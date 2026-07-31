@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { pusherServer } from "@/lib/pusher-server.ts";
+import {
+  CHAMADO_USUARIO_CHANNEL_PREFIX,
+  extrairUsuarioIdDoCanalChamados,
+  podeReceberNovosChamados,
+} from "@/lib/chamados/notificacoes";
 
-const ADMIN_ROLES = ["Admin", "CEO"];
 const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts"];
 const CHECKLIST_ROLES = ["Admin", "CEO", "OPERACIONAL"];
@@ -22,7 +26,16 @@ export async function POST(req: Request) {
 
     if (ADMIN_CHANNELS.includes(channelName)) {
       const role = session.user.role ?? "";
-      if (!ADMIN_ROLES.includes(role)) {
+      if (!podeReceberNovosChamados(role)) {
+        return new NextResponse("Proibido", { status: 403 });
+      }
+      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(authResponse);
+    }
+
+    if (channelName.startsWith(CHAMADO_USUARIO_CHANNEL_PREFIX)) {
+      const channelUserId = extrairUsuarioIdDoCanalChamados(channelName);
+      if (channelUserId === null || channelUserId !== Number(session.user.id)) {
         return new NextResponse("Proibido", { status: 403 });
       }
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);

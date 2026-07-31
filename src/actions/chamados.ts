@@ -5,28 +5,39 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { pusherServer } from "@/lib/pusher-server.ts";
-
-export interface NovoChamadoPayload {
-  chamadoId: number;
-  titulo: string;
-  usuario: string;
-  setor: string;
-  urgencia: string;
-  createdAt: string;
-}
+import {
+  notificarChamadoConcluido,
+  notificarNovoChamado,
+} from "@/lib/chamados/notificacoes-server";
 
 export async function updateChamadosStatus(id: number, novoStatus: string, solucao?: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Não autorizado" };
 
   try {
-    await db.chamados.update({
+    const chamadoAtualizado = await db.chamados.update({
       where: { id },
       data: {
         status: novoStatus,
         ...(solucao && { solucao }),
       },
+      select: {
+        id: true,
+        titulo: true,
+        usuarioId: true,
+        solucao: true,
+        updatedAt: true,
+      },
     });
+
+    if (novoStatus === "CONCLUIDO") {
+      await notificarChamadoConcluido(chamadoAtualizado.usuarioId, {
+        chamadoId: chamadoAtualizado.id,
+        titulo: chamadoAtualizado.titulo,
+        solucao: chamadoAtualizado.solucao ?? undefined,
+        createdAt: chamadoAtualizado.updatedAt.toISOString(),
+      });
+    }
 
     revalidatePath("/PainelAlpha/Chamados");
     return { success: true };
@@ -100,20 +111,14 @@ export async function createChamadoAction(formData: FormData) {
       minute: "2-digit",
     }).format(new Date());
 
-    const payload: NovoChamadoPayload = {
+    await notificarNovoChamado({
       chamadoId: novoChamado.id,
       titulo: novoChamado.titulo,
       usuario: session.user.nome || "Usuário",
       setor: session.user.role || "",
       urgencia: novoChamado.prioridade,
       createdAt: novoChamado.createdAt.toISOString(),
-    };
-
-    try {
-      await pusherServer.trigger("private-admin-chamados", "novo-chamado", payload);
-    } catch (pusherErr) {
-      console.error("[Pusher] Falha ao disparar evento novo-chamado:", pusherErr);
-    }
+    });
 
     await avisarNoZap(
       titulo,

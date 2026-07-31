@@ -27,10 +27,10 @@ Como usuário do módulo de Chamados, quero visualizar todos os detalhes de um c
   - [x] Empilhar cabeçalho, cartões e botões quando não houver largura suficiente.
   - [x] Permitir quebra de linhas em títulos, descrições e soluções.
 - [ ] Task 3 — Validar a entrega (AC: 1–6)
-  - [ ] Executar lint direcionado.
+  - [x] Executar lint direcionado.
   - [ ] Executar typecheck.
-  - [ ] Executar testes.
-  - [ ] Executar build.
+  - [x] Executar testes.
+  - [x] Executar build.
 
 ## Dev Notes
 
@@ -51,15 +51,24 @@ GPT-5 Codex
 
 ### Debug Log References
 
-_A preencher após as validações._
+- `npx eslint src/components/DetalhesChamado.tsx` — passou.
+- `npm run typecheck` — sem erros no modal; bloqueado por quatro erros preexistentes em `ExclusaoFiscal/route`, `ModalPerfilColaborador` e `HabilitacaoRadarClient`.
+- `npm test` — 53 arquivos e 448 testes passaram.
+- `npx next build` — build de produção passou.
+- `npm run lint` — excedeu 180 segundos porque a configuração global percorre diretórios internos do framework; o arquivo alterado passou no lint direcionado.
+- `git diff --check` — passou.
 
 ### Completion Notes List
 
 - O `ui-styling` orientou o uso de viewport dinâmica, overflow interno, layout mobile-first e preservação da acessibilidade do Dialog.
+- O modal agora usa largura progressiva até `max-w-6xl`, respeita a altura dinâmica da viewport e mantém o cabeçalho visível enquanto o corpo rola.
+- Cartões, metadados e ações mudam para uma coluna em larguras menores; textos longos quebram linha sem provocar overflow horizontal.
+- Nenhuma regra de negócio, chamada de API, dependência ou estrutura de banco foi alterada.
 
 ### File List
 
 - `docs/stories/story-chamados-modal-detalhes-responsivo.md`
+- `plan/self-critique-chamados-modal.json`
 - `src/components/DetalhesChamado.tsx`
 
 ## QA Results

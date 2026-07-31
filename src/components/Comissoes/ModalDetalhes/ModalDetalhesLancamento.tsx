@@ -26,8 +26,10 @@ import { Input } from "@/components/ui/input";
 import { StatusBadge } from "../lib/status-badge";
 import { formatarCentavosBRL, formatarDataComissao } from "../lib/formatters";
 import { BuscarDetalhesLancamento, CriarAjusteManual } from "@/actions/CommissionEntries";
-import { EstornarPagamento, ProgramarPagamento, RegistrarPagamento } from "@/actions/CommissionPayments";
+import { EstornarPagamento } from "@/actions/CommissionPayments";
 import { EditorResponsavel } from "./EditorResponsavel";
+import { ModalRegistrarPagamento } from "../MiniCard/ModalRegistrarPagamento";
+import { ModalProgramarPagamento } from "../MiniCard/ModalProgramarPagamento";
 
 interface ModalDetalhesLancamentoProps {
   entryId: string | null;
@@ -55,6 +57,8 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
   const [valorAjuste, setValorAjuste] = useState("");
   const [justificativaAjuste, setJustificativaAjuste] = useState("");
   const [enviandoAjuste, setEnviandoAjuste] = useState(false);
+  const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
+  const [modalProgramacaoAberto, setModalProgramacaoAberto] = useState(false);
 
   useEffect(() => {
     if (!entryId) return;
@@ -86,40 +90,6 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
       setDados(resultado);
     })();
     onAtualizar?.();
-  }
-
-  function marcarComoPago() {
-    if (!dados?.success) return;
-    startTransition(async () => {
-      const resultado = await RegistrarPagamento({
-        entryId: dados.data.entry.id,
-        data: new Date(),
-        valorCents: dados.data.entry.totalCents,
-        meio: "PIX",
-      });
-      if (!resultado.success) {
-        toast.error(resultado.error ?? "Erro ao registrar pagamento");
-        return;
-      }
-      toast.success("Pagamento registrado.");
-      recarregar();
-    });
-  }
-
-  function programar() {
-    if (!dados?.success) return;
-    startTransition(async () => {
-      const resultado = await ProgramarPagamento({
-        entryId: dados.data.entry.id,
-        scheduledPaymentDate: new Date(),
-      });
-      if (!resultado.success) {
-        toast.error(resultado.error ?? "Erro ao programar pagamento");
-        return;
-      }
-      toast.success("Pagamento programado.");
-      recarregar();
-    });
   }
 
   function estornar(paymentId: string) {
@@ -166,7 +136,7 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
 
   return (
     <Dialog open={entryId !== null} onOpenChange={(open) => !open && onOpenChange(false)}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-slate-950 sm:max-w-2xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto border-white/10 bg-slate-950 sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="text-slate-200">Detalhes do Lançamento</DialogTitle>
         </DialogHeader>
@@ -182,7 +152,7 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
         ) : dados?.success ? (
           <>
             <Tabs defaultValue="resumo">
-              <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7">
+              <TabsList className="flex w-full justify-start overflow-x-auto">
                 <TabsTrigger value="resumo">Resumo</TabsTrigger>
                 <TabsTrigger value="memoria">Memória</TabsTrigger>
                 <TabsTrigger value="regra">Regra</TabsTrigger>
@@ -220,6 +190,14 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
                   <span className="font-mono tabular-nums text-white">
                     {formatarCentavosBRL(dados.data.entry.totalCents)}
                   </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Saldo pago</span>
+                  <span className="font-mono tabular-nums text-emerald-300">{formatarCentavosBRL(dados.data.saldoPagoCents)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Saldo pendente</span>
+                  <span className="font-mono tabular-nums text-amber-300">{formatarCentavosBRL(dados.data.saldoPendenteCents)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Vencimento contratual</span>
@@ -284,6 +262,16 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
                           {alocacao.payment.tipo === "ESTORNO" ? "Estorno" : "Pagamento"} — {formatarDataComissao(alocacao.payment.data)}
                         </p>
                         <p className="text-xs text-slate-500">{alocacao.payment.meio}</p>
+                        {alocacao.payment.comprovanteUrl && (
+                          <a
+                            href={`/api/comissoes/comprovantes/${alocacao.paymentId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-block text-xs text-cyan-300 underline"
+                          >
+                            Baixar comprovante
+                          </a>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono tabular-nums text-slate-300">
@@ -386,30 +374,33 @@ export function ModalDetalhesLancamento({ entryId, onOpenChange, onAtualizar }: 
             </Tabs>
 
             <div className="flex flex-wrap gap-2 border-t border-white/5 pt-4">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" disabled={isPending}>
-                    Marcar como pago
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="border-white/10 bg-slate-950">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-slate-200">Confirmar pagamento?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-slate-400">
-                      Registra o pagamento total de {formatarCentavosBRL(dados.data.entry.totalCents)}.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={marcarComoPago}>Confirmar</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-
-              <Button size="sm" variant="outline" className="border-white/10" onClick={programar} disabled={isPending}>
-                Programar
+              <Button size="sm" disabled={isPending || dados.data.saldoPendenteCents <= 0} onClick={() => setModalPagamentoAberto(true)}>
+                Registrar pagamento
+              </Button>
+              <Button size="sm" variant="outline" className="border-white/10" disabled={isPending || dados.data.saldoPendenteCents <= 0} onClick={() => setModalProgramacaoAberto(true)}>
+                Programar pagamento
               </Button>
             </div>
+            {modalPagamentoAberto && (
+              <ModalRegistrarPagamento
+                open
+                onOpenChange={setModalPagamentoAberto}
+                entryId={dados.data.entry.id}
+                colaboradorNome={dados.data.colaboradorNome}
+                saldoPendenteCents={dados.data.saldoPendenteCents}
+                onConfirmado={recarregar}
+              />
+            )}
+            {modalProgramacaoAberto && (
+              <ModalProgramarPagamento
+                open
+                onOpenChange={setModalProgramacaoAberto}
+                entryId={dados.data.entry.id}
+                colaboradorNome={dados.data.colaboradorNome}
+                dataAtual={dados.data.entry.scheduledPaymentDate}
+                onConfirmado={recarregar}
+              />
+            )}
           </>
         ) : null}
       </DialogContent>

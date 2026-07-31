@@ -1600,6 +1600,7 @@ model CommissionEntry {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
+  @@unique([eventId, collaboratorId])
   @@index([collaboratorId])
   @@index([status])
 }
@@ -2259,7 +2260,10 @@ model GoogleCalendarSelecionado {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  eventos GoogleCalendarEventoCache[]
+  eventos           GoogleCalendarEventoCache[]
+  pushChannels      GoogleCalendarPushChannel[]
+  pendingOperations GoogleCalendarPendingOperation[]
+  syncLease         GoogleCalendarSyncLease?
 
   @@unique([conexaoId, googleCalendarId])
 }
@@ -2289,6 +2293,97 @@ model GoogleCalendarEventoCache {
 
   @@unique([calendarioId, googleEventId])
   @@index([calendarioId, inicioEm])
+}
+
+/// Canal push registrado no Google Calendar. O token persistido é somente o hash usado para
+/// autenticar notificações; o valor secreto nunca é armazenado em texto puro.
+model GoogleCalendarPushChannel {
+  id           String                    @id @default(cuid())
+  calendarioId String
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  googleChannelId  String  @unique
+  googleResourceId String?
+  resourceUri      String?
+  channelTokenHash String
+
+  status     String   @default("CREATING") // CREATING | ACTIVE | STOPPING | STOPPED | EXPIRED | ERROR
+  expiresAt  DateTime
+  renewAfter DateTime
+
+  activatedAt DateTime?
+  stoppedAt   DateTime?
+
+  lastMessageNumber  String?
+  lastNotificationAt DateTime?
+  lastErrorCode       String?
+  lastErrorAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pendingOperations GoogleCalendarPendingOperation[]
+
+  @@index([status, renewAfter])
+  @@index([calendarioId, status, expiresAt])
+}
+
+/// Fila persistente at-least-once para sincronização e manutenção de canais. O idempotencyKey
+/// impede enfileiramento duplicado e claimToken oferece fencing durante reclaims.
+model GoogleCalendarPendingOperation {
+  id           String                    @id @default(cuid())
+  calendarioId String
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  pushChannelId String?
+  pushChannel   GoogleCalendarPushChannel? @relation(fields: [pushChannelId], references: [id], onDelete: SetNull)
+
+  operationType  String // SYNC_CALENDAR | RENEW_CHANNEL | STOP_CHANNEL | RECONCILE_CHANNEL
+  source         String // WEBHOOK | MANUAL | SCHEDULED | ADMIN
+  idempotencyKey String @unique
+  payloadJson    String?
+
+  status       String   @default("PENDING") // PENDING | PROCESSING | RETRY | SUCCEEDED | DEAD_LETTER | CANCELLED
+  priority     Int      @default(100)
+  attemptCount Int      @default(0)
+  maxAttempts  Int      @default(8)
+  availableAt  DateTime @default(now())
+
+  claimedBy      String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  claimToken     Int       @default(0)
+
+  lastErrorCode    String?
+  lastErrorMessage String?
+  completedAt      DateTime?
+  deadLetteredAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, availableAt, priority, createdAt])
+  @@index([status, claimExpiresAt])
+  @@index([calendarioId, operationType, status])
+  @@index([pushChannelId])
+}
+
+/// Lease distribuído por calendário. O fencingToken cresce a cada aquisição para impedir que
+/// workers antigos confirmem trabalho depois de perder o lease.
+model GoogleCalendarSyncLease {
+  id           String                    @id @default(cuid())
+  calendarioId String                    @unique
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  ownerId        String
+  fencingToken   Int      @default(1)
+  leaseExpiresAt DateTime
+  heartbeatAt    DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leaseExpiresAt])
 }
 
 /// Compartilhamento de agenda entre colegas (cultura interna: todo mundo vê a agenda de todo

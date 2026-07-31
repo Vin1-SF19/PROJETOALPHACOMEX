@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
-import { listarColegasVisiveis, listarEventosDeColega } from "@/actions/google-calendar-colegas";
 import { obterStatusConexaoCalendarioAlpha } from "@/actions/google-calendar-conexao";
-import { listarCalendariosSelecionados, listarEventosDoCalendario } from "@/actions/google-calendar-eventos";
+import { listarCalendariosSelecionados, listarEventosCache } from "@/actions/google-calendar-eventos";
 import { CalendarioAlphaDashboard } from "@/components/CalendarioAlpha/CalendarioAlphaDashboard";
 import { calcularIntervaloVisao, type VisaoCalendario } from "@/components/CalendarioAlpha/lib/datas";
 import type { EventoExibicao } from "@/components/CalendarioAlpha/lib/tipos";
@@ -70,7 +69,11 @@ export default async function CalendarioAlphaPage({
 
   const resultadosEventos = await Promise.all(
     calendariosVisiveis.map((calendario) =>
-      listarEventosDoCalendario(calendario.id, inicio.toISOString(), fim.toISOString()),
+      listarEventosCache({
+        calendarioId: calendario.id,
+        inicioISO: inicio.toISOString(),
+        fimISO: fim.toISOString(),
+      }),
     ),
   );
 
@@ -97,43 +100,13 @@ export default async function CalendarioAlphaPage({
 
   const algumaFalhaSync = resultadosEventos.some((resultado) => !resultado.success);
 
-  const colegasResultado = await listarColegasVisiveis();
-  const colegasVisiveis = colegasResultado.success
-    ? colegasResultado.data.filter((c) => c.visivel)
-    : [];
-
-  const resultadosEventosColegas = await Promise.all(
-    colegasVisiveis.map((c) => listarEventosDeColega(c.colegaId, inicio.toISOString(), fim.toISOString())),
-  );
-
-  const eventosColegas: EventoExibicao[] = resultadosEventosColegas.flatMap((resultado) => {
-    if (!resultado.success) return [];
-    return resultado.data.map((evento) => ({
-      id: evento.id,
-      googleEventId: evento.googleEventId,
-      status: evento.status,
-      titulo: evento.titulo,
-      inicioEm: evento.inicioEm,
-      fimEm: evento.fimEm,
-      diaInteiro: evento.diaInteiro,
-      etag: evento.etag,
-      linkMeet: evento.linkMeet,
-      calendarioId: `colega-${evento.colegaId}`,
-      calendarioGoogleId: evento.colegaEmail,
-      calendarioNome: evento.colegaNome,
-      calendarioCorHex: evento.cor,
-      calendarioGravavel: evento.gravavel,
-      colegaId: evento.colegaId,
-    }));
-  });
-
   return (
     <CalendarioAlphaDashboard
       temaName={temaName}
       statusConexao={statusConexao}
       conexaoId={statusConexao.conexaoId ?? null}
       calendarios={calendarios}
-      eventos={[...eventos, ...eventosColegas]}
+      eventos={eventos}
       isAdmin={isAdmin}
       visao={visao}
       dataReferenciaISO={dataReferencia.toISOString()}

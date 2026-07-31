@@ -84,34 +84,86 @@ export async function ListarEligibilityOverrides(filtro?: { collaboratorId?: num
 
 const atualizarEligibilityOverrideSchema = z.object({
   id: z.string().min(1),
+  collaboratorId: z.number().int().positive().nullable().optional(),
+  cargoId: z.number().int().positive().nullable().optional(),
+  clienteId: z.number().int().positive().nullable().optional(),
+  contratoComercialId: z.string().min(1).nullable().optional(),
+  servico: z.string().min(1).nullable().optional(),
+  eventType: z.string().min(1).nullable().optional(),
+  dataInicial: z.coerce.date().nullable().optional(),
+  dataFinal: z.coerce.date().nullable().optional(),
+  tipo: tipoOverrideSchema.optional(),
+  percentualEspecifico: z.number().min(0).max(1).nullable().optional(),
+  valorEspecificoCents: z.number().int().nonnegative().nullable().optional(),
   aprovadoEm: z.coerce.date().optional(),
   justificativa: z.string().min(1).optional(),
   prioridade: z.number().int().optional(),
+  approvalRequired: z.boolean().optional(),
 });
 
 export async function AtualizarEligibilityOverride(input: z.infer<typeof atualizarEligibilityOverrideSchema>) {
-  const acesso = await exigirAcesso("APROVAR");
-  if (!acesso.ok) return { success: false, error: acesso.error } as const;
-
   const parsed = atualizarEligibilityOverrideSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
   }
 
   const { id, ...data } = parsed.data;
+  const camposDeEdicao = Object.keys(data).filter((campo) => campo !== "aprovadoEm");
+  const acesso = await exigirAcesso(camposDeEdicao.length > 0 ? "CONFIGURAR" : "APROVAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
   try {
-    const existente = await db.eligibilityOverride.findUnique({ where: { id }, select: { id: true } });
+    const existente = await db.eligibilityOverride.findUnique({ where: { id } });
     if (!existente) return { success: false, error: "Exceção não encontrada" } as const;
+
+    const proximo = { ...existente, ...data };
+    if (
+      !proximo.collaboratorId &&
+      !proximo.cargoId &&
+      !proximo.clienteId &&
+      !proximo.contratoComercialId &&
+      !proximo.servico &&
+      !proximo.eventType
+    ) {
+      return { success: false, error: "A exceção precisa manter ao menos um escopo." } as const;
+    }
 
     const atualizado = await db.eligibilityOverride.update({
       where: { id },
-      data: { ...data, aprovadoById: data.aprovadoEm ? acesso.userId : undefined },
+      data: {
+        ...data,
+        ...(camposDeEdicao.length > 0 && existente.approvalRequired
+          ? { aprovadoEm: null, aprovadoById: null }
+          : { aprovadoById: data.aprovadoEm ? acesso.userId : undefined }),
+      },
     });
 
     return { success: true, data: atualizado } as const;
   } catch (error) {
     console.error("[AtualizarEligibilityOverride]", error);
     return { success: false, error: "Erro interno ao atualizar exceção" } as const;
+  }
+}
+
+const excluirEligibilityOverrideSchema = z.object({ id: z.string().min(1) });
+
+export async function ExcluirEligibilityOverride(input: z.infer<typeof excluirEligibilityOverrideSchema>) {
+  const acesso = await exigirAcesso("CONFIGURAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const parsed = excluirEligibilityOverrideSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
+  }
+
+  try {
+    const existente = await db.eligibilityOverride.findUnique({ where: { id: parsed.data.id }, select: { id: true } });
+    if (!existente) return { success: false, error: "Exceção não encontrada" } as const;
+
+    await db.eligibilityOverride.delete({ where: { id: parsed.data.id } });
+    return { success: true } as const;
+  } catch (error) {
+    console.error("[ExcluirEligibilityOverride]", error);
+    return { success: false, error: "Erro interno ao excluir exceção" } as const;
   }
 }

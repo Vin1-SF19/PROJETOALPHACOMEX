@@ -1,5 +1,5 @@
 import db from "@/lib/prisma";
-import { evaluateRules } from "./rule-engine";
+import { evaluateRules, ruleMatches } from "./rule-engine";
 import { calculateAmountCents } from "./calculators";
 import { calculateCommissionableBase } from "./commissionable-base";
 import { buildCalculationMemory } from "./calculation-memory";
@@ -13,6 +13,7 @@ import { feriadosNacionais } from "./holidays-seed";
 import type { CommissionRuleVersionData, FactRecord } from "./types";
 import type { HolidayRecord } from "./calendar-engine";
 import type { EligibilityOverrideRecord } from "./eligibility-filter";
+import type { FormaPagamento } from "./commissionable-base";
 
 /**
  * Gera CommissionEntry + EntryComponent[] a partir de um CommissionEvent já persistido
@@ -58,13 +59,19 @@ function toRuleConditionsFacts(event: {
   eventDate: Date;
   grossContractAmountCents: number;
   netContractAmountCents: number;
+}, context?: {
+  dataContratacao?: Date | null;
+  deferidoPrimeiraTentativa?: boolean | null;
+  vinculoAuxiliarVigenteNaData?: boolean;
 }): FactRecord {
   return {
     servico: event.servico,
     formaPagamento: event.formaPagamento,
-    dataContratacao: event.eventDate.toISOString(),
+    dataContratacao: (context?.dataContratacao ?? event.eventDate).toISOString(),
     fechadoNoTarifarioOuAcima: event.netContractAmountCents >= event.grossContractAmountCents,
     auditorParticipacaoAutomatica: event.servico.toUpperCase().includes("RADAR"),
+    deferidoPrimeiraTentativa: context?.deferidoPrimeiraTentativa ?? false,
+    vinculoAuxiliarVigenteNaData: context?.vinculoAuxiliarVigenteNaData ?? false,
   };
 }
 
@@ -121,6 +128,29 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
   if (!event) {
     throw new Error(`CommissionEvent ${eventId} não encontrado.`);
   }
+
+  const [processo, eventoContratacao] = event.eventType === "PROCESS_SUCCESS"
+    ? await Promise.all([
+        event.businessProcessId
+          ? db.businessProcess.findUnique({
+              where: { id: event.businessProcessId },
+              select: {
+                analistaAuxiliarId: true,
+                auditorId: true,
+                diretorId: true,
+                deferidoPrimeiraTentativa: true,
+              },
+            })
+          : Promise.resolve(null),
+        event.clienteId !== null
+          ? db.commissionEvent.findFirst({
+              where: { clienteId: event.clienteId, eventType: "CONTRACTING" },
+              select: { eventDate: true },
+              orderBy: { eventDate: "asc" },
+            })
+          : Promise.resolve(null),
+      ])
+    : [null, null];
 
   let entriesCreated = 0;
   let entriesSkipped = 0;
@@ -210,7 +240,11 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
       continue;
     }
 
-    const facts = toRuleConditionsFacts(event);
+    const facts = toRuleConditionsFacts(event, {
+      dataContratacao: eventoContratacao?.eventDate ?? null,
+      deferidoPrimeiraTentativa: processo?.deferidoPrimeiraTentativa ?? false,
+      vinculoAuxiliarVigenteNaData: processo?.analistaAuxiliarId === collaboratorId,
+    });
     const { year: anoEvento, month: mesEvento } = toCivilParts(event.eventDate);
     const feriadosDoMes = await feriadosDoMesParaDsr(anoEvento, mesEvento);
     const { diasUteis: diasUteisDoMes, diasDescanso: diasDescansoDoMes } = contarDiasUteisEDescansoDoMes(anoEvento, mesEvento, feriadosDoMes);
@@ -233,12 +267,23 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
       const regrasDoTipo = regrasDoCargo.filter((r) => r.benefitType === benefitType);
       if (regrasDoTipo.length === 0) continue; // este cargo não tem regra deste tipo para este evento — normal, não é divergência
 
-      const resultado = evaluateRules(regrasDoTipo, facts);
-      if (!resultado.matchedRule) continue; // condições não bateram para nenhuma regra deste tipo — normal
+      // Uma regra-base vence pela precedência normal. Regras ADDITIONAL compatíveis são
+      // cumulativas e viram componentes separados no mesmo Big Card (ex.: êxito +
+      // primeira tentativa), sem criar eventos financeiros artificiais.
+      const regrasBase = regrasDoTipo.filter((regra) => regra.calculation.type !== "ADDITIONAL");
+      const regraBase = evaluateRules(regrasBase, facts).matchedRule;
+      const regrasAdicionais = regrasDoTipo.filter(
+        (regra) => regra.calculation.type === "ADDITIONAL" && ruleMatches(regra, facts),
+      );
+      const regrasVencedoras = [
+        ...(regraBase ? [regraBase] : []),
+        ...regrasAdicionais,
+      ];
 
-      const rule = resultado.matchedRule;
+      if (regrasVencedoras.length === 0) continue;
 
-      if (benefitType === "COMMISSION" && rule.calculation.type === "TOTAL_FIXO_COM_DSR") {
+      for (const rule of regrasVencedoras) {
+        if (benefitType === "COMMISSION" && rule.calculation.type === "TOTAL_FIXO_COM_DSR") {
         const decomposicao = decomporTotalFixoComDsr({
           totalFixoCents: rule.calculation.totalFixoComDsrCents ?? 0,
           diasUteis: diasUteisDoMes,
@@ -271,53 +316,63 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
         });
         dsrJaGeradoPorDecomposicao = true;
         continue;
-      }
+        }
 
-      let commissionableBaseCents: number | undefined;
-      let baseResult: ReturnType<typeof calculateCommissionableBase> | undefined;
+        let commissionableBaseCents: number | undefined;
+        let baseResult: ReturnType<typeof calculateCommissionableBase> | undefined;
 
-      if (rule.calculation.type === "PERCENTAGE" || rule.calculation.type === "PROPORTIONAL") {
-        baseResult = calculateCommissionableBase({
-          tariffAmountCents: event.grossContractAmountCents,
-          contractAmountCents: event.netContractAmountCents,
-          formaPagamento: "PARCELADO_CONTRATACAO_EXITO",
-          preservaTarifarioEmDescontoAte10: true,
-        });
+        if (rule.calculation.type === "PERCENTAGE" || rule.calculation.type === "PROPORTIONAL") {
+          const formaPagamento: FormaPagamento = [
+            "PARCELADO_CONTRATACAO_EXITO",
+            "CARTAO_PARCELADO",
+            "A_VISTA_DESCONTO",
+          ].includes(event.formaPagamento ?? "")
+            ? (event.formaPagamento as FormaPagamento)
+            : "PARCELADO_CONTRATACAO_EXITO";
+          baseResult = calculateCommissionableBase({
+            tariffAmountCents: event.grossContractAmountCents,
+            contractAmountCents: event.netContractAmountCents,
+            formaPagamento,
+            preservaTarifarioEmDescontoAte10: true,
+          });
 
-        if (baseResult.requiresApproval) {
-          divergenciaNesteColaborador = baseResult.reason;
+          if (baseResult.requiresApproval) {
+            divergenciaNesteColaborador = baseResult.reason;
+            break;
+          }
+
+          commissionableBaseCents = baseResult.commissionableBaseCents;
+        }
+
+        const dsrInput =
+          rule.calculation.type === "DSR"
+            ? { baseAmountCents: commissionableBaseCents ?? 0, diasUteis: diasUteisDoMes, diasNaoUteis: diasDescansoDoMes }
+            : undefined;
+
+        let valorCents: number;
+        try {
+          valorCents = calculateAmountCents(rule.calculation, { commissionableBaseCents, dsrInput });
+        } catch (err) {
+          divergenciaNesteColaborador = err instanceof Error ? err.message : "Erro ao calcular valor do lançamento.";
           break;
         }
 
-        commissionableBaseCents = baseResult.commissionableBaseCents;
+        if (decisao?.action === "SUBSTITUIR_VALOR") valorCents = decisao.valorCents;
+        if (decisao?.action === "SUBSTITUIR_PERCENTUAL" && commissionableBaseCents !== undefined) {
+          valorCents = Math.round(commissionableBaseCents * decisao.percentual);
+        }
+
+        const memoria = buildCalculationMemory({ rule, calculatedAmountCents: valorCents, base: baseResult });
+
+        componentesParaCriar.push({
+          tipo: benefitType === "COMMISSION" ? "COMISSAO" : benefitType === "DSR" ? "DSR" : "PREMIO",
+          valorCents,
+          percentual: rule.calculation.rate ?? null,
+          memoriaCalculoJson: JSON.stringify(memoria),
+        });
       }
 
-      const dsrInput =
-        rule.calculation.type === "DSR"
-          ? { baseAmountCents: commissionableBaseCents ?? 0, diasUteis: diasUteisDoMes, diasNaoUteis: diasDescansoDoMes }
-          : undefined;
-
-      let valorCents: number;
-      try {
-        valorCents = calculateAmountCents(rule.calculation, { commissionableBaseCents, dsrInput });
-      } catch (err) {
-        divergenciaNesteColaborador = err instanceof Error ? err.message : "Erro ao calcular valor do lançamento.";
-        break;
-      }
-
-      if (decisao?.action === "SUBSTITUIR_VALOR") valorCents = decisao.valorCents;
-      if (decisao?.action === "SUBSTITUIR_PERCENTUAL" && commissionableBaseCents !== undefined) {
-        valorCents = Math.round(commissionableBaseCents * decisao.percentual);
-      }
-
-      const memoria = buildCalculationMemory({ rule, calculatedAmountCents: valorCents, base: baseResult });
-
-      componentesParaCriar.push({
-        tipo: benefitType === "COMMISSION" ? "COMISSAO" : benefitType === "DSR" ? "DSR" : "PREMIO",
-        valorCents,
-        percentual: rule.calculation.rate ?? null,
-        memoriaCalculoJson: JSON.stringify(memoria),
-      });
+      if (divergenciaNesteColaborador) break;
     }
 
     if (divergenciaNesteColaborador) {
@@ -357,33 +412,35 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
 
     const totalCents = componentesParaCriar.reduce((sum, c) => sum + c.valorCents, 0);
 
-    const entry = entryExistente
-      ? await db.commissionEntry.update({
-          where: { id: entryExistente.id },
-          data: {
-            totalCents,
-            status: "Pendente",
-            contractualDueDate: schedule.contractualDueDate,
-            operationalSuggestedDate: schedule.operationalSuggestedDate,
-          },
-        })
-      : await db.commissionEntry.create({
-          data: {
-            eventId,
-            collaboratorId,
-            cargoId: colaborador.cargoId ?? 0,
-            vinculo,
-            totalCents,
-            status: "Pendente",
-            contractualDueDate: schedule.contractualDueDate,
-            operationalSuggestedDate: schedule.operationalSuggestedDate,
-          },
-        });
+    await db.$transaction(async (tx) => {
+      const entry = await tx.commissionEntry.upsert({
+        where: { eventId_collaboratorId: { eventId, collaboratorId } },
+        update: {
+          cargoId: colaborador.cargoId ?? 0,
+          vinculo,
+          totalCents,
+          status: "Pendente",
+          contractualDueDate: schedule.contractualDueDate,
+          operationalSuggestedDate: schedule.operationalSuggestedDate,
+        },
+        create: {
+          eventId,
+          collaboratorId,
+          cargoId: colaborador.cargoId ?? 0,
+          vinculo,
+          totalCents,
+          status: "Pendente",
+          contractualDueDate: schedule.contractualDueDate,
+          operationalSuggestedDate: schedule.operationalSuggestedDate,
+        },
+      });
 
-    // Um EntryComponent por benefitType vencedor — nunca somados num único componente.
-    for (const componente of componentesParaCriar) {
-      await db.entryComponent.create({ data: { entryId: entry.id, ...componente } });
-    }
+      // Recálculo é substitutivo e atômico: componentes antigos nunca sobrevivem.
+      await tx.entryComponent.deleteMany({ where: { entryId: entry.id } });
+      for (const componente of componentesParaCriar) {
+        await tx.entryComponent.create({ data: { entryId: entry.id, ...componente } });
+      }
+    });
 
     entriesCreated++;
   }
@@ -398,23 +455,53 @@ async function criarLancamentoDivergente(params: {
   vinculo: "CLT" | "PJ";
   motivo: string;
 }) {
-  const entry = await db.commissionEntry.create({
-    data: {
-      eventId: params.eventId,
-      collaboratorId: params.collaboratorId,
-      cargoId: params.cargoId,
-      vinculo: params.vinculo,
-      totalCents: 0,
-      status: "EmDivergencia",
-    },
-  });
+  await db.$transaction(async (tx) => {
+    const entry = await tx.commissionEntry.upsert({
+      where: {
+        eventId_collaboratorId: {
+          eventId: params.eventId,
+          collaboratorId: params.collaboratorId,
+        },
+      },
+      update: {
+        cargoId: params.cargoId,
+        vinculo: params.vinculo,
+        totalCents: 0,
+        status: "EmDivergencia",
+      },
+      create: {
+        eventId: params.eventId,
+        collaboratorId: params.collaboratorId,
+        cargoId: params.cargoId,
+        vinculo: params.vinculo,
+        totalCents: 0,
+        status: "EmDivergencia",
+      },
+    });
 
-  await db.commissionDivergence.create({
-    data: {
-      entryId: entry.id,
-      tipo: "REGRA_NAO_ENCONTRADA_OU_APROVACAO_PENDENTE",
-      severidade: "PENDING_REVIEW",
-      detalhes: params.motivo,
-    },
+    await tx.entryComponent.deleteMany({ where: { entryId: entry.id } });
+    const divergenciaExistente = await tx.commissionDivergence.findFirst({
+      where: {
+        entryId: entry.id,
+        tipo: "REGRA_NAO_ENCONTRADA_OU_APROVACAO_PENDENTE",
+        resolvidoEm: null,
+      },
+      select: { id: true },
+    });
+    if (divergenciaExistente) {
+      await tx.commissionDivergence.update({
+        where: { id: divergenciaExistente.id },
+        data: { detalhes: params.motivo, severidade: "PENDING_REVIEW" },
+      });
+    } else {
+      await tx.commissionDivergence.create({
+        data: {
+          entryId: entry.id,
+          tipo: "REGRA_NAO_ENCONTRADA_OU_APROVACAO_PENDENTE",
+          severidade: "PENDING_REVIEW",
+          detalhes: params.motivo,
+        },
+      });
+    }
   });
 }

@@ -19,7 +19,7 @@
       },
       {
         "text": "As máquinas podem soldar metais com precisão de microns, permitindo a criação de peças nunca antes possíveis. Essa tecnologia revolucionou setores como medicina e aeroespacial ao possibilitar protótipos complexos.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -140,6 +140,10 @@
       {
         "text": "Alguns cactos conseguem induzir flores coloridas fora de estação, mesmo quando o clima não é ideal para reprodução. Eles possuem um sistema de sobrevivência que permite armazenar água por meses inteiros após períodos longos de seca.",
         "shown": 4
+      },
+      {
+        "text": "Alguns cactos possuem mecanismos de camuflagem avançados, imitando folhas ou até mesmo animais do ambiente. Eles também podem expor seções coloridas quando ameaçados para afastar predadores.",
+        "shown": 1
       }
     ]
   },
@@ -439,7 +443,7 @@
       },
       {
         "text": "Um trem de carga consegue puxar mais de mil toneladas apenas com a tração dos motores. Essa força permite que ele cruze terrenos variados, superando obstáculos sem parar.",
-        "shown": 2
+        "shown": 4
       }
     ]
   },
@@ -663,7 +667,7 @@
       },
       {
         "text": "O bambu é tão resistente quanto o aço, mas pesa muito menos. Ele consegue se recuperar de cortes graves e continua a crescer ativamente.",
-        "shown": 1
+        "shown": 3
       }
     ]
   },
@@ -791,7 +795,11 @@
       },
       {
         "text": "A luz não é energia pura, mas sim um fóton — partícula de luz. O raio é apenas a forma mais violenta de descarga elétrica natural da Terra.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O raio é uma descarga elétrica massiva e natural, com voltagens altíssimas. Ele pode atingir temperaturas superiores às do magma terrestre quase instantaneamente.",
+        "shown": 1
       }
     ]
   },
@@ -1039,7 +1047,7 @@
       },
       {
         "text": "Os samurais não eram apenas guerreiros de elite; eles também detinham o dever social do Bushido. Esse código de honra ditava a vida pessoal, estendendo-se para além da batalha em todas as áreas sociais.",
-        "shown": 1
+        "shown": 3
       }
     ]
   },
@@ -1063,7 +1071,7 @@
       },
       {
         "text": "Antigos egípcios usavam pão como moeda de troca. Eles até tinham um tipo específico de pão para diferentes transações comerciais.",
-        "shown": 1
+        "shown": 3
       }
     ]
   },
@@ -1207,7 +1215,11 @@
       },
       {
         "text": "Nem todos os genes definem características; muitos genes interagem complexamente com o ambiente para expressar traços. Isso significa que estilo de vida e dieta têm um impacto maior na saúde do que se pensa.",
-        "shown": 3
+        "shown": 4
+      },
+      {
+        "text": "O DNA é organizado em pares de bases (A, T, C e G), mas a capacidade de identificar essas sequências permite que cientistas mapeiem genes responsáveis por características complexas como o raciocínio. A expectativa de vida pode ser rastreada geneticamente, embora vários fatores ambientais também influenciem esse resultado.",
+        "shown": 1
       }
     ]
   },
@@ -1251,7 +1263,7 @@
       },
       {
         "text": "Os U-boats alemães da Segunda Guerra Mundial usavam um sistema de camuflagem para confundir radares inimigos. Essa tecnologia revolucionou o design dos navios submersíveis após o conflito.",
-        "shown": 1
+        "shown": 3
       }
     ]
   },
@@ -1404,6 +1416,10 @@
       {
         "text": "O número 42 é conhecido como a resposta para a vida, o universo e tudo mais na ficção científica. Isso se deve à obra de Douglas Adams, onde ele foi estabelecido por um computador alienígena.",
         "shown": 4
+      },
+      {
+        "text": "O número Pi ($\\pi$) é irracional, o que significa que seus dígitos nunca se repetem nem formam padrões finitos. Ele também é considerado um número transcendental, algo raro na matemática avançada.",
+        "shown": 1
       }
     ]
   },
@@ -1431,7 +1447,7 @@
       },
       {
         "text": "O pólen das asas é feito de minúsculos sacos chamados androconial, que funcionam como um perfume sexual para atrair machos. As borboletas não podem voar em correnteza de ar; elas precisam bater suas próprias asas para se manterem no movimento.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -1503,7 +1519,7 @@
       },
       {
         "text": "Suas vibrções ao voar podem polinizar flores mesmo quando ela não toca na planta. Um zumbido de abelha é um sinal acústico que pode comunicar informações às rainhas.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -1612,6 +1628,10 @@
       {
         "text": "O músculo cardíaco é mais forte do que um motor de carro popular equivalente na mesma potência. Ele continua batendo mesmo quando desconectado do corpo por alguns minutos, mantido pela energia armazenada nos tecidos circundantes.",
         "shown": 4
+      },
+      {
+        "text": "O músculo cardíaco não para de bater espontaneamente; é ele próprio um órgão eletrogênico. Há até um sistema elétrico intrínseco que regula o ritmo, garantindo bombeamento constante mesmo em caso de falha nervosa.",
+        "shown": 1
       }
     ]
   },
@@ -1755,7 +1775,7 @@
       },
       {
         "text": "O nosso DNA possui genes \"silenciados\", ou latentes. Eles podem ser reativados sob condições específicas, alterando potencialmente as funções do corpo.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -2011,7 +2031,7 @@
       },
       {
         "text": "Os mamutes lanudos viviam há mais de 600 mil anos e eram muito diferentes dos encontrados nos filmes. Suas narinas grandes ajudavam a filtrar o ar gelado, um mecanismo adaptativo essencial para sua sobrevivência no Pleistoceno.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2183,7 +2203,7 @@
       },
       {
         "text": "O primeiro teste de um míssil balístico americano na década de 1950 foi tão explosivo que o calor gerado superou temporariamente a temperatura da superfície do sol. Esse poder bruto levou ao desenvolvimento de motores mais eficientes para futuras missões espaciais profundas.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2243,7 +2263,7 @@
       },
       {
         "text": "Alguns tipos de materiais ferromagnéticos podem ser manipulados por campos magnéticos para armazenar informações, como ocorre nos discos rígidos. Essa capacidade permite a criação de memórias digitais estáveis que perduram por anos.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2275,7 +2295,7 @@
       },
       {
         "text": "A NASA detectou sinais de biomarcadores gasosos em exoplanetas distantes. Esses gases podem indicar a presença de processos biológicos ativos.",
-        "shown": 2
+        "shown": 4
       }
     ]
   },
@@ -2444,6 +2464,10 @@
       {
         "text": "As baunilhas são florestas naturais do Madagascar. Seu cheiro forte é conseguido por um processo que envolve a fermentação de vagem aberta com o tempo.",
         "shown": 4
+      },
+      {
+        "text": "O açafrão, caríssimo por sua cor vibrante, é feito exclusivamente de estigmas da flor e não conta como um grão. Seu preço histórico o tornou mais valioso que ouro em várias civilizações antigas.",
+        "shown": 1
       }
     ]
   },
@@ -2512,6 +2536,10 @@
       {
         "text": "A píton constritora pode imitar os sons de outros bichos para enganar presas. Elas usam essa camuflagem vocal para caçar com mais eficácia.",
         "shown": 4
+      },
+      {
+        "text": "As cobras coral estão entre os animais mais venenosos do mundo, mas muitas vezes seus ninhos contêm ovos que parecem flores vibrantes. O veneno delas não é só letal; ele também pode ser usado por algumas tribos indígenas em ritualísticas e medicina tradicional.",
+        "shown": 1
       }
     ]
   },
@@ -2563,7 +2591,7 @@
       },
       {
         "text": "A cidade de Petra, na Jordânia, foi um centro comercial vibrante por séculos. Sua arquitetura impressionante foi esculpida diretamente nos paredões rochosos.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2611,7 +2639,7 @@
       },
       {
         "text": "O canal foi inaugurado através da modificação de rios naturais, não sendo um corte totalmente novo na terra firme. Os navios gigantes transportados por ele são projetados especificamente para se ajustar às dimensões das câmaras.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -2659,7 +2687,7 @@
       },
       {
         "text": "Muitos roncos de motores antigos eram intencionalmente modificados para soar mais altos e dramáticos, mesmo que fossem menos eficientes. Isso transformou o ruído em um acessório de status social importante nas décadas de 20 a 40.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2875,7 +2903,7 @@
       },
       {
         "text": "A Escola de Ciências de Pittsburgh foi desativada após o colapso da indústria local. Em vez de ser demolida, ela está sendo transformada em um hub tecnológico vivo.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },
@@ -2927,7 +2955,7 @@
       },
       {
         "text": "O primeiro telefone não tinha discagem; ele usava um sistema de encaixe por números e era composto por fiação manual complexa. A gravação de áudio comercial só se tornou viável após o desenvolvimento do disco compacto, revolucionando a portabilidade da música.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -3219,7 +3247,7 @@
       },
       {
         "text": "Muitos \"piratas\" históricos eram, na verdade, mercenários ou corsários contratados por governos. Eles operavam sob bandeiras reais para combater rivais em vez de apenas saquear sem lei.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -3295,7 +3323,7 @@
       },
       {
         "text": "Alguns tsunamis são gerados por colapso de grandes quantidades de rocha submarina, não apenas por terremotos. Esses eventos podem varrer vastas áreas costeiras com força devastadora.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -3407,7 +3435,7 @@
       },
       {
         "text": "Durante o Império Romano, os banhos públicos não eram apenas para higiene. Era um ponto central de socialização política, onde rumores e negócios importantes eram negociados longe dos olhos do poder.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -3515,7 +3543,7 @@
       },
       {
         "text": "O kernel do Linux é um software de código aberto que pode rodar em mais de cinquenta tipos diferentes de arquiteturas de processadores. Isso garante sua enorme compatibilidade, desde PCs poderosos até pequenos dispositivos embarcados.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -3544,6 +3572,10 @@
       {
         "text": "O Titanic foi projetado para ser inafundável, o que era um feito tecnológico impressionante na época. Ele continha mais itens de conforto do que qualquer embarcação antes dele, representando o auge da engenharia romana moderna.",
         "shown": 4
+      },
+      {
+        "text": "O Titanic estava tão bem isolado que tinha um sistema de comunicações interno independente do exterior. Ele era considerado inquebrável por sua engenharia avançada da época.",
+        "shown": 1
       }
     ]
   },
@@ -3567,7 +3599,7 @@
       },
       {
         "text": "As árvores de sequoia são tão grandes e resistentes que vivem por milhares de anos. Elas também contam com um sistema defensivo complexo, quase imune ao fogo.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -3683,7 +3715,7 @@
       },
       {
         "text": "O tucano-de-bico-verde tem um bico que funciona como um termostato natural. Ele muda de cor em resposta às variações de temperatura ambiente, indicando o nível de estresse ou prazer.",
-        "shown": 1
+        "shown": 2
       }
     ]
   },
@@ -3780,6 +3812,10 @@
       {
         "text": "O regime de importação pode ser usado para trazer mercadorias sob inspeção alfandegária. Nesses casos, o produto entra no país sem pagamento de impostos, mas deve sair em um prazo determinado.",
         "shown": 4
+      },
+      {
+        "text": "O termo \"importar\" pode significar comprar algo de fora ou até mesmo incorporar um novo conceito cultural. A globalização acelerou a capacidade humana de interligar mercadorias e ideias.",
+        "shown": 2
       }
     ]
   },
@@ -3792,6 +3828,10 @@
       {
         "text": "São corpos rochosos residuais do sistema solar. Muitos foram originalmente considerados planetas candidatos e agora são classificados como mundos transneptunianos ou planetas anões.",
         "shown": 4
+      },
+      {
+        "text": "Planetas anões como Plutão não têm gravidade suficiente para limpar sua órbita de detritos. Eles orbitam o Sol, mas são mais próximos do Cinturão de Kuiper.",
+        "shown": 1
       }
     ]
   },
@@ -3808,6 +3848,10 @@
       {
         "text": "As civilizações maias usavam pigmentos naturais para criar arte sofisticada. Um dos mais vibrantes era o azul ultramarino, feito de um mineral encontrado apenas na região costeira do Golfo do México.",
         "shown": 4
+      },
+      {
+        "text": "Em algumas culturas indígenas da Amazônia, o uso de pigmentos naturais é fundamental para rituais de passagem. Essas pinturas não apenas decoram, mas carregam significados sociais complexos ou representações espirituais.",
+        "shown": 1
       }
     ]
   },
@@ -4059,7 +4103,7 @@
       },
       {
         "text": "O primeiro queijo feito na história foi provavelmente de caça e raízes. Algumas culturas usavam o suco de folhas fermentadas como substituto do leite.",
-        "shown": 2
+        "shown": 3
       }
     ]
   },
@@ -4107,7 +4151,7 @@
       },
       {
         "text": "O porto de Singapura já foi chamado de \"A Perla do Oriente\" devido ao seu crescimento econômico acelerado. Ele se tornou um dos maiores e mais eficientes hubs de transbordo marítimo global.",
-        "shown": 3
+        "shown": 4
       }
     ]
   },

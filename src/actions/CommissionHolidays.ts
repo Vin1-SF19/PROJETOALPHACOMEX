@@ -122,6 +122,34 @@ export async function ListarFeriados(input: z.infer<typeof listarFeriadosSchema>
   }
 }
 
+const atualizarFeriadoSchema = criarFeriadoSchema.and(z.object({ id: z.string().min(1) }));
+
+export async function AtualizarFeriado(input: z.infer<typeof atualizarFeriadoSchema>) {
+  const acesso = await exigirAcesso("CONFIGURAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const parsed = atualizarFeriadoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
+  }
+
+  const { id, ...data } = parsed.data;
+
+  try {
+    const feriado = await db.holiday.findUnique({ where: { id } });
+    if (!feriado) return { success: false, error: "Feriado não encontrado" } as const;
+    if (feriado.escopo === "NACIONAL") {
+      return { success: false, error: "Feriados nacionais são automáticos e não podem ser editados." } as const;
+    }
+
+    const atualizado = await db.holiday.update({ where: { id }, data });
+    return { success: true, data: atualizado } as const;
+  } catch (error) {
+    console.error("[AtualizarFeriado]", error);
+    return { success: false, error: "Erro interno ao atualizar feriado" } as const;
+  }
+}
+
 const excluirFeriadoSchema = z.object({ id: z.string().min(1) });
 
 export async function ExcluirFeriado(input: z.infer<typeof excluirFeriadoSchema>) {

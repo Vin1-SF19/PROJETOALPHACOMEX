@@ -22,7 +22,12 @@ vi.mock("googleapis", () => ({
   },
 }));
 
-import { atualizarEventoParcial, cancelarEvento } from "@/lib/google-calendar/client";
+import {
+  atualizarEventoParcial,
+  cancelarEvento,
+  mesclarParticipantesGoogle,
+  obterEvento,
+} from "@/lib/google-calendar/client";
 
 beforeAll(() => {
   process.env.GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL = "service@project.test";
@@ -39,6 +44,122 @@ beforeEach(() => {
 });
 
 describe("Google Calendar optimistic concurrency headers", () => {
+  it("preserva metadados dos participantes mantidos e cria objeto mínimo para novos", () => {
+    const participantes = mesclarParticipantesGoogle(
+      [
+        {
+          email: "existente@alpha.com",
+          responseStatus: "accepted",
+          optional: true,
+          resource: true,
+          organizer: true,
+          displayName: "Sala Alpha",
+        },
+        {
+          email: "removido@alpha.com",
+          responseStatus: "declined",
+        },
+      ],
+      ["existente@alpha.com", "novo@alpha.com"],
+    );
+
+    expect(participantes).toEqual([
+      {
+        email: "existente@alpha.com",
+        responseStatus: "accepted",
+        optional: true,
+        resource: true,
+        organizer: true,
+        displayName: "Sala Alpha",
+      },
+      { email: "novo@alpha.com" },
+    ]);
+  });
+
+  it("faz merge server-side antes do PATCH sem recriar Meet", async () => {
+    getMock.mockResolvedValueOnce({
+      data: {
+        attendees: [
+          {
+            email: "existente@alpha.com",
+            responseStatus: "accepted",
+            optional: true,
+          },
+        ],
+        conferenceData: {
+          entryPoints: [{ entryPointType: "video", uri: "https://meet.google.com/existente" }],
+        },
+      },
+    });
+
+    await atualizarEventoParcial({
+      emailUsuario: "user@alpha.com",
+      calendarId: "primary",
+      googleEventId: "evt-1",
+      etagConhecido: '"v1"',
+      evento: {
+        participantes: ["existente@alpha.com", "novo@alpha.com"],
+      },
+    });
+
+    expect(getMock).toHaveBeenCalledWith({
+      calendarId: "primary",
+      eventId: "evt-1",
+    });
+    expect(patchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestBody: {
+          attendees: [
+            {
+              email: "existente@alpha.com",
+              responseStatus: "accepted",
+              optional: true,
+            },
+            { email: "novo@alpha.com" },
+          ],
+        },
+      }),
+      { headers: { "If-Match": '"v1"' } },
+    );
+    const requestBody = patchMock.mock.calls.at(-1)?.[0]?.requestBody;
+    expect(requestBody).not.toHaveProperty("conferenceData");
+  });
+
+  it("loads the complete Google event before editing", async () => {
+    getMock.mockResolvedValueOnce({
+      data: {
+        id: "evt-1",
+        etag: '"v3"',
+        summary: "Planejamento",
+        description: "Contexto preservado",
+        attendees: [{ email: "pessoa@alpha.com", responseStatus: "accepted" }],
+        conferenceData: {
+          entryPoints: [{ entryPointType: "video", uri: "https://meet.google.com/abc-defg-hij" }],
+        },
+        start: { dateTime: "2026-07-30T13:00:00Z" },
+        end: { dateTime: "2026-07-30T14:00:00Z" },
+      },
+    });
+
+    const evento = await obterEvento({
+      emailUsuario: "user@alpha.com",
+      calendarId: "primary",
+      googleEventId: "evt-1",
+    });
+
+    expect(getMock).toHaveBeenCalledWith({
+      calendarId: "primary",
+      eventId: "evt-1",
+    });
+    expect(evento).toMatchObject({
+      googleEventId: "evt-1",
+      etag: '"v3"',
+      descricao: "Contexto preservado",
+      linkMeet: "https://meet.google.com/abc-defg-hij",
+      participantes: [{ email: "pessoa@alpha.com", status: "accepted" }],
+    });
+  });
+
   it("sends If-Match on events.patch", async () => {
     await atualizarEventoParcial({
       emailUsuario: "user@alpha.com",

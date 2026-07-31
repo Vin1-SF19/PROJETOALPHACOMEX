@@ -1,3 +1,5 @@
+import { formatarFormaPagamento as formatarFormaPagamentoCs } from "@/app/PainelAlpha/CadastroClientes/ModalCadastro/formas-pagamento";
+
 /** Formata um valor em centavos (Int) para moeda pt-BR. Nunca usar Float neste módulo. */
 export function formatarCentavosBRL(valorCents: number): string {
   return (valorCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -12,6 +14,18 @@ export function formatarDataComissao(data: Date | string | null): string {
     month: "2-digit",
     year: "numeric",
   }).format(d);
+}
+
+const FORMAS_PAGAMENTO_EQUIVALENTES: Record<string, string> = {
+  PARCELADO_CONTRATACAO_EXITO: "ENTRADA_EXITO",
+  CARTAO_PARCELADO: "PARCELADO_CC",
+  A_VISTA_DESCONTO: "INTEGRAL_PIX",
+};
+
+/** Usa os mesmos rótulos de negócio exibidos em Metas/CS, preservando texto livre desconhecido. */
+export function formatarFormaPagamentoComissao(valor: string | null | undefined): string {
+  if (!valor) return "Não informada";
+  return formatarFormaPagamentoCs(FORMAS_PAGAMENTO_EQUIVALENTES[valor] ?? valor);
 }
 
 export const EVENT_TYPE_LABELS: Record<string, string> = {

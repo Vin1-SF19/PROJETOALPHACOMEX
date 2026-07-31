@@ -101,3 +101,26 @@ export async function DefinirPermissao(input: z.infer<typeof definirPermissaoSch
     return { success: false, error: "Erro interno ao definir permissão" } as const;
   }
 }
+
+const restaurarPermissoesSchema = z.object({ userId: z.number().int().positive() });
+
+export async function RestaurarPermissoesPadrao(input: z.infer<typeof restaurarPermissoesSchema>) {
+  const acesso = await exigirAcesso("CONFIGURAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const parsed = restaurarPermissoesSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
+  }
+
+  try {
+    const usuario = await db.usuarios.findUnique({ where: { id: parsed.data.userId }, select: { id: true } });
+    if (!usuario) return { success: false, error: "Usuário não encontrado" } as const;
+
+    await db.commissionPermission.deleteMany({ where: { userId: parsed.data.userId } });
+    return { success: true } as const;
+  } catch (error) {
+    console.error("[RestaurarPermissoesPadrao]", error);
+    return { success: false, error: "Erro interno ao restaurar permissões" } as const;
+  }
+}

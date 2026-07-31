@@ -7,9 +7,9 @@ const prismaMock = vi.hoisted(() => ({
   commissionEvent: { findUnique: vi.fn() },
   commissionEntry: { findMany: vi.fn() },
   commissionDivergence: { findMany: vi.fn() },
-  usuarios: { findUnique: vi.fn() },
-  cargoColaborador: { findUnique: vi.fn() },
-  setor: { findUnique: vi.fn() },
+  usuarios: { findUnique: vi.fn(), findMany: vi.fn() },
+  cargoColaborador: { findUnique: vi.fn(), findMany: vi.fn() },
+  setor: { findUnique: vi.fn(), findMany: vi.fn() },
 }));
 
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
@@ -55,6 +55,7 @@ function entryBase(overrides: Record<string, unknown> = {}) {
     scheduledPaymentDate: null,
     actualPaymentDate: null,
     componentes: [],
+    alocacoes: [],
     ...overrides,
   };
 }
@@ -65,11 +66,13 @@ describe("BuscarEventoComLancamentos — setor resolvido por usuarios.role (bug 
     sessaoAdmin();
     prismaMock.commissionEvent.findUnique.mockResolvedValue(eventoBase());
     prismaMock.commissionDivergence.findMany.mockResolvedValue([]);
+    prismaMock.cargoColaborador.findMany.mockResolvedValue([]);
+    prismaMock.setor.findMany.mockResolvedValue([]);
   });
 
   it("role='COMERCIAL' vai para setorComercial, mesmo sem CargoColaborador.setorId cadastrado", async () => {
     prismaMock.commissionEntry.findMany.mockResolvedValue([entryBase()]);
-    prismaMock.usuarios.findUnique.mockResolvedValue({ nome: "Sheila", cargo: "Closer", role: "COMERCIAL" });
+    prismaMock.usuarios.findMany.mockResolvedValue([{ id: 16, nome: "Sheila", cargo: "Closer", role: "COMERCIAL" }]);
 
     const result = await BuscarEventoComLancamentos({ eventId: "evento-1" });
 
@@ -87,7 +90,7 @@ describe("BuscarEventoComLancamentos — setor resolvido por usuarios.role (bug 
 
   it("role='OPERACIONAL' vai para setorOperacional", async () => {
     prismaMock.commissionEntry.findMany.mockResolvedValue([entryBase({ collaboratorId: 20 })]);
-    prismaMock.usuarios.findUnique.mockResolvedValue({ nome: "Heline", cargo: "Analista II", role: "OPERACIONAL" });
+    prismaMock.usuarios.findMany.mockResolvedValue([{ id: 20, nome: "Heline", cargo: "Analista II", role: "OPERACIONAL" }]);
 
     const result = await BuscarEventoComLancamentos({ eventId: "evento-1" });
 
@@ -100,9 +103,9 @@ describe("BuscarEventoComLancamentos — setor resolvido por usuarios.role (bug 
 
   it("role que não é Comercial/Operacional (ex: 'Admin') cai para CargoColaborador.setorId como fallback", async () => {
     prismaMock.commissionEntry.findMany.mockResolvedValue([entryBase()]);
-    prismaMock.usuarios.findUnique.mockResolvedValue({ nome: "Vinicius", cargo: "Diretor Operacional", role: "Admin" });
-    prismaMock.cargoColaborador.findUnique.mockResolvedValue({ setorId: 5 });
-    prismaMock.setor.findUnique.mockResolvedValue({ nome: "Operacional" });
+    prismaMock.usuarios.findMany.mockResolvedValue([{ id: 16, nome: "Vinicius", cargo: "Diretor Operacional", role: "Admin" }]);
+    prismaMock.cargoColaborador.findMany.mockResolvedValue([{ nome: "Diretor Operacional", setorId: 5 }]);
+    prismaMock.setor.findMany.mockResolvedValue([{ id: 5, nome: "Operacional" }]);
 
     const result = await BuscarEventoComLancamentos({ eventId: "evento-1" });
 
@@ -110,14 +113,14 @@ describe("BuscarEventoComLancamentos — setor resolvido por usuarios.role (bug 
     if (result.success) {
       expect(result.data.setorOperacional).toHaveLength(1);
     }
-    expect(prismaMock.cargoColaborador.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { nome: "Diretor Operacional" } }),
+    expect(prismaMock.cargoColaborador.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { nome: { in: ["Diretor Operacional"] } } }),
     );
   });
 
   it("sem role reconhecido e sem CargoColaborador cadastrado: cai em semSetor (nunca esconde o colaborador)", async () => {
     prismaMock.commissionEntry.findMany.mockResolvedValue([entryBase()]);
-    prismaMock.usuarios.findUnique.mockResolvedValue({ nome: "Fulano", cargo: null, role: "TI" });
+    prismaMock.usuarios.findMany.mockResolvedValue([{ id: 16, nome: "Fulano", cargo: null, role: "TI" }]);
 
     const result = await BuscarEventoComLancamentos({ eventId: "evento-1" });
 

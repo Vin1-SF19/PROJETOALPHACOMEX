@@ -53,6 +53,16 @@ const URGENCIA_CONFIG = {
     badge: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
     titleColor: 'text-emerald-100',
   },
+  CONCLUIDO: {
+    icon: CheckCircle,
+    label: 'CONCLUÍDO',
+    border: 'border-emerald-400/30',
+    bg: 'bg-emerald-500/5',
+    glow: 'shadow-[0_0_16px_rgba(52,211,153,0.12)]',
+    iconColor: 'text-emerald-400',
+    badge: 'bg-emerald-500/10 border-emerald-400/25 text-emerald-300',
+    titleColor: 'text-emerald-100',
+  },
 } as const;
 
 const FALLBACK_CONFIG = {

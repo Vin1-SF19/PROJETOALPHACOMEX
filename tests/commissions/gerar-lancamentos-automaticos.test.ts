@@ -11,6 +11,11 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
 const gerarLancamentosParaEventoMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/commissions/entry-generator", () => ({ gerarLancamentosParaEvento: gerarLancamentosParaEventoMock }));
+const resolverParticipantesMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/commissions/participant-resolver", () => ({
+  resolverParticipantesAutomaticosEvento: resolverParticipantesMock,
+  registrarAmbiguidadesParticipantes: vi.fn(),
+}));
 
 import { GerarLancamentosAutomaticosEvento } from "@/actions/CommissionEvents";
 
@@ -29,6 +34,7 @@ describe("GerarLancamentosAutomaticosEvento — retroagir eventos sem lançament
       closerUsuarioId: 10,
       analistaResponsavelUsuarioId: 42,
     });
+    resolverParticipantesMock.mockResolvedValue({ collaboratorIds: [10, 42], ambiguidades: [] });
     gerarLancamentosParaEventoMock.mockResolvedValue({ entriesCreated: 2, entriesSkipped: 0, divergencesCreated: 0 });
 
     const result = await GerarLancamentosAutomaticosEvento({ eventId: "evento-1" });
@@ -45,6 +51,7 @@ describe("GerarLancamentosAutomaticosEvento — retroagir eventos sem lançament
       closerUsuarioId: 10,
       analistaResponsavelUsuarioId: null,
     });
+    resolverParticipantesMock.mockResolvedValue({ collaboratorIds: [10], ambiguidades: [] });
     gerarLancamentosParaEventoMock.mockResolvedValue({ entriesCreated: 1, entriesSkipped: 0, divergencesCreated: 0 });
 
     await GerarLancamentosAutomaticosEvento({ eventId: "evento-1" });
@@ -57,6 +64,7 @@ describe("GerarLancamentosAutomaticosEvento — retroagir eventos sem lançament
       closerUsuarioId: null,
       analistaResponsavelUsuarioId: null,
     });
+    resolverParticipantesMock.mockResolvedValue({ collaboratorIds: [], ambiguidades: [] });
 
     const result = await GerarLancamentosAutomaticosEvento({ eventId: "evento-1" });
 

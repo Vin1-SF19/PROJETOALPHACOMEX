@@ -24,6 +24,7 @@ const prismaMock = vi.hoisted(() => ({
   },
   commissionDivergence: {
     create: vi.fn(),
+    updateMany: vi.fn(),
   },
   businessProcess: {
     findFirst: vi.fn(),
@@ -34,6 +35,11 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
 const gerarLancamentosParaEventoMock = vi.hoisted(() => vi.fn().mockResolvedValue({ entriesCreated: 0, entriesSkipped: 0, divergencesCreated: 0 }));
 vi.mock("@/lib/commissions/entry-generator", () => ({ gerarLancamentosParaEvento: gerarLancamentosParaEventoMock }));
+const resolverParticipantesMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/commissions/participant-resolver", () => ({
+  resolverParticipantesAutomaticosEvento: resolverParticipantesMock,
+  registrarAmbiguidadesParticipantes: vi.fn(),
+}));
 
 import { sincronizarComissoes } from "@/lib/commissions/sync-engine";
 
@@ -64,7 +70,12 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     prismaMock.commissionEvent.findMany.mockResolvedValue([]);
     prismaMock.commissionEvent.findFirst.mockResolvedValue(null); // sem CONTRACTING prévio por padrão
     prismaMock.businessProcess.findFirst.mockResolvedValue(null); // sem BusinessProcess por padrão
+    prismaMock.commissionDivergence.updateMany.mockResolvedValue({ count: 0 });
     gerarLancamentosParaEventoMock.mockResolvedValue({ entriesCreated: 0, entriesSkipped: 0, divergencesCreated: 0 });
+    resolverParticipantesMock.mockImplementation(async (eventId: string) => ({
+      collaboratorIds: eventId.includes("exito") ? [10, 42] : eventId.includes("novo") ? [10] : [],
+      ambiguidades: [],
+    }));
   });
 
   it("evento de contratação já existente (idempotência): não cria novo CommissionEvent", async () => {
@@ -122,6 +133,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
     prismaMock.clientes.findFirst.mockResolvedValue(null);
     prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo", closerUsuarioId: null });
+    resolverParticipantesMock.mockResolvedValue({ collaboratorIds: [], ambiguidades: [] });
 
     await sincronizarComissoes({ triggeredBy: "manual" });
 

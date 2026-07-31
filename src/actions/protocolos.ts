@@ -3,6 +3,7 @@
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
+import { notificarChamadoConcluido } from "@/lib/chamados/notificacoes-server";
 
 // Prisma client types não incluem ProtocoloTemplate ainda.
 // Após parar dev server: `npx prisma generate` para remover os casts abaixo.
@@ -119,6 +120,13 @@ export async function finalizarComProtocolo(
     const session = await auth();
     if (!session) return { success: false, error: "Não autorizado" };
 
+    const chamado = await db.chamados.findUnique({
+      where: { id: chamadoId },
+      select: { id: true, titulo: true, usuarioId: true },
+    });
+    if (!chamado) return { success: false, error: "Chamado não encontrado." };
+
+    const concluidoEm = new Date();
     await db.$executeRawUnsafe(
       `UPDATE chamados SET status = ?, solucao = ?, causa = ?, mensagemFinal = ?, templateId = ?, closedAt = ?, updatedAt = ? WHERE id = ?`,
       "CONCLUIDO",
@@ -126,10 +134,17 @@ export async function finalizarComProtocolo(
       dados.causa.trim() || null,
       dados.mensagemFinal.trim() || null,
       dados.templateId ?? null,
-      new Date().toISOString(),
-      new Date().toISOString(),
+      concluidoEm.toISOString(),
+      concluidoEm.toISOString(),
       chamadoId
     );
+
+    await notificarChamadoConcluido(chamado.usuarioId, {
+      chamadoId: chamado.id,
+      titulo: chamado.titulo,
+      solucao: dados.solucao.trim(),
+      createdAt: concluidoEm.toISOString(),
+    });
 
     revalidatePath("/PainelAlpha/Chamados");
     return { success: true };

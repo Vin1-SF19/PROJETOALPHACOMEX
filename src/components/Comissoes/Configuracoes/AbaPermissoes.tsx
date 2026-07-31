@@ -2,11 +2,24 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, RotateCcw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   DefinirPermissao,
   ListarUsuariosComPermissoes,
+  RestaurarPermissoesPadrao,
   type UsuarioComPermissoesRow,
 } from "@/actions/CommissionPermissions";
 import { CATEGORIA_LABEL, CATEGORIAS_PERMISSAO, type CategoriaPermissao } from "@/lib/commissions/permissions";
@@ -50,6 +63,18 @@ export function AbaPermissoes() {
     });
   }
 
+  function restaurar(userId: number) {
+    startTransition(async () => {
+      const resultado = await RestaurarPermissoesPadrao({ userId });
+      if (!resultado.success) {
+        toast.error(resultado.error ?? "Erro ao restaurar permissões");
+        return;
+      }
+      toast.success("Permissões restauradas para o padrão.");
+      void carregar();
+    });
+  }
+
   if (carregando) {
     return (
       <div className="flex justify-center py-8">
@@ -80,7 +105,29 @@ export function AbaPermissoes() {
         <div className="space-y-4">
           {usuarios.map((usuario) => (
             <div key={usuario.id} className="rounded-2xl border border-white/5 bg-slate-900/40 p-4">
-              <p className="text-sm font-medium text-white">{usuario.nome}</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-white">{usuario.nome}</p>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="gap-1.5 border-white/10 text-slate-300" disabled={isPending}>
+                      <RotateCcw className="size-3.5" aria-hidden="true" />
+                      Restaurar padrão
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-white/10 bg-slate-950">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-slate-200">Restaurar permissões de {usuario.nome}?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-slate-400">
+                        As personalizações serão removidas e o usuário voltará ao padrão do módulo, com todas as categorias permitidas.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => restaurar(usuario.id)}>Restaurar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {CATEGORIAS_PERMISSAO.map((categoria) => (
                   <label

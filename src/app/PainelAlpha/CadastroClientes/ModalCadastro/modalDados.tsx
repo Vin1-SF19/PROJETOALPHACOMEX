@@ -14,6 +14,7 @@ import { ModalSelecionarUsuario } from './ModalSelecionarUsuario';
 import { FORMAS_PAGAMENTO, FORMAS_LABEL, formatarFormaPagamento } from './formas-pagamento';
 import { ORIGENS_LEAD_PADRAO } from './origens-lead';
 import { CsNpsModal3DShell } from "../CsNpsMotion";
+import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 
 /**
  * `dataContratacao` é salva como `.toISOString()` de uma data "só o dia" (sem
@@ -156,7 +157,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [isCriandoServico, setIsCriandoServico] = useState(false);
     const [novoServicoNome, setNovoServicoNome] = useState("");
 
-    const listaServicos = ["Habilitação RADAR - 50K", "Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO", "TTD 409", "Recuperação AFRMM", "Outras Recuperaçoes Tributarias"];
+    const listaServicos: string[] = [...SERVICOS_COMERCIAIS_PADRAO];
     const SERVICOS_COM_EMBASAMENTO = ["Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO"];
 
     const listaEmbasamentos = ["Disponibilidade Financeira", "Início ou Retomada", "Receita Bruta (DAS)", "Receita Bruta (CPRB)"];

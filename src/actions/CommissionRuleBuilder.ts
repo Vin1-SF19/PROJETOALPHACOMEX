@@ -167,7 +167,18 @@ export async function PublicarRegra(input: z.infer<typeof publicarRegraSchema>) 
 
 const criarVersaoSchema = salvarRascunhoSchema
   .omit({ name: true, description: true, eventType: true, benefitType: true, cargoId: true, setorId: true, collaboratorId: true, servico: true, approvalRequired: true })
-  .extend({ ruleId: z.string().min(1) });
+  .extend({
+    ruleId: z.string().min(1),
+    name: z.string().min(1).optional(),
+    description: z.string().nullable().optional(),
+    eventType: salvarRascunhoSchema.shape.eventType.optional(),
+    benefitType: salvarRascunhoSchema.shape.benefitType.optional(),
+    cargoId: z.number().int().positive().nullable().optional(),
+    setorId: z.number().int().positive().nullable().optional(),
+    collaboratorId: z.number().int().positive().nullable().optional(),
+    servico: z.string().nullable().optional(),
+    approvalRequired: z.boolean().optional(),
+  });
 
 /**
  * Cria uma NOVA CommissionRuleVersion para uma CommissionRule EXISTENTE, incrementando
@@ -183,7 +194,16 @@ export async function CriarVersaoRegra(input: z.infer<typeof criarVersaoSchema>)
     return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
   }
 
-  const { ruleId, conditions, calculation, paymentSchedule, priority, validFrom, validTo } = parsed.data;
+  const {
+    ruleId,
+    conditions,
+    calculation,
+    paymentSchedule,
+    priority,
+    validFrom,
+    validTo,
+    ...rulePatch
+  } = parsed.data;
 
   try {
     const rule = await db.commissionRule.findUnique({ where: { id: ruleId } });
@@ -196,8 +216,8 @@ export async function CriarVersaoRegra(input: z.infer<typeof criarVersaoSchema>)
 
     const novaVersaoNumero = (ultimaVersao?.version ?? 0) + 1;
 
-    if (priority !== rule.priority) {
-      await db.commissionRule.update({ where: { id: ruleId }, data: { priority } });
+    if (priority !== rule.priority || Object.keys(rulePatch).length > 0) {
+      await db.commissionRule.update({ where: { id: ruleId }, data: { priority, ...rulePatch } });
     }
 
     const novaVersao = await db.commissionRuleVersion.create({
@@ -219,7 +239,7 @@ export async function CriarVersaoRegra(input: z.infer<typeof criarVersaoSchema>)
       entityType: "CommissionRule",
       entityId: ruleId,
       before: { ultimaVersao: ultimaVersao?.version ?? null, priority: rule.priority },
-      after: { novaVersao: novaVersao.version, priority },
+      after: { novaVersao: novaVersao.version, priority, ...rulePatch },
     });
 
     return { success: true, data: novaVersao } as const;
@@ -233,10 +253,16 @@ const inativarRegraSchema = z.object({ ruleId: z.string().min(1) });
 
 /** Marca CommissionRule.active=false — preserva TODO o histórico de versões, nunca deleta. */
 export async function InativarRegra(input: z.infer<typeof inativarRegraSchema>) {
+  return AlterarStatusRegra({ ...input, active: false });
+}
+
+const alterarStatusRegraSchema = inativarRegraSchema.extend({ active: z.boolean() });
+
+export async function AlterarStatusRegra(input: z.infer<typeof alterarStatusRegraSchema>) {
   const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
-  const parsed = inativarRegraSchema.safeParse(input);
+  const parsed = alterarStatusRegraSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
   }
@@ -247,12 +273,12 @@ export async function InativarRegra(input: z.infer<typeof inativarRegraSchema>) 
 
     const atualizada = await db.commissionRule.update({
       where: { id: parsed.data.ruleId },
-      data: { active: false },
+      data: { active: parsed.data.active },
     });
 
     await registrarAuditoria({
       userId: acesso.userId,
-      acao: "INATIVAR_REGRA",
+      acao: parsed.data.active ? "REATIVAR_REGRA" : "INATIVAR_REGRA",
       entityType: "CommissionRule",
       entityId: parsed.data.ruleId,
       before: { active: rule.active },
@@ -261,8 +287,40 @@ export async function InativarRegra(input: z.infer<typeof inativarRegraSchema>) 
 
     return { success: true, data: atualizada } as const;
   } catch (error) {
-    console.error("[InativarRegra]", error);
-    return { success: false, error: "Erro interno ao inativar regra" } as const;
+    console.error("[AlterarStatusRegra]", error);
+    return { success: false, error: `Erro interno ao ${parsed.data.active ? "reativar" : "inativar"} regra` } as const;
+  }
+}
+
+export async function ReativarRegra(input: z.infer<typeof inativarRegraSchema>) {
+  return AlterarStatusRegra({ ...input, active: true });
+}
+
+export async function ListarRegrasConfiguracao() {
+  const acesso = await exigirAcesso("VISUALIZAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  try {
+    const regras = await db.commissionRule.findMany({
+      orderBy: [{ active: "desc" }, { updatedAt: "desc" }],
+      include: {
+        versoes: {
+          orderBy: { version: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: regras.map(({ versoes, ...regra }) => ({
+        ...regra,
+        ultimaVersao: versoes[0] ?? null,
+      })),
+    } as const;
+  } catch (error) {
+    console.error("[ListarRegrasConfiguracao]", error);
+    return { success: false, error: "Erro interno ao listar regras" } as const;
   }
 }
 

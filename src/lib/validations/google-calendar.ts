@@ -149,8 +149,8 @@ export type AtualizarEventoParcialInput = z.infer<typeof atualizarEventoParcialS
 export const cancelarEventoSchema = z.object({
   calendarId: z.string().trim().min(1).max(300),
   googleEventId: z.string().trim().min(1),
-  etagConhecido: z.string().trim().min(1).max(1024).optional(),
-});
+  etagConhecido: z.string().trim().min(1).max(1024),
+}).strict();
 export type CancelarEventoInput = z.infer<typeof cancelarEventoSchema>;
 
 export const corHexSchema = z

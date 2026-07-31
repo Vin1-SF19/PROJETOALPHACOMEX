@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { X, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import { X, AlertTriangle, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { useChamadoNotificacoes, type ChamadoNotificacao } from '@/store/useChamadoNotificacoes';
 
 const URGENCIA_CONFIG = {
@@ -42,6 +42,15 @@ const URGENCIA_CONFIG = {
     glow: '',
     iconColor: 'text-emerald-400',
     badge: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+  },
+  CONCLUIDO: {
+    icon: CheckCircle2,
+    label: 'Chamado concluído',
+    border: 'border-emerald-400/30',
+    bg: 'bg-[#07110d]',
+    glow: 'shadow-[0_0_18px_rgba(52,211,153,0.14)]',
+    iconColor: 'text-emerald-400',
+    badge: 'bg-emerald-500/10 border-emerald-400/25 text-emerald-300',
   },
 } as const;
 

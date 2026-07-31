@@ -49,7 +49,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Operacional | Tarefas Comercial | `/PainelAlpha/PainelTarefas/PainelTarefaC` | `tarefasComercial` |
 | Operacional | Ger. Tarefas | `/PainelAlpha/PainelTarefas/GerenciarTarefas/...` | `gerenciamentoTarefas` |
 | Operacional | Reserva de Salas | `/PainelAlpha/ReservaSalas` | `Reservas` |
-| Operacional | Calendário Alpha | `/PainelAlpha/CalendarioAlpha` | `calendarioAlpha` ← MVP OAuth Google Calendar, 2026-07-17 (sem webhook/vínculos internos, ver seção própria) |
+| Operacional | Agenda Alpha | `/PainelAlpha/CalendarioAlpha` | `calendarioAlpha` ← nome visual novo; rota e permissão legadas preservadas; Google Workspace via Domain-Wide Delegation |
 | Operacional | Serviços Gerais | `/PainelAlpha/PainelTarefas/painelTarefaSG` | `ServiçosGerais` |
 | Comercial | Alpha CRM | `/PainelAlpha/AlphaCRM` | `crm` |
 | Comercial | CS & NPS | `/PainelAlpha/CadastroClientes` | `Cliente` |
@@ -250,7 +250,7 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 ---
 
-## Calendário Alpha — MVP via Domain-Wide Delegation (Google Workspace)
+## Agenda Alpha — rota legada CalendarioAlpha via Domain-Wide Delegation
 
 **Adicionado em:** 2026-07-17 por Scribe (sessão Bibble, a partir de prompt gerado pelo Phantom)
 
@@ -278,6 +278,24 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 **Decisão de arquitetura (dados):** eventos NÃO são espelhados integralmente — `GoogleCalendarEventoCache` guarda só título/horário/status/etag; descrição/participantes/link do Meet ficam só no Google. Google Calendar continua fonte de verdade única.
 
+### Onda cache-first e reestruturação visual (2026-07-30)
+
+O nome visível passou a ser **Agenda Alpha**, sem alterar `/PainelAlpha/CalendarioAlpha`, o id/permissão `calendarioAlpha` ou os gates de sessão. A rota é cache-first: o SSR lê exclusivamente `GoogleCalendarEventoCache`; Google Calendar só é consultado pela sincronização manual explícita ou por ações ao vivo também explícitas, como agendas compartilhadas.
+
+**Backend:** `src/actions/google-calendar-sync.ts` consolida a sincronização por conexão; `src/lib/google-calendar/sync-orchestrator.ts` fornece dedupe/cooldown in-process e resultados tipados por calendário; `sync.ts` só troca cache e `syncToken` em transação após todas as páginas, inclusive na recuperação de `410 Gone`. `google-calendar-eventos.ts` carrega o recurso completo antes de editar; PATCH parcial usa `If-Match`/ETag e preserva descrição, metadados de participantes e Google Meet quando não alterados.
+
+**Frontend:** `CalendarioAlphaDashboard.tsx` foi reduzido a orquestrador; `AgendaSidebar.tsx`, `StatusSincronizacao.tsx`, `AgendaModal3D.tsx`/`AgendaOverlays.tsx`, `ConteudoAgenda.tsx` e hooks em `lib/` concentram sidebar, estado de sync, modais 3D responsivos e controle da tela. `invalidation.ts` sincroniza abas/iframes por `BroadcastChannel`, com fallback `storage`/evento DOM e dedupe contra loops.
+
+**Privacidade:** consultas ao vivo de colegas continuam sob Domain-Wide Delegation e permissão assimétrica. Usuário comum recebe apenas blocos “Ocupado”, sem título, e-mail, Meet, ETag ou id real; Admin/CEO mantém detalhes e escrita. Agendas compartilhadas não entram no snapshot SSR e só são buscadas ao vivo após ação explícita.
+
+**Fase 2A operacional (2026-07-30):** coordenação entre réplicas, fila e push agora existem no código e no schema, mas permanecem **flags-off**. A migration autorizada pelo Vault foi aplicada uma única vez e validada no Turso: `GoogleCalendarPushChannel`, `GoogleCalendarPendingOperation` e `GoogleCalendarSyncLease`, com 7 índices explícitos e 3 unicidades.
+
+**Mapa:** webhook em `src/app/api/calendario-alpha/webhook/route.ts`; fila/lease em `sync-queue.ts` e `distributed-lock.ts`; canais em `client.ts` e `push-channels.ts`; fencing em `sync-orchestrator.ts` e `sync.ts`; operação em `worker.ts`, `maintenance.ts`, `runtime-config.ts` e `observability.ts`; CLIs em `scripts/calendar-alpha-{doctor,worker,maintenance,queue}.mjs`.
+
+**Runbook:** manter flags desligadas e consultar doctor/status; ativar lock → fila → push somente depois de URL HTTPS pública, WAF/rate limit distribuído, scheduler supervisionado e E2E Google/Turso multi-instância; iniciar por canário. 183 testes Agenda Alpha, Forge build/lint/schema, Probe, Anubis, Lens e Sage passaram. Typecheck mantém quatro baselines externos.
+
+**Última atualização:** 2026-07-30 por Scribe
+
 ### Extensão Bibble/IAlpha — 10 tools de agenda (2026-07-23)
 
 **Adicionado em:** 2026-07-23 por Scribe.
@@ -298,7 +316,7 @@ O núcleo conversacional do calendário vive em `src/lib/bibble/calendar-tools.t
 
 **Editado quando:** a Fase 2 (webhook, vínculos internos) for confirmada e implementada, ou se o suporte a conta pessoal (Gmail) precisar voltar (exigiria reintroduzir o fluxo OAuth em paralelo à Domain-Wide Delegation).
 
-**Última atualização:** 2026-07-23 por Scribe
+**Última atualização:** 2026-07-30 por Kowalski
 
 ---
 

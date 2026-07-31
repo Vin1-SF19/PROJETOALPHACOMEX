@@ -54,9 +54,26 @@ export async function ListarCargos() {
       : [];
     const setorPorId = new Map(setores.map((s) => [s.id, s.nome]));
 
+    const usuarios = await db.usuarios.findMany({
+      where: { status: "ATIVO", cargo: { not: null } },
+      select: { cargo: true, role: true },
+    });
+    const rolesPorCargo = new Map<string, Set<string>>();
+    for (const usuario of usuarios) {
+      const cargoNormalizado = usuario.cargo?.trim().toLocaleLowerCase("pt-BR");
+      const role = usuario.role?.trim();
+      if (!cargoNormalizado || !role) continue;
+      if (!rolesPorCargo.has(cargoNormalizado)) rolesPorCargo.set(cargoNormalizado, new Set());
+      rolesPorCargo.get(cargoNormalizado)!.add(role);
+    }
+
     const data = cargos.map((cargo) => ({
       ...cargo,
-      setorNome: cargo.setorId ? setorPorId.get(cargo.setorId) ?? null : null,
+      setoresPorRole: [...(rolesPorCargo.get(cargo.nome.trim().toLocaleLowerCase("pt-BR")) ?? [])].sort(),
+      setorNome:
+        [...(rolesPorCargo.get(cargo.nome.trim().toLocaleLowerCase("pt-BR")) ?? [])].sort().join(" / ") ||
+        (cargo.setorId ? setorPorId.get(cargo.setorId) ?? null : null),
+      setorOrigem: rolesPorCargo.has(cargo.nome.trim().toLocaleLowerCase("pt-BR")) ? "USUARIOS_ROLE" : cargo.setorId ? "CARGO" : null,
     }));
 
     return { success: true, data } as const;
@@ -97,6 +114,7 @@ export async function CriarCargo(input: z.infer<typeof criarCargoSchema>) {
 
 const atualizarCargoSchema = z.object({
   id: z.number().int().positive(),
+  nome: z.string().min(1).optional(),
   setorId: z.number().int().positive().nullable().optional(),
   vinculoPadrao: vinculoPadraoSchema.nullable().optional(),
   naturezaRecebimento: naturezaRecebimentoSchema.nullable().optional(),
@@ -118,6 +136,19 @@ export async function AtualizarCargo(input: z.infer<typeof atualizarCargoSchema>
     const existente = await db.cargoColaborador.findUnique({ where: { id } });
     if (!existente) return { success: false, error: "Cargo não encontrado" } as const;
 
+    if (data.nome && data.nome !== existente.nome) {
+      const nomeEmUso = await db.cargoColaborador.findUnique({ where: { nome: data.nome } });
+      if (nomeEmUso) return { success: false, error: "Já existe um cargo com esse nome" } as const;
+
+      const ocupantes = await db.usuarios.count({ where: { cargo: existente.nome } });
+      if (ocupantes > 0) {
+        return {
+          success: false,
+          error: "Este cargo possui colaboradores vinculados. Ajuste o nome pela Gestão de Colaboradores para não quebrar os vínculos existentes.",
+        } as const;
+      }
+    }
+
     const atualizado = await db.cargoColaborador.update({ where: { id }, data });
     return { success: true, data: atualizado } as const;
   } catch (error) {
@@ -130,10 +161,16 @@ const inativarCargoSchema = z.object({ id: z.number().int().positive() });
 
 /** Nunca DELETE físico — usa o campo `ativo` já existente em CargoColaborador. */
 export async function InativarCargo(input: z.infer<typeof inativarCargoSchema>) {
+  return AlterarStatusCargo({ ...input, ativo: false });
+}
+
+const alterarStatusCargoSchema = inativarCargoSchema.extend({ ativo: z.boolean() });
+
+export async function AlterarStatusCargo(input: z.infer<typeof alterarStatusCargoSchema>) {
   const acesso = await exigirAcesso("CONFIGURAR");
   if (!acesso.ok) return { success: false, error: acesso.error } as const;
 
-  const parsed = inativarCargoSchema.safeParse(input);
+  const parsed = alterarStatusCargoSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: "Dados inválidos", details: parsed.error.flatten() } as const;
   }
@@ -144,13 +181,17 @@ export async function InativarCargo(input: z.infer<typeof inativarCargoSchema>) 
 
     const atualizado = await db.cargoColaborador.update({
       where: { id: parsed.data.id },
-      data: { ativo: false },
+      data: { ativo: parsed.data.ativo },
     });
     return { success: true, data: atualizado } as const;
   } catch (error) {
-    console.error("[InativarCargo]", error);
-    return { success: false, error: "Erro interno ao inativar cargo" } as const;
+    console.error("[AlterarStatusCargo]", error);
+    return { success: false, error: `Erro interno ao ${parsed.data.ativo ? "reativar" : "inativar"} cargo` } as const;
   }
+}
+
+export async function ReativarCargo(input: z.infer<typeof inativarCargoSchema>) {
+  return AlterarStatusCargo({ ...input, ativo: true });
 }
 
 export interface ColaboradorComissaoRow {
@@ -177,7 +218,7 @@ export async function ListarColaboradoresParaComissoes() {
   try {
     const usuarios = await db.usuarios.findMany({
       where: { status: "ATIVO" },
-      select: { id: true, nome: true, cargo: true },
+      select: { id: true, nome: true, cargo: true, role: true },
       orderBy: { nome: "asc" },
     });
 
@@ -204,12 +245,13 @@ export async function ListarColaboradoresParaComissoes() {
 
       const resolucao = resolverVinculoNaData(contratos as ContratoColaboradorRecord[], usuario.id, hoje);
       const setorId = usuario.cargo ? setorIdPorCargo.get(usuario.cargo) ?? null : null;
+      const setorNome = usuario.role?.trim() || (setorId ? setorNomePorId.get(setorId) ?? null : null);
 
       data.push({
         id: usuario.id,
         nome: usuario.nome,
         cargo: usuario.cargo,
-        setorNome: setorId ? setorNomePorId.get(setorId) ?? null : null,
+        setorNome,
         vinculo: resolucao.status === "RESOLVIDO" ? resolucao.vinculo : null,
         vinculoDivergente: resolucao.status !== "RESOLVIDO" ? resolucao.status : null,
       });

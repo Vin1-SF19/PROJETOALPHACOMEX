@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
-  commissionEvent: { findUnique: vi.fn() },
-  commissionEntry: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-  entryComponent: { create: vi.fn() },
+  $transaction: vi.fn(),
+  commissionEvent: { findUnique: vi.fn(), findFirst: vi.fn() },
+  businessProcess: { findUnique: vi.fn() },
+  commissionEntry: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
+  entryComponent: { create: vi.fn(), deleteMany: vi.fn() },
   eligibilityOverride: { findMany: vi.fn() },
-  commissionDivergence: { create: vi.fn() },
+  commissionDivergence: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   usuarios: { findUnique: vi.fn() },
   contratoColaborador: { findMany: vi.fn() },
   cargoColaborador: { findUnique: vi.fn() },
@@ -41,6 +43,10 @@ describe("gerarLancamentosParaEvento", () => {
     vi.clearAllMocks();
     prismaMock.eligibilityOverride.findMany.mockResolvedValue([]);
     prismaMock.commissionEntry.findFirst.mockResolvedValue(null);
+    prismaMock.commissionEntry.upsert.mockResolvedValue({ id: "entry-1" });
+    prismaMock.entryComponent.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.commissionDivergence.findFirst.mockResolvedValue(null);
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
     prismaMock.holiday.findMany.mockResolvedValue([]); // sem feriados estaduais/municipais cadastrados por padrão
   });
 
@@ -67,7 +73,7 @@ describe("gerarLancamentosParaEvento", () => {
 
     expect(result.divergencesCreated).toBe(0);
     expect(result.entriesCreated).toBe(1);
-    expect(prismaMock.commissionEntry.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.commissionEntry.upsert).toHaveBeenCalledTimes(1);
     expect(prismaMock.entryComponent.create).toHaveBeenCalledTimes(1);
 
     const componentCall = prismaMock.entryComponent.create.mock.calls[0][0];
@@ -95,11 +101,48 @@ describe("gerarLancamentosParaEvento", () => {
     const result = await gerarLancamentosParaEvento({ eventId: "evento-1", collaboratorIds: [42] });
 
     expect(result.entriesCreated).toBe(1);
-    expect(prismaMock.commissionEntry.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.commissionEntry.upsert).toHaveBeenCalledTimes(1);
     expect(prismaMock.entryComponent.create).toHaveBeenCalledTimes(1); // só COMISSAO, nunca DSR
 
     const componentCall = prismaMock.entryComponent.create.mock.calls[0][0];
     expect(componentCall.data.tipo).toBe("COMISSAO");
+  });
+
+  it("êxito na primeira tentativa gera prêmio de êxito e adicional no mesmo lançamento", async () => {
+    prismaMock.commissionEvent.findUnique.mockResolvedValue(
+      eventoBase({
+        eventType: "PROCESS_SUCCESS",
+        businessProcessId: "processo-1",
+        eventDate: new Date("2026-07-28T00:00:00.000Z"),
+      }),
+    );
+    prismaMock.businessProcess.findUnique.mockResolvedValue({
+      analistaAuxiliarId: null,
+      auditorId: null,
+      diretorId: null,
+      deferidoPrimeiraTentativa: true,
+    });
+    prismaMock.usuarios.findUnique.mockResolvedValue(usuarioComCargo(4, "Analista II"));
+    prismaMock.contratoColaborador.findMany.mockResolvedValue([
+      { id: "c4", usuarioId: 42, tipo: "CLT", dataInicio: new Date("2026-01-01"), dataFim: null },
+    ]);
+    prismaMock.cargoColaborador.findUnique.mockResolvedValue({
+      id: 4,
+      nome: "Analista II",
+      setorId: null,
+      naturezaRecebimento: null,
+      permiteMultiplosOcupantes: true,
+    });
+
+    const result = await gerarLancamentosParaEvento({ eventId: "evento-1", collaboratorIds: [42] });
+
+    expect(result.entriesCreated).toBe(1);
+    const premios = prismaMock.entryComponent.create.mock.calls
+      .map(([call]) => call.data)
+      .filter((componente) => componente.tipo === "PREMIO")
+      .map((componente) => componente.valorCents);
+    expect(premios).toEqual(expect.arrayContaining([25_000, 10_000]));
+    expect(prismaMock.commissionEntry.upsert).toHaveBeenCalledTimes(1);
   });
 
   it("Analista Sênior: comissão e DSR são gerados como componentes SEPARADOS por decomposição do total fixo (R$350)", async () => {
@@ -150,7 +193,7 @@ describe("gerarLancamentosParaEvento", () => {
 
     expect(result.entriesSkipped).toBe(1);
     expect(result.entriesCreated).toBe(0);
-    expect(prismaMock.commissionEntry.create).not.toHaveBeenCalled();
+    expect(prismaMock.commissionEntry.upsert).not.toHaveBeenCalled();
     expect(prismaMock.usuarios.findUnique).not.toHaveBeenCalled(); // nem chega a buscar o colaborador
   });
 
@@ -172,8 +215,7 @@ describe("gerarLancamentosParaEvento", () => {
 
     const result = await gerarLancamentosParaEvento({ eventId: "evento-1", collaboratorIds: [42] });
 
-    expect(prismaMock.commissionEntry.create).not.toHaveBeenCalled();
-    expect(prismaMock.commissionEntry.update).toHaveBeenCalledTimes(1);
+    expect(prismaMock.commissionEntry.upsert).toHaveBeenCalledTimes(1);
     expect(result.entriesCreated).toBe(1);
   });
 
@@ -215,7 +257,7 @@ describe("gerarLancamentosParaEvento", () => {
 
     expect(result.entriesSkipped).toBe(1);
     expect(result.entriesCreated).toBe(0);
-    expect(prismaMock.commissionEntry.create).not.toHaveBeenCalled();
+    expect(prismaMock.commissionEntry.upsert).not.toHaveBeenCalled();
   });
 
   it("ausência de regra aplicável (cargo sem nenhuma seed correspondente) gera divergência, NUNCA zero silencioso", async () => {
@@ -239,8 +281,8 @@ describe("gerarLancamentosParaEvento", () => {
     expect(result.entriesCreated).toBe(0);
     // O lançamento divergente é criado com totalCents 0 e status EmDivergencia — nunca
     // um valor calculado incorretamente apresentado como se fosse um cálculo válido.
-    expect(prismaMock.commissionEntry.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "EmDivergencia", totalCents: 0 }) }),
+    expect(prismaMock.commissionEntry.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ status: "EmDivergencia", totalCents: 0 }) }),
     );
     expect(prismaMock.commissionDivergence.create).toHaveBeenCalledTimes(1);
   });

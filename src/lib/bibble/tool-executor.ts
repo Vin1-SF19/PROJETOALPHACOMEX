@@ -3,6 +3,7 @@ import { getReceitaData } from "@/app/api/ReceitaFederal/route";
 import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { executarCalendarTool, isCalendarTool } from "@/lib/bibble/calendar-tools";
 import type { EventoCancelamentoPendente } from "@/lib/bibble/calendar-cancellation";
+import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
 
 export interface UserCtx {
   userId: number;
@@ -156,6 +157,15 @@ export async function executarTool(
           usuarioId: userId,
           status: "ABERTO",
         },
+      });
+
+      await notificarNovoChamado({
+        chamadoId: chamado.id,
+        titulo: chamado.titulo,
+        usuario: ctx.userName || "Usuário",
+        setor: ctx.role || "",
+        urgencia: chamado.prioridade,
+        createdAt: chamado.createdAt.toISOString(),
       });
 
       return `Chamado #${chamado.id} criado com título "${titulo}" e prioridade ${prioridade}.`;

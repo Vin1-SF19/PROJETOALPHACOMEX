@@ -9,11 +9,6 @@ import type { ContratoColaboradorRecord } from "./vinculo-resolver";
  * Detecção sistemática de divergências (seção 28 do prompt original — 14 checagens).
  * Nunca calcula silenciosamente quando o dado puder alterar o resultado financeiro.
  *
- * ⚠️ Comportamento esperado nesta fase: a checagem "serviço sem tarifário" vai marcar
- * divergência para TODO evento hoje, porque nenhuma `TariffVersion` foi populada ainda
- * (isso só acontece na Fase 14, Configurações). Não é um bug — é a detecção funcionando
- * corretamente contra um estado real de dado incompleto.
- *
  * ⚠️ Limitação documentada: "analista sem nível" usa heurística de nome de cargo
  * (contém "Sênior"/"Senior"/"II"/"Auxiliar" quando o cargo começa com "Analista") — se
  * não for possível determinar com confiança, NÃO gera falso positivo (não sinaliza).
@@ -73,21 +68,9 @@ export async function detectarDivergenciasDeEvento(eventId: string): Promise<Det
     });
   }
 
-  // 3. Serviço sem tarifário vigente na data do evento
-  const tarifarioVigente = await db.tariffVersion.findFirst({
-    where: {
-      servico: event.servico,
-      dataInicial: { lte: event.eventDate },
-      OR: [{ dataFinal: null }, { dataFinal: { gte: event.eventDate } }],
-    },
-  });
-  if (!tarifarioVigente) {
-    divergencias.push({
-      tipo: "SERVICO_SEM_TARIFARIO",
-      severidade: "PENDING_REVIEW",
-      detalhes: `Nenhum tarifário vigente encontrado para o serviço "${event.servico}" na data ${event.eventDate.toISOString()}.`,
-    });
-  }
+  // `grossContractAmountCents` já é o tarifário/honorário bruto trazido pelo
+  // contrato nos adapters de Metas e CS/NPS. Exigir também uma TariffVersion criava
+  // um falso positivo. Ausência de valor continua coberta por CONTRATO_SEM_VALOR.
 
   // Lançamentos associados a este evento — usados por várias checagens abaixo.
   const entries = await db.commissionEntry.findMany({
@@ -309,6 +292,12 @@ export async function detectarDivergenciasDeEvento(eventId: string): Promise<Det
 export async function persistirDivergenciasDetectadas(eventId: string): Promise<number> {
   const detectadas = await detectarDivergenciasDeEvento(eventId);
   let novasCriadas = 0;
+
+  // Reconcilia o falso positivo legado na próxima sincronização do evento.
+  await db.commissionDivergence.updateMany({
+    where: { eventId, tipo: "SERVICO_SEM_TARIFARIO", resolvidoEm: null },
+    data: { resolvidoEm: new Date() },
+  });
 
   for (const divergencia of detectadas) {
     const jaExiste = await db.commissionDivergence.findFirst({

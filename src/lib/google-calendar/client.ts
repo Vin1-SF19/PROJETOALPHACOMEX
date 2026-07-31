@@ -105,6 +105,89 @@ export async function listarCalendarios(emailUsuario: string): Promise<GoogleCal
   }
 }
 
+export interface IniciarWatchEventosInput {
+  emailUsuario: string;
+  calendarId: string;
+  channelId: string;
+  channelToken: string;
+  webhookUrl: string;
+  expirationMs: number;
+}
+
+export interface WatchEventosAtivo {
+  googleChannelId: string;
+  googleResourceId: string;
+  resourceUri: string | null;
+  expiresAt: Date;
+}
+
+/**
+ * Registra um canal `events.watch`. O subject DWD continua sendo fornecido pelo
+ * chamador server-side; nunca use valores recebidos do webhook nesta função.
+ */
+export async function iniciarWatchEventos(
+  input: IniciarWatchEventosInput,
+): Promise<WatchEventosAtivo> {
+  const calendar = clienteCalendar(input.emailUsuario);
+  try {
+    const resposta = await calendar.events.watch({
+      calendarId: input.calendarId,
+      requestBody: {
+        id: input.channelId,
+        type: "web_hook",
+        address: input.webhookUrl,
+        token: input.channelToken,
+        expiration: String(input.expirationMs),
+      },
+    });
+    const googleChannelId = resposta.data.id?.trim();
+    const googleResourceId = resposta.data.resourceId?.trim();
+    const expiration = Number(resposta.data.expiration);
+    if (
+      !googleChannelId ||
+      !googleResourceId ||
+      !Number.isSafeInteger(expiration) ||
+      expiration <= Date.now()
+    ) {
+      throw new GoogleCalendarError("Resposta inválida ao criar canal push.", {
+        kind: "invalid_request",
+      });
+    }
+    return {
+      googleChannelId,
+      googleResourceId,
+      resourceUri: resposta.data.resourceUri?.trim() || null,
+      expiresAt: new Date(expiration),
+    };
+  } catch (erroOriginal) {
+    if (erroOriginal instanceof GoogleCalendarError) throw erroOriginal;
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
+export interface EncerrarWatchEventosInput {
+  emailUsuario: string;
+  channelId: string;
+  resourceId: string;
+}
+
+/** Encerra um canal usando o par opaco channel/resource devolvido pelo Google. */
+export async function encerrarWatchEventos(
+  input: EncerrarWatchEventosInput,
+): Promise<void> {
+  const calendar = clienteCalendar(input.emailUsuario);
+  try {
+    await calendar.channels.stop({
+      requestBody: {
+        id: input.channelId,
+        resourceId: input.resourceId,
+      },
+    });
+  } catch (erroOriginal) {
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
 function paraGoogleEventoDataDTO(data: calendar_v3.Schema$EventDateTime | undefined) {
   return {
     dataHora: data?.dateTime ?? undefined,
@@ -138,6 +221,28 @@ function mapEventoParaDTO(evento: calendar_v3.Schema$Event): GoogleEventoDTO {
     atualizadoEm: evento.updated ?? new Date().toISOString(),
     visibilidade: (evento.visibility as GoogleEventoDTO["visibilidade"]) ?? "default",
   };
+}
+
+interface ObterEventoParams {
+  emailUsuario: string;
+  calendarId: string;
+  googleEventId: string;
+}
+
+/** Carrega o recurso completo diretamente do Google antes de uma edição. */
+export async function obterEvento(params: ObterEventoParams): Promise<GoogleEventoDTO> {
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    const resposta = await executarComRetry(() =>
+      calendar.events.get({
+        calendarId: params.calendarId,
+        eventId: params.googleEventId,
+      }),
+    );
+    return mapEventoParaDTO(resposta.data);
+  } catch (erroOriginal) {
+    throw classificarErroGoogle(erroOriginal);
+  }
 }
 
 interface ListarEventosPaginaParams {
@@ -286,6 +391,31 @@ export function paraSchemaEventoParcial(input: AtualizarEventoParcialGoogleInput
   return evento;
 }
 
+/**
+ * Preserva metadados gerenciados pelo Google para participantes mantidos
+ * (responseStatus, optional, resource, organizer etc.). Novos e-mails recebem
+ * apenas o objeto mínimo aceito pela API.
+ */
+export function mesclarParticipantesGoogle(
+  existentes: calendar_v3.Schema$EventAttendee[],
+  emailsSolicitados: string[],
+): calendar_v3.Schema$EventAttendee[] {
+  const porEmail = new Map<string, calendar_v3.Schema$EventAttendee>();
+  for (const participante of existentes) {
+    if (participante.email) {
+      porEmail.set(participante.email.trim().toLowerCase(), participante);
+    }
+  }
+  const unicos = Array.from(
+    new Set(emailsSolicitados.map((email) => email.trim().toLowerCase())),
+  );
+
+  return unicos.map((email) => {
+    const existente = porEmail.get(email);
+    return existente ? { ...existente, email: existente.email ?? email } : { email };
+  });
+}
+
 interface CriarEventoParams {
   emailUsuario: string;
   calendarId: string;
@@ -343,12 +473,26 @@ interface AtualizarEventoParcialParams {
 export async function atualizarEventoParcial(params: AtualizarEventoParcialParams): Promise<GoogleEventoDTO> {
   const calendar = clienteCalendar(params.emailUsuario);
   try {
+    const requestBody = paraSchemaEventoParcial(params.evento);
+    if (params.evento.participantes !== undefined) {
+      const eventoAtual = await executarComRetry(() =>
+        calendar.events.get({
+          calendarId: params.calendarId,
+          eventId: params.googleEventId,
+        }),
+      );
+      requestBody.attendees = mesclarParticipantesGoogle(
+        eventoAtual.data.attendees ?? [],
+        params.evento.participantes,
+      );
+    }
+
     const resposta = await executarComRetry(() =>
       calendar.events.patch(
         {
           calendarId: params.calendarId,
           eventId: params.googleEventId,
-          requestBody: paraSchemaEventoParcial(params.evento),
+          requestBody,
           // Mantém suporte a conferenceData também quando o Meet existente foi apenas preservado.
           conferenceDataVersion: 1,
         },

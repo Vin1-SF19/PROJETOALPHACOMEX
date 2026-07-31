@@ -12,6 +12,17 @@ export interface CalendarioSelecionadoView {
   gravavel: boolean;
 }
 
+export interface ColegaAgendaView {
+  colegaId: number;
+  cor: string;
+  visivel: boolean;
+  colega: {
+    id: number;
+    nome: string;
+    email: string;
+  };
+}
+
 export interface EventoExibicao {
   id: string;
   googleEventId: string;

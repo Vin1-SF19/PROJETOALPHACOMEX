@@ -148,9 +148,22 @@ model GoogleCalendarEventoCache { id, calendarioId → GoogleCalendarSelecionado
 | Tipo | Caminho | Auth | Descrição |
 |------|---------|------|-----------|
 | Server Action | `src/actions/google-calendar-conexao.ts` | Sim | `obterStatusConexaoCalendarioAlpha`, `ativarCalendarioAlpha`/`desativarCalendarioAlpha` — puramente local, sem chamada ao Google (a autorização real já existe via Domain-Wide Delegation). |
-| Server Action | `src/actions/google-calendar-eventos.ts` | Sim | Seleção de calendário, sync (full/incremental via `syncToken`), CRUD de evento (etag para detectar conflito), FreeBusy. Toda chamada ao Google usa `emailUsuario` resolvido via `usuario-google.ts` (sempre `usuarios.email` da sessão, nunca do payload do cliente). |
+| Server Action | `src/actions/google-calendar-eventos.ts` | Sim | Seleção de calendário, leitura cache-only (`listarEventosCache`; alias legado `listarEventosDoCalendario`), detalhes completos antes da edição, CRUD via PATCH parcial + `If-Match`/ETag e FreeBusy. Toda chamada ao Google usa `emailUsuario` resolvido via `usuario-google.ts` (sempre `usuarios.email` da sessão, nunca do payload do cliente). |
+| Server Action | `src/actions/google-calendar-sync.ts` | Sim | `sincronizarAgendaAlpha` executa sync manual consolidada por conexão, com status/contadores/erros tipados e atualização de `GoogleCalendarConexao.ultimaSincronizacaoEm` somente após sucesso integral. |
 
-**Sem Route Handlers** — o fluxo OAuth (`/api/calendario-alpha/oauth/{connect,callback}`) foi removido por completo.
+**Onda cache-first (2026-07-30):** renderização não dispara Google API. `invalidation.ts` oferece `BroadcastChannel` com fallback `storage`/evento DOM e dedupe de mensagens entre abas/iframes.
+
+### Fase 2A — push, fila persistente e lock distribuído (2026-07-30)
+
+A Fase 2A está implementada e validada com **flags off**. O Vault apresentou o relatório, recebeu autorização explícita e a migration isolada foi aplicada uma única vez no Turso de produção após backup verificado. Foram adicionados somente `GoogleCalendarPushChannel`, `GoogleCalendarPendingOperation` e `GoogleCalendarSyncLease`, com 7 índices explícitos e 3 unicidades.
+
+`POST /api/calendario-alpha/webhook` é o único Route Handler da Agenda: autentica o sinal do Google, coalesce a fila no Turso e não sincroniza no request. O worker reclama jobs por CAS, adquire lease por calendário e executa o sync sob fencing; maintenance gerencia canais, reconciliação stale e recuperação. Create/renew/stop dos canais também são serializados por lease. Cache e `syncToken` continuam na mesma transação, agora com duas barreiras de fencing e persistência de eventos em lotes seguros.
+
+**Runbook flags-off:** manter as três flags booleanas desligadas; usar `calendar-alpha:doctor`, `calendar-alpha:queue -- status` e `calendar-alpha:maintenance -- --status`; ativar lock → fila → push somente depois de URL HTTPS pública, WAF/rate limit distribuído, scheduler supervisionado e E2E Google/Turso multi-instância; iniciar por canário. Rollback desliga push, drena/interrompe workers, desliga fila e por último o lock.
+
+**Qualidade:** 183 testes Agenda Alpha PASS; Forge build/lint/schema PASS; typecheck preserva quatro baselines externos. Probe, Anubis, Lens e Sage PASS. Ready for Review; rollout externo bloqueado.
+
+**Última atualização:** 2026-07-30 por Scribe
 
 **Pré-requisito fora do código:** Service Account com Domain-Wide Delegation autorizada pelo Super Admin do Google Workspace (Admin Console → Security → API Controls → Domain-wide Delegation), com o Client ID numérico da Service Account e os escopos de `scopes.ts`. Ver `codebase-map.md` para o passo a passo completo.
 

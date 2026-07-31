@@ -62,6 +62,121 @@ Sem os passos 1-4 (feitos por vocês no Google), o código não tem como funcion
 
 ## Critérios de Aceitação
 
+## 2026-07-30 — Reestruturação Agenda Alpha — onda cache-first sem migration
+
+**Status:** InReview
+
+### Critérios de aceitação da onda
+
+- [x] AC-AA-001: a rota principal passa a renderizar eventos exclusivamente do cache local, sem disparar Google Calendar API durante a leitura.
+- [x] AC-AA-002: a sincronização manual é uma operação explícita, consolidada por conexão, com resultado tipado por calendário (`sincronizado`, `cooldown`, `em_andamento` ou `erro`), contadores, erros sanitizados e última sincronização.
+- [x] AC-AA-003: chamadas concorrentes na mesma instância são deduplicadas por usuário/calendário e respeitam cooldown, sem promessa de lock distribuído entre réplicas.
+- [x] AC-AA-004: uma sincronização integralmente bem-sucedida mantém a conexão `ATIVA` e atualiza `GoogleCalendarConexao.ultimaSincronizacaoEm`; falhas não avançam falsamente esse marcador.
+- [x] AC-AA-005: abrir edição de evento Google carrega antes os detalhes completos no servidor, sempre com sessão, permissão e ownership do calendário.
+- [x] AC-AA-006: edição usa PATCH parcial e `If-Match`/ETag, preservando descrição, participantes e Google Meet quando campos não forem enviados.
+- [x] AC-AA-007: invalidação entre abas/iframes usa deduplicação e `BroadcastChannel` com fallback compatível, sem loops de refresh.
+- [x] AC-AA-008: sidebar e superfícies da Agenda Alpha seguem as regras visuais do prompt, com modais 3D acessíveis e responsivos.
+- [x] AC-AA-009: testes cobrem leitura cache-first, orquestrador, detalhes/ETag e invalidação em múltiplas abas.
+
+### Tarefas backend
+
+- [x] Separar a action de leitura cache-only da action de sincronização em `src/actions/google-calendar-eventos.ts`.
+- [x] Criar `src/actions/google-calendar-sync.ts` com contrato consolidado e tipado.
+- [x] Criar `src/lib/google-calendar/sync-orchestrator.ts` com dedupe in-process e cooldown seguro.
+- [x] Corrigir status e `ultimaSincronizacaoEm` da conexão após sucesso total.
+- [x] Criar action segura de detalhes completos e garantir PATCH parcial com ETag.
+- [x] Evoluir a invalidação cross-tab sem quebrar consumidores existentes.
+- [x] Adicionar testes backend escopados.
+
+### Tarefas frontend
+
+- [x] Renomear a experiência visual de Calendário Alpha para Agenda Alpha sem quebrar a rota legada.
+- [x] Consumir leitura cache-only e acionar sincronização apenas de forma explícita.
+- [x] Exibir estados e contadores da sincronização manual.
+- [x] Aplicar regras visuais da sidebar e modais 3D acessíveis.
+- [x] Integrar carregamento de detalhes completos antes de abrir a edição.
+
+### Quality gates da onda
+
+- ESLint escopado: **PASS**.
+- Testes do Calendário/Agenda: **114 PASS**.
+- Next build: **PASS**.
+- `git diff --check`: **PASS**.
+- Typecheck: **sem erros atribuíveis à Agenda Alpha**.
+- Gate global do repositório: **bloqueado por mudanças paralelas de Comissões e pelos 4 erros de baseline já existentes; nenhum deles é atribuído à Agenda Alpha**.
+
+### Limitações conhecidas
+
+- Agendas compartilhadas continuam sendo consultadas ao vivo somente após ação explícita do usuário; elas não fazem parte do cache renderizado no SSR da rota principal.
+- O lock atual é apenas in-process. Coordenação segura entre múltiplas instâncias exige infraestrutura persistente e, se envolver banco/schema, novo ciclo Vault com backup e confirmação.
+- O E2E completo no navegador contra o Google Calendar real permanece pendente nesta onda.
+- `useAgendaAlphaController.ts` tem 321 linhas físicas; a separação atual já reduz o dashboard, mas o controller permanece como dívida de modularização.
+
+### File List exata da onda
+
+**Actions**
+
+- `src/actions/google-calendar-eventos.ts`
+- `src/actions/google-calendar-admin.ts`
+- `src/actions/google-calendar-colegas.ts`
+- `src/actions/google-calendar-sync.ts`
+
+**Rota**
+
+- `src/app/PainelAlpha/CalendarioAlpha/page.tsx`
+- `src/app/PainelAlpha/CalendarioAlpha/loading.tsx`
+- `src/app/PainelAlpha/CalendarioAlpha/error.tsx`
+
+**UI**
+
+- `src/components/CalendarioAlpha/AgendaModal3D.tsx`
+- `src/components/CalendarioAlpha/AgendaOverlays.tsx`
+- `src/components/CalendarioAlpha/AgendaSidebar.tsx`
+- `src/components/CalendarioAlpha/CalendarioAlphaDashboard.tsx`
+- `src/components/CalendarioAlpha/ConteudoAgenda.tsx`
+- `src/components/CalendarioAlpha/DetalhePopover.tsx`
+- `src/components/CalendarioAlpha/EstadoDesconectado.tsx`
+- `src/components/CalendarioAlpha/FormularioEvento.tsx`
+- `src/components/CalendarioAlpha/HeaderCalendario.tsx`
+- `src/components/CalendarioAlpha/MiniCalendarioAgenda.tsx`
+- `src/components/CalendarioAlpha/PainelColegas.tsx`
+- `src/components/CalendarioAlpha/PainelPermissoesColegas.tsx`
+- `src/components/CalendarioAlpha/SeletorCalendarios.tsx`
+- `src/components/CalendarioAlpha/StatusSincronizacao.tsx`
+- `src/components/CalendarioAlpha/lib/tipos.ts`
+- `src/components/CalendarioAlpha/lib/useAgendaAlphaController.ts`
+- `src/components/CalendarioAlpha/lib/useAgendaDesktop.ts`
+- `src/components/CalendarioAlpha/lib/useAgendasCompartilhadas.ts`
+
+**Domínio e integração**
+
+- `src/lib/google-calendar/client.ts`
+- `src/lib/google-calendar/sync.ts`
+- `src/lib/google-calendar/sync-orchestrator.ts`
+- `src/lib/google-calendar/invalidation.ts`
+- `src/lib/modulos-registry.ts`
+- `src/lib/validations/google-calendar.ts`
+
+**Testes**
+
+- `tests/google-calendar/cache-first-actions.test.ts`
+- `tests/google-calendar/client-etag.test.ts`
+- `tests/google-calendar/colegas-privacy.test.ts`
+- `tests/google-calendar/invalidation.test.ts`
+- `tests/google-calendar/page-cache-wiring.test.ts`
+- `tests/google-calendar/sync-action.test.ts`
+- `tests/google-calendar/sync-orchestrator.test.ts`
+- `tests/google-calendar/sync.test.ts`
+- `tests/google-calendar/validations.test.ts`
+
+**Documentação e memória**
+
+- `docs/stories/story-calendario-alpha.md`
+- `.bibble/memory/architecture.md`
+- `.bibble/memory/codebase-map.md`
+- `.bibble/memory/components.md`
+- `.bibble/memory/integration-points.md`
+
 - [x] AC-001: Story aprovada e atualizada conforme decisões tomadas (incluindo a mudança de arquitetura).
 - [x] AC-002: Módulo registrado como 1 entrada em `MODULOS_REGISTRY` (`calendarioAlpha`, rota `/PainelAlpha/CalendarioAlpha`) — grid/sidebar/TabBar/permissões propagam automaticamente.
 - [x] AC-003: Rota (`page.tsx` + `middleware.ts`) e todas as Server Actions exigem `verificarAcessoCalendarioAlpha()` (sessão + usuário `ATIVO` + permissão efetiva `calendarioAlpha`).
@@ -82,7 +197,7 @@ Sem os passos 1-4 (feitos por vocês no Google), o código não tem como funcion
 - [x] AC-019: Vault cumprido **duas vezes** — schema inicial (Fase 2 original) e redesenho para Domain-Wide Delegation (Fase 2 v2) — relatório + backup fresco + confirmação explícita em ambas.
 - [x] AC-020: `tsc --noEmit`, `npm run lint`, `npm test` (64/64) e `npm run build` executados de verdade após o redesenho, todos passando.
 - [x] AC-021: Lens revisou; Anubis revisou com foco específico em `emailUsuario` nunca vir do cliente (confirmado — sempre de `usuarios.email` via sessão); Probe confirmou integração estrutural.
-- [x] AC-022: Limitações declaradas: sem rate limit; FreeBusy sem UI; sem webhook; semana/dia não implementadas; CLI de sync não construída. **Impersonation via Domain-Wide Delegation validada com credencial e Service Account reais em 2026-07-17** (`calendar.calendarList.list` impersonando `ti@alpha-comex.com` retornou os 2 calendários reais da conta) — deixou de ser uma limitação.
+- [x] AC-022 *(registro histórico, parcialmente superado)*: na entrega inicial ainda não existiam as visões Dia/Semana nem controle de frequência da sincronização. Essas lacunas foram superadas posteriormente com as grades de **Dia** e **Semana** e com deduplicação/cooldown (**throttle in-process**) no orquestrador. Permanecem pendentes o webhook e um lock distribuído entre réplicas; a coordenação atual não substitui infraestrutura persistente. **Impersonation via Domain-Wide Delegation validada com credencial e Service Account reais em 2026-07-17** (`calendar.calendarList.list` impersonando `ti@alpha-comex.com` retornou os 2 calendários reais da conta).
 
 ---
 
@@ -205,7 +320,7 @@ Esta extensão torna o Calendário Alpha operável por conversa no Bibble/IAlpha
 
 **Validações:** `src/lib/validations/google-calendar.ts` (inalterado)
 
-**UI:** `src/app/PainelAlpha/CalendarioAlpha/page.tsx`, `src/components/CalendarioAlpha/{CalendarioAlphaDashboard,EstadoDesconectado,HeaderCalendario,VisaoMes,VisaoAgenda,SeletorCalendarios,FormularioEvento,DetalheEvento}.tsx`, `lib/{datas,tipos}.ts`
+**UI:** `src/app/PainelAlpha/CalendarioAlpha/page.tsx`, `src/components/CalendarioAlpha/{CalendarioAlphaDashboard,EstadoDesconectado,HeaderCalendario,VisaoDia,VisaoSemana,VisaoMes,VisaoAno,SeletorCalendarios,FormularioEvento,DetalhePopover}.tsx`, `lib/{datas,tipos}.ts`
 
 **Integração:** `src/lib/modulos-registry.ts` (entrada `calendarioAlpha`), `src/components/layout/GlobalSidebar.tsx` (ícone `CalendarClock`), `src/components/ui/sheet.tsx` (novo componente shadcn)
 

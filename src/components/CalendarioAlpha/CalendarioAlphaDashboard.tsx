@@ -1,47 +1,37 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  listarColegasVisiveis,
-  listarPermissoesColegasTodosUsuarios,
-  listarUsuariosParaCompartilhar,
-  type UsuarioPermissaoColegaDTO,
-} from "@/actions/google-calendar-colegas";
-import { desativarCalendarioAlpha, type StatusConexaoCalendarioAlpha } from "@/actions/google-calendar-conexao";
-import { listarCalendariosGoogleDisponiveis } from "@/actions/google-calendar-eventos";
-import type { GoogleCalendarioDTO } from "@/lib/google-calendar/types";
-import {
-  CALENDARIO_ALPHA_INVALIDATION_EVENT,
-  CALENDARIO_ALPHA_INVALIDATION_KEY,
-} from "@/lib/google-calendar/invalidation";
+import type { StatusConexaoCalendarioAlpha } from "@/actions/google-calendar-conexao";
 import { getTema } from "@/lib/temas";
 
+import { AgendaOverlays } from "./AgendaOverlays";
+import { AgendaSidebar } from "./AgendaSidebar";
+import { ConteudoAgenda } from "./ConteudoAgenda";
 import { EstadoDesconectado } from "./EstadoDesconectado";
-import { FormularioEvento } from "./FormularioEvento";
 import { HeaderCalendario } from "./HeaderCalendario";
-import { PainelColegas } from "./PainelColegas";
-import { PainelPermissoesColegas } from "./PainelPermissoesColegas";
-import { SeletorCalendarios } from "./SeletorCalendarios";
-import { VisaoAno } from "./VisaoAno";
-import { VisaoDia } from "./VisaoDia";
-import { VisaoMes } from "./VisaoMes";
-import { VisaoSemana } from "./VisaoSemana";
+import { StatusSincronizacao } from "./StatusSincronizacao";
 import { dataAnterior, proximaData, type VisaoCalendario } from "./lib/datas";
 import type { CalendarioSelecionadoView, EventoExibicao } from "./lib/tipos";
+import { useAgendaAlphaController } from "./lib/useAgendaAlphaController";
+
+interface CalendarioAlphaDashboardProps {
+  temaName: string;
+  statusConexao: StatusConexaoCalendarioAlpha;
+  conexaoId: string | null;
+  calendarios: CalendarioSelecionadoView[];
+  eventos: EventoExibicao[];
+  isAdmin: boolean;
+  visao: VisaoCalendario;
+  dataReferenciaISO: string;
+  algumaFalhaSync: boolean;
+}
+
+function alvoDigitavel(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+}
 
 export function CalendarioAlphaDashboard({
   temaName,
@@ -53,289 +43,174 @@ export function CalendarioAlphaDashboard({
   visao,
   dataReferenciaISO,
   algumaFalhaSync,
-}: {
-  temaName: string;
-  statusConexao: StatusConexaoCalendarioAlpha;
-  conexaoId: string | null;
-  calendarios: CalendarioSelecionadoView[];
-  eventos: EventoExibicao[];
-  isAdmin: boolean;
-  visao: VisaoCalendario;
-  dataReferenciaISO: string;
-  algumaFalhaSync: boolean;
-}) {
+}: CalendarioAlphaDashboardProps) {
   const tema = getTema(temaName);
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-
-  const [formularioAberto, setFormularioAberto] = useState(false);
-  const [eventoParaEditar, setEventoParaEditar] = useState<EventoExibicao | undefined>(undefined);
-  const [dataParaNovoEvento, setDataParaNovoEvento] = useState<Date>(new Date());
-  const [configAberta, setConfigAberta] = useState(false);
-  const [calendariosGoogle, setCalendariosGoogle] = useState<GoogleCalendarioDTO[]>([]);
-  const [carregandoCalendarios, setCarregandoCalendarios] = useState(false);
-  const [desativarAberto, setDesativarAberto] = useState(false);
-  const [desativando, startDesativando] = useTransition();
-
-  const [colegasAberto, setColegasAberto] = useState(false);
-  const [colegasDisponiveis, setColegasDisponiveis] = useState<{ id: number; nome: string; email: string }[]>([]);
-  const [colegasVisiveis, setColegasVisiveis] = useState<
-    { colegaId: number; cor: string; visivel: boolean; colega: { id: number; nome: string; email: string } }[]
-  >([]);
-
-  const [permissoesAberto, setPermissoesAberto] = useState(false);
-  const [usuariosPermissao, setUsuariosPermissao] = useState<UsuarioPermissaoColegaDTO[]>([]);
+  const agenda = useAgendaAlphaController({
+    statusConexao,
+    conexaoId,
+    visao,
+    dataReferenciaISO,
+    algumaFalhaSync,
+  });
 
   useEffect(() => {
-    function atualizarAgenda() {
-      startTransition(() => router.refresh());
+    function atalhos(evento: KeyboardEvent) {
+      if (
+        evento.defaultPrevented
+        || evento.metaKey
+        || evento.ctrlKey
+        || evento.altKey
+        || alvoDigitavel(evento.target)
+      ) return;
+      const tecla = evento.key.toLowerCase();
+      if (!["c", "t", "m", "w", "d"].includes(tecla)) return;
+      evento.preventDefault();
+      if (tecla === "c") agenda.abrirNovoEvento();
+      if (tecla === "t") agenda.navegarPara(visao, new Date());
+      if (tecla === "m") agenda.navegarPara("mes", agenda.dataReferencia);
+      if (tecla === "w") agenda.navegarPara("semana", agenda.dataReferencia);
+      if (tecla === "d") agenda.navegarPara("dia", agenda.dataReferencia);
     }
-
-    function atualizarAposAlteracaoExterna(evento: StorageEvent) {
-      if (evento.key === CALENDARIO_ALPHA_INVALIDATION_KEY) atualizarAgenda();
-    }
-
-    window.addEventListener("storage", atualizarAposAlteracaoExterna);
-    window.addEventListener(CALENDARIO_ALPHA_INVALIDATION_EVENT, atualizarAgenda);
-    return () => {
-      window.removeEventListener("storage", atualizarAposAlteracaoExterna);
-      window.removeEventListener(CALENDARIO_ALPHA_INVALIDATION_EVENT, atualizarAgenda);
-    };
-  }, [router]);
-
-  const dataReferencia = new Date(dataReferenciaISO);
+    window.addEventListener("keydown", atalhos);
+    return () => window.removeEventListener("keydown", atalhos);
+  }, [agenda, visao]);
 
   if (!statusConexao.conectado) {
-    return <EstadoDesconectado tema={tema} emailUsuario={statusConexao.emailUsuario} onAtivado={() => router.refresh()} />;
+    return (
+      <EstadoDesconectado
+        tema={tema}
+        emailUsuario={statusConexao.emailUsuario}
+        onAtivado={agenda.atualizarAgenda}
+      />
+    );
   }
 
-  function navegarPara(novaVisao: VisaoCalendario, novaData: Date) {
-    const params = new URLSearchParams();
-    params.set("visao", novaVisao);
-    params.set("data", novaData.toISOString().slice(0, 10));
-    startTransition(() => {
-      router.push(`/PainelAlpha/CalendarioAlpha?${params.toString()}`);
-    });
-  }
-
-  async function abrirConfiguracoes() {
-    setCarregandoCalendarios(true);
-    setConfigAberta(true);
-    const resultado = await listarCalendariosGoogleDisponiveis();
-    if (resultado.success) {
-      setCalendariosGoogle(resultado.data);
-    } else {
-      toast.error(resultado.error);
-    }
-    setCarregandoCalendarios(false);
-  }
-
-  async function abrirColegas() {
-    setColegasAberto(true);
-    const [disponiveisResultado, visiveisResultado] = await Promise.all([
-      listarUsuariosParaCompartilhar(),
-      listarColegasVisiveis(),
-    ]);
-    if (disponiveisResultado.success) {
-      setColegasDisponiveis(disponiveisResultado.data);
-    } else {
-      setColegasDisponiveis([]);
-      toast.error(disponiveisResultado.error);
-    }
-    if (visiveisResultado.success) setColegasVisiveis(visiveisResultado.data);
-  }
-
-  async function abrirPermissoes() {
-    setPermissoesAberto(true);
-    const resultado = await listarPermissoesColegasTodosUsuarios();
-    if (resultado.success) setUsuariosPermissao(resultado.data);
-    else toast.error(resultado.error);
-  }
-
-  function abrirNovoEvento(data?: Date) {
-    setEventoParaEditar(undefined);
-    setDataParaNovoEvento(data ?? dataReferencia);
-    setFormularioAberto(true);
-  }
-
-  function editarEvento(evento: EventoExibicao) {
-    setEventoParaEditar(evento);
-    setDataParaNovoEvento(evento.inicioEm ? new Date(evento.inicioEm) : dataReferencia);
-    setFormularioAberto(true);
-  }
-
-  function irParaVisaoMes(data: Date) {
-    navegarPara("mes", data);
-  }
-
-  function irParaVisaoDia(data: Date) {
-    navegarPara("dia", data);
-  }
-
-  function confirmarDesativacao() {
-    startDesativando(async () => {
-      const resultado = await desativarCalendarioAlpha();
-      if (!resultado.success) {
-        toast.error(resultado.error ?? "Não foi possível desativar agora.");
-        return;
-      }
-      toast.success("Calendário Alpha desativado.");
-      setDesativarAberto(false);
-      router.refresh();
-    });
-  }
-
-  const calendariosGravaveis = calendarios.some((c) => c.gravavel);
+  const status = (
+    <StatusSincronizacao
+      tema={tema}
+      emailUsuario={statusConexao.emailUsuario}
+      ultimaSincronizacaoEm={agenda.ultimaSincronizacaoEm}
+      sincronizando={agenda.sincronizando}
+      erro={agenda.erroSincronizacao}
+      erroCompartilhadas={agenda.compartilhadas.erro}
+      resumo={agenda.resumoSincronizacao}
+      onSincronizar={agenda.sincronizarAgora}
+      onDesativar={() => agenda.setDesativarAberto(true)}
+    />
+  );
 
   return (
-    <div className="px-4 sm:px-6 lg:px-10 py-6 max-w-[1600px] mx-auto">
+    <div className="mx-auto max-w-[1800px] px-3 py-4 sm:px-6 lg:px-8">
       <HeaderCalendario
         tema={tema}
         visao={visao}
-        dataReferencia={dataReferencia}
-        emailUsuario={statusConexao.emailUsuario}
-        sincronizando={isPending}
-        isAdmin={isAdmin}
-        onMudarVisao={(novaVisao) => navegarPara(novaVisao, dataReferencia)}
-        onHoje={() => navegarPara(visao, new Date())}
-        onAnterior={() => navegarPara(visao, dataAnterior(visao, dataReferencia))}
-        onProximo={() => navegarPara(visao, proximaData(visao, dataReferencia))}
-        onNovoEvento={() => abrirNovoEvento()}
-        onAbrirConfiguracoes={abrirConfiguracoes}
-        onAbrirColegas={abrirColegas}
-        onAbrirPermissoes={abrirPermissoes}
-        onDesativar={() => setDesativarAberto(true)}
+        dataReferencia={agenda.dataReferencia}
+        status={status}
+        onMudarVisao={(novaVisao) => agenda.navegarPara(novaVisao, agenda.dataReferencia)}
+        onHoje={() => agenda.navegarPara(visao, new Date())}
+        onAnterior={() => agenda.navegarPara(
+          visao,
+          dataAnterior(visao, agenda.dataReferencia),
+        )}
+        onProximo={() => agenda.navegarPara(
+          visao,
+          proximaData(visao, agenda.dataReferencia),
+        )}
+        onNovoEvento={() => agenda.abrirNovoEvento()}
+        onAbrirSidebar={() => agenda.setSidebarMobileAberta(true)}
+        onAbrirConfiguracoes={agenda.abrirConfiguracoes}
       />
 
-      {algumaFalhaSync && (
-        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
-          Alguns calendários não puderam ser sincronizados agora. Os dados exibidos podem estar desatualizados.
-        </div>
-      )}
+      <div className="flex min-h-0 gap-4">
+        <AgendaSidebar
+          tema={tema}
+          dataReferencia={agenda.dataReferencia}
+          calendarios={calendarios}
+          colegas={agenda.compartilhadas.colegas}
+          isAdmin={isAdmin}
+          mobileOpen={agenda.sidebarMobileAberta}
+          onMobileOpenChange={agenda.setSidebarMobileAberta}
+          onCriar={() => agenda.abrirNovoEvento()}
+          onSelecionarDia={(data) => agenda.navegarPara("dia", data)}
+          onGerenciarCalendarios={agenda.abrirConfiguracoes}
+          onGerenciarColegas={agenda.abrirColegas}
+          onGerenciarPermissoes={agenda.abrirPermissoes}
+          onAlternarCalendario={agenda.alternarCalendario}
+          onAlternarColega={agenda.alternarColega}
+          footer={status}
+        />
+        <main className="min-w-0 flex-1" aria-label="Grade da Agenda Alpha">
+          {agenda.carregandoEdicao && (
+            <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+              <Loader2 className="size-4 animate-spin" /> Carregando detalhes do evento…
+            </div>
+          )}
+          {agenda.erroEdicao && agenda.alvoEdicao && (
+            <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+              <span>{agenda.erroEdicao}</span>
+              <button type="button" onClick={() => void agenda.editarEvento(agenda.alvoEdicao!)} className="shrink-0 font-bold underline underline-offset-4">
+                Tentar novamente
+              </button>
+            </div>
+          )}
+          {agenda.compartilhadas.carregando && (
+            <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+              <Loader2 className="size-4 animate-spin" /> Atualizando agendas compartilhadas…
+            </div>
+          )}
+          {agenda.compartilhadas.erro && (
+            <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              <span>{agenda.compartilhadas.erro}</span>
+              <button type="button" onClick={() => void agenda.compartilhadas.carregar()} className="shrink-0 font-bold underline underline-offset-4">
+                Tentar novamente
+              </button>
+            </div>
+          )}
+          <ConteudoAgenda
+            tema={tema}
+            visao={visao}
+            dataReferencia={agenda.dataReferencia}
+            eventos={[...eventos, ...agenda.compartilhadas.eventos]}
+            possuiCalendarios={calendarios.length > 0}
+            onEditarEvento={agenda.editarEvento}
+            onEventoCancelado={agenda.notificarAlteracaoAgenda}
+            onSelecionarHorario={agenda.abrirNovoEvento}
+            onSelecionarDia={(data) => agenda.navegarPara("dia", data)}
+            onSelecionarMes={(data) => agenda.navegarPara("mes", data)}
+            onAbrirConfiguracoes={agenda.abrirConfiguracoes}
+          />
+        </main>
+      </div>
 
-      {calendarios.length === 0 ? (
-        <div className="rounded-[2rem] border border-white/5 bg-white/[0.02] py-16 text-center">
-          <p className="text-sm text-slate-400 mb-4">Nenhum calendário selecionado ainda.</p>
-          <button
-            type="button"
-            onClick={abrirConfiguracoes}
-            className="text-sm font-bold underline underline-offset-4 text-slate-200 hover:text-white"
-          >
-            Escolher calendários do Google
-          </button>
-        </div>
-      ) : visao === "dia" ? (
-        <VisaoDia
-          dataReferencia={dataReferencia}
-          eventos={eventos}
-          tema={tema}
-          onEditarEvento={editarEvento}
-          onEventoCancelado={() => router.refresh()}
-          onSelecionarHorario={(horario) => abrirNovoEvento(horario)}
-        />
-      ) : visao === "semana" ? (
-        <VisaoSemana
-          dataReferencia={dataReferencia}
-          eventos={eventos}
-          tema={tema}
-          onEditarEvento={editarEvento}
-          onEventoCancelado={() => router.refresh()}
-          onSelecionarHorario={(horario) => abrirNovoEvento(horario)}
-        />
-      ) : visao === "mes" ? (
-        <VisaoMes
-          dataReferencia={dataReferencia}
-          eventos={eventos}
-          tema={tema}
-          onEditarEvento={editarEvento}
-          onEventoCancelado={() => router.refresh()}
-          onSelecionarDia={(dia) => irParaVisaoDia(dia)}
-          onNovoEventoNoDia={(dia) => abrirNovoEvento(dia)}
-        />
-      ) : (
-        <VisaoAno
-          dataReferencia={dataReferencia}
-          eventos={eventos}
-          tema={tema}
-          onSelecionarMes={irParaVisaoMes}
-          onSelecionarDia={irParaVisaoDia}
-        />
-      )}
-
-      {conexaoId && (
-        <SeletorCalendarios
-          open={configAberta}
-          onOpenChange={setConfigAberta}
-          tema={tema}
-          conexaoId={conexaoId}
-          calendariosGoogle={calendariosGoogle}
-          calendariosSelecionados={calendarios}
-          onAtualizado={() => router.refresh()}
-        />
-      )}
-      {carregandoCalendarios && configAberta && calendariosGoogle.length === 0 && (
-        <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-xl bg-slate-900 border border-white/10 px-3 py-2 text-xs text-slate-300">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando calendários...
-        </div>
-      )}
-
-      <PainelColegas
-        open={colegasAberto}
-        onOpenChange={setColegasAberto}
+      <AgendaOverlays
         tema={tema}
-        isAdmin={isAdmin}
-        disponiveis={colegasDisponiveis}
-        visiveis={colegasVisiveis}
-        onAtualizado={() => {
-          router.refresh();
-          abrirColegas();
-        }}
-      />
-
-      {isAdmin && (
-        <PainelPermissoesColegas
-          open={permissoesAberto}
-          onOpenChange={setPermissoesAberto}
-          usuarios={usuariosPermissao}
-          onAtualizado={abrirPermissoes}
-        />
-      )}
-
-      <FormularioEvento
-        open={formularioAberto}
-        onOpenChange={setFormularioAberto}
-        tema={tema}
+        conexaoId={conexaoId}
         calendarios={calendarios}
-        dataInicial={dataParaNovoEvento}
-        eventoParaEditar={eventoParaEditar}
-        onSalvo={() => router.refresh()}
+        calendariosGoogle={agenda.calendariosGoogle}
+        carregandoCalendarios={agenda.carregandoCalendarios}
+        configAberta={agenda.configAberta}
+        onConfigAbertaChange={agenda.setConfigAberta}
+        colegasAberto={agenda.colegasAberto}
+        onColegasAbertoChange={agenda.setColegasAberto}
+        isAdmin={isAdmin}
+        colegasDisponiveis={agenda.colegasDisponiveis}
+        colegas={agenda.compartilhadas.colegas}
+        permissoesAberto={agenda.permissoesAberto}
+        onPermissoesAbertoChange={agenda.setPermissoesAberto}
+        usuariosPermissao={agenda.usuariosPermissao}
+        formularioAberto={agenda.formularioAberto}
+        onFormularioAbertoChange={agenda.alterarFormularioAberto}
+        dataEvento={agenda.dataParaNovoEvento}
+        evento={agenda.sessaoEdicao?.evento}
+        detalhesEvento={agenda.sessaoEdicao?.detalhes}
+        desativarAberto={agenda.desativarAberto}
+        onDesativarAbertoChange={agenda.setDesativarAberto}
+        desativando={agenda.desativando}
+        onAtualizar={agenda.notificarAlteracaoAgenda}
+        onAtualizarColegas={agenda.abrirColegas}
+        onAtualizarPermissoes={agenda.abrirPermissoes}
+        onConfirmarDesativacao={agenda.confirmarDesativacao}
       />
-
-      <AlertDialog open={desativarAberto} onOpenChange={setDesativarAberto}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Desativar Calendário Alpha?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O módulo para de exibir sua agenda aqui no Painel. Isso não remove o acesso autorizado pela
-              empresa no Google Workspace — só quem tem acesso ao Admin Console pode revogar isso. Você pode
-              reativar quando quiser.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={desativando}>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmarDesativacao} disabled={desativando}>
-              {desativando && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Sim, desativar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {!calendariosGravaveis && calendarios.length > 0 && (
-        <p className="mt-4 text-center text-[11px] text-slate-500">
-          Todos os calendários selecionados são somente leitura — criar eventos está desabilitado.
-        </p>
-      )}
     </div>
   );
 }

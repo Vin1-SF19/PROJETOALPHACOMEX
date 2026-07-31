@@ -66,6 +66,8 @@ export interface CommissionEntryComColaborador {
   setorNome: string | null;
   vinculo: string;
   totalCents: number;
+  saldoPagoCents: number;
+  saldoPendenteCents: number;
   status: string;
   contractualDueDate: Date | null;
   operationalSuggestedDate: Date | null;
@@ -88,6 +90,8 @@ export interface EventoComLancamentosResult {
     netContractAmountCents: number;
     commissionableBaseCents: number | null;
     status: string;
+    processStatus: string | null;
+    dataContratacao: Date | null;
     /** null quando não há closer atribuído nem por FK nem por texto manual — UI deve exibir "Não Atribuído". */
     closerNome: string | null;
     /** true quando o nome veio de closerUsuarioId (FK real, navegável); false quando é texto manual/herdado de fonte externa. */
@@ -109,9 +113,205 @@ export interface EventoComLancamentosResult {
   setorOperacional: CommissionEntryComColaborador[];
   semSetor: CommissionEntryComColaborador[];
   totalGeralCents: number;
+  totalPendenteCents: number;
 }
 
 const buscarEventoSchema = z.object({ eventId: z.string().min(1) });
+const buscarEventosLoteSchema = z.object({
+  eventIds: z.array(z.string().min(1)).min(1).max(100),
+});
+
+export async function BuscarEventosComLancamentosEmLote(input: z.infer<typeof buscarEventosLoteSchema>) {
+  const acesso = await exigirAcesso("VISUALIZAR");
+  if (!acesso.ok) return { success: false, error: acesso.error } as const;
+
+  const parsed = buscarEventosLoteSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Eventos inválidos" } as const;
+
+  try {
+    const eventIds = [...new Set(parsed.data.eventIds)];
+    const events = await db.commissionEvent.findMany({ where: { id: { in: eventIds } } });
+    const [entries, divergencias] = await Promise.all([
+      db.commissionEntry.findMany({
+        where: { eventId: { in: eventIds } },
+        include: {
+          componentes: true,
+          alocacoes: { select: { valorCents: true } },
+        },
+      }),
+      db.commissionDivergence.findMany({
+        where: { eventId: { in: eventIds }, resolvidoEm: null, tipo: { not: "SERVICO_SEM_TARIFARIO" } },
+        select: { id: true, eventId: true, tipo: true, severidade: true, detalhes: true },
+      }),
+    ]);
+
+    const usuarioIds = [
+      ...new Set([
+        ...entries.map((entry) => entry.collaboratorId),
+        ...events.flatMap((event) => [event.closerUsuarioId, event.analistaResponsavelUsuarioId]).filter((id): id is number => id !== null),
+      ]),
+    ];
+    const processIds = [...new Set(events.map((event) => event.businessProcessId).filter((id): id is string => Boolean(id)))];
+    const contratoIds = [...new Set(events.map((event) => event.contratoComercialId).filter((id): id is string => Boolean(id)))];
+    const clienteIds = [...new Set(events.map((event) => event.clienteId).filter((id): id is number => id !== null))];
+
+    const [usuarios, processos, eventosContratacao] = await Promise.all([
+      usuarioIds.length
+        ? db.usuarios.findMany({
+            where: { id: { in: usuarioIds } },
+            select: { id: true, nome: true, cargo: true, role: true },
+          })
+        : [],
+      processIds.length
+        ? db.businessProcess.findMany({
+            where: { id: { in: processIds } },
+            select: { id: true, dataExito: true, tentativas: true, deferidoPrimeiraTentativa: true, status: true },
+          })
+        : [],
+      contratoIds.length || clienteIds.length
+        ? db.commissionEvent.findMany({
+            where: {
+              eventType: "CONTRACTING",
+              OR: [
+                ...(contratoIds.length ? [{ contratoComercialId: { in: contratoIds } }] : []),
+                ...(clienteIds.length ? [{ clienteId: { in: clienteIds } }] : []),
+              ],
+            },
+            orderBy: { eventDate: "asc" },
+          })
+        : [],
+    ]);
+
+    const cargosNomes = [...new Set(usuarios.map((usuario) => usuario.cargo).filter((cargo): cargo is string => Boolean(cargo)))];
+    const cargos = cargosNomes.length
+      ? await db.cargoColaborador.findMany({
+          where: { nome: { in: cargosNomes } },
+          select: { nome: true, setorId: true },
+        })
+      : [];
+    const setorIds = [...new Set(cargos.map((cargo) => cargo.setorId).filter((id): id is number => id !== null))];
+    const setores = setorIds.length
+      ? await db.setor.findMany({ where: { id: { in: setorIds } }, select: { id: true, nome: true } })
+      : [];
+
+    const usuariosPorId = new Map(usuarios.map((usuario) => [usuario.id, usuario]));
+    const processosPorId = new Map(processos.map((processo) => [processo.id, processo]));
+    const cargosPorNome = new Map(cargos.map((cargo) => [cargo.nome, cargo]));
+    const setoresPorId = new Map(setores.map((setor) => [setor.id, setor.nome]));
+    const entriesPorEvento = new Map<string, typeof entries>();
+    const divergenciasPorEvento = new Map<string, Array<(typeof divergencias)[number]>>();
+    for (const entry of entries) {
+      const lista = entriesPorEvento.get(entry.eventId) ?? [];
+      lista.push(entry);
+      entriesPorEvento.set(entry.eventId, lista);
+    }
+    for (const divergencia of divergencias) {
+      if (!divergencia.eventId) continue;
+      const lista = divergenciasPorEvento.get(divergencia.eventId) ?? [];
+      lista.push(divergencia);
+      divergenciasPorEvento.set(divergencia.eventId, lista);
+    }
+
+    const eventosPorId = new Map(events.map((event) => [event.id, event]));
+    const resultados: EventoComLancamentosResult[] = [];
+    for (const eventId of eventIds) {
+      const event = eventosPorId.get(eventId);
+      if (!event) continue;
+      const processo = event.businessProcessId ? processosPorId.get(event.businessProcessId) : null;
+      const contratacao = event.eventType === "CONTRACTING"
+        ? event
+        : eventosContratacao.find(
+            (item) =>
+              (event.contratoComercialId && item.contratoComercialId === event.contratoComercialId) ||
+              (event.clienteId !== null && item.clienteId === event.clienteId),
+          );
+      const setorComercial: CommissionEntryComColaborador[] = [];
+      const setorOperacional: CommissionEntryComColaborador[] = [];
+      const semSetor: CommissionEntryComColaborador[] = [];
+      let totalGeralCents = 0;
+      let totalPendenteCents = 0;
+
+      for (const entry of entriesPorEvento.get(event.id) ?? []) {
+        const usuario = usuariosPorId.get(entry.collaboratorId);
+        const role = usuario?.role?.trim().toUpperCase();
+        let setorNome = role === "COMERCIAL" ? "Comercial" : role === "OPERACIONAL" ? "Operacional" : null;
+        if (!setorNome && usuario?.cargo) {
+          const setorId = cargosPorNome.get(usuario.cargo)?.setorId;
+          setorNome = setorId ? (setoresPorId.get(setorId) ?? null) : null;
+        }
+        const saldoPagoCents = entry.alocacoes.reduce((total, alocacao) => total + alocacao.valorCents, 0);
+        const saldoPendenteCents = Math.max(0, entry.totalCents - saldoPagoCents);
+        const resumo: CommissionEntryComColaborador = {
+          id: entry.id,
+          collaboratorId: entry.collaboratorId,
+          colaboradorNome: usuario?.nome ?? "Colaborador não encontrado",
+          cargoNome: usuario?.cargo ?? null,
+          setorNome,
+          vinculo: entry.vinculo,
+          totalCents: entry.totalCents,
+          saldoPagoCents,
+          saldoPendenteCents,
+          status: entry.status,
+          contractualDueDate: entry.contractualDueDate,
+          operationalSuggestedDate: entry.operationalSuggestedDate,
+          scheduledPaymentDate: entry.scheduledPaymentDate,
+          actualPaymentDate: entry.actualPaymentDate,
+          componentes: entry.componentes.map((componente) => ({
+            id: componente.id,
+            tipo: componente.tipo,
+            valorCents: componente.valorCents,
+            percentual: componente.percentual,
+            memoriaCalculoJson: componente.memoriaCalculoJson,
+          })),
+        };
+        totalGeralCents += entry.totalCents;
+        totalPendenteCents += saldoPendenteCents;
+        if (setorNome?.toUpperCase() === "COMERCIAL") setorComercial.push(resumo);
+        else if (setorNome?.toUpperCase() === "OPERACIONAL") setorOperacional.push(resumo);
+        else semSetor.push(resumo);
+      }
+
+      const closer = event.closerUsuarioId ? usuariosPorId.get(event.closerUsuarioId) : null;
+      const analista = event.analistaResponsavelUsuarioId ? usuariosPorId.get(event.analistaResponsavelUsuarioId) : null;
+      resultados.push({
+        event: {
+          id: event.id,
+          eventType: event.eventType,
+          cnpj: event.cnpj,
+          razaoSocial: event.razaoSocial,
+          nomeFantasia: event.nomeFantasia,
+          servico: event.servico,
+          eventDate: event.eventDate,
+          formaPagamento: event.formaPagamento,
+          grossContractAmountCents: event.grossContractAmountCents,
+          netContractAmountCents: event.netContractAmountCents,
+          commissionableBaseCents: event.commissionableBaseCents,
+          status: event.status,
+          processStatus: processo?.status ?? null,
+          dataContratacao: contratacao?.eventDate ?? null,
+          closerNome: closer?.nome ?? event.closerNomeManual,
+          closerViaUsuario: Boolean(closer),
+          analistaResponsavelNome: analista?.nome ?? event.analistaResponsavelNomeManual,
+          analistaResponsavelViaUsuario: Boolean(analista),
+          dataExito: processo?.dataExito ?? null,
+          tentativas: processo?.tentativas ?? null,
+          deferidoPrimeiraTentativa: processo?.deferidoPrimeiraTentativa ?? null,
+        },
+        divergencias: (divergenciasPorEvento.get(event.id) ?? []).map(({ id, tipo, severidade, detalhes }) => ({ id, tipo, severidade, detalhes })),
+        setorComercial,
+        setorOperacional,
+        semSetor,
+        totalGeralCents,
+        totalPendenteCents,
+      });
+    }
+
+    return { success: true, data: resultados } as const;
+  } catch (error) {
+    console.error("[BuscarEventosComLancamentosEmLote]", error);
+    return { success: false, error: "Erro interno ao carregar os eventos" } as const;
+  }
+}
 
 export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEventoSchema>) {
   const acesso = await exigirAcesso("VISUALIZAR");
@@ -126,13 +326,16 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
     const event = await db.commissionEvent.findUnique({ where: { id: parsed.data.eventId } });
     if (!event) return { success: false, error: "Evento não encontrado" } as const;
 
-    const [entries, divergencias, closerResolvido, analistaResolvido, businessProcess] = await Promise.all([
+    const [entries, divergencias, closerResolvido, analistaResolvido, businessProcess, eventoContratacao] = await Promise.all([
       db.commissionEntry.findMany({
         where: { eventId: event.id },
-        include: { componentes: true },
+        include: {
+          componentes: true,
+          alocacoes: { select: { valorCents: true } },
+        },
       }),
       db.commissionDivergence.findMany({
-        where: { eventId: event.id, resolvidoEm: null },
+        where: { eventId: event.id, resolvidoEm: null, tipo: { not: "SERVICO_SEM_TARIFARIO" } },
         select: { id: true, tipo: true, severidade: true, detalhes: true },
       }),
       resolverNomeResponsavel(event.closerUsuarioId, event.closerNomeManual),
@@ -140,21 +343,56 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
       event.businessProcessId
         ? db.businessProcess.findUnique({
             where: { id: event.businessProcessId },
-            select: { dataExito: true, tentativas: true, deferidoPrimeiraTentativa: true },
+            select: { dataExito: true, tentativas: true, deferidoPrimeiraTentativa: true, status: true },
           })
         : Promise.resolve(null),
+      event.eventType === "CONTRACTING"
+        ? Promise.resolve(event)
+        : event.contratoComercialId
+          ? db.commissionEvent.findFirst({
+              where: {
+                contratoComercialId: event.contratoComercialId,
+                eventType: "CONTRACTING",
+              },
+              orderBy: { eventDate: "asc" },
+            })
+          : Promise.resolve(null),
     ]);
+
+    const collaboratorIds = [...new Set(entries.map((entry) => entry.collaboratorId))];
+    const usuarios = collaboratorIds.length
+      ? await db.usuarios.findMany({
+          where: { id: { in: collaboratorIds } },
+          select: { id: true, nome: true, cargo: true, role: true },
+        })
+      : [];
+    const usuariosPorId = new Map(usuarios.map((usuario) => [usuario.id, usuario]));
+
+    const cargosNomes = [...new Set(usuarios.map((usuario) => usuario.cargo).filter((cargo): cargo is string => Boolean(cargo)))];
+    const cargos = cargosNomes.length
+      ? await db.cargoColaborador.findMany({
+          where: { nome: { in: cargosNomes } },
+          select: { nome: true, setorId: true },
+        })
+      : [];
+    const cargosPorNome = new Map(cargos.map((cargo) => [cargo.nome, cargo]));
+    const setorIds = [...new Set(cargos.map((cargo) => cargo.setorId).filter((id): id is number => id !== null))];
+    const setores = setorIds.length
+      ? await db.setor.findMany({
+          where: { id: { in: setorIds } },
+          select: { id: true, nome: true },
+        })
+      : [];
+    const setoresPorId = new Map(setores.map((setor) => [setor.id, setor.nome]));
 
     const setorComercial: CommissionEntryComColaborador[] = [];
     const setorOperacional: CommissionEntryComColaborador[] = [];
     const semSetor: CommissionEntryComColaborador[] = [];
     let totalGeralCents = 0;
+    let totalPendenteCents = 0;
 
     for (const entry of entries) {
-      const usuario = await db.usuarios.findUnique({
-        where: { id: entry.collaboratorId },
-        select: { nome: true, cargo: true, role: true },
-      });
+      const usuario = usuariosPorId.get(entry.collaboratorId);
 
       // Setor: prioriza `usuarios.role` (fonte real usada pelo módulo Gestão de Equipe —
       // já vem preenchido como "COMERCIAL"/"OPERACIONAL" para todo colaborador). Só cai
@@ -166,16 +404,12 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
         roleNormalizado === "COMERCIAL" ? "Comercial" : roleNormalizado === "OPERACIONAL" ? "Operacional" : null;
 
       if (!setorNome && usuario?.cargo) {
-        const cargoRow = await db.cargoColaborador.findUnique({
-          where: { nome: usuario.cargo },
-          select: { setorId: true },
-        });
-        const setorRow = cargoRow?.setorId
-          ? await db.setor.findUnique({ where: { id: cargoRow.setorId }, select: { nome: true } })
-          : null;
-        setorNome = setorRow?.nome ?? null;
+        const setorId = cargosPorNome.get(usuario.cargo)?.setorId;
+        setorNome = setorId ? (setoresPorId.get(setorId) ?? null) : null;
       }
 
+      const saldoPagoCents = entry.alocacoes.reduce((total, alocacao) => total + alocacao.valorCents, 0);
+      const saldoPendenteCents = Math.max(0, entry.totalCents - saldoPagoCents);
       const entryResumo: CommissionEntryComColaborador = {
         id: entry.id,
         collaboratorId: entry.collaboratorId,
@@ -184,6 +418,8 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
         setorNome,
         vinculo: entry.vinculo,
         totalCents: entry.totalCents,
+        saldoPagoCents,
+        saldoPendenteCents,
         status: entry.status,
         contractualDueDate: entry.contractualDueDate,
         operationalSuggestedDate: entry.operationalSuggestedDate,
@@ -199,6 +435,7 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
       };
 
       totalGeralCents += entry.totalCents;
+      totalPendenteCents += saldoPendenteCents;
 
       const setorNormalizado = setorNome?.trim().toUpperCase() ?? "";
       if (setorNormalizado === "COMERCIAL") {
@@ -224,6 +461,8 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
         netContractAmountCents: event.netContractAmountCents,
         commissionableBaseCents: event.commissionableBaseCents,
         status: event.status,
+        processStatus: businessProcess?.status ?? null,
+        dataContratacao: eventoContratacao?.eventDate ?? null,
         closerNome: closerResolvido.nome,
         closerViaUsuario: closerResolvido.viaUsuario,
         analistaResponsavelNome: analistaResolvido.nome,
@@ -237,6 +476,7 @@ export async function BuscarEventoComLancamentos(input: z.infer<typeof buscarEve
       setorOperacional,
       semSetor,
       totalGeralCents,
+      totalPendenteCents,
     };
 
     return { success: true, data: result } as const;
@@ -373,11 +613,23 @@ export async function BuscarDetalhesLancamento(input: z.infer<typeof buscarEntry
       event ? resolverNomeResponsavel(event.closerUsuarioId, event.closerNomeManual) : Promise.resolve({ nome: null, viaUsuario: false }),
       event ? resolverNomeResponsavel(event.analistaResponsavelUsuarioId, event.analistaResponsavelNomeManual) : Promise.resolve({ nome: null, viaUsuario: false }),
     ]);
+    const colaborador = await db.usuarios.findUnique({
+      where: { id: entry.collaboratorId },
+      select: { nome: true, cargo: true },
+    });
+    const saldoPagoCents = entry.alocacoes.reduce(
+      (total, alocacao) => total + alocacao.valorCents,
+      0,
+    );
 
     return {
       success: true,
       data: {
         entry,
+        colaboradorNome: colaborador?.nome ?? "Colaborador não encontrado",
+        cargoNome: colaborador?.cargo ?? null,
+        saldoPagoCents,
+        saldoPendenteCents: Math.max(0, entry.totalCents - saldoPagoCents),
         auditoria,
         eventId: entry.eventId,
         closerNome: closerResolvido.nome,

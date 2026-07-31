@@ -59,6 +59,7 @@ export async function ListarDivergencias(input?: z.infer<typeof listarDivergenci
 
   try {
     const where: Prisma.CommissionDivergenceWhereInput = {
+      NOT: { tipo: "SERVICO_SEM_TARIFARIO" },
       ...(severidade ? { severidade } : {}),
       ...(tipo ? { tipo } : {}),
       ...(resolvido === true ? { resolvidoEm: { not: null } } : {}),

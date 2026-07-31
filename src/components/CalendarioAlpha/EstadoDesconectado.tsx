@@ -23,10 +23,10 @@ export function EstadoDesconectado({
     startTransition(async () => {
       const resultado = await ativarCalendarioAlpha();
       if (!resultado.success) {
-        toast.error(resultado.error ?? "Não foi possível ativar o Calendário Alpha agora.");
+        toast.error(resultado.error ?? "Não foi possível ativar a Agenda Alpha agora.");
         return;
       }
-      toast.success("Calendário Alpha ativado.");
+      toast.success("Agenda Alpha ativada.");
       onAtivado();
     });
   }
@@ -39,7 +39,7 @@ export function EstadoDesconectado({
             <CalendarClock className={cn("w-7 h-7", tema.text)} />
           </div>
           <div>
-            <h1 className="text-lg font-black uppercase italic tracking-tighter text-white">Calendário Alpha</h1>
+            <h1 className="text-lg font-black uppercase italic tracking-tighter text-white">Agenda Alpha</h1>
             <p className="text-[11px] uppercase tracking-[0.25em] text-slate-500 font-bold">Sua agenda Google, dentro do Painel</p>
           </div>
         </div>
@@ -69,7 +69,7 @@ export function EstadoDesconectado({
           )}
         >
           {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          Ativar Calendário Alpha
+          Ativar Agenda Alpha
         </button>
 
         <div className="flex items-start gap-2 mt-4 text-[11px] text-slate-500">

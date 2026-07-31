@@ -61,13 +61,21 @@ export async function construirPreviewEspelho(filtros: FiltrosPreview): Promise<
     select: { nome: true, cargo: true },
   });
 
+  const fimExclusivo = new Date(filtros.periodoFim);
+  fimExclusivo.setUTCHours(0, 0, 0, 0);
+  fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1);
+  const inicioInclusivo = new Date(filtros.periodoInicio);
+  inicioInclusivo.setUTCHours(0, 0, 0, 0);
+
   const entries = await db.commissionEntry.findMany({
     where: {
       collaboratorId: filtros.colaboradorId,
-      createdAt: { gte: filtros.periodoInicio, lte: filtros.periodoFim },
+      event: {
+        eventDate: { gte: inicioInclusivo, lt: fimExclusivo },
+      },
     },
     include: { componentes: true, event: true },
-    orderBy: { createdAt: "asc" },
+    orderBy: { event: { eventDate: "asc" } },
   });
 
   const linhasComissao: LinhaEspelhoComissao[] = [];

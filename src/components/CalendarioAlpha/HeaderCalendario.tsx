@@ -1,13 +1,41 @@
 "use client";
 
-import { CalendarDays, CalendarPlus, CalendarRange, ChevronLeft, ChevronRight, Grid3x3, LogOut, RefreshCw, Settings2, ShieldCheck, Users } from "lucide-react";
-import Image from "next/image";
+import { type ReactNode } from "react";
+import {
+  CalendarDays,
+  CalendarPlus,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Grid3x3,
+  Menu,
+  Settings2,
+} from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import type { TemaAlpha } from "@/lib/temas";
+import { cn } from "@/lib/utils";
 
-import { formatarTituloAno, formatarTituloDia, formatarTituloMes, formatarTituloSemana } from "./lib/datas";
-import type { VisaoCalendario } from "./lib/datas";
+import {
+  formatarTituloAno,
+  formatarTituloDia,
+  formatarTituloMes,
+  formatarTituloSemana,
+  type VisaoCalendario,
+} from "./lib/datas";
+
+interface HeaderCalendarioProps {
+  tema: TemaAlpha;
+  visao: VisaoCalendario;
+  dataReferencia: Date;
+  status: ReactNode;
+  onMudarVisao: (visao: VisaoCalendario) => void;
+  onHoje: () => void;
+  onAnterior: () => void;
+  onProximo: () => void;
+  onNovoEvento: () => void;
+  onAbrirSidebar: () => void;
+  onAbrirConfiguracoes: () => void;
+}
 
 const OPCOES_VISAO: { visao: VisaoCalendario; label: string; Icon: typeof CalendarDays }[] = [
   { visao: "dia", label: "Dia", Icon: CalendarDays },
@@ -23,153 +51,135 @@ function tituloDaVisao(visao: VisaoCalendario, dataReferencia: Date): string {
   return formatarTituloMes(dataReferencia);
 }
 
+function BotaoIcone({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+    >
+      {children}
+    </button>
+  );
+}
+
 export function HeaderCalendario({
   tema,
   visao,
   dataReferencia,
-  emailUsuario,
-  sincronizando,
-  isAdmin,
+  status,
   onMudarVisao,
   onHoje,
   onAnterior,
   onProximo,
   onNovoEvento,
+  onAbrirSidebar,
   onAbrirConfiguracoes,
-  onAbrirColegas,
-  onAbrirPermissoes,
-  onDesativar,
-}: {
-  tema: TemaAlpha;
-  visao: VisaoCalendario;
-  dataReferencia: Date;
-  emailUsuario?: string;
-  sincronizando: boolean;
-  isAdmin: boolean;
-  onMudarVisao: (visao: VisaoCalendario) => void;
-  onHoje: () => void;
-  onAnterior: () => void;
-  onProximo: () => void;
-  onNovoEvento: () => void;
-  onAbrirConfiguracoes: () => void;
-  onAbrirColegas: () => void;
-  onAbrirPermissoes: () => void;
-  onDesativar: () => void;
-}) {
+}: HeaderCalendarioProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-      <div className="flex items-center gap-3 min-w-0">
-        <button
-          type="button"
-          onClick={onHoje}
-          className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-black uppercase tracking-wide text-slate-200 hover:bg-white/10 transition-colors"
-        >
-          Hoje
-        </button>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={onAnterior}
-            aria-label="Período anterior"
-            title="Período anterior"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onProximo}
-            aria-label="Próximo período"
-            title="Próximo período"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+    <header className="mb-4 rounded-[2rem] border border-white/10 bg-slate-950/55 p-3 shadow-2xl backdrop-blur-2xl sm:p-4">
+      <div className="flex items-center gap-2">
+        <div className="lg:hidden">
+          <BotaoIcone label="Abrir agendas" onClick={onAbrirSidebar}>
+            <Menu className="size-4" />
+          </BotaoIcone>
         </div>
-        <h2 className="truncate text-base sm:text-lg font-black italic tracking-tight text-white capitalize">
-          {tituloDaVisao(visao, dataReferencia)}
-        </h2>
-        {sincronizando && <RefreshCw className="w-3.5 h-3.5 text-slate-500 animate-spin shrink-0" aria-label="Sincronizando" />}
-      </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center rounded-xl border border-white/10 bg-white/5 p-0.5">
-          {OPCOES_VISAO.map(({ visao: opcao, label, Icon }) => (
-            <button
-              key={opcao}
-              type="button"
-              onClick={() => onMudarVisao(opcao)}
-              aria-pressed={visao === opcao}
-              aria-label={`Visão de ${label.toLowerCase()}`}
-              title={`Visão de ${label.toLowerCase()}`}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-black uppercase tracking-wide transition-colors",
-                visao === opcao ? cn(tema.bg, "text-white") : "text-slate-400 hover:text-white",
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" /> {label}
-            </button>
-          ))}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <CalendarDays className={cn("hidden size-5 shrink-0 sm:block", tema.text)} aria-hidden="true" />
+            <div className="min-w-0">
+              <h1 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                Agenda Alpha
+              </h1>
+              <p className="truncate text-sm font-black capitalize tracking-tight text-white sm:text-lg">
+                {tituloDaVisao(visao, dataReferencia)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden items-center gap-2 lg:flex">
+          <button
+            type="button"
+            onClick={onHoje}
+            className="min-h-10 rounded-xl border border-white/10 bg-white/[0.025] px-3 text-xs font-black uppercase tracking-wide text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+          >
+            Hoje
+          </button>
+          <BotaoIcone label="Período anterior" onClick={onAnterior}>
+            <ChevronLeft className="size-4" />
+          </BotaoIcone>
+          <BotaoIcone label="Próximo período" onClick={onProximo}>
+            <ChevronRight className="size-4" />
+          </BotaoIcone>
+        </div>
+
+        {status}
+
+        <div className="hidden lg:block">
+          <BotaoIcone label="Gerenciar agendas" onClick={onAbrirConfiguracoes}>
+            <Settings2 className="size-4" />
+          </BotaoIcone>
         </div>
 
         <button
           type="button"
           onClick={onNovoEvento}
           className={cn(
-            "flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black uppercase tracking-wide text-white transition-transform hover:scale-[1.03] active:scale-[0.98]",
+            "flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-wide text-white transition-transform hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:px-4",
             tema.bg,
           )}
         >
-          <CalendarPlus className="w-4 h-4" /> Novo evento
-        </button>
-
-        <button
-          type="button"
-          onClick={onAbrirColegas}
-          aria-label="Ver agenda de colegas"
-          title="Ver agenda de colegas"
-          className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-        >
-          <Users className="w-4 h-4" />
-        </button>
-
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={onAbrirPermissoes}
-            aria-label="Gerenciar permissão de compartilhamento de agenda"
-            title="Gerenciar permissão de compartilhamento de agenda"
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-          >
-            <ShieldCheck className="w-4 h-4" />
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={onAbrirConfiguracoes}
-          aria-label="Configurar calendários"
-          title="Configurar calendários"
-          className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-        >
-          <Settings2 className="w-4 h-4" />
-        </button>
-
-        <div className="hidden sm:flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5">
-          <Image src="/google.png" alt="" width={14} height={14} className="rounded-sm" />
-          <span className="text-[11px] text-slate-400 truncate max-w-[10rem]">{emailUsuario}</span>
-        </div>
-
-        <button
-          type="button"
-          onClick={onDesativar}
-          aria-label="Desativar Calendário Alpha"
-          title="Desativar Calendário Alpha"
-          className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-        >
-          <LogOut className="w-4 h-4" />
+          <CalendarPlus className="size-4" />
+          <span className="hidden sm:inline">Criar</span>
         </button>
       </div>
-    </div>
+
+      <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 lg:justify-end">
+        <div className="flex items-center gap-1 lg:hidden">
+          <button
+            type="button"
+            onClick={onHoje}
+            className="min-h-9 rounded-xl border border-white/10 bg-white/[0.025] px-3 text-[11px] font-bold text-slate-300"
+          >
+            Hoje
+          </button>
+          <BotaoIcone label="Período anterior" onClick={onAnterior}>
+            <ChevronLeft className="size-4" />
+          </BotaoIcone>
+          <BotaoIcone label="Próximo período" onClick={onProximo}>
+            <ChevronRight className="size-4" />
+          </BotaoIcone>
+        </div>
+
+        <div className="flex shrink-0 items-center rounded-xl border border-white/10 bg-white/[0.025] p-0.5">
+          {OPCOES_VISAO.map(({ visao: opcao, label, Icon }) => (
+            <button
+              key={opcao}
+              type="button"
+              onClick={() => onMudarVisao(opcao)}
+              aria-pressed={visao === opcao}
+              className={cn(
+                "flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-[10px] font-black uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+                visao === opcao ? cn(tema.bg, "text-white") : "text-slate-500 hover:text-white",
+              )}
+            >
+              <Icon className="size-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </header>
   );
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -21,9 +22,18 @@ export async function POST(req: Request) {
       },
     });
 
+    await notificarNovoChamado({
+      chamadoId: novoChamado.id,
+      titulo: novoChamado.titulo,
+      usuario: session.user.nome || "Usuário",
+      setor: session.user.role || "",
+      urgencia: novoChamado.prioridade,
+      createdAt: novoChamado.createdAt.toISOString(),
+    });
+
     revalidatePath("/PainelAlpha/Chamados");
     return NextResponse.json({ success: true, id: novoChamado.id });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Erro ao criar via Bibble" }, { status: 500 });
   }
 }
