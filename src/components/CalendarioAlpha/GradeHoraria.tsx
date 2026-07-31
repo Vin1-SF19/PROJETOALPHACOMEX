@@ -42,9 +42,9 @@ export function GradeHoraria({
   }, []);
 
   return (
-    <div className="rounded-[2rem] border border-white/5 bg-white/[0.02] overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem] border border-white/5 bg-white/[0.02]">
       <div
-        className="grid border-b border-white/5"
+        className="grid shrink-0 border-b border-white/5"
         style={{ gridTemplateColumns: `4rem repeat(${dias.length}, 1fr)` }}
       >
         <div />
@@ -64,7 +64,7 @@ export function GradeHoraria({
       </div>
 
       {dias.some((dia) => eventosDiaInteiroDoDia(dia, eventos).length > 0) && (
-        <div className="grid border-b border-white/5" style={{ gridTemplateColumns: `4rem repeat(${dias.length}, 1fr)` }}>
+        <div className="grid max-h-28 shrink-0 overflow-y-auto border-b border-white/5" style={{ gridTemplateColumns: `4rem repeat(${dias.length}, 1fr)` }}>
           <div className="flex items-center justify-end pr-2 text-[9px] font-bold uppercase text-slate-600">Dia todo</div>
           {dias.map((dia) => (
             <div key={dia.toISOString()} className="border-l border-white/5 p-1 space-y-1 min-h-[2rem]">
@@ -84,7 +84,7 @@ export function GradeHoraria({
         </div>
       )}
 
-      <div ref={containerRef} className="relative overflow-y-auto" style={{ maxHeight: "70vh" }}>
+      <div ref={containerRef} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="grid" style={{ gridTemplateColumns: `4rem repeat(${dias.length}, 1fr)` }}>
           <div>
             {HORAS.map((hora) => (

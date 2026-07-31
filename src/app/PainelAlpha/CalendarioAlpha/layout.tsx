@@ -17,9 +17,9 @@ export default async function CalendarioAlphaLayout({ children }: { children: Re
   const tema = getTema(userDb?.tema_interface ?? "blue");
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-slate-950">
+    <div className="relative h-dvh min-h-0 overflow-hidden bg-slate-950">
       <CalendarioAlphaBackground accentRgb={tema.accent} />
-      <div className="relative z-10">{children}</div>
+      <div className="relative z-10 h-full min-h-0">{children}</div>
     </div>
   );
 }

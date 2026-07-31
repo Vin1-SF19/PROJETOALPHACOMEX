@@ -66,7 +66,7 @@ function BotaoIcone({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+      className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 lg:size-9"
     >
       {children}
     </button>
@@ -87,7 +87,7 @@ export function HeaderCalendario({
   onAbrirConfiguracoes,
 }: HeaderCalendarioProps) {
   return (
-    <header className="mb-4 rounded-[2rem] border border-white/10 bg-slate-950/55 p-3 shadow-2xl backdrop-blur-2xl sm:p-4">
+    <header className="mb-3 shrink-0 rounded-[1.75rem] border border-white/10 bg-slate-950/55 p-2.5 shadow-2xl backdrop-blur-2xl sm:p-3 [@media(max-height:760px)]:mb-2 [@media(max-height:760px)]:py-2">
       <div className="flex items-center gap-2">
         <div className="lg:hidden">
           <BotaoIcone label="Abrir agendas" onClick={onAbrirSidebar}>
@@ -113,7 +113,7 @@ export function HeaderCalendario({
           <button
             type="button"
             onClick={onHoje}
-            className="min-h-10 rounded-xl border border-white/10 bg-white/[0.025] px-3 text-xs font-black uppercase tracking-wide text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+            className="min-h-10 rounded-xl border border-white/10 bg-white/[0.025] px-3 text-xs font-black uppercase tracking-wide text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 lg:min-h-9"
           >
             Hoje
           </button>
@@ -137,7 +137,7 @@ export function HeaderCalendario({
           type="button"
           onClick={onNovoEvento}
           className={cn(
-            "flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-wide text-white transition-transform hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:px-4",
+            "flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-wide text-white transition-transform hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:px-4 lg:min-h-9",
             tema.bg,
           )}
         >
@@ -146,7 +146,7 @@ export function HeaderCalendario({
         </button>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 lg:justify-end">
+      <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-0.5 lg:justify-end">
         <div className="flex items-center gap-1 lg:hidden">
           <button
             type="button"

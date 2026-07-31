@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from "react-dom";
 import { fmtDate, fmtDateTime } from "@/lib/format-date";
 import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle, Briefcase, Wallet, CreditCard, UserCircle2, Loader2 } from "lucide-react";
-import { adicionarSocio, atualizarLogCS, atualizarLogFeedback, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, salvarAlteracoesGeral, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
+import { adicionarSocio, atualizarLogCS, atualizarLogFeedback, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, excluirSocio, salvarAlteracoesGeral, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
 import { toast } from 'sonner';
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -60,6 +60,17 @@ interface ModalGestaoClienteProps {
     cliente: ClienteCS[] | ClienteCS | null;
     aoSalvar?: () => void | Promise<void>;
 }
+
+type SocioDoModal = {
+    id: number;
+    nome: string;
+    telefone?: string | null;
+    dataNascimento?: string | null;
+    vinculo?: string | null;
+    obs?: string | null;
+    clienteId?: number;
+    _pendente?: "criar" | "editar" | "excluir";
+};
 
 export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGrupo, aoSalvar }: ModalGestaoClienteProps) {
     const { data: session } = useSession();
@@ -198,9 +209,10 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
     const [listaLogsCS, setListaLogsCS] = useState<any[]>([]);
 
-    const [listaSocios, setListaSocios] = useState<any[]>([]);
+    const [listaSocios, setListaSocios] = useState<SocioDoModal[]>([]);
     const [showNovoSocio, setShowNovoSocio] = useState(false);
     const [novoSocio, setNovoSocio] = useState({ nome: "", telefone: "", dataNascimento: "", vinculo: "", obs: "" });
+    const [socioParaExcluir, setSocioParaExcluir] = useState<SocioDoModal | null>(null);
 
     // Edição inline de sócios
     const [editandoSocioId, setEditandoSocioId] = useState<number | null>(null);
@@ -301,6 +313,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         return () => {
             setListaSocios([]);
             setShowNovoSocio(false);
+            setSocioParaExcluir(null);
         };
     }, [cliente?.id, isOpen]);
 
@@ -337,6 +350,31 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             : s));
         setEditandoSocioId(null);
         toast.info("Edição de sócio adicionada ao rascunho — clique em Salvar Alterações para confirmar.");
+    };
+
+    const handleExcluirSocio = (socio: SocioDoModal) => {
+        setSocioParaExcluir(socio);
+    };
+
+    const handleConfirmarExclusaoSocio = () => {
+        if (!socioParaExcluir) return;
+
+        const socioId = socioParaExcluir.id;
+        const socioAindaNaoSalvo = socioParaExcluir._pendente === "criar";
+        setSocioParaExcluir(null);
+
+        setEditandoSocioId((idAtual) => idAtual === socioId ? null : idAtual);
+
+        if (socioAindaNaoSalvo) {
+            setListaSocios((prev) => prev.filter((item) => item.id !== socioId));
+            toast.success("Sócio removido do rascunho.");
+            return;
+        }
+
+        setListaSocios((prev) => prev.map((item) => item.id === socioId
+            ? { ...item, _pendente: "excluir" as const }
+            : item));
+        toast.info("Exclusão adicionada ao rascunho — clique em Salvar Alterações para confirmar.");
     };
 
     const handleAbrirEditCS = (log: any) => {
@@ -639,7 +677,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     /**
      * Salva TUDO que foi editado no modal de uma vez só — dados fiscais do
      * registro principal, o card de gestão de CADA serviço contratado, e as
-     * pendências locais de sócios (`_pendente: "criar"|"editar"`).
+     * pendências locais de sócios (`_pendente: "criar"|"editar"|"excluir"`).
      * Único botão de salvar do modal ("Salvar Alterações" no rodapé) — ver
      * `decisions.md` sobre a unificação. Antes, "Salvar Alterações" e "Salvar
      * Serviço" eram botões independentes que chamavam `salvarAlteracoesGeral`
@@ -719,11 +757,11 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             if (!res.success) falhas.push(`serviço "${registro.servicos || registro.id}"`);
         }
 
-        // 3) Sócios pendentes (criar/editar).
+        // 3) Sócios pendentes (criar/editar/excluir).
         for (const s of listaSocios) {
             if (s._pendente === "criar") {
                 const res = await adicionarSocio(cliente!.id, {
-                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento, vinculo: s.vinculo, obs: s.obs,
+                    nome: s.nome, telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });
                 if (res.success && res.data) {
                     const novoId = res.data.id;
@@ -733,12 +771,19 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                 }
             } else if (s._pendente === "editar") {
                 const res = await atualizarSocio(s.id, {
-                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento, vinculo: s.vinculo, obs: s.obs,
+                    nome: s.nome, telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });
                 if (res.success) {
                     setListaSocios((prev) => prev.map((x) => x.id === s.id ? { ...x, _pendente: undefined } : x));
                 } else {
                     falhas.push(`sócio "${s.nome}"`);
+                }
+            } else if (s._pendente === "excluir") {
+                const res = await excluirSocio(s.id);
+                if (res.success) {
+                    setListaSocios((prev) => prev.filter((x) => x.id !== s.id));
+                } else {
+                    falhas.push(`exclusão do sócio "${s.nome}"`);
                 }
             }
         }
@@ -1269,8 +1314,8 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
-                                    {listaSocios.length > 0 ? (
-                                        listaSocios.map((s: any, i: number) => (
+                                    {listaSocios.some((s) => s._pendente !== "excluir") ? (
+                                        listaSocios.filter((s) => s._pendente !== "excluir").map((s: any, i: number) => (
                                             editandoSocioId === s.id ? (
                                                 <tr key={s.id || i} className="bg-indigo-500/5 border-l-2 border-indigo-500">
                                                     <td className="px-3 py-3">
@@ -1381,13 +1426,26 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <button
-                                                            onClick={() => handleIniciarEdicaoSocio(s)}
-                                                            className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl transition-all duration-200 active:scale-90"
-                                                            title="Editar Sócio"
-                                                        >
-                                                            <Edit3 size={15} />
-                                                        </button>
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleIniciarEdicaoSocio(s)}
+                                                                className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl transition-all duration-200 active:scale-90"
+                                                                title="Editar sócio"
+                                                                aria-label={`Editar sócio ${s.nome}`}
+                                                            >
+                                                                <Edit3 size={15} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleExcluirSocio(s)}
+                                                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200 active:scale-90"
+                                                                title="Excluir sócio"
+                                                                aria-label={`Excluir sócio ${s.nome}`}
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )
@@ -2142,6 +2200,78 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                         </form>
                     </CsNpsModal3DShell>
                 </div>
+            )}
+
+            {socioParaExcluir && portalTarget && createPortal(
+                <div
+                    className="fixed inset-0 z-[220] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="titulo-excluir-socio"
+                    aria-describedby="descricao-excluir-socio"
+                >
+                    <CsNpsModal3DShell className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-rose-500/30 bg-[#0b1220] p-7 shadow-2xl shadow-rose-950/40">
+                        <div className="flex items-start gap-4">
+                            <div className="shrink-0 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3">
+                                <AlertTriangle size={26} className="text-rose-400" />
+                            </div>
+                            <div>
+                                <h3 id="titulo-excluir-socio" className="text-lg font-black uppercase tracking-tight text-white">
+                                    Confirmar exclusão
+                                </h3>
+                                <p id="descricao-excluir-socio" className="mt-1 text-xs leading-relaxed text-slate-400">
+                                    Confira os dados abaixo. Esta ação será aplicada ao confirmar.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 rounded-2xl border border-white/10 bg-black/25 p-4">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-400">Sócio que será apagado</p>
+                            <p className="mt-2 text-base font-black uppercase text-white">{socioParaExcluir.nome}</p>
+                            <dl className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                                <div>
+                                    <dt className="text-[9px] font-black uppercase tracking-widest text-slate-600">Vínculo</dt>
+                                    <dd className="mt-1 font-bold text-slate-300">{socioParaExcluir.vinculo || "Não informado"}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-[9px] font-black uppercase tracking-widest text-slate-600">Telefone</dt>
+                                    <dd className="mt-1 font-bold text-slate-300">{socioParaExcluir.telefone || "Não informado"}</dd>
+                                </div>
+                                {socioParaExcluir.obs && (
+                                    <div className="sm:col-span-2">
+                                        <dt className="text-[9px] font-black uppercase tracking-widest text-slate-600">Observação</dt>
+                                        <dd className="mt-1 break-words text-slate-400">{socioParaExcluir.obs}</dd>
+                                    </div>
+                                )}
+                            </dl>
+                        </div>
+
+                        <p className="mt-4 rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3 text-[11px] leading-relaxed text-amber-200/80">
+                            {socioParaExcluir._pendente === "criar"
+                                ? "Este sócio ainda não foi salvo e será removido somente do rascunho."
+                                : "A exclusão ficará no rascunho e será concluída ao clicar em Salvar Alterações."}
+                        </p>
+
+                        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setSocioParaExcluir(null)}
+                                className="cursor-pointer rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all hover:bg-slate-700"
+                                autoFocus
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmarExclusaoSocio}
+                                className="cursor-pointer rounded-xl bg-rose-600 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-rose-950/40 transition-all hover:bg-rose-500 active:scale-95"
+                            >
+                                Confirmar exclusão
+                            </button>
+                        </div>
+                    </CsNpsModal3DShell>
+                </div>,
+                portalTarget,
             )}
 
             {showConfirmarOcultar && (

@@ -18,6 +18,15 @@
 
 ---
 
+### Bibble confirma "chamado aberto" via chat mesmo quando a abertura falhou
+**Sintoma:** Usuário pede para o Bibble abrir um chamado de suporte pelo chat; o Bibble responde confirmando a abertura (às vezes até com número de chamado), mas o chamado não existe de verdade em `/PainelAlpha/Chamados` — ninguém no admin recebe a notificação.
+**Causa:** A tool `abrir_chamado` ([tool-executor.ts](../../src/lib/bibble/tool-executor.ts)) retornava uma string livre ("Chamado #X criado...", "Dados insuficientes...", "já foi registrado..."), e o `system-prompt.ts` não tinha nenhuma regra obrigando o LLM a basear a resposta final nesse texto literal — diferente da regra de integridade já existente para o calendário. Como a resposta ao usuário é gerada livremente no streaming final ([route.ts](../../src/app/api/bibble/chat/route.ts)), o modelo (principalmente modelos locais menores, ex. `qwen3:14b`) podia alucinar confirmação de sucesso mesmo quando a tool retornou erro, "dados insuficientes" ou duplicado — ou mesmo sem nunca emitir a tool call. Além disso, `db.chamados.create` não tinha try/catch: uma falha real de banco subia como exception não tratada até o catch genérico do `runStream`.
+**Fix:** (1) Envolvido o corpo do case `abrir_chamado` em try/catch, retornando erro explícito em vez de deixar a exception propagar. (2) Prefixado todo retorno da tool com `SUCESSO_ABRIR_CHAMADO:` ou `FALHA_ABRIR_CHAMADO:`. (3) Adicionada "REGRA DE INTEGRIDADE DO CHAMADO" no `system-prompt.ts` (mesmo padrão da regra de integridade do calendário): o Bibble só pode confirmar abertura se o retorno começar com `SUCESSO_ABRIR_CHAMADO`; caso contrário deve explicar o motivo real e nunca inventar número de chamado.
+**Contexto:** Qualquer tool de mutação (cria/edita/exclui algo real no banco) exposta ao Bibble deve seguir esse mesmo padrão: retorno com prefixo de sucesso/falha inequívoco + regra explícita no system prompt proibindo confirmação sem esse prefixo. Isso já existia para o calendário mas não tinha sido replicado para chamados (nem para outras tools de mutação futuras).
+**Adicionado em:** 2026-07-31 (Echo, sessão de bugfix Bibble/Chamados)
+
+---
+
 ### ESLint `react-hooks/set-state-in-effect` — chamar Server Action dentro de `useEffect`
 **Sintoma:** `npm run lint` reporta `error: Calling setState synchronously within an effect can trigger cascading renders` apontando para uma linha tipo `carregarDados();` ou `carregar();` dentro de um `useEffect(() => { ... }, [deps])`.
 **Causa:** Regra do React Compiler (via `eslint-config-next/core-web-vitals`) detecta chamar diretamente uma função que internamente faz `setState` (mesmo que seja uma função `async` que popula estado a partir de uma Server Action) dentro do corpo de um efeito — é o padrão universal do projeto para "buscar dados ao montar" (ex: `ApresentacoesDashboard.tsx`, todo o módulo Alpha Blueprint), mas o linter trata como erro bloqueante, não warning.

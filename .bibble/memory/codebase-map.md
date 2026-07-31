@@ -286,6 +286,8 @@ O nome visível passou a ser **Agenda Alpha**, sem alterar `/PainelAlpha/Calenda
 
 **Frontend:** `CalendarioAlphaDashboard.tsx` foi reduzido a orquestrador; `AgendaSidebar.tsx`, `StatusSincronizacao.tsx`, `AgendaModal3D.tsx`/`AgendaOverlays.tsx`, `ConteudoAgenda.tsx` e hooks em `lib/` concentram sidebar, estado de sync, modais 3D responsivos e controle da tela. `invalidation.ts` sincroniza abas/iframes por `BroadcastChannel`, com fallback `storage`/evento DOM e dedupe contra loops.
 
+**Ajuste de viewport (2026-07-31):** o layout da rota, dashboard, corpo e grade formam uma cadeia `h-dvh`/`h-full` + `min-h-0`. A sidebar desktop usa larguras responsivas menores (`lg`/`xl`/`2xl`) e rola somente suas listas; mês usa seis linhas flexíveis e dia/semana rolam somente as horas. Ao alterar a composição da Agenda, preservar essa cadeia — remover um `min-h-0` intermediário faz o módulo voltar a crescer além do iframe.
+
 **Privacidade:** consultas ao vivo de colegas continuam sob Domain-Wide Delegation e permissão assimétrica. Usuário comum recebe apenas blocos “Ocupado”, sem título, e-mail, Meet, ETag ou id real; Admin/CEO mantém detalhes e escrita. Agendas compartilhadas não entram no snapshot SSR e só são buscadas ao vivo após ação explícita.
 
 **Fase 2A operacional (2026-07-30):** coordenação entre réplicas, fila e push agora existem no código e no schema, mas permanecem **flags-off**. A migration autorizada pelo Vault foi aplicada uma única vez e validada no Turso: `GoogleCalendarPushChannel`, `GoogleCalendarPendingOperation` e `GoogleCalendarSyncLease`, com 7 índices explícitos e 3 unicidades.

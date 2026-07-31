@@ -100,7 +100,7 @@ export function CalendarioAlphaDashboard({
   );
 
   return (
-    <div className="mx-auto max-w-[1800px] px-3 py-4 sm:px-6 lg:px-8">
+    <div className="mx-auto flex h-full min-h-0 max-w-[1800px] flex-col px-3 py-3 sm:px-4 xl:px-5">
       <HeaderCalendario
         tema={tema}
         visao={visao}
@@ -121,7 +121,7 @@ export function CalendarioAlphaDashboard({
         onAbrirConfiguracoes={agenda.abrirConfiguracoes}
       />
 
-      <div className="flex min-h-0 gap-4">
+      <div className="flex min-h-0 flex-1 gap-3">
         <AgendaSidebar
           tema={tema}
           dataReferencia={agenda.dataReferencia}
@@ -139,7 +139,7 @@ export function CalendarioAlphaDashboard({
           onAlternarColega={agenda.alternarColega}
           footer={status}
         />
-        <main className="min-w-0 flex-1" aria-label="Grade da Agenda Alpha">
+        <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-label="Grade da Agenda Alpha">
           {agenda.carregandoEdicao && (
             <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
               <Loader2 className="size-4 animate-spin" /> Carregando detalhes do evento…
@@ -166,19 +166,21 @@ export function CalendarioAlphaDashboard({
               </button>
             </div>
           )}
-          <ConteudoAgenda
-            tema={tema}
-            visao={visao}
-            dataReferencia={agenda.dataReferencia}
-            eventos={[...eventos, ...agenda.compartilhadas.eventos]}
-            possuiCalendarios={calendarios.length > 0}
-            onEditarEvento={agenda.editarEvento}
-            onEventoCancelado={agenda.notificarAlteracaoAgenda}
-            onSelecionarHorario={agenda.abrirNovoEvento}
-            onSelecionarDia={(data) => agenda.navegarPara("dia", data)}
-            onSelecionarMes={(data) => agenda.navegarPara("mes", data)}
-            onAbrirConfiguracoes={agenda.abrirConfiguracoes}
-          />
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <ConteudoAgenda
+              tema={tema}
+              visao={visao}
+              dataReferencia={agenda.dataReferencia}
+              eventos={[...eventos, ...agenda.compartilhadas.eventos]}
+              possuiCalendarios={calendarios.length > 0}
+              onEditarEvento={agenda.editarEvento}
+              onEventoCancelado={agenda.notificarAlteracaoAgenda}
+              onSelecionarHorario={agenda.abrirNovoEvento}
+              onSelecionarDia={(data) => agenda.navegarPara("dia", data)}
+              onSelecionarMes={(data) => agenda.navegarPara("mes", data)}
+              onAbrirConfiguracoes={agenda.abrirConfiguracoes}
+            />
+          </div>
         </main>
       </div>
 

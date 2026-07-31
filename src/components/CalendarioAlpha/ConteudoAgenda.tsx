@@ -38,7 +38,7 @@ export function ConteudoAgenda({
 }: ConteudoAgendaProps) {
   if (!possuiCalendarios) {
     return (
-      <div className="rounded-[2rem] border border-white/5 bg-white/[0.025] py-16 text-center backdrop-blur-xl">
+      <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto rounded-[2rem] border border-white/5 bg-white/[0.025] px-4 py-10 text-center backdrop-blur-xl">
         <p className="text-sm font-bold text-slate-300">Nenhuma agenda selecionada</p>
         <p className="mt-1 text-xs text-slate-500">Escolha ao menos uma agenda Google para preencher a grade.</p>
         <button
@@ -93,12 +93,14 @@ export function ConteudoAgenda({
   }
 
   return (
-    <VisaoAno
-      dataReferencia={dataReferencia}
-      eventos={eventos}
-      tema={tema}
-      onSelecionarMes={onSelecionarMes}
-      onSelecionarDia={onSelecionarDia}
-    />
+    <div className="h-full min-h-0 overflow-y-auto overscroll-contain pr-1">
+      <VisaoAno
+        dataReferencia={dataReferencia}
+        eventos={eventos}
+        tema={tema}
+        onSelecionarMes={onSelecionarMes}
+        onSelecionarDia={onSelecionarDia}
+      />
+    </div>
   );
 }

@@ -693,6 +693,15 @@ if (!acesso.autorizado) return resposta401Ou403(acesso);
 
 **Contrato operacional:** agendas compartilhadas continuam fora do cache SSR e são consultadas ao vivo somente após ação explícita. A Fase 2A concluiu fila, lease/fencing, push, webhook, worker, maintenance, CLIs, flags e observabilidade, todos mantidos flags-off. 183 testes Agenda Alpha, Forge build/lint/schema, Probe, Anubis, Lens e Sage passaram; typecheck conserva quatro baselines externos.
 
+**Atualização 2026-07-31 — contrato responsivo do viewport:**
+
+- [x] `CalendarioAlpha/layout.tsx` fornece a altura do viewport; `CalendarioAlphaDashboard.tsx` propaga `h-full`/`min-h-0` até o conteúdo.
+- [x] `AgendaSidebar.tsx` mantém ações fixas e rolagem apenas nas listas, com Sheet e alvos de toque preservados no mobile.
+- [x] `VisaoMes.tsx` preenche seis linhas flexíveis; `GradeHoraria.tsx` mantém cabeçalhos fixos e rolagem apenas na grade de horas.
+- [x] `ConteudoAgenda.tsx` mantém a visão anual em scroll interno.
+
+**Editado quando:** qualquer wrapper/layout da Agenda mudar altura, flex ou overflow; conferir a cadeia completa até cada visão para evitar corte de funções ou retorno da rolagem externa.
+
 **Última atualização:** 2026-07-30 por Scribe
 
 ---

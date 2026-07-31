@@ -136,39 +136,44 @@ export async function executarTool(
       const prioridade = String(params.prioridade || "MEDIA");
 
       if (!titulo || !descricao) {
-        return "Dados insuficientes para abrir o chamado.";
+        return "FALHA_ABRIR_CHAMADO: dados insuficientes (título ou descrição vazios). Nenhum chamado foi criado — peça os dados que faltam ao usuário.";
       }
 
-      const cincoMinAtras = new Date(Date.now() - 5 * 60 * 1000);
-      const duplicado = await db.chamados.findFirst({
-        where: { usuarioId: userId, titulo, createdAt: { gte: cincoMinAtras } },
-      });
+      try {
+        const cincoMinAtras = new Date(Date.now() - 5 * 60 * 1000);
+        const duplicado = await db.chamados.findFirst({
+          where: { usuarioId: userId, titulo, createdAt: { gte: cincoMinAtras } },
+        });
 
-      if (duplicado) {
-        return `Chamado "${titulo}" já foi registrado recentemente (ID #${duplicado.id}).`;
+        if (duplicado) {
+          return `FALHA_ABRIR_CHAMADO: chamado "${titulo}" já havia sido registrado há poucos minutos (ID #${duplicado.id}). Nenhum chamado novo foi criado — informe o ID existente ao usuário.`;
+        }
+
+        const chamado = await db.chamados.create({
+          data: {
+            titulo,
+            descricao: `[Aberto via Bibble]\n\n${descricao}`,
+            categoria: "SUPORTE",
+            prioridade,
+            usuarioId: userId,
+            status: "ABERTO",
+          },
+        });
+
+        await notificarNovoChamado({
+          chamadoId: chamado.id,
+          titulo: chamado.titulo,
+          usuario: ctx.userName || "Usuário",
+          setor: ctx.role || "",
+          urgencia: chamado.prioridade,
+          createdAt: chamado.createdAt.toISOString(),
+        });
+
+        return `SUCESSO_ABRIR_CHAMADO: Chamado #${chamado.id} criado com título "${titulo}" e prioridade ${prioridade}.`;
+      } catch (err) {
+        console.error("[BIBBLE] Falha ao criar chamado:", err);
+        return "FALHA_ABRIR_CHAMADO: erro interno ao gravar no banco de dados. Nenhum chamado foi criado — informe ao usuário que a abertura falhou e peça para tentar novamente em instantes.";
       }
-
-      const chamado = await db.chamados.create({
-        data: {
-          titulo,
-          descricao: `[Aberto via Bibble]\n\n${descricao}`,
-          categoria: "SUPORTE",
-          prioridade,
-          usuarioId: userId,
-          status: "ABERTO",
-        },
-      });
-
-      await notificarNovoChamado({
-        chamadoId: chamado.id,
-        titulo: chamado.titulo,
-        usuario: ctx.userName || "Usuário",
-        setor: ctx.role || "",
-        urgencia: chamado.prioridade,
-        createdAt: chamado.createdAt.toISOString(),
-      });
-
-      return `Chamado #${chamado.id} criado com título "${titulo}" e prioridade ${prioridade}.`;
     }
 
     case "gerar_ficha_pre_analise": {

@@ -1215,3 +1215,34 @@ O usuário autorizou explicitamente, após o relatório Vault, aplicar em produ�
 
 ### Refletido também em
 - Nenhum arquivo curado adicional foi alterado neste fechamento; plano, story e testes da Fase 2A já contêm os detalhes operacionais e de aceitação.
+
+---
+
+## [2026-07-31 13:35] — Agenda Alpha compactada para o viewport do painel
+
+**Tags:** #refactor #bugfix #tailwind #nextjs
+**Agentes envolvidos:** Bibble, Scout, Iris, Nova (fallback local), Forge, Probe, Lens, Sage, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/CalendarioAlpha/layout.tsx`, `src/components/CalendarioAlpha/{AgendaSidebar,CalendarioAlphaDashboard,ConteudoAgenda,GradeHoraria,HeaderCalendario,MiniCalendarioAgenda,VisaoMes}.tsx`, `docs/stories/story-calendario-alpha.md`
+
+### Contexto
+O usuário pediu reduzir o card lateral e a agenda, adaptando o módulo à tela para evitar rolagem excessiva e manter as funções visíveis.
+
+### O que foi feito
+- A cadeia de altura do layout até as visões passou a usar viewport dinâmico, flex e `min-h-0`, mantendo a rolagem dentro da região correta.
+- Sidebar, header e mini-calendário ficaram mais compactos no desktop; mês passou a seis linhas flexíveis e dia/semana rolam somente as horas.
+
+### Decisões tomadas
+- Compactação é responsiva e restrita ao desktop; Sheet e alvos de toque mobile continuam preservados.
+- A visão anual mantém rolagem interna porque doze meses não devem ser comprimidos até perder legibilidade.
+
+### Problemas encontrados / resolvidos
+- `min-h-0` isolado não tinha efeito porque os pais não forneciam altura/flex; a cadeia completa foi corrigida.
+- O executor de subagentes perdeu autenticação durante a implementação; Scout e Iris concluíram, e o patch foi aplicado localmente como fallback com os mesmos limites de escopo.
+
+### Pendências
+- Validar visualmente no navegador autenticado em notebook e monitor ultrawide; os gates automatizados não medem conforto visual real.
+- O teste preexistente `tests/google-calendar/cli.test.ts` continua excedendo o timeout de 5s no Windows.
+
+### Refletido também em
+- `codebase-map.md`: contrato de altura/scroll da Agenda Alpha.
+- `integration-points.md`: checkpoint de viewport para alterações futuras.

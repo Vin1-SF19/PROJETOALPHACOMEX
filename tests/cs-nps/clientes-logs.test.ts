@@ -9,6 +9,9 @@ const prismaMock = vi.hoisted(() => ({
     create: vi.fn(),
     update: vi.fn(),
   },
+  socios: {
+    delete: vi.fn(),
+  },
 }));
 
 const authMock = vi.hoisted(() => vi.fn());
@@ -21,6 +24,7 @@ vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 import {
   atualizarLogCS,
   atualizarLogFeedback,
+  excluirSocio,
   salvarLogCS,
   salvarLogFeedback,
 } from "@/actions/Clientes";
@@ -178,5 +182,48 @@ describe("ações dos modais de CS e Feedback", () => {
       },
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/PainelAlpha/CadastroClientes");
+  });
+});
+
+describe("exclusão de sócio", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.mockResolvedValue({
+      user: { id: "7", nome: "Ana Responsável" },
+    });
+  });
+
+  it("exclui o sócio e revalida o módulo para uma sessão autenticada", async () => {
+    prismaMock.socios.delete.mockResolvedValue({ id: 42 });
+
+    const resultado = await excluirSocio(42);
+
+    expect(resultado).toEqual({ success: true });
+    expect(prismaMock.socios.delete).toHaveBeenCalledWith({ where: { id: 42 } });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/PainelAlpha/CadastroClientes");
+  });
+
+  it("não acessa o banco sem uma sessão autenticada", async () => {
+    authMock.mockResolvedValue(null);
+
+    const resultado = await excluirSocio(42);
+
+    expect(resultado).toEqual({ success: false, error: "Não autorizado" });
+    expect(prismaMock.socios.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejeita um ID de sócio inválido antes de acessar o banco", async () => {
+    const resultado = await excluirSocio(0);
+
+    expect(resultado).toEqual({ success: false, error: "ID de sócio inválido" });
+    expect(prismaMock.socios.delete).not.toHaveBeenCalled();
+  });
+
+  it("retorna uma mensagem tratável quando a exclusão falha", async () => {
+    prismaMock.socios.delete.mockRejectedValue(new Error("falha de banco"));
+
+    const resultado = await excluirSocio(42);
+
+    expect(resultado).toEqual({ success: false, error: "Não foi possível excluir o sócio." });
   });
 });

@@ -363,3 +363,51 @@ Esta extensão torna o Calendário Alpha operável por conversa no Bibble/IAlpha
 - `tests/google-calendar/validations.test.ts`
 - `docs/qa/coderabbit-reports/story-calendario-alpha-timezone-bibble.md`
 - `docs/qa/coderabbit-reports/story-calendario-alpha-cancelamento-bibble.md`
+
+---
+
+## 2026-07-31 — Ajuste responsivo de densidade e viewport
+
+**Status:** InReview
+
+### Critérios de aceitação
+
+- [x] AC-AA-VIEW-001: o módulo ocupa a altura disponível do iframe/painel com uma cadeia válida de `h-full`/`min-h-0`, evitando rolagem externa excessiva em uso normal.
+- [x] AC-AA-VIEW-002: a sidebar desktop fica mais estreita e compacta, mantém criar/configurar/permissões acessíveis e concentra a rolagem somente nas listas de agendas.
+- [x] AC-AA-VIEW-003: a visão de mês preserva as seis semanas em uma grade flexível, reduz a quantidade de eventos visíveis por célula e mantém acesso ao restante por `+N mais`.
+- [x] AC-AA-VIEW-004: as visões de dia e semana usam a altura restante e rolam somente a grade de horas; cabeçalho e eventos de dia inteiro permanecem acessíveis.
+- [x] AC-AA-VIEW-005: mobile continua usando Sheet, preserva alvos de toque de pelo menos 44px e não perde funções por causa da compactação desktop.
+- [x] AC-AA-VIEW-006: nenhuma action, API, regra de sincronização, permissão, schema ou dado foi alterado.
+
+### Tarefas concluídas
+
+- [x] Trocar o wrapper do módulo de altura mínima livre para viewport dinâmico com overflow controlado.
+- [x] Transformar dashboard, corpo e área principal em uma cadeia flexível com `min-h-0`.
+- [x] Reduzir largura, padding e espaçamentos da sidebar por breakpoint.
+- [x] Compactar mini-calendário e header somente onde há espaço de ponteiro/desktop.
+- [x] Reestruturar mês e grade horária para rolagem interna localizada.
+- [x] Preservar a visão anual com rolagem interna na área da agenda.
+
+### Quality gates
+
+- ESLint escopado nos 8 arquivos TSX alterados: **PASS**.
+- Next build de produção: **PASS**.
+- `git diff --check` escopado: **PASS**.
+- Testes globais: **570/571 PASS**; permanece um timeout preexistente de 5s em `tests/google-calendar/cli.test.ts`, sem relação com layout ou com os arquivos desta onda.
+- Testes diretamente relacionados a datas/wiring da página: **17/17 PASS**.
+- Typecheck global: sem erro nos arquivos desta onda; permanecem erros preexistentes em `ExclusaoFiscal`, `ModalPerfilColaborador`, `HabilitacaoRadarClient` e `tests/google-calendar/sync-queue.test.ts`.
+- Probe: **PASS** — rota, sidebar mobile/desktop, atalhos, CRUD, status e overlays continuam conectados pelos mesmos callbacks.
+- Lens: **PASS** — nenhuma mudança de auth/dados, nenhum corte de função e nenhuma violação nova das regras de tema/componentes.
+- Sage: **PASS com ressalva de baseline** — layout não adiciona lógica de negócio; regressão relevante passou e a única falha global é o timeout CLI preexistente.
+
+### File List exata desta onda
+
+- `src/app/PainelAlpha/CalendarioAlpha/layout.tsx`
+- `src/components/CalendarioAlpha/AgendaSidebar.tsx`
+- `src/components/CalendarioAlpha/CalendarioAlphaDashboard.tsx`
+- `src/components/CalendarioAlpha/ConteudoAgenda.tsx`
+- `src/components/CalendarioAlpha/GradeHoraria.tsx`
+- `src/components/CalendarioAlpha/HeaderCalendario.tsx`
+- `src/components/CalendarioAlpha/MiniCalendarioAgenda.tsx`
+- `src/components/CalendarioAlpha/VisaoMes.tsx`
+- `docs/stories/story-calendario-alpha.md`

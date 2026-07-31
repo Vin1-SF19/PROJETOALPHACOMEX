@@ -33,16 +33,18 @@ export function VisaoMes({
   const eventosPorDia = agruparPorDia(eventos);
   const hoje = new Date();
 
+  const limiteEventosVisiveis = 3;
+
   return (
-    <div className="rounded-[2rem] border border-white/5 bg-white/[0.02] overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-white/5">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[1.75rem] border border-white/5 bg-white/[0.02]">
+      <div className="grid shrink-0 grid-cols-7 border-b border-white/5">
         {DIAS_SEMANA.map((dia) => (
           <div key={dia} className="px-2 py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
             {dia}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 auto-rows-fr">
+      <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6">
         {dias.map((dia) => {
           const chave = dia.toISOString().slice(0, 10);
           const eventosDoDia = eventosPorDia.get(chave) ?? [];
@@ -56,7 +58,7 @@ export function VisaoMes({
               onClick={() => onSelecionarDia(dia)}
               aria-label={`Ver ${dia.toLocaleDateString("pt-BR")}${eventosDoDia.length ? `, ${eventosDoDia.length} evento(s)` : ""}`}
               className={cn(
-                "group relative min-h-[9rem] sm:min-h-[11rem] border-b border-r border-white/5 p-1.5 sm:p-2.5 text-left align-top transition-colors hover:bg-white/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30",
+                "group relative min-h-0 overflow-hidden border-b border-r border-white/5 p-1 sm:p-1.5 xl:p-2 text-left align-top transition-colors hover:bg-white/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/30",
                 foraDoMes && "opacity-30",
               )}
             >
@@ -91,7 +93,7 @@ export function VisaoMes({
                 </span>
               </div>
               <div className="mt-1 space-y-1">
-                {eventosDoDia.slice(0, 5).map((evento) => (
+                {eventosDoDia.slice(0, limiteEventosVisiveis).map((evento) => (
                   <DetalhePopover key={evento.id} evento={evento} tema={tema} onEditar={onEditarEvento} onCancelado={onEventoCancelado}>
                     <button
                       type="button"
@@ -104,14 +106,14 @@ export function VisaoMes({
                     </button>
                   </DetalhePopover>
                 ))}
-                {eventosDoDia.length > 5 && (
+                {eventosDoDia.length > limiteEventosVisiveis && (
                   <DiaEventosPopover dia={dia} eventos={eventosDoDia} onEditarEvento={onEditarEvento}>
                     <button
                       type="button"
                       onClick={(e) => e.stopPropagation()}
                       className="block w-full rounded-md px-1.5 py-0.5 text-left text-[10px] font-semibold text-slate-400 hover:text-white hover:bg-white/5"
                     >
-                      +{eventosDoDia.length - 5} mais
+                      +{eventosDoDia.length - limiteEventosVisiveis} mais
                     </button>
                   </DiaEventosPopover>
                 )}

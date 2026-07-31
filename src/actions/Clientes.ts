@@ -672,6 +672,29 @@ export async function adicionarSocio(clienteId: number, dadosSocio: { nome: stri
 }
 
 
+export async function excluirSocio(socioId: number) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
+    const idValidado = z.number().int().positive().safeParse(socioId);
+    if (!idValidado.success) {
+      return { success: false, error: "ID de sócio inválido" };
+    }
+
+    await db.socios.delete({
+      where: { id: idValidado.data },
+    });
+
+    revalidatePath("/PainelAlpha/CadastroClientes");
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("ERRO AO EXCLUIR SÓCIO:", mensagemDoErro(error));
+    return { success: false, error: "Não foi possível excluir o sócio." };
+  }
+}
+
+
 export async function excluirLogCS(logId: number) {
   try {
     const session = await auth();

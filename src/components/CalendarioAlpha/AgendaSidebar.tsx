@@ -106,12 +106,12 @@ function AgendaSidebarContent({
   footer,
 }: Omit<AgendaSidebarProps, "mobileOpen" | "onMobileOpenChange"> & { recolhida: boolean }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <Button
         type="button"
         onClick={onCriar}
         aria-label="Criar evento"
-        className={cn("min-h-11 w-full gap-2 rounded-xl text-white", tema.bg, recolhida && "px-0")}
+        className={cn("min-h-11 w-full gap-2 rounded-xl text-white lg:min-h-10", tema.bg, recolhida && "px-0")}
       >
         <CalendarPlus className="size-4" />
         {!recolhida && "Criar"}
@@ -121,7 +121,7 @@ function AgendaSidebarContent({
         <MiniCalendarioAgenda dataReferencia={dataReferencia} tema={tema} onSelecionarDia={onSelecionarDia} />
       )}
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-0.5 [@media(max-height:760px)]:space-y-2">
         <GrupoAgenda titulo="Minhas agendas" recolhida={recolhida}>
           {calendarios.map((calendario) => (
             <button
@@ -218,8 +218,8 @@ export function AgendaSidebar(props: AgendaSidebarProps) {
       <aside
         aria-label="Agendas"
         className={cn(
-          "hidden shrink-0 flex-col rounded-[2rem] border border-white/10 bg-slate-950/65 p-3 shadow-2xl backdrop-blur-2xl transition-[width] duration-300 lg:flex",
-          recolhida ? "w-[4.5rem]" : "w-72 xl:w-80",
+          "hidden h-full min-h-0 shrink-0 flex-col rounded-[1.75rem] border border-white/10 bg-slate-950/65 p-2.5 shadow-2xl backdrop-blur-2xl transition-[width] duration-300 lg:flex xl:p-3",
+          recolhida ? "w-[4.25rem]" : "w-60 xl:w-64 2xl:w-72",
         )}
       >
         <AgendaSidebarContent {...props} recolhida={recolhida} />
