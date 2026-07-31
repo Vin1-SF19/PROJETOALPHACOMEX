@@ -18,6 +18,15 @@
 
 ---
 
+### Notificação de chamado: som toca mas o toast não aparece na tela
+**Sintoma:** Usuário ouve o som de notificação (`/sounds/notification.mp3`) mas não vê nenhum toast na tela. Comportamento intermitente — às vezes aparece, às vezes não, sem padrão óbvio.
+**Causa (2 partes):** (1) [NotificationToast.tsx](../../src/components/chamados/NotificationToast.tsx) não tinha fila — `useEffect` sempre pegava `notificacoes[0]` e chamava `setVisivel()` direto. Se um segundo evento chegasse antes dos 6s do primeiro, o segundo **sobrescrevia** o primeiro instantaneamente, sem o usuário nunca ver o toast do primeiro (o som dele já tinha tocado no hook `useAdminChamadosNotifications.ts`, então "ouve o som, não vê nada" é exatamente esse cenário). (2) Causa secundária, estrutural e não corrigida (fora de escopo desta correção): `pusher-js` não faz replay de eventos emitidos enquanto o socket estava desconectado (aba em background, rede instável) — nenhum hook de notificação do projeto (chamados, holerite, checklist) trata isso.
+**Fix:** Reescrito `NotificationToast.tsx` com fila real (FIFO): cada notificação nova entra numa fila (`filaRef`) deduplicada por id (`enfileiradosRef`, com limite de 50 para não vazar memória em sessões longas); `mostrarProximo()` exibe um item por vez e só avança para o próximo depois do timer de 6s (ou de dispensa manual via clique/X). Nenhum evento é mais descartado silenciosamente. Detalhe de implementação: a função recursiva usa o padrão "latest ref" (`mostrarProximoRef`, atualizado dentro de um `useEffect` sem deps) porque o React Compiler/linter deste projeto bloqueia mutação de ref durante o corpo de render (`Cannot access refs during render` / `react-hooks/refs`) e também bloqueia `useCallback` auto-referenciado com deps vazias.
+**Contexto:** Qualquer componente de toast único (`visivel: T | null`) alimentado por uma lista/store que pode receber múltiplos itens em rajada precisa de fila, nunca de "pega o mais recente e substitui" — o mesmo padrão de `useState<T|null>` existe potencialmente em outros toasts do projeto (holerite, checklist) e deveria ser auditado se o mesmo sintoma for relatado lá. A causa secundária (perda de evento por desconexão do Pusher) não foi corrigida — se o sintoma persistir mesmo com a fila (ex.: usuário nunca ouve o som nem vê nada), a próxima hipótese é reconexão do Pusher, não a fila.
+**Adicionado em:** 2026-07-31 (Echo, sessão de bugfix notificações de chamados)
+
+---
+
 ### Bibble confirma "chamado aberto" via chat mesmo quando a abertura falhou (ou nunca foi tentada)
 **Sintoma:** Usuário pede para o Bibble abrir um chamado de suporte pelo chat; o Bibble responde confirmando a abertura com um número de chamado (ex.: `#PAA-2026/789` — formato que não existe no sistema; o ID real é sequencial simples `#1`, `#2`...), mas o chamado não existe de verdade em `/PainelAlpha/Chamados` — ninguém no admin recebe a notificação. Persiste mesmo perguntando várias vezes: o Bibble reafirma a confirmação inventada.
 **Causa raiz (2 camadas):**

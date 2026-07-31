@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { X, AlertTriangle, AlertCircle, CheckCircle2, Info } from 'lucide-react';
@@ -62,16 +62,54 @@ export default function NotificationToast() {
   const router = useRouter();
 
   const [visivel, setVisivel] = useState<ChamadoNotificacao | null>(null);
-  const lastShownIdRef = useRef<string | null>(null);
+  const filaRef = useRef<ChamadoNotificacao[]>([]);
+  const enfileiradosRef = useRef<Set<string>>(new Set());
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Exibe um toast por vez, na ordem de chegada — se dois eventos chegarem em
+  // sequência rápida (ex.: dois chamados abertos quase juntos), o segundo entra
+  // na fila em vez de substituir o primeiro antes do usuário conseguir vê-lo.
+  const mostrarProximoRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    mostrarProximoRef.current = () => {
+      const proximo = filaRef.current.shift();
+      if (!proximo) {
+        timerRef.current = null;
+        setVisivel(null);
+        return;
+      }
+      setVisivel(proximo);
+      timerRef.current = setTimeout(() => mostrarProximoRef.current(), 6000);
+    };
+  });
+  const mostrarProximo = useCallback(() => mostrarProximoRef.current(), []);
 
   useEffect(() => {
-    const latest = notificacoes[0];
-    if (!latest || latest.id === lastShownIdRef.current) return;
-    lastShownIdRef.current = latest.id;
-    setVisivel(latest);
-    const timer = setTimeout(() => setVisivel(null), 6000);
-    return () => clearTimeout(timer);
-  }, [notificacoes]);
+    for (const n of notificacoes) {
+      if (enfileiradosRef.current.has(n.id)) continue;
+      enfileiradosRef.current.add(n.id);
+      filaRef.current.push(n);
+    }
+    // Evita crescimento ilimitado do Set em sessões longas (mesmo limite do store).
+    if (enfileiradosRef.current.size > 50) {
+      const idsAtuais = new Set(notificacoes.map((n) => n.id));
+      enfileiradosRef.current = new Set(
+        [...enfileiradosRef.current].filter((id) => idsAtuais.has(id)),
+      );
+    }
+    if (!timerRef.current) mostrarProximo();
+  }, [notificacoes, mostrarProximo]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const dispensar = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    mostrarProximo();
+  }, [mostrarProximo]);
 
   const config = visivel
     ? (URGENCIA_CONFIG[visivel.urgencia as keyof typeof URGENCIA_CONFIG] ?? FALLBACK)
@@ -93,7 +131,7 @@ export default function NotificationToast() {
               ${config.border} ${config.bg} ${config.glow}
             `}
             onClick={() => {
-              setVisivel(null);
+              dispensar();
               router.push('/PainelAlpha/Chamados');
             }}
           >
@@ -116,8 +154,8 @@ export default function NotificationToast() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setVisivel(null);
                   removerNotificacao(visivel.id);
+                  dispensar();
                 }}
                 className="p-1 rounded-lg text-slate-600 hover:text-white hover:bg-white/10 transition-all cursor-pointer shrink-0"
               >
