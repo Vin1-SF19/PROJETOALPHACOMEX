@@ -1,5 +1,11 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-07-31 — Modelo padrão do Bibble trocado de `gemma4:e4b` para `qwen3:14b`
+**Contexto:** Investigando o bug de falsa confirmação de abertura de chamado (Bibble alegava "chamado #PAA-2026/789 criado" sem a tool nunca ter rodado — ver `known-errors.md`), o usuário perguntou qual IA está no Bibble e quais opções existem para trocar. O modelo padrão em uso era `gemma4:e4b` (8B, denso), um dos mais propensos a pular tool calls e alucinar confirmações.
+**Decisão:** Trocado `BIBBLE_MODEL`/`NEXT_PUBLIC_BIBBLE_MODEL` em `.env.local` para `qwen3:14b`. Antes de decidir, medimos latência real (não estimada) no servidor Ollama do projeto (`192.168.35.113:11434`) com o mesmo formato de chamada do Bibble (tool definitions reais, prompt de abrir chamado): `qwen3:14b` respondeu em **8,5s**, `qwen3.6:35b` e `qwen3.5:35b-a3b` em **~22s** (ambos MoE, mas ainda ~2,6x mais lentos que o 14B neste hardware — a arquitetura MoE não compensou a diferença de tamanho aqui). Os três chamaram a tool corretamente no teste.
+**Alternativas rejeitadas:** Qwen 3.6 · 35B (mais "confiável" em teoria, mas quase 3x mais lento sem ganho comprovado de confiabilidade que justifique — a proteção estrutural do `chamado-guard.ts` já cobre alucinação residual independente do modelo escolhido). OpenAI/Anthropic/Google: não têm API key configurada em `.env.local`, ficariam indisponíveis mesmo aparecendo na lista de seleção da UI.
+**Consequências:** Qualquer modelo Ollama listado em `PROVIDER_MODELS.ollama` ([client.ts](../../src/lib/bibble/client.ts)) funciona de fato (servidor já configurado). Provedores externos (OpenAI/Anthropic/Google) aparecem no seletor mas precisam de API key adicionada em `.env.local` antes de funcionar. Se no futuro a latência do 14B se tornar aceitável em troca de mais confiabilidade, reavaliar com o mesmo método de benchmark real (nunca estimar por tamanho nominal do modelo).
+
 ### 2026-07-28 — Gestão de Comissões e Prêmios: decisões arquiteturais chave (Fases 01-16)
 **Contexto:** Módulo completo executado via fila `prompt-phases/` (17 fases). O prompt original deixava algumas decisões em aberto, resolvidas com o usuário durante a execução (não inventadas).
 **Decisões:**

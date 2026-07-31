@@ -172,6 +172,7 @@ Sem os passos 1-4 (feitos por vocês no Google), o código não tem como funcion
 **Documentação e memória**
 
 - `docs/stories/story-calendario-alpha.md`
+
 - `.bibble/memory/architecture.md`
 - `.bibble/memory/codebase-map.md`
 - `.bibble/memory/components.md`
@@ -411,3 +412,50 @@ Esta extensão torna o Calendário Alpha operável por conversa no Bibble/IAlpha
 - `src/components/CalendarioAlpha/MiniCalendarioAgenda.tsx`
 - `src/components/CalendarioAlpha/VisaoMes.tsx`
 - `docs/stories/story-calendario-alpha.md`
+
+---
+
+## 2026-07-31 — Correção da data civil na visão Dia
+
+**Status:** Done
+
+### Critérios de aceitação
+
+- [x] AC-AA-DIA-001: selecionar a visão Dia preserva exatamente o dia civil exibido na URL, sem recuar por conversão UTC.
+- [x] AC-AA-DIA-002: o intervalo consultado corresponde ao início do dia em `America/Sao_Paulo` até o início do dia seguinte, independentemente do fuso do SSR.
+- [x] AC-AA-DIA-003: navegação e agrupamento de eventos usam chaves `YYYY-MM-DD` calculadas explicitamente em `America/Sao_Paulo`.
+- [x] AC-AA-DIA-004: datas impossíveis são rejeitadas e o fallback seguro continua sendo a data atual.
+- [x] AC-AA-DIA-005: nenhuma action, integração Google, regra de sincronização, schema ou dado foi alterado.
+
+### Implementação e cobertura
+
+- [x] Criar parser e formatador explícitos de data civil local.
+- [x] Aplicar o parser na entrada SSR da Agenda Alpha.
+- [x] Aplicar o formatador na navegação e nas chaves de dia das visões mês/ano.
+- [x] Cobrir data válida, data impossível, ano bissexto e ausência de conversão UTC.
+- [x] Cobrir meia-noite inexistente em transição histórica de DST, garantindo progressão monotônica e grid finito.
+- [x] Proteger por teste de wiring contra reintrodução de `new Date(dataParam)` e `toISOString()` na URL.
+
+### Quality gates
+
+- Testes focados forçando processo em UTC: **30/30 PASS**.
+- ESLint escopado nos arquivos alterados: **PASS**.
+- Next build de produção: **PASS**.
+- `git diff --check`: **PASS**.
+- Suíte global: **584/585 PASS**; o único timeout é o baseline preexistente de 5s em `tests/google-calendar/cli.test.ts`, que passa isoladamente com timeout de 15s (**2/2**).
+- Typecheck: nenhum erro no escopo; permanecem os cinco erros globais preexistentes em `ExclusaoFiscal`, `ModalPerfilColaborador`, `HabilitacaoRadarClient` e `sync-queue.test.ts`.
+- Probe/Lens/Sage: **PASS** — fluxo SSR UTC, intervalo São Paulo, navegação, agrupamento e transição DST validados; varredura adicional de 11.323 datas entre 2000–2030 sem regressão.
+- `npm run build`: a etapa `prisma generate` encontrou `EPERM` na DLL bloqueada do Windows; como não houve mudança de schema, `npx next build` validou a aplicação com sucesso.
+
+### File List desta correção
+
+- `src/app/PainelAlpha/CalendarioAlpha/page.tsx`
+- `src/components/CalendarioAlpha/VisaoAno.tsx`
+- `src/components/CalendarioAlpha/VisaoMes.tsx`
+- `src/components/CalendarioAlpha/lib/datas.ts`
+- `src/components/CalendarioAlpha/lib/useAgendaAlphaController.ts`
+- `tests/google-calendar/datas-calendario.test.ts`
+- `tests/google-calendar/page-cache-wiring.test.ts`
+- `docs/stories/story-calendario-alpha.md`
+- `.bibble/memory/integration-points.md`
+- `.bibble/memory/journal.md`

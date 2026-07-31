@@ -25,7 +25,8 @@ interface BibbleChatLayoutProps {
 let msgCounter = 0;
 const newId = () => `msg-${++msgCounter}-${Date.now()}`;
 
-const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "gemma4:e4b";
+// Modelo do Bibble é fixo — sem seletor na UI (ver .env.local BIBBLE_MODEL).
+const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "qwen3:14b";
 
 export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem";
 
@@ -100,7 +101,7 @@ export default function BibbleChatLayout({
   const [inputValue, setInputValue]         = useState("");
   const [isStreaming, setIsStreaming]       = useState(false);
   const [streamStatus, setStreamStatus]     = useState<StreamStatus>("idle");
-  const [model, setModel]                   = useState(DEFAULT_MODEL);
+  const model = DEFAULT_MODEL;
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -944,17 +945,14 @@ export default function BibbleChatLayout({
             sessions={sessions}
             activeId={activeSessionId}
             activeProjectId={activeProjectId}
-            model={model}
             onSelect={loadSession}
             onNew={handleNewSession}
             onDelete={handleDeleteSession}
             onRename={handleRenameSessionById}
-            onModelChange={setModel}
             onProjectChange={setActiveProjectId}
             onProjectCreate={handleProjectCreate}
             onProjectUpdate={handleProjectUpdate}
             onProjectDelete={handleProjectDelete}
-            isAdmin={isAdmin}
             onToggle={() => setSidebarOpen(false)}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenAgents={() => setOnyxModalOpen(true)}
@@ -993,13 +991,10 @@ export default function BibbleChatLayout({
                 sessions={sessions}
                 activeId={activeSessionId}
                 activeProjectId={activeProjectId}
-                model={model}
-                isAdmin={isAdmin}
                 onSelect={loadSession}
                 onNew={handleNewSession}
                 onDelete={handleDeleteSession}
             onRename={handleRenameSessionById}
-                onModelChange={setModel}
                 onProjectChange={setActiveProjectId}
                 onProjectCreate={handleProjectCreate}
                 onProjectUpdate={handleProjectUpdate}

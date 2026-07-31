@@ -13,6 +13,7 @@ export interface UserCtx {
   confirmouCancelamentoCalendario?: boolean;
   solicitouCancelamentoCalendario?: boolean;
   cancelamentoPendente?: EventoCancelamentoPendente;
+  solicitouAbrirChamado?: boolean;
 }
 
 // Admin/CEO têm acesso irrestrito a todas as tools

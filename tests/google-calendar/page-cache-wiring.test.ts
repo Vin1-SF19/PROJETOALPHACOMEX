@@ -8,6 +8,22 @@ function ler(...partes: string[]): string {
 }
 
 describe("Agenda Alpha cache e wiring", () => {
+  it("mantém a data da URL como data civil local na entrada e na navegação", () => {
+    const page = ler("src", "app", "PainelAlpha", "CalendarioAlpha", "page.tsx");
+    const controller = ler(
+      "src",
+      "components",
+      "CalendarioAlpha",
+      "lib",
+      "useAgendaAlphaController.ts",
+    );
+
+    expect(page).toContain("parsearDataCivil(dataParam)");
+    expect(page).not.toContain("new Date(dataParam)");
+    expect(controller).toContain("data: formatarDataCivil(novaData)");
+    expect(controller).not.toContain("novaData.toISOString().slice(0, 10)");
+  });
+
   it("não importa nem chama leitura ao vivo de agenda de colega na page SSR", () => {
     const source = ler("src", "app", "PainelAlpha", "CalendarioAlpha", "page.tsx");
 

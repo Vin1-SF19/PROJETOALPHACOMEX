@@ -11,6 +11,11 @@ import {
   resolverEventoConfirmadoDoUsuario,
   resultadoCancelamentoConcluido,
 } from "@/lib/bibble/calendar-cancellation";
+import {
+  mensagemSolicitaAbrirChamado,
+  protegerRespostaDeFalsoChamado,
+  resultadoAbrirChamadoConcluido,
+} from "@/lib/bibble/chamado-guard";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { callCompletion, encodeSSE, type ChatMessage, type ContentPart, type StreamChunk } from "@/lib/bibble/completion";
 import { resultadoToolAlterouCalendario } from "@/lib/google-calendar/invalidation";
@@ -212,6 +217,7 @@ async function runStream(
     const mutacoesExecutadas = new Set<string>();
     let alteracaoCalendarioNotificada = false;
     let cancelamentoCalendarioExecutado = false;
+    let chamadoAbertoComSucesso = false;
 
     if (
       userCtx.confirmouCancelamentoCalendario &&
@@ -328,6 +334,9 @@ async function runStream(
           if (resultadoCancelamentoConcluido(tc.function.name, result)) {
             cancelamentoCalendarioExecutado = true;
           }
+          if (resultadoAbrirChamadoConcluido(tc.function.name, result)) {
+            chamadoAbertoComSucesso = true;
+          }
 
           results.push({ role: "tool", tool_call_id: tc.id, content: result });
         }
@@ -348,6 +357,12 @@ async function runStream(
       let respostaFinalProtegida = "";
       const protegerRespostaCancelamento =
         userCtx.solicitouCancelamentoCalendario === true;
+      // Quando o usuário pediu para abrir um chamado, uma alegação falsa de
+      // abertura ("chamado #X criado") só pode ser barrada antes de qualquer
+      // texto chegar à tela — por isso o turno é buferizado e revisado no fim.
+      const protegerRespostaChamado =
+        userCtx.solicitouAbrirChamado === true && !chamadoAbertoComSucesso;
+      const bufferizarResposta = protegerRespostaCancelamento || protegerRespostaChamado;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -365,7 +380,7 @@ async function runStream(
             const chunk = JSON.parse(raw) as StreamChunk;
             const delta = chunk.choices[0]?.delta?.content;
             if (delta) {
-              if (protegerRespostaCancelamento) {
+              if (bufferizarResposta) {
                 respostaFinalProtegida += delta;
               } else {
                 send({ type: "text", text: delta });
@@ -375,11 +390,20 @@ async function runStream(
         }
       }
 
-      if (protegerRespostaCancelamento && respostaFinalProtegida) {
-        const respostaSegura = protegerRespostaDeFalsoCancelamento(
-          respostaFinalProtegida,
-          cancelamentoCalendarioExecutado,
-        );
+      if (bufferizarResposta && respostaFinalProtegida) {
+        let respostaSegura = respostaFinalProtegida;
+        if (protegerRespostaCancelamento) {
+          respostaSegura = protegerRespostaDeFalsoCancelamento(
+            respostaSegura,
+            cancelamentoCalendarioExecutado,
+          );
+        }
+        if (protegerRespostaChamado) {
+          respostaSegura = protegerRespostaDeFalsoChamado(
+            respostaSegura,
+            chamadoAbertoComSucesso,
+          );
+        }
         send({ type: "text", text: respostaSegura });
       }
 
@@ -448,6 +472,7 @@ export async function POST(req: NextRequest) {
   userCtx.solicitouCancelamentoCalendario =
     userCtx.confirmouCancelamentoCalendario ||
     mensagemSolicitaCancelamentoCalendario(message);
+  userCtx.solicitouAbrirChamado = mensagemSolicitaAbrirChamado(message);
 
   if (
     userCtx.confirmouCancelamentoCalendario &&

@@ -1,5 +1,14 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Agenda Alpha — contrato de data civil local (2026-07-31)
+
+- O parâmetro `data=YYYY-MM-DD` da rota `/PainelAlpha/CalendarioAlpha` representa uma **data civil em `America/Sao_Paulo`**, não um instante UTC nem a data local do processo SSR.
+- Parse obrigatório: `parsearDataCivil()` em `src/components/CalendarioAlpha/lib/datas.ts`; não usar `new Date("YYYY-MM-DD")`.
+- Serialização/chaves obrigatórias: `formatarDataCivil()`; não usar `toISOString().slice(0, 10)` para datas do calendário.
+- O contrato vale para navegação, cálculo dos intervalos, títulos, agrupamento/chaves e grids de dia, semana, mês e ano.
+- Motivo: strings ISO somente com data são interpretadas como meia-noite UTC e, em `America/Sao_Paulo`, aparecem na noite do dia anterior.
+- Meias-noites inexistentes em transições históricas de DST devem resolver para o primeiro instante válido da data; a aritmética diária precisa permanecer monotônica para não travar grids.
+
 ## Padrão reutilizável: Vídeo Introdutório por módulo (estreado em Parceiros, 2026-07-14)
 
 Como plugar em um módulo novo (ver `decisions.md` para o design completo):

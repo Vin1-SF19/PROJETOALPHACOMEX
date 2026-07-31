@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Plus, Trash2, MessageSquare, FolderOpen,
-  ChevronDown, Search, Check, Pencil, X,
-  ChevronRight, FileText, AlertTriangle, Settings, Bot, Pin,
+  Search, Check, Pencil, X,
+  ChevronRight, FileText, Settings, Bot, Pin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { agentAvatarUrl } from "@/lib/onyx/browser";
@@ -34,13 +34,10 @@ interface BibbleSidebarPanelProps {
   sessions: SessionSummary[];
   activeId: string | null;
   activeProjectId: string | null;
-  model: string;
-  isAdmin: boolean;
   onSelect: (id: string) => void;
   onNew: (projectId?: string | null) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
-  onModelChange: (model: string) => void;
   onProjectChange: (id: string | null) => void;
   onProjectCreate: (title: string, systemPrompt?: string) => Promise<ProjectSummary | null>;
   onProjectUpdate: (id: string, data: { title?: string; systemPrompt?: string | null }) => Promise<void>;
@@ -119,131 +116,6 @@ function groupByDate(sessions: SessionSummary[]): DateGroup[] {
   return result;
 }
 
-// ─── Model dropdown ───────────────────────────────────────────────────────────
-
-const ONYX_ICON = (
-  <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3">
-    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.3" />
-    <path d="M7 4v3l2 1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-interface OllamaModelPublic {
-  id: string;
-  label: string;
-  paramSize: string | null;
-  family: string | null;
-}
-
-function ModelDropdown({
-  model,
-  open,
-  onClose,
-  onSelect,
-}: {
-  model: string;
-  open: boolean;
-  onClose: () => void;
-  onSelect: (m: string) => void;
-}) {
-  const [ollamaModels, setOllamaModels] = useState<OllamaModelPublic[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    setError(null);
-    fetch("/api/bibble/models")
-      .then(res => res.json())
-      .then((data: { models: OllamaModelPublic[]; error?: string }) => {
-        setOllamaModels(data.models ?? []);
-        if (data.error) setError(data.error);
-      })
-      .catch(() => setError("Não foi possível carregar os modelos do Ollama."))
-      .finally(() => setLoading(false));
-  }, [open]);
-
-  const handleSelect = (m: OllamaModelPublic) => {
-    onSelect(m.id);
-    onClose();
-  };
-
-  if (!open) return null;
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div
-        className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 z-50"
-        style={{ background: "#080f1e", border: "1px solid rgba(30,45,74,0.9)" }}
-      >
-        {/* ── Header ── */}
-        <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: "1px solid rgba(30,45,74,0.6)" }}>
-          <span style={{ color: "#6366f1" }}>{ONYX_ICON}</span>
-          <span className="text-[9px] font-black uppercase tracking-[0.2em] flex-1" style={{ color: "#475569" }}>
-            Modelo
-          </span>
-        </div>
-
-        <div className="overflow-y-auto custom-scrollbar max-h-[300px] p-1.5 space-y-0.5">
-          {loading && (
-            <div className="space-y-1 px-2 py-1">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-9 rounded-xl animate-pulse" style={{ background: "rgba(30,45,74,0.4)" }} />
-              ))}
-            </div>
-          )}
-
-          {error && (
-            <div className="mx-2 my-1 px-3 py-2 rounded-lg flex items-center gap-2"
-              style={{ background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.3)" }}>
-              <AlertTriangle size={12} style={{ color: "#f87171", flexShrink: 0 }} />
-              <span className="text-[10px]" style={{ color: "#fca5a5" }}>{error}</span>
-            </div>
-          )}
-
-          {!loading && !error && ollamaModels.length === 0 && (
-            <div className="px-3 py-4 text-[10px] text-center" style={{ color: "#334155" }}>
-              Nenhum modelo encontrado no Ollama.
-            </div>
-          )}
-
-          {!loading && ollamaModels.map(m => {
-            const isActive = m.id === model;
-            return (
-              <button
-                key={m.id}
-                onClick={() => handleSelect(m)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] transition-all text-left"
-                style={{
-                  color: isActive ? "#f1f5f9" : "#64748b",
-                  background: isActive ? "rgba(99,102,241,0.12)" : "transparent",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "rgba(30,45,74,0.5)"; }}
-                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-              >
-                <Check
-                  size={10}
-                  className="shrink-0"
-                  style={{ color: "#6366f1", opacity: isActive ? 1 : 0 }}
-                />
-                <span className="font-medium flex-1 truncate">{m.label}</span>
-                {isActive && (
-                  <span className="text-[8px] px-1.5 py-0.5 rounded-md shrink-0" style={{ background: "rgba(34,197,94,0.12)", color: "#4ade80" }}>
-                    ativo
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </>
-  );
-}
-
 // ─── ProjectEditor (inline create/edit) ──────────────────────────────────────
 
 function ProjectEditor({
@@ -315,13 +187,10 @@ export default function BibbleSidebarPanel({
   sessions,
   activeId,
   activeProjectId,
-  model,
-  isAdmin,
   onSelect,
   onNew,
   onDelete,
   onRename,
-  onModelChange,
   onProjectChange,
   onProjectCreate,
   onProjectUpdate,
@@ -340,7 +209,6 @@ export default function BibbleSidebarPanel({
   const ac = tema?.accent ?? "99, 102, 241";
   const [tab, setTab]                   = useState<SidebarTab>("chat");
   const [search, setSearch]             = useState("");
-  const [modelOpen, setModelOpen]       = useState(false);
   const [projects, setProjects]         = useState<ProjectSummary[] | null>(null);
   const [creating, setCreating]         = useState(false);
   const [editingId, setEditingId]       = useState<string | null>(null);
@@ -779,39 +647,6 @@ export default function BibbleSidebarPanel({
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ── Model selector footer (somente admin) ─────────────── */}
-      {isAdmin && (
-        <div className="shrink-0 px-3 py-3 relative" style={{ borderTop: "1px solid #1e2d4a" }}>
-          <ModelDropdown
-            model={model}
-            open={modelOpen}
-            onClose={() => setModelOpen(false)}
-            onSelect={onModelChange}
-          />
-
-          <button
-            onClick={() => setModelOpen(p => !p)}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all duration-150"
-            style={{
-              background: modelOpen ? "rgba(30,45,74,0.8)" : "rgba(30,45,74,0.3)",
-              borderColor: modelOpen ? "#1e2d4a" : "rgba(30,45,74,0.5)",
-              color: modelOpen ? "#cbd5e1" : "#64748b",
-            }}
-          >
-            <span style={{ color: "#6366f1" }} className="shrink-0">
-              {ONYX_ICON}
-            </span>
-            <span className="flex-1 text-[11px] font-medium truncate text-left">
-              {model || "Modelo"}
-            </span>
-            <ChevronDown
-              size={11}
-              className={cn("shrink-0 transition-transform duration-150", modelOpen && "rotate-180")}
-            />
-          </button>
         </div>
       )}
 

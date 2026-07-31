@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 import { DetalhePopover } from "./DetalhePopover";
 import { DiaEventosPopover } from "./DiaEventosPopover";
-import { agruparPorDia, diasDoGridMes, mesmodia } from "./lib/datas";
+import { agruparPorDia, diasDoGridMes, formatarDataCivil, mesmodia } from "./lib/datas";
 import { COR_CALENDARIO_PADRAO, type EventoExibicao } from "./lib/tipos";
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -32,6 +32,7 @@ export function VisaoMes({
   const dias = diasDoGridMes(dataReferencia);
   const eventosPorDia = agruparPorDia(eventos);
   const hoje = new Date();
+  const mesReferenciaCivil = formatarDataCivil(dataReferencia).slice(0, 7);
 
   const limiteEventosVisiveis = 3;
 
@@ -46,9 +47,9 @@ export function VisaoMes({
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6">
         {dias.map((dia) => {
-          const chave = dia.toISOString().slice(0, 10);
+          const chave = formatarDataCivil(dia);
           const eventosDoDia = eventosPorDia.get(chave) ?? [];
-          const foraDoMes = dia.getMonth() !== dataReferencia.getMonth();
+          const foraDoMes = chave.slice(0, 7) !== mesReferenciaCivil;
           const ehHoje = mesmodia(dia, hoje);
 
           return (
@@ -69,7 +70,7 @@ export function VisaoMes({
                     ehHoje && "bg-white text-slate-950",
                   )}
                 >
-                  {dia.getDate()}
+                  {Number(chave.slice(8, 10))}
                 </span>
                 <span
                   role="button"

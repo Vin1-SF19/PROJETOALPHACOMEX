@@ -4,7 +4,11 @@ import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { obterStatusConexaoCalendarioAlpha } from "@/actions/google-calendar-conexao";
 import { listarCalendariosSelecionados, listarEventosCache } from "@/actions/google-calendar-eventos";
 import { CalendarioAlphaDashboard } from "@/components/CalendarioAlpha/CalendarioAlphaDashboard";
-import { calcularIntervaloVisao, type VisaoCalendario } from "@/components/CalendarioAlpha/lib/datas";
+import {
+  calcularIntervaloVisao,
+  parsearDataCivil,
+  type VisaoCalendario,
+} from "@/components/CalendarioAlpha/lib/datas";
 import type { EventoExibicao } from "@/components/CalendarioAlpha/lib/tipos";
 import db from "@/lib/prisma";
 
@@ -42,8 +46,7 @@ export default async function CalendarioAlphaPage({
   const visao: VisaoCalendario = VISOES_VALIDAS.includes(visaoParam as VisaoCalendario)
     ? (visaoParam as VisaoCalendario)
     : "mes";
-  const dataParseada = dataParam ? new Date(dataParam) : new Date();
-  const dataReferencia = Number.isNaN(dataParseada.getTime()) ? new Date() : dataParseada;
+  const dataReferencia = parsearDataCivil(dataParam) ?? new Date();
 
   if (!statusConexao.conectado) {
     return (

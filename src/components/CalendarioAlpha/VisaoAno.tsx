@@ -3,7 +3,14 @@
 import { cn } from "@/lib/utils";
 import type { TemaAlpha } from "@/lib/temas";
 
-import { agruparPorDia, diasDoGridMes, formatarMesCurto, mesesDoAno, mesmodia } from "./lib/datas";
+import {
+  agruparPorDia,
+  diasDoGridMes,
+  formatarDataCivil,
+  formatarMesCurto,
+  mesesDoAno,
+  mesmodia,
+} from "./lib/datas";
 import { COR_CALENDARIO_PADRAO, type EventoExibicao } from "./lib/tipos";
 
 const DIAS_SEMANA_INICIAIS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -23,6 +30,7 @@ function MiniMes({
 }) {
   const dias = diasDoGridMes(mesReferencia);
   const hoje = new Date();
+  const mesReferenciaCivil = formatarDataCivil(mesReferencia).slice(0, 7);
 
   return (
     <div className="rounded-[1.75rem] border border-white/5 bg-white/[0.02] p-4">
@@ -40,8 +48,8 @@ function MiniMes({
           </span>
         ))}
         {dias.map((dia) => {
-          const foraDoMes = dia.getMonth() !== mesReferencia.getMonth();
-          const chave = dia.toISOString().slice(0, 10);
+          const chave = formatarDataCivil(dia);
+          const foraDoMes = chave.slice(0, 7) !== mesReferenciaCivil;
           const temEventos = (eventosPorDia.get(chave)?.length ?? 0) > 0;
           const ehHoje = mesmodia(dia, hoje);
 
@@ -57,7 +65,7 @@ function MiniMes({
                 ehHoje && cn(tema.bg, "text-white"),
               )}
             >
-              {dia.getDate()}
+              {Number(chave.slice(8, 10))}
               {temEventos && !ehHoje && (
                 <span
                   className="absolute bottom-0.5 h-1 w-1 rounded-full"
@@ -92,7 +100,7 @@ export function VisaoAno({
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {meses.map((mes) => (
         <MiniMes
-          key={mes.toISOString()}
+          key={formatarDataCivil(mes)}
           mesReferencia={mes}
           eventosPorDia={eventosPorDia}
           tema={tema}

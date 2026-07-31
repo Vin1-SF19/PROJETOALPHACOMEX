@@ -31,7 +31,7 @@ import {
 } from "@/lib/google-calendar/invalidation";
 import type { GoogleCalendarioDTO, GoogleEventoDTO } from "@/lib/google-calendar/types";
 
-import type { VisaoCalendario } from "./datas";
+import { formatarDataCivil, type VisaoCalendario } from "./datas";
 import type { CalendarioSelecionadoView, EventoExibicao } from "./tipos";
 import { useAgendasCompartilhadas } from "./useAgendasCompartilhadas";
 
@@ -110,7 +110,7 @@ export function useAgendaAlphaController({
   const navegarPara = useCallback((novaVisao: VisaoCalendario, novaData: Date) => {
     const params = new URLSearchParams({
       visao: novaVisao,
-      data: novaData.toISOString().slice(0, 10),
+      data: formatarDataCivil(novaData),
     });
     startTransition(() => {
       router.push(`/PainelAlpha/CalendarioAlpha?${params.toString()}`);

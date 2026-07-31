@@ -1246,3 +1246,24 @@ O usuário pediu reduzir o card lateral e a agenda, adaptando o módulo à tela 
 ### Refletido também em
 - `codebase-map.md`: contrato de altura/scroll da Agenda Alpha.
 - `integration-points.md`: checkpoint de viewport para alterações futuras.
+
+---
+
+## [2026-07-31] — Visão Dia preserva a data civil local
+
+**Tags:** #bugfix #agenda-alpha #timezone #nextjs
+**Agentes envolvidos:** Bibble, Scout, Nova, Forge, Probe, Lens, Sage, Scribe, Kowalski
+**Arquivos principais:** `src/app/PainelAlpha/CalendarioAlpha/page.tsx`, `src/components/CalendarioAlpha/lib/{datas,useAgendaAlphaController}.ts`, `src/components/CalendarioAlpha/{VisaoMes,VisaoAno}.tsx`
+
+### Contexto
+Ao selecionar a visão Dia, a Agenda Alpha recuava um dia e ficava sem eventos, enquanto as visões mais amplas mascaravam o erro.
+
+### Causa e correção
+- A URL trazia `YYYY-MM-DD`, mas `new Date(valor)` interpretava a data como meia-noite UTC; em São Paulo, isso correspondia à noite do dia anterior.
+- O módulo passou a parsear, serializar e calcular datas civis explicitamente em `America/Sao_Paulo`, sem depender do fuso local do SSR ou do navegador.
+- Navegação, intervalos, agrupamento, títulos e chaves das visões agora compartilham o mesmo contrato.
+- A meia-noite inexistente de 04/11/2018 revelou risco de loop no grid; o conversor agora escolhe o primeiro instante válido do dia, com fallback limitado e cacheado.
+
+### Limites
+- Nenhuma action, API, sincronização, permissão, schema ou dado foi alterado.
+- Datas impossíveis caem no fallback seguro e a regressão ficou coberta por testes unitários, wiring, SSR em UTC e transição histórica de DST.
