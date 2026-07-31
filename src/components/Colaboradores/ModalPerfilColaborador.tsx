@@ -149,6 +149,7 @@ function TextInput({ value, onChange, placeholder, type = 'text', disabled }: {
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       disabled={disabled}
+      autoComplete="off"
       className="h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-[11px] font-bold text-white placeholder:text-slate-700 focus:border-indigo-500/40 focus:bg-indigo-500/5 outline-none transition-all disabled:opacity-40"
     />
   );
@@ -598,6 +599,7 @@ export default function ModalPerfilColaborador({
                                 <div className="flex gap-2 mt-2">
                                   <input value={novoCargo} onChange={e => setNovoCargo(e.target.value)}
                                     placeholder="Nome do cargo..." onKeyDown={e => e.key === 'Enter' && void handleAddCargo()}
+                                    autoComplete="off"
                                     className="flex-1 h-9 px-3 rounded-xl bg-white/[0.03] border border-indigo-500/30 text-[11px] font-bold text-white placeholder:text-slate-700 outline-none" />
                                   <button onClick={() => void handleAddCargo()}
                                     className="h-9 px-4 rounded-xl bg-indigo-600 text-white text-[9px] font-black uppercase cursor-pointer hover:bg-indigo-500">
@@ -825,6 +827,7 @@ export default function ModalPerfilColaborador({
                                         <div className="flex gap-2 mt-2">
                                           <input value={novaModalidade} onChange={e => setNovaModalidade(e.target.value)}
                                             placeholder="Nova modalidade..." onKeyDown={e => e.key === 'Enter' && void handleAddModalidade()}
+                                            autoComplete="off"
                                             className="flex-1 h-9 px-3 rounded-xl bg-white/[0.03] border border-indigo-500/30 text-[11px] font-bold text-white placeholder:text-slate-700 outline-none" />
                                           <button onClick={() => void handleAddModalidade()} className="h-9 px-4 rounded-xl bg-indigo-600 text-white text-[9px] font-black uppercase cursor-pointer">Salvar</button>
                                         </div>
@@ -938,6 +941,7 @@ export default function ModalPerfilColaborador({
                               value={novaSenha}
                               onChange={e => setNovaSenha(e.target.value)}
                               placeholder="Mínimo 6 caracteres"
+                              autoComplete="new-password"
                               className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
                             />
                           </div>
@@ -950,6 +954,7 @@ export default function ModalPerfilColaborador({
                               value={confirmarSenha}
                               onChange={e => setConfirmarSenha(e.target.value)}
                               placeholder="Repita a nova senha"
+                              autoComplete="new-password"
                               className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
                             />
                           </div>
