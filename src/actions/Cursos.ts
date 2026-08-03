@@ -3,6 +3,7 @@ import db from '@/lib/prisma'
 import { auth } from '../../auth'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { isAdminRole } from '@/lib/roles'
 
 const SETORES_VALIDOS = ["T.I", "Comercial", "Operacional", "Financeiro", "Recursos-Humanos", "Serviços Gerais"]
 
@@ -93,7 +94,7 @@ const criarCursoSchema = z.object({
 
 export async function criarCurso(payload: unknown) {
     const session = await auth()
-    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+    if (!session?.user || (!isAdminRole(session.user.role) && session.user.role !== 'Master')) {
         return { success: false, error: 'Sem permissão' }
     }
 
@@ -138,7 +139,7 @@ const editarCursoSchema = z.object({
 
 export async function editarCurso(payload: unknown) {
     const session = await auth()
-    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+    if (!session?.user || (!isAdminRole(session.user.role) && session.user.role !== 'Master')) {
         return { success: false, error: 'Sem permissão' }
     }
 
@@ -176,7 +177,7 @@ export async function editarCurso(payload: unknown) {
 
 export async function deletarCurso(id: string) {
     const session = await auth()
-    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+    if (!session?.user || (!isAdminRole(session.user.role) && session.user.role !== 'Master')) {
         return { success: false, error: 'Sem permissão' }
     }
     try {
@@ -190,7 +191,7 @@ export async function deletarCurso(id: string) {
 
 export async function vincularModuloACurso(cursoId: string, moduloId: string) {
     const session = await auth()
-    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+    if (!session?.user || (!isAdminRole(session.user.role) && session.user.role !== 'Master')) {
         return { success: false, error: 'Sem permissão' }
     }
     try {
@@ -208,7 +209,7 @@ export async function vincularModuloACurso(cursoId: string, moduloId: string) {
 
 export async function desvincularModuloDeCurso(cursoId: string, moduloId: string) {
     const session = await auth()
-    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+    if (!session?.user || (!isAdminRole(session.user.role) && session.user.role !== 'Master')) {
         return { success: false, error: 'Sem permissão' }
     }
     try {
@@ -224,7 +225,7 @@ export async function desvincularModuloDeCurso(cursoId: string, moduloId: string
 
 export async function updateModuloOrderInCurso(cursoId: string, moduloIds: string[]) {
     const session = await auth()
-    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+    if (!session?.user || (!isAdminRole(session.user.role) && session.user.role !== 'Master')) {
         return { success: false, error: 'Sem permissão' }
     }
     try {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { isAdminRole } from "@/lib/roles";
 
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
@@ -31,7 +32,7 @@ export async function middleware(req: NextRequest) {
 
   if (
     pathname.startsWith("/PainelAlpha/cadastro") &&
-    token?.role !== "Admin"
+    !isAdminRole(typeof token?.role === "string" ? token.role : undefined)
   ) {
     return NextResponse.redirect(new URL("/PainelAlpha", req.nextUrl));
   }

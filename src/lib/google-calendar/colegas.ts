@@ -1,4 +1,6 @@
 /** Paleta fixa para diferenciar colegas na grade — atribuída automaticamente por ordem de adição. */
+import { isAdminRole as hasAdminAccess } from "@/lib/roles";
+
 export const PALETA_CORES_COLEGAS = [
   "#f97316", // laranja
   "#a855f7", // roxo
@@ -17,5 +19,5 @@ export function proximaCorColega(quantidadeAtual: number): string {
 }
 
 export function isAdminRole(role: string | undefined): boolean {
-  return role === "Admin" || role === "CEO";
+  return hasAdminAccess(role);
 }

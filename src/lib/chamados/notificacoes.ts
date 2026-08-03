@@ -1,9 +1,9 @@
+import { isAdminRole } from "@/lib/roles";
+
 export const CHAMADOS_ADMIN_CHANNEL = "private-admin-chamados";
 export const NOVO_CHAMADO_EVENT = "novo-chamado";
 export const CHAMADO_CONCLUIDO_EVENT = "chamado-concluido";
 export const CHAMADO_USUARIO_CHANNEL_PREFIX = "private-chamados-usuario-";
-
-const ADMIN_ROLES = new Set(["ADMIN", "CEO"]);
 
 export interface NovoChamadoPayload {
   chamadoId: number;
@@ -22,7 +22,7 @@ export interface ChamadoConcluidoPayload {
 }
 
 export function podeReceberNovosChamados(role: string | null | undefined): boolean {
-  return ADMIN_ROLES.has(role?.trim().toUpperCase() ?? "");
+  return isAdminRole(role);
 }
 
 export function canalChamadosDoUsuario(userId: number): string {

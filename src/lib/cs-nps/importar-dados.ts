@@ -23,6 +23,7 @@ import {
   ErroPreflightXlsx,
   validarXlsxStreaming,
 } from "@/lib/cs-nps/preflight-xlsx";
+import { isAdminRole } from "@/lib/roles";
 
 export const LIMITE_ARQUIVO_IMPORTACAO_BYTES = 10 * 1024 * 1024;
 export const LIMITE_LINHAS_IMPORTACAO = 2_000;
@@ -898,8 +899,7 @@ export async function salvarImportacao(
       where: { id: userId },
       select: { role: true, status: true },
     });
-    const role = ator?.role.trim().toLocaleLowerCase("pt-BR");
-    if (ator?.status !== "ATIVO" || (role !== "admin" && role !== "ceo")) {
+    if (ator?.status !== "ATIVO" || !isAdminRole(ator?.role)) {
       throw new ErroImportacao(
         "A autorização mudou antes da confirmação",
         "AUTHORIZATION_CHANGED",

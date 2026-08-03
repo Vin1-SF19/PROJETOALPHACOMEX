@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "../../auth";
+import { isAdminRole } from "@/lib/roles";
 import type { Session } from "next-auth";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -8,11 +9,10 @@ import { z } from "zod";
 
 // ─── Roles com acesso de gestão ────────────────────────────────────────────────
 
-const ROLES_GESTAO = ["Admin", "FINANCEIRO", "CEO", "RECURSOS HUMANOS"] as const;
-type RoleGestao = (typeof ROLES_GESTAO)[number];
+const ROLES_GESTAO = ["FINANCEIRO", "RECURSOS HUMANOS"] as const;
 
-function podeGestao(role: string): role is RoleGestao {
-  return (ROLES_GESTAO as readonly string[]).includes(role);
+function podeGestao(role: string): boolean {
+  return isAdminRole(role) || (ROLES_GESTAO as readonly string[]).includes(role);
 }
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ export async function uploadHolerite(data: z.infer<typeof uploadSchema>) {
   if (!user?.id) return { success: false as const, error: "Não autorizado" };
 
   const userId = Number(user.id);
-  const isAdmin = user.role === "Admin";
+  const isAdmin = isAdminRole(user.role);
 
   // Colaborador só pode fazer upload dos próprios holerites
   if (!isAdmin && data.colaboradorId !== userId) {
@@ -315,7 +315,7 @@ export async function deletarHolerite(id: number) {
   const user = sessionUser(session);
   if (!user?.id) return { success: false as const, error: "Não autorizado" };
 
-  if (user.role !== "Admin") {
+  if (!isAdminRole(user.role)) {
     return { success: false as const, error: "Apenas administradores podem deletar holerites" };
   }
 

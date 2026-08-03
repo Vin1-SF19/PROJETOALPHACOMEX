@@ -10,6 +10,7 @@ interface ContainerCargaPropsProps {
   componente: ContainerCargaComponente;
   onChange: (patch: Partial<ContainerCargaComponente>) => void;
   modo?: "componente" | "entrada";
+  idPrefix?: string;
 }
 
 interface ColorFieldProps {
@@ -39,10 +40,16 @@ function ColorField({ id, label, value, onChange }: ColorFieldProps) {
   );
 }
 
-export function ContainerCargaProps({ componente, onChange, modo = "componente" }: ContainerCargaPropsProps) {
+export function ContainerCargaProps({
+  componente,
+  onChange,
+  modo = "componente",
+  idPrefix = "container-carga",
+}: ContainerCargaPropsProps) {
   const pararPreviewRef = useRef<(() => void) | null>(null);
   const canvas = useEditorStore((state) => state.canvas);
   const ehEntrada = modo === "entrada";
+  const campoId = (sufixo: string) => `${idPrefix}-${sufixo}`;
 
   useEffect(() => () => pararPreviewRef.current?.(), []);
 
@@ -96,14 +103,14 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
         </div>
       )}
 
-      <ColorField id="container-carga-cor-principal" label="Cor do container" value={componente.corPrincipal} onChange={(corPrincipal) => onChange({ corPrincipal })} />
-      <ColorField id="container-carga-cor-metal" label="Cor das travas" value={componente.corMetal} onChange={(corMetal) => onChange({ corMetal })} />
-      <ColorField id="container-carga-cor-interior" label="Cor do interior" value={componente.corInterior} onChange={(corInterior) => onChange({ corInterior })} />
+      <ColorField id={campoId("cor-principal")} label="Cor do container" value={componente.corPrincipal} onChange={(corPrincipal) => onChange({ corPrincipal })} />
+      <ColorField id={campoId("cor-metal")} label="Cor das travas" value={componente.corMetal} onChange={(corMetal) => onChange({ corMetal })} />
+      <ColorField id={campoId("cor-interior")} label="Cor do interior" value={componente.corInterior} onChange={(corInterior) => onChange({ corInterior })} />
 
       <div className="space-y-1.5">
-        <label htmlFor="container-carga-angulo" className="text-[11px] text-slate-400">Ângulo de abertura</label>
+        <label htmlFor={campoId("angulo")} className="text-[11px] text-slate-400">Ângulo de abertura</label>
         <input
-          id="container-carga-angulo"
+          id={campoId("angulo")}
           type="number"
           min={45}
           max={120}
@@ -115,9 +122,9 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
 
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1.5">
-          <label htmlFor="container-carga-atraso" className="text-[11px] text-slate-400">Atraso (s)</label>
+          <label htmlFor={campoId("atraso")} className="text-[11px] text-slate-400">Atraso (s)</label>
           <input
-            id="container-carga-atraso"
+            id={campoId("atraso")}
             type="number"
             min={0}
             max={10}
@@ -128,9 +135,9 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="container-carga-duracao" className="text-[11px] text-slate-400">Duração (s)</label>
+          <label htmlFor={campoId("duracao")} className="text-[11px] text-slate-400">Duração (s)</label>
           <input
-            id="container-carga-duracao"
+            id={campoId("duracao")}
             type="number"
             min={0.2}
             max={10}
@@ -147,11 +154,11 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
       {!ehEntrada && (
         <div className="flex items-center justify-between gap-3">
           <div>
-            <label htmlFor="container-carga-transicao" className="text-[11px] text-slate-300">Transição pelo interior</label>
+            <label htmlFor={campoId("transicao")} className="text-[11px] text-slate-300">Transição pelo interior</label>
             <p className="text-[10px] text-slate-500">Inicia o próximo slide durante o zoom.</p>
           </div>
           <input
-            id="container-carga-transicao"
+            id={campoId("transicao")}
             type="checkbox"
             checked={componente.transicaoProximoSlide}
             onChange={(event) => onChange({ transicaoProximoSlide: event.target.checked })}
@@ -162,9 +169,9 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
 
       {(ehEntrada || componente.transicaoProximoSlide) && (
         <div className="space-y-1.5">
-          <label htmlFor="container-carga-duracao-zoom" className="text-[11px] text-slate-400">Duração do zoom (s)</label>
+          <label htmlFor={campoId("duracao-zoom")} className="text-[11px] text-slate-400">Duração do zoom (s)</label>
           <input
-            id="container-carga-duracao-zoom"
+            id={campoId("duracao-zoom")}
             type="number"
             min={0.3}
             max={5}
@@ -179,12 +186,12 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
       <div className="h-px bg-white/5" />
 
       <div className="flex items-center justify-between gap-3">
-        <label htmlFor="container-carga-som" className="flex items-center gap-2 text-[11px] text-slate-300">
+        <label htmlFor={campoId("som")} className="flex items-center gap-2 text-[11px] text-slate-300">
           <Volume2 size={14} aria-hidden="true" />
           Som de abertura
         </label>
         <input
-          id="container-carga-som"
+          id={campoId("som")}
           type="checkbox"
           checked={componente.somHabilitado}
           onChange={(event) => onChange({ somHabilitado: event.target.checked })}
@@ -215,11 +222,11 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[10px] text-slate-500">
-          <label htmlFor="container-carga-volume">Volume</label>
+          <label htmlFor={campoId("volume")}>Volume</label>
           <span>{Math.round(componente.volumeSom * 100)}%</span>
         </div>
         <input
-          id="container-carga-volume"
+          id={campoId("volume")}
           type="range"
           min={0}
           max={1}
@@ -232,9 +239,9 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
 
       {!ehEntrada && (
         <div className="space-y-1.5">
-          <label htmlFor="container-carga-estado-editor" className="text-[11px] text-slate-400">Pré-visualização no editor</label>
+          <label htmlFor={campoId("estado-editor")} className="text-[11px] text-slate-400">Pré-visualização no editor</label>
           <select
-            id="container-carga-estado-editor"
+            id={campoId("estado-editor")}
             value={componente.estadoEditor}
             onChange={(event) => onChange({ estadoEditor: event.target.value as ContainerCargaComponente["estadoEditor"] })}
             className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
@@ -246,9 +253,9 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
       )}
 
       <div className="flex items-center justify-between">
-        <label htmlFor="container-carga-logo" className="text-[11px] text-slate-400">Mostrar marca Alpha</label>
+        <label htmlFor={campoId("logo")} className="text-[11px] text-slate-400">Mostrar marca Alpha</label>
         <input
-          id="container-carga-logo"
+          id={campoId("logo")}
           type="checkbox"
           checked={componente.mostrarLogo}
           onChange={(event) => onChange({ mostrarLogo: event.target.checked })}
@@ -258,7 +265,7 @@ export function ContainerCargaProps({ componente, onChange, modo = "componente" 
 
       <p className="rounded-lg border border-white/5 bg-slate-900/60 p-2 text-[10px] leading-relaxed text-slate-500">
         {ehEntrada
-          ? "Esta capa abre antes do primeiro slide. O navegador pode exigir um clique para liberar o áudio."
+          ? "A abertura revela o próximo slide e conclui a troca no fim exato do zoom."
           : "Na apresentação, o container abre automaticamente. O navegador pode exigir um clique para liberar o áudio."}
       </p>
     </>

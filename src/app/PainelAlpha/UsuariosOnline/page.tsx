@@ -3,13 +3,14 @@ import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
 import { Activity, User, ArrowUpRight, ShieldCheck, Zap, Globe, Fingerprint, Search } from "lucide-react";
 import { getTema } from "@/lib/temas";
+import { isAdminRole } from "@/lib/roles";
 
 
 export const dynamic = "force-dynamic";
 
 export default async function UsuariosOnlinePage() {
   const session = await auth();
-  if (session?.user?.role !== "Admin") redirect("/");
+  if (!isAdminRole(session?.user?.role)) redirect("/");
 
   const style = getTema((session?.user as any)?.tema_interface || "blue");
   
@@ -84,7 +85,7 @@ export default async function UsuariosOnlinePage() {
                   <div className="grid grid-cols-2 gap-4 w-full mb-10">
                     <div className="bg-black/40 rounded-2xl p-3 border border-white/5">
                         <span className="block text-[7px] font-black text-slate-500 uppercase mb-1">Hierarchy</span>
-                        <span className={`text-[9px] font-black uppercase ${u.role === 'Admin' ? 'text-amber-500' : 'text-blue-400'}`}>{u.role}</span>
+                        <span className={`text-[9px] font-black uppercase ${isAdminRole(u.role) ? 'text-amber-500' : 'text-blue-400'}`}>{u.role}</span>
                     </div>
                     <div className="bg-black/40 rounded-2xl p-3 border border-white/5">
                         <span className="block text-[7px] font-black text-slate-500 uppercase mb-1">Interface</span>

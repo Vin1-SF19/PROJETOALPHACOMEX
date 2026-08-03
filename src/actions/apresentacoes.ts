@@ -6,9 +6,10 @@ import {
   criarApresentacaoSchema,
   atualizarStatusSchema,
 } from "@/lib/validations/apresentacao";
+import { isAdminRole } from "@/lib/roles";
 
 function isAdmin(role?: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 export async function ListarApresentacoes(params?: { page?: number; pageSize?: number; busca?: string }) {

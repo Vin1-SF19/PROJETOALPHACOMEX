@@ -5,13 +5,14 @@ import { getTema } from "@/lib/temas";
 import { LayoutGrid } from "lucide-react";
 import { BotoesHeader } from "@/components/Colaboradores/BotoesHeader";
 import { GradeAgentes } from "./GradeAgentes/GradeAgentes";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
 export default async function ColaboradoresPage() {
     const session = await auth();
     
-    if (session?.user?.role !== "Admin" && session?.user?.role !== "CEO") redirect("/");
+    if (!isAdminRole(session?.user?.role)) redirect("/");
 
     const style = getTema((session?.user as any)?.tema_interface || "blue");
 

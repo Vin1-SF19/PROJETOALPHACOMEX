@@ -12,6 +12,7 @@ import { AbaDeAcesso } from "@/components/AbaDeAcesso";
 import Pusher from "pusher-js";
 import { getTema, TemaAlpha } from "@/lib/temas";
 import { MODULOS_REGISTRY, CATEGORIAS, ModuloRegistryItem } from "@/lib/modulos-registry";
+import { isAdminRole } from "@/lib/roles";
 
 export default function PainelAlphaClient({ session, chamadosIniciais, configBanco, permissoesEfetivas }: any) {
   const [mounted, setMounted] = useState(false);
@@ -22,8 +23,7 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
 
   const userName   = session?.user?.nome || session?.user?.name || "Operador";
   const userRole   = session?.user?.role || "USER";
-  const isAdmin    = userRole === "Admin";
-  const isCeo      = userRole === "CEO";
+  const isAdmin    = isAdminRole(userRole);
   const isRh       = userRole === "RECURSOS HUMANOS";
   const isFinc     = userRole === "FINANCEIRO";
 
@@ -74,11 +74,11 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
     const busca = searchTerm.toLowerCase();
 
     const filtered = MODULOS_REGISTRY.filter(m => {
-      if (m.adminOnly && !isAdmin && !isCeo) {
+      if (m.adminOnly && !isAdmin) {
         const roleOk = m.allowedRoles?.includes(userRole);
         if (!roleOk) return false;
       }
-      const temAcesso = isAdmin || isCeo ||
+      const temAcesso = isAdmin ||
         m.allowedRoles?.includes(userRole) ||
         userPermissions.some(p => p.toLowerCase() === m.permission?.toLowerCase());
       if (!temAcesso) return false;
@@ -93,11 +93,11 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
     });
 
     return groups;
-  }, [searchTerm, isAdmin, isCeo, userPermissions, userRole]);
+  }, [searchTerm, isAdmin, userPermissions, userRole]);
 
   if (!mounted) return null;
 
-  const isAdminOrCeo = isAdmin || isCeo;
+  const isAdminOrCeo = isAdmin;
   const compact      = densidade === "compact";
 
   const gridClass = compact
@@ -160,7 +160,7 @@ export default function PainelAlphaClient({ session, chamadosIniciais, configBan
             {
               label: "Nível de Acesso", value: userRole, icon: ShieldCheck,
               color: `${style.text} ${style.glow}`,
-              href: isRh || isAdmin || isCeo || isFinc ? "/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa" : undefined,
+              href: isRh || isAdmin || isFinc ? "/PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa" : undefined,
             },
             { label: "Alpha Comm", value: "Canal de mensagens", icon: Zap, color: "text-blue-500 bg-blue-500/10", href: "/PainelAlpha/AlphaComm" },
             {

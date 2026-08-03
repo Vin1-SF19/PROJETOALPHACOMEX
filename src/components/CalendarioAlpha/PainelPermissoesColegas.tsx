@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { alternarPermissaoColegas, type UsuarioPermissaoColegaDTO } from "@/actions/google-calendar-colegas";
 import { Switch } from "@/components/ui/switch";
 import type { TemaAlpha } from "@/lib/temas";
+import { isAdminRole } from "@/lib/roles";
 
 import { AgendaModal3D } from "./AgendaModal3D";
 
@@ -57,7 +58,7 @@ export function PainelPermissoesColegas({
               <p className="truncate text-sm font-semibold text-white">{usuario.nome}</p>
               <p className="truncate text-[11px] text-slate-500">{usuario.email}</p>
             </div>
-            {usuario.role === "Admin" || usuario.role === "CEO" ? (
+            {isAdminRole(usuario.role) ? (
               <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-emerald-400">
                 <ShieldCheck className="size-3.5" /> Sempre liberado
               </span>

@@ -11,6 +11,7 @@ import {
 } from "@/components/CalendarioAlpha/lib/datas";
 import type { EventoExibicao } from "@/components/CalendarioAlpha/lib/tipos";
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 
 import { auth } from "../../../../auth";
 
@@ -26,7 +27,7 @@ export default async function CalendarioAlphaPage({
 
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
   const role = session.user.role ?? "";
-  const isAdmin = role === "Admin" || role === "CEO";
+  const isAdmin = isAdminRole(role);
 
   if (!isAdmin) {
     const perms = await getPermissoesEfetivas(userId);

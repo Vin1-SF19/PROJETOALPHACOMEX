@@ -10,8 +10,9 @@ import {
   getEstadoAlerta,
   type EstadoAlerta,
 } from '@/actions/HoleriteAlertas';
+import { isAdminRole } from '@/lib/roles';
 
-const ROLES_ALERTA = ['Admin', 'CEO', 'FINANCEIRO', 'RECURSOS HUMANOS'];
+const ROLES_ALERTA = ['FINANCEIRO', 'RECURSOS HUMANOS'];
 
 interface Props {
   role: string;
@@ -30,7 +31,7 @@ export function HoleriteAlertButtons({ role }: Props) {
   const [pendingInicial, startInicial] = useTransition();
   const [pendingFinal, startFinal] = useTransition();
 
-  const podeVer = ROLES_ALERTA.includes(role);
+  const podeVer = isAdminRole(role) || ROLES_ALERTA.includes(role);
 
   useEffect(() => {
     if (!podeVer) return;

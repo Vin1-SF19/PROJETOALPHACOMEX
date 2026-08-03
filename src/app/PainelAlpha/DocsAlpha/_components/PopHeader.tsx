@@ -3,6 +3,7 @@
 import { ShieldCheck, Upload, History, KeyRound } from 'lucide-react'
 import Link from 'next/link'
 import type { AcessosPop } from '../_types'
+import { isSameRole } from '@/lib/roles'
 
 const SETORES = [
   "Diretrizes", "T.I", "OPERACIONAL", "COMERCIAL",
@@ -39,14 +40,14 @@ export function PopHeader({ roleUser, setorAtivo, acessosPop, onSetorChange, onA
         {SETORES.map(s => {
           const podeVer =
             acessosPop.setoresAcessiveis.includes("*") ||
-            acessosPop.setoresAcessiveis.some(sv => sv.toUpperCase().trim() === s.toUpperCase().trim())
+            acessosPop.setoresAcessiveis.some(sv => isSameRole(sv, s))
           if (!podeVer) return null
           return (
             <button
               key={s}
               onClick={() => onSetorChange(s)}
               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${
-                setorAtivo === s ? "bg-blue-600 text-white scale-105" : "text-slate-500 hover:bg-white/5"
+                isSameRole(setorAtivo, s) ? "bg-blue-600 text-white scale-105" : "text-slate-500 hover:bg-white/5"
               }`}
             >
               {s}

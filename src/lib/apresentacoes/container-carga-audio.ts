@@ -19,6 +19,23 @@ function obterContexto() {
   return contextoCompartilhado;
 }
 
+function contextoEstaRodando(contexto: AudioContext) {
+  return contexto.state === "running";
+}
+
+/** Deve ser chamado diretamente por um clique/tecla do player para liberar o Web Audio. */
+export async function desbloquearAudioContainer() {
+  const contexto = obterContexto();
+  if (!contexto) return false;
+  if (contextoEstaRodando(contexto)) return true;
+  try {
+    await contexto.resume();
+    return contextoEstaRodando(contexto);
+  } catch {
+    return false;
+  }
+}
+
 function criarRuido(contexto: AudioContext, duracao: number) {
   const buffer = contexto.createBuffer(1, Math.ceil(contexto.sampleRate * duracao), contexto.sampleRate);
   const dados = buffer.getChannelData(0);
@@ -125,9 +142,9 @@ export function tocarSomAberturaContainer(preset: SomContainerPreset, volume: nu
     else agendarIndustrial(contexto, volume, fontes);
   };
 
-  if (contexto?.state === "suspended") {
-    void contexto.resume().then(agendar).catch(() => {
-      // Alguns browsers exigem interação explícita; a apresentação segue silenciosamente.
+  if (contexto && contexto.state !== "running") {
+    void desbloquearAudioContainer().then((liberado) => {
+      if (liberado) agendar();
     });
   } else {
     agendar();

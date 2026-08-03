@@ -16,6 +16,7 @@ import ChecklistNotificacoesWidget from "@/components/Checklist/ChecklistNotific
 import { TIPO_LABELS } from "@/lib/checklist/items";
 import { getTema } from "@/lib/temas";
 import ModalCadastroCliente from "./Modais/CadastroCliente";
+import { isAdminRole } from "@/lib/roles";
 
 type TipoEmbasamento = NonNullable<EmpresaComProgresso["tipo"]>;
 
@@ -132,7 +133,7 @@ export default function ListaChecklist({
         <div className="flex flex-wrap items-center gap-3">
           <Resumo titulo="Total" valor={empresas.length} />
           <Resumo titulo="Concluídos" valor={concluidos} sucesso />
-          {["Admin", "CEO", "OPERACIONAL"].includes(role) && <ChecklistNotificacoesWidget role={role} />}
+          {(isAdminRole(role) || role === "OPERACIONAL") && <ChecklistNotificacoesWidget role={role} />}
         </div>
       </header>
 

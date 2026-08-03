@@ -4,6 +4,7 @@ import { auth } from "../../../../../auth";
 import db from "@/lib/prisma";
 import { gerarSlideStream, type EventoGeracaoSlide } from "@/lib/apresentacoes-ia/gerar-slide";
 import { encodeSSE } from "@/lib/bibble/completion";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,7 +15,7 @@ const bodySchema = z.object({
 });
 
 function isAdmin(role?: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 /** Mesmo padrão de ownership de src/actions/slides.ts — sobe até Apresentacao.autorId/colaboradores. */

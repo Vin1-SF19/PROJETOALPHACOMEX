@@ -1,6 +1,7 @@
 'use server';
 
 import { auth } from '../../auth';
+import { isAdminRole } from '@/lib/roles';
 import { z } from 'zod';
 import db from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
@@ -8,12 +9,10 @@ import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
 
 const KNOWN_MODULOS = new Set(MODULOS_REGISTRY.map(m => m.permission).filter(Boolean) as string[]);
 
-const ADMIN_ROLES = ['Admin', 'CEO'];
-
 async function requireAdminSession() {
   const session = await auth();
   const role = (session?.user as { role?: string })?.role ?? '';
-  if (!ADMIN_ROLES.includes(role)) throw new Error('Não autorizado');
+  if (!isAdminRole(role)) throw new Error('Não autorizado');
   return session!;
 }
 
@@ -25,7 +24,7 @@ export async function getPermissoesEfetivas(usuarioId: number): Promise<string[]
   });
   if (!user) return [];
 
-  if (ADMIN_ROLES.includes(user.role)) return Array.from(KNOWN_MODULOS);
+  if (isAdminRole(user.role)) return Array.from(KNOWN_MODULOS);
 
   const setorPerms = await db.setorPermissao.findMany({
     where: { setor: user.role },

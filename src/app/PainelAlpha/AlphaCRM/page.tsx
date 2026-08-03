@@ -1,7 +1,7 @@
 import { getTema } from "@/lib/temas";
 import { auth } from "../../../../auth";
-import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
-import PipelinesListClient from "./PipelinesListClient";
+import { ObterDashboardBpm } from "@/actions/bpm/Dashboard";
+import DashboardClient from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,15 @@ export default async function AlphaCRMPage() {
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
 
-  const pipelinesResult = await ListarPipelinesBpm();
+  const dashboardResult = await ObterDashboardBpm();
 
-  return <PipelinesListClient pipelines={pipelinesResult.data ?? []} visual={visual} />;
+  return (
+    <DashboardClient
+      dashboard={dashboardResult.data ?? null}
+      erro={dashboardResult.success ? null : dashboardResult.error ?? "Erro ao carregar dashboard"}
+      visual={visual}
+      currentUserId={session?.user?.id ? Number(session.user.id) : null}
+      currentUserRole={session?.user?.role ?? null}
+    />
+  );
 }

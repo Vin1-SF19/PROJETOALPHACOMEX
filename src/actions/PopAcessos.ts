@@ -4,21 +4,9 @@ import { auth } from "../../auth";
 import db from "@/lib/prisma";
 import type { Session } from "next-auth";
 import { SETOR_GERAL } from "@/lib/pop-acessos";
+import { isAdminRole, isSameRole, normalizeRole } from "@/lib/roles";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
-
-const ROLES_ADMIN = ["Admin", "CEO"] as const;
-const SETORES_POP = [
-  "Diretrizes",
-  "T.I",
-  "OPERACIONAL",
-  "COMERCIAL",
-  "RECURSOS HUMANOS",
-  "FINANCEIRO",
-  "JURÍDICO",
-  "PARCEIRO",
-  "SERVIÇOS GERAIS",
-] as const;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -27,7 +15,7 @@ function sessionUser(session: Session | null) {
 }
 
 function ehAdmin(role: string) {
-  return (ROLES_ADMIN as readonly string[]).includes(role);
+  return isAdminRole(role);
 }
 
 // ─── Core: setores acessíveis para um usuário ──────────────────────────────────
@@ -49,7 +37,7 @@ async function getSetoresAcessiveis(userId: number): Promise<string[]> {
   });
 
   const setoresExtras = extras.map((e) => e.setor);
-  const setorProprio = user.role.toUpperCase().trim();
+  const setorProprio = normalizeRole(user.role);
 
   return ["Diretrizes", setorProprio, ...setoresExtras];
 }
@@ -138,7 +126,7 @@ export async function getMatrizAcessos(): Promise<{ success: boolean; data?: Usu
       id: u.id,
       nome: u.nome,
       role: u.role,
-      setorProprio: u.role.toUpperCase().trim(),
+      setorProprio: normalizeRole(u.role),
       acessos: u.popAcessos.filter((a) => a.setor !== SETOR_GERAL),
       podeUploadGeral: linhaGeral?.podeUpload ?? false,
       podeGerenciarGeral: linhaGeral?.podeGerenciar ?? false,
@@ -187,12 +175,12 @@ export async function salvarAcessos(
     where: { id: { in: usuariosEnvolvidos } },
     select: { id: true, role: true },
   });
-  const setorMap = new Map(usuariosDB.map((u) => [u.id, u.role.toUpperCase().trim()]));
+  const setorMap = new Map(usuariosDB.map((u) => [u.id, u.role]));
 
   for (const item of payload) {
     if (item.setor === SETOR_GERAL) continue; // linha reservada — não é setor de conteúdo
     const setorProprio = setorMap.get(item.usuarioId);
-    if (setorProprio && item.setor.toUpperCase().trim() === setorProprio) {
+    if (setorProprio && isSameRole(item.setor, setorProprio)) {
       return { success: false, error: `Setor próprio não pode ser alterado via PopAcesso (usuário ${item.usuarioId})` };
     }
   }
@@ -235,7 +223,7 @@ export async function concederAcesso(
 
   // Bloquear setor próprio
   const alvo = await db.usuarios.findUnique({ where: { id: usuarioId }, select: { role: true } });
-  if (alvo && setor.toUpperCase().trim() === alvo.role.toUpperCase().trim()) {
+  if (alvo && isSameRole(setor, alvo.role)) {
     return { success: false, error: "Setor próprio sempre acessível — não precisa de registro" };
   }
 
@@ -274,7 +262,7 @@ export async function revogarAcesso(
 
   // Bloquear revogação do setor próprio
   const alvo = await db.usuarios.findUnique({ where: { id: usuarioId }, select: { role: true } });
-  if (alvo && setor.toUpperCase().trim() === alvo.role.toUpperCase().trim()) {
+  if (alvo && isSameRole(setor, alvo.role)) {
     return { success: false, error: "Não é possível revogar o acesso ao setor próprio" };
   }
 

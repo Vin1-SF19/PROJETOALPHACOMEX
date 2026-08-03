@@ -9,8 +9,9 @@ import Link from "next/link";
 import MeusHoleritesView from "./MeusHoleritesView";
 import GestaoHoleritesView from "./GestaoHoleritesView";
 import { HoleriteAlertButtons } from "./HoleriteAlertButtons";
+import { isAdminRole } from "@/lib/roles";
 
-const ROLES_GESTAO = ["Admin", "FINANCEIRO", "CEO", "RECURSOS HUMANOS"];
+const ROLES_GESTAO = ["FINANCEIRO", "RECURSOS HUMANOS"];
 
 type Tab = "gestao" | "meus";
 
@@ -31,7 +32,7 @@ export default function HoleritesPage() {
     | undefined;
 
   const role = user?.role ?? "";
-  const isGestao = ROLES_GESTAO.includes(role);
+  const isGestao = isAdminRole(role) || ROLES_GESTAO.includes(role);
   const userId = Number(user?.id ?? 0);
 
   return (

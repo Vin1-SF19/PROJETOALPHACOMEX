@@ -5,6 +5,7 @@ import {
   formatarDataCalendarioParaBibble,
   TIMEZONE_CALENDARIO_BIBBLE,
 } from "@/lib/bibble/calendar-timezone";
+import { isAdminRole } from "@/lib/roles";
 
 const TIMEZONE_PADRAO = TIMEZONE_CALENDARIO_BIBBLE;
 const MS_DIA = 24 * 60 * 60 * 1000;
@@ -446,7 +447,7 @@ async function resolverColega(
   const termoEmail = termo.toLocaleLowerCase();
   let usuarios: ColegaResolvido[];
 
-  if (ctx.role === "Admin" || ctx.role === "CEO") {
+  if (isAdminRole(ctx.role)) {
     usuarios = await db.usuarios.findMany({
       where: {
         status: "ATIVO",
@@ -623,14 +624,13 @@ function mapearEventoGoogle(evento: {
 }
 
 function exigirAdmin(ctx: CalendarToolContext): string | null {
-  return ctx.role === "Admin" || ctx.role === "CEO"
+  return isAdminRole(ctx.role)
     ? null
     : "Somente Admin/CEO pode criar, editar ou cancelar eventos na agenda de outro colaborador.";
 }
 
 function validarPermissao(ctx: CalendarToolContext): string | null {
-  return ctx.role === "Admin" ||
-    ctx.role === "CEO" ||
+  return isAdminRole(ctx.role) ||
     ctx.permissoes.includes("calendarioAlpha")
     ? null
     : 'Você não tem permissão para acessar o módulo "Calendário Alpha".';

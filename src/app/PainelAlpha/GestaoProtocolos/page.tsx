@@ -5,6 +5,7 @@ import Link from "next/link";
 import { listarTodosTemplates } from "@/actions/protocolos";
 import GestaoProtocolosClient from "@/components/GestaoProtocolos/GestaoProtocolosClient";
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 
 export default async function GestaoProtocolosPage() {
   const session = await auth();
@@ -12,8 +13,7 @@ export default async function GestaoProtocolosPage() {
 
   const role = session.user.role;
   const temPermissao =
-    role === "Admin" ||
-    role === "CEO" ||
+    isAdminRole(role) ||
     role === "SUPORTE" ||
     (session.user as { permissoes?: string[] }).permissoes?.includes("gestaoProtocolos");
 

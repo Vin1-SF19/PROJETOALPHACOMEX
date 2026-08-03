@@ -1267,3 +1267,45 @@ Ao selecionar a visão Dia, a Agenda Alpha recuava um dia e ficava sem eventos, 
 ### Limites
 - Nenhuma action, API, sincronização, permissão, schema ou dado foi alterado.
 - Datas impossíveis caem no fallback seguro e a regressão ficou coberta por testes unitários, wiring, SSR em UTC e transição histórica de DST.
+
+---
+
+## [2026-08-03 17:18] — Player nativo e persistência serial do Alpha Presentation Studio
+
+**Tags:** #bugfix #refactor #decision #integration #nextjs
+**Agentes envolvidos:** Bibble, Scout, Iris, Nova, Forge, Probe, Lens, Sage, Scribe, Kowalski
+**Arquivos tocados:** `src/components/Apresentacoes/Editor/{ApresentacaoEditor,ModalReproducaoApresentacao}.tsx`, `src/components/Apresentacoes/Editor/SidebarEsquerda/SidebarSlides.tsx`, `src/components/Apresentacoes/Editor/store/useEditorStore.ts`, `src/components/Apresentacoes/ModoApresentacao/{ModoApresentacaoClient,TransicaoContainerAlphaLayer}.tsx`, `src/app/PainelAlpha/Apresentacoes/[id]/{editor,apresentar}/page.tsx`, `src/components/layout/PainelLayoutClient.tsx`, `tests/apresentacoes/{central-criativa,container-alpha,editor-persistencia}.test.ts`, `.bibble/memory/{components,integration-points,journal}.md`, `docs/stories/story-apresentacoes-container-alpha-animado.md`
+
+### Contexto
+O player modal demorava, falhava de forma intermitente e chegava a mostrar a sidebar do Painel Alpha dentro da apresentação. O usuário também precisava que o Container Alpha tivesse profundidade visual, abrisse uma única vez e já avançasse pelo zoom ao slide seguinte, sem atraso, repetição ou mudança prematura do palco.
+
+### O que foi feito
+- O iframe interno foi removido do modal; `ModoApresentacaoClient` agora monta diretamente no Dialog usando um snapshot instantâneo dos slides já carregados no Zustand, incluindo componentes/canvas atuais do slide ativo.
+- A transição sintética do Container Alpha ganhou margem responsiva de 5% da menor dimensão do palco, limitada entre 18 e 72 px. O player detecta quando o container real já executa a animação e não monta uma segunda camada concorrente, eliminando a repetição antes do zoom.
+- O destino é promovido no início real do zoom, mas `slidePalco` preserva canvas, fundo, escala e recorte do slide de origem até o callback final da animação 3D. A conversão geométrica da abertura/margem foi corrigida e mantida tipada.
+- Palco e controles passaram a ocupar regiões próprias do layout, sem sobreposição sobre o slide. Range e comandos continuam responsivos, ganharam `focus-visible` e fullscreen explícito.
+- O clique em “Apresentar” desbloqueia Web Audio antes do mount e o modal nasce iniciado. O gate “Iniciar apresentação” existe somente na rota standalone, autenticada e separada do modal; o iframe global de abas permite `autoplay` e `fullscreen`.
+- A persistência ganhou `versaoEdicao` monotônica, `concluirSalvamento` condicionado à versão atual e uma fila independente por `slideId`, serializando escritas do mesmo slide sem bloquear slides diferentes e continuando após rejeição.
+
+### Decisões tomadas
+- Player modal React direto: evita segundo SSR/layout, nova autenticação/consulta Prisma, flash da sidebar e perda do gesto de áudio.
+- Snapshot local primeiro, save em background: a reprodução abre imediatamente sem sacrificar a persistência.
+- Versão monotônica + fila por slide: comparação de referências isolada não era suficiente para impedir respostas e escritas fora de ordem.
+- Sequência única por instância: um `containerCarga` real configurado é a própria transição; a camada sintética só existe quando a animação vem de outro componente.
+- Canvas de origem até `onComplete`: o índice lógico pode avançar no início do zoom sem provocar salto de proporção, fundo ou recorte durante a expansão.
+- Gate apenas standalone: o modal preserva abertura instantânea, enquanto a rota direta obtém explicitamente o gesto exigido para áudio e fullscreen.
+
+### Problemas encontrados / resolvidos
+- A causa raiz era o iframe aninhado apontando para uma rota `force-dynamic`: ele recarregava o layout do painel e só detectava o contexto embutido após hidratação.
+- Saves do debounce, do botão Apresentar e da troca de slide podiam competir; a fila preserva a ordem de envio por slide e a versão impede uma conclusão antiga de limpar `isDirty` novo.
+- A repetição visual vinha da camada sintética concorrendo com o próprio Container Alpha; o guard recursivo mantém apenas a instância real. A troca visual antecipada vinha do palco derivado diretamente do índice já promovido; `slidePalco` agora retém a origem enquanto a transição está ativa.
+- Validação final: ESLint focal PASS, 32/32 testes focados PASS em Central Criativa, Container Alpha e persistência do editor, e `git diff --check` PASS. O typecheck não apresenta erro no player e conserva somente 5 baselines externos: Exclusão Fiscal (2), Radar (1) e Google Calendar (2).
+
+### Pendências
+- Executar E2E futuro em navegador autenticado para churn contínuo da Sidebar e medição da latência visual imediata; ambos foram aprovados nesta sessão por inspeção, mas o navegador automatizado estava indisponível.
+- Manter os 5 baselines externos de typecheck e o bloqueio ambiental do Prisma fora deste escopo até tratamento próprio.
+
+### Refletido também em
+- `components.md`: contrato do modal React nativo, áudio/gate, margem responsiva, sequência única, canvas de origem, controles, snapshot, versão e fila serial.
+- `integration-points.md`: invariantes do player, geometria da transição, rota standalone, iframe global e persistência concorrente.
+- `story-apresentacoes-container-alpha-animado.md`: evolução 1.8, arquivos, 32/32 testes, gates e risco E2E residual.

@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { dadosSlideSchema } from "@/lib/validations/slide-componentes";
 import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
+import { isAdminRole } from "@/lib/roles";
 
 function isAdmin(role?: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 /** Sobe até a Apresentação dona do slide/apresentacaoId e confirma ownership (autor, colaborador ou admin). Nunca confiar só no id do slide isolado. */

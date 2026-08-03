@@ -4,9 +4,10 @@ import { del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 
 function isAdmin(role?: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 export async function ExcluirAssetApresentacao(assetId: string) {

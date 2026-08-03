@@ -27,6 +27,7 @@ import { useSession } from "next-auth/react";
 import { BotaoExportarDados } from "./BotaoExportarDados";
 import { BotaoImportarLote } from "./importacao/BotaoImportarLote";
 import { CsNpsHero3DCard, CsNpsSurface3DCard } from "./CsNpsMotion";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -183,7 +184,7 @@ export default function CadastroCliente() {
                             <Plus size={16} /> Novo Cliente
                         </button>
 
-                        {(session?.user?.role === "Admin" || session?.user?.role === "CEO") && (
+                        {isAdminRole(session?.user?.role) && (
                             <>
                                 <BotaoImportarLote onImportado={carregarDados} />
                                 <BotaoExportarDados />
@@ -379,7 +380,7 @@ export default function CadastroCliente() {
 
                                             {/* LOG */}
                                             <td className="px-6 py-4 text-center">
-                                                {(session?.user?.role === 'Admin' || session?.user?.role === "RECURSOS HUMANOS") ? (
+                                                {(isAdminRole(session?.user?.role) || session?.user?.role === "RECURSOS HUMANOS") ? (
                                                     <button
                                                         onClick={() => abrirLog(c)}
                                                         className="p-2 hover:bg-indigo-500/10 rounded-lg transition-all text-slate-700 hover:text-indigo-400 group-hover:text-slate-500 cursor-pointer"

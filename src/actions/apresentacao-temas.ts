@@ -3,9 +3,10 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { criarTemaSchema, atualizarTemaSchema, aplicarTemaSchema } from "@/lib/validations/apresentacao-tema";
+import { isAdminRole } from "@/lib/roles";
 
 function isAdmin(role?: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 async function checarOwnershipApresentacao(apresentacaoId: string, userId: number, role?: string) {

@@ -2,6 +2,7 @@ import { auth } from "../../../../../auth";
 import { redirect } from "next/navigation";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { ConfiguracoesComissoes } from "@/components/Comissoes/Configuracoes/ConfiguracoesComissoes";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function ConfiguracoesComissoesPage() {
 
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
   const role = session.user.role ?? "";
-  const isAdmin = role === "Admin" || role === "CEO";
+  const isAdmin = isAdminRole(role);
 
   if (!isAdmin) {
     const perms = await getPermissoesEfetivas(userId);

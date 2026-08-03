@@ -9,6 +9,7 @@ import DetalhesChamado from "@/components/DetalhesChamado";
 import ChatChamado from "@/components/ChatChamado";
 import { FiltroChamadosCards } from "@/components/FiltroChamado";
 import { listarTemplates } from "@/actions/protocolos";
+import { isAdminRole } from "@/lib/roles";
 
 const STATUS_STYLES: Record<string, string> = {
   ABERTO: "text-amber-400 bg-amber-400/10 border-amber-400/20",
@@ -55,7 +56,7 @@ export default async function Chamados({
   if (!session) redirect("/");
 
   const { status } = await searchParams;
-  const isAdmin = session.user.role === "Admin";
+  const isAdmin = isAdminRole(session.user.role);
   const isCeo = session.user.role === "CEO";
   const userId = Number(session.user.id);
   const podeVerTodos = isAdmin || isCeo;

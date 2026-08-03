@@ -4,6 +4,7 @@ import { gerarFichaServer } from "@/lib/bibble/gerar-ficha-server";
 import { executarCalendarTool, isCalendarTool } from "@/lib/bibble/calendar-tools";
 import type { EventoCancelamentoPendente } from "@/lib/bibble/calendar-cancellation";
 import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
+import { isAdminRole } from "@/lib/roles";
 
 export interface UserCtx {
   userId: number;
@@ -18,7 +19,7 @@ export interface UserCtx {
 
 // Admin/CEO têm acesso irrestrito a todas as tools
 function isAdmin(ctx: UserCtx): boolean {
-  return ctx.role === "Admin" || ctx.role === "CEO";
+  return isAdminRole(ctx.role);
 }
 
 function temPermissao(ctx: UserCtx, modulo: string): boolean {

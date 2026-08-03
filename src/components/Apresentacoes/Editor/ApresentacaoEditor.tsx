@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { AtualizarSlide } from "@/actions/slides";
-import { useEditorStore, type SlideResumo } from "./store/useEditorStore";
+import { serializarPersistenciaSlide, useEditorStore, type SlideResumo } from "./store/useEditorStore";
 import { COMPONENTES_REGISTRY, type TipoComponente } from "./registry/componentes-registry";
 import { BarraSuperiorEditor } from "./BarraSuperior/BarraSuperiorEditor";
 import { SidebarComponentes } from "./SidebarEsquerda/SidebarComponentes";
@@ -16,7 +16,8 @@ import { ModalReproducaoApresentacao } from "./ModalReproducaoApresentacao";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
 import type { AssetApresentacao } from "@/lib/apresentacoes/assets";
-import type { EntradaApresentacaoConfig } from "@/lib/apresentacoes/entrada-apresentacao";
+import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-audio";
+import type { SlideApresentacao } from "@/components/Apresentacoes/ModoApresentacao/SlideApresentacaoLayer";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -35,7 +36,6 @@ interface ApresentacaoEditorProps {
   slideAtivoIdInicial: string;
   componentesIniciais: ComponenteSlide[];
   canvasInicial: CanvasConfig;
-  entradaApresentacaoInicial: EntradaApresentacaoConfig | null;
   assetsIniciais: AssetApresentacao[];
   temaInicial: TemaResumo | null;
 }
@@ -47,21 +47,20 @@ export function ApresentacaoEditor({
   slideAtivoIdInicial,
   componentesIniciais,
   canvasInicial,
-  entradaApresentacaoInicial,
   assetsIniciais,
   temaInicial,
 }: ApresentacaoEditorProps) {
   const [tema, setTema] = useState<TemaResumo | null>(temaInicial);
   const [modalApresentacaoAberto, setModalApresentacaoAberto] = useState(false);
-  const [abrindoApresentacao, setAbrindoApresentacao] = useState(false);
+  const [slidesReproducao, setSlidesReproducao] = useState<SlideApresentacao[]>([]);
   const inicializar = useEditorStore((s) => s.inicializar);
   const carregarSlide = useEditorStore((s) => s.carregarSlide);
   const componentes = useEditorStore((s) => s.componentes);
   const canvas = useEditorStore((s) => s.canvas);
-  const entradaApresentacao = useEditorStore((s) => s.entradaApresentacao);
+  const slides = useEditorStore((s) => s.slides);
   const slideAtivoId = useEditorStore((s) => s.slideAtivoId);
   const isDirty = useEditorStore((s) => s.isDirty);
-  const marcarSalvo = useEditorStore((s) => s.marcarSalvo);
+  const versaoEdicao = useEditorStore((s) => s.versaoEdicao);
   const setSaving = useEditorStore((s) => s.setSaving);
   const adicionarComponente = useEditorStore((s) => s.adicionarComponente);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,33 +72,37 @@ export function ApresentacaoEditor({
     if (inicializadoRef.current) return;
     inicializadoRef.current = true;
     inicializar(apresentacaoId, slidesIniciais);
-    carregarSlide(slideAtivoIdInicial, componentesIniciais, canvasInicial, entradaApresentacaoInicial);
-  }, [apresentacaoId, slidesIniciais, slideAtivoIdInicial, componentesIniciais, canvasInicial, entradaApresentacaoInicial, inicializar, carregarSlide]);
+    carregarSlide(slideAtivoIdInicial, componentesIniciais, canvasInicial);
+  }, [apresentacaoId, slidesIniciais, slideAtivoIdInicial, componentesIniciais, canvasInicial, inicializar, carregarSlide]);
 
   useEffect(() => {
     if (!isDirty || !slideAtivoId) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
+    const versaoSnapshot = versaoEdicao;
+    debounceRef.current = setTimeout(() => {
       setSaving(true);
-      const res = await AtualizarSlide({
-        id: slideAtivoId,
-        dadosJson: {
-          componentes,
-          canvas,
-          ...(entradaApresentacao ? { entradaApresentacao } : {}),
-        },
-      });
-      if (res.success) {
-        marcarSalvo();
-      } else {
-        setSaving(false);
-        toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar automaticamente.");
-      }
+      void (async () => {
+        let sucesso = false;
+        try {
+          const res = await serializarPersistenciaSlide(slideAtivoId, () => AtualizarSlide({
+            id: slideAtivoId,
+            dadosJson: { componentes, canvas },
+          }));
+          sucesso = res.success;
+          if (!res.success) {
+            toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar automaticamente.");
+          }
+        } catch {
+          toast.error("Erro de conexão ao salvar automaticamente.");
+        } finally {
+          useEditorStore.getState().concluirSalvamento(slideAtivoId, versaoSnapshot, sucesso);
+        }
+      })();
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [componentes, canvas, entradaApresentacao, isDirty, slideAtivoId, marcarSalvo, setSaving]);
+  }, [componentes, canvas, isDirty, slideAtivoId, versaoEdicao, setSaving]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -123,34 +126,39 @@ export function ApresentacaoEditor({
     for (const c of componentesGerados) adicionarComponente(c);
   }
 
-  async function handleApresentar() {
-    if (abrindoApresentacao) return;
-    setAbrindoApresentacao(true);
+  function handleApresentar() {
+    void desbloquearAudioContainer();
 
-    try {
-      if (slideAtivoId && isDirty) {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        setSaving(true);
-        const res = await AtualizarSlide({
-          id: slideAtivoId,
-          dadosJson: {
-            componentes,
-            canvas,
-            ...(entradaApresentacao ? { entradaApresentacao } : {}),
-          },
-        });
-        if (!res.success) {
-          setSaving(false);
-          toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar antes de apresentar.");
-          return;
-        }
-        marcarSalvo();
+    const slideIdSnapshot = slideAtivoId;
+    const componentesSnapshot = componentes;
+    const canvasSnapshot = canvas;
+    const versaoSnapshot = versaoEdicao;
+    const slidesSnapshot = slides.map((slide) => slide.id === slideIdSnapshot
+      ? { ...slide, componentes: componentesSnapshot, canvas: canvasSnapshot }
+      : slide);
+
+    setSlidesReproducao(slidesSnapshot);
+    setModalApresentacaoAberto(true);
+
+    if (!slideIdSnapshot || !isDirty) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSaving(true);
+    void (async () => {
+      let sucesso = false;
+      try {
+        const res = await serializarPersistenciaSlide(slideIdSnapshot, () => AtualizarSlide({
+          id: slideIdSnapshot,
+          dadosJson: { componentes: componentesSnapshot, canvas: canvasSnapshot },
+        }));
+        sucesso = res.success;
+        if (res.success) return;
+        toast.error(typeof res.error === "string" ? res.error : "A apresentação abriu, mas o slide não foi salvo.");
+      } catch {
+        toast.error("A apresentação abriu, mas houve erro de conexão ao salvar o slide.");
+      } finally {
+        useEditorStore.getState().concluirSalvamento(slideIdSnapshot, versaoSnapshot, sucesso);
       }
-
-      setModalApresentacaoAberto(true);
-    } finally {
-      setAbrindoApresentacao(false);
-    }
+    })();
   }
 
   return (
@@ -163,7 +171,7 @@ export function ApresentacaoEditor({
           onTemaAplicado={setTema}
           onSlideGeradoAplicado={handleSlideGeradoAplicado}
           onApresentar={handleApresentar}
-          abrindoApresentacao={abrindoApresentacao}
+          abrindoApresentacao={false}
           assetsIniciais={assetsIniciais}
           temaAtual={tema}
         />
@@ -188,6 +196,8 @@ export function ApresentacaoEditor({
           onOpenChange={setModalApresentacaoAberto}
           apresentacaoId={apresentacaoId}
           titulo={titulo}
+          slides={slidesReproducao}
+          tema={tema}
         />
       </div>
     </DndContext>

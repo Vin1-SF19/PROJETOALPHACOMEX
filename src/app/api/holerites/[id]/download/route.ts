@@ -1,8 +1,9 @@
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { isAdminRole } from "@/lib/roles";
 
-const ROLES_GESTAO = ["Admin", "FINANCEIRO", "CEO", "RECURSOS HUMANOS"];
+const ROLES_GESTAO = ["FINANCEIRO", "RECURSOS HUMANOS"];
 
 export async function GET(
   _request: Request,
@@ -32,7 +33,7 @@ export async function GET(
 
   const userId = Number(user.id);
   const role = user.role || "";
-  const podeVerTodos = ROLES_GESTAO.includes(role);
+  const podeVerTodos = isAdminRole(role) || ROLES_GESTAO.includes(role);
 
   // Ownership check — colaborador só baixa o seu
   if (!podeVerTodos && holerite.colaboradorId !== userId) {

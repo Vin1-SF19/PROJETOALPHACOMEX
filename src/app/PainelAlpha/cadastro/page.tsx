@@ -5,8 +5,9 @@ import { getPermissoesEfetivas } from '@/actions/PermissoesSetor';
 import { getSetoresParaSelect } from '@/actions/gestaoSetores';
 import { listarTemplatesOnboarding } from '@/actions/onboarding';
 import db from '@/lib/prisma';
+import { isAdminRole } from '@/lib/roles';
 
-const ROLES_GESTAO = ['Admin', 'CEO', 'RECURSOS HUMANOS', 'FINANCEIRO'];
+const ROLES_GESTAO = ['RECURSOS HUMANOS', 'FINANCEIRO'];
 
 export default async function CadastroPage() {
   const session = await auth();
@@ -30,7 +31,7 @@ export default async function CadastroPage() {
   }
 
   const ROLES_GESTAO_ALL = [...ROLES_GESTAO, 'Lider Comercial'];
-  if (!ROLES_GESTAO_ALL.includes(role)) {
+  if (!isAdminRole(role) && !ROLES_GESTAO_ALL.includes(role)) {
     let permissoes: string[] = [];
     try {
       permissoes = userId > 0 ? await getPermissoesEfetivas(userId) : [];

@@ -12,6 +12,7 @@ import { enviarMensagemChatAction, getHistoricoMensagens, marcarChatComoLido } f
 import { redirect } from "next/navigation";
 import { toast } from "sonner";
 import { usePresence } from "@/components/PusherGlobal.tsx";
+import { isAdminRole } from "@/lib/roles";
 
 interface Agente {
   id: number;
@@ -36,7 +37,7 @@ export default function AlphaCommPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  if (session && session.user?.role !== "Admin" && (session.user as any).usuario !== "Weslei") {
+  if (session && !isAdminRole(session.user?.role) && (session.user as any).usuario !== "Weslei") {
     toast.error("Acesso restrito ao núcleo Alpha.");
     redirect("/PainelAlpha");
   }

@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { auth } from "../../../../../auth";
+import { isAdminRole } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
@@ -53,7 +54,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const session = await auth();
   const userTyped = session?.user as { role?: string } | undefined;
-  if (!session?.user || userTyped?.role !== "Admin" && userTyped?.role !== "ADMIN") {
+  if (!session?.user || !isAdminRole(userTyped?.role)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   }
 
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = await auth();
   const userTyped = session?.user as { role?: string } | undefined;
-  if (!session?.user || userTyped?.role !== "Admin" && userTyped?.role !== "ADMIN") {
+  if (!session?.user || !isAdminRole(userTyped?.role)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
   }
 

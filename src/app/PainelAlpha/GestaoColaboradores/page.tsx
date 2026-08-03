@@ -3,8 +3,9 @@ import { redirect } from 'next/navigation';
 import db from '@/lib/prisma';
 import { getPermissoesEfetivas } from '@/actions/PermissoesSetor';
 import GestaoColaboradoresClient from '@/components/GestaoColaboradores/GestaoColaboradoresClient';
+import { isAdminRole } from '@/lib/roles';
 
-const ROLES_PERMITIDAS = ['Admin', 'CEO', 'RECURSOS HUMANOS', 'FINANCEIRO'];
+const ROLES_PERMITIDAS = ['RECURSOS HUMANOS', 'FINANCEIRO'];
 
 export default async function GestaoColaboradoresPage() {
   const session = await auth();
@@ -26,7 +27,7 @@ export default async function GestaoColaboradoresPage() {
     // fallback to session role on DB error
   }
 
-  if (!ROLES_PERMITIDAS.includes(role)) {
+  if (!isAdminRole(role) && !ROLES_PERMITIDAS.includes(role)) {
     let permissoes: string[] = [];
     try {
       permissoes = userId > 0 ? await getPermissoesEfetivas(userId) : [];

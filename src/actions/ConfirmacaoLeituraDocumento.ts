@@ -4,10 +4,11 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
+import { isAdminRole, isSameRole } from "@/lib/roles";
 
 // Mesmo gate de `src/app/PainelAlpha/cadastro/page.tsx` — só quem gerencia
 // equipe pode ver o status de leitura de documentos de outros colaboradores.
-const ROLES_GESTAO_EQUIPE = ["Admin", "CEO", "RECURSOS HUMANOS", "FINANCEIRO", "Lider Comercial"];
+const ROLES_GESTAO_EQUIPE = ["RECURSOS HUMANOS", "FINANCEIRO", "Lider Comercial"];
 
 export async function confirmarLeituraDocumento(documentoId: number) {
   try {
@@ -50,7 +51,7 @@ export async function buscarStatusLeituraEquipe(): Promise<
 
     const usuarioIdSolicitante = Number(session.user.id);
     const roleSolicitante = (session.user as { role?: string }).role ?? "";
-    if (!ROLES_GESTAO_EQUIPE.includes(roleSolicitante)) {
+    if (!isAdminRole(roleSolicitante) && !ROLES_GESTAO_EQUIPE.includes(roleSolicitante)) {
       const permissoes = await getPermissoesEfetivas(usuarioIdSolicitante);
       if (!permissoes.includes("cadastro")) {
         return { success: false, error: "Não autorizado" };
@@ -76,9 +77,9 @@ export async function buscarStatusLeituraEquipe(): Promise<
     const resultado: Record<number, StatusLeituraUsuario> = {};
 
     for (const usuario of usuarios) {
-      const setorUsuario = (usuario.role || "").toUpperCase().trim();
+      const setorUsuario = usuario.role;
       const documentosDoSetor = documentos.filter(
-        (d) => (d.setor || "").toUpperCase().trim() === setorUsuario
+        (d) => isSameRole(d.setor, setorUsuario)
       );
       const lidosPeloUsuario = confirmadoPor.get(usuario.id) ?? new Set<number>();
 

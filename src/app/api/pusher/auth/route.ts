@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAdminRole } from "@/lib/roles";
 import { auth } from "../../../../../auth";
 import { pusherServer } from "@/lib/pusher-server.ts";
 import {
@@ -9,7 +10,7 @@ import {
 
 const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts"];
-const CHECKLIST_ROLES = ["Admin", "CEO", "OPERACIONAL"];
+const CHECKLIST_ROLES = ["OPERACIONAL"];
 const CHECKLIST_CHANNELS = ["private-checklist-docs"];
 
 export async function POST(req: Request) {
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
 
     if (CHECKLIST_CHANNELS.includes(channelName)) {
       const role = session.user.role ?? "";
-      if (!CHECKLIST_ROLES.includes(role)) {
+    if (!isAdminRole(role) && !CHECKLIST_ROLES.includes(role)) {
         return new NextResponse("Proibido", { status: 403 });
       }
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);

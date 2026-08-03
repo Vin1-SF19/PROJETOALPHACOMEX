@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   // Apenas Admin/CEO podem criar skills (operação sensível: registra endpoints externos)
   const role = (session.user as { role?: string }).role ?? "";
-  if (role !== "Admin" && role !== "CEO") {
+  if (!isAdminRole(role)) {
     return NextResponse.json({ error: "Apenas administradores podem criar skills." }, { status: 403 });
   }
 

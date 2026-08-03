@@ -13,6 +13,7 @@ import ModalOverrideUser from './ModalOverrideUser';
 import ModalPerfilColaborador from '@/components/Colaboradores/ModalPerfilColaborador';
 import { getContratosVencendo } from '@/actions/ColaboradorRH';
 import { buscarStatusLeituraEquipe, type StatusLeituraUsuario } from '@/actions/ConfirmacaoLeituraDocumento';
+import { isAdminRole } from '@/lib/roles';
 
 interface UserItem {
   id: number;
@@ -29,7 +30,7 @@ interface AbaGestaoEquipeProps {
 }
 
 export default function AbaGestaoEquipe({ currentUserRole = 'User' }: AbaGestaoEquipeProps) {
-  const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'CEO';
+  const isAdmin = isAdminRole(currentUserRole);
 
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);

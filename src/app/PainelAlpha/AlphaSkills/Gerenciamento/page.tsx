@@ -13,10 +13,11 @@ import ModalExcluir from './ModalExcluir';
 import ModalCurso from './CriarCurso';
 import ModalModulosDoCurso from './ModalModulosDoCurso';
 import ModalAcessoGerenciamento from './ModalAcessoGerenciamento';
+import { isAdminRole } from '@/lib/roles';
 
 export default function GerenciadorAlphaSkills() {
     const { data: session } = useSession();
-    const isAdmin = ['Admin', 'CEO'].includes((session?.user as { role?: string })?.role ?? '');
+    const isAdmin = isAdminRole((session?.user as { role?: string })?.role);
 
     const [filtroSetor, setFiltroSetor] = useState("Todos");
     const [loading, setLoading] = useState(true);

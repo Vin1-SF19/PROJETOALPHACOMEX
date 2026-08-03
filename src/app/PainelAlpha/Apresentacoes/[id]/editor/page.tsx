@@ -4,12 +4,12 @@ import db from "@/lib/prisma";
 import { ApresentacaoEditor } from "@/components/Apresentacoes/Editor/ApresentacaoEditor";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
-import { obterEntradaApresentacaoSegura } from "@/lib/apresentacoes/entrada-apresentacao";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
 function isAdmin(role?: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 export default async function ApresentacaoEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +32,7 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
       colaboradores: { where: { userId }, select: { id: true } },
       slides: {
         orderBy: { ordem: "asc" },
-        select: { id: true, ordem: true, nome: true, dadosJson: true },
+        select: { id: true, ordem: true, nome: true, dadosJson: true, transicaoEntrada: true },
       },
       assets: {
         orderBy: { createdAt: "desc" },
@@ -49,11 +49,7 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
   const primeiroSlide = apresentacao.slides[0];
   if (!primeiroSlide) notFound(); // não deve acontecer — toda apresentação sempre tem >= 1 slide (CriarApresentacao garante)
 
-  const dadosPrimeiroSlide = primeiroSlide.dadosJson as {
-    componentes: ComponenteSlide[];
-    canvas?: CanvasConfig;
-    entradaApresentacao?: unknown;
-  } | null;
+  const dadosPrimeiroSlide = primeiroSlide.dadosJson as { componentes: ComponenteSlide[]; canvas?: CanvasConfig } | null;
   const componentesIniciais = dadosPrimeiroSlide?.componentes ?? [];
 
   return (
@@ -64,16 +60,13 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
         id: s.id,
         ordem: s.ordem,
         nome: s.nome,
+        transicaoEntrada: s.transicaoEntrada,
         componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
         canvas: obterCanvasSeguro((s.dadosJson as { canvas?: CanvasConfig } | null)?.canvas),
-        entradaApresentacao: obterEntradaApresentacaoSegura(
-          (s.dadosJson as { entradaApresentacao?: unknown } | null)?.entradaApresentacao,
-        ),
       }))}
       slideAtivoIdInicial={primeiroSlide.id}
       componentesIniciais={componentesIniciais}
       canvasInicial={obterCanvasSeguro(dadosPrimeiroSlide?.canvas)}
-      entradaApresentacaoInicial={obterEntradaApresentacaoSegura(dadosPrimeiroSlide?.entradaApresentacao)}
       assetsIniciais={apresentacao.assets.map((asset) => ({
         ...asset,
         tipo: asset.tipo as "IMAGEM" | "VIDEO" | "AUDIO" | "MODELO_3D",

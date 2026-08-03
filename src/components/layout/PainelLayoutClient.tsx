@@ -310,6 +310,8 @@ export default function PainelLayoutClient({
                 key={tab.id}
                 src={tab.url}
                 title={tab.label}
+                allow="autoplay; fullscreen"
+                allowFullScreen
                 className="w-full h-full border-none absolute inset-0"
                 style={{ display: visible ? 'block' : 'none' }}
                 onLoad={(event) => {

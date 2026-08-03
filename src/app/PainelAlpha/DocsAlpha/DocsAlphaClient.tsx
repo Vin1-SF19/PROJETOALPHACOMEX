@@ -17,6 +17,7 @@ import { PopModalExcluir } from './_components/PopModalExcluir'
 import { PopModalConfigurarPasta } from './_components/PopModalConfigurarPasta'
 import { PopModalConfirmarLeitura } from './_components/PopModalConfirmarLeitura'
 import { EmptyStateDoc } from './_components/EmptyStateDoc'
+import { isSameRole } from '@/lib/roles'
 
 interface Props {
   documentosIniciais: Documento[]
@@ -65,13 +66,12 @@ export default function DocsAlphaClient({ documentosIniciais, documentosConfirma
 
   const documentosAgrupados = useMemo(() => {
     const filtrados = documentos.filter(d => {
-      const setorDoc = d.setor?.toUpperCase().trim()
-      const abaSelecionada = setorAtivo?.toUpperCase().trim()
+      const setorDoc = d.setor
       if (!d.titulo.toLowerCase().includes(busca.toLowerCase())) return false
-      if (setorDoc !== abaSelecionada) return false
+      if (!isSameRole(setorDoc, setorAtivo)) return false
       const setores = acessosPop.setoresAcessiveis
       if (setores.includes("*")) return true
-      return setores.some(s => s.toUpperCase().trim() === setorDoc)
+      return setores.some(s => isSameRole(s, setorDoc))
     })
 
     const agrupados = filtrados.reduce((acc, doc) => {

@@ -10,6 +10,7 @@ import 'react-day-picker/dist/style.css';
 import { agendarSala, buscarReservasAtivas, cancelarReserva, buscarHistoricoReservas, editarReserva as editarReservaAction } from '@/actions/Reservas';
 
 import { getTema } from '@/lib/temas';
+import { isAdminRole } from '@/lib/roles';
 
 export default function ReservaSalas() {
   const { data: session, status } = useSession();
@@ -23,7 +24,7 @@ export default function ReservaSalas() {
   const temaNome = (session?.user as any)?.tema_interface || "blue";
   const style = getTema(temaNome);
   const usuarioLogado = session?.user?.nome || (session?.user as any)?.usuario || "Usuário";
-  const isAdmin = (session?.user as any)?.role === "Admin";
+  const isAdmin = isAdminRole(session?.user?.role);
 
   const atualizar = useCallback(async () => {
     const [ativos, passados] = await Promise.all([buscarReservasAtivas(), buscarHistoricoReservas()]);

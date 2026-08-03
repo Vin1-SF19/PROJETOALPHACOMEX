@@ -11,6 +11,7 @@ import type { UploadedFile } from "./BibbleFileUpload";
 import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, type OnyxAgent, type AgenteFixado } from "@/lib/onyx/browser";
 import { notificarCalendarioAlphaAlterado } from "@/lib/google-calendar/invalidation";
 import { getTema } from "@/lib/temas";
+import { isAdminRole } from "@/lib/roles";
 
 interface BibbleChatLayoutProps {
   userId: number;
@@ -93,7 +94,7 @@ export default function BibbleChatLayout({
   initialHour,
 }: BibbleChatLayoutProps) {
   const tema    = getTema(temaName);
-  const isAdmin = role === "Admin" || role === "ADMIN";
+  const isAdmin = isAdminRole(role);
 
   const [sessions, setSessions]             = useState<SessionSummary[]>(sessoesIniciais);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);

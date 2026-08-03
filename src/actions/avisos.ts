@@ -3,11 +3,12 @@
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
 import { revalidatePath } from "next/cache";
+import { isAdminRole } from "@/lib/roles";
 
 export async function dispararAvisoAction(msg: string, tipo: string = "warning") {
   const session = await auth();
   
-  if (session?.user?.role !== "Admin") {
+  if (!isAdminRole(session?.user?.role)) {
     return { success: false, error: "Acesso Negado" };
   }
 
@@ -38,7 +39,7 @@ export async function dispararAvisoAction(msg: string, tipo: string = "warning")
 
 export async function encerrarAvisoAction() {
   const session = await auth();
-  if (session?.user?.role !== "Admin") return { success: false };
+  if (!isAdminRole(session?.user?.role)) return { success: false };
 
   try {
     await db.avisos_globais.updateMany({

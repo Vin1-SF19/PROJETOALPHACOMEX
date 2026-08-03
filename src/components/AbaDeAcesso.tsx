@@ -1,5 +1,6 @@
 "use client";
 import { Lock } from "lucide-react";
+import { isAdminRole } from "@/lib/roles";
 
 interface AbaProps {
   permissaoRequerida: string;
@@ -12,7 +13,7 @@ export function AbaDeAcesso({ permissaoRequerida, children, userPermissions, use
   
   
   const temAcesso = 
-  userRole === "Admin" ||
+  isAdminRole(userRole) ||
     userPermissions?.includes(permissaoRequerida);
 
   if (!temAcesso) {

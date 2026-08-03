@@ -3,6 +3,7 @@ import db from '@/lib/prisma'
 import { auth } from '../../auth'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { isAdminRole } from '@/lib/roles'
 
 const videoSchema = z.object({
     titulo: z.string().min(1).max(200),
@@ -19,7 +20,7 @@ const payloadSchema = z.object({
 
 export async function uploadVideosLote(payload: unknown) {
     const session = await auth()
-    if (!session?.user || !['Admin', 'Master'].includes((session.user as any).role)) {
+    if (!session?.user || (!isAdminRole(session.user.role) && session.user.role !== 'Master')) {
         return { success: false, error: 'Sem permissão', count: 0, erros: [] }
     }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { AlertTriangle, X } from "lucide-react";
+import { isAdminRole } from "@/lib/roles";
 
 export default function BroadcastBanner() {
   const { data: session } = useSession();
@@ -10,7 +11,7 @@ export default function BroadcastBanner() {
   const [visivel, setVisivel] = useState(false);
 
   const escutarBroadcast = useCallback(async () => {
-    if (session?.user?.role === "Admin") return;
+    if (isAdminRole(session?.user?.role)) return;
 
     try {
       const res = await fetch(`/api/broadcast?t=${Date.now()}`); 
@@ -32,14 +33,14 @@ export default function BroadcastBanner() {
   }, [session, aviso?.id]);
 
   useEffect(() => {
-    if (session?.user?.role === "Admin") return;
+    if (isAdminRole(session?.user?.role)) return;
 
     escutarBroadcast();
     const interval = setInterval(escutarBroadcast, 15000); 
     return () => clearInterval(interval);
   }, [session, escutarBroadcast]);
 
-  if (!visivel || !aviso || session?.user?.role === "Admin") return null;
+  if (!visivel || !aviso || isAdminRole(session?.user?.role)) return null;
 
   const estilos: any = {
     warning: "bg-amber-500/10 border-amber-500/50 text-amber-500 shadow-amber-500/20",

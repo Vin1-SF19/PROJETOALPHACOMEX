@@ -4,13 +4,14 @@ import { BookOpen, Users, MessageCircle } from "lucide-react";
 import { listarTodosTemplatesOnboarding } from "@/actions/onboarding";
 import GestaoOnboardingClient from "@/components/GestaoOnboarding/GestaoOnboardingClient";
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 
 export default async function GestaoOnboardingPage() {
   const session = await auth();
   if (!session) redirect("/");
 
   const role = session.user.role;
-  const isAdmin = role === "Admin" || role === "CEO";
+  const isAdmin = isAdminRole(role);
   if (!isAdmin) redirect("/PainelAlpha");
 
   const [templates, totalUsuarios, totalOnboardings] = await Promise.all([

@@ -25,7 +25,7 @@ export async function getUserOnyxToken(sessionUserId: string | number | undefine
 /** Retorna o token_onyx de qualquer usuário Admin/CEO do banco. */
 async function getAdminOnyxToken(): Promise<string | null> {
   const admin = await db.usuarios.findFirst({
-    where: { role: { in: ["Admin", "CEO"] }, token_onyx: { not: null } },
+    where: { role: { in: ["Admin", "CEO", "TI", "T.I"] }, token_onyx: { not: null } },
     select: { token_onyx: true },
     orderBy: { id: "asc" },
   });

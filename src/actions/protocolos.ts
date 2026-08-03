@@ -3,6 +3,7 @@
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
+import { isAdminRole } from "@/lib/roles";
 import { notificarChamadoConcluido } from "@/lib/chamados/notificacoes-server";
 
 // Prisma client types não incluem ProtocoloTemplate ainda.
@@ -24,7 +25,7 @@ async function requireAdmin() {
   const session = await auth();
   if (!session) throw new Error("Não autorizado");
   const role = session.user.role;
-  if (role !== "Admin" && role !== "CEO") throw new Error("Permissão insuficiente");
+  if (!isAdminRole(role)) throw new Error("Permissão insuficiente");
   return session;
 }
 

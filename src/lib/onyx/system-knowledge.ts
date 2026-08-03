@@ -1,5 +1,6 @@
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { getPainelAlphaKnowledge } from "@/lib/shared/painelalpha-knowledge";
+import { isAdminRole } from "@/lib/roles";
 
 /**
  * Conhecimento do sistema compartilhado com os agentes Onyx.
@@ -62,7 +63,7 @@ export function buildUserIdentityBlock(input: UserIdentityInput): string {
 
 export function buildAgentSystemContext(input: AgentContextInput): string {
   const modules = extractModulesSection();
-  const isAdmin = input.role === "Admin" || input.role === "CEO";
+  const isAdmin = isAdminRole(input.role);
   const acesso = isAdmin
     ? "acesso total (administrador)"
     : input.permissoes.length > 0

@@ -4,6 +4,7 @@ import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { CONECTORES_PERMISSION } from "@/lib/onyx/connectors-guard";
 import { isOnyxConfigured } from "@/lib/onyx/client";
 import ConectoresClient from "@/components/Conectores/ConectoresClient";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function ConectoresPage() {
   if (!session?.user?.id) redirect("/");
 
   const role = session.user.role ?? "";
-  const isAdmin = role === "Admin" || role === "CEO";
+  const isAdmin = isAdminRole(role);
 
   // Admin/CEO sempre; demais precisam da permissão de módulo conectoresIAlpha.
   if (!isAdmin) {

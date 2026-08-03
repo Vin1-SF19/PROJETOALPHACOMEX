@@ -2,10 +2,10 @@ import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import MarketingClient from "./MarketingClient";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
-const ROLES_PERMITIDAS = ["Admin", "CEO"];
 const iframeUrl = process.env.NEXT_PUBLIC_INSTAGRAM_STUDIO_URL ?? "http://192.168.35.113:3876";
 
 export default async function MarketingPage() {
@@ -15,7 +15,7 @@ export default async function MarketingPage() {
   const userId = Number((session.user as { id?: string }).id ?? 0);
   const role = (session.user as { role?: string }).role ?? "";
 
-  if (!ROLES_PERMITIDAS.includes(role)) {
+  if (!isAdminRole(role)) {
     let permissoes: string[] = [];
     try {
       permissoes = userId > 0 ? await getPermissoesEfetivas(userId) : [];

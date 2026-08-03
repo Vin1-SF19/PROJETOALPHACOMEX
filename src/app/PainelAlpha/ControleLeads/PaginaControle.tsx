@@ -14,6 +14,7 @@ import { useSession } from 'next-auth/react';
 import { getPerformanceAcumulada, getPerformanceDiaria } from '@/actions/ComercialControle';
 import { useSearchParams } from 'next/navigation';
 import router from 'next/router';
+import { isAdminRole } from '@/lib/roles';
 
 // --- Tipos ---
 type Aba = 'lancamento' | 'graficos';
@@ -28,7 +29,7 @@ interface Props {
 
 export default function PaginaControle({ usuario, temaConfig }: Props) {
     const { data: session, update } = useSession();
-    const isAdmin = session?.user?.role === "Admin";
+    const isAdmin = isAdminRole(session?.user?.role);
 
     const TemPermissao = isAdmin
 

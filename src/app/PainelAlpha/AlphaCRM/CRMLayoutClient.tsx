@@ -5,15 +5,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getTema } from "@/lib/temas";
 import type { Session } from "next-auth";
+import { isAdminRole } from "@/lib/roles";
 import {
   LayoutDashboard,
   KanbanSquare,
+  ListChecks,
+  Settings2,
   Menu,
   X,
 } from "lucide-react";
 
 const NAV = [
-  { href: "/PainelAlpha/AlphaCRM", label: "Pipelines", icon: LayoutDashboard, exact: true },
+  { href: "/PainelAlpha/AlphaCRM", label: "Dashboard", icon: LayoutDashboard, exact: true, adminOnly: false },
+  { href: "/PainelAlpha/AlphaCRM/tarefas", label: "Tarefas", icon: ListChecks, exact: false, adminOnly: false },
+  { href: "/PainelAlpha/AlphaCRM/admin", label: "Configurações", icon: Settings2, exact: false, adminOnly: true },
 ];
 
 export default function CRMLayout({ children, session }: { children: React.ReactNode; session: Session | null }) {
@@ -21,10 +26,12 @@ export default function CRMLayout({ children, session }: { children: React.React
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
   const accent = visual.accent;
+  const role = session?.user?.role ?? null;
+  const isAdmin = isAdminRole(role);
 
   const [open, setOpen] = useState(false);
 
-  const SidebarContent = () => (
+  const sidebarContent = (
     <>
       {/* Logo */}
       <div className="p-5 border-b border-white/5 flex items-center justify-between">
@@ -50,7 +57,7 @@ export default function CRMLayout({ children, session }: { children: React.React
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon, exact }) => {
+        {NAV.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -94,7 +101,7 @@ export default function CRMLayout({ children, session }: { children: React.React
         ].join(" ")}
         style={{ borderColor: `rgba(${accent},0.1)` }}
       >
-        <SidebarContent />
+        {sidebarContent}
       </aside>
 
       {/* ── Content ── */}

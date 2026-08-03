@@ -1,5 +1,6 @@
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 
 import { auth } from "../../../auth";
 
@@ -34,11 +35,9 @@ export async function verificarAcessoAdministrativoCsNps(): Promise<ResultadoAut
     where: { id: userId },
     select: { role: true, status: true },
   });
-  const roleAtual = usuarioAtual?.role.trim().toLowerCase();
-
   if (
     usuarioAtual?.status !== "ATIVO" ||
-    (roleAtual !== "admin" && roleAtual !== "ceo")
+    !isAdminRole(usuarioAtual?.role)
   ) {
     return {
       autorizado: false,

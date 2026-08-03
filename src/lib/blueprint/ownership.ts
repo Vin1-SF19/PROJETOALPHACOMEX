@@ -1,8 +1,6 @@
 import db from "@/lib/prisma";
 
-function isAdminRole(role?: string | null): boolean {
-  return role === "Admin" || role === "CEO";
-}
+import { isAdminRole } from "@/lib/roles";
 
 export type BlueprintAcao =
   | "visualizar"
@@ -87,4 +85,4 @@ export async function exigirAcessoBlueprint(
   return acesso;
 }
 
-export { isAdminRole };
+export { isAdminRole } from "@/lib/roles";

@@ -13,6 +13,7 @@ import LogoutButton from "./LogoutUser";
 import { SeletorTemaSubmenu } from "./SeletorTemaSubmenu";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { isAdminRole } from "@/lib/roles";
 
 interface UserDropdownProps {
     userName: string;
@@ -53,7 +54,7 @@ export function UserDropdown({ userName, userRole }: UserDropdownProps) {
                             </span>
                             <ShieldCheck
                                 size={14}
-                                className={userRole === "Admin" ? "text-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "text-blue-500"}
+                                className={isAdminRole(userRole) ? "text-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "text-blue-500"}
                             />
                         </div>
                     </div>

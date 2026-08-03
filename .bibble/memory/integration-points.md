@@ -786,12 +786,13 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 #### Evolução: introdução para o próximo slide
 
 - `ContainerCargaRender` emite `ContainerIntroEvent`, mas não controla o índice da apresentação.
-- `ModoApresentacaoClient` mantém o slide anterior e o próximo como camadas irmãs, bloqueando avanço concorrente enquanto a introdução estiver ativa.
-- `SlideApresentacaoLayer` monta o próximo slide no começo do zoom e preserva sua `key` após a expansão, evitando reinício das animações.
+- `ModoApresentacaoClient` mantém o slide anterior e o próximo como camadas irmãs, bloqueando avanço concorrente enquanto a introdução estiver ativa. O índice lógico passa ao destino no primeiro frame do zoom, enquanto `slidePalco` preserva canvas, fundo e escala da origem até o `onComplete`.
+- `SlideApresentacaoLayer` monta o próximo slide no começo do zoom e preserva sua `key` após a expansão, evitando reinício das animações. Quando a configuração pertence ao próprio `containerCarga`, o player não monta `TransicaoContainerAlphaLayer`: a instância real executa abertura e zoom uma única vez.
 - Antes do zoom, `ContainerCargaCameraRig` projeta a abertura 3D em coordenadas locais; `ContainerCargaRender` remove o plano branco e renderiza o JSX do próximo slide atrás das portas. Essa projeção também é enviada em `ContainerIntroEvent.abertura` para alinhar o recorte de expansão.
 - `ContainerCargaProps` centraliza no palco 1280×720 e configura zoom, áudio e dois presets Web Audio.
 - As propriedades continuam em `Slide.dadosJson`, com defaults Zod retrocompatíveis e sem migration.
 - Sem slide seguinte, o container apenas abre; com reduced motion, a transição assume o estado final em duração mínima.
+- Na camada sintética, o container usa margem igual a 5% da menor dimensão do palco, limitada entre 18 e 72 px. A conversão geométrica tipada reaplica essa margem ao componente e à abertura antes de calcular o `clip-path`.
 
 - **Discriminador persistido:** `containerCarga` em `src/lib/validations/slide-componentes-3d.ts` e na union `ComponenteSlide`; continua dentro de `Slide.dadosJson`, sem migration.
 - **Paleta:** `REGISTRY_3D` em `registry/registry-3d.ts`; aparece automaticamente na categoria 3D da sidebar, sem novo menu/atalho/permissão.
@@ -806,13 +807,20 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 
 #### Player modal da apresentação
 
-- `BarraSuperiorEditor` delega a abertura para `ApresentacaoEditor`, que salva o slide ativo antes de montar `ModalReproducaoApresentacao`.
-- O modal carrega `/PainelAlpha/Apresentacoes/[id]/apresentar?modal=1`; `PainelLayoutClient` detecta o iframe e não duplica sidebar/abas.
-- `ModoApresentacaoClient` calcula a escala somente na área útil acima da barra de controles e não solicita fullscreen no modo embutido.
+- `BarraSuperiorEditor` delega a abertura para `ApresentacaoEditor`, que desbloqueia o Web Audio e abre `ModalReproducaoApresentacao` imediatamente no mesmo gesto do usuário.
+- O modal monta `ModoApresentacaoClient` diretamente no Dialog. É proibido reintroduzir iframe interno, navegação para `/apresentar?modal=1`, `postMessage` de fechamento ou nova busca ao abrir: esses caminhos repetiam o shell, auth e Prisma e podiam exibir sidebar/abas dentro do player.
+- O payload instantâneo vem do Zustand: todos os slides já carregados são fotografados, e o slide ativo é substituído pelos `componentes` e `canvas` atuais. `SlideResumo` também preserva `transicaoEntrada`, inclusive em criação, duplicação e carga inicial.
+- O save do slide ativo ocorre em background com snapshot imutável e `versaoEdicao` monotônica. Toda mutação de conteúdo/canvas incrementa a versão; `concluirSalvamento(slideId, versao, sucesso)` só limpa `isDirty` para a versão atual. `serializarPersistenciaSlide()` mantém uma fila por `slideId`, executa escritas do mesmo slide na ordem de entrada, continua após rejeição e não bloqueia slides diferentes. A troca de slide aguarda essa fila antes de carregar o próximo, evitando corrida entre debounce, navegação e Server Action.
+- A rota `/PainelAlpha/Apresentacoes/[id]/apresentar` permanece como player standalone autenticado e consulta o banco; ela reutiliza `ModoApresentacaoClient`, mas não é usada pelo modal.
+- `ModoApresentacaoClient` usa `h-full w-full` no Dialog e `h-dvh w-dvw` na rota standalone. A transição Container Alpha vive dentro do palco do slide de origem para manter canvas, escala e recorte no mesmo sistema de coordenadas.
+- O modal recebe `embutido=true` e nasce iniciado, sem gate ou espera adicional. A tela “Iniciar apresentação” existe somente na rota standalone, onde o clique libera Web Audio e solicita fullscreen; no modal, o gesto original do botão “Apresentar” já faz o desbloqueio.
 - O estado de pausa percorre `SlideApresentacaoLayer` → `RenderComponente` → `ContainerCargaRender`; controles Framer Motion e o frameloop R3F pausam sem remontar o slide.
 - A mesma cadeia propaga `portalContainerCapa`; o render 3D é promovido para o host integral do slide e escapa de qualquer ancestral que pudesse recortá-lo.
 - `ContainerCargaRender` informa `modoCapa` ao Model/CameraRig: a geometria assume composição widescreen e a projeção do portal é recalculada sobre a escala final.
-- O range do `ModoApresentacaoClient` usa a mesma função `navegarPara` dos botões, portanto também cancela uma introdução ativa antes de saltar ao slide escolhido.
-- O fechamento por Escape dentro do iframe usa `ALPHA_FECHAR_APRESENTACAO` via `postMessage` com validação de mesma origem no modal.
+- Os controles continuam usando a mesma `navegarPara`, portanto range, reinício, anterior e próximo cancelam introduções concorrentes. Palco e controles são regiões flex irmãs: a barra possui faixa própria e nunca cobre o slide. Em telas estreitas o range ocupa uma segunda linha responsiva; todos os comandos têm `focus-visible`, atalhos ignoram alvos interativos e fullscreen é uma ação explícita do player.
+- `TransicaoContainerAlphaLayer` usa `clamp(5% da menor dimensão, 18 px, 72 px)` para afastar a capa das bordas e converte `componente`/`abertura` para o canvas da origem. O destino aparece no início do zoom, mas o palco visual de origem permanece até o callback real, evitando salto de proporção e atraso de troca.
+- `PainelLayoutClient` continua com um iframe persistente por aba e declara `allow="autoplay; fullscreen"`/`allowFullScreen`, permitindo áudio e fullscreen ao player nativo do módulo sem criar iframe adicional.
 
-**Editado quando:** mudar o player, os comandos de reprodução, a estratégia de iframe/modal ou o protocolo de fechamento.
+**Editado quando:** mudar o contrato do snapshot do editor, `versaoEdicao`/`concluirSalvamento`, a fila `serializarPersistenciaSlide`, o player compartilhado, o gate standalone, a margem/geometria da transição, os comandos responsivos/fullscreen ou as permissões do iframe global.
+
+**Última atualização:** 2026-08-03 por Scribe

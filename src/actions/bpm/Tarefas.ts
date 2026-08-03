@@ -3,7 +3,7 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { criarTarefaSchema, concluirTarefaSchema, criarTarefaPresetSchema } from "@/lib/validations/bpm";
-import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
+import { exigirAcessoBpmCard, isAdminRole } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "./Cards";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
@@ -37,6 +37,8 @@ export async function CriarTarefaBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    revalidatePath(ROTA_BASE);
+    revalidatePath(`${ROTA_BASE}/tarefas`);
     return { success: true, data: tarefa };
   } catch (error) {
     console.error("[CriarTarefaBpm]", error);
@@ -134,6 +136,8 @@ export async function ConcluirTarefaBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    revalidatePath(ROTA_BASE);
+    revalidatePath(`${ROTA_BASE}/tarefas`);
     return { success: true };
   } catch (error) {
     console.error("[ConcluirTarefaBpm]", error);
@@ -159,6 +163,53 @@ export async function CriarTarefaPresetBpm(dados: unknown) {
   } catch (error) {
     console.error("[CriarTarefaPresetBpm]", error);
     return { success: false, error: "Erro ao criar preset" };
+  }
+}
+
+/**
+ * Central de tarefas (Fase 3, DOMAIN.md/FEATURES.md): visão agregada cross-card.
+ * Admin vê todas as tarefas; usuário comum só vê tarefas de cards onde é
+ * BpmCardMembro (mesma regra de ownership do dashboard).
+ */
+export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; responsavelId?: number }) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+    const userId = Number(session.user.id);
+    const admin = isAdminRole(session.user.role ?? null);
+
+    let cardIdsPermitidos: string[] | undefined;
+    if (!admin) {
+      const membros = await db.bpmCardMembro.findMany({
+        where: { userId },
+        select: { cardId: true },
+      });
+      cardIdsPermitidos = membros.map((m) => m.cardId);
+    }
+
+    const tarefas = await db.bpmTarefa.findMany({
+      where: {
+        ...(filtros?.status ? { status: filtros.status } : {}),
+        ...(filtros?.responsavelId ? { responsavelId: filtros.responsavelId } : {}),
+        ...(cardIdsPermitidos ? { cardId: { in: cardIdsPermitidos } } : {}),
+      },
+      include: {
+        card: {
+          select: {
+            id: true,
+            empresa: { select: { id: true, razaoSocial: true } },
+            pipeline: { select: { id: true, nome: true } },
+          },
+        },
+        responsavel: { select: { id: true, nome: true } },
+      },
+      orderBy: [{ status: "asc" }, { prazo: "asc" }],
+    });
+
+    return { success: true, data: tarefas };
+  } catch (error) {
+    console.error("[ListarTarefasGlobaisBpm]", error);
+    return { success: false, error: "Erro ao buscar tarefas", data: [] };
   }
 }
 

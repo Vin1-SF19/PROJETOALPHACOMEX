@@ -1,4 +1,5 @@
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 
 /**
  * RBAC granular por categoria de ação dentro do módulo de Comissões — substitui a
@@ -31,8 +32,7 @@ export const CATEGORIA_LABEL: Record<CategoriaPermissao, string> = {
   EXPORTAR: "Exportar (gerar espelhos PDF/Excel)",
 };
 
-const ROLES_ADMIN_TOTAL = ["Admin", "CEO"];
-const ROLES_COM_ACESSO_BASE = ["Admin", "CEO", "FINANCEIRO"];
+const ROLES_COM_ACESSO_BASE = ["FINANCEIRO"];
 
 export interface AcessoCategoriaResult {
   ok: boolean;
@@ -52,7 +52,7 @@ export async function verificarAcessoCategoria(
   role: string,
   categoria: CategoriaPermissao,
 ): Promise<AcessoCategoriaResult> {
-  if (ROLES_ADMIN_TOTAL.includes(role)) {
+  if (isAdminRole(role)) {
     return { ok: true, userId };
   }
 

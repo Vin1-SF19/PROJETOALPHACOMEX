@@ -20,6 +20,7 @@ import {
   STATUS_CONCLUIDOS, SECOES, calcularProgressoItens,
 } from "@/lib/checklist/items";
 import { getTema } from "@/lib/temas";
+import { isAdminRole } from "@/lib/roles";
 
 type TipoEmbasamento =
   | "RECEITA_BRUTA_DAS"
@@ -203,7 +204,7 @@ export default function ChecklistView({
               <Download size={13} />
               ZIP
             </a>
-            {['Admin', 'CEO', 'OPERACIONAL'].includes(role) && (
+            {(isAdminRole(role) || role === 'OPERACIONAL') && (
               <ChecklistNotificacoesWidget role={role} />
             )}
           </div>

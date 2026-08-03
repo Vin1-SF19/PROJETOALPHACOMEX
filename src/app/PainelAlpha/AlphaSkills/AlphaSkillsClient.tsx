@@ -5,6 +5,7 @@ import { Search, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
+import { isAdminRole } from '@/lib/roles';
 
 import TrilhaCarrossel from './TrilhaCarrossel';
 import ModuloModal from './ModuloModal';
@@ -58,7 +59,7 @@ export default function AlphaSkillsClient({ session, initialCursos, initialVideo
     const [selectedModulo, setSelectedModulo] = useState<Modulo | null>(null);
     const [setorFiltro, setSetorFiltro] = useState("Todos");
 
-    const isAdmin = session?.user?.role === "Admin" || session?.user?.role === "CEO";
+    const isAdmin = isAdminRole(session?.user?.role);
 
     const setoresDisponiveis = useMemo(() => {
         const set = new Set<string>();

@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { notificarCalendarioAlphaAlterado } from "@/lib/google-calendar/invalidation";
 import { getTema } from "@/lib/temas";
+import { isAdminRole } from "@/lib/roles";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export default function BibbleChat() {
   const { contextoExtra } = useBibble();
   const pathname = usePathname();
 
-  const isAdmin = session?.user?.role === "Admin";
+  const isAdmin = isAdminRole(session?.user?.role);
 
   // ─── Guard: só aparece em páginas do PainelAlpha (outra área para o dashboard) ───
   const isPainelAlpha = pathname.startsWith("/PainelAlpha");

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { atualizarFotoPerfilAction, deletarImagemAction } from "@/actions/perfil";
 import { useSession } from "next-auth/react";
 import { getTema } from "@/lib/temas";
+import { prepareAvatarImage } from "@/lib/avatar-upload";
 
 export function AvatarUpload({ inicial, fotoAtual }: { inicial: string, fotoAtual?: string | null }) {
   const { data: session, update } = useSession();
@@ -25,14 +26,15 @@ export function AvatarUpload({ inicial, fotoAtual }: { inicial: string, fotoAtua
     const toastId = toast.loading("Sincronizando Dossiê...");
 
     try {
-      const response = await fetch(`/api/chat/upload?filename=${encodeURIComponent(file.name)}`, {
+      const prepared = await prepareAvatarImage(file);
+      const response = await fetch(`/api/usuarios/avatar?filename=${encodeURIComponent(prepared.filename)}`, {
         method: 'POST',
-        body: file,
+        headers: { 'Content-Type': prepared.blob.type },
+        body: prepared.blob,
       });
 
-      if (!response.ok) throw new Error(`Erro no servidor`);
-
-      const newBlob = await response.json();
+      const newBlob = await response.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!response.ok || !newBlob.url) throw new Error(newBlob.error || "O servidor não retornou a URL da foto.");
       const res = await atualizarFotoPerfilAction(newBlob.url);
 
       if (res.success) {
@@ -45,6 +47,7 @@ export function AvatarUpload({ inicial, fotoAtual }: { inicial: string, fotoAtua
       toast.error(`Falha: ${error.message}`, { id: toastId });
     } finally {
       setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -105,7 +108,7 @@ export function AvatarUpload({ inicial, fotoAtual }: { inicial: string, fotoAtua
               </div>
 
               <div className="grid grid-cols-1 w-full gap-3">
-                <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept="image/*" />
+                <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" accept="image/jpeg,image/png,image/webp" />
 
                 <button
                   onClick={() => fileInputRef.current?.click()}

@@ -281,20 +281,20 @@
 **Arquivos:** `src/components/Apresentacoes/Editor/RenderEngine/ContainerCarga{Render,Model,CameraRig}.tsx`
 **Tipo:** Client Component / React Three Fiber
 **Props principais:** `componente: ContainerCargaComponente`, `modo: "editor" | "apresentacao"`
-**Uso:** registrado como `containerCarga` na categoria 3D do Alpha Presentation Studio e renderizado exclusivamente pelo `RenderComponente` compartilhado. O mesmo modelo também pode ser selecionado como entrada da apresentação sem remover nem exigir uma instância no canvas.
+**Uso:** registrado como `containerCarga` na categoria 3D do Alpha Presentation Studio e renderizado exclusivamente pelo `RenderComponente` compartilhado. O mesmo modelo também aparece como `Container Alpha — transição de slide` no select existente de animação de entrada.
 
-**Notas:** adaptação do container procedural da seção Sobre do site Alpha Comex. Preserva portas com pivôs nas dobradiças, travas, textura corrugada, marca `/A.PNG` e iluminação cinematográfica. O host e o Canvas são transparentes: somente o modelo 3D e a prévia dentro da abertura são renderizados, sem painel ou gradiente atrás do elemento. O componente nasce em 640×360 (16:9, padrão de imagem/vídeo), mas mantém resize livre. A câmera calcula a bounding box real e reage ao tamanho observado pelo R3F, portanto o modelo permanece enquadrado após resize livre e em proporções extremas. No editor, `estadoEditor` alterna preview fechado/aberto; na apresentação, a sequência trava → abertura → zoom ocorre sem intervalo artificial e promove o próximo slide ao terminar. `prefers-reduced-motion` continua respeitado e `useVisibilidadeIframe` pausa o frameloop fora da viewport.
+**Notas:** adaptação do container procedural da seção Sobre do site Alpha Comex. Preserva portas com pivôs nas dobradiças, travas, textura corrugada, marca `/A.PNG` e iluminação cinematográfica. O host e o Canvas são transparentes: somente o modelo 3D e a prévia dentro da abertura são renderizados, sem painel ou gradiente atrás do elemento. O componente nasce em 640×360 (16:9, padrão de imagem/vídeo), mas mantém resize livre. A câmera calcula a bounding box real e reage ao tamanho observado pelo R3F, portanto o modelo permanece enquadrado após resize livre e em proporções extremas. No editor, `estadoEditor` alterna preview fechado/aberto; na apresentação, a sequência trava → abertura → zoom ocorre uma única vez, sem intervalo artificial, restart ou camada sintética concorrente, e promove o próximo slide ao terminar. `prefers-reduced-motion` continua respeitado e `useVisibilidadeIframe` pausa o frameloop fora da viewport.
 
 **Propriedades editáveis:** `corPrincipal`, `corMetal`, `corInterior`, `anguloAbertura`, `duracaoAbertura`, `atrasoAbertura`, `mostrarLogo`, `estadoEditor`, além de x/y/w/h/rotação/animação comuns a todos os componentes. Os botões `Centralizar` e `Aplicar 16:9` usam as dimensões reais do canvas ativo; assim, instâncias antigas também podem assumir imediatamente o formato de imagem/vídeo sem serem recriadas.
 
 **Última atualização:** 2026-08-03 por Nova
 
-### EntradaApresentacaoProps (Container Alpha como capa)
+### AnimacaoContainerAlphaProps (transição no select de animação)
 
-**Arquivos:** `src/components/Apresentacoes/Editor/PainelDireito/EntradaApresentacaoProps.tsx`, `src/components/Apresentacoes/ModoApresentacao/EntradaContainerAlphaLayer.tsx`, `src/lib/apresentacoes/entrada-apresentacao.ts`
+**Arquivos:** `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/AnimacaoContainerAlphaProps.tsx`, `src/components/Apresentacoes/ModoApresentacao/TransicaoContainerAlphaLayer.tsx`, `src/lib/apresentacoes/animacao-container-alpha.ts`
 **Tipo:** Client Components + schema/helper puro
-**Uso:** no primeiro slide, desmarque o componente atual ou use o botão `Entrada` do painel direito; selecione `Container Alpha` em “Entrada da apresentação”.
-**Notas:** persiste em `dadosJson.entradaApresentacao`, sem migration. O painel mostra uma prévia 16:9 reproduzível e reutiliza `ContainerCargaProps` em modo de entrada para editar cores, ângulo, tempos, zoom, logo e som. No player, a primeira tela já fica montada atrás da capa e também aparece dentro do container; o overlay é removido pelo término real do zoom. O botão de reiniciar reproduz novamente a entrada. O Container Alpha continua disponível normalmente como componente editável da biblioteca.
+**Uso:** selecione qualquer componente do slide e escolha `Container Alpha — transição de slide` no select **Animação de entrada**. A opção não substitui o `containerCarga` editável da biblioteca.
+**Notas:** persiste em `componente.animacao.entrada.containerAlpha`, sem migration. Logo abaixo do select há uma prévia real 16:9 e controles de cores, ângulo, abertura, zoom, logo e som. A prévia usa o slide seguinte no interior; quando não existe próximo slide, exibe a orientação para adicioná-lo. Na transição sintética, o container recebe margem de 5% da menor dimensão do palco, limitada entre 18 e 72 px, criando profundidade e mantendo o enquadramento responsivo. O avanço monta o destino no começo real do zoom, preserva o canvas do slide de origem durante toda a expansão e desmonta o overlay no `onComplete` da própria animação 3D, sem segundo timer. Quando a configuração está no próprio componente `containerCarga`, o player não cria outra camada sintética: abertura e zoom pertencem à mesma instância. O áudio procedural é desbloqueado por gesto no player e no botão de reprodução da prévia.
 
 **Última atualização:** 2026-08-03 por Nova
 
@@ -317,23 +317,29 @@
 ### ModalReproducaoApresentacao
 
 **Arquivo:** `src/components/Apresentacoes/Editor/ModalReproducaoApresentacao.tsx`
-**Tipo:** Client Component / Dialog com player isolado
-**Uso:** aberto pelo botão “Apresentar” da barra do Alpha Presentation Studio após salvar o slide ativo.
+**Tipo:** Client Component / Dialog com player React nativo
+**Uso:** aberto pelo botão “Apresentar” da barra do Alpha Presentation Studio. O clique monta o player imediatamente com os slides que o editor já mantém no Zustand.
 
-**Notas:** monta a rota `/apresentar?modal=1` em iframe responsivo dentro de um Dialog. O Dialog sobrescreve explicitamente o limite `sm:max-w-lg` do componente-base e usa uma superfície horizontal 16:9 de até 1440 px, evitando a aparência de celular em telas desktop. O player usa todo o viewport do iframe; a barra de controles é sobreposta na base e não reduz a área da capa. Oferece reiniciar, anterior, pausar/reproduzir, próximo e fechar; Escape dentro do iframe solicita o fechamento ao modal por `postMessage` restrito à mesma origem.
+**Notas:** não cria iframe interno, não navega para a rota `/apresentar` e não repete layout, autenticação ou consulta Prisma. `ApresentacaoEditor` cria um snapshot dos slides em memória, substituindo o slide ativo pelos `componentes` e `canvas` atuais, abre o Dialog no mesmo gesto do usuário e persiste o snapshot ativo em background. Cada mutação relevante incrementa `versaoEdicao`; `concluirSalvamento(slideId, versao, sucesso)` só limpa `isDirty` quando a resposta ainda pertence ao slide e à versão monotônica atuais. `serializarPersistenciaSlide()` mantém uma fila independente por `slideId`, preserva a ordem das escritas do mesmo slide, libera a fila mesmo após rejeição e permite paralelismo entre slides diferentes. Trocas de slide aguardam a persistência serializada do slide sujo antes de carregar o destino.
+
+**Áudio e início:** `desbloquearAudioContainer()` é chamado diretamente no clique de “Apresentar”, antes do mount do player. O modal nasce com `iniciado=true`, portanto continua instantâneo e não exibe uma segunda tela de confirmação. Somente a rota standalone mostra o gate “Iniciar apresentação”, que fornece o gesto necessário para liberar Web Audio e solicitar fullscreen. Como modal e player vivem no mesmo documento, os presets procedurais não dependem de gesto dentro de um segundo iframe.
+
+**Responsividade e controles:** o Dialog usa uma superfície horizontal 16:9 limitada simultaneamente por largura e altura do viewport. `ModoApresentacaoClient` recebe `h-full w-full` no modo embutido, separa o palco e a barra em regiões flex próprias e mantém reiniciar/anterior/pausar/próximo/range/contador/fullscreen/fechar sem cobrir o slide. Em telas estreitas, o range ocupa uma segunda linha. Todos os comandos expõem estado `focus-visible`, e os atalhos ignoram elementos interativos. O iframe global de abas em `PainelLayoutClient` autoriza `autoplay` e `fullscreen`; ele continua sendo o único iframe do módulo.
+
+**Rota standalone:** `/PainelAlpha/Apresentacoes/[id]/apresentar` continua separada, autenticada e alimentada pelo banco para abertura direta. Ela reutiliza o mesmo `ModoApresentacaoClient`, mas não participa do modal do editor.
 
 **Camada de capa:** durante a reprodução, `ModoApresentacaoClient` fornece um host absoluto sobre 100% do viewport e `ContainerCargaRender` usa portal para esse host. Assim, o Container Alpha ignora a posição e o tamanho salvos no editor e cobre a apresentação inteira; no editor ele continua inline e livremente redimensionável.
 
-**Composição responsiva:** no player, a câmera ajusta a escala horizontal do modelo ao aspect ratio real do viewport e usa preenchimento de 98,5%, mantendo as bordas visíveis sem deixar o container pequeno. As coordenadas da abertura fullscreen são normalizadas para o canvas lógico antes de revelar o próximo slide. A barra de controles inclui slider para navegação direta por slide.
+**Composição responsiva:** o `containerCarga` real promovido para capa continua acompanhando o aspect ratio do palco. Na transição sintética, `TransicaoContainerAlphaLayer` aplica 5% da menor dimensão como respiro, limitado a 18–72 px, e converte componente/abertura para o palco com geometria tipada antes de revelar o destino. `ModoApresentacaoClient` mantém `slidePalco` apontando para o slide de origem enquanto a transição existe; o índice lógico passa ao destino no início do zoom, mas dimensões, fundo, escala e recorte só mudam depois do `onComplete`.
 
-**Última atualização:** 2026-08-03 por Nova
+**Última atualização:** 2026-08-03 por Scribe
 
 ### Container Alpha — modo introdução
 **Arquivos:** `ContainerCargaRender.tsx`, `ContainerCargaCameraRig.tsx`, `SlideApresentacaoLayer.tsx`, `src/lib/apresentacoes/container-intro.ts`, `container-carga-audio.ts`
 **Tipo:** Client Components + helpers puros
 **Uso:** habilitar "Transição pelo interior" nas propriedades do `containerCarga`; no modo apresentação, a abertura promove o slide seguinte através do recorte interno.
 
-**Notas:** o componente emite `ContainerIntroEvent`, mas não altera a navegação. `ModoApresentacaoClient` mantém o slide anterior e o próximo como irmãos com `key={slide.id}`; o próximo é montado no começo do zoom e preservado quando vira a única camada. A consolidação definitiva do próximo slide é acionada pelo `onComplete` da própria animação de zoom da câmera, sem um segundo temporizador ou callback da animação CSS. A câmera interpola do enquadramento responsivo até o interior. O áudio usa Web Audio procedural com presets `industrial` e `hidraulico`, sem arquivos externos, e degrada silenciosamente quando autoplay for bloqueado.
+**Notas:** o componente emite `ContainerIntroEvent`, mas não altera a navegação sozinho. `ModoApresentacaoClient` monta o próximo slide no começo do zoom e o preserva quando vira a única camada. A consolidação definitiva é acionada pelo `onComplete` da própria animação de zoom da câmera, sem segundo temporizador, callback CSS ou remontagem intermediária. Se a animação `container-alpha` pertence ao próprio `containerCarga`, o comando de avanço não monta `TransicaoContainerAlphaLayer`; a mesma instância executa abertura e zoom, eliminando a repetição visual. A câmera interpola do enquadramento responsivo até o interior. O áudio usa Web Audio procedural com presets `industrial` e `hidraulico`, sem arquivos externos, e é desbloqueado pelo gesto do usuário antes da reprodução.
 
 **Portal interior:** quando existe próximo slide, o plano branco `Transition_Backdrop` é omitido. `ContainerCargaCameraRig` projeta a abertura 3D em pixels, e `ContainerCargaRender` usa esse retângulo para renderizar uma prévia `cover` do próximo slide atrás do Canvas transparente; portas e moldura continuam por cima no WebGL. O mesmo retângulo vira a origem exata do `clip-path` de transição.
 

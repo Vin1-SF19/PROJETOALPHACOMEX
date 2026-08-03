@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getTema } from "@/lib/temas";
 import AlphaPresetsConfig from "../AlphaPresets";
+import { isAdminRole } from "@/lib/roles";
 
 
 export default function PresetsPage() {
@@ -17,7 +18,7 @@ export default function PresetsPage() {
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (session?.user && (session.user as any).role !== "Admin") {
+    } else if (session?.user && !isAdminRole(session.user.role)) {
       router.push("/PainelAlpha");
     }
   }, [status, session, router]);

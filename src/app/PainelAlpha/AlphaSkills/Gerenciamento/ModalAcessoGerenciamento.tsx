@@ -4,9 +4,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Shield, ShieldCheck, Lock, Search, Loader2, Users } from 'lucide-react';
 import { listarAcessoModulo, toggleAcessoModulo } from '@/actions/PermissoesSetor';
 import { toast } from 'sonner';
+import { isAdminRole } from '@/lib/roles';
 
 const MODULO = 'skillsGerenciamento';
-const ADMIN_ROLES = ['Admin', 'CEO'];
 
 type UserAcesso = Awaited<ReturnType<typeof listarAcessoModulo>>[number];
 
@@ -31,12 +31,12 @@ export default function ModalAcessoGerenciamento({
     }, [isOpen]);
 
     const temAcesso = (user: UserAcesso) => {
-        if (ADMIN_ROLES.includes(user.role)) return true;
+        if (isAdminRole(user.role)) return true;
         return user.permissaoOverrides.some(o => o.acao === 'ADD');
     };
 
     const handleToggle = async (user: UserAcesso) => {
-        if (ADMIN_ROLES.includes(user.role)) return;
+        if (isAdminRole(user.role)) return;
         setToggling(user.id);
         try {
             const result = await toggleAcessoModulo(user.id, MODULO);
@@ -66,8 +66,8 @@ export default function ModalAcessoGerenciamento({
             u.role.toLowerCase().includes(busca.toLowerCase())
         ), [users, busca]);
 
-    const admins = users.filter(u => ADMIN_ROLES.includes(u.role)).length;
-    const liberados = users.filter(u => !ADMIN_ROLES.includes(u.role) && temAcesso(u)).length;
+    const admins = users.filter(u => isAdminRole(u.role)).length;
+    const liberados = users.filter(u => !isAdminRole(u.role) && temAcesso(u)).length;
 
     if (!isOpen) return null;
 
@@ -144,7 +144,7 @@ export default function ModalAcessoGerenciamento({
                         </div>
                     ) : (
                         filtered.map(user => {
-                            const isAdmin = ADMIN_ROLES.includes(user.role);
+                            const isAdmin = isAdminRole(user.role);
                             const acesso = temAcesso(user);
                             const isToggling = toggling === user.id;
 

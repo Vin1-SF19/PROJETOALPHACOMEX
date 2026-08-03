@@ -18,7 +18,7 @@ export function useTimelineDrag(componente: ComponenteSlide) {
 
   const onMouseDownMover = useCallback(
     (e: React.MouseEvent) => {
-      if (!anim) return;
+      if (!anim || anim.tipo === "container-alpha") return;
       const animAtual = anim;
       e.stopPropagation();
       arrastando.current = { startX: e.clientX, origemDelay: animAtual.delay, modo: "mover" };
@@ -42,7 +42,7 @@ export function useTimelineDrag(componente: ComponenteSlide) {
 
   const onMouseDownRedimensionar = useCallback(
     (e: React.MouseEvent) => {
-      if (!anim) return;
+      if (!anim || anim.tipo === "container-alpha") return;
       const animAtual = anim;
       e.stopPropagation();
       arrastando.current = { startX: e.clientX, origemDelay: animAtual.duracao, modo: "redimensionar" };

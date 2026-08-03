@@ -3,8 +3,9 @@
 import { auth } from '../../auth';
 import db from '@/lib/prisma';
 import { pusherServer } from '@/lib/pusher-server.ts';
+import { isAdminRole } from '@/lib/roles';
 
-const ROLES_ALERTA = ['Admin', 'CEO', 'FINANCEIRO', 'RECURSOS HUMANOS'];
+const ROLES_ALERTA = ['FINANCEIRO', 'RECURSOS HUMANOS'];
 
 export interface HoleriteAlertaPayload {
   id: number;
@@ -43,7 +44,7 @@ export async function dispararAlerteInicial(): Promise<{ ok: boolean; error?: st
   const role = session?.user?.role ?? '';
   const userId = Number(session?.user?.id ?? 0);
 
-  if (!session || !ROLES_ALERTA.includes(role) || userId === 0) {
+  if (!session || (!isAdminRole(role) && !ROLES_ALERTA.includes(role)) || userId === 0) {
     return { ok: false, error: 'Sem permissão' };
   }
 
@@ -62,7 +63,7 @@ export async function dispararAlerteFinal(): Promise<{ ok: boolean; error?: stri
   const role = session?.user?.role ?? '';
   const userId = Number(session?.user?.id ?? 0);
 
-  if (!session || !ROLES_ALERTA.includes(role) || userId === 0) {
+  if (!session || (!isAdminRole(role) && !ROLES_ALERTA.includes(role)) || userId === 0) {
     return { ok: false, error: 'Sem permissão' };
   }
 

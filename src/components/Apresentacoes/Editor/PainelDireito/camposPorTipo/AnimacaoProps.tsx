@@ -1,5 +1,7 @@
 import { ANIMACAO_TIPOS, EASING_TIPOS, type ConfigAnimacao } from "@/lib/validations/animacao";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { ANIMACAO_CONTAINER_ALPHA_PADRAO } from "@/lib/apresentacoes/animacao-container-alpha";
+import { AnimacaoContainerAlphaProps } from "./AnimacaoContainerAlphaProps";
 
 const LABEL_TIPO: Record<(typeof ANIMACAO_TIPOS)[number], string> = {
   fade: "Fade",
@@ -15,6 +17,7 @@ const LABEL_TIPO: Record<(typeof ANIMACAO_TIPOS)[number], string> = {
   stagger: "Cascata (filhos)",
   typing: "Digitação",
   counter: "Contador numérico",
+  "container-alpha": "Container Alpha — transição de slide",
 };
 
 const DEFAULT_ANIMACAO: ConfigAnimacao = { tipo: "fade", duracao: 0.5, delay: 0, easing: "easeOut" };
@@ -38,6 +41,20 @@ export function AnimacaoProps({ componente, onChange }: AnimacaoPropsProps) {
     onChange({ animacao: { ...componente.animacao, entrada: { ...DEFAULT_ANIMACAO, ...anim, ...patch } } });
   }
 
+  function selecionarTipo(tipo: ConfigAnimacao["tipo"] | "") {
+    if (!tipo) {
+      atualizarAnimacao(null);
+      return;
+    }
+    atualizarAnimacao({
+      tipo,
+      delay: tipo === "container-alpha" ? 0 : anim?.delay ?? DEFAULT_ANIMACAO.delay,
+      containerAlpha: tipo === "container-alpha"
+        ? anim?.containerAlpha ?? ANIMACAO_CONTAINER_ALPHA_PADRAO
+        : undefined,
+    });
+  }
+
   const tiposDisponiveis = ANIMACAO_TIPOS.filter((t) => {
     if (t === "stagger") return ehContainer;
     if (t === "typing" || t === "counter") return ehTexto;
@@ -52,7 +69,7 @@ export function AnimacaoProps({ componente, onChange }: AnimacaoPropsProps) {
         <label className="text-[11px] text-slate-400">Tipo</label>
         <select
           value={anim?.tipo ?? ""}
-          onChange={(e) => (e.target.value ? atualizarAnimacao({ tipo: e.target.value as ConfigAnimacao["tipo"] }) : atualizarAnimacao(null))}
+          onChange={(event) => selecionarTipo(event.target.value as ConfigAnimacao["tipo"] | "")}
           className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
         >
           <option value="">Nenhuma</option>
@@ -64,7 +81,9 @@ export function AnimacaoProps({ componente, onChange }: AnimacaoPropsProps) {
         </select>
       </div>
 
-      {anim && (
+      {anim?.tipo === "container-alpha" ? (
+        <AnimacaoContainerAlphaProps animacao={anim} onChange={atualizarAnimacao} />
+      ) : anim ? (
         <>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
@@ -149,7 +168,7 @@ export function AnimacaoProps({ componente, onChange }: AnimacaoPropsProps) {
             </div>
           )}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

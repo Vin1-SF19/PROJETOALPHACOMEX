@@ -20,6 +20,8 @@ import {
 import { getSetoresParaSelect } from '@/actions/gestaoSetores';
 import { AUTOFILL_PROTECTION_ATTRS } from '@/components/ui/autofill-protection';
 import { getTokenOnyxUpdate } from '@/lib/colaboradores/token-onyx-update';
+import { prepareAvatarImage } from '@/lib/avatar-upload';
+import { isAdminRole } from '@/lib/roles';
 
 // ─── Explicit types (independent of Prisma client version) ───────────────────
 
@@ -183,7 +185,7 @@ function SelectInput({ value, onChange, options, disabled }: {
 }
 
 function TabBtn({ active, onClick, label, icon: Icon }: {
-  active: boolean; onClick: () => void; label: string; icon: React.ElementType;
+  active: boolean; onClick: () => void; label: string; icon: React.ComponentType<{ size?: number }>;
 }) {
   return (
     <button
@@ -266,7 +268,7 @@ export default function ModalPerfilColaborador({
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [salvandoSenha, setSalvandoSenha] = useState(false);
 
-  const isAdmin = currentUserRole === 'Admin' || currentUserRole === 'CEO';
+  const isAdmin = isAdminRole(currentUserRole);
   const isRH = currentUserRole === 'RECURSOS HUMANOS';
   const podeVerObs = isAdmin || isRH || currentUserRole === 'FINANCEIRO';
   const podeEditarRole = isAdmin || isRH;
@@ -383,13 +385,22 @@ export default function ModalPerfilColaborador({
   async function handleUploadFoto(file: File) {
     setUploadingFoto(true);
     try {
-      const res = await fetch(`/api/chat/upload?filename=${encodeURIComponent(file.name)}`, {
-        method: 'POST', body: file,
+      const prepared = await prepareAvatarImage(file);
+      const res = await fetch(`/api/usuarios/avatar?filename=${encodeURIComponent(prepared.filename)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': prepared.blob.type },
+        body: prepared.blob,
       });
-      const data = await res.json() as { url?: string };
-      if (data.url) { setImagemUrl(data.url); toast.success('Foto carregada — salve para confirmar'); }
-    } catch { toast.error('Erro ao enviar foto'); }
-    setUploadingFoto(false);
+      const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error || 'O servidor não retornou a URL da foto.');
+      setImagemUrl(data.url);
+      toast.success('Foto carregada — salve para confirmar');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao enviar foto');
+    } finally {
+      setUploadingFoto(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   }
 
   async function handleAddCargo() {
@@ -514,7 +525,7 @@ export default function ModalPerfilColaborador({
                   >
                     <Camera size={10} className="text-white" />
                   </button>
-                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => {
+                  <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => {
                     const f = e.target.files?.[0];
                     if (f) void handleUploadFoto(f);
                     e.target.value = '';
@@ -549,7 +560,7 @@ export default function ModalPerfilColaborador({
                 <TabBtn active={tab === 'contrato'} onClick={() => setTab('contrato')} label="Contrato" icon={FileText} />
                 <TabBtn active={tab === 'documentos'} onClick={() => setTab('documentos')} label={`Documentos ${checklistCount}/${CHECKLIST_ITEMS.length}`} icon={CheckSquare} />
                 {podeVerObs && <TabBtn active={tab === 'observacoes'} onClick={() => setTab('observacoes')} label="Observações" icon={Eye} />}
-                {currentUserRole === 'Admin' && <TabBtn active={tab === 'senha'} onClick={() => setTab('senha')} label="Senha" icon={KeyRound} />}
+                {isAdmin && <TabBtn active={tab === 'senha'} onClick={() => setTab('senha')} label="Senha" icon={KeyRound} />}
               </div>
 
               {/* ── Body ── */}
@@ -939,7 +950,7 @@ export default function ModalPerfilColaborador({
                         <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
                           <Eye size={12} className="text-amber-400 shrink-0" />
                           <p className="text-[9px] font-bold text-amber-400/80 uppercase tracking-wide">
-                            Visível apenas para RH, Financeiro e Admin
+                            Visível apenas para RH, Financeiro e gestão administrativa
                           </p>
                         </div>
                         <textarea
@@ -961,12 +972,12 @@ export default function ModalPerfilColaborador({
                     )}
 
                     {/* TAB: SENHA — Admin only */}
-                    {tab === 'senha' && currentUserRole === 'Admin' && (
+                    {tab === 'senha' && isAdmin && (
                       <div className="p-6 space-y-6">
                         <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/5 border border-red-500/15">
                           <KeyRound size={12} className="text-red-400 shrink-0" />
                           <p className="text-[9px] font-bold text-red-400/80 uppercase tracking-wide">
-                            Visível apenas para Admin · Senha antiga não é necessária
+                            Visível apenas para gestão administrativa · Senha antiga não é necessária
                           </p>
                         </div>
 

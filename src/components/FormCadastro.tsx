@@ -20,6 +20,7 @@ import TogglePillCadastro, { AbaAtiva } from "./cadastro/TogglePillCadastro";
 import PreviewModulosSetor from "./cadastro/PreviewModulosSetor";
 import AbaGestaoEquipe from "./cadastro/AbaGestaoEquipe";
 import ModalOnboarding, { type OnboardingTemplate, type NovoUsuario } from "./ModalOnboarding";
+import { isAdminRole } from "@/lib/roles";
 
 function gerarSenhaSegura(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!";
@@ -37,7 +38,7 @@ export default function CadastroUsuarios({
   setores?: string[];
   templates?: OnboardingTemplate[];
 }) {
-  const isAdmin = currentUserRole === "Admin" || currentUserRole === "CEO";
+  const isAdmin = isAdminRole(currentUserRole);
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(registerAction, null);
   const [aba, setAba] = useState<AbaAtiva>(isAdmin ? "cadastro" : "equipe");

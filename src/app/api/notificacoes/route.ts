@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/prisma";
 import { auth } from "../../../../auth";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ nenhum: true });
 
   const userId = Number(session.user.id);
-  const isAdmin = session.user.role === "Admin";
+  const isAdmin = isAdminRole(session.user.role);
 
   try {
     const ultimaMensagem = await db.mensagensChamado.findFirst({

@@ -10,13 +10,13 @@ import { exigirAcessoConfigPipeline, isAdminRole } from "@/lib/bpm/ownership";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
-export async function ListarPipelinesBpm() {
+export async function ListarPipelinesBpm(incluirInativos = false) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
 
     const pipelines = await db.bpmPipeline.findMany({
-      where: { ativo: true },
+      where: incluirInativos ? undefined : { ativo: true },
       select: {
         id: true,
         nome: true,
@@ -31,6 +31,24 @@ export async function ListarPipelinesBpm() {
   } catch (error) {
     console.error("[ListarPipelinesBpm]", error);
     return { success: false, error: "Erro ao buscar pipelines", data: [] };
+  }
+}
+
+/** Popula seletor de setores na criação/edição de pipeline (Fase 3 — central de configurações). */
+export async function ListarSetoresParaPipelineBpm() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+
+    const setores = await db.setor.findMany({
+      select: { id: true, nome: true },
+      orderBy: { nome: "asc" },
+    });
+
+    return { success: true, data: setores };
+  } catch (error) {
+    console.error("[ListarSetoresParaPipelineBpm]", error);
+    return { success: false, error: "Erro ao buscar setores", data: [] };
   }
 }
 
@@ -77,6 +95,7 @@ export async function CriarPipelineBpm(dados: unknown) {
     });
 
     revalidatePath(ROTA_BASE);
+    revalidatePath(`${ROTA_BASE}/admin`);
     return { success: true, data: pipeline };
   } catch (error) {
     console.error("[CriarPipelineBpm]", error);

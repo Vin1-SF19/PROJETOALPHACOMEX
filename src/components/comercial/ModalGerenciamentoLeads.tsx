@@ -26,6 +26,7 @@ import { listarParceirosSimples, buscarParceiroDetalheSimples } from "@/actions/
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
+import { isAdminRole } from "@/lib/roles";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -115,11 +116,11 @@ const CANAIS_AQUISICAO = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isAdminOrCeo(role: string) {
-    return role === "Admin" || role === "CEO" || role === "Lider Comercial";
+    return isAdminRole(role) || role === "Lider Comercial";
 }
 
 function podeVerGlobal(role: string) {
-    return role === "Admin" || role === "CEO" || role === "Lider Comercial" || role === "FINANCEIRO";
+    return isAdminRole(role) || role === "Lider Comercial" || role === "FINANCEIRO";
 }
 
 function formatBRL(v: number) {

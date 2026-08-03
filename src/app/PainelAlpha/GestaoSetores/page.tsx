@@ -4,8 +4,9 @@ import db from "@/lib/prisma";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { getSetoresComContagem, getCargosComContagem } from "@/actions/gestaoSetores";
 import GestaoSetoresClient from "@/components/GestaoSetores/GestaoSetoresClient";
+import { isAdminRole } from "@/lib/roles";
 
-const ROLES_PERMITIDAS = ["Admin", "CEO", "RECURSOS HUMANOS"];
+const ROLES_PERMITIDAS = ["RECURSOS HUMANOS"];
 
 export default async function GestaoSetoresPage() {
   const session = await auth();
@@ -22,7 +23,7 @@ export default async function GestaoSetoresPage() {
     }
   } catch { /* fallback */ }
 
-  if (!ROLES_PERMITIDAS.includes(role)) {
+  if (!isAdminRole(role) && !ROLES_PERMITIDAS.includes(role)) {
     let permissoes: string[] = [];
     try {
       permissoes = userId > 0 ? await getPermissoesEfetivas(userId) : [];

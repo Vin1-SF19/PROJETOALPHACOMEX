@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Settings, Loader2, Pencil, Trash2, Shield, Link2, CheckCheck } from "lucide-react";
 import { listarAcessosParceiros, salvarAcessoParceiro } from "@/actions/parceiros";
 import { obterConfigParceiros, togglePermitirParceiroConvidar } from "@/actions/convites-parceiro";
+import { isAdminRole } from "@/lib/roles";
 
 type Usuario = { id: number; nome: string; email: string; role: string };
 type Acesso = { userId: number; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
@@ -48,7 +49,6 @@ export default function ModalEngrenagem({
 
   if (!open) return null;
 
-  const isAdminRole = (r: string) => r === "Admin" || r === "CEO";
 
   const toggle = async (userId: number, campo: "podeEditar" | "podeExcluir" | "podeAprovar") => {
     const atual = acessos[userId] ?? { userId, podeEditar: false, podeExcluir: false, podeAprovar: false };

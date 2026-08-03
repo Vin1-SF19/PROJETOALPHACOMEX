@@ -3,6 +3,7 @@
 import { z } from "zod";
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
+import { isAdminRole } from "@/lib/roles";
 import { revalidatePath } from "next/cache";
 import { criarRegistroClienteAPartirDeContrato } from "./Clientes";
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
@@ -10,7 +11,7 @@ import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isAdminOrCeo(role: string) {
-    return role === "FINANCEIRO" || role === "Lider Comercial" || role === "Admin" || role === "CEO" || role === "COMERCIAL";   
+    return isAdminRole(role) || role === "FINANCEIRO" || role === "Lider Comercial" || role === "COMERCIAL";
 }
 
 /**
@@ -28,7 +29,7 @@ function servicoContaComoVenda(servico: string | null | undefined): boolean {
 }
 
 function isComercialOrAdmin(role: string) {
-    return role === "FINANCEIRO" || role === "Lider Comercial" || role === "Admin" || role === "CEO" || role === "COMERCIAL";
+    return isAdminRole(role) || role === "FINANCEIRO" || role === "Lider Comercial" || role === "COMERCIAL";
 }
 
 // ─── Schemas Zod ─────────────────────────────────────────────────────────────

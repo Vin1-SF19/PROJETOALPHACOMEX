@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { getTema } from "@/lib/temas";
 import { ModalBroadcast } from "./ModalBroadcast";
+import { isAdminRole } from "@/lib/roles";
 
 export function EngrenagemFlutuante() {
   const { data: session } = useSession();
@@ -26,7 +27,7 @@ export function EngrenagemFlutuante() {
     setMontado(true);
   }, []);
 
-  if (session?.user?.role !== "Admin" || !montado) return null;
+  if (!isAdminRole(session?.user?.role) || !montado) return null;
 
   const style = getTema((session?.user as any)?.tema_interface || "blue");
 

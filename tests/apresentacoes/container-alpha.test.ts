@@ -12,11 +12,13 @@ import {
 } from "@/lib/apresentacoes/container-intro";
 import { MENSAGEM_SEM_PROXIMO_SLIDE, obterProximoSlide } from "@/lib/apresentacoes/proximo-slide";
 import {
-  criarComponenteEntradaContainerAlpha,
-  ENTRADA_CONTAINER_ALPHA_PADRAO,
-  obterEntradaApresentacaoSegura,
-} from "@/lib/apresentacoes/entrada-apresentacao";
+  ANIMACAO_CONTAINER_ALPHA_PADRAO,
+  criarComponenteAnimacaoContainerAlpha,
+  normalizarConfigAnimacaoContainerAlpha,
+  obterAnimacaoContainerAlpha,
+} from "@/lib/apresentacoes/animacao-container-alpha";
 import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
+import { configAnimacaoSchema } from "@/lib/validations/animacao";
 
 describe("Container Alpha do Presentation Studio", () => {
   it("gera defaults válidos no registry 3D", () => {
@@ -37,19 +39,30 @@ describe("Container Alpha do Presentation Studio", () => {
     expect(dadosSlideSchema.safeParse({ componentes: [componente] }).success).toBe(true);
   });
 
-  it("persiste o Container Alpha como entrada opcional do primeiro slide", () => {
+  it("persiste o Container Alpha dentro do select de animação de entrada do componente", () => {
+    const base = COMPONENTES_REGISTRY.containerCarga.criarComponentePadrao(0, 0);
     const resultado = dadosSlideSchema.parse({
-      componentes: [],
+      componentes: [{
+        ...base,
+        animacao: {
+          entrada: {
+            tipo: "container-alpha",
+            duracao: 0.5,
+            delay: 0,
+            easing: "easeInOut",
+            containerAlpha: ANIMACAO_CONTAINER_ALPHA_PADRAO,
+          },
+        },
+      }],
       canvas: CANVAS_PADRAO,
-      entradaApresentacao: { tipo: "container-alpha" },
     });
 
-    expect(resultado.entradaApresentacao).toMatchObject(ENTRADA_CONTAINER_ALPHA_PADRAO);
-    expect(dadosSlideSchema.safeParse({ componentes: [], entradaApresentacao: undefined }).success).toBe(true);
+    expect(resultado.componentes[0].animacao?.entrada?.tipo).toBe("container-alpha");
+    expect(obterAnimacaoContainerAlpha(resultado.componentes)).toMatchObject(ANIMACAO_CONTAINER_ALPHA_PADRAO);
   });
 
-  it("converte a configuração de entrada em uma capa fullscreen independente do componente da biblioteca", () => {
-    const componente = criarComponenteEntradaContainerAlpha(ENTRADA_CONTAINER_ALPHA_PADRAO, CANVAS_PADRAO);
+  it("converte a configuração da animação em uma transição fullscreen", () => {
+    const componente = criarComponenteAnimacaoContainerAlpha(ANIMACAO_CONTAINER_ALPHA_PADRAO, CANVAS_PADRAO);
 
     expect(componente).toMatchObject({
       tipo: "containerCarga",
@@ -63,9 +76,15 @@ describe("Container Alpha do Presentation Studio", () => {
     expect(componenteSchema.safeParse(componente).success).toBe(true);
   });
 
-  it("ignora configurações de entrada inválidas sem quebrar slides antigos", () => {
-    expect(obterEntradaApresentacaoSegura({ tipo: "container-alpha", corPrincipal: "azul" })).toBeNull();
-    expect(obterEntradaApresentacaoSegura(null)).toBeNull();
+  it("normaliza defaults e rejeita cores inválidas na animação Container Alpha", () => {
+    expect(configAnimacaoSchema.parse({
+      tipo: "container-alpha",
+      duracao: 0.5,
+      delay: 0,
+      easing: "easeInOut",
+      containerAlpha: {},
+    }).containerAlpha).toMatchObject(ANIMACAO_CONTAINER_ALPHA_PADRAO);
+    expect(normalizarConfigAnimacaoContainerAlpha({ corPrincipal: "azul" })).toEqual(ANIMACAO_CONTAINER_ALPHA_PADRAO);
   });
 
   it("resolve o próximo slide pela ordem e informa quando ele não existe", () => {

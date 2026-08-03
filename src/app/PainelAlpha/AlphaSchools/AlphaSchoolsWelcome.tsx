@@ -7,6 +7,7 @@ import { getTema } from "@/lib/temas";
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { isAdminRole } from '@/lib/roles';
 
 
 export default function AlphaSchoolsWelcome({ onEnter }: any) {
@@ -15,7 +16,7 @@ export default function AlphaSchoolsWelcome({ onEnter }: any) {
 
     const temaNome = (session?.user as any)?.tema_interface || "blue";
     const style = getTema(temaNome);
-    const isAdmin = (session?.user as any)?.role === "Admin";
+    const isAdmin = isAdminRole(session?.user?.role);
     
     const temPreset = !!(session?.user as any)?.presetId;
 

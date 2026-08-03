@@ -31,7 +31,6 @@ import {
 } from "./slide-componentes-business";
 import { chatIlustrativoComponenteSchema } from "./slide-componentes-ia";
 import { canvasConfigSchema } from "@/lib/apresentacoes/canvas";
-import { entradaApresentacaoSchema } from "@/lib/apresentacoes/entrada-apresentacao";
 
 export {
   textoComponenteSchema,
@@ -133,7 +132,6 @@ function coletarIds(lista: ComponenteSlide[], acc: string[] = []): string[] {
 export const dadosSlideSchema = z.object({
   componentes: z.array(componenteSchema),
   canvas: canvasConfigSchema.optional(),
-  entradaApresentacao: entradaApresentacaoSchema,
 }).refine(
   (dados) => {
     const ids = coletarIds(dados.componentes);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useMemo, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { RenderComponente } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
 import { stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
@@ -9,14 +10,13 @@ import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { TransicaoSlide } from "./TransicaoSlide";
 import { SlidePortalPreview } from "@/components/Apresentacoes/Editor/RenderEngine/SlidePortalPreview";
 import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
-import type { EntradaApresentacaoConfig } from "@/lib/apresentacoes/entrada-apresentacao";
+import { normalizarConfigAnimacaoContainerAlpha } from "@/lib/apresentacoes/animacao-container-alpha";
 
 export interface SlideApresentacao {
   id: string;
   transicaoEntrada: string | null;
   componentes: ComponenteSlide[];
   canvas: CanvasConfig;
-  entradaApresentacao: EntradaApresentacaoConfig | null;
 }
 
 interface SlideApresentacaoLayerProps {
@@ -30,6 +30,99 @@ interface SlideApresentacaoLayerProps {
   proximoSlide?: SlideApresentacao;
   pausado?: boolean;
   portalContainerCapa?: Element | null;
+}
+
+interface ComponenteNoSlideProps {
+  componente: ComponenteSlide;
+  canvas: CanvasConfig;
+  proximoSlide?: SlideApresentacao;
+  onContainerIntroStart: (evento: ContainerIntroEvent) => void;
+  onContainerIntroComplete: () => void;
+  portalProximoSlide: ReactNode;
+  pausado: boolean;
+  portalContainerCapa?: Element | null;
+}
+
+function ComponenteNoSlide({
+  componente,
+  canvas,
+  proximoSlide,
+  onContainerIntroStart,
+  onContainerIntroComplete,
+  portalProximoSlide,
+  pausado,
+  portalContainerCapa,
+}: ComponenteNoSlideProps) {
+  const componenteRenderizado = useMemo<ComponenteSlide>(() => {
+    if (componente.tipo !== "containerCarga") return componente;
+
+    const menorDimensao = Math.min(canvas.width, canvas.height);
+    const margem = Math.min(72, Math.max(18, menorDimensao * 0.05));
+    const configEntrada = componente.animacao?.entrada?.tipo === "container-alpha"
+      ? normalizarConfigAnimacaoContainerAlpha(componente.animacao.entrada.containerAlpha)
+      : null;
+
+    return {
+      ...componente,
+      x: margem,
+      y: margem,
+      w: Math.max(1, canvas.width - margem * 2),
+      h: Math.max(1, canvas.height - margem * 2),
+      ...(configEntrada ? {
+        corPrincipal: configEntrada.corPrincipal,
+        corMetal: configEntrada.corMetal,
+        corInterior: configEntrada.corInterior,
+        anguloAbertura: configEntrada.anguloAbertura,
+        duracaoAbertura: configEntrada.duracaoAbertura,
+        atrasoAbertura: configEntrada.atrasoAbertura,
+        transicaoProximoSlide: true,
+        duracaoZoom: configEntrada.duracaoZoom,
+        somHabilitado: configEntrada.somHabilitado,
+        somAbertura: configEntrada.somAbertura,
+        volumeSom: configEntrada.volumeSom,
+        mostrarLogo: configEntrada.mostrarLogo,
+      } : {}),
+    };
+  }, [canvas.height, canvas.width, componente]);
+
+  const iniciarIntroNoPalco = useCallback((evento: ContainerIntroEvent) => {
+    if (componenteRenderizado.tipo !== "containerCarga" || !evento.palco) {
+      onContainerIntroStart(evento);
+      return;
+    }
+
+    const escalaX = componenteRenderizado.w / evento.palco.w;
+    const escalaY = componenteRenderizado.h / evento.palco.h;
+    const converterParaPalco = (dimensoes: { x: number; y: number; w: number; h: number }) => ({
+      x: componenteRenderizado.x + dimensoes.x * escalaX,
+      y: componenteRenderizado.y + dimensoes.y * escalaY,
+      w: dimensoes.w * escalaX,
+      h: dimensoes.h * escalaY,
+    });
+
+    onContainerIntroStart({
+      ...evento,
+      palco: { w: canvas.width, h: canvas.height },
+      componente: {
+        ...evento.componente,
+        ...converterParaPalco(evento.componente),
+      },
+      abertura: evento.abertura ? converterParaPalco(evento.abertura) : undefined,
+    });
+  }, [canvas.height, canvas.width, componenteRenderizado, onContainerIntroStart]);
+
+  return (
+    <div style={stylePosicaoAbsoluta(componenteRenderizado)}>
+      <RenderComponente
+        componente={componenteRenderizado}
+        onContainerIntroStart={proximoSlide ? iniciarIntroNoPalco : undefined}
+        onContainerIntroComplete={onContainerIntroComplete}
+        portalProximoSlide={portalProximoSlide}
+        pausado={pausado}
+        portalContainerCapa={componenteRenderizado.tipo === "containerCarga" ? undefined : portalContainerCapa}
+      />
+    </div>
+  );
 }
 
 export function SlideApresentacaoLayer({
@@ -58,24 +151,19 @@ export function SlideApresentacaoLayer({
       style={{ zIndex }}
     >
       <TransicaoSlide slideId={slide.id} transicaoEntrada={slide.transicaoEntrada} pausado={pausado}>
-        {slide.componentes.map((componente) => {
-          const componenteRenderizado = componente.tipo === "containerCarga"
-            ? { ...componente, x: 0, y: 0, w: slide.canvas.width, h: slide.canvas.height }
-            : componente;
-
-          return (
-            <div key={componente.id} style={stylePosicaoAbsoluta(componenteRenderizado)}>
-              <RenderComponente
-                componente={componenteRenderizado}
-                onContainerIntroStart={proximoSlide ? onContainerIntroStart : undefined}
-                onContainerIntroComplete={onContainerIntroComplete}
-                portalProximoSlide={portalProximoSlide}
-                pausado={pausado}
-                portalContainerCapa={portalContainerCapa}
-              />
-            </div>
-          );
-        })}
+        {slide.componentes.map((componente) => (
+          <ComponenteNoSlide
+            key={componente.id}
+            componente={componente}
+            canvas={slide.canvas}
+            proximoSlide={proximoSlide}
+            onContainerIntroStart={onContainerIntroStart}
+            onContainerIntroComplete={onContainerIntroComplete}
+            portalProximoSlide={portalProximoSlide}
+            pausado={pausado}
+            portalContainerCapa={portalContainerCapa}
+          />
+        ))}
       </TransicaoSlide>
     </motion.div>
   );

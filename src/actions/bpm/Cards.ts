@@ -335,6 +335,8 @@ export async function MoverCardBpm(dados: unknown) {
     await executarAutomacaoFechamentoComercial(cardId, userId);
 
     revalidatePath(`${ROTA_BASE}/pipeline/${card.pipelineId}`);
+    revalidatePath(ROTA_BASE);
+    revalidatePath(`${ROTA_BASE}/tarefas`);
     return { success: true };
   } catch (error) {
     console.error("[MoverCardBpm]", error);

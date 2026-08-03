@@ -1,4 +1,5 @@
 import db from "@/lib/prisma";
+import { isAdminRole as hasAdminAccess } from "@/lib/roles";
 
 /**
  * Propriedade de agentes Onyx por usuário do PainelAlpha.
@@ -10,7 +11,7 @@ import db from "@/lib/prisma";
  */
 
 export function isAdminRole(role: string): boolean {
-  return role === "Admin" || role === "CEO";
+  return hasAdminAccess(role);
 }
 
 /** Registra (ou atualiza) o dono e a visibilidade de um agente. */

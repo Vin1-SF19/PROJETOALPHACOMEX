@@ -1,15 +1,14 @@
 import { create } from "zustand";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { adaptarComponentesAoCanvas, CANVAS_PADRAO, type CanvasConfig } from "@/lib/apresentacoes/canvas";
-import type { EntradaApresentacaoConfig } from "@/lib/apresentacoes/entrada-apresentacao";
 
 export interface SlideResumo {
   id: string;
   ordem: number;
   nome: string | null;
+  transicaoEntrada: string | null;
   componentes: ComponenteSlide[];
   canvas: CanvasConfig;
-  entradaApresentacao: EntradaApresentacaoConfig | null;
 }
 
 interface EditorStore {
@@ -18,15 +17,15 @@ interface EditorStore {
   slideAtivoId: string | null;
   componentes: ComponenteSlide[];
   canvas: CanvasConfig;
-  entradaApresentacao: EntradaApresentacaoConfig | null;
   componenteSelecionadoId: string | null;
   zoom: number;
   isDirty: boolean;
   isSaving: boolean;
+  versaoEdicao: number;
 
   inicializar: (apresentacaoId: string, slides: SlideResumo[]) => void;
   setSlides: (slides: SlideResumo[]) => void;
-  carregarSlide: (slideId: string, componentes: ComponenteSlide[], canvas?: CanvasConfig, entradaApresentacao?: EntradaApresentacaoConfig | null) => void;
+  carregarSlide: (slideId: string, componentes: ComponenteSlide[], canvas?: CanvasConfig) => void;
   setSlideAtivo: (slideId: string) => void;
   adicionarComponente: (c: ComponenteSlide) => void;
   substituirComponentes: (componentes: ComponenteSlide[]) => void;
@@ -36,10 +35,24 @@ interface EditorStore {
   setZoom: (zoom: number) => void;
   redimensionarCanvas: (canvas: CanvasConfig) => void;
   atualizarFundoCanvas: (backgroundColor: string) => void;
-  atualizarEntradaApresentacao: (entrada: EntradaApresentacaoConfig | null) => void;
   marcarSujo: () => void;
   marcarSalvo: () => void;
+  concluirSalvamento: (slideId: string, versao: number, sucesso: boolean) => void;
   setSaving: (saving: boolean) => void;
+}
+
+const filasPersistencia = new Map<string, Promise<void>>();
+
+/** Serializa escritas do mesmo slide para uma resposta antiga nunca sobrescrever uma edição mais nova. */
+export function serializarPersistenciaSlide<T>(slideId: string, operacao: () => Promise<T>): Promise<T> {
+  const anterior = filasPersistencia.get(slideId) ?? Promise.resolve();
+  const execucao = anterior.catch(() => undefined).then(operacao);
+  const barreira = execucao.then(() => undefined, () => undefined);
+  filasPersistencia.set(slideId, barreira);
+  void barreira.then(() => {
+    if (filasPersistencia.get(slideId) === barreira) filasPersistencia.delete(slideId);
+  });
+  return execucao;
 }
 
 function ehContainerComFilhos(c: ComponenteSlide): c is Extract<ComponenteSlide, { tipo: "card" | "grid" | "container" }> {
@@ -74,51 +87,66 @@ export const useEditorStore = create<EditorStore>((set) => ({
   slideAtivoId: null,
   componentes: [],
   canvas: CANVAS_PADRAO,
-  entradaApresentacao: null,
   componenteSelecionadoId: null,
   zoom: 1,
   isDirty: false,
   isSaving: false,
+  versaoEdicao: 0,
 
   inicializar: (apresentacaoId, slides) => set({ apresentacaoId, slides }),
   setSlides: (slides) =>
     set((state) => ({
       slides: slides.map((slide) =>
-        slide.id === state.slideAtivoId
-          ? { ...slide, componentes: state.componentes, canvas: state.canvas, entradaApresentacao: state.entradaApresentacao }
-          : slide,
+        slide.id === state.slideAtivoId ? { ...slide, componentes: state.componentes, canvas: state.canvas } : slide,
       ),
     })),
-  carregarSlide: (slideId, componentes, canvas = CANVAS_PADRAO, entradaApresentacao = null) =>
+  carregarSlide: (slideId, componentes, canvas = CANVAS_PADRAO) =>
     set((state) => ({
       slides: state.slides.map((slide) =>
-        slide.id === state.slideAtivoId
-          ? { ...slide, componentes: state.componentes, canvas: state.canvas, entradaApresentacao: state.entradaApresentacao }
-          : slide,
+        slide.id === state.slideAtivoId ? { ...slide, componentes: state.componentes, canvas: state.canvas } : slide,
       ),
       slideAtivoId: slideId,
       componentes,
       canvas,
-      entradaApresentacao,
       componenteSelecionadoId: null,
       isDirty: false,
+      versaoEdicao: state.versaoEdicao + 1,
     })),
-  setSlideAtivo: (slideId) => set({ slideAtivoId: slideId, componenteSelecionadoId: null }),
+  setSlideAtivo: (slideId) => set((state) => ({
+    slideAtivoId: slideId,
+    componenteSelecionadoId: null,
+    versaoEdicao: state.versaoEdicao + 1,
+  })),
 
   adicionarComponente: (c) =>
-    set((state) => ({ componentes: [...state.componentes, c], componenteSelecionadoId: c.id, isDirty: true })),
+    set((state) => ({
+      componentes: [...state.componentes, c],
+      componenteSelecionadoId: c.id,
+      isDirty: true,
+      versaoEdicao: state.versaoEdicao + 1,
+    })),
 
   substituirComponentes: (componentes) =>
-    set({ componentes, componenteSelecionadoId: null, isDirty: true }),
+    set((state) => ({
+      componentes,
+      componenteSelecionadoId: null,
+      isDirty: true,
+      versaoEdicao: state.versaoEdicao + 1,
+    })),
 
   atualizarComponente: (id, patch) =>
-    set((state) => ({ componentes: atualizarNaArvore(state.componentes, id, patch), isDirty: true })),
+    set((state) => ({
+      componentes: atualizarNaArvore(state.componentes, id, patch),
+      isDirty: true,
+      versaoEdicao: state.versaoEdicao + 1,
+    })),
 
   removerComponente: (id) =>
     set((state) => ({
       componentes: removerDaArvore(state.componentes, id),
       componenteSelecionadoId: state.componenteSelecionadoId === id ? null : state.componenteSelecionadoId,
       isDirty: true,
+      versaoEdicao: state.versaoEdicao + 1,
     })),
 
   selecionarComponente: (id) => set({ componenteSelecionadoId: id }),
@@ -129,11 +157,20 @@ export const useEditorStore = create<EditorStore>((set) => ({
       canvas,
       componenteSelecionadoId: null,
       isDirty: true,
+      versaoEdicao: state.versaoEdicao + 1,
     })),
   atualizarFundoCanvas: (backgroundColor) =>
-    set((state) => ({ canvas: { ...state.canvas, backgroundColor }, isDirty: true })),
-  atualizarEntradaApresentacao: (entradaApresentacao) => set({ entradaApresentacao, isDirty: true }),
-  marcarSujo: () => set({ isDirty: true }),
+    set((state) => ({
+      canvas: { ...state.canvas, backgroundColor },
+      isDirty: true,
+      versaoEdicao: state.versaoEdicao + 1,
+    })),
+  marcarSujo: () => set((state) => ({ isDirty: true, versaoEdicao: state.versaoEdicao + 1 })),
   marcarSalvo: () => set({ isDirty: false, isSaving: false }),
+  concluirSalvamento: (slideId, versao, sucesso) => set((state) => {
+    const snapshotAindaAtual = state.slideAtivoId === slideId && state.versaoEdicao === versao;
+    if (!snapshotAindaAtual) return { isSaving: state.isDirty };
+    return { isDirty: sucesso ? false : state.isDirty, isSaving: false };
+  }),
   setSaving: (saving) => set({ isSaving: saving }),
 }));

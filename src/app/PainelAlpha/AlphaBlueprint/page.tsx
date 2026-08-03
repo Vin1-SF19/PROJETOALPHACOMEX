@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import db from "@/lib/prisma";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { BlueprintDashboard } from "@/components/AlphaBlueprint/BlueprintDashboard";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function AlphaBlueprintPage() {
 
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
   const role = session.user.role ?? "";
-  const isAdmin = role === "Admin" || role === "CEO";
+  const isAdmin = isAdminRole(role);
 
   if (!isAdmin) {
     const perms = await getPermissoesEfetivas(userId);

@@ -24,6 +24,7 @@ import { SeletorTemaSubmenu } from '@/components/SeletorTemaSubmenu';
 import { MODULOS_REGISTRY, CATEGORIAS } from '@/lib/modulos-registry';
 import { ModalBroadcast } from '@/components/ModalBroadcast';
 import { getTema } from '@/lib/temas';
+import { isAdminRole } from '@/lib/roles';
 
 // ── Icon map ──────────────────────────────────────────────
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -93,7 +94,7 @@ export default function GlobalSidebar({
   temaName,
 }: GlobalSidebarProps) {
   const pathname = usePathname();
-  const isAdmin = role === 'Admin' || role === 'CEO';
+  const isAdmin = isAdminRole(role);
   // Use activeUrl (tab-aware) for highlighting; fallback to pathname
   const effectiveUrl = activeUrl ?? pathname;
 

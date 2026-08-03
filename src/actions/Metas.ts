@@ -1,6 +1,7 @@
 "use server";
 
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 import { auth } from "../../auth";
 
 export interface ColaboradorMeta {
@@ -88,7 +89,7 @@ export async function getDadosMetas(
 }
 
 function podeGerenciarMetas(role: string) {
-    return role === "Admin" || role === "CEO" || role === "Lider Comercial";
+    return isAdminRole(role) || role === "Lider Comercial";
 }
 
 export async function getColaboradoresParaConfigurar() {

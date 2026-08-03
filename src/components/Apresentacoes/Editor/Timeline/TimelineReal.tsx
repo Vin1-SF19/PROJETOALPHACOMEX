@@ -6,6 +6,7 @@ import { useEditorStore } from "../store/useEditorStore";
 import { COMPONENTES_REGISTRY } from "../registry/componentes-registry";
 import { useTimelineDrag } from "./useTimelineDrag";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { normalizarConfigAnimacaoContainerAlpha } from "@/lib/apresentacoes/animacao-container-alpha";
 
 const MAX_TEMPO = 5;
 const PIXELS_POR_SEGUNDO = 80;
@@ -27,8 +28,13 @@ function BarraDeTempo({ componente, selecionado, onSelecionar }: { componente: C
     );
   }
 
-  const left = anim.delay * PIXELS_POR_SEGUNDO;
-  const width = anim.duracao * PIXELS_POR_SEGUNDO;
+  const ehContainerAlpha = anim.tipo === "container-alpha";
+  const configContainer = ehContainerAlpha ? normalizarConfigAnimacaoContainerAlpha(anim.containerAlpha) : null;
+  const left = (ehContainerAlpha ? 0 : anim.delay) * PIXELS_POR_SEGUNDO;
+  const duracao = configContainer
+    ? configContainer.atrasoAbertura + configContainer.duracaoAbertura + configContainer.duracaoZoom
+    : anim.duracao;
+  const width = duracao * PIXELS_POR_SEGUNDO;
 
   return (
     <div className="relative h-6" style={{ width: LARGURA_REGUA }}>
@@ -43,14 +49,16 @@ function BarraDeTempo({ componente, selecionado, onSelecionar }: { componente: C
         }`}
         style={{ left, width: Math.max(width, 12) }}
       >
-        <span className="truncate">{anim.tipo}</span>
-        <div
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            onMouseDownRedimensionar(e);
-          }}
-          className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/30"
-        />
+        <span className="truncate">{ehContainerAlpha ? "Container Alpha" : anim.tipo}</span>
+        {!ehContainerAlpha && (
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              onMouseDownRedimensionar(e);
+            }}
+            className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/30"
+          />
+        )}
       </div>
     </div>
   );

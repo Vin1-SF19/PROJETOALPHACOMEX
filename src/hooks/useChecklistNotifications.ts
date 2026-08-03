@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { pusherClient } from '@/lib/pusher';
 import { useChecklistNotificacoes } from '@/store/useChecklistNotificacoes';
+import { isAdminRole } from '@/lib/roles';
 
 type NovoDocumentoPayload = {
   documentoId: string;
@@ -15,7 +16,7 @@ type NovoDocumentoPayload = {
   criadoEm: string;
 };
 
-const CHECKLIST_ROLES = ['Admin', 'CEO', 'OPERACIONAL'];
+const CHECKLIST_ROLES = ['OPERACIONAL'];
 const CHANNEL = 'private-checklist-docs';
 const EVENT = 'novo-documento-cliente';
 
@@ -24,7 +25,7 @@ export function useChecklistNotifications(role: string | undefined) {
   const subscribedRef = useRef(false);
 
   useEffect(() => {
-    if (!role || !CHECKLIST_ROLES.includes(role)) return;
+    if (!role || (!isAdminRole(role) && !CHECKLIST_ROLES.includes(role))) return;
     if (!pusherClient) return;
     if (subscribedRef.current) return;
 

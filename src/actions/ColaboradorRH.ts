@@ -5,15 +5,16 @@ import { auth } from "../../auth";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { hashSync } from "bcryptjs";
+import { isAdminRole } from "@/lib/roles";
 
 // ─── Role helpers ─────────────────────────────────────────────────────────────
 
 function isAdminOrCeo(role: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 function isRHOrAbove(role: string) {
-  return ["Admin", "CEO", "RECURSOS HUMANOS", "FINANCEIRO"].includes(role);
+  return isAdminRole(role) || ["RECURSOS HUMANOS", "FINANCEIRO"].includes(role);
 }
 
 async function requireRHOrAbove() {
@@ -411,7 +412,7 @@ export async function alterarSenhaAdmin(usuarioId: number, novaSenha: string) {
 
   const userId = Number((session.user as { id?: string }).id);
   const dbUser = await db.usuarios.findUnique({ where: { id: userId }, select: { role: true } });
-  if (dbUser?.role !== "Admin") return { success: false as const, error: "Sem permissão" };
+  if (!isAdminRole(dbUser?.role)) return { success: false as const, error: "Sem permissão" };
 
   if (!novaSenha || novaSenha.length < 6) {
     return { success: false as const, error: "Senha deve ter ao menos 6 caracteres" };

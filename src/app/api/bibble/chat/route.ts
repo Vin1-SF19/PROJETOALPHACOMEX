@@ -21,6 +21,7 @@ import { callCompletion, encodeSSE, type ChatMessage, type ContentPart, type Str
 import { resultadoToolAlterouCalendario } from "@/lib/google-calendar/invalidation";
 import db from "@/lib/prisma";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
+import { isAdminRole } from "@/lib/roles";
 
 // ─── File content extraction ──────────────────────────────────────────────────
 
@@ -538,7 +539,7 @@ export async function POST(req: NextRequest) {
     : userContent;
 
   // Injeta contexto do usuário no system prompt para o LLM saber as permissões upfront
-  const isAdmin = userRole === "Admin" || userRole === "CEO";
+  const isAdmin = isAdminRole(userRole);
   const permissoesCtx = isAdmin
     ? `\n\n## CONTEXTO DO USUÁRIO\nUsuário: ${userName} | Role: ${userRole} | Acesso: TOTAL (admin)`
     : `\n\n## CONTEXTO DO USUÁRIO\nUsuário: ${userName} | Role: ${userRole}\nMódulos com acesso: ${userPermissoes.length > 0 ? userPermissoes.join(", ") : "nenhum"}\n\nIMPORTANTE: Se o usuário pedir algo de um módulo que não está na lista acima, informe que ele não tem acesso e sugira contatar um administrador. NÃO tente executar a ação.`;

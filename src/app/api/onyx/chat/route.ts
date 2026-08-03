@@ -12,6 +12,7 @@ import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 import db from "@/lib/prisma";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -253,7 +254,7 @@ export async function POST(req: NextRequest) {
           if (isBibbleMode) {
             const persona = input.globalSystemPrompt?.trim() || BIBBLE_SYSTEM_PROMPT;
             const userRole = userTyped.role ?? "";
-            const isAdmin = userRole === "Admin" || userRole === "CEO";
+            const isAdmin = isAdminRole(userRole);
             const userName = userTyped.nome ?? userTyped.name ?? "Usuário";
             const permissoes = (userTyped.permissoes ?? []) as string[];
             const permCtx = isAdmin

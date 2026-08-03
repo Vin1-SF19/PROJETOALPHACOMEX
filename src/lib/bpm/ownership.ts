@@ -1,8 +1,6 @@
 import db from "@/lib/prisma";
 
-function isAdminRole(role?: string | null): boolean {
-  return role === "Admin" || role === "CEO";
-}
+import { isAdminRole } from "@/lib/roles";
 
 export type BpmAcao =
   | "visualizar"
@@ -109,4 +107,4 @@ export function exigirAcessoConfigPipeline(
   }
 }
 
-export { isAdminRole };
+export { isAdminRole } from "@/lib/roles";

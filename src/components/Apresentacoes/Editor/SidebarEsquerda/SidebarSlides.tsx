@@ -13,16 +13,22 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { CriarSlide, ExcluirSlide, DuplicarSlide, ObterSlide, ListarSlides, ReordenarSlides } from "@/actions/slides";
-import { useEditorStore } from "../store/useEditorStore";
+import {
+  AtualizarSlide,
+  CriarSlide,
+  ExcluirSlide,
+  DuplicarSlide,
+  ObterSlide,
+  ListarSlides,
+  ReordenarSlides,
+} from "@/actions/slides";
+import { serializarPersistenciaSlide, useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { CANVAS_PADRAO, obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
-import { obterEntradaApresentacaoSegura } from "@/lib/apresentacoes/entrada-apresentacao";
 
 interface DadosSlidePersistidos {
   componentes: ComponenteSlide[];
   canvas?: CanvasConfig;
-  entradaApresentacao?: unknown;
 }
 
 function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplicar, onExcluir }: {
@@ -81,19 +87,72 @@ export function SidebarSlides() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  async function handleSelecionar(slideId: string) {
-    if (slideId === slideAtivoId) return;
+  async function persistirSlideAtivoSeNecessario() {
+    const maximoTentativas = 6;
+
+    for (let tentativa = 0; tentativa < maximoTentativas; tentativa += 1) {
+      const estado = useEditorStore.getState();
+      if (!estado.slideAtivoId || !estado.isDirty) return true;
+
+      const slideIdSnapshot = estado.slideAtivoId;
+      const componentesSnapshot = estado.componentes;
+      const canvasSnapshot = estado.canvas;
+      const versaoSnapshot = estado.versaoEdicao;
+      estado.setSaving(true);
+
+      let sucesso = false;
+      let mensagemErro: string | null = null;
+      try {
+        const res = await serializarPersistenciaSlide(slideIdSnapshot, () => AtualizarSlide({
+          id: slideIdSnapshot,
+          dadosJson: { componentes: componentesSnapshot, canvas: canvasSnapshot },
+        }));
+        sucesso = res.success;
+        if (!res.success) {
+          mensagemErro = typeof res.error === "string" ? res.error : "Erro ao salvar o slide atual.";
+        }
+      } catch {
+        mensagemErro = "Erro de conexão ao salvar o slide atual.";
+      } finally {
+        useEditorStore.getState().concluirSalvamento(slideIdSnapshot, versaoSnapshot, sucesso);
+      }
+
+      if (!sucesso) {
+        useEditorStore.getState().setSaving(false);
+        toast.error(mensagemErro ?? "Erro ao salvar o slide atual.");
+        return false;
+      }
+
+      const estadoAtual = useEditorStore.getState();
+      if (estadoAtual.slideAtivoId !== slideIdSnapshot) return false;
+      if (!estadoAtual.isDirty) return true;
+    }
+
+    useEditorStore.getState().setSaving(false);
+    toast.error("O slide continuou sendo editado durante o salvamento. Tente trocar novamente.");
+    return false;
+  }
+
+  async function carregarSlideRemoto(slideId: string) {
     const res = await ObterSlide(slideId);
     if (res.success && res.data) {
       const dadosJson = res.data.dadosJson as DadosSlidePersistidos | null;
-      carregarSlide(
-        slideId,
-        dadosJson?.componentes ?? [],
-        obterCanvasSeguro(dadosJson?.canvas),
-        obterEntradaApresentacaoSegura(dadosJson?.entradaApresentacao),
-      );
+      carregarSlide(slideId, dadosJson?.componentes ?? [], obterCanvasSeguro(dadosJson?.canvas));
+      return true;
     } else {
       toast.error(typeof res.error === "string" ? res.error : "Erro ao abrir slide.");
+      return false;
+    }
+  }
+
+  async function handleSelecionar(slideId: string) {
+    if (slideId === slideAtivoId || processando) return;
+    setProcessando(true);
+    try {
+      if (!await persistirSlideAtivoSeNecessario()) return;
+      await carregarSlideRemoto(slideId);
+    } finally {
+      setProcessando(false);
     }
   }
 
@@ -101,17 +160,18 @@ export function SidebarSlides() {
     if (!apresentacaoId || processando) return;
     setProcessando(true);
     try {
+      if (!await persistirSlideAtivoSeNecessario()) return;
       const res = await CriarSlide(apresentacaoId);
       if (res.success && res.data) {
         setSlides([...slides, {
           id: res.data.id,
           ordem: res.data.ordem,
           nome: res.data.nome,
+          transicaoEntrada: null,
           componentes: [],
           canvas: CANVAS_PADRAO,
-          entradaApresentacao: null,
         }]);
-        carregarSlide(res.data.id, [], CANVAS_PADRAO, null);
+        carregarSlide(res.data.id, [], CANVAS_PADRAO);
       } else {
         toast.error(typeof res.error === "string" ? res.error : "Erro ao criar slide.");
       }
@@ -124,6 +184,7 @@ export function SidebarSlides() {
     if (processando || !apresentacaoId) return;
     setProcessando(true);
     try {
+      if (slideId === slideAtivoId && !await persistirSlideAtivoSeNecessario()) return;
       const res = await DuplicarSlide(slideId);
       if (res.success) {
         toast.success("Slide duplicado.");
@@ -133,11 +194,9 @@ export function SidebarSlides() {
             id: s.id,
             ordem: s.ordem,
             nome: s.nome,
+            transicaoEntrada: s.transicaoEntrada ?? null,
             componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
             canvas: obterCanvasSeguro((s.dadosJson as DadosSlidePersistidos | null)?.canvas),
-            entradaApresentacao: obterEntradaApresentacaoSegura(
-              (s.dadosJson as DadosSlidePersistidos | null)?.entradaApresentacao,
-            ),
           })));
         }
       } else {
@@ -157,7 +216,7 @@ export function SidebarSlides() {
         const restantes = slides.filter((s) => s.id !== slideId);
         setSlides(restantes);
         if (slideAtivoId === slideId && restantes[0]) {
-          await handleSelecionar(restantes[0].id);
+          await carregarSlideRemoto(restantes[0].id);
         }
         toast.success("Slide excluído.");
       } else {

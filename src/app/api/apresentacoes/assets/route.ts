@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import db from "@/lib/prisma";
 import { detectarTipoAsset, nomeArquivoSeguro, validarArquivoAsset } from "@/lib/apresentacoes/assets";
+import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
 function isAdmin(role?: string) {
-  return role === "Admin" || role === "CEO";
+  return isAdminRole(role);
 }
 
 async function podeEditar(apresentacaoId: string, userId: number, role?: string): Promise<boolean> {

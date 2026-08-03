@@ -1,6 +1,7 @@
 import { auth } from "../../../../../auth";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
+import { isAdminRole } from "@/lib/roles";
 
 // Rate limiting simples em memória (5 uploads/min por usuário)
 const uploadTimestamps = new Map<string, number[]>();
@@ -25,7 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const role = user.role ?? "";
-    const isPermitido = role === "Admin" || role === "CEO" || role === "FINANCEIRO" || role === "Lider Comercial" || role === "COMERCIAL";
+    const isPermitido = isAdminRole(role) || role === "FINANCEIRO" || role === "Lider Comercial" || role === "COMERCIAL";
     if (!isPermitido) {
         return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
     }

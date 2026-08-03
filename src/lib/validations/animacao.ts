@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { configAnimacaoContainerAlphaSchema } from "@/lib/apresentacoes/animacao-container-alpha";
 
 export const ANIMACAO_TIPOS = [
   "fade",
@@ -14,6 +15,7 @@ export const ANIMACAO_TIPOS = [
   "stagger",
   "typing",
   "counter",
+  "container-alpha",
 ] as const;
 export type AnimacaoTipo = (typeof ANIMACAO_TIPOS)[number];
 
@@ -31,6 +33,8 @@ export const configAnimacaoSchema = z.object({
   velocidadeDigitacao: z.number().min(1).max(200).optional(),
   /** Só usado quando tipo === "counter" — o contador anima de 0 até este valor. */
   valorFinal: z.number().optional(),
+  /** Configuração visual e sonora da transição fullscreen Container Alpha. */
+  containerAlpha: configAnimacaoContainerAlphaSchema.optional(),
 });
 
 export const configAnimacaoCompletaSchema = z
