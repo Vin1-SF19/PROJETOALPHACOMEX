@@ -3,6 +3,7 @@ import { auth } from "../../../../../auth";
 import { listTools, createCustomTool, OnyxError } from "@/lib/onyx/client";
 import { isAdminRole } from "@/lib/onyx/ownership";
 import { IMAGE_GEN_TOOL_NAME } from "@/lib/onyx/tools-meta";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,8 @@ export async function GET() {
   }
   const role = (session.user as { role?: string }).role ?? "";
   try {
-    let tools = await listTools();
+    const userToken = await getUserOnyxToken(session.user.id);
+    let tools = await listTools(userToken);
     if (!isAdminRole(role)) {
       tools = tools.filter(t => t.name !== IMAGE_GEN_TOOL_NAME);
     }
@@ -53,11 +55,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const userToken = await getUserOnyxToken(session.user.id);
     const tool = await createCustomTool({
       definition: body.definition,
       custom_headers: body.custom_headers,
       passthrough_auth: body.passthrough_auth ?? false,
-    });
+    }, userToken);
     return NextResponse.json({ tool }, { status: 201 });
   } catch (err) {
     const status = err instanceof OnyxError ? err.status : 500;

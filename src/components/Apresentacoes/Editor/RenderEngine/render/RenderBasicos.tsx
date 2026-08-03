@@ -6,6 +6,7 @@ import type {
   TextoComponente,
   ImagemComponente,
   VideoComponente,
+  AudioComponente,
   BotaoComponente,
   IconeComponente,
   DivisorComponente,
@@ -124,6 +125,23 @@ export function RenderVideo({ componente }: { componente: VideoComponente }) {
     />
   ) : (
     <div className="flex h-full w-full items-center justify-center bg-slate-800/50 text-slate-600 text-xs">Sem vídeo</div>
+  );
+}
+
+export function RenderAudio({ componente }: { componente: AudioComponente }) {
+  return componente.url ? (
+    <div className="flex h-full w-full items-center gap-3 rounded-xl border border-white/10 bg-slate-950/80 px-4">
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-200">{componente.titulo}</span>
+      <audio
+        src={componente.url}
+        autoPlay={componente.autoplay}
+        loop={componente.loop}
+        controls={componente.controles}
+        className="h-10 min-w-0 flex-[2]"
+      />
+    </div>
+  ) : (
+    <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-800/50 text-xs text-slate-600">Sem áudio</div>
   );
 }
 

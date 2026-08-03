@@ -28,6 +28,15 @@ export const videoComponenteSchema = baseComponenteSchema.extend({
   muted: z.boolean().default(true),
 });
 
+export const audioComponenteSchema = baseComponenteSchema.extend({
+  tipo: z.literal("audio"),
+  url: z.string(),
+  titulo: z.string().default("Áudio"),
+  autoplay: z.boolean().default(false),
+  loop: z.boolean().default(false),
+  controles: z.boolean().default(true),
+});
+
 export const botaoComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("botao"),
   texto: z.string(),

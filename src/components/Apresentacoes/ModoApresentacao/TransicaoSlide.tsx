@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import type { ReactNode } from "react";
 
 /**
@@ -31,20 +31,22 @@ interface TransicaoSlideProps {
   slideId: string;
   transicaoEntrada: string | null;
   children: ReactNode;
+  pausado?: boolean;
 }
 
-export function TransicaoSlide({ slideId, transicaoEntrada, children }: TransicaoSlideProps) {
+export function TransicaoSlide({ slideId, transicaoEntrada, children, pausado = false }: TransicaoSlideProps) {
   const variants = variantsPara(transicaoEntrada);
+  const reducedMotion = useReducedMotion();
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
         key={slideId}
-        initial="initial"
+        initial={pausado ? false : "initial"}
         animate="animate"
         exit="exit"
         variants={variants}
-        transition={{ duration: 0.4, ease: "easeInOut" }}
+        transition={{ duration: reducedMotion || pausado ? 0.01 : 0.4, ease: "easeInOut" }}
         style={{ width: "100%", height: "100%" }}
       >
         {children}

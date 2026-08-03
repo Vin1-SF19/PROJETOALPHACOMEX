@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../../auth";
 import { getAgentAvatar, OnyxError } from "@/lib/onyx/client";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   try {
-    const res = await getAgentAvatar(id);
+    const userToken = await getUserOnyxToken(session.user.id);
+    const res = await getAgentAvatar(id, userToken);
     if (!res.ok || !res.body) {
       return NextResponse.json({ error: "Imagem não encontrada" }, { status: 404 });
     }

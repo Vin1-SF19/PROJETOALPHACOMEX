@@ -1,9 +1,12 @@
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import type { ContainerIntroEvent } from "@/lib/apresentacoes/container-intro";
+import type { ReactNode } from "react";
 import { AnimacaoWrapper, FilhosContainer } from "./nucleo";
 import { GloboRender } from "./GloboRender";
 import { ParticulasRender } from "./ParticulasRender";
 import { ObjetoGlbRender } from "./ObjetoGlbRender";
-import { TextoAnimado, RenderImagem, RenderVideo, RenderBotao, RenderIcone, RenderDivisor } from "./render/RenderBasicos";
+import { ContainerCargaRender } from "./ContainerCargaRender";
+import { TextoAnimado, RenderImagem, RenderVideo, RenderAudio, RenderBotao, RenderIcone, RenderDivisor } from "./render/RenderBasicos";
 import {
   RenderGrafico,
   RenderTabela,
@@ -26,7 +29,27 @@ import { RenderChatIlustrativo } from "./render/RenderIA";
  * Dispatcher fino: cada categoria de componente tem seu próprio arquivo de render em
  * ./render/ — este arquivo só faz o switch e aplica a animação declarativa comum.
  */
-export function RenderComponente({ componente }: { componente: ComponenteSlide }) {
+export type ModoRenderComponente = "editor" | "apresentacao";
+
+interface RenderComponenteProps {
+  componente: ComponenteSlide;
+  modo?: ModoRenderComponente;
+  onContainerIntroStart?: (evento: ContainerIntroEvent) => void;
+  onContainerIntroComplete?: () => void;
+  portalProximoSlide?: ReactNode;
+  pausado?: boolean;
+  portalContainerCapa?: Element | null;
+}
+
+export function RenderComponente({
+  componente,
+  modo = "apresentacao",
+  onContainerIntroStart,
+  onContainerIntroComplete,
+  portalProximoSlide,
+  pausado = false,
+  portalContainerCapa,
+}: RenderComponenteProps) {
   const anim = componente.animacao?.entrada;
 
   switch (componente.tipo) {
@@ -47,6 +70,13 @@ export function RenderComponente({ componente }: { componente: ComponenteSlide }
         </AnimacaoWrapper>
       );
 
+    case "audio":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <RenderAudio componente={componente} />
+        </AnimacaoWrapper>
+      );
+
     case "botao":
       return (
         <AnimacaoWrapper animacao={anim}>
@@ -62,7 +92,7 @@ export function RenderComponente({ componente }: { componente: ComponenteSlide }
             filhos={componente.filhos}
             usaStagger={anim?.tipo === "stagger"}
             staggerDelay={anim?.staggerDelay ?? 0.1}
-            renderFilho={(filho) => <RenderComponente componente={filho} />}
+            renderFilho={(filho) => <RenderComponente componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} />}
           />
         </AnimacaoWrapper>
       );
@@ -75,7 +105,7 @@ export function RenderComponente({ componente }: { componente: ComponenteSlide }
             filhos={componente.filhos}
             usaStagger={anim?.tipo === "stagger"}
             staggerDelay={anim?.staggerDelay ?? 0.1}
-            renderFilho={(filho) => <RenderComponente componente={filho} />}
+            renderFilho={(filho) => <RenderComponente componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} />}
           />
         </AnimacaoWrapper>
       );
@@ -96,7 +126,7 @@ export function RenderComponente({ componente }: { componente: ComponenteSlide }
             filhos={componente.filhos}
             usaStagger={anim?.tipo === "stagger"}
             staggerDelay={anim?.staggerDelay ?? 0.1}
-            renderFilho={(filho) => <RenderComponente componente={filho} />}
+            renderFilho={(filho) => <RenderComponente componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} />}
           />
         </AnimacaoWrapper>
       );
@@ -134,6 +164,21 @@ export function RenderComponente({ componente }: { componente: ComponenteSlide }
       return (
         <AnimacaoWrapper animacao={anim}>
           <ObjetoGlbRender componente={componente} />
+        </AnimacaoWrapper>
+      );
+
+    case "containerCarga":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <ContainerCargaRender
+            componente={componente}
+            modo={modo}
+            onIntroStart={onContainerIntroStart}
+            onIntroComplete={onContainerIntroComplete}
+            portalProximoSlide={portalProximoSlide}
+            pausado={pausado}
+            portalContainerCapa={portalContainerCapa}
+          />
         </AnimacaoWrapper>
       );
 

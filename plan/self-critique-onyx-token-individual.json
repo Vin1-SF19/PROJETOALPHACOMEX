@@ -1,0 +1,30 @@
+{
+  "subtaskId": "onyx-token-individual",
+  "critiquedAt": "2026-08-03T18:15:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "O token individual poderia conter espacos e produzir um header Authorization invalido; authHeaders remove espacos antes do uso.",
+      "A ausencia de ONYX_API_KEY poderia bloquear uma chamada que possui token individual valido; isOnyxConfigured agora aceita a credencial individual.",
+      "Chamadas auxiliares como getImageGenToolId ou download do avatar gerado poderiam voltar silenciosamente ao PAT global; o token agora e propagado em toda a cadeia coberta."
+    ],
+    "edgeCases": [
+      "Chamadas tecnicas sem token individual continuam usando ONYX_API_KEY.",
+      "Token individual vazio ou nulo preserva o fallback existente sem montar Bearer vazio.",
+      "Token individual invalido ou revogado preserva o status e a mensagem devolvidos pelo Onyx atraves de OnyxError."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

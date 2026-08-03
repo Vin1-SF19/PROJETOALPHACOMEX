@@ -1,0 +1,226 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, GripVertical } from "lucide-react";
+import { CriarEtapaBpm, AtualizarEtapaBpm, ReordenarEtapasBpm } from "@/actions/bpm/Etapas";
+import { CriarCampoBpm, AtualizarCampoBpm } from "@/actions/bpm/Campos";
+import type { TemaAlpha } from "@/lib/temas";
+
+interface EtapaBpm {
+  id: string;
+  nome: string;
+  ordem: number;
+  slaDias: number | null;
+  ativo: boolean;
+}
+
+interface CampoBpm {
+  id: string;
+  etapaId: string | null;
+  nome: string;
+  tipo: string;
+  obrigatorio: boolean;
+  ordem: number;
+}
+
+interface PipelineBpm {
+  id: string;
+  nome: string;
+  etapas: EtapaBpm[];
+  campos: CampoBpm[];
+}
+
+const inputCls = "bg-slate-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/20";
+
+export default function AdminPipelineClient({ pipeline, visual }: { pipeline: PipelineBpm; visual: TemaAlpha }) {
+  const accent = visual.accent;
+  const router = useRouter();
+  const [etapas, setEtapas] = useState(pipeline.etapas.slice().sort((a, b) => a.ordem - b.ordem));
+  const [campos, setCampos] = useState(pipeline.campos);
+  const [novaEtapaNome, setNovaEtapaNome] = useState("");
+  const [novoCampoNome, setNovoCampoNome] = useState("");
+  const [novoCampoTipo, setNovoCampoTipo] = useState("texto");
+  const [novoCampoEtapaId, setNovoCampoEtapaId] = useState<string>("");
+  const [novoCampoObrigatorio, setNovoCampoObrigatorio] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function handleCriarEtapa() {
+    if (!novaEtapaNome.trim()) return;
+    const res = await CriarEtapaBpm({ pipelineId: pipeline.id, nome: novaEtapaNome, ordem: etapas.length });
+    if (res.success && res.data) {
+      setEtapas((prev) => [...prev, res.data]);
+      setNovaEtapaNome("");
+    } else {
+      setErro(typeof res.error === "string" ? res.error : "Erro ao criar etapa");
+    }
+  }
+
+  async function handleAtualizarSla(etapaId: string, slaDias: number | null) {
+    setEtapas((prev) => prev.map((e) => (e.id === etapaId ? { ...e, slaDias } : e)));
+    await AtualizarEtapaBpm({ etapaId, slaDias });
+  }
+
+  async function handleMoverEtapa(index: number, direcao: -1 | 1) {
+    const novoIndex = index + direcao;
+    if (novoIndex < 0 || novoIndex >= etapas.length) return;
+
+    const reordenadas = etapas.slice();
+    [reordenadas[index], reordenadas[novoIndex]] = [reordenadas[novoIndex], reordenadas[index]];
+    const comOrdemAtualizada = reordenadas.map((e, i) => ({ ...e, ordem: i }));
+    setEtapas(comOrdemAtualizada);
+
+    await ReordenarEtapasBpm({
+      pipelineId: pipeline.id,
+      ordem: comOrdemAtualizada.map((e) => ({ etapaId: e.id, ordem: e.ordem })),
+    });
+    router.refresh();
+  }
+
+  async function handleCriarCampo() {
+    if (!novoCampoNome.trim()) return;
+    const res = await CriarCampoBpm({
+      pipelineId: pipeline.id,
+      etapaId: novoCampoEtapaId || undefined,
+      nome: novoCampoNome,
+      tipo: novoCampoTipo,
+      obrigatorio: novoCampoObrigatorio,
+      ordem: campos.length,
+    });
+    if (res.success && res.data) {
+      setCampos((prev) => [...prev, res.data]);
+      setNovoCampoNome("");
+      setNovoCampoObrigatorio(false);
+    } else {
+      setErro(typeof res.error === "string" ? res.error : "Erro ao criar campo");
+    }
+  }
+
+  async function handleToggleObrigatorio(campoId: string, obrigatorio: boolean) {
+    setCampos((prev) => prev.map((c) => (c.id === campoId ? { ...c, obrigatorio } : c)));
+    await AtualizarCampoBpm({ campoId, obrigatorio });
+  }
+
+  return (
+    <div className="p-6 space-y-8 max-w-3xl">
+      <div>
+        <h1 className="text-xl font-black text-white">Configurar Pipeline — {pipeline.nome}</h1>
+        <p className="text-sm text-slate-400 mt-1">Etapas, campos e SLA são exclusivos de administradores.</p>
+      </div>
+
+      {erro && (
+        <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{erro}</div>
+      )}
+
+      {/* Etapas */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold text-white uppercase tracking-wide">Etapas</h2>
+        <div className="space-y-2">
+          {etapas.map((etapa, i) => (
+            <div key={etapa.id} className="flex items-center gap-3 bg-slate-800/60 border border-white/5 rounded-xl px-3 py-2">
+              <GripVertical size={14} className="text-slate-600" />
+              <span className="flex-1 text-sm text-white">{etapa.nome}</span>
+              <label className="flex items-center gap-1.5 text-xs text-slate-400">
+                SLA (dias)
+                <input
+                  type="number"
+                  min={1}
+                  className={`${inputCls} w-16`}
+                  value={etapa.slaDias ?? ""}
+                  onChange={(e) => handleAtualizarSla(etapa.id, e.target.value ? Number(e.target.value) : null)}
+                />
+              </label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleMoverEtapa(i, -1)}
+                  disabled={i === 0}
+                  className="p-1 rounded text-slate-500 hover:text-white disabled:opacity-30"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={() => handleMoverEtapa(i, 1)}
+                  disabled={i === etapas.length - 1}
+                  className="p-1 rounded text-slate-500 hover:text-white disabled:opacity-30"
+                >
+                  ↓
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            className={`${inputCls} flex-1`}
+            placeholder="Nome da nova etapa"
+            value={novaEtapaNome}
+            onChange={(e) => setNovaEtapaNome(e.target.value)}
+          />
+          <button
+            onClick={handleCriarEtapa}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
+            style={{ background: `rgba(${accent},0.85)` }}
+          >
+            <Plus size={14} /> Adicionar
+          </button>
+        </div>
+      </section>
+
+      {/* Campos personalizados */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-bold text-white uppercase tracking-wide">Campos Personalizados</h2>
+        <div className="space-y-2">
+          {campos.map((campo) => (
+            <div key={campo.id} className="flex items-center gap-3 bg-slate-800/60 border border-white/5 rounded-xl px-3 py-2">
+              <span className="flex-1 text-sm text-white">{campo.nome}</span>
+              <span className="text-xs text-slate-500">{campo.tipo}</span>
+              <span className="text-xs text-slate-500">
+                {etapas.find((e) => e.id === campo.etapaId)?.nome || "Todas as etapas"}
+              </span>
+              <label className="flex items-center gap-1.5 text-xs text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={campo.obrigatorio}
+                  onChange={(e) => handleToggleObrigatorio(campo.id, e.target.checked)}
+                />
+                Obrigatório
+              </label>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            className={`${inputCls} flex-1 min-w-[140px]`}
+            placeholder="Nome do campo"
+            value={novoCampoNome}
+            onChange={(e) => setNovoCampoNome(e.target.value)}
+          />
+          <select className={inputCls} value={novoCampoTipo} onChange={(e) => setNovoCampoTipo(e.target.value)}>
+            <option value="texto">Texto</option>
+            <option value="numero">Número</option>
+            <option value="data">Data</option>
+            <option value="selecao">Seleção</option>
+            <option value="booleano">Sim/Não</option>
+          </select>
+          <select className={inputCls} value={novoCampoEtapaId} onChange={(e) => setNovoCampoEtapaId(e.target.value)}>
+            <option value="">Todas as etapas</option>
+            {etapas.map((e) => (
+              <option key={e.id} value={e.id}>{e.nome}</option>
+            ))}
+          </select>
+          <label className="flex items-center gap-1.5 text-xs text-slate-400">
+            <input type="checkbox" checked={novoCampoObrigatorio} onChange={(e) => setNovoCampoObrigatorio(e.target.checked)} />
+            Obrigatório
+          </label>
+          <button
+            onClick={handleCriarCampo}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
+            style={{ background: `rgba(${accent},0.85)` }}
+          >
+            <Plus size={14} /> Adicionar
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}

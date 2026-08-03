@@ -5,9 +5,13 @@ import { isAdminRole, recordAgentOwner, getOwnerInfoMap } from "@/lib/onyx/owner
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 /** Remove a skill de geração de imagem dos tool_ids quando o usuário não é admin. */
-async function sanitizeToolIds(toolIds: number[], role: string): Promise<number[]> {
+async function sanitizeToolIds(
+  toolIds: number[],
+  role: string,
+  userToken?: string | null,
+): Promise<number[]> {
   if (isAdminRole(role)) return toolIds;
-  const imgId = await getImageGenToolId();
+  const imgId = await getImageGenToolId(userToken);
   return imgId === null ? toolIds : toolIds.filter(id => id !== imgId);
 }
 
@@ -25,7 +29,8 @@ export async function GET() {
   const admin = isAdminRole(role);
 
   try {
-    const all = await listAgents();
+    const userToken = await getUserOnyxToken(session.user.id);
+    const all = await listAgents(userToken);
     const ownerMap = await getOwnerInfoMap();
 
     const agents = all
@@ -74,7 +79,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const userToken = await getUserOnyxToken(session.user.id);
-    const toolIds = await sanitizeToolIds(Array.isArray(body.tool_ids) ? body.tool_ids : [], role);
+    const toolIds = await sanitizeToolIds(
+      Array.isArray(body.tool_ids) ? body.tool_ids : [],
+      role,
+      userToken,
+    );
     const agent = await createAgent({
       name,
       description,

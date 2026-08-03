@@ -9,10 +9,14 @@ import { COMPONENTES_REGISTRY, type TipoComponente } from "./registry/componente
 import { BarraSuperiorEditor } from "./BarraSuperior/BarraSuperiorEditor";
 import { SidebarComponentes } from "./SidebarEsquerda/SidebarComponentes";
 import { SidebarSlides } from "./SidebarEsquerda/SidebarSlides";
-import { CanvasArea, CANVAS_DIMENSOES } from "./Canvas/CanvasArea";
+import { CanvasArea } from "./Canvas/CanvasArea";
 import { PainelPropriedades } from "./PainelDireito/PainelPropriedades";
 import { TimelineReal } from "./Timeline/TimelineReal";
+import { ModalReproducaoApresentacao } from "./ModalReproducaoApresentacao";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
+import type { AssetApresentacao } from "@/lib/apresentacoes/assets";
+import type { EntradaApresentacaoConfig } from "@/lib/apresentacoes/entrada-apresentacao";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -30,6 +34,9 @@ interface ApresentacaoEditorProps {
   slidesIniciais: SlideResumo[];
   slideAtivoIdInicial: string;
   componentesIniciais: ComponenteSlide[];
+  canvasInicial: CanvasConfig;
+  entradaApresentacaoInicial: EntradaApresentacaoConfig | null;
+  assetsIniciais: AssetApresentacao[];
   temaInicial: TemaResumo | null;
 }
 
@@ -39,12 +46,19 @@ export function ApresentacaoEditor({
   slidesIniciais,
   slideAtivoIdInicial,
   componentesIniciais,
+  canvasInicial,
+  entradaApresentacaoInicial,
+  assetsIniciais,
   temaInicial,
 }: ApresentacaoEditorProps) {
   const [tema, setTema] = useState<TemaResumo | null>(temaInicial);
+  const [modalApresentacaoAberto, setModalApresentacaoAberto] = useState(false);
+  const [abrindoApresentacao, setAbrindoApresentacao] = useState(false);
   const inicializar = useEditorStore((s) => s.inicializar);
   const carregarSlide = useEditorStore((s) => s.carregarSlide);
   const componentes = useEditorStore((s) => s.componentes);
+  const canvas = useEditorStore((s) => s.canvas);
+  const entradaApresentacao = useEditorStore((s) => s.entradaApresentacao);
   const slideAtivoId = useEditorStore((s) => s.slideAtivoId);
   const isDirty = useEditorStore((s) => s.isDirty);
   const marcarSalvo = useEditorStore((s) => s.marcarSalvo);
@@ -59,15 +73,22 @@ export function ApresentacaoEditor({
     if (inicializadoRef.current) return;
     inicializadoRef.current = true;
     inicializar(apresentacaoId, slidesIniciais);
-    carregarSlide(slideAtivoIdInicial, componentesIniciais);
-  }, [apresentacaoId, slidesIniciais, slideAtivoIdInicial, componentesIniciais, inicializar, carregarSlide]);
+    carregarSlide(slideAtivoIdInicial, componentesIniciais, canvasInicial, entradaApresentacaoInicial);
+  }, [apresentacaoId, slidesIniciais, slideAtivoIdInicial, componentesIniciais, canvasInicial, entradaApresentacaoInicial, inicializar, carregarSlide]);
 
   useEffect(() => {
     if (!isDirty || !slideAtivoId) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSaving(true);
-      const res = await AtualizarSlide({ id: slideAtivoId, dadosJson: { componentes } });
+      const res = await AtualizarSlide({
+        id: slideAtivoId,
+        dadosJson: {
+          componentes,
+          canvas,
+          ...(entradaApresentacao ? { entradaApresentacao } : {}),
+        },
+      });
       if (res.success) {
         marcarSalvo();
       } else {
@@ -78,7 +99,7 @@ export function ApresentacaoEditor({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [componentes, isDirty, slideAtivoId, marcarSalvo, setSaving]);
+  }, [componentes, canvas, entradaApresentacao, isDirty, slideAtivoId, marcarSalvo, setSaving]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -87,8 +108,8 @@ export function ApresentacaoEditor({
     const tipo = active.data.current?.tipo as TipoComponente | undefined;
     if (!tipo) return;
 
-    const centroX = CANVAS_DIMENSOES.w / 2 - 60;
-    const centroY = CANVAS_DIMENSOES.h / 2 - 40;
+    const centroX = canvas.width / 2 - 60;
+    const centroY = canvas.height / 2 - 40;
     const novoComponente = COMPONENTES_REGISTRY[tipo].criarComponentePadrao(centroX, centroY);
     adicionarComponente(novoComponente);
   }
@@ -102,6 +123,36 @@ export function ApresentacaoEditor({
     for (const c of componentesGerados) adicionarComponente(c);
   }
 
+  async function handleApresentar() {
+    if (abrindoApresentacao) return;
+    setAbrindoApresentacao(true);
+
+    try {
+      if (slideAtivoId && isDirty) {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        setSaving(true);
+        const res = await AtualizarSlide({
+          id: slideAtivoId,
+          dadosJson: {
+            componentes,
+            canvas,
+            ...(entradaApresentacao ? { entradaApresentacao } : {}),
+          },
+        });
+        if (!res.success) {
+          setSaving(false);
+          toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar antes de apresentar.");
+          return;
+        }
+        marcarSalvo();
+      }
+
+      setModalApresentacaoAberto(true);
+    } finally {
+      setAbrindoApresentacao(false);
+    }
+  }
+
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[#020617] text-slate-200">
@@ -111,6 +162,10 @@ export function ApresentacaoEditor({
           temaAtualId={tema?.id ?? null}
           onTemaAplicado={setTema}
           onSlideGeradoAplicado={handleSlideGeradoAplicado}
+          onApresentar={handleApresentar}
+          abrindoApresentacao={abrindoApresentacao}
+          assetsIniciais={assetsIniciais}
+          temaAtual={tema}
         />
         <div className="flex flex-1 overflow-hidden">
           <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-slate-950/60">
@@ -128,6 +183,12 @@ export function ApresentacaoEditor({
           </aside>
         </div>
         <TimelineReal />
+        <ModalReproducaoApresentacao
+          open={modalApresentacaoAberto}
+          onOpenChange={setModalApresentacaoAberto}
+          apresentacaoId={apresentacaoId}
+          titulo={titulo}
+        />
       </div>
     </DndContext>
   );

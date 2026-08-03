@@ -3,6 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import db from "@/lib/prisma";
 import { ModoApresentacaoClient } from "@/components/Apresentacoes/ModoApresentacao/ModoApresentacaoClient";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
+import { obterEntradaApresentacaoSegura } from "@/lib/apresentacoes/entrada-apresentacao";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +12,14 @@ function isAdmin(role?: string) {
   return role === "Admin" || role === "CEO";
 }
 
-export default async function ModoApresentacaoPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function ModoApresentacaoPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ modal?: string }>;
+}) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   const session = await auth();
   if (!session?.user?.id) redirect("/");
 
@@ -45,7 +53,18 @@ export default async function ModoApresentacaoPage({ params }: { params: Promise
     id: s.id,
     transicaoEntrada: s.transicaoEntrada,
     componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
+    canvas: obterCanvasSeguro((s.dadosJson as { canvas?: CanvasConfig } | null)?.canvas),
+    entradaApresentacao: obterEntradaApresentacaoSegura(
+      (s.dadosJson as { entradaApresentacao?: unknown } | null)?.entradaApresentacao,
+    ),
   }));
 
-  return <ModoApresentacaoClient apresentacaoId={apresentacao.id} slides={slides} tema={apresentacao.tema} />;
+  return (
+    <ModoApresentacaoClient
+      apresentacaoId={apresentacao.id}
+      slides={slides}
+      tema={apresentacao.tema}
+      embutido={query.modal === "1"}
+    />
+  );
 }

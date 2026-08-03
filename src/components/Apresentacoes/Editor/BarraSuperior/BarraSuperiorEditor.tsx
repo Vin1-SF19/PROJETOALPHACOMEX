@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette, WandSparkles, Play } from "lucide-react";
+import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette, WandSparkles, Play, Boxes } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import { SeletorTema } from "./SeletorTema";
 import { ModalGerarComIA } from "./ModalGerarComIA";
 import type { TemaResumo } from "../ApresentacaoEditor";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import type { AssetApresentacao } from "@/lib/apresentacoes/assets";
+import { CentralCriativaModal } from "../CentralCriativa/CentralCriativaModal";
 
 interface BarraSuperiorEditorProps {
   titulo: string;
@@ -15,9 +17,23 @@ interface BarraSuperiorEditorProps {
   temaAtualId: string | null;
   onTemaAplicado: (tema: TemaResumo | null) => void;
   onSlideGeradoAplicado: (componentes: ComponenteSlide[]) => void;
+  onApresentar: () => void;
+  abrindoApresentacao: boolean;
+  assetsIniciais: AssetApresentacao[];
+  temaAtual: TemaResumo | null;
 }
 
-export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTemaAplicado, onSlideGeradoAplicado }: BarraSuperiorEditorProps) {
+export function BarraSuperiorEditor({
+  titulo,
+  apresentacaoId,
+  temaAtualId,
+  onTemaAplicado,
+  onSlideGeradoAplicado,
+  onApresentar,
+  abrindoApresentacao,
+  assetsIniciais,
+  temaAtual,
+}: BarraSuperiorEditorProps) {
   const router = useRouter();
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
@@ -26,10 +42,11 @@ export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTem
   const [tituloLocal, setTituloLocal] = useState(titulo);
   const [seletorTemaAberto, setSeletorTemaAberto] = useState(false);
   const [modalIAAberto, setModalIAAberto] = useState(false);
+  const [centralCriativaAberta, setCentralCriativaAberta] = useState(false);
 
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/5 bg-slate-950/80 px-4">
-      <div className="flex items-center gap-3">
+    <div className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b border-white/5 bg-slate-950/80 px-4">
+      <div className="flex min-w-[220px] shrink-0 items-center gap-3">
         <button
           onClick={() => router.push("/PainelAlpha/Apresentacoes")}
           aria-label="Voltar ao painel de apresentações"
@@ -45,13 +62,23 @@ export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTem
         />
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="ml-auto flex shrink-0 items-center gap-4">
         <button
-          onClick={() => router.push(`/PainelAlpha/Apresentacoes/${apresentacaoId}/apresentar`)}
-          aria-label="Apresentar em tela cheia"
-          className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-500"
+          onClick={() => setCentralCriativaAberta(true)}
+          aria-label="Abrir Central Criativa"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-medium text-indigo-200 hover:bg-indigo-500/20"
         >
-          <Play size={13} aria-hidden="true" /> Apresentar
+          <Boxes size={13} aria-hidden="true" /> Central Criativa
+        </button>
+
+        <button
+          onClick={onApresentar}
+          disabled={abrindoApresentacao}
+          aria-label="Abrir reprodução da apresentação"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-60"
+        >
+          {abrindoApresentacao ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
+          Apresentar
         </button>
 
         <button
@@ -116,6 +143,16 @@ export function BarraSuperiorEditor({ titulo, apresentacaoId, temaAtualId, onTem
         onOpenChange={setModalIAAberto}
         apresentacaoId={apresentacaoId}
         onAplicar={onSlideGeradoAplicado}
+      />
+
+      <CentralCriativaModal
+        open={centralCriativaAberta}
+        onOpenChange={setCentralCriativaAberta}
+        apresentacaoId={apresentacaoId}
+        titulo={tituloLocal}
+        assetsIniciais={assetsIniciais}
+        temaAtual={temaAtual}
+        onTemaAplicado={onTemaAplicado}
       />
     </div>
   );

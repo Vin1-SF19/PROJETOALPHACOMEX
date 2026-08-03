@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getChatFile, OnyxError } from "@/lib/onyx/client";
+import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ fil
   if (!fileId) return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 });
 
   try {
-    const res = await getChatFile(fileId);
+    const userToken = await getUserOnyxToken(session.user.id);
+    const res = await getChatFile(fileId, userToken);
     if (!res.ok || !res.body) {
       return NextResponse.json({ error: "Arquivo não encontrado" }, { status: 404 });
     }

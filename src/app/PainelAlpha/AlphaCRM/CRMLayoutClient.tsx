@@ -4,27 +4,21 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getTema } from "@/lib/temas";
+import type { Session } from "next-auth";
 import {
   LayoutDashboard,
   KanbanSquare,
-  Users,
-  CalendarCheck,
-  BarChart3,
   Menu,
   X,
 } from "lucide-react";
 
 const NAV = [
-  { href: "/PainelAlpha/AlphaCRM", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/PainelAlpha/AlphaCRM/pipeline", label: "Pipeline", icon: KanbanSquare },
-  { href: "/PainelAlpha/AlphaCRM/contatos", label: "Contatos", icon: Users },
-  { href: "/PainelAlpha/AlphaCRM/atividades", label: "Atividades", icon: CalendarCheck },
-  { href: "/PainelAlpha/AlphaCRM/relatorios", label: "Relatórios", icon: BarChart3 },
+  { href: "/PainelAlpha/AlphaCRM", label: "Pipelines", icon: LayoutDashboard, exact: true },
 ];
 
-export default function CRMLayout({ children, session }: { children: React.ReactNode; session: any }) {
+export default function CRMLayout({ children, session }: { children: React.ReactNode; session: Session | null }) {
   const pathname = usePathname();
-  const temaNome = (session?.user as any)?.tema_interface || "blue";
+  const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
   const accent = visual.accent;
 
@@ -44,7 +38,7 @@ export default function CRMLayout({ children, session }: { children: React.React
             </div>
             <span className="font-black text-white tracking-tight text-sm uppercase">Alpha CRM</span>
           </div>
-          <p className="text-[10px] text-slate-500 pl-9">Gestão Comercial</p>
+          <p className="text-[10px] text-slate-500 pl-9">Gestão de Processos</p>
         </div>
         <button
           onClick={() => setOpen(false)}
@@ -76,7 +70,6 @@ export default function CRMLayout({ children, session }: { children: React.React
           );
         })}
       </nav>
-
     </>
   );
 
@@ -126,9 +119,6 @@ export default function CRMLayout({ children, session }: { children: React.React
             </div>
             <span className="font-black text-white text-sm uppercase tracking-tight">Alpha CRM</span>
           </div>
-          <span className="ml-auto text-xs text-slate-500 capitalize">
-            {NAV.find(n => n.exact ? pathname === n.href : pathname.startsWith(n.href))?.label || ""}
-          </span>
         </div>
 
         <main className="flex-1 overflow-auto">{children}</main>

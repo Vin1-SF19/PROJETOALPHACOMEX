@@ -2,6 +2,7 @@ import { useEditorStore } from "../store/useEditorStore";
 import { RenderComponente } from "../RenderEngine/RenderComponente";
 import { useCanvasDragResize } from "./useCanvasDragResize";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import type { ReactNode } from "react";
 
 const HANDLES = [
   { pos: "nw" as const, className: "-left-1.5 -top-1.5 cursor-nwse-resize" },
@@ -22,7 +23,15 @@ const HANDLES = [
  * para a propagação — então o clique nunca "borbulha" até o pai selecionar o
  * container por engano.
  */
-export function ComponenteNoCanvas({ componente, dentroDeContainer = false }: { componente: ComponenteSlide; dentroDeContainer?: boolean }) {
+export function ComponenteNoCanvas({
+  componente,
+  dentroDeContainer = false,
+  portalProximoSlide,
+}: {
+  componente: ComponenteSlide;
+  dentroDeContainer?: boolean;
+  portalProximoSlide?: ReactNode;
+}) {
   const selecionado = useEditorStore((s) => s.componenteSelecionadoId === componente.id);
   const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
   const { onMouseDownMover, onMouseDownRedimensionar } = useCanvasDragResize(
@@ -64,10 +73,10 @@ export function ComponenteNoCanvas({ componente, dentroDeContainer = false }: { 
         // Card/Grid: renderiza os filhos como ComponenteNoCanvas (não RenderComponente puro),
         // para que cada filho seja individualmente selecionável/arrastável dentro do container.
         <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
-          <RenderComponenteContainer componente={componente} />
+          <RenderComponenteContainer componente={componente} portalProximoSlide={portalProximoSlide} />
         </div>
       ) : (
-        <RenderComponente componente={componente} />
+        <RenderComponente componente={componente} modo="editor" portalProximoSlide={portalProximoSlide} />
       )}
 
       {selecionado && !dentroDeContainer && (
@@ -75,6 +84,7 @@ export function ComponenteNoCanvas({ componente, dentroDeContainer = false }: { 
           {HANDLES.map((h) => (
             <div
               key={h.pos}
+              data-editor-only="true"
               onMouseDown={onMouseDownRedimensionar(h.pos)}
               className={`absolute h-3 w-3 rounded-sm border border-white bg-indigo-500 ${h.className}`}
             />
@@ -86,7 +96,13 @@ export function ComponenteNoCanvas({ componente, dentroDeContainer = false }: { 
 }
 
 /** Card/Grid/Container com filhos navegáveis individualmente (não usa RenderComponente.* puro, que é só leitura). */
-function RenderComponenteContainer({ componente }: { componente: Extract<ComponenteSlide, { tipo: "card" | "grid" | "container" }> }) {
+function RenderComponenteContainer({
+  componente,
+  portalProximoSlide,
+}: {
+  componente: Extract<ComponenteSlide, { tipo: "card" | "grid" | "container" }>;
+  portalProximoSlide?: ReactNode;
+}) {
   if (componente.tipo === "card") {
     return (
       <div
@@ -101,7 +117,7 @@ function RenderComponenteContainer({ componente }: { componente: Extract<Compone
       >
         {componente.filhos.map((filho) => (
           <div key={filho.id} style={{ position: "absolute", left: filho.x, top: filho.y, width: filho.w, height: filho.h }}>
-            <ComponenteNoCanvas componente={filho} dentroDeContainer />
+            <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
           </div>
         ))}
       </div>
@@ -128,7 +144,7 @@ function RenderComponenteContainer({ componente }: { componente: Extract<Compone
                 : { position: "relative", width: filho.w, height: filho.h }
             }
           >
-            <ComponenteNoCanvas componente={filho} dentroDeContainer />
+            <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
           </div>
         ))}
       </div>
@@ -147,7 +163,7 @@ function RenderComponenteContainer({ componente }: { componente: Extract<Compone
     >
       {componente.filhos.map((filho) => (
         <div key={filho.id} style={{ position: "relative" }}>
-          <ComponenteNoCanvas componente={filho} dentroDeContainer />
+          <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
         </div>
       ))}
     </div>

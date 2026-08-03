@@ -527,3 +527,24 @@ model BlueprintActivity { projectId, userId, action, entityType, entityId?, prev
 **Editado quando:** Camada 2 (evolução avançada) for iniciada, ou se o onboarding for estendido para dentro do workspace do projeto.
 
 **Última atualização:** 2026-07-27 por Scribe
+
+---
+
+### Estado das abas globais do painel
+
+- `src/components/layout/PainelLayoutClient.tsx` é o proprietário do ciclo de vida das abas e iframes.
+- `src/components/layout/TabBar.tsx` cuida da apresentação e da reordenação acessível com `@dnd-kit`.
+- `src/lib/painel-tabs.ts` concentra os tipos, a chave local por usuário e a normalização defensiva do estado persistido.
+- A persistência usa `localStorage`, sobrevive a reload e logout/login no mesmo navegador e não sincroniza entre dispositivos.
+
+**Última atualização:** 2026-08-03 por Scribe
+
+---
+
+### Alpha Presentation Studio — Container Alpha animado (2026-08-03)
+
+**Evolução de introdução:** `SlideApresentacaoLayer.tsx` mantém camadas estáveis por `slide.id`; `src/lib/apresentacoes/container-intro.ts` concentra centralização, evento e recorte; `container-carga-audio.ts` oferece os presets procedurais Industrial e Hidráulico. `ContainerCargaCameraRig.tsx` agora combina enquadramento responsivo e zoom interno, enquanto `ModoApresentacaoClient.tsx` coordena a promoção do próximo slide sem remount. Não há nova rota, dependência, API ou estrutura de banco.
+
+O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da seção Sobre do site institucional. O contrato fica em `slide-componentes-3d.ts`; defaults em `registry-3d.ts`; modelo/câmera/animação em `RenderEngine/ContainerCarga*.tsx`; propriedades em `PainelDireito/camposPorTipo/ContainerCargaProps.tsx`. Não houve mudança de banco, rota, permissão ou dependência. O modo apresentação passou a escalar o palco canônico 1280×720 para o viewport por `src/lib/apresentacoes/viewport.ts`.
+
+**Última atualização:** 2026-08-03 por Scribe

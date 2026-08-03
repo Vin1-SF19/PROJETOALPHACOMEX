@@ -5,9 +5,13 @@ import { isAdminRole, userOwnsAgent, removeAgentOwner, recordAgentOwner } from "
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 
 /** Remove a skill de geração de imagem dos tool_ids quando o usuário não é admin. */
-async function sanitizeToolIds(toolIds: number[], role: string): Promise<number[]> {
+async function sanitizeToolIds(
+  toolIds: number[],
+  role: string,
+  userToken?: string | null,
+): Promise<number[]> {
   if (isAdminRole(role)) return toolIds;
-  const imgId = await getImageGenToolId();
+  const imgId = await getImageGenToolId(userToken);
   return imgId === null ? toolIds : toolIds.filter(id => id !== imgId);
 }
 
@@ -42,7 +46,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (id === null) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
   try {
-    const agent = await getAgent(id);
+    const userToken = await getUserOnyxToken(session.user.id);
+    const agent = await getAgent(id, userToken);
     return NextResponse.json({ agent });
   } catch (err) {
     const status = err instanceof OnyxError ? err.status : 500;
@@ -83,7 +88,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   try {
     const userToken = await getUserOnyxToken(session.user.id);
-    const toolIds = await sanitizeToolIds(Array.isArray(body.tool_ids) ? body.tool_ids : [], role);
+    const toolIds = await sanitizeToolIds(
+      Array.isArray(body.tool_ids) ? body.tool_ids : [],
+      role,
+      userToken,
+    );
     const agent = await updateAgent(id, {
       name,
       description,

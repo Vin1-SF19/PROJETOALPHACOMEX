@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AUTOFILL_PROTECTION_ATTRS } from "@/components/ui/autofill-protection";
 
 import registerAction from "../actions/CreateAction";
 import TogglePillCadastro, { AbaAtiva } from "./cadastro/TogglePillCadastro";
@@ -124,13 +125,18 @@ export default function CadastroUsuarios({
                 </header>
 
                 <div className="p-8 overflow-y-auto custom-scrollbar bg-[radial-gradient(circle_at_top_left,_var(--tw-gradient-stops))] from-indigo-900/5 via-transparent to-transparent">
-                  <Form action={formAction} autoComplete="off" className="space-y-5">
+                  <Form
+                    action={formAction}
+                    autoComplete="off"
+                    {...AUTOFILL_PROTECTION_ATTRS}
+                    className="space-y-5"
+                  >
 
                     {/* Nome */}
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Identificação Nominal</Label>
                       <div className="relative group">
-                        <Input name="nome" placeholder="NOME DO OPERADOR" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold uppercase tracking-widest focus:border-indigo-500/50 transition-all" required />
+                        <Input name="nome" autoComplete="off" {...AUTOFILL_PROTECTION_ATTRS} placeholder="NOME DO OPERADOR" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold uppercase tracking-widest focus:border-indigo-500/50 transition-all" required />
                         <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={18} />
                       </div>
                     </div>
@@ -139,7 +145,7 @@ export default function CadastroUsuarios({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Username</Label>
-                        <Input name="usuario" autoComplete="off" placeholder="@user" className="h-13 bg-black/40 border-white/5 rounded-2xl text-xs font-bold uppercase focus:border-indigo-500/50" required />
+                        <Input name="usuario" autoComplete="off" {...AUTOFILL_PROTECTION_ATTRS} placeholder="@user" className="h-13 bg-black/40 border-white/5 rounded-2xl text-xs font-bold uppercase focus:border-indigo-500/50" required />
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between ml-1">
@@ -157,6 +163,7 @@ export default function CadastroUsuarios({
                           <Input
                             name="senha"
                             autoComplete="new-password"
+                            {...AUTOFILL_PROTECTION_ATTRS}
                             type="text"
                             placeholder="••••••••"
                             value={senhaCapturada}
@@ -173,7 +180,7 @@ export default function CadastroUsuarios({
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-widest">Terminal de E-mail</Label>
                       <div className="relative group">
-                        <Input name="email" type="email" placeholder="operador@alphasystems.com" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold focus:border-indigo-500/50 transition-all" required />
+                        <Input name="email" type="email" autoComplete="off" {...AUTOFILL_PROTECTION_ATTRS} placeholder="operador@alphasystems.com" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold focus:border-indigo-500/50 transition-all" required />
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={18} />
                       </div>
                     </div>
@@ -184,7 +191,7 @@ export default function CadastroUsuarios({
                         Token Onyx <span className="text-slate-600 normal-case font-bold tracking-normal">(opcional)</span>
                       </Label>
                       <div className="relative group">
-                        <Input name="token_onyx" type="password" autoComplete="off" placeholder="onyx_pat_… — pode preencher depois" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold focus:border-indigo-500/50 transition-all" />
+                        <Input name="token_onyx" type="password" autoComplete="one-time-code" {...AUTOFILL_PROTECTION_ATTRS} placeholder="onyx_pat_… — pode preencher depois" className="h-13 bg-black/40 border-white/5 rounded-2xl pl-12 text-xs font-bold focus:border-indigo-500/50 transition-all" />
                         <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors" size={18} />
                       </div>
                       <p className="text-[8px] text-slate-600 leading-relaxed ml-1">

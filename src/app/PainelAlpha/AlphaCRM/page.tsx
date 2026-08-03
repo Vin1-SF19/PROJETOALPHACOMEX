@@ -1,28 +1,16 @@
-import { auth } from "../../../../auth";
 import { getTema } from "@/lib/temas";
-import { buscarStatsCRM, buscarAtividades, buscarOportunidades } from "@/actions/CRM";
-import DashboardCRM from "./DashboardClient";
+import { auth } from "../../../../auth";
+import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
+import PipelinesListClient from "./PipelinesListClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function AlphaCRMPage() {
   const session = await auth();
-  const temaNome = (session?.user as any)?.tema_interface || "blue";
+  const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
 
-  const [stats, atividades, oportunidades] = await Promise.all([
-    buscarStatsCRM(),
-    buscarAtividades({ concluida: false }),
-    buscarOportunidades(),
-  ]);
+  const pipelinesResult = await ListarPipelinesBpm();
 
-  return (
-    <DashboardCRM
-      stats={stats}
-      atividadesPendentes={atividades.slice(0, 8)}
-      oportunidades={oportunidades}
-      visual={visual}
-      session={session}
-    />
-  );
+  return <PipelinesListClient pipelines={pipelinesResult.data ?? []} visual={visual} />;
 }

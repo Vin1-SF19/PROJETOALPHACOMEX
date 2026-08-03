@@ -4,6 +4,7 @@ import {
   textoComponenteSchema,
   imagemComponenteSchema,
   videoComponenteSchema,
+  audioComponenteSchema,
   botaoComponenteSchema,
   iconeComponenteSchema,
   divisorComponenteSchema,
@@ -12,6 +13,7 @@ import {
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
+  containerCargaComponenteSchema,
 } from "./slide-componentes-3d";
 import {
   graficoComponenteSchema,
@@ -28,17 +30,21 @@ import {
   diagramaComponenteSchema,
 } from "./slide-componentes-business";
 import { chatIlustrativoComponenteSchema } from "./slide-componentes-ia";
+import { canvasConfigSchema } from "@/lib/apresentacoes/canvas";
+import { entradaApresentacaoSchema } from "@/lib/apresentacoes/entrada-apresentacao";
 
 export {
   textoComponenteSchema,
   imagemComponenteSchema,
   videoComponenteSchema,
+  audioComponenteSchema,
   botaoComponenteSchema,
   iconeComponenteSchema,
   divisorComponenteSchema,
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
+  containerCargaComponenteSchema,
   graficoComponenteSchema,
   tabelaComponenteSchema,
   kpiComponenteSchema,
@@ -91,6 +97,7 @@ export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion
   textoComponenteSchema,
   imagemComponenteSchema,
   videoComponenteSchema,
+  audioComponenteSchema,
   botaoComponenteSchema,
   cardComponenteSchema,
   gridComponenteSchema,
@@ -100,6 +107,7 @@ export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
+  containerCargaComponenteSchema,
   graficoComponenteSchema,
   tabelaComponenteSchema,
   kpiComponenteSchema,
@@ -124,6 +132,8 @@ function coletarIds(lista: ComponenteSlide[], acc: string[] = []): string[] {
 
 export const dadosSlideSchema = z.object({
   componentes: z.array(componenteSchema),
+  canvas: canvasConfigSchema.optional(),
+  entradaApresentacao: entradaApresentacaoSchema,
 }).refine(
   (dados) => {
     const ids = coletarIds(dados.componentes);
@@ -135,12 +145,14 @@ export const dadosSlideSchema = z.object({
 export type TextoComponente = z.infer<typeof textoComponenteSchema>;
 export type ImagemComponente = z.infer<typeof imagemComponenteSchema>;
 export type VideoComponente = z.infer<typeof videoComponenteSchema>;
+export type AudioComponente = z.infer<typeof audioComponenteSchema>;
 export type BotaoComponente = z.infer<typeof botaoComponenteSchema>;
 export type IconeComponente = z.infer<typeof iconeComponenteSchema>;
 export type DivisorComponente = z.infer<typeof divisorComponenteSchema>;
 export type GloboComponente = z.infer<typeof globoComponenteSchema>;
 export type ParticulasComponente = z.infer<typeof particulasComponenteSchema>;
 export type Objeto3dComponente = z.infer<typeof objeto3dComponenteSchema>;
+export type ContainerCargaComponente = z.infer<typeof containerCargaComponenteSchema>;
 export type GraficoComponente = z.infer<typeof graficoComponenteSchema>;
 export type TabelaComponente = z.infer<typeof tabelaComponenteSchema>;
 export type KpiComponente = z.infer<typeof kpiComponenteSchema>;
@@ -179,6 +191,7 @@ export type ComponenteSlide =
   | TextoComponente
   | ImagemComponente
   | VideoComponente
+  | AudioComponente
   | BotaoComponente
   | CardComponente
   | GridComponente
@@ -188,6 +201,7 @@ export type ComponenteSlide =
   | GloboComponente
   | ParticulasComponente
   | Objeto3dComponente
+  | ContainerCargaComponente
   | GraficoComponente
   | TabelaComponente
   | KpiComponente

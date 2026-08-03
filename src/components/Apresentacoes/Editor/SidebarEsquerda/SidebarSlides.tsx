@@ -16,6 +16,14 @@ import { toast } from "sonner";
 import { CriarSlide, ExcluirSlide, DuplicarSlide, ObterSlide, ListarSlides, ReordenarSlides } from "@/actions/slides";
 import { useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { CANVAS_PADRAO, obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
+import { obterEntradaApresentacaoSegura } from "@/lib/apresentacoes/entrada-apresentacao";
+
+interface DadosSlidePersistidos {
+  componentes: ComponenteSlide[];
+  canvas?: CanvasConfig;
+  entradaApresentacao?: unknown;
+}
 
 function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplicar, onExcluir }: {
   id: string;
@@ -77,8 +85,13 @@ export function SidebarSlides() {
     if (slideId === slideAtivoId) return;
     const res = await ObterSlide(slideId);
     if (res.success && res.data) {
-      const dadosJson = res.data.dadosJson as { componentes: ComponenteSlide[] } | null;
-      carregarSlide(slideId, dadosJson?.componentes ?? []);
+      const dadosJson = res.data.dadosJson as DadosSlidePersistidos | null;
+      carregarSlide(
+        slideId,
+        dadosJson?.componentes ?? [],
+        obterCanvasSeguro(dadosJson?.canvas),
+        obterEntradaApresentacaoSegura(dadosJson?.entradaApresentacao),
+      );
     } else {
       toast.error(typeof res.error === "string" ? res.error : "Erro ao abrir slide.");
     }
@@ -90,8 +103,15 @@ export function SidebarSlides() {
     try {
       const res = await CriarSlide(apresentacaoId);
       if (res.success && res.data) {
-        setSlides([...slides, { id: res.data.id, ordem: res.data.ordem, nome: res.data.nome }]);
-        carregarSlide(res.data.id, []);
+        setSlides([...slides, {
+          id: res.data.id,
+          ordem: res.data.ordem,
+          nome: res.data.nome,
+          componentes: [],
+          canvas: CANVAS_PADRAO,
+          entradaApresentacao: null,
+        }]);
+        carregarSlide(res.data.id, [], CANVAS_PADRAO, null);
       } else {
         toast.error(typeof res.error === "string" ? res.error : "Erro ao criar slide.");
       }
@@ -109,7 +129,16 @@ export function SidebarSlides() {
         toast.success("Slide duplicado.");
         const listaAtualizada = await ListarSlides(apresentacaoId);
         if (listaAtualizada.success) {
-          setSlides(listaAtualizada.data.map((s) => ({ id: s.id, ordem: s.ordem, nome: s.nome })));
+          setSlides(listaAtualizada.data.map((s) => ({
+            id: s.id,
+            ordem: s.ordem,
+            nome: s.nome,
+            componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
+            canvas: obterCanvasSeguro((s.dadosJson as DadosSlidePersistidos | null)?.canvas),
+            entradaApresentacao: obterEntradaApresentacaoSegura(
+              (s.dadosJson as DadosSlidePersistidos | null)?.entradaApresentacao,
+            ),
+          })));
         }
       } else {
         toast.error(typeof res.error === "string" ? res.error : "Erro ao duplicar slide.");

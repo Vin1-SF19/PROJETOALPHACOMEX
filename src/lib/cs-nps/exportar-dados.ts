@@ -100,39 +100,6 @@ const clienteSelect = {
       createdAt: true,
     },
   },
-  crm_oportunidades: {
-    select: {
-      id: true,
-      titulo: true,
-      empresa: true,
-      valor: true,
-      etapa: true,
-      probabilidade: true,
-      responsavelId: true,
-      clienteId: true,
-      descricao: true,
-      dataFechamento: true,
-      perdaMotivo: true,
-      ordem: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  crm_contatos: {
-    select: {
-      id: true,
-      nome: true,
-      email: true,
-      telefone: true,
-      cargo: true,
-      empresa: true,
-      clienteId: true,
-      origem: true,
-      tags: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
 } as const;
 
 type ExportValue = string | number | boolean | Date | null;
@@ -527,8 +494,6 @@ export async function gerarExportacaoCompletaCsNps(): Promise<{ buffer: Buffer; 
     { name: "Log Alteracoes", headers: Object.keys(clienteSelect.logAlteracao.select), rows: clientes.flatMap((cliente) => cliente.logAlteracao), dateColumns: { dataAlteracao: "date-time" } },
     { name: "Historico Cliente", headers: Object.keys(clienteSelect.historicoAlteracoes.select), rows: clientes.flatMap((cliente) => cliente.historicoAlteracoes), dateColumns: { criadoEm: "date-time" } },
     { name: "Indicacoes", headers: Object.keys(clienteSelect.indicacao.select), rows: clientes.flatMap((cliente) => cliente.indicacao ? [cliente.indicacao] : []), dateColumns: { dataIndicacao: "date-time", comprovanteEnviadoEm: "date-time", createdAt: "date-time" } },
-    { name: "CRM Oportunidades", headers: Object.keys(clienteSelect.crm_oportunidades.select), rows: clientes.flatMap((cliente) => cliente.crm_oportunidades), dateColumns: { dataFechamento: "date-only", createdAt: "date-time", updatedAt: "date-time" } },
-    { name: "CRM Contatos", headers: Object.keys(clienteSelect.crm_contatos.select), rows: clientes.flatMap((cliente) => cliente.crm_contatos), dateColumns: { createdAt: "date-time", updatedAt: "date-time" } },
   ];
 
   const workbook = new ExcelJS.Workbook();

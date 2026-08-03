@@ -3,6 +3,7 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { dadosSlideSchema } from "@/lib/validations/slide-componentes";
+import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 
 function isAdmin(role?: string) {
   return role === "Admin" || role === "CEO";
@@ -100,7 +101,7 @@ export async function CriarSlide(apresentacaoId: string) {
         apresentacaoId,
         ordem: (ultimoSlide?.ordem ?? -1) + 1,
         nome: `Slide ${totalSlides + 1}`,
-        dadosJson: { componentes: [] },
+        dadosJson: { componentes: [], canvas: CANVAS_PADRAO },
       },
       select: { id: true, ordem: true, nome: true, dadosJson: true },
     });

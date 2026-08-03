@@ -18,6 +18,8 @@ import {
   saveChecklist, alterarSenhaAdmin,
 } from '@/actions/ColaboradorRH';
 import { getSetoresParaSelect } from '@/actions/gestaoSetores';
+import { AUTOFILL_PROTECTION_ATTRS } from '@/components/ui/autofill-protection';
+import { getTokenOnyxUpdate } from '@/lib/colaboradores/token-onyx-update';
 
 // ─── Explicit types (independent of Prisma client version) ───────────────────
 
@@ -150,6 +152,7 @@ function TextInput({ value, onChange, placeholder, type = 'text', disabled }: {
       placeholder={placeholder}
       disabled={disabled}
       autoComplete="off"
+      {...AUTOFILL_PROTECTION_ATTRS}
       className="h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-[11px] font-bold text-white placeholder:text-slate-700 focus:border-indigo-500/40 focus:bg-indigo-500/5 outline-none transition-all disabled:opacity-40"
     />
   );
@@ -166,6 +169,8 @@ function SelectInput({ value, onChange, options, disabled }: {
       value={value}
       onChange={e => onChange(e.target.value)}
       disabled={disabled}
+      autoComplete="off"
+      {...AUTOFILL_PROTECTION_ATTRS}
       className="h-10 px-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-[11px] font-bold text-white focus:border-indigo-500/40 outline-none transition-all appearance-none disabled:opacity-40"
       style={{ backgroundColor: '#0f172a', color: 'white' }}
     >
@@ -230,6 +235,7 @@ export default function ModalPerfilColaborador({
   // Token Onyx — só admin/CEO. Vazio = não alterar (mantém o atual no banco).
   const [tokenOnyx, setTokenOnyx] = useState('');
   const [temTokenOnyx, setTemTokenOnyx] = useState(false);
+  const [editandoTokenOnyx, setEditandoTokenOnyx] = useState(false);
 
   // Lists
   const [setoresLista, setSetoresLista] = useState<string[]>([]);
@@ -306,6 +312,9 @@ export default function ModalPerfilColaborador({
       setImagemUrl(u.imagemUrl ?? '');
       setTemTokenOnyx(!!u.tem_token_onyx);
       setTokenOnyx(''); // nunca pré-preenche (valor não trafega)
+      setEditandoTokenOnyx(false);
+      setNovaSenha('');
+      setConfirmarSenha('');
 
       const cl = u.checklistDocumental;
       setChecklist(cl ? { ...cl } : { ...EMPTY_CHECKLIST });
@@ -329,13 +338,17 @@ export default function ModalPerfilColaborador({
         contato_emerg_2_nome: emerg2Nome, contato_emerg_2_tel: emerg2Tel,
         observacoes_internas: obsInternas,
         ...(imagemUrl ? { imagemUrl } : {}),
-        // Token só vai quando admin digitou algo (define/atualiza). Para limpar,
-        // o botão de remover envia a string vazia separadamente.
-        ...(isAdmin && tokenOnyx.trim() ? { token_onyx: tokenOnyx.trim() } : {}),
+        // Mesmo que um gerenciador de senhas injete texto no campo, o token só
+        // entra no payload depois que o admin ativar explicitamente a edição.
+        ...getTokenOnyxUpdate(isAdmin, editandoTokenOnyx, tokenOnyx),
       });
       if (res.success) {
         toast.success('Dados salvos');
-        if (isAdmin && tokenOnyx.trim()) { setTemTokenOnyx(true); setTokenOnyx(''); }
+        if (isAdmin && editandoTokenOnyx && tokenOnyx.trim()) {
+          setTemTokenOnyx(true);
+          setTokenOnyx('');
+          setEditandoTokenOnyx(false);
+        }
         onAtualizado();
         void load();
       }
@@ -360,6 +373,7 @@ export default function ModalPerfilColaborador({
         toast.success('Token Onyx removido');
         setTemTokenOnyx(false);
         setTokenOnyx('');
+        setEditandoTokenOnyx(false);
         onAtualizado();
         void load();
       } else toast.error(res.error ?? 'Erro ao remover token');
@@ -600,6 +614,7 @@ export default function ModalPerfilColaborador({
                                   <input value={novoCargo} onChange={e => setNovoCargo(e.target.value)}
                                     placeholder="Nome do cargo..." onKeyDown={e => e.key === 'Enter' && void handleAddCargo()}
                                     autoComplete="off"
+                                    {...AUTOFILL_PROTECTION_ATTRS}
                                     className="flex-1 h-9 px-3 rounded-xl bg-white/[0.03] border border-indigo-500/30 text-[11px] font-bold text-white placeholder:text-slate-700 outline-none" />
                                   <button onClick={() => void handleAddCargo()}
                                     className="h-9 px-4 rounded-xl bg-indigo-600 text-white text-[9px] font-black uppercase cursor-pointer hover:bg-indigo-500">
@@ -672,12 +687,33 @@ export default function ModalPerfilColaborador({
                               <div className="flex items-center gap-2">
                                 <input
                                   type="password"
-                                  autoComplete="off"
+                                  autoComplete="one-time-code"
+                                  {...AUTOFILL_PROTECTION_ATTRS}
                                   value={tokenOnyx}
                                   onChange={(e) => setTokenOnyx(e.target.value)}
-                                  placeholder={temTokenOnyx ? '•••••••• (configurado — digite para substituir)' : 'onyx_pat_… (opcional)'}
-                                  className="flex-1 h-11 rounded-xl bg-black/40 border border-white/10 text-[11px] font-bold text-white px-3 placeholder:text-slate-600 focus:border-cyan-500/50 outline-none"
+                                  disabled={!editandoTokenOnyx}
+                                  placeholder={temTokenOnyx ? '•••••••• (token configurado)' : 'Nenhum token configurado'}
+                                  className="flex-1 h-11 rounded-xl bg-black/40 border border-white/10 text-[11px] font-bold text-white px-3 placeholder:text-slate-600 focus:border-cyan-500/50 outline-none disabled:cursor-not-allowed disabled:opacity-60"
                                 />
+                                {!editandoTokenOnyx ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setTokenOnyx(''); setEditandoTokenOnyx(true); }}
+                                    disabled={saving}
+                                    className="shrink-0 h-11 px-3 rounded-xl border border-cyan-500/30 text-cyan-400 text-[9px] font-black uppercase tracking-wider hover:bg-cyan-500/10 transition-all cursor-pointer disabled:opacity-50"
+                                  >
+                                    {temTokenOnyx ? 'Alterar token' : 'Configurar token'}
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setTokenOnyx(''); setEditandoTokenOnyx(false); }}
+                                    disabled={saving}
+                                    className="shrink-0 h-11 px-3 rounded-xl border border-white/15 text-slate-400 text-[9px] font-black uppercase tracking-wider hover:bg-white/5 transition-all cursor-pointer disabled:opacity-50"
+                                  >
+                                    Cancelar
+                                  </button>
+                                )}
                                 {temTokenOnyx && (
                                   <button
                                     type="button"
@@ -692,8 +728,8 @@ export default function ModalPerfilColaborador({
                             </Field>
                             <p className="text-[8px] text-slate-600 leading-relaxed mt-1.5">
                               {temTokenOnyx
-                                ? 'Há um token configurado. As conversas e agentes deste usuário usam a identidade dele no Onyx. Digite um novo valor para substituir, ou Remover para voltar à conta de serviço.'
-                                : 'Cole o PAT individual deste usuário no Onyx. Sem token, ele usa a conta de serviço compartilhada.'}
+                                ? 'Há um token configurado. Clique em Alterar token para liberar a substituição, ou Remover para voltar à conta de serviço.'
+                                : 'Clique em Configurar token para informar o PAT individual. Sem token, o usuário usa a conta de serviço compartilhada.'}
                             </p>
                           </section>
                         )}
@@ -828,6 +864,7 @@ export default function ModalPerfilColaborador({
                                           <input value={novaModalidade} onChange={e => setNovaModalidade(e.target.value)}
                                             placeholder="Nova modalidade..." onKeyDown={e => e.key === 'Enter' && void handleAddModalidade()}
                                             autoComplete="off"
+                                            {...AUTOFILL_PROTECTION_ATTRS}
                                             className="flex-1 h-9 px-3 rounded-xl bg-white/[0.03] border border-indigo-500/30 text-[11px] font-bold text-white placeholder:text-slate-700 outline-none" />
                                           <button onClick={() => void handleAddModalidade()} className="h-9 px-4 rounded-xl bg-indigo-600 text-white text-[9px] font-black uppercase cursor-pointer">Salvar</button>
                                         </div>
@@ -909,6 +946,8 @@ export default function ModalPerfilColaborador({
                           value={obsInternas}
                           onChange={e => setObsInternas(e.target.value)}
                           placeholder="Observações internas sobre o colaborador..."
+                          autoComplete="off"
+                          {...AUTOFILL_PROTECTION_ATTRS}
                           rows={12}
                           className="w-full px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-[11px] font-bold text-white placeholder:text-slate-700 focus:border-indigo-500/40 outline-none resize-none leading-relaxed"
                         />
@@ -942,6 +981,7 @@ export default function ModalPerfilColaborador({
                               onChange={e => setNovaSenha(e.target.value)}
                               placeholder="Mínimo 6 caracteres"
                               autoComplete="new-password"
+                              {...AUTOFILL_PROTECTION_ATTRS}
                               className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
                             />
                           </div>
@@ -955,6 +995,7 @@ export default function ModalPerfilColaborador({
                               onChange={e => setConfirmarSenha(e.target.value)}
                               placeholder="Repita a nova senha"
                               autoComplete="new-password"
+                              {...AUTOFILL_PROTECTION_ATTRS}
                               className="w-full h-10 bg-white/[0.03] border border-white/[0.08] rounded-xl px-3 text-sm text-white placeholder:text-slate-700 focus:border-red-500/40 outline-none"
                             />
                           </div>

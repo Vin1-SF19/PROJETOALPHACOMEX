@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Sparkles, Trash2 } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { TextoProps } from "./camposPorTipo/TextoProps";
@@ -12,6 +12,7 @@ import { GloboProps } from "./camposPorTipo/GloboProps";
 import { ParticulasProps } from "./camposPorTipo/ParticulasProps";
 import { ObjetoGlbProps } from "./camposPorTipo/ObjetoGlbProps";
 import { VideoProps } from "./camposPorTipo/VideoProps";
+import { AudioProps } from "./camposPorTipo/AudioProps";
 import { ContainerProps } from "./camposPorTipo/ContainerProps";
 import { GraficoProps } from "./camposPorTipo/GraficoProps";
 import { TabelaProps } from "./camposPorTipo/TabelaProps";
@@ -24,7 +25,9 @@ import { ChecklistProps } from "./camposPorTipo/ChecklistProps";
 import { GrafoProps } from "./camposPorTipo/GrafoProps";
 import { DiagramaProps } from "./camposPorTipo/DiagramaProps";
 import { ChatIlustrativoProps } from "./camposPorTipo/ChatIlustrativoProps";
+import { ContainerCargaProps } from "./camposPorTipo/ContainerCargaProps";
 import { AnimacaoProps } from "./camposPorTipo/AnimacaoProps";
+import { EntradaApresentacaoProps } from "./EntradaApresentacaoProps";
 
 function buscarNaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide | null {
   for (const c of lista) {
@@ -47,11 +50,7 @@ export function PainelPropriedades() {
   const componente = selecionadoId ? buscarNaArvore(componentes, selecionadoId) : null;
 
   if (!componente) {
-    return (
-      <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-600">
-        Selecione um componente para editar suas propriedades
-      </div>
-    );
+    return <EntradaApresentacaoProps />;
   }
 
   function onChange(patch: Partial<ComponenteSlide>) {
@@ -67,13 +66,23 @@ export function PainelPropriedades() {
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Propriedades</h3>
-        <button
-          onClick={handleExcluir}
-          aria-label="Excluir componente"
-          className="cursor-pointer rounded-lg p-1.5 text-slate-500 hover:bg-red-500/10 hover:text-red-400"
-        >
-          <Trash2 size={14} aria-hidden="true" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => selecionarComponente(null)}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-semibold text-indigo-300 hover:bg-indigo-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          >
+            <Sparkles size={13} aria-hidden="true" />
+            Entrada
+          </button>
+          <button
+            onClick={handleExcluir}
+            aria-label="Excluir componente"
+            className="cursor-pointer rounded-lg p-1.5 text-slate-500 hover:bg-red-500/10 hover:text-red-400"
+          >
+            <Trash2 size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -127,7 +136,9 @@ export function PainelPropriedades() {
       {componente.tipo === "globo" && <GloboProps componente={componente} onChange={onChange} />}
       {componente.tipo === "particulas" && <ParticulasProps componente={componente} onChange={onChange} />}
       {componente.tipo === "objeto3d" && <ObjetoGlbProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "containerCarga" && <ContainerCargaProps componente={componente} onChange={onChange} />}
       {componente.tipo === "video" && <VideoProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "audio" && <AudioProps componente={componente} onChange={onChange} />}
       {componente.tipo === "container" && <ContainerProps componente={componente} onChange={onChange} />}
       {componente.tipo === "grafico" && <GraficoProps componente={componente} onChange={onChange} />}
       {componente.tipo === "tabela" && <TabelaProps componente={componente} onChange={onChange} />}

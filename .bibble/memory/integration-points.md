@@ -761,3 +761,58 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 **Editado quando:** Camada 2 (evolução avançada) começar, ou se outro módulo precisar do mesmo padrão de permissão granular por registro.
 
 **Última atualização:** 2026-07-27 por Scribe
+
+---
+
+### Abas globais do Painel Alpha — reordenação e restauração local
+
+**Adicionado em:** 2026-08-03 por Scribe
+
+**Fluxo:** `PainelLayoutClient` recebe/abre módulos → `TabBar` reordena IDs via `@dnd-kit` → `PainelLayoutClient` aplica `arrayMove` → o estado normalizado é salvo em `localStorage` pela chave do usuário. No carregamento seguinte, `parseStoredTabsState` valida e restaura abas, ordem e aba ativa antes de permitir novas gravações.
+
+**Invariantes de integração:**
+- `IAlpha` (`/PainelAlpha`, ID `tab-home`) permanece fixa na posição zero.
+- Somente URLs internas sob `/PainelAlpha` são restauradas.
+- A persistência é isolada por `userId` e não usa banco.
+- `MODULOS_REGISTRY` continua sendo a fonte de categoria e metadados visuais.
+- A troca e o fechamento de abas continuam sob responsabilidade de `PainelLayoutClient`.
+
+**Editado quando:** mudar o contrato de abertura via `ALPHA_OPEN_TAB`, trocar a identidade do usuário, migrar a persistência para servidor ou alterar a aba inicial fixa.
+
+---
+
+### Alpha Presentation Studio — Container Alpha animado (2026-08-03)
+
+#### Evolução: introdução para o próximo slide
+
+- `ContainerCargaRender` emite `ContainerIntroEvent`, mas não controla o índice da apresentação.
+- `ModoApresentacaoClient` mantém o slide anterior e o próximo como camadas irmãs, bloqueando avanço concorrente enquanto a introdução estiver ativa.
+- `SlideApresentacaoLayer` monta o próximo slide no começo do zoom e preserva sua `key` após a expansão, evitando reinício das animações.
+- Antes do zoom, `ContainerCargaCameraRig` projeta a abertura 3D em coordenadas locais; `ContainerCargaRender` remove o plano branco e renderiza o JSX do próximo slide atrás das portas. Essa projeção também é enviada em `ContainerIntroEvent.abertura` para alinhar o recorte de expansão.
+- `ContainerCargaProps` centraliza no palco 1280×720 e configura zoom, áudio e dois presets Web Audio.
+- As propriedades continuam em `Slide.dadosJson`, com defaults Zod retrocompatíveis e sem migration.
+- Sem slide seguinte, o container apenas abre; com reduced motion, a transição assume o estado final em duração mínima.
+
+- **Discriminador persistido:** `containerCarga` em `src/lib/validations/slide-componentes-3d.ts` e na union `ComponenteSlide`; continua dentro de `Slide.dadosJson`, sem migration.
+- **Paleta:** `REGISTRY_3D` em `registry/registry-3d.ts`; aparece automaticamente na categoria 3D da sidebar, sem novo menu/atalho/permissão.
+- **Render único:** `RenderComponente.tsx` encaminha o modo `editor`/`apresentacao` recursivamente. O editor informa `modo="editor"`; o modo apresentação usa o default `apresentacao`.
+- **Edição:** `ContainerCargaProps.tsx` registrado em `PainelPropriedades.tsx`; x/y/w/h e handles continuam no contrato universal de `ComponenteNoCanvas`/`useCanvasDragResize`.
+- **Responsividade:** o Canvas ocupa a caixa inteira e `ContainerCargaCameraRig` reenquadra pela bounding box quando o tamanho real muda. `ModoApresentacaoClient` agora escala uniformemente o slide canônico 1280×720 para caber no viewport inteiro.
+- **Apresentação:** ao montar o slide, as travas se movem e as portas abrem. Voltar ao slide remonta a árvore por `slideId` e reinicia a sequência. Reduced motion aplica o estado aberto imediatamente.
+- **Performance:** um WebGL context por instância, seguindo o padrão dos demais componentes 3D; frameloop pausado fora da viewport.
+- **Asset:** `/public/A.PNG` já existia no Painel Alpha e é idêntico ao arquivo usado pelo site de origem; não houve cópia nem asset novo.
+
+**Editado quando:** o contrato de propriedades, a sequência de abertura, o comportamento editor/apresentação ou a escala responsiva do palco mudar.
+
+#### Player modal da apresentação
+
+- `BarraSuperiorEditor` delega a abertura para `ApresentacaoEditor`, que salva o slide ativo antes de montar `ModalReproducaoApresentacao`.
+- O modal carrega `/PainelAlpha/Apresentacoes/[id]/apresentar?modal=1`; `PainelLayoutClient` detecta o iframe e não duplica sidebar/abas.
+- `ModoApresentacaoClient` calcula a escala somente na área útil acima da barra de controles e não solicita fullscreen no modo embutido.
+- O estado de pausa percorre `SlideApresentacaoLayer` → `RenderComponente` → `ContainerCargaRender`; controles Framer Motion e o frameloop R3F pausam sem remontar o slide.
+- A mesma cadeia propaga `portalContainerCapa`; o render 3D é promovido para o host integral do slide e escapa de qualquer ancestral que pudesse recortá-lo.
+- `ContainerCargaRender` informa `modoCapa` ao Model/CameraRig: a geometria assume composição widescreen e a projeção do portal é recalculada sobre a escala final.
+- O range do `ModoApresentacaoClient` usa a mesma função `navegarPara` dos botões, portanto também cancela uma introdução ativa antes de saltar ao slide escolhido.
+- O fechamento por Escape dentro do iframe usa `ALPHA_FECHAR_APRESENTACAO` via `postMessage` com validação de mesma origem no modal.
+
+**Editado quando:** mudar o player, os comandos de reprodução, a estratégia de iframe/modal ou o protocolo de fechamento.

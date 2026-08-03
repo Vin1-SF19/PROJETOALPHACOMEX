@@ -4,7 +4,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import GlobalSidebar, { SidebarMobileToggle } from './GlobalSidebar';
-import TabBar, { Tab } from './TabBar';
+import { TabBar } from './TabBar';
+import { arrayMove } from '@dnd-kit/sortable';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useChamadosNotifications } from '@/hooks/useAdminChamadosNotifications';
 import { useChecklistNotifications } from '@/hooks/useChecklistNotifications';
@@ -17,6 +18,15 @@ import OnboardingModal from './OnboardingModal';
 import type { OnboardingVideo } from '@/lib/onboarding';
 import { signOut } from 'next-auth/react';
 import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
+import {
+  ensurePinnedHome,
+  getTabsStorageKey,
+  HOME_LABEL,
+  HOME_TAB_ID,
+  HOME_URL,
+  parseStoredTabsState,
+  type PainelTab,
+} from '@/lib/painel-tabs';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,23 +35,6 @@ function getLabelForUrl(url: string): string {
   if (mod) return mod.label;
   const parts = url.split('/').filter(Boolean);
   return parts[parts.length - 1] || 'Página';
-}
-
-const STORAGE_KEY = 'painel_alpha_tabs_v1';
-
-// Aba inicial fixa (não fecha)
-const HOME_URL = '/PainelAlpha';
-const HOME_LABEL = 'IAlpha';
-const HOME_TAB_ID = 'tab-home';
-
-/** Garante a aba inicial "IAlpha" fixada na primeira posição. */
-function ensurePinnedHome(tabs: Tab[]): Tab[] {
-  const homeIdx = tabs.findIndex(t => t.url === HOME_URL);
-  if (homeIdx >= 0) {
-    const home: Tab = { ...tabs[homeIdx], label: HOME_LABEL, pinned: true };
-    return [home, ...tabs.filter((_, i) => i !== homeIdx)];
-  }
-  return [{ id: HOME_TAB_ID, url: HOME_URL, label: HOME_LABEL, pinned: true }, ...tabs];
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -101,27 +94,25 @@ export default function PainelLayoutClient({
   }, []);
 
   // ── Tab state ─────────────────────────────────────────────────────────────
-  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [tabs, setTabs] = useState<PainelTab[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [tabsHydrated, setTabsHydrated] = useState(false);
   const [initIframeLoaded, setInitIframeLoaded] = useState(false);
   const initTabIdRef = useRef<string>('');
   const initialPathnameRef = useRef(pathname);
   const encerrandoSessaoRef = useRef(false);
+  const tabsStorageKey = getTabsStorageKey(userId);
 
   // Initialize: restore from localStorage or create from current URL
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- inicialização das abas a partir do localStorage/URL */
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as
-        | { tabs: Tab[]; activeId: string }
-        | null;
-      if (saved?.tabs?.length) {
-        const normalized = ensurePinnedHome(saved.tabs);
-        setTabs(normalized);
-        const activeExists = normalized.some(t => t.id === saved.activeId);
-        const restoredActive = activeExists ? saved.activeId : normalized[0].id;
-        setActiveId(restoredActive);
-        initTabIdRef.current = restoredActive;
+      const saved = parseStoredTabsState(localStorage.getItem(tabsStorageKey));
+      if (saved) {
+        setTabs(saved.tabs);
+        setActiveId(saved.activeId);
+        initTabIdRef.current = saved.activeId;
+        setTabsHydrated(true);
         return;
       }
     } catch { /* ignore */ }
@@ -141,18 +132,19 @@ export default function PainelLayoutClient({
       ]);
       setActiveId(id);
     }
+    setTabsHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist tabs whenever they change
   useEffect(() => {
-    if (tabs.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ tabs, activeId }));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [tabs, activeId]);
+    if (!tabsHydrated || tabs.length === 0 || !activeId) return;
+
+    try {
+      localStorage.setItem(tabsStorageKey, JSON.stringify({ tabs, activeId }));
+    } catch { /* localStorage may be unavailable in restricted browsing modes */ }
+  }, [tabs, activeId, tabsHydrated, tabsStorageKey]);
 
   // ── Tab management ────────────────────────────────────────────────────────
 
@@ -188,6 +180,27 @@ export default function PainelLayoutClient({
         return filtered[Math.max(0, idx - 1)].id;
       });
       return filtered;
+    });
+  }, []);
+
+  const reorderTabs = useCallback((draggedId: string, targetId: string) => {
+    setTabs(prev => {
+      const oldIndex = prev.findIndex(tab => tab.id === draggedId);
+      const newIndex = prev.findIndex(tab => tab.id === targetId);
+      const draggedTab = prev[oldIndex];
+      const targetTab = prev[newIndex];
+
+      if (
+        oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex === newIndex ||
+        draggedTab?.pinned ||
+        targetTab?.pinned
+      ) {
+        return prev;
+      }
+
+      return ensurePinnedHome(arrayMove(prev, oldIndex, newIndex));
     });
   }, []);
 
@@ -267,6 +280,7 @@ export default function PainelLayoutClient({
                 activeId={activeId}
                 onActivate={setActiveId}
                 onClose={closeTab}
+                onReorder={reorderTabs}
               />
             </div>
             <div className="shrink-0 pr-3">

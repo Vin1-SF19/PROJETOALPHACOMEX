@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Verifica se a tool generate_image está disponível
-    const imageToolId = await getImageGenToolId();
+    const imageToolId = await getImageGenToolId(userToken);
     if (imageToolId === null) {
       return NextResponse.json({ error: "Tool de geração de imagem não disponível no Onyx." }, { status: 503 });
     }
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
     let contentType = "image/png";
 
     if (resolvedFileId) {
-      const fileRes = await getChatFile(resolvedFileId);
+      const fileRes = await getChatFile(resolvedFileId, userToken);
       if (!fileRes.ok) {
         throw new OnyxError(`Não foi possível baixar o arquivo gerado (${fileRes.status}).`, fileRes.status);
       }

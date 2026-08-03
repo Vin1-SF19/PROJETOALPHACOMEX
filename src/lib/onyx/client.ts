@@ -21,8 +21,8 @@ const API_KEY = process.env.ONYX_API_KEY ?? "";
 /** Base normalizada, sem barra final. Ex: http://192.168.35.113:3000 */
 export const ONYX_BASE = RAW_URL.replace(/\/+$/, "");
 
-export function isOnyxConfigured(): boolean {
-  return Boolean(ONYX_BASE && API_KEY);
+export function isOnyxConfigured(userToken?: string | null): boolean {
+  return Boolean(ONYX_BASE && (userToken?.trim() || API_KEY));
 }
 
 /**
@@ -57,7 +57,7 @@ async function onyxFetch(
   path: string,
   init: OnyxFetchInit = {},
 ): Promise<Response> {
-  if (!isOnyxConfigured()) {
+  if (!isOnyxConfigured(init.userToken)) {
     throw new OnyxError("Onyx não configurado (ONYX_API_URL / ONYX_API_KEY ausentes).", 503);
   }
   const { timeoutMs = 30_000, headers, userToken, ...rest } = init;
@@ -154,12 +154,12 @@ export interface CreateToolInput {
 
 // ─── Agentes (Personas) ──────────────────────────────────────────────────────────
 
-export function listAgents(): Promise<OnyxAgent[]> {
-  return onyxJson<OnyxAgent[]>("/persona");
+export function listAgents(userToken?: string | null): Promise<OnyxAgent[]> {
+  return onyxJson<OnyxAgent[]>("/persona", { userToken });
 }
 
-export function getAgent(id: number): Promise<OnyxAgent> {
-  return onyxJson<OnyxAgent>(`/persona/${id}`);
+export function getAgent(id: number, userToken?: string | null): Promise<OnyxAgent> {
+  return onyxJson<OnyxAgent>(`/persona/${id}`, { userToken });
 }
 
 /** Monta o PersonaUpsertRequest com defaults seguros para os campos obrigatórios. */
@@ -212,7 +212,7 @@ export async function deleteAgent(id: number, userToken?: string | null): Promis
  * ser passado como uploaded_image_id no create/update do agente.
  */
 export async function uploadAgentImage(file: Blob, filename: string, userToken?: string | null): Promise<string> {
-  if (!isOnyxConfigured()) {
+  if (!isOnyxConfigured(userToken)) {
     throw new OnyxError("Onyx não configurado.", 503);
   }
   const form = new FormData();
@@ -235,13 +235,31 @@ export async function uploadAgentImage(file: Blob, filename: string, userToken?:
 }
 
 /** Retorna a Response BRUTA da imagem do agente (para a rota proxy de avatar). */
-export function getAgentAvatar(id: number, signal?: AbortSignal): Promise<Response> {
-  return onyxFetch(`/persona/${id}/avatar`, { method: "GET", signal, timeoutMs: 15_000 });
+export function getAgentAvatar(
+  id: number,
+  userToken?: string | null,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return onyxFetch(`/persona/${id}/avatar`, {
+    method: "GET",
+    userToken,
+    signal,
+    timeoutMs: 15_000,
+  });
 }
 
 /** Retorna a Response BRUTA de um arquivo de chat (ex: imagem gerada por agente). */
-export function getChatFile(fileId: string, signal?: AbortSignal): Promise<Response> {
-  return onyxFetch(`/chat/file/${encodeURIComponent(fileId)}`, { method: "GET", signal, timeoutMs: 20_000 });
+export function getChatFile(
+  fileId: string,
+  userToken?: string | null,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return onyxFetch(`/chat/file/${encodeURIComponent(fileId)}`, {
+    method: "GET",
+    userToken,
+    signal,
+    timeoutMs: 20_000,
+  });
 }
 
 export interface OnyxFileDescriptor {
@@ -273,7 +291,7 @@ export async function uploadChatFiles(
   files: Array<{ blob: Blob; name: string }>,
   userToken?: string | null,
 ): Promise<OnyxFileDescriptor[]> {
-  if (!isOnyxConfigured()) throw new OnyxError("Onyx não configurado.", 503);
+  if (!isOnyxConfigured(userToken)) throw new OnyxError("Onyx não configurado.", 503);
   if (files.length === 0) return [];
 
   const form = new FormData();
@@ -377,9 +395,9 @@ export async function setDefaultImageModel(imageProviderId: string): Promise<voi
 }
 
 /** id da tool de geração de imagem no Onyx (resolve por nome). */
-export async function getImageGenToolId(): Promise<number | null> {
+export async function getImageGenToolId(userToken?: string | null): Promise<number | null> {
   try {
-    const tools = await listTools();
+    const tools = await listTools(userToken);
     const t = tools.find(x => x.name === "generate_image");
     return t ? t.id : null;
   } catch {
@@ -389,14 +407,15 @@ export async function getImageGenToolId(): Promise<number | null> {
 
 // ─── Skills (Tools) ──────────────────────────────────────────────────────────────
 
-export function listTools(): Promise<OnyxTool[]> {
-  return onyxJson<OnyxTool[]>("/tool");
+export function listTools(userToken?: string | null): Promise<OnyxTool[]> {
+  return onyxJson<OnyxTool[]>("/tool", { userToken });
 }
 
-export function createCustomTool(input: CreateToolInput): Promise<OnyxTool> {
+export function createCustomTool(input: CreateToolInput, userToken?: string | null): Promise<OnyxTool> {
   // O Onyx deriva nome/descrição do próprio schema OpenAPI (definition).
   return onyxJson<OnyxTool>("/admin/tool/custom", {
     method: "POST",
+    userToken,
     body: JSON.stringify({
       definition: input.definition,
       custom_headers: input.custom_headers ?? null,
@@ -610,7 +629,7 @@ export function synthesizeVoice(
  * Retorna a Response BRUTA do Onyx (JSON com o texto transcrito).
  */
 export async function transcribeAudio(audio: Blob, filename: string, userToken?: string | null): Promise<Response> {
-  if (!isOnyxConfigured()) throw new OnyxError("Onyx não configurado.", 503);
+  if (!isOnyxConfigured(userToken)) throw new OnyxError("Onyx não configurado.", 503);
   const form = new FormData();
   form.append("audio", audio, filename);
   return fetch(`${ONYX_BASE}/api/voice/transcribe`, {

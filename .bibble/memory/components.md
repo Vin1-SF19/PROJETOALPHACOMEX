@@ -261,3 +261,82 @@
 - `dataInputParaDate()` (`tipos.ts`) — helper que interpreta a string `YYYY-MM-DD` de um `<input type="date">` como meio-dia local, evitando o deslocamento de um dia por fuso horário que `new Date("2026-07-30")` puro causaria em fusos negativos.
 
 **Última atualização:** 2026-07-27 por Scribe
+
+### Barra global de abas do Painel Alpha
+
+**Arquivos:** `src/components/layout/TabBar.tsx`, `src/components/layout/PainelLayoutClient.tsx`, `src/lib/painel-tabs.ts`
+**Tipo:** Client Components + helpers puros
+**Uso:** o layout global mantém uma iframe montada por módulo aberto e renderiza uma aba correspondente na barra superior. Abas não fixadas usam `@dnd-kit/sortable` para reordenação horizontal por ponteiro, toque ou teclado. A ação de fechar é um botão separado da ação de ativar/arrastar.
+
+**Contrato visual do arraste:** a transformação sortable deve manter `y = 0`. O container usa rolagem horizontal e pode recortar a aba se o item ativo acompanhar o deslocamento vertical do ponteiro.
+
+**Persistência:** ordem, abas abertas e aba ativa são armazenadas no `localStorage` após a hidratação, em `painel_alpha_tabs_v2_user_<userId>`. `IAlpha` é sempre normalizada como aba fixa, canônica e primeira. Dados duplicados, externos a `/PainelAlpha` ou malformados são ignorados defensivamente.
+
+**Limite:** o estado acompanha logout/login no mesmo navegador e usuário; não sincroniza entre navegadores ou dispositivos.
+
+**Última atualização:** 2026-08-03 por Scribe
+
+### ContainerCargaRender (Container Alpha animado)
+
+**Arquivos:** `src/components/Apresentacoes/Editor/RenderEngine/ContainerCarga{Render,Model,CameraRig}.tsx`
+**Tipo:** Client Component / React Three Fiber
+**Props principais:** `componente: ContainerCargaComponente`, `modo: "editor" | "apresentacao"`
+**Uso:** registrado como `containerCarga` na categoria 3D do Alpha Presentation Studio e renderizado exclusivamente pelo `RenderComponente` compartilhado. O mesmo modelo também pode ser selecionado como entrada da apresentação sem remover nem exigir uma instância no canvas.
+
+**Notas:** adaptação do container procedural da seção Sobre do site Alpha Comex. Preserva portas com pivôs nas dobradiças, travas, textura corrugada, marca `/A.PNG` e iluminação cinematográfica. O host e o Canvas são transparentes: somente o modelo 3D e a prévia dentro da abertura são renderizados, sem painel ou gradiente atrás do elemento. O componente nasce em 640×360 (16:9, padrão de imagem/vídeo), mas mantém resize livre. A câmera calcula a bounding box real e reage ao tamanho observado pelo R3F, portanto o modelo permanece enquadrado após resize livre e em proporções extremas. No editor, `estadoEditor` alterna preview fechado/aberto; na apresentação, a sequência trava → abertura → zoom ocorre sem intervalo artificial e promove o próximo slide ao terminar. `prefers-reduced-motion` continua respeitado e `useVisibilidadeIframe` pausa o frameloop fora da viewport.
+
+**Propriedades editáveis:** `corPrincipal`, `corMetal`, `corInterior`, `anguloAbertura`, `duracaoAbertura`, `atrasoAbertura`, `mostrarLogo`, `estadoEditor`, além de x/y/w/h/rotação/animação comuns a todos os componentes. Os botões `Centralizar` e `Aplicar 16:9` usam as dimensões reais do canvas ativo; assim, instâncias antigas também podem assumir imediatamente o formato de imagem/vídeo sem serem recriadas.
+
+**Última atualização:** 2026-08-03 por Nova
+
+### EntradaApresentacaoProps (Container Alpha como capa)
+
+**Arquivos:** `src/components/Apresentacoes/Editor/PainelDireito/EntradaApresentacaoProps.tsx`, `src/components/Apresentacoes/ModoApresentacao/EntradaContainerAlphaLayer.tsx`, `src/lib/apresentacoes/entrada-apresentacao.ts`
+**Tipo:** Client Components + schema/helper puro
+**Uso:** no primeiro slide, desmarque o componente atual ou use o botão `Entrada` do painel direito; selecione `Container Alpha` em “Entrada da apresentação”.
+**Notas:** persiste em `dadosJson.entradaApresentacao`, sem migration. O painel mostra uma prévia 16:9 reproduzível e reutiliza `ContainerCargaProps` em modo de entrada para editar cores, ângulo, tempos, zoom, logo e som. No player, a primeira tela já fica montada atrás da capa e também aparece dentro do container; o overlay é removido pelo término real do zoom. O botão de reiniciar reproduz novamente a entrada. O Container Alpha continua disponível normalmente como componente editável da biblioteca.
+
+**Última atualização:** 2026-08-03 por Nova
+
+### CentralCriativaModal (Alpha Presentation Studio)
+
+**Arquivos:** `src/components/Apresentacoes/Editor/CentralCriativa/`, `src/app/api/apresentacoes/assets/route.ts`, `src/actions/apresentacao-assets.ts`, `src/lib/apresentacoes/{assets,canvas,exportacao,remover-fundo}.ts`
+**Tipo:** Client Components + Route Handler + Server Action + helpers puros
+**Uso:** aberta pelo botão "Central Criativa" da barra superior do editor. Reúne biblioteca de mídias, Brand Kit, formatos responsivos e exportação do slide ativo.
+
+**Biblioteca:** aceita imagem, vídeo, áudio e GLB/GLTF, valida até 50 MB, persiste no `ApresentacaoAsset` existente e insere a mídia no centro do canvas como componente editável. A exclusão verifica permissão e recusa assets ainda usados em slides. A remoção de fundo é local, baseada nas bordas da imagem, e salva o PNG processado como um novo asset.
+
+**Brand Kit:** usa `ApresentacaoTema` existente para nome, cores, fontes e logo. A aplicação atualiza o tema da apresentação; a cor secundária também pode se tornar o fundo do slide ativo.
+
+**Canvas e exportação:** formatos 16:9, 4:3, quadrado, vertical e personalizado são persistidos em `Slide.dadosJson.canvas`. A troca de dimensões escala e reposiciona recursivamente os componentes. O player calcula o enquadramento pelo tamanho real de cada slide. Exporta PNG em 1x/2x/3x e JSON versionado sem os controles do editor. O modal usa um workspace quase fullscreen, cabeçalho compacto, tabs roláveis em telas estreitas e conteúdo com overflow próprio para não ser recortado dentro do iframe do Painel Alpha.
+
+**Compatibilidade:** slides antigos continuam em 1280x720 por fallback. Nenhuma migration ou alteração de schema foi criada.
+
+**Última atualização:** 2026-08-03 por Nova
+
+### ModalReproducaoApresentacao
+
+**Arquivo:** `src/components/Apresentacoes/Editor/ModalReproducaoApresentacao.tsx`
+**Tipo:** Client Component / Dialog com player isolado
+**Uso:** aberto pelo botão “Apresentar” da barra do Alpha Presentation Studio após salvar o slide ativo.
+
+**Notas:** monta a rota `/apresentar?modal=1` em iframe responsivo dentro de um Dialog. O Dialog sobrescreve explicitamente o limite `sm:max-w-lg` do componente-base e usa uma superfície horizontal 16:9 de até 1440 px, evitando a aparência de celular em telas desktop. O player usa todo o viewport do iframe; a barra de controles é sobreposta na base e não reduz a área da capa. Oferece reiniciar, anterior, pausar/reproduzir, próximo e fechar; Escape dentro do iframe solicita o fechamento ao modal por `postMessage` restrito à mesma origem.
+
+**Camada de capa:** durante a reprodução, `ModoApresentacaoClient` fornece um host absoluto sobre 100% do viewport e `ContainerCargaRender` usa portal para esse host. Assim, o Container Alpha ignora a posição e o tamanho salvos no editor e cobre a apresentação inteira; no editor ele continua inline e livremente redimensionável.
+
+**Composição responsiva:** no player, a câmera ajusta a escala horizontal do modelo ao aspect ratio real do viewport e usa preenchimento de 98,5%, mantendo as bordas visíveis sem deixar o container pequeno. As coordenadas da abertura fullscreen são normalizadas para o canvas lógico antes de revelar o próximo slide. A barra de controles inclui slider para navegação direta por slide.
+
+**Última atualização:** 2026-08-03 por Nova
+
+### Container Alpha — modo introdução
+**Arquivos:** `ContainerCargaRender.tsx`, `ContainerCargaCameraRig.tsx`, `SlideApresentacaoLayer.tsx`, `src/lib/apresentacoes/container-intro.ts`, `container-carga-audio.ts`
+**Tipo:** Client Components + helpers puros
+**Uso:** habilitar "Transição pelo interior" nas propriedades do `containerCarga`; no modo apresentação, a abertura promove o slide seguinte através do recorte interno.
+
+**Notas:** o componente emite `ContainerIntroEvent`, mas não altera a navegação. `ModoApresentacaoClient` mantém o slide anterior e o próximo como irmãos com `key={slide.id}`; o próximo é montado no começo do zoom e preservado quando vira a única camada. A consolidação definitiva do próximo slide é acionada pelo `onComplete` da própria animação de zoom da câmera, sem um segundo temporizador ou callback da animação CSS. A câmera interpola do enquadramento responsivo até o interior. O áudio usa Web Audio procedural com presets `industrial` e `hidraulico`, sem arquivos externos, e degrada silenciosamente quando autoplay for bloqueado.
+
+**Portal interior:** quando existe próximo slide, o plano branco `Transition_Backdrop` é omitido. `ContainerCargaCameraRig` projeta a abertura 3D em pixels, e `ContainerCargaRender` usa esse retângulo para renderizar uma prévia `cover` do próximo slide atrás do Canvas transparente; portas e moldura continuam por cima no WebGL. O mesmo retângulo vira a origem exata do `clip-path` de transição.
+
+**Novas propriedades:** `transicaoProximoSlide`, `duracaoZoom`, `somHabilitado`, `somAbertura`, `volumeSom`. O botão "Centralizar no slide" calcula x/y no palco canônico 1280×720.
+
+**Última atualização:** 2026-08-03 por Nova

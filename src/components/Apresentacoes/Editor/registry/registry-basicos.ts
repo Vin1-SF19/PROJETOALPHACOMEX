@@ -1,9 +1,9 @@
-import { Type, Image as ImageIcon, Video, RectangleHorizontal, Square, LayoutGrid, PanelsTopLeft, Sparkles, Minus } from "lucide-react";
+import { Type, Image as ImageIcon, Video, AudioLines, RectangleHorizontal, Square, LayoutGrid, PanelsTopLeft, Sparkles, Minus } from "lucide-react";
 import type { RegistryEntry } from "./registry-tipos";
 import { gerarId } from "./registry-tipos";
 
 export const REGISTRY_BASICOS: Record<
-  "texto" | "imagem" | "video" | "botao" | "card" | "grid" | "container" | "icone" | "divisor",
+  "texto" | "imagem" | "video" | "audio" | "botao" | "card" | "grid" | "container" | "icone" | "divisor",
   RegistryEntry
 > = {
   texto: {
@@ -28,6 +28,14 @@ export const REGISTRY_BASICOS: Record<
     criarComponentePadrao: (x, y) => ({
       id: gerarId(), tipo: "video", x, y, w: 480, h: 270, zIndex: 0, rotacao: 0,
       url: "", autoplay: false, loop: false, controles: true, muted: true,
+    }),
+  },
+  audio: {
+    label: "Áudio",
+    icone: AudioLines,
+    criarComponentePadrao: (x, y) => ({
+      id: gerarId(), tipo: "audio", x, y, w: 420, h: 72, zIndex: 0, rotacao: 0,
+      url: "", titulo: "Áudio", autoplay: false, loop: false, controles: true,
     }),
   },
   botao: {

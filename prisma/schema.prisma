@@ -71,9 +71,6 @@ model usuarios {
   progressosVideos ProgressoVideo[]
   resultadosProvas ResultadoProva[]
 
-  crm_oportunidades crm_oportunidades[] @relation("CrmOportunidadesResponsavel")
-  crm_atividades    crm_atividades[]    @relation("CrmAtividadesAutor")
-
   holeritesColaborador Holerite[]                 @relation("HoleriteColaborador")
   holeriteUploads      Holerite[]                 @relation("HoleriteUploader")
   popAcessos           PopAcesso[]                @relation("PopAcessoUsuario")
@@ -116,6 +113,13 @@ model usuarios {
   blueprintProjetosDesenvolvimento BlueprintProject[] @relation("BlueprintDeveloper")
   blueprintProjetosCriados BlueprintProject[] @relation("BlueprintCreatedBy")
   blueprintMembros BlueprintMember[]
+
+  bpmCardsResponsavel BpmCard[] @relation("BpmCardResponsavel")
+  bpmCardMembros      BpmCardMembro[]
+  bpmTarefas          BpmTarefa[]
+  bpmCardHistorico    BpmCardHistorico[]
+  bpmPipelineConfigAuditoria BpmPipelineConfigAuditoria[]
+  bpmCardAnexosEnviados BpmCardAnexo[]
 }
 
 model OnboardingTemplate {
@@ -312,8 +316,9 @@ model clientes {
   canalOutro     String?
   indicacao      Indicacao?
 
-  crm_oportunidades crm_oportunidades[]
-  crm_contatos      crm_contatos[]
+  // Alpha BPM (2026-08-03) — reaproveita `clientes` como Empresa do BPM (D-049)
+  bpmCards              BpmCard[]
+  pessoaEmpresaVinculos PessoaEmpresaVinculo[]
 
   @@unique([cnpj, servicos])
   @@map("clientes")
@@ -329,6 +334,10 @@ model socios {
 
   clienteId Int
   cliente   clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  // Alpha BPM (2026-08-03) — reaproveita `socios` como Pessoa do BPM (D-049),
+  // vínculo N:N com empresas via PessoaEmpresaVinculo (socios.clienteId continua 1:1, intocado)
+  empresaVinculos PessoaEmpresaVinculo[]
 
   @@map("socios")
 }
@@ -1095,69 +1104,6 @@ model DocumentoChecklist {
 
 // ─── Alpha CRM ────────────────────────────────────────────────────────────────
 
-model crm_oportunidades {
-  id             Int      @id @default(autoincrement())
-  titulo         String
-  empresa        String?
-  valor          Float?
-  etapa          String   @default("PROSPECCAO")
-  probabilidade  Int      @default(50)
-  responsavelId  Int
-  clienteId      Int?
-  descricao      String?
-  dataFechamento String?
-  perdaMotivo    String?
-  ordem          Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  responsavel usuarios         @relation("CrmOportunidadesResponsavel", fields: [responsavelId], references: [id])
-  cliente     clientes?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  atividades  crm_atividades[]
-
-  @@map("crm_oportunidades")
-}
-
-model crm_contatos {
-  id        Int      @id @default(autoincrement())
-  nome      String
-  email     String?
-  telefone  String?
-  cargo     String?
-  empresa   String?
-  clienteId Int?
-  origem    String?
-  tags      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  cliente    clientes?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  atividades crm_atividades[]
-
-  @@map("crm_contatos")
-}
-
-model crm_atividades {
-  id             Int     @id @default(autoincrement())
-  tipo           String
-  titulo         String
-  descricao      String?
-  dataPrevista   String?
-  dataRealizada  String?
-  concluida      Boolean @default(false)
-  oportunidadeId Int?
-  clienteId      Int?
-  contatoId      Int?
-  autorId        Int
-
-  createdAt DateTime @default(now())
-
-  autor        usuarios           @relation("CrmAtividadesAutor", fields: [autorId], references: [id])
-  oportunidade crm_oportunidades? @relation(fields: [oportunidadeId], references: [id], onDelete: SetNull)
-  contato      crm_contatos?      @relation(fields: [contatoId], references: [id], onDelete: SetNull)
-
-  @@map("crm_atividades")
-}
 
 // ─── Alpha Metas ──────────────────────────────────────────────────────────────
 
@@ -1361,6 +1307,8 @@ model Setor {
   protegido Boolean  @default(false)
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  bpmPipelines BpmPipelineSetor[]
 
   @@map("setor")
 }
@@ -2633,4 +2581,257 @@ model BlueprintActivity {
 
   @@index([projectId])
   @@index([createdAt])
+}
+
+// ─── Alpha BPM (2026-08-03) ───────────────────────────────────────────────────
+// Sistema de BPM/gestão de processos. Empresa = `clientes`, Pessoa = `socios`,
+// Setor = `Setor` (já existentes, reaproveitados — D-049). Card é a unidade central:
+// 1 card = 1 execução de processo/demanda, sempre vinculado a uma empresa (D-021).
+// Etapas/campos/SLA são metadados configuráveis via UI por pipeline (D-013), não enum fixo.
+
+model BpmPipeline {
+  id        String   @id @default(cuid())
+  nome      String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  setores       BpmPipelineSetor[]
+  etapas        BpmEtapa[]
+  campos        BpmCampo[]
+  cards         BpmCard[]
+  configAuditoria BpmPipelineConfigAuditoria[]
+
+  @@index([ativo])
+}
+
+model BpmPipelineSetor {
+  id         String @id @default(cuid())
+  pipelineId String
+  setorId    Int
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  setor    Setor       @relation(fields: [setorId], references: [id])
+
+  @@unique([pipelineId, setorId])
+  @@index([setorId])
+}
+
+model BpmEtapa {
+  id         String  @id @default(cuid())
+  pipelineId String
+  nome       String
+  ordem      Int     @default(0)
+  slaDias    Int?
+  ativo      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  campos   BpmCampo[]
+  cards    BpmCard[]
+
+  @@index([pipelineId])
+  @@index([pipelineId, ordem])
+}
+
+model BpmCampo {
+  id         String  @id @default(cuid())
+  pipelineId String
+  etapaId    String?
+  nome       String
+  tipo       String // "texto" | "numero" | "data" | "selecao" | "booleano" (validado via Zod na action)
+  opcoesJson String? // opções quando tipo = "selecao"
+  obrigatorio Boolean @default(false)
+  ordem      Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapa    BpmEtapa?   @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  valores  BpmCardCampoValor[]
+
+  @@index([pipelineId])
+  @@index([etapaId])
+}
+
+model BpmCard {
+  id         String  @id @default(cuid())
+  empresaId  Int
+  pipelineId String
+  etapaId    String
+  responsavelId Int
+  servico    String?
+  status     String  @default("ATIVO") // "ATIVO" | "CONCLUIDO" | "CANCELADO"
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  concluidoEm DateTime?
+
+  empresa     clientes    @relation(fields: [empresaId], references: [id])
+  pipeline    BpmPipeline @relation(fields: [pipelineId], references: [id])
+  etapa       BpmEtapa    @relation(fields: [etapaId], references: [id])
+  responsavel usuarios    @relation("BpmCardResponsavel", fields: [responsavelId], references: [id])
+
+  campoValores BpmCardCampoValor[]
+  membros      BpmCardMembro[]
+  tarefas      BpmTarefa[]
+  historico    BpmCardHistorico[]
+  anexos       BpmCardAnexo[]
+
+  vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
+  vinculosDestino BpmCardVinculo[] @relation("CardDestino")
+
+  @@index([empresaId])
+  @@index([pipelineId])
+  @@index([etapaId])
+  @@index([responsavelId])
+  @@index([status])
+}
+
+model BpmCardCampoValor {
+  id      String @id @default(cuid())
+  cardId  String
+  campoId String
+  valor   String?
+
+  card  BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  campo BpmCampo @relation(fields: [campoId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, campoId])
+  @@index([campoId])
+}
+
+model BpmCardMembro {
+  id       String   @id @default(cuid())
+  cardId   String
+  userId   Int
+  role     String // "RESPONSAVEL" | "ADMINISTRADOR" | "PARTICIPANTE"
+  createdAt DateTime @default(now())
+
+  card    BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  usuario usuarios @relation(fields: [userId], references: [id])
+
+  @@unique([cardId, userId])
+  @@index([userId])
+}
+
+model BpmCardVinculo {
+  id             String   @id @default(cuid())
+  cardOrigemId   String
+  cardDestinoId  String
+  createdAt      DateTime @default(now())
+
+  cardOrigem  BpmCard @relation("CardOrigem", fields: [cardOrigemId], references: [id], onDelete: Cascade)
+  cardDestino BpmCard @relation("CardDestino", fields: [cardDestinoId], references: [id], onDelete: Cascade)
+
+  @@unique([cardOrigemId, cardDestinoId])
+  @@index([cardDestinoId])
+}
+
+model BpmTarefa {
+  id            String    @id @default(cuid())
+  cardId        String
+  titulo        String
+  descricao     String?
+  responsavelId Int?
+  prazo         DateTime?
+  prioridade    String    @default("NORMAL") // "BAIXA" | "NORMAL" | "ALTA"
+  status        String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
+  checklistJson String?
+  presetId      String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  concluidaEm DateTime?
+
+  card        BpmCard        @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  responsavel usuarios?      @relation(fields: [responsavelId], references: [id])
+  preset      BpmTarefaPreset? @relation(fields: [presetId], references: [id])
+
+  @@index([cardId])
+  @@index([responsavelId])
+  @@index([status])
+}
+
+model BpmTarefaPreset {
+  id          String  @id @default(cuid())
+  pipelineId  String?
+  nome        String
+  descricao   String?
+  tipoGeracao String  @default("UNICA") // "UNICA" | "MULTIPLA" | "FLUXO" (configurável via UI — D-026)
+  templateJson String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tarefas BpmTarefa[]
+
+  @@index([pipelineId])
+}
+
+model BpmCardHistorico {
+  id               String   @id @default(cuid())
+  cardId           String
+  acao             String
+  valorAnteriorJson String?
+  valorNovoJson     String?
+  usuarioId        Int?
+  automacaoOrigem  String?
+  createdAt        DateTime @default(now())
+
+  card    BpmCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  usuario usuarios? @relation(fields: [usuarioId], references: [id])
+
+  @@index([cardId])
+  @@index([createdAt])
+}
+
+model BpmPipelineConfigAuditoria {
+  id             String   @id @default(cuid())
+  pipelineId     String
+  adminId        Int
+  campoAlterado  String
+  valorAnteriorJson String?
+  valorNovoJson     String?
+  createdAt      DateTime @default(now())
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  admin    usuarios    @relation(fields: [adminId], references: [id])
+
+  @@index([pipelineId])
+  @@index([createdAt])
+}
+
+model BpmCardAnexo {
+  id        String   @id @default(cuid())
+  cardId    String
+  url       String
+  nome      String
+  tipo      String?
+  tamanho   Int?
+  enviadoPorId Int
+  createdAt DateTime @default(now())
+
+  card       BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  enviadoPor usuarios @relation(fields: [enviadoPorId], references: [id])
+
+  @@index([cardId])
+}
+
+model PessoaEmpresaVinculo {
+  id        String  @id @default(cuid())
+  pessoaId  Int
+  empresaId Int
+  funcao    String?
+
+  createdAt DateTime @default(now())
+
+  pessoa  socios   @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  empresa clientes @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([pessoaId, empresaId])
+  @@index([empresaId])
 }
