@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import ModalGerenciamentoLeads from "@/components/comercial/ModalGerenciamentoLeads";
 import { ModalJustificativaMeta } from "@/components/Metas/ModalJustificativaMeta";
+import { pusherClient } from "@/lib/pusher";
 import { getTema } from "@/lib/temas";
 import { toast } from "sonner";
 import {
@@ -967,7 +968,23 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
         }
     }, [processarCelebracoes]);
 
-    // Sem polling: atualizar é chamado via callback onDadosAlterados do modal
+    // Real-time: atualiza sozinho quando um closer confirma uma venda (venda-confirmada
+    // disparado por confirmarFechamento em ContratoComercial.ts), sem depender de refresh manual.
+    useEffect(() => {
+        if (!pusherClient) return;
+        const channel = pusherClient.subscribe("private-metas-alpha");
+        channel.bind("venda-confirmada", () => {
+            void atualizar();
+        });
+        return () => {
+            try {
+                channel.unbind("venda-confirmada");
+                pusherClient.unsubscribe("private-metas-alpha");
+            } catch {
+                // ignore cleanup errors on closed connection
+            }
+        };
+    }, [atualizar]);
 
     const isTV = role === 'TV' || modoTV;
 

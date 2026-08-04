@@ -7,6 +7,7 @@ import { isAdminRole } from "@/lib/roles";
 import { revalidatePath } from "next/cache";
 import { criarRegistroClienteAPartirDeContrato } from "./Clientes";
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
+import { pusherServer } from "@/lib/pusher-server.ts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -293,6 +294,14 @@ export async function confirmarFechamento(raw: unknown) {
         }
 
         revalidatePath("/PainelAlpha/Metas");
+
+        await pusherServer
+            .trigger("private-metas-alpha", "venda-confirmada", {
+                usuarioId: atualizado.usuarioId,
+                contaComVenda: atualizado.contaComVenda,
+            })
+            .catch((err) => console.error("[confirmarFechamento:pusher]", err));
+
         return { success: true as const, contrato: atualizado };
     } catch (err) {
         console.error("confirmarFechamento:", err);

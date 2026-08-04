@@ -9,7 +9,7 @@ import {
 } from "@/lib/chamados/notificacoes";
 
 const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
-const ALL_USER_CHANNELS = ["private-holerite-alerts"];
+const ALL_USER_CHANNELS = ["private-holerite-alerts", "private-metas-alpha"];
 const CHECKLIST_ROLES = ["OPERACIONAL"];
 const CHECKLIST_CHANNELS = ["private-checklist-docs"];
 
