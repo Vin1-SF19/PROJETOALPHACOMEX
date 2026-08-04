@@ -3,6 +3,7 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { extratoInputSchema } from "@/lib/validations/extrato";
+import { criarFiltrosPesquisaExtratos } from "@/lib/extrato/pesquisa-extratos";
 
 const EXTRATOS_INCLUDE = {
   periodos: {
@@ -23,17 +24,8 @@ export async function ListarExtratos(params?: { page?: number; pageSize?: number
 
     const page = params?.page && params.page > 0 ? params.page : 1;
     const pageSize = params?.pageSize && params.pageSize > 0 ? Math.min(params.pageSize, 100) : 20;
-    const busca = params?.busca?.trim();
-
-    const where = busca
-      ? {
-          OR: [
-            { razaoSocial: { contains: busca } },
-            { cnpj: { contains: busca.replace(/\D/g, "") } },
-            { analistaResponsavel: { contains: busca } },
-          ],
-        }
-      : {};
+    const filtrosBusca = criarFiltrosPesquisaExtratos(params?.busca);
+    const where = filtrosBusca.length > 0 ? { OR: filtrosBusca } : {};
 
     const [dados, total] = await Promise.all([
       db.extratos.findMany({

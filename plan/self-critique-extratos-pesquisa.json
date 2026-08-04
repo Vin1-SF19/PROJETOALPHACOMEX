@@ -1,0 +1,51 @@
+{
+  "feature": "Pesquisa de extratos bancarios por CNPJ ou razao social",
+  "status": "PASSED",
+  "predicted_bugs": [
+    {
+      "risk": "Uma busca textual gera cnpj contains vazio e faz o OR corresponder a todos os registros.",
+      "mitigation": "A condicao de CNPJ so e adicionada quando o termo normalizado contem digitos.",
+      "verified_by": "tests/extratos/pesquisa-extratos.test.ts"
+    },
+    {
+      "risk": "CNPJ formatado nao corresponde ao valor persistido apenas com digitos.",
+      "mitigation": "Pontuacao e caracteres nao numericos sao removidos antes de montar o filtro.",
+      "verified_by": "tests/extratos/pesquisa-extratos.test.ts"
+    },
+    {
+      "risk": "Razao social digitada em minusculas ou formato misto nao corresponde ao valor normalizado em maiusculas.",
+      "mitigation": "O termo usado no filtro de razao social e convertido para maiusculas.",
+      "verified_by": "tests/extratos/pesquisa-extratos.test.ts"
+    }
+  ],
+  "edge_cases": [
+    {
+      "case": "Busca vazia, somente com espacos ou indefinida",
+      "expected": "Nenhum OR de pesquisa e criado."
+    },
+    {
+      "case": "Busca textual sem nenhum digito",
+      "expected": "Somente razao social e analista entram no OR."
+    },
+    {
+      "case": "CNPJ parcial, formatado ou sem formatacao",
+      "expected": "Os digitos informados sao usados em contains."
+    },
+    {
+      "case": "Razao social com caixa mista e acentos",
+      "expected": "A caixa e normalizada sem remover os caracteres significativos."
+    }
+  ],
+  "security_and_data": {
+    "database_change": false,
+    "secrets_added": false,
+    "authorization_changed": false
+  },
+  "validation": {
+    "targeted_tests": "4 passed",
+    "extratos_tests": "15 passed",
+    "targeted_lint": "passed",
+    "next_build": "passed",
+    "global_gates": "Known unrelated repository failures documented in the story."
+  }
+}
