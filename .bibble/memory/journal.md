@@ -1309,3 +1309,44 @@ O player modal demorava, falhava de forma intermitente e chegava a mostrar a sid
 - `components.md`: contrato do modal React nativo, áudio/gate, margem responsiva, sequência única, canvas de origem, controles, snapshot, versão e fila serial.
 - `integration-points.md`: invariantes do player, geometria da transição, rota standalone, iframe global e persistência concorrente.
 - `story-apresentacoes-container-alpha-animado.md`: evolução 1.8, arquivos, 32/32 testes, gates e risco E2E residual.
+
+---
+
+## [2026-08-04 10:22] — Alpha Metas: feature "Justificativa de Meta" (upload PDF vigente + histórico imutável)
+
+**Tags:** #feature #nextjs #prisma #security #integration
+**Agentes envolvidos:** Scout, Echo, Vault, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `src/lib/metas-permissoes.ts` (novo), `src/actions/Metas.ts`, `src/actions/JustificativaMeta.ts` (novo), `src/app/api/metas/justificativas/{upload,[id]}/route.ts` (novos), `src/components/Metas/{ModalJustificativaMeta,PreviewJustificativa,ListaHistoricoJustificativas,SeletorPeriodoJustificativa}.tsx` (novos), `src/app/PainelAlpha/Metas/MetasClient.tsx`, `tests/metas/{metas-permissoes,justificativa-meta-action,upload-magic-bytes}.test.ts` (novos), `.bibble/memory/known-errors.md`
+
+### Contexto
+Usuário pediu botão "Justificativa de Meta" no topo do módulo Metas: Admin/TI, CEO e Líder Comercial fazem upload de um PDF mensal (mês/ano de referência); upload novo sobrescreve o vigente do período; membros comuns do Comercial só visualizam; aba Histórico lista todas as versões enviadas, preservando as substituídas.
+
+### O que foi feito
+- Novo model `JustificativaMeta` (Prisma) — migration real aplicada no Turso via script Node pontual, validada por `PRAGMA table_info`/`PRAGMA index_list`, backup pré-mudança gerado em `database-backups/pre-change/`.
+- Server Actions (`ListarHistoricoJustificativas`, `BuscarJustificativaVigente`, `RegistrarJustificativaMeta`) + 2 Route Handlers (upload com magic bytes PDF + leitura autenticada via Vercel Blob privado, token `METAS_READ_WRITE_TOKEN`, já configurado pelo usuário em `.env.local`).
+- Modal (`ModalJustificativaMeta` + 3 subcomponentes) integrado ao header do `MetasClient.tsx`, botão sempre visível (conteúdo do modal muda por role).
+- 44 testes automatizados novos, 100% passando; suíte completa do projeto 708/709 (1 falha pré-existente não relacionada).
+
+### Decisões tomadas
+- Escopo restrito a somente PDF (usuário removeu DOCX): rejeição com toast orientando conversão.
+- Histórico imutável sem `@@unique([mes,ano])` — cada upload é `create()` novo, vigente é sempre o mais recente via `orderBy: createdAt desc`. Nunca update/delete físico.
+- Botão sempre visível no header, autorização só no conteúdo do modal + reforçada no backend — padrão alternativo ao botão condicional já usado em "Configurar Metas".
+- Blob Store dedicado `access: "private"` (token `METAS_READ_WRITE_TOKEN`), leitura só via Route Handler autenticada — nunca URL pública direta.
+- AlertDialog de confirmação obrigatório antes de sobrescrever vigente existente.
+
+### Problemas encontrados / resolvidos
+- **Build quebrado (Forge, 1ª rodada):** `podeGerenciarMetas` exportada como função síncrona de `src/actions/Metas.ts` (arquivo `"use server"`) — Next.js só aceita export `async function` nesses arquivos. Fix: extraído para `src/lib/metas-permissoes.ts` (sem `"use server"`). 2ª manifestação real do mesmo padrão já catalogado em `known-errors.md`, atualizado com o novo caso.
+- **Anubis 🟡:** `url` recebida por `RegistrarJustificativaMeta` aceitava qualquer domínio — corrigido na mesma sessão com `.refine()` restringindo a `*.blob.vercel-storage.com`.
+- **Lens 🟡:** componente do modal com 360 linhas (limite 300) por duplicação de bloco de preview entre as 2 abas — Nova extraiu 3 subcomponentes, caiu para 297 linhas; também adicionado try/catch ausente no parse de JSON do upload.
+- **EPERM recorrente no `prisma generate`** (DLL do query engine travada por processos Node residuais) — fix catalogado aplicado 3x ao longo da sessão (`taskkill` antes de gerar).
+
+### Pendências
+- Ausência de auditoria formal (`db.auditoria`) em `RegistrarJustificativaMeta` — aceita como dívida consciente (Anubis/Lens concordam que o histórico imutável já cobre a maior parte do valor de rastreabilidade).
+- Teste manual em browser real (login autenticado) não realizado nesta sessão — sem credenciais disponíveis (mesma limitação já documentada para Comissões/Blueprint).
+
+### Refletido também em
+- `integration-points.md`: seção completa "Alpha Metas — Justificativa de Meta", checklist de integração, achado de comportamento de `podeGerenciarMetas`.
+- `components.md`: entrada para `ModalJustificativaMeta` + 3 subcomponentes.
+- `architecture.md`: model `JustificativaMeta`, env var `METAS_READ_WRITE_TOKEN`, 3 endpoints novos.
+- `decisions.md`: 3 decisões técnicas (vigente+histórico sem `@@unique`, botão sempre visível, Blob Store dedicado privado).
+- `known-errors.md`: atualizado por Echo com a 2ª manifestação do erro "use server" + export síncrono.

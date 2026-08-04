@@ -73,3 +73,17 @@ export function obterAnimacaoContainerAlpha(
   }
   return null;
 }
+
+interface SlideComComponentes {
+  componentes: ComponenteSlide[];
+}
+
+/**
+ * A abertura Container Alpha configurada no primeiro slide funciona como uma
+ * capa anterior à apresentação. O próprio primeiro slide é o destino do zoom.
+ */
+export function obterAnimacaoContainerAlphaInicial(
+  slides: readonly SlideComComponentes[],
+): ConfigAnimacaoContainerAlpha | null {
+  return obterAnimacaoContainerAlpha(slides[0]?.componentes ?? []);
+}

@@ -23,7 +23,7 @@ export function AnimacaoContainerAlphaProps({ animacao, onChange }: AnimacaoCont
   const configuracao = normalizarConfigAnimacaoContainerAlpha(animacao.containerAlpha);
   const componentePreview = useMemo<ContainerCargaComponente>(() => ({
     ...criarComponenteAnimacaoContainerAlpha(configuracao, canvas),
-    estadoEditor: "aberto",
+    estadoEditor: "fechado",
     transicaoProximoSlide: false,
     somHabilitado: false,
   }), [canvas, configuracao]);
@@ -53,35 +53,22 @@ export function AnimacaoContainerAlphaProps({ animacao, onChange }: AnimacaoCont
           <Sparkles size={16} aria-hidden="true" />
         </div>
         <div>
-          <h5 className="text-xs font-bold text-slate-100">Transição Container Alpha</h5>
-          <p className="mt-0.5 flex items-center gap-1 text-[10px] leading-relaxed text-slate-400">
-            Slide atual <ArrowRight size={10} aria-hidden="true" /> próximo slide, sem corte intermediário.
+          <h5 className="text-xs font-bold text-slate-100">Abertura Container Alpha</h5>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-400">
+            Ajuste o acabamento do container usado na abertura da apresentação.
           </p>
         </div>
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prévia real</span>
-          <button
-            type="button"
-            onClick={reproduzirPreview}
-            className="flex items-center gap-1.5 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-          >
-            <Play size={11} aria-hidden="true" />
-            Reproduzir
-          </button>
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prévia do container</span>
+          <p className="mt-0.5 text-[10px] text-slate-500">Visual isolado para conferir cores, metal, interior e marca.</p>
         </div>
-        <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black shadow-xl">
-          <TransicaoContainerAlphaLayer
-            key={previewKey}
-            configuracao={configuracao}
-            slideDestino={{
-              componentes: proximoSlide?.componentes ?? null,
-              canvas: proximoSlide?.canvas ?? canvas,
-            }}
-            pausado={false}
-            onComplete={ignorarEvento}
+        <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-xl">
+          <ContainerCargaRender
+            componente={componentePreview}
+            modo="editor"
           />
         </div>
       </div>

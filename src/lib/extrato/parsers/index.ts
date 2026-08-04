@@ -18,6 +18,11 @@ import { parserGenerico } from "./generico";
 
 export type { ParserExtrato } from "./types";
 
+export interface ParserDetectado {
+  bancoId: "itau" | "santander";
+  parser: ParserExtrato;
+}
+
 /** Um parser por bancoId do catálogo (ver ModalBanco.tsx). */
 export const PARSERS: Record<string, ParserExtrato> = {
   bradesco: parserBradesco,
@@ -41,4 +46,29 @@ export const PARSERS: Record<string, ParserExtrato> = {
 export function obterParser(bancoId: string | null | undefined): ParserExtrato {
   if (bancoId && PARSERS[bancoId]) return PARSERS[bancoId];
   return parserGenerico;
+}
+
+/** Detecta somente layouts validados contra amostras reais e com assinatura inequívoca. */
+export function detectarParserExtrato(texto: string): ParserDetectado | null {
+  const normalizado = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (
+    normalizado.includes("lancamentos do periodo") &&
+    normalizado.includes("saldo total disponivel dia")
+  ) {
+    return { bancoId: "itau", parser: parserItau };
+  }
+
+  if (
+    normalizado.includes("extrato consolidado inteligente") &&
+    normalizado.includes("conta corrente") &&
+    normalizado.includes("movimentacao")
+  ) {
+    return { bancoId: "santander", parser: parserSantander };
+  }
+
+  return null;
 }

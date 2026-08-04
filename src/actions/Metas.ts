@@ -1,8 +1,8 @@
 "use server";
 
 import db from "@/lib/prisma";
-import { isAdminRole } from "@/lib/roles";
 import { auth } from "../../auth";
+import { podeGerenciarMetas } from "@/lib/metas-permissoes";
 
 export interface ColaboradorMeta {
     colaboradoraId: string;
@@ -86,10 +86,6 @@ export async function getDadosMetas(
         console.error("Erro ao buscar metas:", error);
         return { success: false, error: "Erro ao carregar dados" };
     }
-}
-
-function podeGerenciarMetas(role: string) {
-    return isAdminRole(role) || role === "Lider Comercial";
 }
 
 export async function getColaboradoresParaConfigurar() {

@@ -16,6 +16,7 @@ import {
   criarComponenteAnimacaoContainerAlpha,
   normalizarConfigAnimacaoContainerAlpha,
   obterAnimacaoContainerAlpha,
+  obterAnimacaoContainerAlphaInicial,
 } from "@/lib/apresentacoes/animacao-container-alpha";
 import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 import { configAnimacaoSchema } from "@/lib/validations/animacao";
@@ -59,6 +60,35 @@ describe("Container Alpha do Presentation Studio", () => {
 
     expect(resultado.componentes[0].animacao?.entrada?.tipo).toBe("container-alpha");
     expect(obterAnimacaoContainerAlpha(resultado.componentes)).toMatchObject(ANIMACAO_CONTAINER_ALPHA_PADRAO);
+  });
+
+  it("usa a animação Container Alpha do primeiro slide como abertura automática", () => {
+    const componenteComAbertura = {
+      ...COMPONENTES_REGISTRY.containerCarga.criarComponentePadrao(0, 0),
+      animacao: {
+        entrada: configAnimacaoSchema.parse({
+          tipo: "container-alpha",
+          duracao: 0.5,
+          delay: 0,
+          easing: "easeInOut",
+          containerAlpha: ANIMACAO_CONTAINER_ALPHA_PADRAO,
+        }),
+      },
+    };
+    const segundoSlide = { componentes: [] };
+
+    expect(obterAnimacaoContainerAlphaInicial([
+      { componentes: [componenteComAbertura] },
+      segundoSlide,
+    ])).toMatchObject(ANIMACAO_CONTAINER_ALPHA_PADRAO);
+    expect(obterAnimacaoContainerAlphaInicial([
+      { componentes: [] },
+      { componentes: [componenteComAbertura] },
+    ])).toBeNull();
+    expect(obterAnimacaoContainerAlphaInicial([
+      { componentes: [componenteComAbertura] },
+    ])).toMatchObject(ANIMACAO_CONTAINER_ALPHA_PADRAO);
+    expect(obterAnimacaoContainerAlphaInicial([])).toBeNull();
   });
 
   it("converte a configuração da animação em uma transição fullscreen", () => {

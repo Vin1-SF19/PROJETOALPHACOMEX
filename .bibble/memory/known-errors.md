@@ -18,6 +18,29 @@
 
 ---
 
+### Vercel Blob `get()` com `access: "public"` retorna 400 Bad Request
+**Sintoma:** `Error: Vercel Blob: Failed to fetch blob: 400 Bad Request` ao chamar `get(url, { access: "public", token, ... })` do SDK `@vercel/blob`, mesmo com a URL e o token corretos.
+**Causa:** `get()` do SDK é pensado para blobs PRIVADOS (autenticação via token contra a API do Vercel Blob). Para blobs `access: "public"`, a própria doc do SDK diz que o blob é "acessível via sua URL" — chamar `get()` com `access: "public"` não é o fluxo suportado corretamente e retorna 400. `useCache` também só é efetivo para blobs privados (é apenas ignorado para públicos, não é a causa do 400).
+**Fix:** Para blob PÚBLICO, não usar `get()` do SDK — fazer um `fetch()` HTTP direto na própria `arquivoUrl`/URL armazenada (já é uma URL pública completa gerada pelo `put()`), e repassar `response.body` como stream. Exemplo real (`src/app/api/metas/justificativas/[id]/route.ts`):
+```typescript
+const respostaBlob = await fetch(justificativa.arquivoUrl);
+if (!respostaBlob.ok || !respostaBlob.body) return new Response("Arquivo não encontrado", { status: 404 });
+return new Response(respostaBlob.body, {
+  status: 200,
+  headers: {
+    "Content-Type": respostaBlob.headers.get("content-type") ?? "application/pdf",
+    "Cache-Control": "private, no-store, max-age=0",
+    "Content-Disposition": `inline; filename="..."`,
+    "X-Content-Type-Options": "nosniff",
+  },
+});
+```
+Manter `auth()`/checagem de permissão ANTES de buscar o registro no banco — o `fetch()` na URL pública não exige token, mas a rota do painel continua sendo o único caminho autenticado/oficial.
+**Contexto:** Qualquer Blob Store do projeto configurado como público na Vercel (fora do controle do código — decisão de infraestrutura). Se um Blob Store for criado/reconfigurado como público no futuro, usar `fetch()` direto, nunca `get()` do SDK com `access: "public"`.
+**Adicionado em:** 2026-08-04 (Echo, feature Justificativa de Meta — 2º bug real reportado pelo usuário em produção na mesma sessão, após o 1º fix de `private`→`public` no `put()`/upload ter corrigido o envio mas quebrado a leitura)
+
+---
+
 ### Notificação de chamado: som toca mas o toast não aparece na tela
 **Sintoma:** Usuário ouve o som de notificação (`/sounds/notification.mp3`) mas não vê nenhum toast na tela. Comportamento intermitente — às vezes aparece, às vezes não, sem padrão óbvio.
 **Causa (2 partes):** (1) [NotificationToast.tsx](../../src/components/chamados/NotificationToast.tsx) não tinha fila — `useEffect` sempre pegava `notificacoes[0]` e chamava `setVisivel()` direto. Se um segundo evento chegasse antes dos 6s do primeiro, o segundo **sobrescrevia** o primeiro instantaneamente, sem o usuário nunca ver o toast do primeiro (o som dele já tinha tocado no hook `useAdminChamadosNotifications.ts`, então "ouve o som, não vê nada" é exatamente esse cenário). (2) Causa secundária, estrutural e não corrigida (fora de escopo desta correção): `pusher-js` não faz replay de eventos emitidos enquanto o socket estava desconectado (aba em background, rede instável) — nenhum hook de notificação do projeto (chamados, holerite, checklist) trata isso.
@@ -77,11 +100,11 @@ Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` 
 ## Erros Catalogados
 
 ### "use server" file can only export async functions, found object
-**Sintoma:** `npm run build` falha com `Failed to collect page data for /rota` → causa raiz: `A "use server" file can only export async functions, found object.`
-**Causa:** Um arquivo com `"use server"` no topo (Server Actions) exportou uma constante não-função (ex: objeto de configuração, array, número) além das funções async. Next.js proíbe qualquer export que não seja `async function` nesses arquivos.
-**Fix:** Mover a constante para um arquivo separado SEM `"use server"` (ex: `lib/tributos.ts`) e importar dos dois lados (do arquivo de actions e dos componentes que precisam do valor).
-**Contexto:** Acontece ao tentar reexportar constantes (percentuais, configs, enums) de um arquivo de Server Actions para reuso no frontend — parece funcionar em `tsc`/dev, só quebra no `next build`.
-**Adicionado em:** 2026-07-01
+**Sintoma:** `npm run build` falha com `Failed to collect page data for /rota` → causa raiz: `A "use server" file can only export async functions, found object.` Também aparece como `Server Actions must be async functions.` quando o export problemático é uma função SÍNCRONA (não só constante/objeto) — mesma causa raiz, mensagem do Turbopack varia conforme o tipo do export.
+**Causa:** Um arquivo com `"use server"` no topo (Server Actions) exportou algo que não é `async function` — constante não-função (objeto de configuração, array, número) OU uma função helper síncrona (ex: um helper de autorização `function podeX(role) {...}` tornado `export` para reuso). Next.js proíbe qualquer export que não seja `async function` nesses arquivos, sem exceção.
+**Fix:** Mover o export problemático para um arquivo separado SEM `"use server"` (ex: `lib/tributos.ts`, `lib/metas-permissoes.ts`) e importar dos dois lados (do arquivo de actions e de quem mais precisar do valor/função). Caso real: `podeGerenciarMetas(role)` em `src/actions/Metas.ts` foi tornada `export function` (síncrona) para reuso em `src/actions/JustificativaMeta.ts` — quebrou o build com exatamente este erro. Corrigido movendo para `src/lib/metas-permissoes.ts` e trocando os 3 imports (`Metas.ts` interno + `JustificativaMeta.ts` + as 2 rotas de API que precisavam do helper).
+**Contexto:** Acontece ao tentar reexportar constantes (percentuais, configs, enums) OU helpers síncronos de um arquivo de Server Actions para reuso no frontend/outras actions/rotas — parece funcionar em `tsc`/dev, só quebra no `next build`. Regra geral: qualquer coisa exportada de um arquivo `"use server"` deve ser `async function`, sem exceção — helpers síncronos de autorização/formatação/validação devem morar em `src/lib/`, nunca em `src/actions/`.
+**Adicionado em:** 2026-07-01 (constante/objeto) · **Atualizado em:** 2026-08-04 (Echo, feature Justificativa de Meta — 2ª manifestação real, função síncrona)
 
 ### InfoSimples CPF — data_nascimento formato errado
 **Sintoma:** Consulta CPF retorna erro "CPF não encontrado" mesmo com dados corretos.

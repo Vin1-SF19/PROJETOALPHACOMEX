@@ -8,6 +8,7 @@ import {
 import { ocrViaPdf24, isPdf24Configured } from "@/lib/bibble/pdf24-ocr";
 import type { TransacaoNormalizada, PaginaComErro } from "@/types/extrato";
 import { transacaoOnyxSchema, transacoesOnyxArraySchema } from "@/lib/validations/extrato";
+import { detectarParserExtrato } from "@/lib/extrato/parsers";
 
 const AGENT_ORGANIZADOR_ID = Number(process.env.ONYX_AGENT_ORGANIZADOR_ID ?? "32");
 
@@ -409,7 +410,28 @@ export async function processarExtratoPorAgentes(
     );
   }
 
-  console.log(`[extrato-agents] ${paginas.length} página(s) com texto útil — enviando ao Agente Organizador`);
+  console.log(`[extrato-agents] ${paginas.length} página(s) com texto útil — verificando parser determinístico`);
+
+  // Layouts validados contra amostras reais são resolvidos localmente. Além de
+  // evitar dependência da disponibilidade do agente, isso preserva exatamente
+  // os sinais e as quebras de página conhecidas desses extratos. Layouts não
+  // reconhecidos continuam no fluxo por agentes logo abaixo.
+  const parserDetectado = detectarParserExtrato(paginas.join("\n"));
+  if (parserDetectado) {
+    const transacoes = parserDetectado.parser.parse(paginas.join("\n"));
+    if (transacoes.length > 0) {
+      console.log(
+        `[extrato-agents] parser determinístico ${parserDetectado.bancoId}: ${transacoes.length} transação(ões)`,
+      );
+      return { transacoes, paginasComErro: [] };
+    }
+
+    console.warn(
+      `[extrato-agents] parser determinístico ${parserDetectado.bancoId} não encontrou transações — usando fallback por agentes`,
+    );
+  }
+
+  console.log(`[extrato-agents] layout sem resultado determinístico — enviando ao Agente Organizador`);
 
   // 2. Agente Organizador — 1 chamada por página; falha pontual não aborta as demais
   const transacoesBrutas: TransacaoNormalizada[] = [];

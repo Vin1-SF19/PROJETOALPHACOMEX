@@ -790,6 +790,7 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 - `SlideApresentacaoLayer` monta o próximo slide no começo do zoom e preserva sua `key` após a expansão, evitando reinício das animações. Quando a configuração pertence ao próprio `containerCarga`, o player não monta `TransicaoContainerAlphaLayer`: a instância real executa abertura e zoom uma única vez.
 - Antes do zoom, `ContainerCargaCameraRig` projeta a abertura 3D em coordenadas locais; `ContainerCargaRender` remove o plano branco e renderiza o JSX do próximo slide atrás das portas. Essa projeção também é enviada em `ContainerIntroEvent.abertura` para alinhar o recorte de expansão.
 - `ContainerCargaProps` centraliza no palco 1280×720 e configura zoom, áudio e dois presets Web Audio.
+- `AnimacaoContainerAlphaProps` não instancia o player nem `TransicaoContainerAlphaLayer`: a prévia das propriedades monta somente `ContainerCargaRender` fechado em modo editor, sem slide, reprodução ou comandos de apresentação. Seu contrato é exclusivamente visual para editar acabamento.
 - As propriedades continuam em `Slide.dadosJson`, com defaults Zod retrocompatíveis e sem migration.
 - Sem slide seguinte, o container apenas abre; com reduced motion, a transição assume o estado final em duração mínima.
 - Na camada sintética, o container usa margem igual a 5% da menor dimensão do palco, limitada entre 18 e 72 px. A conversão geométrica tipada reaplica essa margem ao componente e à abertura antes de calcular o `clip-path`.
@@ -814,6 +815,7 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 - A rota `/PainelAlpha/Apresentacoes/[id]/apresentar` permanece como player standalone autenticado e consulta o banco; ela reutiliza `ModoApresentacaoClient`, mas não é usada pelo modal.
 - `ModoApresentacaoClient` usa `h-full w-full` no Dialog e `h-dvh w-dvw` na rota standalone. A transição Container Alpha vive dentro do palco do slide de origem para manter canvas, escala e recorte no mesmo sistema de coordenadas.
 - O modal recebe `embutido=true` e nasce iniciado, sem gate ou espera adicional. A tela “Iniciar apresentação” existe somente na rota standalone, onde o clique libera Web Audio e solicita fullscreen; no modal, o gesto original do botão “Apresentar” já faz o desbloqueio.
+- `obterAnimacaoContainerAlphaInicial()` considera somente a configuração do primeiro slide e não exige slide seguinte, porque o Container Alpha é uma capa anterior à apresentação. No modal, `ModoApresentacaoClient` inicializa a camada sintética antes do primeiro frame; no standalone, ela é preparada no gesto do gate. Origem e destino lógico são o índice 0: o zoom revela o slide 1 e não altera o contador. O comando reiniciar prepara novamente a abertura, enquanto o avanço posterior navega diretamente para o slide 2 sem repetir a capa. Em um `containerCarga` real com essa animação, `SlideApresentacaoLayer` desativa a transição interna concorrente para o slide seguinte.
 - O estado de pausa percorre `SlideApresentacaoLayer` → `RenderComponente` → `ContainerCargaRender`; controles Framer Motion e o frameloop R3F pausam sem remontar o slide.
 - A mesma cadeia propaga `portalContainerCapa`; o render 3D é promovido para o host integral do slide e escapa de qualquer ancestral que pudesse recortá-lo.
 - `ContainerCargaRender` informa `modoCapa` ao Model/CameraRig: a geometria assume composição widescreen e a projeção do portal é recalculada sobre a escala final.
@@ -824,3 +826,37 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 **Editado quando:** mudar o contrato do snapshot do editor, `versaoEdicao`/`concluirSalvamento`, a fila `serializarPersistenciaSlide`, o player compartilhado, o gate standalone, a margem/geometria da transição, os comandos responsivos/fullscreen ou as permissões do iframe global.
 
 **Última atualização:** 2026-08-03 por Scribe
+
+---
+
+### Alpha Metas — Justificativa de Meta (feature nova dentro de módulo existente, 2026-08-04)
+
+**Adicionado em:** 2026-08-04 por Scribe (sessão Bibble, pipeline serial completo).
+
+**Descrição:** botão "Justificativa de Meta" no header do módulo `/PainelAlpha/Metas`, visível a TODOS os usuários com acesso ao módulo (sem condição de role no botão — diferente do padrão de "Configurar Metas" pré-existente, que só aparece para quem gerencia). Abre um modal com 2 abas: "Vigente" (seletor mês/ano + preview inline do PDF vigente via `<iframe>`; upload restrito a Admin/TI/CEO/Líder Comercial) e "Histórico" (lista imutável de todas as versões enviadas — clique abre o PDF daquele registro específico, mesmo que já tenha sido substituído como vigente).
+
+**Checklist de integração:**
+- [x] Não exigiu entrada nova em `MODULOS_REGISTRY` — vive dentro da rota `/PainelAlpha/Metas` já registrada (`permission: 'metas'`), reforçando a checagem de role só para a ação de upload.
+- [x] Botão sempre visível no header (`MetasClient.tsx`), sem condição de role — confirmado por Probe.
+- [x] Rotas de API (`upload`, `[id]`) exigem `auth()` + checagem de servidor real (`podeGerenciarMetas`/`getPermissoesEfetivas`), nunca confiam em UI escondida — confirmado por Probe e Anubis.
+- [x] Migration aplicada e validada no Turso real (Vault, backup verificado, confirmação explícita do usuário).
+- [x] 44 testes automatizados cobrindo autorização, validação de período, allowlist de domínio, magic bytes e imutabilidade do histórico (Sage).
+
+**Arquivos envolvidos:**
+- `prisma/schema.prisma` — `model JustificativaMeta` (novo) + relação reversa `justificativasMetaEnviadas` em `usuarios`.
+- `src/lib/metas-permissoes.ts` (novo) — `podeGerenciarMetas(role)`, extraído de `Metas.ts` por erro real de build ("use server" só aceita export async — ver `known-errors.md`).
+- `src/actions/Metas.ts` — editado, importa o helper em vez de defini-lo.
+- `src/actions/JustificativaMeta.ts` (novo) — `ListarHistoricoJustificativas`, `BuscarJustificativaVigente(mes, ano)`, `RegistrarJustificativaMeta({mes, ano, url, nomeArquivo, tamanhoBytes})`.
+- `src/app/api/metas/justificativas/upload/route.ts` (novo) — POST, magic bytes PDF, rate limit 5/min, Vercel Blob `access: "private"`, token `METAS_READ_WRITE_TOKEN`.
+- `src/app/api/metas/justificativas/[id]/route.ts` (novo) — GET, serve PDF `Content-Disposition: inline`.
+- `src/components/Metas/ModalJustificativaMeta.tsx` (novo, orquestrador) + `PreviewJustificativa.tsx` + `ListaHistoricoJustificativas.tsx` + `SeletorPeriodoJustificativa.tsx` (subcomponentes extraídos por Lens/Nova para respeitar o limite de 300 linhas por componente).
+- `src/app/PainelAlpha/Metas/MetasClient.tsx` — editado (botão no header + estado + montagem do modal).
+- `tests/metas/{metas-permissoes,justificativa-meta-action,upload-magic-bytes}.test.ts` (novos, 44 testes).
+
+**Achado real de comportamento (não-bug, documentado via teste):** `podeGerenciarMetas(role)` compara `role === "Lider Comercial"` com igualdade EXATA (case/acento-sensível), enquanto a parte `isAdminRole(role)` da mesma função normaliza caixa/acentos/pontuação. Isso significa que `"lider comercial"` minúsculo ou `"Líder Comercial"` com acento retornam `false`, mas `"admin"`/`"ADMIN"`/`"T.I"` todos retornam `true`. Assimetria pré-existente herdada do código original de `Metas.ts` (não introduzida por esta feature) — relevante para qualquer código futuro que compare contra a role "Lider Comercial" byte-a-byte.
+
+**Como adicionar um padrão semelhante no futuro (documento vigente por período + histórico completo):** replicar o modelo de dados — nunca usar `@@unique([periodo])` (forçaria overwrite físico); cada evento é sempre um `create()` novo; "vigente" é derivado via `findFirst({ where: {periodo}, orderBy: {createdAt: "desc"} })`. Nunca soft-delete nem update do registro antigo.
+
+**Editado quando:** a feature ganhar mais tipos de arquivo, filtros adicionais no histórico, ou o padrão "vigente + histórico imutável" for replicado em outro módulo.
+
+**Última atualização:** 2026-08-04 por Scribe

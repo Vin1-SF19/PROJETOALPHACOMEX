@@ -265,7 +265,7 @@ export function ContainerCargaProps({
 
       <p className="rounded-lg border border-white/5 bg-slate-900/60 p-2 text-[10px] leading-relaxed text-slate-500">
         {ehEntrada
-          ? "A abertura revela o próximo slide e conclui a troca no fim exato do zoom."
+          ? "A prévia acima mostra somente o container fechado. Ao apresentar, ele funciona como capa e revela o slide 1 durante o zoom."
           : "Na apresentação, o container abre automaticamente. O navegador pode exigir um clique para liberar o áudio."}
       </p>
     </>

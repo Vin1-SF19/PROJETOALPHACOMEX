@@ -120,6 +120,8 @@ model usuarios {
   bpmCardHistorico    BpmCardHistorico[]
   bpmPipelineConfigAuditoria BpmPipelineConfigAuditoria[]
   bpmCardAnexosEnviados BpmCardAnexo[]
+
+  justificativasMetaEnviadas JustificativaMeta[]
 }
 
 model OnboardingTemplate {
@@ -1200,6 +1202,22 @@ model MetaEquipe {
 
   @@unique([mes, ano])
   @@map("meta_equipe")
+}
+
+model JustificativaMeta {
+  id           String   @id @default(cuid())
+  mes          Int
+  ano          Int
+  arquivoUrl   String
+  nomeArquivo  String
+  tipoArquivo  String
+  tamanhoBytes Int
+  enviadoPorId Int
+  enviadoPor   usuarios @relation(fields: [enviadoPorId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([mes, ano, createdAt])
+  @@map("justificativa_meta")
 }
 
 // ─── Alpha POP — Acessos Granulares por Setor ─────────────────────────────────

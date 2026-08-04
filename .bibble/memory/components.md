@@ -289,14 +289,14 @@
 
 **Última atualização:** 2026-08-03 por Nova
 
-### AnimacaoContainerAlphaProps (transição no select de animação)
+### AnimacaoContainerAlphaProps (abertura no select de animação)
 
 **Arquivos:** `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/AnimacaoContainerAlphaProps.tsx`, `src/components/Apresentacoes/ModoApresentacao/TransicaoContainerAlphaLayer.tsx`, `src/lib/apresentacoes/animacao-container-alpha.ts`
 **Tipo:** Client Components + schema/helper puro
-**Uso:** selecione qualquer componente do slide e escolha `Container Alpha — transição de slide` no select **Animação de entrada**. A opção não substitui o `containerCarga` editável da biblioteca.
-**Notas:** persiste em `componente.animacao.entrada.containerAlpha`, sem migration. Logo abaixo do select há uma prévia real 16:9 e controles de cores, ângulo, abertura, zoom, logo e som. A prévia usa o slide seguinte no interior; quando não existe próximo slide, exibe a orientação para adicioná-lo. Na transição sintética, o container recebe margem de 5% da menor dimensão do palco, limitada entre 18 e 72 px, criando profundidade e mantendo o enquadramento responsivo. O avanço monta o destino no começo real do zoom, preserva o canvas do slide de origem durante toda a expansão e desmonta o overlay no `onComplete` da própria animação 3D, sem segundo timer. Quando a configuração está no próprio componente `containerCarga`, o player não cria outra camada sintética: abertura e zoom pertencem à mesma instância. O áudio procedural é desbloqueado por gesto no player e no botão de reprodução da prévia.
+**Uso:** selecione qualquer componente do primeiro slide e escolha `Container Alpha — abertura da apresentação` no select **Animação de entrada**. A opção não substitui o `containerCarga` editável da biblioteca.
+**Notas:** persiste em `componente.animacao.entrada.containerAlpha`, sem migration. Logo abaixo do select há uma prévia 16:9 fechada que monta somente `ContainerCargaRender` em modo editor, sem slide, transição, reprodução ou controles do player; ela serve exclusivamente para conferir a capa e editar cores, metal, interior, marca, ângulo, abertura, zoom, logo e som. `ModoApresentacaoClient` trata a configuração do primeiro slide como uma capa anterior à apresentação: o modal já nasce com a camada sintética ativa, o standalone a prepara no gesto “Iniciar apresentação” e reiniciar reaplica o ciclo. O destino do zoom é sempre o próprio slide 1, inclusive em apresentações com um único slide; avançar depois da abertura segue normalmente para o slide 2 sem repetir o container. Na transição sintética, o container recebe margem de 5% da menor dimensão do palco, limitada entre 18 e 72 px, e o overlay desmonta no `onComplete` da animação 3D. Se a configuração estiver em um `containerCarga` real, sua transição interna para o slide seguinte é suprimida durante o render do slide, evitando uma segunda abertura concorrente.
 
-**Última atualização:** 2026-08-03 por Nova
+**Última atualização:** 2026-08-04 por Nova
 
 ### CentralCriativaModal (Alpha Presentation Studio)
 
@@ -346,3 +346,12 @@
 **Novas propriedades:** `transicaoProximoSlide`, `duracaoZoom`, `somHabilitado`, `somAbertura`, `volumeSom`. O botão "Centralizar no slide" calcula x/y no palco canônico 1280×720.
 
 **Última atualização:** 2026-08-03 por Nova
+
+### ModalJustificativaMeta (+ PreviewJustificativa, ListaHistoricoJustificativas, SeletorPeriodoJustificativa)
+**Arquivo:** `src/components/Metas/ModalJustificativaMeta.tsx` (orquestrador, 297 linhas) + `PreviewJustificativa.tsx` + `ListaHistoricoJustificativas.tsx` + `SeletorPeriodoJustificativa.tsx`
+**Tipo:** Client Components
+**Props (orquestrador):** `open: boolean`, `onOpenChange: (open: boolean) => void`, `podeGerenciar: boolean`, `mesAtual: number`, `anoAtual: number`
+**Uso:** `<ModalJustificativaMeta open={...} onOpenChange={...} podeGerenciar={isAdmin || role === 'CEO' || role === 'Lider Comercial'} mesAtual={mesAtual} anoAtual={anoAtual} />` em `src/app/PainelAlpha/Metas/MetasClient.tsx`, acionado por um botão sempre visível no header (sem condição de role — diferente do padrão do botão "Configurar Metas" adjacente).
+**Notas:** `Dialog` + `Tabs` (shadcn) com 2 abas — "Vigente" (`SeletorPeriodoJustificativa` + upload condicionado a `podeGerenciar` + `PreviewJustificativa` do item vigente) e "Histórico" (`ListaHistoricoJustificativas` + `PreviewJustificativa` do item clicado, com `mostrarMetadados={false}` para não duplicar a legenda já visível na lista). `PreviewJustificativa` é o subcomponente compartilhado entre as 2 abas (metadados + link "Nova aba" + `<iframe src="/api/metas/justificativas/{id}">`) — extraído por Lens/Nova para eliminar duplicação e respeitar o limite de 300 linhas por componente (`component-rules.md`). `SeletorPeriodoJustificativa` também exporta a constante `MESES` compartilhada (evita duplicar o array de nomes de mês em cada arquivo). Upload valida tipo/extensão no client (feedback rápido) mas a validação real e definitiva é sempre no servidor (magic bytes). `AlertDialog` de confirmação aparece só quando já existe vigente para o mês/ano selecionado, antes de sobrescrever.
+
+**Última atualização:** 2026-08-04 por Scribe

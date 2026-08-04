@@ -229,3 +229,38 @@ model CommissionAuditLog { id, userId, acao, entityType, entityId, beforeJson, a
 | `GOOGLE_CALENDAR_SERVICE_ACCOUNT_PRIVATE_KEY` | `private_key` da mesma Service Account (com `\n` literais) — nunca em banco, só nesta env var |
 | `BLUEPRINT_STORE_ID` | ID do Vercel Blob Store dedicado do Alpha Blueprint (`store_aFGirg4S8PTvIAMB`) — documentação apenas, o SDK instalado (`@vercel/blob@2.3.1`) seleciona o store pelo token, não aceita `storeId` como parâmetro do `put()` |
 | `BLUEPRINT_READ_WRITE_TOKEN` | Token do mesmo store — usado em `src/app/api/blueprint/upload/route.ts` |
+| `METAS_READ_WRITE_TOKEN` | Token do Blob Store dedicado da feature Justificativa de Meta (`access: "private"`) — usado em `src/app/api/metas/justificativas/{upload,[id]}/route.ts` |
+
+---
+
+## Módulo Alpha Metas — Justificativa de Meta (2026-08-04)
+
+```prisma
+model JustificativaMeta {
+  id           String   @id @default(cuid())
+  mes          Int
+  ano          Int
+  arquivoUrl   String
+  nomeArquivo  String
+  tipoArquivo  String   // sempre "application/pdf" — fixado no servidor, nunca aceito do client
+  tamanhoBytes Int
+  enviadoPorId Int
+  enviadoPor   usuarios @relation(fields: [enviadoPorId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([mes, ano, createdAt])
+  @@map("justificativa_meta")
+}
+```
+
+**Modelo de dados:** sem `@@unique([mes, ano])` de propósito — cada upload é sempre um `create()` novo (histórico imutável, nunca update/delete de registro antigo). "Vigente" de um período é derivado via `findFirst({ where: {mes, ano}, orderBy: {createdAt: "desc"} })`, nunca um campo `ativo`/flag. Migration aplicada no Turso real via script Node pontual, validada por `PRAGMA table_info`/`PRAGMA index_list`, script descartado após uso (padrão já estabelecido no projeto).
+
+| Tipo | Caminho | Auth | Descrição |
+|------|---------|------|-----------|
+| Server Action | `src/actions/JustificativaMeta.ts` | Sim | `ListarHistoricoJustificativas`, `BuscarJustificativaVigente(mes, ano)` — leitura permite `podeGerenciarMetas` OU `getPermissoesEfetivas().includes("metas")`; `RegistrarJustificativaMeta({mes, ano, url, nomeArquivo, tamanhoBytes})` — escrita exige exclusivamente `podeGerenciarMetas`. `url` validada por Zod com allowlist de domínio (`*.blob.vercel-storage.com`, fix pós-auditoria Anubis). |
+| Route Handler | `POST /api/metas/justificativas/upload` | Sim, `podeGerenciarMetas` | Upload de PDF: magic bytes `%PDF` (rejeita qualquer outro tipo, incluindo DOCX, com mensagem orientando conversão), 15MB, rate limit 5/min em memória, `put()` no Vercel Blob `access: "private"` com token `METAS_READ_WRITE_TOKEN`. |
+| Route Handler | `GET /api/metas/justificativas/[id]` | Sim, `podeGerenciarMetas` OU permissão `metas` | Serve o PDF via `get()` do Blob, `Content-Disposition: inline` (abre no navegador/iframe). |
+
+**`podeGerenciarMetas(role)`** vive em `src/lib/metas-permissoes.ts` (não em `src/actions/Metas.ts`, que tem `"use server"` e só pode exportar `async function` — ver `known-errors.md`). Cobre Admin/CEO/TI (via `isAdminRole`, normalizado) + `role === "Lider Comercial"` (comparação EXATA, case/acento-sensível — assimetria real, documentada em teste).
+
+**Última atualização:** 2026-08-04 por Scribe

@@ -37,11 +37,12 @@ quality_gate_tools:
 - [x] **AC-008 — Sem expansão de escopo:** não há mudança em banco, schema Prisma, rotas, menu, permissões, autenticação ou dependências.
 - [x] **AC-009 — Regressão automatizada:** testes cobrem schema, defaults do registry e limites das propriedades do novo tipo.
 - [x] **AC-010 — Quality gates:** `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` são executados; falhas preexistentes/ambientais são documentadas sem ocultar regressões da story.
-- [x] **AC-011 — Animação de entrada:** `Container Alpha — transição de slide` aparece no select existente de animação de entrada de cada componente, mostra uma prévia 16:9 e permite editar aparência, abertura, zoom e áudio no mesmo painel.
-- [x] **AC-012 — Troca sem delay:** ao avançar, o slide seguinte é montado no início real do zoom e a camada do container é removida no callback real de conclusão do zoom, sem temporizador concorrente.
+- [x] **AC-011 — Animação de entrada:** `Container Alpha — abertura da apresentação` aparece no select existente de animação de entrada de cada componente, mostra uma prévia 16:9 isolada e fechada do modelo e permite editar aparência, abertura, zoom e áudio no mesmo painel.
+- [x] **AC-012 — Revelação sem delay:** o slide 1 é revelado no início real do zoom e a camada do container é removida no callback real de conclusão, sem temporizador concorrente; o avanço posterior não repete a capa.
 - [x] **AC-013 — Player instantâneo sem iframe interno:** o modal monta o player React diretamente com um snapshot dos slides do Zustand, desbloqueia áudio no clique de abertura, salva o slide ativo em background sem corrida de estado e mantém controles responsivos e fullscreen sem carregar o shell do Painel Alpha dentro do Dialog.
-- [x] **AC-014 — Transição contínua com profundidade:** a transição sintética mantém uma margem responsiva de 5% da menor dimensão do palco, limitada entre 18 e 72 px; o container abre uma única vez e inicia o zoom sobre o slide seguinte sem restart ou camada sintética concorrente, preservando o canvas do slide de origem até a conclusão real do zoom.
+- [x] **AC-014 — Transição contínua com profundidade:** a transição sintética mantém uma margem responsiva de 5% da menor dimensão do palco, limitada entre 18 e 72 px; o container abre uma única vez e inicia o zoom sobre o slide 1 sem restart ou camada concorrente, inclusive quando não existe slide 2.
 - [x] **AC-015 — Player acessível sem recorte:** os controles ocupam uma faixa própria, sem cobrir o slide, todos os comandos interativos possuem estado `focus-visible`, e somente a rota standalone exibe o gate “Iniciar apresentação” necessário para liberar áudio/tela cheia; o modal permanece instantâneo.
+- [x] **AC-016 — Preview isolado e início automático:** a prévia das propriedades mostra somente o Container Alpha fechado para edição visual, sem slide ou controles de apresentação; quando configurada no primeiro slide, a capa nasce ativa no primeiro frame do player, revela o próprio slide 1 e não depende do comando “próximo” nem da existência de um slide 2.
 
 ## Fora do Escopo
 
@@ -74,7 +75,7 @@ quality_gate_tools:
 
 - [x] **Task 5 — Integrar como animação de entrada** (AC: 11–12)
   - [x] Registrar a opção no select existente e persistir sua configuração em `componente.animacao.entrada.containerAlpha`.
-  - [x] Exibir prévia visual do slide seguinte e controles completos imediatamente abaixo do select.
+  - [x] Exibir uma prévia visual isolada do modelo e os controles completos imediatamente abaixo do select.
   - [x] Sincronizar navegação, zoom e áudio com os eventos reais da animação 3D.
 
 - [x] **Task 6 — Reconstruir o player modal nativo** (AC: 13)
@@ -87,11 +88,18 @@ quality_gate_tools:
 
 - [x] **Task 7 — Refinar profundidade e continuidade da transição** (AC: 14–15)
   - [x] Aplicar margem responsiva de 5%, com `clamp` efetivo entre 18 e 72 px, ao Container Alpha sintético.
-  - [x] Eliminar a repetição causada por uma segunda camada quando o slide já contém o Container Alpha real configurado.
-  - [x] Promover o índice lógico no início do zoom sem trocar o canvas visual de origem antes do `onComplete`.
+  - [x] Eliminar a repetição causada por uma transição interna concorrente quando o slide contém um Container Alpha real configurado.
+  - [x] Manter o índice lógico no slide 1 durante toda a capa e revelar esse mesmo canvas antes do `onComplete`.
   - [x] Separar palco e controles em regiões de layout próprias e adicionar `focus-visible` a botões e range.
   - [x] Restringir o gate de início à rota standalone e manter o modal iniciado desde o primeiro render.
   - [x] Corrigir a tipagem da conversão geométrica usada para alinhar abertura, margem e recorte no palco.
+
+- [x] **Task 8 — Corrigir preview e ciclo inicial** (AC: 16)
+  - [x] Remover slide seguinte, reprodução e controles de apresentação da prévia do painel.
+  - [x] Renderizar o `ContainerCargaRender` diretamente em modo editor e fechado para refletir a aparência da capa.
+  - [x] Inicializar a transição sintética junto com o primeiro render do modal e no gesto de início do standalone.
+  - [x] Reaplicar a mesma abertura automática ao reiniciar a apresentação.
+  - [x] Usar o slide 1 como destino da capa e permitir a abertura mesmo sem slide 2.
 
 ## Dev Notes
 
@@ -148,8 +156,9 @@ quality_gate_tools:
 | Apresentação | Portas partem fechadas e abrem na sequência configurada |
 | Voltar ao slide | Animação reinicia |
 | Reduced motion | Estado aberto é aplicado sem animação longa |
-| Select de animação | Exibe `Container Alpha — transição de slide` para componentes compatíveis |
-| Prévia no painel | Mostra o próximo slide no interior ou a mensagem para adicionar um slide |
+| Select de animação | Exibe `Container Alpha — abertura da apresentação` para componentes compatíveis |
+| Prévia no painel | Mostra somente o modelo 3D para edição visual, sem slide ou controles do player |
+| Início da apresentação | A configuração do primeiro slide monta a capa antes do primeiro frame visível e revela o próprio slide 1 durante o zoom |
 | Avançar no player | Inicia o próximo slide junto do zoom e conclui sem quadro vazio ou delay extra |
 | Áudio | Clique/toque no player libera Web Audio e reproduz o preset configurado |
 | Abrir pelo editor | Dialog monta o player React imediatamente, sem iframe interno, auth ou nova consulta Prisma |
@@ -158,7 +167,7 @@ quality_gate_tools:
 | Player responsivo | Superfície permanece horizontal, range reorganiza em viewport estreito e fullscreen usa ação explícita |
 | Rota standalone | `/apresentar` continua autenticada e reutiliza o mesmo player sem participar do modal |
 | Profundidade da capa | Container sintético mantém 5% de respiro, limitado a 18–72 px, sem encostar na borda |
-| Sequência abertura → zoom | Container abre uma única vez; o slide 2 começa junto do zoom e fica como destino final no mesmo callback |
+| Sequência abertura → zoom | Container abre uma única vez; o slide 1 aparece junto do zoom e permanece como primeiro slide após o callback |
 | Canvas durante o zoom | Palco preserva dimensões e fundo do slide de origem até a transição terminar |
 | Faixa de controles | Comandos não cobrem nem reduzem por sobreposição a área visível do slide |
 | Gate de áudio | “Iniciar apresentação” aparece somente no standalone; o modal abre já iniciado |
@@ -171,7 +180,7 @@ quality_gate_tools:
 - **Complexity:** Medium — novo discriminador persistido e renderização WebGL em múltiplos contextos do Studio.
 - **Primary Agents:** `@dev`, `@ux-design-expert`
 - **Supporting Agents:** `@qa`
-- [ ] **Pre-Commit (@dev):** revisar tipagem, cleanup Three.js, responsividade e acessibilidade.
+- [x] **Pre-Commit (@dev):** tipagem, cleanup Three.js, responsividade e acessibilidade revisados; lint focal e 33 testes focados aprovados.
 - [ ] **Pre-PR (@github-devops):** revisar compatibilidade do JSON existente e regressões no RenderEngine.
 - **Self-healing:** `@dev` light, máximo de 2 iterações, 15 minutos, CRITICAL `auto_fix` e HIGH `document_only`.
 - **Focus Areas:** responsividade por tamanho real, performance de WebGL, validação Zod retrocompatível, reduced motion e ausência de mudanças de banco.
@@ -189,6 +198,8 @@ quality_gate_tools:
 | 2026-08-03 | 1.6 | Entrada independente removida; Container Alpha integrado ao select real de animação de entrada como transição sincronizada entre slides | Nova |
 | 2026-08-03 | 1.7 | Player modal reconstruído como React nativo sem iframe interno, com snapshot instantâneo do Zustand, áudio no gesto, save seguro em background, palco alinhado e controles responsivos/fullscreen | Bibble Squad |
 | 2026-08-03 | 1.8 | Profundidade responsiva de 5% (18–72 px), sequência única abertura→zoom→slide 2, canvas de origem estável, controles fora do palco, gate standalone e foco visível | Bibble Squad |
+| 2026-08-03 | 1.9 | Prévia reduzida ao modelo editável e animação Container Alpha inicializada automaticamente no começo da apresentação | Nova |
+| 2026-08-04 | 2.0 | Prévia fechada e sem slide; Container Alpha convertido em capa anterior que revela o slide 1 sem exigir slide 2 | Nova |
 
 ## Dev Agent Record
 
@@ -212,6 +223,8 @@ Codex (GPT-5)
 - Correção 1.6: ESLint direcionado aprovado; `container-alpha.test.ts` com 21/21 testes aprovados. O typecheck não apresenta erro nos arquivos desta mudança e mantém apenas baselines externos já registrados. Na suíte global, 632/633 testes passaram e permaneceu o timeout recorrente em `tests/google-calendar/cli.test.ts`; lint global excedeu 180s; `npm run build` voltou a ser bloqueado pelo `EPERM` do Prisma. A inspeção visual automatizada ficou indisponível por ausência de navegador conectado ao ambiente.
 - Evolução 1.7: lint focal aprovado; 26/26 testes focados aprovados — 21 do Container Alpha e 5 de persistência concorrente do editor; `git diff --check` aprovado; Lens PASS e Sage PASS. O typecheck global manteve 5 baselines externos. O lint global excedeu o limite de 120s e o build permaneceu bloqueado por `EPERM` do Prisma. A validação visual automatizada não foi executada porque não havia navegador conectado ao ambiente.
 - Evolução 1.8: ESLint focal aprovado; 32/32 testes focados aprovados em `central-criativa.test.ts`, `container-alpha.test.ts` e `editor-persistencia.test.ts`; `git diff --check` aprovado. O typecheck não reporta erro no player e mantém somente 5 baselines externos: Exclusão Fiscal (2), Radar (1) e Google Calendar (2).
+- Evolução 1.9: ESLint focal aprovado; 33/33 testes focados aprovados nos mesmos três arquivos; o novo caso cobre a resolução da abertura automática exclusivamente a partir do primeiro slide e exige um slide de destino. O typecheck não reporta erro nos arquivos da evolução e mantém os mesmos 5 baselines externos. Na suíte global, 661/662 testes passaram e permaneceu apenas o timeout recorrente de `tests/google-calendar/cli.test.ts`. O lint global percorreu também `.aiox-core`, `.agents` e worktrees externos ao app e falhou nesses arquivos preexistentes; nenhum erro pertence aos arquivos desta evolução.
+- Evolução 2.0: a prévia do painel passou ao estado fechado e a abertura sintética usa o slide 1 como origem e destino lógico, funcionando inclusive com uma apresentação de um único slide. O avanço normal deixou de interpretar `container-alpha` como transição entre slides, impedindo a repetição da capa. ESLint focal e 33/33 testes focados aprovados; suíte global em 661/662, mantendo somente o timeout recorrente do Google Calendar; typecheck mantém os mesmos 5 baselines externos.
 
 ### Completion Notes List
 
@@ -220,10 +233,11 @@ Codex (GPT-5)
 - Câmera e palco de apresentação agora se adaptam ao tamanho/proporção disponíveis sem deformação.
 - No player, o container ignora x/y/w/h do editor e usa uma camada própria sobre o palco; na transição sintética, uma margem responsiva de 5% da menor dimensão, limitada entre 18 e 72 px, cria profundidade sem reduzir o container a um elemento de canto.
 - A abertura medida no viewport é convertida para as coordenadas lógicas do slide antes da transição para o próximo conteúdo.
-- A opção `Container Alpha — transição de slide` agora vive no select existente **Animação de entrada** do componente selecionado e salva a configuração no próprio contrato de animação.
-- Ao selecionar a opção, o painel mostra uma prévia 16:9 reproduzível com o próximo slide dentro do container e controles de cores, ângulo, tempos, zoom, logo, preset e volume.
-- No player, avançar inicia uma única sequência: as portas abrem e o próximo slide começa no primeiro frame do zoom; o canvas visual de origem permanece estável e a capa sai no callback real de conclusão, sem timeout, restart ou camada sintética concorrente.
-- O Web Audio é liberado no `pointerdown` do player e no botão de reproduzir da prévia antes de agendar o som procedural.
+- A opção `Container Alpha — abertura da apresentação` vive no select existente **Animação de entrada** do componente selecionado e salva a configuração no próprio contrato de animação.
+- Ao selecionar a opção, o painel mostra somente o modelo 3D fechado em uma prévia 16:9 estática, sem slide, transição ou controles do player; cores, ângulo, tempos, zoom, logo, preset e volume continuam editáveis logo abaixo.
+- Se a configuração estiver no primeiro slide, o modal já nasce com a capa montada; no standalone ela é preparada no mesmo gesto do botão “Iniciar apresentação”. Reiniciar reaplica o ciclo mesmo quando a apresentação possui somente um slide.
+- No player, a capa é anterior à sequência de slides: as portas abrem e o slide 1 começa a aparecer no primeiro frame do zoom. Depois da conclusão, avançar navega normalmente para o slide 2 sem repetir o container.
+- O Web Audio é liberado no gesto que abre/inicia o player antes de agendar o som procedural; a prévia visual do painel não reproduz a apresentação.
 - O botão “Apresentar” agora libera o Web Audio e monta `ModoApresentacaoClient` diretamente no Dialog; não existe segundo iframe, nova navegação, repetição de auth/Prisma ou `postMessage` de fechamento.
 - O modal recebe um snapshot instantâneo dos slides já carregados no Zustand, incluindo a versão atual de componentes/canvas do slide ativo e `transicaoEntrada` dos demais slides.
 - O save do snapshot ativo roda em background sob versão monotônica e fila serial por slide; uma resposta antiga não limpa o estado sujo nem pode sobrescrever uma gravação posterior do mesmo slide.
@@ -276,12 +290,13 @@ Codex (GPT-5)
 ## QA Results
 
 - Lint focal: aprovado sem avisos.
-- Testes focados: 32/32 aprovados nos três arquivos `central-criativa.test.ts`, `container-alpha.test.ts` e `editor-persistencia.test.ts`.
+- Testes focados: 33/33 aprovados nos três arquivos `central-criativa.test.ts`, `container-alpha.test.ts` e `editor-persistencia.test.ts`.
 - `git diff --check`: aprovado.
 - Lens: PASS.
 - Sage: PASS.
 - Typecheck: sem erros no player; 5 baselines externos preservados — Exclusão Fiscal (2), Radar (1) e Google Calendar (2).
-- Lint global: timeout após 120s.
+- Testes globais: 661/662 aprovados; falhou somente o timeout recorrente de `tests/google-calendar/cli.test.ts`.
+- Lint global: falhou em arquivos preexistentes de infraestrutura e worktrees (`.aiox-core`, `.agents` e `.claude/worktrees`); os arquivos da evolução passaram no lint focal.
 - Build: bloqueado por `EPERM` do Prisma.
 - Validação visual automatizada: indisponível por ausência de navegador conectado ao ambiente.
 - Risco residual: manter E2E futuro para churn contínuo da Sidebar e medição da latência visual imediata; ambos os fluxos foram aprovados nesta rodada por inspeção do código, sem substituir o teste em navegador real.

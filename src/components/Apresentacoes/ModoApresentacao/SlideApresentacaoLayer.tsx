@@ -10,7 +10,6 @@ import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { TransicaoSlide } from "./TransicaoSlide";
 import { SlidePortalPreview } from "@/components/Apresentacoes/Editor/RenderEngine/SlidePortalPreview";
 import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
-import { normalizarConfigAnimacaoContainerAlpha } from "@/lib/apresentacoes/animacao-container-alpha";
 
 export interface SlideApresentacao {
   id: string;
@@ -58,9 +57,6 @@ function ComponenteNoSlide({
 
     const menorDimensao = Math.min(canvas.width, canvas.height);
     const margem = Math.min(72, Math.max(18, menorDimensao * 0.05));
-    const configEntrada = componente.animacao?.entrada?.tipo === "container-alpha"
-      ? normalizarConfigAnimacaoContainerAlpha(componente.animacao.entrada.containerAlpha)
-      : null;
 
     return {
       ...componente,
@@ -68,20 +64,11 @@ function ComponenteNoSlide({
       y: margem,
       w: Math.max(1, canvas.width - margem * 2),
       h: Math.max(1, canvas.height - margem * 2),
-      ...(configEntrada ? {
-        corPrincipal: configEntrada.corPrincipal,
-        corMetal: configEntrada.corMetal,
-        corInterior: configEntrada.corInterior,
-        anguloAbertura: configEntrada.anguloAbertura,
-        duracaoAbertura: configEntrada.duracaoAbertura,
-        atrasoAbertura: configEntrada.atrasoAbertura,
-        transicaoProximoSlide: true,
-        duracaoZoom: configEntrada.duracaoZoom,
-        somHabilitado: configEntrada.somHabilitado,
-        somAbertura: configEntrada.somAbertura,
-        volumeSom: configEntrada.volumeSom,
-        mostrarLogo: configEntrada.mostrarLogo,
-      } : {}),
+      // "container-alpha" é a capa anterior ao slide 1. A instância que faz
+      // parte do slide não pode disparar outra transição para o slide 2.
+      ...(componente.animacao?.entrada?.tipo === "container-alpha"
+        ? { transicaoProximoSlide: false }
+        : {}),
     };
   }, [canvas.height, canvas.width, componente]);
 

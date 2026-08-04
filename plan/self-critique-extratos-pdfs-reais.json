@@ -1,0 +1,34 @@
+{
+  "subtaskId": "extratos-pdfs-reais",
+  "critiquedAt": "2026-08-04T13:10:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "Uma assinatura de autodetecção ampla poderia escolher o parser errado; mitigado exigindo duas ou três marcas específicas de cada layout validado.",
+      "O texto mês/ano do cabeçalho Santander poderia ser anexado à primeira movimentação da página; mitigado distinguindo cabeçalho isolado de continuação de tarifa em andamento.",
+      "Uma quebra de página do Itaú poderia separar o prefixo da descrição da linha datada com valor; mitigado conservando o prefixo pendente e testando explicitamente essa fronteira.",
+      "Deduplicar por data, descrição e valor eliminaria lançamentos bancários legítimos idênticos; o caminho determinístico preserva todas as linhas e não aplica essa deduplicação destrutiva."
+    ],
+    "edgeCases": [
+      "Texto vazio ou Santander sem ano de referência retorna uma lista vazia e segue para o fallback por agentes.",
+      "Linhas de saldo com valores monetários são excluídas nos dois layouts.",
+      "Descrições e valores quebrados em múltiplas linhas são recompostos antes da normalização.",
+      "Datas curtas do Santander herdam exclusivamente o ano impresso no documento, não o ano corrente.",
+      "Se um layout reconhecido não produzir transações, o sistema mantém o fallback por agentes IA."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true,
+    "notes": "Os logs adicionados são observabilidade operacional sem conteúdo financeiro, seguindo o padrão já existente em extrato-agents; não são artefatos de depuração."
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

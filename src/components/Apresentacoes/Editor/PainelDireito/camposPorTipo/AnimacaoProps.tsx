@@ -17,7 +17,7 @@ const LABEL_TIPO: Record<(typeof ANIMACAO_TIPOS)[number], string> = {
   stagger: "Cascata (filhos)",
   typing: "Digitação",
   counter: "Contador numérico",
-  "container-alpha": "Container Alpha — transição de slide",
+  "container-alpha": "Container Alpha — abertura da apresentação",
 };
 
 const DEFAULT_ANIMACAO: ConfigAnimacao = { tipo: "fade", duracao: 0.5, delay: 0, easing: "easeOut" };

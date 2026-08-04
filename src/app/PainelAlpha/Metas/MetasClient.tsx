@@ -6,9 +6,10 @@ import Image from "next/image";
 import {
     Settings, Trophy, Target, ArrowLeft,
     X, Check, RefreshCw, Users, Loader2, Crown, TrendingUp, Briefcase,
-    Eye, EyeOff, Tv,
+    Eye, EyeOff, Tv, FileText,
 } from "lucide-react";
 import ModalGerenciamentoLeads from "@/components/comercial/ModalGerenciamentoLeads";
+import { ModalJustificativaMeta } from "@/components/Metas/ModalJustificativaMeta";
 import { getTema } from "@/lib/temas";
 import { toast } from "sonner";
 import {
@@ -874,6 +875,7 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
     const [modalAberto, setModalAberto] = useState(false);
     const [modoTV, setModoTV] = useState(false);
     const [modalGerenciamentoAberto, setModalGerenciamentoAberto] = useState(false);
+    const [modalJustificativaAberto, setModalJustificativaAberto] = useState(false);
     const [rowHeight, setRowHeight] = useState(120);
     const scoreboardRef = useRef<HTMLDivElement>(null);
 
@@ -1117,6 +1119,14 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                         <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Gerenciamento de Leads</span>
                     </button>
 
+                    <button
+                        onClick={() => setModalJustificativaAberto(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-600/10 border border-amber-500/20 hover:bg-amber-600/20 transition-all text-amber-400"
+                    >
+                        <FileText size={15} />
+                        <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Justificativa de Meta</span>
+                    </button>
+
                     {(isAdmin || role === 'CEO' || role === 'Lider Comercial') && (
                         <button
                             onClick={() => setModalAberto(true)}
@@ -1196,6 +1206,15 @@ export default function MetasClient({ dadosIniciais, isAdmin, mesAtual, anoAtual
                     }}
                 />
             )}
+
+            {/* Modal justificativa de meta */}
+            <ModalJustificativaMeta
+                open={modalJustificativaAberto}
+                onOpenChange={setModalJustificativaAberto}
+                podeGerenciar={isAdmin || role === 'CEO' || role === 'Lider Comercial'}
+                mesAtual={mesAtual}
+                anoAtual={anoAtual}
+            />
 
             {/* Modal gerenciamento de leads */}
             {modalGerenciamentoAberto && (

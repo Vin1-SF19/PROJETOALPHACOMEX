@@ -13,11 +13,10 @@ import { calcularEscalaApresentacao } from "@/lib/apresentacoes/viewport";
 import { SlideApresentacaoLayer, type SlideApresentacao } from "./SlideApresentacaoLayer";
 import { TransicaoContainerAlphaLayer } from "./TransicaoContainerAlphaLayer";
 import {
-  obterAnimacaoContainerAlpha,
+  obterAnimacaoContainerAlphaInicial,
   type ConfigAnimacaoContainerAlpha,
 } from "@/lib/apresentacoes/animacao-container-alpha";
 import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-audio";
-import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 
 interface TemaApresentacao {
   id: string;
@@ -50,18 +49,13 @@ interface TransicaoAnimacaoEmCurso {
   configuracao: ConfigAnimacaoContainerAlpha;
 }
 
-function contemContainerRealComAnimacaoAlpha(componentes: ComponenteSlide[]): boolean {
-  return componentes.some((componente) => {
-    if (
-      componente.tipo === "containerCarga"
-      && componente.animacao?.entrada?.tipo === "container-alpha"
-    ) return true;
-
-    if (componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container") {
-      return contemContainerRealComAnimacaoAlpha(componente.filhos);
-    }
-    return false;
-  });
+function criarTransicaoContainerAlphaInicial(
+  slides: SlideApresentacao[],
+  id: number,
+): TransicaoAnimacaoEmCurso | null {
+  const configuracao = obterAnimacaoContainerAlphaInicial(slides);
+  if (!configuracao) return null;
+  return { id, origemIndex: 0, destinoIndex: 0, configuracao };
 }
 
 export function ModoApresentacaoClient({
@@ -77,17 +71,19 @@ export function ModoApresentacaoClient({
   const indiceAtualRef = useRef(0);
   const introRef = useRef<IntroEmCurso | null>(null);
   const sequenciaIntroRef = useRef(0);
-  const transicaoAnimacaoRef = useRef<TransicaoAnimacaoEmCurso | null>(null);
-  const sequenciaTransicaoAnimacaoRef = useRef(0);
+  const transicaoInicial = embutido ? criarTransicaoContainerAlphaInicial(slides, 1) : null;
+  const transicaoAnimacaoRef = useRef<TransicaoAnimacaoEmCurso | null>(transicaoInicial);
+  const sequenciaTransicaoAnimacaoRef = useRef(transicaoInicial?.id ?? 0);
   const [indiceAtual, setIndiceAtual] = useState(0);
   const [intro, setIntro] = useState<IntroEmCurso | null>(null);
-  const [transicaoAnimacao, setTransicaoAnimacao] = useState<TransicaoAnimacaoEmCurso | null>(null);
+  const [transicaoAnimacao, setTransicaoAnimacao] = useState<TransicaoAnimacaoEmCurso | null>(transicaoInicial);
   const [escalaSlide, setEscalaSlide] = useState(1);
   const [pausado, setPausado] = useState(false);
   const [iniciado, setIniciado] = useState(embutido);
   const [telaCheia, setTelaCheia] = useState(false);
   const [containerCapaTarget, setContainerCapaTarget] = useState<HTMLDivElement | null>(null);
   const pausadoRef = useRef(false);
+  const temAberturaInicial = obterAnimacaoContainerAlphaInicial(slides) !== null;
   const slideAtual = slides[indiceAtual];
   const slidePalco = intro
     ? slides[intro.origemIndex]
@@ -105,29 +101,20 @@ export function ModoApresentacaoClient({
     setIndiceAtual(limitado);
   }, [slides.length]);
 
+  const prepararAberturaInicial = useCallback(() => {
+    const proximoId = sequenciaTransicaoAnimacaoRef.current + 1;
+    const novaTransicao = criarTransicaoContainerAlphaInicial(slides, proximoId);
+    if (!novaTransicao) return;
+    sequenciaTransicaoAnimacaoRef.current = proximoId;
+    transicaoAnimacaoRef.current = novaTransicao;
+    setTransicaoAnimacao(novaTransicao);
+  }, [slides]);
+
   const proximoSlide = useCallback(() => {
     const origemIndex = indiceAtualRef.current;
     const destinoIndex = origemIndex + 1;
     if (destinoIndex >= slides.length || introRef.current || transicaoAnimacaoRef.current) return;
-    const configuracao = obterAnimacaoContainerAlpha(slides[origemIndex].componentes);
-    if (!configuracao) {
-      navegarPara(destinoIndex);
-      return;
-    }
-    // Quando a configuração pertence ao próprio Container Alpha, ele já executa
-    // abertura + zoom no palco. Não montar uma segunda camada sintética concorrente.
-    if (contemContainerRealComAnimacaoAlpha(slides[origemIndex].componentes)) return;
-
-    void desbloquearAudioContainer();
-    sequenciaTransicaoAnimacaoRef.current += 1;
-    const novaTransicao: TransicaoAnimacaoEmCurso = {
-      id: sequenciaTransicaoAnimacaoRef.current,
-      origemIndex,
-      destinoIndex,
-      configuracao,
-    };
-    transicaoAnimacaoRef.current = novaTransicao;
-    setTransicaoAnimacao(novaTransicao);
+    navegarPara(destinoIndex);
   }, [navegarPara, slides]);
 
   const slideAnterior = useCallback(() => {
@@ -136,8 +123,9 @@ export function ModoApresentacaoClient({
 
   const reiniciarApresentacao = useCallback(() => {
     navegarPara(0);
+    prepararAberturaInicial();
     setPausado(false);
-  }, [navegarPara]);
+  }, [navegarPara, prepararAberturaInicial]);
 
   const iniciarZoomTransicaoAnimacao = useCallback(() => {
     const transicaoAtual = transicaoAnimacaoRef.current;
@@ -177,11 +165,12 @@ export function ModoApresentacaoClient({
 
   const iniciarApresentacao = useCallback(() => {
     void desbloquearAudioContainer();
+    prepararAberturaInicial();
     setIniciado(true);
     playerRef.current?.requestFullscreen?.().catch(() => {
       // A rota standalone continua full-page quando o navegador negar fullscreen.
     });
-  }, []);
+  }, [prepararAberturaInicial]);
 
   const iniciarIntroContainer = useCallback((evento: ContainerIntroEvent) => {
     const origemIndex = indiceAtualRef.current;
@@ -364,7 +353,7 @@ export function ModoApresentacaoClient({
       <div className="relative z-[200] flex min-h-16 shrink-0 flex-wrap items-center gap-1 border-t border-white/10 bg-slate-950 px-2 py-1 text-white sm:flex-nowrap sm:gap-1.5 sm:px-4">
         <button
           onClick={reiniciarApresentacao}
-          disabled={indiceAtual === 0 && !transicaoAnimacao}
+          disabled={indiceAtual === 0 && !transicaoAnimacao && !temAberturaInicial}
           aria-label="Reiniciar apresentação"
           className="flex size-10 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-30"
         >
