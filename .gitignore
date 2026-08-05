@@ -30,11 +30,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
 
 # vercel
 .vercel
+
+# Claude Code (worktrees + local settings)
+.claude/
+.cursor/worktrees/
+
+# Fases de prompt (fila de execução local do Bibble, nunca vai para o git)
+/prompt-phases/
 
 # typescript
 *.tsbuildinfo
@@ -46,13 +51,6 @@ next-env.d.ts
 /database-backups/*
 !/database-backups/README.md
 !/database-backups/.gitkeep
-
-# Claude Code (worktrees + local settings)
-.claude/
-.cursor/worktrees/
-
-# Fases de prompt (fila de execução local do Bibble, nunca vai para o git)
-/prompt-phases/
 
 # Logs do sync automático com o servidor interno (scripts/sync-servidor.ps1)
 /.sync-logs/

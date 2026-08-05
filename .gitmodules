@@ -1,0 +1,4 @@
+[submodule "bibblesquad"]
+	path = bibblesquad
+	url = https://github.com/Vin1-SF19/BibbleSquad.git
+	branch = main
