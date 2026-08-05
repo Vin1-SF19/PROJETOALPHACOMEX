@@ -7,6 +7,7 @@ import { podeGerenciarMetas } from "@/lib/metas-permissoes";
 export interface ColaboradorMeta {
     colaboradoraId: string;
     nome: string;
+    usuario: string;
     imagemUrl: string | null;
     tema: string;
     vendas: number;
@@ -40,7 +41,7 @@ export async function getDadosMetas(
         const [comerciais, contratosFechados, metas, metaEquipe] = await Promise.all([
             db.usuarios.findMany({
                 where: { role: "COMERCIAL", meta_visivel_painel: true },
-                select: { id: true, nome: true, imagemUrl: true, tema_interface: true },
+                select: { id: true, nome: true, usuario: true, imagemUrl: true, tema_interface: true },
                 orderBy: { nome: "asc" },
             }),
             db.contratoComercial.groupBy({
@@ -65,6 +66,7 @@ export async function getDadosMetas(
             return {
                 colaboradoraId: usuario.nome,
                 nome: usuario.nome,
+                usuario: usuario.usuario,
                 imagemUrl: usuario.imagemUrl ?? null,
                 tema: usuario.tema_interface ?? "blue",
                 vendas: fechados?._count?.id ?? 0,
@@ -101,7 +103,7 @@ export async function getColaboradoresParaConfigurar() {
         const [comerciais, metas, metaEquipe] = await Promise.all([
             db.usuarios.findMany({
                 where: { role: "COMERCIAL" },
-                select: { id: true, nome: true, meta_visivel_painel: true },
+                select: { id: true, nome: true, usuario: true, meta_visivel_painel: true },
                 orderBy: { nome: "asc" },
             }),
             db.metaUsuario.findMany({ where: { mes, ano } }),
@@ -113,6 +115,7 @@ export async function getColaboradoresParaConfigurar() {
             colaboradores: comerciais.map((c) => ({
                 id: c.id,
                 colaboradoraId: c.nome,
+                usuario: c.usuario,
                 meta: metas.find((m) => m.colaboradoraId === c.nome)?.metaMensal ?? 0,
                 visivelNoPainel: c.meta_visivel_painel,
             })),

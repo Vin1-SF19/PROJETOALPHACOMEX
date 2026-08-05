@@ -352,7 +352,7 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                 >
                     <Avatar
                         imagemUrl={colab.imagemUrl}
-                        nome={colab.nome}
+                        nome={colab.usuario}
                         tema={colab.tema}
                         className="w-full h-full"
                     />
@@ -475,7 +475,7 @@ function LinhaColaborador({ colab, rank, rowHeight }: {
                                 ...(quaseNaMeta && !bateuMeta ? { textShadow: `0 0 20px rgba(${accentRgb},0.5)` } : {}),
                             }}
                         >
-                            {colab.nome}
+                            {colab.usuario}
                         </h3>
                         <p className={`font-black uppercase tracking-[0.15em] mt-0.5
                             ${bateuMeta ? "text-amber-500/80" : quaseNaMeta ? "text-white/50" : "text-slate-700"}`}
@@ -589,11 +589,11 @@ function TelaCelebracaoIndividual({ colab, onFechar }: {
                     <div className="relative h-44 w-44 rounded-full overflow-hidden border-4 border-red-600/60 shadow-[0_0_80px_rgba(220,38,38,0.5)]">
                         <div className={`absolute inset-0 ${tema.bg} flex items-center justify-center`}>
                             <span className="text-white font-black text-5xl">
-                                {colab.nome.substring(0, 2).toUpperCase()}
+                                {colab.usuario.substring(0, 2).toUpperCase()}
                             </span>
                         </div>
                         {colab.imagemUrl && (
-                            <Image src={colab.imagemUrl} alt={colab.nome} fill unoptimized className="object-cover relative z-10" />
+                            <Image src={colab.imagemUrl} alt={colab.usuario} fill unoptimized className="object-cover relative z-10" />
                         )}
                     </div>
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 h-10 w-10 rounded-full bg-amber-400 border-4 border-[#040d1a] flex items-center justify-center shadow-xl">
@@ -604,7 +604,7 @@ function TelaCelebracaoIndividual({ colab, onFechar }: {
                 <div className="space-y-3">
                     <p className="text-[11px] font-black uppercase tracking-[0.6em] text-red-500">Parabéns</p>
                     <h2 className="text-6xl font-black uppercase italic text-white tracking-tighter leading-none">
-                        {colab.nome}
+                        {colab.usuario}
                     </h2>
                     <p className="text-2xl font-black text-slate-200 uppercase italic mt-2">Meta Batida!</p>
                     <p className="text-sm text-slate-500 font-bold mt-1">
@@ -675,15 +675,15 @@ function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, onFechar }: {
                                 <div className="relative h-16 w-16 rounded-full overflow-hidden border-2 border-red-600/50 shadow-[0_0_20px_rgba(220,38,38,0.3)]">
                                     <div className={`absolute inset-0 ${tema.bg} flex items-center justify-center`}>
                                         <span className="text-white font-black text-sm">
-                                            {c.nome.substring(0, 2).toUpperCase()}
+                                            {c.usuario.substring(0, 2).toUpperCase()}
                                         </span>
                                     </div>
                                     {c.imagemUrl && (
-                                        <Image src={c.imagemUrl} alt={c.nome} fill unoptimized className="object-cover relative z-10" />
+                                        <Image src={c.imagemUrl} alt={c.usuario} fill unoptimized className="object-cover relative z-10" />
                                     )}
                                 </div>
                                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-wide max-w-[64px] truncate">
-                                    {c.nome.split(" ")[0]}
+                                    {c.usuario}
                                 </span>
                             </div>
                         );
@@ -715,7 +715,7 @@ function TelaCelebracaoEquipe({ colaboradores, totalVendas, meta, onFechar }: {
 
 // ─── Modal de configuração (admin) ───────────────────────────────────────────
 
-type ColabConfig = { id: number; colaboradoraId: string; meta: number; visivelNoPainel: boolean };
+type ColabConfig = { id: number; colaboradoraId: string; usuario: string; meta: number; visivelNoPainel: boolean };
 
 function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onFechar: () => void }) {
     const [colabs, setColabs] = useState<ColabConfig[]>([]);
@@ -815,7 +815,7 @@ function ModalConfigurar({ mes, ano, onFechar }: { mes: number; ano: number; onF
                                 )}
                                 {colabs.map((c, i) => (
                                     <div key={c.colaboradoraId} className={`flex items-center gap-3 p-4 rounded-2xl border transition-all ${c.visivelNoPainel ? "bg-slate-900/50 border-white/5" : "bg-slate-950/50 border-white/[0.03] opacity-60"}`}>
-                                        <span className={`flex-1 text-[11px] font-black uppercase truncate ${c.visivelNoPainel ? "text-white" : "text-slate-500 line-through"}`}>{c.colaboradoraId}</span>
+                                        <span className={`flex-1 text-[11px] font-black uppercase truncate ${c.visivelNoPainel ? "text-white" : "text-slate-500 line-through"}`}>{c.usuario}</span>
                                         <button
                                             onClick={() => toggleVisivel(c)}
                                             disabled={togglingId === c.id}
