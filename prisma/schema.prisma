@@ -120,6 +120,7 @@ model usuarios {
   bpmCardHistorico    BpmCardHistorico[]
   bpmPipelineConfigAuditoria BpmPipelineConfigAuditoria[]
   bpmCardAnexosEnviados BpmCardAnexo[]
+  bpmInteracoesRegistradas BpmInteracaoCard[]
 
   justificativasMetaEnviadas JustificativaMeta[]
 }
@@ -2641,6 +2642,7 @@ model BpmEtapa {
   nome       String
   ordem      Int     @default(0)
   slaDias    Int?
+  script     String? // roteiro de texto exibido na aba "Script" da coluna Presente — só leitura por enquanto
   ativo      Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -2698,6 +2700,7 @@ model BpmCard {
   tarefas      BpmTarefa[]
   historico    BpmCardHistorico[]
   anexos       BpmCardAnexo[]
+  interacoes   BpmInteracaoCard[]
 
   vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
   vinculosDestino BpmCardVinculo[] @relation("CardDestino")
@@ -2837,6 +2840,25 @@ model BpmCardAnexo {
   enviadoPor usuarios @relation(fields: [enviadoPorId], references: [id])
 
   @@index([cardId])
+}
+
+model BpmInteracaoCard {
+  id              String    @id @default(cuid())
+  cardId          String
+  tipo            String    @default("LIGACAO") // string livre p/ extensão futura sem migration (hoje só "LIGACAO")
+  agendadoEm      DateTime?
+  agendaLink      String?
+  observacoes     String?
+  resumo          String?
+  registradoPorId Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  card          BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  registradoPor usuarios @relation(fields: [registradoPorId], references: [id])
+
+  @@index([cardId])
+  @@index([createdAt])
 }
 
 model PessoaEmpresaVinculo {

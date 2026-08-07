@@ -65,11 +65,13 @@ export function AnimacaoWrapper({ animacao, children }: { animacao: ConfigAnimac
   );
 }
 
-const staggerContainerVariants = (staggerDelay: number): Variants => ({
+/** Exportadas (Fase 03) para reaproveitamento em `ComponenteNoCanvas.tsx` — fecha a dívida
+ * técnica de stagger não visível dentro do Editor, sem duplicar a lógica de animação. */
+export const staggerContainerVariants = (staggerDelay: number): Variants => ({
   hidden: {},
   show: { transition: { staggerChildren: staggerDelay } },
 });
-const staggerItemVariants: Variants = {
+export const staggerItemVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };

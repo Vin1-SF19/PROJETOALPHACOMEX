@@ -1,0 +1,32 @@
+{
+  "subtaskId": "story-metas-parceiro-pendente",
+  "critiquedAt": "2026-08-07T10:22:00-03:00",
+  "step5_5": {
+    "predictedBugs": [
+      "Dois responsáveis podem tentar finalizar a mesma pendência ao mesmo tempo; o updateMany condicional precisa fazer a segunda transação falhar e reverter o parceiro duplicado.",
+      "Um canalOutro legado ou JSON adulterado poderia aparecer como card; o parser estrito, versionado e limitado deve retornar null.",
+      "Passar todo cadastro normal pela nova transação poderia quebrar o fluxo existente e seus mocks; somente cadastros originados no Metas usam a transação adicional.",
+      "Se o contrato for fechado antes do parceiro ser finalizado, o fechamento já não criará a indicação; a finalização cria o vínculo retroativo na mesma transação."
+    ],
+    "edgeCases": [
+      "Nome preenchido com espaços é rejeitado; empresa e telefone vazios são removidos do envelope.",
+      "Trocar o canal ou voltar para parceiro cadastrado não envia dados temporários e limpa canalOutro no servidor.",
+      "Contrato fechado sem cliente sincronizado ou com indicação existente reverte a operação e devolve erro acionável.",
+      "Payloads grandes, versão desconhecida e propriedades extras não são interpretados como pendência."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

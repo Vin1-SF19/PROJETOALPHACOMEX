@@ -1,6 +1,7 @@
 import { Globe, Orbit, Box, Container as ContainerIcon } from "lucide-react";
 import type { RegistryEntry } from "./registry-tipos";
 import { gerarId } from "./registry-tipos";
+import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 
 export const REGISTRY_3D: Record<"globo" | "particulas" | "objeto3d" | "containerCarga", RegistryEntry> = {
   globo: {
@@ -30,9 +31,11 @@ export const REGISTRY_3D: Record<"globo" | "particulas" | "objeto3d" | "containe
   containerCarga: {
     label: "Container Alpha",
     icone: ContainerIcon,
+    // Nasce em tamanho padrão de slide (não mais 640x360) — é uma capa de tela cheia,
+    // não um elemento decorativo pequeno; ApresentacaoEditor.tsx ajusta pro canvas real ao soltar.
     criarComponentePadrao: (x, y) => ({
-      id: gerarId(), tipo: "containerCarga", x, y, w: 640, h: 360, zIndex: 0, rotacao: 0,
-      corPrincipal: "#071a3d", corMetal: "#96a3b2", corInterior: "#f5f6f8",
+      id: gerarId(), tipo: "containerCarga", x, y, w: CANVAS_PADRAO.width, h: CANVAS_PADRAO.height, zIndex: 0, rotacao: 0,
+      corPrincipal: "#071a3d", corMetal: "#96a3b2", corInterior: "#171b22",
       anguloAbertura: 105, duracaoAbertura: 1.8, atrasoAbertura: 0.2,
       transicaoProximoSlide: true, duracaoZoom: 1.4,
       somHabilitado: false, somAbertura: "industrial", volumeSom: 0.65,

@@ -5,7 +5,7 @@ import { Search, Clock } from "lucide-react";
 import type { TemaAlpha } from "@/lib/temas";
 import { fmtDateTime } from "@/lib/format-date";
 import { ListarTarefasGlobaisBpm } from "@/actions/bpm/Tarefas";
-import CardDetailDrawer from "../pipeline/[pipelineId]/CardDetailDrawer";
+import CardFullViewModal from "../CardModal/CardFullViewModal";
 
 type Tarefa = Awaited<ReturnType<typeof ListarTarefasGlobaisBpm>>["data"][number];
 
@@ -118,7 +118,7 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
       </div>
 
       {cardSelecionadoId && (
-        <CardDetailDrawer
+        <CardFullViewModal
           cardId={cardSelecionadoId}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}

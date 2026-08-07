@@ -39,6 +39,7 @@ export const atualizarEtapaSchema = z.object({
   nome: z.string().trim().min(1).max(MAX_NOME).optional(),
   ordem: z.number().int().min(0).optional(),
   slaDias: z.number().int().positive().nullable().optional(),
+  script: z.string().trim().max(8000).nullable().optional(),
   ativo: z.boolean().optional(),
 });
 
@@ -90,6 +91,14 @@ export const moverCardSchema = z.object({
 export const criarVinculoCardSchema = z.object({
   cardOrigemId: z.string().cuid(),
   cardDestinoId: z.string().cuid(),
+});
+
+export const criarInteracaoCardSchema = z.object({
+  cardId: z.string().cuid(),
+  agendadoEm: z.coerce.date().optional(),
+  agendaLink: z.string().trim().url().max(500).optional(),
+  observacoes: z.string().trim().max(MAX_DESCRICAO).optional(),
+  resumo: z.string().trim().max(MAX_DESCRICAO).optional(),
 });
 
 export const criarTarefaSchema = z.object({

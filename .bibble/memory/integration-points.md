@@ -806,10 +806,21 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 
 **Editado quando:** o contrato de propriedades, a sequência de abertura, o comportamento editor/apresentação ou a escala responsiva do palco mudar.
 
-#### Player modal da apresentação
+#### Player modal da apresentação — TROCADO para exibidor HTML (2026-08-06)
 
-- `BarraSuperiorEditor` delega a abertura para `ApresentacaoEditor`, que desbloqueia o Web Audio e abre `ModalReproducaoApresentacao` imediatamente no mesmo gesto do usuário.
-- O modal monta `ModoApresentacaoClient` diretamente no Dialog. É proibido reintroduzir iframe interno, navegação para `/apresentar?modal=1`, `postMessage` de fechamento ou nova busca ao abrir: esses caminhos repetiam o shell, auth e Prisma e podiam exibir sidebar/abas dentro do player.
+**Mudança de arquitetura:** o modal aberto pelo botão "Apresentar" no editor deixou de montar `ModoApresentacaoClient` (player React/Three.js ao vivo) e passou a ser `ModalVisualizadorHtml.tsx` (substitui `ModalReproducaoApresentacao.tsx`, removido) — busca o MESMO `.html` autocontido de `GET /api/apresentacoes/[id]/exportar-html` (a rota usada por "Exportar HTML") e renderiza num `<iframe srcDoc={html} sandbox="allow-scripts allow-same-origin">`. Motivo: eliminar 2 caminhos de renderização divergentes (o player ao vivo teve bugs próprios de timing/framing 3D — ver Container Alpha mais abaixo — difíceis de depurar sem browser); agora só existe 1 caminho pra acertar, e o que aparece na prévia é EXATAMENTE (WYSIWYG) o que o usuário baixa.
+
+**⚠️ Reconciliação com a proibição histórica logo abaixo:** aquela proibição era especificamente sobre um iframe com `src="/apresentar?modal=1"` — apontando pra uma ROTA da própria aplicação Next.js, o que reexecutava layout raiz/auth/Prisma e podia vazar sidebar/abas da aplicação pra dentro do player. `ModalVisualizadorHtml.tsx` é estruturalmente diferente: usa `srcDoc` (não `src` apontando pra rota interna) com um documento HTML AUTOCONTIDO E ISOLADO — gerado por uma API route dedicada que faz 1 auth+ownership+query e devolve HTML estático com assets já embutidos como `data:` URI, sem layout raiz, sem sidebar, sem nova consulta ao Prisma dentro do iframe. Não reproduz nenhum dos 3 problemas documentados abaixo. Se "sidebar/shell vazando" voltar a aparecer, a causa é outra, não este mecanismo.
+
+- `BarraSuperiorEditor` delega a abertura para `ApresentacaoEditor`, que desbloqueia o Web Audio e abre `ModalVisualizadorHtml` imediatamente no mesmo gesto do usuário.
+- A prévia agora lê do BANCO (via a rota de export), não mais do Zustand em memória: `handleApresentar()` guarda a promise do salvamento do slide ativo (se `isDirty`) numa ref e passa como prop `aguardarAntesDeGerar` — o modal espera essa promise ANTES de buscar o HTML, pra não mostrar versão desatualizada.
+- Estados do modal: `carregando` (spinner) / `erro` (mensagem + "Tentar de novo") / `pronto` (iframe). Gerar o export pode levar alguns segundos (baixa/embute todos os assets, igual ao download).
+- **Trade-off aceito, não resolvido:** cada abertura do modal chama a rota de export de novo, sem cache — pode ficar perceptivelmente lento em apresentações com bastante imagem/vídeo. Melhoria futura possível: cachear o HTML gerado entre aberturas, invalidando no save.
+- A rota `/PainelAlpha/Apresentacoes/[id]/apresentar` **não foi alterada** — continua standalone, autenticada, consultando o banco, reutilizando `ModoApresentacaoClient`. Todo o texto histórico abaixo (payload Zustand, `embutido=true`, propagação de pausa, `portalContainerCapa`, `modoCapa`, clamp de margem etc.) descreve `ModoApresentacaoClient`/`TransicaoContainerAlphaLayer` — **continua 100% válido pra rota standalone**, mas não descreve mais o modal do editor.
+
+**Nota histórica preservada (proibição original — vale pra qualquer iframe-pra-rota-interna, não pra `srcDoc` de HTML autocontido, ver reconciliação acima):**
+
+- O modal ANTERIOR (`ModalReproducaoApresentacao.tsx`, removido) montava `ModoApresentacaoClient` diretamente no Dialog. É proibido reintroduzir iframe apontando pra rota interna da aplicação (ex.: `/apresentar?modal=1`), `postMessage` de fechamento ou nova busca-de-rota-completa ao abrir: esses caminhos repetiam o shell, auth e Prisma e podiam exibir sidebar/abas dentro do player.
 - O payload instantâneo vem do Zustand: todos os slides já carregados são fotografados, e o slide ativo é substituído pelos `componentes` e `canvas` atuais. `SlideResumo` também preserva `transicaoEntrada`, inclusive em criação, duplicação e carga inicial.
 - O save do slide ativo ocorre em background com snapshot imutável e `versaoEdicao` monotônica. Toda mutação de conteúdo/canvas incrementa a versão; `concluirSalvamento(slideId, versao, sucesso)` só limpa `isDirty` para a versão atual. `serializarPersistenciaSlide()` mantém uma fila por `slideId`, executa escritas do mesmo slide na ordem de entrada, continua após rejeição e não bloqueia slides diferentes. A troca de slide aguarda essa fila antes de carregar o próximo, evitando corrida entre debounce, navegação e Server Action.
 - A rota `/PainelAlpha/Apresentacoes/[id]/apresentar` permanece como player standalone autenticado e consulta o banco; ela reutiliza `ModoApresentacaoClient`, mas não é usada pelo modal.
@@ -860,3 +871,237 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 **Editado quando:** a feature ganhar mais tipos de arquivo, filtros adicionais no histórico, ou o padrão "vigente + histórico imutável" for replicado em outro módulo.
 
 **Última atualização:** 2026-08-04 por Scribe
+
+---
+
+### Alpha Presentation Studio — Categoria "Backgrounds" (fundos animados de tela cheia)
+
+**Adicionado em:** 2026-08-05 por Scribe (sessão Bibble)
+
+**Descrição:** Nova categoria de componentes no Editor, extraindo e parametrizando 7 fundos animados que já existiam hardcoded em outros módulos do painel: Cosmos IAlpha (chat do Bibble — planetas/sol/estrelas com mecânica orbital kepleriana real), Radar Sonar (Consulta RADAR), Estelar CS & NPS / Estelar CheckList / Estelar Agenda Alpha (3 presets de UMA engine compartilhada — os módulos de origem já eram quase idênticos entre si), Blueprint Técnico (Alpha Blueprint) e Aurora dos Módulos (shader WebGL usado em Extratos/Parceiros). Todos totalmente editáveis: cor primária/secundária (swatch nativo `type="color"` + campo de texto lado a lado — usuário pode escolher vendo as cores OU digitar o hex), velocidade, densidade, direção (Radar) e toggles específicos (mostrarSol/quantidadePlanetas no Cosmos, mostrarGrade no Blueprint, mostrarRelogio no Estelar).
+
+**Checklist de integração:**
+- [x] Categoria "Backgrounds" aparece na sidebar do Editor (`CATEGORIAS_COMPONENTE`, sem lista manual separada)
+- [x] 7 itens nomeados arrastáveis com ícone/label próprios
+- [x] Fundo nasce cobrindo o canvas ativo (não um tamanho fixo) e sempre no zIndex mais baixo da lista (nunca tampa componentes existentes) — lógica em `ApresentacaoEditor.tsx` (`handleDragEnd`), não no registry
+- [x] Painel de propriedades com campos condicionais por estilo + botão "Centralizar" (mesmo padrão de `ContainerCargaProps.tsx`)
+- [x] Timeline não rotula todo background como o mesmo item — `tipo` sozinho ("fundoAnimado") não diferencia qual dos 7 foi arrastado, isso vive em `estilo`/`preset`
+- [x] `tsc --noEmit`/lint escopado/`next build`/33 testes de `tests/apresentacoes/` — todos OK, zero regressão nos 2 callers existentes de `AnimatedShaderBackground` (Extratos/Parceiros)
+
+**Arquivos criados:**
+- `src/lib/validations/slide-componentes-fundos.ts` — schema `fundoAnimadoComponenteSchema` (1 tipo só, `estilo` como discriminador interno — mesmo idioma de `container.layout`, NÃO 7 tipos na união)
+- `src/components/Apresentacoes/Editor/registry/registry-fundos.ts` — `REGISTRY_FUNDOS` (7 entradas) + `registryFundoParaEstilo(estilo, preset)` (resolve label/ícone de uma INSTÂNCIA já no slide, usado pela Timeline)
+- `src/components/Apresentacoes/Editor/RenderEngine/{CosmosIAlphaFundo,RadarFundo,EstelarFundo,BlueprintFundo}.tsx` — 1 engine por estilo, `EstelarFundo.tsx` compartilhada pelos 3 presets
+- `src/components/Apresentacoes/Editor/RenderEngine/fundos-utils.ts` — `hexParaRgb()` (o contrato público do componente é hex, igual aos demais tipos do editor; as engines internas usam `rgba(r,g,b,x)`, convenção herdada dos módulos de origem)
+- `src/components/Apresentacoes/Editor/RenderEngine/render/RenderFundos.tsx` — dispatcher por `estilo`
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/FundoAnimadoProps.tsx` — painel de propriedades + `ColorField` (swatch + texto) + botão Centralizar
+
+**Arquivos editados:**
+- `src/lib/validations/slide-componentes.ts` — novo tipo na união discriminada
+- `src/components/Apresentacoes/Editor/registry/componentes-registry.ts` — `TipoComponente` agora é `Exclude<ComponenteSlide["tipo"], "fundoAnimado"> | keyof typeof REGISTRY_FUNDOS` (o tipo "fundoAnimado" sozinho não é uma chave válida do registry — só existe através das 7 chaves nomeadas)
+- `src/components/Apresentacoes/Editor/RenderEngine/RenderComponente.tsx` — `case "fundoAnimado"`
+- `src/components/Apresentacoes/Editor/PainelDireito/PainelPropriedades.tsx` — wire do `FundoAnimadoProps`
+- `src/components/Apresentacoes/Editor/Timeline/TimelineReal.tsx` — troca `COMPONENTES_REGISTRY[c.tipo]` por `resolverEntradaRegistry(c)` (resolve via `registryFundoParaEstilo` quando `tipo === "fundoAnimado"`)
+- `src/components/Apresentacoes/Editor/ApresentacaoEditor.tsx` — `handleDragEnd` força `x:0,y:0,w:canvas.width,h:canvas.height` e `zIndex` mínimo da lista quando o tipo criado é `fundoAnimado`
+- `src/components/Apresentacoes/Editor/Canvas/CanvasArea.tsx` — auto-ajuste de zoom (ResizeObserver, one-shot) para o slide caber inteiro e ficar centralizado ao montar o editor ou trocar o formato do canvas; nunca sobrescreve zoom manual do usuário depois
+- `src/components/ui/animated-shader-background.tsx` — ganhou `corPrimaria`/`corSecundaria`/`velocidade` (opcionais, defaults reproduzem a paleta original); refatorado para o padrão "latest ref" (valores sincronizados via `useEffect`, lidos dentro de `animate()` a cada frame) — corrigiu de quebra também um `react-hooks/refs` pré-existente (`pausadoRef.current = pausado` direto no corpo do render, já presente antes desta sessão)
+
+**Decisão de arquitetura chave:** os 3 presets "estelar" (CS&NPS/CheckList/Agenda Alpha) são UMA engine só (`EstelarFundo.tsx`) — decisão do usuário para não triplicar ~150 linhas quase idênticas. CheckList ganhou paleta própria (esmeralda `#10b981`/indigo `#6366f1`, velocidade 0.8, densidade 1.3) após o usuário notar que CS&NPS e CheckList pareciam "iguais demais" — evitar repetir esse quase-clone se um 4º preset estelar for adicionado no futuro.
+
+**Editado quando:** novo estilo de fundo for pedido, ou os presets "estelar" precisarem de mais variação visual.
+
+**Última atualização:** 2026-08-05 por Scribe
+
+---
+
+### Alpha Presentation Studio — Container Alpha: tamanho padrão, prévia ampliada e zoom sobreposto à abertura
+
+**Adicionado em:** 2026-08-05 por Scribe (sessão Bibble, mesma sessão da categoria Backgrounds)
+
+**Descrição:** 3 melhorias no Container Alpha (componente `containerCarga`, usado tanto como componente de slide quanto como animação de entrada "container-alpha" configurável em `AnimacaoContainerAlphaProps.tsx`):
+1. **Tamanho padrão de slide** — nascia em 640×360 (metade do slide); agora nasce cobrindo o canvas ativo (`registry-3d.ts` usa `CANVAS_PADRAO` como default estático, `ApresentacaoEditor.tsx#handleDragEnd` ajusta pro tamanho real do canvas ativo ao soltar — mesmo padrão já usado para `fundoAnimado`, mas SEM forçar zIndex mínimo: o Container Alpha é uma capa que fica por cima, revelando o próximo slide pela porta, o oposto do Background).
+2. **Prévia ampliada** — a caixinha de prévia dentro do painel de propriedades (`AnimacaoContainerAlphaProps.tsx`) é presa à largura estreita da lateral. Novo botão "Ampliar" abre `ModalPreviaContainerAlpha.tsx` (`Dialog` do shadcn, mesma classe de tamanho responsivo 16:9 já usada em `ModalReproducaoApresentacao.tsx`: `w-[min(96vw,1440px,163.555dvh)]`), mostrando o mesmo `componentePreview` em tamanho de slide de verdade.
+3. **Zoom sobreposto à abertura da porta** — em `ContainerCargaRender.tsx`, o zoom para dentro (câmera dollying via `ContainerCargaCameraRig.tsx`) esperava a porta terminar de abrir 100% antes de começar. Agora começa aos 55% da duração da abertura (`FRACAO_ABERTURA_PARA_INICIAR_ZOOM`), sobrepondo os dois movimentos ("entrar andando" pela porta). 55% é seguro geometricamente: as portas são articuladas na borda EXTERNA (`ContainerCargaModel.tsx` — `Door_Left_Pivot`/`Door_Right_Pivot` nos hinges `±openingW/2`) e nesse ponto do giro já varreram para fora do corredor central por onde a câmera avança — não há clipping da câmera contra a geometria da porta.
+
+**Arquivos criados:**
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/ModalPreviaContainerAlpha.tsx`
+
+**Arquivos editados:**
+- `src/components/Apresentacoes/Editor/registry/registry-3d.ts` — default `w/h` de `containerCarga` para `CANVAS_PADRAO`
+- `src/components/Apresentacoes/Editor/ApresentacaoEditor.tsx` — `handleDragEnd` ajusta `containerCarga` pro canvas real ao soltar (sem mexer no zIndex)
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/AnimacaoContainerAlphaProps.tsx` — botão "Ampliar" + wire do modal
+- `src/components/Apresentacoes/Editor/RenderEngine/ContainerCargaRender.tsx` — delay do zoom recalculado (`inicioAbertura + duracaoAbertura * 0.55` em vez de esperar a abertura completa)
+- `tests/apresentacoes/container-alpha.test.ts` — assert do default atualizado para `CANVAS_PADRAO.width/height` (era `640×360` hardcoded)
+
+**Como este componente já funciona em produção (não confundir com o Background):** `containerCarga` tem DOIS usos — (a) como componente comum dentro de um slide (transiciona pro PRÓXIMO slide ao abrir, via `ComponenteNoSlide` em `SlideApresentacaoLayer.tsx`, que já força quase-tela-cheia com margem própria independente do `w`/`h` salvo) e (b) como "animação de entrada" tipo `container-alpha` configurada em QUALQUER componente do slide 1 (`animacao.entrada.tipo === "container-alpha"`, lido por `obterAnimacaoContainerAlphaInicial` em `ModoApresentacaoClient.tsx`) — nesse caso funciona como CAPA da apresentação inteira, antes do slide 1, via `TransicaoContainerAlphaLayer.tsx` (que também já força tamanho baseado no canvas, independente do componente salvo). As mudanças desta sessão não alteram esses 2 fluxos de apresentação (já forçavam tamanho correto) — só o comportamento ao EDITAR (canvas do editor e a prévia da animação).
+
+**Editado quando:** a fração de sobreposição do zoom (55%) precisar de ajuste fino após teste visual real, ou um 3º uso do Container Alpha for adicionado.
+
+**Última atualização:** 2026-08-05 por Scribe
+
+---
+
+### Alpha Presentation Studio — Exportação HTML autocontida (novo, `Exportar HTML`)
+
+**Adicionado em:** 2026-08-06 por Scribe (sessão Bibble, planejada em Plan Mode, executada em 10 fases)
+
+**Descrição:** Botão "Exportar HTML" na `BarraSuperiorEditor.tsx` baixa a apresentação inteira como **1 arquivo `.html` único, 100% autocontido** (abre offline via `file://`, sem depender do PainelAlpha nem de internet) — reproduzindo a apresentação com fidelidade real: mesmo motor de render (`RenderComponente.tsx` e toda a árvore `RenderEngine`), Container Alpha 3D de verdade (não um fallback), transições configuradas por slide. Navegação: 1 clique ou 1 tick de scroll avança exatamente 1 slide. Se o slide 1 tiver a animação de entrada "Container Alpha", ele aparece **fechado e parado** ao carregar, e o primeiro gesto do usuário dispara a abertura automaticamente.
+
+**Arquitetura (não é vídeo nem screenshot — é o app de verdade bundlado à parte):**
+- **Bundler:** `esbuild` (novo devDependency explícito, já existia como transitivo), formato **IIFE** (não ESM — evita restrição de CORS/módulos ao abrir via `file://`). Bundle gerado em **build-time** (`npm run build:player`, encadeado antes de `next build` no script `build`), nunca por requisição — ler um módulo TS gerado (`src/generated/apresentacoes-player-bundle.ts`, gitignored) é muito mais rápido/previsível do que rodar esbuild dentro de uma function serverless a cada clique.
+- **Isolamento do player:** novo diretório `src/apresentacoes-player/` (`entry.tsx`, `PlayerStandalone.tsx`, `dados-tipos.ts`, `player.css`) — reaproveita `RenderComponente.tsx` e toda `RenderEngine`/`ModoApresentacao` DIRETO (sem duplicar), confirmado por leitura de código que nenhum desses arquivos importa `next/*` nem tem `"use server"` (só `ModoApresentacaoClient.tsx` tinha `useRouter`, por isso NÃO é reaproveitado — `PlayerStandalone.tsx` é uma shell nova, mais simples, com navegação por clique/scroll em vez de botões). `scripts/build-apresentacoes-player.mjs` tem um **guard automatizado**: varre o `metafile` do esbuild e FALHA o build se algo de `next/` ou `"use server"` vazar pro bundle — checagem real a cada build, não promessa.
+- **CSS:** `player.css` usa `@import "tailwindcss" source(none)` + `@source` explícito só pra `RenderEngine`/`ModoApresentacao`/o próprio player (Tailwind v4 varre o repo INTEIRO por padrão se não desligar isso) — caiu de 486KB pra 50.2KB. `@import "@xyflow/react/dist/style.css"` resolve nativamente (mesmo mecanismo que já importa `tw-animate-css`/`shadcn/tailwind.css` em `globals.css`).
+- **Assets do usuário** (imagem/vídeo/áudio/textura de globo/`.glb`): `src/lib/apresentacoes/percorrer-componentes.ts` (walker recursivo puro, entra em filhos de card/grid/container) + `src/lib/apresentacoes/embutir-assets.ts` (`embutirAssetsNosSlides` — pré-checagem de orçamento de bytes usando `ApresentacaoAsset.tamanhoBytes` ANTES de baixar qualquer coisa, orçamento combinado 25MB via `ORCAMENTO_MAX_ASSETS_BYTES`, fail-fast em qualquer falha de download em vez de gerar HTML com asset quebrado). Todos viram `data:` URI base64 na Route Handler.
+- **Logo `/A.PNG` do Container Alpha:** extraído pra `container-carga-assets.ts` (`LOGO_A_URL`, `ContainerCargaModel.tsx` importa em vez do literal). No bundle do player, um alias do esbuild troca esse módulo por `container-carga-assets.player.ts` (usa `__LOGO_A_DATA_URI__`, substituído em build-time via `define` do esbuild lendo `public/A.PNG`) — zero custo de rede em runtime, e o script verifica que o `data:image/png;base64,` realmente aparece no bundle gerado (falha alto se o alias não pegar).
+- **Container Alpha fechado até o 1º gesto:** `ContainerCargaRender.tsx` ganhou prop `deverIniciar?: boolean` (default `true` — zero mudança pra Editor/Modo Apresentação, nenhum call site existente passa isso) que, quando `false`, não registra nenhum `animate()` no `useEffect` principal (fica estático fechado). `TransicaoContainerAlphaLayer.tsx` repassa o mesmo prop. `PlayerStandalone.tsx` orquestra: `estadoCapa: "fechada"|"abrindo"|"concluida"`, detecta a config via `obterAnimacaoContainerAlphaInicial` (já existia), e só entra no deck normal de slides depois do `onComplete` da transição.
+- **Rota:** `GET /api/apresentacoes/[id]/exportar-html` (`src/app/api/apresentacoes/[id]/exportar-html/route.ts`) — auth + `checarOwnershipApresentacao` (extraída pra `src/lib/apresentacoes/ownership.ts`, canônica; as 4 cópias locais pré-existentes não foram tocadas) + query nova (tema com `corPrimaria/Secundaria/Accent`, slides, assets) + escape de `<` no JSON injetado (`<`, evita quebra de `</script>` via título/texto de usuário) + escape de `<title>` (`&`/`<`/`>`) + `Content-Disposition: attachment`.
+
+**Arquivos novos:** `src/apresentacoes-player/{entry.tsx,PlayerStandalone.tsx,dados-tipos.ts,player.css}`, `scripts/build-apresentacoes-player.mjs`, `src/generated/apresentacoes-player-bundle.ts` (gerado, gitignored), `src/app/api/apresentacoes/[id]/exportar-html/route.ts`, `src/lib/apresentacoes/{ownership.ts,container-carga-assets.ts,container-carga-assets.player.ts,percorrer-componentes.ts,embutir-assets.ts}`, `tests/apresentacoes/embutir-assets.test.ts` (12 testes).
+
+**Arquivos editados:** `ContainerCargaModel.tsx` (import `LOGO_A_URL`), `ContainerCargaRender.tsx` (prop `deverIniciar`), `TransicaoContainerAlphaLayer.tsx` (repassa `deverIniciar`), `BarraSuperiorEditor.tsx` (botão "Exportar HTML"), `exportacao.ts` (`exportarApresentacaoComoHtml` + `nomeDownloadSeguro` exportado), `package.json` (devDeps `esbuild`/`postcss` + script `build:player`), `.gitignore`.
+
+**Pendências conscientes (fora do escopo desta v1, decisão do usuário):** Container Alpha só como CAPA do slide 1 — se usado como transição NO MEIO do deck, a exportação ainda não replica esse caso (renderiza como transição de slide comum). Sem teste em browser real nesta sessão (sem Playwright disponível) — todo o pipeline foi validado via `tsc`/lint/build/testes automatizados + guards estáticos, mas **abrir o `.html` de verdade via `file://` e clicar/rolar continua sendo validação manual pendente do usuário**.
+
+**Última atualização:** 2026-08-06 por Scribe
+
+---
+
+### Container Alpha — textura das portas redesenhada (padrão fiel a referência fotográfica real)
+
+**Adicionado em:** 2026-08-06 por Scribe (mesma sessão, após o usuário anexar uma foto de referência de container real "ALPHA COMEX")
+
+**Descrição:** `ContainerCargaModel.tsx` — `makeDoorTexture`/`drawCorrugation` reescritos para bater muito mais de perto com uma referência fotográfica de container real que o usuário anexou, mantendo 100% procedural (sem imagem externa, continua totalmente recolorável via `corPrincipal`/`corMetal`/`corInterior`):
+- **Resolução da textura dobrada** (512×1024 → 1024×2048) — texto e corrugação mais nítidos.
+- **Corrugação com desgaste real:** sujeira acumulada perto do chão/topo, escorridos de ferrugem (10, verticais, finos, perto de rebites), riscos de desgaste (scuffs claros) — tudo com **seed fixa** (`4271`/`8837`, uma por lado, via `criarGeradorSeed` de `fundos-utils.ts`), não `Math.random()` — mesmo cuidado já aplicado aos fundos animados (Container Alpha pode renderizar em 2 instâncias simultâneas — prévia no portal + slide real por baixo — e precisa do MESMO desgaste nas duas, senão "pula" visualmente).
+- **Tabela de peso com unidade dupla** (métrico + imperial, ex. "30.480 KG" / "67.200 LB" empilhados) — antes só tinha KG.
+- **4 barras de trava por porta** (era 3) — `POSICOES_BARRAS`, distribuídas por toda a largura da porta, com 5 braçadeiras cada (era 3).
+- **Castings de canto** (4 aberturas escuras nos cantos do frame, padrão ISO) — componente novo `CornerCasting`, renderizado dentro de `Container_Frame`.
+- Textos/strings (ALPHA COMEX, ACXU 2025 01/22G1, GLOBAL TRADE SOLUTIONS, COMPLIANCE/INTELIGÊNCIA/RESULTADOS) já batiam 1:1 com a referência — não mudaram, só reposicionados pra nova resolução.
+
+**Limitação reconhecida:** fidelidade fotorrealista total (iluminação HDRI, reflexos de ambiente) tem teto real num Three.js procedural sem texturas de imagem prontas — e nenhuma mudança desta sessão foi confirmada visualmente (sem browser disponível). Pendente de validação manual do usuário; provável necessidade de mais 1-2 rodadas de ajuste fino depois que ele olhar o resultado renderizado de verdade.
+
+**Editado quando:** o usuário testar visualmente e pedir ajustes (cores/intensidade do desgaste, posição de texto, etc).
+
+**Última atualização:** 2026-08-06 por Scribe
+
+---
+
+#### Sidebar de slides — nome editável + renumeração automática
+
+- `Slide.nome` (`String?`) fica `null` por padrão desde `CriarSlide` (não grava mais `"Slide N"` literal) — o rótulo exibido é SEMPRE `nome || \`Slide ${ordem+1}\`` (`ItemSlide` em `SidebarSlides.tsx`), então continua correto sozinho depois de excluir/reordenar. Só vira texto fixo persistido quando o usuário clica no ícone de lápis e renomeia.
+- `ExcluirSlide` (actions/slides.ts) roda em `$transaction`: exclui E renumera `ordem` de todos os restantes (sequencial, sem buracos). `SidebarSlides.tsx#handleExcluir` espelha a mesma renumeração no estado local, sem esperar refetch.
+- **Checklist se for mexer em `Slide.ordem`/`Slide.nome` de novo:** qualquer novo fluxo que crie/exclua/reordene slides precisa manter `ordem` denso e sequencial (0,1,2...) — é do que depende o rótulo automático. `ReordenarSlides` (já existente) é o padrão de referência pra "recebe lista de IDs na ordem certa, grava ordem=index".
+
+#### Importação de PPTX
+
+- **Fluxo em 2 fases (revisado 2026-08-07 — antes era upload direto sem prévia):** botão "Upload" na sidebar de slides → seleciona arquivo → `ModalPreImportarPptx.tsx` abre e chama `POST /api/apresentacoes/[id]/pptx-preview` (parser roda, mas NADA é gravado — imagens viram `data:` URI inline, sem Blob/DB) → modal renderiza cada slide de verdade via `RenderComponente` (reaproveitado isolado, confirmado que não depende do Zustand do editor) num palco escalado, com botão de remover por slide → "Confirmar importação" reenvia o MESMO arquivo (`File` mantido em memória no client) + índices excluídos pra `POST /api/apresentacoes/[id]/importar-pptx` (agora com upload real pro Blob + criação de `Slide`, sempre APÊNDICE depois do último slide existente) → sidebar recarrega via `ListarSlides`. "Cancelar" não deixa nenhum resíduo (nada foi gravado na fase de prévia).
+- **Paralelização:** a rota de commit processava imagens SEQUENCIALMENTE — decks com várias imagens passavam do `maxDuration=60` da Vercel (function matada no meio, parecia "trava" pro usuário). Agora usa `Promise.all` sobre os slides pro mapeamento+upload; gravação no banco continua sequencial (ordem determinística).
+- **Dependência nova:** `fast-xml-parser` (parsing dos XML internos do `.pptx` — `jszip`, usado pro unzip, já existia no projeto).
+- **Arquitetura (revisada 2026-08-06 após bug real reportado):** `xml-utils.ts` (parser XML + helpers de relacionamento/caminho compartilhados) → `tema.ts` (resolve cadeia slide→layout→master→tema: cores de tema `<a:schemeClr>` com `<p:clrMap>` e modificadores lumMod/lumOff/shade/tint, fundo herdado `<p:bg>`, posição herdada de placeholder do layout) → `parser.ts` (percorre `<p:spTree>` com composição de transform de grupo em espaço EMU — `chOff`/`chExt` resolvidos corretamente pra grupos aninhados) → `mapear.ts` (`FormaExtraida[]` → `ComponenteSlide[]`, incluindo `rotacao`).
+- **Escopo (decisão confirmada com o usuário 2x — v1 ambiciosa, depois "corrigir o essencial" quando reportou bug real):** extrai texto (cor/negrito/tamanho/alinhamento — 1 estilo por caixa inteira, não por trecho), imagens incl. FUNDO de slide/layout/master (reenviadas pro Vercel Blob + `ApresentacaoAsset`), tabelas (1ª linha=colunas), formas básicas com preenchimento sólido OU cor de tema (rect/roundRect/ellipse → `card`), rotação (`<a:xfrm rot="">`), grupos aninhados com transform correto. NÃO extrai: gráficos, SmartArt, geometria customizada complexa, fonte do tema (schema de `texto` não tem campo `fontFamily`), rich text por TRECHO dentro do parágrafo (schema só guarda 1 estilo/caixa), animações, notas do apresentador, crop de imagem (`srcRect`), EMF/WMF, flip horizontal/vertical (schema não tem campo pra isso). Elementos não suportados são contados (não travam a extração) e reportados no toast (`ignorados: Record<motivo,contagem>`).
+- **Limitação de ordem conhecida:** formas do mesmo tipo XML preservam ordem relativa; tipos DIFERENTES intercalados no XML original (ex.: `<p:pic>` entre dois `<p:sp>`) não preservam z-order exato entre si — `processarArvoreFormas` processa todos os `sp`, depois `pic`, depois `graphicFrame`, depois recursa em `grpSp`. Corrigir exigiria `fast-xml-parser` no modo `preserveOrder` (reescreveria todo acesso a XML do módulo).
+- **Escala:** lê `<p:sldSz>` real do PPTX (EMU) e calcula fator uniforme (sem distorcer) pro canvas de destino (o do último slide já existente na apresentação), centralizando quando a proporção não bate.
+- **Checklist se for mexer no parser:** cada tipo de forma é isolado em try/catch dentro de `processarArvoreFormas` — manter esse padrão ao adicionar suporte a novos tipos (chart, SmartArt etc.), nunca deixar 1 forma derrubar o slide inteiro. `tema.ts#resolverContextoTema` nunca lança (sempre devolve fallback de cores padrão do Office em qualquer falha) — manter essa garantia se for editado.
+- **Testes:** `tests/apresentacoes/pptx-parser.test.ts` (6 casos: básico texto/imagem/forma, fundo herdado do master via schemeClr, cor de tema num preenchimento, herança de posição do layout, rotação, transform de grupo aninhado com matemática conferida a mão) — rodar antes de mexer no parser/tema, é a única forma de validar sem um `.pptx` real.
+- **Risco conhecido, não resolvido:** rota usa `request.formData()` direto — herda o limite padrão de payload de Functions da Vercel (~4,5MB), igual a TODOS os outros uploads deste projeto (não é regressão desta feature). `.pptx` grandes com muita imagem podem falhar por isso, não por bug de parsing. Fix real seria upload direto client→Blob, não implementado.
+- **Fora de alcance nesta arquitetura (infra não disponível, não só "não implementado"):** renderização de referência via LibreOffice/Aspose (não instalado no servidor, inviável numa function serverless), worker/fila com progresso e cancelamento real (sem essa infra no projeto).
+- **Não testado com arquivo `.pptx` real** — validado com XML OOXML sintético (estruturalmente realista, com relacionamentos `.rels`) rodado via `npx tsx` contra o parser de verdade, não só leitura de código. Ainda assim, PowerPoint real tem muita variação entre versões/templates que o sintético não cobre.
+
+**Editado quando:** o usuário testar com um `.pptx` real e reportar o que ainda não ficou "certinho" — dado o escopo (formato complexo), correções pontuais no parser são esperadas; usar `tests/apresentacoes/pptx-parser.test.ts` como base pra reproduzir o caso reportado como XML sintético antes de mexer.
+
+---
+
+### Alpha Motion — Fase 08 (Scroll Reveal + Controles do Player)
+
+**Adicionado em:** 2026-08-06 por Scribe (sessão Bibble, pipeline serial completo)
+
+**Descrição:** Único modo de `SlideScrollConfig.mode` implementado até agora é `"reveal"` — Scroll Scrub/Sticky/Pinned/Parallax/Snap ficam de fora, decisão registrada em `decisions.md` (2026-08-06): o player (`PlayerStandalone.tsx`) navega por SLIDE INTEIRO (1 gesto = 1 avanço, cooldown 800ms), não é rolagem contínua de página — implementar os outros modos exigiria reestruturar esse modelo de navegação. Também ficaram fora: velocidade de reprodução (não há autoplay), play/pause real de slides, mute/volume (`container-carga-audio.ts` só tem desbloqueio de autoplay policy), desativar animações manualmente (só existe `useReducedMotion` via preferência do SO).
+
+**Descoberta arquitetural (relevante para qualquer fase futura que toque o player exportado):** o `.html` exportado por `exportar-html/route.ts` NÃO é HTML estático — é um bundle React offline (esbuild IIFE, `scripts/build-apresentacoes-player.mjs`) que roda `PlayerStandalone.tsx` de verdade dentro do arquivo. Hooks React normais (`useState`/`useEffect`/hooks customizados como `useScrollReveal`) funcionam nele sem restrição especial — a única regra é nunca importar `next/*` nem qualquer arquivo com `"use server"` (2 guards automáticos no script de build abortam o build se isso acontecer).
+
+**Arquivos novos:**
+- `src/lib/apresentacoes/scroll/scroll-reveal.ts` — `ConfigScrollReveal`, `CONFIG_SCROLL_REVEAL_PADRAO`, hook `useScrollReveal(ref, config)` via `IntersectionObserver` real. `threshold` sempre clampado em `[0,1]` antes de passar ao observer (fix de Anubis — `customProperties` é schema Zod permissivo, um valor fora do range lançaria `TypeError` na construção do observer).
+- `src/components/Apresentacoes/Editor/RenderEngine/ScrollRevealWrapper.tsx` — wrapper FINO por componente (diferente de `EfeitosGlobaisSlide.tsx`, que é por SLIDE inteiro). Acha a primeira `ElementAnimation` com `trigger: "on-scroll"` nas animações recebidas; sem ela, retorna `children` direto via Fragment (zero `<div>` extra, zero custo, 100% retrocompatível). Quando ativo, define `width:100%; height:100%` no próprio `<div>` — sem isso os `Render*` internos (`RenderImagem`/`RenderBotao` etc., que dependem de 100% do pai imediato) colapsariam visualmente.
+
+**Arquivos editados:**
+- `src/apresentacoes-player/dados-tipos.ts` — `SlideExportado` ganhou `animacaoConfig: SlideAnimationConfig | null`.
+- `src/app/api/apresentacoes/[id]/exportar-html/route.ts` — `slidesBase` agora propaga `animacaoConfig` de `dadosJson` (nenhuma mudança de `select` do Prisma: `dadosJson: true` já trazia tudo, é `Json` genérico). `embutirAssetsNosSlides` (spread genérico `{ ...slide, componentes: ... }`) já propagava o campo automaticamente, sem precisar de ajuste.
+- `src/components/Apresentacoes/Editor/Canvas/ComponenteNoCanvas.tsx` — `ScrollRevealWrapper` conectado como filho INTERNO do wrapper de posicionamento (que já carrega `ajusteVisual` da Fase 07) — nunca no mesmo nó DOM, para não haver 2 elementos disputando `style.opacity`/`transform`.
+- `src/apresentacoes-player/PlayerStandalone.tsx` — ganhou `voltar()` (espelha `avancar()`, mesmo `bloqueadoRef`/cooldown 800ms), `reiniciar()`, `alternarTelaCheia()` (padrão idêntico a `ModoApresentacaoClient.tsx:154-164`, try/catch, nunca crítica se o browser negar), atalhos de teclado (seta esq/dir, espaço, F — com guard contra `button/input/select/textarea/a/[role='slider']` focado), barra de controles visível só quando `jaInteragiu && !capaAtiva`, e o `map` de componentes agora envolve cada um com `ScrollRevealWrapper`.
+
+**Lookup elementId→animação:** ambos os pontos de conexão (`ComponenteNoCanvas.tsx` e `PlayerStandalone.tsx`) reaproveitam `resolverAnimacoesDoElemento(componente, animacaoConfig)` (`src/lib/apresentacoes/animacao/resolver.ts`, existente desde a Fase 01) — nunca duplicar esse filtro em código novo.
+
+**Dívida técnica registrada (Sage, baixo risco, não corrigida):** `reiniciar()` em `PlayerStandalone.tsx` zera `bloqueadoRef.current` imediatamente, sem cooldown próprio — clicar "reiniciar" 2x rápido ou "reiniciar" seguido de "avançar" pode truncar a transição visual (não corrompe estado, índice sempre válido). Primeira hipótese a investigar se o usuário reportar "a transição de reinício às vezes corta".
+
+**Testes:** `tests/apresentacoes/scroll-reveal.test.ts` — 14 testes (config/schema, clamping de threshold, `resolverAnimacoesDoElemento` com `animacaoConfig` ausente, simulação isolada da máquina de estado do hook — sem DOM real, projeto não tem `@testing-library/react`/`jsdom`, `vitest.config.ts` roda em `environment: "node"`). Comportamento real do `IntersectionObserver` em browser segue como validação manual pendente.
+
+**known-errors.md ganhou 1 entrada nova (Forge):** "ESLint `react-hooks/set-state-in-effect` — `setState` redundante dentro de `useEffect` que só replica o valor inicial do `useState`" — padrão diferente do já catalogado sobre chamar Server Action em efeito; aqui é sobre reafirmar um valor que o inicializador do `useState` já cobria.
+
+**Editado quando:** Fase 09 (Presets/Preview/Polimento) ou Fase 10 (Exportação Final) tocarem `PlayerStandalone.tsx` de novo — considerar extrair a barra de controles (linhas ~223-265) para `PlayerControls.tsx` se o arquivo crescer além do padrão atual (~270 linhas, dentro do limite de 300 mas já perto).
+
+**Última atualização:** 2026-08-06 por Scribe
+
+---
+
+### Alpha Motion — Fase 09 (Presets, Preview e Polimento)
+
+**Adicionado em:** 2026-08-06 por Scribe (sessão Bibble, pipeline serial completo)
+
+**Recorte de escopo (Scout, aprovado pelo usuário):** dos 6 blocos da fase, 2 ficaram documentados como limitação por falta de base no código, não por escolha arbitrária: **multi-seleção de elementos** (`useEditorStore.componenteSelecionadoId: string | null` é singular desde a Onda 2 — "aplicar a todos os SELECIONADOS" pressupõe uma feature de seleção múltipla que nunca existiu) e **Undo/Redo** (nenhuma pilha de histórico em lugar nenhum do editor — "aplicar preset gera 1 entrada de histórico" não tem onde pendurar). **Modo de qualidade** em nível de `Apresentacao` também ficou fora: o model no schema Prisma não tem nenhum campo Json genérico (só colunas fixas como `titulo`/`status`/`temaId`), exigiria migration real → gate do Vault, não incluído nesta rodada.
+
+**Arquivos novos:**
+- `src/lib/apresentacoes/animacao/presets-completos.ts` — `PRESETS_ANIMACAO_COMPLETOS` (8: Minimalista, Corporativo, Cinematográfico, Dinâmico, Storytelling, Cards em sequência, Apresentação de métricas, Card Focus), mesmo espírito de `presets-stagger.ts` mas um nível acima — cada preset retorna `AnimacaoPreset[]` (`Omit<ElementAnimation, "id"|"elementId">`), preenchidos na aplicação, nunca `id` fixo reaproveitado entre elementos. **Sem deduplicação**: aplicar o mesmo preset 2x no mesmo elemento gera 2 conjuntos completos de animações — comportamento intencional (mesmo padrão que o `<select>` "Adicionar animação" original já tinha), documentado em teste.
+- `src/lib/apresentacoes/animacao/responsivo.ts` — `ResponsivoConfig` (5 campos: `desktopOnly`, `distanciaMobile`, `desativarPin`, `desativarParallax`, `fallbackMobile`) dentro de `ElementAnimation.customProperties.responsivo`, sem migration (schema já era `z.unknown()` desde a Fase 01). `lerConfigResponsiva()` faz type-narrowing campo a campo — `distanciaMobile: 0` é tratado corretamente como valor válido (comparação de tipo+range, nunca `??`/`||`, que teria o bug clássico de falsy coercion).
+- `src/components/Apresentacoes/Editor/ReducedMotionSimuladoContext.tsx` — toggle "reduzir animações" ISOLADO do Editor. **Não troca nenhum hook existente**: `AnimacaoWrapper`/`RenderComponente.tsx` (caminho de render REAL compartilhado Editor+player exportado) não usa `useReducedMotion` hoje; só `TransicaoSlide.tsx` usa, e esse é exclusivo do Modo Apresentação/player exportado. Usado só em `PreviewMiniatura.tsx` — zero risco do player exportado herdar a simulação.
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/PreviewMiniatura.tsx` — miniatura DOM/CSS em loop (nunca vídeo/GIF, Seção 14 do prompt original), reaproveita `montarTransition`/`resolverEasingFramerMotion` (`curvas.ts`) — **não** reaproveita `AnimacaoWrapper`/`nucleo.tsx`, que opera sobre o formato ANTIGO `ConfigAnimacao`, incompatível com `ElementAnimation`. Mapa `VARIANTS_PREVIEW` cobre ~20 dos ~87 tipos do catálogo; os demais caem no fallback estático (`VARIANT_PADRAO`), testado contra o catálogo real.
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/SeletorPreset.tsx` — aplica preset ao elemento selecionado atualmente no Editor.
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/CamposResponsividade.tsx` — UI dos 5 campos, grava em `customProperties.responsivo` preservando outras chaves já existentes em `customProperties` da mesma animação (spread completo antes de sobrescrever só a chave `responsivo`).
+- `src/components/Apresentacoes/Editor/BarraSuperior/ModalAplicarPreset.tsx` — "Aplicar a este slide" (síncrono, via store) e "Aplicar a todos os slides" (`AlertDialog` de confirmação — nunca `confirm()` nativo — + loop sequencial reaproveitando a Server Action `AtualizarSlide` já existente, ownership revalidado a cada chamada individual). Botão "Aplicar a todos os slides" desabilita quando `slides.length === 0`.
+
+**Arquivos editados:** `AnimacaoPropsV2.tsx` (preview+seletor de preset anexados; `<select>` "Adicionar animação" mudou de instantâneo para exigir clique em "Adicionar" — dá tempo de ver o preview antes de confirmar), `AnimacaoItemForm.tsx` (`CamposResponsividade`+`PreviewMiniatura` anexados), `BarraSuperiorEditor.tsx` (botão "Presets" + toggle reduced-motion), `ApresentacaoEditor.tsx` (envolvido por `ReducedMotionSimuladoProvider`), `slide-animacao-config.ts` (só comentário documentando a convenção `customProperties.responsivo`, sem mudança de schema).
+
+**Dívida técnica registrada (Anubis, não bloqueante):** "Aplicar a todos os slides" não tem teto de quantidade — uma apresentação com centenas de slides gera centenas de `AtualizarSlide` sequenciais a partir de 1 clique. Aceitável para o volume realista de uso (dezenas de slides), mas vale limite explícito se o produto crescer.
+
+**Dívida técnica registrada (Lens, não bloqueante):** lógica de merge de `SlideAnimationConfig` (`timelineAtual`/`novoConfig`) duplicada entre `aplicarAoSlideAtivo` e `aplicarATodosOsSlides` em `ModalAplicarPreset.tsx` — candidata a extrair um helper compartilhado numa próxima passada por esse arquivo.
+
+**Testes:** `tests/apresentacoes/presets-completos.test.ts` — 45 testes (8 presets válidos com types do catálogo real, nunca incluem `id`/`elementId`, `lerConfigResponsiva` defensivo incluindo `distanciaMobile: 0`, fallback de preview exercitado contra o catálogo real, reaplicação de preset documentada como não-deduplicada).
+
+**known-errors.md:** nenhuma entrada nova nesta fase.
+
+**Editado quando:** Fase 10 (Exportação Final) — considerar se os 2 formatos de animação (`ConfigAnimacao` legado vs `ElementAnimation` novo) devem convergir, o que unificaria `PreviewMiniatura.tsx` e `nucleo.tsx` num só motor de preview.
+
+**Última atualização:** 2026-08-06 por Scribe
+
+**Última atualização:** 2026-08-06
+
+---
+
+## Padrão reutilizável: Guia Inteligente de Módulo (2026-08-07)
+
+Pedido curto reconhecido: **“Adicione o Guia Inteligente neste módulo.”**
+
+### Contrato de integração
+
+- [ ] Inventariar funções reais, permissões, nomes visuais, fluxos e limites do módulo.
+- [ ] Criar/adicionar o manual em `src/lib/shared/module-knowledge/`, dividido por tópicos e aliases.
+- [ ] Registrar o manual no `MANUAIS_MODULOS` e validar a permissão usada pela tool `consultar_manual_modulo`.
+- [ ] Manter dados vivos em tools próprias; o manual ensina procedimentos e não congela números/estados do banco.
+- [ ] Definir `ConfigTutorialModulo` com nova versão somente quando a mudança justificar reapresentação.
+- [ ] Marcar alvos estáveis com `data-guia-<modulo>`; passos condicionais podem não existir e serão ignorados.
+- [ ] Verificar `localStorage` depois da hidratação e passar `userId` do Server Component, sem criar coluna de onboarding.
+- [ ] Incluir botão “Tutoriais” para replay, Pular e Concluir gravando a mesma preferência.
+- [ ] Cobrir aliases, conteúdo crítico, autorização, chave/versionamento e passos ausentes em Vitest.
+- [ ] Validar teclado, reduced motion, mobile, scroll e perfis com permissões diferentes.
+- [ ] Atualizar `patterns.md`, `components.md`, `integration-points.md`, `codebase-map.md` e a story.
+
+### Implementação inicial
+
+- Conhecimento: `src/lib/shared/module-knowledge/{types,registry,metas,parceiros}.ts`.
+- Bibble: `src/lib/bibble/{tools,tool-executor,system-prompt}.ts`.
+- Tour: `src/components/Guias/GuiaModuloTour.tsx` e `src/lib/guias/tutorial-modulo.ts`.
+- Integração: `src/app/PainelAlpha/Parceiros/page.tsx` e `src/components/Parceiros/ParceirosClient.tsx`.
+- Testes: `tests/bibble/module-knowledge.test.ts` e `tests/guias/tutorial-modulo.test.ts`.
+
+**Limite atual:** o manual modular está ligado ao Bibble nativo. A rota de agentes Onyx ainda não injeta esse catálogo; isso é evolução separada, não deve ser presumido ao replicar o padrão.
+
+**Última atualização:** 2026-08-07 por Scribe

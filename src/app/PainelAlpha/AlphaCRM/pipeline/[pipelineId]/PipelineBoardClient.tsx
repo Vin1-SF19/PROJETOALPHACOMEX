@@ -20,7 +20,7 @@ import { Plus, Building2, User } from "lucide-react";
 import { MoverCardBpm, CriarCardBpm } from "@/actions/bpm/Cards";
 import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
-import CardDetailDrawer from "./CardDetailDrawer";
+import CardFullViewModal from "../../CardModal/CardFullViewModal";
 
 interface EtapaBpm {
   id: string;
@@ -276,7 +276,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       )}
 
       {cardSelecionadoId && (
-        <CardDetailDrawer
+        <CardFullViewModal
           cardId={cardSelecionadoId}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}

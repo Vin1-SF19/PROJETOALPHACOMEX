@@ -30,7 +30,9 @@ import {
   diagramaComponenteSchema,
 } from "./slide-componentes-business";
 import { chatIlustrativoComponenteSchema } from "./slide-componentes-ia";
+import { fundoAnimadoComponenteSchema, type FundoAnimadoComponente } from "./slide-componentes-fundos";
 import { canvasConfigSchema } from "@/lib/apresentacoes/canvas";
+import { slideAnimationConfigSchema } from "./slide-animacao-config";
 
 export {
   textoComponenteSchema,
@@ -55,6 +57,7 @@ export {
   grafoComponenteSchema,
   diagramaComponenteSchema,
   chatIlustrativoComponenteSchema,
+  fundoAnimadoComponenteSchema,
 };
 
 // Card/Grid/Container são containers recursivos — ficam aqui (não nos arquivos satélites)
@@ -118,6 +121,7 @@ export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion
   grafoComponenteSchema,
   diagramaComponenteSchema,
   chatIlustrativoComponenteSchema,
+  fundoAnimadoComponenteSchema,
 ]);
 
 /** Coleta todos os ids da árvore (recursivo em containers) — usado para checar unicidade. */
@@ -132,6 +136,8 @@ function coletarIds(lista: ComponenteSlide[], acc: string[] = []): string[] {
 export const dadosSlideSchema = z.object({
   componentes: z.array(componenteSchema),
   canvas: canvasConfigSchema.optional(),
+  /** Alpha Motion (Fase 01) — ausente em slides anteriores a esta fila, sem exigir migração. */
+  animacaoConfig: slideAnimationConfigSchema.optional(),
 }).refine(
   (dados) => {
     const ids = coletarIds(dados.componentes);
@@ -162,6 +168,7 @@ export type ChecklistComponente = z.infer<typeof checklistComponenteSchema>;
 export type GrafoComponente = z.infer<typeof grafoComponenteSchema>;
 export type DiagramaComponente = z.infer<typeof diagramaComponenteSchema>;
 export type ChatIlustrativoComponente = z.infer<typeof chatIlustrativoComponenteSchema>;
+export type { FundoAnimadoComponente };
 
 export interface CardComponente extends z.infer<typeof baseComponenteSchema> {
   tipo: "card";
@@ -210,6 +217,7 @@ export type ComponenteSlide =
   | ChecklistComponente
   | GrafoComponente
   | DiagramaComponente
-  | ChatIlustrativoComponente;
+  | ChatIlustrativoComponente
+  | FundoAnimadoComponente;
 
 export type DadosSlide = z.infer<typeof dadosSlideSchema>;

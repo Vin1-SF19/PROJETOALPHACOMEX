@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { configAnimacaoCompletaSchema } from "./animacao";
+import { sharedElementIdSchema } from "./slide-animacao-config";
 
 /** Campos comuns a todo componente de slide — base de todos os schemas de tipo. */
 export const baseComponenteSchema = z.object({
@@ -12,4 +13,6 @@ export const baseComponenteSchema = z.object({
   rotacao: z.number().default(0),
   /** Tipado na Onda 3 — dados anteriores (Ondas 1/2) têm animacao: undefined, compatível sem migração. */
   animacao: configAnimacaoCompletaSchema,
+  /** Alpha Motion (Fase 06) — id compartilhado entre slides consecutivos para Morph. Opcional, retrocompatível. */
+  sharedElementId: sharedElementIdSchema,
 });

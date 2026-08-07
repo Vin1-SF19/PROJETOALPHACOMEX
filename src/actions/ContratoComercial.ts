@@ -8,6 +8,12 @@ import { revalidatePath } from "next/cache";
 import { criarRegistroClienteAPartirDeContrato } from "./Clientes";
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import { pusherServer } from "@/lib/pusher-server.ts";
+import {
+    CANAL_INDICACAO_PARCEIRO,
+    ParceiroNaoCadastradoInputSchema,
+    serializarParceiroNaoCadastrado,
+    type ParceiroNaoCadastradoInput,
+} from "@/lib/comercial/parceiro-nao-cadastrado";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -54,8 +60,9 @@ const CriarContratoSchema = z.object({
     formaPagamento: z.string().min(1),
     servico: z.string().min(1),
     canalAquisicao: z.string().min(1),
-    canalOutro: z.string().optional(),
+    canalOutro: z.string().trim().max(200).optional(),
     indicadoPorParceiroId: z.number().int().positive().optional(),
+    parceiroNaoCadastrado: ParceiroNaoCadastradoInputSchema.optional(),
     closerNome: z.string().min(1),
     mes: z.number().int().min(1).max(12),
     ano: z.number().int().min(2024).max(2099),
@@ -74,8 +81,9 @@ const AtualizarContratoSchema = z.object({
     formaPagamento: z.string().min(1),
     servico: z.string().min(1),
     canalAquisicao: z.string().min(1),
-    canalOutro: z.string().optional(),
+    canalOutro: z.string().trim().max(200).optional(),
     indicadoPorParceiroId: z.number().int().positive().optional(),
+    parceiroNaoCadastrado: ParceiroNaoCadastradoInputSchema.optional(),
     closerNome: z.string().min(1),
     socios: z.array(SocioSchema).optional(),
 });
@@ -87,6 +95,39 @@ const ConfirmarFechamentoSchema = z.object({
     contratoAssinado: z.boolean(),
     contratoUrl: z.string().url().optional().or(z.literal("")),
 });
+
+function resolverOrigemParceiro(d: {
+    canalAquisicao: string;
+    canalOutro?: string;
+    indicadoPorParceiroId?: number;
+    parceiroNaoCadastrado?: ParceiroNaoCadastradoInput;
+}) {
+    if (d.canalAquisicao === "Outro" && !d.canalOutro?.trim()) {
+        return { success: false as const, error: "Descreva o canal de aquisição" };
+    }
+
+    if (d.canalAquisicao !== CANAL_INDICACAO_PARCEIRO) {
+        return {
+            success: true as const,
+            canalOutro: d.canalAquisicao === "Outro" ? d.canalOutro!.trim() : null,
+            indicadoPorParceiroId: null,
+        };
+    }
+
+    const temCadastrado = Boolean(d.indicadoPorParceiroId);
+    const temPendente = Boolean(d.parceiroNaoCadastrado);
+    if (temCadastrado === temPendente) {
+        return { success: false as const, error: "Selecione um parceiro cadastrado ou informe o parceiro não cadastrado" };
+    }
+
+    return {
+        success: true as const,
+        canalOutro: d.parceiroNaoCadastrado
+            ? serializarParceiroNaoCadastrado(d.parceiroNaoCadastrado)
+            : null,
+        indicadoPorParceiroId: d.parceiroNaoCadastrado ? null : d.indicadoPorParceiroId!,
+    };
+}
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -111,6 +152,8 @@ export async function criarContrato(raw: unknown) {
     }
 
     const d = parsed.data;
+    const origem = resolverOrigemParceiro(d);
+    if (!origem.success) return origem;
 
     try {
         const contrato = await db.contratoComercial.create({
@@ -125,8 +168,8 @@ export async function criarContrato(raw: unknown) {
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
                 canalAquisicao: d.canalAquisicao,
-                canalOutro: d.canalOutro ?? null,
-                indicadoPorParceiroId: d.indicadoPorParceiroId ?? null,
+                canalOutro: origem.canalOutro,
+                indicadoPorParceiroId: origem.indicadoPorParceiroId,
                 closerNome: d.closerNome,
                 mes: d.mes,
                 ano: d.ano,
@@ -159,6 +202,8 @@ export async function atualizarContrato(raw: unknown) {
     const parsed = AtualizarContratoSchema.safeParse(raw);
     if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message };
     const d = parsed.data;
+    const origem = resolverOrigemParceiro(d);
+    if (!origem.success) return origem;
 
     const contrato = await db.contratoComercial.findUnique({ where: { id: d.id } });
     if (!contrato) return { success: false as const, error: "Contrato não encontrado" };
@@ -180,8 +225,8 @@ export async function atualizarContrato(raw: unknown) {
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
                 canalAquisicao: d.canalAquisicao,
-                canalOutro: d.canalOutro ?? null,
-                indicadoPorParceiroId: d.indicadoPorParceiroId ?? null,
+                canalOutro: origem.canalOutro,
+                indicadoPorParceiroId: origem.indicadoPorParceiroId,
                 closerNome: d.closerNome,
                 socios: d.socios ?? [],
             },

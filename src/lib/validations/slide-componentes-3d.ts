@@ -42,7 +42,7 @@ export const containerCargaComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("containerCarga"),
   corPrincipal: corHexSchema.default("#071a3d"),
   corMetal: corHexSchema.default("#96a3b2"),
-  corInterior: corHexSchema.default("#f5f6f8"),
+  corInterior: corHexSchema.default("#171b22"),
   anguloAbertura: z.number().min(45).max(120).default(105),
   duracaoAbertura: z.number().min(0.2).max(10).default(1.8),
   atrasoAbertura: z.number().min(0).max(10).default(0.2),

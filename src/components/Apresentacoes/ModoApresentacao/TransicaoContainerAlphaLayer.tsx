@@ -27,6 +27,8 @@ interface TransicaoContainerAlphaLayerProps {
   pausado: boolean;
   onZoomStart?: (evento: ContainerIntroEvent) => void;
   onComplete: () => void;
+  /** Repassado direto para `ContainerCargaRender` — ver documentação lá. Default `true`. */
+  deverIniciar?: boolean;
 }
 
 export function TransicaoContainerAlphaLayer({
@@ -36,16 +38,18 @@ export function TransicaoContainerAlphaLayer({
   pausado,
   onZoomStart,
   onComplete,
+  deverIniciar = true,
 }: TransicaoContainerAlphaLayerProps) {
   const [intro, setIntro] = useState<ContainerIntroEvent | null>(null);
   const componente = useMemo(
     () => criarComponenteAnimacaoContainerAlpha(configuracao, canvasPalco),
     [canvasPalco, configuracao],
   );
-  const margem = useMemo(
-    () => Math.min(72, Math.max(18, Math.min(canvasPalco.width, canvasPalco.height) * 0.05)),
-    [canvasPalco.height, canvasPalco.width],
-  );
+  // Container Alpha é uma CAPA — "sempre ocupa todo o palco 16:9" (ver comentário de
+  // DIMENSOES_CONTAINER_CAPA em container-intro.ts). Uma margem aqui deixa uma borda visível
+  // ao redor do container (preta durante a abertura, ou o background do slide vazando por
+  // baixo em usos futuros) — sem margem, o container cobre 100% da tela, como documentado.
+  const margem = 0;
   const iniciarIntro = useCallback((evento: ContainerIntroEvent) => {
     const escalaX = (canvasPalco.width - margem * 2) / (evento.palco?.w ?? canvasPalco.width);
     const escalaY = (canvasPalco.height - margem * 2) / (evento.palco?.h ?? canvasPalco.height);
@@ -99,6 +103,7 @@ export function TransicaoContainerAlphaLayer({
             <SlidePortalPreview componentes={slideDestino.componentes} canvas={slideDestino.canvas} />
           )}
           pausado={pausado}
+          deverIniciar={deverIniciar}
         />
       </div>
     </div>

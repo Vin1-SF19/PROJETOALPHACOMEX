@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
+  $transaction: vi.fn(),
   parceiro: {
     findUnique: vi.fn(),
     create: vi.fn(),
@@ -8,6 +9,17 @@ const prismaMock = vi.hoisted(() => ({
   },
   parceiroAcesso: {
     findUnique: vi.fn(),
+  },
+  contratoComercial: {
+    findUnique: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  clientes: {
+    findFirst: vi.fn(),
+  },
+  indicacao: {
+    create: vi.fn(),
+    findMany: vi.fn(),
   },
 }));
 
@@ -35,6 +47,13 @@ describe("responsável físico de parceiro PJ", () => {
       id: 10,
       nome: "Empresa Parceira",
     });
+    prismaMock.indicacao.findMany.mockResolvedValue([]);
+    prismaMock.$transaction.mockImplementation(async (callback) => callback({
+      parceiro: { create: prismaMock.parceiro.create },
+      contratoComercial: { updateMany: prismaMock.contratoComercial.updateMany },
+      clientes: { findFirst: prismaMock.clientes.findFirst },
+      indicacao: { create: prismaMock.indicacao.create },
+    }));
   });
 
   it("permite cadastrar o responsável informando somente o nome", async () => {
@@ -78,6 +97,80 @@ describe("responsável físico de parceiro PJ", () => {
       error: "Ao menos um responsável físico é obrigatório para Pessoa Jurídica",
     });
     expect(prismaMock.parceiro.create).not.toHaveBeenCalled();
+  });
+
+  it("cria e vincula atomicamente quando o cadastro veio de uma pendência do Metas", async () => {
+    const origemContratoId = "clw1234567890abcdef";
+    prismaMock.contratoComercial.findUnique.mockResolvedValue({
+      canalAquisicao: "Indicação Parceiro",
+      indicadoPorParceiroId: null,
+      status: "ENVIADO",
+      cnpj: "12345678000190",
+      servico: "Revisão RADAR 150K",
+      canalOutro: JSON.stringify({
+        tipo: "PARCEIRO_NAO_CADASTRADO",
+        versao: 1,
+        nome: "Maria Responsável",
+      }),
+    });
+    prismaMock.contratoComercial.updateMany.mockResolvedValue({ count: 1 });
+
+    const resultado = await criarParceiro({
+      tipo: "PJ",
+      documento: "12345678000190",
+      nome: "Empresa Parceira",
+      email: "parceiro@example.com",
+      responsaveis: [{ nome: "Maria Responsável" }],
+      origemContratoId,
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.contratoComercial.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: origemContratoId,
+        canalAquisicao: "Indicação Parceiro",
+        indicadoPorParceiroId: null,
+      },
+      data: { indicadoPorParceiroId: 10, canalOutro: null },
+    });
+  });
+
+  it("cria a indicação retroativa quando o contrato já foi fechado", async () => {
+    const origemContratoId = "clw1234567890abcdef";
+    prismaMock.contratoComercial.findUnique.mockResolvedValue({
+      canalAquisicao: "Indicação Parceiro",
+      indicadoPorParceiroId: null,
+      status: "FECHADO",
+      cnpj: "12.345.678/0001-90",
+      servico: "Revisão RADAR 150K",
+      canalOutro: JSON.stringify({
+        tipo: "PARCEIRO_NAO_CADASTRADO",
+        versao: 1,
+        nome: "Maria Responsável",
+      }),
+    });
+    prismaMock.contratoComercial.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.clientes.findFirst.mockResolvedValue({ id: 55, indicacao: null });
+    prismaMock.indicacao.create.mockResolvedValue({ id: 77 });
+
+    const resultado = await criarParceiro({
+      tipo: "PJ",
+      documento: "12345678000190",
+      nome: "Empresa Parceira",
+      email: "parceiro@example.com",
+      responsaveis: [{ nome: "Maria Responsável" }],
+      origemContratoId,
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(prismaMock.clientes.findFirst).toHaveBeenCalledWith({
+      where: { cnpj: "12345678000190", servicos: "Revisão RADAR 150K" },
+      select: { id: true, indicacao: { select: { parceiroId: true } } },
+    });
+    expect(prismaMock.indicacao.create).toHaveBeenCalledWith({
+      data: { parceiroId: 10, clienteId: 55, criadoPorId: 7 },
+    });
   });
 });
 

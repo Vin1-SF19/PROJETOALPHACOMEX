@@ -1,7 +1,7 @@
 import { auth } from "../../../../auth";
 import { redirect } from "next/navigation";
 import db from "@/lib/prisma";
-import { listarParceiros, getPermissaoParceiros } from "@/actions/parceiros";
+import { listarParceiros, getPermissaoParceiros, listarParceirosPendentesCadastro } from "@/actions/parceiros";
 import { getTemplateParadaoConvite, getTemplateParadaoParceiro } from "@/actions/onboarding";
 import { contarPreCadastrosPendentes } from "@/actions/convites-parceiro";
 import { obterVideoIntrodutorioConfig } from "@/actions/video-introdutorio";
@@ -24,17 +24,19 @@ export default async function ParceirosPage({
   const temaName = rec?.tema_interface ?? "blue";
 
   const { busca, nivel } = await searchParams;
-  const [{ parceiros }, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, videoIntrodutorio] = await Promise.all([
+  const [{ parceiros }, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, videoIntrodutorio, parceirosPendentesCadastro] = await Promise.all([
     listarParceiros(busca, nivel),
     getPermissaoParceiros(),
     getTemplateParadaoConvite(),
     getTemplateParadaoParceiro(),
     contarPreCadastrosPendentes(),
     obterVideoIntrodutorioConfig("parceiros"),
+    listarParceirosPendentesCadastro(),
   ]);
 
   return (
     <ParceirosClient
+      userId={userId}
       parceiros={parceiros}
       temaName={temaName}
       busca={busca}
@@ -43,6 +45,7 @@ export default async function ParceirosPage({
       templateConvite={templateConvite}
       templateParceiro={templateParceiro}
       preCadastrosPendentesInicial={preCadastrosPendentesInicial}
+      parceirosPendentesCadastro={parceirosPendentesCadastro}
       videoIntrodutorioConfig={videoIntrodutorio.data}
     />
   );

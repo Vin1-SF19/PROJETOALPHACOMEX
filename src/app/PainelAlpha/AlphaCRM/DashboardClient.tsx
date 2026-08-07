@@ -14,7 +14,7 @@ import {
 import type { TemaAlpha } from "@/lib/temas";
 import { fmtDateTime } from "@/lib/format-date";
 import { ObterDashboardBpm } from "@/actions/bpm/Dashboard";
-import CardDetailDrawer from "./pipeline/[pipelineId]/CardDetailDrawer";
+import CardFullViewModal from "./CardModal/CardFullViewModal";
 
 type DashboardData = NonNullable<Awaited<ReturnType<typeof ObterDashboardBpm>>["data"]>;
 
@@ -167,7 +167,7 @@ export default function DashboardClient({ dashboard, erro, visual, currentUserId
               <button
                 key={h.id}
                 onClick={() => setCardSelecionadoId(h.card.id)}
-                className="w-full text-left bg-slate-900/60 border border-white/5 rounded-xl px-3 py-2.5 hover:border-white/15 transition-colors"
+                className="w-full text-left bg-slate-900/60 border border-white/5 rounded-xl px-3 py-2.5 hover:border-white/15 transition-colors block"
               >
                 <p className="text-sm text-slate-200">
                   <span className="text-white font-medium">{h.usuario?.nome ?? "sistema"}</span> — {h.acao}
@@ -182,7 +182,7 @@ export default function DashboardClient({ dashboard, erro, visual, currentUserId
       </div>
 
       {cardSelecionadoId && (
-        <CardDetailDrawer
+        <CardFullViewModal
           cardId={cardSelecionadoId}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}

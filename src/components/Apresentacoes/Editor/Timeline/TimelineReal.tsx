@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import { COMPONENTES_REGISTRY } from "../registry/componentes-registry";
+import { registryFundoParaEstilo } from "../registry/registry-fundos";
 import { useTimelineDrag } from "./useTimelineDrag";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { normalizarConfigAnimacaoContainerAlpha } from "@/lib/apresentacoes/animacao-container-alpha";
@@ -11,6 +12,12 @@ import { normalizarConfigAnimacaoContainerAlpha } from "@/lib/apresentacoes/anim
 const MAX_TEMPO = 5;
 const PIXELS_POR_SEGUNDO = 80;
 const LARGURA_REGUA = MAX_TEMPO * PIXELS_POR_SEGUNDO;
+
+/** "fundoAnimado" sozinho não diferencia qual dos 7 backgrounds foi arrastado (isso vive em estilo/preset). */
+function resolverEntradaRegistry(componente: ComponenteSlide) {
+  if (componente.tipo === "fundoAnimado") return registryFundoParaEstilo(componente.estilo, componente.preset);
+  return COMPONENTES_REGISTRY[componente.tipo];
+}
 
 function BarraDeTempo({ componente, selecionado, onSelecionar }: { componente: ComponenteSlide; selecionado: boolean; onSelecionar: () => void }) {
   const anim = componente.animacao?.entrada;
@@ -107,7 +114,7 @@ export function TimelineReal() {
               </div>
 
               {camadas.map((c) => {
-                const Icone = COMPONENTES_REGISTRY[c.tipo].icone;
+                const Icone = resolverEntradaRegistry(c).icone;
                 return (
                   <div key={c.id} className="flex items-center gap-2">
                     <button
@@ -119,7 +126,7 @@ export function TimelineReal() {
                       }`}
                     >
                       <Icone size={11} aria-hidden="true" className="shrink-0" />
-                      <span className="truncate">{COMPONENTES_REGISTRY[c.tipo].label}</span>
+                      <span className="truncate">{resolverEntradaRegistry(c).label}</span>
                     </button>
                     <BarraDeTempo componente={c} selecionado={selecionadoId === c.id} onSelecionar={() => selecionarComponente(c.id)} />
                   </div>

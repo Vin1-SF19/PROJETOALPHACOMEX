@@ -7,6 +7,11 @@ import { hashSync } from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { put } from "@vercel/blob";
+import {
+  CANAL_INDICACAO_PARCEIRO,
+  parseParceiroNaoCadastrado,
+  type ParceiroPendenteCadastro,
+} from "@/lib/comercial/parceiro-nao-cadastrado";
 
 const EnderecoSchema = z.object({
   cep: z.string().min(8),
@@ -53,6 +58,7 @@ const ParceiroSchema = z.object({
   termoAceito: z.boolean().optional(),
   termoAceitoEm: z.coerce.date().optional(),
   termoVersao: z.string().optional(),
+  origemContratoId: z.string().cuid().optional(),
 });
 
 function gerarSenhaSegura(): string {
@@ -79,12 +85,43 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
       return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     }
 
-    const { tipo, tipoParceiro, documento, nome, nomeFantasia, dataNascimento, sobre, email, telefone, telefone2, chavePix, tipoChavePix, nomeBanco, agencia, conta, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis, termoAceito, termoAceitoEm, termoVersao } = parsed.data;
+    const { tipo, tipoParceiro, documento, nome, nomeFantasia, dataNascimento, sobre, email, telefone, telefone2, chavePix, tipoChavePix, nomeBanco, agencia, conta, nivel, comissaoPercentual, dadosConsulta, endereco, responsaveis, termoAceito, termoAceitoEm, termoVersao, origemContratoId } = parsed.data;
 
     const docLimpo = documento.replace(/\D/g, "");
 
     const existente = await db.parceiro.findUnique({ where: { documento: docLimpo } });
     if (existente) return { success: false, error: "Documento já cadastrado como parceiro" };
+
+    let contratoOrigem: {
+      canalAquisicao: string;
+      canalOutro: string | null;
+      indicadoPorParceiroId: number | null;
+      status: string;
+      cnpj: string;
+      servico: string;
+    } | null = null;
+    if (origemContratoId) {
+      contratoOrigem = await db.contratoComercial.findUnique({
+        where: { id: origemContratoId },
+        select: {
+          canalAquisicao: true,
+          canalOutro: true,
+          indicadoPorParceiroId: true,
+          status: true,
+          cnpj: true,
+          servico: true,
+        },
+      });
+      const pendencia = parseParceiroNaoCadastrado(contratoOrigem?.canalOutro);
+      if (
+        !contratoOrigem
+        || contratoOrigem.canalAquisicao !== CANAL_INDICACAO_PARCEIRO
+        || contratoOrigem.indicadoPorParceiroId
+        || !pendencia
+      ) {
+        return { success: false, error: "Esta pendência de parceiro não está mais disponível" };
+      }
+    }
 
     const respValidos = (responsaveis ?? []).filter(r => r.nome.trim());
     if (tipo === "PJ" && respValidos.length === 0) {
@@ -97,8 +134,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
     // SEM_COMISSAO nunca guarda override manual — a comissão fica sempre indefinida.
     const comissaoFinal = tipoParceiro === "SEM_COMISSAO" ? null : (comissaoPercentual ?? null);
 
-    const parceiro = await db.parceiro.create({
-      data: {
+    const parceiroData = {
         tipo,
         tipoParceiro,
         documento: docLimpo,
@@ -151,15 +187,81 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
             })),
           },
         }),
-      },
-    });
+    };
+
+    const parceiro = origemContratoId
+      ? await db.$transaction(async (tx) => {
+        const criado = await tx.parceiro.create({ data: parceiroData });
+
+        const vinculo = await tx.contratoComercial.updateMany({
+          where: {
+            id: origemContratoId,
+            canalAquisicao: CANAL_INDICACAO_PARCEIRO,
+            indicadoPorParceiroId: null,
+          },
+          data: {
+            indicadoPorParceiroId: criado.id,
+            canalOutro: null,
+          },
+        });
+        if (vinculo.count !== 1) throw new Error("PENDENCIA_PARCEIRO_INDISPONIVEL");
+
+        // Se o contrato foi fechado antes da finalização do parceiro, o fluxo
+        // normal de fechamento já passou. Nesse caso, cria o vínculo da indicação
+        // na mesma transação para não perder a origem/comissão retroativamente.
+        if (contratoOrigem?.status === "FECHADO") {
+          const cliente = await tx.clientes.findFirst({
+            where: {
+              cnpj: contratoOrigem.cnpj.replace(/\D/g, ""),
+              servicos: contratoOrigem.servico,
+            },
+            select: {
+              id: true,
+              indicacao: { select: { parceiroId: true } },
+            },
+          });
+          if (!cliente) throw new Error("CLIENTE_FECHADO_NAO_ENCONTRADO");
+          if (cliente.indicacao) throw new Error("CLIENTE_JA_POSSUI_INDICACAO");
+
+          await tx.indicacao.create({
+            data: {
+              parceiroId: criado.id,
+              clienteId: cliente.id,
+              criadoPorId: Number(userId),
+            },
+          });
+        }
+
+        return criado;
+      })
+      : await db.parceiro.create({ data: parceiroData });
 
     revalidatePath("/PainelAlpha/Parceiros");
+    if (origemContratoId) {
+      revalidatePath("/PainelAlpha/Metas");
+      if (contratoOrigem?.status === "FECHADO") {
+        try {
+          await recalcularNivel(parceiro.id);
+        } catch (nivelError) {
+          console.error("[criarParceiro:recalcularNivel]", nivelError);
+        }
+        revalidatePath("/PainelAlpha/CadastroClientes");
+      }
+    }
     return { success: true, parceiro: { id: parceiro.id, loginEmail: email, senhaGerada, nome: parceiro.nome } };
   } catch (err: unknown) {
     console.error("[criarParceiro]", err);
     const msg = err instanceof Error ? err.message : "Erro interno";
     if (msg.includes("Unique constraint")) return { success: false, error: "Documento já cadastrado" };
+    if (msg.includes("PENDENCIA_PARCEIRO_INDISPONIVEL")) {
+      return { success: false, error: "Esta pendência foi atualizada por outra pessoa. Recarregue a página." };
+    }
+    if (msg.includes("CLIENTE_FECHADO_NAO_ENCONTRADO")) {
+      return { success: false, error: "O cliente fechado ainda não foi sincronizado com CS & NPS. Tente novamente em instantes." };
+    }
+    if (msg.includes("CLIENTE_JA_POSSUI_INDICACAO")) {
+      return { success: false, error: "Este cliente já possui outro parceiro indicador. Revise o vínculo antes de continuar." };
+    }
     return { success: false, error: "Erro ao cadastrar parceiro" };
   }
 }
@@ -361,6 +463,80 @@ export async function getPermissaoParceiros() {
 }
 
 // ─── Engrenagem (Admin): gerenciar quem pode editar/excluir ──────────────────
+
+type ContratoComPendencia = {
+  id: string;
+  razaoSocial: string;
+  nomeFantasia: string | null;
+  cnpj: string;
+  canalOutro: string | null;
+  createdAt: Date;
+};
+
+function mapearPendenciaParceiro(contrato: ContratoComPendencia): ParceiroPendenteCadastro | null {
+  const dados = parseParceiroNaoCadastrado(contrato.canalOutro);
+  if (!dados) return null;
+  return {
+    contratoId: contrato.id,
+    clienteRazaoSocial: contrato.razaoSocial,
+    clienteNomeFantasia: contrato.nomeFantasia,
+    cnpj: contrato.cnpj,
+    criadoEm: contrato.createdAt,
+    ...dados,
+  };
+}
+
+/** Pendências criadas no Alpha Metas para finalização manual no módulo Parceiros. */
+export async function listarParceirosPendentesCadastro(): Promise<ParceiroPendenteCadastro[]> {
+  const ctx = await getCtx();
+  if (!ctx?.podeEditar) return [];
+
+  const contratos = await db.contratoComercial.findMany({
+    where: {
+      canalAquisicao: CANAL_INDICACAO_PARCEIRO,
+      indicadoPorParceiroId: null,
+      canalOutro: { not: null },
+    },
+    select: {
+      id: true,
+      razaoSocial: true,
+      nomeFantasia: true,
+      cnpj: true,
+      canalOutro: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return contratos
+    .map(mapearPendenciaParceiro)
+    .filter((pendencia): pendencia is ParceiroPendenteCadastro => pendencia !== null);
+}
+
+/** Busca server-side usada pelo cadastro manual; os dados da URL nunca são usados como fonte. */
+export async function buscarParceiroPendenteCadastro(contratoId: string): Promise<ParceiroPendenteCadastro | null> {
+  const ctx = await getCtx();
+  if (!ctx?.podeEditar || !z.string().cuid().safeParse(contratoId).success) return null;
+
+  const contrato = await db.contratoComercial.findFirst({
+    where: {
+      id: contratoId,
+      canalAquisicao: CANAL_INDICACAO_PARCEIRO,
+      indicadoPorParceiroId: null,
+      canalOutro: { not: null },
+    },
+    select: {
+      id: true,
+      razaoSocial: true,
+      nomeFantasia: true,
+      cnpj: true,
+      canalOutro: true,
+      createdAt: true,
+    },
+  });
+
+  return contrato ? mapearPendenciaParceiro(contrato) : null;
+}
 
 export async function listarAcessosParceiros() {
   const ctx = await getCtx();

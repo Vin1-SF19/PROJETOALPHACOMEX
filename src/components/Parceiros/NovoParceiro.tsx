@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, User, Loader2, Search, MapPin, ArrowLeft,
-  CheckCircle2, AlertCircle, Plus, X, ChevronDown,
+  CheckCircle2, AlertCircle, AlertTriangle, Plus, X, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,13 @@ import { criarParceiro } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
 import ModalEndereco, { type EnderecoData } from "./ModalEndereco";
 import ModalCredenciais from "./ModalCredenciais";
+import type { ParceiroPendenteCadastro } from "@/lib/comercial/parceiro-nao-cadastrado";
 
 type OnboardingTemplate = { id: number; nome: string; mensagem: string };
 type Credenciais = { loginEmail: string; senhaGerada: string; nomeParceiro: string };
+type Resp = { nome: string; cpf: string; dataNascimento: string; cargo: string; whatsapp: string };
+
+const respVazio = (): Resp => ({ nome: "", cpf: "", dataNascimento: "", cargo: "", whatsapp: "" });
 
 const TIPO_PIX = ["cpf", "cnpj", "email", "telefone", "aleatoria"] as const;
 const TIPO_PARCEIRO = [
@@ -47,9 +51,11 @@ function formatarDocumento(v: string, tipo: "PF" | "PJ"): string {
 export default function NovoParceiro({
   template,
   temaName = "blue",
+  pendenciaParceiro,
 }: {
   template?: OnboardingTemplate | null;
   temaName?: string;
+  pendenciaParceiro?: ParceiroPendenteCadastro | null;
 }) {
   const router = useRouter();
   const tema = getTema(temaName);
@@ -65,10 +71,10 @@ export default function NovoParceiro({
   const [comissaoFixaOpcao, setComissaoFixaOpcao] = useState<string>("5");
   const [comissaoFixaOutro, setComissaoFixaOutro] = useState("");
 
-  const [nome, setNome] = useState("");
+  const [nome, setNome] = useState(pendenciaParceiro?.empresa || pendenciaParceiro?.nome || "");
   const [nomeFantasia, setNomeFantasia] = useState("");
   const [email, setEmail] = useState("");
-  const [whatsappPF, setWhatsappPF] = useState("");
+  const [whatsappPF, setWhatsappPF] = useState(pendenciaParceiro?.telefone ?? "");
   const [chavePix, setChavePix] = useState("");
   const [tipoChavePix, setTipoChavePix] = useState("");
   const [nomeBanco, setNomeBanco] = useState("");
@@ -77,9 +83,11 @@ export default function NovoParceiro({
   const [dadosConsultaBrutos, setDadosConsultaBrutos] = useState("");
 
   // Responsáveis físicos (vários) — em "gaveta": só um aberto por vez
-  type Resp = { nome: string; cpf: string; dataNascimento: string; cargo: string; whatsapp: string };
-  const respVazio = (): Resp => ({ nome: "", cpf: "", dataNascimento: "", cargo: "", whatsapp: "" });
-  const [responsaveis, setResponsaveis] = useState<Resp[]>([respVazio()]);
+  const [responsaveis, setResponsaveis] = useState<Resp[]>([
+    pendenciaParceiro
+      ? { ...respVazio(), nome: pendenciaParceiro.nome, whatsapp: pendenciaParceiro.telefone ?? "" }
+      : respVazio(),
+  ]);
   const [respAbertoIdx, setRespAbertoIdx] = useState<number>(0); // qual está expandido
 
   const respCompleto = (r: Resp) => r.nome.trim().length >= 2;
@@ -183,6 +191,7 @@ export default function NovoParceiro({
         nomeFantasia: nomeFantasia || undefined,
         dataNascimento: tipo === "PF" ? dataNascPF || undefined : undefined,
         email,
+        telefone: tipo === "PJ" ? (respValidos[0]?.whatsapp || pendenciaParceiro?.telefone || undefined) : undefined,
         telefone2: tipo === "PF" ? whatsappPF || undefined : undefined,
         chavePix: chavePix || undefined,
         tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || undefined,
@@ -201,6 +210,7 @@ export default function NovoParceiro({
               telefone: r.whatsapp || undefined,
             }))
           : undefined,
+        origemContratoId: pendenciaParceiro?.contratoId,
       });
 
       if (!result.success || !result.parceiro) {
@@ -239,6 +249,23 @@ export default function NovoParceiro({
               <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Preencha manualmente ou use a 🔍 para buscar</p>
             </div>
           </div>
+
+          {pendenciaParceiro && (
+            <div
+              role="status"
+              className="rounded-2xl p-4 flex items-start gap-3"
+              style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.42)" }}
+            >
+              <AlertTriangle size={18} className="text-amber-300 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-widest text-amber-200">Cadastro pendente do Alpha Metas</p>
+                <p className="text-xs text-amber-100/80 mt-1">
+                  <strong>{pendenciaParceiro.nome}</strong> indicou {pendenciaParceiro.clienteNomeFantasia || pendenciaParceiro.clienteRazaoSocial}.
+                  Complete os dados abaixo para finalizar e vincular o parceiro automaticamente.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-900/40 border border-white/5 rounded-[2.5rem] overflow-hidden">
 

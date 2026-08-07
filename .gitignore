@@ -47,6 +47,10 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# Bundle do player de exportação HTML (Alpha Presentation Studio) — gerado por
+# scripts/build-apresentacoes-player.mjs, parte do `npm run build`, nunca commitado.
+/src/generated/apresentacoes-player-bundle.ts
+
 # Database backups (sensitive; keep directory documentation only)
 /database-backups/*
 !/database-backups/README.md

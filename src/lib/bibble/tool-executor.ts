@@ -5,6 +5,11 @@ import { executarCalendarTool, isCalendarTool } from "@/lib/bibble/calendar-tool
 import type { EventoCancelamentoPendente } from "@/lib/bibble/calendar-cancellation";
 import { notificarNovoChamado } from "@/lib/chamados/notificacoes-server";
 import { isAdminRole } from "@/lib/roles";
+import {
+  consultarManualModulo,
+  encontrarManualModulo,
+  podeConsultarManualModulo,
+} from "@/lib/shared/module-knowledge";
 
 export interface UserCtx {
   userId: number;
@@ -855,6 +860,21 @@ export async function executarTool(
       } catch (err) {
         return JSON.stringify({ erro: `Falha ao consultar a base do Onyx: ${err instanceof Error ? err.message : String(err)}` });
       }
+    }
+
+    case "consultar_manual_modulo": {
+      const modulo = String(params.modulo ?? "").trim();
+      const topico = String(params.topico ?? "").trim();
+      if (!modulo) return JSON.stringify({ sucesso: false, erro: "Informe o módulo a consultar." });
+
+      const manual = encontrarManualModulo(modulo);
+      if (!manual) return JSON.stringify(consultarManualModulo(modulo, topico || undefined));
+
+      if (!podeConsultarManualModulo(manual, ctx)) {
+        return negado(manual.nome);
+      }
+
+      return JSON.stringify(consultarManualModulo(modulo, topico || undefined));
     }
 
     default:

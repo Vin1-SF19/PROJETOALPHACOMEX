@@ -4,6 +4,7 @@ import db from "@/lib/prisma";
 import { ApresentacaoEditor } from "@/components/Apresentacoes/Editor/ApresentacaoEditor";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
+import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,8 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
   const primeiroSlide = apresentacao.slides[0];
   if (!primeiroSlide) notFound(); // não deve acontecer — toda apresentação sempre tem >= 1 slide (CriarApresentacao garante)
 
-  const dadosPrimeiroSlide = primeiroSlide.dadosJson as { componentes: ComponenteSlide[]; canvas?: CanvasConfig } | null;
+  type DadosSlidePersistidos = { componentes: ComponenteSlide[]; canvas?: CanvasConfig; animacaoConfig?: SlideAnimationConfig };
+  const dadosPrimeiroSlide = primeiroSlide.dadosJson as DadosSlidePersistidos | null;
   const componentesIniciais = dadosPrimeiroSlide?.componentes ?? [];
 
   return (
@@ -61,12 +63,15 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
         ordem: s.ordem,
         nome: s.nome,
         transicaoEntrada: s.transicaoEntrada,
-        componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
-        canvas: obterCanvasSeguro((s.dadosJson as { canvas?: CanvasConfig } | null)?.canvas),
+        componentes: (s.dadosJson as DadosSlidePersistidos | null)?.componentes ?? [],
+        canvas: obterCanvasSeguro((s.dadosJson as DadosSlidePersistidos | null)?.canvas),
+        animacaoConfig: (s.dadosJson as DadosSlidePersistidos | null)?.animacaoConfig,
       }))}
       slideAtivoIdInicial={primeiroSlide.id}
       componentesIniciais={componentesIniciais}
       canvasInicial={obterCanvasSeguro(dadosPrimeiroSlide?.canvas)}
+      animacaoConfigInicial={dadosPrimeiroSlide?.animacaoConfig}
+      transicaoEntradaInicial={primeiroSlide.transicaoEntrada}
       assetsIniciais={apresentacao.assets.map((asset) => ({
         ...asset,
         tipo: asset.tipo as "IMAGEM" | "VIDEO" | "AUDIO" | "MODELO_3D",

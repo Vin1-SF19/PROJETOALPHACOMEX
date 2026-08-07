@@ -26,7 +26,7 @@ describe("Container Alpha do Presentation Studio", () => {
     const componente = COMPONENTES_REGISTRY.containerCarga.criarComponentePadrao(120, 80);
 
     expect(componente.tipo).toBe("containerCarga");
-    expect(componente).toMatchObject({ x: 120, y: 80, w: 640, h: 360 });
+    expect(componente).toMatchObject({ x: 120, y: 80, w: CANVAS_PADRAO.width, h: CANVAS_PADRAO.height });
     expect(componente.w / componente.h).toBeCloseTo(16 / 9);
     expect(componente).toMatchObject({
       transicaoProximoSlide: true,

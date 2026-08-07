@@ -24,6 +24,13 @@ interface ContainerCargaRenderProps {
   portalProximoSlide?: ReactNode;
   pausado?: boolean;
   portalContainerCapa?: Element | null;
+  /**
+   * Gate explícito para o player de exportação HTML: quando `false`, o container fica
+   * fechado e parado (nenhum `animate()` é registrado) até o prop virar `true` — usado pra
+   * esperar o primeiro gesto do usuário antes de abrir a capa. Default `true` preserva 100%
+   * o comportamento atual do Editor/Modo Apresentação (nenhum call site existente passa isso).
+   */
+  deverIniciar?: boolean;
 }
 
 function createMotion(): ContainerCargaMotion {
@@ -105,6 +112,7 @@ export function ContainerCargaRender({
   portalProximoSlide,
   pausado = false,
   portalContainerCapa,
+  deverIniciar = true,
 }: ContainerCargaRenderProps) {
   const { ref, visivel } = useVisibilidadeIframe<HTMLDivElement>();
   const reducedMotion = useReducedMotion();
@@ -131,6 +139,14 @@ export function ContainerCargaRender({
   }, []);
 
   useEffect(() => {
+    if (!deverIniciar) {
+      motionRef.current.doorL = 0;
+      motionRef.current.doorR = 0;
+      motionRef.current.latch = 0;
+      motionRef.current.zoom = 0;
+      return;
+    }
+
     const controls: AnimationPlaybackControls[] = [];
     let somIniciado = false;
     let introEmitida = false;
@@ -176,6 +192,7 @@ export function ContainerCargaRender({
     motionRef.current.zoom = 0;
 
     if (deveAnimar) {
+      const inicioAbertura = componente.atrasoAbertura + 0.22;
       registrarControle(animate(0, 1, {
         duration: 0.35,
         delay: componente.atrasoAbertura,
@@ -187,7 +204,7 @@ export function ContainerCargaRender({
       }));
       registrarControle(animate(0, 1, {
         duration: componente.duracaoAbertura,
-        delay: componente.atrasoAbertura + 0.22,
+        delay: inicioAbertura,
         ease: [0.4, 0, 0.2, 1],
         onUpdate: (value) => {
           motionRef.current.doorL = value;
@@ -196,9 +213,18 @@ export function ContainerCargaRender({
       }));
 
       if (componente.transicaoProximoSlide && onIntroStart) {
+        // O zoom só começa DEPOIS da porta terminar de abrir 100% (mais uma pequena pausa pro
+        // olho registrar "a porta está aberta" antes da câmera se mexer). Antes o zoom começava
+        // aos 55% do giro da porta, sobrepondo as duas animações — geometricamente seguro (as
+        // portas já tinham varrido pra fora do corredor central nesse ponto), mas visualmente
+        // eram 2 movimentos disputando atenção ao mesmo tempo, o que o usuário reportou como
+        // "rápido demais"/"não fica fluido"/"câmera não parece entrar". Sequencial é mais lento
+        // e mais legível: porta termina, pausa curta, DEPOIS a câmera avança — menos coisa
+        // acontecendo por vez.
+        const PAUSA_APOS_ABERTURA = 0.15;
         registrarControle(animate(0, 1, {
           duration: componente.duracaoZoom,
-          delay: componente.atrasoAbertura + componente.duracaoAbertura,
+          delay: inicioAbertura + componente.duracaoAbertura + PAUSA_APOS_ABERTURA,
           ease: [0.45, 0, 0.2, 1],
           onUpdate: (value) => {
             if (!introEmitida && value > 0) {
@@ -240,7 +266,7 @@ export function ContainerCargaRender({
       controls.forEach((control) => control.stop());
       controlsRef.current = [];
     };
-  }, [componente, modo, onIntroComplete, onIntroStart, reducedMotion, ref]);
+  }, [componente, modo, onIntroComplete, onIntroStart, reducedMotion, ref, deverIniciar]);
 
   useEffect(() => {
     pausadoRef.current = pausado;

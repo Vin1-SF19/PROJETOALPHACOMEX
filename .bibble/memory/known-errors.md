@@ -5,6 +5,15 @@
 
 ---
 
+### ESLint `react-hooks/static-components` — "Cannot create components during render"
+**Sintoma:** `npm run lint` (ou Forge) reporta `Error: Cannot create components during render` apontando para uma `function NomeQualquer(...)` declarada DENTRO do corpo de outro componente/função de render (padrão comum ao tentar variar entre `<motion.div>` e `<div>` condicionalmente, ou qualquer "wrapper condicional" ad-hoc).
+**Causa:** Declarar um componente (função que retorna JSX, mesmo pequena/local) dentro do corpo de outro componente cria uma IDENTIDADE NOVA a cada render — React perde o estado interno dele e o React Compiler deste projeto bloqueia isso como erro, não warning.
+**Fix:** Nunca declarar `function Wrapper(...)`/`function ItemWrapper(...)` etc. dentro de outro componente. Alternativas corretas: (a) declarar o componente FORA, no escopo do módulo; (b) se a variação é só "motion.div vs div" condicional, resolver inline com um ternário JSX direto (`condicao ? <motion.div ...>{filhos}</motion.div> : <div ...>{filhos}</div>`) em vez de extrair um componente. Exemplo real corrigido (`ComponenteNoCanvas.tsx`, Fase 03 do Alpha Motion): trocado `function Wrapper({children,style}){...}` interno por um ternário direto no `return`, com uma função auxiliar `renderFilhos()` que retorna um array de JSX (não um componente) para evitar duplicar a lista de filhos entre os dois ramos.
+**Contexto:** Qualquer código que precise alternar entre duas variantes de wrapper (com/sem animação, com/sem determinado estilo) baseado em uma condição calculada em runtime — armadilha fácil de cair ao tentar "organizar" o JSX em uma função auxiliar dentro do componente.
+**Adicionado em:** 2026-08-06 (Nova, sessão Alpha Motion — Fase 03, fechamento da dívida técnica de stagger em `ComponenteNoCanvas.tsx`)
+
+---
+
 ## Template de entrada
 
 ```
@@ -63,6 +72,15 @@ Manter `auth()`/checagem de permissão ANTES de buscar o registro no banco — o
 
 ---
 
+### ESLint `react-hooks/set-state-in-effect` — `setState` redundante dentro de `useEffect` que só replica o valor inicial do `useState`
+**Sintoma:** `npm run lint` reporta `Error: Calling setState synchronously within an effect can trigger cascading renders` numa chamada `setEstado(valorFixo)` dentro de um `useEffect`, SEM nenhuma `Promise`/Server Action envolvida (diferente do caso já catalogado logo abaixo, que é sobre `void`+disable comment).
+**Causa:** Padrão "fallback síncrono" mal escrito: `useState(() => condicaoX)` já calcula o valor inicial correto, mas o `useEffect` reafirma esse mesmo valor com `setEstado(true)` num branch condicional — é sempre redundante (o valor já está certo desde a primeira render) e o lint bloqueia qualquer `setState` direto no corpo do efeito, mesmo quando "parece inofensivo".
+**Fix:** Deletar a chamada redundante — se o `useState` inicial já cobre o caso, o `useEffect` só precisa dar `return` cedo nesse branch, sem tocar o estado. Caso real (`useScrollReveal`, `scroll-reveal.ts`, Fase 08 do Alpha Motion): `useState(() => typeof IntersectionObserver === "undefined")` já deixava `revelado=true` quando não há suporte; o `if (typeof IntersectionObserver === "undefined") { setRevelado(true); return; }` dentro do efeito virou só `if (typeof IntersectionObserver === "undefined") return;`.
+**Contexto:** Qualquer hook que calcule um fallback síncrono no inicializador do `useState` E também tente "garantir" o mesmo valor dentro do `useEffect` — o segundo é sempre desnecessário e vai ser bloqueado pelo lint. Ao revisar, perguntar: "esse `setState` no efeito está fazendo algo que o valor inicial do `useState` já não fez?" — se a resposta for não, remover.
+**Adicionado em:** 2026-08-06 (Forge, sessão Alpha Motion — Fase 08, Scroll Reveal)
+
+---
+
 ### ESLint `react-hooks/set-state-in-effect` — chamar Server Action dentro de `useEffect`
 **Sintoma:** `npm run lint` reporta `error: Calling setState synchronously within an effect can trigger cascading renders` apontando para uma linha tipo `carregarDados();` ou `carregar();` dentro de um `useEffect(() => { ... }, [deps])`.
 **Causa:** Regra do React Compiler (via `eslint-config-next/core-web-vitals`) detecta chamar diretamente uma função que internamente faz `setState` (mesmo que seja uma função `async` que popula estado a partir de uma Server Action) dentro do corpo de um efeito — é o padrão universal do projeto para "buscar dados ao montar" (ex: `ApresentacoesDashboard.tsx`, todo o módulo Alpha Blueprint), mas o linter trata como erro bloqueante, não warning.
@@ -98,6 +116,27 @@ Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` 
 ---
 
 ## Erros Catalogados
+
+### ESLint `react-hooks/refs` — "Cannot access/update ref during render" ao sincronizar um ref com o valor mais novo de um state
+**Sintoma:** `npm run lint` reporta `Error: Cannot update ref during render` apontando pra uma linha tipo `algumRef.current = valor;` escrita direto no corpo do componente (fora de `useEffect`/handler).
+**Causa:** Regra do React Compiler (mesma família de `react-hooks/set-state-in-effect`, já catalogada acima) bloqueia mutar `ref.current` durante o render — é o padrão "latest ref" (guardar o valor mais recente de um state/prop num ref pra ler dentro de um closure de callback/loop que não pode depender de re-render, ex: `requestAnimationFrame`, listener de `wheel`/`resize`, timeout) escrito da forma antiga (mutação direta no corpo da função). Já apareceu 2x nesta sessão: `animated-shader-background.tsx` (refs de velocidade/cor lidas dentro do loop de `animate()`) e `apresentacoes-player/PlayerStandalone.tsx` (`indiceRef` lido dentro do handler de `wheel`/timeout de cooldown).
+**Fix:** Mover a atribuição pra dentro de um `useEffect` com o valor como dependência: `useEffect(() => { algumRef.current = valor; }, [valor]);`. Nunca `algumRef.current = valor;` solto no corpo do componente.
+**Contexto:** Qualquer ref usado como "leitura mais recente dentro de um callback assíncrono/imperativo" (RAF, wheel, resize, setTimeout, WebSocket handler, etc.) neste projeto — o padrão antigo (mutação direta) sempre vai ser pego pelo lint. Verificar isso ANTES de escrever esse padrão, não depois.
+**Adicionado em:** 2026-08-06 (sessão Bibble, export HTML do Presentation Studio)
+
+### Alpha Presentation Studio — Container Alpha não cobre 100% da tela (margem deixa o fundo vazando na borda)
+**Sintoma:** Usuário reporta "o container de entrada ainda continua bugado na hora de rodar a apresentação" mesmo após corrigir o "pulo" de layout do fundo (ver entrada seguinte) — especificamente: o container não cobre a tela inteira, sobra uma borda visível nos 4 lados.
+**Causa:** `container-intro.ts` documenta explicitamente "*O Container Alpha é uma capa: na apresentação sempre ocupa todo o palco 16:9*" — mas a implementação CONTRADIZIA esse comentário: `ComponenteNoSlide` (`SlideApresentacaoLayer.tsx`) e `TransicaoContainerAlphaLayer.tsx` aplicavam uma `margem` de 18-72px (`Math.min(72, Math.max(18, menorDimensao * 0.05))`) ao redor do container, ignorando qualquer tamanho configurado no componente. Antes da categoria Backgrounds existir, essa borda mostrava só a cor de fundo lisa do slide (quase imperceptível) — com um fundo animado (estrelas/planetas/etc.) atrás, a borda de 18-72px passa a mostrar claramente o fundo vazando ao redor do container fechado, e essa MESMA margem também undoava (sobrescrevia) o fix de "tamanho padrão de slide" aplicado no editor (`registry-3d.ts`/`ApresentacaoEditor.tsx`) — o componente podia estar `w/h` = canvas inteiro no editor, mas a apresentação recalculava `x/y/w/h` do zero com a margem de qualquer forma.
+**Fix:** `margem = 0` nos dois arquivos (mantendo a fórmula/conversão de coordenadas parametrizada por `margem`, só zerando o valor, para não perder a estrutura caso um dia se queira reintroduzir uma margem configurável). `FRAME_FILL_CAPA = 0.985` (em `ContainerCargaCameraRig.tsx`) já garante ~1.5% de respiro interno pro modelo 3D não ficar cortado rente à borda — não precisa de margem externa adicional.
+**Contexto:** Qualquer elemento que se autodeclare "capa de tela cheia" (full-bleed) precisa realmente ocupar 100% do palco quando há um fundo animado por baixo — margens "discretas" que pareciam inofensivas contra uma cor sólida se tornam bugs visíveis óbvios contra um fundo com detalhe visual. Ao adicionar qualquer feature nova que pressupõe fundo cheio atrás (como a categoria Backgrounds), reconferir todo componente "capa"/overlay existente que antes convivia só com fundos sólidos.
+**Adicionado em:** 2026-08-05 (sessão Bibble, mesma sessão da categoria Backgrounds)
+
+### Alpha Presentation Studio — fundo animado "pula" de layout durante a animação de entrada Container Alpha
+**Sintoma:** Usuário reporta "a animação de entrada fica bugada quando se tem um background" — ao usar a animação de entrada "Container Alpha" num slide que também tem um fundo animado da categoria Backgrounds (estrelas/blips/âncoras), o campo de partículas visivelmente "pula"/salta para posições diferentes no instante em que a animação da porta termina e revela o slide real.
+**Causa:** `TransicaoContainerAlphaLayer.tsx` (e também `ComponenteNoSlide` em `SlideApresentacaoLayer.tsx`, usado em toda transição normal entre slides com Container Alpha) monta uma PRÉVIA do slide de destino dentro da porta que abre (`SlidePortalPreview`), ao mesmo tempo que o slide real já está montado por baixo — são 2 instâncias React **independentes** do MESMO componente de fundo. `RadarFundo.tsx`/`BlueprintFundo.tsx`/`EstelarFundo.tsx` geravam as posições (blips/âncoras/estrelas) com `Math.random()` puro dentro de um `useEffect` (padrão correto para evitar mismatch de hidratação SSR, herdado dos módulos originais) — mas sem seed fixa, cada instância monta com um layout aleatório DIFERENTE. Quando a prévia dá lugar ao slide real, o layout "pula" visivelmente. `CosmosIAlphaFundo.tsx` já usava seeds fixas (`createSeededRandom` com seeds numéricas hardcoded por camada) e não sofria do bug — só os 3 tipos "estelar/radar/blueprint" tinham o problema.
+**Fix:** `hashStringParaSeed(componente.id)` (novo helper em `fundos-utils.ts`) converte o id do componente (idêntico nas 2 instâncias montadas, já que é o MESMO componente do slide) num número, usado como seed do gerador congruente linear já existente (`criarGeradorSeed`, extraído do padrão já usado em `CosmosIAlphaFundo.tsx`). Layout determinístico por `componente.id` = as 2 instâncias sempre geram o MESMO layout, sem pulo visual.
+**Contexto:** Qualquer componente de fundo/decoração futuro que gere posições aleatórias via `Math.random()` dentro de `useEffect` (padrão necessário para evitar hydration mismatch) precisa de seed determinística por `componente.id` se existir QUALQUER cenário onde o mesmo componente pode ser renderizado em 2 instâncias simultâneas — o que é o caso de qualquer slide com `containerCarga`/Container Alpha (preview do próximo slide sempre pré-montado atrás da porta fechada, não só durante a transição ativa). `Math.random()` puro só é seguro quando existe certeza de que o componente nunca é duplicado na árvore.
+**Adicionado em:** 2026-08-05 (sessão Bibble, categoria Backgrounds + Container Alpha)
 
 ### "use server" file can only export async functions, found object
 **Sintoma:** `npm run build` falha com `Failed to collect page data for /rota` → causa raiz: `A "use server" file can only export async functions, found object.` Também aparece como `Server Actions must be async functions.` quando o export problemático é uma função SÍNCRONA (não só constante/objeto) — mesma causa raiz, mensagem do Turbopack varia conforme o tipo do export.
@@ -164,6 +203,10 @@ Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` 
 **Causa:** Prisma Client em execução está STALE — o dev server subiu com o client gerado ANTES do model novo existir no schema. O model existe no schema e nos tipos, mas o runtime client não.
 **Fix:** `npx prisma generate` + **REINICIAR o dev server** (Turbopack não recarrega o client). No Windows o generate dá EPERM na DLL se o node estiver rodando — parar node antes. SEMPRE logar o erro real no catch (`console.error`), nunca catch vazio.
 **Adicionado em:** 2026-06-23
+
+**Addendum (2026-08-06, Forge):** o mesmo EPERM derruba `npm run build` inteiro (script roda `prisma generate && npm run build:player && next build` — falha no 1º comando, os outros nunca rodam) sempre que o `npm run dev` do usuário está de pé em paralelo. Cuidado ao ler o resultado: se o comando de build for encadeado com `| tail`, o exit code reportado é o do `tail` (quase sempre 0), NÃO o do build — mascarando a falha. Ler o conteúdo real do output, nunca confiar só no exit code de um pipe. Quando a mudança sendo validada NÃO tocou `prisma/schema.prisma`, não é preciso derrubar o dev server só pra validar: rodar `node scripts/build-apresentacoes-player.mjs` e `npx next build` direto (pulando `prisma generate`) valida tsc/lint-equivalente + bundling sem o conflito de lock.
+
+**Addendum 2 (2026-08-06, mesma sessão):** o exit code de um comando em background pode ser mascarado de formas DIFERENTES a cada vez (visto 2x seguidas: 1ª vez foi `| tail` mascarando; 2ª vez foi o último comando de uma cadeia `;` ser um `grep` que retorna 1 por "não achei erro", reportado como "falha" mesmo o build tendo saído 0). Prática mais robusta pra validar build em background: gravar o exit code DENTRO do próprio arquivo de log, ex. `npx next build > log.txt 2>&1; echo "EXIT_CODE:$?" >> log.txt`, e depois ler o arquivo direto — nunca confiar no status ("completed"/"failed") do orquestrador de background sem ler o conteúdo real.
 
 ---
 
@@ -271,4 +314,13 @@ Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` 
 **Sintoma:** usuário anexa imagem, modelo responde como se não houvesse imagem (ou descreve genérico). Logs mostram a imagem indo como texto tipo "[imagem disponível em: url]".
 **Causa:** a imagem estava sendo passada como TEXTO (link/descrição) no content da mensagem. Modelos de visão precisam receber a imagem como conteúdo multimodal real.
 **Fix:** (Bibble/OpenAI-compat) o `content` do user vira array `[{type:"text",text},{type:"image_url",image_url:{url:"data:image/...;base64,..."}}]`. (Onyx) upload via POST /api/chat/file → passar `file_descriptors` no send-chat-message. Sempre checar se o modelo TEM visão antes (`modelSupportsVision`) — Mistral/DeepSeek/Phi/Llama-básico/Qwen não têm; avisar o usuário pra trocar.
+
+---
+
+### `next build` (Turbopack) falha com "the name 'X' is defined multiple times" apontando pra uma função que NÃO existe mais no arquivo
+**Sintoma:** `npx next build` reporta `Ecmascript file had an error ... the name 'AlgumNome' is defined multiple times` num arquivo `.tsx`/`.ts`, apontando linha/coluna de uma declaração de função — mas `grep`/leitura direta do arquivo mostra que essa função só existe UMA vez (ou nem existe mais). Builds anteriores na mesma sessão passavam limpo sem tocar nesse arquivo.
+**Causa:** cache de build do Turbopack (`.next/cache/`) desatualizado/inconsistente — ficou stale depois de uma tentativa de build anterior que falhou no meio (ex.: `prisma generate` travando em `EPERM`, ver entrada de EPERM acima) ou de edições concorrentes de outra sessão/processo no mesmo repositório. `.next/cache` é DIFERENTE de `.next/dev` (usado pelo `npm run dev` rodando em paralelo) — são pastas separadas.
+**Fix:** apagar SÓ `.next/cache` (nunca `.next/dev`, que pertence ao dev server ativo do usuário — apagar essa quebraria a sessão dele) e rodar o build de novo: `rm -rf .next/cache && npx next build`. Confirmar antes com `grep`/leitura direta que a função "duplicada" realmente não existe mais no arquivo — se existir de verdade, é erro real de código, não cache, e limpar o cache não resolve.
+**Contexto:** Qualquer build (`next build`/Forge) que reporte um erro de sintaxe/duplicação num arquivo que a leitura direta do código contradiz. Mais provável de acontecer depois de um build anterior ter sido interrompido/falhado no meio (não só o `prisma generate`/EPERM — qualquer falha no meio da etapa `next build` pode deixar `.next/cache` inconsistente).
+**Adicionado em:** 2026-08-06 (Forge, sessão Container Alpha/exibidor HTML — build reportou `AnimacaoItemForm` duplicado em `AnimacaoPropsV2.tsx`, arquivo não tocado nesta sessão e sem a função duplicada no código real)
 **Adicionado em:** 2026-06-23

@@ -5,6 +5,7 @@ import { auth } from "../../auth";
 import { dadosSlideSchema } from "@/lib/validations/slide-componentes";
 import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 import { isAdminRole } from "@/lib/roles";
+import { transicaoEntradaSchema } from "@/lib/apresentacoes/transicoes/catalogo";
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
@@ -92,16 +93,15 @@ export async function CriarSlide(apresentacaoId: string) {
     const autorizado = await checarOwnershipApresentacao(apresentacaoId, userId, session.user.role);
     if (!autorizado) return { success: false, error: "Sem permissão" };
 
-    const [ultimoSlide, totalSlides] = await Promise.all([
-      db.slide.findFirst({ where: { apresentacaoId }, orderBy: { ordem: "desc" }, select: { ordem: true } }),
-      db.slide.count({ where: { apresentacaoId } }),
-    ]);
+    const ultimoSlide = await db.slide.findFirst({ where: { apresentacaoId }, orderBy: { ordem: "desc" }, select: { ordem: true } });
 
+    // `nome` fica null de propósito (não grava "Slide N" literal) — o rótulo padrão é calculado
+    // no client a partir de `ordem+1` (ver ItemSlide em SidebarSlides.tsx), então continua correto
+    // sozinho depois de excluir/reordenar slides. Só vira texto fixo quando o usuário renomeia.
     const slide = await db.slide.create({
       data: {
         apresentacaoId,
         ordem: (ultimoSlide?.ordem ?? -1) + 1,
-        nome: `Slide ${totalSlides + 1}`,
         dadosJson: { componentes: [], canvas: CANVAS_PADRAO },
       },
       select: { id: true, ordem: true, nome: true, dadosJson: true },
@@ -123,12 +123,29 @@ export async function AtualizarSlide(dados: unknown) {
     if (typeof dados !== "object" || dados === null || !("id" in dados) || !("dadosJson" in dados)) {
       return { success: false, error: "Dados inválidos" };
     }
-    const { id, dadosJson, nome } = dados as { id: unknown; dadosJson: unknown; nome?: unknown };
+    const { id, dadosJson, nome, transicaoEntrada } = dados as {
+      id: unknown;
+      dadosJson: unknown;
+      nome?: unknown;
+      transicaoEntrada?: unknown;
+    };
     if (typeof id !== "string" || !id) return { success: false, error: "Dados inválidos" };
 
     const parsed = dadosSlideSchema.safeParse(dadosJson);
     if (!parsed.success) {
       return { success: false, error: parsed.error.flatten() };
+    }
+
+    // Fase 05 — só valida/grava quando o campo é enviado; ausente = não mexe no valor
+    // existente da coluna (retrocompatibilidade: chamadas antigas de AtualizarSlide não
+    // enviam transicaoEntrada e nunca sobrescreviam a coluna).
+    let transicaoParaGravar: string | null | undefined;
+    if (transicaoEntrada !== undefined) {
+      const parsedTransicao = transicaoEntradaSchema.safeParse(transicaoEntrada);
+      if (!parsedTransicao.success) {
+        return { success: false, error: "Transição inválida" };
+      }
+      transicaoParaGravar = parsedTransicao.data ?? null;
     }
 
     const userId = Number(session.user.id);
@@ -146,6 +163,7 @@ export async function AtualizarSlide(dados: unknown) {
       data: {
         dadosJson: parsed.data as object,
         ...(typeof nome === "string" && nome.trim() ? { nome: nome.trim() } : {}),
+        ...(transicaoParaGravar !== undefined ? { transicaoEntrada: transicaoParaGravar } : {}),
       },
     });
 
@@ -212,7 +230,19 @@ export async function ExcluirSlide(slideId: string) {
       return { success: false, error: "A apresentação precisa ter pelo menos 1 slide." };
     }
 
-    await db.slide.delete({ where: { id: slideId } });
+    // Exclui e renumera `ordem` dos restantes numa transação — sem isso, a exclusão deixava
+    // buracos (ex.: excluir ordem=0 de [0,1,2] deixava [1,2], não [0,1]), e como o rótulo padrão
+    // do slide ("Slide N") é calculado a partir de `ordem+1` quando não há nome customizado, os
+    // slides restantes não "subiam" de número — pedido explícito do usuário pra funcionar assim.
+    await db.$transaction(async (tx) => {
+      await tx.slide.delete({ where: { id: slideId } });
+      const restantes = await tx.slide.findMany({
+        where: { apresentacaoId: slide.apresentacaoId },
+        orderBy: { ordem: "asc" },
+        select: { id: true },
+      });
+      await Promise.all(restantes.map((s, index) => tx.slide.update({ where: { id: s.id }, data: { ordem: index } })));
+    });
 
     revalidatePath(`/PainelAlpha/Apresentacoes/${slide.apresentacaoId}/editor`);
     return { success: true };
@@ -245,11 +275,14 @@ export async function DuplicarSlide(slideId: string) {
         data: { ordem: { increment: 1 } },
       });
 
+      // Se o original não tem nome customizado, usa o rótulo padrão dele ("Slide N", pela
+      // posição ANTES da cópia) como base — evita "Slide (cópia)" sem número.
+      const rotuloBase = original.nome ?? `Slide ${original.ordem + 1}`;
       return tx.slide.create({
         data: {
           apresentacaoId: original.apresentacaoId,
           ordem: original.ordem + 1,
-          nome: `${original.nome ?? "Slide"} (cópia)`,
+          nome: `${rotuloBase} (cópia)`,
           transicaoEntrada: original.transicaoEntrada,
           duracaoAutoplay: original.duracaoAutoplay,
           dadosJson: original.dadosJson as object,

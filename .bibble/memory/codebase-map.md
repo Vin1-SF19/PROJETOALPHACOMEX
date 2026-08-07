@@ -58,7 +58,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Comercial | Alpha Marketing | `/PainelAlpha/ControleLeads/Marketing` | `marketing` |
 | Comercial | Instagram Studio | `/PainelAlpha/Marketing` | `instagramStudio` |
 | Comercial | Alpha Metas | `/PainelAlpha/Metas` | `metas` (role: Lider Comercial) |
-| Comercial | Alpha Presentation Studio | `/PainelAlpha/Apresentacoes` | `apresentacoes` ← Ondas 1-5 de 6 entregues, 2026-07-10 (Dashboard + Editor completo + Temas/Animações/Timeline + Componentes 3D + Motor de IA completo com UI; falta Onda 6 Apresentação/Export/Publicação/Colaboração) |
+| Comercial | Alpha Presentation Studio | `/PainelAlpha/Apresentacoes` | `apresentacoes` ← Ondas 1-5 de 6 entregues, 2026-07-10 (Dashboard + Editor completo + Temas/Animações/Timeline + Componentes 3D + Motor de IA completo com UI). Categoria "Backgrounds" (7 fundos animados) em 2026-08-05. Export HTML autocontido (botão "Exportar HTML", pipeline esbuild + player standalone) em 2026-08-06 — primeira peça real da Onda 6 (Export), ver `integration-points.md` |
 | Comercial | Alpha Blueprint | `/PainelAlpha/AlphaBlueprint` | `blueprint` ← MVP completo, 2026-07-27 (Kanban + workspace por projeto + editor Tiptap + canvas xyflow + arquivos + requisitos + perguntas + comentários + IA + onboarding; Camada 2/evolução avançada não implementada — ver seção própria) |
 | **Financeiro** | **Extratos Bancários** | **`/PainelAlpha/ExtratosBancarios`** | **`Extratos`** ← reescrito 2026-07-09 |
 | Financeiro | Pré Análise | `/PainelAlpha/SistemaPreAnalise` | `analise` |
@@ -355,6 +355,43 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 ---
 
+## Alpha Motion — motor de animação do Presentation Studio (Fases 01-09 da fila `prompt-phases/`)
+
+Sistema de animação/timeline do Alpha Presentation Studio, construído em fases sequenciais (Fundação → Animações básicas → Sequenciamento/Stagger → Timeline Visual → Transições entre Slides → Morph → Efeitos Especiais → Scroll/Controles do Player → Presets/Preview/Polimento). Detalhe completo de cada fase vive em `integration-points.md` (seção "Alpha Motion — Fase N"); esta entrada é só o mapa estrutural.
+
+```
+src/lib/apresentacoes/animacao/     # Núcleo: tipos, catálogo, motor, resolver, gatilhos, stagger, migração
+  presets-stagger.ts                # Fase 03 — presets de 1 campo (StaggerConfig)
+  presets-completos.ts              # Fase 09 — presets de TIMELINE INTEIRA (ElementAnimation[] parcial)
+  responsivo.ts                     # Fase 09 — ResponsivoConfig + lerConfigResponsiva (customProperties.responsivo)
+src/lib/apresentacoes/scroll/       # Fase 08 — scroll-reveal.ts (único modo implementado: "reveal")
+src/components/Apresentacoes/Editor/RenderEngine/
+  RenderComponente.tsx              # Fonte ÚNICA de renderização de dadosJson — PURA, sem seleção/side-effects
+  EfeitosGlobaisSlide.tsx           # Wrapper por SLIDE (Dim Others/Focus Element/Card Expand — Fase 07)
+  ScrollRevealWrapper.tsx           # Wrapper FINO por COMPONENTE (Scroll Reveal — Fase 08)
+src/components/Apresentacoes/Editor/
+  ReducedMotionSimuladoContext.tsx  # Fase 09 — toggle "reduzir animações" ISOLADO do Editor, nunca vaza pro player
+  PainelDireito/camposPorTipo/
+    PreviewMiniatura.tsx            # Fase 09 — miniatura DOM/CSS em loop (nunca vídeo/GIF), usa curvas.ts direto
+    SeletorPreset.tsx                # Fase 09 — aplica preset ao elemento selecionado
+    CamposResponsividade.tsx        # Fase 09 — UI dos 5 campos de ResponsivoConfig
+  BarraSuperior/ModalAplicarPreset.tsx  # Fase 09 — aplicar preset a 1 slide ou a todos (AlertDialog + AtualizarSlide em loop)
+src/apresentacoes-player/           # Bundle React OFFLINE (esbuild IIFE) embutido no .html exportado —
+                                     # nunca importa next/* nem "use server" (guards no build)
+src/components/Apresentacoes/ModoApresentacao/  # Player "ao vivo" dentro do painel (ModoApresentacaoClient.tsx)
+                                     # — DIFERENTE do player exportado, mas mesmo padrão de Fullscreen/atalhos
+```
+
+**Regra estrutural:** `RenderComponente.tsx` nunca ganha lógica de seleção, efeitos entre-irmãos ou scroll — qualquer coisa que precise "ver" outros elementos do slide (Dim Others, Focus Element, Scroll Reveal) vira um wrapper que envolve `RenderComponente` de fora, nunca dentro dele. `ComponenteNoCanvas.tsx` (Editor) e `PlayerStandalone.tsx` (player exportado) são os 2 pontos que compõem esses wrappers ao redor da renderização real.
+
+**Lookup elementId→animação:** sempre via `resolverAnimacoesDoElemento()` (`animacao/resolver.ts`) — nunca duplicar esse filtro.
+
+**Dois formatos de animação coexistem (importante para quem for construir preview/UI nova):** `ConfigAnimacao` (formato legado, Onda 3, lido por `variantsPara`/`AnimacaoWrapper` em `nucleo.tsx`) e `ElementAnimation` (formato novo do Alpha Motion, Fases 01-09, lido via `resolverAnimacoesDoElemento`). Não são intercambiáveis — `PreviewMiniatura.tsx` (Fase 09) precisou de um mapa de variants PRÓPRIO em vez de reaproveitar `nucleo.tsx`, porque os schemas de entrada são incompatíveis. Ainda não convergiram numa fase futura de unificação.
+
+**Última atualização:** 2026-08-06 por Scribe (Fase 09)
+
+---
+
 ## CS & NPS — Modal de dados do cliente: botão único de salvar + auth em Clientes.ts
 
 **Adicionado em:** 2026-07-22 por Scribe (sessão Bibble)
@@ -538,6 +575,22 @@ model BlueprintActivity { projectId, userId, action, entityType, entityId?, prev
 - A persistência usa `localStorage`, sobrevive a reload e logout/login no mesmo navegador e não sincroniza entre dispositivos.
 
 **Última atualização:** 2026-08-03 por Scribe
+
+---
+
+## Guia Inteligente de Módulo — conhecimento do Bibble + tour reutilizável
+
+**Adicionado em:** 2026-08-07 por Scribe.
+**Primeiros módulos documentados:** Alpha Metas e Parceiros.
+**Primeiro tour integrado:** Parceiros.
+
+`src/lib/shared/module-knowledge/` é o catálogo tipado de manuais operacionais sob demanda. `registry.ts` resolve módulos/tópicos por aliases normalizados, produz Markdown e expõe autorização por permissão/role. O Bibble declara `consultar_manual_modulo` em `tools.ts`, executa a consulta somente leitura em `tool-executor.ts` e mantém no `system-prompt.ts` apenas o resumo/instrução necessária para chamar a tool.
+
+`src/components/Guias/GuiaModuloTour.tsx` e `src/lib/guias/tutorial-modulo.ts` formam o tour genérico versionado. A preferência usa `localStorage` por usuário/módulo/versão, portanto não houve migration. Parceiros marca alvos no dashboard, abre automaticamente na primeira visita local e oferece “Tutoriais” para replay.
+
+**Nome para futuras solicitações:** Guia Inteligente de Módulo.
+
+**Última atualização:** 2026-08-07 por Scribe
 
 ---
 

@@ -7,7 +7,7 @@ const corHexSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use uma cor hexadeci
 export const configAnimacaoContainerAlphaSchema = z.object({
   corPrincipal: corHexSchema.default("#071a3d"),
   corMetal: corHexSchema.default("#96a3b2"),
-  corInterior: corHexSchema.default("#f5f6f8"),
+  corInterior: corHexSchema.default("#171b22"),
   anguloAbertura: z.number().min(45).max(120).default(105),
   duracaoAbertura: z.number().min(0.2).max(10).default(1.5),
   atrasoAbertura: z.number().min(0).max(10).default(0),
@@ -23,7 +23,7 @@ export type ConfigAnimacaoContainerAlpha = z.infer<typeof configAnimacaoContaine
 export const ANIMACAO_CONTAINER_ALPHA_PADRAO: ConfigAnimacaoContainerAlpha = {
   corPrincipal: "#071a3d",
   corMetal: "#96a3b2",
-  corInterior: "#f5f6f8",
+  corInterior: "#171b22",
   anguloAbertura: 105,
   duracaoAbertura: 1.5,
   atrasoAbertura: 0,

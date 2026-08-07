@@ -19,6 +19,7 @@ import {
 } from "./render/RenderDados";
 import { RenderGrafo, RenderDiagrama } from "./render/RenderBusiness";
 import { RenderChatIlustrativo } from "./render/RenderIA";
+import { RenderFundoAnimado } from "./render/RenderFundos";
 
 /**
  * Única função que traduz 1 nó do JSON (ComponenteSlide) em JSX.
@@ -256,6 +257,13 @@ export function RenderComponente({
       return (
         <AnimacaoWrapper animacao={anim}>
           <RenderChatIlustrativo componente={componente} />
+        </AnimacaoWrapper>
+      );
+
+    case "fundoAnimado":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <RenderFundoAnimado componente={componente} />
         </AnimacaoWrapper>
       );
 

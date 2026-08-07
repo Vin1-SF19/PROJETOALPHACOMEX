@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     X, ChevronLeft, ChevronRight, Plus, Search, Loader2,
     Eye, Check, BarChart3, Users, FileText, Minus, Trash2, Upload, Pencil,
-    MessageSquare, Archive, ArchiveRestore, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp,
+    MessageSquare, Archive, ArchiveRestore, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,6 +27,13 @@ import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
 import { isAdminRole } from "@/lib/roles";
+import {
+    CANAL_INDICACAO_CLIENTE,
+    CANAL_INDICACAO_PARCEIRO,
+    LABEL_INDICACAO_CLIENTE,
+    LABEL_INDICACAO_PARCEIRO,
+    parseParceiroNaoCadastrado,
+} from "@/lib/comercial/parceiro-nao-cadastrado";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +74,8 @@ interface Contrato {
     formaPagamento: string;
     servico: string;
     canalAquisicao: string;
+    canalOutro?: string | null;
+    indicadoPorParceiroId?: number | null;
     closerNome: string;
     status: string;
     pagamentoConfirmado: boolean;
@@ -108,9 +117,15 @@ const FORMAS_LABEL: Record<string, string> = {
 };
 
 const CANAIS_AQUISICAO = [
-    "Tráfego Pago (Meta - Instagram)", "Tráfego Pago (Google)",
-    "Indicação Parceiro", "Indicação Cliente", "WhatsApp", "Instagram",
-    "Orgânico", "Evento", "Outro",
+    { value: "Tráfego Pago (Meta - Instagram)", label: "Tráfego Pago (Meta - Instagram)" },
+    { value: "Tráfego Pago (Google)", label: "Tráfego Pago (Google)" },
+    { value: CANAL_INDICACAO_PARCEIRO, label: LABEL_INDICACAO_PARCEIRO },
+    { value: CANAL_INDICACAO_CLIENTE, label: LABEL_INDICACAO_CLIENTE },
+    { value: "WhatsApp", label: "WhatsApp" },
+    { value: "Instagram", label: "Instagram" },
+    { value: "Orgânico", label: "Orgânico" },
+    { value: "Evento", label: "Evento" },
+    { value: "Outro", label: "Outro" },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -189,6 +204,7 @@ function FormNovoContrato({
     const isEdicao = !!editandoId;
     const cnpjInicial = initialData?.cnpj ? formatCNPJ(initialData.cnpj) : "";
     const eConstituicaoInicial = initialData?.cnpj === "00000000000000";
+    const parceiroPendenteInicial = parseParceiroNaoCadastrado(initialData?.canalOutro);
 
     const [cnpj, setCnpj] = useState(cnpjInicial);
     const [consultando, setConsultando] = useState(false);
@@ -216,8 +232,14 @@ function FormNovoContrato({
     const [showPagamento, setShowPagamento] = useState(false);
     const [showCloser, setShowCloser] = useState(false);
     const [canalAquisicao, setCanalAquisicao] = useState(initialData?.canalAquisicao ?? "");
-    const [canalOutro, setCanalOutro] = useState((initialData as { canalOutro?: string | null } | undefined)?.canalOutro ?? "");
-    const [indicadoPorParceiroId, setIndicadoPorParceiroId] = useState<number | null>((initialData as { indicadoPorParceiroId?: number | null } | undefined)?.indicadoPorParceiroId ?? null);
+    const [canalOutro, setCanalOutro] = useState(
+        initialData?.canalAquisicao === "Outro" ? (initialData.canalOutro ?? "") : "",
+    );
+    const [indicadoPorParceiroId, setIndicadoPorParceiroId] = useState<number | null>(initialData?.indicadoPorParceiroId ?? null);
+    const [parceiroNaoCadastrado, setParceiroNaoCadastrado] = useState(Boolean(parceiroPendenteInicial));
+    const [parceiroPendenteNome, setParceiroPendenteNome] = useState(parceiroPendenteInicial?.nome ?? "");
+    const [parceiroPendenteEmpresa, setParceiroPendenteEmpresa] = useState(parceiroPendenteInicial?.empresa ?? "");
+    const [parceiroPendenteTelefone, setParceiroPendenteTelefone] = useState(parceiroPendenteInicial?.telefone ?? "");
     const [parceirosLista, setParceirosLista] = useState<{ id: number; nome: string; nomeFantasia: string | null; nivel: string; representantes: string[] }[]>([]);
     const [parceiroDetalhe, setParceiroDetalhe] = useState<ParceiroDetalheSimples | null>(null);
     const [carregandoParceiroDetalhe, setCarregandoParceiroDetalhe] = useState(false);
@@ -228,9 +250,9 @@ function FormNovoContrato({
     const [socios, setSocios] = useState<Socio[]>((initialData?.socios as Socio[]) ?? []);
     const [salvando, setSalvando] = useState(false);
 
-    // Carrega parceiros quando o canal é "Indicação Parceiro"
+    // Carrega parceiros quando o canal é indicação de parceiro.
     useEffect(() => {
-        if (canalAquisicao === "Indicação Parceiro" && parceirosLista.length === 0) {
+        if (canalAquisicao === CANAL_INDICACAO_PARCEIRO && parceirosLista.length === 0) {
             listarParceirosSimples()
                 .then(ps => setParceirosLista(ps.map(p => ({
                     id: p.id,
@@ -321,7 +343,12 @@ function FormNovoContrato({
         if (!servico) { toast.error("Selecione o serviço"); return; }
         if (!canalAquisicao) { toast.error("Selecione o canal de aquisição"); return; }
         if (canalAquisicao === "Outro" && !canalOutro.trim()) { toast.error("Descreva o canal (Outro)"); return; }
-        if (canalAquisicao === "Indicação Parceiro" && !indicadoPorParceiroId) { toast.error("Selecione o parceiro que indicou"); return; }
+        if (canalAquisicao === CANAL_INDICACAO_PARCEIRO && parceiroNaoCadastrado && !parceiroPendenteNome.trim()) {
+            toast.error("Informe o nome do parceiro"); return;
+        }
+        if (canalAquisicao === CANAL_INDICACAO_PARCEIRO && !parceiroNaoCadastrado && !indicadoPorParceiroId) {
+            toast.error("Selecione o parceiro que indicou"); return;
+        }
         if (!closerFinal) { toast.error("Informe o closer"); return; }
 
         const sociosComVinculo = socios.filter((s) => s.nome.trim());
@@ -342,7 +369,16 @@ function FormNovoContrato({
                 servico,
                 canalAquisicao,
                 canalOutro: canalAquisicao === "Outro" ? (canalOutro.trim() || undefined) : undefined,
-                indicadoPorParceiroId: canalAquisicao === "Indicação Parceiro" ? (indicadoPorParceiroId ?? undefined) : undefined,
+                indicadoPorParceiroId: canalAquisicao === CANAL_INDICACAO_PARCEIRO && !parceiroNaoCadastrado
+                    ? (indicadoPorParceiroId ?? undefined)
+                    : undefined,
+                parceiroNaoCadastrado: canalAquisicao === CANAL_INDICACAO_PARCEIRO && parceiroNaoCadastrado
+                    ? {
+                        nome: parceiroPendenteNome.trim(),
+                        empresa: parceiroPendenteEmpresa.trim() || undefined,
+                        telefone: parceiroPendenteTelefone.trim() || undefined,
+                    }
+                    : undefined,
                 closerNome: closerFinal,
                 socios: sociosComVinculo,
             };
@@ -659,8 +695,8 @@ function FormNovoContrato({
                             className={inputCls}
                         >
                             <option value="">Selecione...</option>
-                            {CANAIS_AQUISICAO.map((c) => (
-                                <option key={c} value={c}>{c}</option>
+                            {CANAIS_AQUISICAO.map((canal) => (
+                                <option key={canal.value} value={canal.value}>{canal.label}</option>
                             ))}
                         </select>
                     </div>
@@ -678,13 +714,17 @@ function FormNovoContrato({
                         </div>
                     )}
 
-                    {/* Indicação Parceiro → select de parceiro cadastrado */}
-                    {canalAquisicao === "Indicação Parceiro" && (
-                        <div className="mt-2">
+                    {/* Indicação de parceiros → parceiro cadastrado ou pendente */}
+                    {canalAquisicao === CANAL_INDICACAO_PARCEIRO && (
+                        <div className="mt-2 space-y-3">
                             <label className={labelCls}>Parceiro que indicou</label>
                             <select
                                 value={indicadoPorParceiroId ?? ""}
-                                onChange={(e) => setIndicadoPorParceiroId(e.target.value ? Number(e.target.value) : null)}
+                                onChange={(e) => {
+                                    setIndicadoPorParceiroId(e.target.value ? Number(e.target.value) : null);
+                                    if (e.target.value) setParceiroNaoCadastrado(false);
+                                }}
+                                disabled={parceiroNaoCadastrado}
                                 className={inputCls}
                             >
                                 <option value="">Selecione o parceiro...</option>
@@ -694,8 +734,72 @@ function FormNovoContrato({
                                 })}
                             </select>
 
+                            <button
+                                type="button"
+                                aria-pressed={parceiroNaoCadastrado}
+                                onClick={() => {
+                                    setParceiroNaoCadastrado(true);
+                                    setIndicadoPorParceiroId(null);
+                                }}
+                                className={`w-full min-h-12 px-3 py-2.5 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                                    parceiroNaoCadastrado
+                                        ? "border-amber-400/70 bg-amber-500/20 text-amber-100 shadow-[0_0_24px_rgba(245,158,11,0.16)]"
+                                        : "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15 hover:border-amber-400/60"
+                                }`}
+                            >
+                                <AlertTriangle size={17} className="shrink-0" />
+                                <span className="flex-1">
+                                    <span className="block text-[11px] font-black uppercase tracking-wider">Outro parceiro / Não cadastrado</span>
+                                    <span className="block text-[9px] mt-0.5 opacity-75">Gera uma pendência destacada no módulo de Parceiros</span>
+                                </span>
+                                {parceiroNaoCadastrado && <Check size={16} className="shrink-0" />}
+                            </button>
+
+                            {parceiroNaoCadastrado && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
+                                    <div className="sm:col-span-2">
+                                        <label className={labelCls}>Nome do parceiro *</label>
+                                        <input
+                                            value={parceiroPendenteNome}
+                                            onChange={(e) => setParceiroPendenteNome(e.target.value)}
+                                            maxLength={120}
+                                            placeholder="Nome da pessoa que indicou"
+                                            className={inputCls}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Empresa</label>
+                                        <input
+                                            value={parceiroPendenteEmpresa}
+                                            onChange={(e) => setParceiroPendenteEmpresa(e.target.value)}
+                                            maxLength={160}
+                                            placeholder="Empresa (opcional)"
+                                            className={inputCls}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Telefone</label>
+                                        <input
+                                            value={parceiroPendenteTelefone}
+                                            onChange={(e) => setParceiroPendenteTelefone(e.target.value)}
+                                            maxLength={40}
+                                            inputMode="tel"
+                                            placeholder="(00) 00000-0000"
+                                            className={inputCls}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setParceiroNaoCadastrado(false)}
+                                        className="sm:col-span-2 text-[10px] font-bold text-slate-500 hover:text-slate-300 transition-colors"
+                                    >
+                                        Voltar para a lista de parceiros cadastrados
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Confirmação visual dos dados do parceiro selecionado — gaveta, só leitura */}
-                            {indicadoPorParceiroId && (
+                            {!parceiroNaoCadastrado && indicadoPorParceiroId && (
                                 <div className="mt-2 rounded-xl overflow-hidden" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
                                     <button
                                         type="button"

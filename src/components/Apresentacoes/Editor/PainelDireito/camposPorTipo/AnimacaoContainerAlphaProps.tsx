@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Sparkles, Maximize2 } from "lucide-react";
 import type { ConfigAnimacao } from "@/lib/validations/animacao";
 import type { ContainerCargaComponente } from "@/lib/validations/slide-componentes";
 import {
@@ -12,6 +12,7 @@ import {
 import { ContainerCargaRender } from "@/components/Apresentacoes/Editor/RenderEngine/ContainerCargaRender";
 import { useEditorStore } from "../../store/useEditorStore";
 import { ContainerCargaProps } from "./ContainerCargaProps";
+import { ModalPreviaContainerAlpha } from "./ModalPreviaContainerAlpha";
 
 interface AnimacaoContainerAlphaPropsProps {
   animacao: ConfigAnimacao;
@@ -20,6 +21,7 @@ interface AnimacaoContainerAlphaPropsProps {
 
 export function AnimacaoContainerAlphaProps({ animacao, onChange }: AnimacaoContainerAlphaPropsProps) {
   const canvas = useEditorStore((state) => state.canvas);
+  const [previaAmpliadaAberta, setPreviaAmpliadaAberta] = useState(false);
   const configuracao = normalizarConfigAnimacaoContainerAlpha(animacao.containerAlpha);
   const componentePreview = useMemo<ContainerCargaComponente>(() => ({
     ...criarComponenteAnimacaoContainerAlpha(configuracao, canvas),
@@ -61,9 +63,20 @@ export function AnimacaoContainerAlphaProps({ animacao, onChange }: AnimacaoCont
       </div>
 
       <div className="space-y-2">
-        <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prévia do container</span>
-          <p className="mt-0.5 text-[10px] text-slate-500">Visual isolado para conferir cores, metal, interior e marca.</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prévia do container</span>
+            <p className="mt-0.5 text-[10px] text-slate-500">Visual isolado para conferir cores, metal, interior e marca.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPreviaAmpliadaAberta(true)}
+            aria-label="Ampliar prévia do container em tamanho de slide"
+            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-indigo-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          >
+            <Maximize2 size={12} aria-hidden="true" />
+            Ampliar
+          </button>
         </div>
         <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-slate-950 shadow-xl">
           <ContainerCargaRender
@@ -79,6 +92,12 @@ export function AnimacaoContainerAlphaProps({ animacao, onChange }: AnimacaoCont
         onChange={atualizarConfiguracao}
         modo="entrada"
         idPrefix="animacao-container-alpha"
+      />
+
+      <ModalPreviaContainerAlpha
+        open={previaAmpliadaAberta}
+        onOpenChange={setPreviaAmpliadaAberta}
+        componente={componentePreview}
       />
     </div>
   );

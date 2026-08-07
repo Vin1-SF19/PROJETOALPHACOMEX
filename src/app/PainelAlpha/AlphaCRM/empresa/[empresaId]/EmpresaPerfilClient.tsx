@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Building2, History, KanbanSquare } from "lucide-react";
 import { fmtDateTime } from "@/lib/format-date";
 import type { TemaAlpha } from "@/lib/temas";
-import CardDetailDrawer from "../../pipeline/[pipelineId]/CardDetailDrawer";
 import type { ObterPerfilEmpresaBpm } from "@/actions/bpm/Empresas";
+import CardFullViewModal from "../../CardModal/CardFullViewModal";
 
 type Perfil = NonNullable<Awaited<ReturnType<typeof ObterPerfilEmpresaBpm>>["data"]>;
 
@@ -64,7 +64,7 @@ export default function EmpresaPerfilClient({ perfil, visual, currentUserId, cur
                 <button
                   key={card.id}
                   onClick={() => setCardSelecionadoId(card.id)}
-                  className="text-left bg-slate-900/60 border border-white/5 rounded-xl p-3 hover:border-white/15 transition-colors"
+                  className="text-left bg-slate-900/60 border border-white/5 rounded-xl p-3 hover:border-white/15 transition-colors block"
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-sm font-medium text-white truncate">{card.etapa.nome}</span>
@@ -109,7 +109,7 @@ export default function EmpresaPerfilClient({ perfil, visual, currentUserId, cur
       </section>
 
       {cardSelecionadoId && (
-        <CardDetailDrawer
+        <CardFullViewModal
           cardId={cardSelecionadoId}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}

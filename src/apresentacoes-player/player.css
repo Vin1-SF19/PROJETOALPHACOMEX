@@ -1,0 +1,11 @@
+/**
+ * CSS do player standalone — processado por PostCSS/@tailwindcss/postcss em
+ * scripts/build-apresentacoes-player.mjs. `source(none)` desliga a auto-detecção de conteúdo
+ * do Tailwind v4 (que por padrão varre o repo inteiro a partir daqui) — só os `@source`
+ * abaixo (RenderEngine, ModoApresentacao e o próprio player) são varridos.
+ */
+@import "tailwindcss" source(none);
+@import "@xyflow/react/dist/style.css";
+@source "../components/Apresentacoes/Editor/RenderEngine";
+@source "../components/Apresentacoes/ModoApresentacao";
+@source "./";

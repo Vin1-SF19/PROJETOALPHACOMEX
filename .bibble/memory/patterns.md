@@ -53,3 +53,22 @@ técnico SEMPRE visível (`<code className="text-xs text-slate-500">`, nunca esc
 mensagem genérica) + botão de ação quando aplicável. Reaproveitável em qualquer módulo
 financeiro/operacional futuro que precise de múltiplos estados vazios/erro parametrizados em
 vez de 1 componente por estado.
+
+---
+
+## Guia Inteligente de Módulo (Bibble + tour de primeira visita)
+
+**Estreado em:** Parceiros, 2026-08-07.
+**Frase de ativação futura:** “Adicione o Guia Inteligente neste módulo.”
+
+Funcionalidade reutilizável formada por três partes:
+
+1. **Manual operacional sob demanda:** o módulo descreve suas funções em um catálogo tipado, dividido por tópicos e aliases. O Bibble consulta apenas o tópico necessário por uma tool somente leitura; o manual completo não é enviado em todas as mensagens.
+2. **Tour sequencial de primeira visita:** spotlight ancorado por atributo `data-guia-*`, tooltip com Pular/Voltar/Avançar/Concluir, progresso, Escape, atualização em scroll/resize e `prefers-reduced-motion`.
+3. **Replay:** botão “Tutoriais” reabre o tour sem apagar a preferência já gravada.
+
+Persistência padrão: `localStorage` isolado por `usuarioId + módulo + versão`, no formato `painelalpha:guia-modulo:<modulo>:v<versao>:usuario:<id>`. Aumentar a versão reexibe o tour quando houver mudança material. Como a persistência é local, não sincroniza entre navegadores/dispositivos e não exige migration. Passos cujo seletor não exista por permissão ou estado da tela são removidos automaticamente.
+
+**Referência visual real:** `AlphaBlueprint/BlueprintOnboarding.tsx`. Gestão de Comissões e Prêmios não possui tour sequencial no checkout de 2026-08-07; não citá-la como implementação de código até que isso mude.
+
+**Última atualização:** 2026-08-07 por Scribe

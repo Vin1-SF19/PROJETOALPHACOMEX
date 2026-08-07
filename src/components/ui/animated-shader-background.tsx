@@ -23,12 +23,42 @@ type AnimatedShaderBackgroundProps = {
    * com player de vídeo estiver aberto na mesma página.
    */
   pausado?: boolean;
+  /**
+   * Cor 1 do gradiente animado (hex). Default reproduz o tom "indigo profundo"
+   * original. Editável em tempo real (Alpha Presentation Studio, fundo "Aurora
+   * dos Módulos") sem remontar a cena — lida a cada frame via ref.
+   */
+  corPrimaria?: string;
+  /** Cor 2 do gradiente animado (hex). Default reproduz o tom "indigo claro" original. */
+  corSecundaria?: string;
+  /** Multiplicador de velocidade do shader (1 = ritmo original). Editável em tempo real. */
+  velocidade?: number;
 };
 
-export default function AnimatedShaderBackground({ className, intensidade = 0.9, variant = "sutil", pausado = false }: AnimatedShaderBackgroundProps) {
+export default function AnimatedShaderBackground({
+  className,
+  intensidade = 0.9,
+  variant = "sutil",
+  pausado = false,
+  corPrimaria = "#1e1b4b",
+  corSecundaria = "#6366f1",
+  velocidade = 1,
+}: AnimatedShaderBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pausadoRef = useRef(pausado);
-  pausadoRef.current = pausado;
+  const velocidadeRef = useRef(velocidade);
+  const corPrimariaRef = useRef(corPrimaria);
+  const corSecundariaRef = useRef(corSecundaria);
+
+  // Padrão "latest ref": mutar ref.current direto no corpo do render é bloqueado pelo
+  // React Compiler (react-hooks/refs) — os valores mais novos são sincronizados aqui e
+  // lidos dentro de animate() a cada frame, sem precisar remontar a cena inteira.
+  useEffect(() => {
+    pausadoRef.current = pausado;
+    velocidadeRef.current = velocidade;
+    corPrimariaRef.current = corPrimaria;
+    corSecundariaRef.current = corSecundaria;
+  }, [pausado, velocidade, corPrimaria, corSecundaria]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -50,6 +80,8 @@ export default function AnimatedShaderBackground({ className, intensidade = 0.9,
         iTime: { value: 0 },
         iResolution: { value: new THREE.Vector2(container.clientWidth, container.clientHeight) },
         iIntensidade: { value: intensidade },
+        uCorPrimaria: { value: new THREE.Color(corPrimariaRef.current) },
+        uCorSecundaria: { value: new THREE.Color(corSecundariaRef.current) },
       },
       vertexShader: `
         void main() {
@@ -60,6 +92,8 @@ export default function AnimatedShaderBackground({ className, intensidade = 0.9,
         uniform float iTime;
         uniform vec2 iResolution;
         uniform float iIntensidade;
+        uniform vec3 uCorPrimaria;
+        uniform vec3 uCorSecundaria;
 
         #define NUM_OCTAVES 3
 
@@ -103,14 +137,11 @@ export default function AnimatedShaderBackground({ className, intensidade = 0.9,
             v = p + cos(i * i + (iTime + p.x * 0.08) * 0.025 + i * vec2(13.0, 11.0)) * 3.5 + vec2(sin(iTime * 3.0 + i) * 0.003, cos(iTime * 3.5 - i) * 0.003);
             float tailNoise = fbm(v + vec2(iTime * 0.5, i)) * 0.3 * (1.0 - (i / 35.0));
 
-            /* Paleta indigo/slate (accent do painel — tema "midnight" rgb(79,70,229)
-               e fundo slate-950), no lugar do azul/verde genérico original. */
-            vec4 auroraColors = vec4(
-              0.16 + 0.20 * sin(i * 0.2 + iTime * 0.4),
-              0.14 + 0.22 * cos(i * 0.3 + iTime * 0.5),
-              0.55 + 0.35 * sin(i * 0.4 + iTime * 0.3),
-              1.0
-            );
+            /* Mistura animada entre as 2 cores configuráveis (default reproduz a
+               paleta indigo/slate original) — shimmer combina as 3 fases que antes
+               moviam R/G/B de forma independente, agora aplicadas como 1 fator de mix. */
+            float shimmer = (sin(i * 0.2 + iTime * 0.4) + cos(i * 0.3 + iTime * 0.5) + sin(i * 0.4 + iTime * 0.3)) / 3.0;
+            vec4 auroraColors = vec4(mix(uCorPrimaria, uCorSecundaria, 0.5 + 0.5 * shimmer), 1.0);
             vec4 currentContribution = auroraColors * exp(sin(i * i + iTime * 0.8)) / length(max(v, vec2(v.x * f * 0.015, v.y * 1.5)));
             float thinnessFactor = smoothstep(0.0, 1.0, i / 35.0) * 0.6;
             o += currentContribution * (1.0 + tailNoise * 0.8) * thinnessFactor;
@@ -140,7 +171,9 @@ export default function AnimatedShaderBackground({ className, intensidade = 0.9,
 
     const animate = () => {
       if (elementoVisivel && !pausadoRef.current) {
-        material.uniforms.iTime.value += 0.016;
+        material.uniforms.iTime.value += 0.016 * velocidadeRef.current;
+        (material.uniforms.uCorPrimaria.value as THREE.Color).set(corPrimariaRef.current);
+        (material.uniforms.uCorSecundaria.value as THREE.Color).set(corSecundariaRef.current);
         renderer.render(scene, camera);
       }
       frameId = requestAnimationFrame(animate);
@@ -182,9 +215,10 @@ export default function AnimatedShaderBackground({ className, intensidade = 0.9,
       material.dispose();
       renderer.dispose();
     };
-    // intensidade só é lida na criação do material (uniform) — mudanças em
-    // runtime não precisam remontar toda a cena, mas este componente não
-    // troca intensidade dinamicamente hoje, então []/eslint-disable é seguro.
+    // intensidade só é lida na criação do material (uniform) — nenhum caller troca
+    // intensidade dinamicamente hoje. velocidade/corPrimaria/corSecundaria SÃO
+    // dinâmicas (editáveis ao vivo pelo Alpha Presentation Studio), mas são lidas
+    // via ref dentro de animate() a cada frame — não precisam entrar nas deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

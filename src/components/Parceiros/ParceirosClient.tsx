@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText, Link2, UserPlus,
-  MoreHorizontal, Search, Crown, Gem, Square, Users, Bell,
+  MoreHorizontal, Search, Crown, Gem, Square, Users, Bell, Building2, Phone, ArrowRight, Clock3, CircleHelp,
 } from "lucide-react";
 import { toast } from "sonner";
 import ParceiroCard, { type CardParceiro } from "./ParceiroCard";
@@ -24,6 +24,13 @@ import { useParceirosPreCadastroNotifications, type PreCadastroNotificacao } fro
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 import { BotaoVideoIntrodutorio } from "@/components/VideoIntrodutorio/BotaoVideoIntrodutorio";
+import type { ParceiroPendenteCadastro } from "@/lib/comercial/parceiro-nao-cadastrado";
+import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
+import {
+  marcarTutorialModuloComoVisto,
+  tutorialModuloFoiVisto,
+  type ConfigTutorialModulo,
+} from "@/lib/guias/tutorial-modulo";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
@@ -40,7 +47,58 @@ const PARTICULAS_FUNDO = [
   { x: 30, y: 40, duracao: 5.6, delay: 1.0 },
 ] as const;
 
+const TUTORIAL_PARCEIROS: ConfigTutorialModulo = {
+  modulo: "parceiros",
+  versao: 1,
+  titulo: "Tutoriais de Parceiros",
+  passos: [
+    {
+      id: "visao-geral",
+      seletor: '[data-guia-parceiros="visao-geral"]',
+      titulo: "Visão geral da parceria",
+      descricao: "Aqui você acompanha totais por nível, acessos, indicações e as principais ações do módulo.",
+    },
+    {
+      id: "novo-parceiro",
+      seletor: '[data-guia-parceiros="novo-parceiro"]',
+      titulo: "Cadastre um parceiro",
+      descricao: "Use Novo Parceiro para cadastrar PF ou PJ, responsáveis, endereço, banco/Pix e a regra de comissão.",
+    },
+    {
+      id: "nova-indicacao",
+      seletor: '[data-guia-parceiros="nova-indicacao"]',
+      titulo: "Vincule uma nova indicação",
+      descricao: "Indicação relaciona um parceiro a um cliente que já existe no CS & NPS. Clientes novos nascem pelo fechamento do contrato no Alpha Metas.",
+    },
+    {
+      id: "acoes",
+      seletor: '[data-guia-parceiros="acoes"]',
+      titulo: "Convites e pré-cadastros",
+      descricao: "Em Ações, usuários autorizados geram link e PIN, revisam pré-cadastros e administram termo ou acesso.",
+    },
+    {
+      id: "pendentes",
+      seletor: '[data-guia-parceiros="pendentes-metas"]',
+      titulo: "Finalize parceiros vindos do Metas",
+      descricao: "Cards em destaque indicam parceiros ainda não cadastrados. Abra Finalizar cadastro, complete os dados e o sistema fará o vínculo com o contrato de origem.",
+    },
+    {
+      id: "filtros",
+      seletor: '[data-guia-parceiros="filtros"]',
+      titulo: "Encontre rapidamente",
+      descricao: "Busque por nome, documento ou e-mail e filtre a lista pelos níveis Gold, Platinum e Black.",
+    },
+    {
+      id: "lista",
+      seletor: '[data-guia-parceiros="lista"]',
+      titulo: "Abra o detalhe do parceiro",
+      descricao: "Clique em um card para consultar empresas indicadas, comissão, comprovantes, cadastro, responsáveis e acesso ao portal.",
+    },
+  ],
+};
+
 type Props = {
+  userId: number;
   parceiros: CardParceiro[];
   temaName: string;
   busca?: string;
@@ -49,17 +107,42 @@ type Props = {
   templateConvite: TemplateOnboarding | null;
   templateParceiro: TemplateOnboarding | null;
   preCadastrosPendentesInicial: number;
+  parceirosPendentesCadastro: ParceiroPendenteCadastro[];
   videoIntrodutorioConfig: VideoIntrodutorioConfig;
 };
 
 export default function ParceirosClient({
-  parceiros, temaName, busca, nivel, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, videoIntrodutorioConfig,
+  userId, parceiros, temaName, busca, nivel, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, parceirosPendentesCadastro, videoIntrodutorioConfig,
 }: Props) {
   const tema = getTema(temaName);
   const accent = tema.accent;
   const router = useRouter();
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();
+  const [tutorialAberto, setTutorialAberto] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        if (!tutorialModuloFoiVisto(window.localStorage, TUTORIAL_PARCEIROS, userId)) {
+          setTutorialAberto(true);
+        }
+      } catch {
+        setTutorialAberto(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [userId]);
+
+  const finalizarTutorial = useCallback(() => {
+    try {
+      marcarTutorialModuloComoVisto(window.localStorage, TUTORIAL_PARCEIROS, userId);
+    } catch {
+      // O tour continua utilizável quando o navegador bloqueia armazenamento local.
+    }
+    setTutorialAberto(false);
+  }, [userId]);
 
   // Filtro live — aplica direto na URL (via router.push), sem botão "Filtrar".
   // Mantém deep-linking: busca/nivel continuam vindo de searchParams no Server Component.
@@ -200,6 +283,7 @@ export default function ParceirosClient({
 
         {/* Header repaginado — banner com gradiente + stats vivos */}
         <motion.header
+          data-guia-parceiros="visao-geral"
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
@@ -228,7 +312,7 @@ export default function ParceirosClient({
             </div>
 
             {/* Ações */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div data-guia-parceiros="acoes" className="flex items-center gap-2 flex-wrap">
               {/* Notificação de pré-cadastro pendente — pulsa quando há itens */}
               {podeVerNotificacoes && (
                 <div className={`relative ${notificacoesOpen ? "z-50" : ""}`} ref={notifRef}>
@@ -300,6 +384,16 @@ export default function ParceirosClient({
                 aoAlternarModal={setVideoIntrodutorioModalOpen}
               />
 
+              <button
+                type="button"
+                onClick={() => setTutorialAberto(true)}
+                title="Rever tutoriais"
+                className="h-11 px-3 flex items-center gap-2 rounded-2xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:text-white"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}
+              >
+                <CircleHelp size={15} /> Tutoriais
+              </button>
+
               {/* Menu de ações secundárias — desafoga o header */}
               {(permissao.isAdmin || permissao.podeEditar) && (
                 <div className={`relative ${menuOpen ? "z-50" : ""}`} ref={menuRef}>
@@ -340,7 +434,7 @@ export default function ParceirosClient({
 
               {/* Nova Indicação — ação relevante, fica visível */}
               {permissao.podeEditar && (
-                <button onClick={() => setNovaIndicacaoOpen(true)}
+                <button data-guia-parceiros="nova-indicacao" onClick={() => setNovaIndicacaoOpen(true)}
                   className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-100 hover:brightness-110"
                   style={{ background: `rgba(${accent},0.18)`, border: `1px solid rgba(${accent},0.4)` }}>
                   <Handshake size={15} /> Indicação
@@ -348,7 +442,7 @@ export default function ParceirosClient({
               )}
 
               {/* Ação primária — destaque máximo */}
-              <Link href="/PainelAlpha/Parceiros/novo"
+              <Link data-guia-parceiros="novo-parceiro" href="/PainelAlpha/Parceiros/novo"
                 className="h-11 px-5 flex items-center gap-2 font-black uppercase text-[11px] tracking-widest rounded-2xl transition-all text-black hover:brightness-110"
                 style={{ background: `rgba(${accent},1)`, boxShadow: `0 8px 24px rgba(${accent},0.35)` }}>
                 <Plus size={16} strokeWidth={2.6} /> Novo Parceiro
@@ -364,6 +458,73 @@ export default function ParceirosClient({
             <StatCard icon={<Square size={16} />} label="Black" valor={stats.black} cor="100,116,139" delay={0.2} />
           </div>
         </motion.header>
+
+        {parceirosPendentesCadastro.length > 0 && (
+          <section
+            data-guia-parceiros="pendentes-metas"
+            aria-labelledby="parceiros-pendentes-titulo"
+            className="rounded-3xl p-5 lg:p-6 space-y-4"
+            style={{
+              background: "linear-gradient(135deg, rgba(245,158,11,0.16), rgba(120,53,15,0.08))",
+              border: "1px solid rgba(245,158,11,0.42)",
+              boxShadow: "0 18px 55px rgba(120,53,15,0.18)",
+            }}
+          >
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl grid place-items-center bg-amber-500/15 border border-amber-400/35 shrink-0">
+                <AlertTriangle size={18} className="text-amber-300" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 id="parceiros-pendentes-titulo" className="text-sm font-black uppercase tracking-widest text-amber-100">
+                  Parceiros não cadastrados
+                </h2>
+                <p className="text-[10px] text-amber-200/65 mt-1">
+                  Indicações registradas no Alpha Metas aguardando finalização manual.
+                </p>
+              </div>
+              <span className="min-w-7 h-7 px-2 rounded-full grid place-items-center bg-amber-400 text-amber-950 text-[11px] font-black">
+                {parceirosPendentesCadastro.length}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {parceirosPendentesCadastro.map((pendencia) => (
+                <article
+                  key={pendencia.contratoId}
+                  className="rounded-2xl p-4 bg-[#0a1020]/85 border border-amber-400/25 flex flex-col gap-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl grid place-items-center bg-amber-500/10 shrink-0">
+                      <UserPlus size={16} className="text-amber-300" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-white truncate">{pendencia.nome}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-400 mt-0.5">Não cadastrado</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-[11px] text-slate-400">
+                    {pendencia.empresa && (
+                      <p className="flex items-center gap-2"><Building2 size={12} className="text-slate-500 shrink-0" /><span className="truncate">{pendencia.empresa}</span></p>
+                    )}
+                    {pendencia.telefone && (
+                      <p className="flex items-center gap-2"><Phone size={12} className="text-slate-500 shrink-0" /><span>{pendencia.telefone}</span></p>
+                    )}
+                    <p className="flex items-center gap-2"><Handshake size={12} className="text-slate-500 shrink-0" /><span className="truncate">Indicou {pendencia.clienteNomeFantasia || pendencia.clienteRazaoSocial}</span></p>
+                    <p className="flex items-center gap-2"><Clock3 size={12} className="text-slate-500 shrink-0" /><span>Registrado em {new Date(pendencia.criadoEm).toLocaleDateString("pt-BR")}</span></p>
+                  </div>
+
+                  <Link
+                    href={`/PainelAlpha/Parceiros/novo?origemContratoId=${encodeURIComponent(pendencia.contratoId)}`}
+                    className="mt-auto h-10 px-3 rounded-xl flex items-center justify-center gap-2 bg-amber-400 text-amber-950 text-[10px] font-black uppercase tracking-wider hover:bg-amber-300 transition-colors"
+                  >
+                    Finalizar cadastro <ArrowRight size={13} />
+                  </Link>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Barra do modo exclusão */}
         {modoExclusao && (
@@ -386,7 +547,7 @@ export default function ParceirosClient({
 
         {/* Filtros — live, sem botão "Filtrar": aplica ao digitar (debounce) ou trocar o nível */}
         {!modoExclusao && (
-          <div className="flex flex-wrap gap-2.5">
+          <div data-guia-parceiros="filtros" className="flex flex-wrap gap-2.5">
             <div className="relative flex-1 min-w-[220px]">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
               <input
@@ -412,7 +573,7 @@ export default function ParceirosClient({
 
         {/* Lista */}
         {parceiros.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4 text-slate-600">
+          <div data-guia-parceiros="lista" className="flex flex-col items-center justify-center py-24 gap-4 text-slate-600">
             <Handshake size={48} strokeWidth={1} />
             <p className="text-sm font-bold uppercase tracking-widest">Nenhum parceiro encontrado</p>
             <Link href="/PainelAlpha/Parceiros/novo" className="text-xs font-black uppercase tracking-widest hover:underline" style={{ color: `rgba(${accent}, 1)` }}>
@@ -421,6 +582,7 @@ export default function ParceirosClient({
           </div>
         ) : (
           <motion.div
+            data-guia-parceiros="lista"
             initial="hidden"
             animate="show"
             variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}
@@ -513,6 +675,13 @@ export default function ParceirosClient({
           </div>
         </div>
       )}
+
+      <GuiaModuloTour
+        aberto={tutorialAberto}
+        config={TUTORIAL_PARCEIROS}
+        accent={accent}
+        onFinalizar={finalizarTutorial}
+      />
     </main>
   );
 }

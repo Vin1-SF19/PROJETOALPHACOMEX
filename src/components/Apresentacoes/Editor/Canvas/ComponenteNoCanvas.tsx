@@ -1,7 +1,12 @@
+import { motion } from "framer-motion";
 import { useEditorStore } from "../store/useEditorStore";
 import { RenderComponente } from "../RenderEngine/RenderComponente";
+import { ScrollRevealWrapper } from "../RenderEngine/ScrollRevealWrapper";
+import { staggerContainerVariants, staggerItemVariants } from "../RenderEngine/nucleo";
 import { useCanvasDragResize } from "./useCanvasDragResize";
+import { resolverAnimacoesDoElemento } from "@/lib/apresentacoes/animacao/resolver";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import type { AjusteVisualEfeitoGlobal } from "../RenderEngine/EfeitosGlobaisSlide";
 import type { ReactNode } from "react";
 
 const HANDLES = [
@@ -27,10 +32,13 @@ export function ComponenteNoCanvas({
   componente,
   dentroDeContainer = false,
   portalProximoSlide,
+  ajusteVisual,
 }: {
   componente: ComponenteSlide;
   dentroDeContainer?: boolean;
   portalProximoSlide?: ReactNode;
+  /** Fase 07 — ajuste calculado por `EfeitosGlobaisSlide` (Dim Others/Focus Element). Opcional, retrocompatível. */
+  ajusteVisual?: AjusteVisualEfeitoGlobal;
 }) {
   const selecionado = useEditorStore((s) => s.componenteSelecionadoId === componente.id);
   const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
@@ -43,6 +51,11 @@ export function ComponenteNoCanvas({
   );
 
   const ehContainer = componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container";
+  // Fase 08 — Scroll Reveal no preview do Editor. `animacaoConfig` é do SLIDE ATIVO (mesma
+  // fonte de `useStaggerDelayAtivo` acima); o lookup elementId→animação é sempre feito via
+  // `resolverAnimacoesDoElemento`, nunca duplicado.
+  const animacaoConfigSlide = useEditorStore((s) => s.animacaoConfig);
+  const animacoesDoComponente = resolverAnimacoesDoElemento(componente, animacaoConfigSlide).map((r) => r.animacao);
 
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -63,10 +76,16 @@ export function ComponenteNoCanvas({
         width: componente.w,
         height: componente.h,
         zIndex: componente.zIndex,
-        transform: componente.rotacao ? `rotate(${componente.rotacao}deg)` : undefined,
+        transform: [
+          componente.rotacao ? `rotate(${componente.rotacao}deg)` : "",
+          ajusteVisual?.escalaAjustada ? `scale(${ajusteVisual.escalaAjustada})` : "",
+        ].filter(Boolean).join(" ") || undefined,
         outline: selecionado ? "2px solid rgb(99,102,241)" : "none",
         outlineOffset: 2,
         cursor: dentroDeContainer ? "pointer" : "grab",
+        opacity: ajusteVisual?.opacityAjustada,
+        filter: ajusteVisual?.blurAjustado ? "blur(3px)" : undefined,
+        transition: ajusteVisual ? "opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease" : undefined,
       }}
     >
       {ehContainer ? (
@@ -76,7 +95,9 @@ export function ComponenteNoCanvas({
           <RenderComponenteContainer componente={componente} portalProximoSlide={portalProximoSlide} />
         </div>
       ) : (
-        <RenderComponente componente={componente} modo="editor" portalProximoSlide={portalProximoSlide} />
+        <ScrollRevealWrapper animacoes={animacoesDoComponente}>
+          <RenderComponente componente={componente} modo="editor" portalProximoSlide={portalProximoSlide} />
+        </ScrollRevealWrapper>
       )}
 
       {selecionado && !dentroDeContainer && (
@@ -95,6 +116,30 @@ export function ComponenteNoCanvas({
   );
 }
 
+/**
+ * Detecta se o container tem stagger ativo, em QUALQUER uma das duas fontes possíveis
+ * (Fase 03 — fecha a dívida técnica registrada desde a Onda 3):
+ * (a) formato antigo — `componente.animacao.entrada.tipo === "stagger"`, delay em `staggerDelay`;
+ * (b) formato novo — `ElementAnimation` do tipo "stagger" em `Slide.animacaoConfig.timeline`,
+ *     filtrado por `elementId === componente.id` (StaggerConfig vive no nível SLIDE, não no
+ *     componente — decisão registrada em `.bibble/memory/decisions.md`, 2026-08-06).
+ * Retorna o delay entre filhos, ou `null` se nenhuma fonte tiver stagger configurado.
+ */
+function useStaggerDelayAtivo(componenteId: string, animacaoAntiga: ComponenteSlide["animacao"]): number | null {
+  const animacoesNovoModelo = useEditorStore((s) => s.animacaoConfig?.timeline?.animations);
+
+  if (animacaoAntiga?.entrada?.tipo === "stagger") {
+    return animacaoAntiga.entrada.staggerDelay ?? 0.1;
+  }
+
+  const staggerNovo = animacoesNovoModelo?.find((a) => a.elementId === componenteId && a.type === "stagger");
+  if (staggerNovo?.stagger) {
+    return staggerNovo.stagger.intervalo;
+  }
+
+  return null;
+}
+
 /** Card/Grid/Container com filhos navegáveis individualmente (não usa RenderComponente.* puro, que é só leitura). */
 function RenderComponenteContainer({
   componente,
@@ -103,24 +148,48 @@ function RenderComponenteContainer({
   componente: Extract<ComponenteSlide, { tipo: "card" | "grid" | "container" }>;
   portalProximoSlide?: ReactNode;
 }) {
+  const staggerDelay = useStaggerDelayAtivo(componente.id, componente.animacao);
+  const staggerAtivo = staggerDelay !== null;
+
+  // Sem componentes-wrapper aninhados (proibido pelo React Compiler — "Cannot create
+  // components during render"): a escolha motion.div vs div é feita inline, reaproveitando
+  // as MESMAS variants de `nucleo.tsx`/`FilhosContainer` sem duplicar lógica de animação.
+  function renderFilhos(filhos: ComponenteSlide[], estiloFilho: (filho: ComponenteSlide) => React.CSSProperties) {
+    return filhos.map((filho) =>
+      staggerAtivo ? (
+        <motion.div key={filho.id} style={estiloFilho(filho)} variants={staggerItemVariants}>
+          <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
+        </motion.div>
+      ) : (
+        <div key={filho.id} style={estiloFilho(filho)}>
+          <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
+        </div>
+      ),
+    );
+  }
+
   if (componente.tipo === "card") {
-    return (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          background: componente.corFundo ?? "transparent",
-          borderRadius: componente.borderRadius ?? 0,
-          padding: componente.padding ?? 0,
-          position: "relative",
-        }}
-      >
-        {componente.filhos.map((filho) => (
-          <div key={filho.id} style={{ position: "absolute", left: filho.x, top: filho.y, width: filho.w, height: filho.h }}>
-            <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
-          </div>
-        ))}
-      </div>
+    const style: React.CSSProperties = {
+      width: "100%",
+      height: "100%",
+      background: componente.corFundo ?? "transparent",
+      borderRadius: componente.borderRadius ?? 0,
+      padding: componente.padding ?? 0,
+      position: "relative",
+    };
+    const filhos = renderFilhos(componente.filhos, (filho) => ({
+      position: "absolute",
+      left: filho.x,
+      top: filho.y,
+      width: filho.w,
+      height: filho.h,
+    }));
+    return staggerAtivo ? (
+      <motion.div style={style} initial="hidden" animate="show" variants={staggerContainerVariants(staggerDelay)}>
+        {filhos}
+      </motion.div>
+    ) : (
+      <div style={style}>{filhos}</div>
     );
   }
 
@@ -133,39 +202,34 @@ function RenderComponenteContainer({
           : componente.layout === "stack"
             ? { position: "relative" }
             : { display: "flex", flexDirection: "column", gap: componente.gap ?? 0 };
-    return (
-      <div style={{ width: "100%", height: "100%", background: componente.corFundo ?? "transparent", ...styleLayout }}>
-        {componente.filhos.map((filho) => (
-          <div
-            key={filho.id}
-            style={
-              componente.layout === "stack"
-                ? { position: "absolute", left: filho.x, top: filho.y, width: filho.w, height: filho.h }
-                : { position: "relative", width: filho.w, height: filho.h }
-            }
-          >
-            <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
-          </div>
-        ))}
-      </div>
+    const style: React.CSSProperties = { width: "100%", height: "100%", background: componente.corFundo ?? "transparent", ...styleLayout };
+    const filhos = renderFilhos(componente.filhos, (filho) =>
+      componente.layout === "stack"
+        ? { position: "absolute", left: filho.x, top: filho.y, width: filho.w, height: filho.h }
+        : { position: "relative", width: filho.w, height: filho.h },
+    );
+    return staggerAtivo ? (
+      <motion.div style={style} initial="hidden" animate="show" variants={staggerContainerVariants(staggerDelay)}>
+        {filhos}
+      </motion.div>
+    ) : (
+      <div style={style}>{filhos}</div>
     );
   }
 
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "grid",
-        gridTemplateColumns: `repeat(${componente.colunas}, 1fr)`,
-        gap: componente.gap ?? 0,
-      }}
-    >
-      {componente.filhos.map((filho) => (
-        <div key={filho.id} style={{ position: "relative" }}>
-          <ComponenteNoCanvas componente={filho} dentroDeContainer portalProximoSlide={portalProximoSlide} />
-        </div>
-      ))}
-    </div>
+  const style: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    display: "grid",
+    gridTemplateColumns: `repeat(${componente.colunas}, 1fr)`,
+    gap: componente.gap ?? 0,
+  };
+  const filhos = renderFilhos(componente.filhos, () => ({ position: "relative" }));
+  return staggerAtivo ? (
+    <motion.div style={style} initial="hidden" animate="show" variants={staggerContainerVariants(staggerDelay)}>
+      {filhos}
+    </motion.div>
+  ) : (
+    <div style={style}>{filhos}</div>
   );
 }

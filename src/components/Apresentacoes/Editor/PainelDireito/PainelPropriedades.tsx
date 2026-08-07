@@ -26,7 +26,10 @@ import { GrafoProps } from "./camposPorTipo/GrafoProps";
 import { DiagramaProps } from "./camposPorTipo/DiagramaProps";
 import { ChatIlustrativoProps } from "./camposPorTipo/ChatIlustrativoProps";
 import { ContainerCargaProps } from "./camposPorTipo/ContainerCargaProps";
+import { FundoAnimadoProps } from "./camposPorTipo/FundoAnimadoProps";
 import { AnimacaoProps } from "./camposPorTipo/AnimacaoProps";
+import { AnimacaoPropsV2 } from "./camposPorTipo/AnimacaoPropsV2";
+import { SharedElementIdInput } from "./camposPorTipo/SharedElementIdInput";
 
 function buscarNaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide | null {
   for (const c of lista) {
@@ -144,8 +147,11 @@ export function PainelPropriedades() {
       {componente.tipo === "grafo" && <GrafoProps componente={componente} onChange={onChange} />}
       {componente.tipo === "diagrama" && <DiagramaProps componente={componente} onChange={onChange} />}
       {componente.tipo === "chatIlustrativo" && <ChatIlustrativoProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "fundoAnimado" && <FundoAnimadoProps componente={componente} onChange={onChange} />}
 
       <AnimacaoProps componente={componente} onChange={onChange} />
+      <AnimacaoPropsV2 componente={componente} />
+      <SharedElementIdInput componente={componente} onChange={onChange} />
     </div>
   );
 }

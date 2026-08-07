@@ -55,15 +55,16 @@ function ComponenteNoSlide({
   const componenteRenderizado = useMemo<ComponenteSlide>(() => {
     if (componente.tipo !== "containerCarga") return componente;
 
-    const menorDimensao = Math.min(canvas.width, canvas.height);
-    const margem = Math.min(72, Math.max(18, menorDimensao * 0.05));
-
     return {
       ...componente,
-      x: margem,
-      y: margem,
-      w: Math.max(1, canvas.width - margem * 2),
-      h: Math.max(1, canvas.height - margem * 2),
+      // Container Alpha é uma CAPA — "sempre ocupa todo o palco 16:9" (ver
+      // DIMENSOES_CONTAINER_CAPA em container-intro.ts). Uma margem aqui deixava uma borda
+      // visível ao redor do container onde o fundo do slide (background animado, etc.)
+      // aparecia por baixo antes da hora — sem margem, cobre 100% da tela, como documentado.
+      x: 0,
+      y: 0,
+      w: canvas.width,
+      h: canvas.height,
       // "container-alpha" é a capa anterior ao slide 1. A instância que faz
       // parte do slide não pode disparar outra transição para o slide 2.
       ...(componente.animacao?.entrada?.tipo === "container-alpha"

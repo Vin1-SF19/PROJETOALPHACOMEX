@@ -317,6 +317,28 @@ export const BIBBLE_TOOLS: OllamaTool[] = [
   {
     type: "function",
     function: {
+      name: "consultar_manual_modulo",
+      description:
+        "Consulta o manual operacional oficial de um módulo do PainelAlpha. Use em perguntas de como fazer, onde encontrar, o que significa ou como funciona algo em Alpha Metas ou Parceiros. É somente leitura: nunca cria, edita ou exclui dados. Informe um tópico para receber apenas a parte relevante; omita para consultar o manual completo.",
+      parameters: {
+        type: "object",
+        properties: {
+          modulo: {
+            type: "string",
+            description: "Módulo desejado. Valores aceitos incluem Alpha Metas, Metas e Parceiros.",
+          },
+          topico: {
+            type: "string",
+            description: "Assunto ou dúvida específica, por exemplo: cadastrar parceiro, novo cliente, modo TV, pré-cadastros ou parceiro não cadastrado.",
+          },
+        },
+        required: ["modulo"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "consultar_base_onyx",
       description:
         "Consulta a base de conhecimento dos agentes Onyx (documentos, POPs e materiais indexados no Onyx). Use quando o usuário perguntar sobre procedimentos, documentação ou conhecimento que pode estar registrado no Onyx e não nas suas tools diretas. Retorna a resposta da base do Onyx.",

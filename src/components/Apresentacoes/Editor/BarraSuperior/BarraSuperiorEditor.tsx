@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette, WandSparkles, Play, Boxes } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette, WandSparkles, Play, Boxes, FileCode, Wand2 } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import { SeletorTema } from "./SeletorTema";
+import { SeletorTransicaoSlide } from "./SeletorTransicaoSlide";
 import { ModalGerarComIA } from "./ModalGerarComIA";
+import { ModalAplicarPreset } from "./ModalAplicarPreset";
+import { ToggleReducedMotionSimulado } from "../ReducedMotionSimuladoContext";
 import type { TemaResumo } from "../ApresentacaoEditor";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { AssetApresentacao } from "@/lib/apresentacoes/assets";
 import { CentralCriativaModal } from "../CentralCriativa/CentralCriativaModal";
+import { exportarApresentacaoComoHtml } from "@/lib/apresentacoes/exportacao";
 
 interface BarraSuperiorEditorProps {
   titulo: string;
@@ -43,6 +48,20 @@ export function BarraSuperiorEditor({
   const [seletorTemaAberto, setSeletorTemaAberto] = useState(false);
   const [modalIAAberto, setModalIAAberto] = useState(false);
   const [centralCriativaAberta, setCentralCriativaAberta] = useState(false);
+  const [exportandoHtml, setExportandoHtml] = useState(false);
+  const [modalPresetAberto, setModalPresetAberto] = useState(false);
+
+  async function handleExportarHtml() {
+    setExportandoHtml(true);
+    try {
+      await exportarApresentacaoComoHtml(apresentacaoId, tituloLocal);
+      toast.success("Apresentação exportada em HTML.");
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : "Erro ao exportar HTML.");
+    } finally {
+      setExportandoHtml(false);
+    }
+  }
 
   return (
     <div className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b border-white/5 bg-slate-950/80 px-4">
@@ -82,6 +101,16 @@ export function BarraSuperiorEditor({
         </button>
 
         <button
+          onClick={() => void handleExportarHtml()}
+          disabled={exportandoHtml}
+          aria-label="Exportar apresentação como arquivo HTML autocontido"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
+        >
+          {exportandoHtml ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <FileCode size={13} aria-hidden="true" />}
+          Exportar HTML
+        </button>
+
+        <button
           onClick={() => setModalIAAberto(true)}
           aria-label="Gerar slide com IA"
           className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
@@ -96,6 +125,18 @@ export function BarraSuperiorEditor({
         >
           <Palette size={13} aria-hidden="true" /> Tema
         </button>
+
+        <SeletorTransicaoSlide />
+
+        <button
+          onClick={() => setModalPresetAberto(true)}
+          aria-label="Aplicar preset de animação"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
+        >
+          <Wand2 size={13} aria-hidden="true" /> Presets
+        </button>
+
+        <ToggleReducedMotionSimulado />
 
         <div className="flex items-center gap-1 text-[11px] text-slate-500" aria-live="polite">
           {isSaving ? (
@@ -154,6 +195,8 @@ export function BarraSuperiorEditor({
         temaAtual={temaAtual}
         onTemaAplicado={onTemaAplicado}
       />
+
+      <ModalAplicarPreset open={modalPresetAberto} onOpenChange={setModalPresetAberto} />
     </div>
   );
 }

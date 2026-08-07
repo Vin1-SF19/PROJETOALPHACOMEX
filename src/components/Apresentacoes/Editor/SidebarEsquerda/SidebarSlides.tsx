@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -11,7 +11,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Copy, Trash2 } from "lucide-react";
+import { Plus, Copy, Trash2, Pencil, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   AtualizarSlide,
@@ -25,13 +25,16 @@ import {
 import { serializarPersistenciaSlide, useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { CANVAS_PADRAO, obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
+import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
+import { ModalPreImportarPptx } from "./ModalPreImportarPptx";
 
 interface DadosSlidePersistidos {
   componentes: ComponenteSlide[];
   canvas?: CanvasConfig;
+  animacaoConfig?: SlideAnimationConfig;
 }
 
-function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplicar, onExcluir }: {
+function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplicar, onExcluir, onRenomear }: {
   id: string;
   ordem: number;
   nome: string | null;
@@ -40,9 +43,29 @@ function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplic
   onSelecionar: () => void;
   onDuplicar: () => void;
   onExcluir: () => void;
+  onRenomear: (novoNome: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const rotulo = nome || `Slide ${ordem + 1}`;
+  const [editando, setEditando] = useState(false);
+  const [valorEdicao, setValorEdicao] = useState(rotulo);
+
+  function iniciarEdicao(e: MouseEvent) {
+    e.stopPropagation();
+    setValorEdicao(rotulo);
+    setEditando(true);
+  }
+
+  function confirmarEdicao() {
+    setEditando(false);
+    if (valorEdicao.trim() && valorEdicao.trim() !== nome) onRenomear(valorEdicao);
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+    if (e.key === "Escape") { e.preventDefault(); setEditando(false); }
+  }
 
   return (
     <div
@@ -56,7 +79,27 @@ function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplic
       <span {...attributes} {...listeners} className="cursor-grab select-none px-1 text-slate-600">
         {ordem + 1}
       </span>
-      <span className="flex-1 truncate">{nome || `Slide ${ordem + 1}`}</span>
+      {editando ? (
+        <input
+          autoFocus
+          value={valorEdicao}
+          onChange={(e) => setValorEdicao(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={confirmarEdicao}
+          onKeyDown={handleKeyDown}
+          aria-label="Nome do slide"
+          className="min-w-0 flex-1 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-white outline-none ring-1 ring-indigo-500"
+        />
+      ) : (
+        <span className="flex-1 truncate">{rotulo}</span>
+      )}
+      <button
+        onClick={iniciarEdicao}
+        aria-label="Renomear slide"
+        className="cursor-pointer rounded p-1 text-slate-500 opacity-0 hover:text-white hover:bg-white/10 group-hover:opacity-100"
+      >
+        <Pencil size={12} aria-hidden="true" />
+      </button>
       <button
         onClick={(e) => { e.stopPropagation(); onDuplicar(); }}
         aria-label="Duplicar slide"
@@ -84,6 +127,9 @@ export function SidebarSlides() {
   const setSlides = useEditorStore((s) => s.setSlides);
   const carregarSlide = useEditorStore((s) => s.carregarSlide);
   const [processando, setProcessando] = useState(false);
+  const [arquivoPptxSelecionado, setArquivoPptxSelecionado] = useState<File | null>(null);
+  const [modalPreImportarAberto, setModalPreImportarAberto] = useState(false);
+  const inputPptxRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -97,6 +143,8 @@ export function SidebarSlides() {
       const slideIdSnapshot = estado.slideAtivoId;
       const componentesSnapshot = estado.componentes;
       const canvasSnapshot = estado.canvas;
+      const animacaoConfigSnapshot = estado.animacaoConfig;
+      const transicaoEntradaSnapshot = estado.transicaoEntrada;
       const versaoSnapshot = estado.versaoEdicao;
       estado.setSaving(true);
 
@@ -105,7 +153,8 @@ export function SidebarSlides() {
       try {
         const res = await serializarPersistenciaSlide(slideIdSnapshot, () => AtualizarSlide({
           id: slideIdSnapshot,
-          dadosJson: { componentes: componentesSnapshot, canvas: canvasSnapshot },
+          dadosJson: { componentes: componentesSnapshot, canvas: canvasSnapshot, animacaoConfig: animacaoConfigSnapshot },
+          transicaoEntrada: transicaoEntradaSnapshot,
         }));
         sucesso = res.success;
         if (!res.success) {
@@ -137,7 +186,7 @@ export function SidebarSlides() {
     const res = await ObterSlide(slideId);
     if (res.success && res.data) {
       const dadosJson = res.data.dadosJson as DadosSlidePersistidos | null;
-      carregarSlide(slideId, dadosJson?.componentes ?? [], obterCanvasSeguro(dadosJson?.canvas));
+      carregarSlide(slideId, dadosJson?.componentes ?? [], obterCanvasSeguro(dadosJson?.canvas), dadosJson?.animacaoConfig, res.data.transicaoEntrada);
       return true;
     } else {
       toast.error(typeof res.error === "string" ? res.error : "Erro ao abrir slide.");
@@ -180,6 +229,31 @@ export function SidebarSlides() {
     }
   }
 
+  function handleArquivoPptxSelecionado(arquivo: File) {
+    if (!arquivo.name.toLowerCase().endsWith(".pptx")) {
+      toast.error("Envie um arquivo .pptx (PowerPoint).");
+      return;
+    }
+    setArquivoPptxSelecionado(arquivo);
+    setModalPreImportarAberto(true);
+  }
+
+  /** Chamado pelo ModalPreImportarPptx após a importação real ser confirmada e persistida. */
+  async function handleSlidesImportados() {
+    if (!apresentacaoId) return;
+    const listaAtualizada = await ListarSlides(apresentacaoId);
+    if (listaAtualizada.success) {
+      setSlides(listaAtualizada.data.map((s) => ({
+        id: s.id,
+        ordem: s.ordem,
+        nome: s.nome,
+        transicaoEntrada: s.transicaoEntrada ?? null,
+        componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
+        canvas: obterCanvasSeguro((s.dadosJson as DadosSlidePersistidos | null)?.canvas),
+      })));
+    }
+  }
+
   async function handleDuplicar(slideId: string) {
     if (processando || !apresentacaoId) return;
     setProcessando(true);
@@ -213,7 +287,10 @@ export function SidebarSlides() {
     try {
       const res = await ExcluirSlide(slideId);
       if (res.success) {
-        const restantes = slides.filter((s) => s.id !== slideId);
+        // Renumera `ordem` localmente, espelhando o que ExcluirSlide já faz no banco — sem
+        // isso, o rótulo padrão ("Slide N", calculado por ordem+1 quando não há nome
+        // customizado) ficava com buraco depois de excluir um slide do meio/início.
+        const restantes = slides.filter((s) => s.id !== slideId).map((s, i) => ({ ...s, ordem: i }));
         setSlides(restantes);
         if (slideAtivoId === slideId && restantes[0]) {
           await carregarSlideRemoto(restantes[0].id);
@@ -224,6 +301,31 @@ export function SidebarSlides() {
       }
     } finally {
       setProcessando(false);
+    }
+  }
+
+  /**
+   * Renomeia um slide (ativo ou não). `AtualizarSlide` exige `dadosJson` válido mesmo só pra
+   * mudar o nome — usa o estado AO VIVO do editor se for o slide ativo (pode ter edição não
+   * salva ainda), ou o snapshot já carregado na sidebar caso contrário.
+   */
+  async function handleRenomear(slideId: string, novoNome: string) {
+    const nomeFinal = novoNome.trim();
+    if (!nomeFinal || processando) return;
+
+    const ehAtivo = slideId === slideAtivoId;
+    const slideLocal = slides.find((s) => s.id === slideId);
+    if (!ehAtivo && !slideLocal) return;
+
+    const dadosJson = ehAtivo
+      ? { componentes: useEditorStore.getState().componentes, canvas: useEditorStore.getState().canvas }
+      : { componentes: slideLocal!.componentes, canvas: slideLocal!.canvas };
+
+    const res = await AtualizarSlide({ id: slideId, dadosJson, nome: nomeFinal });
+    if (res.success) {
+      setSlides(slides.map((s) => (s.id === slideId ? { ...s, nome: nomeFinal } : s)));
+    } else {
+      toast.error(typeof res.error === "string" ? res.error : "Erro ao renomear slide.");
     }
   }
 
@@ -244,14 +346,36 @@ export function SidebarSlides() {
     <div className="flex flex-col gap-2 p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Slides</h3>
-        <button
-          onClick={handleAdicionar}
-          disabled={processando}
-          aria-label="Adicionar slide"
-          className="cursor-pointer rounded-lg p-1 text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-40"
-        >
-          <Plus size={14} aria-hidden="true" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <input
+            ref={inputPptxRef}
+            type="file"
+            accept=".pptx"
+            className="hidden"
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0];
+              e.target.value = "";
+              if (arquivo) handleArquivoPptxSelecionado(arquivo);
+            }}
+          />
+          <button
+            onClick={() => inputPptxRef.current?.click()}
+            aria-label="Importar apresentação do PowerPoint (.pptx)"
+            title="Importar .pptx"
+            className="cursor-pointer rounded-lg p-1 text-slate-400 hover:text-white hover:bg-white/10"
+          >
+            <Upload size={14} aria-hidden="true" />
+          </button>
+          <button
+            onClick={handleAdicionar}
+            disabled={processando}
+            aria-label="Adicionar slide"
+            title="Adicionar slide"
+            className="cursor-pointer rounded-lg p-1 text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-40"
+          >
+            <Plus size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -268,11 +392,22 @@ export function SidebarSlides() {
                 onSelecionar={() => handleSelecionar(s.id)}
                 onDuplicar={() => handleDuplicar(s.id)}
                 onExcluir={() => handleExcluir(s.id)}
+                onRenomear={(novoNome) => handleRenomear(s.id, novoNome)}
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
+      {apresentacaoId && (
+        <ModalPreImportarPptx
+          open={modalPreImportarAberto}
+          onOpenChange={setModalPreImportarAberto}
+          apresentacaoId={apresentacaoId}
+          arquivo={arquivoPptxSelecionado}
+          onImportado={() => void handleSlidesImportados()}
+        />
+      )}
     </div>
   );
 }

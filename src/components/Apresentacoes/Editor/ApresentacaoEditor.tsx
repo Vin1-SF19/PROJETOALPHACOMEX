@@ -12,12 +12,14 @@ import { SidebarSlides } from "./SidebarEsquerda/SidebarSlides";
 import { CanvasArea } from "./Canvas/CanvasArea";
 import { PainelPropriedades } from "./PainelDireito/PainelPropriedades";
 import { TimelineReal } from "./Timeline/TimelineReal";
-import { ModalReproducaoApresentacao } from "./ModalReproducaoApresentacao";
+import { TimelineRealV2 } from "./Timeline/TimelineRealV2";
+import { ModalVisualizadorHtml } from "./ModalVisualizadorHtml";
+import { ReducedMotionSimuladoProvider } from "./ReducedMotionSimuladoContext";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
+import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import type { AssetApresentacao } from "@/lib/apresentacoes/assets";
 import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-audio";
-import type { SlideApresentacao } from "@/components/Apresentacoes/ModoApresentacao/SlideApresentacaoLayer";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -36,6 +38,8 @@ interface ApresentacaoEditorProps {
   slideAtivoIdInicial: string;
   componentesIniciais: ComponenteSlide[];
   canvasInicial: CanvasConfig;
+  animacaoConfigInicial?: SlideAnimationConfig;
+  transicaoEntradaInicial?: string | null;
   assetsIniciais: AssetApresentacao[];
   temaInicial: TemaResumo | null;
 }
@@ -47,17 +51,23 @@ export function ApresentacaoEditor({
   slideAtivoIdInicial,
   componentesIniciais,
   canvasInicial,
+  animacaoConfigInicial,
+  transicaoEntradaInicial = null,
   assetsIniciais,
   temaInicial,
 }: ApresentacaoEditorProps) {
   const [tema, setTema] = useState<TemaResumo | null>(temaInicial);
   const [modalApresentacaoAberto, setModalApresentacaoAberto] = useState(false);
-  const [slidesReproducao, setSlidesReproducao] = useState<SlideApresentacao[]>([]);
+  /** Promise do salvamento disparado pelo clique em "Apresentar" (se havia alteração pendente)
+   * — ModalVisualizadorHtml espera ela terminar antes de buscar o HTML exportado, senão a
+   * prévia poderia refletir uma versão desatualizada (a exportação lê do banco, não da memória). */
+  const salvamentoPendenteApresentarRef = useRef<Promise<void> | null>(null);
   const inicializar = useEditorStore((s) => s.inicializar);
   const carregarSlide = useEditorStore((s) => s.carregarSlide);
   const componentes = useEditorStore((s) => s.componentes);
   const canvas = useEditorStore((s) => s.canvas);
-  const slides = useEditorStore((s) => s.slides);
+  const animacaoConfig = useEditorStore((s) => s.animacaoConfig);
+  const transicaoEntrada = useEditorStore((s) => s.transicaoEntrada);
   const slideAtivoId = useEditorStore((s) => s.slideAtivoId);
   const isDirty = useEditorStore((s) => s.isDirty);
   const versaoEdicao = useEditorStore((s) => s.versaoEdicao);
@@ -72,8 +82,8 @@ export function ApresentacaoEditor({
     if (inicializadoRef.current) return;
     inicializadoRef.current = true;
     inicializar(apresentacaoId, slidesIniciais);
-    carregarSlide(slideAtivoIdInicial, componentesIniciais, canvasInicial);
-  }, [apresentacaoId, slidesIniciais, slideAtivoIdInicial, componentesIniciais, canvasInicial, inicializar, carregarSlide]);
+    carregarSlide(slideAtivoIdInicial, componentesIniciais, canvasInicial, animacaoConfigInicial, transicaoEntradaInicial);
+  }, [apresentacaoId, slidesIniciais, slideAtivoIdInicial, componentesIniciais, canvasInicial, animacaoConfigInicial, transicaoEntradaInicial, inicializar, carregarSlide]);
 
   useEffect(() => {
     if (!isDirty || !slideAtivoId) return;
@@ -86,7 +96,8 @@ export function ApresentacaoEditor({
         try {
           const res = await serializarPersistenciaSlide(slideAtivoId, () => AtualizarSlide({
             id: slideAtivoId,
-            dadosJson: { componentes, canvas },
+            dadosJson: { componentes, canvas, animacaoConfig },
+            transicaoEntrada,
           }));
           sucesso = res.success;
           if (!res.success) {
@@ -102,7 +113,7 @@ export function ApresentacaoEditor({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [componentes, canvas, isDirty, slideAtivoId, versaoEdicao, setSaving]);
+  }, [componentes, canvas, animacaoConfig, transicaoEntrada, isDirty, slideAtivoId, versaoEdicao, setSaving]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -114,6 +125,23 @@ export function ApresentacaoEditor({
     const centroX = canvas.width / 2 - 60;
     const centroY = canvas.height / 2 - 40;
     const novoComponente = COMPONENTES_REGISTRY[tipo].criarComponentePadrao(centroX, centroY);
+
+    // Background: nasce cobrindo o canvas ativo (não o tamanho fixo do registry) e sempre
+    // no zIndex mais baixo da lista — nunca deve tampar componentes já existentes no slide.
+    if (novoComponente.tipo === "fundoAnimado") {
+      const zIndexMinimo = componentes.length > 0 ? Math.min(...componentes.map((c) => c.zIndex)) - 1 : -1;
+      adicionarComponente({ ...novoComponente, x: 0, y: 0, w: canvas.width, h: canvas.height, zIndex: zIndexMinimo });
+      return;
+    }
+
+    // Container Alpha: é uma capa de tela cheia (não um elemento decorativo pequeno) — nasce
+    // cobrindo o canvas ativo, mas mantém o zIndex normal (fica por cima, revelando o próximo
+    // slide através da porta ao abrir — o oposto do Background, que deve ficar sempre atrás).
+    if (novoComponente.tipo === "containerCarga") {
+      adicionarComponente({ ...novoComponente, x: 0, y: 0, w: canvas.width, h: canvas.height });
+      return;
+    }
+
     adicionarComponente(novoComponente);
   }
 
@@ -132,36 +160,41 @@ export function ApresentacaoEditor({
     const slideIdSnapshot = slideAtivoId;
     const componentesSnapshot = componentes;
     const canvasSnapshot = canvas;
+    const animacaoConfigSnapshot = animacaoConfig;
+    const transicaoEntradaSnapshot = transicaoEntrada;
     const versaoSnapshot = versaoEdicao;
-    const slidesSnapshot = slides.map((slide) => slide.id === slideIdSnapshot
-      ? { ...slide, componentes: componentesSnapshot, canvas: canvasSnapshot }
-      : slide);
 
-    setSlidesReproducao(slidesSnapshot);
+    // A prévia agora busca o HTML exportado (lido do banco), não mais o estado em memória do
+    // editor — por isso, se há alteração pendente, o salvamento precisa terminar ANTES da busca.
+    // ModalVisualizadorHtml espera essa promise (se houver) antes de chamar a rota de export.
+    salvamentoPendenteApresentarRef.current = slideIdSnapshot && isDirty
+      ? (async () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        setSaving(true);
+        let sucesso = false;
+        try {
+          const res = await serializarPersistenciaSlide(slideIdSnapshot, () => AtualizarSlide({
+            id: slideIdSnapshot,
+            dadosJson: { componentes: componentesSnapshot, canvas: canvasSnapshot, animacaoConfig: animacaoConfigSnapshot },
+            transicaoEntrada: transicaoEntradaSnapshot,
+          }));
+          sucesso = res.success;
+          if (!res.success) {
+            toast.error(typeof res.error === "string" ? res.error : "Não deu pra salvar o slide antes de gerar a prévia.");
+          }
+        } catch {
+          toast.error("Erro de conexão ao salvar o slide antes de gerar a prévia.");
+        } finally {
+          useEditorStore.getState().concluirSalvamento(slideIdSnapshot, versaoSnapshot, sucesso);
+        }
+      })()
+      : null;
+
     setModalApresentacaoAberto(true);
-
-    if (!slideIdSnapshot || !isDirty) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setSaving(true);
-    void (async () => {
-      let sucesso = false;
-      try {
-        const res = await serializarPersistenciaSlide(slideIdSnapshot, () => AtualizarSlide({
-          id: slideIdSnapshot,
-          dadosJson: { componentes: componentesSnapshot, canvas: canvasSnapshot },
-        }));
-        sucesso = res.success;
-        if (res.success) return;
-        toast.error(typeof res.error === "string" ? res.error : "A apresentação abriu, mas o slide não foi salvo.");
-      } catch {
-        toast.error("A apresentação abriu, mas houve erro de conexão ao salvar o slide.");
-      } finally {
-        useEditorStore.getState().concluirSalvamento(slideIdSnapshot, versaoSnapshot, sucesso);
-      }
-    })();
   }
 
   return (
+    <ReducedMotionSimuladoProvider>
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[#020617] text-slate-200">
         <BarraSuperiorEditor
@@ -191,15 +224,16 @@ export function ApresentacaoEditor({
           </aside>
         </div>
         <TimelineReal />
-        <ModalReproducaoApresentacao
+        <TimelineRealV2 />
+        <ModalVisualizadorHtml
           open={modalApresentacaoAberto}
           onOpenChange={setModalApresentacaoAberto}
           apresentacaoId={apresentacaoId}
           titulo={titulo}
-          slides={slidesReproducao}
-          tema={tema}
+          aguardarAntesDeGerar={() => salvamentoPendenteApresentarRef.current}
         />
       </div>
     </DndContext>
+    </ReducedMotionSimuladoProvider>
   );
 }

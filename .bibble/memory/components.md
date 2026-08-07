@@ -314,25 +314,25 @@
 
 **Última atualização:** 2026-08-03 por Nova
 
-### ModalReproducaoApresentacao
+### ModalVisualizadorHtml (substituiu ModalReproducaoApresentacao em 2026-08-06)
 
-**Arquivo:** `src/components/Apresentacoes/Editor/ModalReproducaoApresentacao.tsx`
-**Tipo:** Client Component / Dialog com player React nativo
-**Uso:** aberto pelo botão “Apresentar” da barra do Alpha Presentation Studio. O clique monta o player imediatamente com os slides que o editor já mantém no Zustand.
+**Arquivo:** `src/components/Apresentacoes/Editor/ModalVisualizadorHtml.tsx`
+**Tipo:** Client Component / Dialog com `<iframe srcDoc>` do HTML exportado
+**Uso:** aberto pelo botão "Apresentar" da barra do Alpha Presentation Studio. Não monta mais um player React próprio — busca `GET /api/apresentacoes/[id]/exportar-html` (a MESMA rota do botão "Exportar HTML") e renderiza o HTML retornado dentro de um `<iframe srcDoc={html} sandbox="allow-scripts allow-same-origin">`. A prévia é WYSIWYG real: é literalmente o mesmo arquivo que o usuário baixaria.
 
-**Notas:** não cria iframe interno, não navega para a rota `/apresentar` e não repete layout, autenticação ou consulta Prisma. `ApresentacaoEditor` cria um snapshot dos slides em memória, substituindo o slide ativo pelos `componentes` e `canvas` atuais, abre o Dialog no mesmo gesto do usuário e persiste o snapshot ativo em background. Cada mutação relevante incrementa `versaoEdicao`; `concluirSalvamento(slideId, versao, sucesso)` só limpa `isDirty` quando a resposta ainda pertence ao slide e à versão monotônica atuais. `serializarPersistenciaSlide()` mantém uma fila independente por `slideId`, preserva a ordem das escritas do mesmo slide, libera a fila mesmo após rejeição e permite paralelismo entre slides diferentes. Trocas de slide aguardam a persistência serializada do slide sujo antes de carregar o destino.
+**Por que a troca:** o player React ao vivo (`ModoApresentacaoClient`, descrito abaixo — ainda existe, mas só serve a rota standalone) teve vários bugs de timing/framing 3D no Container Alpha impossíveis de depurar sem browser numa sessão sem acesso visual. Consolidar num único caminho de renderização (o export, que já tinha guards automatizados provando isolamento de Next.js) elimina a divergência.
 
-**Áudio e início:** `desbloquearAudioContainer()` é chamado diretamente no clique de “Apresentar”, antes do mount do player. O modal nasce com `iniciado=true`, portanto continua instantâneo e não exibe uma segunda tela de confirmação. Somente a rota standalone mostra o gate “Iniciar apresentação”, que fornece o gesto necessário para liberar Web Audio e solicitar fullscreen. Como modal e player vivem no mesmo documento, os presets procedurais não dependem de gesto dentro de um segundo iframe.
+**Estados:** `carregando` (spinner) → `pronto` (iframe) ou `erro` (mensagem + "Tentar de novo"). Como a prévia lê do banco (não mais do Zustand em memória), `ApresentacaoEditor.handleApresentar()` guarda a promise do salvamento do slide ativo (se houver alteração pendente) numa ref e passa via prop `aguardarAntesDeGerar` — o modal espera essa promise antes de buscar o HTML.
 
-**Responsividade e controles:** o Dialog usa uma superfície horizontal 16:9 limitada simultaneamente por largura e altura do viewport. `ModoApresentacaoClient` recebe `h-full w-full` no modo embutido, separa o palco e a barra em regiões flex próprias e mantém reiniciar/anterior/pausar/próximo/range/contador/fullscreen/fechar sem cobrir o slide. Em telas estreitas, o range ocupa uma segunda linha. Todos os comandos expõem estado `focus-visible`, e os atalhos ignoram elementos interativos. O iframe global de abas em `PainelLayoutClient` autoriza `autoplay` e `fullscreen`; ele continua sendo o único iframe do módulo.
+**Trade-off aceito:** sem cache — cada abertura reexporta do zero (rebaixa/reembute assets), pode ficar lento em apresentações com bastante mídia.
 
-**Rota standalone:** `/PainelAlpha/Apresentacoes/[id]/apresentar` continua separada, autenticada e alimentada pelo banco para abertura direta. Ela reutiliza o mesmo `ModoApresentacaoClient`, mas não participa do modal do editor.
+**Sandbox do iframe:** `srcDoc` sem `sandbox` herdaria o mesmo origin do painel (diferente de `src` cross-origin); `allow-scripts allow-same-origin` é intencional/explícito por clareza de fronteira, não porque o conteúdo precise de acesso privilegiado — o bundle exportado é autocontido (assets em `data:` URI, sem fetch externo).
 
-**Camada de capa:** durante a reprodução, `ModoApresentacaoClient` fornece um host absoluto sobre 100% do viewport e `ContainerCargaRender` usa portal para esse host. Assim, o Container Alpha ignora a posição e o tamanho salvos no editor e cobre a apresentação inteira; no editor ele continua inline e livremente redimensionável.
+**Não é o "iframe proibido":** existe uma decisão histórica (ver `integration-points.md`) proibindo iframe apontando pra rota interna da app (`/apresentar?modal=1`, causava shell/auth/Prisma duplicados). `ModalVisualizadorHtml` usa `srcDoc` com um documento autocontido gerado por API route dedicada — não é a mesma coisa, não reproduz aquele problema.
 
-**Composição responsiva:** o `containerCarga` real promovido para capa continua acompanhando o aspect ratio do palco. Na transição sintética, `TransicaoContainerAlphaLayer` aplica 5% da menor dimensão como respiro, limitado a 18–72 px, e converte componente/abertura para o palco com geometria tipada antes de revelar o destino. `ModoApresentacaoClient` mantém `slidePalco` apontando para o slide de origem enquanto a transição existe; o índice lógico passa ao destino no início do zoom, mas dimensões, fundo, escala e recorte só mudam depois do `onComplete`.
+**Rota standalone (inalterada):** `/PainelAlpha/Apresentacoes/[id]/apresentar` continua separada, autenticada, alimentada pelo banco, reutilizando `ModoApresentacaoClient` — único lugar do app onde o player React ao vivo ainda roda. Áudio (`desbloquearAudioContainer()` no gate "Iniciar apresentação"), controles (reiniciar/anterior/pausar/próximo/range/contador/fullscreen/fechar), camada de capa do Container Alpha (host absoluto + portal) e composição responsiva (`TransicaoContainerAlphaLayer`, respiro 18–72px, `slidePalco`) — tudo isso descreve essa rota standalone, não mais o modal do editor.
 
-**Última atualização:** 2026-08-03 por Scribe
+**Última atualização:** 2026-08-06 por Scribe
 
 ### Container Alpha — modo introdução
 **Arquivos:** `ContainerCargaRender.tsx`, `ContainerCargaCameraRig.tsx`, `SlideApresentacaoLayer.tsx`, `src/lib/apresentacoes/container-intro.ts`, `container-carga-audio.ts`
@@ -355,3 +355,33 @@
 **Notas:** `Dialog` + `Tabs` (shadcn) com 2 abas — "Vigente" (`SeletorPeriodoJustificativa` + upload condicionado a `podeGerenciar` + `PreviewJustificativa` do item vigente) e "Histórico" (`ListaHistoricoJustificativas` + `PreviewJustificativa` do item clicado, com `mostrarMetadados={false}` para não duplicar a legenda já visível na lista). `PreviewJustificativa` é o subcomponente compartilhado entre as 2 abas (metadados + link "Nova aba" + `<iframe src="/api/metas/justificativas/{id}">`) — extraído por Lens/Nova para eliminar duplicação e respeitar o limite de 300 linhas por componente (`component-rules.md`). `SeletorPeriodoJustificativa` também exporta a constante `MESES` compartilhada (evita duplicar o array de nomes de mês em cada arquivo). Upload valida tipo/extensão no client (feedback rápido) mas a validação real e definitiva é sempre no servidor (magic bytes). `AlertDialog` de confirmação aparece só quando já existe vigente para o mês/ano selecionado, antes de sobrescrever.
 
 **Última atualização:** 2026-08-04 por Scribe
+
+### SidebarSlides (Alpha Presentation Studio)
+**Arquivo:** `src/components/Apresentacoes/Editor/SidebarEsquerda/SidebarSlides.tsx`
+**Tipo:** Client Component
+**Uso:** lista de slides na lateral esquerda do editor — reordenar (drag), selecionar, duplicar, excluir, renomear, adicionar, importar de `.pptx`.
+
+**Notas (2026-08-06):** rótulo de cada slide é `nome || \`Slide ${ordem+1}\`` — `nome` fica `null` até o usuário renomear explicitamente (ícone de lápis, vira `<input>` inline, confirma em blur/Enter). Excluir renumera `ordem` de todos os restantes (sequencial, sem buracos, tanto no banco via `$transaction` em `ExcluirSlide` quanto localmente) — é disso que depende o rótulo automático continuar certo. Slides importados entram sempre no final (append), nunca substituem os existentes.
+
+**Importação de PPTX (revisado 2026-08-07):** botão "Upload" (ícone, ao lado do "+") abre um `<input type="file" accept=".pptx">` oculto — mas NÃO importa direto: guarda o `File` em estado e abre `ModalPreImportarPptx.tsx` (novo, mesma pasta). Ver `src/lib/apresentacoes/pptx/` pro parser e `integration-points.md` (seção "Importação de PPTX") pro fluxo de 2 fases completo (prévia não-destrutiva → confirmar/cancelar), escopo e limites.
+
+### ModalPreImportarPptx
+**Arquivo:** `src/components/Apresentacoes/Editor/SidebarEsquerda/ModalPreImportarPptx.tsx`
+**Tipo:** Client Component / Dialog
+**Uso:** aberto pelo botão de upload da `SidebarSlides` depois de selecionar um `.pptx`. Busca a prévia (`POST .../pptx-preview`, não grava nada), renderiza cada slide extraído de verdade via `RenderComponente` (reaproveitado isolado — confirmado que não depende de contexto do editor) num palco escalado (`transform: scale()`, mesma técnica do Modo Apresentação), permite marcar slides pra remover, e só no "Confirmar" reenvia o arquivo original + índices excluídos pra `POST .../importar-pptx` (aí sim grava).
+
+**Última atualização:** 2026-08-07
+
+**Última atualização:** 2026-08-06
+
+### GuiaModuloTour (Guia Inteligente de Módulo)
+
+**Arquivo:** `src/components/Guias/GuiaModuloTour.tsx` + `src/lib/guias/tutorial-modulo.ts`
+**Tipo:** Client Component + helper puro
+**Props:** `aberto`, `config`, `accent`, `onFinalizar`
+
+**Uso:** o módulo define um `ConfigTutorialModulo` estável com `modulo`, `versao`, `titulo` e passos (`id`, `seletor`, `titulo`, `descricao`). A página marca elementos com seletores `data-guia-*`, verifica `tutorialModuloFoiVisto()` na primeira hidratação, abre o componente quando necessário e chama `marcarTutorialModuloComoVisto()` ao pular/concluir. Um botão separado reabre o tour.
+
+**Notas:** filtra alvos ausentes antes de iniciar; acompanha resize e qualquer container com scroll; centraliza suavemente o alvo fora da viewport; usa quatro painéis escuros para criar recorte real do spotlight; respeita reduced motion e Escape. A persistência é local, versionada e por usuário. Primeira integração: `ParceirosClient.tsx`, com passos de cadastro, indicação, ações, pendências do Metas, filtros e detalhe.
+
+**Última atualização:** 2026-08-07 por Scribe
