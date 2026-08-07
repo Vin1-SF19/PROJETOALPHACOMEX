@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText, Link2, UserPlus,
-  MoreHorizontal, Search, Crown, Gem, Square, Users, Bell, Building2, Phone, ArrowRight, Clock3, CircleHelp,
+  MoreHorizontal, Search, Crown, Gem, Square, Users, Bell, CircleHelp,
 } from "lucide-react";
 import { toast } from "sonner";
 import ParceiroCard, { type CardParceiro } from "./ParceiroCard";
@@ -26,6 +26,7 @@ import AnimatedShaderBackground from "@/components/ui/animated-shader-background
 import { BotaoVideoIntrodutorio } from "@/components/VideoIntrodutorio/BotaoVideoIntrodutorio";
 import type { ParceiroPendenteCadastro } from "@/lib/comercial/parceiro-nao-cadastrado";
 import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
+import { GavetaParceirosPendentes } from "./GavetaParceirosPendentes";
 import {
   marcarTutorialModuloComoVisto,
   tutorialModuloFoiVisto,
@@ -80,7 +81,7 @@ const TUTORIAL_PARCEIROS: ConfigTutorialModulo = {
       id: "pendentes",
       seletor: '[data-guia-parceiros="pendentes-metas"]',
       titulo: "Finalize parceiros vindos do Metas",
-      descricao: "Cards em destaque indicam parceiros ainda não cadastrados. Abra Finalizar cadastro, complete os dados e o sistema fará o vínculo com o contrato de origem.",
+      descricao: "A gaveta mostra quantos parceiros ainda não foram cadastrados. Abra-a, escolha Finalizar cadastro e complete os dados para fazer o vínculo com o contrato de origem.",
     },
     {
       id: "filtros",
@@ -459,72 +460,7 @@ export default function ParceirosClient({
           </div>
         </motion.header>
 
-        {parceirosPendentesCadastro.length > 0 && (
-          <section
-            data-guia-parceiros="pendentes-metas"
-            aria-labelledby="parceiros-pendentes-titulo"
-            className="rounded-3xl p-5 lg:p-6 space-y-4"
-            style={{
-              background: "linear-gradient(135deg, rgba(245,158,11,0.16), rgba(120,53,15,0.08))",
-              border: "1px solid rgba(245,158,11,0.42)",
-              boxShadow: "0 18px 55px rgba(120,53,15,0.18)",
-            }}
-          >
-            <div className="flex items-start sm:items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl grid place-items-center bg-amber-500/15 border border-amber-400/35 shrink-0">
-                <AlertTriangle size={18} className="text-amber-300" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 id="parceiros-pendentes-titulo" className="text-sm font-black uppercase tracking-widest text-amber-100">
-                  Parceiros não cadastrados
-                </h2>
-                <p className="text-[10px] text-amber-200/65 mt-1">
-                  Indicações registradas no Alpha Metas aguardando finalização manual.
-                </p>
-              </div>
-              <span className="min-w-7 h-7 px-2 rounded-full grid place-items-center bg-amber-400 text-amber-950 text-[11px] font-black">
-                {parceirosPendentesCadastro.length}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {parceirosPendentesCadastro.map((pendencia) => (
-                <article
-                  key={pendencia.contratoId}
-                  className="rounded-2xl p-4 bg-[#0a1020]/85 border border-amber-400/25 flex flex-col gap-3"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl grid place-items-center bg-amber-500/10 shrink-0">
-                      <UserPlus size={16} className="text-amber-300" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-black text-white truncate">{pendencia.nome}</p>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-400 mt-0.5">Não cadastrado</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 text-[11px] text-slate-400">
-                    {pendencia.empresa && (
-                      <p className="flex items-center gap-2"><Building2 size={12} className="text-slate-500 shrink-0" /><span className="truncate">{pendencia.empresa}</span></p>
-                    )}
-                    {pendencia.telefone && (
-                      <p className="flex items-center gap-2"><Phone size={12} className="text-slate-500 shrink-0" /><span>{pendencia.telefone}</span></p>
-                    )}
-                    <p className="flex items-center gap-2"><Handshake size={12} className="text-slate-500 shrink-0" /><span className="truncate">Indicou {pendencia.clienteNomeFantasia || pendencia.clienteRazaoSocial}</span></p>
-                    <p className="flex items-center gap-2"><Clock3 size={12} className="text-slate-500 shrink-0" /><span>Registrado em {new Date(pendencia.criadoEm).toLocaleDateString("pt-BR")}</span></p>
-                  </div>
-
-                  <Link
-                    href={`/PainelAlpha/Parceiros/novo?origemContratoId=${encodeURIComponent(pendencia.contratoId)}`}
-                    className="mt-auto h-10 px-3 rounded-xl flex items-center justify-center gap-2 bg-amber-400 text-amber-950 text-[10px] font-black uppercase tracking-wider hover:bg-amber-300 transition-colors"
-                  >
-                    Finalizar cadastro <ArrowRight size={13} />
-                  </Link>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
+        <GavetaParceirosPendentes pendencias={parceirosPendentesCadastro} accent={accent} />
 
         {/* Barra do modo exclusão */}
         {modoExclusao && (

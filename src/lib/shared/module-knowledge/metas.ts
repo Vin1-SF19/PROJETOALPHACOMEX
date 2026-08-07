@@ -70,9 +70,10 @@ O cliente do CS & NPS é criado ou reativado somente quando o pagamento/fechamen
       conteudo: `1. No formulário do lead/contrato, escolha **Indicação de parceiros** no canal de aquisição.
 2. Ao final da lista, selecione **Outro parceiro / Não cadastrado**.
 3. Informe o nome do parceiro (obrigatório). Empresa e telefone são opcionais.
-4. Salve o lead. O sistema não cria um parceiro incompleto.
-5. No módulo Parceiros, responsáveis com permissão de edição verão um card destacado.
-6. Clique em **Finalizar cadastro**, revise os dados pré-preenchidos e conclua o cadastro manual. O parceiro será vinculado ao contrato.`,
+4. Se quiser cancelar, clique novamente no mesmo botão **Outro parceiro / Não cadastrado** para voltar à lista de parceiros cadastrados.
+5. Salve o lead. O sistema não cria um parceiro incompleto.
+6. No módulo Parceiros, responsáveis com permissão de edição verão a pendência na gaveta de cadastros.
+7. Abra a gaveta, clique em **Finalizar cadastro**, revise os dados pré-preenchidos e conclua o cadastro manual. O parceiro será vinculado ao contrato.`,
     },
     {
       id: "justificativa-meta",

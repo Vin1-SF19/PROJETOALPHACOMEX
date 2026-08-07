@@ -70,11 +70,12 @@ Se o cliente ainda não existe, cadastre o lead/contrato no Alpha Metas e confir
       id: "finalizar-pendente-metas",
       titulo: "Finalizar parceiro não cadastrado vindo do Alpha Metas",
       aliases: ["pendente do metas", "parceiro pendente", "não cadastrado", "finalizar cadastro"],
-      conteudo: `1. No topo do dashboard, localize **Parceiros não cadastrados**.
-2. O card mostra nome, empresa/telefone disponíveis, cliente indicado e data.
-3. Clique em **Finalizar cadastro**.
-4. Revise os dados pré-preenchidos e complete o cadastro manual.
-5. Ao salvar, o parceiro é criado e vinculado ao contrato de origem. Se o contrato já estava fechado, a indicação ao cliente também é regularizada.`,
+      conteudo: `1. No topo do dashboard, localize a gaveta **Parceiros aguardando cadastro**. O contador mostra quantas pendências existem.
+2. Clique na gaveta para expandir. Quando houver muitos itens, use a rolagem dentro da própria gaveta.
+3. Cada card mostra nome, empresa/telefone disponíveis, cliente indicado e data.
+4. Clique em **Finalizar cadastro**.
+5. Revise os dados pré-preenchidos e complete o cadastro manual.
+6. Ao salvar, o parceiro é criado e vinculado ao contrato de origem. Se o contrato já estava fechado, a indicação ao cliente também é regularizada.`,
     },
     {
       id: "detalhe-edicao",

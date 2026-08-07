@@ -40,6 +40,11 @@ import { construirSvgFormaColorida, construirSvgImagemRecortada, extrairGeometri
  * - Fonte (`fontFamily`) do texto — DETECTADA e reportada em `fontesNaoAplicadas` (nunca trocada
  *   silenciosamente pela fonte padrão do sistema), mas não aplicada — o componente `texto` do
  *   Alpha Motion não tem campo `fontFamily`.
+ * - `flipH`/`flipV` (espelhamento) — DETECTADO e reportado no campo `geometria` do diagnóstico
+ *   quando presente, mas não aplicado — nem `imagem` nem `caixa` têm campo de flip no schema de
+ *   componente. Aplicar de verdade exigiria mudança de schema + render engine, fora do escopo
+ *   de "corrigir o importador". No arquivo de regressão usado nesta correção, todo `flipH`/`flipV`
+ *   está `false` (confirmado por inspeção direta), então não há impacto visual conhecido hoje.
  * - Rich text por TRECHO — o componente `texto` guarda 1 estilo por caixa inteira (não por run);
  *   usa cor/tamanho/negrito do 1º run que os definir pra caixa toda.
  * - `<a:arcTo>` dentro de `custGeom` — convertido pra arco elíptico SVG via geometria analítica
@@ -95,6 +100,12 @@ interface RetanguloBruto {
   off: { x: number; y: number };
   ext: { cx: number; cy: number };
   rot: number;
+  flipH: boolean;
+  flipV: boolean;
+}
+
+function lerFlagBooleana(valor: unknown): boolean {
+  return valor === "1" || valor === 1 || valor === "true" || valor === true;
 }
 
 function lerXfrmBruto(spPr: NoXml | undefined): RetanguloBruto | null {
@@ -107,7 +118,10 @@ function lerXfrmBruto(spPr: NoXml | undefined): RetanguloBruto | null {
   const cy = extrairNumero(ext?.["@_cy"]);
   if (x === null || y === null || cx === null || cy === null) return null;
   const rotBruto = extrairNumero(xfrm?.["@_rot"]);
-  return { off: { x, y }, ext: { cx, cy }, rot: rotBruto !== null ? rotBruto / 60000 : 0 };
+  return {
+    off: { x, y }, ext: { cx, cy }, rot: rotBruto !== null ? rotBruto / 60000 : 0,
+    flipH: lerFlagBooleana(xfrm?.["@_flipH"]), flipV: lerFlagBooleana(xfrm?.["@_flipV"]),
+  };
 }
 
 /** Lê o `<a:xfrm>` da forma; se ausente, tenta herdar posição/tamanho do placeholder correspondente no layout. */
@@ -328,11 +342,15 @@ async function processarShape(
   const temCustGeom = Boolean(spPr?.["a:custGeom"]);
   const prst = spPr?.["a:prstGeom"]?.["@_prst"];
   const geometria = temCustGeom ? extrairGeometriaCustGeom(xmlShapeCru) : null;
-  const descricaoGeometria = temCustGeom
+  const baseGeometria = temCustGeom
     ? geometria
       ? `custGeom ${geometria.ehRetangulo ? "retangular" : `path (${geometria.viewBoxW}x${geometria.viewBoxH})`}`
       : "custGeom ilegível (sem <a:path> reconhecível)"
     : typeof prst === "string" ? `prstGeom:${prst}` : "sem geometria declarada";
+  // Componente `imagem`/`caixa` do Alpha Motion não tem campo de flip — em vez de aplicar
+  // silenciosamente sem efeito, o flip detectado fica visível no diagnóstico (posição/imagem
+  // continuam corretas, só o espelhamento não é reproduzido).
+  const descricaoGeometria = baseGeometria + (bruto.flipH || bruto.flipV ? ` [flip${bruto.flipH ? "H" : ""}${bruto.flipV ? "V" : ""} detectado, não suportado pelo schema]` : "");
 
   // 1) Imagem usada como preenchimento da forma — com ou sem recorte por custGeom.
   if (spPr?.["a:blipFill"]) {
@@ -411,9 +429,10 @@ async function processarImagem(
   }
 
   const { x, y, w, h, rotacao } = converterComTransform(bruto, transform, escalaInfo);
+  const notaFlip = bruto.flipH || bruto.flipV ? `flip${bruto.flipH ? "H" : ""}${bruto.flipV ? "V" : ""} detectado, não suportado pelo schema` : null;
   return {
     forma: { tipo: "imagem", x, y, w, h, rotacao, bytes: asset.bytes, mimeType: asset.mimeType, nomeArquivo: asset.caminhoMedia.split("/").pop() ?? "imagem" },
-    motivo: null, fillEncontrado: "blipFill", relationshipId: rEmbed ?? null, assetResolvido: asset.caminhoMedia, geometria: null,
+    motivo: null, fillEncontrado: "blipFill", relationshipId: rEmbed ?? null, assetResolvido: asset.caminhoMedia, geometria: notaFlip,
   };
 }
 
@@ -448,7 +467,7 @@ function processarTabela(
   if (linhasTexto.length === 0) return null;
 
   const [colunas, ...linhas] = linhasTexto;
-  const { x: px, y: py, w, h, rotacao } = converterComTransform({ off: { x, y }, ext: { cx, cy }, rot: 0 }, transform, escalaInfo);
+  const { x: px, y: py, w, h, rotacao } = converterComTransform({ off: { x, y }, ext: { cx, cy }, rot: 0, flipH: false, flipV: false }, transform, escalaInfo);
   return { tipo: "tabela", x: px, y: py, w, h, rotacao, colunas, linhas };
 }
 

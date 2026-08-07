@@ -1778,3 +1778,44 @@ O padrão foi batizado **Guia Inteligente de Módulo**. Pedido futuro curto: “
 **Validação focada:** 11/11 testes novos e lint dos arquivos da feature aprovados. Typecheck global manteve somente erros preexistentes em Exclusão Fiscal, Habilitação RADAR e fila do Google Calendar.
 
 **Última atualização:** 2026-08-07 por Kowalski
+
+---
+
+## [2026-08-07] — Importador PPTX: correção profunda de interpretação OOXML (arquivo real de 18 slides)
+
+**Tags:** #bugfix #integration #decision
+**Arquivos tocados:** `src/lib/apresentacoes/pptx/ordem-xml.ts` (novo), `src/lib/apresentacoes/pptx/geometria.ts` (novo), `src/lib/apresentacoes/pptx/parser.ts` (reescrito), `src/lib/apresentacoes/pptx/tipos.ts`, `src/lib/apresentacoes/pptx/xml-utils.ts`, `src/lib/apresentacoes/pptx/tema.ts`, `src/lib/apresentacoes/pptx/mapear.ts`, `tests/apresentacoes/pptx-parser.test.ts`
+
+### Contexto
+O usuário reportou, com um `.pptx` real de 18 slides, que o importador (implementado em rounds anteriores desta mesma sessão, validado só com XML sintético) ainda vinha "sem as imagens e sem as formatações certas". Trouxe um diagnóstico técnico próprio e específico: o arquivo real usa `<a:blipFill>` dentro de `<p:sp>` pra imagem (nunca `<p:pic>`), com `<asvg:svgBlip>` como alternativa vetorial, e `<a:custGeom>` em vez de `<a:prstGeom>` na maioria das formas — nenhum dos dois reconhecido pelo parser existente, que classificava tudo isso como "forma sem texto/preenchimento reconhecido" e descartava.
+
+### O que foi feito
+- Inspeção direta do `.pptx` real do usuário (unzip + grep/python) confirmou 100% do diagnóstico do usuário: zero `<p:pic>` nos slides 2/3/4; `blipFill` dentro de `<p:sp>` com `asvg:svgBlip` resolvendo via `.rels` pra PNG+SVG; `custGeom` variando de retângulo simples (slide 10) a curvas reais via `cubicBezTo` (fotos de especialista do slide 3); e um bug de z-order real — `<p:spTree>` do slide 3 tem 14 `<p:grpSp>` seguidos de 52 `<p:sp>` no XML, mas o parser processava todos os `sp` antes de todos os `grpSp` (`fast-xml-parser` agrupa por tag, perde ordem entre tipos diferentes).
+- `ordem-xml.ts`: scanner de texto XML cru (regex+pilha) que reconstrói a árvore de ordem REAL entre `p:sp`/`p:pic`/`p:grpSp`/`p:graphicFrame`/`p:cxnSp`, com offsets de início/fim de cada nó. `ConsumidorPorTipo` zipa os arrays já parseados (agrupados por tag) de volta na sequência certa; `xmlDoNo` fatia o XML cru de 1 shape específico pra reprocessamento independente.
+- `geometria.ts`: scanner sequencial de comandos `moveTo`/`lnTo`/`cubicBezTo`/`quadBezTo`/`arcTo`/`close` dentro de `<a:path>` (também teria a ordem embaralhada pelo `fast-xml-parser` normal, de forma ainda pior — desenharia a forma errada, não só posicionada errado). Converte pra `d` de SVG; detecta o caso comum de retângulo exportado como `custGeom` (evita SVG desnecessário); gera SVG com `clipPath` (imagem recortada) ou path colorido (fallback de forma sem card nativo).
+- `parser.ts` reescrito: `processarArvoreFormas` agora itera a ordem real (via `ordem-xml.ts`) em vez de "todos os sp, depois todos os pic..."; novo `processarShape` reconhece `<a:blipFill>` em `<p:sp>` (com `resolverBlipPreferido` compartilhado escolhendo `svgBlip` sobre raster), decide entre card nativo/SVG recortado/SVG colorido conforme a geometria; `p:cxnSp` agora é CONTADO em `ignorados` em vez de silenciosamente nunca iterado; toda forma não aproveitada ganha um motivo específico (nome da forma + geometria + fill encontrado) em vez da mensagem genérica antiga; fontes usadas (`<a:latin typeface>`) detectadas e reportadas em `fontesNaoAplicadas`; `flipH`/`flipV` detectados e expostos no diagnóstico (não aplicados — schema sem campo de flip); diagnóstico estruturado por elemento (`slide`, `shapeId`, `nome`, `tipoOoxml`, `fillEncontrado`, `relationshipId`, `assetResolvido`, `grupoPai`, `geometria`, `motivoFallback`) logado por slide via `console.info`.
+- `mapear.ts`: `objectFit` de imagem trocado de `"contain"` pra `"cover"` — `<a:stretch><a:fillRect/></a:stretch>` (o caso comum, sem crop) sempre preenche o quadro por completo no PowerPoint, "contain" deixaria barras vazias.
+- Validação em 2 camadas: (1) 8 testes vitest novos com XML sintético controlado (blipFill+svgBlip+custGeom retangular/curvo, ordem intercalada sp→pic→grupo→sp, detecção de fonte, motivo específico, cxnSp contado) — 14/14 passando; (2) rodado o parser de verdade via `npx tsx` direto contra o `.pptx` real de 18 slides do usuário (não só leitura de código) — slide 10 deixou de ficar vazio, as 14 fotos de especialista do slide 3 apareceram recortadas, slides 2/4 com fundo+ícones em blipFill/svgBlip extraídos corretamente, 0 exceções em qualquer slide, 0 elementos "não pareados" entre ordem real e árvore parseada.
+
+### Decisões tomadas
+- `custGeom` colorido (sem imagem) sem componente nativo pro path arbitrário vira SVG com o path preenchido — reaproveita a mesma infraestrutura do recorte de imagem, em vez de inventar um novo tipo de componente no schema.
+- Flip (`flipH`/`flipV`) e fonte (`fontFamily`) DETECTADOS e reportados, mas não aplicados — schema de componente não tem campo pra nenhum dos dois; aplicar de verdade exigiria mudança de schema + render engine, escopo maior que "corrigir o importador". Mesmo raciocínio de "nunca substituir/descartar em silêncio" já usado em rounds anteriores desta sessão.
+- `srcRect` (crop em pixel) não implementado — sem lib de processamento de imagem no servidor; `objectFit:"cover"` é a aproximação escolhida (preenche sem distorcer, não recorta exato).
+
+### Problemas encontrados / resolvidos
+- `grep -c` contava LINHAS, não ocorrências — XML real do PowerPoint é minificado em 1 linha só, então `grep -c` subestimava drasticamente contagens de `blipFill`/`custGeom` durante a investigação. Corrigido pra `grep -o | wc -l`.
+- `EPERM` do `prisma generate` no Windows durante o Forge — causa já catalogada em `known-errors.md` (dev server do usuário rodando em paralelo trava o `.dll.node`). Confirmado via inspeção de processo (não presumido) que era o `next dev` do próprio usuário; não derrubado. Contornado com o workaround já documentado (`next build` direto, pulando `prisma generate`, já que nenhuma mudança tocou `schema.prisma`) — `next build` completo passou limpo.
+- Teste `tests/google-calendar/cli.test.ts` falha por timeout só quando a suíte inteira roda em paralelo (confirmado passando isolado) — pré-existente, não relacionado, não investigado a fundo (fora do escopo desta sessão).
+
+### Pendências (fora do escopo desta correção, honestamente listadas)
+- Comparação visual real contra o PowerPoint original (LibreOffice headless ou equivalent) — ferramenta não disponível neste ambiente. Toda validação foi estrutural (posição/imagem/cor/z-index corretos nos dados) mais uma heurística de texto sobreposto (bounding box quase idêntico, sem achados nos 18 slides) — não é prova visual.
+- Rich text por TRECHO (múltiplos estilos num mesmo parágrafo) — schema de `texto` só guarda 1 estilo por caixa inteira, limitação pré-existente não resolvida.
+- `fontFamily`/`flipH`/`flipV` detectados mas não aplicados — precisaria de mudança de schema (`slide-componentes.ts`) + render engine, não só o importador.
+- `gradFill`/`pattFill` (gradiente/padrão) em forma sem equivalente no schema — mesmo fallback SVG do `custGeom` colorido seria aplicável, não implementado nesta passada.
+- `arcTo` dentro de `custGeom` convertido analiticamente pra arco SVG, mas sem nenhum exemplo real no arquivo de regressão pra confirmar visualmente — tratar como best-effort.
+
+### Refletido também em
+- `integration-points.md`: seção "Importação de PPTX" reescrita com a arquitetura nova (`ordem-xml.ts`+`geometria.ts`), causa raiz real, escopo atualizado e validação com arquivo real.
+- `known-errors.md`: nenhuma entrada nova — o EPERM do Prisma já estava catalogado com o workaround exato usado.
+
+**Última atualização:** 2026-08-07

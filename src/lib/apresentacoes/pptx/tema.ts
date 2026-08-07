@@ -235,6 +235,12 @@ interface RetanguloEmuBruto {
   off: { x: number; y: number };
   ext: { cx: number; cy: number };
   rot: number;
+  flipH: boolean;
+  flipV: boolean;
+}
+
+function lerFlagBooleana(valor: unknown): boolean {
+  return valor === "1" || valor === 1 || valor === "true" || valor === true;
 }
 
 function lerXfrmBruto(spPr: NoXml | undefined): RetanguloEmuBruto | null {
@@ -247,7 +253,10 @@ function lerXfrmBruto(spPr: NoXml | undefined): RetanguloEmuBruto | null {
   const cy = Number(ext?.["@_cy"]);
   if (![x, y, cx, cy].every(Number.isFinite)) return null;
   const rot = Number(xfrm?.["@_rot"]);
-  return { off: { x, y }, ext: { cx, cy }, rot: Number.isFinite(rot) ? rot : 0 };
+  return {
+    off: { x, y }, ext: { cx, cy }, rot: Number.isFinite(rot) ? rot : 0,
+    flipH: lerFlagBooleana(xfrm?.["@_flipH"]), flipV: lerFlagBooleana(xfrm?.["@_flipV"]),
+  };
 }
 
 /**

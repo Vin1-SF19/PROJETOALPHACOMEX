@@ -244,6 +244,21 @@ function FormNovoContrato({
     const [parceiroDetalhe, setParceiroDetalhe] = useState<ParceiroDetalheSimples | null>(null);
     const [carregandoParceiroDetalhe, setCarregandoParceiroDetalhe] = useState(false);
     const [parceiroDetalheAberto, setParceiroDetalheAberto] = useState(false);
+
+    const alternarParceiroNaoCadastrado = () => {
+        if (parceiroNaoCadastrado) {
+            setParceiroNaoCadastrado(false);
+            setParceiroPendenteNome("");
+            setParceiroPendenteEmpresa("");
+            setParceiroPendenteTelefone("");
+            return;
+        }
+
+        setParceiroNaoCadastrado(true);
+        setIndicadoPorParceiroId(null);
+        setParceiroDetalhe(null);
+        setParceiroDetalheAberto(false);
+    };
     const [closerNome, setCloserNome] = useState(initialData?.closerNome ?? nomeUsuario ?? "");
     const [closerCustom, setCloserCustom] = useState("");
     const [mostraCloserCustom, setMostraCloserCustom] = useState(false);
@@ -737,10 +752,10 @@ function FormNovoContrato({
                             <button
                                 type="button"
                                 aria-pressed={parceiroNaoCadastrado}
-                                onClick={() => {
-                                    setParceiroNaoCadastrado(true);
-                                    setIndicadoPorParceiroId(null);
-                                }}
+                                aria-label={parceiroNaoCadastrado
+                                    ? "Cancelar parceiro não cadastrado e voltar para a lista de parceiros"
+                                    : "Informar um parceiro ainda não cadastrado"}
+                                onClick={alternarParceiroNaoCadastrado}
                                 className={`w-full min-h-12 px-3 py-2.5 rounded-xl border text-left transition-all flex items-center gap-3 ${
                                     parceiroNaoCadastrado
                                         ? "border-amber-400/70 bg-amber-500/20 text-amber-100 shadow-[0_0_24px_rgba(245,158,11,0.16)]"
@@ -750,13 +765,36 @@ function FormNovoContrato({
                                 <AlertTriangle size={17} className="shrink-0" />
                                 <span className="flex-1">
                                     <span className="block text-[11px] font-black uppercase tracking-wider">Outro parceiro / Não cadastrado</span>
-                                    <span className="block text-[9px] mt-0.5 opacity-75">Gera uma pendência destacada no módulo de Parceiros</span>
+                                    <span className="block text-[9px] mt-0.5 opacity-80">
+                                        {parceiroNaoCadastrado
+                                            ? "Selecionado · clique novamente para cancelar"
+                                            : "Gera uma pendência destacada no módulo de Parceiros"}
+                                    </span>
                                 </span>
-                                {parceiroNaoCadastrado && <Check size={16} className="shrink-0" />}
+                                {parceiroNaoCadastrado && (
+                                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-amber-300 text-amber-950">
+                                        <X size={15} strokeWidth={2.5} />
+                                    </span>
+                                )}
                             </button>
 
                             {parceiroNaoCadastrado && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
+                                    <div
+                                        role="status"
+                                        className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-amber-300/45 bg-amber-400/15 px-3 py-3 shadow-[0_8px_24px_rgba(245,158,11,0.12)]"
+                                    >
+                                        <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-300" />
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-amber-100">
+                                                Parceiro não cadastrado ativo
+                                            </p>
+                                            <p className="mt-1 text-[10px] font-semibold leading-relaxed text-amber-100/75">
+                                                Para cancelar e voltar à lista de parceiros cadastrados, clique novamente em
+                                                <span className="font-black text-amber-100"> Outro parceiro / Não cadastrado</span> acima.
+                                            </p>
+                                        </div>
+                                    </div>
                                     <div className="sm:col-span-2">
                                         <label className={labelCls}>Nome do parceiro *</label>
                                         <input
@@ -788,13 +826,6 @@ function FormNovoContrato({
                                             className={inputCls}
                                         />
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setParceiroNaoCadastrado(false)}
-                                        className="sm:col-span-2 text-[10px] font-bold text-slate-500 hover:text-slate-300 transition-colors"
-                                    >
-                                        Voltar para a lista de parceiros cadastrados
-                                    </button>
                                 </div>
                             )}
 

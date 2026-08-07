@@ -35,6 +35,8 @@ quality_gate_tools:
 7. Ao concluir o cadastro, o novo parceiro é vinculado ao contrato comercial em uma operação consistente; o card deixa de ser listado e o fluxo normal de indicação permanece disponível quando o contrato for fechado.
 8. Edição de contrato alternando entre parceiro cadastrado, não cadastrado e outro canal remove os dados temporários que não forem mais aplicáveis.
 9. A entrega não adiciona rota, item de menu, permissão, variável de ambiente ou migration.
+10. A opção `Outro parceiro / Não cadastrado` funciona como alternância: um segundo clique cancela o modo, volta à lista de parceiros cadastrados e o aviso explica essa ação com destaque.
+11. As pendências no módulo Parceiros ficam em uma gaveta compacta e recolhível, alinhada ao visual do Painel Alpha, com contador e área rolável quando houver muitos itens.
 
 ## Tasks / Subtasks
 
@@ -58,6 +60,11 @@ quality_gate_tools:
   - [x] Rodar testes focados.
   - [x] Rodar `npm run lint`, `npm run typecheck`, `npm test` e `npm run build`.
   - [x] Atualizar checklist, File List e notas de conclusão desta story.
+- [x] Task 6 — Refinamento visual e escalabilidade (AC: 10, 11)
+  - [x] Transformar a opção de parceiro não cadastrado em controle reversível no mesmo botão.
+  - [x] Substituir o retorno discreto por um aviso destacado com instrução de cancelamento.
+  - [x] Extrair a listagem de pendências para uma gaveta compacta, recolhível e com rolagem interna.
+  - [x] Rodar os quality gates proporcionais e atualizar File List e notas.
 
 ## Dev Notes
 
@@ -91,6 +98,7 @@ quality_gate_tools:
 | 2026-08-07 | 1.0 | Story criada a partir do pedido e do blueprint Scout | River (SM) |
 | 2026-08-07 | 1.1 | Story iniciada para implementação | Dex (Dev) |
 | 2026-08-07 | 1.2 | Fluxo completo implementado, testado e preparado para revisão | Dex (Dev) |
+| 2026-08-07 | 1.3 | Refinamento visual solicitado: alternância no Metas e gaveta de pendências em Parceiros | Dex (Dev) |
 
 ## Dev Agent Record
 
@@ -107,6 +115,10 @@ GPT-5 Codex (Dex / Builder).
 - `npm run lint` — excedeu 180 segundos sem emitir diagnóstico; lint focado aprovado.
 - `npm run build` — bloqueado no `prisma generate` por DLL do Prisma em uso (`EPERM`); `npm run build:player` e `npx next build` passaram, com 70 páginas geradas.
 - CodeRabbit — não executado porque WSL não está instalado; degradação prevista pelo skill.
+- Refinamento visual: lint focado sem erros (mantém somente o warning preexistente em `ModalGerenciamentoLeads.tsx:1560`) e 25/25 testes focados aprovados.
+- Suíte completa após o refinamento: 932/933 testes aprovados; o único timeout foi novamente `tests/google-calendar/cli.test.ts`, aprovado 2/2 quando executado isoladamente.
+- `npm run typecheck` após o refinamento manteve somente os quatro erros preexistentes em Exclusão Fiscal, Habilitação RADAR e `google-calendar/sync-queue.test.ts`; nenhum erro nos arquivos alterados.
+- `npm run lint` global permaneceu sem emitir diagnósticos por mais de 90 segundos e foi interrompido; o lint focado dos cinco arquivos de código da entrega foi concluído com zero erros.
 
 ### Completion Notes List
 
@@ -115,6 +127,9 @@ GPT-5 Codex (Dex / Builder).
 - O módulo Parceiros lista somente pendências para quem possui `podeEditar` e abre o cadastro com dados server-side pré-preenchidos.
 - Cadastro e vínculo usam transação com proteção contra concorrência. Contrato já fechado também cria a indicação retroativa; conflitos revertem toda a operação.
 - Nenhuma migration, dependência, variável de ambiente, rota, menu ou permissão foi adicionada.
+- O controle de parceiro não cadastrado agora é reversível no mesmo botão, limpa o rascunho ao cancelar e apresenta uma instrução destacada.
+- As pendências foram movidas para uma gaveta recolhida por padrão, com contador, animação respeitando reduced motion e rolagem interna limitada a 460px.
+- O tutorial de Parceiros e os manuais consultados pelo Bibble foram sincronizados com o novo comportamento.
 
 ### File List
 
@@ -126,6 +141,9 @@ GPT-5 Codex (Dex / Builder).
 - `src/actions/parceiros.ts`
 - `src/app/PainelAlpha/Parceiros/page.tsx`
 - `src/components/Parceiros/ParceirosClient.tsx`
+- `src/components/Parceiros/GavetaParceirosPendentes.tsx` (novo)
+- `src/lib/shared/module-knowledge/metas.ts`
+- `src/lib/shared/module-knowledge/parceiros.ts`
 - `src/app/PainelAlpha/Parceiros/novo/page.tsx`
 - `src/components/Parceiros/NovoParceiro.tsx`
 - `tests/metas/parceiro-nao-cadastrado.test.ts` (novo)

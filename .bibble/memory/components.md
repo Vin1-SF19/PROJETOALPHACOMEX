@@ -385,3 +385,14 @@
 **Notas:** filtra alvos ausentes antes de iniciar; acompanha resize e qualquer container com scroll; centraliza suavemente o alvo fora da viewport; usa quatro painéis escuros para criar recorte real do spotlight; respeita reduced motion e Escape. A persistência é local, versionada e por usuário. Primeira integração: `ParceirosClient.tsx`, com passos de cadastro, indicação, ações, pendências do Metas, filtros e detalhe.
 
 **Última atualização:** 2026-08-07 por Scribe
+
+### GavetaParceirosPendentes
+
+**Arquivo:** `src/components/Parceiros/GavetaParceirosPendentes.tsx`
+**Tipo:** Client Component
+**Props:** `pendencias: ParceiroPendenteCadastro[]`, `accent: string`
+**Uso:** renderizada em `ParceirosClient.tsx` antes dos filtros, com o seletor `data-guia-parceiros="pendentes-metas"` preservado para o Guia Inteligente.
+
+**Notas:** substitui o bloco amarelo sempre expandido por uma gaveta compacta, recolhida por padrão, com contador e animação acessível por `aria-expanded`/`aria-controls`. Ao abrir, exibe os mesmos links de finalização em uma grade com altura máxima de 460px e rolagem interna, evitando crescimento excessivo quando houver muitos parceiros pendentes. A cor primária segue o `accent` do tema; o âmbar fica restrito ao status de atenção.
+
+**Última atualização:** 2026-08-07 por Nova
