@@ -11,6 +11,7 @@ import type {
   IconeComponente,
   DivisorComponente,
 } from "@/lib/validations/slide-componentes";
+import { pilhaCssDaFonte } from "@/lib/apresentacoes/pptx/texto";
 import { AnimacaoWrapper } from "../nucleo";
 
 /**
@@ -80,6 +81,38 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
   const textoCounter = useCounterValue(valorFinalCounter, ehCounter, anim?.duracao ?? 1, anim?.delay ?? 0);
   const textoFinal = ehTyping ? textoTyping : ehCounter ? textoCounter : componente.texto;
 
+  const vertical = componente.verticalAlign === "middle" ? "center" : componente.verticalAlign === "bottom" ? "flex-end" : "flex-start";
+  const richContent = componente.richText?.paragraphs.map((paragraph, paragraphIndex) => (
+    <span
+      key={paragraphIndex}
+      style={{
+        display: "block",
+        textAlign: paragraph.alignment ?? componente.alinhamento ?? "left",
+        marginLeft: paragraph.marginLeft,
+        textIndent: paragraph.indent,
+        lineHeight: paragraph.lineSpacing ? `${paragraph.lineSpacing}%` : undefined,
+        marginTop: paragraph.spaceBefore,
+        marginBottom: paragraph.spaceAfter,
+      }}
+    >
+      {paragraph.bullet ? `${paragraph.bullet} ` : paragraph.numbering ? `${(paragraph.numbering.startAt ?? 1) + paragraphIndex}. ` : null}
+      {paragraph.runs.map((run, runIndex) => {
+        const style: React.CSSProperties = {
+          fontFamily: pilhaCssDaFonte(run.fontFamily),
+          fontSize: run.fontSize,
+          fontWeight: run.bold ? 700 : undefined,
+          fontStyle: run.italic ? "italic" : undefined,
+          textDecoration: [run.underline && run.underline !== "none" ? "underline" : "", run.strike && run.strike !== "noStrike" ? "line-through" : ""].filter(Boolean).join(" ") || undefined,
+          color: run.color,
+          letterSpacing: run.tracking,
+          verticalAlign: run.baseline ? `${run.baseline / 1000}%` : undefined,
+          textTransform: run.caps === "all" ? "uppercase" : run.caps === "small" ? "lowercase" : undefined,
+        };
+        return <span key={runIndex} style={style}>{run.text}</span>;
+      })}
+      {paragraphIndex < (componente.richText?.paragraphs.length ?? 0) - 1 ? "\n" : null}
+    </span>
+  ));
   const conteudo = (
     <Tag
       style={{
@@ -90,9 +123,23 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
         width: "100%",
         height: "100%",
         margin: 0,
+        fontFamily: pilhaCssDaFonte(componente.fontFamily),
+        fontStyle: componente.fontStyle,
+        textDecoration: componente.textDecoration,
+        lineHeight: componente.lineHeight,
+        letterSpacing: componente.letterSpacing,
+        padding: componente.padding
+          ? `${componente.padding.top}px ${componente.padding.right}px ${componente.padding.bottom}px ${componente.padding.left}px`
+          : undefined,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: vertical,
+        whiteSpace: componente.wrap === false ? "pre" : "pre-wrap",
+        overflow: componente.autofit === "shape" ? "visible" : "hidden",
+        boxSizing: "border-box",
       }}
     >
-      {textoFinal}
+      {componente.richText && !ehTyping && !ehCounter ? richContent : textoFinal}
     </Tag>
   );
 
@@ -101,6 +148,31 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
 }
 
 export function RenderImagem({ componente }: { componente: ImagemComponente }) {
+  if (componente.tile && componente.url) {
+    return <div role="img" aria-label={componente.alt ?? ""} style={{ width: "100%", height: "100%", backgroundImage: `url(${JSON.stringify(componente.url)})`, backgroundRepeat: "repeat" }} />;
+  }
+  if (componente.crop && componente.url) {
+    const visibleWidth = Math.max(0.001, 1 - componente.crop.left - componente.crop.right);
+    const visibleHeight = Math.max(0.001, 1 - componente.crop.top - componente.crop.bottom);
+    return (
+      <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- renderer compartilhado com export offline */}
+        <img
+          src={componente.url}
+          alt={componente.alt ?? ""}
+          style={{
+            position: "absolute",
+            width: `${100 / visibleWidth}%`,
+            height: `${100 / visibleHeight}%`,
+            left: `${(-componente.crop.left / visibleWidth) * 100}%`,
+            top: `${(-componente.crop.top / visibleHeight) * 100}%`,
+            objectFit: "fill",
+            display: "block",
+          }}
+        />
+      </div>
+    );
+  }
   return componente.url ? (
     // eslint-disable-next-line @next/next/no-img-element -- RenderEngine é genérico (também roda no Export estático), sem acesso garantido ao otimizador do next/image fora do App Router
     <img
@@ -176,5 +248,23 @@ export function RenderIcone({ componente }: { componente: IconeComponente }) {
 }
 
 export function RenderDivisor({ componente }: { componente: DivisorComponente }) {
-  return <div style={{ width: "100%", height: componente.espessura ?? 2, background: componente.cor ?? "#ffffff33" }} />;
+  const strokeDasharray = componente.estilo === "dot" ? "1 4" : componente.estilo === "dash" ? "8 5" : componente.estilo === "dashDot" ? "8 4 1 4" : undefined;
+  const markerId = `pptx-arrow-${componente.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true" style={{ display: "block", overflow: "visible" }}>
+      <defs>
+        <marker id={`${markerId}-end`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill={componente.cor ?? "#ffffff33"} /></marker>
+        <marker id={`${markerId}-start`} markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto-start-reverse"><path d="M8,0 L0,4 L8,8 Z" fill={componente.cor ?? "#ffffff33"} /></marker>
+      </defs>
+      <line
+        x1="0" y1="5" x2="100" y2="5"
+        stroke={componente.cor ?? "#ffffff33"}
+        strokeWidth={componente.espessura ?? 2}
+        strokeLinecap={componente.cap ?? "butt"}
+        strokeDasharray={strokeDasharray}
+        markerStart={componente.beginArrow && componente.beginArrow !== "none" ? `url(#${markerId}-start)` : undefined}
+        markerEnd={componente.endArrow && componente.endArrow !== "none" ? `url(#${markerId}-end)` : undefined}
+      />
+    </svg>
+  );
 }

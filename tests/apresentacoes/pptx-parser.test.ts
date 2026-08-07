@@ -240,6 +240,11 @@ describe("extrairApresentacaoPptx — herança de tema/layout/master, grupos e r
     expect(filhoGrupo.y).toBeCloseTo(315, 0);
     expect(filhoGrupo.w).toBeCloseTo(42, 0);
     expect(filhoGrupo.h).toBeCloseTo(42, 0);
+
+    const grupoIntermediario = resultado.intermediateModel.slides[0].elements.find((element) => element.type === "group");
+    expect(grupoIntermediario?.children).toHaveLength(1);
+    expect(grupoIntermediario?.children?.[0].transform.off).toEqual({ x: 500000, y: 500000 });
+    expect(grupoIntermediario?.children?.[0].transform.worldTransform.e).toBeCloseTo(3000000);
   });
 });
 
@@ -483,11 +488,11 @@ describe("extrairApresentacaoPptx — ordem real do documento, fontes detectadas
     expect(resultado.fontesNaoAplicadas).toContain("Open Sans");
   });
 
-  it("registra motivo ESPECÍFICO (com o nome da forma) pra forma sem fill/texto — nunca a mensagem genérica antiga", async () => {
+  it("ignora silenciosamente forma deliberadamente invisível sem fill/linha/texto", async () => {
     const resultado = await montar();
     const motivos = Object.keys(resultado.ignorados);
-    expect(motivos.some((m) => m.includes("FormaVazia"))).toBe(true);
-    expect(motivos).not.toContain("forma sem texto/preenchimento reconhecido");
+    expect(motivos.some((m) => m.includes("FormaVazia"))).toBe(false);
+    expect(resultado.diagnosticosDetalhados.find((item) => item.source.name === "FormaVazia")).toMatchObject({ severity: "INFO", result: "skipped" });
   });
 
   it("conta p:cxnSp (conector) em ignorados em vez de descartar em silêncio", async () => {

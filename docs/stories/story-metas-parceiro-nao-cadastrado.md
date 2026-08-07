@@ -37,6 +37,10 @@ quality_gate_tools:
 9. A entrega não adiciona rota, item de menu, permissão, variável de ambiente ou migration.
 10. A opção `Outro parceiro / Não cadastrado` funciona como alternância: um segundo clique cancela o modo, volta à lista de parceiros cadastrados e o aviso explica essa ação com destaque.
 11. As pendências no módulo Parceiros ficam em uma gaveta compacta e recolhível, alinhada ao visual do Painel Alpha, com contador e área rolável quando houver muitos itens.
+12. O Canal de Aquisição passa a oferecer `Prospecção ativa`.
+13. Na primeira utilização, o canal exibe um input obrigatório para descrever a prospecção e persiste o texto no campo existente do contrato, sem migration.
+14. Valores de prospecção previamente salvos ficam disponíveis em um select compartilhado nas próximas inclusões, sem duplicatas de caixa/espaçamento.
+15. Quando o catálogo já possuir itens, o usuário ainda consegue escolher `Adicionar nova prospecção` e alimentar uma nova opção.
 
 ## Tasks / Subtasks
 
@@ -65,6 +69,11 @@ quality_gate_tools:
   - [x] Substituir o retorno discreto por um aviso destacado com instrução de cancelamento.
   - [x] Extrair a listagem de pendências para uma gaveta compacta, recolhível e com rolagem interna.
   - [x] Rodar os quality gates proporcionais e atualizar File List e notas.
+- [x] Task 7 — Canal Prospecção ativa com catálogo incremental (AC: 12–15)
+  - [x] Criar constantes e normalização tipada do catálogo, com testes unitários.
+  - [x] Validar e persistir a descrição em `canalOutro` somente para o canal correto.
+  - [x] Listar valores distintos por Server Action autenticada, com select de reutilização e opção de novo valor.
+  - [x] Atualizar o conhecimento do Bibble, a memória técnica e executar os quality gates.
 
 ## Dev Notes
 
@@ -99,6 +108,7 @@ quality_gate_tools:
 | 2026-08-07 | 1.1 | Story iniciada para implementação | Dex (Dev) |
 | 2026-08-07 | 1.2 | Fluxo completo implementado, testado e preparado para revisão | Dex (Dev) |
 | 2026-08-07 | 1.3 | Refinamento visual solicitado: alternância no Metas e gaveta de pendências em Parceiros | Dex (Dev) |
+| 2026-08-07 | 1.4 | Novo canal Prospecção ativa com catálogo incremental solicitado | Dex (Dev) |
 
 ## Dev Agent Record
 
@@ -119,6 +129,11 @@ GPT-5 Codex (Dex / Builder).
 - Suíte completa após o refinamento: 932/933 testes aprovados; o único timeout foi novamente `tests/google-calendar/cli.test.ts`, aprovado 2/2 quando executado isoladamente.
 - `npm run typecheck` após o refinamento manteve somente os quatro erros preexistentes em Exclusão Fiscal, Habilitação RADAR e `google-calendar/sync-queue.test.ts`; nenhum erro nos arquivos alterados.
 - `npm run lint` global permaneceu sem emitir diagnósticos por mais de 90 segundos e foi interrompido; o lint focado dos cinco arquivos de código da entrega foi concluído com zero erros.
+- Prospecção ativa: lint focado em sete arquivos concluído sem erros e 19/19 testes de Metas/Bibble aprovados.
+- Suíte completa após o novo canal: 937/938 testes aprovados; `tests/google-calendar/cli.test.ts` excedeu o timeout de 5s na suíte e passou 2/2 isoladamente (4,35s de testes).
+- O typecheck global manteve erros externos em Exclusão Fiscal, RADAR, Notas e Google Calendar; nenhum diagnóstico nos arquivos desta entrega.
+- `npm run build` parou no `prisma generate` por DLL em uso (`EPERM`) e `build:player` encontrou o entrypoint ausente de Apresentações; `npx next build` compilou e gerou 70 páginas com sucesso.
+- O lint global da rodada de Prospecção ativa também excedeu 120 segundos sem emitir diagnósticos; a validação focada permanece a fonte concluída da entrega.
 
 ### Completion Notes List
 
@@ -130,6 +145,8 @@ GPT-5 Codex (Dex / Builder).
 - O controle de parceiro não cadastrado agora é reversível no mesmo botão, limpa o rascunho ao cancelar e apresenta uma instrução destacada.
 - As pendências foram movidas para uma gaveta recolhida por padrão, com contador, animação respeitando reduced motion e rolagem interna limitada a 460px.
 - O tutorial de Parceiros e os manuais consultados pelo Bibble foram sincronizados com o novo comportamento.
+- `Prospecção ativa` agora grava a descrição normalizada em `canalOutro`, reutiliza valores globais dos contratos existentes e permite alimentar novas opções sem tabela adicional.
+- O Bibble ganhou um tópico específico ensinando o input inicial, o select e a opção `Adicionar nova prospecção`.
 
 ### File List
 
@@ -137,7 +154,9 @@ GPT-5 Codex (Dex / Builder).
 - `plan/self-critique-story-metas-parceiro-pendente.json` (novo)
 - `src/lib/comercial/parceiro-nao-cadastrado.ts` (novo)
 - `src/actions/ContratoComercial.ts`
+- `src/lib/comercial/prospeccao-ativa.ts` (novo)
 - `src/components/comercial/ModalGerenciamentoLeads.tsx`
+- `src/components/comercial/CampoProspeccaoAtiva.tsx` (novo)
 - `src/actions/parceiros.ts`
 - `src/app/PainelAlpha/Parceiros/page.tsx`
 - `src/components/Parceiros/ParceirosClient.tsx`
@@ -147,7 +166,11 @@ GPT-5 Codex (Dex / Builder).
 - `src/app/PainelAlpha/Parceiros/novo/page.tsx`
 - `src/components/Parceiros/NovoParceiro.tsx`
 - `tests/metas/parceiro-nao-cadastrado.test.ts` (novo)
+- `tests/metas/prospeccao-ativa.test.ts` (novo)
+- `tests/bibble/module-knowledge.test.ts`
 - `tests/parceiros/responsavel.test.ts`
+- `.bibble/memory/architecture.md`
+- `.bibble/memory/components.md`
 
 ## QA Results
 

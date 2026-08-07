@@ -35,6 +35,15 @@ describe("catálogo de conhecimento modular do Bibble", () => {
     expect(resultado.conteudo).toContain("Alpha Metas");
   });
 
+  it("ensina o catálogo incremental de prospecção ativa", () => {
+    const resultado = consultarManualModulo("Alpha Metas", "prospecção ativa");
+    expect(resultado.sucesso).toBe(true);
+    if (!resultado.sucesso) return;
+
+    expect(resultado.conteudo).toContain("Adicionar nova prospecção");
+    expect(resultado.conteudo).toContain("catálogo compartilhado");
+  });
+
   it("cobre os fluxos críticos dos dois módulos", () => {
     const metas = consultarManualModulo("Alpha Metas");
     const parceiros = consultarManualModulo("Parceiros");

@@ -1,6 +1,204 @@
 "use server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
+import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
+import { normalizarDadosEmpresaBpm } from "@/lib/bpm/dados-empresa";
+
+function formatarCnpj(cnpj: string): string {
+  const digitos = cnpj.replace(/\D/g, "");
+  if (digitos.length !== 14) return cnpj;
+  return digitos.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+}
+
+/**
+ * Consolida, sem mutações, os dados da empresa usados por Pré-Análise, CS&NPS,
+ * Radar Fiscal e pelo próprio card. O ownership é validado antes de qualquer
+ * consulta aos dados empresariais.
+ */
+export async function ObterDadosEmpresaCardBpm(cardId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: null };
+    const userId = Number(session.user.id);
+
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+
+    const card = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: {
+        empresa: {
+          select: {
+            id: true,
+            status: true,
+            cnpj: true,
+            razaoSocial: true,
+            nomeFantasia: true,
+            dataConstituicao: true,
+            uf: true,
+            municipio: true,
+            regimeTributario: true,
+            servicos: true,
+            analistaResponsavel: true,
+            dataContratacao: true,
+            dataExito: true,
+            formaPagamento: true,
+            valorContrato: true,
+            closerNome: true,
+            origemLead: true,
+            canalAquisicao: true,
+            canalOutro: true,
+            socios: {
+              select: {
+                id: true,
+                nome: true,
+                telefone: true,
+                obs: true,
+                dataNascimento: true,
+                vinculo: true,
+              },
+            },
+          },
+        },
+        responsavel: { select: { nome: true } },
+        membros: {
+          select: {
+            role: true,
+            usuario: { select: { nome: true } },
+          },
+        },
+      },
+    });
+    if (!card) return { success: false, error: "Card não encontrado", data: null };
+
+    const cnpjLimpo = card.empresa.cnpj.replace(/\D/g, "");
+    const cnpjsPossiveis = Array.from(new Set([
+      card.empresa.cnpj,
+      cnpjLimpo,
+      formatarCnpj(cnpjLimpo),
+    ].filter(Boolean)));
+
+    const [registrosCs, pessoasVinculadas, preAnalise, radarFiscal] = await Promise.all([
+      db.clientes.findMany({
+        where: { cnpj: { in: cnpjsPossiveis } },
+        select: {
+          id: true,
+          status: true,
+          cnpj: true,
+          razaoSocial: true,
+          nomeFantasia: true,
+          dataConstituicao: true,
+          uf: true,
+          municipio: true,
+          regimeTributario: true,
+          servicos: true,
+          analistaResponsavel: true,
+          dataContratacao: true,
+          dataExito: true,
+          formaPagamento: true,
+          valorContrato: true,
+          closerNome: true,
+          origemLead: true,
+          canalAquisicao: true,
+          canalOutro: true,
+          socios: {
+            select: {
+              id: true,
+              nome: true,
+              telefone: true,
+              obs: true,
+              dataNascimento: true,
+              vinculo: true,
+            },
+          },
+        },
+        orderBy: { id: "asc" },
+      }),
+      db.socios.findMany({
+        where: {
+          OR: [
+            { clienteId: card.empresa.id },
+            { empresaVinculos: { some: { empresaId: card.empresa.id } } },
+          ],
+        },
+        select: {
+          id: true,
+          nome: true,
+          telefone: true,
+          obs: true,
+          dataNascimento: true,
+          vinculo: true,
+        },
+        orderBy: { nome: "asc" },
+      }),
+      cnpjLimpo.length === 14
+        ? db.consultaPreAnalise.findUnique({
+            where: { cnpj: cnpjLimpo },
+            select: {
+              regimeEA: true,
+              qualificacao: true,
+              submodalidade: true,
+              capitalSocial: true,
+              nomeResponsavel: true,
+              telefoneContato: true,
+              observacoes: true,
+              dadosBrutos: true,
+              updatedAt: true,
+            },
+          })
+        : Promise.resolve(null),
+      db.radar_fiscal.findFirst({
+        where: { cnpj: { in: cnpjsPossiveis } },
+        select: {
+          qualificacao: true,
+          situacao_cadastral: true,
+          data_abertura: true,
+          capital_social: true,
+          regime_receita: true,
+          regime_ea: true,
+          data_opcao_simples: true,
+          data_exclusao_simples: true,
+          divida_tributaria: true,
+          historico_regime: true,
+          cnaes: true,
+          qsa: true,
+          data_consulta: true,
+          perse_anexo: true,
+          perse: true,
+        },
+      }),
+    ]);
+
+    const papeis: Record<string, string> = {
+      RESPONSAVEL: "Responsável do card",
+      ADMINISTRADOR: "Administrador do card",
+      PARTICIPANTE: "Participante do card",
+    };
+    const responsaveisBpm = [
+      { nome: card.responsavel.nome, papel: "Responsável do card" },
+      ...card.membros.map((membro) => ({
+        nome: membro.usuario.nome,
+        papel: papeis[membro.role] || membro.role,
+      })),
+    ];
+
+    const data = normalizarDadosEmpresaBpm({
+      empresaPrincipal: card.empresa,
+      registrosCs: registrosCs.length > 0 ? registrosCs : [card.empresa],
+      pessoasVinculadas,
+      preAnalise,
+      radarFiscal,
+      responsaveisBpm,
+    });
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("[ObterDadosEmpresaCardBpm]", error);
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : "Erro ao buscar dados da empresa";
+    return { success: false, error: msg, data: null };
+  }
+}
 
 /**
  * Perfil consolidado de uma empresa (Empresa = `clientes`, D-049): todos os

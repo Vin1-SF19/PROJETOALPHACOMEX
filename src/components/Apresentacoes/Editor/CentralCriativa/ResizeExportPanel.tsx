@@ -30,7 +30,7 @@ export function ResizeExportPanel({ titulo, temaId, assets }: ResizeExportPanelP
   const [exportando, setExportando] = useState(false);
 
   function aplicarDimensoes(width: number, height: number) {
-    const validacao = canvasConfigSchema.safeParse({ width, height, backgroundColor: canvas.backgroundColor });
+    const validacao = canvasConfigSchema.safeParse({ width, height, backgroundColor: canvas.backgroundColor, backgroundImage: canvas.backgroundImage });
     if (!validacao.success) {
       toast.error("Use dimensões entre 320 e 3840 pixels.");
       return;

@@ -7,6 +7,7 @@ import {
   extrairUsuarioIdDoCanalChamados,
   podeReceberNovosChamados,
 } from "@/lib/chamados/notificacoes";
+import { NOTA_USUARIO_CHANNEL_PREFIX, extrairUsuarioIdDoCanalNotas } from "@/lib/notas/notificacoes";
 
 const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts", "private-metas-alpha"];
@@ -36,6 +37,15 @@ export async function POST(req: Request) {
 
     if (channelName.startsWith(CHAMADO_USUARIO_CHANNEL_PREFIX)) {
       const channelUserId = extrairUsuarioIdDoCanalChamados(channelName);
+      if (channelUserId === null || channelUserId !== Number(session.user.id)) {
+        return new NextResponse("Proibido", { status: 403 });
+      }
+      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(authResponse);
+    }
+
+    if (channelName.startsWith(NOTA_USUARIO_CHANNEL_PREFIX)) {
+      const channelUserId = extrairUsuarioIdDoCanalNotas(channelName);
       if (channelUserId === null || channelUserId !== Number(session.user.id)) {
         return new NextResponse("Proibido", { status: 403 });
       }

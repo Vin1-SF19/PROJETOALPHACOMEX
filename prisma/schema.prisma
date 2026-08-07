@@ -114,6 +114,18 @@ model usuarios {
   blueprintProjetosCriados BlueprintProject[] @relation("BlueprintCreatedBy")
   blueprintMembros BlueprintMember[]
 
+  notasPropriedade      Note[]              @relation("NoteOwner")
+  notasCriadas          Note[]              @relation("NoteCreatedBy")
+  notasAtualizadas      Note[]              @relation("NoteUpdatedBy")
+  notaPermissoesCriadas NotePermission[]    @relation("NotePermissionCreatedBy")
+  notaTagsProprias      Tag[]               @relation("TagOwner")
+  notaVersoesAlteradas  NoteVersion[]       @relation("NoteVersionChangedBy")
+  notaComentarios       NoteComment[]       @relation("NoteCommentAuthor")
+  notaAnexosEnviados    NoteAttachment[]    @relation("NoteAttachmentUploadedBy")
+  notaLembretes         NoteReminder[]      @relation("NoteReminderUser")
+  notaAbasAbertas       UserOpenNoteTab[]   @relation("UserOpenNoteTabUser")
+  notaWorkspace         UserNotesWorkspace? @relation("UserNotesWorkspaceUser")
+
   bpmCardsResponsavel BpmCard[] @relation("BpmCardResponsavel")
   bpmCardMembros      BpmCardMembro[]
   bpmTarefas          BpmTarefa[]
@@ -2442,6 +2454,203 @@ model BlueprintProject {
   @@index([requesterId])
   @@index([ownerId])
   @@index([updatedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Sistema de Notas — camada global (Fase 01, prompt-phases/SistemaDeNotas)
+// ─────────────────────────────────────────────────────────────────────────
+
+model Note {
+  id             String    @id @default(cuid())
+  title          String
+  contentJson    Json
+  plainText      String
+  ownerId        Int
+  visibility     String // PRIVADA | COMPARTILHADA | EQUIPE | INSTITUCIONAL
+  status         String    @default("ATIVA") // RASCUNHO | ATIVA | ARQUIVADA | LIXEIRA
+  color          String?
+  icon           String?
+  isFavorite     Boolean   @default(false)
+  isPinned       Boolean   @default(false)
+  currentVersion Int       @default(1)
+  createdById    Int
+  updatedById    Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+  deletedAt      DateTime?
+
+  owner     usuarios  @relation("NoteOwner", fields: [ownerId], references: [id])
+  createdBy usuarios  @relation("NoteCreatedBy", fields: [createdById], references: [id])
+  updatedBy usuarios? @relation("NoteUpdatedBy", fields: [updatedById], references: [id])
+
+  contexts    NoteContext[]
+  permissions NotePermission[]
+  tags        NoteTag[]
+  versions    NoteVersion[]
+  comments    NoteComment[]
+  attachments NoteAttachment[]
+  reminders   NoteReminder[]
+  openTabs    UserOpenNoteTab[]
+
+  @@index([ownerId, status])
+  @@index([status, deletedAt])
+  @@index([visibility])
+  @@index([updatedAt])
+  @@index([isPinned])
+}
+
+model NoteContext {
+  id           String   @id @default(cuid())
+  noteId       String
+  moduleKey    String
+  entityType   String
+  entityId     String
+  displayName  String
+  internalPath String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([moduleKey, entityType, entityId])
+  @@index([noteId])
+}
+
+model NotePermission {
+  id          String   @id @default(cuid())
+  noteId      String
+  subjectType String // USUARIO | SETOR | ROLE
+  subjectId   String
+  role        String // LEITOR | COMENTARISTA | EDITOR | ADMIN
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  createdBy usuarios @relation("NotePermissionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([noteId, subjectType, subjectId])
+  @@index([subjectType, subjectId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String
+  ownerId   Int?
+  setorNome String?
+  createdAt DateTime @default(now())
+
+  owner usuarios? @relation("TagOwner", fields: [ownerId], references: [id])
+  notes NoteTag[]
+
+  @@unique([name, ownerId, setorNome])
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId])
+}
+
+model NoteVersion {
+  id            String   @id @default(cuid())
+  noteId        String
+  version       Int
+  title         String
+  contentJson   Json
+  plainText     String
+  changedById   Int
+  changeSummary String?
+  createdAt     DateTime @default(now())
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  changedBy usuarios @relation("NoteVersionChangedBy", fields: [changedById], references: [id])
+
+  @@unique([noteId, version])
+  @@index([noteId, createdAt])
+}
+
+model NoteComment {
+  id         String    @id @default(cuid())
+  noteId     String
+  parentId   String?
+  authorId   Int
+  content    String
+  isResolved Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  note   Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author usuarios @relation("NoteCommentAuthor", fields: [authorId], references: [id])
+
+  @@index([noteId, deletedAt])
+}
+
+model NoteAttachment {
+  id         String    @id @default(cuid())
+  noteId     String
+  fileName   String
+  mimeType   String
+  size       Int
+  storageKey String
+  uploadedById Int
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime?
+
+  note       Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  uploadedBy usuarios @relation("NoteAttachmentUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([noteId, deletedAt])
+}
+
+model NoteReminder {
+  id          String    @id @default(cuid())
+  noteId      String
+  userId      Int
+  remindAt    DateTime
+  status      String    @default("PENDENTE") // PENDENTE | CONCLUIDO | ADIADO
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  note Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user usuarios @relation("NoteReminderUser", fields: [userId], references: [id])
+
+  @@index([userId, remindAt, status])
+}
+
+model UserOpenNoteTab {
+  id         String   @id @default(cuid())
+  userId     Int
+  noteId     String
+  position   Int
+  isActive   Boolean  @default(false)
+  isPinned   Boolean  @default(false)
+  openedAt   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  note Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user usuarios @relation("UserOpenNoteTabUser", fields: [userId], references: [id])
+
+  @@unique([userId, noteId])
+  @@index([userId, position])
+}
+
+model UserNotesWorkspace {
+  userId           Int      @id
+  isTaskbarVisible Boolean  @default(true)
+  viewerMode       String   @default("RECOLHIDO") // RECOLHIDO | COMPACTO | EXPANDIDO | TELA_AMPLA
+  viewerHeight     Int      @default(320)
+  activeNoteId     String?
+  updatedAt        DateTime @updatedAt
+
+  user usuarios @relation("UserNotesWorkspaceUser", fields: [userId], references: [id])
 }
 
 model BlueprintMember {

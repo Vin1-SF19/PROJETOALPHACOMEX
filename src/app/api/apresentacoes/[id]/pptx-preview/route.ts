@@ -6,9 +6,11 @@ import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas
 import { extrairApresentacaoPptx } from "@/lib/apresentacoes/pptx/parser";
 import { mapearSlideExtraido } from "@/lib/apresentacoes/pptx/mapear";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { resumirDiagnosticos } from "@/lib/apresentacoes/pptx/diagnostico";
+import { renderizarReferenciaPptx } from "@/lib/apresentacoes/pptx/reference-renderer";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const PPTX_MAX_BYTES = 80 * 1024 * 1024;
 
@@ -85,25 +87,54 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: "Nenhum slide encontrado neste arquivo." }, { status: 422 });
     }
 
+    const referenceWidth = Math.min(640, canvas.width);
+    const referencia = await renderizarReferenciaPptx(buffer, {
+      width: referenceWidth,
+      height: Math.max(1, Math.round(referenceWidth * canvas.height / canvas.width)),
+    }, 40_000);
+    const referenceImages = referencia.ok
+      ? referencia.slides.map((slide) => ({ slideNumber: slide.slideNumber, url: `data:image/png;base64,${slide.png.toString("base64")}` }))
+      : [];
+
     // Sem upload de verdade — só base64 inline, em paralelo (é conversão local, não I/O de rede,
     // mas paralelizar ainda ajuda com decks grandes por não serializar o trabalho de CPU/await).
     const enviarImagemComoDataUri = async (bytes: Uint8Array, mimeType: string): Promise<string> =>
       `data:${mimeType};base64,${Buffer.from(bytes).toString("base64")}`;
 
     const slides = await Promise.all(
-      extraido.slides.map(async (slide): Promise<ComponenteSlide[]> => {
+      extraido.slides.map(async (slide): Promise<{ componentes: ComponenteSlide[]; canvas: CanvasConfig }> => {
         try {
-          return await mapearSlideExtraido(slide, enviarImagemComoDataUri);
+          const componentes = await mapearSlideExtraido(slide, enviarImagemComoDataUri);
+          return {
+            componentes,
+            canvas: {
+              ...canvas,
+              backgroundColor: slide.backgroundColor || "#FFFFFF",
+              ...(slide.backgroundImage ? { backgroundImage: slide.backgroundImage } : { backgroundImage: undefined }),
+            },
+          };
         } catch (erro) {
           console.error("[pptx-preview] Falha ao mapear slide extraído", erro);
-          return [];
+          return { componentes: [], canvas: { ...canvas, backgroundColor: "#FFFFFF", backgroundImage: undefined } };
         }
       }),
     );
 
     return NextResponse.json({
       success: true,
-      data: { slides: slides.map((componentes) => ({ componentes })), canvas, ignorados: extraido.ignorados },
+      data: {
+        slides,
+        canvas,
+        ignorados: extraido.ignorados,
+        fontesDetectadas: extraido.fontesDetectadas,
+        diagnosticos: extraido.diagnosticosDetalhados,
+        resumoDiagnosticos: resumirDiagnosticos(extraido.diagnosticosDetalhados),
+        importerVersion: extraido.intermediateModel.importerVersion,
+        referenceImages,
+        referenceRenderer: referencia.ok
+          ? { available: true, name: referencia.renderer }
+          : { available: false, reason: referencia.reason },
+      },
     });
   } catch (error) {
     console.error("[POST /api/apresentacoes/[id]/pptx-preview]", error);

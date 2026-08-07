@@ -13,6 +13,7 @@ import {
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
   X, PanelLeft, User, Pin, ChevronLeft, ChevronRight,
   Instagram, Activity, Handshake, Cable, MonitorPlay, CalendarClock, Compass, HandCoins,
+  StickyNote,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -34,6 +35,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Scale, FileText, GraduationCap, BookOpen, KeyRound,
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
   Instagram, Handshake, Cable, MonitorPlay, CalendarClock, Compass, HandCoins,
+  StickyNote,
 };
 
 const ACTIVE_BG: Record<string, string> = {

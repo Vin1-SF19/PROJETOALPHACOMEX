@@ -396,3 +396,14 @@
 **Notas:** substitui o bloco amarelo sempre expandido por uma gaveta compacta, recolhida por padrão, com contador e animação acessível por `aria-expanded`/`aria-controls`. Ao abrir, exibe os mesmos links de finalização em uma grade com altura máxima de 460px e rolagem interna, evitando crescimento excessivo quando houver muitos parceiros pendentes. A cor primária segue o `accent` do tema; o âmbar fica restrito ao status de atenção.
 
 **Última atualização:** 2026-08-07 por Nova
+
+### CampoProspeccaoAtiva
+
+**Arquivo:** `src/components/comercial/CampoProspeccaoAtiva.tsx`
+**Tipo:** Client Component
+**Props:** `valor`, `opcoes`, `onChange`, `inputClassName`, `labelClassName`
+**Uso:** renderizado pelo cadastro de lead em `ModalGerenciamentoLeads.tsx` quando o Canal de Aquisição é `Prospecção ativa`.
+
+**Notas:** sem catálogo, mostra um input obrigatório com a informação de que o valor será reutilizado. Com valores persistidos, mostra um select e oferece `Adicionar nova prospecção`; o usuário também pode voltar às opções cadastradas. O estado é local e a persistência ocorre somente ao salvar o contrato.
+
+**Última atualização:** 2026-08-07 por Nova

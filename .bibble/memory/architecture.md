@@ -233,6 +233,102 @@ model CommissionAuditLog { id, userId, acao, entityType, entityId, beforeJson, a
 
 ---
 
+## Sistema de Notas — camada global (Fases 01-05/8, 2026-08-07 — ✅ MIGRATION APLICADA EM PRODUÇÃO)
+
+> **✅ STATUS: as 11 tabelas abaixo EXISTEM DE VERDADE no Turso real de produção desde 2026-08-07 (durante a Fase 05).** Não é mais schema teórico aguardando aprovação — pode haver dado real gravado por usuários a qualquer momento a partir de agora. Ver `decisions.md` ("migration de 11 tabelas APLICADA EM PRODUÇÃO") para o histórico completo (Vault bloqueou na Fase 01 aguardando o usuário, usuário confirmou explicitamente durante a Fase 05 após testar ao vivo e encontrar o erro esperado, backup de 64.699,9 KB/32.949 linhas gerado e validado antes da aplicação).
+
+Fila `prompt-phases/` (8 fases, ver `prompt-phases/00-contexto-geral.md` para o prompt mestre completo). Fase 01 entregou schema + permissões + Server Actions base.
+
+```prisma
+model Note {
+  id, title, contentJson Json, plainText, ownerId Int, visibility (PRIVADA|COMPARTILHADA|EQUIPE|INSTITUCIONAL),
+  status (RASCUNHO|ATIVA|ARQUIVADA|LIXEIRA, default ATIVA), color?, icon?, isFavorite, currentVersion (default 1),
+  createdById Int, updatedById Int?, createdAt, updatedAt, archivedAt?, deletedAt?
+  contexts NoteContext[], permissions NotePermission[], tags NoteTag[], versions NoteVersion[],
+  comments NoteComment[], attachments NoteAttachment[], reminders NoteReminder[], openTabs UserOpenNoteTab[]
+  @@index([ownerId,status]) @@index([status,deletedAt]) @@index([visibility]) @@index([updatedAt])
+}
+model NoteContext { id, noteId → Note, moduleKey, entityType, entityId, displayName, internalPath, metadata Json?, createdAt }
+model NotePermission { id, noteId → Note, subjectType (USUARIO|SETOR|ROLE), subjectId, role (LEITOR|COMENTARISTA|EDITOR|ADMIN), createdById Int, createdAt
+  @@unique([noteId,subjectType,subjectId]) }
+model Tag { id, name, color, ownerId Int?, setorNome String?, createdAt @@unique([name,ownerId,setorNome]) }
+model NoteTag { noteId → Note, tagId → Tag, @@id([noteId,tagId]) }
+model NoteVersion { id, noteId → Note, version Int, title, contentJson Json, plainText, changedById Int, changeSummary?, createdAt
+  @@unique([noteId,version]) }
+model NoteComment { id, noteId → Note, parentId?, authorId Int, content, isResolved, createdAt, updatedAt, deletedAt? }
+model NoteAttachment { id, noteId → Note, fileName, mimeType, size Int, storageKey, uploadedById Int, createdAt, deletedAt? }
+model NoteReminder { id, noteId → Note, userId Int, remindAt, status (default PENDENTE), completedAt?, createdAt }
+model UserOpenNoteTab { id, userId Int, noteId → Note, position Int, isActive, isPinned, openedAt, updatedAt
+  @@unique([userId,noteId]) }
+model UserNotesWorkspace { userId Int @id, isTaskbarVisible, viewerMode (default RECOLHIDO), viewerHeight (default 320), activeNoteId?, updatedAt }
+```
+
+**Todas as FKs de usuário são `Int` com `@relation` nomeada explicitamente** (`"NoteOwner"`, `"NoteCreatedBy"`, `"NoteUpdatedBy"`, `"NotePermissionCreatedBy"`, `"TagOwner"`, `"NoteVersionChangedBy"`, `"NoteCommentAuthor"`, `"NoteAttachmentUploadedBy"`, `"NoteReminderUser"`, `"UserOpenNoteTabUser"`, `"UserNotesWorkspaceUser"`) — mesmo padrão real já usado em `BlueprintProject` (`"BlueprintRequester"` etc), obrigatório porque `Note` tem 3 FKs (`ownerId`/`createdById`/`updatedById`) para `usuarios`.
+
+**Herança de permissão contextual** (`src/lib/notas/permissoes.ts`): nota vinculada a um módulo restrito (`NoteContext.moduleKey`) só é visível a quem também tem a permissão daquele módulo via `getPermissoesEfetivas()` — owner/Admin/CEO/TI sempre bypassam. "Nota de equipe" (`NotePermission.subjectType = "SETOR"`) compara `subjectId` contra `usuarios.role` via `isSameRole()` (`src/lib/roles.ts`) — não existe tabela de membros de equipe no projeto, ver decisão em `decisions.md`.
+
+**Server Actions** (`src/actions/Notas.ts`): `CriarNota`, `AtualizarNota` (controle de versão otimista via `baseVersion`/`currentVersion`, retorna `error: "CONFLITO_VERSAO"` se desatualizado — nunca sobrescreve silenciosamente), `ObterNota`, `ListarNotas` (paginado, mesmo contrato `{success,data,total,page,pageSize,totalPages}` do resto do projeto), `ArquivarNota`, `RestaurarNota`, `MoverNotaParaLixeira`, `ExcluirNotaDefinitivamente`.
+
+**Escala de z-index** (`src/lib/z-index.ts`, novo): `conteudoPrincipal`(0) → `headerSidebar`(50) → `barraNotas`(100) → `editorNotas`(110) → `dropdown`(150) → `modal`(250) → `toast`(300) → `alertaCritico`(400). Não existia escala formal antes — valores soltos pré-existentes (`z-40`, `z-50`, `z-[55]`, `z-[60]`, `z-[70]`, `z-[200]` em `GlobalSidebar.tsx`/`PainelLayoutClient.tsx`/`OnboardingModal.tsx`) **não foram tocados/renumerados** (fora de escopo desta fila, risco de regressão visual em código não relacionado).
+
+**Registry:** entrada `{ id: 'notas', label: 'Central de Notas', href: '/PainelAlpha/Notas', iconName: 'StickyNote', category: 'infra', permission: 'notas' }` em `MODULOS_REGISTRY` — rota ainda não existe (chega na Fase 03).
+
+### Fase 02 — Barra global inferior + editor TipTap + autosave (2026-08-07)
+
+**Barra global** (`src/components/Notas/NotesGlobalTaskbar.tsx`): montada 1x em `PainelLayoutClient.tsx`, **fora** do container de iframes dos módulos (que usa `position: absolute`) — nunca fica escondida atrás de um módulo aberto. Hidrata de `localStorage` (`src/lib/notas-tabs.ts`, chave `painel_alpha_notas_tabs_v1_user_<userId>`, mesma técnica de normalização defensiva de `painel-tabs.ts`) e do backend (`ObterWorkspaceNotas`), abas reordenáveis via `@dnd-kit/sortable` (mesma técnica de `TabBar.tsx`, `horizontalTransform`/`y:0`).
+
+**Estado global:** `src/store/useNotasWorkspace.ts` (Zustand simples, sem middleware) — nunca guarda conteúdo integral da nota, só metadados leves de abas + `syncState` (`salvo|pendente|salvando|erro|conflito|offline`) por `noteId`.
+
+**Editor:** `src/components/Notas/NoteEditor/NoteEditor.tsx` reaproveita a MESMA base TipTap do `SpecificationEditor.tsx` (Alpha Blueprint) — `StarterKit`/`Underline`/`Link`/`Image`/`Placeholder`/`TaskList`/`TaskItem`/`Table`+`TableRow`+`TableCell`+`TableHeader`, `immediatelyRender: false` — mais `TextStyle`+`Color`+`Highlight` (destaque/cor) e `SlashCommand` (extensão própria, comando `/`). Autosave debounce 1500ms idêntico ao Blueprint. Rascunho local em `localStorage` por `noteId`, comparado contra `baseVersion` antes de reaplicar. Controle de versão otimista real: `AtualizarNota` retorna `error: "CONFLITO_VERSAO"` se `baseVersion` não bate com `currentVersion` no servidor — o editor nunca sobrescreve, só sinaliza status `"conflito"`.
+
+**Slash-command (`/`):** construído com `@tiptap/suggestion` + `ReactRenderer`, popup posicionado via `position: fixed` + `getBoundingClientRect()` nativo do DOM — **sem** instalar `tippy.js` (biblioteca comum para esse propósito no ecossistema TipTap). Ver decisão em `decisions.md`.
+
+**Dependências novas** (todas pinadas em versão EXATA `3.29.1`, sem `^`, para não conflitar com `@tiptap/core@3.29.1` já usado pelo Blueprint — `@tiptap/extension-color` por padrão puxaria `3.29.2`, que exige `@tiptap/core@3.29.2`, quebrando a instalação): `@tiptap/extension-color`, `@tiptap/extension-text-style`, `@tiptap/extension-highlight`, `@tiptap/extension-mention`, `@tiptap/suggestion`.
+
+**Atalhos** (`src/hooks/useNotasAtalhos.ts`): `Ctrl+Shift+N` (nova nota), `Ctrl+Shift+B` (toggle barra), `Ctrl+Alt+N` (Central de Notas) — confirmado sem conflito com nenhum listener de teclado existente no painel.
+
+**Limitação conhecida:** sem credenciais de login disponíveis para teste em browser real (mesma limitação já documentada em Alpha Blueprint/Comissões) — verificação feita via `tsc`/`lint`/`build` limpos + revisão estática de Probe. Recomenda-se teste manual humano do fluxo completo antes de uso real.
+
+### Fase 03 — Central de Notas (2026-08-07)
+
+**Rota real:** `src/app/PainelAlpha/Notas/page.tsx` — `auth()`+`redirect("/")` sem sessão, `isAdminRole` bypass, `getPermissoesEfetivas().includes("notas")`+`redirect("/PainelAlpha")` sem permissão. Padrão idêntico a `AlphaBlueprintPage`.
+
+**`Note` ganhou `isPinned Boolean @default(false)` + índice** — ainda no mesmo lote de schema pendente desde a Fase 01 (migration real no Turso continua bloqueada pelo Vault).
+
+**Busca:** `BuscarNotas` (`src/actions/NotasBusca.ts`) é um contrato PRÓPRIO, separado de `ListarNotas` (Fase 01, usado pela barra global) — full-text (`title`/`plainText`/nome de etiqueta), 9 seções de filtro (RECENTES/FAVORITAS/FIXADAS/COMPARTILHADAS_COMIGO/CRIADAS_POR_MIM/EQUIPE/CONTEXTUAIS/ARQUIVADAS/LIXEIRA), paginado (mesmo contrato `{success,data,total,page,pageSize,totalPages}`). `select` da lista é leve (sem `contentJson`/`currentVersion`) — conteúdo completo só é buscado via `ObterNota` (Fase 01) quando uma nota é selecionada, com proteção de race condition (`cancelado` no cleanup do `useEffect`) e `key={notaCarregada.id}` forçando remontagem do `NoteEditor`.
+
+**`FixarNota`:** limite de 10 notas fixadas simultâneas por usuário (constante `LIMITE_FIXADAS`), retorna erro amigável ao exceder — número escolhido e documentado, não hardcoded silenciosamente.
+
+**Reaproveitamento do editor confirmado (ponto crítico validado por Probe):** `NoteEditor.tsx` (Fase 02) é o ÚNICO editor no projeto — a Central o importa direto, sem duplicar autosave/versão otimista/rascunho local.
+
+**Coerência Barra Global × Central:** ambas leem/escrevem `Note` via Server Actions distintas, sem sincronização em tempo real entre si — comportamento aceito nesta fase (sem WebSocket/polling implementado ainda).
+
+### Fase 04 — Contextos + Integração com Módulos (2026-08-07)
+
+**`src/actions/NotasContexto.ts`:** `VincularContextoNota` (valida `podeEditarNota` + `moduleKey` existe em `MODULOS_REGISTRY` + permissão do módulo + `entidadeReferenciadaExiste` — ver achado de segurança em `decisions.md`), `RemoverContextoNota` (resolve `noteId` real a partir do `contextId` no banco, nunca confia em `noteId` do client), `ObterContagemNotasContexto`/`ListarNotasDoContexto` (sempre filtrados nota a nota por `podeVisualizarNota`, nunca `plainText`/`contentJson` no `select`).
+
+**Componentes reutilizáveis** (`src/components/Notas/Contexto/`): `NotesContextButton` (badge+trigger, incorpora a contagem diretamente — nunca existiu um `NotesContextBadge.tsx` separado), `NotesContextPanel` (lista de notas vinculadas + criar nota já vinculada), `NoteLinkDialog` (buscar e vincular nota já existente do próprio usuário).
+
+**`NotesSearchCommand`** (`src/components/Notas/NotesSearchCommand.tsx`): command palette isolada, construída sem `cmdk` (não instalado, nenhuma command palette existia no projeto) — `Dialog` do Radix + busca com debounce, integrada na barra global via botão de busca.
+
+**Integração real:** apenas `chamados` (`src/components/DetalhesChamado.tsx`) — CS&NPS/Alpha Leads/Agenda Alpha ficam como pendência explícita (ver `decisions.md` para o porquê).
+
+### Fase 05 — Colaboração, Histórico e Notificações (2026-08-07) — **migration aplicada em produção durante esta fase**
+
+**`src/actions/NotasColaboracao.ts`:** `CompartilharNota` (valida `podeCompartilharNota` + existência do usuário destinatário — achado do Anubis, corrigido), `RemoverAcessoNota`, `ListarPermissoesNota`, `TransferirPropriedadeNota` (só dono ou Admin, valida novo dono existe), `CriarComentarioNota` (bloqueia nota `PRIVADA` exceto para o próprio dono; menções notificam só quem já tem `podeVisualizarNota`, role real buscada do banco antes da checagem), `ListarComentariosNota`, `ResolverComentario`, `ExcluirComentarioNota` (autor, Admin, ou ADMIN da nota), `ObterHistoricoVersoes`, `RestaurarVersaoNota` (chave composta `noteId_version` torna estruturalmente impossível restaurar versão de outra nota).
+
+**Notificações real-time via Pusher** (não polling — `src/lib/notas/notificacoes.ts` + `src/store/useNotasNotificacoes.ts` + `src/hooks/useNotasNotifications.ts`): canal privado `private-notas-usuario-<id>`, mesmo padrão de `useAdminChamadosNotifications.ts`. `/api/pusher/auth` ganhou bloco de autorização idêntico ao de chamados (extrai `channelUserId` do nome do canal, compara com a sessão). Payload das notificações NUNCA inclui `plainText`/`contentJson` — só `noteId`/`noteTitle`/mensagem genérica. `NotaNotificacaoToast.tsx` usa `sonner` (não replicou o componente Framer Motion custom de Chamados — mais simples, consistente com o resto do módulo).
+
+**Menção `@` e comando `/`** compartilham a mesma técnica de popup manual (`position: fixed` + `getBoundingClientRect`, sem `tippy.js`) — `src/components/Notas/NoteEditor/{mention-suggestion.ts,MentionList.tsx}`. **Achado de performance conhecido, não corrigido:** busca de usuário para menção chama `BuscarTodosUsuarios()` sem debounce/cache a cada keystroke (ver `decisions.md`).
+
+**Dívida de segurança pré-existente identificada (não nova):** `BuscarTodosUsuarios` (`src/actions/RecursosHumanos.ts`) não tem `auth()`/checagem de permissão — qualquer usuário autenticado lista todos os colaboradores. Reaproveitada por `UserSearchSelect.tsx`/`mention-suggestion.ts` nesta fase, mas não é uma regressão introduzida por ela (ver `decisions.md`).
+
+**Bug visual real corrigido:** barra global (`NotesGlobalTaskbar`) cobria a sidebar em telas `lg+` — corrigido com prop `sidebarOffsetClass`, reaproveitando a mesma variável `sidebarOffset` já usada pelo conteúdo principal em `PainelLayoutClient.tsx`.
+
+**Última atualização:** 2026-08-07 por Scribe
+
+---
+
 ## Módulo Alpha Metas — Justificativa de Meta (2026-08-04)
 
 ```prisma
@@ -264,3 +360,11 @@ model JustificativaMeta {
 **`podeGerenciarMetas(role)`** vive em `src/lib/metas-permissoes.ts` (não em `src/actions/Metas.ts`, que tem `"use server"` e só pode exportar `async function` — ver `known-errors.md`). Cobre Admin/CEO/TI (via `isAdminRole`, normalizado) + `role === "Lider Comercial"` (comparação EXATA, case/acento-sensível — assimetria real, documentada em teste).
 
 **Última atualização:** 2026-08-04 por Scribe
+
+## Alpha Metas — catálogo incremental de Prospecção ativa (2026-08-07)
+
+**Server Action:** `getProspeccoesAtivas()` em `src/actions/ContratoComercial.ts`.
+
+O canal usa `ContratoComercial.canalAquisicao = "Prospecção ativa"` e persiste sua descrição normalizada no `canalOutro` existente. A action exige sessão e papel comercial/administrativo, consulta somente `canalOutro` dos contratos desse canal, limita a leitura aos 500 registros mais recentes e devolve valores tipados, ordenados e deduplicados sem diferenciar caixa ou espaçamento. Não existe endpoint, nova tabela ou migration.
+
+O helper `src/lib/comercial/prospeccao-ativa.ts` é a fonte única do rótulo, validação de até 200 caracteres e normalização do catálogo. `resolverOrigemParceiro()` preserva `canalOutro` somente para `Outro`, `Prospecção ativa` ou o envelope tipado de parceiro pendente; demais canais continuam limpando o campo.

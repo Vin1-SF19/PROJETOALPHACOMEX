@@ -173,20 +173,41 @@ export function escaparAtributoXml(valor: string): string {
 /** Monta um SVG autocontido: imagem recortada pelo path (clipPath), `preserveAspectRatio` tipo
  * "cover" (`slice`) pra preencher o quadro igual o comportamento padrão de preenchimento de
  * forma do PowerPoint. `imagemUrl` pode ser `data:` (prévia) ou URL do Blob (após commit). */
-export function construirSvgImagemRecortada(pathSvg: string, viewBoxW: number, viewBoxH: number, imagemUrl: string): string {
+export function construirSvgImagemRecortada(
+  pathSvg: string,
+  viewBoxW: number,
+  viewBoxH: number,
+  imagemUrl: string,
+  crop?: PptxCrop,
+  opacity = 1,
+): string {
   const urlSegura = escaparAtributoXml(imagemUrl);
+  const visibleWidth = Math.max(0.001, 1 - (crop?.left ?? 0) - (crop?.right ?? 0));
+  const visibleHeight = Math.max(0.001, 1 - (crop?.top ?? 0) - (crop?.bottom ?? 0));
+  const imageWidth = viewBoxW / visibleWidth;
+  const imageHeight = viewBoxH / visibleHeight;
+  const imageX = -((crop?.left ?? 0) / visibleWidth) * viewBoxW;
+  const imageY = -((crop?.top ?? 0) / visibleHeight) * viewBoxH;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxW} ${viewBoxH}">`
     + `<clipPath id="c"><path d="${pathSvg}"/></clipPath>`
-    + `<image href="${urlSegura}" width="${viewBoxW}" height="${viewBoxH}" preserveAspectRatio="xMidYMid slice" clip-path="url(#c)"/>`
+    + `<image href="${urlSegura}" x="${imageX}" y="${imageY}" width="${imageWidth}" height="${imageHeight}" opacity="${Math.max(0, Math.min(1, opacity))}" preserveAspectRatio="xMidYMid slice" clip-path="url(#c)"/>`
     + `</svg>`;
 }
 
 /** Fallback de ÚLTIMO recurso pra `custGeom` colorido (`solidFill`) sem equivalente nativo no
  * schema de componentes (só rect/roundRect/ellipse têm campo próprio) — desenha o path real
  * preenchido, em vez de descartar a forma inteira. */
-export function construirSvgFormaColorida(pathSvg: string, viewBoxW: number, viewBoxH: number, corFundo: string): string {
+export function construirSvgFormaColorida(
+  pathSvg: string,
+  viewBoxW: number,
+  viewBoxH: number,
+  corFundo: string,
+  stroke?: { color: string; width: number; dash?: string },
+): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxW} ${viewBoxH}">`
-    + `<path d="${pathSvg}" fill="${escaparAtributoXml(corFundo)}"/>`
+    + `<path d="${pathSvg}" fill="${escaparAtributoXml(corFundo)}"`
+    + (stroke ? ` stroke="${escaparAtributoXml(stroke.color)}" stroke-width="${stroke.width}"${stroke.dash ? ` stroke-dasharray="${escaparAtributoXml(stroke.dash)}"` : ""}` : "")
+    + `/>`
     + `</svg>`;
 }
 
@@ -194,3 +215,4 @@ export function svgParaDataUri(svgMarkup: string): string {
   const base64 = Buffer.from(svgMarkup, "utf-8").toString("base64");
   return `data:image/svg+xml;base64,${base64}`;
 }
+import type { PptxCrop } from "./modelo-intermediario";

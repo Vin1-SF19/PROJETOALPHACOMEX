@@ -2,15 +2,23 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, ChevronDown, Phone, ExternalLink, Loader2 } from "lucide-react";
+import { Building2, ExternalLink, Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { isAdminRole } from "@/lib/roles";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import PainelHistorico from "./PainelHistorico";
+import PainelHistoricoServico from "./PainelHistoricoServico";
 import PainelRegistrar from "./PainelRegistrar";
 import PainelProximaEtapa from "./PainelProximaEtapa";
+import {
+  DadosEmpresaDrawer,
+  DadosEmpresaToggle,
+  useDadosEmpresaDrawer,
+} from "./DadosEmpresaDrawer";
+import { TelefonesCardButton } from "./TelefonesCardButton";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -33,6 +41,8 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  const [abaAtiva, setAbaAtiva] = useState<string>("card");
+  const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
 
   const carregando = card?.id !== cardId && erro === null;
 
@@ -129,61 +139,89 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
                       </Link>
                     </div>
                   </div>
-                  <button
-                    disabled
-                    title="Em breve"
-                    className="p-1.5 rounded-lg text-slate-600 opacity-40 cursor-not-allowed shrink-0"
-                  >
-                    <ChevronDown size={16} />
-                  </button>
+                  <DadosEmpresaToggle
+                    aberto={dadosEmpresaDrawer.aberto}
+                    empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
+                    onToggle={dadosEmpresaDrawer.alternar}
+                  />
                 </div>
 
-                <button
-                  disabled
-                  title="Em breve"
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 opacity-90 cursor-not-allowed"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(52,211,153,0.35), rgba(52,211,153,0.1))",
-                    boxShadow: "0 10px 28px -8px rgba(52,211,153,0.55)",
-                  }}
-                >
-                  <Phone size={28} className="text-emerald-400" />
-                </button>
+                <TelefonesCardButton
+                  cardId={card.id}
+                  empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
+                />
               </div>
 
-              <div className="flex flex-wrap gap-2 mt-4">
-                {SERVICOS_FIXOS.map((servico) => {
-                  const marcado = card.servico?.toLowerCase().includes(servico.toLowerCase());
-                  return (
-                    <button
-                      key={servico}
-                      disabled
-                      title="Em breve"
-                      className="px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-not-allowed backdrop-blur-sm transition-colors"
-                      style={
-                        marcado
-                          ? { background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, border: `1px solid rgba(${accent},0.35)` }
-                          : { background: "rgba(255,255,255,0.03)", color: "#64748b", border: "1px solid rgba(255,255,255,0.08)" }
-                      }
-                    >
-                      {servico}
-                    </button>
-                  );
-                })}
-              </div>
+              <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="mt-4">
+                <TabsList className="flex-wrap h-auto bg-transparent border-none p-0 gap-2 justify-start">
+                  <TabsTrigger
+                    value="card"
+                    className="rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm transition-colors border data-[state=active]:shadow-none"
+                    style={
+                      abaAtiva === "card"
+                        ? { background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, borderColor: `rgba(${accent},0.35)` }
+                        : { background: "rgba(255,255,255,0.03)", color: "#64748b", borderColor: "rgba(255,255,255,0.08)" }
+                    }
+                  >
+                    Este card
+                  </TabsTrigger>
+                  {SERVICOS_FIXOS.map((servico) => {
+                    const ativo = abaAtiva === servico;
+                    return (
+                      <TabsTrigger
+                        key={servico}
+                        value={servico}
+                        className="rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm transition-colors border data-[state=active]:shadow-none"
+                        style={
+                          ativo
+                            ? { background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, borderColor: `rgba(${accent},0.35)` }
+                            : { background: "rgba(255,255,255,0.03)", color: "#64748b", borderColor: "rgba(255,255,255,0.08)" }
+                        }
+                      >
+                        {servico}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </Tabs>
             </div>
 
             {/* 3 painéis */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_0.8fr] gap-4 px-4 sm:px-6 pb-6 overflow-hidden min-h-0">
-              <PainelHistorico
-                card={card}
-                interacoes={interacoes}
-                accent={accent}
-                currentUserId={currentUserId}
-                currentUserRole={currentUserRole}
-                onAtualizado={() => { recarregar(); onAtualizado(); }}
-                onAbrirCard={onAbrirCard}
-              />
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_max-content] gap-4 px-4 sm:px-6 pb-6 overflow-hidden min-h-0">
+              {dadosEmpresaDrawer.aberto ? (
+                <DadosEmpresaDrawer
+                  accent={accent}
+                  carregando={dadosEmpresaDrawer.carregando}
+                  dados={dadosEmpresaDrawer.dados}
+                  erro={dadosEmpresaDrawer.erro}
+                  onFechar={dadosEmpresaDrawer.fechar}
+                  onRecarregar={dadosEmpresaDrawer.recarregar}
+                />
+              ) : (
+                <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="min-h-0 h-full">
+                  <TabsContent value="card" className="h-full m-0">
+                    <PainelHistorico
+                      card={card}
+                      interacoes={interacoes}
+                      accent={accent}
+                      currentUserId={currentUserId}
+                      currentUserRole={currentUserRole}
+                      onAtualizado={() => { recarregar(); onAtualizado(); }}
+                      onAbrirCard={onAbrirCard}
+                    />
+                  </TabsContent>
+                  {SERVICOS_FIXOS.map((servico) => (
+                    <TabsContent key={servico} value={servico} className="h-full m-0">
+                      <PainelHistoricoServico
+                        cardId={card.id}
+                        servico={servico}
+                        accent={accent}
+                        onAbrirCard={onAbrirCard}
+                      />
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              )}
               <PainelRegistrar
                 card={card}
                 etapaAtual={etapaAtual}

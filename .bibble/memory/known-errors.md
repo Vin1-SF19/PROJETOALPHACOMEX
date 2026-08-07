@@ -208,6 +208,8 @@ Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` 
 
 **Addendum 2 (2026-08-06, mesma sessão):** o exit code de um comando em background pode ser mascarado de formas DIFERENTES a cada vez (visto 2x seguidas: 1ª vez foi `| tail` mascarando; 2ª vez foi o último comando de uma cadeia `;` ser um `grep` que retorna 1 por "não achei erro", reportado como "falha" mesmo o build tendo saído 0). Prática mais robusta pra validar build em background: gravar o exit code DENTRO do próprio arquivo de log, ex. `npx next build > log.txt 2>&1; echo "EXIT_CODE:$?" >> log.txt`, e depois ler o arquivo direto — nunca confiar no status ("completed"/"failed") do orquestrador de background sem ler o conteúdo real.
 
+**Addendum 3 (2026-08-07, sessão Sistema de Notas):** o EPERM pode reaparecer NO MEIO de uma sessão longa mesmo depois de já ter sido resolvido uma vez — cada `npm run build`/`tsc`/`lint` pode inadvertidamente reiniciar processos node novos (ex: script `build:player`, workers de postcss do Turbopack) que voltam a travar a DLL. Fix seguro: `tasklist //FI "IMAGENAME eq node.exe"` (Bash) ou `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` (PowerShell, mostra `CommandLine` completa) para IDENTIFICAR qual PID é o quê ANTES de matar qualquer um — processos do Cursor/VSCode (`tsserver.js`, `typingsInstaller.js`, helpers do editor) NUNCA devem ser mortos, só os PIDs cuja `CommandLine` mostra `next dev`/`next build`/`npm run dev`/scripts do próprio projeto. `Stop-Process -Id <lista> -Force` seletivo, nunca `taskkill /F /IM node.exe` genérico (mataria o editor do usuário).
+
 ---
 
 ## Filtro de string PT-BR com acento nunca casa (includes retorna sempre false)

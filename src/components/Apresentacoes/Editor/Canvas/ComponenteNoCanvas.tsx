@@ -78,12 +78,13 @@ export function ComponenteNoCanvas({
         zIndex: componente.zIndex,
         transform: [
           componente.rotacao ? `rotate(${componente.rotacao}deg)` : "",
+          componente.flipH || componente.flipV ? `scale(${componente.flipH ? -1 : 1}, ${componente.flipV ? -1 : 1})` : "",
           ajusteVisual?.escalaAjustada ? `scale(${ajusteVisual.escalaAjustada})` : "",
         ].filter(Boolean).join(" ") || undefined,
         outline: selecionado ? "2px solid rgb(99,102,241)" : "none",
         outlineOffset: 2,
         cursor: dentroDeContainer ? "pointer" : "grab",
-        opacity: ajusteVisual?.opacityAjustada,
+        opacity: (ajusteVisual?.opacityAjustada ?? 1) * (componente.opacidade ?? 1),
         filter: ajusteVisual?.blurAjustado ? "blur(3px)" : undefined,
         transition: ajusteVisual ? "opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease" : undefined,
       }}
@@ -176,6 +177,13 @@ function RenderComponenteContainer({
       borderRadius: componente.borderRadius ?? 0,
       padding: componente.padding ?? 0,
       position: "relative",
+      boxSizing: "border-box",
+      border: componente.larguraBorda
+        ? `${componente.larguraBorda}px ${componente.estiloBorda ?? "solid"} ${componente.corBorda ?? "transparent"}`
+        : undefined,
+      boxShadow: componente.sombra
+        ? `${componente.sombra.inset ? "inset " : ""}${componente.sombra.x}px ${componente.sombra.y}px ${componente.sombra.blur}px ${componente.sombra.spread}px ${componente.sombra.color}`
+        : undefined,
     };
     const filhos = renderFilhos(componente.filhos, (filho) => ({
       position: "absolute",

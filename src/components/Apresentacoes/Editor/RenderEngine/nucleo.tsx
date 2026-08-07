@@ -1,5 +1,6 @@
 import { motion, type Variants, type TargetAndTransition, type Transition } from "framer-motion";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { stylePosicaoAbsoluta } from "./posicionamento";
 import type { ConfigAnimacao } from "@/lib/validations/animacao";
 
 interface VariantsResultado {
@@ -92,8 +93,8 @@ export function FilhosContainer({
 }) {
   const posicaoFilho = (filho: ComponenteSlide): React.CSSProperties =>
     style.display === "grid" || style.display === "flex"
-      ? { position: "relative", width: filho.w, height: filho.h, zIndex: filho.zIndex }
-      : { position: "absolute", left: filho.x, top: filho.y, width: filho.w, height: filho.h, zIndex: filho.zIndex };
+      ? { ...stylePosicaoAbsoluta(filho), position: "relative", left: undefined, top: undefined }
+      : stylePosicaoAbsoluta(filho);
 
   if (usaStagger) {
     return (

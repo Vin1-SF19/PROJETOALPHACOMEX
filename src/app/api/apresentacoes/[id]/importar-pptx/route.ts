@@ -9,11 +9,14 @@ import { nomeArquivoSeguro } from "@/lib/apresentacoes/assets";
 import { extrairApresentacaoPptx } from "@/lib/apresentacoes/pptx/parser";
 import { mapearSlideExtraido } from "@/lib/apresentacoes/pptx/mapear";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { resumirDiagnosticos } from "@/lib/apresentacoes/pptx/diagnostico";
+import { renderizarReferenciaPptx } from "@/lib/apresentacoes/pptx/reference-renderer";
+import { createHash } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 // Parsing de zip/XML + upload de cada imagem embutida pro Blob pode levar um tempo real em
 // decks grandes — mesmo teto já usado por exportar-html/gerar-slide neste projeto.
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const PPTX_MAX_BYTES = 80 * 1024 * 1024;
 const IMAGEM_MAX_BYTES = 50 * 1024 * 1024;
@@ -100,9 +103,56 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: "Nenhum slide encontrado neste arquivo." }, { status: 422 });
     }
 
+    let originalFileUrl: string;
+    try {
+      const originalPath = `apresentacoes/${apresentacaoId}/originais/${Date.now()}-${crypto.randomUUID()}-${nomeArquivoSeguro(arquivo.name)}`;
+      const originalBlob = await put(originalPath, buffer, {
+        access: "public",
+        addRandomSuffix: false,
+        contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+      });
+      originalFileUrl = originalBlob.url;
+      await db.apresentacaoAsset.create({
+        data: {
+          apresentacaoId,
+          tipo: "PPTX",
+          url: originalBlob.url,
+          nomeOriginal: arquivo.name.slice(0, 255),
+          tamanhoBytes: buffer.byteLength,
+        },
+      });
+    } catch (erro) {
+      console.error("[importar-pptx] Falha ao preservar o arquivo original", erro);
+      return NextResponse.json({ success: false, error: "Não foi possível preservar o PowerPoint original; a importação foi cancelada sem criar slides." }, { status: 502 });
+    }
+
+    const referencia = await renderizarReferenciaPptx(buffer, canvas, 40_000);
+    const referenceUrls = new Map<number, string>();
+    if (referencia.ok) {
+      await Promise.all(referencia.slides.map(async (slide) => {
+        const referencePath = `apresentacoes/${apresentacaoId}/reference/${crypto.randomUUID()}-slide-${slide.slideNumber}.png`;
+        const blob = await put(referencePath, slide.png, {
+          access: "public",
+          addRandomSuffix: false,
+          contentType: "image/png",
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+        });
+        referenceUrls.set(slide.slideNumber, blob.url);
+      })).catch((error: unknown) => console.error("[importar-pptx] Falha ao preservar renders de referência", error));
+    } else {
+      console.warn("[importar-pptx] Render de referência indisponível", referencia.reason);
+    }
+
     const errosDeImagem: string[] = [];
-    const enviarImagem = async (bytes: Uint8Array, mimeType: string, nomeArquivoOriginal: string): Promise<string> => {
-      try {
+    const cacheUploads = new Map<string, Promise<string>>();
+    const enviarImagem = (bytes: Uint8Array, mimeType: string, nomeArquivoOriginal: string): Promise<string> => {
+      const hash = createHash("sha256").update(bytes).digest("hex");
+      const cacheKey = `${mimeType}:${hash}`;
+      const existente = cacheUploads.get(cacheKey);
+      if (existente) return existente;
+      const upload = (async () => {
+        try {
         if (bytes.byteLength > IMAGEM_MAX_BYTES) throw new Error("Imagem excede o limite de tamanho");
         const caminho = `apresentacoes/${apresentacaoId}/pptx-${Date.now()}-${crypto.randomUUID()}-${nomeArquivoSeguro(nomeArquivoOriginal)}`;
         const blob = await put(caminho, Buffer.from(bytes), {
@@ -119,7 +169,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         console.error("[importar-pptx] Falha ao enviar imagem extraída", erro);
         errosDeImagem.push(nomeArquivoOriginal);
         return "";
-      }
+        }
+      })();
+      cacheUploads.set(cacheKey, upload);
+      return upload;
     };
 
     // Mapeia (e envia imagem pro Blob) todos os slides EM PARALELO — sequencial aqui já causou
@@ -131,37 +184,73 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .map((slide, indice) => ({ slide, indice }))
       .filter(({ indice }) => !indicesExcluidos.has(indice));
 
-    const componentesPorSlide = await Promise.all(
-      slidesParaCriar.map(async ({ slide }) => {
+    const slidesMapeados = await Promise.all(
+      slidesParaCriar.map(async ({ slide, indice }) => {
         try {
           const componentes = await mapearSlideExtraido(slide, enviarImagem);
           // Remove componentes de imagem cujo upload falhou (url vazia) em vez de gravar um
           // componente quebrado no slide — o erro já fica registrado em errosDeImagem.
-          return componentes.filter((c) => c.tipo !== "imagem" || c.url);
+          return {
+            componentes: componentes.filter((c) => c.tipo !== "imagem" || c.url),
+            canvas: {
+              ...canvas,
+              backgroundColor: slide.backgroundColor || "#FFFFFF",
+              ...(slide.backgroundImage ? { backgroundImage: slide.backgroundImage } : { backgroundImage: undefined }),
+            },
+            slideNumber: indice + 1,
+          };
         } catch (erro) {
           console.error("[importar-pptx] Falha ao mapear slide extraído", erro);
-          return [] as ComponenteSlide[];
+          return { componentes: [] as ComponenteSlide[], canvas: { ...canvas, backgroundColor: "#FFFFFF", backgroundImage: undefined }, slideNumber: indice + 1 };
         }
       }),
     );
 
     let proximaOrdem = ultimoSlide.ordem + 1;
-    for (const componentes of componentesPorSlide) {
+    const resumoDiagnosticos = resumirDiagnosticos(extraido.diagnosticosDetalhados);
+    for (const slideMapeado of slidesMapeados) {
       await db.slide.create({
         // Cast seguro (mesmo padrão de AtualizarSlide/DuplicarSlide em actions/slides.ts):
         // Prisma exige InputJsonValue (index signature genérica) pro campo Json, que não é
         // estruturalmente igual ao tipo forte ComponenteSlide[] recursivo.
-        data: { apresentacaoId, ordem: proximaOrdem, dadosJson: { componentes, canvas } as object },
+        data: {
+          apresentacaoId,
+          ordem: proximaOrdem,
+          dadosJson: {
+            componentes: slideMapeado.componentes,
+            canvas: slideMapeado.canvas,
+            pptxSource: {
+              type: "pptx",
+              originalFileUrl,
+              originalFileName: arquivo.name.slice(0, 255),
+              importerVersion: extraido.intermediateModel.importerVersion,
+              slideNumber: slideMapeado.slideNumber,
+              diagnostics: resumoDiagnosticos,
+              ...(referenceUrls.get(slideMapeado.slideNumber) ? { referenceImageUrl: referenceUrls.get(slideMapeado.slideNumber) } : {}),
+            },
+          } as object,
+        },
       });
       proximaOrdem += 1;
     }
-    const slidesCriados = componentesPorSlide.length;
+    const slidesCriados = slidesMapeados.length;
 
     revalidatePath(`/PainelAlpha/Apresentacoes/${apresentacaoId}/editor`);
 
     return NextResponse.json({
       success: true,
-      data: { slidesCriados, ignorados: extraido.ignorados, errosDeImagem },
+      data: {
+        slidesCriados,
+        ignorados: extraido.ignorados,
+        errosDeImagem,
+        originalFileUrl,
+        fontesDetectadas: extraido.fontesDetectadas,
+        resumoDiagnosticos,
+        importerVersion: extraido.intermediateModel.importerVersion,
+        referenceRenderer: referencia.ok
+          ? { available: true, name: referencia.renderer, slides: referenceUrls.size }
+          : { available: false, reason: referencia.reason },
+      },
     });
   } catch (error) {
     console.error("[POST /api/apresentacoes/[id]/importar-pptx]", error);

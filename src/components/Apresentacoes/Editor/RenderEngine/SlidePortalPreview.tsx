@@ -40,7 +40,7 @@ export function SlidePortalPreview({ componentes, canvas = CANVAS_PADRAO }: Slid
     : 0;
 
   return (
-    <div ref={hostRef} className="relative h-full w-full overflow-hidden" style={{ backgroundColor: canvas.backgroundColor }}>
+    <div ref={hostRef} className="relative h-full w-full overflow-hidden" style={{ backgroundColor: canvas.backgroundColor, backgroundImage: canvas.backgroundImage }}>
       <div
         className="absolute left-1/2 top-1/2 shrink-0"
         style={{
@@ -49,6 +49,7 @@ export function SlidePortalPreview({ componentes, canvas = CANVAS_PADRAO }: Slid
           transform: `translate(-50%, -50%) scale(${escala})`,
           transformOrigin: "center center",
           backgroundColor: canvas.backgroundColor,
+          backgroundImage: canvas.backgroundImage,
         }}
       >
         {componentes.map((componente) => (

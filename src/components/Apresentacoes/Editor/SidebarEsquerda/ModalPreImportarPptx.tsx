@@ -12,9 +12,15 @@ import {
 import { RenderComponente } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
+import { stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
+import { resolverFontesNoDocumento, type FontSubstitution } from "@/lib/apresentacoes/pptx/texto";
+import type { PptxDiagnosticEntry, PptxDiagnosticSeverity } from "@/lib/apresentacoes/pptx/diagnostico";
+import { compararImagens } from "@/lib/apresentacoes/pptx/visual-diff";
+import { toPng } from "html-to-image";
 
 interface SlideExtraidoPreview {
   componentes: ComponenteSlide[];
+  canvas?: CanvasConfig;
 }
 
 interface ModalPreImportarPptxProps {
@@ -32,18 +38,29 @@ const LARGURA_THUMBNAIL = 220;
 /** 1 slide em miniatura — mesma técnica de palco escalado do Modo Apresentação (canvas em
  * tamanho real, `transform: scale()` pra caber na miniatura), renderizando os componentes de
  * verdade via `RenderComponente` — não é uma simulação, é o mesmo motor de render do editor. */
-function ThumbnailSlide({ componentes, canvas }: { componentes: ComponenteSlide[]; canvas: CanvasConfig }) {
+function ThumbnailSlide({ componentes, canvas, captureRef }: { componentes: ComponenteSlide[]; canvas: CanvasConfig; captureRef?: (node: HTMLDivElement | null) => void }) {
   const escala = LARGURA_THUMBNAIL / canvas.width;
   const altura = Math.round(canvas.height * escala);
 
   return (
     <div
       className="relative overflow-hidden rounded-md"
-      style={{ width: LARGURA_THUMBNAIL, height: altura, backgroundColor: canvas.backgroundColor }}
+      style={{ width: LARGURA_THUMBNAIL, height: altura, backgroundColor: canvas.backgroundColor, backgroundImage: canvas.backgroundImage }}
     >
-      <div style={{ width: canvas.width, height: canvas.height, transform: `scale(${escala})`, transformOrigin: "top left", position: "relative" }}>
+      <div
+        ref={captureRef}
+        style={{
+          width: canvas.width,
+          height: canvas.height,
+          transform: `scale(${escala})`,
+          transformOrigin: "top left",
+          position: "relative",
+          backgroundColor: canvas.backgroundColor,
+          backgroundImage: canvas.backgroundImage,
+        }}
+      >
         {componentes.map((c) => (
-          <div key={c.id} style={{ position: "absolute", left: c.x, top: c.y, width: c.w, height: c.h, zIndex: c.zIndex }}>
+          <div key={c.id} style={stylePosicaoAbsoluta(c)}>
             <RenderComponente componente={c} modo="apresentacao" />
           </div>
         ))}
@@ -64,6 +81,13 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const [slides, setSlides] = useState<SlideExtraidoPreview[]>([]);
   const [canvas, setCanvas] = useState<CanvasConfig | null>(null);
   const [ignorados, setIgnorados] = useState<Record<string, number>>({});
+  const [fontes, setFontes] = useState<FontSubstitution[]>([]);
+  const [diagnosticos, setDiagnosticos] = useState<PptxDiagnosticEntry[]>([]);
+  const [resumoDiagnosticos, setResumoDiagnosticos] = useState<Record<PptxDiagnosticSeverity, number>>({ INFO: 0, WARNING: 0, FALLBACK: 0, ERROR: 0 });
+  const [referenceImages, setReferenceImages] = useState<Array<{ slideNumber: number; url: string }>>([]);
+  const [referenceRenderer, setReferenceRenderer] = useState<{ available: boolean; name?: string; reason?: string } | null>(null);
+  const [visualDiffs, setVisualDiffs] = useState<Record<number, { importedUrl: string; diffUrl: string; similarity: number }>>({});
+  const captureRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [excluidos, setExcluidos] = useState<Set<number>>(new Set());
   const [confirmando, setConfirmando] = useState(false);
   const arquivoRef = useRef<File | null>(null);
@@ -80,6 +104,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       setStatus("carregando");
       setErro(null);
       setExcluidos(new Set());
+      setVisualDiffs({});
       try {
         const formData = new FormData();
         formData.append("file", arquivo);
@@ -96,6 +121,11 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
         setSlides(resultado.data.slides);
         setCanvas(resultado.data.canvas);
         setIgnorados(resultado.data.ignorados ?? {});
+        setDiagnosticos(resultado.data.diagnosticos ?? []);
+        setResumoDiagnosticos(resultado.data.resumoDiagnosticos ?? { INFO: 0, WARNING: 0, FALLBACK: 0, ERROR: 0 });
+        setReferenceImages(resultado.data.referenceImages ?? []);
+        setReferenceRenderer(resultado.data.referenceRenderer ?? null);
+        setFontes(await resolverFontesNoDocumento(resultado.data.fontesDetectadas ?? []));
         setStatus("pronto");
       } catch {
         if (cancelado) return;
@@ -108,6 +138,40 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       cancelado = true;
     };
   }, [open, arquivo, apresentacaoId]);
+
+  useEffect(() => {
+    if (status !== "pronto" || !canvas || referenceImages.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      await document.fonts?.ready;
+      const results: Record<number, { importedUrl: string; diffUrl: string; similarity: number }> = {};
+      for (let index = 0; index < slides.length; index += 1) {
+        if (cancelled) return;
+        const node = captureRefs.current[index];
+        const reference = referenceImages.find((item) => item.slideNumber === index + 1);
+        if (!node || !reference) continue;
+        try {
+          const slideCanvas = slides[index].canvas ?? canvas;
+          const importedUrl = await toPng(node, {
+            canvasWidth: slideCanvas.width,
+            canvasHeight: slideCanvas.height,
+            pixelRatio: 1,
+            backgroundColor: slideCanvas.backgroundColor,
+            style: { transform: "none", transformOrigin: "top left" },
+          });
+          const diff = await compararImagens(reference.url, importedUrl, {
+            width: 320,
+            height: Math.max(1, Math.round(320 * slideCanvas.height / slideCanvas.width)),
+          });
+          results[index] = { importedUrl, diffUrl: diff.diffUrl, similarity: diff.similarity };
+          if (!cancelled) setVisualDiffs({ ...results });
+        } catch (error) {
+          console.warn(`[PPTX Import] Falha no diff visual do slide ${index + 1}`, error);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [status, canvas, referenceImages, slides]);
 
   function alternarExclusao(indice: number) {
     setExcluidos((atual) => {
@@ -161,6 +225,8 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
 
   const totalRestante = slides.length - excluidos.size;
   const totalIgnoradosPreview = Object.values(ignorados).reduce((soma, n) => soma + n, 0);
+  const fontesAusentes = fontes.filter((font) => !font.available);
+  const problemasVisuais = diagnosticos.filter((item) => item.severity !== "INFO");
 
   return (
     <Dialog open={open} onOpenChange={(v) => !confirmando && onOpenChange(v)}>
@@ -205,6 +271,28 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
               )}
             </div>
 
+            {(fontesAusentes.length > 0 || problemasVisuais.length > 0) && (
+              <div className="border-b border-white/5 bg-slate-900/40 px-5 py-2 text-[11px] text-slate-400">
+                {fontesAusentes.length > 0 && (
+                  <p className="text-amber-300">
+                    {fontesAusentes.map((font) => `Fonte “${font.original}” não disponível — substituída por “${font.substitute}”.`).join(" ")}
+                  </p>
+                )}
+                {problemasVisuais.length > 0 && (
+                  <p>
+                    Diagnóstico: {resumoDiagnosticos.ERROR} erro(s), {resumoDiagnosticos.FALLBACK} fallback(s), {resumoDiagnosticos.WARNING} aviso(s).
+                    {problemasVisuais.slice(0, 3).map((item) => ` Slide ${item.source.slide} / ${item.source.name ?? item.source.shapeId ?? item.type}: ${item.message}`).join(" ")}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {referenceRenderer && !referenceRenderer.available && (
+              <div className="border-b border-white/5 bg-amber-950/20 px-5 py-2 text-[11px] text-amber-300">
+                Comparação visual independente indisponível: {referenceRenderer.reason}
+              </div>
+            )}
+
             <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 overflow-y-auto p-5">
               {slides.map((slide, indice) => {
                 const excluido = excluidos.has(indice);
@@ -213,7 +301,11 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                     <div
                       className={`relative rounded-md border transition-opacity ${excluido ? "border-white/5 opacity-35" : "border-white/10"}`}
                     >
-                      <ThumbnailSlide componentes={slide.componentes} canvas={canvas} />
+                      <ThumbnailSlide
+                        componentes={slide.componentes}
+                        canvas={slide.canvas ?? canvas}
+                        captureRef={(node) => { captureRefs.current[indice] = node; }}
+                      />
                       <button
                         type="button"
                         onClick={() => alternarExclusao(indice)}
@@ -224,6 +316,22 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                         {excluido ? <RotateCcw size={12} aria-hidden="true" /> : <X size={12} aria-hidden="true" />}
                       </button>
                     </div>
+                    {visualDiffs[indice] && referenceImages.find((item) => item.slideNumber === indice + 1) && (
+                      <div className="grid grid-cols-3 gap-1 text-center text-[9px] text-slate-500">
+                        {[
+                          ["Original", referenceImages.find((item) => item.slideNumber === indice + 1)!.url],
+                          ["Importado", visualDiffs[indice].importedUrl],
+                          ["Diferença", visualDiffs[indice].diffUrl],
+                        ].map(([label, url]) => (
+                          <div key={label}>
+                            {/* eslint-disable-next-line @next/next/no-img-element -- data URI gerada localmente para diagnóstico */}
+                            <img src={url} alt={label} className="aspect-video w-full rounded-sm border border-white/5 object-fill" />
+                            <span>{label}</span>
+                          </div>
+                        ))}
+                        <span className="col-span-3">Similaridade de pixels: {(visualDiffs[indice].similarity * 100).toFixed(1)}% (inspeção visual obrigatória)</span>
+                      </div>
+                    )}
                     <span className="text-center text-[11px] text-slate-500">Slide {indice + 1}{excluido ? " (removido)" : ""}</span>
                   </div>
                 );

@@ -44,7 +44,7 @@ function formatarBytes(bytes: number | null): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function SectionCard({
+export function SectionCard({
   icon: Icon,
   title,
   count,

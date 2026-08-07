@@ -48,10 +48,20 @@ export const MANUAL_ALPHA_METAS: ManualModulo = {
 2. Informe o CNPJ e consulte a Receita Federal, ou marque empresa em constituição.
 3. Preencha valor, forma de pagamento, serviço e closer.
 4. Se necessário, inclua os sócios.
-5. Escolha o canal de aquisição: tráfego pago Meta/Instagram, tráfego pago Google, indicação de parceiros, indicação de clientes, WhatsApp, Instagram, orgânico, evento ou outro. Para parceiro cadastrado, selecione-o na lista e, se precisar, abra os detalhes somente leitura de documento, nível, contato, endereço e representantes.
+5. Escolha o canal de aquisição: tráfego pago Meta/Instagram, tráfego pago Google, indicação de parceiros, indicação de clientes, WhatsApp, Instagram, orgânico, evento, prospecção ativa ou outro. Para parceiro cadastrado, selecione-o na lista e, se precisar, abra os detalhes somente leitura de documento, nível, contato, endereço e representantes.
 6. Salve. O registro entra em Enviados.
 
 O cliente do CS & NPS é criado ou reativado somente quando o pagamento/fechamento é confirmado.`,
+    },
+    {
+      id: "prospeccao-ativa",
+      titulo: "Registrar e reutilizar uma prospecção ativa",
+      aliases: ["prospecção ativa", "nova prospecção", "canal de prospecção", "lista de prospecções"],
+      conteudo: `1. No formulário do lead/contrato, escolha **Prospecção ativa** no Canal de Aquisição.
+2. Se ainda não houver opções cadastradas, descreva a prospecção no input obrigatório.
+3. Salve o lead. O texto passa a integrar o catálogo compartilhado de prospecções.
+4. Nos próximos cadastros, escolha uma prospecção já usada no select.
+5. Para alimentar outro valor, selecione **Adicionar nova prospecção**, preencha o input e salve. Valores iguais com diferença apenas de caixa ou espaçamento não são duplicados.`,
     },
     {
       id: "fechar-contrato",

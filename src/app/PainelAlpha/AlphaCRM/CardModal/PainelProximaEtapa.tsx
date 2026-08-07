@@ -48,8 +48,8 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
                   }
             }
           >
-            <span>{etapa.nome}</span>
-            {ativa ? <Check size={15} /> : <ArrowRight size={14} className="opacity-50" />}
+            <span className="whitespace-nowrap">{etapa.nome}</span>
+            {ativa ? <Check size={15} className="shrink-0" /> : <ArrowRight size={14} className="shrink-0 opacity-50" />}
           </button>
         );
       })}

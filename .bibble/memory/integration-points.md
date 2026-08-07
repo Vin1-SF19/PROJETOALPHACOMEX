@@ -47,6 +47,40 @@ Ao criar um novo módulo, verificar e registrar:
 
 ---
 
+## Sistema de Notas (EM CONSTRUÇÃO — fila `prompt-phases/`, Fase 01/8 concluída em 2026-08-07)
+
+- **Rota:** `/PainelAlpha/Notas` — **existe de verdade desde a Fase 03** (`src/app/PainelAlpha/Notas/page.tsx`, mesmo padrão de auth/permissão do `AlphaBlueprintPage`).
+- **Registry:** entrada `notas` em `src/lib/modulos-registry.ts` (`category: 'infra'`, `permission: 'notas'`, `iconName: 'StickyNote'`) — confirmado por Probe que isso já é suficiente para aparecer em `GlobalSidebar.tsx`, `PainelAlphaClient.tsx`, `ModalGerenciarSetor.tsx`/`ModalOverrideUser.tsx`/`PreviewModulosSetor.tsx` sem tocar mais nenhum arquivo manual (reconfirma que o checklist antigo de 3 arrays do `CLAUDE.md` raiz está obsoleto).
+- **Ícone:** `StickyNote` importado em `ICON_MAP` de `GlobalSidebar.tsx`.
+- **Permissão necessária:** `getPermissoesEfetivas(userId).includes('notas')` — a ser checada na `page.tsx` quando ela existir (Fase 03), mesmo padrão dos demais módulos.
+- **Checklist de integração desta fase:**
+  - [x] Entrada no registry
+  - [x] Ícone resolve
+  - [x] Aparece nas telas de gerenciamento de permissão (derivado automaticamente do registry)
+  - [x] Rota/página — `/PainelAlpha/Notas` real desde a Fase 03
+  - [x] Atalhos de teclado `Ctrl+Shift+N`/`Ctrl+Shift+B`/`Ctrl+Alt+N` — `src/hooks/useNotasAtalhos.ts`, confirmado sem conflito com nenhum listener existente
+  - [x] Barra global inferior (`NotesGlobalTaskbar`) — construída como componente IRMÃO de `TabBar.tsx`/`PainelLayoutClient.tsx`, montada fora do container de iframes dos módulos
+- **Editado quando:** Cada fase seguinte da fila concluir — atualizar este checklist e adicionar entrada própria por fase, seguindo o padrão já usado por Alpha Presentation Studio/Alpha Blueprint (uma seção "Onda N"/"Fase N" por entrega).
+
+### Sistema de Notas — integração por módulo (Fase 04, 2026-08-07)
+
+**Componente reutilizável:** `<NotesContextButton moduleKey entityType entityId displayName internalPath />` (`src/components/Notas/Contexto/NotesContextButton.tsx`) — badge "Notas: N" que abre popover com lista de notas vinculadas + criar/vincular.
+
+**Módulos integrados:**
+- [x] **Chamados** — `src/components/DetalhesChamado.tsx`, dentro do `DialogHeader`, ao lado do badge `#{chamado.id}`. `moduleKey: "chamados"`, `entityType: "chamado"`, `entityId: String(chamado.id)`.
+
+**Módulos PENDENTES (documentados, não esquecidos):**
+- [ ] **CS&NPS** (`src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx`) — arquivo de 2000+ linhas, precisa de reconhecimento dedicado do Scout antes de tocar (módulo já teve incidente real de perda de dados, ver `decisions.md` 2026-07-13).
+- [ ] **Alpha Leads** — componente real de detalhe de UM lead ainda não localizado (`ModalGerenciamentoLeads.tsx` pertence ao módulo Metas, não a Leads).
+- [ ] **Agenda Alpha** — detalhe de evento/reunião, nem investigado ainda.
+
+**Checklist para integrar um módulo novo:**
+1. Scout mapeia a estrutura real do componente de detalhe daquele registro (onde inserir o botão sem quebrar layout).
+2. Adicionar `<NotesContextButton>` no lugar certo, com `moduleKey`/`entityType`/`entityId`/`displayName`/`internalPath` corretos.
+3. **Obrigatório:** adicionar um caso em `entidadeReferenciadaExiste()` (`src/actions/NotasContexto.ts`) validando que o registro existe — sem isso, `VincularContextoNota` rejeita por padrão (fail-safe).
+
+---
+
 ## Módulos e seus integration points
 
 <!-- Adicionar aqui conforme o projeto cresce -->
@@ -992,7 +1026,28 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 - `ExcluirSlide` (actions/slides.ts) roda em `$transaction`: exclui E renumera `ordem` de todos os restantes (sequencial, sem buracos). `SidebarSlides.tsx#handleExcluir` espelha a mesma renumeração no estado local, sem esperar refetch.
 - **Checklist se for mexer em `Slide.ordem`/`Slide.nome` de novo:** qualquer novo fluxo que crie/exclua/reordene slides precisa manter `ordem` denso e sequencial (0,1,2...) — é do que depende o rótulo automático. `ReordenarSlides` (já existente) é o padrão de referência pra "recebe lista de IDs na ordem certa, grava ordem=index".
 
-#### Importação de PPTX
+#### Importação de PPTX — arquitetura vigente de alta fidelidade
+
+**Atualizado em:** 2026-08-07 por Scribe
+
+- **Fluxo:** `ModalPreImportarPptx.tsx` envia o arquivo para `POST /api/apresentacoes/[id]/pptx-preview`, recebe canvas por slide, fontes/diagnósticos e, quando o backend independente está disponível, os quadros Original/Importado/Diferença. A confirmação reenvia o mesmo arquivo e os índices selecionados para `POST /api/apresentacoes/[id]/importar-pptx`; o `.pptx` original é preservado como asset para reimportação e as imagens são deduplicadas por SHA-256.
+- **Modelo intermediário obrigatório:** `modelo-intermediario.ts` representa `Slide -> Element tree -> Transform/Style/Text/Asset`, mantendo árvore de grupos, coordenadas EMU, matrizes local/world, origem slide/layout/master, z-order e nós de fallback. A conversão para `ComponenteSlide` ocorre somente depois, em `mapear.ts`.
+- **Resolução OOXML:** `parser.ts` percorre a ordem real do XML e resolve a cadeia slide → layout → master → theme. `heranca.ts` resolve placeholders/propriedades herdadas; `color-resolver.ts` resolve cores RGB/theme/system e modificadores; `matriz-transformacao.ts` compõe grupos, rotação e flips; `texto.ts` mantém parágrafos/runs, quebras intercaladas, margens, bullets, tabs, autofit e fontes; `geometria.ts` cobre preset/custom geometry e recortes SVG.
+- **Fidelidade propagada ao render compartilhado:** background branco implícito e fundos sólidos/gradientes, rich text, font family/fallback, crop exato (`srcRect`), stretch/tile, flip, opacidade, linhas/setas, bordas e sombras são usados no Editor, prévia, modo apresentação e player exportado. `CanvasArea.tsx` oferece "Debug PPTX" com bounding boxes, IDs, z-index, dimensões e fallbacks.
+- **Renderer de referência:** `reference-renderer.ts` + `scripts/render-pptx-reference.ps1` usam PowerPoint COM no Windows, com automação/macros desativadas, para gerar PNGs independentes. `visual-diff.ts` calcula similaridade e imagem de diferença no browser. Em ambiente sem PowerPoint o fluxo continua com aviso, sem fingir que a referência existe.
+- **Segurança e isolamento:** `seguranca.ts` limita quantidade/tamanho/razão de compressão e bloqueia paths inseguros; relacionamentos externos não são buscados. Falha em um elemento gera diagnóstico/fallback localizado e não derruba o slide.
+- **Fontes:** o browser aguarda `document.fonts.ready`; a prévia separa disponíveis, substituídas e ausentes. Mapeamentos conhecidos incluem SF Pro Display → Inter e variantes Open Sans → Open Sans; o renderer usa uma pilha CSS estável como último recurso.
+- **Cobertura atual:** imagens raster/SVG, shapes, custom geometry, grupos aninhados, texto rico, tabelas básicas, conectores/linhas, backgrounds e principais efeitos. Charts, SmartArt, OLE, EMF/WMF e alguns fills/efeitos OOXML incomuns continuam como fallback diagnosticado até existir conversão nativa.
+- **Validação desta revisão:** 25/25 testes PPTX passaram; PowerPoint COM exportou 1/1 slide sintético no smoke. O arquivo real de 18 slides não estava anexado à tarefa atual, portanto a comparação visual e a lista real de fontes ausentes continuam pendentes e não devem ser declaradas como aprovadas.
+- **Checklist ao alterar:** preserve o modelo intermediário e a ordem OOXML, mantenha parser/render desacoplados, adicione fixture sintético por regressão, rode os dois testes PPTX e valide Original/Importado/Diferença com um deck real antes de declarar alta fidelidade.
+
+**Editado quando:** surgir um novo caso OOXML, mudar o renderer compartilhado ou for executado o aceite visual do deck real.
+
+---
+
+#### Importação de PPTX — histórico anterior (superado pela arquitetura acima)
+
+> Registro preservado para contexto histórico. As limitações e resultados abaixo descrevem a implementação anterior e não representam o estado atual nem comprovam o aceite visual desta revisão.
 
 - **Fluxo em 2 fases (revisado 2026-08-07 — antes era upload direto sem prévia):** botão "Upload" na sidebar de slides → seleciona arquivo → `ModalPreImportarPptx.tsx` abre e chama `POST /api/apresentacoes/[id]/pptx-preview` (parser roda, mas NADA é gravado — imagens viram `data:` URI inline, sem Blob/DB) → modal renderiza cada slide de verdade via `RenderComponente` (reaproveitado isolado, confirmado que não depende do Zustand do editor) num palco escalado, com botão de remover por slide → "Confirmar importação" reenvia o MESMO arquivo (`File` mantido em memória no client) + índices excluídos pra `POST /api/apresentacoes/[id]/importar-pptx` (agora com upload real pro Blob + criação de `Slide`, sempre APÊNDICE depois do último slide existente) → sidebar recarrega via `ListarSlides`. "Cancelar" não deixa nenhum resíduo (nada foi gravado na fase de prévia).
 - **Paralelização:** a rota de commit processava imagens SEQUENCIALMENTE — decks com várias imagens passavam do `maxDuration=60` da Vercel (function matada no meio, parecia "trava" pro usuário). Agora usa `Promise.all` sobre os slides pro mapeamento+upload; gravação no banco continua sequencial (ordem determinística).

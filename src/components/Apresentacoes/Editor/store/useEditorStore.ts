@@ -189,7 +189,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
     })),
   atualizarFundoCanvas: (backgroundColor) =>
     set((state) => ({
-      canvas: { ...state.canvas, backgroundColor },
+      canvas: { ...state.canvas, backgroundColor, backgroundImage: undefined },
       isDirty: true,
       versaoEdicao: state.versaoEdicao + 1,
     })),

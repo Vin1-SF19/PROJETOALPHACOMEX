@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import ModalProtocolo from "./ModalProtocolo";
+import { NotesContextButton } from "@/components/Notas/Contexto/NotesContextButton";
 
 type Solicitante = {
   nome: string;
@@ -147,6 +148,13 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
                   <span className={`px-3 py-1 rounded-lg border text-xs font-black ${prio.class}`}>
                     {prio.label}
                   </span>
+                  <NotesContextButton
+                    moduleKey="chamados"
+                    entityType="chamado"
+                    entityId={String(chamado.id)}
+                    displayName={chamado.titulo}
+                    internalPath="/PainelAlpha/Chamados"
+                  />
                 </div>
               </div>
             </DialogHeader>

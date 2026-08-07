@@ -69,6 +69,17 @@ export const cardComponenteSchema = baseComponenteSchema.extend({
   corFundo: z.string().optional(),
   borderRadius: z.number().optional(),
   padding: z.number().optional(),
+  corBorda: z.string().optional(),
+  larguraBorda: z.number().nonnegative().optional(),
+  estiloBorda: z.enum(["solid", "dashed", "dotted"]).optional(),
+  sombra: z.object({
+    x: z.number(),
+    y: z.number(),
+    blur: z.number().nonnegative(),
+    spread: z.number(),
+    color: z.string(),
+    inset: z.boolean().optional(),
+  }).optional(),
   get filhos() {
     return z.array(componenteSchema);
   },
@@ -138,6 +149,14 @@ export const dadosSlideSchema = z.object({
   canvas: canvasConfigSchema.optional(),
   /** Alpha Motion (Fase 01) — ausente em slides anteriores a esta fila, sem exigir migração. */
   animacaoConfig: slideAnimationConfigSchema.optional(),
+  pptxSource: z.object({
+    type: z.literal("pptx"),
+    originalFileUrl: z.string().url().optional(),
+    originalFileName: z.string().min(1),
+    importerVersion: z.string().min(1),
+    slideNumber: z.number().int().positive(),
+    diagnostics: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  }).optional(),
 }).refine(
   (dados) => {
     const ids = coletarIds(dados.componentes);
@@ -175,6 +194,10 @@ export interface CardComponente extends z.infer<typeof baseComponenteSchema> {
   corFundo?: string;
   borderRadius?: number;
   padding?: number;
+  corBorda?: string;
+  larguraBorda?: number;
+  estiloBorda?: "solid" | "dashed" | "dotted";
+  sombra?: { x: number; y: number; blur: number; spread: number; color: string; inset?: boolean };
   filhos: ComponenteSlide[];
 }
 export interface GridComponente extends z.infer<typeof baseComponenteSchema> {

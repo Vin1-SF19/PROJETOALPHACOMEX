@@ -8,6 +8,8 @@ import {
   resolverCaminhoRelativo,
   type NoXml,
 } from "./xml-utils";
+import { resolverCorOoxml, type ColorResolverContext } from "./color-resolver";
+import type { PptxResolvedColor } from "./modelo-intermediario";
 
 /**
  * Resolução de cor de tema (`<a:schemeClr>`) e fundo herdado (slide → layout → master) — a
@@ -49,14 +51,39 @@ export interface ContextoTema {
   bgLayout: NoXml | null;
   /** Árvore de formas do layout — usada pra herdar posição de placeholders sem `<a:xfrm>` próprio no slide. */
   spTreeLayout: NoXml | null;
+  spTreeMaster: NoXml | null;
+  layoutXml: NoXml | null;
+  masterXml: NoXml | null;
+  themeXml: NoXml | null;
+  caminhoLayout: string | null;
+  caminhoMaster: string | null;
+  caminhoTema: string | null;
+  relsLayout: Record<string, string>;
+  relsMaster: Record<string, string>;
+}
+
+function contextoFallback(overrides: Partial<ContextoTema> = {}): ContextoTema {
+  return {
+    esquemaCores: ESQUEMA_FALLBACK,
+    mapaCores: MAPA_FALLBACK,
+    bgMaster: null,
+    bgLayout: null,
+    spTreeLayout: null,
+    spTreeMaster: null,
+    layoutXml: null,
+    masterXml: null,
+    themeXml: null,
+    caminhoLayout: null,
+    caminhoMaster: null,
+    caminhoTema: null,
+    relsLayout: {},
+    relsMaster: {},
+    ...overrides,
+  };
 }
 
 function lerCorSimples(no: NoXml): string | null {
-  const srgb = no?.["a:srgbClr"]?.["@_val"];
-  if (typeof srgb === "string") return `#${srgb}`;
-  const sys = no?.["a:sysClr"]?.["@_lastClr"];
-  if (typeof sys === "string") return `#${sys}`;
-  return null;
+  return resolverCorOoxml(no, { scheme: {}, colorMap: {} })?.hex ?? null;
 }
 
 async function lerEsquemaCores(zip: JSZip, caminhoTema: string): Promise<EsquemaCores> {
@@ -96,7 +123,7 @@ export async function resolverContextoTema(zip: JSZip, caminhoSlide: string): Pr
     const nomeSlide = caminhoSlide.split("/").pop() ?? "";
     const relsSlide = await lerRelacionamentos(zip, `${pastaSlide}/_rels/${nomeSlide}.rels`);
     const alvoLayout = acharAlvoPorPrefixo(relsSlide, "slideLayouts/");
-    if (!alvoLayout) return { esquemaCores: ESQUEMA_FALLBACK, mapaCores: MAPA_FALLBACK, bgMaster: null, bgLayout: null, spTreeLayout: null };
+    if (!alvoLayout) return contextoFallback();
 
     const caminhoLayout = resolverCaminhoRelativo(caminhoSlide, alvoLayout);
     const layoutXml = await lerXml(zip, caminhoLayout);
@@ -107,63 +134,28 @@ export async function resolverContextoTema(zip: JSZip, caminhoSlide: string): Pr
     const nomeLayout = caminhoLayout.split("/").pop() ?? "";
     const relsLayout = await lerRelacionamentos(zip, `${pastaLayout}/_rels/${nomeLayout}.rels`);
     const alvoMaster = acharAlvoPorPrefixo(relsLayout, "slideMasters/");
-    if (!alvoMaster) return { esquemaCores: ESQUEMA_FALLBACK, mapaCores: MAPA_FALLBACK, bgMaster: null, bgLayout, spTreeLayout };
+    if (!alvoMaster) return contextoFallback({ bgLayout, spTreeLayout, layoutXml, caminhoLayout, relsLayout });
 
     const caminhoMaster = resolverCaminhoRelativo(caminhoLayout, alvoMaster);
     const masterXml = await lerXml(zip, caminhoMaster);
     const bgMaster = masterXml?.["p:sldMaster"]?.["p:cSld"]?.["p:bg"] ?? null;
+    const spTreeMaster = masterXml?.["p:sldMaster"]?.["p:cSld"]?.["p:spTree"] ?? null;
     const mapaCores = lerMapaCores(masterXml?.["p:sldMaster"]?.["p:clrMap"]);
 
     const pastaMaster = caminhoMaster.split("/").slice(0, -1).join("/");
     const nomeMaster = caminhoMaster.split("/").pop() ?? "";
     const relsMaster = await lerRelacionamentos(zip, `${pastaMaster}/_rels/${nomeMaster}.rels`);
     const alvoTema = acharAlvoPorPrefixo(relsMaster, "theme/");
-    if (!alvoTema) return { esquemaCores: ESQUEMA_FALLBACK, mapaCores, bgMaster, bgLayout, spTreeLayout };
+    if (!alvoTema) return contextoFallback({ mapaCores, bgMaster, bgLayout, spTreeLayout, spTreeMaster, layoutXml, masterXml, caminhoLayout, caminhoMaster, relsLayout, relsMaster });
 
     const caminhoTema = resolverCaminhoRelativo(caminhoMaster, alvoTema);
+    const themeXml = await lerXml(zip, caminhoTema);
     const esquemaCores = await lerEsquemaCores(zip, caminhoTema);
-    return { esquemaCores, mapaCores, bgMaster, bgLayout, spTreeLayout };
+    return contextoFallback({ esquemaCores, mapaCores, bgMaster, bgLayout, spTreeLayout, spTreeMaster, layoutXml, masterXml, themeXml, caminhoLayout, caminhoMaster, caminhoTema, relsLayout, relsMaster });
   } catch (erro) {
     console.error("[pptx/tema] Falha ao resolver tema/layout/master — usando cores padrão do Office", erro);
-    return { esquemaCores: ESQUEMA_FALLBACK, mapaCores: MAPA_FALLBACK, bgMaster: null, bgLayout: null, spTreeLayout: null };
+    return contextoFallback();
   }
-}
-
-function hexParaRgb(hex: string): [number, number, number] {
-  const limpo = hex.replace("#", "");
-  return [parseInt(limpo.slice(0, 2), 16), parseInt(limpo.slice(2, 4), 16), parseInt(limpo.slice(4, 6), 16)];
-}
-
-function rgbParaHex(r: number, g: number, b: number): string {
-  const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
-  return `#${[r, g, b].map((c) => clamp(c).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
-}
-
-/** Aproximação padrão (usada por várias implementações OOXML não-Microsoft) de shade/tint —
- * não é bit-exata ao algoritmo do PowerPoint, mas fica visualmente muito próxima. */
-function aplicarModificadores(hex: string, mods: { lumMod?: number; lumOff?: number; shade?: number; tint?: number }): string {
-  let [r, g, b] = hexParaRgb(hex);
-
-  if (mods.shade !== undefined) {
-    const f = mods.shade / 100000;
-    r *= f; g *= f; b *= f;
-  }
-  if (mods.tint !== undefined) {
-    const f = mods.tint / 100000;
-    r = r * f + 255 * (1 - f);
-    g = g * f + 255 * (1 - f);
-    b = b * f + 255 * (1 - f);
-  }
-  if (mods.lumMod !== undefined || mods.lumOff !== undefined) {
-    // Aproximação simples: aplica o mesmo fator/offset de luminância proporcionalmente aos 3 canais.
-    const lumMod = (mods.lumMod ?? 100000) / 100000;
-    const lumOff = (mods.lumOff ?? 0) / 100000;
-    r = r * lumMod + 255 * lumOff;
-    g = g * lumMod + 255 * lumOff;
-    b = b * lumMod + 255 * lumOff;
-  }
-
-  return rgbParaHex(r, g, b);
 }
 
 /**
@@ -173,62 +165,109 @@ function aplicarModificadores(hex: string, mods: { lumMod?: number; lumOff?: num
  * cores por sistema não mapeadas ficam fora do escopo desta versão).
  */
 export function lerCorOoxml(no: NoXml | undefined, contexto: ContextoTema): string | null {
-  if (!no) return null;
-
-  const lerMods = (fonte: NoXml) => ({
-    lumMod: fonte?.["a:lumMod"]?.["@_val"] !== undefined ? Number(fonte["a:lumMod"]["@_val"]) : undefined,
-    lumOff: fonte?.["a:lumOff"]?.["@_val"] !== undefined ? Number(fonte["a:lumOff"]["@_val"]) : undefined,
-    shade: fonte?.["a:shade"]?.["@_val"] !== undefined ? Number(fonte["a:shade"]["@_val"]) : undefined,
-    tint: fonte?.["a:tint"]?.["@_val"] !== undefined ? Number(fonte["a:tint"]["@_val"]) : undefined,
-  });
-
-  const srgb = no["a:srgbClr"];
-  if (srgb?.["@_val"]) {
-    const base = `#${srgb["@_val"]}`;
-    return aplicarModificadores(base, lerMods(srgb));
-  }
-
-  const scheme = no["a:schemeClr"];
-  if (scheme?.["@_val"]) {
-    const nomeEsquema = scheme["@_val"] as string;
-    const slot = contexto.mapaCores[nomeEsquema] ?? (SLOTS_ESQUEMA_CORES.includes(nomeEsquema as SlotCor) ? (nomeEsquema as SlotCor) : null);
-    if (!slot) return null;
-    const base = contexto.esquemaCores[slot];
-    return aplicarModificadores(base, lerMods(scheme));
-  }
-
-  return null;
+  const colorContext: ColorResolverContext = { scheme: contexto.esquemaCores, colorMap: contexto.mapaCores };
+  return resolverCorOoxml(no, colorContext)?.css ?? null;
 }
 
 export interface FundoResolvido {
   tipoCor: string | null;
   imagemREmbed: string | null;
+  gradientCss?: string;
+  gradient?: { angle: number; stops: Array<{ position: number; color: PptxResolvedColor }> };
+  sourceLevel?: "slide" | "layout" | "master" | "default";
 }
 
 /** Resolve `<p:bg><p:bgPr>` (cor ou imagem) de um nó de fundo já localizado (slide/layout/master). */
-export function lerFundo(bgNo: NoXml | null, contexto: ContextoTema): FundoResolvido | null {
+export function lerFundo(bgNo: NoXml | null, contexto: ContextoTema, sourceLevel?: FundoResolvido["sourceLevel"]): FundoResolvido | null {
   const bgPr = bgNo?.["p:bgPr"];
+  const bgRef = bgNo?.["p:bgRef"];
+  if (!bgPr && bgRef) {
+    const cor = lerCorOoxml(bgRef, contexto);
+    if (cor) return { tipoCor: cor, imagemREmbed: null, sourceLevel };
+  }
   if (!bgPr) return null;
 
   const blip = bgPr["a:blipFill"]?.["a:blip"];
   const rEmbed = resolverBlipPreferido(blip);
-  if (typeof rEmbed === "string") return { tipoCor: null, imagemREmbed: rEmbed };
+  if (typeof rEmbed === "string") return { tipoCor: null, imagemREmbed: rEmbed, sourceLevel };
 
   const solid = bgPr["a:solidFill"];
   if (solid) {
     const cor = lerCorOoxml(solid, contexto);
-    if (cor) return { tipoCor: cor, imagemREmbed: null };
+    if (cor) return { tipoCor: cor, imagemREmbed: null, sourceLevel };
   }
 
-  // Gradiente: aproxima pela cor do primeiro stop — sem suporte a gradiente real no schema
-  // de fundo do Alpha Motion, uma cor sólida representativa é a melhor aproximação disponível.
   const gradStops = comoArray(bgPr["a:gradFill"]?.["a:gsLst"]?.["a:gs"]);
   if (gradStops.length > 0) {
-    const cor = lerCorOoxml(gradStops[0], contexto);
-    if (cor) return { tipoCor: cor, imagemREmbed: null };
+    const stops = gradStops.map((stop) => ({
+      position: Math.max(0, Math.min(100, (Number(stop?.["@_pos"]) || 0) / 1000)),
+      color: resolverCorOoxml(stop, { scheme: contexto.esquemaCores, colorMap: contexto.mapaCores }),
+    })).filter((stop): stop is { position: number; color: PptxResolvedColor } => Boolean(stop.color));
+    if (stops.length) {
+      const angle = ((Number(bgPr["a:gradFill"]?.["a:lin"]?.["@_ang"]) || 0) / 60000 + 90) % 360;
+      return {
+        tipoCor: stops[0].color.css,
+        imagemREmbed: null,
+        gradientCss: `linear-gradient(${angle}deg, ${stops.map((stop) => `${stop.color.css} ${stop.position}%`).join(", ")})`,
+        gradient: { angle, stops },
+        sourceLevel,
+      };
+    }
   }
 
   return null;
+}
+
+export interface ReferenciasEstiloResolvidas {
+  fill: NoXml | null;
+  line: NoXml | null;
+  effects: NoXml | null;
+  fontFamily: string | null;
+  placeholderColor: string | null;
+}
+
+function itemPorIndice(value: NoXml | NoXml[] | undefined, index: number): NoXml | null {
+  return comoArray<NoXml>(value)[index] ?? null;
+}
+
+/** Resolve `p:style` (`fillRef/lnRef/effectRef/fontRef`) no `fmtScheme/fontScheme` do Theme. */
+export function resolverReferenciasEstilo(style: NoXml | undefined, contexto: ContextoTema): ReferenciasEstiloResolvidas {
+  const themeElements = contexto.themeXml?.["a:theme"]?.["a:themeElements"];
+  const fmtScheme = themeElements?.["a:fmtScheme"];
+  const fillIndex = Number(style?.["a:fillRef"]?.["@_idx"]);
+  const lineIndex = Number(style?.["a:lnRef"]?.["@_idx"]);
+  const effectIndex = Number(style?.["a:effectRef"]?.["@_idx"]);
+  let fill: NoXml | null = null;
+  if (Number.isFinite(fillIndex) && fillIndex > 0) {
+    const list = fillIndex >= 1001 ? fmtScheme?.["a:bgFillStyleLst"] : fmtScheme?.["a:fillStyleLst"];
+    const index = fillIndex >= 1001 ? fillIndex - 1001 : fillIndex - 1;
+    const values = [
+      ...comoArray<NoXml>(list?.["a:solidFill"]),
+      ...comoArray<NoXml>(list?.["a:gradFill"]),
+      ...comoArray<NoXml>(list?.["a:blipFill"]),
+      ...comoArray<NoXml>(list?.["a:pattFill"]),
+      ...comoArray<NoXml>(list?.["a:noFill"]),
+    ];
+    fill = values[index] ?? null;
+  }
+  const line = Number.isFinite(lineIndex) && lineIndex > 0
+    ? itemPorIndice(fmtScheme?.["a:lnStyleLst"]?.["a:ln"], lineIndex - 1)
+    : null;
+  const effects = Number.isFinite(effectIndex) && effectIndex > 0
+    ? itemPorIndice(fmtScheme?.["a:effectStyleLst"]?.["a:effectStyle"], effectIndex - 1)
+    : null;
+  const fontRef = style?.["a:fontRef"];
+  const fontCollection = fontRef?.["@_idx"] === "minor"
+    ? themeElements?.["a:fontScheme"]?.["a:minorFont"]
+    : themeElements?.["a:fontScheme"]?.["a:majorFont"];
+  const placeholderColor = lerCorOoxml(fontRef, contexto);
+  return {
+    fill,
+    line,
+    effects,
+    fontFamily: typeof fontCollection?.["a:latin"]?.["@_typeface"] === "string" ? fontCollection["a:latin"]["@_typeface"] : null,
+    placeholderColor,
+  };
 }
 
 interface RetanguloEmuBruto {

@@ -58,6 +58,7 @@ export const MODULOS_REGISTRY: ModuloRegistryItem[] = [
 
   // ─── INFRA / DOCS ───
   { id: 'Documentos',         label: 'POP',                   href: '/PainelAlpha/DocsAlpha',                                                        iconName: 'FileStack',     category: 'infra',       permission: 'Documentos',         img: '/arquivo.png',            desc: 'Documentos de guia e normas para funções.',             tag: 'POP',        color: 'from-indigo-600/20' },
+  { id: 'notas',              label: 'Central de Notas',      href: '/PainelAlpha/Notas',                                                            iconName: 'StickyNote',    category: 'infra',       permission: 'notas',              img: '/document.png',           desc: 'Notas privadas, compartilhadas e vinculadas a registros do painel.', tag: 'Notas', color: 'from-yellow-600/20' },
 
   // ─── ADMIN ───
   { id: 'skillsGerenciamento', label: 'Ger. Alpha Skills', href: '/PainelAlpha/AlphaSkills/Gerenciamento', iconName: 'Settings', category: 'admin', permission: 'skillsGerenciamento', allowedRoles: ['Admin', 'CEO', 'TI'], img: '/elearning.png', desc: 'Gerenciamento de cursos, módulos e vídeos do Alpha Skills.', tag: 'Admin', color: 'from-green-600/20' },

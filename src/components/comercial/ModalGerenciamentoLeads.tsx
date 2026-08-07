@@ -15,6 +15,7 @@ import {
     getContratos,
     getColaboradoresComerciais,
     getServicosComerciais,
+    getProspeccoesAtivas,
     criarServicoComercial,
     excluirContrato,
     atualizarContratoUrl,
@@ -26,6 +27,7 @@ import { listarParceirosSimples, buscarParceiroDetalheSimples } from "@/actions/
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
+import { CampoProspeccaoAtiva } from "./CampoProspeccaoAtiva";
 import { isAdminRole } from "@/lib/roles";
 import {
     CANAL_INDICACAO_CLIENTE,
@@ -34,6 +36,10 @@ import {
     LABEL_INDICACAO_PARCEIRO,
     parseParceiroNaoCadastrado,
 } from "@/lib/comercial/parceiro-nao-cadastrado";
+import {
+    CANAL_PROSPECCAO_ATIVA,
+    normalizarCatalogoProspeccoes,
+} from "@/lib/comercial/prospeccao-ativa";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -125,6 +131,7 @@ const CANAIS_AQUISICAO = [
     { value: "Instagram", label: "Instagram" },
     { value: "Orgânico", label: "Orgânico" },
     { value: "Evento", label: "Evento" },
+    { value: CANAL_PROSPECCAO_ATIVA, label: CANAL_PROSPECCAO_ATIVA },
     { value: "Outro", label: "Outro" },
 ];
 
@@ -189,17 +196,20 @@ interface FormNovoContratoProps {
     ano: number;
     colaboradores: UsuarioSimples[];
     servicos: string[];
+    prospeccoesAtivas: string[];
     nomeUsuario?: string;
     initialData?: Contrato;
     editandoId?: string;
     onServicoNovo: (nome: string) => Promise<void>;
+    onProspeccaoSalva: (nome: string) => void;
     onSalvo: () => void;
     onCancelar: () => void;
 }
 
 function FormNovoContrato({
     mes, ano,
-    colaboradores, servicos, nomeUsuario, initialData, editandoId, onServicoNovo, onSalvo, onCancelar,
+    colaboradores, servicos, prospeccoesAtivas, nomeUsuario, initialData, editandoId,
+    onServicoNovo, onProspeccaoSalva, onSalvo, onCancelar,
 }: FormNovoContratoProps) {
     const isEdicao = !!editandoId;
     const cnpjInicial = initialData?.cnpj ? formatCNPJ(initialData.cnpj) : "";
@@ -233,7 +243,9 @@ function FormNovoContrato({
     const [showCloser, setShowCloser] = useState(false);
     const [canalAquisicao, setCanalAquisicao] = useState(initialData?.canalAquisicao ?? "");
     const [canalOutro, setCanalOutro] = useState(
-        initialData?.canalAquisicao === "Outro" ? (initialData.canalOutro ?? "") : "",
+        initialData?.canalAquisicao === "Outro" || initialData?.canalAquisicao === CANAL_PROSPECCAO_ATIVA
+            ? (initialData.canalOutro ?? "")
+            : "",
     );
     const [indicadoPorParceiroId, setIndicadoPorParceiroId] = useState<number | null>(initialData?.indicadoPorParceiroId ?? null);
     const [parceiroNaoCadastrado, setParceiroNaoCadastrado] = useState(Boolean(parceiroPendenteInicial));
@@ -358,6 +370,9 @@ function FormNovoContrato({
         if (!servico) { toast.error("Selecione o serviço"); return; }
         if (!canalAquisicao) { toast.error("Selecione o canal de aquisição"); return; }
         if (canalAquisicao === "Outro" && !canalOutro.trim()) { toast.error("Descreva o canal (Outro)"); return; }
+        if (canalAquisicao === CANAL_PROSPECCAO_ATIVA && !canalOutro.trim()) {
+            toast.error("Descreva a prospecção ativa"); return;
+        }
         if (canalAquisicao === CANAL_INDICACAO_PARCEIRO && parceiroNaoCadastrado && !parceiroPendenteNome.trim()) {
             toast.error("Informe o nome do parceiro"); return;
         }
@@ -383,7 +398,9 @@ function FormNovoContrato({
                 formaPagamento: formaPagamentoFinal,
                 servico,
                 canalAquisicao,
-                canalOutro: canalAquisicao === "Outro" ? (canalOutro.trim() || undefined) : undefined,
+                canalOutro: canalAquisicao === "Outro" || canalAquisicao === CANAL_PROSPECCAO_ATIVA
+                    ? (canalOutro.trim() || undefined)
+                    : undefined,
                 indicadoPorParceiroId: canalAquisicao === CANAL_INDICACAO_PARCEIRO && !parceiroNaoCadastrado
                     ? (indicadoPorParceiroId ?? undefined)
                     : undefined,
@@ -403,6 +420,9 @@ function FormNovoContrato({
                 : await criarContrato({ ...payload, mes, ano });
 
             if (!res.success) { toast.error(res.error); return; }
+            if (canalAquisicao === CANAL_PROSPECCAO_ATIVA) {
+                onProspeccaoSalva(canalOutro.trim());
+            }
             toast.success(isEdicao ? "Lead atualizado!" : "Contrato enviado!");
             onSalvo();
         } catch {
@@ -706,7 +726,10 @@ function FormNovoContrato({
                         <label className={labelCls}>Canal *</label>
                         <select
                             value={canalAquisicao}
-                            onChange={(e) => setCanalAquisicao(e.target.value)}
+                            onChange={(e) => {
+                                if (e.target.value !== canalAquisicao) setCanalOutro("");
+                                setCanalAquisicao(e.target.value);
+                            }}
                             className={inputCls}
                         >
                             <option value="">Selecione...</option>
@@ -727,6 +750,16 @@ function FormNovoContrato({
                                 className={inputCls}
                             />
                         </div>
+                    )}
+
+                    {canalAquisicao === CANAL_PROSPECCAO_ATIVA && (
+                        <CampoProspeccaoAtiva
+                            valor={canalOutro}
+                            opcoes={prospeccoesAtivas}
+                            onChange={setCanalOutro}
+                            inputClassName={inputCls}
+                            labelClassName={labelCls}
+                        />
                     )}
 
                     {/* Indicação de parceiros → parceiro cadastrado ou pendente */}
@@ -1532,6 +1565,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
     const [carregando, setCarregando] = useState(true);
     const [colaboradores, setColaboradores] = useState<UsuarioSimples[]>([]);
     const [servicos, setServicos] = useState<string[]>([]);
+    const [prospeccoesAtivas, setProspeccoesAtivas] = useState<string[]>([]);
     const [contratoParaFechar, setContratoParaFechar] = useState<Contrato | null>(null);
     const [contratoParaExcluir, setContratoParaExcluir] = useState<Contrato | null>(null);
     const [modoEdicao, setModoEdicao] = useState<Contrato | null>(null);
@@ -1557,7 +1591,7 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
         } finally {
             setCarregando(false);
         }
-    }, [mes, ano, isAdmin, painelGlobal, filtroColaboradorId]);
+    }, [mes, ano, podeGlobal, painelGlobal, filtroColaboradorId]);
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1573,6 +1607,9 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
             const merged = [...new Set([...SERVICOS_COMERCIAIS_PADRAO, ...fromDb])];
             setServicos(merged);
         });
+        getProspeccoesAtivas().then((res) => {
+            if (res.success) setProspeccoesAtivas(res.prospeccoes);
+        });
     }, []);
 
     const handleServicoNovo = async (nome: string) => {
@@ -1583,6 +1620,10 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
         } else {
             toast.error(res.error);
         }
+    };
+
+    const handleProspeccaoSalva = (nome: string) => {
+        setProspeccoesAtivas((atuais) => normalizarCatalogoProspeccoes([...atuais, nome]));
     };
 
     const handleExcluirConfirmado = async () => {
@@ -1755,10 +1796,12 @@ export default function ModalGerenciamentoLeads({ role, nomeUsuario, onFechar, o
                                         ano={ano}
                                         colaboradores={colaboradores}
                                         servicos={servicos}
+                                        prospeccoesAtivas={prospeccoesAtivas}
                                         nomeUsuario={nomeUsuario}
                                         initialData={modoEdicao ?? undefined}
                                         editandoId={modoEdicao?.id}
                                         onServicoNovo={handleServicoNovo}
+                                        onProspeccaoSalva={handleProspeccaoSalva}
                                         onSalvo={() => {
                                             setMostraForm(false);
                                             setModoEdicao(null);

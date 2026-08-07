@@ -9,13 +9,57 @@ export const textoComponenteSchema = baseComponenteSchema.extend({
   fontSize: z.number().optional(),
   fontWeight: z.enum(["normal", "bold"]).optional(),
   alinhamento: z.enum(["left", "center", "right"]).optional(),
+  fontFamily: z.string().optional(),
+  fontStyle: z.enum(["normal", "italic"]).optional(),
+  textDecoration: z.string().optional(),
+  lineHeight: z.number().positive().optional(),
+  letterSpacing: z.number().optional(),
+  padding: z.object({ left: z.number(), right: z.number(), top: z.number(), bottom: z.number() }).optional(),
+  verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),
+  wrap: z.boolean().optional(),
+  autofit: z.enum(["none", "normal", "shape"]).optional(),
+  richText: z.object({
+    paragraphs: z.array(z.object({
+      alignment: z.enum(["left", "center", "right", "justify"]).optional(),
+      level: z.number().int().nonnegative().optional(),
+      marginLeft: z.number().optional(),
+      indent: z.number().optional(),
+      lineSpacing: z.number().optional(),
+      spaceBefore: z.number().optional(),
+      spaceAfter: z.number().optional(),
+      bullet: z.string().optional(),
+      numbering: z.object({ type: z.string(), startAt: z.number().int().optional() }).optional(),
+      tabs: z.array(z.number()).optional(),
+      runs: z.array(z.object({
+        text: z.string(),
+        fontFamily: z.string().optional(),
+        fontSize: z.number().positive().optional(),
+        bold: z.boolean().optional(),
+        italic: z.boolean().optional(),
+        underline: z.string().optional(),
+        strike: z.string().optional(),
+        color: z.string().optional(),
+        baseline: z.number().optional(),
+        tracking: z.number().optional(),
+        caps: z.string().optional(),
+        hyperlink: z.string().optional(),
+      })),
+    })),
+  }).optional(),
 });
 
 export const imagemComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("imagem"),
   url: z.string(),
   alt: z.string().optional(),
-  objectFit: z.enum(["cover", "contain"]).optional(),
+  objectFit: z.enum(["cover", "contain", "fill"]).optional(),
+  crop: z.object({
+    left: z.number().min(0).max(0.999),
+    top: z.number().min(0).max(0.999),
+    right: z.number().min(0).max(0.999),
+    bottom: z.number().min(0).max(0.999),
+  }).optional(),
+  tile: z.boolean().optional(),
 });
 
 /** Vídeo HTML5 nativo — mesmo padrão de imagem (URL, sem upload próprio nesta onda). */
@@ -57,4 +101,8 @@ export const divisorComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("divisor"),
   cor: z.string().optional(),
   espessura: z.number().optional(),
+  estilo: z.enum(["solid", "dash", "dot", "dashDot"]).optional(),
+  cap: z.enum(["butt", "round", "square"]).optional(),
+  beginArrow: z.string().optional(),
+  endArrow: z.string().optional(),
 });

@@ -89,7 +89,20 @@ export function RenderComponente({
       return (
         <AnimacaoWrapper animacao={anim}>
           <FilhosContainer
-            style={{ background: componente.corFundo ?? "transparent", borderRadius: componente.borderRadius ?? 0, padding: componente.padding ?? 0, position: "relative", overflow: "hidden" }}
+            style={{
+              background: componente.corFundo ?? "transparent",
+              borderRadius: componente.borderRadius ?? 0,
+              padding: componente.padding ?? 0,
+              position: "relative",
+              overflow: "hidden",
+              boxSizing: "border-box",
+              border: componente.larguraBorda
+                ? `${componente.larguraBorda}px ${componente.estiloBorda ?? "solid"} ${componente.corBorda ?? "transparent"}`
+                : undefined,
+              boxShadow: componente.sombra
+                ? `${componente.sombra.inset ? "inset " : ""}${componente.sombra.x}px ${componente.sombra.y}px ${componente.sombra.blur}px ${componente.sombra.spread}px ${componente.sombra.color}`
+                : undefined,
+            }}
             filhos={componente.filhos}
             usaStagger={anim?.tipo === "stagger"}
             staggerDelay={anim?.staggerDelay ?? 0.1}

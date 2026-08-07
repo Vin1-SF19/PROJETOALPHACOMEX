@@ -203,6 +203,7 @@ export function PlayerStandalone({ dados }: { dados: DadosApresentacaoExportada 
                 width: slideAtual.canvas.width,
                 height: slideAtual.canvas.height,
                 backgroundColor: slideAtual.canvas.backgroundColor,
+                backgroundImage: slideAtual.canvas.backgroundImage,
                 transform: `scale(${escala})`,
                 transformOrigin: "center center",
               }}

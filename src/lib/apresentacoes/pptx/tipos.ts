@@ -1,4 +1,7 @@
-/** Representação intermediária extraída de um `.pptx` — antes de virar `ComponenteSlide[]`. */
+import type { PptxCrop, PptxEffects, PptxIntermediateModel, PptxLine, PptxSourceRef, PptxTextBody } from "./modelo-intermediario";
+import type { PptxDiagnosticEntry } from "./diagnostico";
+
+/** Modelo de conversão derivado do `PptxIntermediateModel` — antes de virar `ComponenteSlide[]`. */
 
 export interface RetanguloExtraido {
   x: number;
@@ -7,6 +10,11 @@ export interface RetanguloExtraido {
   h: number;
   /** Graus, sentido horário — mesma convenção do campo `rotacao` do schema de componentes. */
   rotacao: number;
+  flipH?: boolean;
+  flipV?: boolean;
+  opacidade?: number;
+  zIndex?: number;
+  source?: PptxSourceRef;
 }
 
 export interface FormaTextoExtraida extends RetanguloExtraido {
@@ -17,6 +25,17 @@ export interface FormaTextoExtraida extends RetanguloExtraido {
   tamanhoFonte: number | null;
   alinhamento: "left" | "center" | "right" | null;
   ehTitulo: boolean;
+  richText?: PptxTextBody;
+  fontFamily?: string | null;
+  italic?: boolean;
+  underline?: string | null;
+  lineHeight?: number | null;
+  letterSpacing?: number | null;
+  padding?: { left: number; right: number; top: number; bottom: number };
+  verticalAlign?: "top" | "middle" | "bottom";
+  wrap?: boolean;
+  autofit?: "none" | "normal" | "shape";
+  fontScale?: number;
 }
 
 export interface FormaImagemExtraida extends RetanguloExtraido {
@@ -24,6 +43,8 @@ export interface FormaImagemExtraida extends RetanguloExtraido {
   bytes: Uint8Array;
   mimeType: string;
   nomeArquivo: string;
+  crop?: PptxCrop;
+  tile?: boolean;
 }
 
 export interface FormaTabelaExtraida extends RetanguloExtraido {
@@ -38,12 +59,26 @@ export interface FormaCaixaExtraida extends RetanguloExtraido {
   corFundo: string | null;
   formato: "rect" | "roundRect" | "ellipse";
   textoInterno: FormaTextoExtraida | null;
+  line?: PptxLine;
+  effects?: PptxEffects;
+  gradientCss?: string | null;
+  lineWidthPx?: number;
+  sombra?: { x: number; y: number; blur: number; spread: number; color: string; inset?: boolean };
 }
 
-export type FormaExtraida = FormaTextoExtraida | FormaImagemExtraida | FormaTabelaExtraida | FormaCaixaExtraida;
+export interface FormaLinhaExtraida extends RetanguloExtraido {
+  tipo: "linha";
+  line: PptxLine;
+  lineWidthPx?: number;
+}
+
+export type FormaExtraida = FormaTextoExtraida | FormaImagemExtraida | FormaTabelaExtraida | FormaCaixaExtraida | FormaLinhaExtraida;
 
 export interface SlideExtraido {
   formas: FormaExtraida[];
+  backgroundColor: string;
+  backgroundImage?: string;
+  sourcePath?: string;
 }
 
 /** 1 entrada de diagnóstico por elemento OOXML processado (sucesso ou fallback) — pensado pra
@@ -70,10 +105,11 @@ export interface ApresentacaoPptxExtraida {
    * fill reconhecido etc.) — contadas por motivo ESPECÍFICO, só pra reportar ao usuário o que
    * ficou de fora (nunca uma mensagem genérica única). */
   ignorados: Record<string, number>;
-  /** Nomes de fonte (`<a:latin typeface="...">`) usados no arquivo original que NÃO são
-   * aplicados no Alpha Motion — o componente de texto não tem campo `fontFamily`. Reportado
-   * explicitamente em vez de trocar pela fonte padrão do sistema em silêncio. */
+  /** Alias legado. A disponibilidade real é verificada no browser pelo FontResolver. */
   fontesNaoAplicadas: string[];
+  fontesDetectadas: string[];
   /** 1 entrada por elemento OOXML processado — ver `DiagnosticoElemento`. */
   diagnostico: DiagnosticoElemento[];
+  diagnosticosDetalhados: PptxDiagnosticEntry[];
+  intermediateModel: PptxIntermediateModel;
 }

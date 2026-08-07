@@ -76,6 +76,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Admin | Gestão de Protocolos | `/PainelAlpha/GestaoProtocolos` | roles Admin/CEO/Suporte |
 | Admin | Onboarding | `/PainelAlpha/GestaoOnboarding` | admin only |
 | Admin | Conectores IAlpha | `/PainelAlpha/Conectores` | admin only |
+| Infra | Central de Notas | `/PainelAlpha/Notas` | `notas` ← **Fases 01-05/8 concluídas em 2026-08-07, migration APLICADA EM PRODUÇÃO** (schema+permissões, barra global+editor+autosave, Central de Notas, contextos, colaboração/histórico/notificações real-time — ver seção própria abaixo e `architecture.md`) |
 
 ### Alpha CheckList — organização operacional (2026-07-14)
 
@@ -355,6 +356,49 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 ---
 
+## Sistema de Notas — camada global (fila `prompt-phases/`, Fases 01-05/8 concluídas — ✅ MIGRATION APLICADA EM PRODUÇÃO em 2026-08-07)
+
+**Objetivo:** camada global de notas do Painel Alpha (barra inferior estilo abas de planilha, editor TipTap, Central de Notas, vínculo com módulos/registros, colaboração, anexos/lembretes). Prompt mestre e as 8 fases vivem em `prompt-phases/00-contexto-geral.md` a `08-testes-ia-hooks-documentacao-final.md` (fila ativa — ver `prompt-phases/_status.md`).
+
+**✅ As 11 tabelas do sistema (`Note`, `NoteContext`, `NotePermission`, `Tag`, `NoteTag`, `NoteVersion`, `NoteComment`, `NoteAttachment`, `NoteReminder`, `UserOpenNoteTab`, `UserNotesWorkspace`) existem de verdade no Turso de produção desde 2026-08-07** — ver `decisions.md` para o histórico completo do desbloqueio.
+
+**Fase 05 (Colaboração + Histórico + Notificações) — concluída, aprovada por Forge/Probe/Anubis — MIGRATION APLICADA EM PRODUÇÃO durante esta fase:**
+- `src/actions/NotasColaboracao.ts` (compartilhar/permissões/comentários/menções/histórico/restauração de versão).
+- Notificações real-time via Pusher (`src/lib/notas/notificacoes.ts`, `src/hooks/useNotasNotifications.ts`, canal `private-notas-usuario-<id>` em `/api/pusher/auth`).
+- Menção `@` via `@tiptap/extension-mention` (instalada na Fase 02, usada agora).
+- Bug visual real corrigido (barra cobria a sidebar) + as 11 tabelas do sistema aplicadas no Turso real após confirmação explícita do usuário.
+
+**Fase 04 (Contextos + Integração) — concluída, aprovada por Forge/Probe/Anubis (com escopo reduzido documentado):**
+- `src/actions/NotasContexto.ts` + `src/components/Notas/Contexto/{NotesContextButton,NotesContextPanel,NoteLinkDialog}.tsx` + `src/components/Notas/NotesSearchCommand.tsx`.
+- Integração real só em `chamados` (`DetalhesChamado.tsx`) — CS&NPS/Alpha Leads/Agenda Alpha pendentes, ver `decisions.md`.
+- Achado de segurança corrigido: `entidadeReferenciadaExiste()` valida existência do registro antes de aceitar vínculo.
+
+**Fase 03 (Central de Notas) — concluída, aprovada por Forge/Probe:**
+- `src/app/PainelAlpha/Notas/page.tsx` — rota real, existe de verdade agora.
+- `src/components/Notas/Central/{CentralDeNotas,SidebarFiltros,ListaNotas,PainelPropriedades,EstadoVazioNotas}.tsx`.
+- `src/actions/NotasBusca.ts` — `BuscarNotas` (busca full-text + 9 seções), `FixarNota`/`FavoritarNota`/tags.
+- `Note.isPinned` adicionado ao schema (mesmo lote de migration pendente da Fase 01).
+
+**Fase 02 (Barra + Editor + Autosave) — concluída, aprovada por Forge/Probe:**
+- `src/components/Notas/NotesGlobalTaskbar.tsx` + `NoteTab.tsx` + `NoteViewer.tsx` + `NoteEditor/{NoteEditor.tsx,slash-command.ts,SlashCommandList.tsx}` — barra fixa no rodapé, editor TipTap reaproveitando a base do Alpha Blueprint + extensões novas (cor/destaque/slash-command).
+- `src/store/useNotasWorkspace.ts` (Zustand), `src/lib/notas-tabs.ts` (persistência local), `src/hooks/useNotasAtalhos.ts` (atalhos), `src/actions/NotasWorkspace.ts` (Server Actions de abas).
+- `PainelLayoutClient.tsx` monta a barra fora do container de iframes.
+- 5 pacotes TipTap novos instalados com versão pinada exata (ver `architecture.md`).
+
+**Fase 01 (Fundação) — concluída, aprovada por Forge/Probe:**
+- `prisma/schema.prisma` — 11 models novos (ver `architecture.md` para o detalhe completo do schema). **Migration real AINDA NÃO aplicada no Turso** — bloqueada pelo Vault aguardando confirmação do usuário (ver `decisions.md`).
+- `src/lib/validations/notas.ts` — Zod (criar/atualizar/listar nota, vincular contexto, compartilhar, workspace, abas).
+- `src/lib/notas/permissoes.ts` — `podeVisualizarNota`/`podeEditarNota`/etc., com herança de permissão contextual via `MODULOS_REGISTRY`/`getPermissoesEfetivas` e resolução de "nota de equipe" via `isSameRole()` contra `usuarios.role` (não existe tabela de Team no projeto).
+- `src/actions/Notas.ts` — `CriarNota`, `AtualizarNota` (versão otimista), `ObterNota`, `ListarNotas` (paginado), `ArquivarNota`, `RestaurarNota`, `MoverNotaParaLixeira`, `ExcluirNotaDefinitivamente`.
+- `src/lib/z-index.ts` (novo) — primeira escala de z-index centralizada do projeto.
+- `src/lib/modulos-registry.ts` — entrada `notas` (categoria `infra`, ícone `StickyNote`) — rota ainda não existe (Fase 03).
+
+**Próximas fases (não iniciadas ainda):** 02 (barra inferior + editor TipTap + autosave), 03 (Central de Notas — rota real nasce aqui), 04 (contextos/integração com módulos reais), 05 (colaboração/histórico/notificações), 06 (anexos/lembretes/auditoria), 07 (responsividade/acessibilidade/performance), 08 (testes/IA/documentação final).
+
+**Última atualização:** 2026-08-07 por Scribe
+
+---
+
 ## Alpha Motion — motor de animação do Presentation Studio (Fases 01-09 da fila `prompt-phases/`)
 
 Sistema de animação/timeline do Alpha Presentation Studio, construído em fases sequenciais (Fundação → Animações básicas → Sequenciamento/Stagger → Timeline Visual → Transições entre Slides → Morph → Efeitos Especiais → Scroll/Controles do Player → Presets/Preview/Polimento). Detalhe completo de cada fase vive em `integration-points.md` (seção "Alpha Motion — Fase N"); esta entrada é só o mapa estrutural.
@@ -388,7 +432,33 @@ src/components/Apresentacoes/ModoApresentacao/  # Player "ao vivo" dentro do pai
 
 **Dois formatos de animação coexistem (importante para quem for construir preview/UI nova):** `ConfigAnimacao` (formato legado, Onda 3, lido por `variantsPara`/`AnimacaoWrapper` em `nucleo.tsx`) e `ElementAnimation` (formato novo do Alpha Motion, Fases 01-09, lido via `resolverAnimacoesDoElemento`). Não são intercambiáveis — `PreviewMiniatura.tsx` (Fase 09) precisou de um mapa de variants PRÓPRIO em vez de reaproveitar `nucleo.tsx`, porque os schemas de entrada são incompatíveis. Ainda não convergiram numa fase futura de unificação.
 
-**Última atualização:** 2026-08-06 por Scribe (Fase 09)
+### Alpha Motion — importador PPTX de alta fidelidade
+
+**Atualizado em:** 2026-08-07 por Scribe
+
+```
+src/lib/apresentacoes/pptx/
+  parser.ts                 # Orquestra OOXML slide/layout/master/theme e gera modelo intermediário
+  modelo-intermediario.ts   # Árvore canônica em EMU: source, transform, fill, text, effects e fallback
+  matriz-transformacao.ts   # Matrizes afins para grupos, rotação e flips
+  color-resolver.ts         # Cores RGB/theme/system + modificadores OOXML
+  heranca.ts                # Placeholders e propriedades herdadas
+  texto.ts                  # Paragraph/run, listas, tabs, autofit e FontResolver
+  geometria.ts              # preset/custom geometry, paths e clip de imagem
+  diagnostico.ts            # INFO/WARNING/FALLBACK/ERROR por elemento
+  seguranca.ts              # Limites ZIP e bloqueio de caminhos/relações externas
+  reference-renderer.ts     # PNG independente via PowerPoint COM quando disponível
+  visual-diff.ts            # Original/Importado/Diferença e similaridade
+  mapear.ts                 # Única fronteira do modelo PPTX para ComponenteSlide
+src/app/api/apresentacoes/[id]/pptx-preview/route.ts    # Prévia sem persistência
+src/app/api/apresentacoes/[id]/importar-pptx/route.ts   # Commit, asset original e deduplicação
+scripts/render-pptx-reference.ps1                       # Export seguro pelo PowerPoint
+tests/apresentacoes/pptx-ooxml-core.test.ts             # Regressões de cor/matriz/texto/herança/segurança
+```
+
+O render não é exclusivo da prévia: schema e componentes compartilhados propagam rich text, fontes, crop/tile, flip, opacidade, linha/seta, sombra e background gradiente para Editor, PortalPreview, modo apresentação e player offline. `CanvasArea.tsx` concentra o overlay "Debug PPTX". A story de referência é `docs/stories/story-alpha-motion-importador-pptx-alta-fidelidade.md`.
+
+**Última atualização:** 2026-08-07 por Scribe (importador PPTX de alta fidelidade)
 
 ---
 

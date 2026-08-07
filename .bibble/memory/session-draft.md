@@ -1,0 +1,2 @@
+2026-08-07 — Alpha Motion: importador PPTX reestruturado com modelo intermediário OOXML, herança slide/layout/master/theme, texto rico, crop/tile, transforms, diagnóstico, renderer PowerPoint e diff visual; 25/25 testes específicos aprovados.
+Aceite visual do deck real de 18 slides permanece pendente porque o `.pptx` não foi anexado à tarefa atual; story e mapas do projeto registram essa limitação sem declarar falso sucesso.

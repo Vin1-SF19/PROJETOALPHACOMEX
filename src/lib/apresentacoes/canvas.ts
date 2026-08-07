@@ -5,6 +5,7 @@ export const canvasConfigSchema = z.object({
   width: z.number().int().min(320).max(3840),
   height: z.number().int().min(320).max(3840),
   backgroundColor: z.string().min(1).max(64).default("#0f172a"),
+  backgroundImage: z.string().max(4096).optional(),
 });
 
 export type CanvasConfig = z.infer<typeof canvasConfigSchema>;

@@ -14,6 +14,11 @@ import {
     serializarParceiroNaoCadastrado,
     type ParceiroNaoCadastradoInput,
 } from "@/lib/comercial/parceiro-nao-cadastrado";
+import {
+    CANAL_PROSPECCAO_ATIVA,
+    normalizarCatalogoProspeccoes,
+    ProspeccaoAtivaSchema,
+} from "@/lib/comercial/prospeccao-ativa";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -102,6 +107,19 @@ function resolverOrigemParceiro(d: {
     indicadoPorParceiroId?: number;
     parceiroNaoCadastrado?: ParceiroNaoCadastradoInput;
 }) {
+    if (d.canalAquisicao === CANAL_PROSPECCAO_ATIVA) {
+        const prospeccao = ProspeccaoAtivaSchema.safeParse(d.canalOutro ?? "");
+        if (!prospeccao.success) {
+            return { success: false as const, error: prospeccao.error.issues[0].message };
+        }
+
+        return {
+            success: true as const,
+            canalOutro: prospeccao.data,
+            indicadoPorParceiroId: null,
+        };
+    }
+
     if (d.canalAquisicao === "Outro" && !d.canalOutro?.trim()) {
         return { success: false as const, error: "Descreva o canal de aquisição" };
     }
@@ -458,6 +476,44 @@ export async function getServicosComerciais() {
     } catch (err) {
         console.error("getServicosComerciais:", err);
         return { success: false as const, error: "Erro ao buscar serviços" };
+    }
+}
+
+export async function getProspeccoesAtivas() {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+
+    const userId = Number((session.user as { id?: string }).id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+        return { success: false as const, error: "Não autorizado" };
+    }
+
+    const usuario = await db.usuarios.findUnique({
+        where: { id: userId },
+        select: { role: true },
+    });
+    if (!isComercialOrAdmin(usuario?.role ?? "")) {
+        return { success: false as const, error: "Sem permissão" };
+    }
+
+    try {
+        const contratos = await db.contratoComercial.findMany({
+            where: {
+                canalAquisicao: CANAL_PROSPECCAO_ATIVA,
+                canalOutro: { not: null },
+            },
+            select: { canalOutro: true },
+            orderBy: { updatedAt: "desc" },
+            take: 500,
+        });
+
+        return {
+            success: true as const,
+            prospeccoes: normalizarCatalogoProspeccoes(contratos.map((contrato) => contrato.canalOutro)),
+        };
+    } catch (err) {
+        console.error("getProspeccoesAtivas:", err);
+        return { success: false as const, error: "Erro ao buscar prospecções ativas" };
     }
 }
 

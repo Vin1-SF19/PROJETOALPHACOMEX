@@ -15,6 +15,10 @@ import ChecklistNotificationToast from '@/components/Checklist/ChecklistNotifica
 import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
 import BibbleWeatherWidget from '@/components/BibbleChatHome/BibbleWeatherWidget';
 import OnboardingModal from './OnboardingModal';
+import { NotesGlobalTaskbar } from '@/components/Notas/NotesGlobalTaskbar';
+import { NotaNotificacaoToast } from '@/components/Notas/NotaNotificacaoToast';
+import { useNotasNotifications } from '@/hooks/useNotasNotifications';
+import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
 import type { OnboardingVideo } from '@/lib/onboarding';
 import { signOut } from 'next-auth/react';
 import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
@@ -72,6 +76,8 @@ export default function PainelLayoutClient({
   const showOnboarding = !onboardingVisto && !onboardingDone && !!onboardingVideo;
 
   useChamadosNotifications(role, userId);
+  useNotasNotifications(userId);
+  useNotasLembretesPendentes();
   useChecklistNotifications(role);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────
@@ -243,6 +249,7 @@ export default function PainelLayoutClient({
       <NotificationToast />
       <ChecklistNotificationToast />
       <HoleriteNotificacaoGlobal authenticated />
+      <NotaNotificacaoToast />
 
       {!tvMode && (
         <GlobalSidebar
@@ -347,6 +354,9 @@ export default function PainelLayoutClient({
           )}
         </div>
       </div>
+
+      {/* Camada global de notas — fora do container de iframes, sobreposta ao rodapé de qualquer módulo aberto. Recuada pela mesma largura da sidebar em telas lg+ para nunca cobri-la. */}
+      {!tvMode && <NotesGlobalTaskbar userId={userId} sidebarOffsetClass={sidebarOffset} />}
     </>
   );
 }

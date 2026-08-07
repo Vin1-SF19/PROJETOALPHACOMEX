@@ -9,6 +9,7 @@ import {
 } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard, isAdminRole } from "@/lib/bpm/ownership";
 import { executarAutomacaoFechamentoComercial } from "@/lib/bpm/automacoes";
+import { buscarServicosContratados } from "@/actions/Clientes";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -135,6 +136,50 @@ export async function ObterCardBpm(cardId: string) {
     console.error("[ObterCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao buscar card";
     return { success: false, error: msg };
+  }
+}
+
+/** Lista nome e telefone das pessoas vinculadas à empresa do card. */
+export async function ListarTelefonesCardBpm(cardId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Não autorizado", data: [] };
+    }
+    const userId = Number(session.user.id);
+
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+
+    const card = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: { empresaId: true },
+    });
+    if (!card) return { success: false, error: "Card não encontrado", data: [] };
+
+    const pessoas = await db.socios.findMany({
+      where: {
+        telefone: { not: null },
+        OR: [
+          { clienteId: card.empresaId },
+          { empresaVinculos: { some: { empresaId: card.empresaId } } },
+        ],
+      },
+      select: { id: true, nome: true, telefone: true },
+      orderBy: [{ nome: "asc" }, { id: "asc" }],
+    });
+
+    const data = pessoas.flatMap((pessoa) => {
+      const telefone = pessoa.telefone?.trim();
+      return telefone ? [{ id: pessoa.id, nome: pessoa.nome, telefone }] : [];
+    });
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("[ListarTelefonesCardBpm]", error);
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : "Erro ao buscar telefones";
+    return { success: false, error: msg, data: [] };
   }
 }
 
@@ -341,6 +386,67 @@ export async function MoverCardBpm(dados: unknown) {
   } catch (error) {
     console.error("[MoverCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao mover card";
+    return { success: false, error: msg };
+  }
+}
+
+function servicoBate(valor: string | null | undefined, servico: string): boolean {
+  if (!valor) return false;
+  return valor.toLowerCase().includes(servico.toLowerCase());
+}
+
+/**
+ * Histórico da empresa (mesmo CNPJ) num serviço específico (ex: "TTD-409"),
+ * cruzando 3 fontes já existentes: cadastros CS&NPS (`clientes`, um registro
+ * por serviço contratado), contratos do Painel de Metas (`buscarServicosContratados`)
+ * e outros cards do próprio Alpha BPM/CRM para a mesma empresa. Usado pelas tabs
+ * de serviço do CardFullViewModal — nenhuma tabela nova, nenhuma migration.
+ */
+export async function ObterHistoricoServicoEmpresa(cardId: string, servico: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+
+    const card = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: { empresaId: true, empresa: { select: { cnpj: true } } },
+    });
+    if (!card) return { success: false, error: "Card não encontrado" };
+
+    const [registrosClientesTodos, contratosTodos, outrosCardsTodos] = await Promise.all([
+      db.clientes.findMany({
+        where: { cnpj: card.empresa.cnpj },
+        select: {
+          id: true, servicos: true, status: true, analistaResponsavel: true,
+          dataContratacao: true, dataExito: true,
+        },
+        orderBy: { id: "desc" },
+      }),
+      buscarServicosContratados(card.empresa.cnpj),
+      db.bpmCard.findMany({
+        where: { empresaId: card.empresaId, id: { not: cardId } },
+        select: {
+          id: true, servico: true, status: true, createdAt: true,
+          pipeline: { select: { nome: true } },
+          etapa: { select: { nome: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    const data = {
+      registrosClientes: registrosClientesTodos.filter((c) => servicoBate(c.servicos, servico)),
+      contratos: contratosTodos.filter((c) => servicoBate(c.servico, servico)),
+      outrosCards: outrosCardsTodos.filter((c) => servicoBate(c.servico, servico)),
+    };
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("[ObterHistoricoServicoEmpresa]", error);
+    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao buscar histórico do serviço";
     return { success: false, error: msg };
   }
 }

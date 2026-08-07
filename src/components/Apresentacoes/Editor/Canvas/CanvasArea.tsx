@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Bug } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { useEditorStore } from "../store/useEditorStore";
 import { ComponenteNoCanvas } from "./ComponenteNoCanvas";
@@ -19,6 +20,7 @@ interface CanvasAreaProps {
 }
 
 export function CanvasArea({ tema }: CanvasAreaProps) {
+  const [debugPptx, setDebugPptx] = useState(false);
   const componentes = useEditorStore((s) => s.componentes);
   const slides = useEditorStore((s) => s.slides);
   const slideAtivoId = useEditorStore((s) => s.slideAtivoId);
@@ -61,6 +63,16 @@ export function CanvasArea({ tema }: CanvasAreaProps) {
 
   return (
     <div ref={areaVisualizacaoRef} className="relative flex h-full w-full items-center justify-center overflow-auto bg-slate-950 p-12">
+      <button
+        type="button"
+        data-editor-only="true"
+        onClick={() => setDebugPptx((current) => !current)}
+        aria-pressed={debugPptx}
+        className={`absolute right-4 top-4 z-50 flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium ${debugPptx ? "border-cyan-400/50 bg-cyan-500/15 text-cyan-200" : "border-white/10 bg-slate-900/80 text-slate-400 hover:text-white"}`}
+      >
+        <Bug size={13} aria-hidden="true" />
+        Debug PPTX
+      </button>
       <div
         ref={setNodeRef}
         id="alpha-presentation-canvas"
@@ -72,6 +84,7 @@ export function CanvasArea({ tema }: CanvasAreaProps) {
           transform: `scale(${zoom})`,
           transformOrigin: "center center",
           backgroundColor: canvas.backgroundColor,
+          backgroundImage: canvas.backgroundImage,
           outline: isOver ? "2px dashed rgb(99,102,241)" : "1px solid rgba(255,255,255,0.05)",
           // CSS custom properties do tema aplicado — disponíveis para qualquer componente que
           // queira referenciar var(--tema-cor-*) manualmente. Opt-in: os 7 tipos existentes não
@@ -99,6 +112,19 @@ export function CanvasArea({ tema }: CanvasAreaProps) {
             <ComponenteNoCanvas key={c.id} componente={c} portalProximoSlide={portalProximoSlide} ajusteVisual={ajuste} />
           )}
         </EfeitosGlobaisSlide>
+
+        {debugPptx && componentes.filter((component) => component.pptxOrigem).map((component) => (
+          <div
+            key={`debug-${component.id}`}
+            data-editor-only="true"
+            className={`pointer-events-none absolute border ${component.pptxOrigem?.fallback ? "border-amber-400 bg-amber-400/5" : "border-cyan-400/80 bg-cyan-400/[0.03]"}`}
+            style={{ left: component.x, top: component.y, width: component.w, height: component.h, zIndex: 100000 }}
+          >
+            <span className="absolute left-0 top-0 max-w-full -translate-y-full truncate bg-slate-950/90 px-1 py-0.5 font-mono text-[9px] text-cyan-200">
+              {component.pptxOrigem?.shapeId ?? "?"} · {component.pptxOrigem?.name ?? component.tipo} · z{component.zIndex} · {Math.round(component.w)}×{Math.round(component.h)}
+            </span>
+          </div>
+        ))}
 
         {componentes.length === 0 && (
           <div data-editor-only="true" className="absolute inset-0 flex items-center justify-center text-sm text-slate-600">

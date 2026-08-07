@@ -149,11 +149,16 @@ export async function AtualizarSlide(dados: unknown) {
     }
 
     const userId = Number(session.user.id);
-    const slideAtual = await db.slide.findUnique({ where: { id }, select: { apresentacaoId: true } });
+    const slideAtual = await db.slide.findUnique({ where: { id }, select: { apresentacaoId: true, dadosJson: true } });
     if (!slideAtual) return { success: false, error: "Slide não encontrado" };
 
     const autorizado = await checarOwnershipApresentacao(slideAtual.apresentacaoId, userId, session.user.role);
     if (!autorizado) return { success: false, error: "Sem permissão" };
+
+    const dadosExistentes = dadosSlideSchema.safeParse(slideAtual.dadosJson);
+    const dadosParaGravar = parsed.data.pptxSource || !dadosExistentes.success || !dadosExistentes.data.pptxSource
+      ? parsed.data
+      : { ...parsed.data, pptxSource: dadosExistentes.data.pptxSource };
 
     await db.slide.update({
       where: { id },
@@ -161,7 +166,7 @@ export async function AtualizarSlide(dados: unknown) {
       // o Prisma exige InputJsonValue (index signature genérica) para campos Json,
       // que não é estruturalmente igual ao tipo forte ComponenteSlide[] recursivo.
       data: {
-        dadosJson: parsed.data as object,
+        dadosJson: dadosParaGravar as object,
         ...(typeof nome === "string" && nome.trim() ? { nome: nome.trim() } : {}),
         ...(transicaoParaGravar !== undefined ? { transicaoEntrada: transicaoParaGravar } : {}),
       },

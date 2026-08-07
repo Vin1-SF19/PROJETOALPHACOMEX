@@ -312,6 +312,7 @@ export function ModoApresentacaoClient({
             width: slidePalco.canvas.width,
             height: slidePalco.canvas.height,
             backgroundColor: slidePalco.canvas.backgroundColor,
+            backgroundImage: slidePalco.canvas.backgroundImage,
             transform: `scale(${escalaSlide})`,
             transformOrigin: "center center",
           }}
