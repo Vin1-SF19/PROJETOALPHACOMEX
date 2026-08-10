@@ -9,6 +9,7 @@ import { TransicaoContainerAlphaLayer } from "@/components/Apresentacoes/ModoApr
 import { obterAnimacaoContainerAlphaInicial } from "@/lib/apresentacoes/animacao-container-alpha";
 import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-audio";
 import type { DadosApresentacaoExportada } from "./dados-tipos";
+import { FontesPersonalizadasStyle } from "@/components/Apresentacoes/FontesPersonalizadasStyle";
 
 /**
  * Tempo de bloqueio após cada avanço — cobre a duração real da transição (`TransicaoSlide`
@@ -185,6 +186,7 @@ export function PlayerStandalone({ dados }: { dados: DadosApresentacaoExportada 
       onClick={handleClick}
       className="fixed inset-0 flex min-h-0 min-w-0 items-center justify-center overflow-hidden bg-black"
     >
+      <FontesPersonalizadasStyle fontes={dados.fontesPersonalizadas ?? []} />
       {capaAtiva && configCapaInicial ? (
         <TransicaoContainerAlphaLayer
           configuracao={configCapaInicial}

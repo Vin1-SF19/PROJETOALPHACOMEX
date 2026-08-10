@@ -7,6 +7,7 @@ import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 import { isAdminRole } from "@/lib/roles";
 import { transicaoEntradaSchema } from "@/lib/apresentacoes/transicoes/catalogo";
 import { removerPresetsDoPacoteDoSlide } from "@/lib/apresentacoes/animacao/presets-personalizados";
+import { removerFontesDoPacoteDoSlide } from "@/lib/apresentacoes/fontes-personalizadas";
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
@@ -164,6 +165,9 @@ export async function AtualizarSlide(dados: unknown) {
           ...(parsed.data.presetsAnimacao || !dadosExistentes.data.presetsAnimacao
             ? {}
             : { presetsAnimacao: dadosExistentes.data.presetsAnimacao }),
+          ...(parsed.data.fontesPersonalizadas || !dadosExistentes.data.fontesPersonalizadas
+            ? {}
+            : { fontesPersonalizadas: dadosExistentes.data.fontesPersonalizadas }),
         }
       : parsed.data;
 
@@ -248,6 +252,7 @@ export async function ExcluirSlide(slideId: string) {
     // slides restantes não "subiam" de número — pedido explícito do usuário pra funcionar assim.
     const dadosSlideExcluido = dadosSlideSchema.safeParse(slide.dadosJson);
     const presetsDoSlideExcluido = dadosSlideExcluido.success ? dadosSlideExcluido.data.presetsAnimacao : undefined;
+    const fontesDoSlideExcluido = dadosSlideExcluido.success ? dadosSlideExcluido.data.fontesPersonalizadas : undefined;
 
     await db.$transaction(async (tx) => {
       await tx.slide.delete({ where: { id: slideId } });
@@ -257,12 +262,21 @@ export async function ExcluirSlide(slideId: string) {
         select: { id: true, dadosJson: true },
       });
       await Promise.all(restantes.map((s, index) => tx.slide.update({ where: { id: s.id }, data: { ordem: index } })));
-      if (presetsDoSlideExcluido?.length && restantes[0]) {
+      if ((presetsDoSlideExcluido?.length || fontesDoSlideExcluido?.length) && restantes[0]) {
         const dadosDestino = dadosSlideSchema.safeParse(restantes[0].dadosJson);
-        if (dadosDestino.success && !dadosDestino.data.presetsAnimacao?.length) {
+        if (dadosDestino.success) {
+          const presetsParaTransferir = !dadosDestino.data.presetsAnimacao?.length ? presetsDoSlideExcluido : undefined;
+          const fontesParaTransferir = !dadosDestino.data.fontesPersonalizadas?.length ? fontesDoSlideExcluido : undefined;
+          if (!presetsParaTransferir?.length && !fontesParaTransferir?.length) return;
           await tx.slide.update({
             where: { id: restantes[0].id },
-            data: { dadosJson: { ...dadosDestino.data, presetsAnimacao: presetsDoSlideExcluido } as object },
+            data: {
+              dadosJson: {
+                ...dadosDestino.data,
+                ...(presetsParaTransferir?.length ? { presetsAnimacao: presetsParaTransferir } : {}),
+                ...(fontesParaTransferir?.length ? { fontesPersonalizadas: fontesParaTransferir } : {}),
+              } as object,
+            },
           });
         }
       }
@@ -295,7 +309,7 @@ export async function DuplicarSlide(slideId: string) {
     // depois insere a cópia nessa posição — evita ordem fracionária, mantém `ordem` sempre inteiro e denso.
     const dadosOriginais = dadosSlideSchema.safeParse(original.dadosJson);
     const dadosDaCopia = dadosOriginais.success
-      ? removerPresetsDoPacoteDoSlide(dadosOriginais.data)
+      ? removerFontesDoPacoteDoSlide(removerPresetsDoPacoteDoSlide(dadosOriginais.data))
       : original.dadosJson;
 
     const copia = await db.$transaction(async (tx) => {

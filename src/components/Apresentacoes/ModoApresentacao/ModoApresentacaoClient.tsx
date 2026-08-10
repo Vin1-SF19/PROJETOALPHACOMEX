@@ -17,6 +17,8 @@ import {
   type ConfigAnimacaoContainerAlpha,
 } from "@/lib/apresentacoes/animacao-container-alpha";
 import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-audio";
+import type { FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { FontesPersonalizadasStyle } from "@/components/Apresentacoes/FontesPersonalizadasStyle";
 
 interface TemaApresentacao {
   id: string;
@@ -30,6 +32,7 @@ interface ModoApresentacaoClientProps {
   apresentacaoId: string;
   slides: SlideApresentacao[];
   tema: TemaApresentacao | null;
+  fontesPersonalizadas?: FontePersonalizada[];
   embutido?: boolean;
   onClose?: () => void;
 }
@@ -62,6 +65,7 @@ export function ModoApresentacaoClient({
   apresentacaoId,
   slides,
   tema,
+  fontesPersonalizadas = [],
   embutido = false,
   onClose,
 }: ModoApresentacaoClientProps) {
@@ -285,6 +289,7 @@ export function ModoApresentacaoClient({
         "--tema-cor-accent": tema.corAccent,
       } as React.CSSProperties) : undefined}
     >
+      <FontesPersonalizadasStyle fontes={fontesPersonalizadas} />
       {!iniciado ? (
         <div className="flex min-h-0 flex-1 items-center justify-center bg-gradient-to-br from-slate-950 via-black to-slate-950 p-6">
           <button

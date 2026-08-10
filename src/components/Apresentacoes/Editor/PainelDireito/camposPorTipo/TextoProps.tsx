@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { AlignCenter, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, Italic, Minus, Underline } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, FileUp, Italic, Minus, Plus, Underline, X } from "lucide-react";
+import { toast } from "sonner";
 import type { TextoComponente } from "@/lib/validations/slide-componentes";
 import { FONTES_ALPHA_MOTION } from "@/lib/apresentacoes/fontes";
 import {
@@ -10,6 +11,7 @@ import {
   textoPlanoDoRichText,
   type RichRunPatch,
 } from "@/lib/apresentacoes/rich-text-edit";
+import { useFontesPersonalizadas } from "../../FontesPersonalizadasContext";
 
 interface IntervaloTexto {
   inicio: number;
@@ -44,7 +46,13 @@ function BotaoFormato({ ativo, label, onClick, children }: { ativo: boolean; lab
 
 export function TextoProps({ componente, onChange }: { componente: TextoComponente; onChange: (patch: Partial<TextoComponente>) => void }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
   const [intervalo, setIntervalo] = useState<IntervaloTexto>({ inicio: 0, fim: 0 });
+  const [adicionandoFonte, setAdicionandoFonte] = useState(false);
+  const [nomeNovaFonte, setNomeNovaFonte] = useState("");
+  const [arquivoNovaFonte, setArquivoNovaFonte] = useState<File | null>(null);
+  const [enviandoFonte, setEnviandoFonte] = useState(false);
+  const { fontesPersonalizadas, adicionarFonte } = useFontesPersonalizadas();
   const runs = componente.richText?.paragraphs.flatMap((paragraph) => paragraph.runs) ?? [];
   const todosEmNegrito = runs.length > 0 ? runs.every((run) => run.bold) : componente.fontWeight === "bold";
   const todosEmItalico = runs.length > 0 ? runs.every((run) => run.italic) : componente.fontStyle === "italic";
@@ -100,7 +108,26 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
 
   const categorias = Array.from(new Set(FONTES_ALPHA_MOTION.map((fonte) => fonte.categoria)));
   const fonteAtual = componente.fontFamily ?? "Inter";
-  const fonteAtualEstaNoCatalogo = FONTES_ALPHA_MOTION.some((fonte) => fonte.nome === fonteAtual);
+  const fonteAtualEstaNoCatalogo = FONTES_ALPHA_MOTION.some((fonte) => fonte.nome === fonteAtual)
+    || fontesPersonalizadas.some((fonte) => fonte.nome === fonteAtual);
+
+  async function handleAdicionarFonte() {
+    if (!arquivoNovaFonte || !nomeNovaFonte.trim() || enviandoFonte) return;
+    setEnviandoFonte(true);
+    try {
+      const fonte = await adicionarFonte(nomeNovaFonte.trim(), arquivoNovaFonte);
+      aplicarEstilo({ fontFamily: fonte.nome }, { fontFamily: fonte.nome });
+      toast.success(`Fonte "${fonte.nome}" adicionada e aplicada.`);
+      setNomeNovaFonte("");
+      setArquivoNovaFonte(null);
+      if (inputArquivoRef.current) inputArquivoRef.current.value = "";
+      setAdicionandoFonte(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível adicionar a fonte.");
+    } finally {
+      setEnviandoFonte(false);
+    }
+  }
 
   return (
     <>
@@ -125,9 +152,20 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <label className="col-span-2 space-y-1.5">
-          <span className="text-[11px] text-slate-400">Fonte</span>
+        <div className="col-span-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor={`fonte-${componente.id}`} className="text-[11px] text-slate-400">Fonte</label>
+            <button
+              type="button"
+              onClick={() => setAdicionandoFonte((aberto) => !aberto)}
+              className="inline-flex items-center gap-1 rounded-md border border-indigo-400/30 bg-indigo-500/10 px-2 py-1 text-[10px] font-semibold text-indigo-200 hover:bg-indigo-500/20"
+            >
+              {adicionandoFonte ? <X size={12} aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}
+              {adicionandoFonte ? "Fechar" : "Adicionar fonte"}
+            </button>
+          </div>
           <select
+            id={`fonte-${componente.id}`}
             value={fonteAtual}
             onChange={(event) => aplicarEstilo({ fontFamily: event.target.value }, { fontFamily: event.target.value })}
             style={{ fontFamily: `"${fonteAtual}", sans-serif` }}
@@ -141,8 +179,55 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
                 ))}
               </optgroup>
             ))}
+            {fontesPersonalizadas.length > 0 && (
+              <optgroup label="Minhas fontes">
+                {fontesPersonalizadas.map((fonte) => (
+                  <option key={fonte.id} value={fonte.nome} style={{ fontFamily: `"${fonte.nome}", sans-serif` }}>{fonte.nome}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
-        </label>
+          {adicionandoFonte && (
+            <div className="space-y-2 rounded-lg border border-indigo-400/20 bg-indigo-950/20 p-2.5">
+              <label className="block space-y-1">
+                <span className="text-[10px] font-medium text-slate-300">Nome da fonte</span>
+                <input
+                  type="text"
+                  maxLength={80}
+                  value={nomeNovaFonte}
+                  onChange={(event) => setNomeNovaFonte(event.target.value)}
+                  placeholder="Ex.: Fonte da minha marca"
+                  className="w-full rounded-md border border-white/10 bg-slate-950 px-2.5 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-indigo-500"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-white/15 bg-slate-950/70 px-2.5 py-2 text-xs text-slate-400 hover:border-indigo-400/50 hover:text-slate-200">
+                <FileUp size={15} className="shrink-0" aria-hidden="true" />
+                <span className="min-w-0 truncate">{arquivoNovaFonte?.name ?? "Escolher WOFF2, WOFF, TTF ou OTF"}</span>
+                <input
+                  ref={inputArquivoRef}
+                  type="file"
+                  accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const arquivo = event.target.files?.[0] ?? null;
+                    setArquivoNovaFonte(arquivo);
+                    if (arquivo && !nomeNovaFonte.trim()) setNomeNovaFonte(arquivo.name.replace(/\.[^.]+$/, ""));
+                  }}
+                />
+              </label>
+              <p className="text-[9px] leading-relaxed text-slate-500">Até 10 MB. A fonte fica disponível em todos os slides e será incluída na apresentação exportada.</p>
+              <button
+                type="button"
+                onClick={() => void handleAdicionarFonte()}
+                disabled={!arquivoNovaFonte || !nomeNovaFonte.trim() || enviandoFonte}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FileUp size={14} aria-hidden="true" />
+                {enviandoFonte ? "Enviando..." : "Adicionar e aplicar"}
+              </button>
+            </div>
+          )}
+        </div>
         <label className="space-y-1.5">
           <span className="text-[11px] text-slate-400">Tamanho (px)</span>
           <input

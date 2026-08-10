@@ -6,6 +6,7 @@ import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import type { DadosApresentacaoExportada } from "@/apresentacoes-player/dados-tipos";
+import { normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false, follow: false } };
@@ -32,6 +33,11 @@ export default async function ApresentacaoPublicaPage({ params }: { params: Prom
   const dados: DadosApresentacaoExportada = {
     titulo: apresentacao.titulo,
     tema: apresentacao.tema,
+    fontesPersonalizadas: normalizarFontesPersonalizadas(
+      apresentacao.slides
+        .map((slide) => (slide.dadosJson as { fontesPersonalizadas?: FontePersonalizada[] } | null)?.fontesPersonalizadas)
+        .find(Array.isArray),
+    ),
     slides: apresentacao.slides.map((slide) => ({
       id: slide.id,
       ordem: slide.ordem,

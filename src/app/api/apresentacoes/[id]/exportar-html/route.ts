@@ -7,6 +7,8 @@ import { embutirAssetsNosSlides, OrcamentoAssetsExcedidoError } from "@/lib/apre
 import { nomeDownloadSeguro } from "@/lib/apresentacoes/exportacao";
 import { PLAYER_JS, PLAYER_CSS } from "@/generated/apresentacoes-player-bundle";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
+import { normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { embutirFontesPersonalizadas, OrcamentoFontesExcedidoError } from "@/lib/apresentacoes/embutir-fontes-personalizadas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -55,10 +57,17 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }));
 
   let slidesComAssets: typeof slidesBase;
+  let fontesPersonalizadas: FontePersonalizada[];
   try {
     slidesComAssets = await embutirAssetsNosSlides(slidesBase, apresentacao.assets);
+    const fontesHospedadas = normalizarFontesPersonalizadas(
+      apresentacao.slides
+        .map((slide) => (slide.dadosJson as { fontesPersonalizadas?: FontePersonalizada[] } | null)?.fontesPersonalizadas)
+        .find(Array.isArray),
+    );
+    fontesPersonalizadas = await embutirFontesPersonalizadas(fontesHospedadas);
   } catch (erro) {
-    if (erro instanceof OrcamentoAssetsExcedidoError) {
+    if (erro instanceof OrcamentoAssetsExcedidoError || erro instanceof OrcamentoFontesExcedidoError) {
       return new Response(erro.message, { status: 413 });
     }
     console.error("[exportar-html] falha ao embutir assets", { apresentacaoId: id, erro });
@@ -68,6 +77,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const dados = {
     titulo: apresentacao.titulo,
     tema: apresentacao.tema,
+    fontesPersonalizadas,
     slides: slidesComAssets,
   };
 

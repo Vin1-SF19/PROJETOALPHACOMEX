@@ -23,6 +23,8 @@ import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-a
 import type { PresetAnimacaoPersonalizado } from "@/lib/apresentacoes/animacao/presets-personalizados";
 import { PresetsAnimacaoProvider } from "./PresetsAnimacaoContext";
 import { EditorKeyboardShortcuts } from "./EditorKeyboardShortcuts";
+import type { FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { FontesPersonalizadasProvider } from "./FontesPersonalizadasContext";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -39,6 +41,7 @@ interface ApresentacaoEditorProps {
   titulo: string;
   slugPublicoInicial: string | null;
   presetsAnimacaoIniciais: PresetAnimacaoPersonalizado[];
+  fontesPersonalizadasIniciais: FontePersonalizada[];
   slidesIniciais: SlideResumo[];
   slideAtivoIdInicial: string;
   componentesIniciais: ComponenteSlide[];
@@ -54,6 +57,7 @@ export function ApresentacaoEditor({
   titulo,
   slugPublicoInicial,
   presetsAnimacaoIniciais,
+  fontesPersonalizadasIniciais,
   slidesIniciais,
   slideAtivoIdInicial,
   componentesIniciais,
@@ -200,6 +204,7 @@ export function ApresentacaoEditor({
 
   return (
     <PresetsAnimacaoProvider apresentacaoId={apresentacaoId} presetsIniciais={presetsAnimacaoIniciais} aguardarAntesDeSalvar={salvarAlteracoesPendentes}>
+    <FontesPersonalizadasProvider apresentacaoId={apresentacaoId} fontesIniciais={fontesPersonalizadasIniciais} aguardarAntesDeSalvar={salvarAlteracoesPendentes}>
     <ReducedMotionSimuladoProvider>
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[#020617] text-slate-200">
@@ -244,6 +249,7 @@ export function ApresentacaoEditor({
       </div>
     </DndContext>
     </ReducedMotionSimuladoProvider>
+    </FontesPersonalizadasProvider>
     </PresetsAnimacaoProvider>
   );
 }

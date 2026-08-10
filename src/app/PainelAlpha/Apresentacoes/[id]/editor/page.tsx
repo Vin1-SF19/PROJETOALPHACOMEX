@@ -8,6 +8,7 @@ import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import { isAdminRole } from "@/lib/roles";
 import { normalizarPresetsAnimacaoPersonalizados, type PresetAnimacaoPersonalizado } from "@/lib/apresentacoes/animacao/presets-personalizados";
 import { apresentacaoPublicaDisponivel } from "@/lib/apresentacoes/publicacao";
+import { normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
 
 export const dynamic = "force-dynamic";
 
@@ -60,12 +61,16 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
     canvas?: CanvasConfig;
     animacaoConfig?: SlideAnimationConfig;
     presetsAnimacao?: PresetAnimacaoPersonalizado[];
+    fontesPersonalizadas?: FontePersonalizada[];
   };
   const dadosPrimeiroSlide = primeiroSlide.dadosJson as DadosSlidePersistidos | null;
   const componentesIniciais = dadosPrimeiroSlide?.componentes ?? [];
   const presetsAnimacaoIniciais = apresentacao.slides
     .map((slide) => (slide.dadosJson as DadosSlidePersistidos | null)?.presetsAnimacao)
     .find((presets) => Array.isArray(presets));
+  const fontesPersonalizadasIniciais = apresentacao.slides
+    .map((slide) => (slide.dadosJson as DadosSlidePersistidos | null)?.fontesPersonalizadas)
+    .find((fontes) => Array.isArray(fontes));
 
   return (
     <ApresentacaoEditor
@@ -73,6 +78,7 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
       titulo={apresentacao.titulo}
       slugPublicoInicial={apresentacao.slugPublico && apresentacaoPublicaDisponivel(apresentacao) ? apresentacao.slugPublico : null}
       presetsAnimacaoIniciais={normalizarPresetsAnimacaoPersonalizados(presetsAnimacaoIniciais)}
+      fontesPersonalizadasIniciais={normalizarFontesPersonalizadas(fontesPersonalizadasIniciais)}
       slidesIniciais={apresentacao.slides.map((s) => ({
         id: s.id,
         ordem: s.ordem,

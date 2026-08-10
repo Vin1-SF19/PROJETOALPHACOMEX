@@ -337,47 +337,68 @@ Cada fase passa por Forge → Probe → (Anubis se tocar auth/rota pública ou d
 
 ---
 
-## DECISÕES PENDENTES — consolidado para resposta do usuário
+## DECISÕES — respondidas pelo usuário em 2026-08-10
 
-Organizado por bloco temático (não por coluna) para facilitar responder de uma vez. Nenhuma delas bloqueia entender o pedido — todas bloqueiam começar a codar a peça correspondente.
+Todos os blocos abaixo foram percorridos via `AskUserQuestion`. Decisões marcadas ✅ são definitivas; as marcadas ⏳ continuam pendentes (o usuário optou explicitamente por decidir depois, ou o conteúdo ainda não existe).
 
-### Bloco 1 — Automações recorrentes (Colunas 1, 2, 3, 4)
-1. `BpmCardTentativaLigacao` (tabela nova) vs reaproveitar `BpmInteracaoCard` já existente para contar as 5 ligações/dia — recomendação: reaproveitar.
-2. "Travar" o responsável nas 5 ligações/dia (Coluna 1) — só indicador visual de pendência, ou bloqueia alguma ação real (ex: não deixa mover o card sem completar as 5)?
-3. Horário exato do cron diário (proposto 12h UTC = 9h Brasília, ajustável).
-4. O que conta como "dia" na contagem de 8 dias — corridos (incluindo fim de semana) ou úteis?
-5. Confirma que só a Coluna 1 tem a automação de ligações (5/dia) — Colunas 2, 3 e 4 têm só a automação de 8 dias (Próximo Contato)?
+### Bloco 1 — Automações recorrentes (Colunas 1, 2, 3, 4) — ✅ TODAS FECHADAS
+1. **Contador de ligações: reaproveitar `BpmInteracaoCard`** (tipo `LIGACAO`), sem tabela nova. Contagem do dia via `COUNT(*) WHERE cardId=X AND tipo='LIGACAO' AND DATE(createdAt)=hoje`.
+2. **Sem trava real** — as 5 ligações/dia são só indicador visual de pendência ("faltam N de 5 hoje"). Não bloqueia mover o card nem nenhuma outra ação.
+3. **Cron diário às 9h Brasília** (12h UTC).
+4. **Dias ÚTEIS** (não corridos) para a contagem de 8 dias — segunda a sexta, feriados não descontados a menos que o usuário peça depois (o projeto já tem `Holiday`/`holidays-seed.ts` no módulo de Comissões, reaproveitável se precisar de feriado nacional/estadual/municipal no cálculo — avaliar na Fase F).
+5. **Confirmado: só a Coluna 1 (Novos leads) tem a automação de 5 ligações/dia.** Colunas 2, 3 e 4 têm apenas a automação de 8 dias via `proximoContatoEm`.
 
-### Bloco 2 — Google Meet: criação e reagendamento (Coluna 2 e 3)
-6. Data/Hora (Coluna 2) viram colunas dedicadas em `BpmCard` (recomendação do Bibble) ou `BpmCampo` como o resto?
-7. A reunião é criada na agenda de quem clica o botão, ou do responsável do card?
-8. Duração padrão do evento (não especificada) — 30min? 1h?
-9. Participantes do evento: só o responsável, ou também um e-mail do lead/empresa (se existir)?
+### Bloco 2 — Google Meet: criação e reagendamento (Colunas 2 e 3) — ✅ TODAS FECHADAS
+6. **Data/Hora em colunas dedicadas** — `BpmCard.dataReuniao DateTime?` (não `BpmCampo`).
+7. **Reunião criada na agenda de QUEM CLICA o botão**, não do responsável do card — usa a sessão de quem está agendando, sem exigir que o responsável tenha Agenda Alpha conectada.
+8. **Duração padrão: 1 hora.**
+9. **Convidar também o e-mail do lead/empresa como participante** — ⚠️ **sub-decisão nova gerada por esta resposta**: hoje não está claro de onde vem esse e-mail no BPM (`BpmCard`/`Cliente`/algum `BpmCampo`?) — Scout precisa mapear isso especificamente na Fase D antes de implementar o convite automático. Se não houver e-mail cadastrado em lugar nenhum acessível ao card, o convite deste participante fica condicional ("convida se existir, ignora se não").
 
-### Bloco 3 — Transcrição do Google Meet (Coluna 3) — o maior bloqueio técnico do plano inteiro
-10. Integração automática via Google Meet REST API (exige autorizar escopo novo no Admin Console do Workspace + confirmar gravação/transcrição habilitada + mecanismo de busca pós-reunião) **ou** campo de texto livre preenchido manualmente por quem participou (disponível imediatamente, sem infra nova)? Você pediu para eu documentar em vez de decidir — está documentado na seção da Coluna 3 acima; preciso da sua escolha para prosseguir com qualquer implementação desta peça.
-11. Se manual: `BpmCampo` tipo texto (mecanismo já existente) ou coluna dedicada `BpmCard.transcricaoReuniao` (texto potencialmente longo, `BpmCardCampoValor.valor` não tem tratamento especial de tamanho hoje)?
+### Bloco 3 — Transcrição do Google Meet (Coluna 3) — ✅ DECIDIDO, ⏳ requer trabalho de infra antes do código
+10. **Integração automática via Google Meet REST API, escolhida.** Esta é a peça de maior esforço de infraestrutura do plano inteiro. Antes de qualquer código: (a) usuário/Super Admin do Workspace precisa autorizar o(s) escopo(s) da Google Meet API no Admin Console (Security → API Controls → Domain-wide Delegation, mesmo Client ID da Service Account ou um novo, a definir); (b) confirmar que a gravação com transcrição fica habilitada nas contas do Workspace usadas para essas reuniões; (c) Scout precisa de uma investigação técnica dedicada (fora deste documento) sobre o formato real da API (`conferenceRecords`/`transcripts` endpoints, forma de correlacionar um `googleEventId` do Calendar com o `conferenceRecord` do Meet, latência real de disponibilização). **Fase H permanece bloqueada até os itens (a) e (b) serem resolvidos fora do código.**
+11. Formato de armazenamento da transcrição (campo dedicado vs `BpmCampo`) — decisão adiada até a investigação técnica da Fase H definir o tamanho/formato real do que a API devolve (texto corrido? JSON com timestamps por falante?).
 
-### Bloco 4 — Reaproveitamento de campos entre etapas (Colunas 3, 4, 5)
-12. "Radar pretendido" aparece na Coluna 1 (Novos leads) e na Coluna 3 (Reunião Agendada) — é o MESMO campo (1 `BpmCampo` de nível pipeline) ou 2 campos independentes por coincidência de nome?
-13. "Valor acordado no contrato" e "Forma de pagamento" aparecem nas Colunas 3, 4 e 5 — mesma pergunta: campo único reaproveitado entre etapas, ou duplicado por etapa?
-14. Se reaproveitado: aceita a tabela de junção nova `BpmCampoObrigatorioEtapa` (permite "campo X é obrigatório nas etapas A, B e C, mas não em D") como solução, ou prefere outra abordagem?
+### Bloco 4 — Reaproveitamento de campos entre etapas (Colunas 1, 3, 4, 5) — ✅ TODAS FECHADAS
+12. **"Radar pretendido" é o MESMO campo** entre Coluna 1 e Coluna 3 — 1 `BpmCampo` de nível pipeline (`etapaId: null`), preenchido uma vez, visível/editável nas duas etapas.
+13. **"Valor acordado no contrato" e "Forma de pagamento" são campos únicos reaproveitados** entre Colunas 3, 4 e 5 — mesmo princípio.
+14. **Aceita a tabela `BpmCampoObrigatorioEtapa`** (`{ campoId, etapaId }`) para modelar "este campo é obrigatório nestas etapas específicas, mesmo sendo um campo de nível pipeline". Isto entra na Fase A (schema).
 
-### Bloco 5 — Catálogos de opções não especificados (Coluna 3)
-15. "Radar pretendido" (Colunas 1 e 3) — lista de opções do Select.
-16. "Forma de pagamento" — lista de opções do Select.
-17. "Exportador" — lista de opções do Select (Sim/Não? outras?).
+### Bloco 5 — Catálogos de opções (Coluna 3) — ✅ TODAS FECHADAS
+15. **"Radar pretendido":** `["Radar 150k", "Radar Ilimitado"]`.
+16. **"Forma de pagamento":** `["50% Entrada / 50% Êxito (Pix)", "Parcelamento Cartão de Crédito - até 12x com juros", "Integral na contratação - 10% OFF (Pix)"]`.
+17. **"Exportador":** `["Sim", "Não"]`.
 
-### Bloco 6 — Catálogo de motivos de Lost (Coluna 6)
-18. Lista de "critérios padronizados" para o Motivo de Lost — você mesmo marcou como pendente, precisa ser definida antes desta coluna ser implementável.
+### Bloco 6 — Catálogo de motivos de Lost (Coluna 6) — ✅ FECHADO, com peça técnica nova
+18. **Lista:** `["Sem orçamento", "Escolheu concorrente", "Sem resposta", "Empresa não tem viabilidade"]` **+ opção "Outro" com campo de texto livre condicional.** ⚠️ **Isto muda o desenho do `BpmCampo`**: hoje o catálogo de tipos é `texto|numero|data|selecao|booleano`, sem noção de "seleção com opção 'outro' que revela um campo de texto companion". Duas rotas possíveis: (a) 2 `BpmCampo` separados ("Motivo de Lost" seleção + "Motivo de Lost - Outro" texto, exibido condicionalmente no componente quando o primeiro = "Outro" — sem mudança de schema, só lógica de UI); (b) estender `BpmCampo.tipo` com um novo tipo `selecao_com_outro` (mudança de schema/validação mais ampla, reaproveitável por outros campos futuros que precisem do mesmo padrão). **Recomendação do Bibble: rota (a)** — sem migration, resolve o caso concreto sem generalizar prematuramente um padrão que só apareceu 1 vez até agora.
 
-### Bloco 7 — Checklist de follow-up (Coluna 4) — segunda maior peça de risco do plano
-19. Catálogo de perguntas do checklist de follow-up — não especificado, bloqueia `BpmChecklistFollowUpPergunta`.
-20. A trava de UI (confirmada como "bloqueio real") tem alguma saída de emergência (ex: "salvar como rascunho e sair" sem completar) ou é bloqueio absoluto sem exceção nenhuma?
+### Bloco 7 — Checklist de follow-up (Coluna 4) — ⚠️ PARCIALMENTE FECHADO
+19. **⏳ Catálogo de perguntas do checklist: ainda não definido.** Usuário optou por decidir depois. **A Fase G (trava de UI) fica bloqueada até esta lista existir** — sem ela, `BpmChecklistFollowUpPergunta` não tem o que semear.
+20. **✅ Trava de UI é bloqueio absoluto, sem exceção** — mais rígido que a recomendação original do Bibble (que sugeria uma saída de emergência tipo "salvar como rascunho"). Decisão do usuário, registrada como escolha deliberada: o card literalmente não fecha até o checklist do último follow-up estar 100% completo. **Nota de risco mantida:** isto é comportamento sem precedente no projeto — vale testar com um usuário real antes de generalizar para outras etapas, caso o padrão precise se repetir.
 
-### Bloco 8 — Status pós-fechamento (Coluna 5)
-21. Cores específicas para cada um dos 5 status (Aguardando contrato / Contrato a enviar / Contrato enviado / Pagamento confirmado / Contrato assinado) — posso propor uma paleta seguindo os tokens de design já usados no projeto (`temas.ts`), ou você tem preferência de cores específica?
+### Bloco 8 — Status pós-fechamento (Coluna 5) — ✅ FECHADO
+21. **Bibble propõe a paleta.** Os temas de `temas.ts` são paletas de UI global (cor de destaque do usuário), não semânticas de progresso — não são o encaixe certo para "5 estágios sequenciais de um processo pós-venda". Proposta de progressão lógica (do menos ao mais avançado), usando classes Tailwind padrão já usadas em badges de status em outros módulos do projeto (mesmo padrão de `chamados.status`/`ContratoComercial.status`):
 
-### Bloco 9 — Automações ainda não especificadas (Colunas 8 e 9)
-22. Standby - Follow Up: você mesmo marcou como "documentar detalhadamente [...] posteriormente" — este plano só registrou a intenção (semanal, NoLoss, interrupção manual). Aguardando especificação completa quando você tiver pronta.
-23. Monitoramento: idem, zero detalhe registrado, aguardando especificação.
+| Status | Cor proposta | Classe Tailwind |
+|---|---|---|
+| Aguardando contrato | Cinza (neutro, ainda não iniciado) | `bg-slate-500/15 text-slate-400 border-slate-500/30` |
+| Contrato a enviar | Azul (ação pendente da equipe) | `bg-blue-500/15 text-blue-400 border-blue-500/30` |
+| Contrato enviado | Âmbar (aguardando o cliente) | `bg-amber-500/15 text-amber-400 border-amber-500/30` |
+| Pagamento confirmado | Violeta (marco financeiro) | `bg-violet-500/15 text-violet-400 border-violet-500/30` |
+| Contrato assinado | Verde (concluído) | `bg-emerald-500/15 text-emerald-400 border-emerald-500/30` |
+
+A confirmar/ajustar visualmente na Fase B, quando o componente existir de verdade (mais fácil validar cor vendo o badge real no board do que em texto).
+
+### Bloco 9 — Automações ainda não especificadas (Colunas 8 e 9) — ⏳ SEM MUDANÇA
+22. Standby - Follow Up: aguardando especificação completa do usuário (semanal, NoLoss, interrupção manual — só a intenção registrada).
+23. Monitoramento: aguardando especificação completa do usuário — zero detalhe ainda.
+
+---
+
+## O que falta antes da Fase A (schema) poder começar
+
+Apesar de quase todas as decisões estarem fechadas, ainda há 3 bloqueios reais de conteúdo (não mais de arquitetura):
+1. **Catálogo de perguntas do checklist de follow-up** (Bloco 7, item 19) — bloqueia só a Fase G, não as demais.
+2. **Autorização do escopo Google Meet API no Admin Console + confirmação de gravação/transcrição habilitada** (Bloco 3, item 10) — ação do usuário/Super Admin fora do código, bloqueia só a Fase H.
+3. **Especificação de Standby (Coluna 8) e Monitoramento (Coluna 9)** — bloqueia só a Fase I.
+
+**Nenhum desses 3 bloqueia as Fases A-F** (schema base, indicador visual, badge de canal, campos obrigatórios, regra de avanço, Google Meet criar/reagendar, Cron, automações de ligação/8-dias) — essas já têm tudo que precisam para começar.

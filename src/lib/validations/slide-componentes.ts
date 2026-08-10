@@ -34,6 +34,7 @@ import { fundoAnimadoComponenteSchema, type FundoAnimadoComponente } from "./sli
 import { canvasConfigSchema } from "@/lib/apresentacoes/canvas";
 import { slideAnimationConfigSchema } from "./slide-animacao-config";
 import { presetsAnimacaoPersonalizadosSchema } from "@/lib/apresentacoes/animacao/presets-personalizados";
+import { fontesPersonalizadasSchema } from "@/lib/apresentacoes/fontes-personalizadas";
 
 export {
   textoComponenteSchema,
@@ -152,6 +153,8 @@ export const dadosSlideSchema = z.object({
   animacaoConfig: slideAnimationConfigSchema.optional(),
   /** Biblioteca de presets da apresentação. Fica em um slide-hospedeiro e é preservada pelo autosave. */
   presetsAnimacao: presetsAnimacaoPersonalizadosSchema.optional(),
+  /** Biblioteca de fontes enviadas pelo usuário. Fica em um único slide-hospedeiro, sem migration. */
+  fontesPersonalizadas: fontesPersonalizadasSchema.optional(),
   pptxSource: z.object({
     type: z.literal("pptx"),
     originalFileUrl: z.string().url().optional(),

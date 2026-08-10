@@ -87,9 +87,17 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         servico: true,
         status: true,
         createdAt: true,
+        primeiraVisualizacaoEm: true,
+        statusPosFechamento: true,
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true } },
         responsavel: { select: { id: true, nome: true } },
         _count: { select: { tarefas: true, anexos: true } },
+        // Só o campo "Canal de origem" — evita carregar todos os BpmCampo do card no board.
+        campoValores: {
+          where: { campo: { nome: "Canal de origem" } },
+          select: { valor: true },
+          take: 1,
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -131,6 +139,14 @@ export async function ObterCardBpm(cardId: string) {
     });
 
     if (!card) return { success: false, error: "Card não encontrado" };
+
+    // Indicador "nunca acessado" — primeiro acesso por QUALQUER usuário apaga a marcação.
+    if (!card.primeiraVisualizacaoEm) {
+      const agora = new Date();
+      await db.bpmCard.update({ where: { id: cardId }, data: { primeiraVisualizacaoEm: agora } });
+      card.primeiraVisualizacaoEm = agora;
+    }
+
     return { success: true, data: card };
   } catch (error) {
     console.error("[ObterCardBpm]", error);

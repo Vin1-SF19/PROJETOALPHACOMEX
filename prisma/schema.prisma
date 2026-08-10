@@ -133,6 +133,7 @@ model usuarios {
   bpmPipelineConfigAuditoria BpmPipelineConfigAuditoria[]
   bpmCardAnexosEnviados BpmCardAnexo[]
   bpmInteracoesRegistradas BpmInteracaoCard[]
+  bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
 
   justificativasMetaEnviadas JustificativaMeta[]
 }
@@ -2829,6 +2830,7 @@ model BpmPipeline {
   campos        BpmCampo[]
   cards         BpmCard[]
   configAuditoria BpmPipelineConfigAuditoria[]
+  checklistPerguntas BpmChecklistFollowUpPergunta[]
 
   @@index([ativo])
 }
@@ -2861,6 +2863,10 @@ model BpmEtapa {
   campos   BpmCampo[]
   cards    BpmCard[]
 
+  transicoesOrigem  BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
+  transicoesDestino BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
+  camposObrigatorios BpmCampoObrigatorioEtapa[]
+
   @@index([pipelineId])
   @@index([pipelineId, ordem])
 }
@@ -2881,6 +2887,7 @@ model BpmCampo {
   pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   etapa    BpmEtapa?   @relation(fields: [etapaId], references: [id], onDelete: Cascade)
   valores  BpmCardCampoValor[]
+  obrigatorioEmEtapas BpmCampoObrigatorioEtapa[]
 
   @@index([pipelineId])
   @@index([etapaId])
@@ -2899,6 +2906,17 @@ model BpmCard {
   updatedAt   DateTime  @updatedAt
   concluidoEm DateTime?
 
+  // Pipeline "Revisão de Radar" — automações e regras por etapa (2026-08-10, ver
+  // .bibble/memory/plano-novos-leads-bpm.md). Todas nullable — nenhum card legado precisa
+  // ser retroativamente preenchido; automações tratam ausência como "ainda não se aplica".
+  primeiraVisualizacaoEm DateTime? // primeiro acesso ao card, por qualquer usuário — indicador "nunca acessado" some após preenchido
+  proximoContatoEm       DateTime? // interrompe a automação de 8 dias (cobrança de follow-up); também validado como obrigatório na ENTRADA de "Em Tratativa"/"Sem Viabilidade"
+  dataReuniao            DateTime? // data+hora combinadas da reunião (Coluna "Agendar Reunião"), timezone America/Sao_Paulo — mesmo contrato da Agenda Alpha
+  googleEventId          String?   // id do evento no Google Calendar, criado via botão "Agendar pelo Google Meet" — permite reagendar/atualizar o mesmo evento depois
+  googleMeetLink         String?   // cache do hangoutLink retornado pela API, evita nova chamada só para exibir o link
+  statusPosFechamento    String?   // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
+  transcricaoReuniao     String?   // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)
+
   empresa     clientes    @relation(fields: [empresaId], references: [id])
   pipeline    BpmPipeline @relation(fields: [pipelineId], references: [id])
   etapa       BpmEtapa    @relation(fields: [etapaId], references: [id])
@@ -2910,6 +2928,7 @@ model BpmCard {
   historico    BpmCardHistorico[]
   anexos       BpmCardAnexo[]
   interacoes   BpmInteracaoCard[]
+  checklistsFollowUp BpmChecklistFollowUp[]
 
   vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
   vinculosDestino BpmCardVinculo[] @relation("CardDestino")
@@ -3068,6 +3087,67 @@ model BpmInteracaoCard {
 
   @@index([cardId])
   @@index([createdAt])
+}
+
+// Pipeline "Revisão de Radar" — máquina de estado de transições permitidas entre etapas
+// (2026-08-10, ver .bibble/memory/plano-novos-leads-bpm.md). Etapa SEM nenhuma linha aqui
+// como origem continua permitindo qualquer destino — fallback preserva o comportamento
+// atual dos pipelines "Financeiro"/"Radar", que nunca pediram essa restrição.
+model BpmEtapaTransicaoPermitida {
+  id             String   @id @default(cuid())
+  etapaOrigemId  String
+  etapaDestinoId String
+  etapaOrigem    BpmEtapa @relation("TransicaoOrigem", fields: [etapaOrigemId], references: [id], onDelete: Cascade)
+  etapaDestino   BpmEtapa @relation("TransicaoDestino", fields: [etapaDestinoId], references: [id], onDelete: Cascade)
+
+  @@unique([etapaOrigemId, etapaDestinoId])
+  @@index([etapaOrigemId])
+}
+
+// Permite que um BpmCampo de nível pipeline (etapaId: null) seja obrigatório só em etapas
+// específicas, sem duplicar o campo por etapa (ex: "Valor acordado no contrato" é o mesmo
+// campo em Reunião Agendada/Em Tratativa/Fechado, mas só passa a ser obrigatório nelas).
+model BpmCampoObrigatorioEtapa {
+  id      String   @id @default(cuid())
+  campoId String
+  etapaId String
+  campo   BpmCampo @relation(fields: [campoId], references: [id], onDelete: Cascade)
+  etapa   BpmEtapa @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+
+  @@unique([campoId, etapaId])
+  @@index([etapaId])
+}
+
+// Checklist de follow-up obrigatório da etapa "Em Tratativa" — a lógica de UI que trava o
+// fechamento do card até o checklist estar completo é implementada em fase separada (Fase G),
+// e depende do catálogo de perguntas ainda não definido pelo usuário; o schema nasce pronto
+// para receber esse catálogo quando existir.
+model BpmChecklistFollowUp {
+  id            String   @id @default(cuid())
+  cardId        String
+  card          BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  perguntasJson String   // snapshot das perguntas NO MOMENTO do follow-up — perguntas podem mudar no catálogo depois sem afetar registros passados
+  respostasJson String
+  completo      Boolean  @default(false)
+  criadoPorId   Int
+  criadoEm      DateTime @default(now())
+
+  usuario usuarios @relation(fields: [criadoPorId], references: [id])
+
+  @@index([cardId])
+}
+
+model BpmChecklistFollowUpPergunta {
+  id          String  @id @default(cuid())
+  pipelineId  String
+  pergunta    String
+  tipo        String  // "texto" | "selecao" | "booleano" — mesmo catálogo de BpmCampo
+  opcoesJson  String?
+  obrigatoria Boolean @default(true)
+  ordem       Int     @default(0)
+  ativo       Boolean @default(true)
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
 }
 
 model PessoaEmpresaVinculo {

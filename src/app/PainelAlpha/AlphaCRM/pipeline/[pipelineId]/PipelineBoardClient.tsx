@@ -50,16 +50,32 @@ interface CardBpm {
   etapaId: string;
   servico: string | null;
   status: string;
+  primeiraVisualizacaoEm?: Date | string | null;
+  statusPosFechamento?: string | null;
   empresa: { id: number; razaoSocial: string; nomeFantasia: string | null };
   responsavel: { id: number; nome: string };
   _count: { tarefas: number; anexos: number };
+  campoValores?: { valor: string | null }[];
 }
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
 
+// Progressão do menos ao mais avançado no pós-fechamento (ver plano-novos-leads-bpm.md, Bloco 8).
+const STATUS_POS_FECHAMENTO_CONFIG: Record<string, { label: string; classe: string }> = {
+  AGUARDANDO_CONTRATO: { label: "Aguardando contrato", classe: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
+  CONTRATO_A_ENVIAR: { label: "Contrato a enviar", classe: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  CONTRATO_ENVIADO: { label: "Contrato enviado", classe: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  PAGAMENTO_CONFIRMADO: { label: "Pagamento confirmado", classe: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
+  CONTRATO_ASSINADO: { label: "Contrato assinado", classe: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+};
+
 function KanbanCard({ card, accent, onAbrir }: { card: CardBpm; accent: string; onAbrir: (cardId: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+
+  const naoAcessado = !card.primeiraVisualizacaoEm;
+  const canalOrigem = card.campoValores?.[0]?.valor;
+  const statusConfig = card.statusPosFechamento ? STATUS_POS_FECHAMENTO_CONFIG[card.statusPosFechamento] : null;
 
   return (
     <div
@@ -68,9 +84,17 @@ function KanbanCard({ card, accent, onAbrir }: { card: CardBpm; accent: string; 
       {...attributes}
       {...listeners}
       onClick={() => onAbrir(card.id)}
-      className="bg-slate-800/80 border border-white/5 rounded-xl p-3 space-y-2 cursor-grab active:cursor-grabbing hover:border-white/10 transition-colors select-none"
+      className={`bg-slate-800/80 border rounded-xl p-3 space-y-2 cursor-grab active:cursor-grabbing transition-colors select-none ${
+        naoAcessado ? "border-cyan-400/50 hover:border-cyan-400/70" : "border-white/5 hover:border-white/10"
+      }`}
     >
       <div className="flex items-center gap-1.5 text-sm font-semibold text-white leading-tight">
+        {naoAcessado && (
+          <span
+            className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 animate-pulse"
+            title="Nunca acessado"
+          />
+        )}
         <Building2 size={12} className="text-slate-400 shrink-0" />
         <Link
           href={`/PainelAlpha/AlphaCRM/empresa/${card.empresa.id}`}
@@ -82,6 +106,20 @@ function KanbanCard({ card, accent, onAbrir }: { card: CardBpm; accent: string; 
         </Link>
       </div>
       {card.servico && <p className="text-[11px] text-slate-400 leading-tight">{card.servico}</p>}
+      {(canalOrigem || statusConfig) && (
+        <div className="flex flex-wrap items-center gap-1">
+          {canalOrigem && (
+            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-white/5 text-slate-300 border border-white/10">
+              {canalOrigem}
+            </span>
+          )}
+          {statusConfig && (
+            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md border ${statusConfig.classe}`}>
+              {statusConfig.label}
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between pt-0.5">
         <div className="flex items-center gap-2 text-[10px] text-slate-500">
           {card._count.tarefas > 0 && <span>{card._count.tarefas} tarefa(s)</span>}
