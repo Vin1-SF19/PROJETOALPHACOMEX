@@ -27,6 +27,7 @@ import { ModalBroadcast } from '@/components/ModalBroadcast';
 import { getTema } from '@/lib/temas';
 import { isAdminRole } from '@/lib/roles';
 import { NotesLauncherButton } from '@/components/Notas/NotesLauncherButton';
+import { useElementWidth } from '@/hooks/useElementWidth';
 
 // ── Icon map ──────────────────────────────────────────────
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -80,6 +81,10 @@ interface GlobalSidebarProps {
   activeUrl?: string;
   openUrls?: string[];
   temaName?: string;
+  /** Reporta a largura REAL (renderizada) da sidebar desktop — permite que elementos irmãos
+   *  (ex: barra global de notas) encostem exatamente onde ela termina, sem depender de um
+   *  valor fixo espelhado que pode dessincronizar do CSS real. */
+  onWidthChange?: (width: number) => void;
 }
 
 export default function GlobalSidebar({
@@ -95,6 +100,7 @@ export default function GlobalSidebar({
   activeUrl,
   openUrls = [],
   temaName,
+  onWidthChange,
 }: GlobalSidebarProps) {
   const pathname = usePathname();
   const isAdmin = isAdminRole(role);
@@ -108,6 +114,8 @@ export default function GlobalSidebar({
 
   const asideRef = useRef<HTMLElement>(null);
   const [tooltip, setTooltip] = useState<{ label: string; top: number; category: string } | null>(null);
+
+  useElementWidth(asideRef, onWidthChange ?? (() => {}));
 
   const showTooltip = (e: React.MouseEvent<HTMLElement>, label: string, category: string) => {
     if (!isCollapsed || !asideRef.current) return;

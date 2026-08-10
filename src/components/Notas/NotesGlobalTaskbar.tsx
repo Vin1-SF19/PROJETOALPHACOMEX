@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { cn } from "@/lib/utils";
 import {
   closestCenter,
   DndContext,
@@ -18,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
 import { CriarNota, ObterNota, ArquivarNota, MoverNotaParaLixeira } from "@/actions/Notas";
+import { FixarNota } from "@/actions/NotasBusca";
 import {
   AbrirAbaNota,
   FecharAbaNota,
@@ -38,8 +38,11 @@ import { NoteContextLinkDialog } from "@/components/Notas/Contexto/NoteContextLi
 
 interface NotesGlobalTaskbarProps {
   userId: number;
-  /** Classe de posicionamento `left` (ex: "lg:left-[260px]") — a barra começa exatamente onde a sidebar termina, nunca por cima dela, em telas lg+. */
-  sidebarOffsetClass?: string;
+  /** Largura REAL da sidebar desktop em px, medida ao vivo via ResizeObserver (ver
+   *  GlobalSidebar/useElementWidth) — a barra encosta exatamente aqui, nunca num valor fixo
+   *  assumido que pode dessincronizar do CSS real. 0 no mobile/tablet (sidebar em "gaveta",
+   *  sem espaço reservado) — a barra ocupa a largura toda nesse caso. */
+  sidebarWidth?: number;
 }
 
 interface NotaAtivaCarregada {
@@ -49,7 +52,7 @@ interface NotaAtivaCarregada {
   version: number;
 }
 
-export function NotesGlobalTaskbar({ userId, sidebarOffsetClass = "" }: NotesGlobalTaskbarProps) {
+export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTaskbarProps) {
   const router = useRouter();
   const tabs = useNotasWorkspace((state) => state.tabs);
   const activeTabId = useNotasWorkspace((state) => state.activeTabId);
@@ -230,11 +233,8 @@ export function NotesGlobalTaskbar({ userId, sidebarOffsetClass = "" }: NotesGlo
             animate={{ scaleX: 1 }}
             exit={{ scaleX: 0 }}
             transition={{ duration: 0.32, ease: "easeOut" }}
-            style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left" }}
-            className={cn(
-              "fixed bottom-0 left-0 right-0 h-10 border-t border-amber-500/20 bg-[#030813]",
-              sidebarOffsetClass,
-            )}
+            style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left", left: sidebarWidth }}
+            className="fixed bottom-0 right-0 h-10 border-t border-amber-500/20 bg-[#030813] transition-[left] duration-200 ease-in-out"
           >
             <motion.div
               initial={{ opacity: 0 }}
@@ -257,11 +257,8 @@ export function NotesGlobalTaskbar({ userId, sidebarOffsetClass = "" }: NotesGlo
             animate={{ scaleX: 1 }}
             exit={{ scaleX: 0 }}
             transition={{ duration: 0.26, ease: "easeInOut" }}
-            style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left" }}
-            className={cn(
-              "fixed bottom-0 left-0 right-0 flex h-10 items-center gap-1 border-t border-white/[0.06] bg-[#030813] px-2 transition-[left,right] duration-300 ease-in-out",
-              sidebarOffsetClass,
-            )}
+            style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left", left: sidebarWidth }}
+            className="fixed bottom-0 right-0 flex h-10 items-center gap-1 border-t border-white/[0.06] bg-[#030813] px-2 transition-[left] duration-200 ease-in-out"
           >
             <button
               type="button"
@@ -316,7 +313,14 @@ export function NotesGlobalTaskbar({ userId, sidebarOffsetClass = "" }: NotesGlo
                         const novoTitulo = window.prompt("Renomear nota", tab.title);
                         if (novoTitulo) useNotasWorkspace.getState().renomearAba(tab.id, novoTitulo);
                       }}
-                      onFixar={() => toast.info("Fixar nota — disponível na Central de Notas (Fase 03)")}
+                      onFixar={async () => {
+                        const res = await FixarNota({ noteId: tab.noteId, fixada: true });
+                        if (!res.success) {
+                          toast.error(res.error ?? "Não foi possível fixar a nota");
+                          return;
+                        }
+                        toast.success("Nota fixada");
+                      }}
                       onDuplicar={() => toast.info("Duplicar nota — disponível na Central de Notas (Fase 03)")}
                       onCompartilhar={() => setNoteIdCompartilhar(tab.noteId)}
                       onAbrirTelaAmpla={() => {

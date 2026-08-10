@@ -82,6 +82,12 @@ export function NoteContextLinkDialog({ noteId, trigger, open, onOpenChange, onV
           <DialogTitle>Vincular a um registro</DialogTitle>
         </DialogHeader>
 
+        <p className="text-xs leading-relaxed text-slate-500">
+          Conecta esta nota a um registro específico de outro módulo do painel (ex: um chamado, um cliente).
+          A nota passa a aparecer ali como &ldquo;Notas relacionadas&rdquo;, e você pode remover o vínculo quando quiser
+          sem apagar a nota.
+        </p>
+
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">Módulo:</span>
@@ -101,11 +107,15 @@ export function NoteContextLinkDialog({ noteId, trigger, open, onOpenChange, onV
           <input
             value={query}
             onChange={(event) => void buscar(event.target.value)}
-            placeholder="Buscar por número ou título..."
+            placeholder="Digite para buscar (nome, número, documento)..."
+            autoFocus
             className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 outline-none placeholder:text-slate-600"
           />
 
           <div className="max-h-64 overflow-y-auto">
+            {query.trim().length < 1 && (
+              <p className="px-1 py-2 text-xs text-slate-600">Comece a digitar acima para ver os resultados.</p>
+            )}
             {buscando && <p className="px-1 py-2 text-xs text-slate-600">Buscando...</p>}
             {!buscando &&
               resultados.map((registro) => (
@@ -119,7 +129,7 @@ export function NoteContextLinkDialog({ noteId, trigger, open, onOpenChange, onV
                 </button>
               ))}
             {!buscando && query.trim().length >= 1 && resultados.length === 0 && (
-              <p className="px-1 py-2 text-xs text-slate-600">Nenhum registro encontrado.</p>
+              <p className="px-1 py-2 text-xs text-slate-600">Nenhum registro encontrado para &ldquo;{query}&rdquo;.</p>
             )}
           </div>
         </div>

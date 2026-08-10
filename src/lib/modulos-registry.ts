@@ -83,6 +83,8 @@ export interface ModuloVinculavel {
  */
 export const MODULOS_VINCULAVEIS: ModuloVinculavel[] = [
   { moduleKey: "chamados", entityType: "chamado", label: "Chamados" },
+  { moduleKey: "Cliente", entityType: "cliente", label: "CS & NPS (Clientes)" },
+  { moduleKey: "parceiros", entityType: "parceiro", label: "Parceiros" },
 ];
 
 export const CATEGORIAS: CategoriaItem[] = [

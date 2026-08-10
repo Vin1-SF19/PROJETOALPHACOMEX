@@ -91,8 +91,8 @@ export function ApresentacoesDashboard({ temaName = "blue" }: ApresentacoesDashb
               <MonitorPlay className="w-7 h-7" style={{ color: `rgba(${accent},1)` }} aria-hidden="true" />
             </div>
             <div>
-              <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic leading-none">
-                <span style={{ color: `rgba(${accent},1)` }}>PRESENTATION</span> STUDIO
+              <h1 className="text-4xl font-black tracking-tighter text-white italic leading-none">
+                <span style={{ color: `rgba(${accent},1)` }}>Alpha</span> Motion
               </h1>
               <p className="text-[10px] font-black uppercase tracking-[0.4em] mt-1 ml-1" style={{ color: `rgba(${accent},0.6)` }}>
                 APRESENTAÇÕES INTERATIVAS ALPHA

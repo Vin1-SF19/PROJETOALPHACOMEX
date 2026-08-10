@@ -29,6 +29,16 @@ async function entidadeReferenciadaExiste(moduleKey: string, entityType: string,
     return chamado !== null;
   }
 
+  if (moduleKey === "Cliente" && entityType === "cliente") {
+    const cliente = await db.clientes.findUnique({ where: { id: idNumerico }, select: { id: true } });
+    return cliente !== null;
+  }
+
+  if (moduleKey === "parceiros" && entityType === "parceiro") {
+    const parceiro = await db.parceiro.findUnique({ where: { id: idNumerico }, select: { id: true } });
+    return parceiro !== null;
+  }
+
   return false;
 }
 
@@ -173,6 +183,44 @@ export async function BuscarRegistrosVinculaveis(input: { moduleKey: string; que
         entityId: String(chamado.id),
         displayName: `#${chamado.id} — ${chamado.titulo}`,
         internalPath: "/PainelAlpha/Chamados",
+      })) as RegistroVinculavel[],
+    };
+  }
+
+  if (input.moduleKey === "Cliente") {
+    const idNumerico = Number(query);
+    const clientes = await db.clientes.findMany({
+      where: Number.isSafeInteger(idNumerico)
+        ? { OR: [{ id: idNumerico }, { razaoSocial: { contains: query } }, { nomeFantasia: { contains: query } }, { cnpj: { contains: query } }] }
+        : { OR: [{ razaoSocial: { contains: query } }, { nomeFantasia: { contains: query } }, { cnpj: { contains: query } }] },
+      select: { id: true, razaoSocial: true, nomeFantasia: true },
+      take: 10,
+    });
+    return {
+      success: true as const,
+      data: clientes.map((cliente) => ({
+        entityId: String(cliente.id),
+        displayName: cliente.nomeFantasia || cliente.razaoSocial,
+        internalPath: "/PainelAlpha/CadastroClientes",
+      })) as RegistroVinculavel[],
+    };
+  }
+
+  if (input.moduleKey === "parceiros") {
+    const idNumerico = Number(query);
+    const parceiros = await db.parceiro.findMany({
+      where: Number.isSafeInteger(idNumerico)
+        ? { OR: [{ id: idNumerico }, { nome: { contains: query } }, { nomeFantasia: { contains: query } }, { documento: { contains: query } }] }
+        : { OR: [{ nome: { contains: query } }, { nomeFantasia: { contains: query } }, { documento: { contains: query } }] },
+      select: { id: true, nome: true, nomeFantasia: true },
+      take: 10,
+    });
+    return {
+      success: true as const,
+      data: parceiros.map((parceiro) => ({
+        entityId: String(parceiro.id),
+        displayName: parceiro.nomeFantasia || parceiro.nome,
+        internalPath: "/PainelAlpha/Parceiros",
       })) as RegistroVinculavel[],
     };
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { X, FileText, Loader2, AlertCircle, Users } from "lucide-react";
@@ -55,6 +56,8 @@ export function NoteTab({
 }: NoteTabProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tabId });
   const horizontalTransform = transform ? { ...transform, y: 0 } : null;
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(horizontalTransform),
@@ -63,7 +66,7 @@ export function NoteTab({
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={menuAberto} onOpenChange={setMenuAberto}>
       <div
         ref={setNodeRef}
         style={style}
@@ -74,24 +77,33 @@ export function NoteTab({
             : "border-transparent bg-transparent text-slate-500 hover:bg-white/[0.04] hover:text-slate-300",
         )}
       >
+        {/* Âncora invisível posicionada no ponto do clique direito — o menu de contexto abre
+            ali, nunca colado no botão. O botão em si só ativa a nota no clique esquerdo. */}
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            onClick={onActivate}
-            title={title}
-            className="flex h-full min-w-0 max-w-[160px] cursor-grab items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 active:cursor-grabbing"
-          >
-            <FileText size={11} className="shrink-0 opacity-60" aria-hidden="true" />
-            {syncState === "salvando" && <Loader2 size={10} className="shrink-0 animate-spin text-blue-400" aria-label="Salvando" />}
-            {(syncState === "erro" || syncState === "conflito") && (
-              <AlertCircle size={10} className="shrink-0 text-rose-400" aria-label="Erro de sincronização" />
-            )}
-            {isShared && <Users size={10} className="shrink-0 opacity-60" aria-label="Nota compartilhada" />}
-            <span className="truncate text-[11px] font-medium">{title || "Sem título"}</span>
-          </button>
+          <span aria-hidden="true" className="pointer-events-none fixed h-px w-px" style={{ left: menuPos.x, top: menuPos.y }} />
         </DropdownMenuTrigger>
+
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          onClick={onActivate}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setMenuPos({ x: event.clientX, y: event.clientY });
+            setMenuAberto(true);
+          }}
+          title={title}
+          className="flex h-full min-w-0 max-w-[160px] cursor-grab items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 active:cursor-grabbing"
+        >
+          <FileText size={11} className="shrink-0 opacity-60" aria-hidden="true" />
+          {syncState === "salvando" && <Loader2 size={10} className="shrink-0 animate-spin text-blue-400" aria-label="Salvando" />}
+          {(syncState === "erro" || syncState === "conflito") && (
+            <AlertCircle size={10} className="shrink-0 text-rose-400" aria-label="Erro de sincronização" />
+          )}
+          {isShared && <Users size={10} className="shrink-0 opacity-60" aria-label="Nota compartilhada" />}
+          <span className="truncate text-[11px] font-medium">{title || "Sem título"}</span>
+        </button>
 
         <button
           type="button"

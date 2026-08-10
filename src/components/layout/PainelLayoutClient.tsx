@@ -17,6 +17,7 @@ import BibbleWeatherWidget from '@/components/BibbleChatHome/BibbleWeatherWidget
 import OnboardingModal from './OnboardingModal';
 import { NotesGlobalTaskbar } from '@/components/Notas/NotesGlobalTaskbar';
 import { NotaNotificacaoToast } from '@/components/Notas/NotaNotificacaoToast';
+import { useNotasWorkspace } from '@/store/useNotasWorkspace';
 import { useNotasNotifications } from '@/hooks/useNotasNotifications';
 import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
 import { isAdminRole } from '@/lib/roles';
@@ -72,6 +73,12 @@ export default function PainelLayoutClient({
   const { isCollapsed, isMobileOpen, toggleCollapse, toggleMobile, closeMobile } = useSidebarState();
   const pathname = usePathname();
 
+  // Largura REAL da sidebar desktop, medida ao vivo (ResizeObserver) — a barra global de
+  // notas encosta exatamente aqui, nunca num valor fixo assumido. Começa em 0 (mobile/sem
+  // sidebar reservando espaço) até a primeira medição chegar.
+  const [sidebarWidth, setSidebarWidth] = useState(0);
+  const handleSidebarWidthChange = useCallback((width: number) => setSidebarWidth(width), []);
+
   // Onboarding obrigatório: mostra o vídeo até o usuário marcar como visto
   const [onboardingDone, setOnboardingDone] = useState(false);
   const showOnboarding = !onboardingVisto && !onboardingDone && !!onboardingVideo;
@@ -79,6 +86,10 @@ export default function PainelLayoutClient({
   // Sistema de Notas é uma camada global, mas ainda assim respeita a permissão do módulo 'notas'
   // (bypass padrão Admin/CEO/TI, mesmo critério usado em todo o restante do painel).
   const temAcessoNotas = isAdminRole(role) || permissoes.includes('notas');
+  // A barra de notas é `fixed bottom-0` no shell externo — os iframes de módulo não sabem que
+  // ela existe (documentos isolados) e desenhariam conteúdo por baixo dela sem este respiro.
+  const notasBarraVisivel = useNotasWorkspace((state) => state.isTaskbarVisible);
+  const ALTURA_BARRA_NOTAS_PX = 40;
 
   useChamadosNotifications(role, userId);
   useNotasNotifications(temAcessoNotas ? userId : 0);
@@ -248,7 +259,6 @@ export default function PainelLayoutClient({
       initialPathnameRef.current.startsWith(activeUrl + '/'));
 
   const sidebarOffset = isCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[260px]';
-  const sidebarLeftOffset = isCollapsed ? 'lg:left-[72px]' : 'lg:left-[260px]';
 
   return (
     <>
@@ -271,6 +281,7 @@ export default function PainelLayoutClient({
           onOpenTab={openTab}
           activeUrl={activeUrl}
           temaName={temaName}
+          onWidthChange={handleSidebarWidthChange}
         />
       )}
 
@@ -302,8 +313,13 @@ export default function PainelLayoutClient({
           </div>
         )}
 
-        {/* Page content */}
-        <div className="flex-1 overflow-hidden relative">
+        {/* Page content — reserva o espaço da barra de notas (fixed, fora dos iframes) para
+            que nenhum módulo desenhe conteúdo por baixo dela (ex: rodapé da sidebar do Bibble
+            na Home). */}
+        <div
+          className="flex-1 overflow-hidden relative transition-[padding] duration-200 ease-in-out"
+          style={{ paddingBottom: !tvMode && temAcessoNotas && notasBarraVisivel ? ALTURA_BARRA_NOTAS_PX : 0 }}
+        >
 
           {/* SSR fallback shown while initial iframe loads */}
           {showChildrenFallback && (
@@ -361,8 +377,12 @@ export default function PainelLayoutClient({
         </div>
       </div>
 
-      {/* Camada global de notas — fora do container de iframes, sobreposta ao rodapé de qualquer módulo aberto. Recuada pela mesma largura da sidebar em telas lg+ para nunca cobri-la. */}
-      {!tvMode && temAcessoNotas && <NotesGlobalTaskbar userId={userId} sidebarOffsetClass={sidebarLeftOffset} />}
+      {/* Camada global de notas — fora do container de iframes, sobreposta ao rodapé de qualquer módulo aberto.
+          Encosta exatamente onde a sidebar termina de verdade (sidebarWidth medido ao vivo via
+          ResizeObserver em GlobalSidebar) — nunca um valor fixo assumido, então nunca sobrepõe a
+          sidebar mesmo que a largura real dela mude ou dessincronize do CSS esperado. No mobile/
+          tablet (< lg, sidebar em modo "gaveta") sidebarWidth fica 0 e a barra ocupa a largura toda. */}
+      {!tvMode && temAcessoNotas && <NotesGlobalTaskbar userId={userId} sidebarWidth={sidebarWidth} />}
     </>
   );
 }

@@ -76,6 +76,8 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const carregouRef = useRef(false);
   const setSyncState = useNotasWorkspace((state) => state.setSyncState);
+  const renomearAba = useNotasWorkspace((state) => state.renomearAba);
+  const tabs = useNotasWorkspace((state) => state.tabs);
 
   const rascunhoKey = `${RASCUNHO_STORAGE_PREFIX}_${noteId}`;
 
@@ -272,8 +274,22 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
       <input
         value={title}
         onChange={(event) => {
-          setTitle(event.target.value);
+          const novoTitulo = event.target.value;
+          setTitle(novoTitulo);
           setTituloEditadoManualmente(true);
+          setStatus("pendente");
+
+          // Reflete no rótulo da aba na barra de tarefas em tempo real — a aba não sabe do
+          // título até a nota ser salva, então sem isso o usuário vê o valor antigo ali.
+          if (tabs.some((tab) => tab.noteId === noteId)) {
+            const tab = tabs.find((t) => t.noteId === noteId);
+            if (tab) renomearAba(tab.id, novoTitulo);
+          }
+
+          if (editor) salvarRascunhoLocal(editor.getJSON(), editor.getText());
+
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          debounceRef.current = setTimeout(salvar, AUTOSAVE_DEBOUNCE_MS);
         }}
         placeholder="Sem título"
         className="border-b border-white/5 bg-transparent px-4 py-2 text-sm font-semibold text-white outline-none placeholder:text-slate-600"

@@ -27,6 +27,8 @@ Ready for Review
 13. O usuário pode selecionar um intervalo no campo de texto e aplicar cor, fonte, tamanho ou estilos somente àquele trecho; sem intervalo, a alteração é aplicada ao texto inteiro.
 14. As fontes oferecidas são carregadas tanto no painel quanto no player compartilhado usado em apresentação, link público e exportação HTML.
 15. Não é introduzida tabela, coluna, migration ou mutação em massa de banco.
+16. A tela inicial identifica o modulo como `Alpha Motion`, sem o titulo legado `Presentation Studio`.
+17. Cada card exibe uma miniatura responsiva do Slide 1 quando ele possui conteudo; slides vazios mantem o placeholder atual.
 
 ## Blueprint de Integração
 
@@ -70,6 +72,9 @@ Ready for Review
 - [x] Adicionar texto justificado, aplicação de efeitos em todos os elementos e liberar animações de interação e rolagem.
 - [x] Corrigir o alinhamento justificado para distribuir também a última ou única linha dentro do componente.
 - [x] Adicionar controle universal de opacidade com multisseleção e histórico transacional.
+- [x] Renomear o dashboard para Alpha Motion e exibir uma miniatura segura do Slide 1 nos cards.
+- [x] Corrigir a camada negativa do background para ele aparecer na miniatura do Slide 1.
+- [x] Substituir qualquer simulacao por um mini visualizador real do Slide 1 usando o renderer compartilhado.
 
 ## Testing
 
@@ -91,6 +96,10 @@ Ready for Review
 | 2026-08-10 | 2.5 | Texto justificado, aplicação de animação em lote, oito interações de hover/clique e efeitos de Scroll Reveal configuráveis. | Codex |
 | 2026-08-10 | 2.6 | Justificação distribuída corrigida para textos simples, parágrafos ricos, player e exportação. | Codex |
 | 2026-08-10 | 2.7 | Controle de opacidade de 0% a 100% para todos os elementos, fundos e multisseleção. | Codex |
+| 2026-08-10 | 2.8 | Dashboard renomeado para Alpha Motion e cards com miniatura responsiva e estatica do primeiro slide. | Codex |
+| 2026-08-10 | 2.9 | Normalizacao de z-index na miniatura para preservar o background fixo abaixo do conteudo. | Codex |
+| 2026-08-10 | 3.0 | Background separado do conteudo e representado por composicoes estaticas fieis aos cinco estilos do Alpha Motion. | Codex |
+| 2026-08-10 | 3.1 | Miniatura substituida por mini visualizador real do Slide 1, montado apenas proximo da viewport. | Codex |
 
 ## Dev Agent Record
 
@@ -139,6 +148,13 @@ GPT-5 Codex
 - Opacidade universal: `npm test` aprovou 1021/1022 testes; permaneceu somente o timeout preexistente de `tests/google-calendar/cli.test.ts`.
 - Opacidade universal: `npx tsc --noEmit` manteve somente as quatro falhas preexistentes e o lint global excedeu 180s; nenhum erro novo pertence ao escopo alterado.
 - Opacidade universal: `npm run build` foi bloqueado no `prisma generate` pelo `EPERM` preexistente; `npm run build:player` e `npx next build` (70 páginas) foram aprovados separadamente.
+- Miniaturas do dashboard: 315/315 testes do Alpha Motion, ESLint do escopo, `git diff --check` e `npx next build` com 70 paginas aprovados.
+- Miniaturas do dashboard: `npm test` aprovou 1025/1026 testes e manteve apenas o timeout preexistente de `tests/google-calendar/cli.test.ts`; `npm run typecheck` manteve somente as quatro falhas antigas documentadas e `npm run lint` global excedeu 180s no escopo legado.
+- Background da miniatura: o z-index negativo persistido pelo editor agora e normalizado somente no DTO de preview, sem alterar os dados do slide.
+- Background da miniatura: 3/3 testes direcionados, ESLint do escopo, `git diff --check` e `npx next build` com 70 paginas aprovados; gates globais mantiveram apenas o baseline preexistente.
+- Mini visualizador real: 315/315 testes do Alpha Motion, 3/3 testes direcionados, ESLint do escopo, `git diff --check` e `npx next build` com 70 paginas aprovados; preserva os tipos reais dos componentes, o background e a ordem das camadas.
+- Suite global: 1025/1026 testes aprovados; permanece apenas o timeout preexistente em `tests/google-calendar/cli.test.ts`. O lint global excedeu o limite de 180 segundos, enquanto o ESLint dos arquivos alterados passou.
+- Background fiel da miniatura: `npm test` aprovou 1026/1027 casos e manteve somente o timeout preexistente de `tests/google-calendar/cli.test.ts`; typecheck e lint globais permaneceram no baseline documentado.
 
 ### Completion Notes List
 
@@ -162,6 +178,10 @@ GPT-5 Codex
 - A aba Interação oferece oito efeitos reais de hover/clique e os efeitos de clique podem ser repetidos a cada nova interação.
 - A aba Rolagem oferece 14 variações de entrada, limiar visível configurável e opção de executar uma vez ou repetir ao voltar.
 - O player, a apresentação e o HTML exportado usam o mesmo renderer para os novos efeitos e tratam o background como tela cheia independentemente das dimensões antigas salvas.
+- A tela inicial agora usa o nome Alpha Motion e os cards renderizam o conteudo do Slide 1 na proporcao original; slides vazios continuam com o icone de monitor.
+- Miniaturas validam o JSON antes do render e convertem video, audio, 3D e fundos animados em placeholders estaticos para evitar consumo excessivo no grid.
+- A ordem das camadas da miniatura e deslocada para uma faixa nao negativa, garantindo que o background continue visivel atras do conteudo dentro do SVG.
+- Os cards agora montam o mesmo `RenderComponente` da apresentacao para todos os elementos do Slide 1, inclusive backgrounds, midias e 3D; cards fora da viewport sao desmontados para controlar o custo de renderizacao.
 - Nenhuma migration, dependência ou alteração estrutural de banco foi necessária.
 - Validação visual autenticada deve ser repetida por um usuário com sessão válida antes da aprovação final de QA.
 - DoD: requisitos funcionais, estrutura, segurança, testes direcionados, documentação e build Next aplicáveis estão concluídos; os gates globais `npm run lint`, `npm test` e `npm run build` permanecem marcados como bloqueados exclusivamente pelas falhas preexistentes descritas no Debug Log.
@@ -182,6 +202,9 @@ GPT-5 Codex
 - `src/apresentacoes-player/player.css`
 - `src/generated/apresentacoes-player-bundle.ts`
 - `src/components/Apresentacoes/Editor/EditorKeyboardShortcuts.tsx`
+- `src/components/Apresentacoes/Dashboard/ApresentacoesDashboard.tsx`
+- `src/components/Apresentacoes/Dashboard/CardApresentacao.tsx`
+- `src/components/Apresentacoes/Dashboard/MiniaturaSlideApresentacao.tsx`
 - `src/components/Apresentacoes/Editor/ApresentacaoEditor.tsx`
 - `src/components/Apresentacoes/FontesPersonalizadasStyle.tsx`
 - `src/components/Apresentacoes/Editor/FontesPersonalizadasContext.tsx`
@@ -210,6 +233,7 @@ GPT-5 Codex
 - `src/components/Apresentacoes/Editor/registry/componentes-registry.ts`
 - `src/components/Apresentacoes/Editor/store/useEditorStore.ts`
 - `src/lib/apresentacoes/fontes.ts`
+- `src/lib/apresentacoes/miniatura-slide.ts`
 - `src/lib/apresentacoes/alinhamento.ts`
 - `src/lib/apresentacoes/animacao/catalogo.ts`
 - `src/lib/apresentacoes/animacao/registry.ts`
@@ -227,10 +251,12 @@ GPT-5 Codex
 - `src/apresentacoes-player/PlayerStandalone.tsx`
 - `src/components/Apresentacoes/ModoApresentacao/ModoApresentacaoClient.tsx`
 - `src/actions/slides.ts`
+- `src/actions/apresentacoes.ts`
 - `src/lib/validations/slide-componentes.ts`
 - `src/lib/validations/slide-componentes-basicos.ts`
 - `src/lib/apresentacoes/rich-text-edit.ts`
 - `tests/apresentacoes/editor-history-selection.test.ts`
+- `tests/apresentacoes/miniatura-slide.test.ts`
 - `tests/apresentacoes/alinhamento-canvas.test.ts`
 - `tests/apresentacoes/fontes-locais.test.ts`
 - `tests/apresentacoes/fontes-personalizadas.test.ts`

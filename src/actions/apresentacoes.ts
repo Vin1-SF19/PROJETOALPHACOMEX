@@ -11,6 +11,7 @@ import { z } from "zod";
 import { dadosSlideSchema } from "@/lib/validations/slide-componentes";
 import { presetsAnimacaoPersonalizadosSchema } from "@/lib/apresentacoes/animacao/presets-personalizados";
 import { gerarSlugPublico } from "@/lib/apresentacoes/publicacao";
+import { criarMiniaturaSlide } from "@/lib/apresentacoes/miniatura-slide";
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
@@ -85,6 +86,11 @@ export async function ListarApresentacoes(params?: { page?: number; pageSize?: n
           updatedAt: true,
           autor: { select: { id: true, nome: true } },
           _count: { select: { slides: true } },
+          slides: {
+            orderBy: { ordem: "asc" },
+            take: 1,
+            select: { dadosJson: true },
+          },
         },
         orderBy: { updatedAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -95,7 +101,10 @@ export async function ListarApresentacoes(params?: { page?: number; pageSize?: n
 
     return {
       success: true,
-      data: dados,
+      data: dados.map(({ slides, ...apresentacao }) => ({
+        ...apresentacao,
+        primeiroSlide: criarMiniaturaSlide(slides[0]?.dadosJson),
+      })),
       total,
       page,
       pageSize,
