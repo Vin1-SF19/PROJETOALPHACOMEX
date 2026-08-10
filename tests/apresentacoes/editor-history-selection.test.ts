@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useEditorStore } from "@/components/Apresentacoes/Editor/store/useEditorStore";
-import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import type { ComponenteSlide, FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
 import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 
 function texto(id: string, x: number, y: number, zIndex: number): ComponenteSlide {
   return { id, tipo: "texto", texto: id, tag: "p", x, y, w: 100, h: 50, zIndex, rotacao: 0 };
+}
+
+function fundo(id: string, estilo: FundoAnimadoComponente["estilo"] = "radar"): FundoAnimadoComponente {
+  return {
+    id, tipo: "fundoAnimado", x: 99, y: 77, w: 300, h: 200, zIndex: 50, rotacao: 25,
+    estilo, corPrimaria: "#4f46e5", corSecundaria: "#0ea5e9", velocidade: 1, densidade: 1,
+    direcao: "horario", intensidade: 1, mostrarSol: true, quantidadePlanetas: 8,
+    mostrarGrade: true, mostrarRelogio: false,
+  };
 }
 
 describe("Alpha Motion — histórico, multisseleção e camadas", () => {
@@ -21,6 +30,7 @@ describe("Alpha Motion — histórico, multisseleção e camadas", () => {
       historicoFuturo: [],
       isDirty: false,
       versaoEdicao: 0,
+      guiasAlinhamento: { verticais: [], horizontais: [] },
     });
   });
 
@@ -103,5 +113,59 @@ describe("Alpha Motion — histórico, multisseleção e camadas", () => {
     const [a, b] = useEditorStore.getState().componentes;
     expect(b.x - a.x).toBe(distanciaAntes);
     expect((Math.min(a.x, b.x) + Math.max(a.x + a.w, b.x + b.w)) / 2).toBe(CANVAS_PADRAO.width / 2);
+  });
+
+  it("centraliza apenas no eixo horizontal sem alterar Y", () => {
+    const store = useEditorStore.getState();
+    store.selecionarComponente("a");
+    store.selecionarComponente("b", true);
+    const ysAntes = store.componentes.map((componente) => componente.y);
+    store.centralizarSelecionados("horizontal");
+    const [a, b] = useEditorStore.getState().componentes;
+    expect([a.y, b.y]).toEqual(ysAntes);
+    expect((Math.min(a.x, b.x) + Math.max(a.x + a.w, b.x + b.w)) / 2).toBe(CANVAS_PADRAO.width / 2);
+  });
+
+  it("centraliza apenas no eixo vertical sem alterar X", () => {
+    const store = useEditorStore.getState();
+    store.selecionarComponente("a");
+    store.selecionarComponente("b", true);
+    const xsAntes = store.componentes.map((componente) => componente.x);
+    store.centralizarSelecionados("vertical");
+    const [a, b] = useEditorStore.getState().componentes;
+    expect([a.x, b.x]).toEqual(xsAntes);
+    expect((Math.min(a.y, b.y) + Math.max(a.y + a.h, b.y + b.h)) / 2).toBe(CANVAS_PADRAO.height / 2);
+  });
+
+  it("aplica um unico fundo fixo, limpa a selecao e o ajusta ao canvas", () => {
+    useEditorStore.setState({
+      componentes: [fundo("antigo"), texto("a", 10, 20, 1)],
+      componenteSelecionadoId: "a",
+      componentesSelecionadosIds: ["a"],
+    });
+
+    useEditorStore.getState().aplicarFundo(fundo("novo", "estelar"));
+    let estado = useEditorStore.getState();
+    const fundos = estado.componentes.filter((componente) => componente.tipo === "fundoAnimado");
+    expect(fundos).toHaveLength(1);
+    expect(fundos[0]).toMatchObject({ id: "novo", x: 0, y: 0, w: CANVAS_PADRAO.width, h: CANVAS_PADRAO.height, rotacao: 0 });
+    expect(estado.componentesSelecionadosIds).toEqual([]);
+
+    estado.desfazer();
+    expect(useEditorStore.getState().componentes.some((componente) => componente.id === "antigo")).toBe(true);
+    useEditorStore.getState().refazer();
+
+    useEditorStore.getState().redimensionarCanvas({ ...CANVAS_PADRAO, width: 900, height: 1600 });
+    estado = useEditorStore.getState();
+    expect(estado.componentes.find((componente) => componente.id === "novo")).toMatchObject({ x: 0, y: 0, w: 900, h: 1600, rotacao: 0 });
+  });
+
+  it("mantem o fundo abaixo dos elementos ao reordenar camadas", () => {
+    useEditorStore.setState({ componentes: [fundo("bg"), texto("a", 10, 20, 1), texto("b", 210, 120, 2)] });
+    useEditorStore.getState().reordenarCamadas(["a", "bg", "b"]);
+    const estado = useEditorStore.getState();
+    const bg = estado.componentes.find((componente) => componente.id === "bg")!;
+    const elementos = estado.componentes.filter((componente) => componente.tipo !== "fundoAnimado");
+    expect(elementos.every((componente) => componente.zIndex > bg.zIndex)).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronUp, ChevronDown, GripVertical, Trash2 } from "lucide-react";
+import { ChevronUp, ChevronDown, GripVertical, Lock, Trash2 } from "lucide-react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -75,11 +75,12 @@ function LinhaCamada({ componente }: { componente: ComponenteSlide }) {
   const selecionado = useEditorStore((state) => state.componentesSelecionadosIds.includes(componente.id));
   const selecionarComponente = useEditorStore((state) => state.selecionarComponente);
   const removerComponente = useEditorStore((state) => state.removerComponente);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: componente.id });
+  const ehFundo = componente.tipo === "fundoAnimado";
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: componente.id, disabled: ehFundo });
   const Icone = resolverEntradaRegistry(componente).icone;
 
   function selecionar(event: React.MouseEvent) {
-    selecionarComponente(componente.id, event.ctrlKey || event.metaKey);
+    selecionarComponente(componente.id, !ehFundo && (event.ctrlKey || event.metaKey));
   }
 
   return (
@@ -89,16 +90,26 @@ function LinhaCamada({ componente }: { componente: ComponenteSlide }) {
       className="flex items-center gap-2"
     >
       <div className={`flex w-36 shrink-0 items-center rounded-lg border ${selecionado ? "border-cyan-400/50 bg-cyan-500/10" : "border-white/5 bg-slate-900/60"}`}>
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          aria-label={`Mover camada ${resolverEntradaRegistry(componente).label}`}
-          title="Arraste para mudar a camada"
-          className="cursor-grab touch-none p-1.5 text-slate-600 hover:text-white active:cursor-grabbing"
-        >
-          <GripVertical size={12} aria-hidden="true" />
-        </button>
+        {ehFundo ? (
+          <span
+            aria-label="Fundo fixado na base das camadas"
+            title="Fundo fixado na base das camadas"
+            className="p-1.5 text-indigo-300"
+          >
+            <Lock size={12} aria-hidden="true" />
+          </span>
+        ) : (
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            aria-label={`Mover camada ${resolverEntradaRegistry(componente).label}`}
+            title="Arraste para mudar a camada"
+            className="cursor-grab touch-none p-1.5 text-slate-600 hover:text-white active:cursor-grabbing"
+          >
+            <GripVertical size={12} aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
           onClick={selecionar}
@@ -136,6 +147,9 @@ export function TimelineReal() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
+    const camadaAtiva = camadas.find((componente) => componente.id === active.id);
+    const camadaAlvo = camadas.find((componente) => componente.id === over.id);
+    if (camadaAtiva?.tipo === "fundoAnimado" || camadaAlvo?.tipo === "fundoAnimado") return;
     const oldIndex = camadas.findIndex((componente) => componente.id === active.id);
     const newIndex = camadas.findIndex((componente) => componente.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;

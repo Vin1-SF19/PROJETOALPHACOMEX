@@ -26,6 +26,10 @@ export const COMPONENTES_REGISTRY: Record<TipoComponente, RegistryEntry> = {
 
 export const TIPOS_COMPONENTE: TipoComponente[] = Object.keys(COMPONENTES_REGISTRY) as TipoComponente[];
 
+export function ehTipoFundo(tipo: TipoComponente): tipo is keyof typeof REGISTRY_FUNDOS {
+  return tipo in REGISTRY_FUNDOS;
+}
+
 /** Categorias para agrupamento na sidebar do Editor. */
 export const CATEGORIAS_COMPONENTE = [
   { nome: "Básicos", tipos: Object.keys(REGISTRY_BASICOS) as TipoComponente[] },

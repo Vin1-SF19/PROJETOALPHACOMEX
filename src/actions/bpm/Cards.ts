@@ -357,11 +357,43 @@ export async function MoverCardBpm(dados: unknown) {
 
     if (card.etapaId === etapaDestinoId) return { success: true };
 
-    // D-024: bloqueia avanço se a etapa de destino exige campos obrigatórios não preenchidos.
-    const camposObrigatoriosDestino = await db.bpmCampo.findMany({
-      where: { pipelineId: card.pipelineId, etapaId: etapaDestinoId, obrigatorio: true },
-      select: { id: true, nome: true },
+    // Máquina de estado do pipeline "Revisão de Radar" (plano-novos-leads-bpm.md): se a etapa de
+    // ORIGEM tem QUALQUER transição cadastrada, só os destinos explicitamente permitidos valem.
+    // Etapa sem nenhuma linha cadastrada continua permitindo qualquer destino (fallback preserva
+    // o comportamento livre dos pipelines "Financeiro"/"Radar", que nunca pediram essa restrição).
+    const transicoesDaOrigem = await db.bpmEtapaTransicaoPermitida.findMany({
+      where: { etapaOrigemId: card.etapaId },
+      select: { etapaDestinoId: true },
     });
+    if (transicoesDaOrigem.length > 0) {
+      const destinosPermitidos = new Set(transicoesDaOrigem.map((t) => t.etapaDestinoId));
+      if (!destinosPermitidos.has(etapaDestinoId)) {
+        return {
+          success: false,
+          error: `Não é possível mover diretamente desta etapa para "${etapaDestino.nome}" — verifique as etapas permitidas.`,
+        };
+      }
+    }
+
+    // Campos obrigatórios: (a) BpmCampo cadastrado DIRETO na etapa destino (mecanismo original);
+    // (b) BpmCampo de nível pipeline (etapaId: null) marcado como obrigatório NESTA etapa via
+    // BpmCampoObrigatorioEtapa — permite reaproveitar o mesmo campo (ex: "Valor acordado no
+    // contrato") como obrigatório em várias etapas sem duplicá-lo.
+    const [camposDiretos, camposViaJuncao] = await Promise.all([
+      db.bpmCampo.findMany({
+        where: { pipelineId: card.pipelineId, etapaId: etapaDestinoId, obrigatorio: true },
+        select: { id: true, nome: true },
+      }),
+      db.bpmCampoObrigatorioEtapa.findMany({
+        where: { etapaId: etapaDestinoId },
+        select: { campo: { select: { id: true, nome: true } } },
+      }),
+    ]);
+    const camposObrigatoriosDestino = [
+      ...camposDiretos,
+      ...camposViaJuncao.map((c) => c.campo),
+    ].filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i); // dedupe por id
+
     if (camposObrigatoriosDestino.length > 0) {
       const valoresPreenchidos = await db.bpmCardCampoValor.findMany({
         where: { cardId, campoId: { in: camposObrigatoriosDestino.map((c) => c.id) } },
@@ -377,6 +409,17 @@ export async function MoverCardBpm(dados: unknown) {
           error: `Não é possível avançar: campos obrigatórios pendentes (${faltantes.map((f) => f.nome).join(", ")})`,
         };
       }
+    }
+
+    // Validação de ENTRADA (diferente de "obrigatório para mover"): Em Tratativa/Sem Viabilidade
+    // exigem BpmCard.proximoContatoEm preenchido para o card poder ENTRAR na etapa — é coluna
+    // nativa do BpmCard, não um BpmCampo, então precisa de checagem própria (ver plano, Coluna 4/7).
+    const ETAPAS_EXIGEM_PROXIMO_CONTATO = ["Em tratativa", "Sem viabilidade"];
+    if (ETAPAS_EXIGEM_PROXIMO_CONTATO.includes(etapaDestino.nome) && !card.proximoContatoEm) {
+      return {
+        success: false,
+        error: `Não é possível avançar para "${etapaDestino.nome}": o campo "Próximo Contato" precisa estar preenchido.`,
+      };
     }
 
     await db.$transaction(async (tx) => {

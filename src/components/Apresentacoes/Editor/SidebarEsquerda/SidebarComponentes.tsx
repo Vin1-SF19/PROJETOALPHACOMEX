@@ -1,8 +1,19 @@
+"use client";
+
 import { ChevronDown } from "lucide-react";
-import { CATEGORIAS_COMPONENTE } from "../registry/componentes-registry";
+import { CATEGORIAS_COMPONENTE, COMPONENTES_REGISTRY, ehTipoFundo, type TipoComponente } from "../registry/componentes-registry";
 import { ItemComponenteArrastavel } from "./ItemComponenteArrastavel";
+import { useEditorStore } from "../store/useEditorStore";
 
 export function SidebarComponentes() {
+  const aplicarFundo = useEditorStore((state) => state.aplicarFundo);
+
+  function handleAplicarFundo(tipo: TipoComponente) {
+    if (!ehTipoFundo(tipo)) return;
+    const componente = COMPONENTES_REGISTRY[tipo].criarComponentePadrao(0, 0);
+    if (componente.tipo === "fundoAnimado") aplicarFundo(componente);
+  }
+
   return (
     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
       <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Componentes</h3>
@@ -14,7 +25,7 @@ export function SidebarComponentes() {
           </summary>
           <div className="grid grid-cols-2 gap-2 pb-2 pt-1">
             {categoria.tipos.map((tipo) => (
-              <ItemComponenteArrastavel key={tipo} tipo={tipo} />
+              <ItemComponenteArrastavel key={tipo} tipo={tipo} onAplicarFundo={handleAplicarFundo} />
             ))}
           </div>
         </details>

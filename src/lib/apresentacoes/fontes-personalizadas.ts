@@ -60,12 +60,17 @@ export function nomeFonteJaExiste(fontes: FontePersonalizada[], nome: string): b
   return fontes.some((fonte) => fonte.nome.toLocaleLowerCase("pt-BR") === nomeNormalizado);
 }
 
+function stringCssSegura(valor: string): string {
+  // Evita delimitadores HTML literais mesmo se o <style> for renderizado no servidor.
+  return JSON.stringify(valor).replace(/</g, "\\3c ").replace(/>/g, "\\3e ");
+}
+
 /** Gera CSS sem interpolar tokens livres: strings passam por JSON.stringify antes de entrar no @font-face. */
 export function cssDasFontesPersonalizadas(fontes: FontePersonalizada[]): string {
   return fontes.map((fonte) => [
     "@font-face {",
-    `  font-family: ${JSON.stringify(fonte.nome)};`,
-    `  src: url(${JSON.stringify(fonte.url)}) format(${JSON.stringify(fonte.formato)});`,
+    `  font-family: ${stringCssSegura(fonte.nome)};`,
+    `  src: url(${stringCssSegura(fonte.url)}) format(${stringCssSegura(fonte.formato)});`,
     "  font-style: normal;",
     "  font-weight: 100 900;",
     "  font-display: swap;",

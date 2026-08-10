@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { calcularAlinhamentoMagnetico, type CaixaAlinhamento } from "@/lib/apresentacoes/alinhamento";
 
 type HandlePosicao = "nw" | "ne" | "sw" | "se";
 
@@ -32,6 +33,7 @@ export function useCanvasDragResize(componenteId: string, x: number, y: number, 
   const moverComponentes = useEditorStore((s) => s.moverComponentes);
   const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
   const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
+  const setGuiasAlinhamento = useEditorStore((s) => s.setGuiasAlinhamento);
   const zoom = useEditorStore((s) => s.zoom);
   const zoomRef = useRef(zoom);
   useEffect(() => {
@@ -42,6 +44,9 @@ export function useCanvasDragResize(componenteId: string, x: number, y: number, 
     startX: number;
     startY: number;
     origens: Array<{ id: string; x: number; y: number }>;
+    caixasMoveis: CaixaAlinhamento[];
+    referencias: CaixaAlinhamento[];
+    canvas: { width: number; height: number };
   } | null>(null);
   const redimensionando = useRef<{
     startX: number;
@@ -61,24 +66,44 @@ export function useCanvasDragResize(componenteId: string, x: number, y: number, 
       ? estado.componentesSelecionadosIds
       : [componenteId];
     const origens = coletarOrigensMoviveis(estado.componentes, new Set(ids));
+    const idsMovidos = new Set(origens.map((origem) => origem.id));
+    const caixasMoveis = estado.componentes
+      .filter((componente) => idsMovidos.has(componente.id) && componente.tipo !== "fundoAnimado")
+      .map((componente) => ({ id: componente.id, x: componente.x, y: componente.y, w: componente.w, h: componente.h, rotacao: componente.rotacao }));
+    const referencias = estado.componentes
+      .filter((componente) => !idsMovidos.has(componente.id) && componente.tipo !== "fundoAnimado")
+      .map((componente) => ({ id: componente.id, x: componente.x, y: componente.y, w: componente.w, h: componente.h, rotacao: componente.rotacao }));
     iniciarTransacaoHistorico();
-    arrastando.current = { startX: e.clientX, startY: e.clientY, origens };
+    setGuiasAlinhamento({ verticais: [], horizontais: [] });
+    arrastando.current = { startX: e.clientX, startY: e.clientY, origens, caixasMoveis, referencias, canvas: estado.canvas };
 
     function onMove(ev: MouseEvent) {
       if (!arrastando.current) return;
-      const deltaX = (ev.clientX - arrastando.current.startX) / zoomRef.current;
-      const deltaY = (ev.clientY - arrastando.current.startY) / zoomRef.current;
-      moverComponentes(arrastando.current.origens, deltaX, deltaY);
+      const deltaXBruto = (ev.clientX - arrastando.current.startX) / zoomRef.current;
+      const deltaYBruto = (ev.clientY - arrastando.current.startY) / zoomRef.current;
+      const podeAlinhar = arrastando.current.caixasMoveis.length === arrastando.current.origens.length;
+      const resultado = podeAlinhar
+        ? calcularAlinhamentoMagnetico({
+            caixasMoveis: arrastando.current.caixasMoveis,
+            referencias: arrastando.current.referencias,
+            canvas: arrastando.current.canvas,
+            deltaX: deltaXBruto,
+            deltaY: deltaYBruto,
+          })
+        : { deltaX: deltaXBruto, deltaY: deltaYBruto, guias: { verticais: [], horizontais: [] } };
+      setGuiasAlinhamento(resultado.guias);
+      moverComponentes(arrastando.current.origens, resultado.deltaX, resultado.deltaY);
     }
     function onUp() {
       arrastando.current = null;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      setGuiasAlinhamento({ verticais: [], horizontais: [] });
       finalizarTransacaoHistorico();
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [componenteId, finalizarTransacaoHistorico, iniciarTransacaoHistorico, moverComponentes]);
+  }, [componenteId, finalizarTransacaoHistorico, iniciarTransacaoHistorico, moverComponentes, setGuiasAlinhamento]);
 
   const onMouseDownRedimensionar = useCallback((handle: HandlePosicao) => (e: React.MouseEvent) => {
     e.stopPropagation();

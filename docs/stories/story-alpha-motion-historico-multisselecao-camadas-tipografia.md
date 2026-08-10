@@ -65,6 +65,8 @@ Ready for Review
 - [x] Atualizar checklist, file list e mapas técnicos.
 - [x] Corrigir carregamento das fontes com WOFF2 local e incorporação no HTML exportado.
 - [x] Corrigir resolução da folha de fontes pelo Turbopack no `globals.css`.
+- [x] Permitir upload de WOFF2/WOFF/TTF/OTF com nome personalizado, persistência por apresentação e incorporação no HTML exportado.
+- [x] Transformar backgrounds em fundos fixos aplicados por clique, adicionar guias magnéticas e separar a centralização por eixo.
 
 ## Testing
 
@@ -81,6 +83,8 @@ Ready for Review
 | 2026-08-10 | 2.0 | Undo/Redo, multisseleção, rotação, centralização, camadas, reordenação acessível de slides e tipografia rica implementados e validados. | Dex |
 | 2026-08-10 | 2.1 | Fontes remotas substituídas por 32 arquivos WOFF2 locais e incorporação base64 no HTML exportado. | Dex |
 | 2026-08-10 | 2.2 | Folha gerada movida para `src/app`, imports corrigidos e grafo do `next dev` reiniciado para eliminar o erro de resolução do Turbopack. | Dex |
+| 2026-08-10 | 2.3 | Biblioteca de fontes personalizadas com upload seguro, nome livre, aplicação imediata e suporte aos players e exportação offline. | Dex |
+| 2026-08-10 | 2.4 | Background fixo selecionável apenas pela timeline, alinhamento magnético estilo Canva e centralização horizontal, vertical ou completa. | Codex |
 
 ## Dev Agent Record
 
@@ -107,6 +111,15 @@ GPT-5 Codex
 - Correção Turbopack: `npx next build` compilou com sucesso em 47s e gerou 70 páginas usando Next 16.1.6.
 - Correção Turbopack: `next dev` reiniciado somente para os processos do workspace; `/PainelAlpha/Apresentacoes` respondeu HTTP 200, sem erro de resolução CSS.
 - Correção Turbopack: 17/17 testes de fontes, ESLint direcionado e `git diff --check` aprovados.
+- Fontes personalizadas: `npx vitest run tests/apresentacoes` aprovou 25 arquivos e 297/297 testes; teste direcionado passou com 29/29 casos de fontes.
+- Fontes personalizadas: ESLint direcionado aprovado; `npx tsc --noEmit` não apresentou falhas novas e manteve somente as 4 falhas preexistentes documentadas.
+- Fontes personalizadas: `npm test` aprovou 1006/1007 testes; a única falha foi o timeout preexistente de `tests/google-calendar/cli.test.ts`.
+- Fontes personalizadas: `npx next build` aprovado com 70 páginas e a rota `/api/apresentacoes/fontes`; `npm run build:player` aprovado.
+- Fontes personalizadas: lint global excedeu 120s devido ao escopo legado; lint direcionado do conjunto alterado foi aprovado sem erros ou avisos.
+- Fundo e alinhamento: 13/13 testes direcionados aprovados, incluindo magnetismo, substituição/resize do fundo, camada protegida e centralização por eixo.
+- Fundo e alinhamento: ESLint direcionado, `git diff --check`, `npx next build` (70 páginas) e `npm run build:player` aprovados.
+- Fundo e alinhamento: `npm test` aprovou 1014/1015 casos; permaneceu apenas o timeout preexistente de `tests/google-calendar/cli.test.ts`. O lint global excedeu 180s; o escopo alterado está limpo.
+- Fundo e alinhamento: `npx tsc --noEmit` não apresentou falhas novas; permanecem somente as quatro falhas preexistentes já documentadas.
 
 ### Completion Notes List
 
@@ -117,6 +130,12 @@ GPT-5 Codex
 - Texto rico editável por intervalo, catálogo de 15 fontes e defaults explícitos compartilhados entre editor e player.
 - As 15 famílias deixaram de depender da rede: são servidas localmente pelo painel e incorporadas no HTML exportado para funcionar offline.
 - A folha gerada passou a ficar ao lado de `globals.css`; o servidor de desenvolvimento precisa ser reiniciado quando esse arquivo é criado pela primeira vez, pois o Turbopack pode manter o grafo anterior em memória.
+- O painel de texto agora permite adicionar uma fonte com nome personalizado e arquivo WOFF2/WOFF/TTF/OTF; ela é aplicada imediatamente e fica disponível em todos os slides da apresentação.
+- O upload valida tamanho, extensão e assinatura binária, preserva a biblioteca durante autosave/exclusão de slide e incorpora as fontes como `data:` URI no HTML offline.
+- Os backgrounds agora são aplicados por clique, substituem o fundo anterior, ocupam automaticamente todo o slide e ficam bloqueados na base das camadas.
+- O fundo não recebe seleção, resize ou rotação pelo canvas; cores e animações continuam editáveis ao selecioná-lo exclusivamente pela timeline.
+- O arraste de elementos exibe guias magnéticas para bordas e centros de outros elementos e do próprio slide, respeitando zoom, multisseleção e rotação visual.
+- O painel de propriedades oferece centralização horizontal, vertical e completa para elementos ou conjuntos selecionados.
 - Nenhuma migration, dependência ou alteração estrutural de banco foi necessária.
 - Validação visual autenticada deve ser repetida por um usuário com sessão válida antes da aprovação final de QA.
 - DoD: requisitos funcionais, estrutura, segurança, testes direcionados, documentação e build Next aplicáveis estão concluídos; os gates globais `npm run lint`, `npm test` e `npm run build` permanecem marcados como bloqueados exclusivamente pelas falhas preexistentes descritas no Debug Log.
@@ -138,22 +157,45 @@ GPT-5 Codex
 - `src/generated/apresentacoes-player-bundle.ts`
 - `src/components/Apresentacoes/Editor/EditorKeyboardShortcuts.tsx`
 - `src/components/Apresentacoes/Editor/ApresentacaoEditor.tsx`
+- `src/components/Apresentacoes/FontesPersonalizadasStyle.tsx`
+- `src/components/Apresentacoes/Editor/FontesPersonalizadasContext.tsx`
 - `src/components/Apresentacoes/Editor/BarraSuperior/BarraSuperiorEditor.tsx`
 - `src/components/Apresentacoes/Editor/Canvas/ComponenteNoCanvas.tsx`
+- `src/components/Apresentacoes/Editor/Canvas/CanvasArea.tsx`
+- `src/components/Apresentacoes/Editor/Canvas/GuiasAlinhamento.tsx`
 - `src/components/Apresentacoes/Editor/Canvas/useCanvasDragResize.ts`
 - `src/components/Apresentacoes/Editor/PainelDireito/PainelPropriedades.tsx`
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/FundoAnimadoProps.tsx`
 - `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/TextoProps.tsx`
 - `src/components/Apresentacoes/Editor/RenderEngine/render/RenderBasicos.tsx`
 - `src/components/Apresentacoes/Editor/SidebarEsquerda/SidebarSlides.tsx`
+- `src/components/Apresentacoes/Editor/SidebarEsquerda/ItemComponenteArrastavel.tsx`
+- `src/components/Apresentacoes/Editor/SidebarEsquerda/SidebarComponentes.tsx`
 - `src/components/Apresentacoes/Editor/Timeline/TimelineReal.tsx`
 - `src/components/Apresentacoes/Editor/Timeline/useTimelineDrag.ts`
 - `src/components/Apresentacoes/Editor/Timeline/useTimelineDragV2.ts`
 - `src/components/Apresentacoes/Editor/registry/registry-basicos.ts`
+- `src/components/Apresentacoes/Editor/registry/componentes-registry.ts`
 - `src/components/Apresentacoes/Editor/store/useEditorStore.ts`
 - `src/lib/apresentacoes/fontes.ts`
+- `src/lib/apresentacoes/alinhamento.ts`
+- `src/lib/apresentacoes/fontes-personalizadas.ts`
+- `src/lib/apresentacoes/embutir-fontes-personalizadas.ts`
+- `src/app/api/apresentacoes/fontes/route.ts`
+- `src/app/api/apresentacoes/[id]/exportar-html/route.ts`
+- `src/app/PainelAlpha/Apresentacoes/[id]/editor/page.tsx`
+- `src/app/PainelAlpha/Apresentacoes/[id]/apresentar/page.tsx`
+- `src/app/apresentacao/[slug]/page.tsx`
+- `src/apresentacoes-player/dados-tipos.ts`
+- `src/apresentacoes-player/PlayerStandalone.tsx`
+- `src/components/Apresentacoes/ModoApresentacao/ModoApresentacaoClient.tsx`
+- `src/actions/slides.ts`
+- `src/lib/validations/slide-componentes.ts`
 - `src/lib/apresentacoes/rich-text-edit.ts`
 - `tests/apresentacoes/editor-history-selection.test.ts`
+- `tests/apresentacoes/alinhamento-canvas.test.ts`
 - `tests/apresentacoes/fontes-locais.test.ts`
+- `tests/apresentacoes/fontes-personalizadas.test.ts`
 - `tests/apresentacoes/rich-text-edit.test.ts`
 - `.bibble/memory/codebase-map.md`
 - `.bibble/memory/integration-points.md`

@@ -63,6 +63,26 @@ export function ComponenteNoCanvas({
     .filter((resolvida) => resolvida.origem === "novo-modelo")
     .map((resolvida) => resolvida.animacao);
 
+  if (componente.tipo === "fundoAnimado") {
+    return (
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        style={{
+          width: "100%",
+          height: "100%",
+          zIndex: componente.zIndex,
+          transform: ajusteVisual?.escalaAjustada ? `scale(${ajusteVisual.escalaAjustada})` : undefined,
+          opacity: (ajusteVisual?.opacityAjustada ?? 1) * (componente.opacidade ?? 1),
+          filter: ajusteVisual?.blurAjustado ? "blur(3px)" : undefined,
+          transition: ajusteVisual ? "opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease" : undefined,
+        }}
+      >
+        <RenderComponenteAnimado componente={componente} modo="editor" portalProximoSlide={portalProximoSlide} animacaoConfig={animacaoConfigSlide} />
+      </div>
+    );
+  }
+
   function handleMouseDown(e: React.MouseEvent) {
     e.stopPropagation();
     const aditivo = e.ctrlKey || e.metaKey;

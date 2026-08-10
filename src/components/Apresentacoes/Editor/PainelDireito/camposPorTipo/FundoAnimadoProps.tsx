@@ -1,8 +1,4 @@
-"use client";
-
-import { Crosshair } from "lucide-react";
 import type { FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
-import { useEditorStore } from "../../store/useEditorStore";
 
 const NOMES_ESTILO: Record<FundoAnimadoComponente["estilo"], string> = {
   cosmosIAlpha: "Cosmos IAlpha",
@@ -50,32 +46,15 @@ function ColorField({ id, label, value, fallback, onChange }: ColorFieldProps) {
 }
 
 export function FundoAnimadoProps({ componente, onChange }: { componente: FundoAnimadoComponente; onChange: (patch: Partial<FundoAnimadoComponente>) => void }) {
-  const canvas = useEditorStore((s) => s.canvas);
   const { estilo } = componente;
   const usaDensidade = estilo === "cosmosIAlpha" || estilo === "radar" || estilo === "estelar" || estilo === "blueprintTecnico";
   const usaCorSecundaria = estilo === "estelar" || estilo === "blueprintTecnico" || estilo === "auroraModulos";
-
-  function centralizar() {
-    onChange({
-      x: (canvas.width - componente.w) / 2,
-      y: (canvas.height - componente.h) / 2,
-    });
-  }
 
   return (
     <>
       <div className="rounded-lg border border-white/5 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-500">
         Estilo: <span className="font-semibold text-slate-300">{NOMES_ESTILO[estilo]}</span>
       </div>
-
-      <button
-        type="button"
-        onClick={centralizar}
-        className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-      >
-        <Crosshair size={15} aria-hidden="true" />
-        Centralizar
-      </button>
 
       <ColorField id="fundo-cor-primaria" label="Cor primária" value={componente.corPrimaria} fallback="#4f46e5" onChange={(corPrimaria) => onChange({ corPrimaria })} />
 

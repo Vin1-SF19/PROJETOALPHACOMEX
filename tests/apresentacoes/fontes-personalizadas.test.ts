@@ -68,10 +68,11 @@ describe("fontes personalizadas do Alpha Motion", () => {
   });
 
   it("gera @font-face escapando nome e URL como strings CSS", () => {
-    const css = cssDasFontesPersonalizadas([criarFonte({ nome: 'Marca \"Premium\"' })]);
-    expect(css).toContain('font-family: "Marca \\"Premium\\"";');
+    const css = cssDasFontesPersonalizadas([criarFonte({ nome: 'Marca \"Premium\" </style><script>' })]);
+    expect(css).toContain('font-family: "Marca \\"Premium\\"');
     expect(css).toContain('format("woff2")');
     expect(css).not.toContain("</style>");
+    expect(css).not.toContain("<script>");
   });
 
   it("normaliza dados antigos ou inválidos para biblioteca vazia", () => {

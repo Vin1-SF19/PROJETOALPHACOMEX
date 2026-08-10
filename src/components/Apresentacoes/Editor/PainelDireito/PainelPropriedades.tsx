@@ -1,4 +1,4 @@
-import { Crosshair, RotateCcw, Trash2 } from "lucide-react";
+import { AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, Crosshair, RotateCcw, Trash2 } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { TextoProps } from "./camposPorTipo/TextoProps";
@@ -74,6 +74,8 @@ export function PainelPropriedades() {
     atualizarComponentes(Object.fromEntries(ids.map((id) => [id, { rotacao }])));
   }
 
+  const ehFundo = componente.tipo === "fundoAnimado";
+
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       <div className="flex items-center justify-between">
@@ -90,6 +92,12 @@ export function PainelPropriedades() {
         </button>
       </div>
 
+      {ehFundo ? (
+        <div className="rounded-lg border border-indigo-400/20 bg-indigo-500/10 px-3 py-2 text-[11px] leading-relaxed text-indigo-200">
+          Fundo fixo e ajustado automaticamente ao tamanho do slide. Selecione-o nesta timeline para alterar cores e efeitos.
+        </div>
+      ) : (
+        <>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1.5">
           <label className="text-[11px] text-slate-400">X</label>
@@ -153,14 +161,37 @@ export function PainelPropriedades() {
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={centralizarSelecionados}
-        className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20"
-      >
-        <Crosshair size={14} aria-hidden="true" />
-        {selecionadosIds.length > 1 ? "Centralizar conjunto no slide" : "Centralizar no slide"}
-      </button>
+      <div className="grid grid-cols-3 gap-1.5" aria-label="Alinhamento no slide">
+        <button
+          type="button"
+          onClick={() => centralizarSelecionados("horizontal")}
+          title="Centralizar horizontalmente"
+          className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-[10px] font-medium text-indigo-200 hover:bg-indigo-500/20"
+        >
+          <AlignHorizontalJustifyCenter size={14} aria-hidden="true" />
+          Horizontal
+        </button>
+        <button
+          type="button"
+          onClick={() => centralizarSelecionados("vertical")}
+          title="Centralizar verticalmente"
+          className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-[10px] font-medium text-indigo-200 hover:bg-indigo-500/20"
+        >
+          <AlignVerticalJustifyCenter size={14} aria-hidden="true" />
+          Vertical
+        </button>
+        <button
+          type="button"
+          onClick={() => centralizarSelecionados("ambos")}
+          title="Centralizar horizontal e verticalmente"
+          className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2 py-2 text-[10px] font-medium text-indigo-200 hover:bg-indigo-500/20"
+        >
+          <Crosshair size={14} aria-hidden="true" />
+          Centro
+        </button>
+      </div>
+        </>
+      )}
 
       <div className="h-px bg-white/5" />
 

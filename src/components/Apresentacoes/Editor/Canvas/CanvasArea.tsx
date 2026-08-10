@@ -9,6 +9,7 @@ import type { TemaResumo } from "../ApresentacaoEditor";
 import { SlidePortalPreview } from "../RenderEngine/SlidePortalPreview";
 import { EfeitosGlobaisSlide } from "../RenderEngine/EfeitosGlobaisSlide";
 import { obterProximoSlide } from "@/lib/apresentacoes/proximo-slide";
+import { GuiasAlinhamento } from "./GuiasAlinhamento";
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
@@ -112,6 +113,7 @@ export function CanvasArea({ tema }: CanvasAreaProps) {
             <ComponenteNoCanvas key={c.id} componente={c} portalProximoSlide={portalProximoSlide} ajusteVisual={ajuste} />
           )}
         </EfeitosGlobaisSlide>
+        <GuiasAlinhamento />
 
         {debugPptx && componentes.filter((component) => component.pptxOrigem).map((component) => (
           <div

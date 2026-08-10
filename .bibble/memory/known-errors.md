@@ -5,6 +5,15 @@
 
 ---
 
+### `prisma generate`/`npm run build` falha com EPERM em `query_engine-windows.dll.node`
+**Sintoma:** `Error: EPERM: operation not permitted, rename '...\.prisma\client\query_engine-windows.dll.node.tmpNNNNN' -> '...\query_engine-windows.dll.node'`, tanto rodando `npx prisma generate` isolado quanto dentro de `npm run build` (que chama `prisma generate` como primeiro passo).
+**Causa:** um processo `node.exe` anterior (dev server, build travado, ou processo residual de uma execução prévia que não finalizou limpo) ainda tem o `.dll.node` do Query Engine aberto — o Windows bloqueia o rename atômico que o Prisma usa para substituir o binário. Reincide especialmente depois de um `npm run build` anterior falhar/ser interrompido, porque os processos filhos (`next build`, workers do PostCSS) podem sobreviver ao comando pai.
+**Fix:** listar processos `node.exe` (`tasklist //FI "IMAGENAME eq node.exe"` ou `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` para ver a `CommandLine` de cada um) e encerrá-los (`taskkill //F //PID <id>`) antes de tentar `prisma generate`/`npm run build` de novo. Confirmar com o usuário antes de matar processos que possam ser trabalho dele em outra janela — uma vez autorizado, o padrão pode ser reaplicado sem perguntar de novo na mesma sessão se o mesmo erro reincidir.
+**Contexto:** Ambiente de desenvolvimento Windows local deste projeto. Builds muito longos (15-30min neste ambiente, projeto grande) aumentam a chance de o usuário/agente interromper e deixar processo residual. Se o erro reincidir mesmo após matar todos os `node.exe`, verificar se um antivírus/EDR está com lock no arquivo (menos provável, não observado até agora).
+**Adicionado em:** 2026-08-10 (Forge, Fase A e Fase B do plano BPM "Revisão de Radar" — reincidiu 2x na mesma sessão)
+
+---
+
 ### `next dev`/Turbopack não resolve folha CSS criada depois que o servidor iniciou
 **Sintoma:** `globals.css` falha com `CssSyntaxError: Can't resolve './arquivo.css'`, embora o arquivo exista no caminho informado e `npx next build` compile com sucesso.
 **Causa:** o grafo de dependências do processo `next dev` foi criado antes da nova folha CSS existir e pode continuar tratando o arquivo como ausente mesmo após HMR. O problema foi observado no Next.js 16.1.6 com Turbopack.

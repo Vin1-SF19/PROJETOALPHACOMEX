@@ -1,7 +1,10 @@
 import { create } from "zustand";
-import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import type { ComponenteSlide, FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
 import { adaptarComponentesAoCanvas, CANVAS_PADRAO, type CanvasConfig } from "@/lib/apresentacoes/canvas";
 import type { AnimationGroup, ElementAnimation, SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
+import type { GuiasAlinhamento } from "@/lib/apresentacoes/alinhamento";
+
+export type EixoCentralizacao = "horizontal" | "vertical" | "ambos";
 
 export interface SlideResumo {
   id: string;
@@ -42,12 +45,14 @@ interface EditorStore {
   isDirty: boolean;
   isSaving: boolean;
   versaoEdicao: number;
+  guiasAlinhamento: GuiasAlinhamento;
 
   inicializar: (apresentacaoId: string, slides: SlideResumo[]) => void;
   setSlides: (slides: SlideResumo[]) => void;
   carregarSlide: (slideId: string, componentes: ComponenteSlide[], canvas?: CanvasConfig, animacaoConfig?: SlideAnimationConfig, transicaoEntrada?: string | null) => void;
   setSlideAtivo: (slideId: string) => void;
   adicionarComponente: (c: ComponenteSlide) => void;
+  aplicarFundo: (fundo: FundoAnimadoComponente) => void;
   substituirComponentes: (componentes: ComponenteSlide[]) => void;
   atualizarComponente: (id: string, patch: Partial<ComponenteSlide>) => void;
   atualizarComponentes: (patches: Record<string, Partial<ComponenteSlide>>) => void;
@@ -56,12 +61,13 @@ interface EditorStore {
   removerComponentes: (ids: string[]) => void;
   selecionarComponente: (id: string | null, aditivo?: boolean) => void;
   reordenarCamadas: (ordemDoTopoParaBase: string[]) => void;
-  centralizarSelecionados: () => void;
+  centralizarSelecionados: (eixo?: EixoCentralizacao) => void;
   iniciarTransacaoHistorico: () => void;
   finalizarTransacaoHistorico: () => void;
   desfazer: () => void;
   refazer: () => void;
   setZoom: (zoom: number) => void;
+  setGuiasAlinhamento: (guias: GuiasAlinhamento) => void;
   redimensionarCanvas: (canvas: CanvasConfig) => void;
   atualizarFundoCanvas: (backgroundColor: string) => void;
   atualizarTransicaoSlide: (transicaoEntrada: string | null) => void;
@@ -188,6 +194,18 @@ function estadoAlterado(state: EditorStore) {
   return { isDirty: true, versaoEdicao: state.versaoEdicao + 1 };
 }
 
+function ajustarFundosAoCanvas(componentes: ComponenteSlide[], canvas: CanvasConfig): ComponenteSlide[] {
+  const elementos = componentes.filter((componente) => componente.tipo !== "fundoAnimado");
+  const zBase = elementos.length > 0 ? Math.min(...elementos.map((componente) => componente.zIndex)) - 1 : 0;
+  let indiceFundo = 0;
+  return componentes.map((componente) => {
+    if (componente.tipo !== "fundoAnimado") return componente;
+    const zIndex = zBase - indiceFundo;
+    indiceFundo += 1;
+    return { ...componente, x: 0, y: 0, w: canvas.width, h: canvas.height, zIndex, rotacao: 0 };
+  });
+}
+
 export const useEditorStore = create<EditorStore>((set) => ({
   apresentacaoId: null,
   slides: [],
@@ -204,6 +222,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   isDirty: false,
   isSaving: false,
   versaoEdicao: 0,
+  guiasAlinhamento: { verticais: [], horizontais: [] },
 
   inicializar: (apresentacaoId, slides) => set({ apresentacaoId, slides }),
   setSlides: (slides) =>
@@ -224,7 +243,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
           : slide,
       ),
       slideAtivoId: slideId,
-      componentes,
+      componentes: ajustarFundosAoCanvas(componentes, canvas),
       canvas,
       animacaoConfig,
       transicaoEntrada,
@@ -232,6 +251,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       componentesSelecionadosIds: [],
       historicoPassado: [],
       historicoFuturo: [],
+      guiasAlinhamento: { verticais: [], horizontais: [] },
       isDirty: false,
       versaoEdicao: state.versaoEdicao + 1,
     }));
@@ -245,6 +265,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       componentesSelecionadosIds: [],
       historicoPassado: [],
       historicoFuturo: [],
+      guiasAlinhamento: { verticais: [], horizontais: [] },
       versaoEdicao: state.versaoEdicao + 1,
     }));
   },
@@ -256,9 +277,29 @@ export const useEditorStore = create<EditorStore>((set) => ({
     componentesSelecionadosIds: [c.id],
     ...estadoAlterado(state),
   })),
+  aplicarFundo: (fundo) => set((state) => {
+    const semFundo = state.componentes.filter((componente) => componente.tipo !== "fundoAnimado");
+    const menorZIndex = semFundo.length > 0 ? Math.min(...semFundo.map((componente) => componente.zIndex)) - 1 : 0;
+    const fundoAjustado: FundoAnimadoComponente = {
+      ...fundo,
+      x: 0,
+      y: 0,
+      w: state.canvas.width,
+      h: state.canvas.height,
+      zIndex: menorZIndex,
+      rotacao: 0,
+    };
+    return {
+      ...registrarHistorico(state),
+      componentes: [fundoAjustado, ...semFundo],
+      componenteSelecionadoId: null,
+      componentesSelecionadosIds: [],
+      ...estadoAlterado(state),
+    };
+  }),
   substituirComponentes: (componentes) => set((state) => ({
     ...registrarHistorico(state),
-    componentes,
+    componentes: ajustarFundosAoCanvas(componentes, state.canvas),
     componenteSelecionadoId: null,
     componentesSelecionadosIds: [],
     ...estadoAlterado(state),
@@ -320,15 +361,22 @@ export const useEditorStore = create<EditorStore>((set) => ({
   }),
   reordenarCamadas: (ordemDoTopoParaBase) => set((state) => {
     if (ordemDoTopoParaBase.length !== state.componentes.length) return state;
-    const zIndexPorId = new Map(ordemDoTopoParaBase.map((id, index) => [id, ordemDoTopoParaBase.length - index]));
+    const idsFundos = new Set(state.componentes.filter((componente) => componente.tipo === "fundoAnimado").map((componente) => componente.id));
+    const ordemElementos = ordemDoTopoParaBase.filter((id) => !idsFundos.has(id));
+    const ordemFundos = ordemDoTopoParaBase.filter((id) => idsFundos.has(id));
+    const zIndexPorId = new Map<string, number>();
+    ordemElementos.forEach((id, index) => zIndexPorId.set(id, ordemElementos.length - index + 1));
+    ordemFundos.forEach((id, index) => zIndexPorId.set(id, -index));
     return {
       ...registrarHistorico(state),
       componentes: state.componentes.map((componente) => ({ ...componente, zIndex: zIndexPorId.get(componente.id) ?? componente.zIndex })),
       ...estadoAlterado(state),
     };
   }),
-  centralizarSelecionados: () => set((state) => {
-    const selecionados = state.componentes.filter((componente) => state.componentesSelecionadosIds.includes(componente.id));
+  centralizarSelecionados: (eixo = "ambos") => set((state) => {
+    const selecionados = state.componentes.filter(
+      (componente) => componente.tipo !== "fundoAnimado" && state.componentesSelecionadosIds.includes(componente.id),
+    );
     if (selecionados.length === 0) return state;
     const esquerda = Math.min(...selecionados.map((componente) => componente.x));
     const topo = Math.min(...selecionados.map((componente) => componente.y));
@@ -336,7 +384,13 @@ export const useEditorStore = create<EditorStore>((set) => ({
     const base = Math.max(...selecionados.map((componente) => componente.y + componente.h));
     const deltaX = (state.canvas.width - (direita - esquerda)) / 2 - esquerda;
     const deltaY = (state.canvas.height - (base - topo)) / 2 - topo;
-    const patches = Object.fromEntries(selecionados.map((componente) => [componente.id, { x: componente.x + deltaX, y: componente.y + deltaY }]));
+    const patches = Object.fromEntries(selecionados.map((componente) => [
+      componente.id,
+      {
+        x: componente.x + (eixo === "vertical" ? 0 : deltaX),
+        y: componente.y + (eixo === "horizontal" ? 0 : deltaY),
+      },
+    ]));
     return {
       ...registrarHistorico(state),
       componentes: atualizarMultiplosNaArvore(state.componentes, patches),
@@ -387,9 +441,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
   }),
 
   setZoom: (zoom) => set({ zoom: Math.min(4, Math.max(0.25, zoom)) }),
+  setGuiasAlinhamento: (guiasAlinhamento) => set({ guiasAlinhamento }),
   redimensionarCanvas: (canvas) => set((state) => ({
     ...registrarHistorico(state),
-    componentes: adaptarComponentesAoCanvas(state.componentes, state.canvas, canvas),
+    componentes: ajustarFundosAoCanvas(adaptarComponentesAoCanvas(state.componentes, state.canvas, canvas), canvas),
     canvas,
     componenteSelecionadoId: null,
     componentesSelecionadosIds: [],

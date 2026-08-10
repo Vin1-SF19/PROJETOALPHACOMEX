@@ -2,11 +2,12 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import type { TipoComponente } from "../registry/componentes-registry";
-import { COMPONENTES_REGISTRY } from "../registry/componentes-registry";
+import { COMPONENTES_REGISTRY, ehTipoFundo } from "../registry/componentes-registry";
 
-export function ItemComponenteArrastavel({ tipo }: { tipo: TipoComponente }) {
+export function ItemComponenteArrastavel({ tipo, onAplicarFundo }: { tipo: TipoComponente; onAplicarFundo: (tipo: TipoComponente) => void }) {
   const entry = COMPONENTES_REGISTRY[tipo];
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `paleta-${tipo}`, data: { tipo } });
+  const fundo = ehTipoFundo(tipo);
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `paleta-${tipo}`, data: { tipo }, disabled: fundo });
   const Icone = entry.icone;
 
   return (
@@ -15,12 +16,15 @@ export function ItemComponenteArrastavel({ tipo }: { tipo: TipoComponente }) {
       {...listeners}
       {...attributes}
       type="button"
-      aria-label={`Adicionar componente ${entry.label}`}
-      className="flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-slate-900/60 p-3 text-slate-300 transition-colors hover:border-indigo-500/40 hover:text-white cursor-grab active:cursor-grabbing"
+      onClick={fundo ? () => onAplicarFundo(tipo) : undefined}
+      aria-label={fundo ? `Aplicar fundo ${entry.label}` : `Adicionar componente ${entry.label}`}
+      title={fundo ? "Clique para aplicar ao slide" : "Arraste para adicionar ao slide"}
+      className={`flex flex-col items-center gap-1.5 rounded-xl border border-white/5 bg-slate-900/60 p-3 text-slate-300 transition-colors hover:border-indigo-500/40 hover:text-white ${fundo ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
       style={{ opacity: isDragging ? 0.4 : 1 }}
     >
       <Icone size={20} aria-hidden="true" />
       <span className="text-[10px] font-medium">{entry.label}</span>
+      {fundo && <span className="text-[8px] font-semibold uppercase tracking-wider text-indigo-300">Clique para aplicar</span>}
     </button>
   );
 }
