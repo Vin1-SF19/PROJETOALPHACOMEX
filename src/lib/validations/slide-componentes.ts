@@ -33,6 +33,7 @@ import { chatIlustrativoComponenteSchema } from "./slide-componentes-ia";
 import { fundoAnimadoComponenteSchema, type FundoAnimadoComponente } from "./slide-componentes-fundos";
 import { canvasConfigSchema } from "@/lib/apresentacoes/canvas";
 import { slideAnimationConfigSchema } from "./slide-animacao-config";
+import { presetsAnimacaoPersonalizadosSchema } from "@/lib/apresentacoes/animacao/presets-personalizados";
 
 export {
   textoComponenteSchema,
@@ -149,6 +150,8 @@ export const dadosSlideSchema = z.object({
   canvas: canvasConfigSchema.optional(),
   /** Alpha Motion (Fase 01) — ausente em slides anteriores a esta fila, sem exigir migração. */
   animacaoConfig: slideAnimationConfigSchema.optional(),
+  /** Biblioteca de presets da apresentação. Fica em um slide-hospedeiro e é preservada pelo autosave. */
+  presetsAnimacao: presetsAnimacaoPersonalizadosSchema.optional(),
   pptxSource: z.object({
     type: z.literal("pptx"),
     originalFileUrl: z.string().url().optional(),

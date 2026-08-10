@@ -1,7 +1,11 @@
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { ContainerIntroEvent } from "@/lib/apresentacoes/container-intro";
 import type { ReactNode } from "react";
+import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
+import { resolverAnimacoesDoElemento } from "@/lib/apresentacoes/animacao/resolver";
 import { AnimacaoWrapper, FilhosContainer } from "./nucleo";
+import { AnimacaoElementoWrapper } from "./AnimacaoElementoWrapper";
+import { ScrollRevealWrapper } from "./ScrollRevealWrapper";
 import { GloboRender } from "./GloboRender";
 import { ParticulasRender } from "./ParticulasRender";
 import { ObjetoGlbRender } from "./ObjetoGlbRender";
@@ -40,6 +44,26 @@ interface RenderComponenteProps {
   portalProximoSlide?: ReactNode;
   pausado?: boolean;
   portalContainerCapa?: Element | null;
+  animacaoConfig?: SlideAnimationConfig;
+}
+
+/**
+ * Fronteira única do modelo novo. Quando existe timeline para o elemento, ela substitui a
+ * animação legada daquele nó; sem timeline, o comportamento antigo permanece intacto.
+ */
+export function RenderComponenteAnimado(props: RenderComponenteProps) {
+  const resolvidas = resolverAnimacoesDoElemento(props.componente, props.animacaoConfig);
+  const animacoesNovas = resolvidas.filter((item) => item.origem === "novo-modelo").map((item) => item.animacao);
+  if (animacoesNovas.length === 0) return <RenderComponente {...props} />;
+
+  const componenteSemAnimacaoLegada = { ...props.componente, animacao: undefined } as ComponenteSlide;
+  return (
+    <ScrollRevealWrapper animacoes={animacoesNovas}>
+      <AnimacaoElementoWrapper animacoes={animacoesNovas}>
+        <RenderComponente {...props} componente={componenteSemAnimacaoLegada} />
+      </AnimacaoElementoWrapper>
+    </ScrollRevealWrapper>
+  );
 }
 
 export function RenderComponente({
@@ -50,6 +74,7 @@ export function RenderComponente({
   portalProximoSlide,
   pausado = false,
   portalContainerCapa,
+  animacaoConfig,
 }: RenderComponenteProps) {
   const anim = componente.animacao?.entrada;
 
@@ -106,7 +131,7 @@ export function RenderComponente({
             filhos={componente.filhos}
             usaStagger={anim?.tipo === "stagger"}
             staggerDelay={anim?.staggerDelay ?? 0.1}
-            renderFilho={(filho) => <RenderComponente componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} />}
+            renderFilho={(filho) => <RenderComponenteAnimado componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} animacaoConfig={animacaoConfig} />}
           />
         </AnimacaoWrapper>
       );
@@ -119,7 +144,7 @@ export function RenderComponente({
             filhos={componente.filhos}
             usaStagger={anim?.tipo === "stagger"}
             staggerDelay={anim?.staggerDelay ?? 0.1}
-            renderFilho={(filho) => <RenderComponente componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} />}
+            renderFilho={(filho) => <RenderComponenteAnimado componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} animacaoConfig={animacaoConfig} />}
           />
         </AnimacaoWrapper>
       );
@@ -140,7 +165,7 @@ export function RenderComponente({
             filhos={componente.filhos}
             usaStagger={anim?.tipo === "stagger"}
             staggerDelay={anim?.staggerDelay ?? 0.1}
-            renderFilho={(filho) => <RenderComponente componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} />}
+            renderFilho={(filho) => <RenderComponenteAnimado componente={filho} modo={modo} onContainerIntroStart={onContainerIntroStart} onContainerIntroComplete={onContainerIntroComplete} portalProximoSlide={portalProximoSlide} pausado={pausado} portalContainerCapa={portalContainerCapa} animacaoConfig={animacaoConfig} />}
           />
         </AnimacaoWrapper>
       );

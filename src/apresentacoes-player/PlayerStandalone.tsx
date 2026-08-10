@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
-import { RenderComponente } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
-import { ScrollRevealWrapper } from "@/components/Apresentacoes/Editor/RenderEngine/ScrollRevealWrapper";
+import { RenderComponenteAnimado } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
+import { EfeitosGlobaisSlide } from "@/components/Apresentacoes/Editor/RenderEngine/EfeitosGlobaisSlide";
 import { stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
 import { calcularEscalaApresentacao } from "@/lib/apresentacoes/viewport";
 import { TransicaoSlide } from "@/components/Apresentacoes/ModoApresentacao/TransicaoSlide";
 import { TransicaoContainerAlphaLayer } from "@/components/Apresentacoes/ModoApresentacao/TransicaoContainerAlphaLayer";
 import { obterAnimacaoContainerAlphaInicial } from "@/lib/apresentacoes/animacao-container-alpha";
 import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-audio";
-import { resolverAnimacoesDoElemento } from "@/lib/apresentacoes/animacao/resolver";
 import type { DadosApresentacaoExportada } from "./dados-tipos";
 
 /**
@@ -184,7 +183,7 @@ export function PlayerStandalone({ dados }: { dados: DadosApresentacaoExportada 
     <div
       ref={viewportRef}
       onClick={handleClick}
-      className="relative flex h-dvh w-dvw items-center justify-center overflow-hidden bg-black"
+      className="fixed inset-0 flex min-h-0 min-w-0 items-center justify-center overflow-hidden bg-black"
     >
       {capaAtiva && configCapaInicial ? (
         <TransicaoContainerAlphaLayer
@@ -208,13 +207,15 @@ export function PlayerStandalone({ dados }: { dados: DadosApresentacaoExportada 
                 transformOrigin: "center center",
               }}
             >
-              {slideAtual.componentes.map((componente) => (
-                <div key={componente.id} style={stylePosicaoAbsoluta(componente)}>
-                  <ScrollRevealWrapper animacoes={resolverAnimacoesDoElemento(componente, slideAtual.animacaoConfig ?? undefined).map((r) => r.animacao)}>
-                    <RenderComponente componente={componente} modo="apresentacao" />
-                  </ScrollRevealWrapper>
-                </div>
-              ))}
+              <EfeitosGlobaisSlide componentes={slideAtual.componentes} animacaoConfig={slideAtual.animacaoConfig ?? undefined}>
+                {(componente, ajuste) => (
+                  <div key={componente.id} style={stylePosicaoAbsoluta(componente)}>
+                    <div style={{ width: "100%", height: "100%", opacity: ajuste.opacityAjustada, filter: ajuste.blurAjustado ? "blur(3px)" : undefined, transform: ajuste.escalaAjustada ? `scale(${ajuste.escalaAjustada})` : undefined }}>
+                      <RenderComponenteAnimado componente={componente} modo="apresentacao" animacaoConfig={slideAtual.animacaoConfig ?? undefined} />
+                    </div>
+                  </div>
+                )}
+              </EfeitosGlobaisSlide>
             </div>
           </div>
         </TransicaoSlide>

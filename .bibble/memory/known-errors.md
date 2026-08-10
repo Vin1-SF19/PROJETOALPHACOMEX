@@ -5,6 +5,15 @@
 
 ---
 
+### `next dev`/Turbopack não resolve folha CSS criada depois que o servidor iniciou
+**Sintoma:** `globals.css` falha com `CssSyntaxError: Can't resolve './arquivo.css'`, embora o arquivo exista no caminho informado e `npx next build` compile com sucesso.
+**Causa:** o grafo de dependências do processo `next dev` foi criado antes da nova folha CSS existir e pode continuar tratando o arquivo como ausente mesmo após HMR. O problema foi observado no Next.js 16.1.6 com Turbopack.
+**Fix:** manter folhas globais geradas junto de `src/app/globals.css`, usar import local (`@import "./arquivo.css"`) e reiniciar o processo `next dev` depois da primeira geração do arquivo. Antes de encerrar processos, filtrar pelo caminho absoluto do workspace e pelos comandos `next dev`/`start-server.js`, preservando outros processos Node.
+**Contexto:** arquivos CSS gerados por scripts enquanto o servidor de desenvolvimento já está ativo. Se o build de produção também falhar, tratar como caminho realmente inválido em vez de cache do dev server.
+**Adicionado em:** 2026-08-10 (Forge, correção das fontes locais do Alpha Motion)
+
+---
+
 ### ESLint `react-hooks/static-components` — "Cannot create components during render"
 **Sintoma:** `npm run lint` (ou Forge) reporta `Error: Cannot create components during render` apontando para uma `function NomeQualquer(...)` declarada DENTRO do corpo de outro componente/função de render (padrão comum ao tentar variar entre `<motion.div>` e `<div>` condicionalmente, ou qualquer "wrapper condicional" ad-hoc).
 **Causa:** Declarar um componente (função que retorna JSX, mesmo pequena/local) dentro do corpo de outro componente cria uma IDENTIDADE NOVA a cada render — React perde o estado interno dele e o React Compiler deste projeto bloqueia isso como erro, não warning.

@@ -9,6 +9,19 @@ interface UsuarioContexto {
   role: string;
 }
 
+/**
+ * Acesso ao MÓDULO Notas em si (aparecer na barra global, criar nota nova, etc.) — separado da
+ * permissão sobre uma nota específica. Bypass padrão Admin/CEO/TI, mesmo critério usado em todo
+ * o resto do painel. Toda Server Action que cria/lista notas sem já ter um `noteId` para checar
+ * (ex: `CriarNota`, `ListarNotas`, `BuscarNotas`) deve validar isto primeiro — a UI escondendo a
+ * barra para quem não tem a permissão não é suficiente sozinha (defesa em profundidade).
+ */
+export async function temAcessoAoModuloNotas(usuario: UsuarioContexto): Promise<boolean> {
+  if (isAdminRole(usuario.role)) return true;
+  const permissoesEfetivas = await getPermissoesEfetivas(usuario.id);
+  return permissoesEfetivas.includes("notas");
+}
+
 interface NotaComRelacoes {
   ownerId: number;
   createdById: number;

@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && npm run build:player && next build",
     "build:player": "node scripts/build-apresentacoes-player.mjs",
+    "fonts:alpha-motion": "node scripts/download-alpha-motion-fonts.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

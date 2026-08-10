@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Crosshair, RotateCcw, Trash2 } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { TextoProps } from "./camposPorTipo/TextoProps";
@@ -45,9 +45,11 @@ function buscarNaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide |
 export function PainelPropriedades() {
   const componentes = useEditorStore((s) => s.componentes);
   const selecionadoId = useEditorStore((s) => s.componenteSelecionadoId);
+  const selecionadosIds = useEditorStore((s) => s.componentesSelecionadosIds);
   const atualizarComponente = useEditorStore((s) => s.atualizarComponente);
-  const removerComponente = useEditorStore((s) => s.removerComponente);
-  const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
+  const atualizarComponentes = useEditorStore((s) => s.atualizarComponentes);
+  const removerComponentes = useEditorStore((s) => s.removerComponentes);
+  const centralizarSelecionados = useEditorStore((s) => s.centralizarSelecionados);
 
   const componente = selecionadoId ? buscarNaArvore(componentes, selecionadoId) : null;
 
@@ -64,14 +66,21 @@ export function PainelPropriedades() {
   }
 
   function handleExcluir() {
-    removerComponente(componente!.id);
-    selecionarComponente(null);
+    removerComponentes(selecionadosIds.length > 0 ? selecionadosIds : [componente!.id]);
+  }
+
+  function atualizarRotacao(rotacao: number) {
+    const ids = selecionadosIds.length > 0 ? selecionadosIds : [componente!.id];
+    atualizarComponentes(Object.fromEntries(ids.map((id) => [id, { rotacao }])));
   }
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Propriedades</h3>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Propriedades</h3>
+          {selecionadosIds.length > 1 && <p className="mt-0.5 text-[10px] font-medium text-cyan-300">{selecionadosIds.length} elementos selecionados</p>}
+        </div>
         <button
           onClick={handleExcluir}
           aria-label="Excluir componente"
@@ -119,6 +128,39 @@ export function PainelPropriedades() {
           />
         </div>
       </div>
+
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Rotação (graus)</span>
+          <input
+            type="number"
+            min={-360}
+            max={360}
+            step={1}
+            value={Math.round(componente.rotacao * 10) / 10}
+            onChange={(e) => atualizarRotacao(Number(e.target.value))}
+            className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => atualizarRotacao(0)}
+          aria-label="Zerar rotação"
+          title="Zerar rotação"
+          className="mt-5 flex size-9 cursor-pointer items-center justify-center rounded-lg border border-white/10 bg-slate-900 text-slate-400 hover:text-white"
+        >
+          <RotateCcw size={14} aria-hidden="true" />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={centralizarSelecionados}
+        className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-500/20"
+      >
+        <Crosshair size={14} aria-hidden="true" />
+        {selecionadosIds.length > 1 ? "Centralizar conjunto no slide" : "Centralizar no slide"}
+      </button>
 
       <div className="h-px bg-white/5" />
 

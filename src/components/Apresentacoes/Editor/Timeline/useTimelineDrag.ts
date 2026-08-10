@@ -13,6 +13,8 @@ const MAX_TEMPO = 5;
  */
 export function useTimelineDrag(componente: ComponenteSlide) {
   const atualizarComponente = useEditorStore((s) => s.atualizarComponente);
+  const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
+  const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
   const anim = componente.animacao?.entrada;
   const arrastando = useRef<{ startX: number; origemDelay: number; modo: "mover" | "redimensionar" } | null>(null);
 
@@ -21,6 +23,7 @@ export function useTimelineDrag(componente: ComponenteSlide) {
       if (!anim || anim.tipo === "container-alpha") return;
       const animAtual = anim;
       e.stopPropagation();
+      iniciarTransacaoHistorico();
       arrastando.current = { startX: e.clientX, origemDelay: animAtual.delay, modo: "mover" };
 
       function onMove(ev: MouseEvent) {
@@ -33,11 +36,12 @@ export function useTimelineDrag(componente: ComponenteSlide) {
         arrastando.current = null;
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        finalizarTransacaoHistorico();
       }
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [anim, atualizarComponente, componente],
+    [anim, atualizarComponente, componente, finalizarTransacaoHistorico, iniciarTransacaoHistorico],
   );
 
   const onMouseDownRedimensionar = useCallback(
@@ -45,6 +49,7 @@ export function useTimelineDrag(componente: ComponenteSlide) {
       if (!anim || anim.tipo === "container-alpha") return;
       const animAtual = anim;
       e.stopPropagation();
+      iniciarTransacaoHistorico();
       arrastando.current = { startX: e.clientX, origemDelay: animAtual.duracao, modo: "redimensionar" };
 
       function onMove(ev: MouseEvent) {
@@ -57,11 +62,12 @@ export function useTimelineDrag(componente: ComponenteSlide) {
         arrastando.current = null;
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        finalizarTransacaoHistorico();
       }
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [anim, atualizarComponente, componente],
+    [anim, atualizarComponente, componente, finalizarTransacaoHistorico, iniciarTransacaoHistorico],
   );
 
   return { onMouseDownMover, onMouseDownRedimensionar, PIXELS_POR_SEGUNDO };

@@ -1,0 +1,35 @@
+{
+  "subtaskId": "alpha-motion-historico-multisselecao-tipografia",
+  "critiquedAt": "2026-08-10T14:05:00-03:00",
+  "step5_5": {
+    "predictedBugs": [
+      "Cada evento mousemove poderia criar uma entrada independente e tornar Ctrl+Z praticamente inutilizável; os gestos agora abrem e fecham uma única transação de histórico.",
+      "Selecionar simultaneamente um componente pai e um filho poderia deslocar o filho duas vezes; o movimento em lote filtra origens aninhadas sob outro item selecionado.",
+      "Excluir um elemento pela timeline poderia deixar animações e grupos órfãos; a remoção em lote limpa as referências associadas.",
+      "Runs ricos importados poderiam sobrescrever a cor global no player; atualizações globais sincronizam os runs e o renderer aplica defaults explícitos por run.",
+      "Fontes disponíveis somente no editor divergiriam da apresentação exportada; o mesmo catálogo remoto foi carregado no painel e no bundle do player regenerado."
+    ],
+    "edgeCases": [
+      "Atalhos de histórico com foco em input, textarea, select ou contenteditable preservam o undo nativo do campo.",
+      "Carregar outro slide limpa as pilhas para impedir que o histórico de um slide altere outro.",
+      "Reordenar uma lista vazia ou com um único elemento não altera zIndex nem cria passo inútil.",
+      "Formatar uma seleção que atravessa quebra de linha divide e recompõe runs sem perder o texto.",
+      "Falha ao persistir a ordem dos slides restaura imediatamente a ordem anterior na gaveta.",
+      "O histórico é limitado a 100 snapshots para evitar crescimento indefinido de memória."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

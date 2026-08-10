@@ -9,20 +9,20 @@ const MIN_DURACAO = 0.1;
  * espírito de `useTimelineDrag.ts` (mouse events próprios, 1 eixo=tempo), mas grava via
  * `atualizarAnimacaoElemento` (update in-place, sem remove+add) em vez de `atualizarComponente`.
  *
- * Segue o MESMO padrão real já usado em todo o editor (`useCanvasDragResize.ts`,
- * `useTimelineDrag.ts`): atualiza a cada `mousemove`, sem "commit só ao soltar" — este
- * projeto não tem sistema de undo/redo real (decisão registrada em
- * `.bibble/memory/decisions.md`, 2026-08-06), então não há uma pilha de histórico para
- * proteger de múltiplas entradas.
+ * Atualiza a cada `mousemove`, mas abre uma transação para o gesto inteiro ocupar somente
+ * uma entrada da pilha Undo/Redo ao soltar o mouse.
  */
 export function useTimelineDragV2(animacao: ElementAnimation, pixelsPorSegundo: number, maxTempo: number) {
   const atualizarAnimacaoElemento = useEditorStore((s) => s.atualizarAnimacaoElemento);
+  const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
+  const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
   const arrastando = useRef<{ startX: number; origemDelay: number } | null>(null);
   const redimensionando = useRef<{ startX: number; origemDuracao: number } | null>(null);
 
   const onMouseDownMover = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      iniciarTransacaoHistorico();
       arrastando.current = { startX: e.clientX, origemDelay: animacao.delay };
 
       function onMove(ev: MouseEvent) {
@@ -35,16 +35,18 @@ export function useTimelineDragV2(animacao: ElementAnimation, pixelsPorSegundo: 
         arrastando.current = null;
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        finalizarTransacaoHistorico();
       }
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [animacao.id, animacao.delay, atualizarAnimacaoElemento, pixelsPorSegundo, maxTempo],
+    [animacao.id, animacao.delay, atualizarAnimacaoElemento, finalizarTransacaoHistorico, iniciarTransacaoHistorico, pixelsPorSegundo, maxTempo],
   );
 
   const onMouseDownRedimensionar = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      iniciarTransacaoHistorico();
       redimensionando.current = { startX: e.clientX, origemDuracao: animacao.duration };
 
       function onMove(ev: MouseEvent) {
@@ -57,11 +59,12 @@ export function useTimelineDragV2(animacao: ElementAnimation, pixelsPorSegundo: 
         redimensionando.current = null;
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        finalizarTransacaoHistorico();
       }
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [animacao.id, animacao.duration, atualizarAnimacaoElemento, pixelsPorSegundo, maxTempo],
+    [animacao.id, animacao.duration, atualizarAnimacaoElemento, finalizarTransacaoHistorico, iniciarTransacaoHistorico, pixelsPorSegundo, maxTempo],
   );
 
   return { onMouseDownMover, onMouseDownRedimensionar };

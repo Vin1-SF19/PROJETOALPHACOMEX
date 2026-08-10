@@ -1,13 +1,15 @@
 import { motion } from "framer-motion";
 import { useEditorStore } from "../store/useEditorStore";
-import { RenderComponente } from "../RenderEngine/RenderComponente";
+import { RenderComponenteAnimado } from "../RenderEngine/RenderComponente";
 import { ScrollRevealWrapper } from "../RenderEngine/ScrollRevealWrapper";
+import { AnimacaoElementoWrapper } from "../RenderEngine/AnimacaoElementoWrapper";
 import { staggerContainerVariants, staggerItemVariants } from "../RenderEngine/nucleo";
 import { useCanvasDragResize } from "./useCanvasDragResize";
 import { resolverAnimacoesDoElemento } from "@/lib/apresentacoes/animacao/resolver";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { AjusteVisualEfeitoGlobal } from "../RenderEngine/EfeitosGlobaisSlide";
 import type { ReactNode } from "react";
+import { RotateCw } from "lucide-react";
 
 const HANDLES = [
   { pos: "nw" as const, className: "-left-1.5 -top-1.5 cursor-nwse-resize" },
@@ -40,14 +42,16 @@ export function ComponenteNoCanvas({
   /** Fase 07 — ajuste calculado por `EfeitosGlobaisSlide` (Dim Others/Focus Element). Opcional, retrocompatível. */
   ajusteVisual?: AjusteVisualEfeitoGlobal;
 }) {
-  const selecionado = useEditorStore((s) => s.componenteSelecionadoId === componente.id);
+  const selecionado = useEditorStore((s) => s.componentesSelecionadosIds.includes(componente.id));
+  const selecaoMultipla = useEditorStore((s) => s.componentesSelecionadosIds.length > 1);
   const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
-  const { onMouseDownMover, onMouseDownRedimensionar } = useCanvasDragResize(
+  const { onMouseDownMover, onMouseDownRedimensionar, onMouseDownRotacionar } = useCanvasDragResize(
     componente.id,
     componente.x,
     componente.y,
     componente.w,
     componente.h,
+    componente.rotacao,
   );
 
   const ehContainer = componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container";
@@ -55,11 +59,19 @@ export function ComponenteNoCanvas({
   // fonte de `useStaggerDelayAtivo` acima); o lookup elementId→animação é sempre feito via
   // `resolverAnimacoesDoElemento`, nunca duplicado.
   const animacaoConfigSlide = useEditorStore((s) => s.animacaoConfig);
-  const animacoesDoComponente = resolverAnimacoesDoElemento(componente, animacaoConfigSlide).map((r) => r.animacao);
+  const animacoesDoComponente = resolverAnimacoesDoElemento(componente, animacaoConfigSlide)
+    .filter((resolvida) => resolvida.origem === "novo-modelo")
+    .map((resolvida) => resolvida.animacao);
 
-  function handleClick(e: React.MouseEvent) {
+  function handleMouseDown(e: React.MouseEvent) {
     e.stopPropagation();
-    selecionarComponente(componente.id);
+    const aditivo = e.ctrlKey || e.metaKey;
+    if (aditivo) {
+      selecionarComponente(componente.id, true);
+      return;
+    }
+    if (!selecionado) selecionarComponente(componente.id);
+    if (!dentroDeContainer) onMouseDownMover(e);
   }
 
   return (
@@ -67,8 +79,8 @@ export function ComponenteNoCanvas({
       role="button"
       tabIndex={0}
       aria-label={`Componente ${componente.tipo}`}
-      onClick={handleClick}
-      onMouseDown={!dentroDeContainer ? onMouseDownMover : undefined}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={handleMouseDown}
       style={{
         position: dentroDeContainer ? "relative" : "absolute",
         left: dentroDeContainer ? undefined : componente.x,
@@ -81,7 +93,7 @@ export function ComponenteNoCanvas({
           componente.flipH || componente.flipV ? `scale(${componente.flipH ? -1 : 1}, ${componente.flipV ? -1 : 1})` : "",
           ajusteVisual?.escalaAjustada ? `scale(${ajusteVisual.escalaAjustada})` : "",
         ].filter(Boolean).join(" ") || undefined,
-        outline: selecionado ? "2px solid rgb(99,102,241)" : "none",
+        outline: selecionado ? `2px solid ${selecaoMultipla ? "rgb(34,211,238)" : "rgb(99,102,241)"}` : "none",
         outlineOffset: 2,
         cursor: dentroDeContainer ? "pointer" : "grab",
         opacity: (ajusteVisual?.opacityAjustada ?? 1) * (componente.opacidade ?? 1),
@@ -92,17 +104,30 @@ export function ComponenteNoCanvas({
       {ehContainer ? (
         // Card/Grid: renderiza os filhos como ComponenteNoCanvas (não RenderComponente puro),
         // para que cada filho seja individualmente selecionável/arrastável dentro do container.
-        <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
-          <RenderComponenteContainer componente={componente} portalProximoSlide={portalProximoSlide} />
-        </div>
-      ) : (
         <ScrollRevealWrapper animacoes={animacoesDoComponente}>
-          <RenderComponente componente={componente} modo="editor" portalProximoSlide={portalProximoSlide} />
+          <AnimacaoElementoWrapper animacoes={animacoesDoComponente}>
+            <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
+              <RenderComponenteContainer componente={componente} portalProximoSlide={portalProximoSlide} />
+            </div>
+          </AnimacaoElementoWrapper>
         </ScrollRevealWrapper>
+      ) : (
+        <RenderComponenteAnimado componente={componente} modo="editor" portalProximoSlide={portalProximoSlide} animacaoConfig={animacaoConfigSlide} />
       )}
 
       {selecionado && !dentroDeContainer && (
         <>
+          <div data-editor-only="true" className="pointer-events-none absolute left-1/2 top-0 h-7 -translate-x-1/2 -translate-y-full border-l border-indigo-300/70" />
+          <button
+            type="button"
+            data-editor-only="true"
+            onMouseDown={onMouseDownRotacionar}
+            aria-label="Rotacionar componente"
+            title="Arraste para rotacionar"
+            className="absolute left-1/2 top-0 z-20 flex size-6 -translate-x-1/2 -translate-y-[calc(100%+28px)] cursor-grab items-center justify-center rounded-full border border-white bg-indigo-500 text-white shadow-lg active:cursor-grabbing"
+          >
+            <RotateCw size={12} aria-hidden="true" />
+          </button>
           {HANDLES.map((h) => (
             <div
               key={h.pos}

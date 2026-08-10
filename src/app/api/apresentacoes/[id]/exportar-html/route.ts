@@ -77,7 +77,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
 <title>${escaparTextoHtml(apresentacao.titulo)}</title>
 <style>${PLAYER_CSS}</style>
 </head>

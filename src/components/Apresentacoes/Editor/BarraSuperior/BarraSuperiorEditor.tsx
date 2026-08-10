@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette, WandSparkles, Play, Boxes, FileCode, Wand2 } from "lucide-react";
+import { ArrowLeft, ZoomIn, ZoomOut, Loader2, Check, Palette, WandSparkles, Play, Boxes, Download, Wand2, Undo2, Redo2 } from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import { SeletorTema } from "./SeletorTema";
 import { SeletorTransicaoSlide } from "./SeletorTransicaoSlide";
@@ -14,11 +13,13 @@ import type { TemaResumo } from "../ApresentacaoEditor";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { AssetApresentacao } from "@/lib/apresentacoes/assets";
 import { CentralCriativaModal } from "../CentralCriativa/CentralCriativaModal";
-import { exportarApresentacaoComoHtml } from "@/lib/apresentacoes/exportacao";
+import { ModalExportarApresentacao } from "./ModalExportarApresentacao";
 
 interface BarraSuperiorEditorProps {
   titulo: string;
   apresentacaoId: string;
+  slugPublicoInicial: string | null;
+  aguardarAntesDeExportar: () => Promise<void>;
   temaAtualId: string | null;
   onTemaAplicado: (tema: TemaResumo | null) => void;
   onSlideGeradoAplicado: (componentes: ComponenteSlide[]) => void;
@@ -31,6 +32,8 @@ interface BarraSuperiorEditorProps {
 export function BarraSuperiorEditor({
   titulo,
   apresentacaoId,
+  slugPublicoInicial,
+  aguardarAntesDeExportar,
   temaAtualId,
   onTemaAplicado,
   onSlideGeradoAplicado,
@@ -44,24 +47,16 @@ export function BarraSuperiorEditor({
   const setZoom = useEditorStore((s) => s.setZoom);
   const isDirty = useEditorStore((s) => s.isDirty);
   const isSaving = useEditorStore((s) => s.isSaving);
+  const podeDesfazer = useEditorStore((s) => s.historicoPassado.length > 0);
+  const podeRefazer = useEditorStore((s) => s.historicoFuturo.length > 0);
+  const desfazer = useEditorStore((s) => s.desfazer);
+  const refazer = useEditorStore((s) => s.refazer);
   const [tituloLocal, setTituloLocal] = useState(titulo);
   const [seletorTemaAberto, setSeletorTemaAberto] = useState(false);
   const [modalIAAberto, setModalIAAberto] = useState(false);
   const [centralCriativaAberta, setCentralCriativaAberta] = useState(false);
-  const [exportandoHtml, setExportandoHtml] = useState(false);
+  const [modalExportarAberto, setModalExportarAberto] = useState(false);
   const [modalPresetAberto, setModalPresetAberto] = useState(false);
-
-  async function handleExportarHtml() {
-    setExportandoHtml(true);
-    try {
-      await exportarApresentacaoComoHtml(apresentacaoId, tituloLocal);
-      toast.success("Apresentação exportada em HTML.");
-    } catch (erro) {
-      toast.error(erro instanceof Error ? erro.message : "Erro ao exportar HTML.");
-    } finally {
-      setExportandoHtml(false);
-    }
-  }
 
   return (
     <div className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b border-white/5 bg-slate-950/80 px-4">
@@ -82,6 +77,29 @@ export function BarraSuperiorEditor({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-4">
+        <div className="flex items-center rounded-lg border border-white/5 bg-slate-900/60 p-0.5" role="group" aria-label="Histórico de edição">
+          <button
+            type="button"
+            onClick={desfazer}
+            disabled={!podeDesfazer}
+            title="Desfazer (Ctrl+Z)"
+            aria-label="Desfazer última mudança"
+            className="cursor-pointer rounded p-1.5 text-slate-400 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Undo2 size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={refazer}
+            disabled={!podeRefazer}
+            title="Refazer (Ctrl+Y)"
+            aria-label="Refazer mudança"
+            className="cursor-pointer rounded p-1.5 text-slate-400 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <Redo2 size={14} aria-hidden="true" />
+          </button>
+        </div>
+
         <button
           onClick={() => setCentralCriativaAberta(true)}
           aria-label="Abrir Central Criativa"
@@ -101,13 +119,11 @@ export function BarraSuperiorEditor({
         </button>
 
         <button
-          onClick={() => void handleExportarHtml()}
-          disabled={exportandoHtml}
-          aria-label="Exportar apresentação como arquivo HTML autocontido"
-          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60"
+          onClick={() => setModalExportarAberto(true)}
+          aria-label="Abrir opções de exportação"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
         >
-          {exportandoHtml ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <FileCode size={13} aria-hidden="true" />}
-          Exportar HTML
+          <Download size={13} aria-hidden="true" /> Exportar
         </button>
 
         <button
@@ -197,6 +213,14 @@ export function BarraSuperiorEditor({
       />
 
       <ModalAplicarPreset open={modalPresetAberto} onOpenChange={setModalPresetAberto} />
+      <ModalExportarApresentacao
+        open={modalExportarAberto}
+        onOpenChange={setModalExportarAberto}
+        apresentacaoId={apresentacaoId}
+        titulo={tituloLocal}
+        slugPublicoInicial={slugPublicoInicial}
+        aguardarAntesDeExportar={aguardarAntesDeExportar}
+      />
     </div>
   );
 }

@@ -14,7 +14,7 @@ import {
   type CriarTagInput,
   type AplicarTagInput,
 } from "@/lib/validations/notas";
-import { podeEditarNota } from "@/lib/notas/permissoes";
+import { podeEditarNota, temAcessoAoModuloNotas } from "@/lib/notas/permissoes";
 
 async function sessaoUsuario() {
   const session = await auth();
@@ -30,6 +30,9 @@ async function sessaoUsuario() {
 export async function BuscarNotas(input?: BuscarNotasInput) {
   const usuario = await sessaoUsuario();
   if (!usuario) return { success: false as const, error: "Não autorizado", data: [], total: 0 };
+  if (!(await temAcessoAoModuloNotas(usuario))) {
+    return { success: false as const, error: "Sem permissão para o módulo de Notas", data: [], total: 0 };
+  }
 
   const parsed = buscarNotasSchema.safeParse(input ?? {});
   if (!parsed.success) return { success: false as const, error: "Filtros inválidos", data: [], total: 0 };

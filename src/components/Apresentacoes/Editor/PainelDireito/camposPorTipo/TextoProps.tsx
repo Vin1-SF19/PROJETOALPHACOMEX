@@ -1,49 +1,262 @@
+import { useRef, useState } from "react";
+import { AlignCenter, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, Italic, Minus, Underline } from "lucide-react";
 import type { TextoComponente } from "@/lib/validations/slide-componentes";
+import { FONTES_ALPHA_MOTION } from "@/lib/apresentacoes/fontes";
+import {
+  aplicarEstiloNoIntervaloRichText,
+  atualizarRunRichText,
+  criarRichTextDoTexto,
+  sincronizarRichTextComTexto,
+  textoPlanoDoRichText,
+  type RichRunPatch,
+} from "@/lib/apresentacoes/rich-text-edit";
+
+interface IntervaloTexto {
+  inicio: number;
+  fim: number;
+}
+
+function estiloBase(componente: TextoComponente): RichRunPatch {
+  return {
+    color: componente.corTexto,
+    fontFamily: componente.fontFamily,
+    fontSize: componente.fontSize,
+    bold: componente.fontWeight === "bold",
+    italic: componente.fontStyle === "italic",
+    underline: componente.textDecoration?.includes("underline") ? "sng" : "none",
+  };
+}
+
+function BotaoFormato({ ativo, label, onClick, children }: { ativo: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={ativo}
+      aria-label={label}
+      title={label}
+      className={`flex size-9 cursor-pointer items-center justify-center rounded-lg border ${ativo ? "border-indigo-400 bg-indigo-500/20 text-indigo-200" : "border-white/10 bg-slate-900 text-slate-400 hover:text-white"}`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function TextoProps({ componente, onChange }: { componente: TextoComponente; onChange: (patch: Partial<TextoComponente>) => void }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [intervalo, setIntervalo] = useState<IntervaloTexto>({ inicio: 0, fim: 0 });
+  const runs = componente.richText?.paragraphs.flatMap((paragraph) => paragraph.runs) ?? [];
+  const todosEmNegrito = runs.length > 0 ? runs.every((run) => run.bold) : componente.fontWeight === "bold";
+  const todosEmItalico = runs.length > 0 ? runs.every((run) => run.italic) : componente.fontStyle === "italic";
+  const todosSublinhados = runs.length > 0
+    ? runs.every((run) => Boolean(run.underline && run.underline !== "none"))
+    : componente.textDecoration?.includes("underline") === true;
+  const temTrechoSelecionado = intervalo.fim > intervalo.inicio;
+
+  function atualizarSelecao() {
+    const campo = textareaRef.current;
+    if (!campo) return;
+    setIntervalo({ inicio: campo.selectionStart, fim: campo.selectionEnd });
+  }
+
+  function atualizarTexto(texto: string) {
+    onChange({
+      texto,
+      ...(componente.richText ? { richText: sincronizarRichTextComTexto(componente.richText, texto) } : {}),
+    });
+  }
+
+  function aplicarEstilo(patchRun: RichRunPatch, patchComponente: Partial<TextoComponente>) {
+    const richTextBase = componente.richText ?? criarRichTextDoTexto(componente.texto, estiloBase(componente));
+    const inicio = temTrechoSelecionado ? intervalo.inicio : 0;
+    const fim = temTrechoSelecionado ? intervalo.fim : componente.texto.length;
+    const richText = aplicarEstiloNoIntervaloRichText(richTextBase, inicio, fim, patchRun);
+    const abrangeTudo = inicio === 0 && fim === componente.texto.length;
+    onChange({
+      ...(abrangeTudo ? patchComponente : {}),
+      richText,
+      texto: textoPlanoDoRichText(richText),
+    });
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(intervalo.inicio, intervalo.fim);
+    });
+  }
+
+  function aplicarAlinhamento(alinhamento: NonNullable<TextoComponente["alinhamento"]>) {
+    onChange({
+      alinhamento,
+      ...(componente.richText
+        ? { richText: { paragraphs: componente.richText.paragraphs.map((paragraph) => ({ ...paragraph, alignment: alinhamento })) } }
+        : {}),
+    });
+  }
+
+  function editarRun(paragraphIndex: number, runIndex: number, patch: Parameters<typeof atualizarRunRichText>[3]) {
+    if (!componente.richText) return;
+    const richText = atualizarRunRichText(componente.richText, paragraphIndex, runIndex, patch);
+    onChange({ richText, texto: textoPlanoDoRichText(richText) });
+  }
+
+  const categorias = Array.from(new Set(FONTES_ALPHA_MOTION.map((fonte) => fonte.categoria)));
+  const fonteAtual = componente.fontFamily ?? "Inter";
+  const fonteAtualEstaNoCatalogo = FONTES_ALPHA_MOTION.some((fonte) => fonte.nome === fonteAtual);
+
   return (
     <>
       <div className="space-y-1.5">
-        <label className="text-[11px] text-slate-400">Texto</label>
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-[11px] text-slate-400" htmlFor={`texto-${componente.id}`}>Texto</label>
+          <span className={`rounded px-1.5 py-0.5 text-[9px] ${temTrechoSelecionado ? "bg-cyan-500/15 text-cyan-200" : "bg-white/5 text-slate-500"}`}>
+            {temTrechoSelecionado ? `${intervalo.fim - intervalo.inicio} caracteres selecionados` : "Sem seleção: aplica ao texto inteiro"}
+          </span>
+        </div>
         <textarea
+          ref={textareaRef}
+          id={`texto-${componente.id}`}
           value={componente.texto}
-          onChange={(e) => onChange({ texto: e.target.value })}
-          className="h-20 w-full resize-none rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+          onChange={(event) => atualizarTexto(event.target.value)}
+          onSelect={atualizarSelecao}
+          onKeyUp={atualizarSelecao}
+          onMouseUp={atualizarSelecao}
+          className="h-24 w-full resize-y rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
         />
+        <p className="text-[10px] leading-relaxed text-slate-600">Selecione um trecho acima e use fonte, tamanho, cor ou estilo. Sem seleção, a mudança vale para todo o texto.</p>
       </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="col-span-2 space-y-1.5">
+          <span className="text-[11px] text-slate-400">Fonte</span>
+          <select
+            value={fonteAtual}
+            onChange={(event) => aplicarEstilo({ fontFamily: event.target.value }, { fontFamily: event.target.value })}
+            style={{ fontFamily: `"${fonteAtual}", sans-serif` }}
+            className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+          >
+            {!fonteAtualEstaNoCatalogo && <option value={fonteAtual}>{fonteAtual} (importada)</option>}
+            {categorias.map((categoria) => (
+              <optgroup key={categoria} label={categoria}>
+                {FONTES_ALPHA_MOTION.filter((fonte) => fonte.categoria === categoria).map((fonte) => (
+                  <option key={fonte.nome} value={fonte.nome} style={{ fontFamily: `"${fonte.nome}", sans-serif` }}>{fonte.nome}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Tamanho (px)</span>
+          <input
+            type="number"
+            min={6}
+            max={300}
+            value={componente.fontSize ?? 16}
+            onChange={(event) => {
+              const fontSize = Math.max(6, Math.min(300, Number(event.target.value)));
+              aplicarEstilo({ fontSize }, { fontSize });
+            }}
+            className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Cor</span>
+          <input
+            type="color"
+            value={componente.corTexto ?? "#ffffff"}
+            onChange={(event) => aplicarEstilo({ color: event.target.value }, { corTexto: event.target.value })}
+            className="h-9 w-full cursor-pointer rounded-lg border border-white/10 bg-slate-900"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Formatação do texto ou trecho selecionado">
+        <BotaoFormato
+          ativo={todosEmNegrito}
+          label="Negrito"
+          onClick={() => {
+            const bold = !todosEmNegrito;
+            aplicarEstilo({ bold }, { fontWeight: bold ? "bold" : "normal" });
+          }}
+        ><Bold size={15} aria-hidden="true" /></BotaoFormato>
+        <BotaoFormato
+          ativo={todosEmItalico}
+          label="Itálico"
+          onClick={() => {
+            const italic = !todosEmItalico;
+            aplicarEstilo({ italic }, { fontStyle: italic ? "italic" : "normal" });
+          }}
+        ><Italic size={15} aria-hidden="true" /></BotaoFormato>
+        <BotaoFormato
+          ativo={todosSublinhados}
+          label="Sublinhado"
+          onClick={() => {
+            const underline = todosSublinhados ? "none" : "sng";
+            aplicarEstilo({ underline }, { textDecoration: todosSublinhados ? "none" : "underline" });
+          }}
+        ><Underline size={15} aria-hidden="true" /></BotaoFormato>
+      </div>
+
       <div className="space-y-1.5">
-        <label className="text-[11px] text-slate-400">Estilo</label>
-        <select
-          value={componente.tag}
-          onChange={(e) => onChange({ tag: e.target.value as TextoComponente["tag"] })}
-          className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-        >
+        <span className="text-[11px] text-slate-400">Alinhamento no componente</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-1" role="group" aria-label="Alinhamento horizontal">
+            {([
+              ["left", AlignLeft, "Alinhar à esquerda"],
+              ["center", AlignCenter, "Centralizar horizontalmente"],
+              ["right", AlignRight, "Alinhar à direita"],
+            ] as const).map(([valor, Icone, label]) => (
+              <button key={valor} type="button" onClick={() => aplicarAlinhamento(valor)} aria-label={label} aria-pressed={(componente.alinhamento ?? "left") === valor} className={`flex size-9 cursor-pointer items-center justify-center rounded-lg border ${(componente.alinhamento ?? "left") === valor ? "border-indigo-400 bg-indigo-500/20 text-indigo-200" : "border-white/10 bg-slate-900 text-slate-400"}`}>
+                <Icone size={15} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1" role="group" aria-label="Alinhamento vertical">
+            {([
+              ["top", ChevronsUp, "Alinhar ao topo"],
+              ["middle", Minus, "Centralizar verticalmente"],
+              ["bottom", ChevronsDown, "Alinhar à base"],
+            ] as const).map(([valor, Icone, label]) => (
+              <button key={valor} type="button" onClick={() => onChange({ verticalAlign: valor })} aria-label={label} aria-pressed={(componente.verticalAlign ?? "top") === valor} className={`flex size-9 cursor-pointer items-center justify-center rounded-lg border ${(componente.verticalAlign ?? "top") === valor ? "border-indigo-400 bg-indigo-500/20 text-indigo-200" : "border-white/10 bg-slate-900 text-slate-400"}`}>
+                <Icone size={15} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Altura da linha</span>
+          <input type="number" min={0.7} max={4} step={0.1} value={componente.lineHeight ?? 1.2} onChange={(event) => onChange({ lineHeight: Math.max(0.7, Number(event.target.value)) })} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500" />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Espaço entre letras</span>
+          <input type="number" min={-10} max={50} step={0.5} value={componente.letterSpacing ?? 0} onChange={(event) => onChange({ letterSpacing: Number(event.target.value) })} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500" />
+        </label>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-[11px] text-slate-400">Estilo semântico</label>
+        <select value={componente.tag} onChange={(event) => onChange({ tag: event.target.value as TextoComponente["tag"] })} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500">
           <option value="h1">Título grande</option>
           <option value="h2">Título</option>
           <option value="p">Parágrafo</option>
           <option value="span">Texto simples</option>
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1.5">
-          <label className="text-[11px] text-slate-400">Cor</label>
-          <input
-            type="color"
-            value={componente.corTexto ?? "#ffffff"}
-            onChange={(e) => onChange({ corTexto: e.target.value })}
-            className="h-9 w-full rounded-lg border border-white/10 bg-slate-900"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-[11px] text-slate-400">Tamanho</label>
-          <input
-            type="number"
-            value={componente.fontSize ?? 16}
-            onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
-            className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-          />
-        </div>
-      </div>
+
+      {componente.richText && (
+        <details className="group rounded-lg border border-white/10 bg-slate-950/40">
+          <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-semibold text-slate-300">Runs avançados ({runs.length})</summary>
+          <div className="space-y-2 border-t border-white/10 p-2">
+            {componente.richText.paragraphs.flatMap((paragraph, paragraphIndex) => paragraph.runs.map((run, runIndex) => (
+              <div key={`${paragraphIndex}-${runIndex}`} className="flex items-start gap-1 rounded-md bg-slate-900/80 p-1.5">
+                <textarea value={run.text} rows={1} onChange={(event) => editarRun(paragraphIndex, runIndex, { text: event.target.value })} aria-label={`Trecho ${runIndex + 1} do parágrafo ${paragraphIndex + 1}`} className="min-h-8 min-w-0 flex-1 resize-y rounded border border-white/10 bg-slate-950 px-2 py-1 text-xs text-white outline-none focus:border-indigo-500" />
+                <input type="color" value={run.color ?? componente.corTexto ?? "#ffffff"} onChange={(event) => editarRun(paragraphIndex, runIndex, { color: event.target.value })} aria-label={`Cor do trecho ${runIndex + 1}`} className="size-7 rounded border border-white/10 bg-transparent" />
+              </div>
+            )))}
+          </div>
+        </details>
+      )}
     </>
   );
 }

@@ -7,10 +7,36 @@ import {
   atualizarStatusSchema,
 } from "@/lib/validations/apresentacao";
 import { isAdminRole } from "@/lib/roles";
+import { z } from "zod";
+import { dadosSlideSchema } from "@/lib/validations/slide-componentes";
+import { presetsAnimacaoPersonalizadosSchema } from "@/lib/apresentacoes/animacao/presets-personalizados";
+import { gerarSlugPublico } from "@/lib/apresentacoes/publicacao";
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
 }
+
+async function podeEditarApresentacao(apresentacaoId: string, userId: number, role?: string): Promise<boolean> {
+  if (isAdmin(role)) return true;
+  const apresentacao = await db.apresentacao.findUnique({
+    where: { id: apresentacaoId },
+    select: {
+      autorId: true,
+      colaboradores: { where: { userId, papel: "EDITOR" }, select: { id: true } },
+    },
+  });
+  return Boolean(apresentacao && (apresentacao.autorId === userId || apresentacao.colaboradores.length > 0));
+}
+
+const salvarPresetsSchema = z.object({
+  apresentacaoId: z.string().min(1),
+  presets: presetsAnimacaoPersonalizadosSchema,
+});
+
+const gerarLinkPublicoSchema = z.object({
+  apresentacaoId: z.string().min(1),
+  renovar: z.boolean().optional().default(false),
+});
 
 export async function ListarApresentacoes(params?: { page?: number; pageSize?: number; busca?: string }) {
   try {
@@ -215,5 +241,73 @@ export async function AtualizarStatusApresentacao(dados: unknown) {
   } catch (error) {
     console.error("[AtualizarStatusApresentacao]", error);
     return { success: false, error: "Erro ao atualizar status" };
+  }
+}
+
+export async function SalvarPresetsAnimacaoApresentacao(dados: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    const parsed = salvarPresetsSchema.safeParse(dados);
+    if (!parsed.success) return { success: false as const, error: "Presets inválidos" };
+
+    const { apresentacaoId, presets } = parsed.data;
+    const autorizado = await podeEditarApresentacao(apresentacaoId, Number(session.user.id), session.user.role);
+    if (!autorizado) return { success: false as const, error: "Sem permissão para editar esta apresentação" };
+
+    const slides = await db.slide.findMany({
+      where: { apresentacaoId },
+      orderBy: { ordem: "asc" },
+      select: { id: true, dadosJson: true },
+    });
+    const slidesValidos = slides.flatMap((slide) => {
+      const resultado = dadosSlideSchema.safeParse(slide.dadosJson);
+      return resultado.success ? [{ slide, dados: resultado.data }] : [];
+    });
+    const hospedeiro = slidesValidos.find((item) => item.dados.presetsAnimacao) ?? slidesValidos[0];
+    if (!hospedeiro) return { success: false as const, error: "A apresentação não possui slide válido para salvar os presets" };
+
+    await db.slide.update({
+      where: { id: hospedeiro.slide.id },
+      data: { dadosJson: { ...hospedeiro.dados, presetsAnimacao: presets } as object },
+    });
+
+    revalidatePath(`/PainelAlpha/Apresentacoes/${apresentacaoId}/editor`);
+    return { success: true as const, data: presets };
+  } catch (error) {
+    console.error("[SalvarPresetsAnimacaoApresentacao]", error);
+    return { success: false as const, error: "Erro ao salvar presets" };
+  }
+}
+
+export async function GerarLinkPublicoApresentacao(dados: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    const parsed = gerarLinkPublicoSchema.safeParse(dados);
+    if (!parsed.success) return { success: false as const, error: "Dados inválidos" };
+
+    const { apresentacaoId, renovar } = parsed.data;
+    const autorizado = await podeEditarApresentacao(apresentacaoId, Number(session.user.id), session.user.role);
+    if (!autorizado) return { success: false as const, error: "Sem permissão para publicar esta apresentação" };
+
+    const atual = await db.apresentacao.findUnique({
+      where: { id: apresentacaoId },
+      select: { slugPublico: true },
+    });
+    if (!atual) return { success: false as const, error: "Apresentação não encontrada" };
+
+    const slugPublico = atual.slugPublico && !renovar ? atual.slugPublico : gerarSlugPublico();
+    await db.apresentacao.update({
+      where: { id: apresentacaoId },
+      data: { slugPublico, status: "PUBLICADA", expiraEm: null },
+    });
+
+    revalidatePath("/PainelAlpha/Apresentacoes");
+    revalidatePath(`/PainelAlpha/Apresentacoes/${apresentacaoId}/editor`);
+    return { success: true as const, data: { slugPublico, caminho: `/apresentacao/${slugPublico}` } };
+  } catch (error) {
+    console.error("[GerarLinkPublicoApresentacao]", error);
+    return { success: false as const, error: "Erro ao gerar link da apresentação" };
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Boxes, Maximize2, Palette, Sparkles, X } from "lucide-react";
+import { Boxes, CircleHelp, Maximize2, Palette, Sparkles, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,8 @@ import { useEditorStore } from "../store/useEditorStore";
 import { BibliotecaAssets } from "./BibliotecaAssets";
 import { BrandKitPanel } from "./BrandKitPanel";
 import { ResizeExportPanel } from "./ResizeExportPanel";
+import { PresetsAnimacaoPanel } from "./PresetsAnimacaoPanel";
+import { CentralCriativaTutorial } from "./CentralCriativaTutorial";
 
 interface CentralCriativaModalProps {
   open: boolean;
@@ -33,6 +35,7 @@ export function CentralCriativaModal({
   onTemaAplicado,
 }: CentralCriativaModalProps) {
   const [assets, setAssets] = useState(assetsIniciais);
+  const [tutorialAberto, setTutorialAberto] = useState(false);
   const canvas = useEditorStore((state) => state.canvas);
   const adicionarComponente = useEditorStore((state) => state.adicionarComponente);
   const atualizarFundoCanvas = useEditorStore((state) => state.atualizarFundoCanvas);
@@ -71,6 +74,7 @@ export function CentralCriativaModal({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
@@ -84,10 +88,17 @@ export function CentralCriativaModal({
             <div className="min-w-0">
               <DialogTitle className="truncate text-base text-white sm:text-lg">Central Criativa Alpha</DialogTitle>
               <DialogDescription className="mt-1 line-clamp-2 text-xs text-slate-400 sm:text-sm">
-                Mídias, identidade visual, formatos e exportação no mesmo workspace.
+                Mídias, presets, identidade visual, formatos e exportação no mesmo workspace.
               </DialogDescription>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setTutorialAberto(true)}
+            className="absolute right-14 top-3 flex h-9 items-center gap-1.5 rounded-xl border border-white/10 bg-slate-950/70 px-3 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 sm:right-16 sm:top-5"
+          >
+            <CircleHelp size={15} aria-hidden="true" /> <span className="hidden sm:inline">Tutorial</span>
+          </button>
           <DialogClose asChild>
             <button
               type="button"
@@ -102,12 +113,16 @@ export function CentralCriativaModal({
           <div className="shrink-0 overflow-x-auto border-b border-white/10 bg-slate-950/95 px-3 py-2.5 sm:px-6 sm:py-3">
             <TabsList className="h-11 w-max min-w-full justify-start sm:min-w-0">
               <TabsTrigger value="biblioteca" className="min-w-36 px-4"><Boxes size={14} /> Biblioteca</TabsTrigger>
+              <TabsTrigger value="presets" className="min-w-36 px-4"><Wand2 size={14} /> Presets</TabsTrigger>
               <TabsTrigger value="marca" className="min-w-36 px-4"><Palette size={14} /> Brand Kit</TabsTrigger>
               <TabsTrigger value="formato" className="min-w-48 px-4"><Maximize2 size={14} /> Formato e exportação</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="biblioteca" className="min-h-0 overflow-hidden p-3 sm:p-5 lg:p-6">
             <BibliotecaAssets apresentacaoId={apresentacaoId} assets={assets} onAssetsChange={setAssets} onInsert={inserirAsset} />
+          </TabsContent>
+          <TabsContent value="presets" className="min-h-0 overflow-hidden p-3 sm:p-5 lg:p-6">
+            <PresetsAnimacaoPanel />
           </TabsContent>
           <TabsContent value="marca" className="min-h-0 overflow-y-auto p-3 sm:p-5 lg:p-6">
             <BrandKitPanel apresentacaoId={apresentacaoId} assets={assets} temaAtual={temaAtual} onTemaAplicado={aplicarTemaCriado} onInsertLogo={inserirAsset} />
@@ -118,5 +133,7 @@ export function CentralCriativaModal({
         </Tabs>
       </DialogContent>
     </Dialog>
+    <CentralCriativaTutorial open={tutorialAberto} onOpenChange={setTutorialAberto} />
+    </>
   );
 }

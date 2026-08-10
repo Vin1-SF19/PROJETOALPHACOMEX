@@ -29,6 +29,7 @@ interface SidebarFiltrosProps {
   tags: TagDisponivel[];
   tagsSelecionadas: string[];
   onToggleTag: (tagId: string) => void;
+  accent: string;
 }
 
 export function SidebarFiltros({
@@ -37,9 +38,10 @@ export function SidebarFiltros({
   tags,
   tagsSelecionadas,
   onToggleTag,
+  accent,
 }: SidebarFiltrosProps) {
   return (
-    <nav className="flex h-full w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-white/5 p-3">
+    <nav className="flex h-full w-56 shrink-0 flex-col gap-1 overflow-y-auto p-3">
       {SECOES.map((secao) => {
         const Icon = secao.icon;
         const ativa = secao.id === secaoAtiva;
@@ -49,9 +51,14 @@ export function SidebarFiltros({
             type="button"
             onClick={() => onSelecionarSecao(secao.id)}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-              ativa ? "bg-amber-500/10 text-amber-300" : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+              "flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors",
+              !ativa && "text-slate-400 hover:bg-white/5 hover:text-slate-200",
             )}
+            style={
+              ativa
+                ? { background: `rgba(${accent},0.14)`, color: `rgba(${accent},1)` }
+                : undefined
+            }
           >
             <Icon size={14} aria-hidden="true" />
             {secao.label}

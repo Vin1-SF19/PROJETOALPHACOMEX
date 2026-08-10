@@ -1,0 +1,43 @@
+{
+  "feature": "Alpha Motion - presets, tutorial, contorno e compartilhamento",
+  "date": "2026-08-10",
+  "predictedBugs": [
+    {
+      "risk": "Autosave do slide sobrescrever a biblioteca de presets salva no mesmo dadosJson",
+      "mitigation": "O provider aguarda o salvamento pendente e AtualizarSlide preserva presetsAnimacao do JSON persistido."
+    },
+    {
+      "risk": "Excluir ou duplicar o slide hospedeiro perder ou multiplicar a biblioteca de presets",
+      "mitigation": "A exclusão transfere a biblioteca para o primeiro slide restante e a duplicação remove a cópia do campo."
+    },
+    {
+      "risk": "Links públicos previsíveis, expirados ou antigos permanecerem acessíveis",
+      "mitigation": "O slug usa UUID com 32 caracteres hexadecimais, a rota valida status e expiração, e renovar substitui o slug anterior."
+    },
+    {
+      "risk": "O contorno ser cortado nas bordas da imagem",
+      "mitigation": "O canvas de saída é ampliado de acordo com a espessura antes de compor máscara e imagem original."
+    }
+  ],
+  "edgeCases": [
+    "Preset vazio, inválido, acima de 16 etapas ou biblioteca acima de 50 itens",
+    "Apresentação em rascunho, slug inválido ou link expirado retorna 404",
+    "Duplicação e exclusão do slide que armazena os presets",
+    "Imagem grande limitada a 12 megapixels e espessura de contorno limitada entre 1 e 32 pixels",
+    "Falha de clipboard oferece feedback sem perder o link gerado"
+  ],
+  "checks": {
+    "targetedLint": "passed",
+    "alphaMotionTests": "260/260 passed",
+    "targetedTests": "64/64 passed",
+    "nextBuild": "passed (70 pages)",
+    "typecheck": "blocked only by documented pre-existing errors",
+    "fullTestSuite": "970/971 passed; one pre-existing Google Calendar CLI timeout",
+    "repositoryLint": "blocked by pre-existing errors outside this feature",
+    "npmBuild": "blocked before Next.js by Prisma query engine EPERM; direct next build passed",
+    "authenticatedBrowserFlow": "blocked by login credentials; public invalid-slug route verified",
+    "hardcodedSecrets": false,
+    "databaseMigration": false
+  },
+  "passed": true
+}

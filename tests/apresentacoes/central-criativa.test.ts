@@ -4,6 +4,7 @@ import { adaptarComponentesAoCanvas, CANVAS_PADRAO, canvasConfigSchema } from "@
 import { detectarTipoAsset, nomeArquivoSeguro, validarArquivoAsset } from "@/lib/apresentacoes/assets";
 import { componenteSchema, dadosSlideSchema } from "@/lib/validations/slide-componentes";
 import { calcularEscalaApresentacao } from "@/lib/apresentacoes/viewport";
+import { gerarOffsetsContorno } from "@/lib/apresentacoes/remover-fundo";
 
 describe("Central Criativa do Alpha Presentation Studio", () => {
   it("aceita os formatos de asset suportados e bloqueia executáveis", () => {
@@ -42,5 +43,13 @@ describe("Central Criativa do Alpha Presentation Studio", () => {
   it("enquadra formatos quadrado e vertical sem corte no player", () => {
     expect(calcularEscalaApresentacao(900, 700, 1080, 1080)).toBeCloseTo(700 / 1080);
     expect(calcularEscalaApresentacao(900, 700, 1080, 1920)).toBeCloseTo(700 / 1920);
+  });
+
+  it("gera offsets circulares limitados para o contorno da imagem", () => {
+    const offsets = gerarOffsetsContorno(8);
+    expect(offsets.length).toBeGreaterThanOrEqual(8);
+    expect(new Set(offsets.map((offset) => `${offset.x}:${offset.y}`)).size).toBe(offsets.length);
+    expect(offsets.every((offset) => Math.abs(offset.x) <= 8 && Math.abs(offset.y) <= 8)).toBe(true);
+    expect(gerarOffsetsContorno(100).every((offset) => Math.abs(offset.x) <= 32 && Math.abs(offset.y) <= 32)).toBe(true);
   });
 });

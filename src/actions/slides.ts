@@ -6,6 +6,7 @@ import { dadosSlideSchema } from "@/lib/validations/slide-componentes";
 import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 import { isAdminRole } from "@/lib/roles";
 import { transicaoEntradaSchema } from "@/lib/apresentacoes/transicoes/catalogo";
+import { removerPresetsDoPacoteDoSlide } from "@/lib/apresentacoes/animacao/presets-personalizados";
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
@@ -156,9 +157,15 @@ export async function AtualizarSlide(dados: unknown) {
     if (!autorizado) return { success: false, error: "Sem permissão" };
 
     const dadosExistentes = dadosSlideSchema.safeParse(slideAtual.dadosJson);
-    const dadosParaGravar = parsed.data.pptxSource || !dadosExistentes.success || !dadosExistentes.data.pptxSource
-      ? parsed.data
-      : { ...parsed.data, pptxSource: dadosExistentes.data.pptxSource };
+    const dadosParaGravar = dadosExistentes.success
+      ? {
+          ...parsed.data,
+          ...(parsed.data.pptxSource || !dadosExistentes.data.pptxSource ? {} : { pptxSource: dadosExistentes.data.pptxSource }),
+          ...(parsed.data.presetsAnimacao || !dadosExistentes.data.presetsAnimacao
+            ? {}
+            : { presetsAnimacao: dadosExistentes.data.presetsAnimacao }),
+        }
+      : parsed.data;
 
     await db.slide.update({
       where: { id },
@@ -224,7 +231,7 @@ export async function ExcluirSlide(slideId: string) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
     const userId = Number(session.user.id);
-    const slide = await db.slide.findUnique({ where: { id: slideId }, select: { apresentacaoId: true } });
+    const slide = await db.slide.findUnique({ where: { id: slideId }, select: { apresentacaoId: true, dadosJson: true } });
     if (!slide) return { success: false, error: "Slide não encontrado" };
 
     const autorizado = await checarOwnershipApresentacao(slide.apresentacaoId, userId, session.user.role);
@@ -239,14 +246,26 @@ export async function ExcluirSlide(slideId: string) {
     // buracos (ex.: excluir ordem=0 de [0,1,2] deixava [1,2], não [0,1]), e como o rótulo padrão
     // do slide ("Slide N") é calculado a partir de `ordem+1` quando não há nome customizado, os
     // slides restantes não "subiam" de número — pedido explícito do usuário pra funcionar assim.
+    const dadosSlideExcluido = dadosSlideSchema.safeParse(slide.dadosJson);
+    const presetsDoSlideExcluido = dadosSlideExcluido.success ? dadosSlideExcluido.data.presetsAnimacao : undefined;
+
     await db.$transaction(async (tx) => {
       await tx.slide.delete({ where: { id: slideId } });
       const restantes = await tx.slide.findMany({
         where: { apresentacaoId: slide.apresentacaoId },
         orderBy: { ordem: "asc" },
-        select: { id: true },
+        select: { id: true, dadosJson: true },
       });
       await Promise.all(restantes.map((s, index) => tx.slide.update({ where: { id: s.id }, data: { ordem: index } })));
+      if (presetsDoSlideExcluido?.length && restantes[0]) {
+        const dadosDestino = dadosSlideSchema.safeParse(restantes[0].dadosJson);
+        if (dadosDestino.success && !dadosDestino.data.presetsAnimacao?.length) {
+          await tx.slide.update({
+            where: { id: restantes[0].id },
+            data: { dadosJson: { ...dadosDestino.data, presetsAnimacao: presetsDoSlideExcluido } as object },
+          });
+        }
+      }
     });
 
     revalidatePath(`/PainelAlpha/Apresentacoes/${slide.apresentacaoId}/editor`);
@@ -274,6 +293,11 @@ export async function DuplicarSlide(slideId: string) {
 
     // Empurra a ordem de todos os slides posteriores em +1 para abrir espaço logo após o original,
     // depois insere a cópia nessa posição — evita ordem fracionária, mantém `ordem` sempre inteiro e denso.
+    const dadosOriginais = dadosSlideSchema.safeParse(original.dadosJson);
+    const dadosDaCopia = dadosOriginais.success
+      ? removerPresetsDoPacoteDoSlide(dadosOriginais.data)
+      : original.dadosJson;
+
     const copia = await db.$transaction(async (tx) => {
       await tx.slide.updateMany({
         where: { apresentacaoId: original.apresentacaoId, ordem: { gt: original.ordem } },
@@ -290,7 +314,7 @@ export async function DuplicarSlide(slideId: string) {
           nome: `${rotuloBase} (cópia)`,
           transicaoEntrada: original.transicaoEntrada,
           duracaoAutoplay: original.duracaoAutoplay,
-          dadosJson: original.dadosJson as object,
+          dadosJson: dadosDaCopia as object,
         },
         select: { id: true, ordem: true, nome: true, dadosJson: true },
       });

@@ -3,6 +3,7 @@ import type { SlideAnimationConfig } from "./tipos";
 import type { ElementAnimation } from "./tipos";
 import { migrarAnimacaoAntiga } from "./migracao";
 import { obterAnimacao, type AnimationDefinition } from "./registry";
+import { calcularDelaysEfetivos, resolverOrdemExecucao, resolucaoOrdemEhErro } from "./gatilhos";
 
 /**
  * Prova de mecanismo da Fase 01 (Fundação — "Preview básico", Seção 32 do prompt original).
@@ -32,8 +33,15 @@ export function resolverAnimacoesDoElemento(
   componente: ComponenteSlide,
   animacaoConfig: SlideAnimationConfig | undefined,
 ): AnimacaoResolvida[] {
-  const doNovoModelo =
-    animacaoConfig?.timeline?.animations.filter((anim) => anim.elementId === componente.id) ?? [];
+  const timeline = animacaoConfig?.timeline?.animations ?? [];
+  const resolucao = resolverOrdemExecucao(timeline);
+  const ordenadas = resolucaoOrdemEhErro(resolucao)
+    ? [...timeline].sort((a, b) => a.order - b.order)
+    : resolucao.ordenadas;
+  const delaysEfetivos = calcularDelaysEfetivos(ordenadas);
+  const doNovoModelo = ordenadas
+    .filter((anim) => anim.elementId === componente.id)
+    .map((anim) => ({ ...anim, delay: delaysEfetivos.get(anim.id) ?? anim.delay }));
 
   if (doNovoModelo.length > 0) {
     return doNovoModelo.map((animacao) => ({

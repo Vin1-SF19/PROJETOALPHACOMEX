@@ -16,6 +16,7 @@ import {
   podeRestaurarNota,
   podeExcluirNota,
   podeExcluirDefinitivamenteNota,
+  temAcessoAoModuloNotas,
 } from "@/lib/notas/permissoes";
 import { isAdminRole } from "@/lib/roles";
 
@@ -28,6 +29,9 @@ async function sessaoUsuario() {
 export async function CriarNota(input: CriarNotaInput) {
   const usuario = await sessaoUsuario();
   if (!usuario) return { success: false as const, error: "Não autorizado" };
+  if (!(await temAcessoAoModuloNotas(usuario))) {
+    return { success: false as const, error: "Sem permissão para o módulo de Notas" };
+  }
 
   const parsed = criarNotaSchema.safeParse(input);
   if (!parsed.success) return { success: false as const, error: "Dados inválidos" };
@@ -159,6 +163,9 @@ export async function ObterNota(noteId: string) {
 export async function ListarNotas(input?: ListarNotasInput) {
   const usuario = await sessaoUsuario();
   if (!usuario) return { success: false as const, error: "Não autorizado", data: [], total: 0 };
+  if (!(await temAcessoAoModuloNotas(usuario))) {
+    return { success: false as const, error: "Sem permissão para o módulo de Notas", data: [], total: 0 };
+  }
 
   const parsed = listarNotasSchema.safeParse(input ?? {});
   if (!parsed.success) return { success: false as const, error: "Filtros inválidos", data: [], total: 0 };

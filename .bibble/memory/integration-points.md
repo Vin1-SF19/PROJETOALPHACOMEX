@@ -1066,6 +1066,30 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 
 ---
 
+### Alpha Motion — correções definitivas de editor, runtime e exportação (2026-08-10)
+
+**Texto PPTX editável:** `rich-text-edit.ts` é a única regra de sincronização entre `propriedades.texto` e `propriedades.richText`. O algoritmo preserva prefixo/sufixo e estilos dos runs não alterados; inserções herdam o estilo adjacente. `TextoProps.tsx` permite negrito/itálico/sublinhado global e edição/formatação por run. Um componente de texto do PowerPoint continua sendo um componente, mas seus trechos ricos deixam de ficar travados.
+
+**Runtime unificado de animação:** `RenderComponenteAnimado` resolve `ElementAnimation` pelo `resolver.ts` e compõe `AnimacaoElementoWrapper` com `ScrollRevealWrapper`. Essa fronteira é usada no canvas, modo apresentação e `PlayerStandalone`, e é propagada recursivamente por cards, grids e containers. Quando um elemento tem timeline nova, somente nele a animação legada é desativada, evitando duas transforms/opacity concorrentes; sem timeline, o comportamento legado permanece.
+
+**Sequenciamento:** `resolver.ts` calcula os delays efetivos sobre a timeline completa do slide por `resolverOrdemExecucao` + `calcularDelaysEfetivos`, portanto `after-previous` e dependências entre elementos diferentes não são reduzidos ao subconjunto local. Dependências inválidas usam ordem estável como fallback.
+
+**Gatilhos e efeitos:** o wrapper executa os gatilhos automáticos, clique, hover e visibilidade; `on-scroll` continua delegado ao wrapper específico. Variants adicionadas cobrem os tipos visuais que antes caíam no mesmo fallback. Efeitos globais continuam em `EfeitosGlobaisSlide`.
+
+**HTML responsivo:** o export adiciona viewport seguro; `player.css` normaliza `html/body/#root` para 100%, remove margem/padding, bloqueia overflow e o player usa raiz `fixed inset-0`. A escala canônica é recalculada ao redimensionar, rotacionar e alternar fullscreen.
+
+**Editor:** `SidebarSlides.tsx` virou gaveta recolhível com contagem, altura máxima e scroll próprio. `SidebarComponentes.tsx` usa o espaço vertical restante e não abre mais “Básicos” automaticamente; todas as categorias iniciam fechadas.
+
+**Regressões/gates:** novos testes cobrem sincronização de rich text, variants/runtime e delay entre elementos. Testes direcionados, lint direcionado, build do player e `next build` foram aprovados. O teste completo preserva uma falha preexistente por timeout do Google Calendar; typecheck/lint globais também mantêm erros de baseline fora do Alpha Motion. O fluxo visual autenticado ainda requer validação manual porque o ambiente local redirecionou ao login sem credenciais disponíveis.
+
+**Esta seção substitui** a descrição histórica da Fase 08 que dizia que `PlayerStandalone.tsx` compunha apenas `ScrollRevealWrapper`; ela permanece abaixo como registro da implementação original.
+
+**Editado quando:** a fronteira compartilhada de render animado, os formatos de rich text, o modelo de gatilhos ou a estrutura de sidebar/export forem alterados.
+
+**Última atualização:** 2026-08-10 por Scribe
+
+---
+
 ### Alpha Motion — Fase 08 (Scroll Reveal + Controles do Player)
 
 **Adicionado em:** 2026-08-06 por Scribe (sessão Bibble, pipeline serial completo)
@@ -1160,3 +1184,63 @@ Pedido curto reconhecido: **“Adicione o Guia Inteligente neste módulo.”**
 **Limite atual:** o manual modular está ligado ao Bibble nativo. A rota de agentes Onyx ainda não injeta esse catálogo; isso é evolução separada, não deve ser presumido ao replicar o padrão.
 
 **Última atualização:** 2026-08-07 por Scribe
+
+---
+
+## Alpha Motion — Central Criativa, presets e publicação (2026-08-10)
+
+### Biblioteca de presets
+
+- Fonte persistente: `Slide.dadosJson.presetsAnimacao`; deve existir em somente um slide hospedeiro por apresentação.
+- Toda leitura/escrita deve passar por `normalizarPresetsAnimacaoPersonalizados` e pelo catálogo `listarPresetsAnimacaoDisponiveis` para manter presets nativos e personalizados compatíveis.
+- `AtualizarSlide` precisa preservar a biblioteca existente. Ao excluir o hospedeiro, transfira-a na mesma transação; ao duplicar, remova o campo da cópia.
+- Antes de salvar presets, `PresetsAnimacaoProvider` aguarda o autosave pendente do editor para impedir concorrência de atualizações no mesmo JSON.
+
+### Exportação e link público
+
+- `ApresentacaoEditor` centraliza `salvarAlteracoesPendentes`; HTML e publicação devem aguardar essa função antes de iniciar.
+- `GerarLinkPublicoApresentacao` aceita somente proprietário, admin global ou colaborador editor/admin e publica com slug aleatório de 32 caracteres hexadecimais. Renovar substitui o slug e invalida imediatamente o link anterior.
+- `/apresentacao/[slug]` é pública, `force-dynamic`, `noindex` e responde 404 para slug inválido, rascunho ou apresentação expirada. A renderização reutiliza `PlayerStandalone`, preservando responsividade e URLs públicas dos assets.
+
+### Central Criativa e imagens
+
+- `CentralCriativaModal` integra as abas Biblioteca, Presets, Marca e Formato, além do tutorial contextual.
+- `BibliotecaAssets` oferece remoção de fundo e contorno. `criarContornoImagem` amplia o canvas conforme a espessura, usa a máscara do fundo removido e gera novo PNG sem alterar o asset original.
+
+### Validação da entrega
+
+- Testes Alpha Motion: 260/260; lint direcionado e `next build` aprovados.
+- O teste visual autenticado permaneceu bloqueado por falta de credenciais; a rota pública inválida foi validada no browser sem redirecionamento ao login.
+- Nenhuma migration ou dependência foi adicionada.
+
+**Última atualização:** 2026-08-10 por Scribe
+
+---
+
+## Alpha Motion — edição transacional, camadas e texto rico (2026-08-10)
+
+### Histórico e transformações do canvas
+
+**Arquivos:** `src/components/Apresentacoes/Editor/store/useEditorStore.ts`, `EditorKeyboardShortcuts.tsx`, `Canvas/ComponenteNoCanvas.tsx`, `Canvas/useCanvasDragResize.ts`
+
+**Editado quando:** uma nova ação do editor precisar participar de Undo/Redo, operar sobre múltiplos elementos ou introduzir um gesto contínuo.
+
+**Como integrar:** ações discretas devem registrar um snapshot pela store; gestos com vários eventos devem chamar `iniciarTransacaoHistorico()` no início e `finalizarTransacaoHistorico()` no fim. Nunca grave uma entrada por `mousemove`. Ao mover uma seleção, preserve posições relativas e filtre filhos cujo pai também está selecionado.
+
+### Ordem de slides e camadas
+
+**Arquivos:** `SidebarEsquerda/SidebarSlides.tsx`, `Timeline/TimelineReal.tsx`, `useEditorStore.ts`
+
+**Editado quando:** a persistência de ordem, os controles da gaveta ou a semântica de `zIndex` forem alterados.
+
+**Como integrar:** a timeline lista do topo visual para a base e converte essa ordem em `zIndex`. Exclusões devem passar por `removerComponentes()` para limpar animações e grupos. A gaveta atualiza otimisticamente, mas restaura a ordem anterior se `ReordenarSlides` falhar.
+
+### Tipografia compartilhada entre editor e player
+
+**Arquivos:** `src/lib/apresentacoes/fontes.ts`, `src/lib/apresentacoes/rich-text-edit.ts`, `TextoProps.tsx`, `RenderBasicos.tsx`, `src/app/globals.css`, `src/apresentacoes-player/player.css`, `src/generated/apresentacoes-player-bundle.ts`
+
+**Editado quando:** fontes, propriedades de texto, rich text importado ou a renderização do player mudarem.
+
+**Como integrar:** formatação com seleção deve usar `aplicarEstiloNoIntervaloRichText`; sem seleção, sincronize propriedades globais e runs. Toda fonte nova precisa existir no catálogo e na URL de provisionamento de `scripts/download-alpha-motion-fonts.mjs`; execute `npm run fonts:alpha-motion` para gerar os WOFF2 e `src/app/alpha-motion-fonts.css`. A folha deve permanecer ao lado de `globals.css` e ser importada como `./alpha-motion-fonts.css`, pois o resolvedor CSS do Turbopack falhou com o caminho transversal `../styles`. Depois execute `npm run build:player`: o script troca `/fonts/alpha-motion/*.woff2` por data URI e falha se sobrar qualquer referência externa ou caminho local no bundle HTML offline.
+
+**Última atualização:** 2026-08-10 por Scribe

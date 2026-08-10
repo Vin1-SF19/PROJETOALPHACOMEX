@@ -11,7 +11,8 @@ export const REGISTRY_BASICOS: Record<
     icone: Type,
     criarComponentePadrao: (x, y) => ({
       id: gerarId(), tipo: "texto", x, y, w: 280, h: 60, zIndex: 0, rotacao: 0,
-      texto: "Texto", tag: "p", alinhamento: "left",
+      texto: "Texto", tag: "p", alinhamento: "left", verticalAlign: "middle",
+      corTexto: "#ffffff", fontFamily: "Inter", fontSize: 32, lineHeight: 1.2, letterSpacing: 0,
     }),
   },
   imagem: {

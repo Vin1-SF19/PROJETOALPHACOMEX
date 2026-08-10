@@ -19,6 +19,7 @@ import { NotesGlobalTaskbar } from '@/components/Notas/NotesGlobalTaskbar';
 import { NotaNotificacaoToast } from '@/components/Notas/NotaNotificacaoToast';
 import { useNotasNotifications } from '@/hooks/useNotasNotifications';
 import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
+import { isAdminRole } from '@/lib/roles';
 import type { OnboardingVideo } from '@/lib/onboarding';
 import { signOut } from 'next-auth/react';
 import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
@@ -75,9 +76,13 @@ export default function PainelLayoutClient({
   const [onboardingDone, setOnboardingDone] = useState(false);
   const showOnboarding = !onboardingVisto && !onboardingDone && !!onboardingVideo;
 
+  // Sistema de Notas é uma camada global, mas ainda assim respeita a permissão do módulo 'notas'
+  // (bypass padrão Admin/CEO/TI, mesmo critério usado em todo o restante do painel).
+  const temAcessoNotas = isAdminRole(role) || permissoes.includes('notas');
+
   useChamadosNotifications(role, userId);
-  useNotasNotifications(userId);
-  useNotasLembretesPendentes();
+  useNotasNotifications(temAcessoNotas ? userId : 0);
+  useNotasLembretesPendentes(temAcessoNotas);
   useChecklistNotifications(role);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────
@@ -243,6 +248,7 @@ export default function PainelLayoutClient({
       initialPathnameRef.current.startsWith(activeUrl + '/'));
 
   const sidebarOffset = isCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[260px]';
+  const sidebarLeftOffset = isCollapsed ? 'lg:left-[72px]' : 'lg:left-[260px]';
 
   return (
     <>
@@ -356,7 +362,7 @@ export default function PainelLayoutClient({
       </div>
 
       {/* Camada global de notas — fora do container de iframes, sobreposta ao rodapé de qualquer módulo aberto. Recuada pela mesma largura da sidebar em telas lg+ para nunca cobri-la. */}
-      {!tvMode && <NotesGlobalTaskbar userId={userId} sidebarOffsetClass={sidebarOffset} />}
+      {!tvMode && temAcessoNotas && <NotesGlobalTaskbar userId={userId} sidebarOffsetClass={sidebarLeftOffset} />}
     </>
   );
 }

@@ -91,4 +91,27 @@ describe("Alpha Motion — Fase 01 — resolver (leitura → fallback → regist
     const resolvidas = resolverAnimacoesDoElemento(componente, animacaoConfig);
     expect(resolvidas).toEqual([]);
   });
+
+  it("aplica o delay de after-previous mesmo quando a animação anterior pertence a outro elemento", () => {
+    const componente = criarComponenteTexto({ id: "c2" });
+    const animacaoConfig: SlideAnimationConfig = {
+      version: 1,
+      timeline: {
+        duration: 2,
+        animations: [
+          {
+            id: "primeira", elementId: "c1", category: "entrance", type: "fade-in",
+            trigger: "on-slide-enter", duration: 0.8, delay: 0.2, order: 0, easing: { curva: "easeOut" },
+          },
+          {
+            id: "segunda", elementId: "c2", category: "entrance", type: "zoom-in",
+            trigger: "after-previous", duration: 0.5, delay: 0.1, order: 1, easing: { curva: "easeOut" },
+          },
+        ],
+      },
+    };
+
+    const [resolvida] = resolverAnimacoesDoElemento(componente, animacaoConfig);
+    expect(resolvida.animacao.delay).toBeCloseTo(1.1);
+  });
 });

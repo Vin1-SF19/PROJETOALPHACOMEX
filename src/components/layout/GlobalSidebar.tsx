@@ -26,6 +26,7 @@ import { MODULOS_REGISTRY, CATEGORIAS } from '@/lib/modulos-registry';
 import { ModalBroadcast } from '@/components/ModalBroadcast';
 import { getTema } from '@/lib/temas';
 import { isAdminRole } from '@/lib/roles';
+import { NotesLauncherButton } from '@/components/Notas/NotesLauncherButton';
 
 // ── Icon map ──────────────────────────────────────────────
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -97,6 +98,7 @@ export default function GlobalSidebar({
 }: GlobalSidebarProps) {
   const pathname = usePathname();
   const isAdmin = isAdminRole(role);
+  const temAcessoNotas = isAdmin || permissoes.includes('notas');
   // Use activeUrl (tab-aware) for highlighting; fallback to pathname
   const effectiveUrl = activeUrl ?? pathname;
 
@@ -359,7 +361,7 @@ export default function GlobalSidebar({
       </nav>
 
       {/* Footer: avatar + dropdown */}
-      <div className={`shrink-0 border-t border-white/5 p-3 ${isCollapsed ? 'flex justify-center' : ''}`}>
+      <div className={`shrink-0 border-t border-white/5 p-3 flex flex-col gap-1 ${isCollapsed ? 'items-center' : ''}`}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -442,6 +444,8 @@ export default function GlobalSidebar({
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {temAcessoNotas && <NotesLauncherButton isCollapsed={isCollapsed} />}
       </div>
     </div>
   );

@@ -98,7 +98,21 @@ async function bundlarJs() {
 async function compilarCss() {
   const cssFonte = fs.readFileSync(CSS_ENTRY, "utf8");
   const resultado = await postcss([tailwindcssPostcss()]).process(cssFonte, { from: CSS_ENTRY, to: undefined });
-  return resultado.css;
+  const cssComFontesEmbutidas = resultado.css.replace(
+    /url\((["']?)\/fonts\/alpha-motion\/([^"')]+)\1\)/g,
+    (_trecho, _aspas, arquivo) => {
+      const caminhoFonte = path.join(ROOT, "public/fonts/alpha-motion", arquivo);
+      if (!fs.existsSync(caminhoFonte)) {
+        throw new Error(`Fonte local não encontrada para o player: ${caminhoFonte}. Execute npm run fonts:alpha-motion.`);
+      }
+      const base64 = fs.readFileSync(caminhoFonte).toString("base64");
+      return `url("data:font/woff2;base64,${base64}")`;
+    },
+  );
+  if (/fonts\.googleapis\.com|fonts\.gstatic\.com|\/fonts\/alpha-motion\//.test(cssComFontesEmbutidas)) {
+    throw new Error("O CSS do player ainda contém referência externa ou caminho de fonte não embutido");
+  }
+  return cssComFontesEmbutidas;
 }
 
 async function main() {

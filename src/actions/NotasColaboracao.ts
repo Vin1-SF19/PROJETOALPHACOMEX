@@ -118,7 +118,26 @@ export async function ListarPermissoesNota(noteId: string) {
   }
 
   const permissoes = await db.notePermission.findMany({ where: { noteId }, orderBy: { createdAt: "asc" } });
-  return { success: true as const, data: permissoes };
+
+  const idsUsuarios = permissoes
+    .filter((p) => p.subjectType === "USUARIO")
+    .map((p) => Number(p.subjectId))
+    .filter((id) => Number.isSafeInteger(id));
+
+  const usuariosEncontrados = idsUsuarios.length
+    ? await db.usuarios.findMany({ where: { id: { in: idsUsuarios } }, select: { id: true, nome: true } })
+    : [];
+  const nomesPorId = new Map(usuariosEncontrados.map((u) => [u.id, u.nome]));
+
+  const permissoesComNome = permissoes.map((permissao) => ({
+    ...permissao,
+    subjectDisplayName:
+      permissao.subjectType === "USUARIO"
+        ? (nomesPorId.get(Number(permissao.subjectId)) ?? `Usuário #${permissao.subjectId}`)
+        : permissao.subjectId,
+  }));
+
+  return { success: true as const, data: permissoesComNome };
 }
 
 export async function TransferirPropriedadeNota(input: { noteId: string; novoOwnerId: number }) {

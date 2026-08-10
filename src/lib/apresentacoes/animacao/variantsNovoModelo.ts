@@ -103,6 +103,8 @@ export function variantsParaNovoModelo(anim: ElementAnimation): VariantsResultad
       return { initial: { opacity: 1, scale: 1 }, animate: { opacity: 0, scale: 0 }, transition };
     case "collapse":
       return { initial: { opacity: 1, scaleY: 1 }, animate: { opacity: 0, scaleY: 0 }, transition };
+    case "mask-close":
+      return { initial: { opacity: 1, clipPath: "inset(0% 0% 0% 0%)" }, animate: { opacity: 0, clipPath: "inset(50% 50% 50% 50%)" }, transition };
 
     // --- Rotação ---
     case "rotate-in":
@@ -167,6 +169,21 @@ export function variantsParaNovoModelo(anim: ElementAnimation): VariantsResultad
       return { initial: { rotate: 0 }, animate: { rotate: [0, 3, -3, 0] }, transition: { ...transition, repeat: anim.repeat ?? Infinity } };
     case "blur-focus":
       return { initial: { filter: "blur(0px)" }, animate: { filter: ["blur(0px)", "blur(2px)", "blur(0px)"] }, transition: { ...transition, repeat: anim.repeat ?? Infinity } };
+    case "card-expand":
+    case "expand-to-focus":
+    case "focus-element":
+      return { initial: { scale: 1 }, animate: { scale: anim.intensity ?? 1.08 }, transition };
+    case "color-fill":
+      return { initial: { filter: "saturate(1) brightness(1)" }, animate: { filter: "saturate(1.2) brightness(1.12)" }, transition };
+    case "bar-grow-horizontal-ltr":
+    case "bar-grow-horizontal-rtl":
+    case "bar-grow-center":
+      return { initial: { scaleX: 0 }, animate: { scaleX: 1 }, transition };
+    case "bar-grow-vertical-btt":
+    case "bar-grow-vertical-ttb":
+      return { initial: { scaleY: 0 }, animate: { scaleY: 1 }, transition };
+    case "dim-others":
+      return { initial: { opacity: 1 }, animate: { opacity: 1 }, transition };
 
     default:
       return null;

@@ -2,7 +2,8 @@
 
 import { useCallback, useMemo, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { RenderComponente } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
+import { RenderComponenteAnimado } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
+import { EfeitosGlobaisSlide, type AjusteVisualEfeitoGlobal } from "@/components/Apresentacoes/Editor/RenderEngine/EfeitosGlobaisSlide";
 import { stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
 import type { ContainerIntroEvent } from "@/lib/apresentacoes/container-intro";
 import { CLIP_SLIDE_COMPLETO } from "@/lib/apresentacoes/container-intro";
@@ -10,12 +11,14 @@ import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { TransicaoSlide } from "./TransicaoSlide";
 import { SlidePortalPreview } from "@/components/Apresentacoes/Editor/RenderEngine/SlidePortalPreview";
 import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
+import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 
 export interface SlideApresentacao {
   id: string;
   transicaoEntrada: string | null;
   componentes: ComponenteSlide[];
   canvas: CanvasConfig;
+  animacaoConfig?: SlideAnimationConfig;
 }
 
 interface SlideApresentacaoLayerProps {
@@ -40,6 +43,8 @@ interface ComponenteNoSlideProps {
   portalProximoSlide: ReactNode;
   pausado: boolean;
   portalContainerCapa?: Element | null;
+  ajusteVisual: AjusteVisualEfeitoGlobal;
+  animacaoConfig?: SlideAnimationConfig;
 }
 
 function ComponenteNoSlide({
@@ -51,6 +56,8 @@ function ComponenteNoSlide({
   portalProximoSlide,
   pausado,
   portalContainerCapa,
+  ajusteVisual,
+  animacaoConfig,
 }: ComponenteNoSlideProps) {
   const componenteRenderizado = useMemo<ComponenteSlide>(() => {
     if (componente.tipo !== "containerCarga") return componente;
@@ -101,14 +108,17 @@ function ComponenteNoSlide({
 
   return (
     <div style={stylePosicaoAbsoluta(componenteRenderizado)}>
-      <RenderComponente
+      <div style={{ width: "100%", height: "100%", opacity: ajusteVisual.opacityAjustada, filter: ajusteVisual.blurAjustado ? "blur(3px)" : undefined, transform: ajusteVisual.escalaAjustada ? `scale(${ajusteVisual.escalaAjustada})` : undefined }}>
+      <RenderComponenteAnimado
         componente={componenteRenderizado}
         onContainerIntroStart={proximoSlide ? iniciarIntroNoPalco : undefined}
         onContainerIntroComplete={onContainerIntroComplete}
         portalProximoSlide={portalProximoSlide}
         pausado={pausado}
         portalContainerCapa={componenteRenderizado.tipo === "containerCarga" ? undefined : portalContainerCapa}
+        animacaoConfig={animacaoConfig}
       />
+      </div>
     </div>
   );
 }
@@ -139,19 +149,23 @@ export function SlideApresentacaoLayer({
       style={{ zIndex }}
     >
       <TransicaoSlide slideId={slide.id} transicaoEntrada={slide.transicaoEntrada} pausado={pausado}>
-        {slide.componentes.map((componente) => (
-          <ComponenteNoSlide
-            key={componente.id}
-            componente={componente}
-            canvas={slide.canvas}
-            proximoSlide={proximoSlide}
-            onContainerIntroStart={onContainerIntroStart}
-            onContainerIntroComplete={onContainerIntroComplete}
-            portalProximoSlide={portalProximoSlide}
-            pausado={pausado}
-            portalContainerCapa={portalContainerCapa}
-          />
-        ))}
+        <EfeitosGlobaisSlide componentes={slide.componentes} animacaoConfig={slide.animacaoConfig}>
+          {(componente, ajusteVisual) => (
+            <ComponenteNoSlide
+              key={componente.id}
+              componente={componente}
+              canvas={slide.canvas}
+              proximoSlide={proximoSlide}
+              onContainerIntroStart={onContainerIntroStart}
+              onContainerIntroComplete={onContainerIntroComplete}
+              portalProximoSlide={portalProximoSlide}
+              pausado={pausado}
+              portalContainerCapa={portalContainerCapa}
+              ajusteVisual={ajusteVisual}
+              animacaoConfig={slide.animacaoConfig}
+            />
+          )}
+        </EfeitosGlobaisSlide>
       </TransicaoSlide>
     </motion.div>
   );

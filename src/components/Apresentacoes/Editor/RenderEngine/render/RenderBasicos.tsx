@@ -98,12 +98,12 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
       {paragraph.bullet ? `${paragraph.bullet} ` : paragraph.numbering ? `${(paragraph.numbering.startAt ?? 1) + paragraphIndex}. ` : null}
       {paragraph.runs.map((run, runIndex) => {
         const style: React.CSSProperties = {
-          fontFamily: pilhaCssDaFonte(run.fontFamily),
-          fontSize: run.fontSize,
-          fontWeight: run.bold ? 700 : undefined,
-          fontStyle: run.italic ? "italic" : undefined,
+          fontFamily: pilhaCssDaFonte(run.fontFamily ?? componente.fontFamily),
+          fontSize: run.fontSize ?? componente.fontSize,
+          fontWeight: run.bold === undefined ? (componente.fontWeight === "bold" ? 700 : 400) : run.bold ? 700 : 400,
+          fontStyle: run.italic === undefined ? componente.fontStyle : run.italic ? "italic" : "normal",
           textDecoration: [run.underline && run.underline !== "none" ? "underline" : "", run.strike && run.strike !== "noStrike" ? "line-through" : ""].filter(Boolean).join(" ") || undefined,
-          color: run.color,
+          color: run.color ?? componente.corTexto ?? "#ffffff",
           letterSpacing: run.tracking,
           verticalAlign: run.baseline ? `${run.baseline / 1000}%` : undefined,
           textTransform: run.caps === "all" ? "uppercase" : run.caps === "small" ? "lowercase" : undefined,
@@ -116,14 +116,14 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
   const conteudo = (
     <Tag
       style={{
-        color: componente.corTexto,
-        fontSize: componente.fontSize,
+        color: componente.corTexto ?? "#ffffff",
+        fontSize: componente.fontSize ?? 16,
         fontWeight: componente.fontWeight === "bold" ? 700 : 400,
         textAlign: componente.alinhamento ?? "left",
         width: "100%",
         height: "100%",
         margin: 0,
-        fontFamily: pilhaCssDaFonte(componente.fontFamily),
+        fontFamily: pilhaCssDaFonte(componente.fontFamily ?? "Inter"),
         fontStyle: componente.fontStyle,
         textDecoration: componente.textDecoration,
         lineHeight: componente.lineHeight,

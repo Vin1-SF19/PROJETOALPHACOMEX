@@ -6,6 +6,8 @@ import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import { isAdminRole } from "@/lib/roles";
+import { normalizarPresetsAnimacaoPersonalizados, type PresetAnimacaoPersonalizado } from "@/lib/apresentacoes/animacao/presets-personalizados";
+import { apresentacaoPublicaDisponivel } from "@/lib/apresentacoes/publicacao";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,9 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
       titulo: true,
       autorId: true,
       temaId: true,
+      slugPublico: true,
+      status: true,
+      expiraEm: true,
       tema: {
         select: { id: true, nome: true, corPrimaria: true, corSecundaria: true, corAccent: true },
       },
@@ -50,14 +55,24 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
   const primeiroSlide = apresentacao.slides[0];
   if (!primeiroSlide) notFound(); // não deve acontecer — toda apresentação sempre tem >= 1 slide (CriarApresentacao garante)
 
-  type DadosSlidePersistidos = { componentes: ComponenteSlide[]; canvas?: CanvasConfig; animacaoConfig?: SlideAnimationConfig };
+  type DadosSlidePersistidos = {
+    componentes: ComponenteSlide[];
+    canvas?: CanvasConfig;
+    animacaoConfig?: SlideAnimationConfig;
+    presetsAnimacao?: PresetAnimacaoPersonalizado[];
+  };
   const dadosPrimeiroSlide = primeiroSlide.dadosJson as DadosSlidePersistidos | null;
   const componentesIniciais = dadosPrimeiroSlide?.componentes ?? [];
+  const presetsAnimacaoIniciais = apresentacao.slides
+    .map((slide) => (slide.dadosJson as DadosSlidePersistidos | null)?.presetsAnimacao)
+    .find((presets) => Array.isArray(presets));
 
   return (
     <ApresentacaoEditor
       apresentacaoId={apresentacao.id}
       titulo={apresentacao.titulo}
+      slugPublicoInicial={apresentacao.slugPublico && apresentacaoPublicaDisponivel(apresentacao) ? apresentacao.slugPublico : null}
+      presetsAnimacaoIniciais={normalizarPresetsAnimacaoPersonalizados(presetsAnimacaoIniciais)}
       slidesIniciais={apresentacao.slides.map((s) => ({
         id: s.id,
         ordem: s.ordem,

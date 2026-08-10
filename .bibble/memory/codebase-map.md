@@ -410,7 +410,8 @@ src/lib/apresentacoes/animacao/     # Núcleo: tipos, catálogo, motor, resolver
   responsivo.ts                     # Fase 09 — ResponsivoConfig + lerConfigResponsiva (customProperties.responsivo)
 src/lib/apresentacoes/scroll/       # Fase 08 — scroll-reveal.ts (único modo implementado: "reveal")
 src/components/Apresentacoes/Editor/RenderEngine/
-  RenderComponente.tsx              # Fonte ÚNICA de renderização de dadosJson — PURA, sem seleção/side-effects
+  RenderComponente.tsx              # Render puro + fronteira RenderComponenteAnimado para compor a timeline
+  AnimacaoElementoWrapper.tsx       # Executa ElementAnimation (auto/click/hover/visible) via Framer Motion
   EfeitosGlobaisSlide.tsx           # Wrapper por SLIDE (Dim Others/Focus Element/Card Expand — Fase 07)
   ScrollRevealWrapper.tsx           # Wrapper FINO por COMPONENTE (Scroll Reveal — Fase 08)
 src/components/Apresentacoes/Editor/
@@ -426,11 +427,17 @@ src/components/Apresentacoes/ModoApresentacao/  # Player "ao vivo" dentro do pai
                                      # — DIFERENTE do player exportado, mas mesmo padrão de Fullscreen/atalhos
 ```
 
-**Regra estrutural:** `RenderComponente.tsx` nunca ganha lógica de seleção, efeitos entre-irmãos ou scroll — qualquer coisa que precise "ver" outros elementos do slide (Dim Others, Focus Element, Scroll Reveal) vira um wrapper que envolve `RenderComponente` de fora, nunca dentro dele. `ComponenteNoCanvas.tsx` (Editor) e `PlayerStandalone.tsx` (player exportado) são os 2 pontos que compõem esses wrappers ao redor da renderização real.
+**Regra estrutural:** `RenderComponente` continua puro e sem seleção ou efeitos entre irmãos. `RenderComponenteAnimado`, exportado pelo mesmo arquivo, é a fronteira compartilhada que resolve a timeline e compõe `ScrollRevealWrapper` + `AnimacaoElementoWrapper`; efeitos que precisam enxergar o slide inteiro continuam em `EfeitosGlobaisSlide`. Canvas, apresentação interna e player offline devem usar essa fronteira, inclusive ao renderizar filhos de containers.
 
 **Lookup elementId→animação:** sempre via `resolverAnimacoesDoElemento()` (`animacao/resolver.ts`) — nunca duplicar esse filtro.
 
-**Dois formatos de animação coexistem (importante para quem for construir preview/UI nova):** `ConfigAnimacao` (formato legado, Onda 3, lido por `variantsPara`/`AnimacaoWrapper` em `nucleo.tsx`) e `ElementAnimation` (formato novo do Alpha Motion, Fases 01-09, lido via `resolverAnimacoesDoElemento`). Não são intercambiáveis — `PreviewMiniatura.tsx` (Fase 09) precisou de um mapa de variants PRÓPRIO em vez de reaproveitar `nucleo.tsx`, porque os schemas de entrada são incompatíveis. Ainda não convergiram numa fase futura de unificação.
+**Dois formatos de animação coexistem:** `ConfigAnimacao` legado e `ElementAnimation` novo. `RenderComponenteAnimado` prioriza a timeline nova apenas no elemento que possui `ElementAnimation`, evitando que a animação legada concorra visualmente; elementos sem timeline mantêm o fallback legado.
+
+**Rich text editável:** `src/lib/apresentacoes/rich-text-edit.ts` sincroniza a edição do texto plano com parágrafos/runs importados e preserva a formatação fora do trecho alterado. `TextoProps.tsx` é a UI de edição global e por run; nunca atualizar apenas `propriedades.texto` quando `propriedades.richText` estiver presente, pois o renderer considera o rich text a fonte visual.
+
+**Player/export responsivo:** `PlayerStandalone.tsx` usa raiz fixa no viewport e o CSS de `src/apresentacoes-player/player.css` zera margens, ocupa `html/body/#root` e bloqueia overflow. A escala canônica continua a cargo do hook de viewport e deve reagir a resize/fullscreen.
+
+**Sidebar do editor:** `SidebarSlides.tsx` é uma gaveta recolhível com altura limitada e scroll próprio; `SidebarComponentes.tsx` ocupa o espaço restante e todas as categorias iniciam fechadas.
 
 ### Alpha Motion — importador PPTX de alta fidelidade
 
@@ -645,6 +652,34 @@ model BlueprintActivity { projectId, userId, action, entityType, entityId?, prev
 - A persistência usa `localStorage`, sobrevive a reload e logout/login no mesmo navegador e não sincroniza entre dispositivos.
 
 **Última atualização:** 2026-08-03 por Scribe
+
+---
+
+### Alpha Motion — Central Criativa, presets e compartilhamento (2026-08-10)
+
+- Presets personalizados de animação são armazenados em `Slide.dadosJson.presetsAnimacao`, em um único slide hospedeiro da apresentação. O contrato e a normalização ficam em `src/lib/apresentacoes/animacao/presets-personalizados.ts`.
+- `PresetsAnimacaoContext.tsx` compartilha o catálogo no editor e persiste pela Server Action `SalvarPresetsAnimacaoApresentacao`. O autosave preserva o campo, a exclusão transfere a biblioteca e a duplicação remove a cópia para evitar versões concorrentes.
+- `PresetsAnimacaoPanel.tsx` oferece CRUD; `SeletorPreset.tsx` e `ModalAplicarPreset.tsx` consomem o catálogo combinado de presets nativos e personalizados.
+- A Central Criativa ganhou tutorial contextual e processamento de imagem com remoção de fundo ou contorno PNG configurável.
+- `ModalExportarApresentacao.tsx` concentra HTML e link público. `GerarLinkPublicoApresentacao` publica ou renova um slug aleatório, enquanto `/apresentacao/[slug]` valida formato, status e expiração e reutiliza `PlayerStandalone` via `PublicPresentationPlayer`.
+- Não houve nova dependência, coluna, tabela ou migration.
+
+**Última atualização:** 2026-08-10 por Scribe
+
+---
+
+### Alpha Motion — histórico, multisseleção, camadas e tipografia (2026-08-10)
+
+- `src/components/Apresentacoes/Editor/store/useEditorStore.ts` é a fonte única de histórico do slide, multisseleção e operações em lote. O histórico mantém até 100 snapshots e deve ser aberto/fechado como transação em gestos contínuos.
+- `EditorKeyboardShortcuts.tsx` concentra Ctrl/Cmd+Z e os atalhos de refazer; inputs e editores de texto conservam o histórico nativo.
+- `Canvas/ComponenteNoCanvas.tsx` e `Canvas/useCanvasDragResize.ts` implementam seleção aditiva, movimento conjunto, resize e rotação. Pais selecionados impedem o deslocamento duplicado de filhos também selecionados.
+- `Timeline/TimelineReal.tsx` representa a ordem visual de cima para baixo, persiste a ordem por `zIndex` e oferece exclusão direta; a store remove animações e grupos ligados aos elementos excluídos.
+- `SidebarEsquerda/SidebarSlides.tsx` mantém o DnD persistido de slides, agora com alça explícita, teclado e rollback visual em caso de falha.
+- `src/lib/apresentacoes/rich-text-edit.ts` é o helper de edição por intervalo. `TextoProps.tsx` usa o catálogo de `fontes.ts`, e `RenderBasicos.tsx` aplica defaults explícitos para impedir divergência de cor entre editor e apresentação.
+- As 15 famílias tipográficas ficam em `public/fonts/alpha-motion/` como 32 WOFF2 latinos e são declaradas por `src/app/alpha-motion-fonts.css`, junto de `globals.css` para resolução estável no Turbopack. `globals.css` serve esses arquivos localmente; o build do player converte os mesmos arquivos para data URI, mantendo o HTML exportado offline. `npm run fonts:alpha-motion` reprovisiona os ativos e alterações no renderer/CSS exigem `npm run build:player`.
+- Não houve dependência, migration, coluna ou mutação em massa de banco.
+
+**Última atualização:** 2026-08-10 por Scribe
 
 ---
 

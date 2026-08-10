@@ -15,10 +15,11 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { useEditorStore } from "../store/useEditorStore";
-import { PRESETS_ANIMACAO_COMPLETOS, type PresetAnimacaoCompletoId } from "@/lib/apresentacoes/animacao/presets-completos";
+import { listarPresetsAnimacaoDisponiveis, type PresetAnimacaoDisponivel } from "@/lib/apresentacoes/animacao/presets-personalizados";
 import { AtualizarSlide } from "@/actions/slides";
 import type { ElementAnimation, SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { usePresetsAnimacao } from "../PresetsAnimacaoContext";
 
 interface ModalAplicarPresetProps {
   open: boolean;
@@ -30,11 +31,10 @@ function idsDeNivelSuperior(componentes: ComponenteSlide[]): string[] {
   return componentes.map((c) => c.id);
 }
 
-function gerarAnimacoesParaElementos(presetId: PresetAnimacaoCompletoId, elementIds: string[]): ElementAnimation[] {
-  const parciais = PRESETS_ANIMACAO_COMPLETOS[presetId].criar();
+function gerarAnimacoesParaElementos(preset: PresetAnimacaoDisponivel, elementIds: string[]): ElementAnimation[] {
   const animacoes: ElementAnimation[] = [];
   for (const elementId of elementIds) {
-    for (const parcial of parciais) {
+    for (const parcial of preset.animacoes) {
       animacoes.push({ ...parcial, id: `anim-${crypto.randomUUID()}`, elementId });
     }
   }
@@ -47,7 +47,7 @@ function gerarAnimacoesParaElementos(presetId: PresetAnimacaoCompletoId, element
  * sobrescrever configurações existentes de vários slides de uma vez.
  */
 export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetProps) {
-  const [presetId, setPresetId] = useState<PresetAnimacaoCompletoId | "">("");
+  const [presetId, setPresetId] = useState("");
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [aplicandoTodos, setAplicandoTodos] = useState(false);
   const [progresso, setProgresso] = useState({ atual: 0, total: 0 });
@@ -60,10 +60,13 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
   const carregarSlide = useEditorStore((s) => s.carregarSlide);
   const setSlides = useEditorStore((s) => s.setSlides);
   const marcarSujo = useEditorStore((s) => s.marcarSujo);
+  const { presetsPersonalizados } = usePresetsAnimacao();
+  const presetsDisponiveis = listarPresetsAnimacaoDisponiveis(presetsPersonalizados);
+  const presetSelecionado = presetsDisponiveis.find((preset) => preset.id === presetId);
 
   function aplicarAoSlideAtivo() {
-    if (!presetId) return;
-    const novas = gerarAnimacoesParaElementos(presetId, idsDeNivelSuperior(componentes));
+    if (!presetSelecionado) return;
+    const novas = gerarAnimacoesParaElementos(presetSelecionado, idsDeNivelSuperior(componentes));
     const timelineAtual = animacaoConfig?.timeline ?? { duration: 0, animations: [] };
     const novoConfig: SlideAnimationConfig = {
       version: animacaoConfig?.version ?? 1,
@@ -72,12 +75,12 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
     };
     if (slideAtivoId) carregarSlide(slideAtivoId, componentes, canvas, novoConfig, useEditorStore.getState().transicaoEntrada);
     marcarSujo();
-    toast.success(`Preset "${PRESETS_ANIMACAO_COMPLETOS[presetId].nome}" aplicado a ${componentes.length} elemento(s) do slide.`);
+    toast.success(`Preset "${presetSelecionado.nome}" aplicado a ${componentes.length} elemento(s) do slide.`);
     onOpenChange(false);
   }
 
   async function aplicarATodosOsSlides() {
-    if (!presetId) return;
+    if (!presetSelecionado) return;
     setAplicandoTodos(true);
     setProgresso({ atual: 0, total: slides.length });
 
@@ -90,7 +93,7 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
       const componentesDoSlide = ehSlideAtivo ? componentes : slide.componentes;
       const configDoSlide = ehSlideAtivo ? animacaoConfig : slide.animacaoConfig;
 
-      const novas = gerarAnimacoesParaElementos(presetId, idsDeNivelSuperior(componentesDoSlide));
+      const novas = gerarAnimacoesParaElementos(presetSelecionado, idsDeNivelSuperior(componentesDoSlide));
       const timelineAtual = configDoSlide?.timeline ?? { duration: 0, animations: [] };
       const novoConfig: SlideAnimationConfig = {
         version: configDoSlide?.version ?? 1,
@@ -123,7 +126,7 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
     onOpenChange(false);
 
     if (falhas > 0) toast.error(`Preset aplicado, mas ${falhas} de ${slidesAtualizados.length} slide(s) falharam ao salvar.`);
-    else toast.success(`Preset "${PRESETS_ANIMACAO_COMPLETOS[presetId].nome}" aplicado a ${slidesAtualizados.length} slide(s).`);
+    else toast.success(`Preset "${presetSelecionado.nome}" aplicado a ${slidesAtualizados.length} slide(s).`);
   }
 
   return (
@@ -138,16 +141,16 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
           </DialogHeader>
 
           <div className="space-y-2">
-            {Object.entries(PRESETS_ANIMACAO_COMPLETOS).map(([id, preset]) => (
+            {presetsDisponiveis.map((preset) => (
               <button
-                key={id}
+                key={preset.id}
                 type="button"
-                onClick={() => setPresetId(id as PresetAnimacaoCompletoId)}
+                onClick={() => setPresetId(preset.id)}
                 className={`w-full cursor-pointer rounded-lg border p-3 text-left transition-colors ${
-                  presetId === id ? "border-indigo-500 bg-indigo-500/10" : "border-white/10 bg-slate-900/60 hover:border-white/20"
+                  presetId === preset.id ? "border-indigo-500 bg-indigo-500/10" : "border-white/10 bg-slate-900/60 hover:border-white/20"
                 }`}
               >
-                <p className="text-sm font-medium text-white">{preset.nome}</p>
+                <p className="text-sm font-medium text-white">{preset.nome}{preset.origem === "personalizado" ? " · personalizado" : ""}</p>
                 <p className="text-xs text-slate-500">{preset.descricao}</p>
               </button>
             ))}
@@ -156,7 +159,7 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
           <DialogFooter className="flex-col gap-2 sm:flex-row">
             <button
               type="button"
-              disabled={!presetId}
+              disabled={!presetSelecionado}
               onClick={aplicarAoSlideAtivo}
               className="cursor-pointer rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-xs font-medium text-white hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -164,7 +167,7 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
             </button>
             <button
               type="button"
-              disabled={!presetId || slides.length === 0}
+              disabled={!presetSelecionado || slides.length === 0}
               onClick={() => setConfirmacaoAberta(true)}
               className="cursor-pointer rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -179,7 +182,7 @@ export function ModalAplicarPreset({ open, onOpenChange }: ModalAplicarPresetPro
           <AlertDialogHeader>
             <AlertDialogTitle>Sobrescrever animações de {slides.length} slide(s)?</AlertDialogTitle>
             <AlertDialogDescription>
-              Isso vai aplicar o preset &ldquo;{presetId ? PRESETS_ANIMACAO_COMPLETOS[presetId].nome : ""}&rdquo; a todos os elementos de
+              Isso vai aplicar o preset &ldquo;{presetSelecionado?.nome ?? ""}&rdquo; a todos os elementos de
               nível superior de {slides.length} slide(s), somando às animações já existentes. Esta ação não pode ser desfeita
               automaticamente.
             </AlertDialogDescription>

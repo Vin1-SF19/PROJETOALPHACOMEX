@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, GripVertical, Trash2 } from "lucide-react";
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useEditorStore } from "../store/useEditorStore";
 import { COMPONENTES_REGISTRY } from "../registry/componentes-registry";
 import { registryFundoParaEstilo } from "../registry/registry-fundos";
@@ -13,13 +16,12 @@ const MAX_TEMPO = 5;
 const PIXELS_POR_SEGUNDO = 80;
 const LARGURA_REGUA = MAX_TEMPO * PIXELS_POR_SEGUNDO;
 
-/** "fundoAnimado" sozinho não diferencia qual dos 7 backgrounds foi arrastado (isso vive em estilo/preset). */
 function resolverEntradaRegistry(componente: ComponenteSlide) {
   if (componente.tipo === "fundoAnimado") return registryFundoParaEstilo(componente.estilo, componente.preset);
   return COMPONENTES_REGISTRY[componente.tipo];
 }
 
-function BarraDeTempo({ componente, selecionado, onSelecionar }: { componente: ComponenteSlide; selecionado: boolean; onSelecionar: () => void }) {
+function BarraDeTempo({ componente, selecionado, onSelecionar }: { componente: ComponenteSlide; selecionado: boolean; onSelecionar: (event: React.MouseEvent) => void }) {
   const anim = componente.animacao?.entrada;
   const { onMouseDownMover, onMouseDownRedimensionar } = useTimelineDrag(componente);
 
@@ -46,22 +48,20 @@ function BarraDeTempo({ componente, selecionado, onSelecionar }: { componente: C
   return (
     <div className="relative h-6" style={{ width: LARGURA_REGUA }}>
       <div
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelecionar();
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelecionar(event);
         }}
         onMouseDown={onMouseDownMover}
-        className={`absolute top-0 flex h-6 cursor-grab items-center rounded px-1 text-[9px] font-bold text-white active:cursor-grabbing ${
-          selecionado ? "bg-indigo-500" : "bg-indigo-500/50"
-        }`}
+        className={`absolute top-0 flex h-6 cursor-grab items-center rounded px-1 text-[9px] font-bold text-white active:cursor-grabbing ${selecionado ? "bg-indigo-500" : "bg-indigo-500/50"}`}
         style={{ left, width: Math.max(width, 12) }}
       >
         <span className="truncate">{ehContainerAlpha ? "Container Alpha" : anim.tipo}</span>
         {!ehContainerAlpha && (
           <div
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              onMouseDownRedimensionar(e);
+            onMouseDown={(event) => {
+              event.stopPropagation();
+              onMouseDownRedimensionar(event);
             }}
             className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/30"
           />
@@ -71,23 +71,85 @@ function BarraDeTempo({ componente, selecionado, onSelecionar }: { componente: C
   );
 }
 
-/** Timeline real (Onda 3): régua de tempo + barras de delay/duração da animação de entrada, arrastáveis. */
+function LinhaCamada({ componente }: { componente: ComponenteSlide }) {
+  const selecionado = useEditorStore((state) => state.componentesSelecionadosIds.includes(componente.id));
+  const selecionarComponente = useEditorStore((state) => state.selecionarComponente);
+  const removerComponente = useEditorStore((state) => state.removerComponente);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: componente.id });
+  const Icone = resolverEntradaRegistry(componente).icone;
+
+  function selecionar(event: React.MouseEvent) {
+    selecionarComponente(componente.id, event.ctrlKey || event.metaKey);
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.45 : 1 }}
+      className="flex items-center gap-2"
+    >
+      <div className={`flex w-36 shrink-0 items-center rounded-lg border ${selecionado ? "border-cyan-400/50 bg-cyan-500/10" : "border-white/5 bg-slate-900/60"}`}>
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label={`Mover camada ${resolverEntradaRegistry(componente).label}`}
+          title="Arraste para mudar a camada"
+          className="cursor-grab touch-none p-1.5 text-slate-600 hover:text-white active:cursor-grabbing"
+        >
+          <GripVertical size={12} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={selecionar}
+          className={`flex min-w-0 flex-1 items-center gap-1.5 py-1 text-[10px] ${selecionado ? "text-white" : "text-slate-400"}`}
+        >
+          <Icone size={11} aria-hidden="true" className="shrink-0" />
+          <span className="truncate">{resolverEntradaRegistry(componente).label}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => removerComponente(componente.id)}
+          aria-label={`Excluir ${resolverEntradaRegistry(componente).label} da timeline`}
+          title="Excluir elemento"
+          className="cursor-pointer p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400"
+        >
+          <Trash2 size={11} aria-hidden="true" />
+        </button>
+      </div>
+      <BarraDeTempo componente={componente} selecionado={selecionado} onSelecionar={selecionar} />
+    </div>
+  );
+}
+
+/** Timeline de elementos: tempo da animação + ordem real de camadas do slide. */
 export function TimelineReal() {
   const [aberto, setAberto] = useState(true);
-  const componentes = useEditorStore((s) => s.componentes);
-  const selecionadoId = useEditorStore((s) => s.componenteSelecionadoId);
-  const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
-
+  const componentes = useEditorStore((state) => state.componentes);
+  const reordenarCamadas = useEditorStore((state) => state.reordenarCamadas);
   const camadas = [...componentes].sort((a, b) => b.zIndex - a.zIndex);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = camadas.findIndex((componente) => componente.id === active.id);
+    const newIndex = camadas.findIndex((componente) => componente.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    reordenarCamadas(arrayMove(camadas, oldIndex, newIndex).map((componente) => componente.id));
+  }
 
   return (
     <div className="shrink-0 border-t border-white/5 bg-slate-950/80">
       <button
-        onClick={() => setAberto((v) => !v)}
+        onClick={() => setAberto((valor) => !valor)}
         className="flex w-full cursor-pointer items-center justify-between px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white"
         aria-expanded={aberto}
       >
-        Timeline ({camadas.length})
+        Camadas e animações ({camadas.length})
         {aberto ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronUp size={12} aria-hidden="true" />}
       </button>
 
@@ -96,43 +158,23 @@ export function TimelineReal() {
           {camadas.length === 0 ? (
             <p className="text-xs text-slate-600">Nenhum componente neste slide ainda.</p>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              {/* Régua de tempo */}
-              <div className="flex gap-2">
-                <div className="w-28 shrink-0" />
-                <div className="relative h-4 border-b border-white/10" style={{ width: LARGURA_REGUA }}>
-                  {Array.from({ length: MAX_TEMPO + 1 }).map((_, i) => (
-                    <span
-                      key={i}
-                      className="absolute top-0 text-[9px] text-slate-600"
-                      style={{ left: i * PIXELS_POR_SEGUNDO }}
-                    >
-                      {i}s
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {camadas.map((c) => {
-                const Icone = resolverEntradaRegistry(c).icone;
-                return (
-                  <div key={c.id} className="flex items-center gap-2">
-                    <button
-                      onClick={() => selecionarComponente(c.id)}
-                      className={`flex w-28 shrink-0 items-center gap-1.5 truncate rounded-lg border px-2 py-1 text-[10px] transition-colors ${
-                        selecionadoId === c.id
-                          ? "border-indigo-500/40 bg-indigo-500/10 text-white"
-                          : "border-white/5 bg-slate-900/60 text-slate-400 hover:border-white/10"
-                      }`}
-                    >
-                      <Icone size={11} aria-hidden="true" className="shrink-0" />
-                      <span className="truncate">{resolverEntradaRegistry(c).label}</span>
-                    </button>
-                    <BarraDeTempo componente={c} selecionado={selecionadoId === c.id} onSelecionar={() => selecionarComponente(c.id)} />
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={camadas.map((componente) => componente.id)} strategy={verticalListSortingStrategy}>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex gap-2">
+                    <div className="w-36 shrink-0 px-2 text-[9px] text-slate-600">Topo ↑ / Base ↓</div>
+                    <div className="relative h-4 border-b border-white/10" style={{ width: LARGURA_REGUA }}>
+                      {Array.from({ length: MAX_TEMPO + 1 }).map((_, index) => (
+                        <span key={index} className="absolute top-0 text-[9px] text-slate-600" style={{ left: index * PIXELS_POR_SEGUNDO }}>
+                          {index}s
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                  {camadas.map((componente) => <LinhaCamada key={componente.id} componente={componente} />)}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       )}

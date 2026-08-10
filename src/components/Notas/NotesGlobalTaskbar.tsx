@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   closestCenter,
@@ -12,7 +13,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Plus, LayoutGrid, ChevronUp, ChevronDown, StickyNote, Search } from "lucide-react";
+import { Plus, LayoutGrid, ChevronUp, ChevronDown, Search, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
@@ -32,10 +33,12 @@ import { Z_INDEX } from "@/lib/z-index";
 import { NoteTab } from "./NoteTab";
 import { NoteViewer } from "./NoteViewer";
 import { NotesSearchCommand } from "./NotesSearchCommand";
+import { NoteShareDialog } from "@/components/Notas/Colaboracao/NoteShareDialog";
+import { NoteContextLinkDialog } from "@/components/Notas/Contexto/NoteContextLinkDialog";
 
 interface NotesGlobalTaskbarProps {
   userId: number;
-  /** Classe de padding-left (ex: "lg:pl-[260px]") — mesmo recuo do conteúdo principal, para a barra nunca cobrir a sidebar fixa em telas lg+. */
+  /** Classe de posicionamento `left` (ex: "lg:left-[260px]") — a barra começa exatamente onde a sidebar termina, nunca por cima dela, em telas lg+. */
   sidebarOffsetClass?: string;
 }
 
@@ -65,8 +68,25 @@ export function NotesGlobalTaskbar({ userId, sidebarOffsetClass = "" }: NotesGlo
 
   const [notaAtiva, setNotaAtiva] = useState<NotaAtivaCarregada | null>(null);
   const [buscaAberta, setBuscaAberta] = useState(false);
+  const [carregandoAbertura, setCarregandoAbertura] = useState(true);
+  const [noteIdCompartilhar, setNoteIdCompartilhar] = useState<string | null>(null);
+  const [noteIdVincular, setNoteIdVincular] = useState<string | null>(null);
   const storageKey = getNotasTabsStorageKey(userId);
   const hidratadoDoServidorRef = useRef(false);
+  const isTaskbarVisibleAnteriorRef = useRef(isTaskbarVisible);
+
+  // Feedback visual de abertura breve e visível antes de revelar o conteúdo — dispara toda vez
+  // que a barra transiciona de fechada para aberta (o componente nunca desmonta entre uma
+  // abertura e outra, então não basta inicializar o estado uma vez só na montagem).
+  useEffect(() => {
+    const abriuAgora = isTaskbarVisible && !isTaskbarVisibleAnteriorRef.current;
+    isTaskbarVisibleAnteriorRef.current = isTaskbarVisible;
+    if (!abriuAgora) return;
+
+    setCarregandoAbertura(true);
+    const timeout = setTimeout(() => setCarregandoAbertura(false), 420);
+    return () => clearTimeout(timeout);
+  }, [isTaskbarVisible]);
 
   useEffect(() => {
     if (hidratadoDoServidorRef.current) return;
@@ -181,23 +201,13 @@ export function NotesGlobalTaskbar({ userId, sidebarOffsetClass = "" }: NotesGlo
     void AtualizarWorkspaceNotas({ isTaskbarVisible, viewerMode });
   }, [isTaskbarVisible, viewerMode]);
 
-  if (!isTaskbarVisible) {
-    return (
-      <button
-        type="button"
-        onClick={toggleTaskbar}
-        title="Mostrar barra de notas"
-        className="fixed bottom-2 right-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#0b1120] text-slate-400 shadow-lg hover:text-white"
-        style={{ zIndex: Z_INDEX.barraNotas }}
-      >
-        <StickyNote size={14} />
-      </button>
-    );
-  }
-
+  // O gatilho de abrir/fechar agora vive no ícone da sidebar (NotesLauncherButton).
+  // AnimatePresence precisa que o componente que sai continue montado durante a animação de
+  // saída — por isso o "fechado" não é um `return null` direto, é a ausência do filho dentro
+  // de AnimatePresence (ver fechamento do componente mais abaixo).
   return (
     <>
-      {notaAtiva && (
+      {isTaskbarVisible && notaAtiva && (
         <NoteViewer
           noteId={notaAtiva.noteId}
           initialTitle={notaAtiva.title}
@@ -207,108 +217,169 @@ export function NotesGlobalTaskbar({ userId, sidebarOffsetClass = "" }: NotesGlo
         />
       )}
 
-      <div
-        className={cn(
-          "fixed inset-x-0 bottom-0 flex h-10 items-center gap-1 border-t border-white/[0.06] bg-[#030813] px-2 transition-all duration-300 ease-in-out",
-          sidebarOffsetClass,
-        )}
-        style={{ zIndex: Z_INDEX.barraNotas }}
-      >
-        <button
-          type="button"
-          title="Nova nota (Ctrl+Shift+N)"
-          onClick={() => void criarNovaNota()}
-          className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/10 px-2 text-[11px] font-medium text-slate-300 hover:bg-white/5 hover:text-white"
-        >
-          <Plus size={13} />
-          Nova nota
-        </button>
-
-        <button
-          type="button"
-          title="Central de Notas (Ctrl+Alt+N)"
-          onClick={() => router.push("/PainelAlpha/Notas")}
-          className="flex h-7 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-400 hover:bg-white/5 hover:text-white"
-        >
-          <LayoutGrid size={13} />
-          Central
-        </button>
-
-        <button
-          type="button"
-          title="Buscar notas"
-          onClick={() => setBuscaAberta(true)}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
-        >
-          <Search size={13} />
-        </button>
-
-        <div className="h-4 w-px shrink-0 bg-white/10" />
-
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
-            <div
-              role="tablist"
-              aria-label="Notas abertas"
-              className="flex h-full min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      {/*
+        Efeito de "parede saindo/voltando pra dentro da sidebar": a faixa cresce (abrindo) ou
+        encolhe (fechando) em largura a partir da borda esquerda (transformOrigin: left —
+        exatamente onde a sidebar termina), em vez de um fade.
+      */}
+      <AnimatePresence>
+        {isTaskbarVisible && carregandoAbertura && (
+          <motion.div
+            key="notas-carregando"
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            exit={{ scaleX: 0 }}
+            transition={{ duration: 0.32, ease: "easeOut" }}
+            style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left" }}
+            className={cn(
+              "fixed bottom-0 left-0 right-0 h-10 border-t border-amber-500/20 bg-[#030813]",
+              sidebarOffsetClass,
+            )}
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1, duration: 0.15 }}
+              className="flex h-full items-center justify-center gap-2 px-2 text-[11px] font-medium text-amber-300"
             >
-              {tabs.map((tab) => (
-                <NoteTab
-                  key={tab.id}
-                  tabId={tab.id}
-                  noteId={tab.noteId}
-                  title={tab.title}
-                  isActive={tab.id === activeTabId && viewerMode !== "RECOLHIDO"}
-                  syncState={syncState[tab.noteId]}
-                  onActivate={() => ativarAbaHandler(tab.id, tab.noteId)}
-                  onClose={() => fecharAbaHandler(tab.id, tab.noteId)}
-                  onRenomear={() => {
-                    /* renomear via prompt simples nesta fase — refinamento de UI fica para fases seguintes */
-                    const novoTitulo = window.prompt("Renomear nota", tab.title);
-                    if (novoTitulo) useNotasWorkspace.getState().renomearAba(tab.id, novoTitulo);
-                  }}
-                  onFixar={() => toast.info("Fixar nota — disponível na Central de Notas (Fase 03)")}
-                  onDuplicar={() => toast.info("Duplicar nota — disponível na Central de Notas (Fase 03)")}
-                  onCompartilhar={() => toast.info("Compartilhamento chega na Fase 05")}
-                  onAbrirTelaAmpla={() => {
-                    ativarAbaHandler(tab.id, tab.noteId);
-                    setViewerMode("TELA_AMPLA");
-                  }}
-                  onVincular={() => toast.info("Vincular a registro chega na Fase 04")}
-                  onFecharOutras={() => {
-                    tabs.filter((t) => t.id !== tab.id).forEach((t) => fecharAbaHandler(t.id, t.noteId));
-                  }}
-                  onFecharADireita={() => {
-                    const idx = tabs.findIndex((t) => t.id === tab.id);
-                    tabs.slice(idx + 1).forEach((t) => fecharAbaHandler(t.id, t.noteId));
-                  }}
-                  onArquivar={async () => {
-                    await ArquivarNota(tab.noteId);
-                    fecharAbaHandler(tab.id, tab.noteId);
-                    toast.success("Nota arquivada");
-                  }}
-                  onExcluir={async () => {
-                    await MoverNotaParaLixeira(tab.noteId);
-                    fecharAbaHandler(tab.id, tab.noteId);
-                    toast.success("Nota movida para a lixeira");
-                  }}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+              <Loader2 size={14} className="animate-spin" />
+              Carregando
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        <button
-          type="button"
-          title={viewerMode === "RECOLHIDO" ? "Expandir painel" : "Recolher painel"}
-          onClick={() => setViewerMode(viewerMode === "RECOLHIDO" ? "COMPACTO" : "RECOLHIDO")}
-          className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white"
-        >
-          {viewerMode === "RECOLHIDO" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-      </div>
+      <AnimatePresence>
+        {isTaskbarVisible && !carregandoAbertura && (
+          <motion.div
+            key="notas-barra"
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            exit={{ scaleX: 0 }}
+            transition={{ duration: 0.26, ease: "easeInOut" }}
+            style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left" }}
+            className={cn(
+              "fixed bottom-0 left-0 right-0 flex h-10 items-center gap-1 border-t border-white/[0.06] bg-[#030813] px-2 transition-[left,right] duration-300 ease-in-out",
+              sidebarOffsetClass,
+            )}
+          >
+            <button
+              type="button"
+              title="Nova nota (Ctrl+Shift+N)"
+              onClick={() => void criarNovaNota()}
+              className="flex h-7 shrink-0 items-center gap-1 rounded-lg border border-white/10 px-2 text-[11px] font-medium text-slate-300 hover:bg-white/5 hover:text-white"
+            >
+              <Plus size={13} />
+              Nova nota
+            </button>
+
+            <button
+              type="button"
+              title="Central de Notas (Ctrl+Alt+N)"
+              onClick={() => router.push("/PainelAlpha/Notas")}
+              className="flex h-7 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-400 hover:bg-white/5 hover:text-white"
+            >
+              <LayoutGrid size={13} />
+              Central
+            </button>
+
+            <button
+              type="button"
+              title="Buscar notas"
+              onClick={() => setBuscaAberta(true)}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
+            >
+              <Search size={13} />
+            </button>
+
+            <div className="h-4 w-px shrink-0 bg-white/10" />
+
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
+                <div
+                  role="tablist"
+                  aria-label="Notas abertas"
+                  className="flex h-full min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {tabs.map((tab) => (
+                    <NoteTab
+                      key={tab.id}
+                      tabId={tab.id}
+                      noteId={tab.noteId}
+                      title={tab.title}
+                      isActive={tab.id === activeTabId && viewerMode !== "RECOLHIDO"}
+                      syncState={syncState[tab.noteId]}
+                      onActivate={() => ativarAbaHandler(tab.id, tab.noteId)}
+                      onClose={() => fecharAbaHandler(tab.id, tab.noteId)}
+                      onRenomear={() => {
+                        /* renomear via prompt simples nesta fase — refinamento de UI fica para fases seguintes */
+                        const novoTitulo = window.prompt("Renomear nota", tab.title);
+                        if (novoTitulo) useNotasWorkspace.getState().renomearAba(tab.id, novoTitulo);
+                      }}
+                      onFixar={() => toast.info("Fixar nota — disponível na Central de Notas (Fase 03)")}
+                      onDuplicar={() => toast.info("Duplicar nota — disponível na Central de Notas (Fase 03)")}
+                      onCompartilhar={() => setNoteIdCompartilhar(tab.noteId)}
+                      onAbrirTelaAmpla={() => {
+                        ativarAbaHandler(tab.id, tab.noteId);
+                        setViewerMode("TELA_AMPLA");
+                      }}
+                      onVincular={() => setNoteIdVincular(tab.noteId)}
+                      onFecharOutras={() => {
+                        tabs.filter((t) => t.id !== tab.id).forEach((t) => fecharAbaHandler(t.id, t.noteId));
+                      }}
+                      onFecharADireita={() => {
+                        const idx = tabs.findIndex((t) => t.id === tab.id);
+                        tabs.slice(idx + 1).forEach((t) => fecharAbaHandler(t.id, t.noteId));
+                      }}
+                      onArquivar={async () => {
+                        await ArquivarNota(tab.noteId);
+                        fecharAbaHandler(tab.id, tab.noteId);
+                        toast.success("Nota arquivada");
+                      }}
+                      onExcluir={async () => {
+                        await MoverNotaParaLixeira(tab.noteId);
+                        fecharAbaHandler(tab.id, tab.noteId);
+                        toast.success("Nota movida para a lixeira");
+                      }}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+
+            <button
+              type="button"
+              title={viewerMode === "RECOLHIDO" ? "Expandir painel" : "Recolher painel"}
+              onClick={() => setViewerMode(viewerMode === "RECOLHIDO" ? "COMPACTO" : "RECOLHIDO")}
+              className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white"
+            >
+              {viewerMode === "RECOLHIDO" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <NotesSearchCommand open={buscaAberta} onOpenChange={setBuscaAberta} />
+
+      {noteIdCompartilhar && (
+        <NoteShareDialog
+          noteId={noteIdCompartilhar}
+          open={noteIdCompartilhar !== null}
+          onOpenChange={(open) => {
+            if (!open) setNoteIdCompartilhar(null);
+          }}
+        />
+      )}
+
+      {noteIdVincular && (
+        <NoteContextLinkDialog
+          noteId={noteIdVincular}
+          open={noteIdVincular !== null}
+          onOpenChange={(open) => {
+            if (!open) setNoteIdVincular(null);
+          }}
+        />
+      )}
     </>
   );
 }

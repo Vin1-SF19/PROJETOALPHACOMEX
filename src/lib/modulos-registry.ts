@@ -69,6 +69,22 @@ export const MODULOS_REGISTRY: ModuloRegistryItem[] = [
   { id: 'conectoresIAlpha',      label: 'Conectores IAlpha',        href: '/PainelAlpha/Conectores',                                                    iconName: 'Cable',         category: 'admin',       permission: 'conectoresIAlpha',  allowedRoles: ['Admin', 'CEO', 'TI'],                           img: '/local-na-rede-internet.png', desc: 'Fontes de conhecimento da IA: indexação, sincronização e bases.', tag: 'IAlpha', color: 'from-cyan-600/20' },
 ];
 
+export interface ModuloVinculavel {
+  moduleKey: string;
+  entityType: string;
+  label: string;
+}
+
+/**
+ * Módulos que o diálogo "Vincular a um registro" (NoteContextLinkDialog) pode oferecer —
+ * restrito aos que têm checagem real de existência em `entidadeReferenciadaExiste`
+ * (src/actions/NotasContexto.ts). Adicionar um módulo aqui sem o caso correspondente lá faria
+ * a busca sempre retornar vazio (fail-safe, nunca finge suporte que não existe).
+ */
+export const MODULOS_VINCULAVEIS: ModuloVinculavel[] = [
+  { moduleKey: "chamados", entityType: "chamado", label: "Chamados" },
+];
+
 export const CATEGORIAS: CategoriaItem[] = [
   { id: 'operacional', label: 'Operacional',    color: 'text-blue-400',    activeColor: 'bg-blue-500/10 border-blue-500/30',   iconName: 'Briefcase' },
   { id: 'comercial',   label: 'Comercial',      color: 'text-indigo-400',  activeColor: 'bg-indigo-500/10 border-indigo-500/30', iconName: 'TrendingUp' },

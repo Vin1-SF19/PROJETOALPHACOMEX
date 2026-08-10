@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
-import { Box, ImageIcon, Loader2, Music2, Plus, Search, Sparkles, Trash2, Upload } from "lucide-react";
+import { Box, Eraser, ImageIcon, Loader2, Music2, Plus, ScanLine, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ExcluirAssetApresentacao } from "@/actions/apresentacao-assets";
 import { assetApresentacaoSchema, formatarTamanhoAsset, type AssetApresentacao, type TipoAsset } from "@/lib/apresentacoes/assets";
-import { removerFundoPelasBordas } from "@/lib/apresentacoes/remover-fundo";
+import { criarContornoImagem, removerFundoPelasBordas } from "@/lib/apresentacoes/remover-fundo";
 
 interface BibliotecaAssetsProps {
   apresentacaoId: string;
@@ -51,6 +52,9 @@ export function BibliotecaAssets({ apresentacaoId, assets, onAssetsChange, onIns
   const [enviando, setEnviando] = useState(false);
   const [processandoId, setProcessandoId] = useState<string | null>(null);
   const [tolerancia, setTolerancia] = useState(42);
+  const [corContorno, setCorContorno] = useState("#ffffff");
+  const [espessuraContorno, setEspessuraContorno] = useState(8);
+  const [assetProcessar, setAssetProcessar] = useState<AssetApresentacao | null>(null);
   const [assetExcluir, setAssetExcluir] = useState<AssetApresentacao | null>(null);
 
   const filtrados = useMemo(() => assets.filter((asset) => {
@@ -74,16 +78,20 @@ export function BibliotecaAssets({ apresentacaoId, assets, onAssetsChange, onIns
     }
   }
 
-  async function handleRemoverFundo(asset: AssetApresentacao) {
+  async function handleProcessarImagem(asset: AssetApresentacao, acao: "remover-fundo" | "criar-contorno") {
     setProcessandoId(asset.id);
     try {
-      const blob = await removerFundoPelasBordas(asset.url, tolerancia);
+      const blob = acao === "remover-fundo"
+        ? await removerFundoPelasBordas(asset.url, tolerancia)
+        : await criarContornoImagem(asset.url, tolerancia, { cor: corContorno, espessura: espessuraContorno });
       const nomeBase = asset.nomeOriginal.replace(/\.[^.]+$/, "");
-      const novo = await enviarArquivo(apresentacaoId, new File([blob], `${nomeBase}-sem-fundo.png`, { type: "image/png" }));
+      const sufixo = acao === "remover-fundo" ? "sem-fundo" : "com-contorno";
+      const novo = await enviarArquivo(apresentacaoId, new File([blob], `${nomeBase}-${sufixo}.png`, { type: "image/png" }));
       onAssetsChange([novo, ...assets]);
-      toast.success("PNG transparente criado e salvo na biblioteca.");
+      toast.success(acao === "remover-fundo" ? "PNG transparente criado e salvo na biblioteca." : "PNG com contorno criado e salvo na biblioteca.");
+      setAssetProcessar(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível remover o fundo.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível processar a imagem.");
     } finally {
       setProcessandoId(null);
     }
@@ -134,7 +142,7 @@ export function BibliotecaAssets({ apresentacaoId, assets, onAssetsChange, onIns
                   <div><p className="truncate text-xs font-medium text-slate-200" title={asset.nomeOriginal}>{asset.nomeOriginal}</p><p className="mt-0.5 text-[10px] text-slate-500">{formatarTamanhoAsset(asset.tamanhoBytes)}</p></div>
                   <div className="flex gap-1.5">
                     <button onClick={() => onInsert(asset)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-600/90 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-500"><Plus size={12} /> Inserir</button>
-                    {asset.tipo === "IMAGEM" && <button onClick={() => void handleRemoverFundo(asset)} disabled={processandoId !== null} aria-label={`Remover fundo de ${asset.nomeOriginal}`} title="Remover fundo" className="rounded-lg border border-white/10 p-1.5 text-slate-400 hover:text-white disabled:opacity-50">{processandoId === asset.id ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}</button>}
+                    {asset.tipo === "IMAGEM" && <button onClick={() => setAssetProcessar(asset)} disabled={processandoId !== null} aria-label={`Processar ${asset.nomeOriginal}`} title="Remover fundo ou criar contorno" className="rounded-lg border border-white/10 p-1.5 text-slate-400 hover:text-white disabled:opacity-50">{processandoId === asset.id ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}</button>}
                     <button onClick={() => setAssetExcluir(asset)} aria-label={`Excluir ${asset.nomeOriginal}`} className="rounded-lg border border-white/10 p-1.5 text-slate-500 hover:border-red-500/30 hover:text-red-400"><Trash2 size={13} /></button>
                   </div>
                 </div>
@@ -147,6 +155,20 @@ export function BibliotecaAssets({ apresentacaoId, assets, onAssetsChange, onIns
       <AlertDialog open={assetExcluir !== null} onOpenChange={(open) => !open && setAssetExcluir(null)}>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Excluir arquivo da biblioteca?</AlertDialogTitle><AlertDialogDescription>O arquivo será apagado permanentemente. A exclusão será bloqueada se ele ainda estiver em uso em algum slide.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => void confirmarExclusao()} className="bg-red-600 hover:bg-red-500">Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={assetProcessar !== null} onOpenChange={(open) => !open && setAssetProcessar(null)}>
+        <DialogContent className="border-white/10 bg-slate-950 text-white sm:max-w-lg">
+          <DialogHeader><DialogTitle>Processar imagem</DialogTitle><DialogDescription className="text-slate-400">O original será preservado e o resultado ficará salvo como um novo PNG.</DialogDescription></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button type="button" disabled={!assetProcessar || processandoId !== null} onClick={() => assetProcessar && void handleProcessarImagem(assetProcessar, "remover-fundo")} className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 text-left hover:border-indigo-400/40 hover:bg-indigo-500/10 disabled:opacity-50"><Eraser size={20} className="mb-3 text-indigo-300" /><strong className="block text-sm">Remover fundo</strong><span className="mt-1 block text-xs leading-5 text-slate-500">Torna transparente o fundo conectado às bordas.</span></button>
+            <button type="button" disabled={!assetProcessar || processandoId !== null} onClick={() => assetProcessar && void handleProcessarImagem(assetProcessar, "criar-contorno")} className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 text-left hover:border-sky-400/40 hover:bg-sky-500/10 disabled:opacity-50"><ScanLine size={20} className="mb-3 text-sky-300" /><strong className="block text-sm">Criar contorno</strong><span className="mt-1 block text-xs leading-5 text-slate-500">Remove o fundo e adiciona uma borda ao redor da silhueta.</span></button>
+          </div>
+          <div className="grid gap-3 rounded-xl border border-white/10 bg-slate-900/40 p-3 sm:grid-cols-2">
+            <label className="text-xs text-slate-400">Cor do contorno<div className="mt-1 flex gap-2"><input type="color" value={corContorno} onChange={(event) => setCorContorno(event.target.value)} className="h-9 w-12 rounded border border-white/10 bg-transparent" /><input value={corContorno} onChange={(event) => setCorContorno(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-950 px-2 text-xs text-white" /></div></label>
+            <label className="text-xs text-slate-400">Espessura: {espessuraContorno}px<input type="range" min={1} max={32} value={espessuraContorno} onChange={(event) => setEspessuraContorno(Number(event.target.value))} className="mt-3 w-full accent-sky-500" /></label>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

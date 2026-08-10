@@ -5,7 +5,7 @@ import { vincularContextoSchema, removerContextoSchema, type VincularContextoInp
 import { podeEditarNota, podeVisualizarNota } from "@/lib/notas/permissoes";
 import { isAdminRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
-import { MODULOS_REGISTRY } from "@/lib/modulos-registry";
+import { MODULOS_REGISTRY, MODULOS_VINCULAVEIS } from "@/lib/modulos-registry";
 
 async function sessaoUsuario() {
   const session = await auth();
@@ -130,6 +130,54 @@ export async function ObterContagemNotasContexto({ moduleKey, entityType, entity
     temFixada: visiveis.some((n) => n.isPinned),
     ultimaAtualizacao: visiveis.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0]?.updatedAt ?? null,
   };
+}
+
+interface RegistroVinculavel {
+  entityId: string;
+  displayName: string;
+  internalPath: string;
+}
+
+export async function BuscarRegistrosVinculaveis(input: { moduleKey: string; query: string }) {
+  const usuario = await sessaoUsuario();
+  if (!usuario) return { success: false as const, error: "Não autorizado", data: [] };
+
+  const moduloVinculavel = MODULOS_VINCULAVEIS.find((m) => m.moduleKey === input.moduleKey);
+  if (!moduloVinculavel) return { success: false as const, error: "Módulo desconhecido", data: [] };
+
+  const modulo = MODULOS_REGISTRY.find((m) => m.id === input.moduleKey);
+  if (!modulo) return { success: false as const, error: "Módulo desconhecido", data: [] };
+  if (!isAdminRole(usuario.role) && modulo.permission) {
+    const permissoes = await getPermissoesEfetivas(usuario.id);
+    if (!permissoes.includes(modulo.permission)) {
+      return { success: false as const, error: "Sem permissão para consultar este módulo", data: [] };
+    }
+  }
+
+  const query = input.query.trim();
+  if (query.length < 1) return { success: true as const, data: [] as RegistroVinculavel[] };
+
+  if (input.moduleKey === "chamados") {
+    const idNumerico = Number(query);
+    const chamados = await db.chamados.findMany({
+      where: Number.isSafeInteger(idNumerico)
+        ? { OR: [{ id: idNumerico }, { titulo: { contains: query } }] }
+        : { titulo: { contains: query } },
+      select: { id: true, titulo: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+    return {
+      success: true as const,
+      data: chamados.map((chamado) => ({
+        entityId: String(chamado.id),
+        displayName: `#${chamado.id} — ${chamado.titulo}`,
+        internalPath: "/PainelAlpha/Chamados",
+      })) as RegistroVinculavel[],
+    };
+  }
+
+  return { success: true as const, data: [] as RegistroVinculavel[] };
 }
 
 export async function ListarNotasDoContexto({ moduleKey, entityType, entityId }: ContagemContextoParams) {

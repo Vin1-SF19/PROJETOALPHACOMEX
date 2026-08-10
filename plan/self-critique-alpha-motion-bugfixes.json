@@ -1,0 +1,28 @@
+{
+  "subtaskId": "alpha-motion-bugfixes",
+  "critiquedAt": "2026-08-10T10:10:00-03:00",
+  "step5_5": {
+    "predictedBugs": [
+      "Editar somente o texto plano poderia manter richText como fonte dominante e ocultar a alteração; o sincronizador agora atualiza os dois formatos preservando os runs não alterados.",
+      "A animação legada poderia competir com a timeline nova e produzir sempre a mesma aparência; a fronteira compartilhada prioriza o modelo novo somente quando ele existe no elemento.",
+      "Animações de filhos dentro de containers poderiam desaparecer no player; animacaoConfig agora é propagada recursivamente pela árvore de componentes."
+    ],
+    "edgeCases": [
+      "Parágrafos adicionados, removidos ou vazios continuam editáveis e não descartam a formatação preservável.",
+      "Slides sem timeline nova continuam usando a animação legada sem mudança de comportamento.",
+      "Resize, rotação e fullscreen recalculam a escala do palco e o documento exportado não cria margens ou barras de rolagem."
+    ],
+    "errorHandlingReviewed": true,
+    "securityReviewed": true,
+    "passed": true
+  },
+  "step6": {
+    "followsExistingPatterns": true,
+    "noHardcodedSecrets": true,
+    "testsAdded": true,
+    "documentationUpdated": true,
+    "noConsoleLogsAdded": true,
+    "passed": true
+  },
+  "overall": "PASSED"
+}

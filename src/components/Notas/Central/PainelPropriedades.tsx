@@ -28,9 +28,10 @@ interface PainelPropriedadesProps {
   nota: NotaListada;
   usuarioAtualId: number;
   onAtualizado: () => void;
+  accent: string;
 }
 
-export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado }: PainelPropriedadesProps) {
+export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent }: PainelPropriedadesProps) {
   const [processando, setProcessando] = useState(false);
 
   async function toggleFixar() {
@@ -80,7 +81,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado }: Paine
   }
 
   return (
-    <div className="flex h-full w-64 shrink-0 flex-col gap-4 overflow-y-auto border-l border-white/5 p-4">
+    <div className="flex h-full w-64 shrink-0 flex-col gap-4 overflow-y-auto p-4">
       <div>
         <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-600">Ações</p>
         <div className="flex flex-col gap-1">
@@ -90,8 +91,9 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado }: Paine
             onClick={() => void toggleFixar()}
             className={cn(
               "flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs",
-              nota.isPinned ? "text-amber-300" : "text-slate-400 hover:bg-white/5",
+              !nota.isPinned && "text-slate-400 hover:bg-white/5",
             )}
+            style={nota.isPinned ? { color: `rgba(${accent},1)` } : undefined}
           >
             <Pin size={13} /> {nota.isPinned ? "Desafixar" : "Fixar"}
           </button>
@@ -101,8 +103,9 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado }: Paine
             onClick={() => void toggleFavorito()}
             className={cn(
               "flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs",
-              nota.isFavorite ? "text-amber-300" : "text-slate-400 hover:bg-white/5",
+              !nota.isFavorite && "text-slate-400 hover:bg-white/5",
             )}
+            style={nota.isFavorite ? { color: `rgba(${accent},1)` } : undefined}
           >
             <Star size={13} /> {nota.isFavorite ? "Remover dos favoritos" : "Favoritar"}
           </button>

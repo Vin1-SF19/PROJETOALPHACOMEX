@@ -1,0 +1,33 @@
+{
+  "subtaskId": "alpha-motion-fontes-locais",
+  "critiquedAt": "2026-08-10T14:40:00-03:00",
+  "step5_5": {
+    "predictedBugs": [
+      "Referências ao Google Fonts em runtime manteriam o defeito em redes bloqueadas; os imports remotos foram removidos do painel e do player.",
+      "Caminhos /fonts funcionariam no Next, mas quebrariam ao abrir o HTML exportado como arquivo local; o build do player converte cada WOFF2 em data URI.",
+      "Uma fonte ausente poderia gerar um bundle aparentemente válido com fallback silencioso; o build agora falha explicitamente quando o arquivo local não existe.",
+      "Baixar todos os subconjuntos e pesos aumentaria desnecessariamente o bundle; o provisionamento limita-se ao subconjunto latino e aos pesos 400/700 usados pelo editor."
+    ],
+    "edgeCases": [
+      "Fontes variáveis com faixa de peso, como 300 900, são mantidas quando cobrem 400 ou 700.",
+      "Famílias sem itálico ou peso 700 nativo continuam utilizáveis com síntese do navegador sem interromper o catálogo.",
+      "Arquivos menores que 1 KB são rejeitados pelo downloader como resposta inválida.",
+      "O player exportado é verificado contra referências residuais ao Google Fonts, gstatic ou /fonts/alpha-motion.",
+      "Caracteres acentuados do português estão incluídos no subconjunto latino baixado."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

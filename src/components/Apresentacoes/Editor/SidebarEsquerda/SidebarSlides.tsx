@@ -3,15 +3,16 @@
 import { useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import {
   DndContext,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   closestCenter,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Copy, Trash2, Pencil, Upload } from "lucide-react";
+import { Plus, Copy, Trash2, Pencil, Upload, ChevronDown, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import {
   AtualizarSlide,
@@ -76,9 +77,17 @@ function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplic
         ativo ? "border-indigo-500/40 bg-indigo-500/10 text-white" : "border-white/5 bg-slate-900/40 text-slate-400 hover:border-white/10"
       }`}
     >
-      <span {...attributes} {...listeners} className="cursor-grab select-none px-1 text-slate-600">
-        {ordem + 1}
-      </span>
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        aria-label={`Mover ${rotulo}`}
+        title="Arraste para reordenar"
+        className="flex cursor-grab touch-none items-center gap-0.5 px-1 text-slate-600 hover:text-white active:cursor-grabbing"
+      >
+        <GripVertical size={12} aria-hidden="true" />
+        <span>{ordem + 1}</span>
+      </button>
       {editando ? (
         <input
           autoFocus
@@ -129,9 +138,13 @@ export function SidebarSlides() {
   const [processando, setProcessando] = useState(false);
   const [arquivoPptxSelecionado, setArquivoPptxSelecionado] = useState<File | null>(null);
   const [modalPreImportarAberto, setModalPreImportarAberto] = useState(false);
+  const [gavetaAberta, setGavetaAberta] = useState(true);
   const inputPptxRef = useRef<HTMLInputElement>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   async function persistirSlideAtivoSeNecessario() {
     const maximoTentativas = 6;
@@ -339,13 +352,26 @@ export function SidebarSlides() {
     setSlides(reordenados);
 
     const res = await ReordenarSlides({ apresentacaoId, ordemIds: reordenados.map((s) => s.id) });
-    if (!res.success) toast.error("Erro ao salvar a nova ordem dos slides.");
+    if (!res.success) {
+      setSlides(slides);
+      toast.error("Erro ao salvar a nova ordem dos slides. A ordem anterior foi restaurada.");
+    }
   }
 
   return (
-    <div className="flex flex-col gap-2 p-4">
+    <div className="flex shrink-0 flex-col gap-2 p-4 pb-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Slides</h3>
+        <button
+          type="button"
+          onClick={() => setGavetaAberta((aberta) => !aberta)}
+          aria-expanded={gavetaAberta}
+          aria-controls="gaveta-slides-alpha-motion"
+          className="flex min-w-0 items-center gap-1.5 rounded py-1 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300"
+        >
+          <ChevronDown size={13} className={`shrink-0 transition-transform ${gavetaAberta ? "" : "-rotate-90"}`} aria-hidden="true" />
+          <span>Slides</span>
+          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] tabular-nums text-slate-600">{slides.length}</span>
+        </button>
         <div className="flex items-center gap-0.5">
           <input
             ref={inputPptxRef}
@@ -378,26 +404,30 @@ export function SidebarSlides() {
         </div>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={slides.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-1.5">
-            {slides.map((s) => (
-              <ItemSlide
-                key={s.id}
-                id={s.id}
-                ordem={s.ordem}
-                nome={s.nome}
-                ativo={s.id === slideAtivoId}
-                podeExcluir={slides.length > 1}
-                onSelecionar={() => handleSelecionar(s.id)}
-                onDuplicar={() => handleDuplicar(s.id)}
-                onExcluir={() => handleExcluir(s.id)}
-                onRenomear={(novoNome) => handleRenomear(s.id, novoNome)}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      {gavetaAberta && (
+        <div id="gaveta-slides-alpha-motion" className="max-h-[42dvh] min-h-0 overflow-y-auto pr-1">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={slides.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-1.5">
+                {slides.map((s) => (
+                  <ItemSlide
+                    key={s.id}
+                    id={s.id}
+                    ordem={s.ordem}
+                    nome={s.nome}
+                    ativo={s.id === slideAtivoId}
+                    podeExcluir={slides.length > 1}
+                    onSelecionar={() => handleSelecionar(s.id)}
+                    onDuplicar={() => handleDuplicar(s.id)}
+                    onExcluir={() => handleExcluir(s.id)}
+                    onRenomear={(novoNome) => handleRenomear(s.id, novoNome)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </div>
+      )}
 
       {apresentacaoId && (
         <ModalPreImportarPptx

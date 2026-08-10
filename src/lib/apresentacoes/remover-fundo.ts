@@ -79,3 +79,57 @@ export async function removerFundoPelasBordas(url: string, tolerancia: number): 
     canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Falha ao gerar o PNG transparente.")), "image/png");
   });
 }
+
+export function gerarOffsetsContorno(espessura: number, amostras = 24): Array<{ x: number; y: number }> {
+  const raio = Math.max(1, Math.min(32, Math.round(espessura)));
+  const quantidade = Math.max(8, Math.min(64, Math.round(amostras)));
+  const unicos = new Map<string, { x: number; y: number }>();
+  for (let indice = 0; indice < quantidade; indice += 1) {
+    const angulo = (indice / quantidade) * Math.PI * 2;
+    const x = Math.round(Math.cos(angulo) * raio);
+    const y = Math.round(Math.sin(angulo) * raio);
+    unicos.set(`${x}:${y}`, { x, y });
+  }
+  return [...unicos.values()];
+}
+
+/** Remove o fundo conectado às bordas e cria um contorno sólido ao redor da silhueta. */
+export async function criarContornoImagem(
+  url: string,
+  tolerancia: number,
+  opcoes?: { cor?: string; espessura?: number },
+): Promise<Blob> {
+  const transparente = await removerFundoPelasBordas(url, tolerancia);
+  const urlTemporaria = URL.createObjectURL(transparente);
+  try {
+    const imagem = await carregarImagem(urlTemporaria);
+    const espessura = Math.max(1, Math.min(32, Math.round(opcoes?.espessura ?? 8)));
+    const cor = /^#[0-9a-f]{6}$/i.test(opcoes?.cor ?? "") ? opcoes?.cor ?? "#ffffff" : "#ffffff";
+
+    const mascara = document.createElement("canvas");
+    mascara.width = imagem.naturalWidth;
+    mascara.height = imagem.naturalHeight;
+    const contextoMascara = mascara.getContext("2d");
+    if (!contextoMascara) throw new Error("Seu navegador não disponibilizou o processador de imagem.");
+    contextoMascara.drawImage(imagem, 0, 0);
+    contextoMascara.globalCompositeOperation = "source-in";
+    contextoMascara.fillStyle = cor;
+    contextoMascara.fillRect(0, 0, mascara.width, mascara.height);
+
+    const saida = document.createElement("canvas");
+    saida.width = imagem.naturalWidth + espessura * 2;
+    saida.height = imagem.naturalHeight + espessura * 2;
+    const contextoSaida = saida.getContext("2d");
+    if (!contextoSaida) throw new Error("Seu navegador não disponibilizou o processador de imagem.");
+    for (const offset of gerarOffsetsContorno(espessura)) {
+      contextoSaida.drawImage(mascara, espessura + offset.x, espessura + offset.y);
+    }
+    contextoSaida.drawImage(imagem, espessura, espessura);
+
+    return await new Promise((resolve, reject) => {
+      saida.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Falha ao gerar o PNG com contorno.")), "image/png");
+    });
+  } finally {
+    URL.revokeObjectURL(urlTemporaria);
+  }
+}

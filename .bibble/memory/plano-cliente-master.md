@@ -28,7 +28,7 @@ Dado cadastral puro da empresa — o que é **igual e reaproveitável** em qualq
 ```prisma
 model Cliente {
   id                  Int      @id @default(autoincrement())
-  cnpj                String   @unique               // ÚNICO de verdade — sem composição com outro campo. 14 chars, A-Z0-9 sem pontuação (CNPJ alfanumérico, RFB jul/2026 — ver decisão da pergunta 1)
+  cnpj                String?  @unique               // nullable — empresa "em constituição" sem CNPJ ainda (decisão da pergunta 11, achado real na Fase 1). 14 chars, A-Z0-9 sem pontuação quando preenchido (CNPJ alfanumérico, RFB jul/2026 — pergunta 1)
   razaoSocial         String
   nomeFantasia        String?
   dataConstituicao    String?                          // mantém String (padrão já usado no projeto todo — nunca DateTime pra esse campo)
@@ -241,6 +241,11 @@ Nada disto é assumido silenciosamente — cada item aqui é uma pergunta real q
     - `PessoaClienteVinculo` continua sendo o vínculo Pessoa↔Cliente (empresa). Precisa de um **novo model irmão, `PessoaParceiroVinculo`** (Pessoa↔Parceiro), já que os campos de contexto são diferentes (`ParceiroResponsavel` tem `cpf`/`dataNascimento` obrigatórios + `cargo` opcional; `ParceiroRepresentante` tem `tipo`/`documento`/`nome`/`dataNascimento`/`cargo`/`email`/`telefone` — **`ParceiroResponsavel` HOJE NÃO TEM CAMPO DE TELEFONE** — ver risco novo abaixo).
     - **Risco novo, não previsto na versão anterior do plano:** `ParceiroResponsavel` (`src/prisma/schema.prisma`, `model ParceiroResponsavel`) não captura telefone hoje — só `nome`/`cpf`/`dataNascimento`/`cargo`. Como `Pessoa.celular` é a chave obrigatória, **todo responsável de parceiro legado cai automaticamente na categoria "sem celular" da pergunta 8** — nenhum vira `Pessoa` no backfill automático até alguém coletar o telefone. Isso pode ser um volume maior do que os sócios sem telefone (lá pelo menos o campo existe, mesmo que vazio às vezes; aqui o campo nunca existiu). A Fase 1 precisa dimensionar isso separadamente e o formulário de cadastro de responsável de parceiro (`ModalConvidarParceiro.tsx`/wizard de convite) precisa ganhar um campo de celular obrigatório novo, o que é uma mudança de UI adicional fora do que este plano cobria originalmente.
     - Este item também deve ser cruzado com o Vault: `ParceiroResponsavel.cpf`/`ParceiroRepresentante.documento` são dados de PF mais sensíveis que os de `socios` hoje — convergir para um cadastro único aumenta a superfície de dado pessoal concentrado em `Pessoa`, o que é exatamente o tipo de mudança que Anubis deve revisar explicitamente na Fase 3 (LGPD/exposição de dado).
+11. ~~**Empresa "em constituição" sem CNPJ real — como `Cliente.cnpj @unique` suporta isso?**~~ **RESPONDIDO (2026-08-10): opção (a), `cnpj String? @unique` (nullable).** "Não tem CNPJ ainda" é `NULL`, não um valor fake — já refletido no `model Cliente` da seção 2.1. Nenhum sentinela artificial (`"PENDENTE-{id}"`) é usado. **Consequências diretas para a Fase 2:**
+    - **SQLite (e por extensão o Turso/libSQL) não considera múltiplos `NULL` como colisão de `UNIQUE`** — cada `NULL` é tratado como distinto dos demais nessa constraint, então N empresas "em constituição" simultâneas (`cnpj = NULL`) convivem sem erro. Isso é o comportamento padrão do motor, não uma configuração a fazer.
+    - **Script de backfill (Fase 2, item 3) precisa de uma regra explícita de saneamento**: qualquer `clientes.cnpj` igual a `"00000000000000"` (ou outro padrão claramente inválido — todos dígitos iguais, por exemplo) vira `Cliente.cnpj = NULL` no backfill, **nunca** é copiado literalmente. Script deve logar cada caso convertido para o usuário revisar (hoje só há 1 caso confirmado, `clientes.id=277`, mas o backfill deve tratar isso como regra, não como exceção hardcoded de 1 `id` só).
+    - **Toda tela/action que hoje assume que `cliente.cnpj` sempre existe** (buscas por CNPJ, `verificarCNPJDuplicado`, exportações, `formatCnpj` na exibição) precisa tratar `null` explicitamente — mesmo padrão de resiliência já usado no projeto para `Transacao.data` nullable (ver `decisions.md`, 2026-07-09): nunca assumir presença, exibir algo como "CNPJ pendente" quando `null`.
+    - **`ClienteServico`/demais tabelas satélite que hoje buscam por CNPJ para achar a empresa** (ex: `ObterDadosEmpresaCardBpm`, adapters de Comissões) precisam de um caminho alternativo para empresas sem CNPJ — na prática, sempre navegar pelo `Cliente.id`/FK real em vez de por CNPJ nesses casos, o que já é a direção geral do plano (FK real em vez de string), então não é uma exceção nova de arquitetura, só uma confirmação de que o caminho por CNPJ nunca pode ser o único.
 
 ---
 
@@ -248,8 +253,8 @@ Nada disto é assumido silenciosamente — cada item aqui é uma pergunta real q
 
 Cada fase abaixo é um agente por vez, relatório obrigatório antes de avançar, seguindo `bibble/SKILL.md`. Migrations reais em produção SEMPRE passam por Vault + backup fresco + confirmação explícita, sem exceção — mesmo as classificadas 🟢.
 
-### Fase 0 — Confirmação das decisões pendentes (usuário, sem código)
-Responder as 10 perguntas da seção 4. Sem isso, a Fase 1 não começa — evita retrabalho de schema no meio do caminho.
+### Fase 0 — Confirmação das decisões pendentes (usuário, sem código) — ✅ CONCLUÍDA (2026-08-10)
+Todas as 11 perguntas da seção 4 respondidas (10 em 2026-08-08; a 11ª, nascida do achado real da Fase 1, em 2026-08-10). Fase 2 liberada.
 
 ### Fase 1 — Auditoria de dado real (Vault + DataEngineer, só leitura no Turso)
 1. Rodar query no Turso real contando: quantos CNPJs distintos existem em `clientes` hoje vs quantas linhas (mede o tamanho real da duplicação por serviço).
@@ -264,6 +269,27 @@ Responder as 10 perguntas da seção 4. Sem isso, a Fase 1 não começa — evit
 8. **Backup completo do Turso** dedicado a esta auditoria antes de qualquer query de escrita futura — mesmo Fase 1 sendo só leitura, já deixa o backup pronto para a Fase 2.
 
 Relatório da Fase 1 vira input direto do schema final da Fase 2 (pode ajustar nullable/not-null das FKs conforme o dado real, não a suposição).
+
+### Fase 1 — RESULTADO (executado em 2026-08-10, Vault aprovou após backup fresco em `database-backups/pre-change/painelalpha_turso_pre_change_auditoria-cliente-master_2026-08-10T16-38-24-483Z.sql`, 168 tabelas, 33.117 linhas)
+
+| # | Item | Resultado |
+|---|---|---|
+| 1 | CNPJs distintos vs linhas em `clientes` | 254 linhas, **253 CNPJs distintos** — só 1 CNPJ duplicado por serviço hoje (bem menor do que o plano supunha). |
+| 2 | Formato de CNPJ (7 tabelas) | **100% consistente**: `clientes`, `contratos_comerciais`, `Extratos`, `ConsultaPreAnalise`, `consultas_radar` (23.358 linhas!), `radar_fiscal`, `operacional_clientes` — todas com CNPJ **14 dígitos, só números, sem pontuação**, sem outlier de comprimento. Nenhuma máscara salva em produção. **O CNPJ alfanumérico (pergunta 1) ainda não apareceu no dado real** — normalização para 14 chars A-Z0-9 continua sendo a decisão correta para o futuro, mas hoje a migração em si não vai encontrar nenhum caso alfanumérico para tratar. |
+| — | **Achado novo, não previsto:** `clientes.id=277`, `cnpj="00000000000000"`, `razaoSocial="Em constituição"` | **Caso de negócio real e legítimo**: empresa nova cujo CNPJ ainda não existe (em processo de abertura), cadastrada com CNPJ zerado como placeholder para não travar o fluxo de trabalho comercial/CS&NPS. **Isto quebra a suposição de `cnpj String @unique` sozinho** — se houver 2+ empresas "em constituição" simultaneamente, `00000000000000` colide. Decisão pendente nova (ver seção 4, pergunta 11): `Cliente.cnpj` precisa aceitar um estado "ainda não tem CNPJ" sem violar unicidade — provavelmente `cnpj String? @unique` (nullable) com um identificador interno separado para o registro "em constituição", ou um valor sentinela único por linha (`PENDENTE-{id}`) em vez de zeros fixos. **Bloqueante para o schema final da Fase 2.** |
+| 3 | Contratos sem `Cliente` correspondente | 81 CNPJs distintos em `contratos_comerciais`, **18 sem correspondência em `clientes`** (~22%) — volume real e não-trivial de `Cliente`s que nasceriam automaticamente com a decisão da pergunta 5 (FK obrigatória, criar no ato). |
+| 4 | Operacional sem `Cliente` correspondente | 4 CNPJs distintos em `operacional_clientes`, **3 sem correspondência** (75% do módulo) — confirma que a decisão da pergunta 4 (FK obrigatória) vai gerar `Cliente` novo para a maioria das empresas do Operacional hoje. Volume baixo em termos absolutos (só 4 empresas no módulo inteiro), risco de execução baixo. |
+| 5 | `CommissionEvent` com `clienteId` órfão | **0 órfãos** de 274 linhas — ótima notícia, nenhum saneamento necessário aqui. 4 linhas com `clienteId` `NULL` (esperado — eventos sem cliente resolvido). `BusinessProcess`/`EligibilityOverride` confirmados vazios (0 linhas cada). |
+| 6 | Divergência de razão social `clientes` × `contratos_comerciais` | 65 CNPJs presentes em ambos, **1 divergência** ("FORTY SIX ADMINISTRACAO, IMPORTACAO E COMERCIO LTDA" vs "forty six administradora de bens ltda" — nome da empresa parece ter mudado de ramo/redação entre o cadastro dos dois módulos). Volume desprezível — a Fase 3.6 pode tratar como exceção manual pontual, não precisa de heurística de desempate automática. |
+| 7 | `socios.telefone` — vazio e duplicidade | 377 sócios total, **174 sem telefone (46%)**, 191 telefones distintos preenchidos. **11 números duplicados entre sócios diferentes** — incluindo 1 caso real de 3 empresas distintas com o mesmo celular ("CELIO"/"Célio"/"Célio", clientes #24/#77/#79 — quase certamente a mesma pessoa física, sócia/contato de 3 empresas ao mesmo tempo: **prova de campo exatamente do cenário que `Pessoa` global resolve**). Volume de duplicidade é pequeno (11 de 191, ~5.8%) — viável de resolver manualmente na Fase 2, não precisa de heurística automática de desambiguação. |
+| 8 | `parceiro_responsavel` | **0 linhas confirmadas** — tabela vazia na prática. Muda a leitura do risco 1 da seção 2.4a: não é "volume grande de saneamento manual", é **zero registros a migrar** — o model pode simplesmente não ter dado legado a tratar (só relevante para cadastros futuros, que já nascem exigindo celular). |
+| 9 | `parceiro_representante` — telefone/tipo | 28 total, **20 com telefone (71%), 8 sem (29%)** — bem menos pendência do que o pior cenário do plano. **100% são `tipo = "PF"`** — o risco 2 da seção 2.4a (representante PJ) não se aplica no dado atual; a decisão "só PF converge" fica vazia de exceção real hoje (mas continua valendo como regra para o futuro). Cruzamento de telefone contra `socios`: **0 coincidências** — nenhuma pessoa hoje é sócia de uma empresa E representante de um parceiro ao mesmo tempo (diferente do que a auditoria de sócios já provou entre empresas diferentes). |
+
+**Conclusões que mudam o plano:**
+1. **CNPJ está mais limpo do que o previsto** — a Fase 2 não precisa de lógica de deduplicação por máscara/formato. A única exceção real é o CNPJ placeholder "em constituição" (nova pergunta 11, bloqueante).
+2. **Volume de "Clientes órfãos que nascem no backfill"**: 18 (Metas) + 3 (Operacional) = pelo menos 21 `Cliente`s novos só por essas duas fontes, antes mesmo de contar o resto. Não é alarmante, mas o usuário deve saber que o `Cliente` master não nasce só com as 253 empresas de hoje.
+3. **Duplicidade de celular existe e é real (11 casos), mas é pequena e gerenciável** — não bloqueia a Fase 2, mas exige que o script de backfill trate explicitamente "mesmo celular, sócio de 2+ empresas diferentes" como **o caso de sucesso esperado** (vira 1 `Pessoa` com N `PessoaClienteVinculo`), não como erro.
+4. **`parceiro_responsavel` vazio simplifica bastante a Fase 3.1** — não há dado legado para saneamento manual coletivo, só a mudança de formulário para cadastros futuros continua necessária.
 
 ### Fase 2 — Schema novo em paralelo (Echo + DataEngineer, sem migration real ainda)
 1. Criar `model Cliente`, `model ClienteServico`, `model Pessoa`, `model PessoaClienteVinculo`, `model PessoaParceiroVinculo` (e `ClienteServicoLogCs`/`ClienteServicoLogFeedback`/`ClienteServicoHistorico`, já decidido no nível `ClienteServico` — pergunta 2) no `schema.prisma`, **sem remover ainda os models antigos** (`clientes`/`socios`/`ParceiroResponsavel`/`ParceiroRepresentante` continuam existindo em paralelo por enquanto — migração incremental, não big-bang).
@@ -321,7 +347,7 @@ Para CADA módulo desta lista, o ciclo completo é:
 - Não inclui a decisão de qual código roda a migração real (script Node pontual via `@libsql/client/web`, seguindo o padrão já estabelecido no projeto — `prisma db push`/`migrate` não alcançam o Turso remoto, ver `decisions.md` 2026-07-06).
 - Não inclui cronograma de tempo/duração — cada fase é serial e só avança com aprovação explícita, sem prazo pré-definido.
 - Não assume qual módulo o usuário quer priorizar primeiro na Fase 3 além da ordem sugerida por risco — o usuário pode reordenar.
-- Não decide sozinho as 7 perguntas da seção 4 — são bloqueantes, não default silencioso.
+- Não decide sozinho as 11 perguntas da seção 4 — são bloqueantes, não default silencioso. **Todas as 11 estão respondidas** (9 pelo usuário em 2026-08-08; a pergunta 9 respondida pela própria Fase 1 em 2026-08-10 com dado real: 11 duplicidades de 191 celulares, volume pequeno e gerenciável; a pergunta 11, nascida do achado real da Fase 1, respondida pelo usuário em 2026-08-10: `cnpj` nullable). **Fase 0 concluída — plano liberado para a Fase 2 (schema novo em paralelo).**
 
 ---
 

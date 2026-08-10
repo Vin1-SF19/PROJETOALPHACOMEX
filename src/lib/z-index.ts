@@ -17,12 +17,15 @@
 export const Z_INDEX = {
   /** Conteúdo principal da página (iframe de módulo, etc). */
   conteudoPrincipal: 0,
-  /** Header/sidebar do painel. */
+  /** Barra global inferior de notas (NotesGlobalTaskbar) — SEMPRE abaixo da sidebar (z-50 real
+   *  em GlobalSidebar.tsx), nunca sobrepõe. A barra só ocupa a faixa à direita da sidebar por
+   *  posicionamento (`left`), mas o z-index menor é uma segunda camada de garantia contra
+   *  qualquer sobreposição visual durante transições/redimensionamento. */
+  barraNotas: 30,
+  /** Header/sidebar do painel — replica o z-50 real usado em GlobalSidebar.tsx. */
   headerSidebar: 50,
-  /** Barra global inferior de notas (NotesGlobalTaskbar), sempre visível. */
-  barraNotas: 100,
   /** Visualizador/editor de nota expandido acima da barra. */
-  editorNotas: 110,
+  editorNotas: 60,
   /** Dropdowns e popovers (menu de contexto da aba, menu "ver todas as notas"). */
   dropdown: 150,
   /** Modais e diálogos (NoteShareDialog, NoteHistoryDialog, AlertDialog de confirmação). */

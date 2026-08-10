@@ -5,6 +5,7 @@ import { ModoApresentacaoClient } from "@/components/Apresentacoes/ModoApresenta
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
 import { isAdminRole } from "@/lib/roles";
+import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ export default async function ModoApresentacaoPage({
     transicaoEntrada: s.transicaoEntrada,
     componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
     canvas: obterCanvasSeguro((s.dadosJson as { canvas?: CanvasConfig } | null)?.canvas),
+    animacaoConfig: (s.dadosJson as { animacaoConfig?: SlideAnimationConfig } | null)?.animacaoConfig,
   }));
 
   return (

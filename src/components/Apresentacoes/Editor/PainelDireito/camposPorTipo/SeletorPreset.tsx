@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Wand2 } from "lucide-react";
 import { useEditorStore } from "../../store/useEditorStore";
-import { PRESETS_ANIMACAO_COMPLETOS, type PresetAnimacaoCompletoId } from "@/lib/apresentacoes/animacao/presets-completos";
 import type { ElementAnimation } from "@/lib/apresentacoes/animacao/tipos";
+import { listarPresetsAnimacaoDisponiveis } from "@/lib/apresentacoes/animacao/presets-personalizados";
+import { usePresetsAnimacao } from "../../PresetsAnimacaoContext";
 
 interface SeletorPresetProps {
   elementoId: string;
@@ -16,12 +17,16 @@ interface SeletorPresetProps {
  * comuns na timeline, editáveis normalmente via `AnimacaoItemForm`.
  */
 export function SeletorPreset({ elementoId }: SeletorPresetProps) {
-  const [presetSelecionado, setPresetSelecionado] = useState<PresetAnimacaoCompletoId | "">("");
+  const [presetSelecionado, setPresetSelecionado] = useState("");
   const adicionarAnimacaoElemento = useEditorStore((s) => s.adicionarAnimacaoElemento);
+  const { presetsPersonalizados } = usePresetsAnimacao();
+  const presetsDisponiveis = listarPresetsAnimacaoDisponiveis(presetsPersonalizados);
+  const presetAtivo = presetsDisponiveis.find((preset) => preset.id === presetSelecionado);
 
-  function aplicarPreset(id: PresetAnimacaoCompletoId) {
-    const parciais = PRESETS_ANIMACAO_COMPLETOS[id].criar();
-    for (const parcial of parciais) {
+  function aplicarPreset(id: string) {
+    const preset = presetsDisponiveis.find((item) => item.id === id);
+    if (!preset) return;
+    for (const parcial of preset.animacoes) {
       const animacao: ElementAnimation = { ...parcial, id: `anim-${crypto.randomUUID()}`, elementId: elementoId };
       adicionarAnimacaoElemento(animacao);
     }
@@ -39,21 +44,21 @@ export function SeletorPreset({ elementoId }: SeletorPresetProps) {
         id={`preset-${elementoId}`}
         value={presetSelecionado}
         onChange={(e) => {
-          const id = e.target.value as PresetAnimacaoCompletoId | "";
+          const id = e.target.value;
           setPresetSelecionado(id);
           if (id) aplicarPreset(id);
         }}
         className="w-full rounded-md border border-white/10 bg-slate-950 px-2 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
       >
         <option value="">Escolher preset...</option>
-        {Object.entries(PRESETS_ANIMACAO_COMPLETOS).map(([id, preset]) => (
-          <option key={id} value={id}>
-            {preset.nome}
+        {presetsDisponiveis.map((preset) => (
+          <option key={preset.id} value={preset.id}>
+            {preset.nome}{preset.origem === "personalizado" ? " — personalizado" : ""}
           </option>
         ))}
       </select>
-      {presetSelecionado && (
-        <p className="text-[10px] text-slate-500">{PRESETS_ANIMACAO_COMPLETOS[presetSelecionado].descricao}</p>
+      {presetAtivo && (
+        <p className="text-[10px] text-slate-500">{presetAtivo.descricao}</p>
       )}
     </div>
   );

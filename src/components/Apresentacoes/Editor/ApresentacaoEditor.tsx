@@ -20,6 +20,9 @@ import type { CanvasConfig } from "@/lib/apresentacoes/canvas";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import type { AssetApresentacao } from "@/lib/apresentacoes/assets";
 import { desbloquearAudioContainer } from "@/lib/apresentacoes/container-carga-audio";
+import type { PresetAnimacaoPersonalizado } from "@/lib/apresentacoes/animacao/presets-personalizados";
+import { PresetsAnimacaoProvider } from "./PresetsAnimacaoContext";
+import { EditorKeyboardShortcuts } from "./EditorKeyboardShortcuts";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -34,6 +37,8 @@ export interface TemaResumo {
 interface ApresentacaoEditorProps {
   apresentacaoId: string;
   titulo: string;
+  slugPublicoInicial: string | null;
+  presetsAnimacaoIniciais: PresetAnimacaoPersonalizado[];
   slidesIniciais: SlideResumo[];
   slideAtivoIdInicial: string;
   componentesIniciais: ComponenteSlide[];
@@ -47,6 +52,8 @@ interface ApresentacaoEditorProps {
 export function ApresentacaoEditor({
   apresentacaoId,
   titulo,
+  slugPublicoInicial,
+  presetsAnimacaoIniciais,
   slidesIniciais,
   slideAtivoIdInicial,
   componentesIniciais,
@@ -154,52 +161,54 @@ export function ApresentacaoEditor({
     for (const c of componentesGerados) adicionarComponente(c);
   }
 
+  async function salvarAlteracoesPendentes(): Promise<void> {
+    const estado = useEditorStore.getState();
+    if (!estado.isDirty || !estado.slideAtivoId) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    const slideIdSnapshot = estado.slideAtivoId;
+    const versaoSnapshot = estado.versaoEdicao;
+    setSaving(true);
+    let sucesso = false;
+    let mensagemErro = "Não foi possível salvar o slide antes de continuar.";
+    try {
+      const res = await serializarPersistenciaSlide(slideIdSnapshot, () => AtualizarSlide({
+        id: slideIdSnapshot,
+        dadosJson: {
+          componentes: estado.componentes,
+          canvas: estado.canvas,
+          animacaoConfig: estado.animacaoConfig,
+        },
+        transicaoEntrada: estado.transicaoEntrada,
+      }));
+      sucesso = res.success;
+      if (!res.success && typeof res.error === "string") mensagemErro = res.error;
+    } catch {
+      mensagemErro = "Erro de conexão ao salvar o slide antes de continuar.";
+    } finally {
+      useEditorStore.getState().concluirSalvamento(slideIdSnapshot, versaoSnapshot, sucesso);
+    }
+    if (!sucesso) throw new Error(mensagemErro);
+  }
+
   function handleApresentar() {
     void desbloquearAudioContainer();
-
-    const slideIdSnapshot = slideAtivoId;
-    const componentesSnapshot = componentes;
-    const canvasSnapshot = canvas;
-    const animacaoConfigSnapshot = animacaoConfig;
-    const transicaoEntradaSnapshot = transicaoEntrada;
-    const versaoSnapshot = versaoEdicao;
-
-    // A prévia agora busca o HTML exportado (lido do banco), não mais o estado em memória do
-    // editor — por isso, se há alteração pendente, o salvamento precisa terminar ANTES da busca.
-    // ModalVisualizadorHtml espera essa promise (se houver) antes de chamar a rota de export.
-    salvamentoPendenteApresentarRef.current = slideIdSnapshot && isDirty
-      ? (async () => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        setSaving(true);
-        let sucesso = false;
-        try {
-          const res = await serializarPersistenciaSlide(slideIdSnapshot, () => AtualizarSlide({
-            id: slideIdSnapshot,
-            dadosJson: { componentes: componentesSnapshot, canvas: canvasSnapshot, animacaoConfig: animacaoConfigSnapshot },
-            transicaoEntrada: transicaoEntradaSnapshot,
-          }));
-          sucesso = res.success;
-          if (!res.success) {
-            toast.error(typeof res.error === "string" ? res.error : "Não deu pra salvar o slide antes de gerar a prévia.");
-          }
-        } catch {
-          toast.error("Erro de conexão ao salvar o slide antes de gerar a prévia.");
-        } finally {
-          useEditorStore.getState().concluirSalvamento(slideIdSnapshot, versaoSnapshot, sucesso);
-        }
-      })()
-      : null;
+    salvamentoPendenteApresentarRef.current = salvarAlteracoesPendentes();
 
     setModalApresentacaoAberto(true);
   }
 
   return (
+    <PresetsAnimacaoProvider apresentacaoId={apresentacaoId} presetsIniciais={presetsAnimacaoIniciais} aguardarAntesDeSalvar={salvarAlteracoesPendentes}>
     <ReducedMotionSimuladoProvider>
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[#020617] text-slate-200">
+        <EditorKeyboardShortcuts />
         <BarraSuperiorEditor
           titulo={titulo}
           apresentacaoId={apresentacaoId}
+          slugPublicoInicial={slugPublicoInicial}
+          aguardarAntesDeExportar={salvarAlteracoesPendentes}
           temaAtualId={tema?.id ?? null}
           onTemaAplicado={setTema}
           onSlideGeradoAplicado={handleSlideGeradoAplicado}
@@ -209,7 +218,7 @@ export function ApresentacaoEditor({
           temaAtual={tema}
         />
         <div className="flex flex-1 overflow-hidden">
-          <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-white/5 bg-slate-950/60">
+          <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-white/5 bg-slate-950/60">
             <SidebarSlides />
             <div className="h-px bg-white/5" />
             <SidebarComponentes />
@@ -235,5 +244,6 @@ export function ApresentacaoEditor({
       </div>
     </DndContext>
     </ReducedMotionSimuladoProvider>
+    </PresetsAnimacaoProvider>
   );
 }

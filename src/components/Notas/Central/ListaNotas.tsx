@@ -29,6 +29,7 @@ interface ListaNotasProps {
   totalPages: number;
   onMudarPage: (page: number) => void;
   carregando: boolean;
+  accent: string;
 }
 
 const OPCOES_ORDENACAO: { id: OrdenacaoNotas; label: string }[] = [
@@ -51,6 +52,7 @@ export function ListaNotas({
   totalPages,
   onMudarPage,
   carregando,
+  accent,
 }: ListaNotasProps) {
   return (
     <div className="flex h-full w-full max-w-sm shrink-0 flex-col border-r border-white/5">
@@ -73,19 +75,22 @@ export function ListaNotas({
         {carregando && <div className="px-3 py-4 text-xs text-slate-600">Carregando...</div>}
 
         {!carregando &&
-          notas.map((nota) => (
+          notas.map((nota) => {
+            const selecionada = nota.id === notaSelecionadaId;
+            return (
             <button
               key={nota.id}
               type="button"
               onClick={() => onSelecionar(nota.id)}
               className={cn(
-                "flex w-full flex-col gap-1 border-b border-white/5 px-3 py-2.5 text-left transition-colors",
-                nota.id === notaSelecionadaId ? "bg-amber-500/[0.08]" : "hover:bg-white/[0.03]",
+                "flex w-full flex-col gap-1 border-b border-white/5 border-l-2 px-3 py-2.5 text-left transition-colors",
+                !selecionada && "border-l-transparent hover:bg-white/[0.03]",
               )}
+              style={selecionada ? { background: `rgba(${accent},0.08)`, borderLeftColor: `rgba(${accent},1)` } : undefined}
             >
               <div className="flex items-center gap-1.5">
-                {nota.isPinned && <Pin size={10} className="shrink-0 text-amber-400" aria-label="Fixada" />}
-                {nota.isFavorite && <Star size={10} className="shrink-0 text-amber-400" aria-label="Favorita" />}
+                {nota.isPinned && <Pin size={10} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Fixada" />}
+                {nota.isFavorite && <Star size={10} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Favorita" />}
                 <span className="truncate text-sm font-medium text-slate-200">{nota.title || "Sem título"}</span>
               </div>
 
@@ -109,7 +114,8 @@ export function ListaNotas({
                 <span className="truncate text-[10px] text-indigo-400/80">{nota.contexts[0].displayName}</span>
               )}
             </button>
-          ))}
+            );
+          })}
 
         {!carregando && notas.length === 0 && (
           <div className="px-3 py-4 text-xs text-slate-600">Nenhuma nota nesta seção.</div>
