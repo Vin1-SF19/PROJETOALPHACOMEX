@@ -30,6 +30,7 @@ import { FundoAnimadoProps } from "./camposPorTipo/FundoAnimadoProps";
 import { AnimacaoProps } from "./camposPorTipo/AnimacaoProps";
 import { AnimacaoPropsV2 } from "./camposPorTipo/AnimacaoPropsV2";
 import { SharedElementIdInput } from "./camposPorTipo/SharedElementIdInput";
+import { ControleOpacidade } from "./ControleOpacidade";
 
 function buscarNaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide | null {
   for (const c of lista) {
@@ -50,6 +51,8 @@ export function PainelPropriedades() {
   const atualizarComponentes = useEditorStore((s) => s.atualizarComponentes);
   const removerComponentes = useEditorStore((s) => s.removerComponentes);
   const centralizarSelecionados = useEditorStore((s) => s.centralizarSelecionados);
+  const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
+  const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
 
   const componente = selecionadoId ? buscarNaArvore(componentes, selecionadoId) : null;
 
@@ -74,7 +77,14 @@ export function PainelPropriedades() {
     atualizarComponentes(Object.fromEntries(ids.map((id) => [id, { rotacao }])));
   }
 
+  function atualizarOpacidade(percentual: number) {
+    const opacidade = Math.min(100, Math.max(0, percentual)) / 100;
+    const ids = selecionadosIds.length > 0 ? selecionadosIds : [componente!.id];
+    atualizarComponentes(Object.fromEntries(ids.map((id) => [id, { opacidade }])));
+  }
+
   const ehFundo = componente.tipo === "fundoAnimado";
+  const opacidadePercentual = Math.round((componente.opacidade ?? 1) * 100);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
@@ -192,6 +202,15 @@ export function PainelPropriedades() {
       </div>
         </>
       )}
+
+      <ControleOpacidade
+        elementoId={componente.id}
+        percentual={opacidadePercentual}
+        quantidadeSelecionada={selecionadosIds.length}
+        onChange={atualizarOpacidade}
+        onIniciarAlteracao={iniciarTransacaoHistorico}
+        onFinalizarAlteracao={finalizarTransacaoHistorico}
+      />
 
       <div className="h-px bg-white/5" />
 

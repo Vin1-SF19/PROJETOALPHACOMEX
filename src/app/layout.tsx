@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "sonner";
@@ -10,6 +11,9 @@ import { NotificacaoFlutuante } from "@/components/NotificacaoFlutuante";
 import { Heartbeat } from "@/components/Heartbeat";
 import { ThemeSyncer } from "@/components/ThemeSyncer";
 import { PusherGlobal } from "@/components/PusherGlobal.tsx";
+
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Painel Alpha | Sistema de Gestão",
@@ -31,7 +35,7 @@ export default async function RootLayout({
       className="dark"
       style={{ "--alpha-primary": rgbPadrao } as React.CSSProperties}
     >
-      <body className="antialiased selection:bg-alpha/30">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-alpha/30`}>
         <SessionProvider session={session}>
           <ThemeSyncer />
           <Toaster theme="dark" position="top-right" richColors />

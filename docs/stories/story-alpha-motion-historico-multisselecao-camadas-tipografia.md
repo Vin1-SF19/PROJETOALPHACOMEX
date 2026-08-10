@@ -68,6 +68,8 @@ Ready for Review
 - [x] Permitir upload de WOFF2/WOFF/TTF/OTF com nome personalizado, persistência por apresentação e incorporação no HTML exportado.
 - [x] Transformar backgrounds em fundos fixos aplicados por clique, adicionar guias magnéticas e separar a centralização por eixo.
 - [x] Adicionar texto justificado, aplicação de efeitos em todos os elementos e liberar animações de interação e rolagem.
+- [x] Corrigir o alinhamento justificado para distribuir também a última ou única linha dentro do componente.
+- [x] Adicionar controle universal de opacidade com multisseleção e histórico transacional.
 
 ## Testing
 
@@ -87,6 +89,8 @@ Ready for Review
 | 2026-08-10 | 2.3 | Biblioteca de fontes personalizadas com upload seguro, nome livre, aplicação imediata e suporte aos players e exportação offline. | Dex |
 | 2026-08-10 | 2.4 | Background fixo selecionável apenas pela timeline, alinhamento magnético estilo Canva e centralização horizontal, vertical ou completa. | Codex |
 | 2026-08-10 | 2.5 | Texto justificado, aplicação de animação em lote, oito interações de hover/clique e efeitos de Scroll Reveal configuráveis. | Codex |
+| 2026-08-10 | 2.6 | Justificação distribuída corrigida para textos simples, parágrafos ricos, player e exportação. | Codex |
+| 2026-08-10 | 2.7 | Controle de opacidade de 0% a 100% para todos os elementos, fundos e multisseleção. | Codex |
 
 ## Dev Agent Record
 
@@ -126,6 +130,15 @@ GPT-5 Codex
 - Interação e texto: ESLint direcionado, `git diff --check`, `npx next build` (70 páginas) e `npm run build:player` aprovados.
 - Interação e texto: `npx tsc --noEmit` não apresentou falhas novas; permanecem somente as quatro falhas preexistentes já documentadas.
 - Interação e texto: `npm test` aprovou 1018/1019 testes; a única falha permaneceu o timeout preexistente de `tests/google-calendar/cli.test.ts`.
+- Correção do justificar: teste direcionado aprovado com 3/3 casos e ESLint direcionado sem erros ou avisos.
+- Correção do justificar: `npm test` aprovou 1019/1020 testes; permaneceu somente o timeout preexistente de `tests/google-calendar/cli.test.ts`.
+- Correção do justificar: `npx tsc --noEmit` não apresentou falhas novas; permanecem somente as quatro falhas preexistentes documentadas.
+- Correção do justificar: `npm run lint` global excedeu 180s; o lint dos arquivos alterados foi aprovado.
+- Correção do justificar: `npm run build` foi bloqueado no `prisma generate` pelo `EPERM` preexistente; `npm run build:player` e `npx next build` (70 páginas) foram aprovados.
+- Opacidade universal: 17/17 testes direcionados e ESLint do escopo aprovados, cobrindo controle visual, multisseleção, Undo/Redo e render no player/exportação.
+- Opacidade universal: `npm test` aprovou 1021/1022 testes; permaneceu somente o timeout preexistente de `tests/google-calendar/cli.test.ts`.
+- Opacidade universal: `npx tsc --noEmit` manteve somente as quatro falhas preexistentes e o lint global excedeu 180s; nenhum erro novo pertence ao escopo alterado.
+- Opacidade universal: `npm run build` foi bloqueado no `prisma generate` pelo `EPERM` preexistente; `npm run build:player` e `npx next build` (70 páginas) foram aprovados separadamente.
 
 ### Completion Notes List
 
@@ -143,6 +156,8 @@ GPT-5 Codex
 - O arraste de elementos exibe guias magnéticas para bordas e centros de outros elementos e do próprio slide, respeitando zoom, multisseleção e rotação visual.
 - O painel de propriedades oferece centralização horizontal, vertical e completa para elementos ou conjuntos selecionados.
 - O texto aceita alinhamento justificado no componente e nos parágrafos ricos; o importador PPTX preserva `justify` em vez de convertê-lo para esquerda.
+- O justificar agora usa distribuição completa também na última ou única linha, ocupando a largura do componente em textos simples e ricos.
+- O painel oferece opacidade de 0% a 100% para qualquer tipo de elemento, inclusive fundo; em multisseleção, o valor é aplicado ao grupo e um arraste inteiro ocupa somente uma etapa no histórico.
 - O seletor de efeitos oferece “Aplicar a todos”, incluindo elementos aninhados, sem duplicar o mesmo efeito e com uma única entrada no histórico.
 - A aba Interação oferece oito efeitos reais de hover/clique e os efeitos de clique podem ser repetidos a cada nova interação.
 - A aba Rolagem oferece 14 variações de entrada, limiar visível configurável e opção de executar uma vez ou repetir ao voltar.
@@ -176,6 +191,7 @@ GPT-5 Codex
 - `src/components/Apresentacoes/Editor/Canvas/GuiasAlinhamento.tsx`
 - `src/components/Apresentacoes/Editor/Canvas/useCanvasDragResize.ts`
 - `src/components/Apresentacoes/Editor/PainelDireito/PainelPropriedades.tsx`
+- `src/components/Apresentacoes/Editor/PainelDireito/ControleOpacidade.tsx`
 - `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/FundoAnimadoProps.tsx`
 - `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/AnimacaoItemForm.tsx`
 - `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/AnimacaoPropsV2.tsx`

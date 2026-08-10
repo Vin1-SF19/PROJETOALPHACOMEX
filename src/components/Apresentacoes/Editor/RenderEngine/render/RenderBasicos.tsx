@@ -82,44 +82,51 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
   const textoFinal = ehTyping ? textoTyping : ehCounter ? textoCounter : componente.texto;
 
   const vertical = componente.verticalAlign === "middle" ? "center" : componente.verticalAlign === "bottom" ? "flex-end" : "flex-start";
-  const richContent = componente.richText?.paragraphs.map((paragraph, paragraphIndex) => (
-    <span
-      key={paragraphIndex}
-      style={{
-        display: "block",
-        textAlign: paragraph.alignment ?? componente.alinhamento ?? "left",
-        marginLeft: paragraph.marginLeft,
-        textIndent: paragraph.indent,
-        lineHeight: paragraph.lineSpacing ? `${paragraph.lineSpacing}%` : undefined,
-        marginTop: paragraph.spaceBefore,
-        marginBottom: paragraph.spaceAfter,
-      }}
-    >
-      {paragraph.bullet ? `${paragraph.bullet} ` : paragraph.numbering ? `${(paragraph.numbering.startAt ?? 1) + paragraphIndex}. ` : null}
-      {paragraph.runs.map((run, runIndex) => {
-        const style: React.CSSProperties = {
-          fontFamily: pilhaCssDaFonte(run.fontFamily ?? componente.fontFamily),
-          fontSize: run.fontSize ?? componente.fontSize,
-          fontWeight: run.bold === undefined ? (componente.fontWeight === "bold" ? 700 : 400) : run.bold ? 700 : 400,
-          fontStyle: run.italic === undefined ? componente.fontStyle : run.italic ? "italic" : "normal",
-          textDecoration: [run.underline && run.underline !== "none" ? "underline" : "", run.strike && run.strike !== "noStrike" ? "line-through" : ""].filter(Boolean).join(" ") || undefined,
-          color: run.color ?? componente.corTexto ?? "#ffffff",
-          letterSpacing: run.tracking,
-          verticalAlign: run.baseline ? `${run.baseline / 1000}%` : undefined,
-          textTransform: run.caps === "all" ? "uppercase" : run.caps === "small" ? "lowercase" : undefined,
-        };
-        return <span key={runIndex} style={style}>{run.text}</span>;
-      })}
-      {paragraphIndex < (componente.richText?.paragraphs.length ?? 0) - 1 ? "\n" : null}
-    </span>
-  ));
+  const alinhamentoTexto = componente.alinhamento ?? "left";
+  const richContent = componente.richText?.paragraphs.map((paragraph, paragraphIndex) => {
+    const alinhamentoParagrafo = paragraph.alignment ?? alinhamentoTexto;
+
+    return (
+      <span
+        key={paragraphIndex}
+        style={{
+          display: "block",
+          width: "100%",
+          textAlign: alinhamentoParagrafo,
+          textAlignLast: alinhamentoParagrafo === "justify" ? "justify" : undefined,
+          marginLeft: paragraph.marginLeft,
+          textIndent: paragraph.indent,
+          lineHeight: paragraph.lineSpacing ? `${paragraph.lineSpacing}%` : undefined,
+          marginTop: paragraph.spaceBefore,
+          marginBottom: paragraph.spaceAfter,
+        }}
+      >
+        {paragraph.bullet ? `${paragraph.bullet} ` : paragraph.numbering ? `${(paragraph.numbering.startAt ?? 1) + paragraphIndex}. ` : null}
+        {paragraph.runs.map((run, runIndex) => {
+          const style: React.CSSProperties = {
+            fontFamily: pilhaCssDaFonte(run.fontFamily ?? componente.fontFamily),
+            fontSize: run.fontSize ?? componente.fontSize,
+            fontWeight: run.bold === undefined ? (componente.fontWeight === "bold" ? 700 : 400) : run.bold ? 700 : 400,
+            fontStyle: run.italic === undefined ? componente.fontStyle : run.italic ? "italic" : "normal",
+            textDecoration: [run.underline && run.underline !== "none" ? "underline" : "", run.strike && run.strike !== "noStrike" ? "line-through" : ""].filter(Boolean).join(" ") || undefined,
+            color: run.color ?? componente.corTexto ?? "#ffffff",
+            letterSpacing: run.tracking,
+            verticalAlign: run.baseline ? `${run.baseline / 1000}%` : undefined,
+            textTransform: run.caps === "all" ? "uppercase" : run.caps === "small" ? "lowercase" : undefined,
+          };
+          return <span key={runIndex} style={style}>{run.text}</span>;
+        })}
+        {paragraphIndex < (componente.richText?.paragraphs.length ?? 0) - 1 ? "\n" : null}
+      </span>
+    );
+  });
   const conteudo = (
     <Tag
       style={{
         color: componente.corTexto ?? "#ffffff",
         fontSize: componente.fontSize ?? 16,
         fontWeight: componente.fontWeight === "bold" ? 700 : 400,
-        textAlign: componente.alinhamento ?? "left",
+        textAlign: alinhamentoTexto,
         width: "100%",
         height: "100%",
         margin: 0,
@@ -139,7 +146,20 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
         boxSizing: "border-box",
       }}
     >
-      {componente.richText && !ehTyping && !ehCounter ? richContent : textoFinal}
+      {componente.richText && !ehTyping && !ehCounter ? (
+        richContent
+      ) : (
+        <span
+          style={{
+            display: "block",
+            width: "100%",
+            textAlign: alinhamentoTexto,
+            textAlignLast: alinhamentoTexto === "justify" ? "justify" : undefined,
+          }}
+        >
+          {textoFinal}
+        </span>
+      )}
     </Tag>
   );
 

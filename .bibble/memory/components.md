@@ -22,6 +22,13 @@
 
 <!-- Adicionar aqui conforme o projeto cresce -->
 
+### ControleOpacidade (Alpha Motion)
+**Arquivo:** `src/components/Apresentacoes/Editor/PainelDireito/ControleOpacidade.tsx`
+**Tipo:** Client-compatible presentational component
+**Props:** `elementoId`, `percentual`, `quantidadeSelecionada`, `onChange`, `onIniciarAlteracao`, `onFinalizarAlteracao`
+**Uso:** montado pelo `PainelPropriedades` para ajustar de 0% a 100% a opacidade de qualquer elemento ou da multisseleção.
+**Notas:** o componente é controlado e acessível; a transação de histórico é aberta/fechada pelo painel para um arraste inteiro ocupar somente uma etapa no Undo/Redo.
+
 ### ComissoesDashboard (+ Cabecalho/EventoCard/MiniCard/ModalDetalhes)
 **Arquivo:** `src/components/Comissoes/ComissoesDashboard.tsx`
 **Tipo:** Client Component (orquestrador)

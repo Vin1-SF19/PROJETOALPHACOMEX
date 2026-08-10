@@ -1,5 +1,8 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useEditorStore } from "@/components/Apresentacoes/Editor/store/useEditorStore";
+import { ControleOpacidade } from "@/components/Apresentacoes/Editor/PainelDireito/ControleOpacidade";
 import type { ComponenteSlide, FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
 import { CANVAS_PADRAO } from "@/lib/apresentacoes/canvas";
 
@@ -135,6 +138,41 @@ describe("Alpha Motion — histórico, multisseleção e camadas", () => {
     const [a, b] = useEditorStore.getState().componentes;
     expect([a.x, b.x]).toEqual(xsAntes);
     expect((Math.min(a.y, b.y) + Math.max(a.y + a.h, b.y + b.h)) / 2).toBe(CANVAS_PADRAO.height / 2);
+  });
+
+  it("ajusta a opacidade da multisselecao em uma unica etapa de historico", () => {
+    const store = useEditorStore.getState();
+    store.selecionarComponente("a");
+    store.selecionarComponente("b", true);
+    store.iniciarTransacaoHistorico();
+    store.atualizarComponentes({ a: { opacidade: 0.7 }, b: { opacidade: 0.7 } });
+    store.atualizarComponentes({ a: { opacidade: 0.35 }, b: { opacidade: 0.35 } });
+    store.finalizarTransacaoHistorico();
+
+    expect(useEditorStore.getState().componentes).toEqual([
+      expect.objectContaining({ id: "a", opacidade: 0.35 }),
+      expect.objectContaining({ id: "b", opacidade: 0.35 }),
+    ]);
+    expect(useEditorStore.getState().historicoPassado).toHaveLength(1);
+
+    useEditorStore.getState().desfazer();
+    expect(useEditorStore.getState().componentes.every((componente) => componente.opacidade === undefined)).toBe(true);
+  });
+
+  it("exibe o controle percentual de opacidade para o elemento selecionado", () => {
+    const html = renderToStaticMarkup(createElement(ControleOpacidade, {
+      elementoId: "a",
+      percentual: 35,
+      quantidadeSelecionada: 2,
+      onChange: () => undefined,
+      onIniciarAlteracao: () => undefined,
+      onFinalizarAlteracao: () => undefined,
+    }));
+
+    expect(html).toContain("Opacidade");
+    expect(html).toContain('type="range"');
+    expect(html).toContain('aria-valuetext="35%"');
+    expect(html).toContain("2 elementos selecionados");
   });
 
   it("aplica um unico fundo fixo, limpa a selecao e o ajusta ao canvas", () => {
