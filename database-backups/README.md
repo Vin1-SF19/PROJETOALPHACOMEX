@@ -10,7 +10,7 @@ Esta pasta guarda backups locais do banco remoto do PainelAlpha. Dumps, snapshot
 ## Regras
 
 - Um backup usado para liberar alteração deve ser anterior à operação, estar verificado e ter no máximo 48 horas.
-- A limpeza automática remove somente arquivos de `daily/` com mais de 7 dias e apenas depois de um novo backup diário ser criado e validado.
+- A limpeza automática remove somente arquivos de `daily/` com mais de 30 dias e apenas depois de um novo backup diário ser criado e validado.
 - A limpeza automática nunca remove `pre-change/`.
 - Uma falha de backup não autoriza alteração no banco e não autoriza apagar backups existentes.
 - Nunca registrar tokens, URLs com credenciais ou conteúdo de linhas do banco em logs.
