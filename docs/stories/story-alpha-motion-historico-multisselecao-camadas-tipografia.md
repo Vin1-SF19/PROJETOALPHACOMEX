@@ -67,6 +67,7 @@ Ready for Review
 - [x] Corrigir resolução da folha de fontes pelo Turbopack no `globals.css`.
 - [x] Permitir upload de WOFF2/WOFF/TTF/OTF com nome personalizado, persistência por apresentação e incorporação no HTML exportado.
 - [x] Transformar backgrounds em fundos fixos aplicados por clique, adicionar guias magnéticas e separar a centralização por eixo.
+- [x] Adicionar texto justificado, aplicação de efeitos em todos os elementos e liberar animações de interação e rolagem.
 
 ## Testing
 
@@ -85,6 +86,7 @@ Ready for Review
 | 2026-08-10 | 2.2 | Folha gerada movida para `src/app`, imports corrigidos e grafo do `next dev` reiniciado para eliminar o erro de resolução do Turbopack. | Dex |
 | 2026-08-10 | 2.3 | Biblioteca de fontes personalizadas com upload seguro, nome livre, aplicação imediata e suporte aos players e exportação offline. | Dex |
 | 2026-08-10 | 2.4 | Background fixo selecionável apenas pela timeline, alinhamento magnético estilo Canva e centralização horizontal, vertical ou completa. | Codex |
+| 2026-08-10 | 2.5 | Texto justificado, aplicação de animação em lote, oito interações de hover/clique e efeitos de Scroll Reveal configuráveis. | Codex |
 
 ## Dev Agent Record
 
@@ -120,6 +122,10 @@ GPT-5 Codex
 - Fundo e alinhamento: ESLint direcionado, `git diff --check`, `npx next build` (70 páginas) e `npm run build:player` aprovados.
 - Fundo e alinhamento: `npm test` aprovou 1014/1015 casos; permaneceu apenas o timeout preexistente de `tests/google-calendar/cli.test.ts`. O lint global excedeu 180s; o escopo alterado está limpo.
 - Fundo e alinhamento: `npx tsc --noEmit` não apresentou falhas novas; permanecem somente as quatro falhas preexistentes já documentadas.
+- Interação e texto: 44/44 testes direcionados aprovados, cobrindo catálogo, variants, Scroll Reveal, lote/histórico, fundo no player e alinhamento justificado.
+- Interação e texto: ESLint direcionado, `git diff --check`, `npx next build` (70 páginas) e `npm run build:player` aprovados.
+- Interação e texto: `npx tsc --noEmit` não apresentou falhas novas; permanecem somente as quatro falhas preexistentes já documentadas.
+- Interação e texto: `npm test` aprovou 1018/1019 testes; a única falha permaneceu o timeout preexistente de `tests/google-calendar/cli.test.ts`.
 
 ### Completion Notes List
 
@@ -136,6 +142,11 @@ GPT-5 Codex
 - O fundo não recebe seleção, resize ou rotação pelo canvas; cores e animações continuam editáveis ao selecioná-lo exclusivamente pela timeline.
 - O arraste de elementos exibe guias magnéticas para bordas e centros de outros elementos e do próprio slide, respeitando zoom, multisseleção e rotação visual.
 - O painel de propriedades oferece centralização horizontal, vertical e completa para elementos ou conjuntos selecionados.
+- O texto aceita alinhamento justificado no componente e nos parágrafos ricos; o importador PPTX preserva `justify` em vez de convertê-lo para esquerda.
+- O seletor de efeitos oferece “Aplicar a todos”, incluindo elementos aninhados, sem duplicar o mesmo efeito e com uma única entrada no histórico.
+- A aba Interação oferece oito efeitos reais de hover/clique e os efeitos de clique podem ser repetidos a cada nova interação.
+- A aba Rolagem oferece 14 variações de entrada, limiar visível configurável e opção de executar uma vez ou repetir ao voltar.
+- O player, a apresentação e o HTML exportado usam o mesmo renderer para os novos efeitos e tratam o background como tela cheia independentemente das dimensões antigas salvas.
 - Nenhuma migration, dependência ou alteração estrutural de banco foi necessária.
 - Validação visual autenticada deve ser repetida por um usuário com sessão válida antes da aprovação final de QA.
 - DoD: requisitos funcionais, estrutura, segurança, testes direcionados, documentação e build Next aplicáveis estão concluídos; os gates globais `npm run lint`, `npm test` e `npm run build` permanecem marcados como bloqueados exclusivamente pelas falhas preexistentes descritas no Debug Log.
@@ -166,7 +177,12 @@ GPT-5 Codex
 - `src/components/Apresentacoes/Editor/Canvas/useCanvasDragResize.ts`
 - `src/components/Apresentacoes/Editor/PainelDireito/PainelPropriedades.tsx`
 - `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/FundoAnimadoProps.tsx`
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/AnimacaoItemForm.tsx`
+- `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/AnimacaoPropsV2.tsx`
 - `src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/TextoProps.tsx`
+- `src/components/Apresentacoes/Editor/RenderEngine/AnimacaoElementoWrapper.tsx`
+- `src/components/Apresentacoes/Editor/RenderEngine/ScrollRevealWrapper.tsx`
+- `src/components/Apresentacoes/Editor/RenderEngine/posicionamento.ts`
 - `src/components/Apresentacoes/Editor/RenderEngine/render/RenderBasicos.tsx`
 - `src/components/Apresentacoes/Editor/SidebarEsquerda/SidebarSlides.tsx`
 - `src/components/Apresentacoes/Editor/SidebarEsquerda/ItemComponenteArrastavel.tsx`
@@ -179,6 +195,11 @@ GPT-5 Codex
 - `src/components/Apresentacoes/Editor/store/useEditorStore.ts`
 - `src/lib/apresentacoes/fontes.ts`
 - `src/lib/apresentacoes/alinhamento.ts`
+- `src/lib/apresentacoes/animacao/catalogo.ts`
+- `src/lib/apresentacoes/animacao/registry.ts`
+- `src/lib/apresentacoes/animacao/variantsNovoModelo.ts`
+- `src/lib/apresentacoes/pptx/parser.ts`
+- `src/lib/apresentacoes/pptx/tipos.ts`
 - `src/lib/apresentacoes/fontes-personalizadas.ts`
 - `src/lib/apresentacoes/embutir-fontes-personalizadas.ts`
 - `src/app/api/apresentacoes/fontes/route.ts`
@@ -191,12 +212,15 @@ GPT-5 Codex
 - `src/components/Apresentacoes/ModoApresentacao/ModoApresentacaoClient.tsx`
 - `src/actions/slides.ts`
 - `src/lib/validations/slide-componentes.ts`
+- `src/lib/validations/slide-componentes-basicos.ts`
 - `src/lib/apresentacoes/rich-text-edit.ts`
 - `tests/apresentacoes/editor-history-selection.test.ts`
 - `tests/apresentacoes/alinhamento-canvas.test.ts`
 - `tests/apresentacoes/fontes-locais.test.ts`
 - `tests/apresentacoes/fontes-personalizadas.test.ts`
 - `tests/apresentacoes/rich-text-edit.test.ts`
+- `tests/apresentacoes/animacao-catalogo.test.ts`
+- `tests/apresentacoes/texto-justificado-posicionamento.test.ts`
 - `.bibble/memory/codebase-map.md`
 - `.bibble/memory/integration-points.md`
 - `.bibble/memory/session-draft.md`

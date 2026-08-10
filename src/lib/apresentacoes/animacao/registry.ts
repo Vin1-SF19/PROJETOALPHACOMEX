@@ -1,4 +1,4 @@
-import type { ElementAnimation, EasingConfig, AnimationCategoria } from "./tipos";
+import type { ElementAnimation, EasingConfig, AnimationCategoria, AnimationTrigger } from "./tipos";
 import { criarAnimationController, type AnimationController } from "./motor";
 
 /**
@@ -15,6 +15,7 @@ export interface AnimationDefinition {
   defaultDuration: number;
   defaultEasing: EasingConfig;
   supportedProperties: string[];
+  defaultTrigger?: AnimationTrigger;
   createAnimation: (element: HTMLElement, config: ElementAnimation) => AnimationController;
 }
 

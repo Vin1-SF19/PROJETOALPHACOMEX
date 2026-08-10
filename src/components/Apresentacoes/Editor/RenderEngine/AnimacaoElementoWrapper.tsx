@@ -9,7 +9,7 @@ interface CamadaAnimacaoProps {
 }
 
 function CamadaAnimacao({ animacao, children }: CamadaAnimacaoProps) {
-  const [acionada, setAcionada] = useState(false);
+  const [cicloClique, setCicloClique] = useState(0);
   const variants = variantsParaNovoModelo(animacao);
   if (!variants) return <>{children}</>;
 
@@ -26,12 +26,14 @@ function CamadaAnimacao({ animacao, children }: CamadaAnimacaoProps) {
   if (animacao.trigger === "on-click") {
     const handleClick = (event: MouseEvent<HTMLDivElement>) => {
       event.stopPropagation();
-      setAcionada(true);
+      setCicloClique((ciclo) => ciclo + 1);
     };
     return (
-      <motion.div style={style} initial={variants.initial} animate={acionada ? variants.animate : variants.initial} transition={variants.transition} onClick={handleClick}>
-        {children}
-      </motion.div>
+      <div style={style} onClick={handleClick}>
+        <motion.div key={cicloClique} style={style} initial={variants.initial} animate={cicloClique > 0 ? variants.animate : variants.initial} transition={variants.transition}>
+          {children}
+        </motion.div>
+      </div>
     );
   }
 
@@ -69,4 +71,3 @@ export function AnimacaoElementoWrapper({ animacoes, children }: { animacoes: El
     children,
   );
 }
-

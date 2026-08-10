@@ -168,4 +168,25 @@ describe("Alpha Motion — histórico, multisseleção e camadas", () => {
     const elementos = estado.componentes.filter((componente) => componente.tipo !== "fundoAnimado");
     expect(elementos.every((componente) => componente.zIndex > bg.zIndex)).toBe(true);
   });
+
+  it("adiciona uma animação a todos os elementos em uma única etapa de histórico", () => {
+    const criarAnimacao = (elementId: string) => ({
+      id: `anim-${elementId}`,
+      elementId,
+      category: "interaction" as const,
+      type: "hover-lift",
+      trigger: "on-hover" as const,
+      duration: 0.25,
+      delay: 0,
+      order: 0,
+      easing: { curva: "easeOut" as const },
+    });
+
+    useEditorStore.getState().adicionarAnimacoesElementos([criarAnimacao("a"), criarAnimacao("b")]);
+    const estado = useEditorStore.getState();
+    expect(estado.animacaoConfig?.timeline?.animations).toHaveLength(2);
+    expect(estado.historicoPassado).toHaveLength(1);
+    estado.desfazer();
+    expect(useEditorStore.getState().animacaoConfig).toBeUndefined();
+  });
 });

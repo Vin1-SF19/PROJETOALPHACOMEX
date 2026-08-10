@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import type { ElementAnimation } from "@/lib/apresentacoes/animacao/tipos";
 import { useScrollReveal, CONFIG_SCROLL_REVEAL_PADRAO, type ConfigScrollReveal } from "@/lib/apresentacoes/scroll/scroll-reveal";
+import { variantsParaNovoModelo } from "@/lib/apresentacoes/animacao/variantsNovoModelo";
 
 interface ScrollRevealWrapperProps {
   animacoes: ElementAnimation[];
@@ -39,18 +41,33 @@ export function ScrollRevealWrapper({ animacoes, children }: ScrollRevealWrapper
 
   if (!animacaoScroll) return <>{children}</>;
 
+  const variants = variantsParaNovoModelo(animacaoScroll);
+  if (!variants) {
+    return (
+      <div
+        ref={ref}
+        style={{
+          width: "100%",
+          height: "100%",
+          opacity: revelado ? 1 : 0,
+          transform: revelado ? "none" : "translateY(16px)",
+          transition: "opacity 0.5s ease, transform 0.5s ease",
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   return (
-    <div
+    <motion.div
       ref={ref}
-      style={{
-        width: "100%",
-        height: "100%",
-        opacity: revelado ? 1 : 0,
-        transform: revelado ? "none" : "translateY(16px)",
-        transition: "opacity 0.5s ease, transform 0.5s ease",
-      }}
+      style={{ width: "100%", height: "100%" }}
+      initial={variants.initial}
+      animate={revelado ? variants.animate : variants.initial}
+      transition={variants.transition}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }

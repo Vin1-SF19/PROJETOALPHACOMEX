@@ -136,7 +136,7 @@ function extrairTextoDeBody(txBody: NoXml, contexto: ContextoTema, fontesDetecta
   corTexto: string | null;
   negrito: boolean;
   tamanhoFonte: number | null;
-  alinhamento: "left" | "center" | "right" | null;
+  alinhamento: "left" | "center" | "right" | "justify" | null;
   richText: NonNullable<FormaTextoExtraida["richText"]>;
   fontFamily: string | null;
   italic: boolean;
@@ -163,7 +163,7 @@ function extrairTextoDeBody(txBody: NoXml, contexto: ContextoTema, fontesDetecta
     tamanhoFonte: firstStyledRun?.style.fontSizePt !== undefined
       ? firstStyledRun.style.fontSizePt * 12700 * escalaInfo.escala
       : null,
-    alinhamento: alignment === "justify" ? "left" : alignment ?? null,
+    alinhamento: alignment ?? null,
     richText,
     fontFamily: firstStyledRun?.style.fontFamily ?? null,
     italic: firstStyledRun?.style.italic ?? false,

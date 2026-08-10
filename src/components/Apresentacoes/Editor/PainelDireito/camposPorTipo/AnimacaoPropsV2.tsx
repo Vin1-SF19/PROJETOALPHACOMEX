@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Layers3, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { useEditorStore } from "../../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { AnimationCategoria, ElementAnimation } from "@/lib/apresentacoes/animacao/tipos";
@@ -7,65 +8,97 @@ import { listarAnimacoes } from "@/lib/apresentacoes/animacao/registry";
 import { AnimacaoItemForm } from "./AnimacaoItemForm";
 import { PreviewMiniatura } from "./PreviewMiniatura";
 import { SeletorPreset } from "./SeletorPreset";
-import "@/lib/apresentacoes/animacao"; // garante o catálogo (69 animações) populado antes de listarAnimacoes()
+import "@/lib/apresentacoes/animacao";
 
 interface AnimacaoPropsV2Props {
   componente: ComponenteSlide;
 }
 
-/**
- * `interaction` já existe em `AnimationCategoria` (desabilitada até a Fase 08 dar lógica
- * real de gatilho — a Fase 03 só resolve a ORDEM/dependência, não interações do usuário no
- * player). "Rolagem" não é uma `category` — é um sub-sistema à parte (`scroll` em
- * `SlideAnimationConfig`, Fase 08) — por isso fica fora do array navegável por categoria,
- * representada só como aba visualmente desabilitada, sem `id` de categoria válido.
- */
-const ABAS: { id: AnimationCategoria; label: string; habilitada: boolean }[] = [
-  { id: "entrance", label: "Entrada", habilitada: true },
-  { id: "emphasis", label: "Ênfase", habilitada: true },
-  { id: "exit", label: "Saída", habilitada: true },
-  { id: "interaction", label: "Interação", habilitada: false },
+type AbaAnimacao = AnimationCategoria | "scroll";
+
+const ABAS: { id: AbaAnimacao; label: string }[] = [
+  { id: "entrance", label: "Entrada" },
+  { id: "emphasis", label: "Ênfase" },
+  { id: "exit", label: "Saída" },
+  { id: "interaction", label: "Interação" },
+  { id: "scroll", label: "Rolagem" },
 ];
 
-/**
- * Painel de animações do Alpha Motion (Fase 02) — ADICIONAL ao painel legado (`AnimacaoProps`,
- * Onda 3), nunca o substitui. Grava em `Slide.animacaoConfig.timeline.animations[]` (decisão
- * registrada em `.bibble/memory/decisions.md`, 2026-08-06), não em `componente.animacao`.
- */
+const TIPOS_SCROLL = new Set([
+  "fade-in", "fade-up", "fade-down", "fade-left", "fade-right", "blur-in",
+  "slide-in-left", "slide-in-right", "slide-in-up", "slide-in-down",
+  "scale-in", "zoom-in", "pop-in", "rotate-in",
+]);
+
+function coletarIdsAnimaveis(componentes: ComponenteSlide[], tipoAnimacao: string): string[] {
+  const ids: string[] = [];
+  for (const item of componentes) {
+    if (item.tipo === "fundoAnimado") continue;
+    const ehContainer = item.tipo === "card" || item.tipo === "grid" || item.tipo === "container";
+    if (tipoAnimacao !== "stagger" || ehContainer) ids.push(item.id);
+    if (ehContainer) {
+      ids.push(...coletarIdsAnimaveis(item.filhos, tipoAnimacao));
+    }
+  }
+  return ids;
+}
+
+/** Painel do novo modelo de animações, incluindo interação real, scroll reveal e aplicação em lote. */
 export function AnimacaoPropsV2({ componente }: AnimacaoPropsV2Props) {
-  const [abaAtiva, setAbaAtiva] = useState<AnimationCategoria>("entrance");
+  const [abaAtiva, setAbaAtiva] = useState<AbaAnimacao>("entrance");
   const [tipoEmPreview, setTipoEmPreview] = useState("");
-  const animacaoConfig = useEditorStore((s) => s.animacaoConfig);
-  const adicionarAnimacaoElemento = useEditorStore((s) => s.adicionarAnimacaoElemento);
-  const removerAnimacaoElemento = useEditorStore((s) => s.removerAnimacaoElemento);
+  const componentes = useEditorStore((state) => state.componentes);
+  const animacaoConfig = useEditorStore((state) => state.animacaoConfig);
+  const adicionarAnimacaoElemento = useEditorStore((state) => state.adicionarAnimacaoElemento);
+  const adicionarAnimacoesElementos = useEditorStore((state) => state.adicionarAnimacoesElementos);
+  const removerAnimacaoElemento = useEditorStore((state) => state.removerAnimacaoElemento);
+  const atualizarAnimacaoElemento = useEditorStore((state) => state.atualizarAnimacaoElemento);
+  const animacoesAtuais = animacaoConfig?.timeline?.animations ?? [];
 
-  const animacoesDoElemento = (animacaoConfig?.timeline?.animations ?? []).filter(
-    (a) => a.elementId === componente.id && a.category === abaAtiva,
+  const animacoesDoElemento = animacoesAtuais.filter(
+    (animacao) => animacao.elementId === componente.id
+      && (abaAtiva === "scroll"
+        ? animacao.trigger === "on-scroll"
+        : animacao.category === abaAtiva && animacao.trigger !== "on-scroll"),
   );
-  const opcoesCatalogo = listarAnimacoes(abaAtiva);
-  const definicaoEmPreview = opcoesCatalogo.find((d) => d.id === tipoEmPreview);
+  const opcoesCatalogo = abaAtiva === "scroll"
+    ? listarAnimacoes("entrance").filter((definicao) => TIPOS_SCROLL.has(definicao.id))
+    : listarAnimacoes(abaAtiva);
+  const definicaoEmPreview = opcoesCatalogo.find((definicao) => definicao.id === tipoEmPreview);
 
-  function adicionar(tipo: string) {
-    const definicao = opcoesCatalogo.find((d) => d.id === tipo);
-    const nova: ElementAnimation = {
+  function criarAnimacao(tipo: string, elementId: string): ElementAnimation {
+    const definicao = opcoesCatalogo.find((item) => item.id === tipo);
+    return {
       id: `anim-${crypto.randomUUID()}`,
-      elementId: componente.id,
-      category: abaAtiva,
+      elementId,
+      category: abaAtiva === "scroll" ? "entrance" : abaAtiva,
       type: tipo,
-      trigger: "on-slide-enter",
+      trigger: abaAtiva === "scroll" ? "on-scroll" : definicao?.defaultTrigger ?? "on-slide-enter",
       duration: definicao?.defaultDuration ?? 0.5,
       delay: 0,
-      order: animacoesDoElemento.length,
+      order: animacoesAtuais.filter((animacao) => animacao.elementId === elementId).length,
       easing: definicao?.defaultEasing ?? { curva: "easeOut" },
+      ...(abaAtiva === "scroll"
+        ? { customProperties: { percentualVisivel: 0.3, executarUmaVez: true, delay: 0 } }
+        : {}),
     };
-    adicionarAnimacaoElemento(nova);
   }
 
-  function atualizar(id: string, patch: Partial<ElementAnimation>) {
-    const atual = animacoesDoElemento.find((a) => a.id === id);
-    if (!atual) return;
-    removerAnimacaoElemento(id);
-    adicionarAnimacaoElemento({ ...atual, ...patch });
+  function adicionar(tipo: string) {
+    adicionarAnimacaoElemento(criarAnimacao(tipo, componente.id));
+  }
+
+  function adicionarEmTodos(tipo: string) {
+    const modelo = criarAnimacao(tipo, componente.id);
+    const ids = coletarIdsAnimaveis(componentes, tipo).filter((elementId) =>
+      !animacoesAtuais.some(
+        (animacao) => animacao.elementId === elementId && animacao.type === tipo && animacao.trigger === modelo.trigger,
+      ),
+    );
+    const novas = ids.map((elementId) => criarAnimacao(tipo, elementId));
+    adicionarAnimacoesElementos(novas);
+    if (novas.length === 0) toast.info("Esse efeito já está aplicado a todos os elementos do slide.");
+    else toast.success(`Efeito aplicado a ${novas.length} elemento${novas.length === 1 ? "" : "s"} do slide.`);
   }
 
   return (
@@ -81,54 +114,44 @@ export function AnimacaoPropsV2({ componente }: AnimacaoPropsV2Props) {
             key={aba.id}
             role="tab"
             aria-selected={abaAtiva === aba.id}
-            disabled={!aba.habilitada}
-            onClick={() => aba.habilitada && setAbaAtiva(aba.id)}
-            className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
-              !aba.habilitada
-                ? "cursor-not-allowed text-slate-600"
-                : abaAtiva === aba.id
-                  ? "bg-indigo-500/20 text-indigo-300"
-                  : "text-slate-400 hover:bg-white/5"
-            }`}
+            onClick={() => {
+              setAbaAtiva(aba.id);
+              setTipoEmPreview("");
+            }}
+            className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${abaAtiva === aba.id ? "bg-indigo-500/20 text-indigo-300" : "text-slate-400 hover:bg-white/5"}`}
           >
             {aba.label}
-            {!aba.habilitada && <span className="ml-1 text-slate-700">(em breve)</span>}
           </button>
         ))}
-        {/* "Rolagem" não é uma AnimationCategoria (é o sub-sistema `scroll`, Fase 08) — item puramente visual, sem estado de seleção. */}
-        <button disabled className="cursor-not-allowed rounded-md px-2 py-1 text-[10px] font-medium text-slate-600">
-          Rolagem<span className="ml-1 text-slate-700">(em breve)</span>
-        </button>
       </div>
 
-      {animacoesDoElemento.map((anim) => (
+      {animacoesDoElemento.map((animacao) => (
         <AnimacaoItemForm
-          key={anim.id}
-          animacao={anim}
+          key={animacao.id}
+          animacao={animacao}
           opcoes={opcoesCatalogo}
           ehContainer={componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container"}
-          onChange={(patch) => atualizar(anim.id, patch)}
-          onRemover={() => removerAnimacaoElemento(anim.id)}
+          onChange={(patch) => atualizarAnimacaoElemento(animacao.id, patch)}
+          onRemover={() => removerAnimacaoElemento(animacao.id)}
         />
       ))}
 
       <div className="space-y-1.5">
         <label htmlFor={`nova-animacao-${componente.id}`} className="text-[11px] text-slate-400">
-          Adicionar animação
+          {abaAtiva === "scroll" ? "Adicionar efeito de rolagem" : abaAtiva === "interaction" ? "Adicionar interação" : "Adicionar animação"}
         </label>
         <select
           id={`nova-animacao-${componente.id}`}
           value={tipoEmPreview}
-          onChange={(e) => setTipoEmPreview(e.target.value)}
+          onChange={(event) => setTipoEmPreview(event.target.value)}
           className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
         >
           <option value="">Escolher tipo...</option>
-          {opcoesCatalogo.map((def) => (
-            <option key={def.id} value={def.id}>
-              {def.name}
-            </option>
+          {opcoesCatalogo.map((definicao) => (
+            <option key={definicao.id} value={definicao.id}>{definicao.name}</option>
           ))}
         </select>
+
         {definicaoEmPreview && (
           <>
             <PreviewMiniatura
@@ -139,16 +162,29 @@ export function AnimacaoPropsV2({ componente }: AnimacaoPropsV2Props) {
                 easing: definicaoEmPreview.defaultEasing,
               }}
             />
-            <button
-              type="button"
-              onClick={() => {
-                adicionar(tipoEmPreview);
-                setTipoEmPreview("");
-              }}
-              className="w-full cursor-pointer rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
-            >
-              Adicionar {definicaoEmPreview.name}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  adicionar(tipoEmPreview);
+                  setTipoEmPreview("");
+                }}
+                className="cursor-pointer rounded-md bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500"
+              >
+                Adicionar ao elemento
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  adicionarEmTodos(tipoEmPreview);
+                  setTipoEmPreview("");
+                }}
+                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20"
+              >
+                <Layers3 size={13} aria-hidden="true" />
+                Aplicar a todos
+              </button>
+            </div>
           </>
         )}
       </div>

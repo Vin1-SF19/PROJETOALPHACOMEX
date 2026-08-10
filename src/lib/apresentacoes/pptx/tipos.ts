@@ -23,7 +23,7 @@ export interface FormaTextoExtraida extends RetanguloExtraido {
   corTexto: string | null;
   negrito: boolean;
   tamanhoFonte: number | null;
-  alinhamento: "left" | "center" | "right" | null;
+  alinhamento: "left" | "center" | "right" | "justify" | null;
   ehTitulo: boolean;
   richText?: PptxTextBody;
   fontFamily?: string | null;

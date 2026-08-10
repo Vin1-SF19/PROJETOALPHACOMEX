@@ -72,6 +72,7 @@ interface EditorStore {
   atualizarFundoCanvas: (backgroundColor: string) => void;
   atualizarTransicaoSlide: (transicaoEntrada: string | null) => void;
   adicionarAnimacaoElemento: (animacao: ElementAnimation) => void;
+  adicionarAnimacoesElementos: (animacoes: ElementAnimation[]) => void;
   removerAnimacaoElemento: (animacaoId: string) => void;
   atualizarAnimacaoElemento: (id: string, patch: Partial<ElementAnimation>) => void;
   reordenarAnimacoesElemento: (elementId: string, novaOrdemIds: string[]) => void;
@@ -469,6 +470,19 @@ export const useEditorStore = create<EditorStore>((set) => ({
         version: state.animacaoConfig?.version ?? 1,
         ...state.animacaoConfig,
         timeline: { ...timelineAtual, animations: [...timelineAtual.animations, animacao] },
+      },
+      ...estadoAlterado(state),
+    };
+  }),
+  adicionarAnimacoesElementos: (animacoes) => set((state) => {
+    if (animacoes.length === 0) return state;
+    const timelineAtual = state.animacaoConfig?.timeline ?? { duration: 0, animations: [] };
+    return {
+      ...registrarHistorico(state),
+      animacaoConfig: {
+        version: state.animacaoConfig?.version ?? 1,
+        ...state.animacaoConfig,
+        timeline: { ...timelineAtual, animations: [...timelineAtual.animations, ...animacoes] },
       },
       ...estadoAlterado(state),
     };

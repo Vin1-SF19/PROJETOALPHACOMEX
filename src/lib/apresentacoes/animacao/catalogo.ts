@@ -14,16 +14,18 @@ import { CONFIG_BORDER_DRAW_PADRAO } from "./border-draw";
 
 type Def = Pick<AnimationDefinition, "id" | "name" | "category" | "description" | "supportedProperties"> & {
   defaultDuration?: number;
+  defaultTrigger?: AnimationDefinition["defaultTrigger"];
   customProperties?: Record<string, unknown>;
 };
 
-function def({ id, name, category, description, supportedProperties, defaultDuration = 0.5, customProperties }: Def): void {
+function def({ id, name, category, description, supportedProperties, defaultDuration = 0.5, defaultTrigger, customProperties }: Def): void {
   registrarAnimacao({
     id,
     name,
     category,
     description,
     defaultDuration,
+    defaultTrigger,
     defaultEasing: { curva: "easeOut" },
     supportedProperties,
     createAnimation: (_element, config) =>
@@ -194,3 +196,13 @@ def({
   defaultDuration: 0.5,
   customProperties: { escala: 1.08, brilho: true, sombra: true },
 });
+
+// ===== Interação — hover e clique =====
+def({ id: "hover-lift", name: "Elevar ao passar", category: "interaction", description: "Eleva e amplia suavemente enquanto o ponteiro está sobre o elemento.", supportedProperties: ["transform"], defaultDuration: 0.25, defaultTrigger: "on-hover" });
+def({ id: "hover-grow", name: "Ampliar ao passar", category: "interaction", description: "Amplia o elemento enquanto o ponteiro está sobre ele.", supportedProperties: ["transform"], defaultDuration: 0.2, defaultTrigger: "on-hover" });
+def({ id: "hover-glow", name: "Brilhar ao passar", category: "interaction", description: "Aplica brilho e destaque enquanto o ponteiro está sobre o elemento.", supportedProperties: ["filter"], defaultDuration: 0.25, defaultTrigger: "on-hover" });
+def({ id: "hover-tilt", name: "Inclinar ao passar", category: "interaction", description: "Inclina levemente o elemento durante o hover.", supportedProperties: ["transform"], defaultDuration: 0.25, defaultTrigger: "on-hover" });
+def({ id: "click-pulse", name: "Pulso ao clicar", category: "interaction", description: "Executa uma pulsação curta a cada clique.", supportedProperties: ["transform"], defaultDuration: 0.35, defaultTrigger: "on-click" });
+def({ id: "click-bounce", name: "Salto ao clicar", category: "interaction", description: "Faz o elemento saltar e retornar ao lugar ao clicar.", supportedProperties: ["transform"], defaultDuration: 0.45, defaultTrigger: "on-click" });
+def({ id: "click-shake", name: "Tremer ao clicar", category: "interaction", description: "Executa um tremor horizontal curto a cada clique.", supportedProperties: ["transform"], defaultDuration: 0.4, defaultTrigger: "on-click" });
+def({ id: "click-flip", name: "Girar ao clicar", category: "interaction", description: "Faz uma volta completa no eixo vertical ao clicar.", supportedProperties: ["transform"], defaultDuration: 0.55, defaultTrigger: "on-click" });

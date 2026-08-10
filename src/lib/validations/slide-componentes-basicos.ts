@@ -8,7 +8,7 @@ export const textoComponenteSchema = baseComponenteSchema.extend({
   corTexto: z.string().optional(),
   fontSize: z.number().optional(),
   fontWeight: z.enum(["normal", "bold"]).optional(),
-  alinhamento: z.enum(["left", "center", "right"]).optional(),
+  alinhamento: z.enum(["left", "center", "right", "justify"]).optional(),
   fontFamily: z.string().optional(),
   fontStyle: z.enum(["normal", "italic"]).optional(),
   textDecoration: z.string().optional(),

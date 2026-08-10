@@ -185,6 +185,24 @@ export function variantsParaNovoModelo(anim: ElementAnimation): VariantsResultad
     case "dim-others":
       return { initial: { opacity: 1 }, animate: { opacity: 1 }, transition };
 
+    // --- Interação (o wrapper decide se o alvo é acionado por clique ou hover) ---
+    case "hover-lift":
+      return { initial: { y: 0, scale: 1 }, animate: { y: -8, scale: 1.03 }, transition };
+    case "hover-grow":
+      return { initial: { scale: 1 }, animate: { scale: 1.06 }, transition };
+    case "hover-glow":
+      return { initial: { filter: "brightness(1) drop-shadow(0 0 0 rgba(99,102,241,0))" }, animate: { filter: "brightness(1.2) drop-shadow(0 8px 18px rgba(99,102,241,0.45))" }, transition };
+    case "hover-tilt":
+      return { initial: { rotate: 0, scale: 1 }, animate: { rotate: 3, scale: 1.02 }, transition };
+    case "click-pulse":
+      return { initial: { scale: 1 }, animate: { scale: [1, 0.94, 1.08, 1] }, transition };
+    case "click-bounce":
+      return { initial: { y: 0 }, animate: { y: [0, -14, 0, -6, 0] }, transition };
+    case "click-shake":
+      return { initial: { x: 0 }, animate: { x: [0, -8, 8, -6, 6, 0] }, transition };
+    case "click-flip":
+      return { initial: { rotateY: 0 }, animate: { rotateY: [0, 180, 360] }, transition };
+
     default:
       return null;
   }

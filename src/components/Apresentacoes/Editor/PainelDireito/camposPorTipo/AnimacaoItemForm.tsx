@@ -57,6 +57,11 @@ interface AnimacaoItemFormProps {
 export function AnimacaoItemForm({ animacao, opcoes, ehContainer, onChange, onRemover }: AnimacaoItemFormProps) {
   const definicao = opcoes.find((d) => d.id === animacao.type);
   const curvaAtual = curvaSimplesDaAnimacao(animacao);
+  const propriedadesScroll = animacao.customProperties ?? {};
+
+  function atualizarScroll(patch: Record<string, unknown>) {
+    onChange({ customProperties: { ...propriedadesScroll, ...patch } });
+  }
 
   function aplicarPreset(presetId: PresetStaggerId) {
     onChange({ stagger: PRESETS_STAGGER[presetId].criar() });
@@ -143,6 +148,33 @@ export function AnimacaoItemForm({ animacao, opcoes, ehContainer, onChange, onRe
           ))}
         </select>
       </div>
+
+      {animacao.trigger === "on-scroll" && (
+        <div className="space-y-2 rounded-md border border-cyan-400/15 bg-cyan-500/5 p-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">Configuração da rolagem</p>
+          <label className="block space-y-1">
+            <span className="text-[10px] text-slate-500">Percentual visível para iniciar</span>
+            <input
+              type="number"
+              min={10}
+              max={100}
+              step={5}
+              value={Math.round((typeof propriedadesScroll.percentualVisivel === "number" ? propriedadesScroll.percentualVisivel : 0.3) * 100)}
+              onChange={(event) => atualizarScroll({ percentualVisivel: Math.min(1, Math.max(0.1, Number(event.target.value) / 100)) })}
+              className="w-full rounded-md border border-white/10 bg-slate-950 px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 text-[10px] text-slate-400">
+            Executar somente uma vez
+            <input
+              type="checkbox"
+              checked={propriedadesScroll.executarUmaVez !== false}
+              onChange={(event) => atualizarScroll({ executarUmaVez: event.target.checked })}
+              className="size-4 accent-cyan-500"
+            />
+          </label>
+        </div>
+      )}
 
       {ehContainer && animacao.type === "stagger" && (
         <div className="space-y-2 border-t border-white/5 pt-2">

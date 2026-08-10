@@ -30,6 +30,7 @@ describe("Alpha Motion — Fase 02 — catálogo de animações", () => {
     expect(listarAnimacoes("entrance").length).toBeGreaterThanOrEqual(35);
     expect(listarAnimacoes("exit").length).toBeGreaterThanOrEqual(17);
     expect(listarAnimacoes("emphasis").length).toBeGreaterThanOrEqual(16);
+    expect(listarAnimacoes("interaction").length).toBeGreaterThanOrEqual(8);
   });
 
   it("cada animação registrada tem os 8 campos obrigatórios de AnimationDefinition", () => {
@@ -86,6 +87,13 @@ describe("Alpha Motion — Fase 02 — variants (Framer Motion) do novo modelo",
 
   it("tipo desconhecido retorna null (fallback seguro, não quebra o slide)", () => {
     expect(variantsParaNovoModelo(anim({ type: "tipo-inexistente" }))).toBeNull();
+  });
+
+  it("interações possuem gatilho padrão e variants executáveis", () => {
+    expect(obterAnimacao("hover-lift")?.defaultTrigger).toBe("on-hover");
+    expect(obterAnimacao("click-pulse")?.defaultTrigger).toBe("on-click");
+    expect(variantsParaNovoModelo(anim({ type: "hover-lift", category: "interaction", trigger: "on-hover" }))).not.toBeNull();
+    expect(variantsParaNovoModelo(anim({ type: "click-shake", category: "interaction", trigger: "on-click" }))).not.toBeNull();
   });
 });
 

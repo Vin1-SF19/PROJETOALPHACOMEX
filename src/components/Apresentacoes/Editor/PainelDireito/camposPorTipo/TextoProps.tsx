@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AlignCenter, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, FileUp, Italic, Minus, Plus, Underline, X } from "lucide-react";
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, FileUp, Italic, Minus, Plus, Underline, X } from "lucide-react";
 import { toast } from "sonner";
 import type { TextoComponente } from "@/lib/validations/slide-componentes";
 import { FONTES_ALPHA_MOTION } from "@/lib/apresentacoes/fontes";
@@ -288,6 +288,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
               ["left", AlignLeft, "Alinhar à esquerda"],
               ["center", AlignCenter, "Centralizar horizontalmente"],
               ["right", AlignRight, "Alinhar à direita"],
+              ["justify", AlignJustify, "Justificar texto"],
             ] as const).map(([valor, Icone, label]) => (
               <button key={valor} type="button" onClick={() => aplicarAlinhamento(valor)} aria-label={label} aria-pressed={(componente.alinhamento ?? "left") === valor} className={`flex size-9 cursor-pointer items-center justify-center rounded-lg border ${(componente.alinhamento ?? "left") === valor ? "border-indigo-400 bg-indigo-500/20 text-indigo-200" : "border-white/10 bg-slate-900 text-slate-400"}`}>
                 <Icone size={15} aria-hidden="true" />
