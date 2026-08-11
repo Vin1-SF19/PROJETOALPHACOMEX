@@ -211,6 +211,44 @@ export function construirSvgFormaColorida(
     + `</svg>`;
 }
 
+function corEOpacidadeDaParada(cor: string): { cor: string; opacidade?: number } {
+  const rgba = /^rgba\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*\)$/i.exec(cor);
+  if (!rgba) return { cor };
+  const [, r, g, b, alpha] = rgba;
+  return { cor: `rgb(${r}, ${g}, ${b})`, opacidade: Math.max(0, Math.min(1, Number(alpha))) };
+}
+
+/** Fallback SVG para `custGeom` arbitrário com `gradFill`. O ângulo recebido usa a mesma
+ * convenção CSS já aplicada aos cards: 0° aponta para cima e 90° da esquerda para a direita. */
+export function construirSvgFormaGradiente(
+  pathSvg: string,
+  viewBoxW: number,
+  viewBoxH: number,
+  angle: number,
+  stops: Array<{ position: number; color: string }>,
+  stroke?: { color: string; width: number; dash?: string },
+): string {
+  const rad = (angle * Math.PI) / 180;
+  const dx = Math.sin(rad);
+  const dy = -Math.cos(rad);
+  const x1 = 0.5 - dx / 2;
+  const y1 = 0.5 - dy / 2;
+  const x2 = 0.5 + dx / 2;
+  const y2 = 0.5 + dy / 2;
+  const stopsMarkup = stops.map((stop) => {
+    const normalizada = corEOpacidadeDaParada(stop.color);
+    return `<stop offset="${Math.max(0, Math.min(100, stop.position))}%" stop-color="${escaparAtributoXml(normalizada.cor)}"`
+      + (normalizada.opacidade !== undefined ? ` stop-opacity="${normalizada.opacidade}"` : "")
+      + "/>";
+  }).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxW} ${viewBoxH}">`
+    + `<defs><linearGradient id="g" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stopsMarkup}</linearGradient></defs>`
+    + `<path d="${pathSvg}" fill="url(#g)"`
+    + (stroke ? ` stroke="${escaparAtributoXml(stroke.color)}" stroke-width="${stroke.width}"${stroke.dash ? ` stroke-dasharray="${escaparAtributoXml(stroke.dash)}"` : ""}` : "")
+    + `/>`
+    + `</svg>`;
+}
+
 export function svgParaDataUri(svgMarkup: string): string {
   const base64 = Buffer.from(svgMarkup, "utf-8").toString("base64");
   return `data:image/svg+xml;base64,${base64}`;

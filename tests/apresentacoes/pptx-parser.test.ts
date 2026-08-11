@@ -266,6 +266,7 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
   // (clipPath) a imagem original, virando um SVG novo com a foto embutida como data: URI.
   // Freeform 3: custGeom CURVO (mesma estrela) + solidFill (sem blipFill) — sem card nativo pra
   // path arbitrário, deve virar SVG com o path colorido (fallback de última instância).
+  // Freeform 4: custGeom CURVO + gradFill — deve preservar stops/alpha no SVG, não ser ignorado.
   const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
   <p:cSld>
@@ -299,6 +300,32 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
             </a:blip>
             <a:stretch><a:fillRect/></a:stretch>
           </a:blipFill>
+        </p:spPr>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="8" name="Estrela Gradiente"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="500000" y="0"/><a:ext cx="500000" cy="500000"/></a:xfrm>
+          <a:custGeom>
+            <a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/>
+            <a:rect l="0" t="0" r="0" b="0"/>
+            <a:pathLst>
+              <a:path w="500000" h="500000">
+                <a:moveTo><a:pt x="250000" y="0"/></a:moveTo>
+                <a:lnTo><a:pt x="500000" y="250000"/></a:lnTo>
+                <a:lnTo><a:pt x="250000" y="500000"/></a:lnTo>
+                <a:lnTo><a:pt x="0" y="250000"/></a:lnTo>
+                <a:close/>
+              </a:path>
+            </a:pathLst>
+          </a:custGeom>
+          <a:gradFill rotWithShape="true">
+            <a:gsLst>
+              <a:gs pos="0"><a:srgbClr val="FD0002"><a:alpha val="99500"/></a:srgbClr></a:gs>
+              <a:gs pos="100000"><a:srgbClr val="0D112E"/></a:gs>
+            </a:gsLst>
+            <a:lin ang="0"/>
+          </a:gradFill>
         </p:spPr>
       </p:sp>
       <p:sp>
@@ -377,7 +404,7 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
 
   it("custGeom curvo + blipFill: recorta a imagem original pelo path real (clipPath), virando SVG novo", async () => {
     const resultado = await montar();
-    const forma = resultado.slides[0].formas[1];
+    const forma = resultado.slides[0].formas[2];
     expect(forma.tipo).toBe("imagem");
     if (forma.tipo !== "imagem") return;
     expect(forma.mimeType).toBe("image/svg+xml");
@@ -390,7 +417,7 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
 
   it("custGeom curvo + solidFill (sem blipFill): fallback de última instância vira SVG com o path colorido", async () => {
     const resultado = await montar();
-    const forma = resultado.slides[0].formas[2];
+    const forma = resultado.slides[0].formas[3];
     expect(forma.tipo).toBe("imagem");
     if (forma.tipo !== "imagem") return;
     expect(forma.mimeType).toBe("image/svg+xml");
@@ -398,6 +425,20 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
     const svg = Buffer.from(forma.bytes).toString("utf-8");
     expect(svg).toContain('fill="#112233"');
     expect(svg).not.toContain("<clipPath");
+  });
+
+  it("custGeom curvo + gradFill: vira SVG com gradiente, stops e alpha preservados", async () => {
+    const resultado = await montar();
+    const forma = resultado.slides[0].formas[1];
+    expect(forma.tipo).toBe("imagem");
+    if (forma.tipo !== "imagem") return;
+    const svg = Buffer.from(forma.bytes).toString("utf-8");
+    expect(svg).toContain("<linearGradient");
+    expect(svg).toContain('stop-color="rgb(253, 0, 2)"');
+    expect(svg).toContain('stop-opacity="0.995"');
+    expect(svg).toContain('stop-color="#0D112E"');
+    expect(svg).toContain('fill="url(#g)"');
+    expect(resultado.ignorados).toEqual({});
   });
 });
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { X, FileText, Loader2, AlertCircle, Users } from "lucide-react";
+import { X, FileText, Loader2, AlertCircle, Users, Pin } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,8 @@ interface NoteTabProps {
   noteId: string;
   title: string;
   isActive: boolean;
+  isPinned?: boolean;
+  color?: string | null;
   syncState?: EstadoSincronizacaoNota;
   isShared?: boolean;
   onActivate: () => void;
@@ -29,6 +31,7 @@ interface NoteTabProps {
   onCompartilhar: () => void;
   onAbrirTelaAmpla: () => void;
   onVincular: () => void;
+  onEscolherCor: (posicao: { x: number; y: number }) => void;
   onFecharOutras: () => void;
   onFecharADireita: () => void;
   onArquivar: () => void;
@@ -39,6 +42,8 @@ export function NoteTab({
   tabId,
   title,
   isActive,
+  isPinned,
+  color,
   syncState,
   isShared,
   onActivate,
@@ -49,12 +54,13 @@ export function NoteTab({
   onCompartilhar,
   onAbrirTelaAmpla,
   onVincular,
+  onEscolherCor,
   onFecharOutras,
   onFecharADireita,
   onArquivar,
   onExcluir,
 }: NoteTabProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tabId });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tabId, disabled: isPinned });
   const horizontalTransform = transform ? { ...transform, y: 0 } : null;
   const [menuAberto, setMenuAberto] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
@@ -63,6 +69,7 @@ export function NoteTab({
     transform: CSS.Transform.toString(horizontalTransform),
     transition,
     opacity: isDragging ? 0.55 : 1,
+    ...(color ? { borderLeftColor: color, borderLeftWidth: 2 } : undefined),
   };
 
   return (
@@ -93,10 +100,17 @@ export function NoteTab({
             setMenuPos({ x: event.clientX, y: event.clientY });
             setMenuAberto(true);
           }}
-          title={title}
-          className="flex h-full min-w-0 max-w-[160px] cursor-grab items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 active:cursor-grabbing"
+          title={isPinned ? `${title} (fixada)` : title}
+          className={cn(
+            "flex h-full min-w-0 max-w-[160px] items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70",
+            isPinned ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
+          )}
         >
-          <FileText size={11} className="shrink-0 opacity-60" aria-hidden="true" />
+          {isPinned ? (
+            <Pin size={11} className="shrink-0 opacity-70" aria-label="Fixada" />
+          ) : (
+            <FileText size={11} className="shrink-0 opacity-60" aria-hidden="true" />
+          )}
           {syncState === "salvando" && <Loader2 size={10} className="shrink-0 animate-spin text-blue-400" aria-label="Salvando" />}
           {(syncState === "erro" || syncState === "conflito") && (
             <AlertCircle size={10} className="shrink-0 text-rose-400" aria-label="Erro de sincronização" />
@@ -105,31 +119,38 @@ export function NoteTab({
           <span className="truncate text-[11px] font-medium">{title || "Sem título"}</span>
         </button>
 
-        <button
-          type="button"
-          aria-label={`Fechar nota ${title}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onClose();
-          }}
-          className="mr-1 shrink-0 rounded p-0.5 opacity-0 outline-none transition-all hover:bg-rose-500/10 hover:text-rose-400 focus-visible:opacity-100 group-hover/notetab:opacity-60"
-        >
-          <X size={10} aria-hidden="true" />
-        </button>
+        {!isPinned && (
+          <button
+            type="button"
+            aria-label={`Fechar nota ${title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClose();
+            }}
+            className="mr-1 shrink-0 rounded p-0.5 opacity-0 outline-none transition-all hover:bg-rose-500/10 hover:text-rose-400 focus-visible:opacity-100 group-hover/notetab:opacity-60"
+          >
+            <X size={10} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <DropdownMenuContent align="start" className="w-52">
         <DropdownMenuItem onClick={onRenomear}>Renomear</DropdownMenuItem>
-        <DropdownMenuItem onClick={onFixar}>Fixar</DropdownMenuItem>
+        <DropdownMenuItem onClick={onFixar}>{isPinned ? "Desafixar" : "Fixar"}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onEscolherCor(menuPos)}>Cor da aba</DropdownMenuItem>
         <DropdownMenuItem onClick={onDuplicar}>Duplicar</DropdownMenuItem>
         <DropdownMenuItem onClick={onCompartilhar}>Compartilhar</DropdownMenuItem>
         <DropdownMenuItem onClick={onAbrirTelaAmpla}>Abrir em janela maior</DropdownMenuItem>
         <DropdownMenuItem onClick={onVincular}>Vincular a um registro</DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onClose}>Fechar</DropdownMenuItem>
-        <DropdownMenuItem onClick={onFecharOutras}>Fechar outras</DropdownMenuItem>
-        <DropdownMenuItem onClick={onFecharADireita}>Fechar as da direita</DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {!isPinned && (
+          <>
+            <DropdownMenuItem onClick={onClose}>Fechar</DropdownMenuItem>
+            <DropdownMenuItem onClick={onFecharOutras}>Fechar outras</DropdownMenuItem>
+            <DropdownMenuItem onClick={onFecharADireita}>Fechar as da direita</DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onClick={onArquivar}>Arquivar</DropdownMenuItem>
         <DropdownMenuItem onClick={onExcluir} className="text-rose-400 focus:text-rose-400">
           Excluir

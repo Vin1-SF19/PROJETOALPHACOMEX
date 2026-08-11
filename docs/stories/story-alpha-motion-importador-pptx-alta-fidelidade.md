@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress — implementação concluída; validação visual do fixture real pendente por ausência do PPTX anexado
+In Progress — implementação e regressão no PPTX real concluídas; comparação visual independente indisponível no servidor
 
 ## Executor Assignment
 
@@ -34,7 +34,7 @@ Pipeline alvo:
 6. Imagens em `p:pic` e `p:sp/a:blipFill` resolvem relationships, preferem SVG, preservam `srcRect`, stretch/tile, rotação, flip, opacidade e aspect ratio sem `object-fit: cover` indiscriminado.
 7. `custGeom` preserva paths OOXML e usa SVG/clipPath/mask como fallback localizado quando não houver equivalente nativo.
 8. Texto preserva `TextBody -> Paragraph -> Run`, estilos por run, métricas em centésimos de ponto, margens, alinhamento, spacing, indentação, bullets/tabs, wrap/anchor/vert e os três modos de autofit.
-9. `FontResolver` aplica fonte/peso/estilo quando disponível, aguarda `document.fonts.ready` para medições e reporta substituições sem fazê-las silenciosamente.
+9. `FontResolver` aplica fonte/peso/estilo quando disponível, solicita cada família com `document.fonts.load`, aguarda `document.fonts.ready` para medições e reporta substituições sem fazê-las silenciosamente.
 10. Fills transparentes/ausentes e TextBoxes whitespace-only sem efeito visual são tratados como conteúdo válido/ignorado silenciosamente, não como erro.
 11. Style references `lnRef/fillRef/effectRef/fontRef`, linhas/bordas e efeitos principais (ao menos outer shadow) são resolvidos pelo Theme e renderizados.
 12. Ordem de `spTree` é preservada entre tipos e dentro de grupos; elementos visuais de Master/Layout são mesclados sem duplicar placeholders.
@@ -46,6 +46,7 @@ Pipeline alvo:
 18. O fixture real importa 18/18 slides, resolve os assets esperados e satisfaz as validações visuais descritas para slides 1–8; testes sintéticos cobrem os recursos genéricos sem hardcodes do fixture.
 19. Compatibilidade com slides existentes e editabilidade dos tipos já suportados são preservadas; nenhuma reescrita do editor ou migration de banco é introduzida.
 20. `npm run lint`, `npm run typecheck`, `npm test` e `npm run build` são executados; falhas preexistentes ou ambientais são separadas das regressões desta story.
+21. O arquivo real `Plano de Marketing.pptx` importa 21/21 slides sem elementos ignorados/não convertidos, incluindo `custGeom` preenchido por `gradFill`, e seu upload multipart preserva exatamente o tamanho do binário.
 
 ## Blueprint de Integração
 
@@ -85,7 +86,7 @@ Pipeline alvo:
 - Preservar o isolamento `try/catch` por elemento e slide.
 - Não alterar Prisma/schema; qualquer necessidade de migration exige ciclo Vault separado.
 - Não duplicar o render engine: editor, preview e export continuam usando `RenderComponente`.
-- O arquivo PPTX real não está presente no workspace nesta execução; AC-18 só pode ser fechado após o usuário anexá-lo novamente.
+- O fixture histórico de 18 slides não está presente; a regressão desta correção usa o arquivo real `Plano de Marketing.pptx`, de 21 slides, fornecido pelo usuário em 2026-08-11.
 - Render de referência depende de LibreOffice/Aspose/ONLYOFFICE disponível no ambiente; a ausência deve produzir estado informativo.
 - O worktree já contém mudanças não relacionadas; esta story não pode revertê-las nem incluí-las acidentalmente.
 
@@ -98,14 +99,15 @@ Pipeline alvo:
 - [x] Mapear/renderizar efeitos, linhas, fallback e metadata (AC: 11, 13, 14, 19)
 - [x] Integrar APIs/modal, preservação do original e diagnóstico (AC: 14, 15, 16, 17)
 - [x] Remover o `413` de produção com upload direto multipart e conectar todos os blobs do Alpha Motion ao store `MOTION` (AC: 15, 16)
-- [ ] Validar o fixture real de 18 slides quando o arquivo for disponibilizado (AC: 18)
+- [ ] Validar o fixture histórico de 18 slides quando ele voltar a estar disponível (AC: 18)
+- [x] Validar o deck real reportado de 21 slides, sem hardcodes do fixture, e registrar a indisponibilidade do renderer independente (AC: 17, 21)
 - [x] Executar quality gates e atualizar esta checklist/File List (AC: 20)
 
 ## Testing
 
 - Vitest em `tests/apresentacoes/pptx-parser.test.ts` e arquivos adicionais em `tests/apresentacoes/`.
 - Casos sintéticos para background `bg1 -> lt1 -> sysClr/lastClr`, color transforms, placeholders, grupos rotacionados/flipados, crop, rich text, whitespace, style refs, shadow, linhas, z-order e fallback.
-- Regressão real: 18 slides e comparação com renderer independente, condicionada à disponibilidade do fixture e renderer.
+- Regressão real: `Plano de Marketing.pptx`, 21 slides; comparação com renderer independente condicionada à disponibilidade desse renderer.
 
 ## CodeRabbit Integration
 
@@ -122,6 +124,7 @@ Pipeline alvo:
 | 2026-08-07 | 1.0 | Story criada a partir da especificação integral do usuário e do reconhecimento do pipeline existente. | River |
 | 2026-08-07 | 2.0 | Pipeline OOXML intermediário, render fiel, referência independente, diff visual, segurança e regressões sintéticas implementados. | Dex |
 | 2026-08-11 | 2.1 | Upload PPTX direto/multipart, prévia sem base64 e store dedicado `MOTION` aplicados para eliminar o limite 413 em produção. | Dex |
+| 2026-08-11 | 2.2 | `custGeom` com `gradFill` convertido em SVG, fontes carregadas antes da checagem e regressão concluída no deck real de 21 slides. | Dex |
 
 ## Dev Agent Record
 
@@ -132,8 +135,8 @@ GPT-5 Codex
 ### Debug Log References
 
 - `npx vitest run tests/apresentacoes/pptx-parser.test.ts tests/apresentacoes/pptx-ooxml-core.test.ts` — 25/25.
-- `npm test` — 1033/1034; uma falha preexistente por timeout em `tests/google-calendar/cli.test.ts`.
-- `npm run typecheck` — sem erro nos arquivos da story; falhas preexistentes em `ExclusaoFiscal`, Radar e testes Google Calendar.
+- `npm test` — 1035/1036; uma falha preexistente por timeout em `tests/google-calendar/cli.test.ts`.
+- `npm run typecheck` — sem erro nos arquivos da story; falhas fora do importador em `ExclusaoFiscal`, Radar, Notas (alteração paralela) e testes Google Calendar.
 - ESLint direcionado a todos os arquivos da correção — PASS; `npm run lint` global não concluiu dentro do teto de 180 segundos.
 - `npm run build:player` — PASS.
 - `npm run build` — bloqueado antes do Next build por `EPERM` ao substituir `node_modules/.prisma/client/query_engine-windows.dll.node` (arquivo em uso no ambiente).
@@ -143,6 +146,11 @@ GPT-5 Codex
 - ESLint direcionado aos 10 arquivos alterados na correção de produção — PASS.
 - `npx tsc --noEmit --pretty false` — nenhum erro novo; permanecem erros preexistentes em `ExclusaoFiscal`, Radar e testes Google Calendar.
 - Smoke real do store configurado em `.env.local` — listagem, escrita e remoção aprovadas sem resíduo.
+- `npx vitest run tests/apresentacoes/pptx-parser.test.ts tests/apresentacoes/pptx-ooxml-core.test.ts tests/apresentacoes/pptx-upload.test.ts` — 30/30.
+- Regressão direta em `Plano de Marketing.pptx` — 21/21 slides, 0 ignorados, 0 não convertidos; os três `Freeform 5` com gradiente foram gerados como imagem SVG.
+- Smoke multipart com o arquivo real — 7.084.495 bytes enviados e confirmados por `head` com tamanho idêntico; blob temporário removido ao final.
+- ESLint direcionado aos cinco arquivos de código/teste desta correção — PASS; `npm run lint` global permaneceu ativo por mais de cinco minutos e foi encerrado.
+- `npm run build:player` e `npx next build` — PASS; 70/70 páginas geradas e as rotas de upload, prévia e importação PPTX presentes.
 
 ### Completion Notes List
 
@@ -151,14 +159,17 @@ GPT-5 Codex
 - Rich text por run, herança de placeholder, quebras intercaladas, métricas de fonte, crop/tile, flip, opacidade, linhas e sombras foram propagados ao render compartilhado.
 - O PPTX original e referências PowerPoint são preservados; assets repetidos são deduplicados por SHA-256.
 - A prévia aguarda fontes, reporta substituições e produz Original/Importado/Diferença quando o renderer independente está disponível.
-- A validação visual do arquivo real e a lista real de fontes ausentes permanecem pendentes porque somente a especificação textual foi anexada, sem o `.pptx`.
+- O arquivo real de 21 slides foi processado integralmente sem elementos ignorados ou não convertidos; a comparação pixel a pixel permanece indisponível porque não há renderer PPTX independente configurado no servidor.
 - O binário PPTX agora vai direto do navegador ao Vercel Blob com multipart; as APIs recebem somente uma referência JSON validada por store, caminho e apresentação.
 - Imagens da prévia usam blobs temporários em vez de `data:` URIs, mantendo também a resposta abaixo do limite da Function; cancelamento e confirmação executam limpeza protegida.
 - Assets, fontes, imagens extraídas, referências e originais novos usam `MOTION_READ_WRITE_TOKEN`; exclusões e catálogo de fontes preservam compatibilidade com o store legado.
+- Formas livres com `custGeom` e gradiente linear agora preservam stops, cores e transparência em um SVG localizado, em vez de serem descartadas.
+- A detecção de fontes solicita explicitamente o carregamento antes de testar disponibilidade, eliminando falsos avisos para Montserrat e Open Sans empacotadas.
 
 ### File List
 
 - `docs/stories/story-alpha-motion-importador-pptx-alta-fidelidade.md`
+- `.bibble/memory/integration-points.md`
 - `scripts/render-pptx-reference.ps1`
 - `src/actions/slides.ts`
 - `src/actions/apresentacao-assets.ts`
@@ -207,4 +218,4 @@ GPT-5 Codex
 
 ## QA Results
 
-- **CONCERNS:** regressões sintéticas e renderer independente aprovados; aceite visual final permanece bloqueado até o `.pptx` real de 18 slides ser anexado nesta tarefa. Gates globais também contêm falhas preexistentes documentadas acima.
+- **CONCERNS:** regressões sintéticas e importação do deck real de 21 slides aprovadas sem elementos perdidos; a comparação visual independente permanece indisponível no servidor. Gates globais também contêm falhas preexistentes documentadas acima.

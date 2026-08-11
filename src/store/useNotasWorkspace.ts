@@ -16,11 +16,13 @@ interface NotasWorkspaceStore {
   syncState: Record<string, EstadoSincronizacaoNota>;
 
   hidratar: (state: { tabs: NotaTab[]; activeId: string | null }) => void;
-  abrirAba: (noteId: string, title: string) => void;
+  abrirAba: (noteId: string, title: string, opts?: { pinned?: boolean; color?: string | null }) => void;
   fecharAba: (tabId: string) => void;
   ativarAba: (tabId: string) => void;
   reordenarAbas: (draggedId: string, targetId: string) => void;
   renomearAba: (tabId: string, title: string) => void;
+  definirCorAba: (tabId: string, color: string | null) => void;
+  definirPinnedAba: (noteId: string, pinned: boolean) => void;
   setViewerMode: (mode: ViewerMode) => void;
   setViewerHeight: (height: number) => void;
   toggleTaskbar: () => void;
@@ -38,7 +40,7 @@ export const useNotasWorkspace = create<NotasWorkspaceStore>((set) => ({
 
   hidratar: ({ tabs, activeId }) => set({ tabs, activeTabId: activeId, hydrated: true }),
 
-  abrirAba: (noteId, title) =>
+  abrirAba: (noteId, title, opts) =>
     set((state) => {
       const existente = state.tabs.find((tab) => tab.noteId === noteId);
       if (existente) {
@@ -46,7 +48,7 @@ export const useNotasWorkspace = create<NotasWorkspaceStore>((set) => ({
       }
       const id = `nota-tab-${noteId}`;
       return {
-        tabs: [...state.tabs, { id, noteId, title }],
+        tabs: [...state.tabs, { id, noteId, title, pinned: opts?.pinned, color: opts?.color }],
         activeTabId: id,
         viewerMode: state.viewerMode === "RECOLHIDO" ? "COMPACTO" : state.viewerMode,
       };
@@ -56,6 +58,9 @@ export const useNotasWorkspace = create<NotasWorkspaceStore>((set) => ({
     set((state) => {
       const idx = state.tabs.findIndex((tab) => tab.id === tabId);
       if (idx === -1) return state;
+      // Abas fixadas não fecham pelo fluxo normal — precisam ser desafixadas primeiro (mesma
+      // regra da aba fixa "IAlpha" na barra principal do painel).
+      if (state.tabs[idx].pinned) return state;
       const restantes = state.tabs.filter((tab) => tab.id !== tabId);
       const activeTabId =
         state.activeTabId === tabId
@@ -81,6 +86,16 @@ export const useNotasWorkspace = create<NotasWorkspaceStore>((set) => ({
   renomearAba: (tabId, title) =>
     set((state) => ({
       tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, title } : tab)),
+    })),
+
+  definirCorAba: (tabId, color) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, color } : tab)),
+    })),
+
+  definirPinnedAba: (noteId, pinned) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.noteId === noteId ? { ...tab, pinned } : tab)),
     })),
 
   setViewerMode: (viewerMode) => set({ viewerMode }),

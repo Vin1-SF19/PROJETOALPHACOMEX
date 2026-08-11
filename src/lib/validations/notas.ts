@@ -150,6 +150,16 @@ export const favoritarNotaSchema = z.object({
 });
 export type FavoritarNotaInput = z.infer<typeof favoritarNotaSchema>;
 
+export const definirCorNotaSchema = z.object({
+  noteId: z.string().min(1),
+  color: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Cor deve ser um hex válido, ex: #f59e0b")
+    .nullable(),
+});
+export type DefinirCorNotaInput = z.infer<typeof definirCorNotaSchema>;
+
 export const criarTagSchema = z.object({
   name: z.string().trim().min(1).max(40),
   color: z.string().trim().min(1).max(30),

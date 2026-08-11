@@ -26,7 +26,7 @@ export async function ObterWorkspaceNotas() {
     db.userOpenNoteTab.findMany({
       where: { userId: usuario.id },
       orderBy: { position: "asc" },
-      include: { note: { select: { id: true, title: true, deletedAt: true } } },
+      include: { note: { select: { id: true, title: true, color: true, deletedAt: true } } },
     }),
   ]);
 
@@ -46,6 +46,7 @@ export async function ObterWorkspaceNotas() {
           id: aba.id,
           noteId: aba.noteId,
           title: aba.note.title,
+          color: aba.note.color,
           isPinned: aba.isPinned,
           isActive: aba.isActive,
         })),
@@ -90,7 +91,9 @@ export async function FecharAbaNota(noteId: string) {
   const usuario = await sessaoUsuario();
   if (!usuario) return { success: false as const, error: "Não autorizado" };
 
-  await db.userOpenNoteTab.deleteMany({ where: { userId: usuario.id, noteId } });
+  // Abas fixadas não fecham pelo fluxo normal (mesma regra aplicada no store client) —
+  // reforçado aqui para não depender só da UI esconder o botão de fechar.
+  await db.userOpenNoteTab.deleteMany({ where: { userId: usuario.id, noteId, isPinned: false } });
   return { success: true as const };
 }
 

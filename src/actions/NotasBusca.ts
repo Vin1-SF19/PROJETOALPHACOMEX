@@ -6,11 +6,13 @@ import {
   buscarNotasSchema,
   fixarNotaSchema,
   favoritarNotaSchema,
+  definirCorNotaSchema,
   criarTagSchema,
   aplicarTagSchema,
   type BuscarNotasInput,
   type FixarNotaInput,
   type FavoritarNotaInput,
+  type DefinirCorNotaInput,
   type CriarTagInput,
   type AplicarTagInput,
 } from "@/lib/validations/notas";
@@ -154,6 +156,32 @@ export async function FixarNota(input: FixarNotaInput) {
   }
 
   await db.note.update({ where: { id: parsed.data.noteId }, data: { isPinned: parsed.data.fixada } });
+
+  // Uma nota fixada sempre aparece como aba permanente na barra global — cria a aba se ela
+  // ainda não estiver aberta, ou só sincroniza a flag se já estiver. Desafixar NÃO fecha a
+  // aba (o usuário decide fechá-la manualmente), só a libera para fechar normalmente de novo.
+  if (parsed.data.fixada) {
+    const maiorPosicao = await db.userOpenNoteTab.aggregate({
+      where: { userId: usuario.id },
+      _max: { position: true },
+    });
+    await db.userOpenNoteTab.upsert({
+      where: { userId_noteId: { userId: usuario.id, noteId: parsed.data.noteId } },
+      create: {
+        userId: usuario.id,
+        noteId: parsed.data.noteId,
+        position: (maiorPosicao._max.position ?? -1) + 1,
+        isPinned: true,
+      },
+      update: { isPinned: true },
+    });
+  } else {
+    await db.userOpenNoteTab.updateMany({
+      where: { userId: usuario.id, noteId: parsed.data.noteId },
+      data: { isPinned: false },
+    });
+  }
+
   return { success: true as const };
 }
 
@@ -169,6 +197,21 @@ export async function FavoritarNota(input: FavoritarNotaInput) {
   }
 
   await db.note.update({ where: { id: parsed.data.noteId }, data: { isFavorite: parsed.data.favorita } });
+  return { success: true as const };
+}
+
+export async function DefinirCorNota(input: DefinirCorNotaInput) {
+  const usuario = await sessaoUsuario();
+  if (!usuario) return { success: false as const, error: "Não autorizado" };
+
+  const parsed = definirCorNotaSchema.safeParse(input);
+  if (!parsed.success) return { success: false as const, error: "Dados inválidos" };
+
+  if (!(await podeEditarNota(usuario, parsed.data.noteId))) {
+    return { success: false as const, error: "Sem permissão" };
+  }
+
+  await db.note.update({ where: { id: parsed.data.noteId }, data: { color: parsed.data.color } });
   return { success: true as const };
 }
 

@@ -26,10 +26,10 @@ import { AtualizarNota } from "@/actions/Notas";
 import { SlashCommand } from "./slash-command";
 import { mentionSuggestion } from "./mention-suggestion";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
+import { getNotaRascunhoStorageKey } from "@/lib/notas-tabs";
 import { cn } from "@/lib/utils";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
-const RASCUNHO_STORAGE_PREFIX = "painel_alpha_nota_rascunho_v1";
 
 function ToolbarButton({
   ativo,
@@ -79,7 +79,7 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
   const renomearAba = useNotasWorkspace((state) => state.renomearAba);
   const tabs = useNotasWorkspace((state) => state.tabs);
 
-  const rascunhoKey = `${RASCUNHO_STORAGE_PREFIX}_${noteId}`;
+  const rascunhoKey = getNotaRascunhoStorageKey(noteId);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -214,8 +214,8 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
   if (!editor) return null;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-1 border-b border-white/5 px-2 py-1.5">
+    <div className="flex h-full w-full min-w-0 flex-col">
+      <div className="flex flex-wrap items-center gap-1 border-b border-white/5 px-2 py-1.5">
         <ToolbarButton title="Título" ativo={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
           <Heading1 size={15} />
         </ToolbarButton>
@@ -292,10 +292,10 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
           debounceRef.current = setTimeout(salvar, AUTOSAVE_DEBOUNCE_MS);
         }}
         placeholder="Sem título"
-        className="border-b border-white/5 bg-transparent px-4 py-2 text-sm font-semibold text-white outline-none placeholder:text-slate-600"
+        className="w-full border-b border-white/5 bg-transparent px-4 py-2 text-sm font-semibold text-white outline-none placeholder:text-slate-600"
       />
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-w-0 flex-1 overflow-y-auto">
         <EditorContent editor={editor} />
       </div>
     </div>

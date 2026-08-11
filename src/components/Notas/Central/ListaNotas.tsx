@@ -55,7 +55,7 @@ export function ListaNotas({
   accent,
 }: ListaNotasProps) {
   return (
-    <div className="flex h-full w-full max-w-sm shrink-0 flex-col border-r border-white/5">
+    <div className="flex h-full w-full min-w-0 flex-col">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
         <span className="text-[10px] uppercase tracking-wide text-slate-600">Ordenar por</span>
         <select

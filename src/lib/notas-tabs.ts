@@ -3,6 +3,8 @@ export interface NotaTab {
   noteId: string;
   title: string;
   pinned?: boolean;
+  /** Cor escolhida para a nota (hex) — persiste mesmo com a aba fechada, pois vem de `Note.color`, não do estado da aba. */
+  color?: string | null;
 }
 
 export interface NotasTabsState {
@@ -11,6 +13,7 @@ export interface NotasTabsState {
 }
 
 const STORAGE_KEY_PREFIX = "painel_alpha_notas_tabs_v1_user";
+const RASCUNHO_STORAGE_PREFIX = "painel_alpha_nota_rascunho_v1";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -24,7 +27,8 @@ function isStoredNotaTab(value: unknown): value is NotaTab {
     value.id.trim().length > 0 &&
     typeof value.noteId === "string" &&
     value.noteId.trim().length > 0 &&
-    typeof value.title === "string"
+    typeof value.title === "string" &&
+    (value.color === undefined || value.color === null || typeof value.color === "string")
   );
 }
 
@@ -34,6 +38,23 @@ export function getNotasTabsStorageKey(userId: number): string {
   }
 
   return `${STORAGE_KEY_PREFIX}_${userId}`;
+}
+
+export function getNotaRascunhoStorageKey(noteId: string): string {
+  return `${RASCUNHO_STORAGE_PREFIX}_${noteId}`;
+}
+
+/**
+ * Chamado ao arquivar/excluir uma nota — sem isso, um rascunho de edição sobrevive no
+ * localStorage apontando para uma nota que não existe mais (ou foi movida para a lixeira), e
+ * seria reaplicado por engano se um ID de nota fosse reutilizado.
+ */
+export function limparRascunhoLocalDaNota(noteId: string): void {
+  try {
+    localStorage.removeItem(getNotaRascunhoStorageKey(noteId));
+  } catch {
+    /* localStorage indisponível — best-effort */
+  }
 }
 
 export function normalizeStoredNotaTabs(value: unknown): NotaTab[] {
@@ -54,6 +75,7 @@ export function normalizeStoredNotaTabs(value: unknown): NotaTab[] {
       noteId: candidate.noteId,
       title: candidate.title.trim() || "Sem título",
       pinned: candidate.pinned === true,
+      color: candidate.color ?? null,
     });
   }
 

@@ -117,5 +117,15 @@ export async function VerificarLembretesPendentes() {
     }
   }
 
+  // Marca como notificado assim que o Pusher é disparado — sem isso, a mesma checagem
+  // periódica (a cada 5min enquanto o painel está aberto) reencontra o lembrete ainda
+  // "PENDENTE" e reenvia a notificação para sempre, mesmo que o usuário já tenha visto.
+  if (lembretesVencidos.length > 0) {
+    await db.noteReminder.updateMany({
+      where: { id: { in: lembretesVencidos.map((l) => l.id) } },
+      data: { status: "NOTIFICADO" },
+    });
+  }
+
   return { success: true as const, data: lembretesVencidos.map((l) => ({ id: l.id, noteId: l.noteId, noteTitle: l.note.title })) };
 }

@@ -5,6 +5,10 @@ import { Pin, Star, Archive, Trash2, Tag as TagIcon, Link2, Share2, History, Mes
 import { toast } from "sonner";
 import { FixarNota, FavoritarNota } from "@/actions/NotasBusca";
 import { ArquivarNota, MoverNotaParaLixeira, ExcluirNotaDefinitivamente } from "@/actions/Notas";
+import { FecharAbaNota } from "@/actions/NotasWorkspace";
+import { useNotasWorkspace } from "@/store/useNotasWorkspace";
+import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
+import { limparRascunhoLocalDaNota } from "@/lib/notas-tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +37,22 @@ interface PainelPropriedadesProps {
 
 export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent }: PainelPropriedadesProps) {
   const [processando, setProcessando] = useState(false);
+  const tabs = useNotasWorkspace((state) => state.tabs);
+  const fecharAba = useNotasWorkspace((state) => state.fecharAba);
+  const removerNotificacoesDaNota = useNotasNotificacoes((state) => state.removerNotificacoesDaNota);
+
+  // Chamado ao arquivar/excluir a partir da Central — a nota pode estar aberta como aba na
+  // barra global ao mesmo tempo; sem isso a aba fica "pendurada" apontando para uma nota que
+  // não está mais ativa, e notificações/rascunhos antigos continuam referenciando-a.
+  function limparResquiciosDaNota(noteId: string) {
+    const tabAberta = tabs.find((tab) => tab.noteId === noteId);
+    if (tabAberta) {
+      fecharAba(tabAberta.id);
+      void FecharAbaNota(noteId);
+    }
+    removerNotificacoesDaNota(noteId);
+    limparRascunhoLocalDaNota(noteId);
+  }
 
   async function toggleFixar() {
     setProcessando(true);
@@ -56,6 +76,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
     setProcessando(true);
     await ArquivarNota(nota.id);
     setProcessando(false);
+    limparResquiciosDaNota(nota.id);
     toast.success("Nota arquivada");
     onAtualizado();
   }
@@ -64,6 +85,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
     setProcessando(true);
     await MoverNotaParaLixeira(nota.id);
     setProcessando(false);
+    limparResquiciosDaNota(nota.id);
     toast.success("Nota movida para a lixeira");
     onAtualizado();
   }
@@ -76,6 +98,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
       toast.error(res.error ?? "Não foi possível excluir a nota");
       return;
     }
+    limparResquiciosDaNota(nota.id);
     toast.success("Nota excluída definitivamente");
     onAtualizado();
   }

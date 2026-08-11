@@ -194,6 +194,14 @@ export async function resolverFontesNoDocumento(fonts: string[]): Promise<FontSu
   if (typeof document === "undefined" || !document.fonts) {
     return fonts.map((original) => ({ original, substitute: FONT_SUBSTITUTIONS[original.toLowerCase()] ?? "Arial", available: false }));
   }
+  // `document.fonts.ready` só aguarda fontes que o navegador já decidiu carregar. Como a
+  // prévia ainda não montou os textos neste ponto, @font-face como Montserrat/Open Sans podia
+  // continuar ocioso e `check()` retornava falso apesar do WOFF2 existir no aplicativo.
+  await Promise.all(fonts.map(async (original) => {
+    const limpa = original.replace(/["']/g, "").trim();
+    if (!limpa) return;
+    await document.fonts.load(`16px "${limpa}"`, "Alpha Motion").catch(() => []);
+  }));
   await document.fonts.ready;
   return fonts.map((original) => {
     const available = document.fonts.check(`16px "${original.replace(/"/g, "")}"`);

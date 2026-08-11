@@ -7,7 +7,7 @@ import {
 } from "./xml-utils";
 import { buscarPosicaoNoLayout, lerCorOoxml, lerFundo, resolverContextoTema, resolverReferenciasEstilo, type ContextoTema } from "./tema";
 import { ConsumidorPorTipo, construirArvoreOrdem, xmlDoNo, type NoOrdem } from "./ordem-xml";
-import { construirSvgFormaColorida, construirSvgImagemRecortada, extrairGeometriaCustGeom, type GeometriaCustGeom } from "./geometria";
+import { construirSvgFormaColorida, construirSvgFormaGradiente, construirSvgImagemRecortada, extrairGeometriaCustGeom, type GeometriaCustGeom } from "./geometria";
 import { MATRIZ_IDENTIDADE, matrizDoGrupo, matrizEscala, matrizRotacao, matrizTranslacao, multiplicarMatrizes, transformarRetangulo } from "./matriz-transformacao";
 import type { PptxCrop, PptxEffects, PptxElement, PptxFill, PptxIntermediateSlide, PptxLine, PptxMatrix, PptxSourceRef } from "./modelo-intermediario";
 import { PPTX_IMPORTER_VERSION } from "./modelo-intermediario";
@@ -29,7 +29,7 @@ import { resolverCorOoxml } from "./color-resolver";
  * `<a:custGeom>` é interpretado via `geometria.ts`: retângulo simples (comum em exports de
  * ferramentas de design que nunca usam `prstGeom`) vira `rect` nativo; path real não-retangular
  * vira SVG — recortando (`clipPath`) a imagem quando a forma tem `blipFill`, ou desenhando o
- * path colorido quando é só `solidFill`. Nenhuma forma reconhecida (imagem/texto/cor) é
+ * path preenchido quando usa `solidFill` ou `gradFill`. Nenhuma forma reconhecida (imagem/texto/cor) é
  * descartada em silêncio: toda forma que não vira componente ganha um motivo ESPECÍFICO em
  * `ignorados` (nunca uma mensagem genérica única) e uma entrada em `diagnostico`.
  *
@@ -503,20 +503,24 @@ async function processarShape(
     };
   }
 
-  // 3) custGeom genuinamente não-retangular com fundo sólido — sem card nativo pra path
-  //    arbitrário; fallback SVG (o path real preenchido) em vez de descartar a forma inteira.
-  if (geometria && !geometria.ehRetangulo && geometria.pathSvg && (corFundo || line)) {
+  // 3) custGeom genuinamente não-retangular — sem card nativo pra path arbitrário; fallback
+  //    SVG preserva tanto fundo sólido quanto gradiente, em vez de descartar a forma inteira.
+  if (geometria && !geometria.ehRetangulo && geometria.pathSvg && (corFundo || gradientStops.length > 0 || line)) {
     const { x, y, w, h, rotacao, flipH, flipV } = converterComTransform(bruto, transform, escalaInfo);
     const stroke = line?.color ? {
       color: line.color.css,
       width: Math.max(1, line.widthEmu / Math.max(1, bruto.ext.cx) * geometria.viewBoxW),
       ...(line.dash ? { dash: line.dash.includes("dot") ? "1 2" : "4 3" } : {}),
     } : undefined;
-    const svgMarkup = construirSvgFormaColorida(geometria.pathSvg, geometria.viewBoxW, geometria.viewBoxH, corFundo ?? "none", stroke);
+    const svgMarkup = gradientStops.length > 0
+      ? construirSvgFormaGradiente(geometria.pathSvg, geometria.viewBoxW, geometria.viewBoxH, gradientAngle, gradientStops, stroke)
+      : construirSvgFormaColorida(geometria.pathSvg, geometria.viewBoxW, geometria.viewBoxH, corFundo ?? "none", stroke);
     const bytes = new TextEncoder().encode(svgMarkup);
     return {
       forma: { tipo: "imagem", x, y, w, h, rotacao, flipH, flipV, bytes, mimeType: "image/svg+xml", nomeArquivo: `forma-${nomeForma}.svg` },
-      motivo: null, fillEncontrado: "custGeom colorido (fallback SVG)", relationshipId: null, assetResolvido: null, geometria: descricaoGeometria,
+      motivo: null,
+      fillEncontrado: gradientStops.length > 0 ? "custGeom gradiente (fallback SVG)" : "custGeom colorido (fallback SVG)",
+      relationshipId: null, assetResolvido: null, geometria: descricaoGeometria,
     };
   }
 
@@ -540,7 +544,7 @@ async function processarShape(
   }
 
   // 5) Nada aproveitável — motivo ESPECÍFICO (nunca a antiga mensagem genérica).
-  const tipoFill = effectiveGradientFill ? "gradFill sem stops resolvíveis"
+  const tipoFill = effectiveGradientFill ? (gradientStops.length > 0 ? "gradFill resolvido sem geometria renderizável" : "gradFill sem stops resolvíveis")
     : unsupportedPatternFill ? "pattFill (padrão, sem equivalente no schema)"
     : spPr?.["a:noFill"] ? "noFill (sem preenchimento — provável forma só de contorno)"
     : "sem fill declarado ou não resolvido";

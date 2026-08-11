@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolverCorOoxml } from "@/lib/apresentacoes/pptx/color-resolver";
 import { aplicarMatriz, matrizDoGrupo, transformarRetangulo } from "@/lib/apresentacoes/pptx/matriz-transformacao";
-import { extrairTextBody, pilhaCssDaFonte, textoTemConteudoVisual } from "@/lib/apresentacoes/pptx/texto";
+import { extrairTextBody, pilhaCssDaFonte, resolverFontesNoDocumento, textoTemConteudoVisual } from "@/lib/apresentacoes/pptx/texto";
 import { lerFundo, type ContextoTema } from "@/lib/apresentacoes/pptx/tema";
 import { resolverCaminhoRelativo } from "@/lib/apresentacoes/pptx/xml-utils";
 import { mapearSlideExtraido } from "@/lib/apresentacoes/pptx/mapear";
@@ -10,6 +10,8 @@ const colorContext = {
   scheme: { lt1: "#FFFFFF", accent1: "#336699" },
   colorMap: { bg1: "lt1", tx1: "accent1" },
 };
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("ColorResolver OOXML", () => {
   it("resolve schemeClr pelo clrMap e aplica alpha/luminosidade", () => {
@@ -89,6 +91,20 @@ describe("texto PPTX", () => {
 
   it("expõe pilha CSS explícita para fallback de fonte", () => {
     expect(pilhaCssDaFonte("SF Pro Display Heavy")).toContain("Inter");
+  });
+
+  it("carrega explicitamente @font-face antes de decidir que a fonte está ausente", async () => {
+    const disponiveis = new Set<string>();
+    const load = vi.fn(async (font: string) => {
+      disponiveis.add(font);
+      return [];
+    });
+    const check = vi.fn((font: string) => disponiveis.has(font));
+    vi.stubGlobal("document", { fonts: { ready: Promise.resolve(), load, check } });
+
+    const [fonte] = await resolverFontesNoDocumento(["Montserrat"]);
+    expect(load).toHaveBeenCalledWith('16px "Montserrat"', "Alpha Motion");
+    expect(fonte).toEqual({ original: "Montserrat", substitute: "Montserrat", available: true });
   });
 });
 

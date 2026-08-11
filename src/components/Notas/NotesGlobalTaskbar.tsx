@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
 import { CriarNota, ObterNota, ArquivarNota, MoverNotaParaLixeira } from "@/actions/Notas";
-import { FixarNota } from "@/actions/NotasBusca";
+import { FixarNota, DefinirCorNota } from "@/actions/NotasBusca";
 import {
   AbrirAbaNota,
   FecharAbaNota,
@@ -27,14 +27,16 @@ import {
   AtualizarWorkspaceNotas,
 } from "@/actions/NotasWorkspace";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
+import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
 import { useNotasAtalhos } from "@/hooks/useNotasAtalhos";
-import { getNotasTabsStorageKey, parseStoredNotasTabsState } from "@/lib/notas-tabs";
+import { getNotasTabsStorageKey, parseStoredNotasTabsState, limparRascunhoLocalDaNota } from "@/lib/notas-tabs";
 import { Z_INDEX } from "@/lib/z-index";
 import { NoteTab } from "./NoteTab";
 import { NoteViewer } from "./NoteViewer";
 import { NotesSearchCommand } from "./NotesSearchCommand";
 import { NoteShareDialog } from "@/components/Notas/Colaboracao/NoteShareDialog";
 import { NoteContextLinkDialog } from "@/components/Notas/Contexto/NoteContextLinkDialog";
+import { NoteColorPicker } from "./NoteColorPicker";
 
 interface NotesGlobalTaskbarProps {
   userId: number;
@@ -66,14 +68,29 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
   const fecharAba = useNotasWorkspace((state) => state.fecharAba);
   const ativarAba = useNotasWorkspace((state) => state.ativarAba);
   const reordenarAbas = useNotasWorkspace((state) => state.reordenarAbas);
+  const definirCorAba = useNotasWorkspace((state) => state.definirCorAba);
+  const definirPinnedAba = useNotasWorkspace((state) => state.definirPinnedAba);
   const setViewerMode = useNotasWorkspace((state) => state.setViewerMode);
   const toggleTaskbar = useNotasWorkspace((state) => state.toggleTaskbar);
+  const removerNotificacoesDaNota = useNotasNotificacoes((state) => state.removerNotificacoesDaNota);
+
+  // Chamado sempre que uma nota é arquivada ou movida para a lixeira — garante que nenhum
+  // resquício de estado em memória/localStorage (notificação já recebida, rascunho não
+  // salvo) sobreviva referenciando uma nota que não está mais ativa.
+  const limparResquiciosDaNota = useCallback(
+    (noteId: string) => {
+      removerNotificacoesDaNota(noteId);
+      limparRascunhoLocalDaNota(noteId);
+    },
+    [removerNotificacoesDaNota],
+  );
 
   const [notaAtiva, setNotaAtiva] = useState<NotaAtivaCarregada | null>(null);
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [carregandoAbertura, setCarregandoAbertura] = useState(true);
   const [noteIdCompartilhar, setNoteIdCompartilhar] = useState<string | null>(null);
   const [noteIdVincular, setNoteIdVincular] = useState<string | null>(null);
+  const [corPickerTab, setCorPickerTab] = useState<{ tabId: string; noteId: string; posicao: { x: number; y: number } } | null>(null);
   const storageKey = getNotasTabsStorageKey(userId);
   const hidratadoDoServidorRef = useRef(false);
   const isTaskbarVisibleAnteriorRef = useRef(isTaskbarVisible);
@@ -106,7 +123,7 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
       const res = await ObterWorkspaceNotas();
       if (res.success) {
         hidratar({
-          tabs: res.data.abas.map((aba) => ({ id: aba.id, noteId: aba.noteId, title: aba.title, pinned: aba.isPinned })),
+          tabs: res.data.abas.map((aba) => ({ id: aba.id, noteId: aba.noteId, title: aba.title, pinned: aba.isPinned, color: aba.color })),
           activeId: res.data.abas.find((aba) => aba.isActive)?.id ?? null,
         });
         setViewerMode(res.data.workspace.viewerMode as never);
@@ -305,6 +322,8 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
                       noteId={tab.noteId}
                       title={tab.title}
                       isActive={tab.id === activeTabId && viewerMode !== "RECOLHIDO"}
+                      isPinned={tab.pinned}
+                      color={tab.color}
                       syncState={syncState[tab.noteId]}
                       onActivate={() => ativarAbaHandler(tab.id, tab.noteId)}
                       onClose={() => fecharAbaHandler(tab.id, tab.noteId)}
@@ -314,13 +333,16 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
                         if (novoTitulo) useNotasWorkspace.getState().renomearAba(tab.id, novoTitulo);
                       }}
                       onFixar={async () => {
-                        const res = await FixarNota({ noteId: tab.noteId, fixada: true });
+                        const novoValor = !tab.pinned;
+                        const res = await FixarNota({ noteId: tab.noteId, fixada: novoValor });
                         if (!res.success) {
-                          toast.error(res.error ?? "Não foi possível fixar a nota");
+                          toast.error(res.error ?? "Não foi possível atualizar a nota");
                           return;
                         }
-                        toast.success("Nota fixada");
+                        definirPinnedAba(tab.noteId, novoValor);
+                        toast.success(novoValor ? "Nota fixada na barra" : "Nota desafixada");
                       }}
+                      onEscolherCor={(posicao) => setCorPickerTab({ tabId: tab.id, noteId: tab.noteId, posicao })}
                       onDuplicar={() => toast.info("Duplicar nota — disponível na Central de Notas (Fase 03)")}
                       onCompartilhar={() => setNoteIdCompartilhar(tab.noteId)}
                       onAbrirTelaAmpla={() => {
@@ -338,11 +360,13 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
                       onArquivar={async () => {
                         await ArquivarNota(tab.noteId);
                         fecharAbaHandler(tab.id, tab.noteId);
+                        limparResquiciosDaNota(tab.noteId);
                         toast.success("Nota arquivada");
                       }}
                       onExcluir={async () => {
                         await MoverNotaParaLixeira(tab.noteId);
                         fecharAbaHandler(tab.id, tab.noteId);
+                        limparResquiciosDaNota(tab.noteId);
                         toast.success("Nota movida para a lixeira");
                       }}
                     />
@@ -381,6 +405,22 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
           open={noteIdVincular !== null}
           onOpenChange={(open) => {
             if (!open) setNoteIdVincular(null);
+          }}
+        />
+      )}
+
+      {corPickerTab && (
+        <NoteColorPicker
+          open={corPickerTab !== null}
+          posicao={corPickerTab.posicao}
+          corAtual={tabs.find((t) => t.id === corPickerTab.tabId)?.color}
+          onOpenChange={(open) => {
+            if (!open) setCorPickerTab(null);
+          }}
+          onEscolher={async (cor) => {
+            definirCorAba(corPickerTab.tabId, cor);
+            const res = await DefinirCorNota({ noteId: corPickerTab.noteId, color: cor });
+            if (!res.success) toast.error(res.error ?? "Não foi possível salvar a cor");
           }}
         />
       )}
