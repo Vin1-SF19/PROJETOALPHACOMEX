@@ -132,11 +132,12 @@ GPT-5 Codex
 ### Debug Log References
 
 - `npx vitest run tests/apresentacoes/pptx-parser.test.ts tests/apresentacoes/pptx-ooxml-core.test.ts` — 25/25.
-- `npm test` — 947/948; uma falha preexistente por timeout em `tests/google-calendar/cli.test.ts`.
+- `npm test` — 1033/1034; uma falha preexistente por timeout em `tests/google-calendar/cli.test.ts`.
 - `npm run typecheck` — sem erro nos arquivos da story; falhas preexistentes em `ExclusaoFiscal`, Radar e testes Google Calendar.
-- ESLint direcionado a todos os arquivos da story — PASS; `npm run lint` global falha em milhares de arquivos preexistentes sob `.aiox-core`, `.agents` e `.claude/worktrees`, fora do escopo da story.
+- ESLint direcionado a todos os arquivos da correção — PASS; `npm run lint` global não concluiu dentro do teto de 180 segundos.
 - `npm run build:player` — PASS.
 - `npm run build` — bloqueado antes do Next build por `EPERM` ao substituir `node_modules/.prisma/client/query_engine-windows.dll.node` (arquivo em uso no ambiente).
+- `npm run build:player` e `npx next build` — PASS; 70/70 páginas geradas e a nova rota `/api/apresentacoes/[id]/pptx-upload` incluída no build de produção.
 - Smoke do renderer independente — PowerPoint COM exportou 1/1 slide sintético para PNG.
 - `npx vitest run tests/apresentacoes/pptx-upload.test.ts tests/apresentacoes/pptx-parser.test.ts tests/apresentacoes/pptx-ooxml-core.test.ts` — 28/28.
 - ESLint direcionado aos 10 arquivos alterados na correção de produção — PASS.
