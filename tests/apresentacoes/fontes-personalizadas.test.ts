@@ -5,11 +5,14 @@ import {
   fontePersonalizadaSchema,
   fontesPersonalizadasSchema,
   LIMITE_FONTES_PERSONALIZADAS,
+  filtrarFontesUsadas,
+  mesclarFontesPersonalizadas,
   nomeFonteJaExiste,
   normalizarFontesPersonalizadas,
   assinaturaConfereComFormato,
   type FontePersonalizada,
 } from "@/lib/apresentacoes/fontes-personalizadas";
+import { caminhoFonteGlobal, fonteGlobalDoBlob } from "@/lib/apresentacoes/fontes-globais";
 import {
   embutirFontesPersonalizadas,
   OrcamentoFontesExcedidoError,
@@ -78,6 +81,39 @@ describe("fontes personalizadas do Alpha Motion", () => {
   it("normaliza dados antigos ou inválidos para biblioteca vazia", () => {
     expect(normalizarFontesPersonalizadas(undefined)).toEqual([]);
     expect(normalizarFontesPersonalizadas([{ nome: "incompleta" }])).toEqual([]);
+  });
+
+  it("mescla o catálogo global e incorpora somente fontes usadas nos componentes", () => {
+    const global = criarFonte({ nome: "Global Sans" });
+    const localDuplicada = criarFonte({ id: "550e8400-e29b-41d4-a716-446655440001", nome: "global sans" });
+    const serif = criarFonte({ id: "550e8400-e29b-41d4-a716-446655440002", nome: "Serif Especial" });
+    const mescladas = mesclarFontesPersonalizadas([global], [localDuplicada, serif]);
+    expect(mescladas).toHaveLength(2);
+    expect(filtrarFontesUsadas(mescladas, [{
+      componentes: [{
+        id: "texto",
+        tipo: "texto",
+        texto: "Marca",
+        tag: "p",
+        x: 0,
+        y: 0,
+        w: 300,
+        h: 100,
+        zIndex: 1,
+        rotacao: 0,
+        fontFamily: "Serif Especial",
+      }],
+    }])).toEqual([serif]);
+  });
+
+  it("reconstrói os metadados da fonte global pelo caminho do Blob", () => {
+    const pathname = caminhoFonteGlobal("550e8400-e29b-41d4-a716-446655440000", "Fonte da Equipe", "marca.woff2");
+    expect(fonteGlobalDoBlob({
+      pathname,
+      url: "https://arquivos.exemplo.com/marca.woff2",
+      size: 2048,
+      uploadedAt: new Date("2026-08-11T10:00:00.000Z"),
+    })).toMatchObject({ nome: "Fonte da Equipe", formato: "woff2", tamanhoBytes: 2048 });
   });
 
   it("bloqueia exportação antes de baixar fontes acima do orçamento", async () => {

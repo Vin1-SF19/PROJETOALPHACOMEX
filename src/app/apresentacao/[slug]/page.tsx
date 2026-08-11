@@ -6,7 +6,8 @@ import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import type { DadosApresentacaoExportada } from "@/apresentacoes-player/dados-tipos";
-import { normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { filtrarFontesUsadas, mesclarFontesPersonalizadas, normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { listarFontesGlobais } from "@/lib/apresentacoes/fontes-globais";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false, follow: false } };
@@ -30,22 +31,28 @@ export default async function ApresentacaoPublicaPage({ params }: { params: Prom
   });
   if (!apresentacao || !apresentacaoPublicaDisponivel(apresentacao)) notFound();
 
-  const dados: DadosApresentacaoExportada = {
-    titulo: apresentacao.titulo,
-    tema: apresentacao.tema,
-    fontesPersonalizadas: normalizarFontesPersonalizadas(
+  const slides = apresentacao.slides.map((slide) => ({
+    id: slide.id,
+    ordem: slide.ordem,
+    transicaoEntrada: slide.transicaoEntrada,
+    componentes: (slide.dadosJson as { componentes?: ComponenteSlide[] } | null)?.componentes ?? [],
+    canvas: obterCanvasSeguro((slide.dadosJson as { canvas?: CanvasConfig } | null)?.canvas),
+    animacaoConfig: (slide.dadosJson as { animacaoConfig?: SlideAnimationConfig } | null)?.animacaoConfig ?? null,
+  }));
+  const fontesDisponiveis = mesclarFontesPersonalizadas(
+    await listarFontesGlobais(),
+    normalizarFontesPersonalizadas(
       apresentacao.slides
         .map((slide) => (slide.dadosJson as { fontesPersonalizadas?: FontePersonalizada[] } | null)?.fontesPersonalizadas)
         .find(Array.isArray),
     ),
-    slides: apresentacao.slides.map((slide) => ({
-      id: slide.id,
-      ordem: slide.ordem,
-      transicaoEntrada: slide.transicaoEntrada,
-      componentes: (slide.dadosJson as { componentes?: ComponenteSlide[] } | null)?.componentes ?? [],
-      canvas: obterCanvasSeguro((slide.dadosJson as { canvas?: CanvasConfig } | null)?.canvas),
-      animacaoConfig: (slide.dadosJson as { animacaoConfig?: SlideAnimationConfig } | null)?.animacaoConfig ?? null,
-    })),
+  );
+
+  const dados: DadosApresentacaoExportada = {
+    titulo: apresentacao.titulo,
+    tema: apresentacao.tema,
+    fontesPersonalizadas: filtrarFontesUsadas(fontesDisponiveis, slides),
+    slides,
   };
 
   return <PublicPresentationPlayer dados={dados} />;

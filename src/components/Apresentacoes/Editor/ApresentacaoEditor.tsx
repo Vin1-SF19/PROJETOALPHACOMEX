@@ -207,7 +207,7 @@ export function ApresentacaoEditor({
     <FontesPersonalizadasProvider apresentacaoId={apresentacaoId} fontesIniciais={fontesPersonalizadasIniciais} aguardarAntesDeSalvar={salvarAlteracoesPendentes}>
     <ReducedMotionSimuladoProvider>
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="flex h-screen flex-col bg-[#020617] text-slate-200">
+      <div className="flex h-dvh min-h-0 flex-col bg-[#020617] text-slate-200">
         <EditorKeyboardShortcuts />
         <BarraSuperiorEditor
           titulo={titulo}
@@ -222,18 +222,18 @@ export function ApresentacaoEditor({
           assetsIniciais={assetsIniciais}
           temaAtual={tema}
         />
-        <div className="flex flex-1 overflow-hidden">
-          <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-white/5 bg-slate-950/60">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <aside className="flex w-[clamp(11rem,18vw,16rem)] shrink-0 flex-col overflow-hidden border-r border-white/5 bg-slate-950/60">
             <SidebarSlides />
             <div className="h-px bg-white/5" />
             <SidebarComponentes />
           </aside>
 
-          <main className="flex-1 overflow-hidden">
+          <main className="min-w-0 flex-1 overflow-hidden">
             <CanvasArea tema={tema} />
           </main>
 
-          <aside className="w-72 shrink-0 overflow-y-auto border-l border-white/5 bg-slate-950/60">
+          <aside className="w-[clamp(15rem,21vw,18rem)] shrink-0 overflow-y-auto border-l border-white/5 bg-slate-950/60">
             <PainelPropriedades />
           </aside>
         </div>

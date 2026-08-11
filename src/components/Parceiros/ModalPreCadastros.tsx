@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, UserPlus, Loader2, Check, Ban, Mail, Phone, MapPin, Building2, RotateCcw, ExternalLink } from "lucide-react";
+import { X, UserPlus, Loader2, Check, Ban, Mail, Phone, MapPin, Building2, RotateCcw, ExternalLink, Pencil, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { listarPreCadastros, aprovarPreCadastro, rejeitarPreCadastro } from "@/actions/convites-parceiro";
+import { podeAprovar } from "@/lib/parceiros/pre-cadastro-checklist";
+import ModalEditarPreCadastro from "./ModalEditarPreCadastro";
 
 type StatusPreCadastro = "PENDENTE" | "APROVADO" | "REJEITADO";
 
@@ -30,6 +32,9 @@ type PreCadastro = {
   nomeFantasia: string | null;
   cnpj: string | null;
   sobre: string | null;
+  tipoRecebimento: string | null;
+  souRepresentante: boolean;
+  representantesExtra: string | null;
   termoVersao: string;
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -58,6 +63,7 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
   const [lista, setLista] = useState<PreCadastro[]>([]);
   const [loading, setLoading] = useState(false);
   const [processando, setProcessando] = useState<number | null>(null);
+  const [editando, setEditando] = useState<PreCadastro | null>(null);
   const itemFocoRef = useRef<HTMLDivElement | null>(null);
 
   const recarregar = (status: StatusPreCadastro) => {
@@ -169,6 +175,12 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
                   <span className="text-[9px] text-slate-600 shrink-0">{new Date(p.createdAt).toLocaleDateString("pt-BR")}</span>
                 </div>
 
+                {aba === "PENDENTE" && !podeAprovar(p) && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg mb-2 text-[10px] font-bold" style={{ background: "rgba(244,63,94,0.08)", color: "#fda4af" }}>
+                    <AlertTriangle size={12} className="shrink-0" /> Faltam dados obrigatórios para aprovar — clique em Editar
+                  </div>
+                )}
+
                 <div className="grid sm:grid-cols-2 gap-1.5 text-[11px] text-slate-400 mb-3">
                   <Info icon={<Mail size={11} />} v={p.email} />
                   <Info icon={<Phone size={11} />} v={p.whatsapp ? `${p.telefone} · WhatsApp ${p.whatsapp}` : p.telefone} />
@@ -196,6 +208,13 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
                   <div className="flex gap-2">
                     {aba === "PENDENTE" && (
                       <>
+                        <button
+                          onClick={() => setEditando(p)}
+                          disabled={processando === p.id}
+                          className="flex items-center gap-1 px-3 h-8 rounded-lg border border-blue-500/30 text-blue-400 text-[10px] font-black uppercase hover:bg-blue-500/10 transition-all disabled:opacity-50"
+                        >
+                          <Pencil size={12} /> Editar
+                        </button>
                         <button
                           onClick={() => handleRejeitar(p.id)}
                           disabled={processando === p.id}
@@ -240,6 +259,17 @@ export default function ModalPreCadastros({ open, onClose, isAdmin, onAprovado, 
           )}
         </div>
       </div>
+
+      {editando && (
+        <ModalEditarPreCadastro
+          preCadastro={editando}
+          onClose={() => setEditando(null)}
+          onSalvo={() => {
+            setEditando(null);
+            recarregar(aba);
+          }}
+        />
+      )}
     </div>
   );
 }

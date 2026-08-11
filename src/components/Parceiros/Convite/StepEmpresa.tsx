@@ -21,6 +21,8 @@ interface Props {
   sobre: string;
   souRepresentante: boolean;
   representantesExtra: RepresentanteExtra[];
+  cpf: string;
+  dataNascimento: string;
   onChange: (patch: {
     cnpj?: string;
     razaoSocial?: string;
@@ -29,13 +31,15 @@ interface Props {
     sobre?: string;
     souRepresentante?: boolean;
     representantesExtra?: RepresentanteExtra[];
+    cpf?: string;
+    dataNascimento?: string;
   }) => void;
   onBack: () => void;
   onNext: () => void;
 }
 
 export default function StepEmpresa({
-  cnpj, razaoSocial, nomeFantasia, sobre, souRepresentante, representantesExtra, onChange, onBack, onNext,
+  cnpj, razaoSocial, nomeFantasia, sobre, souRepresentante, representantesExtra, cpf, dataNascimento, onChange, onBack, onNext,
 }: Props) {
   const [buscando, setBuscando] = useState(false);
   const [erroBusca, setErroBusca] = useState<string | null>(null);
@@ -85,9 +89,15 @@ export default function StepEmpresa({
   const precisaRepresentante = !souRepresentante;
   const representanteOk = !precisaRepresentante || representantesValidos.length > 0;
 
+  // Quando o próprio preenchedor é o representante, seu CPF e data de nascimento
+  // (coletados lá no Step 1, onde são opcionais para o fluxo PF) passam a ser
+  // obrigatórios aqui — são eles que a aprovação usa para montar o responsável (ver
+  // aprovarPreCadastro em actions/convites-parceiro.ts).
+  const dadosProprioOk = !souRepresentante || (cpf.replace(/\D/g, "").length === 11 && !!dataNascimento);
+
   function handleContinuar() {
     setTentouAvancar(true);
-    if (representanteOk) onNext();
+    if (representanteOk && dadosProprioOk) onNext();
   }
 
   return (
@@ -158,6 +168,32 @@ export default function StepEmpresa({
         <p className="text-[10.5px] text-slate-500 -mt-1">
           Se desmarcado, informe abaixo quem são o(s) representante(s) legais da empresa.
         </p>
+
+        {souRepresentante && (
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Campo label="Seu CPF" obrigatorio>
+              <input
+                value={cpf}
+                onChange={(e) => onChange({ cpf: formatarCpf(e.target.value) })}
+                placeholder="000.000.000-00"
+                className={`${inputCls} font-mono`}
+              />
+            </Campo>
+            <Campo label="Sua Data Nasc." obrigatorio>
+              <input
+                type="date"
+                value={dataNascimento}
+                onChange={(e) => onChange({ dataNascimento: e.target.value })}
+                className={inputCls}
+              />
+            </Campo>
+            {tentouAvancar && !dadosProprioOk && (
+              <p className="text-[11px] text-rose-400 col-span-2">
+                Informe seu CPF e data de nascimento — são obrigatórios para você ser cadastrado como representante da empresa.
+              </p>
+            )}
+          </div>
+        )}
 
         {!souRepresentante && (
           <div className="space-y-3 pt-1">

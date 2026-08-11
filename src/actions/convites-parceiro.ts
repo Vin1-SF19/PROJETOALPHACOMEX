@@ -190,6 +190,11 @@ const PreCadastroSchema = z.object({
 }).refine(
   (d) => d.tipoRecebimento !== "PJ" || d.souRepresentante !== false || (d.representantesExtra && d.representantesExtra.length > 0),
   { message: "Adicione ao menos um representante da empresa", path: ["representantesExtra"] },
+).refine(
+  // Espelha a exigência de aprovarPreCadastro (souRepresentante && pc.cpf && pc.dataNascimento):
+  // sem isso o pré-cadastro é salvo mas fica impossível de aprovar depois.
+  (d) => d.tipoRecebimento !== "PJ" || d.souRepresentante === false || (!!d.cpf && d.cpf.replace(/\D/g, "").length === 11 && !!d.dataNascimento?.trim()),
+  { message: "Informe seu CPF e data de nascimento — obrigatórios para você ser o representante da empresa", path: ["cpf"] },
 );
 
 /**
@@ -291,6 +296,7 @@ export async function listarPreCadastros(status: "PENDENTE" | "APROVADO" | "REJE
       telefone: true, whatsapp: true, cep: true, logradouro: true, numero: true,
       complemento: true, bairro: true, cidade: true,
       areasAtuacao: true, nomeEmpresa: true, razaoSocial: true, nomeFantasia: true, cnpj: true, sobre: true,
+      tipoRecebimento: true, souRepresentante: true, representantesExtra: true,
       termoVersao: true, termoAceitoEm: true, status: true, createdAt: true, updatedAt: true,
       parceiroId: true, aprovadoPorId: true,
     },
@@ -317,6 +323,83 @@ export async function contarPreCadastrosPendentes() {
   const ctx = await getCtx();
   if (!ctx?.podeAcessarParceiros) return 0;
   return db.preCadastroParceiro.count({ where: { status: "PENDENTE" } });
+}
+
+const RepresentanteEdicaoSchema = z.object({
+  nome: z.string().min(2, "Informe o nome do representante"),
+  cpf: z.string().min(11, "CPF do representante inválido"),
+  dataNascimento: z.string().min(1, "Informe a data de nascimento do representante"),
+  cargo: z.string().max(80).optional(),
+});
+
+// Edição pela equipe (via ModalEditarPreCadastro) — mais permissiva que
+// PreCadastroSchema (formulário público): todo campo é opcional aqui porque a
+// edição é parcial (corrige só o que falta), a obrigatoriedade real de cada
+// campo é decidida por avaliarPendencias()/aprovarPreCadastro(), não aqui.
+const EdicaoPreCadastroSchema = z.object({
+  nomeCompleto: z.string().min(2).max(200).optional(),
+  cpf: z.string().max(20).optional(),
+  dataNascimento: z.string().max(20).optional(),
+  whatsapp: z.string().max(30).optional(),
+  cep: z.string().max(9).optional(),
+  logradouro: z.string().max(150).optional(),
+  numero: z.string().max(30).optional(),
+  complemento: z.string().max(30).optional(),
+  bairro: z.string().max(150).optional(),
+  cidade: z.string().max(150).optional(),
+  uf: z.string().length(2).optional(),
+  tipoRecebimento: z.enum(["PF", "PJ"]).optional(),
+  souRepresentante: z.boolean().optional(),
+  representantesExtra: z.array(RepresentanteEdicaoSchema).max(10).optional(),
+  razaoSocial: z.string().max(200).optional(),
+  nomeFantasia: z.string().max(200).optional(),
+  cnpj: z.string().max(20).optional(),
+});
+
+/**
+ * Edita um pré-cadastro PENDENTE (ou REJEITADO) para corrigir dados faltantes
+ * antes de aprovar — usado quando aprovarPreCadastro() bloqueou por falta de
+ * representante/documento. Não altera status nem cria Parceiro.
+ */
+export async function atualizarPreCadastro(preCadastroId: number, input: z.infer<typeof EdicaoPreCadastroSchema>) {
+  const ctx = await getCtx();
+  if (!ctx || (!ctx.isAdmin && !ctx.podeAprovar)) return { success: false as const, error: "Sem permissão para editar pré-cadastros" };
+
+  const pc = await db.preCadastroParceiro.findUnique({ where: { id: preCadastroId }, select: { id: true, status: true } });
+  if (!pc) return { success: false as const, error: "Pré-cadastro não encontrado" };
+  if (pc.status === "APROVADO") return { success: false as const, error: "Pré-cadastro já foi aprovado — não é mais editável" };
+
+  const parsed = EdicaoPreCadastroSchema.safeParse(input);
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  const d = parsed.data;
+
+  await db.preCadastroParceiro.update({
+    where: { id: preCadastroId },
+    data: {
+      ...(d.nomeCompleto !== undefined && { nomeCompleto: d.nomeCompleto.trim() }),
+      ...(d.cpf !== undefined && { cpf: d.cpf.replace(/\D/g, "") || null }),
+      ...(d.dataNascimento !== undefined && { dataNascimento: d.dataNascimento.trim() || null }),
+      ...(d.whatsapp !== undefined && { whatsapp: d.whatsapp.trim() || null, telefone: d.whatsapp.trim() }),
+      ...(d.cep !== undefined && { cep: d.cep.replace(/\D/g, "") || null }),
+      ...(d.logradouro !== undefined && { logradouro: d.logradouro.trim() || null }),
+      ...(d.numero !== undefined && { numero: d.numero.trim() || null }),
+      ...(d.complemento !== undefined && { complemento: d.complemento.trim() || null }),
+      ...(d.bairro !== undefined && { bairro: d.bairro.trim() || null }),
+      ...(d.cidade !== undefined && { cidade: d.cidade.trim() || null }),
+      ...(d.uf !== undefined && { uf: d.uf.toUpperCase() }),
+      ...(d.tipoRecebimento !== undefined && { tipoRecebimento: d.tipoRecebimento }),
+      ...(d.souRepresentante !== undefined && { souRepresentante: d.souRepresentante }),
+      ...(d.representantesExtra !== undefined && {
+        representantesExtra: d.representantesExtra.length > 0 ? JSON.stringify(d.representantesExtra) : null,
+      }),
+      ...(d.razaoSocial !== undefined && { razaoSocial: d.razaoSocial.trim() || null }),
+      ...(d.nomeFantasia !== undefined && { nomeFantasia: d.nomeFantasia.trim() || null }),
+      ...(d.cnpj !== undefined && { cnpj: d.cnpj.replace(/\D/g, "") || null }),
+    },
+  });
+
+  revalidatePath("/PainelAlpha/Parceiros");
+  return { success: true as const };
 }
 
 /**

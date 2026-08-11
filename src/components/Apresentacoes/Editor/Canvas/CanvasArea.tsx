@@ -13,8 +13,6 @@ import { GuiasAlinhamento } from "./GuiasAlinhamento";
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
-/** Espaço reservado ao redor do slide dentro da área de rolagem — mesmo valor do `p-12` abaixo. */
-const RESPIRO_VISUALIZACAO_PX = 48;
 
 interface CanvasAreaProps {
   tema: TemaResumo | null;
@@ -37,33 +35,29 @@ export function CanvasArea({ tema }: CanvasAreaProps) {
     <SlidePortalPreview componentes={proximoSlide?.componentes ?? null} canvas={proximoSlide?.canvas} />
   );
 
-  // Ajusta o zoom uma vez para o slide inteiro caber e ficar bem centralizado na área
-  // visível — dispara ao montar o editor e sempre que o FORMATO do canvas mudar (16:9 →
-  // vertical etc). ResizeObserver garante a primeira medida real (o container pode reportar
-  // 0 no instante exato do mount, mesmo problema já catalogado em animated-shader-background.tsx).
-  // Some após a primeira medida útil — nunca sobrescreve um zoom que o usuário já ajustou
-  // manualmente depois, só reage a um formato de canvas novo.
+  // Mantém o slide enquadrado quando o formato ou a área útil mudam. O ResizeObserver
+  // cobre resize da janela, zoom do sistema e redistribuição das barras laterais.
   useEffect(() => {
     const area = areaVisualizacaoRef.current;
     if (!area) return;
 
     const ajustarParaCaber = () => {
-      const larguraDisponivel = area.clientWidth - RESPIRO_VISUALIZACAO_PX * 2;
-      const alturaDisponivel = area.clientHeight - RESPIRO_VISUALIZACAO_PX * 2;
+      const estilo = window.getComputedStyle(area);
+      const larguraDisponivel = area.clientWidth - Number.parseFloat(estilo.paddingLeft) - Number.parseFloat(estilo.paddingRight);
+      const alturaDisponivel = area.clientHeight - Number.parseFloat(estilo.paddingTop) - Number.parseFloat(estilo.paddingBottom);
       if (larguraDisponivel <= 0 || alturaDisponivel <= 0) return;
       const zoomIdeal = Math.min(1, larguraDisponivel / canvas.width, alturaDisponivel / canvas.height);
       setZoom(Number(zoomIdeal.toFixed(2)));
-      resizeObserver.disconnect();
     };
 
     const resizeObserver = new ResizeObserver(ajustarParaCaber);
     resizeObserver.observe(area);
     return () => resizeObserver.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só recalcula quando o FORMATO do canvas muda; setZoom é estável (ação do zustand)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setZoom é uma ação estável do Zustand
   }, [canvas.width, canvas.height]);
 
   return (
-    <div ref={areaVisualizacaoRef} className="relative flex h-full w-full items-center justify-center overflow-auto bg-slate-950 p-12">
+    <div ref={areaVisualizacaoRef} className="relative flex h-full w-full items-center justify-center overflow-auto bg-slate-950 p-4 lg:p-8 2xl:p-12">
       <button
         type="button"
         data-editor-only="true"

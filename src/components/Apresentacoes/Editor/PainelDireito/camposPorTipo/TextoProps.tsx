@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, FileUp, Italic, Minus, Plus, Underline, X } from "lucide-react";
 import { toast } from "sonner";
 import type { TextoComponente } from "@/lib/validations/slide-componentes";
@@ -46,12 +46,14 @@ function BotaoFormato({ ativo, label, onClick, children }: { ativo: boolean; lab
 
 export function TextoProps({ componente, onChange }: { componente: TextoComponente; onChange: (patch: Partial<TextoComponente>) => void }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputTamanhoRef = useRef<HTMLInputElement>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
   const [intervalo, setIntervalo] = useState<IntervaloTexto>({ inicio: 0, fim: 0 });
   const [adicionandoFonte, setAdicionandoFonte] = useState(false);
   const [nomeNovaFonte, setNomeNovaFonte] = useState("");
   const [arquivoNovaFonte, setArquivoNovaFonte] = useState<File | null>(null);
   const [enviandoFonte, setEnviandoFonte] = useState(false);
+  const [tamanhoDigitado, setTamanhoDigitado] = useState(String(componente.fontSize ?? 16));
   const { fontesPersonalizadas, adicionarFonte } = useFontesPersonalizadas();
   const runs = componente.richText?.paragraphs.flatMap((paragraph) => paragraph.runs) ?? [];
   const todosEmNegrito = runs.length > 0 ? runs.every((run) => run.bold) : componente.fontWeight === "bold";
@@ -74,7 +76,17 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
     });
   }
 
-  function aplicarEstilo(patchRun: RichRunPatch, patchComponente: Partial<TextoComponente>) {
+  useEffect(() => {
+    if (document.activeElement !== inputTamanhoRef.current) {
+      setTamanhoDigitado(String(componente.fontSize ?? 16));
+    }
+  }, [componente.fontSize]);
+
+  function aplicarEstilo(
+    patchRun: RichRunPatch,
+    patchComponente: Partial<TextoComponente>,
+    restaurarSelecao = false,
+  ) {
     const richTextBase = componente.richText ?? criarRichTextDoTexto(componente.texto, estiloBase(componente));
     const inicio = temTrechoSelecionado ? intervalo.inicio : 0;
     const fim = temTrechoSelecionado ? intervalo.fim : componente.texto.length;
@@ -85,10 +97,12 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
       richText,
       texto: textoPlanoDoRichText(richText),
     });
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(intervalo.inicio, intervalo.fim);
-    });
+    if (restaurarSelecao) {
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+        textareaRef.current?.setSelectionRange(intervalo.inicio, intervalo.fim);
+      });
+    }
   }
 
   function aplicarAlinhamento(alinhamento: NonNullable<TextoComponente["alinhamento"]>) {
@@ -180,7 +194,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
               </optgroup>
             ))}
             {fontesPersonalizadas.length > 0 && (
-              <optgroup label="Minhas fontes">
+              <optgroup label="Fontes globais">
                 {fontesPersonalizadas.map((fonte) => (
                   <option key={fonte.id} value={fonte.nome} style={{ fontFamily: `"${fonte.nome}", sans-serif` }}>{fonte.nome}</option>
                 ))}
@@ -215,7 +229,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
                   }}
                 />
               </label>
-              <p className="text-[9px] leading-relaxed text-slate-500">Até 10 MB. A fonte fica disponível em todos os slides e será incluída na apresentação exportada.</p>
+              <p className="text-[9px] leading-relaxed text-slate-500">Até 10 MB. A fonte fica disponível globalmente para todos os usuários e nas apresentações exportadas.</p>
               <button
                 type="button"
                 onClick={() => void handleAdicionarFonte()}
@@ -231,12 +245,22 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
         <label className="space-y-1.5">
           <span className="text-[11px] text-slate-400">Tamanho (px)</span>
           <input
+            ref={inputTamanhoRef}
             type="number"
             min={6}
             max={300}
-            value={componente.fontSize ?? 16}
+            value={tamanhoDigitado}
             onChange={(event) => {
-              const fontSize = Math.max(6, Math.min(300, Number(event.target.value)));
+              const proximo = event.target.value;
+              setTamanhoDigitado(proximo);
+              const fontSize = Number(proximo);
+              if (Number.isFinite(fontSize) && fontSize >= 6 && fontSize <= 300) {
+                aplicarEstilo({ fontSize }, { fontSize });
+              }
+            }}
+            onBlur={() => {
+              const fontSize = Math.max(6, Math.min(300, Number(tamanhoDigitado) || 16));
+              setTamanhoDigitado(String(fontSize));
               aplicarEstilo({ fontSize }, { fontSize });
             }}
             className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
@@ -259,7 +283,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
           label="Negrito"
           onClick={() => {
             const bold = !todosEmNegrito;
-            aplicarEstilo({ bold }, { fontWeight: bold ? "bold" : "normal" });
+            aplicarEstilo({ bold }, { fontWeight: bold ? "bold" : "normal" }, true);
           }}
         ><Bold size={15} aria-hidden="true" /></BotaoFormato>
         <BotaoFormato
@@ -267,7 +291,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
           label="Itálico"
           onClick={() => {
             const italic = !todosEmItalico;
-            aplicarEstilo({ italic }, { fontStyle: italic ? "italic" : "normal" });
+            aplicarEstilo({ italic }, { fontStyle: italic ? "italic" : "normal" }, true);
           }}
         ><Italic size={15} aria-hidden="true" /></BotaoFormato>
         <BotaoFormato
@@ -275,7 +299,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
           label="Sublinhado"
           onClick={() => {
             const underline = todosSublinhados ? "none" : "sng";
-            aplicarEstilo({ underline }, { textDecoration: todosSublinhados ? "none" : "underline" });
+            aplicarEstilo({ underline }, { textDecoration: todosSublinhados ? "none" : "underline" }, true);
           }}
         ><Underline size={15} aria-hidden="true" /></BotaoFormato>
       </div>

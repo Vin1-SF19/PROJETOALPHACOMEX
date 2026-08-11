@@ -29,6 +29,11 @@ Ready for Review
 15. Não é introduzida tabela, coluna, migration ou mutação em massa de banco.
 16. A tela inicial identifica o modulo como `Alpha Motion`, sem o titulo legado `Presentation Studio`.
 17. Cada card exibe uma miniatura responsiva do Slide 1 quando ele possui conteudo; slides vazios mantem o placeholder atual.
+18. Digitar o tamanho da fonte, inclusive pelo teclado numerico, mantem o foco no campo e aceita a edicao completa do valor.
+19. Redimensionar um componente de texto escala proporcionalmente a fonte base e os tamanhos dos trechos ricos.
+20. Fontes enviadas por um usuario entram em um catalogo global, ficam disponiveis aos demais usuarios e continuam funcionando no editor, player, link publico e HTML exportado.
+21. A criacao de contorno remove fundo, preenchimento e imagem original, deixando somente o traco ao redor da silhueta.
+22. O editor recalcula o enquadramento quando a viewport muda e mantem zoom e funcoes da barra superior acessiveis em resolucoes menores.
 
 ## Blueprint de Integração
 
@@ -75,6 +80,10 @@ Ready for Review
 - [x] Renomear o dashboard para Alpha Motion e exibir uma miniatura segura do Slide 1 nos cards.
 - [x] Corrigir a camada negativa do background para ele aparecer na miniatura do Slide 1.
 - [x] Substituir qualquer simulacao por um mini visualizador real do Slide 1 usando o renderer compartilhado.
+- [x] Corrigir foco do input numerico e escalar tipografia no redimensionamento do texto.
+- [x] Compartilhar fontes adicionadas em catalogo global sem alterar o schema do banco.
+- [x] Gerar contorno transparente sem fundo ou preenchimento.
+- [x] Compactar o editor e recalcular o zoom conforme a area disponivel.
 
 ## Testing
 
@@ -100,6 +109,7 @@ Ready for Review
 | 2026-08-10 | 2.9 | Normalizacao de z-index na miniatura para preservar o background fixo abaixo do conteudo. | Codex |
 | 2026-08-10 | 3.0 | Background separado do conteudo e representado por composicoes estaticas fieis aos cinco estilos do Alpha Motion. | Codex |
 | 2026-08-10 | 3.1 | Miniatura substituida por mini visualizador real do Slide 1, montado apenas proximo da viewport. | Codex |
+| 2026-08-11 | 3.2 | Input numerico corrigido, tipografia escalavel, fontes globais, contorno vazado e editor responsivo. | Codex |
 
 ## Dev Agent Record
 
@@ -155,6 +165,9 @@ GPT-5 Codex
 - Mini visualizador real: 315/315 testes do Alpha Motion, 3/3 testes direcionados, ESLint do escopo, `git diff --check` e `npx next build` com 70 paginas aprovados; preserva os tipos reais dos componentes, o background e a ordem das camadas.
 - Suite global: 1025/1026 testes aprovados; permanece apenas o timeout preexistente em `tests/google-calendar/cli.test.ts`. O lint global excedeu o limite de 180 segundos, enquanto o ESLint dos arquivos alterados passou.
 - Background fiel da miniatura: `npm test` aprovou 1026/1027 casos e manteve somente o timeout preexistente de `tests/google-calendar/cli.test.ts`; typecheck e lint globais permaneceram no baseline documentado.
+- Melhorias de texto/fontes/contorno/responsividade: 320/320 testes do Alpha Motion e 24/24 direcionados aprovados; ESLint do escopo e `git diff --check` aprovados.
+- Gates globais desta revisao: `npm test` aprovou 1030/1031 casos, restando apenas o timeout preexistente do Google Calendar; typecheck manteve somente os quatro erros baseline; lint global excedeu 180s.
+- Build desta revisao: `npm run build` encontrou o `EPERM` conhecido no `prisma generate`; `npm run build:player` e `npx next build` foram aprovados separadamente com 70 paginas.
 
 ### Completion Notes List
 
@@ -182,6 +195,11 @@ GPT-5 Codex
 - Miniaturas validam o JSON antes do render e convertem video, audio, 3D e fundos animados em placeholders estaticos para evitar consumo excessivo no grid.
 - A ordem das camadas da miniatura e deslocada para uma faixa nao negativa, garantindo que o background continue visivel atras do conteudo dentro do SVG.
 - Os cards agora montam o mesmo `RenderComponente` da apresentacao para todos os elementos do Slide 1, inclusive backgrounds, midias e 3D; cards fora da viewport sao desmontados para controlar o custo de renderizacao.
+- O campo numerico de tamanho mantem seu proprio rascunho e nao devolve mais o foco ao textarea durante a digitacao.
+- Redimensionar uma caixa de texto escala a fonte base e os tamanhos explicitos de todos os runs ricos a partir do snapshot inicial do gesto.
+- Novas fontes sao salvas no catalogo global do Vercel Blob e ficam disponiveis a todos; player, link publico e exportacao filtram somente familias realmente usadas.
+- O contorno agora subtrai a silhueta original depois de expandir a mascara, deixando somente o traco transparente por dentro.
+- Barra superior, laterais e canvas usam dimensoes responsivas; o zoom fica no inicio dos controles e o enquadramento reage continuamente a mudancas da viewport.
 - Nenhuma migration, dependência ou alteração estrutural de banco foi necessária.
 - Validação visual autenticada deve ser repetida por um usuário com sessão válida antes da aprovação final de QA.
 - DoD: requisitos funcionais, estrutura, segurança, testes direcionados, documentação e build Next aplicáveis estão concluídos; os gates globais `npm run lint`, `npm test` e `npm run build` permanecem marcados como bloqueados exclusivamente pelas falhas preexistentes descritas no Debug Log.
@@ -241,6 +259,9 @@ GPT-5 Codex
 - `src/lib/apresentacoes/pptx/parser.ts`
 - `src/lib/apresentacoes/pptx/tipos.ts`
 - `src/lib/apresentacoes/fontes-personalizadas.ts`
+- `src/lib/apresentacoes/fontes-globais.ts`
+- `src/lib/apresentacoes/redimensionamento-texto.ts`
+- `src/lib/apresentacoes/remover-fundo.ts`
 - `src/lib/apresentacoes/embutir-fontes-personalizadas.ts`
 - `src/app/api/apresentacoes/fontes/route.ts`
 - `src/app/api/apresentacoes/[id]/exportar-html/route.ts`
@@ -260,6 +281,7 @@ GPT-5 Codex
 - `tests/apresentacoes/alinhamento-canvas.test.ts`
 - `tests/apresentacoes/fontes-locais.test.ts`
 - `tests/apresentacoes/fontes-personalizadas.test.ts`
+- `tests/apresentacoes/redimensionamento-texto.test.ts`
 - `tests/apresentacoes/rich-text-edit.test.ts`
 - `tests/apresentacoes/animacao-catalogo.test.ts`
 - `tests/apresentacoes/texto-justificado-posicionamento.test.ts`

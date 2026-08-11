@@ -7,8 +7,9 @@ import { embutirAssetsNosSlides, OrcamentoAssetsExcedidoError } from "@/lib/apre
 import { nomeDownloadSeguro } from "@/lib/apresentacoes/exportacao";
 import { PLAYER_JS, PLAYER_CSS } from "@/generated/apresentacoes-player-bundle";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
-import { normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { filtrarFontesUsadas, mesclarFontesPersonalizadas, normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
 import { embutirFontesPersonalizadas, OrcamentoFontesExcedidoError } from "@/lib/apresentacoes/embutir-fontes-personalizadas";
+import { listarFontesGlobais } from "@/lib/apresentacoes/fontes-globais";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -65,7 +66,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         .map((slide) => (slide.dadosJson as { fontesPersonalizadas?: FontePersonalizada[] } | null)?.fontesPersonalizadas)
         .find(Array.isArray),
     );
-    fontesPersonalizadas = await embutirFontesPersonalizadas(fontesHospedadas);
+    const fontesDisponiveis = mesclarFontesPersonalizadas(await listarFontesGlobais(), fontesHospedadas);
+    fontesPersonalizadas = await embutirFontesPersonalizadas(filtrarFontesUsadas(fontesDisponiveis, slidesBase));
   } catch (erro) {
     if (erro instanceof OrcamentoAssetsExcedidoError || erro instanceof OrcamentoFontesExcedidoError) {
       return new Response(erro.message, { status: 413 });

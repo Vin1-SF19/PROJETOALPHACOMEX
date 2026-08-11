@@ -244,6 +244,8 @@ export default function ConviteWizard({ token, termo }: Props) {
                 sobre={form.sobre}
                 souRepresentante={form.souRepresentante}
                 representantesExtra={form.representantesExtra}
+                cpf={form.cpf}
+                dataNascimento={form.dataNascimento}
                 onChange={patch}
                 onBack={() => irPara(4)}
                 onNext={handleConcluirEmpresa}

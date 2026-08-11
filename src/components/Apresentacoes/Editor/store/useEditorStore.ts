@@ -441,7 +441,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
     };
   }),
 
-  setZoom: (zoom) => set({ zoom: Math.min(4, Math.max(0.25, zoom)) }),
+  setZoom: (zoom) => set({ zoom: Math.min(4, Math.max(0.1, zoom)) }),
   setGuiasAlinhamento: (guiasAlinhamento) => set({ guiasAlinhamento }),
   redimensionarCanvas: (canvas) => set((state) => ({
     ...registrarHistorico(state),

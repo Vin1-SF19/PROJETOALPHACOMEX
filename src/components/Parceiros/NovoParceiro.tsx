@@ -217,6 +217,9 @@ export default function NovoParceiro({
         toast.error(result.error ?? "Erro ao cadastrar");
         return;
       }
+      if (result.avisoIndicacao) {
+        toast.warning(result.avisoIndicacao, { duration: 10000 });
+      }
       setCredenciais({ loginEmail: result.parceiro.loginEmail, senhaGerada: result.parceiro.senhaGerada, nomeParceiro: result.parceiro.nome });
       setModalCredOpen(true);
     } finally {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -147,13 +147,21 @@ export default function ParceirosClient({
 
   // Filtro live — aplica direto na URL (via router.push), sem botão "Filtrar".
   // Mantém deep-linking: busca/nivel continuam vindo de searchParams no Server Component.
+  // router.push + router.refresh() disparados em sequência competiam entre si (o
+  // refresh podia buscar o RSC payload da URL ainda antiga, antes do push
+  // terminar de aplicar a nova) — o filtro mudava a URL mas a lista nunca
+  // atualizava. useTransition faz o Next aguardar a navegação real terminar
+  // antes de considerar o filtro "aplicado", eliminando a corrida.
   const [buscaInput, setBuscaInput] = useState(busca ?? "");
+  const [, startTransition] = useTransition();
   const aplicarFiltro = useCallback((novaBusca: string, novoNivel: string) => {
     const params = new URLSearchParams();
     if (novaBusca.trim()) params.set("busca", novaBusca.trim());
     if (novoNivel) params.set("nivel", novoNivel);
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    startTransition(() => {
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    });
   }, [router, pathname]);
 
   useEffect(() => {

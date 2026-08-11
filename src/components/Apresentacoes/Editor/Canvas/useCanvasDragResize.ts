@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { calcularAlinhamentoMagnetico, type CaixaAlinhamento } from "@/lib/apresentacoes/alinhamento";
+import { tipografiaAoRedimensionar } from "@/lib/apresentacoes/redimensionamento-texto";
 
 type HandlePosicao = "nw" | "ne" | "sw" | "se";
 
@@ -28,7 +29,8 @@ function coletarOrigensMoviveis(
 }
 
 /** Drag/resize/rotação livre, sempre consolidado em uma única entrada de histórico por gesto. */
-export function useCanvasDragResize(componenteId: string, x: number, y: number, w: number, h: number, rotacao: number) {
+export function useCanvasDragResize(componente: ComponenteSlide) {
+  const { id: componenteId, x, y, w, h, rotacao } = componente;
   const atualizarComponente = useEditorStore((s) => s.atualizarComponente);
   const moverComponentes = useEditorStore((s) => s.moverComponentes);
   const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
@@ -55,6 +57,7 @@ export function useCanvasDragResize(componenteId: string, x: number, y: number, 
     origemY: number;
     origemW: number;
     origemH: number;
+    componenteOrigem: ComponenteSlide;
     handle: HandlePosicao;
   } | null>(null);
   const rotacionando = useRef<{ centroX: number; centroY: number; anguloInicial: number; rotacaoInicial: number } | null>(null);
@@ -108,11 +111,20 @@ export function useCanvasDragResize(componenteId: string, x: number, y: number, 
   const onMouseDownRedimensionar = useCallback((handle: HandlePosicao) => (e: React.MouseEvent) => {
     e.stopPropagation();
     iniciarTransacaoHistorico();
-    redimensionando.current = { startX: e.clientX, startY: e.clientY, origemX: x, origemY: y, origemW: w, origemH: h, handle };
+    redimensionando.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origemX: x,
+      origemY: y,
+      origemW: w,
+      origemH: h,
+      componenteOrigem: componente,
+      handle,
+    };
 
     function onMove(ev: MouseEvent) {
       if (!redimensionando.current) return;
-      const { startX, startY, origemX, origemY, origemW, origemH, handle: handleAtual } = redimensionando.current;
+      const { startX, startY, origemX, origemY, origemW, origemH, componenteOrigem, handle: handleAtual } = redimensionando.current;
       const deltaX = (ev.clientX - startX) / zoomRef.current;
       const deltaY = (ev.clientY - startY) / zoomRef.current;
       let novoX = origemX;
@@ -124,7 +136,10 @@ export function useCanvasDragResize(componenteId: string, x: number, y: number, 
       if (handleAtual === "sw") { novoW = Math.max(MIN_TAMANHO, origemW - deltaX); novoH = Math.max(MIN_TAMANHO, origemH + deltaY); novoX = origemX + (origemW - novoW); }
       if (handleAtual === "ne") { novoW = Math.max(MIN_TAMANHO, origemW + deltaX); novoH = Math.max(MIN_TAMANHO, origemH - deltaY); novoY = origemY + (origemH - novoH); }
       if (handleAtual === "nw") { novoW = Math.max(MIN_TAMANHO, origemW - deltaX); novoH = Math.max(MIN_TAMANHO, origemH - deltaY); novoX = origemX + (origemW - novoW); novoY = origemY + (origemH - novoH); }
-      atualizarComponente(componenteId, { x: novoX, y: novoY, w: novoW, h: novoH });
+      const tipografia = componenteOrigem.tipo === "texto"
+        ? tipografiaAoRedimensionar(componenteOrigem, novoW, novoH)
+        : {};
+      atualizarComponente(componenteId, { x: novoX, y: novoY, w: novoW, h: novoH, ...tipografia });
     }
     function onUp() {
       redimensionando.current = null;
@@ -134,7 +149,7 @@ export function useCanvasDragResize(componenteId: string, x: number, y: number, 
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [atualizarComponente, componenteId, finalizarTransacaoHistorico, h, iniciarTransacaoHistorico, w, x, y]);
+  }, [atualizarComponente, componente, componenteId, finalizarTransacaoHistorico, h, iniciarTransacaoHistorico, w, x, y]);
 
   const onMouseDownRotacionar = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

@@ -59,8 +59,8 @@ export function BarraSuperiorEditor({
   const [modalPresetAberto, setModalPresetAberto] = useState(false);
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-4 overflow-x-auto border-b border-white/5 bg-slate-950/80 px-4">
-      <div className="flex min-w-[220px] shrink-0 items-center gap-3">
+    <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-white/5 bg-slate-950/80 px-2 py-2 lg:flex-nowrap lg:px-4">
+      <div className="flex min-w-[160px] max-w-[240px] flex-1 items-center gap-2 lg:shrink-0">
         <button
           onClick={() => router.push("/PainelAlpha/Apresentacoes")}
           aria-label="Voltar ao painel de apresentações"
@@ -72,11 +72,11 @@ export function BarraSuperiorEditor({
           value={tituloLocal}
           onChange={(e) => setTituloLocal(e.target.value)}
           aria-label="Título da apresentação"
-          className="bg-transparent text-sm font-bold text-white outline-none focus:underline"
+          className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none focus:underline"
         />
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-4">
+      <div className="flex min-w-0 basis-full items-center gap-2 overflow-x-auto lg:ml-auto lg:basis-auto">
         <div className="flex items-center rounded-lg border border-white/5 bg-slate-900/60 p-0.5" role="group" aria-label="Histórico de edição">
           <button
             type="button"
@@ -100,12 +100,30 @@ export function BarraSuperiorEditor({
           </button>
         </div>
 
+        <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/5 bg-slate-900/60 px-1.5 py-1">
+          <button
+            onClick={() => setZoom(zoom - 0.25)}
+            aria-label="Diminuir zoom"
+            className="cursor-pointer rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+          >
+            <ZoomOut size={14} aria-hidden="true" />
+          </button>
+          <span className="w-10 text-center text-[11px] text-slate-400">{Math.round(zoom * 100)}%</span>
+          <button
+            onClick={() => setZoom(zoom + 0.25)}
+            aria-label="Aumentar zoom"
+            className="cursor-pointer rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white"
+          >
+            <ZoomIn size={14} aria-hidden="true" />
+          </button>
+        </div>
+
         <button
           onClick={() => setCentralCriativaAberta(true)}
           aria-label="Abrir Central Criativa"
           className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-[11px] font-medium text-indigo-200 hover:bg-indigo-500/20"
         >
-          <Boxes size={13} aria-hidden="true" /> Central Criativa
+          <Boxes size={13} aria-hidden="true" /> <span className="hidden 2xl:inline">Central Criativa</span>
         </button>
 
         <button
@@ -115,7 +133,7 @@ export function BarraSuperiorEditor({
           className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-60"
         >
           {abrindoApresentacao ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
-          Apresentar
+          <span className="hidden xl:inline">Apresentar</span>
         </button>
 
         <button
@@ -123,7 +141,7 @@ export function BarraSuperiorEditor({
           aria-label="Abrir opções de exportação"
           className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
         >
-          <Download size={13} aria-hidden="true" /> Exportar
+          <Download size={13} aria-hidden="true" /> <span className="hidden 2xl:inline">Exportar</span>
         </button>
 
         <button
@@ -131,7 +149,7 @@ export function BarraSuperiorEditor({
           aria-label="Gerar slide com IA"
           className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
         >
-          <WandSparkles size={13} aria-hidden="true" /> Gerar com IA
+          <WandSparkles size={13} aria-hidden="true" /> <span className="hidden 2xl:inline">Gerar com IA</span>
         </button>
 
         <button
@@ -139,7 +157,7 @@ export function BarraSuperiorEditor({
           aria-label="Escolher tema"
           className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
         >
-          <Palette size={13} aria-hidden="true" /> Tema
+          <Palette size={13} aria-hidden="true" /> <span className="hidden 2xl:inline">Tema</span>
         </button>
 
         <SeletorTransicaoSlide />
@@ -149,7 +167,7 @@ export function BarraSuperiorEditor({
           aria-label="Aplicar preset de animação"
           className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 px-3 py-1.5 text-[11px] text-slate-400 hover:border-white/10 hover:text-white"
         >
-          <Wand2 size={13} aria-hidden="true" /> Presets
+          <Wand2 size={13} aria-hidden="true" /> <span className="hidden 2xl:inline">Presets</span>
         </button>
 
         <ToggleReducedMotionSimulado />
@@ -168,23 +186,6 @@ export function BarraSuperiorEditor({
           )}
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-white/5 bg-slate-900/60 px-1.5 py-1">
-          <button
-            onClick={() => setZoom(zoom - 0.25)}
-            aria-label="Diminuir zoom"
-            className="cursor-pointer rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white"
-          >
-            <ZoomOut size={14} aria-hidden="true" />
-          </button>
-          <span className="w-10 text-center text-[11px] text-slate-400">{Math.round(zoom * 100)}%</span>
-          <button
-            onClick={() => setZoom(zoom + 0.25)}
-            aria-label="Aumentar zoom"
-            className="cursor-pointer rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white"
-          >
-            <ZoomIn size={14} aria-hidden="true" />
-          </button>
-        </div>
       </div>
 
       <SeletorTema

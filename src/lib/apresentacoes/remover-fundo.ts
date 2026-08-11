@@ -124,7 +124,11 @@ export async function criarContornoImagem(
     for (const offset of gerarOffsetsContorno(espessura)) {
       contextoSaida.drawImage(mascara, espessura + offset.x, espessura + offset.y);
     }
+    // Apaga toda a silhueta original depois de expandir a máscara. O PNG final
+    // contém somente o anel externo: sem fundo, preenchimento ou imagem interna.
+    contextoSaida.globalCompositeOperation = "destination-out";
     contextoSaida.drawImage(imagem, espessura, espessura);
+    contextoSaida.globalCompositeOperation = "source-over";
 
     return await new Promise((resolve, reject) => {
       saida.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Falha ao gerar o PNG com contorno.")), "image/png");

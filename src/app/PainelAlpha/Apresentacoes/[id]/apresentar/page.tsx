@@ -6,7 +6,8 @@ import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { obterCanvasSeguro, type CanvasConfig } from "@/lib/apresentacoes/canvas";
 import { isAdminRole } from "@/lib/roles";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
-import { normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { filtrarFontesUsadas, mesclarFontesPersonalizadas, normalizarFontesPersonalizadas, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
+import { listarFontesGlobais } from "@/lib/apresentacoes/fontes-globais";
 
 export const dynamic = "force-dynamic";
 
@@ -59,13 +60,17 @@ export default async function ModoApresentacaoPage({
   const fontesPersonalizadas = apresentacao.slides
     .map((slide) => (slide.dadosJson as { fontesPersonalizadas?: FontePersonalizada[] } | null)?.fontesPersonalizadas)
     .find(Array.isArray);
+  const fontesDisponiveis = mesclarFontesPersonalizadas(
+    await listarFontesGlobais(),
+    normalizarFontesPersonalizadas(fontesPersonalizadas),
+  );
 
   return (
     <ModoApresentacaoClient
       apresentacaoId={apresentacao.id}
       slides={slides}
       tema={apresentacao.tema}
-      fontesPersonalizadas={normalizarFontesPersonalizadas(fontesPersonalizadas)}
+      fontesPersonalizadas={filtrarFontesUsadas(fontesDisponiveis, slides)}
     />
   );
 }

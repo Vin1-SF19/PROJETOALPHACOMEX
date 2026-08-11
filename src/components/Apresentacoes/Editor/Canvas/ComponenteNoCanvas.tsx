@@ -45,14 +45,7 @@ export function ComponenteNoCanvas({
   const selecionado = useEditorStore((s) => s.componentesSelecionadosIds.includes(componente.id));
   const selecaoMultipla = useEditorStore((s) => s.componentesSelecionadosIds.length > 1);
   const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
-  const { onMouseDownMover, onMouseDownRedimensionar, onMouseDownRotacionar } = useCanvasDragResize(
-    componente.id,
-    componente.x,
-    componente.y,
-    componente.w,
-    componente.h,
-    componente.rotacao,
-  );
+  const { onMouseDownMover, onMouseDownRedimensionar, onMouseDownRotacionar } = useCanvasDragResize(componente);
 
   const ehContainer = componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container";
   // Fase 08 — Scroll Reveal no preview do Editor. `animacaoConfig` é do SLIDE ATIVO (mesma

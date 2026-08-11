@@ -1,28 +1,30 @@
-import { put, del } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
-import db from "@/lib/prisma";
 import { checarOwnershipApresentacao } from "@/lib/apresentacoes/ownership";
 import { nomeArquivoSeguro } from "@/lib/apresentacoes/assets";
-import { dadosSlideSchema } from "@/lib/validations/slide-componentes";
 import {
   configuracaoDaFontePorNomeArquivo,
   fontePersonalizadaSchema,
-  LIMITE_FONTES_PERSONALIZADAS,
   nomeFonteJaExiste,
   nomeFontePersonalizadaSchema,
-  normalizarFontesPersonalizadas,
   assinaturaConfereComFormato,
   TAMANHO_MAX_FONTE_PERSONALIZADA_BYTES,
+  type FontePersonalizada,
 } from "@/lib/apresentacoes/fontes-personalizadas";
+import {
+  caminhoFonteGlobal,
+  LIMITE_FONTES_GLOBAIS,
+  listarFontesGlobais,
+} from "@/lib/apresentacoes/fontes-globais";
 
 export const dynamic = "force-dynamic";
 
-class ConflitoFonteError extends Error {}
-
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
+  if (!session?.user?.id) {
+    return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
+  }
 
   let formData: FormData;
   try {
@@ -56,30 +58,27 @@ export async function POST(request: NextRequest) {
   }
 
   const autorizado = await checarOwnershipApresentacao(apresentacaoId, Number(session.user.id), session.user.role);
-  if (!autorizado) return NextResponse.json({ success: false, error: "Sem permissão para editar esta apresentação" }, { status: 403 });
+  if (!autorizado) {
+    return NextResponse.json({ success: false, error: "Sem permissão para editar esta apresentação" }, { status: 403 });
+  }
 
-  const slidesAtuais = await db.slide.findMany({
-    where: { apresentacaoId },
-    orderBy: { ordem: "asc" },
-    select: { id: true, dadosJson: true },
-  });
-  const slidesValidos = slidesAtuais.flatMap((slide) => {
-    const resultado = dadosSlideSchema.safeParse(slide.dadosJson);
-    return resultado.success ? [{ id: slide.id, dados: resultado.data }] : [];
-  });
-  const fontesAtuais = slidesValidos.map((slide) => slide.dados.fontesPersonalizadas).find(Array.isArray) ?? [];
-  if (fontesAtuais.length >= LIMITE_FONTES_PERSONALIZADAS) {
-    return NextResponse.json({ success: false, error: `Limite de ${LIMITE_FONTES_PERSONALIZADAS} fontes atingido.` }, { status: 400 });
+  let fontesGlobais: FontePersonalizada[];
+  try {
+    fontesGlobais = await listarFontesGlobais();
+  } catch (error) {
+    console.error("[POST /api/apresentacoes/fontes] catálogo global indisponível", error);
+    return NextResponse.json({ success: false, error: "O catálogo global de fontes está indisponível no momento." }, { status: 503 });
   }
-  if (nomeFonteJaExiste(fontesAtuais, resultadoNome.data)) {
-    return NextResponse.json({ success: false, error: "Já existe uma fonte com esse nome nesta apresentação." }, { status: 409 });
+  if (fontesGlobais.length >= LIMITE_FONTES_GLOBAIS) {
+    return NextResponse.json({ success: false, error: `Limite global de ${LIMITE_FONTES_GLOBAIS} fontes atingido.` }, { status: 400 });
   }
-  if (slidesValidos.length === 0) {
-    return NextResponse.json({ success: false, error: "A apresentação não possui um slide válido." }, { status: 400 });
+  if (nomeFonteJaExiste(fontesGlobais, resultadoNome.data)) {
+    return NextResponse.json({ success: false, error: "Já existe uma fonte global com esse nome." }, { status: 409 });
   }
 
   const nomeSeguro = nomeArquivoSeguro(arquivo.name) || `fonte.${arquivo.name.split(".").pop()?.toLowerCase()}`;
-  const caminho = `apresentacoes/${apresentacaoId}/fontes/${Date.now()}-${crypto.randomUUID()}-${nomeSeguro}`;
+  const fonteId = crypto.randomUUID();
+  const caminho = caminhoFonteGlobal(fonteId, resultadoNome.data, nomeSeguro);
   let urlEnviada: string | null = null;
 
   try {
@@ -92,7 +91,7 @@ export async function POST(request: NextRequest) {
     urlEnviada = blob.url;
 
     const fonte = fontePersonalizadaSchema.parse({
-      id: crypto.randomUUID(),
+      id: fonteId,
       nome: resultadoNome.data,
       url: blob.url,
       formato: configuracao.formato,
@@ -102,36 +101,10 @@ export async function POST(request: NextRequest) {
       criadoEm: new Date().toISOString(),
     });
 
-    await db.$transaction(async (tx) => {
-      const slides = await tx.slide.findMany({
-        where: { apresentacaoId },
-        orderBy: { ordem: "asc" },
-        select: { id: true, dadosJson: true },
-      });
-      const validos = slides.flatMap((slide) => {
-        const resultado = dadosSlideSchema.safeParse(slide.dadosJson);
-        return resultado.success ? [{ id: slide.id, dados: resultado.data }] : [];
-      });
-      const hospedeiro = validos.find((slide) => slide.dados.fontesPersonalizadas)
-        ?? validos.find((slide) => slide.dados.presetsAnimacao)
-        ?? validos[0];
-      if (!hospedeiro) throw new Error("Nenhum slide válido");
-
-      const existentes = normalizarFontesPersonalizadas(hospedeiro.dados.fontesPersonalizadas);
-      if (existentes.length >= LIMITE_FONTES_PERSONALIZADAS || nomeFonteJaExiste(existentes, fonte.nome)) {
-        throw new ConflitoFonteError("A biblioteca de fontes foi alterada durante o envio.");
-      }
-      await tx.slide.update({
-        where: { id: hospedeiro.id },
-        data: { dadosJson: { ...hospedeiro.dados, fontesPersonalizadas: [...existentes, fonte] } as object },
-      });
-    });
-
     return NextResponse.json({ success: true, fonte });
   } catch (error) {
-    if (urlEnviada) await del(urlEnviada, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(() => undefined);
-    if (error instanceof ConflitoFonteError) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 409 });
+    if (urlEnviada) {
+      await del(urlEnviada, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(() => undefined);
     }
     console.error("[POST /api/apresentacoes/fontes]", error);
     return NextResponse.json({ success: false, error: "Não foi possível adicionar a fonte." }, { status: 500 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 
 export const TAMANHO_MAX_FONTE_PERSONALIZADA_BYTES = 10 * 1024 * 1024;
 export const LIMITE_FONTES_PERSONALIZADAS = 50;
@@ -58,6 +59,38 @@ export function assinaturaConfereComFormato(bytes: Uint8Array, formato: FormatoF
 export function nomeFonteJaExiste(fontes: FontePersonalizada[], nome: string): boolean {
   const nomeNormalizado = nome.trim().toLocaleLowerCase("pt-BR");
   return fontes.some((fonte) => fonte.nome.toLocaleLowerCase("pt-BR") === nomeNormalizado);
+}
+
+export function mesclarFontesPersonalizadas(...listas: FontePersonalizada[][]): FontePersonalizada[] {
+  const porNome = new Map<string, FontePersonalizada>();
+  for (const fonte of listas.flat()) {
+    const chave = fonte.nome.trim().toLocaleLowerCase("pt-BR");
+    if (!porNome.has(chave)) porNome.set(chave, fonte);
+  }
+  return [...porNome.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+function coletarFamilias(componentes: ComponenteSlide[], familias: Set<string>) {
+  for (const componente of componentes) {
+    if (componente.tipo === "texto") {
+      if (componente.fontFamily) familias.add(componente.fontFamily.toLocaleLowerCase("pt-BR"));
+      for (const paragrafo of componente.richText?.paragraphs ?? []) {
+        for (const run of paragrafo.runs) {
+          if (run.fontFamily) familias.add(run.fontFamily.toLocaleLowerCase("pt-BR"));
+        }
+      }
+    }
+    if (componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container") {
+      coletarFamilias(componente.filhos, familias);
+    }
+  }
+}
+
+/** Evita baixar/incorporar todo o catálogo global quando a apresentação usa poucas fontes. */
+export function filtrarFontesUsadas(fontes: FontePersonalizada[], slides: Array<{ componentes: ComponenteSlide[] }>): FontePersonalizada[] {
+  const familias = new Set<string>();
+  for (const slide of slides) coletarFamilias(slide.componentes, familias);
+  return fontes.filter((fonte) => familias.has(fonte.nome.toLocaleLowerCase("pt-BR")));
 }
 
 function stringCssSegura(valor: string): string {

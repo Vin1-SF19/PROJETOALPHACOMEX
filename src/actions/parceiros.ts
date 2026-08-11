@@ -72,6 +72,8 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
   success: boolean;
   error?: string;
   parceiro?: { id: number; loginEmail: string; senhaGerada: string; nome: string };
+  /** Parceiro foi criado normalmente, mas a indicação retroativa (venda já fechada) não pôde ser vinculada — ver texto para o que fazer manualmente. */
+  avisoIndicacao?: string;
 }> {
   try {
     const session = await auth();
@@ -189,6 +191,11 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
         }),
     };
 
+    // A criação do parceiro + vínculo do contrato de origem SEMPRE devem acontecer
+    // juntos (é o cadastro em si — nunca deve falhar por conflito de indicação de
+    // OUTRO cliente). A indicação retroativa (abaixo, fora desta transação) é uma
+    // conveniência best-effort: se ela não puder ser feita, o parceiro continua
+    // criado normalmente e a equipe resolve a indicação manualmente depois.
     const parceiro = origemContratoId
       ? await db.$transaction(async (tx) => {
         const criado = await tx.parceiro.create({ data: parceiroData });
@@ -206,61 +213,55 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
         });
         if (vinculo.count !== 1) throw new Error("PENDENCIA_PARCEIRO_INDISPONIVEL");
 
-        // Se o contrato foi fechado antes da finalização do parceiro, o fluxo
-        // normal de fechamento já passou. Nesse caso, cria o vínculo da indicação
-        // na mesma transação para não perder a origem/comissão retroativamente.
-        if (contratoOrigem?.status === "FECHADO") {
-          const cliente = await tx.clientes.findFirst({
-            where: {
-              cnpj: contratoOrigem.cnpj.replace(/\D/g, ""),
-              servicos: contratoOrigem.servico,
-            },
-            select: {
-              id: true,
-              indicacao: { select: { parceiroId: true } },
-            },
-          });
-          if (!cliente) throw new Error("CLIENTE_FECHADO_NAO_ENCONTRADO");
-          if (cliente.indicacao) throw new Error("CLIENTE_JA_POSSUI_INDICACAO");
-
-          await tx.indicacao.create({
-            data: {
-              parceiroId: criado.id,
-              clienteId: cliente.id,
-              criadoPorId: Number(userId),
-            },
-          });
-        }
-
         return criado;
       })
       : await db.parceiro.create({ data: parceiroData });
 
     revalidatePath("/PainelAlpha/Parceiros");
-    if (origemContratoId) {
-      revalidatePath("/PainelAlpha/Metas");
-      if (contratoOrigem?.status === "FECHADO") {
-        try {
-          await recalcularNivel(parceiro.id);
-        } catch (nivelError) {
-          console.error("[criarParceiro:recalcularNivel]", nivelError);
+
+    // Indicação retroativa (contrato já FECHADO antes do parceiro existir) —
+    // best-effort, fora da transação de criação: um conflito aqui não pode
+    // reverter o cadastro do parceiro, que já está completo e válido.
+    let avisoIndicacao: string | undefined;
+    if (origemContratoId && contratoOrigem?.status === "FECHADO") {
+      try {
+        const cliente = await db.clientes.findFirst({
+          where: {
+            cnpj: contratoOrigem.cnpj.replace(/\D/g, ""),
+            servicos: contratoOrigem.servico,
+          },
+          select: { id: true, indicacao: { select: { parceiroId: true } } },
+        });
+        if (!cliente) {
+          avisoIndicacao = "Parceiro cadastrado, mas o cliente fechado ainda não foi sincronizado com CS & NPS — vincule a indicação manualmente depois.";
+        } else if (cliente.indicacao) {
+          avisoIndicacao = "Parceiro cadastrado, mas o cliente desta venda já possui outro parceiro indicador — revise a indicação manualmente em CS & NPS.";
+        } else {
+          await db.indicacao.create({
+            data: { parceiroId: parceiro.id, clienteId: cliente.id, criadoPorId: Number(userId) },
+          });
         }
-        revalidatePath("/PainelAlpha/CadastroClientes");
+      } catch (indicacaoError) {
+        console.error("[criarParceiro:indicacaoRetroativa]", indicacaoError);
+        avisoIndicacao = "Parceiro cadastrado, mas houve falha ao vincular a indicação da venda já fechada — vincule manualmente em CS & NPS.";
       }
+
+      revalidatePath("/PainelAlpha/Metas");
+      try {
+        await recalcularNivel(parceiro.id);
+      } catch (nivelError) {
+        console.error("[criarParceiro:recalcularNivel]", nivelError);
+      }
+      revalidatePath("/PainelAlpha/CadastroClientes");
     }
-    return { success: true, parceiro: { id: parceiro.id, loginEmail: email, senhaGerada, nome: parceiro.nome } };
+
+    return { success: true, parceiro: { id: parceiro.id, loginEmail: email, senhaGerada, nome: parceiro.nome }, avisoIndicacao };
   } catch (err: unknown) {
     console.error("[criarParceiro]", err);
     const msg = err instanceof Error ? err.message : "Erro interno";
     if (msg.includes("Unique constraint")) return { success: false, error: "Documento já cadastrado" };
     if (msg.includes("PENDENCIA_PARCEIRO_INDISPONIVEL")) {
       return { success: false, error: "Esta pendência foi atualizada por outra pessoa. Recarregue a página." };
-    }
-    if (msg.includes("CLIENTE_FECHADO_NAO_ENCONTRADO")) {
-      return { success: false, error: "O cliente fechado ainda não foi sincronizado com CS & NPS. Tente novamente em instantes." };
-    }
-    if (msg.includes("CLIENTE_JA_POSSUI_INDICACAO")) {
-      return { success: false, error: "Este cliente já possui outro parceiro indicador. Revise o vínculo antes de continuar." };
     }
     return { success: false, error: "Erro ao cadastrar parceiro" };
   }
