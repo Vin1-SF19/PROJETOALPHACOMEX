@@ -122,7 +122,14 @@ export async function ObterCardBpm(cardId: string) {
       include: {
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
         pipeline: { select: { id: true, nome: true } },
-        etapa: true,
+        etapa: {
+          include: {
+            // Transições permitidas a partir da etapa ATUAL — usado pela UI para mostrar só
+            // os destinos alcançáveis (PainelProximaEtapa). Vazio = qualquer destino permitido
+            // (mesmo fallback de MoverCardBpm).
+            transicoesOrigem: { select: { etapaDestinoId: true } },
+          },
+        },
         responsavel: { select: { id: true, nome: true } },
         campoValores: { include: { campo: true } },
         membros: { include: { usuario: { select: { id: true, nome: true } } } },

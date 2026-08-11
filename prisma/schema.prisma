@@ -2913,6 +2913,7 @@ model BpmCard {
   proximoContatoEm       DateTime? // interrompe a automação de 8 dias (cobrança de follow-up); também validado como obrigatório na ENTRADA de "Em Tratativa"/"Sem Viabilidade"
   dataReuniao            DateTime? // data+hora combinadas da reunião (Coluna "Agendar Reunião"), timezone America/Sao_Paulo — mesmo contrato da Agenda Alpha
   googleEventId          String?   // id do evento no Google Calendar, criado via botão "Agendar pelo Google Meet" — permite reagendar/atualizar o mesmo evento depois
+  googleCalendarId       String?   // GoogleCalendarSelecionado.googleCalendarId usado ao criar a reunião — necessário para reagendar via atualizarEventoParcialNoCalendario (achado na Fase D)
   googleMeetLink         String?   // cache do hangoutLink retornado pela API, evita nova chamada só para exibir o link
   statusPosFechamento    String?   // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
   transcricaoReuniao     String?   // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)

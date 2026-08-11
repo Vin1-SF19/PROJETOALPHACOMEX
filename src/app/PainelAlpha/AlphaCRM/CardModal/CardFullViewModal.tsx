@@ -12,6 +12,7 @@ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoServico from "./PainelHistoricoServico";
 import PainelRegistrar from "./PainelRegistrar";
+import PainelReuniao from "./PainelReuniao";
 import PainelProximaEtapa from "./PainelProximaEtapa";
 import {
   DadosEmpresaDrawer,
@@ -80,6 +81,18 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
   const podeMoverEtapa = isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR";
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
+
+  // Máquina de estado (BpmEtapaTransicaoPermitida, ver plano-novos-leads-bpm.md): se a etapa
+  // atual tem QUALQUER transição cadastrada, só os destinos permitidos + a própria etapa atual
+  // (referência visual) aparecem. Sem nenhuma transição cadastrada, mostra todas — mesmo
+  // fallback já aplicado em MoverCardBpm, para não quebrar pipelines sem essa restrição.
+  const transicoesDaEtapaAtual = card?.etapa.transicoesOrigem ?? [];
+  const etapasParaMover =
+    transicoesDaEtapaAtual.length > 0
+      ? etapas.filter(
+          (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
+        )
+      : etapas;
 
   return (
     <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -228,13 +241,20 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
                 accent={accent}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
               />
-              <PainelProximaEtapa
-                card={card}
-                etapas={etapas}
-                podeMoverEtapa={podeMoverEtapa}
-                accent={accent}
-                onMovido={() => { recarregar(); onAtualizado(); }}
-              />
+              <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
+                <PainelReuniao
+                  card={card}
+                  accent={accent}
+                  onAtualizado={() => { recarregar(); onAtualizado(); }}
+                />
+                <PainelProximaEtapa
+                  card={card}
+                  etapas={etapasParaMover}
+                  podeMoverEtapa={podeMoverEtapa}
+                  accent={accent}
+                  onMovido={() => { recarregar(); onAtualizado(); }}
+                />
+              </div>
             </div>
           </div>
         )}
