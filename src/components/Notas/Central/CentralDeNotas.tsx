@@ -183,7 +183,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
           </div>
           <div>
             <h1 className="text-2xl font-black uppercase italic leading-none tracking-tighter text-white sm:text-3xl">
-              Central de <span style={{ color: `rgba(${accent},1)` }}>Notas</span>
+              Bloco de notas <span style={{ color: `rgba(${accent},1)` }}>ALpha</span>
             </h1>
             <p className="ml-0.5 mt-1 text-[10px] font-black uppercase tracking-[0.35em] text-slate-500">
               {totalGeral} nota{totalGeral === 1 ? "" : "s"} no painel

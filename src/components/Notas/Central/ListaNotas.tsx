@@ -96,11 +96,15 @@ export function ListaNotas({
                         : "border-white/[0.06] bg-white/[0.035] hover:border-white/[0.12] hover:bg-white/[0.06]",
                     )}
                     style={
-                      selecionada
+                      nota.color || selecionada
                         ? {
-                            background: `rgba(${accent},0.12)`,
-                            borderColor: `rgba(${accent},0.4)`,
-                            boxShadow: `0 20px 45px -12px rgba(${accent},0.35)`,
+                            ...(selecionada
+                              ? {
+                                  background: `rgba(${accent},0.12)`,
+                                  boxShadow: `0 20px 45px -12px rgba(${accent},0.35)`,
+                                }
+                              : undefined),
+                            borderColor: nota.color ?? `rgba(${accent},0.4)`,
                           }
                         : undefined
                     }

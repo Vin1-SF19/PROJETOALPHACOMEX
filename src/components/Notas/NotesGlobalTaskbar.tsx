@@ -290,7 +290,7 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
 
             <button
               type="button"
-              title="Central de Notas (Ctrl+Alt+N)"
+              title="Bloco de notas ALpha (Ctrl+Alt+N)"
               onClick={() => router.push("/PainelAlpha/Notas")}
               className="flex h-7 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-400 hover:bg-white/5 hover:text-white"
             >
@@ -348,7 +348,7 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
                         toast.success(novoValor ? "Nota fixada na barra" : "Nota desafixada");
                       }}
                       onEscolherCor={(posicao) => setCorPickerTab({ tabId: tab.id, noteId: tab.noteId, posicao })}
-                      onDuplicar={() => toast.info("Duplicar nota — disponível na Central de Notas (Fase 03)")}
+                      onDuplicar={() => toast.info("Duplicar nota — disponível no Bloco de notas ALpha (Fase 03)")}
                       onCompartilhar={() => setNoteIdCompartilhar(tab.noteId)}
                       onAbrirTelaAmpla={() => {
                         ativarAbaHandler(tab.id, tab.noteId);
