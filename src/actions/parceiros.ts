@@ -271,17 +271,18 @@ export async function listarParceiros(busca?: string, nivel?: string) {
   const session = await auth();
   if (!session?.user) return { parceiros: [] };
 
+  // SQLite/LibSQL: o `contains` do Prisma vira LIKE, que aqui só ignora case para
+  // ASCII e NUNCA para acentos (ç/ã/é...) — "joão" nunca casa "João" via LIKE puro,
+  // e o provider tampouco aceita `mode: "insensitive"` (exclusivo de Postgres/Mongo).
+  // Por isso a busca por nome/documento/email é feita em memória após remover
+  // acento+case dos dois lados — mesmo padrão já usado no projeto para busca PT-BR
+  // (ver known-errors.md). O filtro de nível continua no banco (é exato).
+  const normalizar = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const buscaNormalizada = busca?.trim() ? normalizar(busca) : undefined;
+  const documentoBusca = busca?.replace(/\D/g, "");
+
   const parceiros = await db.parceiro.findMany({
-    where: {
-      ...(busca && {
-        OR: [
-          { nome: { contains: busca } },
-          { documento: { contains: busca.replace(/\D/g, "") } },
-          { email: { contains: busca } },
-        ],
-      }),
-      ...(nivel && { nivel }),
-    },
+    where: { ...(nivel && { nivel }) },
     include: {
       endereco: true,
       indicacoes: {
@@ -293,7 +294,15 @@ export async function listarParceiros(busca?: string, nivel?: string) {
     orderBy: { createdAt: "desc" },
   });
 
-  return { parceiros };
+  if (!buscaNormalizada) return { parceiros };
+
+  const filtrados = parceiros.filter((p) =>
+    normalizar(p.nome).includes(buscaNormalizada)
+    || normalizar(p.email).includes(buscaNormalizada)
+    || (documentoBusca && p.documento.includes(documentoBusca)),
+  );
+
+  return { parceiros: filtrados };
 }
 
 const COMISSAO_POR_NIVEL: Record<string, number> = { GOLD: 5, PLATINUM: 10, BLACK: 15 };

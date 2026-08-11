@@ -1,10 +1,10 @@
 "use server";
 
-import { del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
+import { excluirBlobMotion } from "@/lib/apresentacoes/blob";
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
@@ -43,7 +43,7 @@ export async function ExcluirAssetApresentacao(assetId: string) {
     if (emUso) return { success: false, error: "Este arquivo está em uso em um slide. Remova o componente antes de excluir." };
 
     await db.apresentacaoAsset.delete({ where: { id: asset.id } });
-    await del(asset.url, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch((error: unknown) => {
+    await excluirBlobMotion(asset.url).catch((error: unknown) => {
       console.error("[ExcluirAssetApresentacao:blob]", error);
     });
 

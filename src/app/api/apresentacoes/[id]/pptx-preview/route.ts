@@ -1,4 +1,6 @@
+import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
@@ -8,11 +10,11 @@ import { mapearSlideExtraido } from "@/lib/apresentacoes/pptx/mapear";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { resumirDiagnosticos } from "@/lib/apresentacoes/pptx/diagnostico";
 import { renderizarReferenciaPptx } from "@/lib/apresentacoes/pptx/reference-renderer";
+import { excluirBlobMotion, obterTokenMotion } from "@/lib/apresentacoes/blob";
+import { carregarArquivoPptx, ErroEntradaPptx, prefixoPreviewPptx } from "@/lib/apresentacoes/pptx/upload";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-const PPTX_MAX_BYTES = 80 * 1024 * 1024;
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
@@ -29,12 +31,13 @@ async function podeEditar(apresentacaoId: string, userId: number, role?: string)
 
 /**
  * Pré-visualização de um `.pptx` ANTES de importar de verdade: roda o MESMO parser da rota de
- * commit (`importar-pptx`), mas nunca grava nada — nem `Slide` no banco, nem imagem no Blob.
- * Imagens viram `data:` URI inline (bytes convertidos direto, sem round-trip de rede), pra
- * quem cancelar não deixar nenhum resíduo. `ModalPreImportarPptx.tsx` usa essa resposta pra
- * renderizar os slides de verdade (via `RenderComponente`) antes do usuário confirmar.
+ * commit (`importar-pptx`), mas nunca cria `Slide` nem registra asset no banco. Imagens da
+ * prévia usam URLs temporárias no store MOTION para manter a resposta abaixo do limite das
+ * Functions; o modal as remove ao confirmar/cancelar. `ModalPreImportarPptx.tsx` usa essa
+ * resposta para renderizar os slides de verdade antes do usuário confirmar.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const urlsTemporarias: string[] = [];
   try {
     const { id: apresentacaoId } = await params;
     const session = await auth();
@@ -44,20 +47,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const autorizado = await podeEditar(apresentacaoId, userId, session.user.role);
     if (!autorizado) return NextResponse.json({ success: false, error: "Sem permissão para editar esta apresentação" }, { status: 403 });
 
-    const formData = await request.formData();
-    const arquivo = formData.get("file");
-    if (!(arquivo instanceof File)) {
-      return NextResponse.json({ success: false, error: "Arquivo ausente" }, { status: 400 });
-    }
-    if (!arquivo.name.toLowerCase().endsWith(".pptx")) {
-      return NextResponse.json({ success: false, error: "Envie um arquivo .pptx (PowerPoint)." }, { status: 400 });
-    }
-    if (arquivo.size <= 0) {
-      return NextResponse.json({ success: false, error: "O arquivo está vazio." }, { status: 400 });
-    }
-    if (arquivo.size > PPTX_MAX_BYTES) {
-      return NextResponse.json({ success: false, error: `O arquivo excede o limite de ${Math.round(PPTX_MAX_BYTES / 1024 / 1024)} MB.` }, { status: 413 });
-    }
+    const arquivo = await carregarArquivoPptx(request, apresentacaoId);
 
     const ultimoSlide = await db.slide.findFirst({
       where: { apresentacaoId },
@@ -68,12 +58,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const canvas: CanvasConfig = obterCanvasSeguro((ultimoSlide.dadosJson as { canvas?: unknown } | null)?.canvas);
 
-    let buffer: Buffer;
-    try {
-      buffer = Buffer.from(await arquivo.arrayBuffer());
-    } catch {
-      return NextResponse.json({ success: false, error: "Não foi possível ler o arquivo enviado." }, { status: 400 });
-    }
+    const buffer = arquivo.buffer;
 
     let extraido: Awaited<ReturnType<typeof extrairApresentacaoPptx>>;
     try {
@@ -93,18 +78,46 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       height: Math.max(1, Math.round(referenceWidth * canvas.height / canvas.width)),
     }, 40_000);
     const referenceImages = referencia.ok
-      ? referencia.slides.map((slide) => ({ slideNumber: slide.slideNumber, url: `data:image/png;base64,${slide.png.toString("base64")}` }))
+      ? await Promise.all(referencia.slides.map(async (slide) => {
+        const caminho = `${prefixoPreviewPptx(apresentacaoId)}${crypto.randomUUID()}-reference-${slide.slideNumber}.png`;
+        const blob = await put(caminho, slide.png, {
+          access: "public",
+          addRandomSuffix: false,
+          contentType: "image/png",
+          token: obterTokenMotion(),
+        });
+        urlsTemporarias.push(blob.url);
+        return { slideNumber: slide.slideNumber, url: blob.url };
+      }))
       : [];
 
-    // Sem upload de verdade — só base64 inline, em paralelo (é conversão local, não I/O de rede,
-    // mas paralelizar ainda ajuda com decks grandes por não serializar o trabalho de CPU/await).
-    const enviarImagemComoDataUri = async (bytes: Uint8Array, mimeType: string): Promise<string> =>
-      `data:${mimeType};base64,${Buffer.from(bytes).toString("base64")}`;
+    // URLs temporárias mantêm a resposta da Function pequena. Base64 inline fazia decks com
+    // muitas imagens ultrapassarem o mesmo teto de payload que causava o 413 no upload.
+    const cacheUploads = new Map<string, Promise<string>>();
+    const enviarImagemTemporaria = (bytes: Uint8Array, mimeType: string, nomeArquivo: string): Promise<string> => {
+      const hash = createHash("sha256").update(bytes).digest("hex");
+      const existente = cacheUploads.get(hash);
+      if (existente) return existente;
+      const upload = (async () => {
+        const extensao = nomeArquivo.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "bin";
+        const caminho = `${prefixoPreviewPptx(apresentacaoId)}${crypto.randomUUID()}-${hash.slice(0, 12)}.${extensao}`;
+        const blob = await put(caminho, Buffer.from(bytes), {
+          access: "public",
+          addRandomSuffix: false,
+          contentType: mimeType,
+          token: obterTokenMotion(),
+        });
+        urlsTemporarias.push(blob.url);
+        return blob.url;
+      })();
+      cacheUploads.set(hash, upload);
+      return upload;
+    };
 
     const slides = await Promise.all(
       extraido.slides.map(async (slide): Promise<{ componentes: ComponenteSlide[]; canvas: CanvasConfig }> => {
         try {
-          const componentes = await mapearSlideExtraido(slide, enviarImagemComoDataUri);
+          const componentes = await mapearSlideExtraido(slide, enviarImagemTemporaria);
           return {
             componentes,
             canvas: {
@@ -131,12 +144,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         resumoDiagnosticos: resumirDiagnosticos(extraido.diagnosticosDetalhados),
         importerVersion: extraido.intermediateModel.importerVersion,
         referenceImages,
+        temporaryAssetUrls: urlsTemporarias,
         referenceRenderer: referencia.ok
           ? { available: true, name: referencia.renderer }
           : { available: false, reason: referencia.reason },
       },
     });
   } catch (error) {
+    if (urlsTemporarias.length > 0) await excluirBlobMotion(urlsTemporarias).catch(() => undefined);
+    if (error instanceof ErroEntradaPptx) {
+      return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+    }
     console.error("[POST /api/apresentacoes/[id]/pptx-preview]", error);
     return NextResponse.json({ success: false, error: "Erro ao gerar a prévia do PowerPoint." }, { status: 500 });
   }

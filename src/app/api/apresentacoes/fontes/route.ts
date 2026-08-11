@@ -1,4 +1,4 @@
-import { del, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { checarOwnershipApresentacao } from "@/lib/apresentacoes/ownership";
@@ -17,6 +17,7 @@ import {
   LIMITE_FONTES_GLOBAIS,
   listarFontesGlobais,
 } from "@/lib/apresentacoes/fontes-globais";
+import { excluirBlobMotion, obterTokenMotion } from "@/lib/apresentacoes/blob";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       access: "public",
       addRandomSuffix: false,
       contentType: configuracao.mimeType,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      token: obterTokenMotion(),
     });
     urlEnviada = blob.url;
 
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, fonte });
   } catch (error) {
     if (urlEnviada) {
-      await del(urlEnviada, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(() => undefined);
+      await excluirBlobMotion(urlEnviada).catch(() => undefined);
     }
     console.error("[POST /api/apresentacoes/fontes]", error);
     return NextResponse.json({ success: false, error: "Não foi possível adicionar a fonte." }, { status: 500 });

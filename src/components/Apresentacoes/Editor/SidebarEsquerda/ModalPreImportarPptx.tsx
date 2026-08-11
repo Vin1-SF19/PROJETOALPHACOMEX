@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import { Loader2, TriangleAlert, X, RotateCcw, FileWarning } from "lucide-react";
 import {
@@ -34,6 +35,24 @@ interface ModalPreImportarPptxProps {
 type Status = "carregando" | "pronto" | "erro";
 
 const LARGURA_THUMBNAIL = 220;
+const PPTX_MAX_BYTES = 80 * 1024 * 1024;
+const PPTX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+async function limparUploadsTemporarios(apresentacaoId: string, urls: string[]): Promise<void> {
+  const unicas = Array.from(new Set(urls.filter(Boolean)));
+  if (unicas.length === 0) return;
+  await fetch(`/api/apresentacoes/${apresentacaoId}/pptx-upload`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ urls: unicas }),
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
+function caminhoDoUploadPptx(apresentacaoId: string, nome: string): string {
+  const nomeSeguro = nome.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 160);
+  return `apresentacoes/${apresentacaoId}/originais/${crypto.randomUUID()}-${nomeSeguro || "apresentacao.pptx"}`;
+}
 
 /** 1 slide em miniatura — mesma técnica de palco escalado do Modo Apresentação (canvas em
  * tamanho real, `transform: scale()` pra caber na miniatura), renderizando os componentes de
@@ -90,7 +109,11 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const captureRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [excluidos, setExcluidos] = useState<Set<number>>(new Set());
   const [confirmando, setConfirmando] = useState(false);
+  const [progressoUpload, setProgressoUpload] = useState(0);
   const arquivoRef = useRef<File | null>(null);
+  const originalUploadRef = useRef<string | null>(null);
+  const previewAssetsRef = useRef<string[]>([]);
+  const preservarOriginalRef = useRef(false);
 
   useEffect(() => {
     arquivoRef.current = arquivo;
@@ -99,18 +122,51 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   useEffect(() => {
     if (!open || !arquivo) return;
     let cancelado = false;
+    let urlEnviada: string | null = null;
 
     (async () => {
       setStatus("carregando");
+      setProgressoUpload(0);
       setErro(null);
       setExcluidos(new Set());
       setVisualDiffs({});
       try {
-        const formData = new FormData();
-        formData.append("file", arquivo);
-        const resposta = await fetch(`/api/apresentacoes/${apresentacaoId}/pptx-preview`, { method: "POST", body: formData });
+        if (!arquivo.name.toLowerCase().endsWith(".pptx")) throw new Error("Envie um arquivo .pptx (PowerPoint).");
+        if (arquivo.size <= 0) throw new Error("O arquivo está vazio.");
+        if (arquivo.size > PPTX_MAX_BYTES) throw new Error("O arquivo excede o limite de 80 MB.");
+
+        preservarOriginalRef.current = false;
+        originalUploadRef.current = null;
+        previewAssetsRef.current = [];
+        const blob = await upload(caminhoDoUploadPptx(apresentacaoId, arquivo.name), arquivo, {
+          access: "public",
+          contentType: PPTX_CONTENT_TYPE,
+          multipart: true,
+          handleUploadUrl: `/api/apresentacoes/${apresentacaoId}/pptx-upload`,
+          onUploadProgress: ({ percentage }) => {
+            if (!cancelado) setProgressoUpload(Math.round(percentage));
+          },
+        });
+        urlEnviada = blob.url;
+        if (cancelado) {
+          await limparUploadsTemporarios(apresentacaoId, [blob.url]);
+          return;
+        }
+        originalUploadRef.current = blob.url;
+
+        const resposta = await fetch(`/api/apresentacoes/${apresentacaoId}/pptx-preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileUrl: blob.url, fileName: arquivo.name }),
+        });
         const resultado = await resposta.json().catch(() => null);
-        if (cancelado) return;
+        const urlsTemporarias = Array.isArray(resultado?.data?.temporaryAssetUrls)
+          ? resultado.data.temporaryAssetUrls.filter((url: unknown): url is string => typeof url === "string")
+          : [];
+        if (cancelado) {
+          await limparUploadsTemporarios(apresentacaoId, urlsTemporarias);
+          return;
+        }
 
         if (!resposta.ok || !resultado?.success) {
           setErro(typeof resultado?.error === "string" ? resultado.error : "Erro ao gerar a prévia do PowerPoint.");
@@ -124,18 +180,26 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
         setDiagnosticos(resultado.data.diagnosticos ?? []);
         setResumoDiagnosticos(resultado.data.resumoDiagnosticos ?? { INFO: 0, WARNING: 0, FALLBACK: 0, ERROR: 0 });
         setReferenceImages(resultado.data.referenceImages ?? []);
+        previewAssetsRef.current = urlsTemporarias;
         setReferenceRenderer(resultado.data.referenceRenderer ?? null);
         setFontes(await resolverFontesNoDocumento(resultado.data.fontesDetectadas ?? []));
         setStatus("pronto");
-      } catch {
+      } catch (error) {
         if (cancelado) return;
-        setErro("Erro de conexão ao gerar a prévia do PowerPoint.");
+        setErro(error instanceof Error && error.message ? error.message : "Erro de conexão ao gerar a prévia do PowerPoint.");
         setStatus("erro");
       }
     })();
 
     return () => {
       cancelado = true;
+      const urls = [
+        ...previewAssetsRef.current,
+        ...(!preservarOriginalRef.current && urlEnviada ? [urlEnviada] : []),
+      ];
+      previewAssetsRef.current = [];
+      if (!preservarOriginalRef.current) originalUploadRef.current = null;
+      void limparUploadsTemporarios(apresentacaoId, urls);
     };
   }, [open, arquivo, apresentacaoId]);
 
@@ -184,13 +248,15 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
 
   async function handleConfirmar() {
     const arquivoAtual = arquivoRef.current;
-    if (!arquivoAtual || confirmando) return;
+    const originalUrl = originalUploadRef.current;
+    if (!arquivoAtual || !originalUrl || confirmando) return;
     setConfirmando(true);
     try {
-      const formData = new FormData();
-      formData.append("file", arquivoAtual);
-      formData.append("excluirIndices", JSON.stringify(Array.from(excluidos)));
-      const resposta = await fetch(`/api/apresentacoes/${apresentacaoId}/importar-pptx`, { method: "POST", body: formData });
+      const resposta = await fetch(`/api/apresentacoes/${apresentacaoId}/importar-pptx`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl: originalUrl, fileName: arquivoAtual.name, excluirIndices: Array.from(excluidos) }),
+      });
       const resultado = await resposta.json().catch(() => null);
 
       if (!resposta.ok || !resultado?.success) {
@@ -214,6 +280,10 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
         );
       }
 
+      preservarOriginalRef.current = true;
+      originalUploadRef.current = null;
+      await limparUploadsTemporarios(apresentacaoId, previewAssetsRef.current);
+      previewAssetsRef.current = [];
       onOpenChange(false);
       onImportado();
     } catch {
@@ -241,7 +311,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
         {status === "carregando" && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-slate-400">
             <Loader2 size={24} className="animate-spin" aria-hidden="true" />
-            <p className="text-sm">Analisando o arquivo…</p>
+            <p className="text-sm">{progressoUpload < 100 ? `Enviando PowerPoint… ${progressoUpload}%` : "Analisando o arquivo…"}</p>
           </div>
         )}
 

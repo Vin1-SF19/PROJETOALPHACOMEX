@@ -1,9 +1,10 @@
-import { del, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import db from "@/lib/prisma";
 import { detectarTipoAsset, nomeArquivoSeguro, validarArquivoAsset } from "@/lib/apresentacoes/assets";
 import { isAdminRole } from "@/lib/roles";
+import { excluirBlobMotion, obterTokenMotion } from "@/lib/apresentacoes/blob";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     const blob = await put(caminho, arquivo, {
       access: "public",
       addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      token: obterTokenMotion(),
     });
     urlEnviada = blob.url;
 
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, asset: { ...asset, createdAt: asset.createdAt.toISOString() } });
   } catch (error) {
     if (urlEnviada) {
-      await del(urlEnviada, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(() => undefined);
+      await excluirBlobMotion(urlEnviada).catch(() => undefined);
     }
     console.error("[POST /api/apresentacoes/assets]", error);
     return NextResponse.json({ success: false, error: "Não foi possível enviar o arquivo" }, { status: 500 });

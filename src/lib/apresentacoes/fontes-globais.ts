@@ -4,6 +4,7 @@ import {
   fontePersonalizadaSchema,
   type FontePersonalizada,
 } from "@/lib/apresentacoes/fontes-personalizadas";
+import { obterTokensMotionComLegado } from "@/lib/apresentacoes/blob";
 
 export const PREFIXO_FONTES_GLOBAIS = "apresentacoes/fontes-globais/";
 export const LIMITE_FONTES_GLOBAIS = 200;
@@ -48,19 +49,23 @@ export function fonteGlobalDoBlob(blob: {
 
 /** Catálogo compartilhado por todos os usuários, armazenado sem dependência de schema. */
 export async function listarFontesGlobais(): Promise<FontePersonalizada[]> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) return [];
-
   const fontes: FontePersonalizada[] = [];
-  let cursor: string | undefined;
-  do {
-    const pagina = await list({ prefix: PREFIXO_FONTES_GLOBAIS, limit: 1000, cursor, token });
-    for (const blob of pagina.blobs) {
-      const fonte = fonteGlobalDoBlob(blob);
-      if (fonte) fontes.push(fonte);
-    }
-    cursor = pagina.hasMore ? pagina.cursor : undefined;
-  } while (cursor && fontes.length < LIMITE_FONTES_GLOBAIS);
+  const ids = new Set<string>();
+  for (const token of obterTokensMotionComLegado()) {
+    let cursor: string | undefined;
+    do {
+      const pagina = await list({ prefix: PREFIXO_FONTES_GLOBAIS, limit: 1000, cursor, token });
+      for (const blob of pagina.blobs) {
+        const fonte = fonteGlobalDoBlob(blob);
+        if (fonte && !ids.has(fonte.id)) {
+          ids.add(fonte.id);
+          fontes.push(fonte);
+        }
+      }
+      cursor = pagina.hasMore ? pagina.cursor : undefined;
+    } while (cursor && fontes.length < LIMITE_FONTES_GLOBAIS);
+    if (fontes.length >= LIMITE_FONTES_GLOBAIS) break;
+  }
 
   return fontes
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))

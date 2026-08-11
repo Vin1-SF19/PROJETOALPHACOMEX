@@ -97,6 +97,7 @@ Pipeline alvo:
 - [x] Implementar rich text, fonte e autofit retrocompatíveis (AC: 8, 9, 10)
 - [x] Mapear/renderizar efeitos, linhas, fallback e metadata (AC: 11, 13, 14, 19)
 - [x] Integrar APIs/modal, preservação do original e diagnóstico (AC: 14, 15, 16, 17)
+- [x] Remover o `413` de produção com upload direto multipart e conectar todos os blobs do Alpha Motion ao store `MOTION` (AC: 15, 16)
 - [ ] Validar o fixture real de 18 slides quando o arquivo for disponibilizado (AC: 18)
 - [x] Executar quality gates e atualizar esta checklist/File List (AC: 20)
 
@@ -120,6 +121,7 @@ Pipeline alvo:
 |---|---:|---|---|
 | 2026-08-07 | 1.0 | Story criada a partir da especificação integral do usuário e do reconhecimento do pipeline existente. | River |
 | 2026-08-07 | 2.0 | Pipeline OOXML intermediário, render fiel, referência independente, diff visual, segurança e regressões sintéticas implementados. | Dex |
+| 2026-08-11 | 2.1 | Upload PPTX direto/multipart, prévia sem base64 e store dedicado `MOTION` aplicados para eliminar o limite 413 em produção. | Dex |
 
 ## Dev Agent Record
 
@@ -136,6 +138,10 @@ GPT-5 Codex
 - `npm run build:player` — PASS.
 - `npm run build` — bloqueado antes do Next build por `EPERM` ao substituir `node_modules/.prisma/client/query_engine-windows.dll.node` (arquivo em uso no ambiente).
 - Smoke do renderer independente — PowerPoint COM exportou 1/1 slide sintético para PNG.
+- `npx vitest run tests/apresentacoes/pptx-upload.test.ts tests/apresentacoes/pptx-parser.test.ts tests/apresentacoes/pptx-ooxml-core.test.ts` — 28/28.
+- ESLint direcionado aos 10 arquivos alterados na correção de produção — PASS.
+- `npx tsc --noEmit --pretty false` — nenhum erro novo; permanecem erros preexistentes em `ExclusaoFiscal`, Radar e testes Google Calendar.
+- Smoke real do store configurado em `.env.local` — listagem, escrita e remoção aprovadas sem resíduo.
 
 ### Completion Notes List
 
@@ -145,14 +151,21 @@ GPT-5 Codex
 - O PPTX original e referências PowerPoint são preservados; assets repetidos são deduplicados por SHA-256.
 - A prévia aguarda fontes, reporta substituições e produz Original/Importado/Diferença quando o renderer independente está disponível.
 - A validação visual do arquivo real e a lista real de fontes ausentes permanecem pendentes porque somente a especificação textual foi anexada, sem o `.pptx`.
+- O binário PPTX agora vai direto do navegador ao Vercel Blob com multipart; as APIs recebem somente uma referência JSON validada por store, caminho e apresentação.
+- Imagens da prévia usam blobs temporários em vez de `data:` URIs, mantendo também a resposta abaixo do limite da Function; cancelamento e confirmação executam limpeza protegida.
+- Assets, fontes, imagens extraídas, referências e originais novos usam `MOTION_READ_WRITE_TOKEN`; exclusões e catálogo de fontes preservam compatibilidade com o store legado.
 
 ### File List
 
 - `docs/stories/story-alpha-motion-importador-pptx-alta-fidelidade.md`
 - `scripts/render-pptx-reference.ps1`
 - `src/actions/slides.ts`
+- `src/actions/apresentacao-assets.ts`
 - `src/app/api/apresentacoes/[id]/importar-pptx/route.ts`
 - `src/app/api/apresentacoes/[id]/pptx-preview/route.ts`
+- `src/app/api/apresentacoes/[id]/pptx-upload/route.ts`
+- `src/app/api/apresentacoes/assets/route.ts`
+- `src/app/api/apresentacoes/fontes/route.ts`
 - `src/apresentacoes-player/PlayerStandalone.tsx`
 - `src/components/Apresentacoes/Editor/Canvas/CanvasArea.tsx`
 - `src/components/Apresentacoes/Editor/Canvas/ComponenteNoCanvas.tsx`
@@ -166,6 +179,8 @@ GPT-5 Codex
 - `src/components/Apresentacoes/Editor/store/useEditorStore.ts`
 - `src/components/Apresentacoes/ModoApresentacao/ModoApresentacaoClient.tsx`
 - `src/lib/apresentacoes/canvas.ts`
+- `src/lib/apresentacoes/blob.ts`
+- `src/lib/apresentacoes/fontes-globais.ts`
 - `src/lib/apresentacoes/pptx/color-resolver.ts`
 - `src/lib/apresentacoes/pptx/diagnostico.ts`
 - `src/lib/apresentacoes/pptx/geometria.ts`
@@ -179,6 +194,7 @@ GPT-5 Codex
 - `src/lib/apresentacoes/pptx/tema.ts`
 - `src/lib/apresentacoes/pptx/texto.ts`
 - `src/lib/apresentacoes/pptx/tipos.ts`
+- `src/lib/apresentacoes/pptx/upload.ts`
 - `src/lib/apresentacoes/pptx/visual-diff.ts`
 - `src/lib/apresentacoes/pptx/xml-utils.ts`
 - `src/lib/validations/slide-componentes-base.ts`
@@ -186,6 +202,7 @@ GPT-5 Codex
 - `src/lib/validations/slide-componentes.ts`
 - `tests/apresentacoes/pptx-ooxml-core.test.ts`
 - `tests/apresentacoes/pptx-parser.test.ts`
+- `tests/apresentacoes/pptx-upload.test.ts`
 
 ## QA Results
 

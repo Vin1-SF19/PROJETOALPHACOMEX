@@ -12,13 +12,14 @@ import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { resumirDiagnosticos } from "@/lib/apresentacoes/pptx/diagnostico";
 import { renderizarReferenciaPptx } from "@/lib/apresentacoes/pptx/reference-renderer";
 import { createHash } from "node:crypto";
+import { obterTokenMotion } from "@/lib/apresentacoes/blob";
+import { carregarArquivoPptx, ErroEntradaPptx } from "@/lib/apresentacoes/pptx/upload";
 
 export const dynamic = "force-dynamic";
 // Parsing de zip/XML + upload de cada imagem embutida pro Blob pode levar um tempo real em
 // decks grandes — mesmo teto já usado por exportar-html/gerar-slide neste projeto.
 export const maxDuration = 120;
 
-const PPTX_MAX_BYTES = 80 * 1024 * 1024;
 const IMAGEM_MAX_BYTES = 50 * 1024 * 1024;
 
 function isAdmin(role?: string) {
@@ -44,34 +45,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const autorizado = await podeEditar(apresentacaoId, userId, session.user.role);
     if (!autorizado) return NextResponse.json({ success: false, error: "Sem permissão para editar esta apresentação" }, { status: 403 });
 
-    const formData = await request.formData();
-    const arquivo = formData.get("file");
-    if (!(arquivo instanceof File)) {
-      return NextResponse.json({ success: false, error: "Arquivo ausente" }, { status: 400 });
-    }
-
-    // Índices (0-based, na ordem de extração) marcados como "remover" na prévia — enviados
-    // como JSON opcional. Formato inválido é tratado como "nenhum excluído" (fail-open pra não
-    // travar a importação por um campo auxiliar malformado).
-    const excluirIndicesRaw = formData.get("excluirIndices");
-    let indicesExcluidos = new Set<number>();
-    if (typeof excluirIndicesRaw === "string" && excluirIndicesRaw) {
-      try {
-        const parsed: unknown = JSON.parse(excluirIndicesRaw);
-        if (Array.isArray(parsed) && parsed.every((v) => typeof v === "number")) indicesExcluidos = new Set(parsed);
-      } catch {
-        // ignora — segue sem exclusão
-      }
-    }
-    if (!arquivo.name.toLowerCase().endsWith(".pptx")) {
-      return NextResponse.json({ success: false, error: "Envie um arquivo .pptx (PowerPoint)." }, { status: 400 });
-    }
-    if (arquivo.size <= 0) {
-      return NextResponse.json({ success: false, error: "O arquivo está vazio." }, { status: 400 });
-    }
-    if (arquivo.size > PPTX_MAX_BYTES) {
-      return NextResponse.json({ success: false, error: `O arquivo excede o limite de ${Math.round(PPTX_MAX_BYTES / 1024 / 1024)} MB.` }, { status: 413 });
-    }
+    const arquivo = await carregarArquivoPptx(request, apresentacaoId);
+    const indicesExcluidos = arquivo.excluirIndices;
 
     const ultimoSlide = await db.slide.findFirst({
       where: { apresentacaoId },
@@ -84,12 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // importados no mesmo tamanho dos que já estão na apresentação.
     const canvas: CanvasConfig = obterCanvasSeguro((ultimoSlide.dadosJson as { canvas?: unknown } | null)?.canvas);
 
-    let buffer: Buffer;
-    try {
-      buffer = Buffer.from(await arquivo.arrayBuffer());
-    } catch {
-      return NextResponse.json({ success: false, error: "Não foi possível ler o arquivo enviado." }, { status: 400 });
-    }
+    const buffer = arquivo.buffer;
 
     let extraido: Awaited<ReturnType<typeof extrairApresentacaoPptx>>;
     try {
@@ -105,20 +75,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let originalFileUrl: string;
     try {
-      const originalPath = `apresentacoes/${apresentacaoId}/originais/${Date.now()}-${crypto.randomUUID()}-${nomeArquivoSeguro(arquivo.name)}`;
-      const originalBlob = await put(originalPath, buffer, {
-        access: "public",
-        addRandomSuffix: false,
-        contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-      });
-      originalFileUrl = originalBlob.url;
+      if (arquivo.blobUrl) {
+        originalFileUrl = arquivo.blobUrl;
+      } else {
+        const originalPath = `apresentacoes/${apresentacaoId}/originais/${Date.now()}-${crypto.randomUUID()}-${nomeArquivoSeguro(arquivo.nome)}`;
+        const originalBlob = await put(originalPath, buffer, {
+          access: "public",
+          addRandomSuffix: false,
+          contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          token: obterTokenMotion(),
+        });
+        originalFileUrl = originalBlob.url;
+      }
       await db.apresentacaoAsset.create({
         data: {
           apresentacaoId,
           tipo: "PPTX",
-          url: originalBlob.url,
-          nomeOriginal: arquivo.name.slice(0, 255),
+          url: originalFileUrl,
+          nomeOriginal: arquivo.nome.slice(0, 255),
           tamanhoBytes: buffer.byteLength,
         },
       });
@@ -136,7 +110,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           access: "public",
           addRandomSuffix: false,
           contentType: "image/png",
-          token: process.env.BLOB_READ_WRITE_TOKEN,
+          token: obterTokenMotion(),
         });
         referenceUrls.set(slide.slideNumber, blob.url);
       })).catch((error: unknown) => console.error("[importar-pptx] Falha ao preservar renders de referência", error));
@@ -159,7 +133,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           access: "public",
           addRandomSuffix: false,
           contentType: mimeType,
-          token: process.env.BLOB_READ_WRITE_TOKEN,
+          token: obterTokenMotion(),
         });
         await db.apresentacaoAsset.create({
           data: { apresentacaoId, tipo: "IMAGEM", url: blob.url, nomeOriginal: nomeArquivoOriginal.slice(0, 255), tamanhoBytes: bytes.byteLength },
@@ -222,7 +196,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             pptxSource: {
               type: "pptx",
               originalFileUrl,
-              originalFileName: arquivo.name.slice(0, 255),
+              originalFileName: arquivo.nome.slice(0, 255),
               importerVersion: extraido.intermediateModel.importerVersion,
               slideNumber: slideMapeado.slideNumber,
               diagnostics: resumoDiagnosticos,
@@ -253,6 +227,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     });
   } catch (error) {
+    if (error instanceof ErroEntradaPptx) {
+      return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+    }
     console.error("[POST /api/apresentacoes/[id]/importar-pptx]", error);
     return NextResponse.json({ success: false, error: "Erro ao importar o arquivo PowerPoint." }, { status: 500 });
   }
