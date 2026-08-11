@@ -7,6 +7,7 @@ import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { Z_INDEX } from "@/lib/z-index";
 import { NoteEditor } from "./NoteEditor/NoteEditor";
 import { cn } from "@/lib/utils";
+import { Dock, DockItem, DockIcon, DockLabel } from "@/components/ui/dock";
 
 const ALTURA_MIN = 220;
 const ALTURA_MAX_RATIO = 0.85;
@@ -79,24 +80,28 @@ export function NoteViewer({ noteId, initialTitle, initialContentJson, initialVe
       )}
 
       <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-2 py-1">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            title="Recolher"
-            onClick={() => setViewerMode("RECOLHIDO")}
-            className="rounded p-1 text-slate-500 hover:bg-white/5 hover:text-white"
-          >
-            <Minus size={13} />
-          </button>
-          <button
-            type="button"
-            title={viewerMode === "TELA_AMPLA" ? "Compacto" : "Tela ampla"}
-            onClick={() => setViewerMode(viewerMode === "TELA_AMPLA" ? "COMPACTO" : "TELA_AMPLA")}
-            className="rounded p-1 text-slate-500 hover:bg-white/5 hover:text-white"
-          >
-            <Maximize2 size={13} />
-          </button>
-        </div>
+        <Dock orientation="horizontal" magnification={34} distance={60} panelSize={24} className="gap-0.5">
+          <DockItem>
+            <button
+              type="button"
+              onClick={() => setViewerMode("RECOLHIDO")}
+              className="flex h-6 items-center justify-center rounded p-1 text-slate-500 hover:bg-white/5 hover:text-white"
+            >
+              <DockIcon><Minus size={13} /></DockIcon>
+              <DockLabel>Recolher</DockLabel>
+            </button>
+          </DockItem>
+          <DockItem>
+            <button
+              type="button"
+              onClick={() => setViewerMode(viewerMode === "TELA_AMPLA" ? "COMPACTO" : "TELA_AMPLA")}
+              className="flex h-6 items-center justify-center rounded p-1 text-slate-500 hover:bg-white/5 hover:text-white"
+            >
+              <DockIcon><Maximize2 size={13} /></DockIcon>
+              <DockLabel>{viewerMode === "TELA_AMPLA" ? "Compacto" : "Tela ampla"}</DockLabel>
+            </button>
+          </DockItem>
+        </Dock>
         <button
           type="button"
           title="Fechar nota"

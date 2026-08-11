@@ -10,6 +10,7 @@
 
 import { pdfjsWorkerReady } from "./pdfjs-polyfill";
 import { ocrViaPdf24, isPdf24Configured } from "./pdf24-ocr";
+import { fetchTrustedBibbleBlob } from "./attachment-security";
 
 const TIKA_URL = (process.env.TIKA_SERVER_URL ?? "http://192.168.35.113:9998").replace(/\/+$/, "");
 const TIKA_TIMEOUT_MS = 30_000;
@@ -103,12 +104,11 @@ export async function extractTextFromBuffer(
   try {
     const text = await extractViaTika(buffer, mimeType || "application/octet-stream");
     if (text && !textoInsuficiente(text)) {
-      console.log(`[TIKA] ${fileName}: ${text.length} chars extraídos`);
+      console.info("[BIBBLE PDF] extraction", { source: "tika", extractedChars: text.length });
       return { text, source: "tika" };
     }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[TIKA] Falha ao processar ${fileName}: ${msg}. Tentando fallback...`);
+  } catch {
+    console.warn("[BIBBLE PDF] extraction-fallback", { failedSource: "tika", nextSource: "pdf-parse" });
   }
 
   // Fallback pdf-parse (só para PDFs)
@@ -116,29 +116,27 @@ export async function extractTextFromBuffer(
     try {
       const text = await extractViaPdfParse(buffer);
       if (text && !textoInsuficiente(text)) {
-        console.log(`[PDF-PARSE fallback] ${fileName}: ${text.length} chars extraídos`);
+        console.info("[BIBBLE PDF] extraction", { source: "pdf-parse", extractedChars: text.length });
         return { text, source: "pdf-parse" };
       }
-      console.warn(`[PDF-PARSE fallback] ${fileName}: texto insuficiente (${text.length} chars). Tentando OCR...`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[PDF-PARSE fallback] Falha em ${fileName}: ${msg}`);
+      console.warn("[BIBBLE PDF] extraction-fallback", { failedSource: "pdf-parse", nextSource: "pdf24-ocr", extractedChars: text.length });
+    } catch {
+      console.warn("[BIBBLE PDF] extraction-fallback", { failedSource: "pdf-parse", nextSource: "pdf24-ocr" });
     }
 
     // Último recurso: PDF sem camada de texto (scan/imagem) — OCR real via PDF24
     if (isPdf24Configured()) {
       try {
-        console.log(`[PDF24-OCR] ${fileName}: sem texto extraível, acionando OCR...`);
+        console.info("[BIBBLE PDF] extraction-attempt", { source: "pdf24-ocr" });
         const bufferOcr = await ocrViaPdf24(buffer, fileName);
         const text = await extractViaTika(bufferOcr, "application/pdf");
         if (text && !textoInsuficiente(text)) {
-          console.log(`[PDF24-OCR] ${fileName}: ${text.length} chars extraídos após OCR`);
+          console.info("[BIBBLE PDF] extraction", { source: "pdf24-ocr", extractedChars: text.length });
           return { text, source: "pdf24-ocr" };
         }
-        console.warn(`[PDF24-OCR] ${fileName}: OCR concluído mas ainda sem texto útil.`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[PDF24-OCR] Falha em ${fileName}: ${msg}`);
+        console.warn("[BIBBLE PDF] extraction-empty", { source: "pdf24-ocr", extractedChars: text.length });
+      } catch {
+        console.warn("[BIBBLE PDF] extraction-failed", { source: "pdf24-ocr" });
       }
     }
   }
@@ -160,7 +158,7 @@ export async function extractTextFromUrl(
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetchTrustedBibbleBlob(url, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status} ao baixar ${fileName}`);
     const arrayBuffer = await res.arrayBuffer();
     return extractTextFromBuffer(Buffer.from(arrayBuffer), mimeType, fileName);

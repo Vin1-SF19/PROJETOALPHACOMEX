@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { NotaListada } from "./ListaNotas";
 import { cn } from "@/lib/utils";
+import { Dock, DockItem, DockIcon, DockLabel } from "@/components/ui/dock";
 import { NoteShareDialog } from "@/components/Notas/Colaboracao/NoteShareDialog";
 import { NoteHistoryDialog } from "@/components/Notas/Colaboracao/NoteHistoryDialog";
 import { NoteCommentsPanel } from "@/components/Notas/Colaboracao/NoteCommentsPanel";
@@ -107,102 +108,133 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
     <div className="flex h-full w-64 shrink-0 flex-col gap-4 overflow-y-auto p-4">
       <div>
         <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-600">Ações</p>
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            disabled={processando}
-            onClick={() => void toggleFixar()}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs",
-              !nota.isPinned && "text-slate-400 hover:bg-white/5",
-            )}
-            style={nota.isPinned ? { color: `rgba(${accent},1)` } : undefined}
-          >
-            <Pin size={13} /> {nota.isPinned ? "Desafixar" : "Fixar"}
-          </button>
-          <button
-            type="button"
-            disabled={processando}
-            onClick={() => void toggleFavorito()}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs",
-              !nota.isFavorite && "text-slate-400 hover:bg-white/5",
-            )}
-            style={nota.isFavorite ? { color: `rgba(${accent},1)` } : undefined}
-          >
-            <Star size={13} /> {nota.isFavorite ? "Remover dos favoritos" : "Favoritar"}
-          </button>
-          <NoteShareDialog
-            noteId={nota.id}
-            trigger={
-              <button type="button" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-400 hover:bg-white/5">
-                <Share2 size={13} /> Compartilhar
-              </button>
-            }
-          />
-          <NoteHistoryDialog
-            noteId={nota.id}
-            onRestaurado={onAtualizado}
-            trigger={
-              <button type="button" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-400 hover:bg-white/5">
-                <History size={13} /> Histórico de versões
-              </button>
-            }
-          />
-          <CriarLembreteDialog
-            noteId={nota.id}
-            trigger={
-              <button type="button" className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-400 hover:bg-white/5">
-                <Bell size={13} /> Lembretes
-              </button>
-            }
-          />
-          {nota.status !== "ARQUIVADA" && (
+        <Dock orientation="vertical" magnification={40} distance={70} className="gap-0.5">
+          <DockItem>
             <button
               type="button"
               disabled={processando}
-              onClick={() => void arquivar()}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-400 hover:bg-white/5"
+              onClick={() => void toggleFixar()}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs",
+                !nota.isPinned && "text-slate-400 hover:bg-white/5",
+              )}
+              style={nota.isPinned ? { color: `rgba(${accent},1)` } : undefined}
             >
-              <Archive size={13} /> Arquivar
+              <DockIcon><Pin size={13} /></DockIcon>
+              <DockLabel>{nota.isPinned ? "Desafixar" : "Fixar"}</DockLabel>
             </button>
-          )}
-          {nota.status !== "LIXEIRA" && (
+          </DockItem>
+
+          <DockItem>
             <button
               type="button"
               disabled={processando}
-              onClick={() => void moverParaLixeira()}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-rose-400 hover:bg-rose-500/10"
+              onClick={() => void toggleFavorito()}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs",
+                !nota.isFavorite && "text-slate-400 hover:bg-white/5",
+              )}
+              style={nota.isFavorite ? { color: `rgba(${accent},1)` } : undefined}
             >
-              <Trash2 size={13} /> Mover para a lixeira
+              <DockIcon><Star size={13} /></DockIcon>
+              <DockLabel>{nota.isFavorite ? "Remover dos favoritos" : "Favoritar"}</DockLabel>
             </button>
-          )}
-          {nota.status === "LIXEIRA" && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <button
-                  type="button"
-                  disabled={processando}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-rose-400 hover:bg-rose-500/10"
-                >
-                  <Trash2 size={13} /> Excluir definitivamente
+          </DockItem>
+
+          <DockItem>
+            <NoteShareDialog
+              noteId={nota.id}
+              trigger={
+                <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
+                  <DockIcon><Share2 size={13} /></DockIcon>
+                  <DockLabel>Compartilhar</DockLabel>
                 </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir definitivamente?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. A nota e seu histórico serão removidos permanentemente.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void excluirDefinitivamente()}>Excluir</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              }
+            />
+          </DockItem>
+
+          <DockItem>
+            <NoteHistoryDialog
+              noteId={nota.id}
+              onRestaurado={onAtualizado}
+              trigger={
+                <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
+                  <DockIcon><History size={13} /></DockIcon>
+                  <DockLabel>Histórico de versões</DockLabel>
+                </button>
+              }
+            />
+          </DockItem>
+
+          <DockItem>
+            <CriarLembreteDialog
+              noteId={nota.id}
+              trigger={
+                <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
+                  <DockIcon><Bell size={13} /></DockIcon>
+                  <DockLabel>Lembretes</DockLabel>
+                </button>
+              }
+            />
+          </DockItem>
+
+          {nota.status !== "ARQUIVADA" && (
+            <DockItem>
+              <button
+                type="button"
+                disabled={processando}
+                onClick={() => void arquivar()}
+                className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5"
+              >
+                <DockIcon><Archive size={13} /></DockIcon>
+                <DockLabel>Arquivar</DockLabel>
+              </button>
+            </DockItem>
           )}
-        </div>
+
+          {nota.status !== "LIXEIRA" && (
+            <DockItem>
+              <button
+                type="button"
+                disabled={processando}
+                onClick={() => void moverParaLixeira()}
+                className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-rose-400 hover:bg-rose-500/10"
+              >
+                <DockIcon><Trash2 size={13} /></DockIcon>
+                <DockLabel>Mover para a lixeira</DockLabel>
+              </button>
+            </DockItem>
+          )}
+
+          {nota.status === "LIXEIRA" && (
+            <DockItem>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={processando}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-rose-400 hover:bg-rose-500/10"
+                  >
+                    <DockIcon><Trash2 size={13} /></DockIcon>
+                    <DockLabel>Excluir definitivamente</DockLabel>
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir definitivamente?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. A nota e seu histórico serão removidos permanentemente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => void excluirDefinitivamente()}>Excluir</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DockItem>
+          )}
+        </Dock>
       </div>
 
       {nota.contexts.length > 0 && (

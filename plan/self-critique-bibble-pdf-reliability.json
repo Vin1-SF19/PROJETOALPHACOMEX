@@ -1,0 +1,41 @@
+{
+  "subtaskId": "bibble-pdf-reliability",
+  "critiquedAt": "2026-08-11T18:31:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "O envelope Markdown dos anexos podia ultrapassar o teto mesmo depois de reduzir o texto bruto; o contexto montado passou a receber uma seleção final limitada.",
+      "Um anexo sem erro e sem upload ativo ainda podia não ter URL confirmada; a regra compartilhada agora exige uploadUrl não vazia.",
+      "O último frame SSE podia ser perdido quando o provider encerrava sem newline; o consumidor agora faz flush do TextDecoder e do buffer residual.",
+      "EOF físico do stream da aplicação podia persistir resposta parcial; o protocolo agora exige done explícito e restaura o turno em falha.",
+      "Um done truncado ainda podia ser marcado successful=true e persistido; o servidor agora marca falha e o cliente rejeita truncated de forma independente.",
+      "URLs de anexos e de saída do OCR podiam causar fetch fora da origem esperada; Blob e PDF24 agora rejeitam redirects e revalidam origem antes do envio de credenciais.",
+      "Anexos não-PDF ainda mantinham tools ativas; qualquer anexo agora isola a geração de ações no sistema.",
+      "O histórico limitava cada mensagem abaixo do conteúdo que a própria persistência produzia; o teto agora deriva do envelope máximo e possui limite agregado.",
+      "Ações diretas de confirmação podiam ocorrer antes do isolamento por tools; anexos agora desabilitam também os atalhos de side effect."
+    ],
+    "edgeCases": [
+      "contextWindow legado de 4.096 com PDF é elevado no servidor para a capacidade segura conhecida.",
+      "Prompt fixo que consome todo o orçamento retorna erro acionável sem invadir a reserva de saída.",
+      "Documento acima de 50.000 caracteres preserva sentinelas no início, meio e fim e comunica redução.",
+      "Upload pendente, com erro ou sem URL bloqueia botão, Enter e a chamada defensiva do layout.",
+      "finish_reason length e provider EOF sem finish_reason seguem resultados distintos e testados.",
+      "MIME vazio, PDF sem magic bytes, URL Blob fora de /bibble-chat/ e saída PDF24 cross-origin são rejeitados.",
+      "Texto extraído acima do teto do upload mantém início, meio e fim e inclui aviso explícito.",
+      "O 11º anexo é barrado antes do upload, contextWindow 512 permanece compatível e payload bruto acima de 8 MiB é rejeitado."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

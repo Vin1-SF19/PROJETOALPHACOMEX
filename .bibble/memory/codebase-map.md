@@ -2,7 +2,7 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-07-15 (CS & NPS — importação em lote)
+> Última atualização: 2026-08-11 (Bibble/IAlpha — leitura confiável de PDFs e respostas completas)
 
 ---
 
@@ -29,7 +29,7 @@ src/
 │   ├── prisma.ts                # Cliente Prisma via adapter PrismaLibSql (Turso)
 │   ├── validations/              # Schemas Zod compartilhados (ex: extrato.ts)
 │   ├── onyx/                     # Integração com agentes Onyx (client.ts, extrato-agents.ts)
-│   ├── bibble/                   # Bibble (assistente): tika.ts, pdf24-ocr.ts, pdfjs-polyfill.ts
+│   ├── bibble/                   # Bibble: anexos, segurança, orçamento de contexto, SSE e extração Tika/pdf-parse/PDF24
 │   └── temas.ts                  # Paletas de accent color (CONFIG_TEMAS) usadas por vários módulos
 ├── hooks/                        # Custom hooks client-side
 ├── types/                        # Types globais (ex: extrato.ts)
@@ -221,7 +221,7 @@ Actions de listagem aceitam `{ page?, pageSize?, busca? }` e retornam `{ success
 ## Notas de arquitetura importantes
 
 - **Banco real ≠ `.env` local**: o app SEMPRE conecta ao Turso remoto via `PrismaLibSql` adapter, independente do `datasource db`/`DATABASE_URL` do `schema.prisma` (que é decorativo neste projeto). `prisma db push`/`migrate` NÃO alcançam produção — mudanças de schema exigem script Node pontual com `@libsql/client/web`. Ver `decisions.md` (2026-07-06 e 2026-07-09).
-- **Pipeline de IA para documentos** (`src/lib/bibble/tika.ts`): Tika (primário) → pdf-parse v2 (fallback) → PDF24-OCR (último recurso, PDFs sem texto nativo). `pdfjs-polyfill.ts` é obrigatório antes de qualquer `import("pdf-parse")` (ver `known-errors.md`).
+- **Pipeline de IA para documentos** (`src/lib/bibble/tika.ts`): Tika (primário) → pdf-parse v2 (fallback) → PDF24-OCR (último recurso, PDFs sem texto nativo). `pdfjs-polyfill.ts` é obrigatório antes de qualquer `import("pdf-parse")` (ver `known-errors.md`). O upload e o chat compartilham limites/validação por `attachment-security.ts`; o conteúdo grande é reduzido de forma explícita pelo orçamento, preservando início, meio e fim.
 - **Módulos renderizam dentro de um `<iframe>`** a partir de `/PainelAlpha` (`PainelLayoutClient.tsx`) — atenção a isso ao debugar problemas de layout/canvas que só aparecem em produção real do painel, não em teste isolado da rota.
 
 ---
@@ -706,3 +706,39 @@ model BlueprintActivity { projectId, userId, action, entityType, entityId?, prev
 O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da seção Sobre do site institucional. O contrato fica em `slide-componentes-3d.ts`; defaults em `registry-3d.ts`; modelo/câmera/animação em `RenderEngine/ContainerCarga*.tsx`; propriedades em `PainelDireito/camposPorTipo/ContainerCargaProps.tsx`. Não houve mudança de banco, rota, permissão ou dependência. O modo apresentação passou a escalar o palco canônico 1280×720 para o viewport por `src/lib/apresentacoes/viewport.ts`.
 
 **Última atualização:** 2026-08-03 por Scribe
+
+---
+
+## Bibble/IAlpha — anexos PDF e conclusão confiável de respostas (2026-08-11)
+
+### Fluxo de upload e prontidão
+
+- `src/lib/bibble/attachments.ts` é o contrato compartilhado de anexos: tipos MIME aceitos, máximo de 10 arquivos por turno e a regra `isAttachmentReady`/`areAttachmentsReady`. Um arquivo só está pronto quando terminou o upload, não tem erro e recebeu `uploadUrl`.
+- `BibbleChatInput.tsx` aplica a regra ao botão e ao envio por teclado; `BibbleChatLayout.tsx` repete a guarda antes de criar sessão, limpar a caixa ou enviar a requisição. Assim, um PDF ainda em upload não é descartado por corrida de estado.
+- `BibbleFileUpload.tsx` e `BibbleChatLayout.tsx` usam o mesmo catálogo de MIME e o mesmo teto de quantidade. O tamanho máximo aceito pela rota é 100 MB por arquivo.
+- `POST /api/bibble/upload-to-blob` (`src/app/api/bibble/upload-to-blob/route.ts`) exige sessão, tipo permitido e, para PDF, concordância entre MIME, extensão `.pdf` e magic bytes `%PDF`. O objeto é salvo em `bibble-chat/<uuid>` no Vercel Blob; o nome original não compõe o caminho.
+
+### Extração e conteúdo enviado ao modelo
+
+- `src/lib/bibble/tika.ts` centraliza a cadeia Tika → `pdf-parse` → PDF24 OCR. Tika atende documentos suportados; `pdf-parse` é fallback local exclusivo de PDF; PDF24 é o último recurso para PDF sem texto útil. `src/lib/bibble/pdf24-ocr.ts` limita criação, polling e download à mesma origem configurada, sem seguir redirects.
+- A extração ocorre no upload e retorna `extractedContent` e `extractionSource`. O retorno do upload é limitado por `BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET` (30.000 tokens estimados) via `selectTextForTokenBudget`; quando necessário, preserva início, meio e fim e inclui aviso de capacidade no próprio texto.
+- `src/lib/bibble/attachment-security.ts` concentra máximo de 100 MB, máximo de 10 anexos, limite agregado do payload/histórico, schema Zod estrito, magic bytes e a allowlist de URLs `https://*.blob.vercel-storage.com/bibble-chat/...`. Downloads do chat usam `fetchTrustedBibbleBlob` com redirect manual, impedindo URLs arbitrárias fornecidas pelo cliente.
+- Qualquer turno com anexo desabilita tools em `src/app/api/bibble/chat/route.ts`; o documento não confiável participa somente de uma geração de resposta, sem executar ações do sistema.
+
+### Orçamento de contexto e saída
+
+- `src/lib/bibble/context-budget.ts` estima custo, define janela padrão de 32.768 tokens e reserva até 4.096 tokens para a saída. Para PDFs com configuração legada/insuficiente (como 4.096), a rota usa a janela segura do provedor.
+- O orçamento desconta prompt de sistema, pedido, tools, imagens e histórico antes de alocar espaço aos anexos. Histórico recente e documentos grandes são ajustados por orçamento; reduções usam trechos de início, meio e fim com aviso explícito, nunca corte silencioso apenas do começo.
+- `src/lib/bibble/completion.ts` propaga o limite de saída ao provider (`max_tokens`/`max_completion_tokens` e, no Ollama, `num_ctx`/`num_predict`) e lê o `finish_reason` inclusive no frame final do stream.
+
+### SSE, persistência e retry
+
+- `src/app/api/bibble/chat/route.ts` faz uma única geração em streaming quando há anexo, usa `maxDuration = 120` e envia `done` com `finishReason`, `truncated` e `successful`. `length`, `max_tokens`, EOF sem `finish_reason`, limite de tools e erros são marcados como incompletos.
+- `src/lib/bibble/client-stream.ts` só aceita conclusão após evento `done` explícito e rejeita `truncated: true` ou `successful: false`; EOF físico não significa sucesso.
+- Em stream incompleto, timeout ou erro de protocolo, `BibbleChatLayout.tsx` remove o par parcial, não persiste a resposta cortada e restaura o mesmo texto e os mesmos anexos prontos para nova tentativa. O botão Parar usa a mesma restauração.
+
+### Cobertura dedicada
+
+`tests/bibble/attachment-readiness.test.ts`, `attachment-security.test.ts`, `context-budget.test.ts`, `completion-budget-stream.test.ts`, `client-stream-protocol.test.ts` e `pdf-extraction-chain.test.ts` cobrem a guarda de envio, limites/SSRF, seleção início-meio-fim, parâmetros do provider, protocolo de conclusão e fallbacks de extração.
+
+**Última atualização:** 2026-08-11 por Scribe

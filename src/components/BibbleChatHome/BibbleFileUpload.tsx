@@ -3,6 +3,11 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import { Upload, X, Image, FileText, Video, File, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  BIBBLE_ATTACHMENT_ACCEPT,
+  isAllowedBibbleAttachmentType,
+  selectAttachmentsWithinLimit,
+} from "@/lib/bibble/attachments";
 
 export interface UploadedFile {
   id: string;
@@ -10,6 +15,7 @@ export interface UploadedFile {
   previewUrl?: string;
   uploadUrl?: string;
   extractedContent?: string;
+  extractionSource?: "tika" | "pdf-parse" | "pdf24-ocr" | "unsupported";
   uploading: boolean;
   error?: string;
 }
@@ -20,13 +26,6 @@ interface BibbleFileUploadProps {
   maxFileSize: number;
   maxFiles: number;
 }
-
-const ALLOWED_TYPES = {
-  image: ["image/jpeg", "image/png", "image/gif", "image/webp"],
-  video: ["video/mp4", "video/webm", "video/x-matroska"],
-  document: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/plain", "text/csv", "application/json"],
-  archive: ["application/zip", "application/x-zip-compressed"],
-};
 
 const SIZE_DISPLAY = {
   image: "200KB",
@@ -46,11 +45,64 @@ export function BibbleFileUpload({ files, onFilesChange, maxFileSize, maxFiles }
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  const uploadFiles = useCallback(async (
+    filesToUpload: UploadedFile[],
+    currentFiles: UploadedFile[],
+  ) => {
+    const updates = await Promise.all(
+      filesToUpload.map(async (item): Promise<UploadedFile> => {
+        try {
+          const formData = new FormData();
+          formData.append("file", item.file);
+          formData.append("size", item.file.size.toString());
+
+          const uploadResponse = await fetch("/api/bibble/upload-to-blob", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text();
+            throw new Error(errorText || "Upload failed");
+          }
+
+          const data = await uploadResponse.json();
+          if (!data.success || !data.file) throw new Error(data.error || "Upload failed");
+
+          const fileWithUrl: UploadedFile = {
+            ...item,
+            uploading: false,
+            uploadUrl: data.file.url,
+            extractedContent: data.file.extractedContent as string | undefined,
+            extractionSource: data.file.extractionSource as UploadedFile["extractionSource"],
+          };
+          console.info("[BIBBLE UPLOAD] completed", {
+            size: fileWithUrl.file.size,
+            type: fileWithUrl.file.type,
+            extractedChars: fileWithUrl.extractedContent?.length ?? 0,
+          });
+          return fileWithUrl;
+        } catch {
+          console.error("[BIBBLE UPLOAD] failed", {
+            size: item.file.size,
+            type: item.file.type,
+          });
+          return { ...item, uploading: false, error: "Falha ao upload" };
+        }
+      }),
+    );
+
+    const updatesById = new Map(updates.map(file => [file.id, file]));
+    onFilesChange(currentFiles.map(file => updatesById.get(file.id) ?? file));
+  }, [onFilesChange]);
+
   const handleFiles = useCallback(async (newFiles: File[]) => {
     const uploaded: UploadedFile[] = [];
     const errors: UploadedFile[] = [];
+    const limitedFiles = selectAttachmentsWithinLimit(files, newFiles)
+      .slice(0, Math.max(0, maxFiles - files.length));
 
-    for (const file of newFiles) {
+    for (const file of limitedFiles) {
       // Verificar tamanho
       if (file.size > maxFileSize) {
         errors.push({
@@ -63,7 +115,7 @@ export function BibbleFileUpload({ files, onFilesChange, maxFileSize, maxFiles }
       }
 
       // Verificar tipo
-      const isValidType = Object.values(ALLOWED_TYPES).flat().includes(file.type);
+      const isValidType = isAllowedBibbleAttachmentType(file.type);
       if (!isValidType) {
         errors.push({
           id: `${file.name}-${Date.now()}-${Math.random()}`,
@@ -97,61 +149,9 @@ export function BibbleFileUpload({ files, onFilesChange, maxFileSize, maxFiles }
 
     // Processar uploads
     if (uploaded.length > 0) {
-      await uploadFiles(uploaded);
+      await uploadFiles(uploaded, newFilesList);
     }
-  }, [files, maxFileSize, maxFiles, onFilesChange]);
-
-  const uploadFiles = async (filesToUpload: UploadedFile[]) => {
-    const results: Array<{ id: string; success: boolean }> = [];
-
-    // Upload em paralelo para o endpoint específico do Bibble Chat
-    await Promise.all(
-      filesToUpload.map(async (item) => {
-        try {
-          const formData = new FormData();
-          formData.append("file", item.file);
-          formData.append("size", item.file.size.toString());
-
-          const uploadResponse = await fetch("/api/bibble/upload-to-blob", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text();
-            throw new Error(errorText || "Upload failed");
-          }
-
-          const data = await uploadResponse.json();
-
-          if (data.success && data.file) {
-            // Update with upload URL and extracted content (for PDFs/text files)
-            const fileWithUrl = {
-              ...item,
-              uploading: false,
-              uploadUrl: data.file.url,
-              extractedContent: data.file.extractedContent as string | undefined,
-            };
-
-            results.push({ id: item.id, success: true });
-            onFilesChange(
-              files.map(f => f.id === item.id ? fileWithUrl : f)
-            );
-
-            console.log(`[BIBBLE UPLOAD] File uploaded: ${fileWithUrl.file.name} -> ${data.file.url}`);
-          } else {
-            throw new Error(data.error || "Upload failed");
-          }
-        } catch (error) {
-          console.error(`Upload failed for ${item.file.name}:`, error);
-          results.push({ id: item.id, success: false });
-          onFilesChange(
-            files.map(f => f.id === item.id ? { ...f, uploading: false, error: "Falha ao upload" } : f)
-          );
-        }
-      })
-    );
-  };
+  }, [files, maxFileSize, maxFiles, onFilesChange, uploadFiles]);
 
   const removeFile = useCallback((id: string) => {
     const fileToRemove = files.find(f => f.id === id);
@@ -340,7 +340,7 @@ export function BibbleFileUpload({ files, onFilesChange, maxFileSize, maxFiles }
         ref={inputRef}
         type="file"
         multiple
-        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.json,.zip"
+        accept={BIBBLE_ATTACHMENT_ACCEPT}
         className="hidden"
         onChange={handleFileInput}
       />

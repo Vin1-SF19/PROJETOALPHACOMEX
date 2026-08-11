@@ -19,15 +19,17 @@ import Highlight from "@tiptap/extension-highlight";
 import Mention from "@tiptap/extension-mention";
 import {
   Bold, Italic, UnderlineIcon, Strikethrough, List, ListOrdered,
-  ListTodo, Quote, Code, Table as TableIcon, Heading1, Heading2,
+  ListTodo, Quote, Code, Heading1, Heading2,
   Highlighter, Minus, Undo2, Redo2,
 } from "lucide-react";
 import { AtualizarNota } from "@/actions/Notas";
 import { SlashCommand } from "./slash-command";
 import { mentionSuggestion } from "./mention-suggestion";
+import { TableSizePicker } from "./TableSizePicker";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { getNotaRascunhoStorageKey } from "@/lib/notas-tabs";
 import { cn } from "@/lib/utils";
+import { Dock, DockItem, DockIcon, DockLabel } from "@/components/ui/dock";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -43,17 +45,19 @@ function ToolbarButton({
   title: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white",
-        ativo && "bg-white/10 text-white",
-      )}
-    >
-      {children}
-    </button>
+    <DockItem>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "flex h-7 items-center justify-center rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white",
+          ativo && "bg-white/10 text-white",
+        )}
+      >
+        <DockIcon>{children}</DockIcon>
+        <DockLabel>{title}</DockLabel>
+      </button>
+    </DockItem>
   );
 }
 
@@ -215,7 +219,8 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
-      <div className="flex flex-wrap items-center gap-1 border-b border-white/5 px-2 py-1.5">
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-white/5 px-2 py-1.5">
+        <Dock orientation="horizontal" magnification={38} distance={80} panelSize={28} className="gap-0.5">
         <ToolbarButton title="Título" ativo={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
           <Heading1 size={15} />
         </ToolbarButton>
@@ -252,9 +257,13 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
         <ToolbarButton title="Código" ativo={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
           <Code size={15} />
         </ToolbarButton>
-        <ToolbarButton title="Tabela" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
-          <TableIcon size={15} />
-        </ToolbarButton>
+        <DockItem>
+          <TableSizePicker
+            onEscolher={(linhas, colunas) =>
+              editor.chain().focus().insertTable({ rows: linhas, cols: colunas, withHeaderRow: true }).run()
+            }
+          />
+        </DockItem>
         <ToolbarButton title="Divisor" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
           <Minus size={15} />
         </ToolbarButton>
@@ -265,6 +274,7 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
         <ToolbarButton title="Refazer" onClick={() => editor.chain().focus().redo().run()}>
           <Redo2 size={15} />
         </ToolbarButton>
+        </Dock>
 
         <div className="ml-auto flex items-center gap-2 pr-1 text-[10px] uppercase tracking-wide text-slate-500">
           <StatusIndicador status={status} />

@@ -1819,3 +1819,40 @@ O usuário reportou, com um `.pptx` real de 18 slides, que o importador (impleme
 - `known-errors.md`: nenhuma entrada nova — o EPERM do Prisma já estava catalogado com o workaround exato usado.
 
 **Última atualização:** 2026-08-07
+
+---
+
+## [2026-08-11 16:16] — Bibble: leitura confiável de PDFs e respostas não truncadas
+
+**Tags:** #bugfix #integration #nextjs #security #critical
+**Agentes envolvidos:** Bibble, Scout, River, Dex, Forge, Probe, Anubis, Sage, Scribe, Kowalski
+**Arquivos tocados:** `src/app/api/bibble/{chat,upload-to-blob}/route.ts`, `src/components/BibbleChatHome/{BibbleChatInput,BibbleChatLayout,BibbleFileUpload,BibbleSettingsPanel}.tsx`, `src/lib/bibble/{attachments,attachment-security,client-stream,completion,context-budget,pdf24-ocr,tika}.ts`, `tests/bibble/*.test.ts`, `docs/stories/story-ialpha-bibble-leitura-confiavel-pdf-respostas-completas.md`
+
+### Contexto
+O IAlpha perdia PDFs enviados ao Bibble e, quando o arquivo chegava a ser lido, entregava respostas abreviadas. A investigação confirmou uma corrida entre upload e envio, cortes silenciosos de 50 mil/25 mil caracteres, janela legada de 4.096 tokens sem reserva de saída, geração duplicada e persistência de streams encerrados parcialmente.
+
+### O que foi feito
+- O envio passou a exigir todos os anexos prontos tanto na UI quanto na guarda defensiva do layout; em EOF, timeout ou término por limite, texto e anexos são restaurados e a resposta parcial não é persistida.
+- Foi criado um orçamento único de contexto com reserva positiva de saída, janela efetiva compatível com o modelo, seleção transparente de início/meio/fim do PDF e limite explícito serializado por provider; PDF/anexos usam uma única geração em streaming e desabilitam tools.
+- A cadeia Tika → `pdf-parse` → PDF24 foi preservada, com observabilidade somente por metadados. O hardening adicionou Zod strict, limites agregados, Blob HTTPS/path/same-origin sem redirects, chaves opacas, validação de MIME/magic bytes e PDF24 same-origin.
+- A suíte `tests/bibble` passou com 11 arquivos e 86 testes; lint direcionado passou sem erros e `npx next build` compilou e gerou 70 páginas. Nenhuma migration, schema ou mutação de banco foi feita.
+
+### Decisões tomadas
+- Conteúdo maior que a capacidade é reduzido preservando início/meio/fim com aviso explícito, em vez de cortes fixos silenciosos ou alegação de leitura integral.
+- `finish_reason=length|max_tokens`, EOF sem `done` e `truncated:true` são falhas não persistíveis; o usuário recebe o turno original de volta para retry.
+- Qualquer anexo isola o turno das tools, porque MIME/nome fornecidos pelo cliente não são prova suficiente para autorizar ações laterais.
+
+### Problemas encontrados / resolvidos
+- O botão e Enter ignoravam `filesReady`; o layout filtrava anexos ainda em upload e limpava a seleção — ambos agora compartilham a mesma regra de prontidão e o servidor mantém validação independente.
+- O PDF sofria truncagem no upload, novamente no chat e na persistência; os cortes foram substituídos por orçamento consciente da janela e teto agregado testável.
+- A rota fazia uma completion não-stream descartada antes da resposta final e aceitava EOF físico como sucesso; PDF/anexos agora seguem uma única geração e exigem encerramento aplicativo válido.
+
+### Pendências
+- Blobs continuam públicos por contrato do armazenamento atual; chave opaca reduz exposição, mas ownership/autorização forte de download exige arquitetura de storage autenticado.
+- O caminho legado Onyx ainda tem limite próprio de aproximadamente 25 mil caracteres e não foi alterado nesta story do Bibble nativo.
+- OCR continua sujeito a latência/timeout de serviços externos; streams longos ainda dependem dos limites reais do proxy/provider, embora agora falhem de modo explícito e recuperável.
+- Gates globais seguem bloqueados por problemas externos/preexistentes: milhares de violações fora do escopo no lint, erros de typecheck em Exclusão Fiscal/Habilitação RADAR/Google Calendar, timeout de Google Calendar, `prisma generate` com `EPERM` e CodeRabbit indisponível sem WSL. A story permanece `In Progress`; Lens não pôde emitir aprovação formal sem Forge global verde.
+
+### Refletido também em
+- `docs/stories/story-ialpha-bibble-leitura-confiavel-pdf-respostas-completas.md`: causas, critérios, implementação, testes, gates e pendências consolidados no Dev Agent Record.
+- `codebase-map.md` e `integration-points.md`: fluxo de anexos, orçamento, SSE e controles de segurança atualizados por Scribe.

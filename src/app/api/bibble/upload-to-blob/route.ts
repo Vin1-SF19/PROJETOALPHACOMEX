@@ -2,32 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
 import { extractTextFromBuffer } from "@/lib/bibble/tika";
+import { selectTextForTokenBudget } from "@/lib/bibble/context-budget";
+import {
+  BIBBLE_ATTACHMENT_MAX_BYTES,
+  BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET,
+  hasPdfMagicBytes,
+  isAllowedBibbleAttachmentType,
+} from "@/lib/bibble/attachment-security";
 
 export const dynamic = "force-dynamic";
+// O fallback de OCR pode aguardar o job do PDF24 por até 8 minutos.
+export const maxDuration = 600;
 
-const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-
-const ALLOWED_TYPES = [
-  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
-  "video/mp4", "video/webm", "video/quicktime",
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain", "text/csv", "application/json",
-  "application/zip", "application/x-zip-compressed",
-];
+const MAX_SIZE = BIBBLE_ATTACHMENT_MAX_BYTES;
 
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const userId = Number(session.user.id);
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
@@ -43,19 +36,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (file.type && !ALLOWED_TYPES.includes(file.type)) {
+  if (!file.type || !isAllowedBibbleAttachmentType(file.type)) {
     return NextResponse.json(
-      { error: `Tipo não permitido: ${file.type}` },
+      { error: file.type ? `Tipo não permitido: ${file.type}` : "Tipo do arquivo ausente" },
       { status: 400 }
     );
   }
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const uniqueName = `${userId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
-  const uploadPath = `bibble-chat/${uniqueName}`;
-
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
+  const declaresPdf = file.type === "application/pdf";
+  const namedAsPdf = file.name.toLowerCase().endsWith(".pdf");
+  if (declaresPdf !== namedAsPdf || (declaresPdf && !hasPdfMagicBytes(buffer))) {
+    return NextResponse.json(
+      { error: "Conteúdo do arquivo não corresponde a um PDF válido" },
+      { status: 422 },
+    );
+  }
+
+  const uniqueName = crypto.randomUUID();
+  const uploadPath = `bibble-chat/${uniqueName}`;
 
   const [blob, extraction] = await Promise.all([
     put(uploadPath, new Blob([arrayBuffer], { type: file.type }), {
@@ -65,13 +65,20 @@ export async function POST(request: NextRequest) {
     extractTextFromBuffer(buffer, file.type, file.name),
   ]);
 
-  const extractedContent = extraction.text
-    ? (extraction.text.length > 50000
-        ? extraction.text.slice(0, 50000) + "\n\n...[truncado]"
-        : extraction.text)
-    : undefined;
+  const selectedExtraction = selectTextForTokenBudget(
+    extraction.text,
+    BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET,
+    "texto extraído no upload",
+  );
+  const extractedContent = selectedExtraction.text || undefined;
 
-  console.log(`[BIBBLE UPLOAD] ${file.name} — fonte: ${extraction.source}, chars: ${extraction.text.length}`);
+  console.info("[BIBBLE PDF] extraction", {
+    stage: "upload",
+    source: extraction.source,
+    extractedChars: extraction.text.length,
+    includedChars: selectedExtraction.includedChars,
+    strategy: extraction.text ? selectedExtraction.strategy : "no-useful-text",
+  });
 
   return NextResponse.json({
     success: true,
@@ -83,6 +90,11 @@ export async function POST(request: NextRequest) {
       url: blob.url,
       uploadPath,
       extractedContent,
+      extractionSource: extraction.source,
+      extractionReduced: selectedExtraction.reduced,
+      extractionNotice: selectedExtraction.reduced
+        ? "O texto retornado foi reduzido com trechos do início, meio e fim; a redução está marcada no conteúdo."
+        : undefined,
     },
   });
 }

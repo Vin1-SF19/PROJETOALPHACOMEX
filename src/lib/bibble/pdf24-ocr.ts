@@ -25,8 +25,29 @@ export function isPdf24Configured(): boolean {
   return Boolean(PDF24_URL && PDF24_KEY);
 }
 
-function authHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${PDF24_KEY}` };
+export function resolveSameOriginUrl(baseValue: string, candidate: string): URL {
+  const base = new URL(baseValue);
+  const resolved = new URL(candidate, `${baseValue.replace(/\/+$/, "")}/`);
+  if (resolved.origin !== base.origin) {
+    throw new Error("Destino PDF24 fora da origem configurada");
+  }
+  return resolved;
+}
+
+async function fetchPdf24(candidate: string, init: RequestInit): Promise<Response> {
+  const url = resolveSameOriginUrl(PDF24_URL, candidate);
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${PDF24_KEY}`);
+  const response = await fetch(url, {
+    ...init,
+    redirect: "manual",
+    headers,
+  });
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error("Redirecionamento PDF24 bloqueado");
+  }
+  if (response.url) resolveSameOriginUrl(PDF24_URL, response.url);
+  return response;
 }
 
 interface Pdf24JobFile {
@@ -60,10 +81,9 @@ async function criarJobOcr(buffer: Buffer, fileName: string): Promise<number> {
   const timer = setTimeout(() => ctrl.abort(), PDF24_REQUEST_TIMEOUT_MS);
 
   try {
-    const res = await fetch(`${PDF24_URL}/api/${PDF24_SOLUTION_ID}`, {
+    const res = await fetchPdf24(`${PDF24_URL}/api/${PDF24_SOLUTION_ID}`, {
       method: "POST",
       signal: ctrl.signal,
-      headers: authHeaders(),
       body: form,
     });
 
@@ -77,7 +97,7 @@ async function criarJobOcr(buffer: Buffer, fileName: string): Promise<number> {
       throw new Error("PDF24 não retornou um id de job válido.");
     }
 
-    console.log(`[PDF24-OCR] job criado: id=${data.id}, arquivo=${fileName}`);
+    console.info("[BIBBLE PDF] ocr-job", { stage: "created", source: "pdf24-ocr" });
     return data.id;
   } finally {
     clearTimeout(timer);
@@ -90,10 +110,9 @@ async function consultarJobOcr(jobId: number): Promise<Pdf24JobResponse> {
   const timer = setTimeout(() => ctrl.abort(), PDF24_REQUEST_TIMEOUT_MS);
 
   try {
-    const res = await fetch(`${PDF24_URL}/api/${jobId}`, {
+    const res = await fetchPdf24(`${PDF24_URL}/api/${jobId}`, {
       method: "GET",
       signal: ctrl.signal,
-      headers: authHeaders(),
     });
 
     if (!res.ok) {
@@ -123,7 +142,7 @@ async function aguardarJobOcr(jobId: number): Promise<Pdf24JobFile> {
     const job = await consultarJobOcr(jobId);
 
     if (job.output?.files && job.output.files.length > 0) {
-      console.log(`[PDF24-OCR] job ${jobId} concluído (status=${job.status})`);
+      console.info("[BIBBLE PDF] ocr-job", { stage: "completed", source: "pdf24-ocr", status: job.status });
       return job.output.files[0];
     }
 
@@ -131,7 +150,7 @@ async function aguardarJobOcr(jobId: number): Promise<Pdf24JobFile> {
       throw new Error(`PDF24 reportou falha no job ${jobId} (status=${job.status}).`);
     }
 
-    console.log(`[PDF24-OCR] job ${jobId} em andamento (status=${job.status})...`);
+    console.info("[BIBBLE PDF] ocr-job", { stage: "polling", source: "pdf24-ocr", status: job.status });
     await new Promise((resolve) => setTimeout(resolve, PDF24_POLL_INTERVAL_MS));
   }
 
@@ -140,16 +159,15 @@ async function aguardarJobOcr(jobId: number): Promise<Pdf24JobFile> {
 
 /** Resolve a URL final do arquivo (absoluta ou relativa à base da API) e baixa o binário. */
 async function baixarArquivoOcr(file: Pdf24JobFile): Promise<Buffer> {
-  const url = file.path.startsWith("http") ? file.path : `${PDF24_URL}${file.path.startsWith("/") ? "" : "/"}${file.path}`;
+  const url = resolveSameOriginUrl(PDF24_URL, file.path).href;
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PDF24_REQUEST_TIMEOUT_MS);
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchPdf24(url, {
       method: "GET",
       signal: ctrl.signal,
-      headers: authHeaders(),
     });
 
     if (!res.ok) {
@@ -171,8 +189,8 @@ async function baixarArquivoOcr(file: Pdf24JobFile): Promise<Buffer> {
 export async function ocrViaPdf24(buffer: Buffer, fileName: string): Promise<Buffer> {
   const jobId = await criarJobOcr(buffer, fileName);
   const arquivo = await aguardarJobOcr(jobId);
-  console.log(`[PDF24-OCR] baixando resultado: ${arquivo.name}`);
+  console.info("[BIBBLE PDF] ocr-job", { stage: "downloading", source: "pdf24-ocr" });
   const resultado = await baixarArquivoOcr(arquivo);
-  console.log(`[PDF24-OCR] concluído: ${resultado.length} bytes`);
+  console.info("[BIBBLE PDF] ocr-job", { stage: "downloaded", source: "pdf24-ocr", bytes: resultado.length });
   return resultado;
 }

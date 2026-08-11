@@ -12,6 +12,13 @@ import { agentAvatarUrl, fetchFixados, toggleFixarAgente, fetchAgents, type Onyx
 import { notificarCalendarioAlphaAlterado } from "@/lib/google-calendar/invalidation";
 import { getTema } from "@/lib/temas";
 import { isAdminRole } from "@/lib/roles";
+import {
+  areAttachmentsReady,
+  BIBBLE_MAX_FILES_PER_TURN,
+  isAllowedBibbleAttachmentType,
+  selectAttachmentsWithinLimit,
+} from "@/lib/bibble/attachments";
+import { consumeBibbleAppStream } from "@/lib/bibble/client-stream";
 
 interface BibbleChatLayoutProps {
   userId: number;
@@ -28,6 +35,7 @@ const newId = () => `msg-${++msgCounter}-${Date.now()}`;
 
 // Modelo do Bibble é fixo — sem seletor na UI (ver .env.local BIBBLE_MODEL).
 const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "qwen3:14b";
+const DEFAULT_CONTEXT_WINDOW = 32_768;
 
 export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem";
 
@@ -162,8 +170,11 @@ export default function BibbleChatLayout({
     return localStorage.getItem("bibble-computer-access") === "true";
   });
   const [contextWindow, setContextWindow] = useState<number>(() => {
-    if (typeof window === "undefined") return 4096;
-    return Number(localStorage.getItem("bibble-context-window") ?? "4096");
+    if (typeof window === "undefined") return DEFAULT_CONTEXT_WINDOW;
+    const stored = Number(localStorage.getItem("bibble-context-window"));
+    return Number.isFinite(stored) && stored > 4_096
+      ? stored
+      : DEFAULT_CONTEXT_WINDOW;
   });
   const abortRef                              = useRef<AbortController | null>(null);
   const messagesRef                           = useRef<Message[]>([]);
@@ -192,17 +203,12 @@ export default function BibbleChatLayout({
   /* ── Add & upload files ─────────────────────────────────── */
   const handleAddFiles = useCallback((newFiles: File[]) => {
     const MAX_SIZE = 100 * 1024 * 1024;
-    const ALLOWED = [
-      "image/jpeg","image/png","image/gif","image/webp","image/svg+xml",
-      "video/mp4","video/webm","video/quicktime",
-      "application/pdf",
-      "application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text/plain","text/csv","application/json",
-    ];
+    const acceptedFiles = newFiles.filter(
+      file => file.size <= MAX_SIZE && isAllowedBibbleAttachmentType(file.type),
+    );
+    const selectedFiles = selectAttachmentsWithinLimit(uploadFiles, acceptedFiles);
 
-    const entries: UploadedFile[] = newFiles
-      .filter(f => f.size <= MAX_SIZE && (ALLOWED.includes(f.type) || f.name.match(/\.(txt|csv|json|md|pdf|doc|docx|xls|xlsx|ts|tsx|js|jsx|py)$/i)))
+    const entries: UploadedFile[] = selectedFiles
       .map(f => ({
         id: `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         file: f,
@@ -222,7 +228,14 @@ export default function BibbleChatLayout({
       fetch("/api/bibble/upload-to-blob", { method: "POST", body: form })
         .then(res => {
           if (!res.ok) return Promise.reject(new Error(`HTTP ${res.status}`));
-          return res.json() as Promise<{ success: boolean; file: { url: string; extractedContent?: string } }>;
+          return res.json() as Promise<{
+            success: boolean;
+            file: {
+              url: string;
+              extractedContent?: string;
+              extractionSource?: UploadedFile["extractionSource"];
+            };
+          }>;
         })
         .then(data => {
           setUploadFiles(prev => prev.map(f =>
@@ -231,6 +244,7 @@ export default function BibbleChatLayout({
               uploading: false,
               uploadUrl: data.file.url,
               extractedContent: data.file.extractedContent,
+              extractionSource: data.file.extractionSource,
             } : f
           ));
         })
@@ -240,7 +254,7 @@ export default function BibbleChatLayout({
           ));
         });
     });
-  }, []);
+  }, [uploadFiles]);
 
   /* ── Settings handlers (persist em localStorage) ────────── */
   const handleTemperatureChange = (v: number) => {
@@ -379,7 +393,7 @@ export default function BibbleChatLayout({
         body: JSON.stringify({ userContent: userMsg, assistantContent: assistantMsg }),
       });
       if (!res.ok) {
-        console.error("[Bibble] saveMessages failed:", res.status, await res.text().catch(() => ""));
+        console.error("[BIBBLE PERSISTENCE] failed", { status: res.status });
         return;
       }
       setSessions(prev =>
@@ -389,65 +403,37 @@ export default function BibbleChatLayout({
             : s
         )
       );
-    } catch (err) {
-      console.error("[Bibble] saveMessages error:", err);
+    } catch {
+      console.error("[BIBBLE PERSISTENCE] failed", { status: "network-error" });
     }
   }, []);
 
   /* ── Consome o stream SSE (Bibble ou Onyx) e atualiza a mensagem do assistente ── */
   const consumeChatStream = useCallback(async (res: Response, assistantId: string): Promise<string> => {
-    if (!res.ok || !res.body) throw new Error("API error");
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
     let fullResponse = "";
-    let receivedAnyEvent = false;
 
-    outer: while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split("\n\n");
-      buf = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-          const event = JSON.parse(line.slice(6)) as {
-            type: string;
-            text?: string;
-            state?: string;
-            message?: string;
-            onyxSessionId?: string;
-          };
-
-          receivedAnyEvent = true;
-          if (event.type === "session" && event.onyxSessionId) {
-            onyxSessionRef.current = event.onyxSessionId;
-          } else if (event.type === "status" && event.state) {
-            setStreamStatus(event.state as StreamStatus);
-          } else if (event.type === "text" && event.text) {
-            fullResponse += event.text;
-            const { content: snapContent, thinkContent: snapThink } = splitThink(fullResponse);
-            setMessages(prev =>
-              prev.map(m =>
-                m.id === assistantId
-                  ? { ...m, content: snapContent, thinkContent: snapThink, streaming: true }
-                  : m
-              )
-            );
-          } else if (event.type === "calendar_changed") {
-            notificarCalendarioAlphaAlterado();
-          } else if (event.type === "error") {
-            fullResponse = event.message ?? "Erro ao processar.";
-          } else if (event.type === "done") {
-            break outer;
-          }
-        } catch { /* malformed chunk */ }
+    const result = await consumeBibbleAppStream(res, (event) => {
+      if (event.type === "session" && event.onyxSessionId) {
+        onyxSessionRef.current = event.onyxSessionId;
+      } else if (event.type === "status" && event.state) {
+        setStreamStatus(event.state as StreamStatus);
+      } else if (event.type === "text" && event.text) {
+        fullResponse += event.text;
+        const { content: snapContent, thinkContent: snapThink } = splitThink(fullResponse);
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? { ...m, content: snapContent, thinkContent: snapThink, streaming: true }
+              : m
+          )
+        );
+      } else if (event.type === "calendar_changed") {
+        notificarCalendarioAlphaAlterado();
+      } else if (event.type === "error") {
+        fullResponse = event.message ?? "Erro ao processar.";
       }
-    }
-    if (!receivedAnyEvent || !fullResponse.trim()) {
+    });
+    if (!result.receivedAnyEvent || !fullResponse.trim()) {
       return fullResponse.trim() || "Tive um problema. Tenta de novo.";
     }
     return fullResponse;
@@ -502,13 +488,20 @@ export default function BibbleChatLayout({
     const text = inputValue.trim();
     if (!text && uploadFiles.length === 0) return;
 
+    // Defesa independente da UI: nenhum efeito colateral pode acontecer antes
+    // de todos os anexos terem URL confirmada e estarem livres de erro.
+    if (!areAttachmentsReady(uploadFiles)) return;
+    if (uploadFiles.length > BIBBLE_MAX_FILES_PER_TURN) return;
+
+    const filesAtSend = uploadFiles;
+
     // Guarda para restaurar na caixa caso o usuário interrompa este envio.
-    lastSentRef.current = { text, files: uploadFiles };
+    lastSentRef.current = { text, files: filesAtSend };
     interruptedRef.current = false;
 
     setInputValue("");
 
-    const readyFiles = uploadFiles.filter(f => !f.uploading && !f.error);
+    const readyFiles = filesAtSend;
 
     // A bolha mostra os anexos visualmente (imagem/chip), então o texto fica limpo.
     // Só docs (não-imagem) ganham um rótulo curto quando não há texto digitado.
@@ -532,7 +525,7 @@ export default function BibbleChatLayout({
     if (readyFiles.length > 0) {
       const docParts = readyFiles
         .filter(f => f.extractedContent?.trim())
-        .map(f => `#### 📄 ${f.file.name}\n\`\`\`\n${f.extractedContent!.slice(0, 25000)}\n\`\`\``);
+        .map(f => `#### 📄 ${f.file.name}\n\`\`\`\n${f.extractedContent!}\n\`\`\``);
       if (docParts.length > 0) {
         persistedContent = `${msgContent}\n\n---\n### Conteúdo dos arquivos anexados\n\n${docParts.join("\n\n")}\n---`;
       }
@@ -581,17 +574,15 @@ export default function BibbleChatLayout({
 
     try {
       // Preparar dados dos arquivos para envio (URLs do Blob)
-      const filesForChat = uploadFiles
-        .filter(f => !f.uploading && !f.error && f.uploadUrl)
+      const filesForChat = filesAtSend
         .map(f => ({
           name: f.file.name,
           type: f.file.type,
           size: f.file.size,
           url: f.uploadUrl,
           extractedContent: f.extractedContent,
+          extractionSource: f.extractionSource,
         }));
-
-      console.log("[BIBBLE] Sending message with files:", filesForChat.map(f => f.name));
 
       // Agentes Onyx → /api/onyx/chat | Bibble → /api/bibble/chat com modelo do dropdown
       const agente = selectedAgentRef.current;
@@ -629,8 +620,21 @@ export default function BibbleChatLayout({
 
       fullResponse = await consumeChatStream(res, assistantMsg.id);
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        fullResponse = fullResponse || "Tive um problema. Tenta de novo.";
+      if ((err as Error).name === "AbortError") {
+        // O fluxo de interrupção restaura os dados em handleStop.
+      } else {
+        // EOF/timeout/erro de protocolo nunca persiste resposta parcial. O turno
+        // volta integralmente para a caixa para retry.
+        setMessages(prev => prev.filter(message =>
+          message.id !== userMsg.id && message.id !== assistantMsg.id,
+        ));
+        setInputValue(text);
+        setUploadFiles(filesAtSend);
+        setShowFiles(filesAtSend.length > 0);
+        setIsStreaming(false);
+        setStreamStatus("idle");
+        abortRef.current = null;
+        return;
       }
     }
 

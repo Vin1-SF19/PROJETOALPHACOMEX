@@ -287,7 +287,7 @@ export default function BibbleSettingsPanel({
                 <input
                   type="number" min={512} max={262144} step={512} value={contextWindow}
                   onChange={e => {
-                    const v = Math.max(512, Math.min(262144, Number(e.target.value) || 4096));
+                    const v = Math.max(512, Math.min(262144, Number(e.target.value) || 32768));
                     onContextWindowChange(v);
                   }}
                   className="w-20 h-7 px-2 text-center text-[12px] font-bold rounded-md outline-none tabular-nums"

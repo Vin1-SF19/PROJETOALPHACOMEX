@@ -1245,3 +1245,105 @@ Pedido curto reconhecido: **“Adicione o Guia Inteligente neste módulo.”**
 **Como integrar:** formatação com seleção deve usar `aplicarEstiloNoIntervaloRichText`; sem seleção, sincronize propriedades globais e runs. Toda fonte nova precisa existir no catálogo e na URL de provisionamento de `scripts/download-alpha-motion-fonts.mjs`; execute `npm run fonts:alpha-motion` para gerar os WOFF2 e `src/app/alpha-motion-fonts.css`. A folha deve permanecer ao lado de `globals.css` e ser importada como `./alpha-motion-fonts.css`, pois o resolvedor CSS do Turbopack falhou com o caminho transversal `../styles`. Depois execute `npm run build:player`: o script troca `/fonts/alpha-motion/*.woff2` por data URI e falha se sobrar qualquer referência externa ou caminho local no bundle HTML offline.
 
 **Última atualização:** 2026-08-10 por Scribe
+
+---
+
+## Bibble/IAlpha — fluxo de anexos e PDFs
+
+### Contrato de seleção, upload e prontidão
+
+**Arquivos:** `src/lib/bibble/attachments.ts`, `src/components/BibbleChatHome/BibbleChatInput.tsx`, `src/components/BibbleChatHome/BibbleFileUpload.tsx`, `src/components/BibbleChatHome/BibbleChatLayout.tsx`, `src/app/api/bibble/upload-to-blob/route.ts`
+
+**Propósito:** mantém UI, layout e API alinhados sobre tipos permitidos, máximo de 10 anexos, máximo de 100 MB por arquivo e o momento em que um anexo pode ser enviado. A condição canônica é: upload finalizado, sem erro e com `uploadUrl` confirmado.
+
+**Editado quando:** um tipo/tamanho/quantidade de anexo mudar, o upload trocar de storage, um novo ponto da UI anexar arquivos ou o estado de upload ganhar outra etapa.
+
+**Como adicionar:** importe as constantes/helpers de `attachments.ts`; não recrie arrays MIME nem permita envio direto pelo componente. O handler final deve repetir a guarda antes de efeitos colaterais.
+
+```typescript
+if (!areAttachmentsReady(uploadFiles)) return;
+if (uploadFiles.length > BIBBLE_MAX_FILES_PER_TURN) return;
+const selected = selectAttachmentsWithinLimit(uploadFiles, incomingFiles);
+```
+
+Na rota de upload, novos tipos precisam entrar na allowlist compartilhada e ter validação de conteúdo correspondente quando houver assinatura conhecida. PDFs exigem MIME `application/pdf`, extensão `.pdf` e magic bytes `%PDF`. O caminho do Blob permanece opaco: `bibble-chat/<uuid>`.
+
+**Última atualização:** 2026-08-11 por Scribe
+
+### Extração de documentos e segurança dos anexos
+
+**Arquivos:** `src/lib/bibble/attachment-security.ts`, `src/lib/bibble/tika.ts`, `src/lib/bibble/pdf24-ocr.ts`, `src/lib/bibble/pdfjs-polyfill.ts`, `src/app/api/bibble/upload-to-blob/route.ts`, `src/app/api/bibble/chat/route.ts`
+
+**Propósito:** valida o envelope do chat e executa a leitura na ordem Tika → `pdf-parse` → PDF24 OCR. Downloads aceitam somente URLs HTTPS do Vercel Blob sob `/bibble-chat/`, bloqueiam redirects e revalidam a URL de resposta. O PDF24 só recebe/retorna recursos da mesma origem configurada.
+
+**Editado quando:** um formato de documento for aceito, a cadeia de extração mudar, o host/caminho de storage mudar, o schema do payload ganhar campo ou um processador externo for substituído.
+
+**Como adicionar:** toda URL de anexo recebida do cliente deve passar por `parseTrustedBibbleBlobUrl`/`fetchTrustedBibbleBlob`; nunca use `fetch(file.url)` diretamente. Preserve `extractionSource` no upload e no payload para observabilidade sem registrar nome ou conteúdo do arquivo.
+
+```typescript
+const parsed = bibbleChatInputSchema.safeParse(input);
+if (!parsed.success) return invalidInputResponse;
+
+const response = await fetchTrustedBibbleBlob(parsed.data.files[0].url!);
+const extraction = await extractTextFromBuffer(buffer, mimeType, fileName);
+```
+
+Qualquer turno com anexo usa `toolsForTurn = []`: conteúdo do documento não confiável não pode acionar tools do sistema. O Blob criado pela rota atual usa `access: "public"`, mas seu caminho é opaco e o chat só baixa URLs que passam pela allowlist acima.
+
+**Última atualização:** 2026-08-11 por Scribe
+
+### Orçamento de contexto e saída do Bibble
+
+**Arquivos:** `src/lib/bibble/context-budget.ts`, `src/lib/bibble/completion.ts`, `src/app/api/bibble/chat/route.ts`, `src/components/BibbleChatHome/BibbleSettingsPanel.tsx`
+
+**Propósito:** evita que PDF/histórico ocupem a reserva da resposta. A janela padrão é 32.768 tokens, a saída reserva até 4.096 tokens e PDFs com janela legada/insuficiente são ajustados para a janela segura do provider. Conteúdo excedente usa seleção explícita de início, meio e fim.
+
+**Editado quando:** um provider/modelo mudar de capacidade, o default do painel mudar, outro tipo de conteúdo exigir custo próprio ou a reserva de saída for alterada.
+
+**Como adicionar:** primeiro calcule os custos fixos; depois distribua `availableContentTokens` entre histórico e anexos. Use `selectTextForTokenBudget`/`selectRecentHistory` em vez de `slice(0, N)` e encaminhe os valores resolvidos à completion.
+
+```typescript
+const budget = calculateRequestBudget({
+  model,
+  requestedContextWindow,
+  hasPdf,
+  systemPrompt,
+  userPrompt,
+  tools,
+});
+
+const selection = selectTextForTokenBudget(text, budget.availableContentTokens, "documento");
+await callCompletion(messages, tools, model, signal, true, temperature,
+  budget.effectiveContextWindow, budget.outputTokenLimit);
+```
+
+No Ollama, `callCompletion` também envia `options.num_ctx` e `options.num_predict`; nos endpoints OpenAI-compatible, usa `max_tokens` ou `max_completion_tokens` conforme o modelo.
+
+**Última atualização:** 2026-08-11 por Scribe
+
+### Protocolo SSE concluído e retry preservando anexos
+
+**Arquivos:** `src/lib/bibble/completion.ts`, `src/lib/bibble/client-stream.ts`, `src/app/api/bibble/chat/route.ts`, `src/components/BibbleChatHome/BibbleChatLayout.tsx`
+
+**Propósito:** distingue resposta concluída de conexão encerrada ou limite de saída. O provider precisa fornecer `finish_reason`; a API precisa emitir `done`; o cliente só persiste quando `done.truncated !== true` e `done.successful !== false`.
+
+**Editado quando:** um endpoint novo reutilizar o consumidor SSE, eventos forem adicionados, o provider mudar de formato ou o fluxo de persistência/retry mudar.
+
+**Como adicionar:** endpoints Bibble devem encerrar com um evento explícito e marcar qualquer conclusão anormal como falha. O client comum deve continuar tratando EOF físico como incompleto.
+
+```typescript
+send({
+  type: "done",
+  finishReason,
+  truncated: isOutputTruncated(finishReason),
+  successful: !isOutputTruncated(finishReason),
+});
+
+await consumeBibbleAppStream(response, onEvent);
+```
+
+Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove as mensagens parciais e restaura o texto e a mesma coleção de anexos para retry. Não persista `fullResponse` antes da confirmação do protocolo.
+
+**Testes de contrato:** `tests/bibble/attachment-readiness.test.ts`, `attachment-security.test.ts`, `context-budget.test.ts`, `completion-budget-stream.test.ts`, `client-stream-protocol.test.ts`, `pdf-extraction-chain.test.ts`.
+
+**Última atualização:** 2026-08-11 por Scribe

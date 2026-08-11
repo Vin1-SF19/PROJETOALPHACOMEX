@@ -5,6 +5,12 @@ import { ArrowUp, Square, Paperclip, X, FileText, Image, Video, File, Palette, C
 import { type StreamStatus } from "./BibbleChatLayout";
 import { cn } from "@/lib/utils";
 import type { UploadedFile } from "./BibbleFileUpload";
+import {
+  areAttachmentsReady,
+  BIBBLE_ATTACHMENT_ACCEPT,
+  BIBBLE_MAX_FILES_PER_TURN,
+  canSendBibbleMessage,
+} from "@/lib/bibble/attachments";
 import { type TemaAlpha } from "@/lib/temas";
 import { BotaoMicrofone } from "./BotaoMicrofone";
 import {
@@ -92,9 +98,14 @@ export default function BibbleChatInput({
   };
   const currentImgModel = imgModels?.find(m => m.is_default);
   const showImageSelector = !!imageGenAvailable && !!isAdmin && !isStreaming && detectsImageIntent(value);
-  const canSend = (value.trim().length > 0 || files.length > 0) && !isStreaming && !disabled;
-  const filesReady = files.every(f => !f.uploading && !f.error);
-  const isAllUploadsFinished = files.length > 0 && files.every(f => !f.uploading && !f.error);
+  const filesReady = areAttachmentsReady(files);
+  const hasFileErrors = files.some(file => Boolean(file.error));
+  const canSend = canSendBibbleMessage({
+    text: value,
+    files,
+    isStreaming,
+    disabled,
+  });
 
   const removeFile = useCallback((id: string) => {
     const fileToRemove = files.find(f => f.id === id);
@@ -254,7 +265,7 @@ export default function BibbleChatInput({
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.json,.md,.ts,.tsx,.js,.jsx,.py"
+            accept={BIBBLE_ATTACHMENT_ACCEPT}
             className="hidden"
             onChange={(e) => {
               const picked = Array.from(e.target.files ?? []);
@@ -277,16 +288,18 @@ export default function BibbleChatInput({
                   onToggleFiles(!showFiles);
                 }
               }}
-              disabled={isStreaming}
+              disabled={isStreaming || files.length >= BIBBLE_MAX_FILES_PER_TURN}
               className={cn(
                 "p-2 rounded-lg transition-all duration-150 shrink-0",
                 showFiles
                   ? "text-indigo-400"
                   : "text-slate-500 hover:text-indigo-400",
-                isStreaming && "opacity-40 cursor-not-allowed",
+                (isStreaming || files.length >= BIBBLE_MAX_FILES_PER_TURN) && "opacity-40 cursor-not-allowed",
               )}
               style={showFiles ? { background: "rgba(99,102,241,0.12)" } : {}}
-              title={showFiles ? "Esconder arquivos" : "Anexar arquivo (Shift+P)"}
+              title={files.length >= BIBBLE_MAX_FILES_PER_TURN
+                ? `Limite de ${BIBBLE_MAX_FILES_PER_TURN} anexos atingido`
+                : showFiles ? "Esconder arquivos" : "Anexar arquivo (Shift+P)"}
             >
               <Paperclip size={15} />
             </button>
@@ -309,11 +322,13 @@ export default function BibbleChatInput({
                   "text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wider",
                   filesReady
                     ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                    : isAllUploadsFinished
-                    ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                    : "bg-red-500/10 text-red-400 border border-red-500/20"
+                    : hasFileErrors
+                    ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                    : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
                 )}>
-                  {files.filter(f => !f.uploading && !f.error).length}/{files.length} PRONTOS
+                  {hasFileErrors
+                    ? "FALHA NO UPLOAD"
+                    : `${files.filter(f => areAttachmentsReady([f])).length}/${files.length} PRONTOS`}
                 </span>
               )}
               <span className="text-[9px] text-slate-600 select-none hidden sm:block">
@@ -322,7 +337,7 @@ export default function BibbleChatInput({
                   : filesReady && files.length > 0
                   ? "ENTER PARA ENVIAR"
                   : files.length > 0
-                  ? "AGUARDANDO UPLOADS..."
+                  ? hasFileErrors ? "REMOVA O ANEXO COM FALHA" : "AGUARDANDO UPLOADS..."
                   : "SHIFT+P PARA ANEXAR"
                 }
               </span>
@@ -425,11 +440,15 @@ export default function BibbleChatInput({
               {files.length > 0 && (
                 <span className={cn(
                   "text-[9px] font-medium px-1.5 py-0.5 rounded border",
-                  files.every(f => !f.uploading && !f.error)
+                  filesReady
                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                     : "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
                 )}>
-                  {files.every(f => !f.uploading && !f.error) ? "PRONTO P/ ENVIAR" : `${files.filter(f => !f.uploading && !f.error).length}/${files.length}`}
+                  {filesReady
+                    ? "PRONTO P/ ENVIAR"
+                    : hasFileErrors
+                    ? "FALHA"
+                    : `${files.filter(f => areAttachmentsReady([f])).length}/${files.length}`}
                 </span>
               )}
             </div>
