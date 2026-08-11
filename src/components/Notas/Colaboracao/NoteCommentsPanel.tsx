@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Trash2 } from "lucide-react";
 import { CriarComentarioNota, ListarComentariosNota, ResolverComentario, ExcluirComentarioNota } from "@/actions/NotasColaboracao";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ComentarioListado {
   id: string;
@@ -20,15 +21,18 @@ interface NoteCommentsPanelProps {
 
 export function NoteCommentsPanel({ noteId, usuarioAtualId }: NoteCommentsPanelProps) {
   const [comentarios, setComentarios] = useState<ComentarioListado[]>([]);
+  const [carregando, setCarregando] = useState(true);
   const [texto, setTexto] = useState("");
 
   async function carregar() {
     const res = await ListarComentariosNota(noteId);
     if (res.success) setComentarios(res.data);
+    setCarregando(false);
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCarregando(true);
     void carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId]);
@@ -59,7 +63,13 @@ export function NoteCommentsPanel({ noteId, usuarioAtualId }: NoteCommentsPanelP
       <p className="text-[10px] uppercase tracking-wide text-slate-600">Comentários</p>
 
       <div className="flex flex-col gap-2">
-        {comentarios.map((comentario) => (
+        {carregando && (
+          <>
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+          </>
+        )}
+        {!carregando && comentarios.map((comentario) => (
           <div key={comentario.id} className={`rounded-lg p-2 text-xs ${comentario.isResolved ? "bg-white/[0.02] opacity-60" : "bg-white/[0.04]"}`}>
             <div className="mb-1 flex items-center justify-between">
               <span className="font-medium text-slate-300">{comentario.author.nome}</span>
@@ -79,7 +89,7 @@ export function NoteCommentsPanel({ noteId, usuarioAtualId }: NoteCommentsPanelP
             <p className="text-slate-400">{comentario.content}</p>
           </div>
         ))}
-        {comentarios.length === 0 && <p className="text-xs text-slate-600">Nenhum comentário ainda.</p>}
+        {!carregando && comentarios.length === 0 && <p className="text-xs text-slate-600">Nenhum comentário ainda.</p>}
       </div>
 
       <div className="flex items-center gap-2">

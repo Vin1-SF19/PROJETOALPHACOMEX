@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Paperclip, Download, Trash2, Loader2 } from "lucide-react";
 import { RegistrarAnexoNota, ListarAnexosNota, ExcluirAnexoNota } from "@/actions/NotasAnexos";
 import { NOTAS_ANEXO_MAX_SIZE } from "@/lib/validations/notas";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AnexoListado {
   id: string;
@@ -27,16 +28,19 @@ function formatarTamanho(bytes: number): string {
 
 export function ListaAnexos({ noteId }: ListaAnexosProps) {
   const [anexos, setAnexos] = useState<AnexoListado[]>([]);
+  const [carregando, setCarregando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function carregar() {
     const res = await ListarAnexosNota(noteId);
     if (res.success) setAnexos(res.data);
+    setCarregando(false);
   }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCarregando(true);
     void carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId]);
@@ -118,7 +122,13 @@ export function ListaAnexos({ noteId }: ListaAnexosProps) {
       </div>
 
       <div className="flex flex-col gap-1">
-        {anexos.map((anexo) => (
+        {carregando && (
+          <>
+            <Skeleton className="h-7 w-full rounded-lg" />
+            <Skeleton className="h-7 w-4/5 rounded-lg" />
+          </>
+        )}
+        {!carregando && anexos.map((anexo) => (
           <div key={anexo.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2 py-1.5 text-xs">
             <a
               href={`/api/notas/anexos/${anexo.id}`}
@@ -135,7 +145,7 @@ export function ListaAnexos({ noteId }: ListaAnexosProps) {
             </button>
           </div>
         ))}
-        {anexos.length === 0 && <p className="text-xs text-slate-600">Nenhum anexo ainda.</p>}
+        {!carregando && anexos.length === 0 && <p className="text-xs text-slate-600">Nenhum anexo ainda.</p>}
       </div>
     </div>
   );

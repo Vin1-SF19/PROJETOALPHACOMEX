@@ -1,6 +1,7 @@
 import { Pin, Star, Paperclip, MessageSquare } from "lucide-react";
 import type { OrdenacaoNotas } from "@/lib/validations/notas";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface NotaListada {
   id: string;
@@ -42,6 +43,16 @@ function formatarData(data: Date | string): string {
   return new Date(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
+/** Imita a forma real de um item da lista (título + metadados) para não haver salto de layout quando os dados chegam. */
+function ItemListaSkeleton() {
+  return (
+    <div className="flex w-full flex-col gap-2 border-b border-white/5 border-l-2 border-l-transparent px-3 py-2.5">
+      <Skeleton className="h-3.5 w-3/5" />
+      <Skeleton className="h-2.5 w-2/5" />
+    </div>
+  );
+}
+
 export function ListaNotas({
   notas,
   notaSelecionadaId,
@@ -72,7 +83,8 @@ export function ListaNotas({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {carregando && <div className="px-3 py-4 text-xs text-slate-600">Carregando...</div>}
+        {carregando &&
+          Array.from({ length: 8 }).map((_, i) => <ItemListaSkeleton key={i} />)}
 
         {!carregando &&
           notas.map((nota) => {

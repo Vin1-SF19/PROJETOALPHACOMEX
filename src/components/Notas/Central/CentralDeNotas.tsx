@@ -17,9 +17,17 @@ import { SidebarFiltros } from "./SidebarFiltros";
 import { ListaNotas, type NotaListada } from "./ListaNotas";
 import { PainelPropriedades } from "./PainelPropriedades";
 import { EstadoVazioNotas } from "./EstadoVazioNotas";
-import { NoteEditor } from "@/components/Notas/NoteEditor/NoteEditor";
+import { NoteEditorSkeleton } from "@/components/Notas/NoteEditor/NoteEditorSkeleton";
 
 const AnimatedShaderBackground = dynamic(() => import("@/components/ui/animated-shader-background"), { ssr: false });
+
+// O NoteEditor carrega o Tiptap inteiro (StarterKit, tabelas, mentions, slash-command) — pesado
+// demais para entrar no bundle inicial da Central se o usuário só está navegando a lista, sem
+// nunca abrir uma nota. Lazy-load sob demanda, com o skeleton como estado de carregamento.
+const NoteEditor = dynamic(() => import("@/components/Notas/NoteEditor/NoteEditor").then((mod) => mod.NoteEditor), {
+  ssr: false,
+  loading: () => <NoteEditorSkeleton />,
+});
 
 const DEBOUNCE_MS = 400;
 
@@ -269,6 +277,10 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
               initialContentJson={notaCarregada.contentJson}
               initialVersion={notaCarregada.version}
             />
+          ) : notaSelecionada ? (
+            // Nota escolhida na lista, mas o conteúdo (ObterNota) ainda está a caminho —
+            // sem isso o EstadoVazioNotas piscava por engano entre o clique e o carregamento.
+            <NoteEditorSkeleton />
           ) : (
             <EstadoVazioNotas onCriarNota={() => void criarNota()} accent={accent} />
           )}
