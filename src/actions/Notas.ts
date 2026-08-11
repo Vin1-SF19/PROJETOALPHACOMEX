@@ -109,12 +109,21 @@ export async function AtualizarNota(input: AtualizarNotaInput) {
   const novaVersao = notaAtual.currentVersion + 1;
   const tituloFinal = dados.title !== undefined ? dados.title.trim() || "Sem título" : notaAtual.title;
 
+  // Round-trip via JSON.parse/stringify antes de entregar ao Prisma — o valor de `contentJson`
+  // que chega da Server Action, quando contém estruturas aninhadas mais complexas (ex: nós de
+  // tabela do Tiptap: tableRow → tableCell/tableHeader → paragraph), disparava
+  // "Cannot access toStringTag on the server" no driver adapter LibSQL ao gravar o campo Json
+  // — mesmo sendo um objeto plano e válido (confirmado por JSON.stringify bem-sucedido antes
+  // desta chamada). O round-trip descarta qualquer proxy/referência não-plana remanescente da
+  // travessia RSC sem exigir mudança de schema nem de versão de dependência.
+  const contentJsonLimpo = dados.contentJson !== undefined ? (JSON.parse(JSON.stringify(dados.contentJson)) as typeof dados.contentJson) : undefined;
+
   const [notaAtualizada] = await db.$transaction([
     db.note.update({
       where: { id: dados.id },
       data: {
         title: tituloFinal,
-        contentJson: dados.contentJson ?? undefined,
+        contentJson: contentJsonLimpo ?? undefined,
         plainText: dados.plainText ?? undefined,
         color: dados.color === undefined ? undefined : dados.color,
         icon: dados.icon === undefined ? undefined : dados.icon,
@@ -129,7 +138,7 @@ export async function AtualizarNota(input: AtualizarNotaInput) {
         noteId: dados.id,
         version: novaVersao,
         title: tituloFinal,
-        contentJson: dados.contentJson ?? notaAtual.contentJson ?? {},
+        contentJson: contentJsonLimpo ?? notaAtual.contentJson ?? {},
         plainText: dados.plainText ?? notaAtual.plainText,
         changedById: usuario.id,
       },

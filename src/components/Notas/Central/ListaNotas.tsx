@@ -1,11 +1,12 @@
-import { Pin, Star, Paperclip, MessageSquare } from "lucide-react";
-import type { OrdenacaoNotas } from "@/lib/validations/notas";
+import { AnimatePresence, motion } from "framer-motion";
+import { Pin, Star, Paperclip, MessageSquare, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export interface NotaListada {
   id: string;
   title: string;
+  plainText?: string;
   visibility: string;
   status: string;
   isFavorite: boolean;
@@ -24,8 +25,6 @@ interface ListaNotasProps {
   notas: NotaListada[];
   notaSelecionadaId: string | null;
   onSelecionar: (noteId: string) => void;
-  ordenarPor: OrdenacaoNotas;
-  onMudarOrdenacao: (ordenacao: OrdenacaoNotas) => void;
   page: number;
   totalPages: number;
   onMudarPage: (page: number) => void;
@@ -33,22 +32,20 @@ interface ListaNotasProps {
   accent: string;
 }
 
-const OPCOES_ORDENACAO: { id: OrdenacaoNotas; label: string }[] = [
-  { id: "ATUALIZACAO", label: "Última edição" },
-  { id: "CRIACAO", label: "Data de criação" },
-  { id: "TITULO", label: "Título" },
-];
-
 function formatarData(data: Date | string): string {
   return new Date(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-/** Imita a forma real de um item da lista (título + metadados) para não haver salto de layout quando os dados chegam. */
-function ItemListaSkeleton() {
+/** Imita a forma real de um card (título + prévia + rodapé) para não haver salto de layout quando os dados chegam. */
+function CardNotaSkeleton() {
   return (
-    <div className="flex w-full flex-col gap-2 border-b border-white/5 border-l-2 border-l-transparent px-3 py-2.5">
+    <div className="flex h-40 w-full flex-col gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-3 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] backdrop-blur-md">
       <Skeleton className="h-3.5 w-3/5" />
-      <Skeleton className="h-2.5 w-2/5" />
+      <Skeleton className="h-2.5 w-full" />
+      <Skeleton className="h-2.5 w-4/5" />
+      <div className="mt-auto">
+        <Skeleton className="h-2.5 w-2/5" />
+      </div>
     </div>
   );
 }
@@ -57,8 +54,6 @@ export function ListaNotas({
   notas,
   notaSelecionadaId,
   onSelecionar,
-  ordenarPor,
-  onMudarOrdenacao,
   page,
   totalPages,
   onMudarPage,
@@ -67,70 +62,115 @@ export function ListaNotas({
 }: ListaNotasProps) {
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-        <span className="text-[10px] uppercase tracking-wide text-slate-600">Ordenar por</span>
-        <select
-          value={ordenarPor}
-          onChange={(event) => onMudarOrdenacao(event.target.value as OrdenacaoNotas)}
-          className="rounded-md border border-white/10 bg-transparent px-2 py-1 text-xs text-slate-300 outline-none"
-        >
-          {OPCOES_ORDENACAO.map((opcao) => (
-            <option key={opcao.id} value={opcao.id} className="bg-[#0b1120]">
-              {opcao.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <div className="flex-1 overflow-y-auto p-3">
+        {carregando && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <CardNotaSkeleton key={i} />
+            ))}
+          </div>
+        )}
 
-      <div className="flex-1 overflow-y-auto">
-        {carregando &&
-          Array.from({ length: 8 }).map((_, i) => <ItemListaSkeleton key={i} />)}
+        {!carregando && notas.length > 0 && (
+          <motion.div layout className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AnimatePresence mode="popLayout">
+              {notas.map((nota, index) => {
+                const selecionada = nota.id === notaSelecionadaId;
+                return (
+                  <motion.button
+                    key={nota.id}
+                    type="button"
+                    layout
+                    initial={{ opacity: 0, y: 10, scale: 0.94 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.3) }}
+                    whileHover={{ y: -6, scale: 1.015 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => onSelecionar(nota.id)}
+                    className={cn(
+                      "group relative flex h-40 flex-col overflow-hidden rounded-2xl border p-3 text-left backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-300",
+                      "shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_45px_-12px_rgba(0,0,0,0.65)]",
+                      selecionada
+                        ? "border-transparent"
+                        : "border-white/[0.06] bg-white/[0.035] hover:border-white/[0.12] hover:bg-white/[0.06]",
+                    )}
+                    style={
+                      selecionada
+                        ? {
+                            background: `rgba(${accent},0.12)`,
+                            borderColor: `rgba(${accent},0.4)`,
+                            boxShadow: `0 20px 45px -12px rgba(${accent},0.35)`,
+                          }
+                        : undefined
+                    }
+                  >
+                    {nota.color && (
+                      <span
+                        className="absolute left-0 top-0 h-full w-1"
+                        style={{ background: nota.color }}
+                        aria-hidden="true"
+                      />
+                    )}
 
-        {!carregando &&
-          notas.map((nota) => {
-            const selecionada = nota.id === notaSelecionadaId;
-            return (
-            <button
-              key={nota.id}
-              type="button"
-              onClick={() => onSelecionar(nota.id)}
-              className={cn(
-                "flex w-full flex-col gap-1 border-b border-white/5 border-l-2 px-3 py-2.5 text-left transition-colors",
-                !selecionada && "border-l-transparent hover:bg-white/[0.03]",
-              )}
-              style={selecionada ? { background: `rgba(${accent},0.08)`, borderLeftColor: `rgba(${accent},1)` } : undefined}
-            >
-              <div className="flex items-center gap-1.5">
-                {nota.isPinned && <Pin size={10} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Fixada" />}
-                {nota.isFavorite && <Star size={10} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Favorita" />}
-                <span className="truncate text-sm font-medium text-slate-200">{nota.title || "Sem título"}</span>
-              </div>
+                    <div className="mb-1 flex items-center gap-1.5">
+                      {nota.isPinned && <Pin size={11} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Fixada" />}
+                      {nota.isFavorite && <Star size={11} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Favorita" />}
+                      <span className="truncate text-sm font-semibold text-slate-100">{nota.title || "Sem título"}</span>
+                    </div>
 
-              <div className="flex items-center gap-2 text-[10px] text-slate-600">
-                <span>{formatarData(nota.updatedAt)}</span>
-                <span>·</span>
-                <span>{nota.owner.nome}</span>
-                {nota._count.attachments > 0 && (
-                  <span className="flex items-center gap-0.5">
-                    <Paperclip size={9} /> {nota._count.attachments}
-                  </span>
-                )}
-                {nota._count.comments > 0 && (
-                  <span className="flex items-center gap-0.5">
-                    <MessageSquare size={9} /> {nota._count.comments}
-                  </span>
-                )}
-              </div>
+                    {nota.plainText?.trim() ? (
+                      <p className="line-clamp-3 flex-1 text-xs leading-relaxed text-slate-500">
+                        {nota.plainText.trim()}
+                      </p>
+                    ) : (
+                      <p className="flex flex-1 items-center gap-1.5 text-xs italic text-slate-700">
+                        <FileText size={12} /> Nota vazia
+                      </p>
+                    )}
 
-              {nota.contexts.length > 0 && (
-                <span className="truncate text-[10px] text-indigo-400/80">{nota.contexts[0].displayName}</span>
-              )}
-            </button>
-            );
-          })}
+                    {nota.tags.length > 0 && (
+                      <div className="mb-1.5 mt-1 flex flex-wrap gap-1">
+                        {nota.tags.slice(0, 3).map(({ tag }) => (
+                          <span
+                            key={tag.id}
+                            className="truncate rounded-full border px-1.5 py-0.5 text-[9px]"
+                            style={{ borderColor: `${tag.color}55`, color: tag.color }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-auto flex items-center gap-2 border-t border-white/5 pt-1.5 text-[10px] text-slate-600">
+                      <span className="truncate">{nota.owner.nome}</span>
+                      <span className="shrink-0">·</span>
+                      <span className="shrink-0">{formatarData(nota.updatedAt)}</span>
+                      {nota._count.attachments > 0 && (
+                        <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                          <Paperclip size={9} /> {nota._count.attachments}
+                        </span>
+                      )}
+                      {nota._count.comments > 0 && (
+                        <span className="flex shrink-0 items-center gap-0.5">
+                          <MessageSquare size={9} /> {nota._count.comments}
+                        </span>
+                      )}
+                    </div>
+
+                    {nota.contexts.length > 0 && (
+                      <span className="mt-1 truncate text-[9px] text-indigo-400/80">{nota.contexts[0].displayName}</span>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
         {!carregando && notas.length === 0 && (
-          <div className="px-3 py-4 text-xs text-slate-600">Nenhuma nota nesta seção.</div>
+          <div className="flex h-full items-center justify-center px-3 py-4 text-xs text-slate-600">Nenhuma nota nesta seção.</div>
         )}
       </div>
 

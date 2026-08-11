@@ -37,6 +37,7 @@ import { NotesSearchCommand } from "./NotesSearchCommand";
 import { NoteShareDialog } from "@/components/Notas/Colaboracao/NoteShareDialog";
 import { NoteContextLinkDialog } from "@/components/Notas/Contexto/NoteContextLinkDialog";
 import { NoteColorPicker } from "./NoteColorPicker";
+import { Dock, DockItem, DockIcon, DockLabel } from "@/components/ui/dock";
 
 interface NotesGlobalTaskbarProps {
   userId: number;
@@ -297,14 +298,18 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
               Central
             </button>
 
-            <button
-              type="button"
-              title="Buscar notas"
-              onClick={() => setBuscaAberta(true)}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
-            >
-              <Search size={13} />
-            </button>
+            <Dock orientation="horizontal" magnification={34} distance={60} panelSize={28} className="gap-0.5">
+              <DockItem>
+                <button
+                  type="button"
+                  onClick={() => setBuscaAberta(true)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
+                >
+                  <DockIcon><Search size={13} /></DockIcon>
+                  <DockLabel>Buscar notas</DockLabel>
+                </button>
+              </DockItem>
+            </Dock>
 
             <div className="h-4 w-px shrink-0 bg-white/10" />
 
@@ -375,14 +380,18 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
               </SortableContext>
             </DndContext>
 
-            <button
-              type="button"
-              title={viewerMode === "RECOLHIDO" ? "Expandir painel" : "Recolher painel"}
-              onClick={() => setViewerMode(viewerMode === "RECOLHIDO" ? "COMPACTO" : "RECOLHIDO")}
-              className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white"
-            >
-              {viewerMode === "RECOLHIDO" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
+            <Dock orientation="horizontal" magnification={34} distance={60} panelSize={28} className="ml-1 gap-0.5">
+              <DockItem>
+                <button
+                  type="button"
+                  onClick={() => setViewerMode(viewerMode === "RECOLHIDO" ? "COMPACTO" : "RECOLHIDO")}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white"
+                >
+                  <DockIcon>{viewerMode === "RECOLHIDO" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</DockIcon>
+                  <DockLabel>{viewerMode === "RECOLHIDO" ? "Expandir painel" : "Recolher painel"}</DockLabel>
+                </button>
+              </DockItem>
+            </Dock>
           </motion.div>
         )}
       </AnimatePresence>

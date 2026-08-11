@@ -106,6 +106,7 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
       select: {
         id: true,
         title: true,
+        plainText: true,
         visibility: true,
         status: true,
         isFavorite: true,

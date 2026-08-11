@@ -1,0 +1,60 @@
+/* Estilo visual das tabelas dentro do editor de notas (Tiptap) — o plugin
+   @tailwindcss/typography (.prose) só estiliza tabelas de forma básica, sem bordas de célula
+   visíveis nem suporte ao handle de redimensionamento de coluna (Table.configure({ resizable:
+   true })), que fica invisível/quebrado sem este CSS dedicado. */
+
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0.75rem 0;
+  overflow: hidden;
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 10px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+  min-width: 1em;
+}
+
+.ProseMirror table th {
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+  text-align: left;
+}
+
+.ProseMirror table td:hover,
+.ProseMirror table th:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ProseMirror table .selectedCell {
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.ProseMirror table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(245, 158, 11, 0.08);
+  pointer-events: none;
+}
+
+/* Handle de redimensionar coluna — Table.configure({ resizable: true }) */
+.ProseMirror table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background: rgba(245, 158, 11, 0.6);
+  pointer-events: none;
+}
+
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}

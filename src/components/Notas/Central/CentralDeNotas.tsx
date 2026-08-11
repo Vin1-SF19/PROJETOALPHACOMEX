@@ -11,15 +11,15 @@ import { CriarNota, ObterNota } from "@/actions/Notas";
 import { AbrirAbaNota } from "@/actions/NotasWorkspace";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { getTema } from "@/lib/temas";
-import type { SecaoCentralNotas, OrdenacaoNotas } from "@/lib/validations/notas";
+import type { SecaoCentralNotas } from "@/lib/validations/notas";
 import type { JSONContent } from "@tiptap/react";
 import { SidebarFiltros } from "./SidebarFiltros";
 import { ListaNotas, type NotaListada } from "./ListaNotas";
 import { PainelPropriedades } from "./PainelPropriedades";
 import { EstadoVazioNotas } from "./EstadoVazioNotas";
 import { NoteEditorSkeleton } from "@/components/Notas/NoteEditor/NoteEditorSkeleton";
-
-const AnimatedShaderBackground = dynamic(() => import("@/components/ui/animated-shader-background"), { ssr: false });
+import { NotasBackground } from "./NotasBackground";
+import { NotasCard3D } from "./NotasCard3D";
 
 // O NoteEditor carrega o Tiptap inteiro (StarterKit, tabelas, mentions, slash-command) — pesado
 // demais para entrar no bundle inicial da Central se o usuário só está navegando a lista, sem
@@ -42,7 +42,9 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
   const { data: session } = useSession();
   const usuarioAtualId = Number((session?.user as { id?: string | number } | undefined)?.id ?? 0);
   const [secaoAtiva, setSecaoAtiva] = useState<SecaoCentralNotas>("RECENTES");
-  const [ordenarPor, setOrdenarPor] = useState<OrdenacaoNotas>("ATUALIZACAO");
+  // Sem seletor visual de ordenação no grid de cards — sempre por última edição, o critério
+  // mais útil para "o que eu estava fazendo" num layout de galeria.
+  const ordenarPor = "ATUALIZACAO" as const;
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -160,29 +162,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
 
   return (
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#020617] text-slate-200">
-      <div className="pointer-events-none absolute inset-0 z-0">
-        <AnimatedShaderBackground
-          variant="sutil"
-          intensidade={0.35}
-          velocidade={0.6}
-          corPrimaria="#020617"
-          corSecundaria={`rgb(${accent})`}
-          className="opacity-40"
-        />
-        <div
-          className="absolute -top-32 -left-24 h-[420px] w-[420px] rounded-full blur-[140px]"
-          style={{ background: `rgba(${accent},0.16)` }}
-        />
-        <div className="absolute -bottom-40 -right-24 h-[380px] w-[380px] rounded-full bg-indigo-600/10 blur-[130px]" />
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)",
-            backgroundSize: "36px 36px",
-          }}
-        />
-      </div>
+      <NotasBackground accentRgb={accent} />
 
       <motion.header
         initial={{ opacity: 0, y: -10 }}
@@ -236,65 +216,68 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
       </motion.header>
 
       <div className="relative z-10 mx-4 mb-4 mt-4 flex min-h-0 flex-1 gap-4 md:mx-6 md:mb-6">
-        <div className="overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 backdrop-blur-2xl">
-          <SidebarFiltros
-            secaoAtiva={secaoAtiva}
-            onSelecionarSecao={(secao) => {
-              setSecaoAtiva(secao);
-              setPage(1);
-            }}
-            tags={tags}
-            tagsSelecionadas={tagsSelecionadas}
-            onToggleTag={toggleTag}
-            accent={accent}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1 overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 backdrop-blur-2xl">
-          <ListaNotas
-            notas={notas}
-            notaSelecionadaId={notaSelecionadaId}
-            onSelecionar={setNotaSelecionadaId}
-            ordenarPor={ordenarPor}
-            onMudarOrdenacao={(valor) => {
-              setOrdenarPor(valor);
-              setPage(1);
-            }}
-            page={page}
-            totalPages={totalPages}
-            onMudarPage={setPage}
-            carregando={carregando}
-            accent={accent}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1 overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 backdrop-blur-2xl">
-          {notaSelecionada && notaCarregada && notaCarregada.id === notaSelecionada.id ? (
-            <NoteEditor
-              key={notaCarregada.id}
-              noteId={notaCarregada.id}
-              initialTitle={notaCarregada.title}
-              initialContentJson={notaCarregada.contentJson}
-              initialVersion={notaCarregada.version}
-            />
-          ) : notaSelecionada ? (
-            // Nota escolhida na lista, mas o conteúdo (ObterNota) ainda está a caminho —
-            // sem isso o EstadoVazioNotas piscava por engano entre o clique e o carregamento.
-            <NoteEditorSkeleton />
-          ) : (
-            <EstadoVazioNotas onCriarNota={() => void criarNota()} accent={accent} />
-          )}
-        </div>
-
-        {notaSelecionada && (
-          <div className="overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 backdrop-blur-2xl">
-            <PainelPropriedades
-              nota={notaSelecionada}
-              usuarioAtualId={usuarioAtualId}
-              onAtualizado={() => setRecarregarToken((token) => token + 1)}
+        <NotasCard3D delay={0}>
+          <div className="overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
+            <SidebarFiltros
+              secaoAtiva={secaoAtiva}
+              onSelecionarSecao={(secao) => {
+                setSecaoAtiva(secao);
+                setPage(1);
+              }}
+              tags={tags}
+              tagsSelecionadas={tagsSelecionadas}
+              onToggleTag={toggleTag}
               accent={accent}
             />
           </div>
+        </NotasCard3D>
+
+        <NotasCard3D delay={0.05} className="min-w-0 flex-1">
+          <div className="h-full overflow-hidden">
+            <ListaNotas
+              notas={notas}
+              notaSelecionadaId={notaSelecionadaId}
+              onSelecionar={setNotaSelecionadaId}
+              page={page}
+              totalPages={totalPages}
+              onMudarPage={setPage}
+              carregando={carregando}
+              accent={accent}
+            />
+          </div>
+        </NotasCard3D>
+
+        <NotasCard3D delay={0.1} className="min-w-0 flex-1">
+          <div className="h-full overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
+            {notaSelecionada && notaCarregada && notaCarregada.id === notaSelecionada.id ? (
+              <NoteEditor
+                key={notaCarregada.id}
+                noteId={notaCarregada.id}
+                initialTitle={notaCarregada.title}
+                initialContentJson={notaCarregada.contentJson}
+                initialVersion={notaCarregada.version}
+              />
+            ) : notaSelecionada ? (
+              // Nota escolhida na lista, mas o conteúdo (ObterNota) ainda está a caminho —
+              // sem isso o EstadoVazioNotas piscava por engano entre o clique e o carregamento.
+              <NoteEditorSkeleton />
+            ) : (
+              <EstadoVazioNotas onCriarNota={() => void criarNota()} accent={accent} />
+            )}
+          </div>
+        </NotasCard3D>
+
+        {notaSelecionada && (
+          <NotasCard3D delay={0.15}>
+            <div className="h-full overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
+              <PainelPropriedades
+                nota={notaSelecionada}
+                usuarioAtualId={usuarioAtualId}
+                onAtualizado={() => setRecarregarToken((token) => token + 1)}
+                accent={accent}
+              />
+            </div>
+          </NotasCard3D>
         )}
       </div>
     </div>

@@ -20,12 +20,17 @@ interface TableSizePickerProps {
 export function TableSizePicker({ onEscolher }: TableSizePickerProps) {
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState<{ linhas: number; colunas: number } | null>(null);
+  // Incrementado a cada seleção — força o Radix Popover a remontar do zero (novo componente,
+  // não só um novo estado) em vez de reabrir o mesmo Root, que ficava preso em open=true por
+  // uma disputa de foco entre o fechamento do popover e o editor.focus() do onEscolher.
+  const [instancia, setInstancia] = useState(0);
 
   const linhasAtivas = hover?.linhas ?? 0;
   const colunasAtivas = hover?.colunas ?? 0;
 
   return (
     <Popover
+      key={instancia}
       open={open}
       onOpenChange={(novoOpen) => {
         setOpen(novoOpen);
@@ -74,6 +79,7 @@ export function TableSizePicker({ onEscolher }: TableSizePickerProps) {
                 onClick={() => {
                   setOpen(false);
                   setHover(null);
+                  setInstancia((n) => n + 1);
                   onEscolher(linha, coluna);
                 }}
                 className={cn(

@@ -1,5 +1,6 @@
 "use client";
 
+import "./note-editor.css";
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -26,6 +27,7 @@ import { AtualizarNota } from "@/actions/Notas";
 import { SlashCommand } from "./slash-command";
 import { mentionSuggestion } from "./mention-suggestion";
 import { TableSizePicker } from "./TableSizePicker";
+import { TableEditPanel } from "./TableEditPanel";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { getNotaRascunhoStorageKey } from "@/lib/notas-tabs";
 import { cn } from "@/lib/utils";
@@ -263,6 +265,9 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
               editor.chain().focus().insertTable({ rows: linhas, cols: colunas, withHeaderRow: true }).run()
             }
           />
+        </DockItem>
+        <DockItem>
+          <TableEditPanel editor={editor} />
         </DockItem>
         <ToolbarButton title="Divisor" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
           <Minus size={15} />
