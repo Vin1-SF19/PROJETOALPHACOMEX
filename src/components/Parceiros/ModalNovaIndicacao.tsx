@@ -8,16 +8,17 @@ import {
 
 type ParceiroSimples = { id: number; nome: string; nomeFantasia: string | null; documento: string; nivel: string };
 type ClienteOpt = {
-  id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string; status: string;
+  id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string | null; status: string;
   indicacao: { parceiroId: number; status: string } | null;
 };
 
-// Valores reais observados em produção (clientes.status) — sem enum formal no schema.
+// Valores reais observados em produção (ClienteServico.status) — sem enum formal no schema.
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   "Deferido": { bg: "rgba(16,185,129,0.15)", color: "#34d399" },
   "Em Andamento": { bg: "rgba(245,158,11,0.15)", color: "#fbbf24" },
   "Stand By": { bg: "rgba(148,163,184,0.15)", color: "#cbd5e1" },
   "Arquivado": { bg: "rgba(100,116,139,0.15)", color: "#94a3b8" },
+  "Sem serviço": { bg: "rgba(100,116,139,0.15)", color: "#94a3b8" }, // empresa no Cliente Master sem ClienteServico ainda
 };
 const STATUS_STYLE_DEFAULT = { bg: "rgba(239,68,68,0.15)", color: "#f87171" }; // cancelados e outros não mapeados
 

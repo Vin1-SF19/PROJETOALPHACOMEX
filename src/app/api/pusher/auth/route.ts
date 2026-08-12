@@ -12,7 +12,7 @@ import {
   BPM_PIPELINE_CHANNEL_PREFIX,
   extrairPipelineIdCanalBpm,
 } from "@/lib/bpm/realtime";
-import db from "@/lib/prisma";
+import { checarAcessoBpmPipeline } from "@/lib/bpm/ownership";
 
 const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts", "private-metas-alpha"];
@@ -37,12 +37,12 @@ export async function POST(req: Request) {
         return new NextResponse("Canal inválido", { status: 403 });
       }
 
-      const pipeline = await db.bpmPipeline.findUnique({
-        where: { id: pipelineId },
-        select: { id: true },
-      });
-      if (!pipeline) {
-        return new NextResponse("Pipeline não encontrado", { status: 403 });
+      const podeAcessar = await checarAcessoBpmPipeline(
+        pipelineId,
+        Number(session.user.id),
+      );
+      if (!podeAcessar) {
+        return new NextResponse("Proibido", { status: 403 });
       }
 
       const authResponse = pusherServer.authorizeChannel(socketId, channelName);

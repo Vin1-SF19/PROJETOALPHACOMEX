@@ -553,6 +553,7 @@ export default function DetalheParceiroClient({
                 {responsaveis.map((responsavel, i) => {
                   const aberto = responsavelAbertoIdx === i;
                   const nomeValido = responsavel.nome.trim().length >= 2;
+                  const responsavelCompleto = nomeValido && responsavel.whatsapp.trim().length >= 8;
 
                   return (
                     <div
@@ -615,7 +616,7 @@ export default function DetalheParceiroClient({
                               <input value={responsavel.cargo} onChange={e => atualizarResponsavel(i, "cargo", e.target.value)} placeholder="Sócio, Diretor..." className={inputCls} />
                             </div>
                             <div>
-                              <p className={labelCls}>WhatsApp</p>
+                              <p className={labelCls}>WhatsApp *</p>
                               <input value={responsavel.whatsapp} onChange={e => atualizarResponsavel(i, "whatsapp", e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
                             </div>
                           </div>
@@ -625,7 +626,7 @@ export default function DetalheParceiroClient({
                           </div>
                           <button
                             type="button"
-                            disabled={!nomeValido}
+                            disabled={!responsavelCompleto}
                             onClick={() => setResponsavelAbertoIdx(-1)}
                             className="w-full h-10 rounded-xl border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-black uppercase text-[10px] tracking-widest disabled:opacity-30"
                           >
@@ -644,7 +645,7 @@ export default function DetalheParceiroClient({
                 >
                   <Plus size={14} /> Adicionar responsável
                 </button>
-                <p className="text-[9px] text-slate-600">Somente o nome é obrigatório.</p>
+                <p className="text-[9px] text-slate-600">Nome e WhatsApp são obrigatórios.</p>
               </div>
             ) : parceiro.representantes.length === 0 ? (
               <p className="text-xs text-slate-600">Sem responsável.</p>

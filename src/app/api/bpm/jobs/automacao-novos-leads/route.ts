@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { executarAutomacaoNovosLeads } from "@/lib/bpm/automacao-novos-leads";
+import { executarAutomacaoFollowUpBpm } from "@/lib/bpm/automacao-novos-leads";
 import { autorizarCron } from "@/lib/bpm/cron-auth";
+import { executarPollingTranscricoesBpm } from "@/lib/bpm/transcricao-reuniao-server";
 
 export const dynamic = "force-dynamic";
+let jobEmAndamento = false;
 
 export async function GET(request: Request) {
   const segredo = process.env.CRON_SECRET;
@@ -18,15 +20,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
   }
 
+  if (jobEmAndamento) {
+    return NextResponse.json(
+      { success: false, error: "O job de follow-up já está em execução." },
+      { status: 409 },
+    );
+  }
+
+  jobEmAndamento = true;
   try {
-    const resumo = await executarAutomacaoNovosLeads();
-    return NextResponse.json({ success: true, data: resumo });
+    const transcricoes = await executarPollingTranscricoesBpm();
+    const followUp = await executarAutomacaoFollowUpBpm();
+    return NextResponse.json({ success: true, data: { transcricoes, followUp } });
   } catch (error) {
     console.error("[AutomacaoNovosLeadsRoute] Falha no lote", error);
     return NextResponse.json(
-      { success: false, error: "Falha ao executar automação de Novos leads." },
+      { success: false, error: "Falha ao executar automação de follow-up do CRM." },
       { status: 500 },
     );
+  } finally {
+    jobEmAndamento = false;
   }
 }
-

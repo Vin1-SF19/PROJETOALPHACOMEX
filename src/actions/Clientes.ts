@@ -325,14 +325,32 @@ export async function buscarClientes() {
         historicoAlteracoes: {
           orderBy: { criadoEm: 'desc' },
         },
-        indicacao: {
-          where: { status: "ATIVA" },
-          include: { parceiro: { select: { id: true, nome: true, nivel: true } } },
-        },
       },
       orderBy: { createdAt: 'desc' }
     });
-    return lista;
+
+    // `indicacao` (empresa ↔ parceiro) migrou para o Cliente Master (`Cliente`, Fase 3.1
+    // do plano de unificação) — `clientes` (legado, CS&NPS) não tem mais essa relação
+    // direta. Resolve por CNPJ normalizado, mesma ponte usada em outros pontos da Fase 3.1.
+    const cnpjs = [...new Set(lista.map((c) => c.cnpj?.replace(/\D/g, "").toUpperCase()).filter((c): c is string => !!c))];
+    const clientesMaster = cnpjs.length
+      ? await db.cliente.findMany({
+          where: { cnpj: { in: cnpjs } },
+          select: {
+            cnpj: true,
+            indicacao: {
+              where: { status: "ATIVA" },
+              include: { parceiro: { select: { id: true, nome: true, nivel: true } } },
+            },
+          },
+        })
+      : [];
+    const indicacaoPorCnpj = new Map(clientesMaster.map((c) => [c.cnpj, c.indicacao]));
+
+    return lista.map((c) => ({
+      ...c,
+      indicacao: indicacaoPorCnpj.get(c.cnpj?.replace(/\D/g, "").toUpperCase() ?? "") ?? null,
+    }));
   } catch (error: any) {
     console.error("ERRO DO PRISMA buscarClientes:", error?.message ?? error);
     throw error;

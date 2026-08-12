@@ -29,7 +29,10 @@ const ResponsavelSchema = z.object({
   dataNascimento: z.string().optional(),
   cargo: z.string().optional(),
   email: z.string().optional(),
-  telefone: z.string().optional(),
+  // Obrigatório desde a Fase 3.1b (Cliente Master) — todo representante vira
+  // `Pessoa` (celular como chave única obrigatória, decisão do plano). Sem
+  // telefone não há como resolver/criar a Pessoa correspondente.
+  telefone: z.string().min(8, "Informe o WhatsApp do representante"),
 });
 
 const ParceiroSchema = z.object({
@@ -66,6 +69,95 @@ function gerarSenhaSegura(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
   return Array.from(array, (b) => chars[b % chars.length]).join("");
+}
+
+function normalizarCelular(v: string): string {
+  return v.replace(/\D/g, "");
+}
+
+type PrismaTx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/**
+ * Sincroniza os representantes (PF) de um Parceiro com `Pessoa`/`PessoaParceiroVinculo`
+ * (papel="REPRESENTANTE") — substitui o antigo `representantes: { create/deleteMany }`
+ * de `ParceiroRepresentante` (Fase 3.1b do Cliente Master).
+ *
+ * Estratégia de DIFF, não delete-all-recreate: `Pessoa` é global (pode estar vinculada
+ * a Cliente/outro Parceiro por celular já existente — reaproveita, nunca duplica).
+ * Vínculos que saíram do payload são desvinculados (delete do vínculo, NUNCA da Pessoa,
+ * que pode estar em uso em outro contexto).
+ */
+async function sincronizarRepresentantesParceiro(
+  tx: PrismaTx,
+  parceiroId: number,
+  responsaveis: z.infer<typeof ResponsavelSchema>[],
+) {
+  const validos = responsaveis.filter((r) => r.nome.trim());
+
+  const vinculosAtuais = await tx.pessoaParceiroVinculo.findMany({
+    where: { parceiroId, papel: "REPRESENTANTE" },
+    select: { id: true, pessoaId: true, pessoa: { select: { celular: true } } },
+  });
+  const celularesNoPayload = new Set(validos.map((r) => normalizarCelular(r.telefone)));
+
+  // Desvincula quem saiu do payload (mantém a Pessoa intacta).
+  for (const v of vinculosAtuais) {
+    if (!celularesNoPayload.has(v.pessoa.celular)) {
+      await tx.pessoaParceiroVinculo.delete({ where: { id: v.id } });
+    }
+  }
+
+  for (const r of validos) {
+    const celular = normalizarCelular(r.telefone);
+    const pessoa = await tx.pessoa.upsert({
+      where: { celular },
+      create: {
+        celular,
+        nome: r.nome,
+        cpf: r.cpf?.replace(/\D/g, "") || null,
+        dataNascimento: r.dataNascimento || null,
+        email: r.email || null,
+      },
+      update: {
+        // Não sobrescreve nome/dados de uma Pessoa já existente por engano — o campo
+        // aqui é só uma referência de contexto do parceiro, não a fonte oficial da Pessoa.
+      },
+    });
+
+    await tx.pessoaParceiroVinculo.upsert({
+      where: { pessoaId_parceiroId_papel: { pessoaId: pessoa.id, parceiroId, papel: "REPRESENTANTE" } },
+      create: {
+        pessoaId: pessoa.id,
+        parceiroId,
+        papel: "REPRESENTANTE",
+        tipoDocumento: "PF",
+        documento: r.cpf?.replace(/\D/g, "") || null,
+        cargo: r.cargo || null,
+      },
+      update: {
+        cargo: r.cargo || null,
+        documento: r.cpf?.replace(/\D/g, "") || null,
+        ativo: true,
+      },
+    });
+  }
+}
+
+/** Formato usado pela UI (mesmo shape do antigo `ParceiroRepresentante`) — lido via `PessoaParceiroVinculo`. */
+async function listarRepresentantesParceiro(tx: PrismaTx, parceiroId: number) {
+  const vinculos = await tx.pessoaParceiroVinculo.findMany({
+    where: { parceiroId, papel: "REPRESENTANTE", ativo: true },
+    include: { pessoa: { select: { nome: true, celular: true, cpf: true, email: true } } },
+    orderBy: { criadoEm: "asc" },
+  });
+  return vinculos.map((v) => ({
+    nome: v.pessoa.nome,
+    documento: v.pessoa.cpf ?? v.documento ?? "",
+    dataNascimento: null as string | null,
+    cargo: v.cargo,
+    email: v.pessoa.email,
+    telefone: v.pessoa.celular,
+  }));
 }
 
 export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Promise<{
@@ -176,30 +268,22 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
             },
           },
         }),
-        ...(respValidos.length > 0 && {
-          representantes: {
-            create: respValidos.map(r => ({
-              tipo: "PF",
-              documento: r.cpf?.replace(/\D/g, "") || "",
-              nome: r.nome,
-              dataNascimento: r.dataNascimento || null,
-              cargo: r.cargo || null,
-              email: r.email || null,
-              telefone: r.telefone || null,
-            })),
-          },
-        }),
     };
 
-    // A criação do parceiro + vínculo do contrato de origem SEMPRE devem acontecer
-    // juntos (é o cadastro em si — nunca deve falhar por conflito de indicação de
-    // OUTRO cliente). A indicação retroativa (abaixo, fora desta transação) é uma
-    // conveniência best-effort: se ela não puder ser feita, o parceiro continua
-    // criado normalmente e a equipe resolve a indicação manualmente depois.
-    const parceiro = origemContratoId
-      ? await db.$transaction(async (tx) => {
-        const criado = await tx.parceiro.create({ data: parceiroData });
+    // A criação do parceiro + representantes (Pessoa/PessoaParceiroVinculo) + vínculo
+    // do contrato de origem SEMPRE acontecem juntos numa transação (é o cadastro em si —
+    // nunca deve falhar por conflito de indicação de OUTRO cliente, nem deixar o parceiro
+    // criado sem seus representantes). A indicação retroativa (abaixo, fora desta
+    // transação) é uma conveniência best-effort: se ela não puder ser feita, o parceiro
+    // continua criado normalmente e a equipe resolve a indicação manualmente depois.
+    const parceiro = await db.$transaction(async (tx) => {
+      const criado = await tx.parceiro.create({ data: parceiroData });
 
+      if (respValidos.length > 0) {
+        await sincronizarRepresentantesParceiro(tx, criado.id, respValidos);
+      }
+
+      if (origemContratoId) {
         const vinculo = await tx.contratoComercial.updateMany({
           where: {
             id: origemContratoId,
@@ -212,24 +296,24 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
           },
         });
         if (vinculo.count !== 1) throw new Error("PENDENCIA_PARCEIRO_INDISPONIVEL");
+      }
 
-        return criado;
-      })
-      : await db.parceiro.create({ data: parceiroData });
+      return criado;
+    });
 
     revalidatePath("/PainelAlpha/Parceiros");
 
     // Indicação retroativa (contrato já FECHADO antes do parceiro existir) —
     // best-effort, fora da transação de criação: um conflito aqui não pode
     // reverter o cadastro do parceiro, que já está completo e válido.
+    // Busca por CNPJ em `Cliente` (empresa, Cliente Master) — não mais em `clientes`
+    // (legado) nem filtrando por `servico` (que agora é granularidade de `ClienteServico`,
+    // não da empresa: a indicação é da EMPRESA, não de um serviço específico dela).
     let avisoIndicacao: string | undefined;
     if (origemContratoId && contratoOrigem?.status === "FECHADO") {
       try {
-        const cliente = await db.clientes.findFirst({
-          where: {
-            cnpj: contratoOrigem.cnpj.replace(/\D/g, ""),
-            servicos: contratoOrigem.servico,
-          },
+        const cliente = await db.cliente.findFirst({
+          where: { cnpj: contratoOrigem.cnpj.replace(/\D/g, "").toUpperCase() },
           select: { id: true, indicacao: { select: { parceiroId: true } } },
         });
         if (!cliente) {
@@ -353,14 +437,16 @@ export async function buscarParceiro(id: number) {
     where: { id },
     include: {
       endereco: true,
-      representantes: true,
       indicacoes: {
         where: { status: "ATIVA" },
         include: {
           cliente: {
             select: {
               id: true, razaoSocial: true, nomeFantasia: true, cnpj: true,
-              dataConstituicao: true, dataContratacao: true, uf: true, regimeTributario: true, status: true,
+              dataConstituicao: true, uf: true, regimeTributario: true,
+              // dataContratacao/status vivem em ClienteServico (por serviço), não em
+              // Cliente (empresa) — pega os do serviço mais recentemente atualizado.
+              servicos: { select: { dataContratacao: true, status: true }, orderBy: { updatedAt: "desc" }, take: 1 },
             },
           },
         },
@@ -370,9 +456,22 @@ export async function buscarParceiro(id: number) {
   });
   if (!parceiro) return null;
 
+  // Representantes agora vêm de Pessoa/PessoaParceiroVinculo (Fase 3.1b do Cliente
+  // Master) — mesmo formato do antigo `ParceiroRepresentante` para não quebrar a UI.
+  const representantes = await listarRepresentantesParceiro(db, id);
+
+  const indicacoesComCliente = parceiro.indicacoes.map((ind) => ({
+    ...ind,
+    cliente: {
+      ...ind.cliente,
+      dataContratacao: ind.cliente.servicos[0]?.dataContratacao ?? null,
+      status: ind.cliente.servicos[0]?.status ?? null,
+    },
+  }));
+
   // Serviço contratado + valor do contrato (ContratoComercial vinculado só por CNPJ,
   // sem FK — pega o contrato FECHADO mais recente de cada CNPJ indicado).
-  const cnpjs = parceiro.indicacoes.map((ind) => ind.cliente.cnpj);
+  const cnpjs = indicacoesComCliente.map((ind) => ind.cliente.cnpj).filter((c): c is string => c !== null);
   const contratos = cnpjs.length
     ? await db.contratoComercial.findMany({
         where: { cnpj: { in: cnpjs }, status: "FECHADO" },
@@ -393,11 +492,11 @@ export async function buscarParceiro(id: number) {
   const ehEspecial = parceiro.tipoParceiro === "ESPECIAL";
   const TOTAL_TRIBUTOS_PCT = 19.53;
 
-  const contratacoesParaTimeline = parceiro.indicacoes
-    .filter((ind) => ind.cliente.dataContratacao)
+  const contratacoesParaTimeline = indicacoesComCliente
+    .filter((ind) => ind.cliente.dataContratacao && ind.cliente.cnpj)
     .map((ind) => {
       const data = new Date(ind.cliente.dataContratacao!);
-      return isNaN(data.getTime()) ? null : { cnpj: ind.cliente.cnpj, data };
+      return isNaN(data.getTime()) ? null : { cnpj: ind.cliente.cnpj!, data };
     })
     .filter((c): c is { cnpj: string; data: Date } => c !== null);
   const nivelHistoricoPorCnpj = calcularNivelPorContratacaoHistorico(contratacoesParaTimeline);
@@ -406,11 +505,12 @@ export async function buscarParceiro(id: number) {
 
   return {
     ...parceiro,
-    indicacoes: parceiro.indicacoes.map((ind) => {
-      const contrato = contratoPorCnpj.get(ind.cliente.cnpj);
+    representantes,
+    indicacoes: indicacoesComCliente.map((ind) => {
+      const contrato = ind.cliente.cnpj ? contratoPorCnpj.get(ind.cliente.cnpj) : undefined;
       const valorContrato = contrato?.valorContrato ?? null;
 
-      const nivelHistorico = nivelHistoricoPorCnpj.get(ind.cliente.cnpj) ?? null;
+      const nivelHistorico = (ind.cliente.cnpj && nivelHistoricoPorCnpj.get(ind.cliente.cnpj)) || null;
       const comissaoPercentualEmpresa = semComissao
         ? null
         : ehEspecial
@@ -585,12 +685,20 @@ const DIA_MS = 86_400_000;
 export async function recalcularNivel(parceiroId: number): Promise<string> {
   const indicacoes = await db.indicacao.findMany({
     where: { parceiroId, status: "ATIVA" },
-    select: { cliente: { select: { dataContratacao: true } } },
+    select: { cliente: { select: { servicos: { select: { dataContratacao: true } } } } },
   });
 
+  // `dataContratacao` vive em `ClienteServico` (por serviço), não em `Cliente` (empresa).
+  // Uma empresa com múltiplos serviços conta a partir da contratação MAIS ANTIGA — a regra
+  // de nível é "a empresa indicada foi efetivamente contratada", não "todo serviço dela".
   const datasContratacao = indicacoes
-    .map((i) => (i.cliente.dataContratacao ? new Date(i.cliente.dataContratacao) : null))
-    .filter((d): d is Date => d !== null && !isNaN(d.getTime()))
+    .map((i) => {
+      const datas = i.cliente.servicos
+        .map((s) => (s.dataContratacao ? new Date(s.dataContratacao) : null))
+        .filter((d): d is Date => d !== null && !isNaN(d.getTime()));
+      return datas.length > 0 ? new Date(Math.min(...datas.map((d) => d.getTime()))) : null;
+    })
+    .filter((d): d is Date => d !== null)
     .sort((a, b) => a.getTime() - b.getTime());
 
   let nivel = "GOLD";
@@ -678,7 +786,7 @@ export async function listarClientesParaIndicacao(busca?: string) {
   const buscaLimpa = busca?.trim() ?? "";
   const cnpjDigitos = buscaLimpa.replace(/\D/g, "");
 
-  const clientes = await db.clientes.findMany({
+  const clientes = await db.cliente.findMany({
     where: buscaLimpa
       ? {
           OR: [
@@ -689,41 +797,69 @@ export async function listarClientesParaIndicacao(busca?: string) {
         }
       : {},
     select: {
-      id: true, razaoSocial: true, nomeFantasia: true, cnpj: true, status: true,
+      id: true, razaoSocial: true, nomeFantasia: true, cnpj: true,
+      // `status` do card (Deferido/Em Andamento/Stand By/Arquivado/Cancelado) é do
+      // SERVIÇO contratado (ClienteServico), não da empresa (Cliente.status é só
+      // ATIVO/ARQUIVADO) — pega o serviço mais recentemente atualizado como "status atual".
+      servicos: { select: { status: true }, orderBy: { updatedAt: "desc" }, take: 1 },
       indicacao: { select: { parceiroId: true, status: true } },
     },
     take: 30,
     orderBy: { razaoSocial: "asc" },
   });
-  return clientes;
+  return clientes.map((c) => ({
+    id: c.id,
+    razaoSocial: c.razaoSocial,
+    nomeFantasia: c.nomeFantasia,
+    cnpj: c.cnpj,
+    status: c.servicos[0]?.status ?? "Sem serviço",
+    indicacao: c.indicacao,
+  }));
 }
 
 /** Lista enxuta de parceiros para selects (modais, Metas). */
 export async function listarParceirosSimples() {
   const session = await auth();
   if (!session?.user) return [];
-  return db.parceiro.findMany({
-    select: {
-      id: true, nome: true, nomeFantasia: true, documento: true, nivel: true,
-      representantes: { select: { nome: true } },
-    },
+  const parceiros = await db.parceiro.findMany({
+    select: { id: true, nome: true, nomeFantasia: true, documento: true, nivel: true },
     orderBy: { nome: "asc" },
   });
+
+  // Representantes agora vêm de Pessoa/PessoaParceiroVinculo (Fase 3.1b do Cliente
+  // Master) — mesmo formato do antigo `ParceiroRepresentante` para não quebrar a UI.
+  const vinculos = await db.pessoaParceiroVinculo.findMany({
+    where: { parceiroId: { in: parceiros.map((p) => p.id) }, papel: "REPRESENTANTE", ativo: true },
+    select: { parceiroId: true, pessoa: { select: { nome: true } } },
+  });
+  const representantesPorParceiro = new Map<number, { nome: string }[]>();
+  for (const v of vinculos) {
+    const lista = representantesPorParceiro.get(v.parceiroId) ?? [];
+    lista.push({ nome: v.pessoa.nome });
+    representantesPorParceiro.set(v.parceiroId, lista);
+  }
+
+  return parceiros.map((p) => ({ ...p, representantes: representantesPorParceiro.get(p.id) ?? [] }));
 }
 
 /** Dados completos do parceiro para confirmação visual (ex: ao selecionar "Indicação Parceiro" em Novo Cliente). Somente leitura. */
 export async function buscarParceiroDetalheSimples(id: number) {
   const session = await auth();
   if (!session?.user) return null;
-  return db.parceiro.findUnique({
+  const parceiro = await db.parceiro.findUnique({
     where: { id },
     select: {
       id: true, tipo: true, documento: true, nome: true, nomeFantasia: true,
       email: true, telefone: true, telefone2: true, nivel: true,
       endereco: { select: { cep: true, logradouro: true, numero: true, complemento: true, bairro: true, cidade: true, uf: true } },
-      representantes: { select: { nome: true, documento: true, cargo: true, email: true, telefone: true } },
     },
   });
+  if (!parceiro) return null;
+
+  // Representantes agora vêm de Pessoa/PessoaParceiroVinculo (Fase 3.1b do Cliente
+  // Master) — mesmo formato do antigo `ParceiroRepresentante` para não quebrar a UI.
+  const representantes = await listarRepresentantesParceiro(db, id);
+  return { ...parceiro, representantes };
 }
 
 // ─── Edição e exclusão (com permissão) ───────────────────────────────────────
@@ -778,50 +914,40 @@ export async function editarParceiro(id: number, input: z.infer<typeof EditarPar
   const comissaoFinal = d.tipoParceiro === "SEM_COMISSAO" ? null : (d.comissaoPercentual ?? null);
 
   try {
-    await db.parceiro.update({
-      where: { id },
-      data: {
-        nome: d.nome,
-        nomeFantasia: d.nomeFantasia ?? null,
-        dataNascimento: d.dataNascimento ?? null,
-        sobre: d.sobre ?? null,
-        email: d.email,
-        loginEmail: d.email.toLowerCase().trim(),
-        telefone: d.telefone ?? null,
-        telefone2: d.telefone2 ?? null,
-        chavePix: d.chavePix ?? null,
-        tipoChavePix: d.tipoChavePix ?? null,
-        nomeBanco: d.nomeBanco ?? null,
-        agencia: d.agencia ?? null,
-        conta: d.conta ?? null,
-        ...(dadosBancariosMudaram && { pixConfirmado: false, pixConfirmadoEm: null }),
-        ...(d.tipoParceiro && { tipoParceiro: d.tipoParceiro }),
-        comissaoPercentual: comissaoFinal,
-        ...(d.endereco && {
-          endereco: {
-            upsert: {
-              create: { cep: d.endereco.cep.replace(/\D/g, ""), logradouro: d.endereco.logradouro, numero: d.endereco.numero || null, complemento: d.endereco.complemento || null, bairro: d.endereco.bairro, cidade: d.endereco.cidade, uf: d.endereco.uf.toUpperCase() },
-              update: { cep: d.endereco.cep.replace(/\D/g, ""), logradouro: d.endereco.logradouro, numero: d.endereco.numero || null, complemento: d.endereco.complemento || null, bairro: d.endereco.bairro, cidade: d.endereco.cidade, uf: d.endereco.uf.toUpperCase() },
+    await db.$transaction(async (tx) => {
+      await tx.parceiro.update({
+        where: { id },
+        data: {
+          nome: d.nome,
+          nomeFantasia: d.nomeFantasia ?? null,
+          dataNascimento: d.dataNascimento ?? null,
+          sobre: d.sobre ?? null,
+          email: d.email,
+          loginEmail: d.email.toLowerCase().trim(),
+          telefone: d.telefone ?? null,
+          telefone2: d.telefone2 ?? null,
+          chavePix: d.chavePix ?? null,
+          tipoChavePix: d.tipoChavePix ?? null,
+          nomeBanco: d.nomeBanco ?? null,
+          agencia: d.agencia ?? null,
+          conta: d.conta ?? null,
+          ...(dadosBancariosMudaram && { pixConfirmado: false, pixConfirmadoEm: null }),
+          ...(d.tipoParceiro && { tipoParceiro: d.tipoParceiro }),
+          comissaoPercentual: comissaoFinal,
+          ...(d.endereco && {
+            endereco: {
+              upsert: {
+                create: { cep: d.endereco.cep.replace(/\D/g, ""), logradouro: d.endereco.logradouro, numero: d.endereco.numero || null, complemento: d.endereco.complemento || null, bairro: d.endereco.bairro, cidade: d.endereco.cidade, uf: d.endereco.uf.toUpperCase() },
+                update: { cep: d.endereco.cep.replace(/\D/g, ""), logradouro: d.endereco.logradouro, numero: d.endereco.numero || null, complemento: d.endereco.complemento || null, bairro: d.endereco.bairro, cidade: d.endereco.cidade, uf: d.endereco.uf.toUpperCase() },
+              },
             },
-          },
-        }),
-        ...(d.responsaveis && {
-          // Substitui o conjunto de representantes (deleta os antigos e recria)
-          representantes: {
-            deleteMany: {},
-            create: (responsaveisValidos ?? [])
-              .map(r => ({
-                tipo: "PF",
-                documento: r.cpf?.replace(/\D/g, "") || "",
-                nome: r.nome,
-                dataNascimento: r.dataNascimento || null,
-                cargo: r.cargo || null,
-                email: r.email || null,
-                telefone: r.telefone || null,
-              })),
-          },
-        }),
-      },
+          }),
+        },
+      });
+
+      if (d.responsaveis) {
+        await sincronizarRepresentantesParceiro(tx, id, responsaveisValidos ?? []);
+      }
     });
     revalidatePath("/PainelAlpha/Parceiros");
     revalidatePath(`/PainelAlpha/Parceiros/${id}`);

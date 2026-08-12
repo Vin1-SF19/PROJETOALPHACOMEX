@@ -19,11 +19,11 @@ export type ResponsavelForm = {
 
 export type ResponsavelPayload = {
   nome: string;
+  telefone: string;
   cpf?: string;
   dataNascimento?: string;
   cargo?: string;
   email?: string;
-  telefone?: string;
 };
 
 export function criarResponsavelVazio(): ResponsavelForm {
@@ -65,13 +65,15 @@ export function montarPayloadResponsaveis(
   responsaveis: ResponsavelForm[],
 ): ResponsavelPayload[] {
   return responsaveis
-    .filter((responsavel) => responsavel.nome.trim().length >= 2)
+    // WhatsApp obrigatório desde a Fase 3.1b (Cliente Master) — todo representante
+    // vira Pessoa, que exige celular como chave única.
+    .filter((responsavel) => responsavel.nome.trim().length >= 2 && responsavel.whatsapp.trim().length >= 8)
     .map((responsavel) => ({
       nome: responsavel.nome.trim(),
+      telefone: responsavel.whatsapp.trim(),
       cpf: responsavel.cpf.replace(/\D/g, "") || undefined,
       dataNascimento: responsavel.dataNascimento || undefined,
       cargo: responsavel.cargo.trim() || undefined,
       email: responsavel.email.trim() || undefined,
-      telefone: responsavel.whatsapp.trim() || undefined,
     }));
 }

@@ -1,8 +1,15 @@
 "use client";
 
 import { toast } from "sonner";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, CalendarClock, Check } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm } from "@/actions/bpm/Cards";
+import {
+  ERRO_DATA_REUNIAO_OBRIGATORIA,
+  etapaEhAgendarReuniao,
+  destinoEhReuniaoAgendada,
+} from "@/lib/bpm/agendar-reuniao";
+import { etapaEhReuniaoAgendada } from "@/lib/bpm/reuniao-agendada";
+import { normalizarNomeEtapa } from "@/lib/bpm/novos-leads";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -16,6 +23,10 @@ interface Props {
 }
 
 export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accent, onMovido }: Props) {
+  const aguardandoDataHora = etapaEhAgendarReuniao(card.etapa.nome) && !card.dataReuniao;
+  const aguardandoTranscricao = etapaEhReuniaoAgendada(card.etapa.nome)
+    && !card.transcricaoReuniao?.trim();
+
   async function handleMover(etapaDestinoId: string) {
     if (etapaDestinoId === card.etapa.id) return;
     const res = await MoverCardBpm({ cardId: card.id, etapaDestinoId });
@@ -25,13 +36,38 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
 
   return (
     <div className="rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-4 space-y-2">
+      {aguardandoDataHora && (
+        <div className="mb-3 flex gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
+          <CalendarClock size={14} className="mt-0.5 shrink-0" />
+          <span>{ERRO_DATA_REUNIAO_OBRIGATORIA} A saída para Standby continua disponível.</span>
+        </div>
+      )}
+      {aguardandoTranscricao && (
+        <div className="mb-3 flex gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
+          <CalendarClock size={14} className="mt-0.5 shrink-0" />
+          <span>
+            A transcrição da reunião ainda não foi recebida. Sincronize-a antes de avançar.
+            A saída para Standby continua disponível.
+          </span>
+        </div>
+      )}
       {etapas.map((etapa) => {
         const ativa = etapa.id === card.etapa.id;
+        const bloqueadaPorDataHora = aguardandoDataHora && destinoEhReuniaoAgendada(etapa.nome);
+        const bloqueadaPorTranscricao = aguardandoTranscricao
+          && ["Em tratativa", "Sem viabilidade"].map(normalizarNomeEtapa)
+            .includes(normalizarNomeEtapa(etapa.nome));
+        const motivoBloqueio = bloqueadaPorDataHora
+          ? ERRO_DATA_REUNIAO_OBRIGATORIA
+          : bloqueadaPorTranscricao
+            ? "A transcrição da reunião ainda não foi recebida."
+            : undefined;
         return (
           <button
             key={etapa.id}
             onClick={() => handleMover(etapa.id)}
-            disabled={!podeMoverEtapa}
+            disabled={!podeMoverEtapa || bloqueadaPorDataHora || bloqueadaPorTranscricao}
+            title={motivoBloqueio}
             className="w-full flex items-center justify-between gap-2 text-left px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60 not-disabled:hover:-translate-y-0.5 not-disabled:active:translate-y-0"
             style={
               ativa

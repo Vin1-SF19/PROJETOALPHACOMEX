@@ -17,12 +17,16 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { fmtDateTime } from "@/lib/format-date";
-import { ObterCardBpm, AtualizarCardBpm } from "@/actions/bpm/Cards";
+import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
 import { CriarTarefaBpm, ConcluirTarefaBpm } from "@/actions/bpm/Tarefas";
 import { RegistrarAnexoBpm, ExcluirAnexoBpm } from "@/actions/bpm/Anexos";
 import { CriarVinculoCardBpm } from "@/actions/bpm/Vinculos";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { isAdminRole } from "@/lib/roles";
+import { PainelRequisitosAvanco } from "./PainelRequisitosAvanco";
+import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
+import { PainelProximoContato } from "./PainelProximoContato";
+import { CampoBpmInput } from "../CampoBpmInput";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -35,6 +39,11 @@ interface Props {
   currentUserRole: string | null;
   onAtualizado: () => void;
   onAbrirCard: (cardId: string) => void;
+  etapasParaMover: { id: string; nome: string }[];
+  onEstadoFollowUpChange: (estado: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO") => void;
+  podeEditar: boolean;
+  podeMoverEtapa: boolean;
+  realtimeRevision: number;
 }
 
 function formatarBytes(bytes: number | null): string {
@@ -84,30 +93,35 @@ export function SectionCard({
   );
 }
 
-export default function PainelHistorico({ card, interacoes, accent, currentUserId, currentUserRole, onAtualizado, onAbrirCard }: Props) {
-  const [valoresCampos, setValoresCampos] = useState<Record<string, string>>(() => {
-    const iniciais: Record<string, string> = {};
-    for (const cv of card.campoValores) {
-      if (cv.valor) iniciais[cv.campo.id] = cv.valor;
-    }
-    return iniciais;
-  });
-  const [salvandoCampos, setSalvandoCampos] = useState(false);
+export default function PainelHistorico({ card, interacoes, accent, currentUserId, currentUserRole, onAtualizado, onAbrirCard, etapasParaMover, onEstadoFollowUpChange, podeEditar, podeMoverEtapa, realtimeRevision }: Props) {
   const [novaTarefaTitulo, setNovaTarefaTitulo] = useState("");
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const inputAnexoRef = useRef<HTMLInputElement>(null);
+  const [revisaoInicial] = useState(realtimeRevision);
   const [vinculoBusca, setVinculoBusca] = useState("");
+  const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
+    Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""])),
+  );
+  const [salvandoCamposAtuais, setSalvandoCamposAtuais] = useState(false);
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeExcluirAnexo = isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR";
+  const camposAtuaisAlterados = card.camposEtapa.some(
+    (campo) => (valoresCamposAtuais[campo.id] ?? "") !== (campo.valor ?? ""),
+  );
 
-  async function handleSalvarCampos() {
-    setSalvandoCampos(true);
-    const res = await AtualizarCardBpm({ cardId: card.id, camposValores: valoresCampos });
-    setSalvandoCampos(false);
-    if (res.success) { toast.success("Campos atualizados"); onAtualizado(); }
-    else toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar campos");
+  async function salvarCamposAtuais() {
+    if (!podeEditar || !camposAtuaisAlterados) return;
+    setSalvandoCamposAtuais(true);
+    const resultado = await AtualizarCardBpm({ cardId: card.id, camposValores: valoresCamposAtuais });
+    setSalvandoCamposAtuais(false);
+    if (!resultado.success) {
+      toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa");
+      return;
+    }
+    toast.success("Campos da etapa atualizados");
+    onAtualizado();
   }
 
   async function handleCriarTarefa() {
@@ -169,7 +183,10 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
   const interacoesAnteriores = interacoes.slice(1);
 
   return (
-    <div className="rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-4 space-y-3">
+    <div className="min-h-0 rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 space-y-3 lg:h-full lg:overflow-y-auto">
+      {realtimeRevision !== revisaoInicial && (
+        <div className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">Este card recebeu uma atualização em tempo real. Os valores que você está editando foram preservados; revise-os antes de salvar.</div>
+      )}
       {/* Status + última interação, estrutura fixa */}
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-4">
         <div className="flex items-center justify-between">
@@ -233,45 +250,52 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
         </SectionCard>
       )}
 
-      {card.campoValores.length > 0 && (
-        <SectionCard icon={SlidersHorizontal} title="Campos" accent={accent}>
-          <div className="space-y-2 mt-2">
-            {card.campoValores.map(({ campo }) => (
-              <div key={campo.id} className="space-y-1">
-                <label className="text-[11px] text-slate-400 font-medium">
-                  {campo.nome}{campo.obrigatorio && " *"}
+      <section id={`campos-etapa-atual-${card.id}`} tabIndex={-1} className="space-y-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 outline-none focus-visible:ring-2 focus-visible:ring-white/30" aria-labelledby={`campos-etapa-atual-titulo-${card.id}`}>
+        <div className="flex items-start gap-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" style={{ background: `rgba(${accent},0.15)` }}>
+            <SlidersHorizontal size={13} style={{ color: `rgb(${accent})` }} />
+          </div>
+          <div>
+            <h3 id={`campos-etapa-atual-titulo-${card.id}`} className="text-xs font-bold uppercase tracking-wide text-white">Campos da etapa atual</h3>
+            <p className="mt-0.5 text-[11px] text-slate-500">{card.etapa.nome} · campos obrigatórios e opcionais.</p>
+          </div>
+        </div>
+
+        {card.camposEtapa.length === 0 ? (
+          <p className="text-xs text-slate-500">Esta etapa não possui campos configurados.</p>
+        ) : (
+          <div className="space-y-3 border-t border-white/5 pt-3">
+            {card.camposEtapa.map((campo) => (
+              <div key={campo.id} className="space-y-1.5">
+                <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
+                  {campo.nome}{campo.obrigatorio ? " *" : ""}
                 </label>
-                {campo.tipo === "selecao" && campo.opcoesJson ? (
-                  <select
-                    className={inputCls}
-                    value={valoresCampos[campo.id] ?? ""}
-                    onChange={(e) => setValoresCampos((prev) => ({ ...prev, [campo.id]: e.target.value }))}
-                  >
-                    <option value="">Selecione...</option>
-                    {(JSON.parse(campo.opcoesJson) as string[]).map((op) => (
-                      <option key={op} value={op}>{op}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    className={inputCls}
-                    type={campo.tipo === "numero" ? "number" : campo.tipo === "data" ? "date" : "text"}
-                    value={valoresCampos[campo.id] ?? ""}
-                    onChange={(e) => setValoresCampos((prev) => ({ ...prev, [campo.id]: e.target.value }))}
-                  />
-                )}
+                <CampoBpmInput
+                  campo={campo}
+                  value={valoresCamposAtuais[campo.id] ?? ""}
+                  onChange={(valor) => setValoresCamposAtuais((atuais) => ({ ...atuais, [campo.id]: valor }))}
+                  className={inputCls}
+                  disabled={!podeEditar}
+                />
               </div>
             ))}
-            <button
-              onClick={handleSalvarCampos}
-              disabled={salvandoCampos}
-              className="w-full py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: `rgba(${accent},0.85)` }}
-            >
-              {salvandoCampos ? "Salvando..." : "Salvar campos"}
+            <button type="button" onClick={() => void salvarCamposAtuais()} disabled={!podeEditar || !camposAtuaisAlterados || salvandoCamposAtuais} className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45" style={{ background: `rgba(${accent},0.85)` }}>
+              {salvandoCamposAtuais && <Loader2 size={14} className="animate-spin" />}
+              {salvandoCamposAtuais ? "Salvando..." : "Salvar campos da etapa"}
             </button>
+            {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}
           </div>
-        </SectionCard>
+        )}
+      </section>
+
+      <PainelRequisitosAvanco card={card} etapas={etapasParaMover} accent={accent} onAtualizado={onAtualizado} podeEditar={podeEditar} podeMover={podeMoverEtapa} />
+
+      {["em tratativa", "sem viabilidade"].includes(card.etapa.nome.trim().toLocaleLowerCase("pt-BR")) && (
+        <PainelProximoContato card={card} accent={accent} onAtualizado={onAtualizado} podeEditar={podeEditar} />
+      )}
+
+      {card.etapa.nome.trim().toLocaleLowerCase("pt-BR") === "em tratativa" && (
+        <PainelChecklistFollowUp cardId={card.id} accent={accent} onAtualizado={onAtualizado} onEstadoChange={onEstadoFollowUpChange} podeEditar={podeEditar} />
       )}
 
       <SectionCard icon={ListTodo} title="Tarefas" count={card.tarefas.length} accent={accent} defaultOpen>

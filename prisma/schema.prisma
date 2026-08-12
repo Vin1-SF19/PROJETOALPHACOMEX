@@ -88,6 +88,7 @@ model usuarios {
   onyxAgentesFixados OnyxAgenteFixado[]
 
   historicoAlteracoesCliente HistoricoAlteracaoCliente[]
+  clienteServicoHistoricos ClienteServicoHistorico[] @relation("ClienteServicoHistoricoUsuario")
 
   parceirosCriados        Parceiro[]
   indicacoesCriadas       Indicacao[]       @relation("IndicacaoAutor")
@@ -333,7 +334,8 @@ model clientes {
   // Canal de aquisição (Painel de Metas) + indicação por parceiro
   canalAquisicao String?
   canalOutro     String?
-  indicacao      Indicacao?
+  // `indicacao Indicacao?` removida em 2026-08-12 (Fase 3.1 Cliente Master) —
+  // Indicacao.clienteId agora aponta para `Cliente`, não mais para `clientes` legado.
 
   // Alpha BPM (2026-08-03) — reaproveita `clientes` como Empresa do BPM (D-049)
   bpmCards              BpmCard[]
@@ -418,6 +420,176 @@ model HistoricoAlteracaoCliente {
   @@index([clienteId, criadoEm])
   @@index([loteId])
   @@map("historico_alteracao_cliente")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLIENTE MASTER (2026-08-12, ver .bibble/memory/plano-cliente-master.md)
+// Fase 2 — schema novo em paralelo aos models antigos (clientes/socios etc.),
+// sem remover nada ainda. Cliente = empresa (1 linha por CNPJ). ClienteServico
+// = o que hoje vive dentro de `clientes` (status/analista/dataExito/valor).
+// Pessoa = pessoa física global (celular como chave), N:N com Cliente E Parceiro.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Cliente {
+  id                  Int      @id @default(autoincrement())
+  cnpj                String?  @unique // nullable — empresa "em constituição" sem CNPJ ainda (ver decisions.md pergunta 11)
+  razaoSocial         String
+  nomeFantasia        String?
+  dataConstituicao    String?
+  uf                  String?
+  municipio           String?
+  regimeTributario    String?
+  capitalSocial       String?
+  situacaoCadastral   String?
+  status              String   @default("ATIVO") // ATIVO | ARQUIVADO — status da EMPRESA, não de um serviço
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  servicos  ClienteServico[]
+  pessoas   PessoaClienteVinculo[]
+  indicacao Indicacao?
+
+  @@index([razaoSocial])
+  @@index([status])
+}
+
+model ClienteServico {
+  id        Int     @id @default(autoincrement())
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  servico             String
+  status              String  @default("Em Andamento")
+  analistaResponsavel String?
+  dataContratacao     String?
+  dataExito           String?
+  formaPagamento      String?
+  valorContrato       Float?
+  closerNome          String?
+  ultimoCs            Int?    @default(0)
+  nps                 Int?
+  feedbackGoogle      Boolean @default(false)
+  nomeGoogle          String?
+  embasamento         String?
+  origemLead          String?
+  canalAquisicao      String?
+  canalOutro          String?
+
+  logCs               ClienteServicoLogCs[]
+  logFeedback         ClienteServicoLogFeedback[]
+  historicoAlteracoes ClienteServicoHistorico[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clienteId, servico])
+  @@index([status])
+}
+
+model ClienteServicoLogCs {
+  id               String         @id @default(cuid())
+  dataRegistro     DateTime       @default(now())
+  colaborador      String
+  sentimento       String
+  observacao       String?
+  clienteServicoId Int
+  clienteServico   ClienteServico @relation(fields: [clienteServicoId], references: [id], onDelete: Cascade)
+
+  @@index([clienteServicoId])
+}
+
+model ClienteServicoLogFeedback {
+  id               String         @id @default(cuid())
+  dataRegistro     DateTime       @default(now())
+  colaborador      String
+  sentimento       String
+  observacao       String?
+  clienteServicoId Int
+  clienteServico   ClienteServico @relation(fields: [clienteServicoId], references: [id], onDelete: Cascade)
+
+  @@index([clienteServicoId])
+}
+
+/// Sucessora de HistoricoAlteracaoCliente, penduradas em ClienteServico (decisão da
+/// pergunta 2 do plano — Opção B). Mesma granularidade por campo + agrupamento por loteId.
+model ClienteServicoHistorico {
+  id                 String   @id @default(cuid())
+  loteId             String
+  clienteServicoId   Int
+  clienteServico     ClienteServico @relation(fields: [clienteServicoId], references: [id], onDelete: Cascade)
+  campo              String
+  valorAnterior      String?
+  valorNovo          String?
+  userId             Int?
+  usuario            usuarios? @relation("ClienteServicoHistoricoUsuario", fields: [userId], references: [id], onDelete: SetNull)
+  nomeUsuarioNaEpoca String
+  acao               String   @default("EDICAO")
+  criadoEm           DateTime @default(now())
+
+  @@index([clienteServicoId, criadoEm])
+  @@index([loteId])
+}
+
+/// Pessoa física global — celular como chave, N:N com Cliente (empresa) e com
+/// Parceiro. Substitui `socios` (1:N preso a 1 cliente) e `ParceiroResponsavel`/
+/// `ParceiroRepresentante` (decisão do usuário, 2026-08-08, pergunta 10).
+model Pessoa {
+  id             Int      @id @default(autoincrement())
+  celular        String   @unique
+  nome           String
+  cpf            String?
+  dataNascimento String?
+  email          String?
+  telefoneExtra  String?
+  observacao     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vinculos         PessoaClienteVinculo[]
+  vinculosParceiro PessoaParceiroVinculo[]
+
+  @@index([nome])
+}
+
+model PessoaClienteVinculo {
+  id        Int     @id @default(autoincrement())
+  pessoaId  Int
+  pessoa    Pessoa  @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  vinculo   String?
+  cargo     String?
+  principal Boolean  @default(false)
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  @@unique([pessoaId, clienteId])
+  @@index([clienteId])
+  @@index([pessoaId])
+}
+
+/// Substitui ParceiroResponsavel/ParceiroRepresentante (decisão 2026-08-08). `papel`
+/// distingue os 2 tipos herdados ("RESPONSAVEL_LEGAL" | "REPRESENTANTE").
+model PessoaParceiroVinculo {
+  id         Int      @id @default(autoincrement())
+  pessoaId   Int
+  pessoa     Pessoa   @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  parceiroId Int
+  parceiro   Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+
+  papel         String // "RESPONSAVEL_LEGAL" | "REPRESENTANTE"
+  tipoDocumento String? // "PF" | "PJ"
+  documento     String?
+  cargo         String?
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+
+  @@unique([pessoaId, parceiroId, papel])
+  @@index([parceiroId])
+  @@index([pessoaId])
 }
 
 model ordemPastas {
@@ -1881,10 +2053,10 @@ model Parceiro {
   criadoPorId        Int
   criadoPor          usuarios                @relation(fields: [criadoPorId], references: [id])
   endereco           ParceiroEndereco?
-  responsaveis       ParceiroResponsavel[]
   representantes     ParceiroRepresentante[]
   indicacoes         Indicacao[]
   convitesGerados    ConviteParceiro[]       @relation("ConvitesPorParceiro")
+  pessoasVinculadas  PessoaParceiroVinculo[]
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
@@ -1900,7 +2072,7 @@ model Indicacao {
   parceiroId            Int
   parceiro              Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
   clienteId             Int       @unique // uma empresa é indicada por no máximo 1 parceiro
-  cliente               clientes  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente               Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   dataIndicacao         DateTime  @default(now())
   status                String    @default("ATIVA") // "ATIVA" | "DESVINCULADA"
   criadoPorId           Int
@@ -1951,20 +2123,12 @@ model ParceiroEndereco {
   @@map("parceiro_endereco")
 }
 
-model ParceiroResponsavel {
-  id             Int      @id @default(autoincrement())
-  parceiroId     Int
-  parceiro       Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
-  nome           String
-  cpf            String
-  dataNascimento String
-  cargo          String?
-
-  @@index([parceiroId])
-  @@map("parceiro_responsavel")
-}
-
 // Representantes cadastrados pelo parceiro no portal AlphaParceiros (manual, N por parceiro).
+// Mantido no schema por decisão explícita (2026-08-12, Fase 3.1b do Cliente Master) mesmo
+// sem escrita nova — mesmo padrão já aplicado a `PessoaEmpresaVinculo` em 2026-08-08. O
+// fluxo ativo de representante de parceiro passa a ser `Pessoa`/`PessoaParceiroVinculo`
+// (papel="REPRESENTANTE"). `ParceiroResponsavel` (irmão órfão, 0 uso confirmado no código)
+// foi removido nesta mesma fase.
 model ParceiroRepresentante {
   id             Int      @id @default(autoincrement())
   parceiroId     Int

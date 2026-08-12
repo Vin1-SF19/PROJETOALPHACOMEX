@@ -125,6 +125,7 @@ Pipeline alvo:
 | 2026-08-07 | 2.0 | Pipeline OOXML intermediário, render fiel, referência independente, diff visual, segurança e regressões sintéticas implementados. | Dex |
 | 2026-08-11 | 2.1 | Upload PPTX direto/multipart, prévia sem base64 e store dedicado `MOTION` aplicados para eliminar o limite 413 em produção. | Dex |
 | 2026-08-11 | 2.2 | `custGeom` com `gradFill` convertido em SVG, fontes carregadas antes da checagem e regressão concluída no deck real de 21 slides. | Dex |
+| 2026-08-12 | 2.3 | Fontes incorporadas extraídas do EOT e carregadas no Alpha Motion; gradientes de cards e contornos grossos/gradientes corrigidos e validados no deck real. | Dex |
 
 ## Dev Agent Record
 
@@ -151,6 +152,12 @@ GPT-5 Codex
 - Smoke multipart com o arquivo real — 7.084.495 bytes enviados e confirmados por `head` com tamanho idêntico; blob temporário removido ao final.
 - ESLint direcionado aos cinco arquivos de código/teste desta correção — PASS; `npm run lint` global permaneceu ativo por mais de cinco minutos e foi encerrado.
 - `npm run build:player` e `npx next build` — PASS; 70/70 páginas geradas e as rotas de upload, prévia e importação PPTX presentes.
+- `npx vitest run tests/apresentacoes/pptx-parser.test.ts tests/apresentacoes/pptx-ooxml-core.test.ts tests/apresentacoes/pptx-upload.test.ts tests/apresentacoes/fontes-personalizadas.test.ts --no-coverage` — 47/47.
+- ESLint direcionado aos 12 arquivos de código/teste alterados em 2026-08-12 — PASS.
+- `npx next build` — PASS; compilação de produção e 70/70 páginas geradas.
+- Regressão direta de 2026-08-12 no arquivo real — 21/21 slides, 0 ignorados; cinco fontes incorporadas extraídas como TTF/OTF: SF Pro Display Heavy, SF Pro Display, Montserrat, Aileron Bold e Open Sans.
+- `npm test` — 1162/1163 testes aprovados; falhas fora do Alpha Motion em `tests/google-calendar/cli.test.ts` (timeout) e `tests/bpm/card-telefones.test.ts` (`server-only` ausente).
+- `npm run typecheck` — nenhum erro novo da story; falhas preexistentes em `ExclusaoFiscal`, Radar e testes Google Calendar. `npm run lint` global excedeu 120 segundos sem emitir erro; o lint direcionado passou.
 
 ### Completion Notes List
 
@@ -165,6 +172,9 @@ GPT-5 Codex
 - Assets, fontes, imagens extraídas, referências e originais novos usam `MOTION_READ_WRITE_TOKEN`; exclusões e catálogo de fontes preservam compatibilidade com o store legado.
 - Formas livres com `custGeom` e gradiente linear agora preservam stops, cores e transparência em um SVG localizado, em vez de serem descartadas.
 - A detecção de fontes solicita explicitamente o carregamento antes de testar disponibilidade, eliminando falsos avisos para Montserrat e Open Sans empacotadas.
+- O importador agora extrai o SFNT original das fontes `.fntdata`/EOT do PowerPoint; a prévia as carrega como assets temporários e a confirmação as publica no catálogo global do Alpha Motion.
+- Gradientes de formas editáveis não são mais substituídos por uma cor sólida durante o mapeamento para cards.
+- Contornos de `custGeom`, inclusive gradientes, usam a espessura real em EMU e um viewBox com sangria; isso elimina o recorte e os grandes blocos vermelhos que substituíam os anéis do deck.
 
 ### File List
 
@@ -181,6 +191,7 @@ GPT-5 Codex
 - `src/apresentacoes-player/PlayerStandalone.tsx`
 - `src/components/Apresentacoes/Editor/Canvas/CanvasArea.tsx`
 - `src/components/Apresentacoes/Editor/Canvas/ComponenteNoCanvas.tsx`
+- `src/components/Apresentacoes/Editor/FontesPersonalizadasContext.tsx`
 - `src/components/Apresentacoes/Editor/CentralCriativa/ResizeExportPanel.tsx`
 - `src/components/Apresentacoes/Editor/RenderEngine/RenderComponente.tsx`
 - `src/components/Apresentacoes/Editor/RenderEngine/SlidePortalPreview.tsx`
@@ -195,6 +206,7 @@ GPT-5 Codex
 - `src/lib/apresentacoes/fontes-globais.ts`
 - `src/lib/apresentacoes/pptx/color-resolver.ts`
 - `src/lib/apresentacoes/pptx/diagnostico.ts`
+- `src/lib/apresentacoes/pptx/fontes-embutidas.ts`
 - `src/lib/apresentacoes/pptx/geometria.ts`
 - `src/lib/apresentacoes/pptx/heranca.ts`
 - `src/lib/apresentacoes/pptx/mapear.ts`

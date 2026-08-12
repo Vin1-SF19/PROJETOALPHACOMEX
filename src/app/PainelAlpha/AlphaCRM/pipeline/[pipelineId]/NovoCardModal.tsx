@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { ClipboardCheck, X } from "lucide-react";
 import { BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
+import { CampoBpmInput, type CampoBpmEditavel } from "../../CampoBpmInput";
 
-interface CampoBpm {
-  id: string;
-  nome: string;
-  tipo: string;
-  obrigatorio: boolean;
-  opcoesJson: string | null;
-}
+type CampoBpm = CampoBpmEditavel;
 
 interface EmpresaOpcao {
   id: number;
@@ -27,6 +22,7 @@ interface UsuarioOpcao {
 interface Props {
   pipelineId: string;
   etapaId: string;
+  etapaNome: string;
   campos: CampoBpm[];
   currentUserId: number | null;
   accent: string;
@@ -45,7 +41,7 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
-export default function NovoCardModal({ pipelineId, etapaId, campos, currentUserId, accent, onClose, onCriado }: Props) {
+export default function NovoCardModal({ pipelineId, etapaId, etapaNome, campos, currentUserId, accent, onClose, onCriado }: Props) {
   const [buscaEmpresa, setBuscaEmpresa] = useState("");
   const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
   const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaOpcao | null>(null);
@@ -131,6 +127,21 @@ export default function NovoCardModal({ pipelineId, etapaId, campos, currentUser
             </div>
           )}
 
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-3" aria-label="Etapa e requisitos do novo card">
+            <div className="flex items-start gap-2.5">
+              <ClipboardCheck size={16} className="mt-0.5 shrink-0" style={{ color: `rgb(${accent})` }} />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Criar na etapa</p>
+                <p className="text-sm font-semibold text-white">{etapaNome}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                  {campos.some((campo) => campo.obrigatorio)
+                    ? `${campos.filter((campo) => campo.obrigatorio).length} requisito(s) obrigatório(s) precisam ser preenchidos.`
+                    : "Esta etapa não possui campos adicionais obrigatórios."}
+                </p>
+              </div>
+            </div>
+          </section>
+
           <FieldRow label="Empresa *">
             {empresaSelecionada ? (
               <div className="flex items-center justify-between bg-slate-800 border border-white/10 rounded-xl px-3 py-2">
@@ -183,33 +194,21 @@ export default function NovoCardModal({ pipelineId, etapaId, campos, currentUser
             <input className={inputCls} placeholder="Descrição do serviço" value={servico} onChange={(e) => setServico(e.target.value)} />
           </FieldRow>
 
-          {campos.map((campo) => (
-            <FieldRow key={campo.id} label={`${campo.nome}${campo.obrigatorio ? " *" : ""}`}>
-              {campo.tipo === "selecao" && campo.opcoesJson ? (
-                <select
-                  className={inputCls}
-                  required={campo.obrigatorio}
-                  aria-required={campo.obrigatorio}
-                  value={valoresCampos[campo.id] ?? ""}
-                  onChange={(e) => setValoresCampos((prev) => ({ ...prev, [campo.id]: e.target.value }))}
-                >
-                  <option value="">Selecione...</option>
-                  {(JSON.parse(campo.opcoesJson) as string[]).map((op) => (
-                    <option key={op} value={op}>{op}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  className={inputCls}
-                  required={campo.obrigatorio}
-                  aria-required={campo.obrigatorio}
-                  type={campo.tipo === "numero" ? "number" : campo.tipo === "data" ? "date" : "text"}
-                  value={valoresCampos[campo.id] ?? ""}
-                  onChange={(e) => setValoresCampos((prev) => ({ ...prev, [campo.id]: e.target.value }))}
-                />
-              )}
-            </FieldRow>
-          ))}
+          {campos.length > 0 && (
+            <div className="space-y-3 border-t border-white/5 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Campos desta etapa</p>
+              {campos.map((campo) => (
+                <FieldRow key={campo.id} label={`${campo.nome}${campo.obrigatorio ? " *" : ""}`}>
+                  <CampoBpmInput
+                    campo={campo}
+                    className={inputCls}
+                    value={valoresCampos[campo.id] ?? ""}
+                    onChange={(valor) => setValoresCampos((prev) => ({ ...prev, [campo.id]: valor }))}
+                  />
+                </FieldRow>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2 p-5 border-t border-white/5">

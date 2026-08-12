@@ -1044,7 +1044,9 @@ Prisma exige a relação declarada nos DOIS models quando há `@relation` — ao
 - **Fontes:** antes da checagem, o browser solicita explicitamente cada família com `document.fonts.load` e então aguarda `document.fonts.ready`; isso evita marcar como ausentes fontes empacotadas que ainda não haviam sido usadas no DOM. A prévia separa disponíveis, substituídas e ausentes. Mapeamentos conhecidos incluem SF Pro Display → Inter e variantes Open Sans → Open Sans; o renderer usa uma pilha CSS estável como último recurso.
 - **Catálogo global de fontes:** uploads manuais usam `POST /api/apresentacoes/fontes` e o prefixo `apresentacoes/fontes-globais/` no Vercel Blob. Não há model/migration. `listarFontesGlobais()` alimenta editor, apresentação autenticada, link público e exportação; antes de incorporar no HTML, `filtrarFontesUsadas()` percorre também filhos de containers e runs ricos.
 - **Cobertura atual:** imagens raster/SVG, shapes, custom geometry, grupos aninhados, texto rico, tabelas básicas, conectores/linhas, backgrounds e principais efeitos. Charts, SmartArt, OLE, EMF/WMF e alguns fills/efeitos OOXML incomuns continuam como fallback diagnosticado até existir conversão nativa.
-- **Validação desta revisão:** 30/30 testes PPTX direcionados passaram. O arquivo real `Plano de Marketing.pptx` importou 21/21 slides, com 0 elementos ignorados e 0 não convertidos; os três `Freeform 5` com `custGeom` + `gradFill` foram convertidos em SVG gradiente. O mesmo binário de 7.084.495 bytes passou pelo upload multipart real no store `MOTION`, foi conferido por `head` com tamanho idêntico e removido depois do smoke. A comparação visual independente continua indisponível no servidor e deve ser tratada como aviso informativo, não como falha de upload/importação.
+- **Fontes incorporadas:** `fontes-embutidas.ts` lê `p:embeddedFontLst`, remove o invólucro EOT de `.fntdata` e recupera o SFNT TTF/OTF original. A prévia cria `@font-face` temporário; ao confirmar, `garantirFontesEmbutidasGlobais()` publica/deduplica a família no store `MOTION` e o contexto do editor é atualizado sem reload.
+- **Contornos e gradientes:** `lerLinhaOoxml()` preserva `a:ln/a:gradFill`. Fallbacks SVG de `custGeom` convertem a espessura EMU para pixels finais e ampliam viewBox/componente pela metade do traço, evitando recorte. `mapearSlideExtraido()` preserva `gradientCss` em cards editáveis.
+- **Validação desta revisão:** 47/47 testes direcionados passaram. O arquivo real `Plano de Marketing.pptx` importou 21/21 slides, com 0 elementos ignorados; cinco fontes incorporadas foram extraídas (SF Pro Display Heavy, SF Pro Display, Montserrat, Aileron Bold e Open Sans), e os anéis com contorno sólido/gradiente foram gerados como SVG com escala correta. O mesmo binário de 7.084.495 bytes passou pelo upload multipart real no store `MOTION`, foi conferido por `head` com tamanho idêntico e removido depois do smoke.
 - **Checklist ao alterar:** preserve o modelo intermediário e a ordem OOXML, mantenha parser/render desacoplados, adicione fixture sintético por regressão, rode os dois testes PPTX e valide Original/Importado/Diferença com um deck real antes de declarar alta fidelidade.
 
 **Editado quando:** surgir um novo caso OOXML, mudar o renderer compartilhado ou for executado o aceite visual do deck real.
@@ -1367,6 +1369,30 @@ Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove a
 **Como integrar:** após a persistência bem-sucedida, chamar `notificarPipelineBpm` com o tipo adequado. O cliente trata o evento `alpha-crm-atualizado` como sinal de invalidação e relê os dados autenticados; nunca enviar dados do lead no payload Pusher.
 
 **Última atualização:** 2026-08-12 por Codex/Bibble.
+
+### Alpha CRM — Agendar reunião e ciclo de follow-up
+
+**Arquivos:** `src/lib/bpm/agendar-reuniao.ts`, `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`, `src/lib/bpm/automacao-novos-leads.ts`.
+
+**Propósito:** impede o avanço de Agendar reunião para Reunião Agendada sem `BpmCard.dataReuniao`, mantendo Standby como contingência, e integra a etapa ao ciclo compartilhado de oito dias úteis.
+
+**Como integrar:** movimentos manuais continuam passando por `MoverCardBpm`; nunca confiar apenas no botão desabilitado. Para Agendar reunião, a data-base do ciclo é a última entrada na etapa registrada em `BpmCardHistorico`, com fallback em `createdAt` para legado. O job revalida etapa, status e `proximoContatoEm = null` no update atômico, registra `agendar_reuniao_8_dias_uteis` e só então publica realtime.
+
+**Limite:** a meta de cinco ligações permanece exclusiva de Novos leads. A ausência de Data/Hora não bloqueia Standby automático ou manual, pois esse destino é a saída de contingência do fluxo.
+
+**Última atualização:** 2026-08-12 por Codex/Bibble.
+
+### Alpha CRM — transcrição pós-reunião do Google Meet
+
+**Arquivos:** `src/lib/google-meet/client.ts`, `src/lib/bpm/transcricao-reuniao.ts`, `src/lib/bpm/transcricao-reuniao-server.ts`, `src/actions/bpm/TranscricaoMeet.ts`, `src/actions/bpm/GoogleMeet.ts`, `PainelReuniao.tsx`, `Cards.ts`, rota de automação do CRM.
+
+**Propósito:** captura os artefatos pós-conferência do Meet, persiste a transcrição no card, reconhece o estado no modal e impede avanço comercial sem evidência.
+
+**Como integrar:** o meeting code vem somente de `googleMeetLink` oficial; o subject DWD é resolvido pelo cache do evento/calendário no servidor. Use o cliente Meet dedicado com `meetings.space.readonly`; não amplie os escopos do cliente Calendar. Toda sincronização manual exige ownership e a persistência usa CAS, histórico sem texto bruto e realtime após commit. O polling permanece no cron protegido existente e cards em Reunião Agendada entram no ciclo de oito dias úteis.
+
+**Limites:** a API e a delegação precisam estar configuradas no Google; a transcrição deve ser realmente gerada pelo Meet. Após recebida, a reunião não pode ser reagendada/reutilizada. Não houve migration.
+
+**Última atualização:** 2026-08-12 por Scribe/Codex.
 
 ### Alpha CRM — regras e cadência de Novos leads
 

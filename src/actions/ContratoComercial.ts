@@ -334,18 +334,30 @@ export async function confirmarFechamento(raw: unknown) {
 
             // Vínculo de indicação de parceiro: só faz sentido na PRIMEIRA criação real
             // do registro (não em reativação nem quando já existia ativo).
+            // `resultadoSync.clienteId` é o id de `clientes` (legado — Metas/ContratoComercial
+            // ainda não migrou para o Cliente Master, isso é a Fase 3.6). `Indicacao.clienteId`
+            // já aponta para `Cliente` (Fase 3.1) — resolve o `Cliente` pelo MESMO CNPJ em vez
+            // de usar o id legado direto, senão a FK grava um id de tabela errada.
             if (resultadoSync.criado && atualizado.indicadoPorParceiroId) {
                 try {
-                    await db.indicacao.create({
-                        data: {
-                            parceiroId: atualizado.indicadoPorParceiroId,
-                            clienteId: resultadoSync.clienteId,
-                            criadoPorId: userId,
-                        },
+                    const clienteMaster = await db.cliente.findFirst({
+                        where: { cnpj: atualizado.cnpj.replace(/\D/g, "").toUpperCase() },
+                        select: { id: true, indicacao: { select: { parceiroId: true } } },
                     });
-                    const { recalcularNivel } = await import("@/actions/parceiros");
-                    await recalcularNivel(atualizado.indicadoPorParceiroId);
-                    revalidatePath("/PainelAlpha/Parceiros");
+                    if (clienteMaster && !clienteMaster.indicacao) {
+                        await db.indicacao.create({
+                            data: {
+                                parceiroId: atualizado.indicadoPorParceiroId,
+                                clienteId: clienteMaster.id,
+                                criadoPorId: userId,
+                            },
+                        });
+                        const { recalcularNivel } = await import("@/actions/parceiros");
+                        await recalcularNivel(atualizado.indicadoPorParceiroId);
+                        revalidatePath("/PainelAlpha/Parceiros");
+                    } else if (!clienteMaster) {
+                        console.error("vincular indicação parceiro: Cliente Master ainda não sincronizado para o CNPJ", atualizado.cnpj);
+                    }
                 } catch (indErr) {
                     console.error("vincular indicação parceiro:", indErr);
                 }

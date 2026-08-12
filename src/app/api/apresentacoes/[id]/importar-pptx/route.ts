@@ -14,6 +14,8 @@ import { renderizarReferenciaPptx } from "@/lib/apresentacoes/pptx/reference-ren
 import { createHash } from "node:crypto";
 import { obterTokenMotion } from "@/lib/apresentacoes/blob";
 import { carregarArquivoPptx, ErroEntradaPptx } from "@/lib/apresentacoes/pptx/upload";
+import { garantirFontesEmbutidasGlobais } from "@/lib/apresentacoes/fontes-globais";
+import type { FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
 
 export const dynamic = "force-dynamic";
 // Parsing de zip/XML + upload de cada imagem embutida pro Blob pode levar um tempo real em
@@ -71,6 +73,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (extraido.slides.length === 0) {
       return NextResponse.json({ success: false, error: "Nenhum slide encontrado neste arquivo." }, { status: 422 });
+    }
+
+    let fontesEmbutidas: FontePersonalizada[] = [];
+    try {
+      fontesEmbutidas = await garantirFontesEmbutidasGlobais(extraido.fontesEmbutidas);
+    } catch (erro) {
+      // A fonte melhora a fidelidade, mas uma indisponibilidade do store nao deve descartar
+      // todo o trabalho de importacao. O fallback tipografico continua sendo diagnosticado.
+      console.error("[importar-pptx] Falha ao publicar fontes incorporadas", erro);
     }
 
     let originalFileUrl: string;
@@ -219,6 +230,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         errosDeImagem,
         originalFileUrl,
         fontesDetectadas: extraido.fontesDetectadas,
+        fontesEmbutidas,
         resumoDiagnosticos,
         importerVersion: extraido.intermediateModel.importerVersion,
         referenceRenderer: referencia.ok

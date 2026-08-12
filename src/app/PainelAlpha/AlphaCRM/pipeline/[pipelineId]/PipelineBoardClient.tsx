@@ -239,7 +239,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [etapaNovoCard, setEtapaNovoCard] = useState<string | null>(null);
-  const [modalRevision, setModalRevision] = useState(0);
+  const [realtimeRevision, setRealtimeRevision] = useState(0);
   const ultimaRequisicaoRef = useRef(0);
   const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardSelecionadoIdRef = useRef<string | null>(null);
@@ -278,9 +278,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         realtimeTimerRef.current = null;
         void recarregarCards();
         router.refresh();
-        if (cardSelecionadoIdRef.current) {
-          setModalRevision((revision) => revision + 1);
-        }
+        if (cardSelecionadoIdRef.current) setRealtimeRevision((revision) => revision + 1);
       }, 100);
     };
 
@@ -363,7 +361,10 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     etapaSelecionada?.camposObrigatorios?.map((item) => item.campoId) ?? [],
   );
   const camposNovoCard = pipeline.campos
-    .filter((campo) => !campo.etapaId || campo.etapaId === etapaNovoCard)
+    .filter(
+      (campo) =>
+        campo.etapaId === etapaNovoCard || camposObrigatoriosSelecionados.has(campo.id),
+    )
     .map((campo) => ({
       ...campo,
       obrigatorio: campo.obrigatorio || camposObrigatoriosSelecionados.has(campo.id),
@@ -419,6 +420,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         <NovoCardModal
           pipelineId={pipeline.id}
           etapaId={etapaNovoCard}
+          etapaNome={etapaSelecionada?.nome ?? "Etapa selecionada"}
           campos={camposNovoCard}
           currentUserId={currentUserId}
           accent={accent}
@@ -438,8 +440,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
       {cardSelecionadoId && (
         <CardFullViewModal
-          key={`${cardSelecionadoId}-${modalRevision}`}
           cardId={cardSelecionadoId}
+          realtimeRevision={realtimeRevision}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}
           accent={accent}

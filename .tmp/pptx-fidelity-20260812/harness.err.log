@@ -1,0 +1,17 @@
+C:\Users\TI\Desktop\PainelAlpha\node_modules\@xyflow\react\dist\style.css:3
+.react-flow {
+^
+
+SyntaxError: Unexpected token '.'
+    at wrapSafe (node:internal/modules/cjs/loader:1787:18)
+    at Module._compile (node:internal/modules/cjs/loader:1828:20)
+    at node:internal/modules/cjs/loader:1985:10
+    at Object.transformer (C:\Users\TI\Desktop\PainelAlpha\node_modules\tsx\dist\register-BoI6-WNn.cjs:9:2916)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at <anonymous> (C:\Users\TI\Desktop\PainelAlpha\src\components\Apresentacoes\Editor\RenderEngine\render\RenderBusiness.tsx:2:8)
+
+Node.js v24.16.0

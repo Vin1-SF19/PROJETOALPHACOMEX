@@ -7,6 +7,7 @@ import type { FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizad
 interface FontesPersonalizadasContextValue {
   fontesPersonalizadas: FontePersonalizada[];
   adicionarFonte: (nome: string, arquivo: File) => Promise<FontePersonalizada>;
+  registrarFontes: (fontes: FontePersonalizada[]) => void;
 }
 
 const FontesPersonalizadasContext = createContext<FontesPersonalizadasContextValue | null>(null);
@@ -40,7 +41,15 @@ export function FontesPersonalizadasProvider({
     return resultado.fonte;
   }, [aguardarAntesDeSalvar, apresentacaoId]);
 
-  const value = useMemo(() => ({ fontesPersonalizadas, adicionarFonte }), [adicionarFonte, fontesPersonalizadas]);
+  const registrarFontes = useCallback((fontes: FontePersonalizada[]) => {
+    setFontesPersonalizadas((atuais) => {
+      const porId = new Map(atuais.map((fonte) => [fonte.id, fonte]));
+      for (const fonte of fontes) porId.set(fonte.id, fonte);
+      return [...porId.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    });
+  }, []);
+
+  const value = useMemo(() => ({ fontesPersonalizadas, adicionarFonte, registrarFontes }), [adicionarFonte, fontesPersonalizadas, registrarFontes]);
 
   return (
     <FontesPersonalizadasContext.Provider value={value}>

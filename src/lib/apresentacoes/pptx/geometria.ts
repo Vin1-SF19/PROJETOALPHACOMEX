@@ -202,11 +202,14 @@ export function construirSvgFormaColorida(
   viewBoxW: number,
   viewBoxH: number,
   corFundo: string,
-  stroke?: { color: string; width: number; dash?: string },
+  stroke?: SvgStroke,
 ): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxW} ${viewBoxH}">`
+  const gradienteContorno = stroke?.gradient ? construirDefinicaoGradiente("sg", stroke.gradient.angle, stroke.gradient.stops) : null;
+  const pinturaContorno = gradienteContorno ? "url(#sg)" : stroke?.color;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBoxComSangriaDeContorno(viewBoxW, viewBoxH, stroke)}">`
+    + (gradienteContorno ? `<defs>${gradienteContorno}</defs>` : "")
     + `<path d="${pathSvg}" fill="${escaparAtributoXml(corFundo)}"`
-    + (stroke ? ` stroke="${escaparAtributoXml(stroke.color)}" stroke-width="${stroke.width}"${stroke.dash ? ` stroke-dasharray="${escaparAtributoXml(stroke.dash)}"` : ""}` : "")
+    + (stroke && pinturaContorno ? ` stroke="${escaparAtributoXml(pinturaContorno)}" stroke-width="${stroke.width}"${stroke.dash ? ` stroke-dasharray="${escaparAtributoXml(stroke.dash)}"` : ""}` : "")
     + `/>`
     + `</svg>`;
 }
@@ -218,16 +221,24 @@ function corEOpacidadeDaParada(cor: string): { cor: string; opacidade?: number }
   return { cor: `rgb(${r}, ${g}, ${b})`, opacidade: Math.max(0, Math.min(1, Number(alpha))) };
 }
 
-/** Fallback SVG para `custGeom` arbitrário com `gradFill`. O ângulo recebido usa a mesma
- * convenção CSS já aplicada aos cards: 0° aponta para cima e 90° da esquerda para a direita. */
-export function construirSvgFormaGradiente(
-  pathSvg: string,
-  viewBoxW: number,
-  viewBoxH: number,
-  angle: number,
-  stops: Array<{ position: number; color: string }>,
-  stroke?: { color: string; width: number; dash?: string },
-): string {
+interface SvgGradient {
+  angle: number;
+  stops: Array<{ position: number; color: string }>;
+}
+
+interface SvgStroke {
+  color?: string;
+  gradient?: SvgGradient;
+  width: number;
+  dash?: string;
+}
+
+function viewBoxComSangriaDeContorno(viewBoxW: number, viewBoxH: number, stroke?: SvgStroke): string {
+  const margem = stroke ? Math.max(0, stroke.width / 2) : 0;
+  return `${-margem} ${-margem} ${viewBoxW + margem * 2} ${viewBoxH + margem * 2}`;
+}
+
+function construirDefinicaoGradiente(id: string, angle: number, stops: SvgGradient["stops"]): string {
   const rad = (angle * Math.PI) / 180;
   const dx = Math.sin(rad);
   const dy = -Math.cos(rad);
@@ -241,10 +252,26 @@ export function construirSvgFormaGradiente(
       + (normalizada.opacidade !== undefined ? ` stop-opacity="${normalizada.opacidade}"` : "")
       + "/>";
   }).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxW} ${viewBoxH}">`
-    + `<defs><linearGradient id="g" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stopsMarkup}</linearGradient></defs>`
+  return `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stopsMarkup}</linearGradient>`;
+}
+
+/** Fallback SVG para `custGeom` arbitrário com `gradFill`. O ângulo recebido usa a mesma
+ * convenção CSS já aplicada aos cards: 0° aponta para cima e 90° da esquerda para a direita. */
+export function construirSvgFormaGradiente(
+  pathSvg: string,
+  viewBoxW: number,
+  viewBoxH: number,
+  angle: number,
+  stops: Array<{ position: number; color: string }>,
+  stroke?: SvgStroke,
+): string {
+  const gradienteFundo = construirDefinicaoGradiente("g", angle, stops);
+  const gradienteContorno = stroke?.gradient ? construirDefinicaoGradiente("sg", stroke.gradient.angle, stroke.gradient.stops) : null;
+  const pinturaContorno = gradienteContorno ? "url(#sg)" : stroke?.color;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBoxComSangriaDeContorno(viewBoxW, viewBoxH, stroke)}">`
+    + `<defs>${gradienteFundo}${gradienteContorno ?? ""}</defs>`
     + `<path d="${pathSvg}" fill="url(#g)"`
-    + (stroke ? ` stroke="${escaparAtributoXml(stroke.color)}" stroke-width="${stroke.width}"${stroke.dash ? ` stroke-dasharray="${escaparAtributoXml(stroke.dash)}"` : ""}` : "")
+    + (stroke && pinturaContorno ? ` stroke="${escaparAtributoXml(pinturaContorno)}" stroke-width="${stroke.width}"${stroke.dash ? ` stroke-dasharray="${escaparAtributoXml(stroke.dash)}"` : ""}` : "")
     + `/>`
     + `</svg>`;
 }

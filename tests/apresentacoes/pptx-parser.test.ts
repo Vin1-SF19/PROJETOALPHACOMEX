@@ -326,6 +326,15 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
             </a:gsLst>
             <a:lin ang="0"/>
           </a:gradFill>
+          <a:ln w="952500">
+            <a:gradFill>
+              <a:gsLst>
+                <a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>
+                <a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs>
+              </a:gsLst>
+              <a:lin ang="5400000"/>
+            </a:gradFill>
+          </a:ln>
         </p:spPr>
       </p:sp>
       <p:sp>
@@ -438,6 +447,9 @@ describe("extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preen
     expect(svg).toContain('stop-opacity="0.995"');
     expect(svg).toContain('stop-color="#0D112E"');
     expect(svg).toContain('fill="url(#g)"');
+    expect(svg).toContain('stroke="url(#sg)"');
+    expect(svg).toContain('viewBox="-');
+    expect(forma.w).toBeGreaterThan(500000 * (CANVAS_TESTE.width / 12192000));
     expect(resultado.ignorados).toEqual({});
   });
 });

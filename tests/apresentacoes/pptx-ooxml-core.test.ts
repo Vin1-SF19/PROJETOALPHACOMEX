@@ -5,6 +5,8 @@ import { extrairTextBody, pilhaCssDaFonte, resolverFontesNoDocumento, textoTemCo
 import { lerFundo, type ContextoTema } from "@/lib/apresentacoes/pptx/tema";
 import { resolverCaminhoRelativo } from "@/lib/apresentacoes/pptx/xml-utils";
 import { mapearSlideExtraido } from "@/lib/apresentacoes/pptx/mapear";
+import { extrairSfntDeFontePowerPoint } from "@/lib/apresentacoes/pptx/fontes-embutidas";
+import { construirSvgFormaColorida } from "@/lib/apresentacoes/pptx/geometria";
 
 const colorContext = {
   scheme: { lt1: "#FFFFFF", accent1: "#336699" },
@@ -144,5 +146,46 @@ describe("adaptador Alpha Motion", () => {
       }],
     }, async () => "data:image/png;base64,AQ==");
     expect(component).toMatchObject({ tipo: "imagem", objectFit: "fill", flipH: true, crop: { left: 0.1 }, pptxOrigem: { shapeId: "7" } });
+  });
+
+  it("preserva o gradiente de uma forma ao criar o card editavel", async () => {
+    const [component] = await mapearSlideExtraido({
+      backgroundColor: "#FFFFFF",
+      formas: [{
+        tipo: "caixa",
+        x: 0, y: 0, w: 300, h: 200, rotacao: 0,
+        corFundo: "#000000", formato: "rect", textoInterno: null,
+        gradientCss: "linear-gradient(90deg, #FF0000 0%, #0000FF 100%)",
+      }],
+    }, async () => "");
+    expect(component).toMatchObject({
+      tipo: "card",
+      corFundo: "linear-gradient(90deg, #FF0000 0%, #0000FF 100%)",
+    });
+  });
+});
+
+describe("fontes e contornos incorporados", () => {
+  it("extrai do invólucro EOT o payload OpenType original", () => {
+    const fonte = new Uint8Array([0x4f, 0x54, 0x54, 0x4f, 1, 2, 3, 4]);
+    const eot = new Uint8Array(20 + fonte.byteLength);
+    const view = new DataView(eot.buffer);
+    view.setUint32(0, eot.byteLength, true);
+    view.setUint32(4, fonte.byteLength, true);
+    eot.set(fonte, 20);
+
+    const resultado = extrairSfntDeFontePowerPoint(eot);
+    expect(resultado?.formato).toBe("opentype");
+    expect(Array.from(resultado?.bytes ?? [])).toEqual(Array.from(fonte));
+  });
+
+  it("gera SVG com gradiente no contorno e sangria para não recortar o traço", () => {
+    const svg = construirSvgFormaColorida("M 0 0 L 100 0 L 100 100 Z", 100, 100, "none", {
+      width: 20,
+      gradient: { angle: 90, stops: [{ position: 0, color: "#FF0000" }, { position: 100, color: "#0000FF" }] },
+    });
+    expect(svg).toContain('viewBox="-10 -10 120 120"');
+    expect(svg).toContain('id="sg"');
+    expect(svg).toContain('stroke="url(#sg)"');
   });
 });

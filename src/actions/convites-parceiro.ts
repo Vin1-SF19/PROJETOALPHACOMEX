@@ -157,6 +157,7 @@ const RepresentanteExtraSchema = z.object({
   cpf: z.string().min(11, "CPF do representante inválido"),
   dataNascimento: z.string().min(1, "Informe a data de nascimento do representante"),
   cargo: z.string().max(80).optional(),
+  telefone: z.string().max(30).optional(),
 });
 
 // Validação rígida do formulário público (espelho do Google Forms).
@@ -330,6 +331,7 @@ const RepresentanteEdicaoSchema = z.object({
   cpf: z.string().min(11, "CPF do representante inválido"),
   dataNascimento: z.string().min(1, "Informe a data de nascimento do representante"),
   cargo: z.string().max(80).optional(),
+  telefone: z.string().max(30).optional(),
 });
 
 // Edição pela equipe (via ModalEditarPreCadastro) — mais permissiva que
@@ -433,17 +435,28 @@ export async function aprovarPreCadastro(preCadastroId: number) {
   // ParceiroSchema/respValidos em actions/parceiros.ts). Monta a partir dos
   // dados que o próprio preenchedor já informou (souRepresentante=true) ou da
   // lista de representantes extras coletada no wizard (souRepresentante=false).
-  type RepresentanteWizard = { nome: string; cpf: string; dataNascimento: string; cargo?: string; telefone?: string; email?: string };
+  // WhatsApp obrigatório desde a Fase 3.1b (Cliente Master) — todo representante
+  // vira Pessoa, que exige celular como chave única.
+  type RepresentanteWizard = { nome: string; cpf: string; dataNascimento: string; cargo?: string; telefone: string; email?: string };
   let responsaveis: RepresentanteWizard[] | undefined;
   if (tipo === "PJ") {
-    if (pc.souRepresentante && pc.cpf && pc.dataNascimento) {
+    if (pc.souRepresentante && pc.cpf && pc.dataNascimento && pc.whatsapp) {
       // O preenchedor já informou WhatsApp e e-mail no Step 1 (pc.whatsapp/pc.email)
       // — reaproveita aqui em vez de exigir que ele digite de novo como representante.
-      responsaveis = [{ nome: pc.nomeCompleto, cpf: pc.cpf, dataNascimento: pc.dataNascimento, telefone: pc.whatsapp ?? undefined, email: pc.email ?? undefined }];
+      responsaveis = [{ nome: pc.nomeCompleto, cpf: pc.cpf, dataNascimento: pc.dataNascimento, telefone: pc.whatsapp, email: pc.email ?? undefined }];
     } else if (!pc.souRepresentante && pc.representantesExtra) {
       try {
-        const extras = JSON.parse(pc.representantesExtra) as RepresentanteWizard[];
-        if (Array.isArray(extras) && extras.length > 0) responsaveis = extras;
+        const extras = JSON.parse(pc.representantesExtra) as (Omit<RepresentanteWizard, "telefone"> & { telefone?: string })[];
+        if (Array.isArray(extras) && extras.length > 0) {
+          const comTelefone = extras.filter((e): e is RepresentanteWizard => !!e.telefone?.trim());
+          if (comTelefone.length < extras.length) {
+            return {
+              success: false as const,
+              error: "Um ou mais representantes estão sem WhatsApp — edite o pré-cadastro e complete o telefone antes de aprovar",
+            };
+          }
+          responsaveis = comTelefone;
+        }
       } catch {
         // JSON inválido — cai para o fallback abaixo (erro claro ao invés de crash)
       }
@@ -451,7 +464,9 @@ export async function aprovarPreCadastro(preCadastroId: number) {
     if (!responsaveis || responsaveis.length === 0) {
       return {
         success: false as const,
-        error: "Pré-cadastro PJ sem representante válido — complete os dados do representante antes de aprovar",
+        error: pc.souRepresentante && (!pc.whatsapp)
+          ? "Pré-cadastro sem WhatsApp do representante — complete o telefone antes de aprovar"
+          : "Pré-cadastro PJ sem representante válido — complete os dados do representante antes de aprovar",
       };
     }
   }

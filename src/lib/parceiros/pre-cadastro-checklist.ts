@@ -8,6 +8,7 @@ export type RepresentanteExtra = {
   cpf: string;
   dataNascimento: string;
   cargo?: string;
+  telefone?: string;
 };
 
 export type PendenciaPreCadastro = {

@@ -80,12 +80,34 @@ export const atualizarCardSchema = z.object({
   responsavelId: z.number().int().positive().optional(),
   servico: z.string().trim().max(120).nullable().optional(),
   status: z.enum(BPM_CARD_STATUS).optional(),
+  proximoContatoEm: z.preprocess(
+    (valor) => valor === "" ? null : valor,
+    z.coerce.date().nullable().optional(),
+  ),
   camposValores: z.record(z.string().cuid(), z.string().max(4000)).optional(),
+});
+
+export const salvarChecklistFollowUpSchema = z.object({
+  cardId: z.string().cuid(),
+  checklistId: z.string().cuid().optional(),
+  respostas: z.record(
+    z.string().trim().min(1).max(100),
+    z.union([z.string().max(MAX_DESCRICAO), z.boolean()]),
+  ),
+  concluir: z.boolean().default(false),
 });
 
 export const moverCardSchema = z.object({
   cardId: z.string().cuid(),
   etapaDestinoId: z.string().cuid(),
+});
+
+export const salvarRequisitosEMoverCardSchema = moverCardSchema.extend({
+  camposValores: z.record(z.string().cuid(), z.string().max(4000)).default({}),
+  proximoContatoEm: z.preprocess(
+    (valor) => valor === "" ? null : valor,
+    z.coerce.date().nullable().optional(),
+  ),
 });
 
 export const criarVinculoCardSchema = z.object({

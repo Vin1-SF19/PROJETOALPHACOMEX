@@ -762,3 +762,13 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - Consumidor do canal privado por pipeline: `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`.
 - Autorização Pusher compartilhada: `src/app/api/pusher/auth/route.ts`.
 - Regressão do contrato: `tests/bpm/realtime.test.ts`.
+
+## Alpha CRM — transcrições do Google Meet (2026-08-12)
+
+- `src/lib/google-meet/client.ts`: cliente Meet v2 server-only, DWD com escopo mínimo, paginação e retry limitados.
+- `src/lib/bpm/transcricao-reuniao.ts`: valida link/meeting code, escolhe a conferência correlata e consolida entries.
+- `src/lib/bpm/transcricao-reuniao-server.ts`: resolve organizador pelo cache, persiste por CAS, audita e publica realtime; também executa polling limitado.
+- `src/actions/bpm/TranscricaoMeet.ts`: action manual com autenticação, Zod e ownership.
+- `PainelReuniao.tsx` e `PainelProximaEtapa.tsx`: estados pendente/recebida/erro e motivo visual do bloqueio.
+- `Cards.ts`: autoridade do guard para Em tratativa/Sem viabilidade; Standby continua livre.
+- A rota protegida de follow-up executa polling e o ciclo de oito dias para Reunião Agendada. Sem schema ou migration novos.

@@ -93,7 +93,7 @@ export default function ModalEditarPreCadastro({
   }, []);
 
   const addRepresentante = () =>
-    setRepresentantesExtra((prev) => [...prev, { nome: "", cpf: "", dataNascimento: "", cargo: "" }]);
+    setRepresentantesExtra((prev) => [...prev, { nome: "", cpf: "", dataNascimento: "", cargo: "", telefone: "" }]);
   const updateRepresentante = (i: number, campo: keyof RepresentanteExtra, valor: string) =>
     setRepresentantesExtra((prev) => prev.map((r, idx) => (idx === i ? { ...r, [campo]: valor } : r)));
   const removeRepresentante = (i: number) =>
@@ -218,6 +218,10 @@ export default function ModalEditarPreCadastro({
                       <div className="grid grid-cols-2 gap-2">
                         <input value={r.cpf} onChange={(e) => updateRepresentante(i, "cpf", formatarCpf(e.target.value))} placeholder="CPF" className={`${inputCls} font-mono`} />
                         <input type="date" value={r.dataNascimento} onChange={(e) => updateRepresentante(i, "dataNascimento", e.target.value)} className={inputCls} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={r.cargo ?? ""} onChange={(e) => updateRepresentante(i, "cargo", e.target.value)} placeholder="Cargo / Relação" className={inputCls} />
+                        <input value={r.telefone ?? ""} onChange={(e) => updateRepresentante(i, "telefone", e.target.value)} placeholder="WhatsApp" className={inputCls} />
                       </div>
                     </div>
                   ))}

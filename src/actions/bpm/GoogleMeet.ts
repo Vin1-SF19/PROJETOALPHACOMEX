@@ -7,12 +7,134 @@ import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "./Cards";
 import {
   criarEventoNoCalendario,
-  atualizarEventoParcialNoCalendario,
 } from "@/actions/google-calendar-eventos";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import {
+  atualizarEventoParcial as atualizarEventoParcialGoogle,
+  cancelarEvento as cancelarEventoGoogle,
+  obterEvento as obterEventoGoogle,
+} from "@/lib/google-calendar/client";
+import {
+  obterUsuarioGoogleAtivo,
+  obterUsuarioGoogleAtivoPorCalendario,
+} from "@/lib/google-calendar/usuario-google";
+import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
+import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
+
+async function confirmarLinkMeetCriado(params: {
+  userId: number;
+  calendarioId: string;
+  googleCalendarId: string;
+  googleEventId: string;
+}) {
+  const usuarioGoogle = await obterUsuarioGoogleAtivo(params.userId);
+  if (!usuarioGoogle.ok) return null;
+
+  let ultimoEvento: Awaited<ReturnType<typeof obterEventoGoogle>> | null = null;
+  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+    if (tentativa > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 300 * tentativa));
+    }
+    ultimoEvento = await obterEventoGoogle({
+      emailUsuario: usuarioGoogle.emailUsuario,
+      calendarId: params.googleCalendarId,
+      googleEventId: params.googleEventId,
+    });
+    if (ultimoEvento.linkMeet) {
+      await db.googleCalendarEventoCache.update({
+        where: {
+          calendarioId_googleEventId: {
+            calendarioId: params.calendarioId,
+            googleEventId: params.googleEventId,
+          },
+        },
+        data: dadosCacheDeEvento(ultimoEvento),
+      });
+      return ultimoEvento.linkMeet;
+    }
+  }
+
+  if (ultimoEvento) {
+    await cancelarEventoGoogle({
+      emailUsuario: usuarioGoogle.emailUsuario,
+      calendarId: params.googleCalendarId,
+      googleEventId: params.googleEventId,
+      etagConhecido: ultimoEvento.etag,
+    });
+    await db.googleCalendarEventoCache.deleteMany({
+      where: { calendarioId: params.calendarioId, googleEventId: params.googleEventId },
+    });
+  }
+  return null;
+}
+
+async function reagendarEventoVinculado(params: {
+  googleEventId: string;
+  googleCalendarId: string;
+  googleMeetLink: string;
+  inicio: Date;
+  fim: Date;
+}) {
+  const vinculos = await db.googleCalendarEventoCache.findMany({
+    where: {
+      googleEventId: params.googleEventId,
+      linkMeet: params.googleMeetLink,
+      calendario: { googleCalendarId: params.googleCalendarId, gravavel: true },
+    },
+    select: {
+      calendarioId: true,
+      etag: true,
+      calendario: { select: { timezone: true } },
+    },
+    take: 2,
+  });
+  if (vinculos.length !== 1) {
+    return { success: false as const, error: "Não foi possível confirmar o organizador e o espaço desta reunião. Revise o vínculo na Agenda Alpha." };
+  }
+  const vinculo = vinculos[0];
+  const usuarioGoogle = await obterUsuarioGoogleAtivoPorCalendario(vinculo.calendarioId);
+  if (!usuarioGoogle.ok) {
+    return { success: false as const, error: "A Agenda Alpha do organizador não está ativa." };
+  }
+
+  const eventoAtual = await obterEventoGoogle({
+    emailUsuario: usuarioGoogle.emailUsuario,
+    calendarId: params.googleCalendarId,
+    googleEventId: params.googleEventId,
+  });
+  if (eventoAtual.linkMeet !== params.googleMeetLink) {
+    return { success: false as const, error: "O espaço do Google Meet foi alterado fora do painel. Revise o evento antes de reagendar." };
+  }
+
+  const eventoAtualizado = await atualizarEventoParcialGoogle({
+    emailUsuario: usuarioGoogle.emailUsuario,
+    calendarId: params.googleCalendarId,
+    googleEventId: params.googleEventId,
+    etagConhecido: eventoAtual.etag,
+    evento: {
+      inicio: params.inicio,
+      fim: params.fim,
+      diaInteiro: false,
+      timezone: vinculo.calendario.timezone || "America/Sao_Paulo",
+    },
+  });
+  if (eventoAtualizado.linkMeet !== params.googleMeetLink) {
+    return { success: false as const, error: "O Google devolveu um espaço de reunião diferente. O card não foi alterado; revise o evento na Agenda Alpha." };
+  }
+  await db.googleCalendarEventoCache.update({
+    where: {
+      calendarioId_googleEventId: {
+        calendarioId: vinculo.calendarioId,
+        googleEventId: params.googleEventId,
+      },
+    },
+    data: dadosCacheDeEvento(eventoAtualizado),
+  });
+  return { success: true as const };
+}
 
 const agendarSchema = z.object({
   cardId: z.string().min(1),
@@ -94,15 +216,24 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
 
     if (!resultado.success) return { success: false, error: resultado.error };
 
-    // O link do Meet real só é conhecido depois de criado — criarEventoNoCalendario já grava
-    // o evento completo (incluindo linkMeet) em GoogleCalendarEventoCache; buscamos de lá em
-    // vez de fazer uma segunda chamada à API do Google.
     const eventoCache = await db.googleCalendarEventoCache.findUnique({
       where: {
         calendarioId_googleEventId: { calendarioId: calendario.id, googleEventId: resultado.data.googleEventId },
       },
       select: { linkMeet: true },
     });
+    const googleMeetLink = eventoCache?.linkMeet ?? await confirmarLinkMeetCriado({
+      userId,
+      calendarioId: calendario.id,
+      googleCalendarId: calendario.googleCalendarId,
+      googleEventId: resultado.data.googleEventId,
+    });
+    if (!googleMeetLink) {
+      return {
+        success: false,
+        error: "O Google não confirmou o link do Meet. O evento incompleto foi desfeito; tente agendar novamente.",
+      };
+    }
 
     await db.$transaction(async (tx) => {
       await tx.bpmCard.update({
@@ -111,7 +242,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
           dataReuniao: inicio,
           googleEventId: resultado.data.googleEventId,
           googleCalendarId: calendario.googleCalendarId,
-          googleMeetLink: eventoCache?.linkMeet ?? null,
+          googleMeetLink,
         },
       });
       await registrarHistoricoCard(
@@ -129,7 +260,9 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
     await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
     return { success: true, data: { googleEventId: resultado.data.googleEventId } };
   } catch (error) {
-    console.error("[AgendarReuniaoGoogleMeetBpm]", error);
+    console.error("[AgendarReuniaoGoogleMeetBpm]", error instanceof GoogleCalendarError
+      ? { kind: error.kind, status: error.status, message: error.message }
+      : { message: error instanceof Error ? error.message : "Erro desconhecido" });
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao agendar reunião";
     return { success: false, error: msg };
   }
@@ -154,27 +287,38 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
 
     const card = await db.bpmCard.findUnique({
       where: { id: cardId },
-      select: { id: true, googleEventId: true, googleCalendarId: true, dataReuniao: true },
+      select: {
+        id: true,
+        googleEventId: true,
+        googleCalendarId: true,
+        googleMeetLink: true,
+        dataReuniao: true,
+        transcricaoReuniao: true,
+      },
     });
     if (!card) return { success: false, error: "Card não encontrado" };
-    if (!card.googleEventId || !card.googleCalendarId) {
+    if (!card.googleEventId || !card.googleCalendarId || !card.googleMeetLink) {
       return { success: false, error: "Este card ainda não tem reunião agendada — use Agendar pelo Google Meet primeiro." };
+    }
+    if (card.transcricaoReuniao?.trim()) {
+      return {
+        success: false,
+        error: "Esta reunião já possui transcrição recebida e não pode ser reutilizada em outra data. Avance o card para preservar o vínculo da evidência.",
+      };
     }
 
     const inicio = dataHora;
     const fim = new Date(inicio.getTime() + DURACAO_PADRAO_MINUTOS * 60_000);
 
-    const resultado = await atualizarEventoParcialNoCalendario({
-      calendarId: card.googleCalendarId,
+    const resultado = await reagendarEventoVinculado({
+      googleCalendarId: card.googleCalendarId,
       googleEventId: card.googleEventId,
+      googleMeetLink: card.googleMeetLink,
       inicio,
       fim,
     });
 
     if (!resultado.success) return { success: false, error: resultado.error };
-    if (resultado.data.conflito) {
-      return { success: false, error: "O evento foi alterado por fora do painel — abra a Agenda Alpha para revisar antes de reagendar." };
-    }
 
     await db.$transaction(async (tx) => {
       await tx.bpmCard.update({ where: { id: cardId }, data: { dataReuniao: inicio } });
@@ -184,7 +328,12 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
           acao: "REUNIAO_REAGENDADA",
           usuarioId: userId,
           valorAnteriorJson: JSON.stringify({ dataReuniao: card.dataReuniao }),
-          valorNovoJson: JSON.stringify({ dataReuniao: inicio }),
+          valorNovoJson: JSON.stringify({
+            dataReuniao: inicio,
+            googleEventId: card.googleEventId,
+            googleMeetLink: card.googleMeetLink,
+            transcricaoPreservada: Boolean(card.transcricaoReuniao?.trim()),
+          }),
         },
         tx,
       );
@@ -194,7 +343,9 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
     await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
     return { success: true };
   } catch (error) {
-    console.error("[ReagendarReuniaoBpm]", error);
+    console.error("[ReagendarReuniaoBpm]", error instanceof GoogleCalendarError
+      ? { kind: error.kind, status: error.status, message: error.message }
+      : { message: error instanceof Error ? error.message : "Erro desconhecido" });
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao reagendar reunião";
     return { success: false, error: msg };
   }

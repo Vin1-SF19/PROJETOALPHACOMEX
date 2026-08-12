@@ -1,5 +1,6 @@
 import type { PptxCrop, PptxEffects, PptxIntermediateModel, PptxLine, PptxSourceRef, PptxTextBody } from "./modelo-intermediario";
 import type { PptxDiagnosticEntry } from "./diagnostico";
+import type { FonteEmbutidaPptx } from "./fontes-embutidas";
 
 /** Modelo de conversão derivado do `PptxIntermediateModel` — antes de virar `ComponenteSlide[]`. */
 
@@ -108,6 +109,8 @@ export interface ApresentacaoPptxExtraida {
   /** Alias legado. A disponibilidade real é verificada no browser pelo FontResolver. */
   fontesNaoAplicadas: string[];
   fontesDetectadas: string[];
+  /** Fontes realmente incorporadas ao pacote, já extraídas do invólucro EOT como TTF/OTF. */
+  fontesEmbutidas: FonteEmbutidaPptx[];
   /** 1 entrada por elemento OOXML processado — ver `DiagnosticoElemento`. */
   diagnostico: DiagnosticoElemento[];
   diagnosticosDetalhados: PptxDiagnosticEntry[];

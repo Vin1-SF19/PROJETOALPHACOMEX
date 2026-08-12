@@ -152,7 +152,7 @@ async function mapearForma(
   return {
     id: crypto.randomUUID(), tipo: "card", x: forma.x, y: forma.y, w: forma.w, h: forma.h,
     zIndex, rotacao: forma.rotacao,
-    corFundo: forma.corFundo ?? "transparent",
+    corFundo: forma.gradientCss ?? forma.corFundo ?? "transparent",
     borderRadius: raioDaCaixa(forma.formato, forma.w, forma.h),
     padding: 16,
     filhos,

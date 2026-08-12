@@ -16,6 +16,7 @@ import { validarPacotePptx } from "./seguranca";
 import { extrairTextBody, textoTemConteudoVisual } from "./texto";
 import { montarCadeiaPlaceholder, resolverNaCadeia, shapeEhPlaceholder, textoEhInstrucaoDeMaster } from "./heranca";
 import { resolverCorOoxml } from "./color-resolver";
+import { extrairFontesEmbutidasPptx } from "./fontes-embutidas";
 
 /**
  * Parser de `.pptx` (OOXML) — extrai texto, imagens (inclusive imagem-como-preenchimento de
@@ -287,11 +288,24 @@ function lerOpacidadeBlip(blip: NoXml | undefined): number | undefined {
 
 function lerLinhaOoxml(lineNode: NoXml | undefined, contexto: ContextoTema): PptxLine | undefined {
   if (!lineNode || lineNode["a:noFill"] !== undefined) return undefined;
-  const color = resolverCorOoxml(lineNode["a:solidFill"], { scheme: contexto.esquemaCores, colorMap: contexto.mapaCores }) ?? undefined;
+  const colorContext = { scheme: contexto.esquemaCores, colorMap: contexto.mapaCores };
+  const color = resolverCorOoxml(lineNode["a:solidFill"], colorContext) ?? undefined;
+  const gradientStops = comoArray<NoXml>(lineNode["a:gradFill"]?.["a:gsLst"]?.["a:gs"])
+    .map((stop) => ({
+      position: Math.max(0, Math.min(100, (Number(stop?.["@_pos"]) || 0) / 1000)),
+      color: resolverCorOoxml(stop, colorContext),
+    }))
+    .filter((stop): stop is { position: number; color: NonNullable<typeof stop.color> } => Boolean(stop.color));
+  const gradient = gradientStops.length > 0 ? {
+    type: "gradient" as const,
+    angle: ((Number(lineNode["a:gradFill"]?.["a:lin"]?.["@_ang"]) || 0) / 60000 + 90) % 360,
+    stops: gradientStops,
+  } : undefined;
   const width = Number(lineNode["@_w"]);
   return {
     widthEmu: Number.isFinite(width) ? width : 12700,
     color,
+    gradient,
     dash: lineNode["a:prstDash"]?.["@_val"],
     cap: lineNode["@_cap"],
     join: lineNode["a:round"] !== undefined ? "round" : lineNode["a:bevel"] !== undefined ? "bevel" : lineNode["a:miter"] !== undefined ? "miter" : undefined,
@@ -507,9 +521,13 @@ async function processarShape(
   //    SVG preserva tanto fundo sólido quanto gradiente, em vez de descartar a forma inteira.
   if (geometria && !geometria.ehRetangulo && geometria.pathSvg && (corFundo || gradientStops.length > 0 || line)) {
     const { x, y, w, h, rotacao, flipH, flipV } = converterComTransform(bruto, transform, escalaInfo);
-    const stroke = line?.color ? {
-      color: line.color.css,
-      width: Math.max(1, line.widthEmu / Math.max(1, bruto.ext.cx) * geometria.viewBoxW),
+    const larguraContornoPx = line && (line.color || line.gradient) ? line.widthEmu * escalaInfo.escala : 0;
+    const stroke = larguraContornoPx > 0 && line ? {
+      ...(line.color ? { color: line.color.css } : {}),
+      ...(line.gradient ? { gradient: { angle: line.gradient.angle ?? 0, stops: line.gradient.stops.map((stop) => ({ position: stop.position, color: stop.color.css })) } } : {}),
+      // `a:ln/@w` está em coordenadas do slide e NÃO cresce junto com o espaço local do grupo.
+      // Converte primeiro para pixels finais e só então para unidades do viewBox do SVG.
+      width: Math.max(1, (larguraContornoPx / Math.max(0.001, w)) * geometria.viewBoxW),
       ...(line.dash ? { dash: line.dash.includes("dot") ? "1 2" : "4 3" } : {}),
     } : undefined;
     const svgMarkup = gradientStops.length > 0
@@ -517,9 +535,23 @@ async function processarShape(
       : construirSvgFormaColorida(geometria.pathSvg, geometria.viewBoxW, geometria.viewBoxH, corFundo ?? "none", stroke);
     const bytes = new TextEncoder().encode(svgMarkup);
     return {
-      forma: { tipo: "imagem", x, y, w, h, rotacao, flipH, flipV, bytes, mimeType: "image/svg+xml", nomeArquivo: `forma-${nomeForma}.svg` },
+      // OOXML posiciona a forma pelo path e deixa metade do traco ultrapassar esse quadro.
+      // Ampliar o componente e o viewBox evita cortar os aneis grossos nas quatro bordas.
+      forma: {
+        tipo: "imagem",
+        x: x - larguraContornoPx / 2,
+        y: y - larguraContornoPx / 2,
+        w: w + larguraContornoPx,
+        h: h + larguraContornoPx,
+        rotacao,
+        flipH,
+        flipV,
+        bytes,
+        mimeType: "image/svg+xml",
+        nomeArquivo: `forma-${nomeForma}.svg`,
+      },
       motivo: null,
-      fillEncontrado: gradientStops.length > 0 ? "custGeom gradiente (fallback SVG)" : "custGeom colorido (fallback SVG)",
+      fillEncontrado: gradientStops.length > 0 ? "custGeom gradiente (fallback SVG)" : corFundo ? "custGeom colorido (fallback SVG)" : "custGeom contorno (fallback SVG)",
       relationshipId: null, assetResolvido: null, geometria: descricaoGeometria,
     };
   }
@@ -1055,6 +1087,7 @@ export async function extrairApresentacaoPptx(
   const escalaInfo = calcularEscalaPptx(slideSizeEmu, canvasDestino);
 
   const relsApresentacao = await lerRelacionamentos(zip, "ppt/_rels/presentation.xml.rels");
+  const fontesEmbutidas = await extrairFontesEmbutidasPptx(zip, presentationXml, relsApresentacao);
   const idsOrdenados = comoArray(presentationXml?.["p:presentation"]?.["p:sldIdLst"]?.["p:sldId"])
     .map((s: NoXml) => s?.["@_r:id"])
     .filter((id: unknown): id is string => typeof id === "string");
@@ -1208,6 +1241,7 @@ export async function extrairApresentacaoPptx(
     // agora é decidida no browser pelo FontResolver.
     fontesNaoAplicadas: fontes,
     fontesDetectadas: fontes,
+    fontesEmbutidas,
     diagnostico,
     diagnosticosDetalhados,
     intermediateModel: { version: 1, importerVersion: PPTX_IMPORTER_VERSION, slideSizeEmu, slides: intermediateSlides },

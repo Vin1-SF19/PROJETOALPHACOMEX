@@ -18,6 +18,9 @@ import { resolverFontesNoDocumento, type FontSubstitution } from "@/lib/apresent
 import type { PptxDiagnosticEntry, PptxDiagnosticSeverity } from "@/lib/apresentacoes/pptx/diagnostico";
 import { compararImagens } from "@/lib/apresentacoes/pptx/visual-diff";
 import { toPng } from "html-to-image";
+import { FontesPersonalizadasStyle } from "@/components/Apresentacoes/FontesPersonalizadasStyle";
+import { useFontesPersonalizadas } from "@/components/Apresentacoes/Editor/FontesPersonalizadasContext";
+import type { FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
 
 interface SlideExtraidoPreview {
   componentes: ComponenteSlide[];
@@ -101,6 +104,8 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const [canvas, setCanvas] = useState<CanvasConfig | null>(null);
   const [ignorados, setIgnorados] = useState<Record<string, number>>({});
   const [fontes, setFontes] = useState<FontSubstitution[]>([]);
+  const [fontesDetectadas, setFontesDetectadas] = useState<string[]>([]);
+  const [fontesEmbutidas, setFontesEmbutidas] = useState<FontePersonalizada[]>([]);
   const [diagnosticos, setDiagnosticos] = useState<PptxDiagnosticEntry[]>([]);
   const [resumoDiagnosticos, setResumoDiagnosticos] = useState<Record<PptxDiagnosticSeverity, number>>({ INFO: 0, WARNING: 0, FALLBACK: 0, ERROR: 0 });
   const [referenceImages, setReferenceImages] = useState<Array<{ slideNumber: number; url: string }>>([]);
@@ -114,6 +119,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const originalUploadRef = useRef<string | null>(null);
   const previewAssetsRef = useRef<string[]>([]);
   const preservarOriginalRef = useRef(false);
+  const { registrarFontes } = useFontesPersonalizadas();
 
   useEffect(() => {
     arquivoRef.current = arquivo;
@@ -130,6 +136,9 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       setErro(null);
       setExcluidos(new Set());
       setVisualDiffs({});
+      setFontes([]);
+      setFontesDetectadas([]);
+      setFontesEmbutidas([]);
       try {
         if (!arquivo.name.toLowerCase().endsWith(".pptx")) throw new Error("Envie um arquivo .pptx (PowerPoint).");
         if (arquivo.size <= 0) throw new Error("O arquivo está vazio.");
@@ -182,7 +191,8 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
         setReferenceImages(resultado.data.referenceImages ?? []);
         previewAssetsRef.current = urlsTemporarias;
         setReferenceRenderer(resultado.data.referenceRenderer ?? null);
-        setFontes(await resolverFontesNoDocumento(resultado.data.fontesDetectadas ?? []));
+        setFontesDetectadas(resultado.data.fontesDetectadas ?? []);
+        setFontesEmbutidas(resultado.data.fontesEmbutidas ?? []);
         setStatus("pronto");
       } catch (error) {
         if (cancelado) return;
@@ -202,6 +212,17 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       void limparUploadsTemporarios(apresentacaoId, urls);
     };
   }, [open, arquivo, apresentacaoId]);
+
+  useEffect(() => {
+    if (status !== "pronto") return;
+    let cancelado = false;
+    void document.fonts?.ready
+      .then(() => resolverFontesNoDocumento(fontesDetectadas))
+      .then((resultado) => {
+        if (!cancelado) setFontes(resultado);
+      });
+    return () => { cancelado = true; };
+  }, [fontesDetectadas, fontesEmbutidas, status]);
 
   useEffect(() => {
     if (status !== "pronto" || !canvas || referenceImages.length === 0) return;
@@ -264,11 +285,13 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
         return;
       }
 
-      const { slidesCriados, ignorados: ignoradosFinal, errosDeImagem } = resultado.data as {
+      const { slidesCriados, ignorados: ignoradosFinal, errosDeImagem, fontesEmbutidas: fontesPublicadas = [] } = resultado.data as {
         slidesCriados: number;
         ignorados: Record<string, number>;
         errosDeImagem: string[];
+        fontesEmbutidas?: FontePersonalizada[];
       };
+      registrarFontes(fontesPublicadas);
       const totalIgnorados = Object.values(ignoradosFinal ?? {}).reduce((soma, n) => soma + n, 0);
       toast.success(`${slidesCriados} slide${slidesCriados === 1 ? "" : "s"} importado${slidesCriados === 1 ? "" : "s"} do PowerPoint.`);
       if (totalIgnorados > 0 || errosDeImagem?.length > 0) {
@@ -299,7 +322,9 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const problemasVisuais = diagnosticos.filter((item) => item.severity !== "INFO");
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !confirmando && onOpenChange(v)}>
+    <>
+      <FontesPersonalizadasStyle fontes={fontesEmbutidas} />
+      <Dialog open={open} onOpenChange={(v) => !confirmando && onOpenChange(v)}>
       <DialogContent className="flex max-h-[85vh] w-[min(96vw,1100px)] max-w-none flex-col gap-0 overflow-hidden rounded-2xl border-white/10 bg-slate-950 p-0 sm:max-w-none">
         <DialogTitle className="border-b border-white/5 px-5 py-4 text-sm font-bold text-white">
           Importar PowerPoint
@@ -430,6 +455,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
           </>
         )}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }

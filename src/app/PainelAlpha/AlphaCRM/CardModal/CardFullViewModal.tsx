@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Building2, ExternalLink, Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -20,6 +20,8 @@ import {
   useDadosEmpresaDrawer,
 } from "./DadosEmpresaDrawer";
 import { TelefonesCardButton } from "./TelefonesCardButton";
+import { toast } from "sonner";
+import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -29,6 +31,7 @@ const SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"];
 
 interface Props {
   cardId: string;
+  realtimeRevision?: number;
   accent: string;
   currentUserId: number | null;
   currentUserRole: string | null;
@@ -37,13 +40,17 @@ interface Props {
   onAbrirCard: (cardId: string) => void;
 }
 
-export default function CardFullViewModal({ cardId, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard }: Props) {
+export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard }: Props) {
   const [card, setCard] = useState<CardDetalhe | null>(null);
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
+  const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
+  const atualizarEstadoFollowUp = useCallback((estado: EstadoFollowUpModal) => {
+    setEstadoFollowUpPorCard((estados) => ({ ...estados, [cardId]: estado }));
+  }, [cardId]);
 
   const carregando = card?.id !== cardId && erro === null;
 
@@ -73,6 +80,15 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
     return () => { cancelado = true; };
   }, [cardId]);
 
+  useEffect(() => {
+    if (realtimeRevision === 0) return;
+    let cancelado = false;
+    ObterCardBpm(cardId).then((res) => {
+      if (!cancelado && res.success && res.data) setCard(res.data);
+    });
+    return () => { cancelado = true; };
+  }, [cardId, realtimeRevision]);
+
   async function recarregar() {
     const res = await ObterCardBpm(cardId);
     if (res.success && res.data) setCard(res.data);
@@ -80,6 +96,7 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
 
   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
   const podeMoverEtapa = isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR";
+  const podeEditar = podeMoverEtapa;
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
   // Máquina de estado (BpmEtapaTransicaoPermitida, ver plano-novos-leads-bpm.md): se a etapa
@@ -93,9 +110,25 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
           (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
         )
       : etapas;
+  const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
+  const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual, podeEditar);
 
   return (
-    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Sheet open onOpenChange={(open) => {
+      if (open) return;
+      if (deveBloquearFechamento && card) {
+        const checklist = document.getElementById(`follow-up-${card.id}`);
+        checklist?.scrollIntoView({ behavior: "smooth", block: "center" });
+        checklist?.focus({ preventScroll: true });
+        toast.error(estadoFollowUpAtual === "CARREGANDO"
+          ? "Aguarde a validação do último follow-up antes de fechar este card."
+          : estadoFollowUpAtual === "ERRO"
+            ? "Não foi possível validar o follow-up. Recarregue a seção antes de fechar o card."
+            : "Conclua o checklist do último follow-up antes de fechar este card.");
+        return;
+      }
+      onClose();
+    }}>
       <SheetContent
         side="bottom"
         className="h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
@@ -200,7 +233,7 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
             </div>
 
             {/* 3 painéis */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_max-content] gap-4 px-4 sm:px-6 pb-6 overflow-hidden min-h-0">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_max-content] gap-4 px-4 sm:px-6 pb-6 overflow-y-auto lg:overflow-hidden min-h-0">
               {dadosEmpresaDrawer.aberto ? (
                 <DadosEmpresaDrawer
                   accent={accent}
@@ -211,8 +244,8 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
                   onRecarregar={dadosEmpresaDrawer.recarregar}
                 />
               ) : (
-                <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="min-h-0 h-full">
-                  <TabsContent value="card" className="h-full m-0">
+                <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="min-h-0 lg:h-full lg:overflow-hidden">
+                  <TabsContent value="card" className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
                     <PainelHistorico
                       card={card}
                       interacoes={interacoes}
@@ -221,10 +254,15 @@ export default function CardFullViewModal({ cardId, accent, currentUserId, curre
                       currentUserRole={currentUserRole}
                       onAtualizado={() => { recarregar(); onAtualizado(); }}
                       onAbrirCard={onAbrirCard}
+                      etapasParaMover={etapasParaMover}
+                      onEstadoFollowUpChange={atualizarEstadoFollowUp}
+                      podeEditar={podeEditar}
+                      podeMoverEtapa={podeMoverEtapa}
+                      realtimeRevision={realtimeRevision}
                     />
                   </TabsContent>
                   {SERVICOS_FIXOS.map((servico) => (
-                    <TabsContent key={servico} value={servico} className="h-full m-0">
+                    <TabsContent key={servico} value={servico} className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
                       <PainelHistoricoServico
                         cardId={card.id}
                         servico={servico}

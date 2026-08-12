@@ -1,0 +1,47 @@
+{
+  "responsaveisSemTelefone": [],
+  "representantesForaPorTipo": [],
+  "representantesSemTelefone": [
+    {
+      "id": 19,
+      "nome": "Valor Aduaneiro",
+      "parceiroId": 11
+    },
+    {
+      "id": 20,
+      "nome": "Seleto",
+      "parceiroId": 12
+    },
+    {
+      "id": 22,
+      "nome": "Gama",
+      "parceiroId": 14
+    },
+    {
+      "id": 23,
+      "nome": "Paulo Buono",
+      "parceiroId": 15
+    },
+    {
+      "id": 24,
+      "nome": "Guto",
+      "parceiroId": 16
+    },
+    {
+      "id": 25,
+      "nome": "ALEXANDRE BARROS",
+      "parceiroId": 17
+    },
+    {
+      "id": 53,
+      "nome": "Marcos Paulo",
+      "parceiroId": 40
+    },
+    {
+      "id": 56,
+      "nome": "Tarik Lacerda Falluh",
+      "parceiroId": 43
+    }
+  ],
+  "representantesParceiroOrfao": []
+}

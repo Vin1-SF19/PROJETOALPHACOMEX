@@ -69,6 +69,7 @@ export interface PptxCrop {
 export interface PptxLine {
   widthEmu: number;
   color?: PptxResolvedColor;
+  gradient?: Extract<PptxFill, { type: "gradient" }>;
   dash?: string;
   cap?: string;
   join?: string;

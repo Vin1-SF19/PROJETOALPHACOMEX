@@ -12,6 +12,7 @@ import { resumirDiagnosticos } from "@/lib/apresentacoes/pptx/diagnostico";
 import { renderizarReferenciaPptx } from "@/lib/apresentacoes/pptx/reference-renderer";
 import { excluirBlobMotion, obterTokenMotion } from "@/lib/apresentacoes/blob";
 import { carregarArquivoPptx, ErroEntradaPptx, prefixoPreviewPptx } from "@/lib/apresentacoes/pptx/upload";
+import { fontePersonalizadaSchema, type FontePersonalizada } from "@/lib/apresentacoes/fontes-personalizadas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -114,6 +115,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return upload;
     };
 
+    // Registra as fontes incorporadas somente como assets temporarios nesta etapa. Assim a
+    // miniatura usa exatamente a familia do PPTX sem poluir o catalogo se o usuario cancelar.
+    const fontesEmbutidas: FontePersonalizada[] = await Promise.all(
+      extraido.fontesEmbutidas.map(async (fonte) => {
+        const url = await enviarImagemTemporaria(fonte.bytes, fonte.mimeType, fonte.nomeArquivo);
+        return fontePersonalizadaSchema.parse({
+          id: crypto.randomUUID(),
+          nome: fonte.nome,
+          url,
+          formato: fonte.formato,
+          mimeType: fonte.mimeType,
+          nomeOriginal: fonte.nomeArquivo,
+          tamanhoBytes: fonte.bytes.byteLength,
+          criadoEm: new Date().toISOString(),
+        });
+      }),
+    );
+
     const slides = await Promise.all(
       extraido.slides.map(async (slide): Promise<{ componentes: ComponenteSlide[]; canvas: CanvasConfig }> => {
         try {
@@ -140,6 +159,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         canvas,
         ignorados: extraido.ignorados,
         fontesDetectadas: extraido.fontesDetectadas,
+        fontesEmbutidas,
         diagnosticos: extraido.diagnosticosDetalhados,
         resumoDiagnosticos: resumirDiagnosticos(extraido.diagnosticosDetalhados),
         importerVersion: extraido.intermediateModel.importerVersion,

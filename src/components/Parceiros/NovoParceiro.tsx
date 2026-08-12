@@ -90,7 +90,7 @@ export default function NovoParceiro({
   ]);
   const [respAbertoIdx, setRespAbertoIdx] = useState<number>(0); // qual está expandido
 
-  const respCompleto = (r: Resp) => r.nome.trim().length >= 2;
+  const respCompleto = (r: Resp) => r.nome.trim().length >= 2 && r.whatsapp.trim().length >= 8;
   const updateResp = (i: number, campo: keyof Resp, valor: string) =>
     setResponsaveis(prev => prev.map((r, idx) => idx === i ? { ...r, [campo]: valor } : r));
   const addResp = () => {
@@ -207,7 +207,7 @@ export default function NovoParceiro({
               cpf: r.cpf ? r.cpf.replace(/\D/g, "") : undefined,
               dataNascimento: r.dataNascimento || undefined,
               cargo: r.cargo || undefined,
-              telefone: r.whatsapp || undefined,
+              telefone: r.whatsapp.trim(),
             }))
           : undefined,
         origemContratoId: pendenciaParceiro?.contratoId,
@@ -480,11 +480,11 @@ export default function NovoParceiro({
                               <Input value={r.cargo} onChange={e => updateResp(i, "cargo", e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
                             </div>
                             <div className="space-y-1">
-                              <Label className={labelCls}>WhatsApp</Label>
+                              <Label className={labelCls}>WhatsApp *</Label>
                               <Input value={r.whatsapp} onChange={e => updateResp(i, "whatsapp", e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
                             </div>
                           </div>
-                          {/* Fecha a gaveta assim que o único campo obrigatório (nome) estiver válido. */}
+                          {/* Fecha a gaveta assim que os campos obrigatórios (nome + WhatsApp) estiverem válidos. */}
                           <Button type="button" variant="outline" disabled={!completo}
                             onClick={() => setRespAbertoIdx(-1)}
                             className="w-full h-10 rounded-xl border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-black uppercase text-[11px] tracking-widest gap-2 disabled:opacity-30">

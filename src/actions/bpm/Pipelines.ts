@@ -6,7 +6,13 @@ import {
   criarPipelineSchema,
   atualizarPipelineSchema,
 } from "@/lib/validations/bpm";
-import { exigirAcessoConfigPipeline, isAdminRole } from "@/lib/bpm/ownership";
+import {
+  checarAcessoBpmPipeline,
+  exigirAcessoBpmPipeline,
+  exigirAcessoConfigPipeline,
+  exigirAcessoModuloBpm,
+  isAdminRole,
+} from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
@@ -15,6 +21,8 @@ export async function ListarPipelinesBpm(incluirInativos = false) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+    const userId = Number(session.user.id);
+    await exigirAcessoModuloBpm(userId);
 
     const pipelines = await db.bpmPipeline.findMany({
       where: incluirInativos ? undefined : { ativo: true },
@@ -28,7 +36,13 @@ export async function ListarPipelinesBpm(incluirInativos = false) {
       orderBy: { nome: "asc" },
     });
 
-    return { success: true, data: pipelines };
+    const acessos = await Promise.all(
+      pipelines.map((pipeline) => checarAcessoBpmPipeline(pipeline.id, userId)),
+    );
+    return {
+      success: true,
+      data: pipelines.filter((_, index) => acessos[index]),
+    };
   } catch (error) {
     console.error("[ListarPipelinesBpm]", error);
     return { success: false, error: "Erro ao buscar pipelines", data: [] };
@@ -57,6 +71,7 @@ export async function ObterPipelineBpm(pipelineId: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
 
     const pipeline = await db.bpmPipeline.findUnique({
       where: { id: pipelineId },

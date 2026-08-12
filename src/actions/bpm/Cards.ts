@@ -6,13 +6,21 @@ import {
   criarCardSchema,
   atualizarCardSchema,
   moverCardSchema,
+  salvarRequisitosEMoverCardSchema,
 } from "@/lib/validations/bpm";
-import { exigirAcessoBpmCard, isAdminRole } from "@/lib/bpm/ownership";
+import {
+  exigirAcessoBpmCard,
+  exigirAcessoBpmPipeline,
+  exigirAcessoModuloBpm,
+  isAdminRole,
+  usuarioElegivelResponsavelBpm,
+} from "@/lib/bpm/ownership";
 import { executarAutomacaoFechamentoComercial } from "@/lib/bpm/automacoes";
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
-  carregarCamposFaltantesCardEtapa,
+  carregarCamposAplicaveisCardEtapa,
+  carregarCamposAplicaveisEtapa,
   carregarCamposObrigatoriosEtapa,
 } from "@/lib/bpm/requisitos-etapa-server";
 import { listarCamposObrigatoriosFaltantes } from "@/lib/bpm/requisitos-etapa";
@@ -23,6 +31,14 @@ import {
   intervaloDiaCivilSaoPaulo,
   META_LIGACOES_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
+import { obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
+import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
+import {
+  etapaEhEmTratativa,
+  obterErroChecklistParaSaidaEmTratativa,
+  obterErroProximoContatoParaEntrada,
+} from "@/lib/bpm/em-tratativa";
+import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -45,14 +61,16 @@ export async function BuscarEmpresasBpm(termo: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
-    if (!termo || termo.trim().length < 2) return { success: true, data: [] };
+    await exigirAcessoModuloBpm(Number(session.user.id));
+    const termoSeguro = termo.trim().slice(0, 120);
+    if (termoSeguro.length < 2) return { success: true, data: [] };
 
     const empresas = await db.clientes.findMany({
       where: {
         OR: [
-          { razaoSocial: { contains: termo } },
-          { nomeFantasia: { contains: termo } },
-          { cnpj: { contains: termo } },
+          { razaoSocial: { contains: termoSeguro } },
+          { nomeFantasia: { contains: termoSeguro } },
+          { cnpj: { contains: termoSeguro } },
         ],
       },
       select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
@@ -72,6 +90,7 @@ export async function ListarUsuariosResponsavelBpm() {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+    await exigirAcessoModuloBpm(Number(session.user.id));
 
     const usuarios = await db.usuarios.findMany({
       where: { status: "ATIVO" },
@@ -90,6 +109,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+    await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
 
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
@@ -203,6 +223,12 @@ export async function ObterCardBpm(cardId: string) {
 
     if (!card) return { success: false, error: "Card não encontrado" };
 
+    const camposEtapa = await carregarCamposAplicaveisCardEtapa(
+      card.id,
+      card.pipelineId,
+      card.etapaId,
+    );
+
     // Indicador "nunca acessado" — primeiro acesso por QUALQUER usuário apaga a marcação.
     if (!card.primeiraVisualizacaoEm) {
       const agora = new Date();
@@ -220,7 +246,7 @@ export async function ObterCardBpm(cardId: string) {
       }
     }
 
-    return { success: true, data: card };
+    return { success: true, data: { ...card, camposEtapa } };
   } catch (error) {
     console.error("[ObterCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao buscar card";
@@ -281,6 +307,10 @@ export async function CriarCardBpm(dados: unknown) {
     const parsed = criarCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { empresaId, pipelineId, etapaId, responsavelId, servico, camposValores } = parsed.data;
+    await exigirAcessoBpmPipeline(pipelineId, userId);
+    if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
+      return { success: false, error: "Responsável inválido para este pipeline." };
+    }
 
     // D-021: empresa é sempre obrigatória — já garantido pelo schema Zod (empresaId obrigatório),
     // aqui confirmamos que a empresa de fato existe.
@@ -305,7 +335,51 @@ export async function CriarCardBpm(dados: unknown) {
       };
     }
 
+    if (camposValores && Object.keys(camposValores).length > 0) {
+      const camposAplicaveis = await carregarCamposAplicaveisEtapa(pipelineId, etapaId);
+      const idsAplicaveis = new Set(camposAplicaveis.map((campo) => campo.id));
+      if (Object.keys(camposValores).some((campoId) => !idsAplicaveis.has(campoId))) {
+        return {
+          success: false,
+          error: "Um ou mais campos não pertencem à etapa de criação selecionada.",
+        };
+      }
+      const validacao = validarValoresCamposBpm(camposAplicaveis, camposValores);
+      if (!validacao.success) return validacao;
+    }
+
     const card = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmPipeline(pipelineId, userId, tx);
+      const [etapaAtual, empresaAtual, responsavelElegivel] = await Promise.all([
+        tx.bpmEtapa.findUnique({
+          where: { id: etapaId },
+          select: { pipelineId: true, ativo: true },
+        }),
+        tx.clientes.findUnique({ where: { id: empresaId }, select: { id: true } }),
+        usuarioElegivelResponsavelBpm(pipelineId, responsavelId, tx),
+      ]);
+      if (!etapaAtual?.ativo || etapaAtual.pipelineId !== pipelineId) {
+        throw new Error("CRIACAO_CARD_INVALIDA");
+      }
+      if (!empresaAtual || !responsavelElegivel) {
+        throw new Error("CRIACAO_CARD_INVALIDA");
+      }
+      const camposAtuais = await carregarCamposAplicaveisEtapa(
+        pipelineId,
+        etapaId,
+        tx,
+      );
+      const validacaoAtual = validarValoresCamposBpm(camposAtuais, camposValores ?? {});
+      if (!validacaoAtual.success) {
+        throw new Error(`CAMPO_INVALIDO:${validacaoAtual.error}`);
+      }
+      const obrigatoriosAtuais = camposAtuais.filter((campo) => campo.obrigatorio);
+      const faltantesAtuais = listarCamposObrigatoriosFaltantes(
+        obrigatoriosAtuais,
+        validacaoAtual.valores,
+      );
+      if (faltantesAtuais.length > 0) throw new Error("CRIACAO_CARD_INVALIDA");
+
       const novoCard = await tx.bpmCard.create({
         data: { empresaId, pipelineId, etapaId, responsavelId, servico },
       });
@@ -316,7 +390,7 @@ export async function CriarCardBpm(dados: unknown) {
       });
 
       if (camposValores) {
-        const entradas = Object.entries(camposValores).filter(([, v]) => v.trim() !== "");
+        const entradas = Object.entries(validacaoAtual.valores).filter(([, v]) => v !== "");
         if (entradas.length) {
           await tx.bpmCardCampoValor.createMany({
             data: entradas.map(([campoId, valor]) => ({ cardId: novoCard.id, campoId, valor })),
@@ -341,7 +415,14 @@ export async function CriarCardBpm(dados: unknown) {
     return { success: true, data: card };
   } catch (error) {
     console.error("[CriarCardBpm]", error);
-    return { success: false, error: "Erro ao criar card" };
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : error instanceof Error && error.message === "CRIACAO_CARD_INVALIDA"
+        ? "Os dados de criação mudaram ou não são mais válidos. Recarregue e tente novamente."
+        : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
+          ? error.message.slice("CAMPO_INVALIDO:".length)
+          : "Erro ao criar card";
+    return { success: false, error: msg };
   }
 }
 
@@ -359,12 +440,75 @@ export async function AtualizarCardBpm(dados: unknown) {
 
     const cardAnterior = await db.bpmCard.findUnique({ where: { id: cardId } });
     if (!cardAnterior) return { success: false, error: "Card não encontrado" };
+    if (
+      campos.responsavelId !== undefined
+      && !(await usuarioElegivelResponsavelBpm(
+        cardAnterior.pipelineId,
+        campos.responsavelId,
+      ))
+    ) {
+      return { success: false, error: "Responsável inválido para este pipeline." };
+    }
+
+    const snapshotAnterior = {
+      ...(campos.responsavelId !== undefined
+        ? { responsavelId: cardAnterior.responsavelId }
+        : {}),
+      ...(campos.servico !== undefined ? { servico: cardAnterior.servico } : {}),
+      ...(campos.status !== undefined ? { status: cardAnterior.status } : {}),
+      ...(campos.proximoContatoEm !== undefined
+        ? { proximoContatoEm: cardAnterior.proximoContatoEm }
+        : {}),
+      ...(camposValores ? { camposAlterados: Object.keys(camposValores) } : {}),
+    };
 
     await db.$transaction(async (tx) => {
-      await tx.bpmCard.update({ where: { id: cardId }, data: campos });
+      const cardAtual = await tx.bpmCard.findUnique({ where: { id: cardId } });
+      if (
+        !cardAtual
+        || cardAtual.etapaId !== cardAnterior.etapaId
+        || cardAtual.status !== cardAnterior.status
+        || cardAtual.updatedAt.getTime() !== cardAnterior.updatedAt.getTime()
+      ) {
+        throw new Error("CONFLITO_ATUALIZACAO_CARD");
+      }
+      if (
+        campos.responsavelId !== undefined
+        && !(await usuarioElegivelResponsavelBpm(
+          cardAtual.pipelineId,
+          campos.responsavelId,
+          tx,
+        ))
+      ) {
+        throw new Error("RESPONSAVEL_INVALIDO");
+      }
+
+      let valoresValidados: Record<string, string> = {};
+      if (camposValores && Object.keys(camposValores).length > 0) {
+        const camposAplicaveis = await carregarCamposAplicaveisCardEtapa(
+          cardId,
+          cardAtual.pipelineId,
+          cardAtual.etapaId,
+          tx,
+        );
+        const validacao = validarValoresCamposBpm(camposAplicaveis, camposValores);
+        if (!validacao.success) throw new Error(`CAMPO_INVALIDO:${validacao.error}`);
+        valoresValidados = validacao.valores;
+      }
+
+      const atualizacao = await tx.bpmCard.updateMany({
+        where: {
+          id: cardId,
+          etapaId: cardAnterior.etapaId,
+          status: cardAnterior.status,
+          updatedAt: cardAnterior.updatedAt,
+        },
+        data: campos,
+      });
+      if (atualizacao.count !== 1) throw new Error("CONFLITO_ATUALIZACAO_CARD");
 
       if (camposValores) {
-        for (const [campoId, valor] of Object.entries(camposValores)) {
+        for (const [campoId, valor] of Object.entries(valoresValidados)) {
           await tx.bpmCardCampoValor.upsert({
             where: { cardId_campoId: { cardId, campoId } },
             create: { cardId, campoId, valor },
@@ -378,8 +522,11 @@ export async function AtualizarCardBpm(dados: unknown) {
           cardId,
           acao: "CARD_ATUALIZADO",
           usuarioId: userId,
-          valorAnteriorJson: JSON.stringify(cardAnterior),
-          valorNovoJson: JSON.stringify(campos),
+          valorAnteriorJson: JSON.stringify(snapshotAnterior),
+          valorNovoJson: JSON.stringify({
+            ...campos,
+            ...(camposValores ? { camposAlterados: Object.keys(camposValores) } : {}),
+          }),
         },
       });
 
@@ -406,7 +553,390 @@ export async function AtualizarCardBpm(dados: unknown) {
     return { success: true };
   } catch (error) {
     console.error("[AtualizarCardBpm]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao atualizar card";
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : error instanceof Error && error.message === "CONFLITO_ATUALIZACAO_CARD"
+        ? "O card mudou enquanto era editado. Recarregue e tente novamente."
+        : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
+          ? error.message.slice("CAMPO_INVALIDO:".length)
+          : error instanceof Error && error.message === "RESPONSAVEL_INVALIDO"
+            ? "Responsável inválido para este pipeline."
+          : "Erro ao atualizar card";
+    return { success: false, error: msg };
+  }
+}
+
+type DadosMovimentoComRequisitos = {
+  cardId: string;
+  etapaDestinoId: string;
+  camposValores: Record<string, string>;
+  proximoContatoEm?: Date | null;
+};
+
+type ClienteContextoMovimento = Pick<
+  typeof db,
+  "bpmCard" | "bpmEtapa" | "bpmEtapaTransicaoPermitida"
+>;
+
+async function carregarContextoMovimento(
+  cardId: string,
+  etapaDestinoId: string,
+  client: ClienteContextoMovimento = db,
+) {
+  const [card, etapaDestino] = await Promise.all([
+    client.bpmCard.findUnique({
+      where: { id: cardId },
+      include: { etapa: { select: { nome: true } } },
+    }),
+    client.bpmEtapa.findUnique({ where: { id: etapaDestinoId } }),
+  ]);
+  if (!card) return { error: "Card não encontrado" } as const;
+  if (!etapaDestino || etapaDestino.pipelineId !== card.pipelineId) {
+    return { error: "Etapa não pertence ao pipeline do card" } as const;
+  }
+
+  const transicoes = await client.bpmEtapaTransicaoPermitida.findMany({
+    where: { etapaOrigemId: card.etapaId },
+    select: { etapaDestinoId: true },
+  });
+  if (
+    transicoes.length > 0
+    && !transicoes.some((transicao) => transicao.etapaDestinoId === etapaDestinoId)
+  ) {
+    return {
+      error: `Não é possível mover diretamente desta etapa para "${etapaDestino.nome}" — verifique as etapas permitidas.`,
+    } as const;
+  }
+  return { card, etapaDestino } as const;
+}
+
+async function carregarCamposTransicao(params: {
+  cardId: string;
+  pipelineId: string;
+  etapaOrigemId: string;
+  etapaOrigemNome: string;
+  etapaDestinoId: string;
+  etapaDestinoNome: string;
+}, client: Parameters<typeof carregarCamposAplicaveisCardEtapa>[3] = db) {
+  const [camposOrigemTodos, camposDestino] = await Promise.all([
+    etapaEhNovosLeads(params.etapaOrigemNome)
+      ? carregarCamposAplicaveisCardEtapa(
+          params.cardId,
+          params.pipelineId,
+          params.etapaOrigemId,
+          client,
+        )
+      : Promise.resolve([]),
+    carregarCamposAplicaveisCardEtapa(
+      params.cardId,
+      params.pipelineId,
+      params.etapaDestinoId,
+      client,
+    ),
+  ]);
+  const camposOrigem = camposOrigemTodos.filter((campo) => campo.obrigatorio);
+  const origemPorId = new Map(camposOrigem.map((campo) => [campo.id, campo]));
+  const destinoPorId = new Map(camposDestino.map((campo) => [campo.id, campo]));
+  const ids = new Set([...origemPorId.keys(), ...destinoPorId.keys()]);
+
+  return [...ids].map((id) => {
+    const origem = origemPorId.get(id);
+    const destino = destinoPorId.get(id);
+    const campo = destino ?? origem;
+    if (!campo) throw new Error("Campo da transição não encontrado");
+    const contexto = origem && destino
+      ? "AMBOS"
+      : origem
+        ? "ORIGEM"
+        : "DESTINO";
+    return {
+      ...campo,
+      obrigatorio: Boolean(origem?.obrigatorio || destino?.obrigatorio),
+      valor: destino?.valor ?? origem?.valor ?? null,
+      contexto,
+      etapaAplicacaoNome: contexto === "ORIGEM"
+        ? params.etapaOrigemNome
+        : contexto === "DESTINO"
+          ? params.etapaDestinoNome
+          : `${params.etapaOrigemNome} / ${params.etapaDestinoNome}`,
+    };
+  }).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome));
+}
+
+async function carregarGuardasNativasMovimento(params: {
+  cardId: string;
+  etapaOrigemNome: string;
+  etapaDestinoNome: string;
+  dataReuniao: Date | null;
+  transcricaoReuniao: string | null;
+  proximoContatoEm: Date | null;
+}, client: Pick<typeof db, "bpmChecklistFollowUp"> = db) {
+  const guardas = [
+    obterErroDataReuniaoParaMovimento({
+      etapaOrigemNome: params.etapaOrigemNome,
+      etapaDestinoNome: params.etapaDestinoNome,
+      dataReuniao: params.dataReuniao,
+    }),
+    obterErroTranscricaoParaMovimento({
+      etapaOrigemNome: params.etapaOrigemNome,
+      etapaDestinoNome: params.etapaDestinoNome,
+      transcricaoReuniao: params.transcricaoReuniao,
+    }),
+    obterErroProximoContatoParaEntrada({
+      etapaDestinoNome: params.etapaDestinoNome,
+      proximoContatoEm: params.proximoContatoEm,
+    }),
+  ].filter((erro): erro is string => Boolean(erro));
+
+  if (etapaEhEmTratativa(params.etapaOrigemNome)) {
+    const ultimoChecklist = await client.bpmChecklistFollowUp.findFirst({
+      where: { cardId: params.cardId },
+      select: { completo: true },
+      orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
+    });
+    const erroChecklist = obterErroChecklistParaSaidaEmTratativa({
+      etapaOrigemNome: params.etapaOrigemNome,
+      ultimoChecklist,
+    });
+    if (erroChecklist) guardas.push(erroChecklist);
+  }
+  return guardas;
+}
+
+export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+
+    const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
+    if ("error" in contexto) return { success: false, error: contexto.error };
+    const { card, etapaDestino } = contexto;
+    const campos = await carregarCamposTransicao({
+      cardId,
+      pipelineId: card.pipelineId,
+      etapaOrigemId: card.etapaId,
+      etapaOrigemNome: card.etapa.nome,
+      etapaDestinoId,
+      etapaDestinoNome: etapaDestino.nome,
+    });
+    const faltantes = campos
+      .filter((campo) => campo.obrigatorio && !campo.valor?.trim())
+      .map((campo) => ({
+        id: campo.id,
+        nome: campo.nome,
+        contexto: campo.contexto,
+        etapaAplicacaoNome: campo.etapaAplicacaoNome,
+      }));
+    const guardas = await carregarGuardasNativasMovimento({
+      cardId,
+      etapaOrigemNome: card.etapa.nome,
+      etapaDestinoNome: etapaDestino.nome,
+      dataReuniao: card.dataReuniao,
+      transcricaoReuniao: card.transcricaoReuniao,
+      proximoContatoEm: card.proximoContatoEm,
+    });
+
+    return {
+      success: true,
+      data: {
+        etapaDestino: { id: etapaDestino.id, nome: etapaDestino.nome },
+        campos,
+        faltantes,
+        guardas,
+        proximoContatoEm: card.proximoContatoEm,
+        podeMover: faltantes.length === 0 && guardas.length === 0,
+      },
+    };
+  } catch (error) {
+    console.error("[ObterRequisitosTransicaoBpm]", error);
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : "Erro ao buscar requisitos da transição";
+    return { success: false, error: msg };
+  }
+}
+
+async function executarMovimentoComRequisitos(
+  dados: DadosMovimentoComRequisitos,
+  userId: number,
+  userRole: string | null,
+) {
+  const { cardId, etapaDestinoId, camposValores, proximoContatoEm } = dados;
+  await exigirAcessoBpmCard(cardId, userId, userRole, "moverEtapa");
+  const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
+  if ("error" in contexto) return { success: false, error: contexto.error };
+  const { card, etapaDestino } = contexto;
+  if (card.etapaId === etapaDestinoId) return { success: true };
+
+  const camposTransicao = await carregarCamposTransicao({
+    cardId,
+    pipelineId: card.pipelineId,
+    etapaOrigemId: card.etapaId,
+    etapaOrigemNome: card.etapa.nome,
+    etapaDestinoId,
+    etapaDestinoNome: etapaDestino.nome,
+  });
+  const idsTransicao = new Set(camposTransicao.map((campo) => campo.id));
+  if (Object.keys(camposValores).some((campoId) => !idsTransicao.has(campoId))) {
+    return {
+      success: false,
+      error: "Um ou mais campos não pertencem aos requisitos desta transição.",
+    };
+  }
+  const validacaoCampos = validarValoresCamposBpm(camposTransicao, camposValores);
+  if (!validacaoCampos.success) return validacaoCampos;
+  const valoresValidados = validacaoCampos.valores;
+
+  const valoresEfetivos = new Map(
+    camposTransicao.map((campo) => [campo.id, valoresValidados[campo.id] ?? campo.valor]),
+  );
+  const faltantes = camposTransicao.filter(
+    (campo) => campo.obrigatorio && !valoresEfetivos.get(campo.id)?.trim(),
+  );
+  if (faltantes.length > 0) {
+    const faltantesOrigem = faltantes.filter(
+      (campo) => campo.contexto === "ORIGEM" || campo.contexto === "AMBOS",
+    );
+    return {
+      success: false,
+      error: faltantesOrigem.length > 0
+        ? `Não é possível sair de ${card.etapa.nome}: campos obrigatórios pendentes (${faltantes.map((campo) => campo.nome).join(", ")}).`
+        : `Não é possível avançar: campos obrigatórios pendentes (${faltantes.map((campo) => campo.nome).join(", ")})`,
+    };
+  }
+
+  const proximoContatoEfetivo = proximoContatoEm === undefined
+    ? card.proximoContatoEm
+    : proximoContatoEm;
+  const guardas = await carregarGuardasNativasMovimento({
+    cardId,
+    etapaOrigemNome: card.etapa.nome,
+    etapaDestinoNome: etapaDestino.nome,
+    dataReuniao: card.dataReuniao,
+    transcricaoReuniao: card.transcricaoReuniao,
+    proximoContatoEm: proximoContatoEfetivo,
+  });
+  if (guardas.length > 0) return { success: false, error: guardas[0] };
+
+  const resultadoMovimento = await db.$transaction(async (tx) => {
+    await exigirAcessoBpmCard(cardId, userId, userRole, "moverEtapa", tx);
+    const contextoAtual = await carregarContextoMovimento(cardId, etapaDestinoId, tx);
+    if ("error" in contextoAtual) {
+      throw new Error(`MOVIMENTO_INVALIDO:${contextoAtual.error}`);
+    }
+    const { card: cardAtual, etapaDestino: destinoAtual } = contextoAtual;
+    if (cardAtual.etapaId !== card.etapaId || cardAtual.status !== card.status) {
+      throw new Error("CONFLITO_MOVIMENTO_CARD");
+    }
+
+    const camposAtuais = await carregarCamposTransicao({
+      cardId,
+      pipelineId: cardAtual.pipelineId,
+      etapaOrigemId: cardAtual.etapaId,
+      etapaOrigemNome: cardAtual.etapa.nome,
+      etapaDestinoId,
+      etapaDestinoNome: destinoAtual.nome,
+    }, tx);
+    const idsAtuais = new Set(camposAtuais.map((campo) => campo.id));
+    if (Object.keys(camposValores).some((campoId) => !idsAtuais.has(campoId))) {
+      throw new Error("MOVIMENTO_INVALIDO:Um ou mais campos não pertencem aos requisitos desta transição.");
+    }
+    const validacaoAtual = validarValoresCamposBpm(camposAtuais, camposValores);
+    if (!validacaoAtual.success) {
+      throw new Error(`MOVIMENTO_INVALIDO:${validacaoAtual.error}`);
+    }
+    const valoresEfetivosAtuais = new Map(
+      camposAtuais.map((campo) => [
+        campo.id,
+        validacaoAtual.valores[campo.id] ?? campo.valor,
+      ]),
+    );
+    const faltantesAtuais = camposAtuais.filter(
+      (campo) => campo.obrigatorio && !valoresEfetivosAtuais.get(campo.id)?.trim(),
+    );
+    if (faltantesAtuais.length > 0) {
+      throw new Error(
+        `MOVIMENTO_INVALIDO:Campos obrigatórios pendentes (${faltantesAtuais.map((campo) => campo.nome).join(", ")}).`,
+      );
+    }
+    const proximoContatoAtual = proximoContatoEm === undefined
+      ? cardAtual.proximoContatoEm
+      : proximoContatoEm;
+    const guardasAtuais = await carregarGuardasNativasMovimento({
+      cardId,
+      etapaOrigemNome: cardAtual.etapa.nome,
+      etapaDestinoNome: destinoAtual.nome,
+      dataReuniao: cardAtual.dataReuniao,
+      transcricaoReuniao: cardAtual.transcricaoReuniao,
+      proximoContatoEm: proximoContatoAtual,
+    }, tx);
+    if (guardasAtuais.length > 0) {
+      throw new Error(`MOVIMENTO_INVALIDO:${guardasAtuais[0]}`);
+    }
+
+    for (const [campoId, valor] of Object.entries(validacaoAtual.valores)) {
+      await tx.bpmCardCampoValor.upsert({
+        where: { cardId_campoId: { cardId, campoId } },
+        create: { cardId, campoId, valor },
+        update: { valor },
+      });
+    }
+    const movimento = await tx.bpmCard.updateMany({
+      where: { id: cardId, etapaId: cardAtual.etapaId, status: cardAtual.status },
+      data: {
+        etapaId: etapaDestinoId,
+        ...(proximoContatoEm !== undefined ? { proximoContatoEm } : {}),
+      },
+    });
+    if (movimento.count !== 1) {
+      throw new Error("CONFLITO_MOVIMENTO_CARD");
+    }
+    await tx.bpmCardHistorico.create({
+      data: {
+        cardId,
+        acao: "CARD_MOVIDO",
+        usuarioId: userId,
+        valorAnteriorJson: JSON.stringify({ etapaId: cardAtual.etapaId }),
+        valorNovoJson: JSON.stringify({
+          etapaId: etapaDestinoId,
+          camposPreenchidos: Object.keys(validacaoAtual.valores),
+          ...(proximoContatoEm !== undefined ? { proximoContatoEm } : {}),
+        }),
+      },
+    });
+    return { pipelineId: cardAtual.pipelineId };
+  });
+
+  await executarAutomacaoFechamentoComercial(cardId, userId);
+  await notificarPipelineBpm({ pipelineId: resultadoMovimento.pipelineId, cardId, tipo: "CARD_MOVIDO" });
+  revalidatePath(`${ROTA_BASE}/pipeline/${resultadoMovimento.pipelineId}`);
+  revalidatePath(ROTA_BASE);
+  revalidatePath(`${ROTA_BASE}/tarefas`);
+  return { success: true };
+}
+
+export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const parsed = salvarRequisitosEMoverCardSchema.safeParse(dados);
+    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    return await executarMovimentoComRequisitos(
+      parsed.data,
+      Number(session.user.id),
+      session.user.role ?? null,
+    );
+  } catch (error) {
+    console.error("[SalvarRequisitosEMoverCardBpm]", error);
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : error instanceof Error && error.message === "CONFLITO_MOVIMENTO_CARD"
+        ? "O card mudou enquanto você preenchia os requisitos. Recarregue e tente novamente."
+        : error instanceof Error && error.message.startsWith("MOVIMENTO_INVALIDO:")
+          ? error.message.slice("MOVIMENTO_INVALIDO:".length)
+        : "Erro ao salvar requisitos e mover card";
     return { success: false, error: msg };
   }
 }
@@ -415,111 +945,22 @@ export async function MoverCardBpm(dados: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
-    const userId = Number(session.user.id);
-
     const parsed = moverCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, etapaDestinoId } = parsed.data;
-
-    // D-042: apenas o responsável do card ou um administrador pode movê-lo de etapa.
-    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "moverEtapa");
-
-    const card = await db.bpmCard.findUnique({
-      where: { id: cardId },
-      include: { etapa: { select: { nome: true } } },
-    });
-    if (!card) return { success: false, error: "Card não encontrado" };
-
-    const etapaDestino = await db.bpmEtapa.findUnique({ where: { id: etapaDestinoId } });
-    if (!etapaDestino || etapaDestino.pipelineId !== card.pipelineId) {
-      return { success: false, error: "Etapa não pertence ao pipeline do card" };
-    }
-
-    if (card.etapaId === etapaDestinoId) return { success: true };
-
-    if (etapaEhNovosLeads(card.etapa.nome)) {
-      const faltantesOrigem = await carregarCamposFaltantesCardEtapa(
-        cardId,
-        card.pipelineId,
-        card.etapaId,
-      );
-      if (faltantesOrigem.length > 0) {
-        return {
-          success: false,
-          error: `Não é possível sair de Novos leads: campos obrigatórios pendentes (${faltantesOrigem.map((campo) => campo.nome).join(", ")}).`,
-        };
-      }
-    }
-
-    // Máquina de estado do pipeline "Revisão de Radar" (plano-novos-leads-bpm.md): se a etapa de
-    // ORIGEM tem QUALQUER transição cadastrada, só os destinos explicitamente permitidos valem.
-    // Etapa sem nenhuma linha cadastrada continua permitindo qualquer destino (fallback preserva
-    // o comportamento livre dos pipelines "Financeiro"/"Radar", que nunca pediram essa restrição).
-    const transicoesDaOrigem = await db.bpmEtapaTransicaoPermitida.findMany({
-      where: { etapaOrigemId: card.etapaId },
-      select: { etapaDestinoId: true },
-    });
-    if (transicoesDaOrigem.length > 0) {
-      const destinosPermitidos = new Set(transicoesDaOrigem.map((t) => t.etapaDestinoId));
-      if (!destinosPermitidos.has(etapaDestinoId)) {
-        return {
-          success: false,
-          error: `Não é possível mover diretamente desta etapa para "${etapaDestino.nome}" — verifique as etapas permitidas.`,
-        };
-      }
-    }
-
-    // Campos obrigatórios: (a) BpmCampo cadastrado DIRETO na etapa destino (mecanismo original);
-    // (b) BpmCampo de nível pipeline (etapaId: null) marcado como obrigatório NESTA etapa via
-    // BpmCampoObrigatorioEtapa — permite reaproveitar o mesmo campo (ex: "Valor acordado no
-    // contrato") como obrigatório em várias etapas sem duplicá-lo.
-    const faltantesDestino = await carregarCamposFaltantesCardEtapa(
-      cardId,
-      card.pipelineId,
-      etapaDestinoId,
+    return await executarMovimentoComRequisitos(
+      { ...parsed.data, camposValores: {} },
+      Number(session.user.id),
+      session.user.role ?? null,
     );
-    if (faltantesDestino.length > 0) {
-      return {
-        success: false,
-        error: `Não é possível avançar: campos obrigatórios pendentes (${faltantesDestino.map((campo) => campo.nome).join(", ")})`,
-      };
-    }
-
-    // Validação de ENTRADA (diferente de "obrigatório para mover"): Em Tratativa/Sem Viabilidade
-    // exigem BpmCard.proximoContatoEm preenchido para o card poder ENTRAR na etapa — é coluna
-    // nativa do BpmCard, não um BpmCampo, então precisa de checagem própria (ver plano, Coluna 4/7).
-    const ETAPAS_EXIGEM_PROXIMO_CONTATO = ["Em tratativa", "Sem viabilidade"];
-    if (ETAPAS_EXIGEM_PROXIMO_CONTATO.includes(etapaDestino.nome) && !card.proximoContatoEm) {
-      return {
-        success: false,
-        error: `Não é possível avançar para "${etapaDestino.nome}": o campo "Próximo Contato" precisa estar preenchido.`,
-      };
-    }
-
-    await db.$transaction(async (tx) => {
-      await tx.bpmCard.update({ where: { id: cardId }, data: { etapaId: etapaDestinoId } });
-      await tx.bpmCardHistorico.create({
-        data: {
-          cardId,
-          acao: "CARD_MOVIDO",
-          usuarioId: userId,
-          valorAnteriorJson: JSON.stringify({ etapaId: card.etapaId }),
-          valorNovoJson: JSON.stringify({ etapaId: etapaDestinoId }),
-        },
-      });
-    });
-
-    // D-009/D-034: automação em código, disparada após o card mudar de etapa.
-    await executarAutomacaoFechamentoComercial(cardId, userId);
-    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId, tipo: "CARD_MOVIDO" });
-
-    revalidatePath(`${ROTA_BASE}/pipeline/${card.pipelineId}`);
-    revalidatePath(ROTA_BASE);
-    revalidatePath(`${ROTA_BASE}/tarefas`);
-    return { success: true };
   } catch (error) {
     console.error("[MoverCardBpm]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao mover card";
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : error instanceof Error && error.message === "CONFLITO_MOVIMENTO_CARD"
+        ? "O card mudou enquanto era movido. Recarregue e tente novamente."
+        : error instanceof Error && error.message.startsWith("MOVIMENTO_INVALIDO:")
+          ? error.message.slice("MOVIMENTO_INVALIDO:".length)
+        : "Erro ao mover card";
     return { success: false, error: msg };
   }
 }
