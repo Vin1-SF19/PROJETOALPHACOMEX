@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Pin, Star, Paperclip, MessageSquare, FileText, CheckSquare2, Square } from "lucide-react";
+import { Pin, Star, Paperclip, MessageSquare, FileText, CheckSquare2, Square, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarraAcoesLixeira } from "./BarraAcoesLixeira";
@@ -40,6 +40,8 @@ interface ListaNotasProps {
   onToggleSelecionada: (noteId: string) => void;
   onExcluirSelecionadas: () => void;
   onEsvaziarLixeira: () => void;
+  isEquipe: boolean;
+  onAbrirEquipes: () => void;
 }
 
 function formatarData(data: Date | string): string {
@@ -78,6 +80,8 @@ export function ListaNotas({
   onToggleSelecionada,
   onExcluirSelecionadas,
   onEsvaziarLixeira,
+  isEquipe,
+  onAbrirEquipes,
 }: ListaNotasProps) {
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
@@ -92,6 +96,25 @@ export function ListaNotas({
           onExcluirSelecionadas={onExcluirSelecionadas}
           onEsvaziarLixeira={onEsvaziarLixeira}
         />
+      )}
+
+      {isEquipe && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-white/5 bg-cyan-400/[0.035] px-3 py-3 sm:px-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/10 text-cyan-300">
+            <Users size={17} aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-slate-200">Equipes de notas</p>
+            <p className="truncate text-[11px] text-slate-500">Crie equipes, gerencie membros e funções.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onAbrirEquipes}
+            className="shrink-0 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[11px] font-bold text-cyan-200 transition hover:border-cyan-300/40 hover:bg-cyan-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          >
+            Gerenciar equipes
+          </button>
+        </div>
       )}
 
       <div className="flex-1 overflow-y-auto p-3" data-guia-notas="lista-cards">

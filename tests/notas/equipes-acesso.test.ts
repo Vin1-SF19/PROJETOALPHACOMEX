@@ -33,4 +33,24 @@ describe("Equipes privadas de notas — integração de acesso", () => {
     expect(actions).toContain("Somente o criador pode alterar funções");
     expect(actions).toContain("Somente o criador pode excluir a equipe");
   });
+
+  it("exibe o gerenciador somente dentro da visualização Notas de equipe", () => {
+    const header = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/CentralNotasHeader.tsx"),
+      "utf8",
+    );
+    const lista = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/ListaNotas.tsx"),
+      "utf8",
+    );
+    const central = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/CentralDeNotas.tsx"),
+      "utf8",
+    );
+
+    expect(header).not.toContain("Gerenciar equipes");
+    expect(lista).toContain("{isEquipe && (");
+    expect(lista).toContain("Gerenciar equipes");
+    expect(central).toContain('isEquipe={secaoAtiva === "EQUIPE"}');
+  });
 });

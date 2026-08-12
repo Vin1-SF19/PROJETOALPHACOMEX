@@ -242,6 +242,7 @@ O usuário autorizou inequivocamente a execução da feature e da migration deli
 |---|---:|---|---|
 | 2026-08-12 | 1.0 | Story criada a partir do pedido, blueprint anterior e reconhecimento Scout; modelagem corrigida para shares relacionais | River (SM) |
 | 2026-08-12 | 2.0 | Feature implementada, migration aplicada e validada, UI integrada e quality gates executados | Dex (Dev) |
+| 2026-08-12 | 2.1 | Acesso ao gerenciador movido do cabeçalho para a visualização contextual Notas de equipe | Dex (Dev) |
 
 ## Dev Agent Record
 
@@ -265,6 +266,7 @@ Codex GPT-5.
 - Compartilhamento por equipe usa FKs reais e preserva o legado usuário/setor.
 - Maior papel efetivo é calculado deterministicamente entre todos os caminhos.
 - Teste visual interno ficou limitado pela ausência de sessão autenticada no navegador isolado.
+- O botão de gerenciamento é exibido somente dentro da seção `Notas de equipe`.
 
 ### File List
 
@@ -282,6 +284,7 @@ Codex GPT-5.
 - `src/components/Notas/Colaboracao/NoteShareDialog.tsx`
 - `src/components/Notas/Central/CentralDeNotas.tsx`
 - `src/components/Notas/Central/CentralNotasHeader.tsx`
+- `src/components/Notas/Central/ListaNotas.tsx`
 - `tests/notas/equipes.test.ts` (novo)
 - `tests/notas/equipes-acesso.test.ts` (novo)
 - `tests/notas/acesso-e-lixeira.test.ts`

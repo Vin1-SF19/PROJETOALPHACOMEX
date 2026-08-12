@@ -363,7 +363,6 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         onCriarNota={() => void criarNota()}
         onAbrirTutorial={() => setTutorialAberto(true)}
         onAbrirFiltros={() => setFiltrosAbertos(true)}
-        onAbrirEquipes={() => setEquipesAbertas(true)}
       />
 
       <div className="relative z-10 mx-3 mb-3 mt-3 flex min-h-0 flex-1 gap-4 md:mx-6 md:mb-6 md:mt-4">
@@ -411,6 +410,8 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
                 onToggleSelecionada={lixeira.toggleSelecionada}
                 onExcluirSelecionadas={() => void lixeira.excluirSelecionadas()}
                 onEsvaziarLixeira={() => void lixeira.esvaziar()}
+                isEquipe={secaoAtiva === "EQUIPE"}
+                onAbrirEquipes={() => setEquipesAbertas(true)}
               />
             </div>
           </NotasCard3D>
