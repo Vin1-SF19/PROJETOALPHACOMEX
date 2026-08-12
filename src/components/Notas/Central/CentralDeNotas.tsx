@@ -504,9 +504,9 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         {/* Propriedades: coluna fixa só no desktop — no mobile/tablet vira bottom sheet,
             acionada pelo botão "Ações" dentro do próprio NoteEditor. */}
         {notaSelecionada && (
-          <div className="hidden lg:block">
-            <NotasCard3D delay={0.15}>
-              <div className="h-full overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
+          <div className="hidden h-full min-h-0 lg:block">
+            <NotasCard3D delay={0.15} className="h-full min-h-0">
+              <div className="h-full min-h-0 overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
                 <PainelPropriedades
                   nota={notaSelecionada}
                   usuarioAtualId={usuarioAtualId}

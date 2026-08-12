@@ -246,6 +246,7 @@ O usuário autorizou inequivocamente a execução da feature e da migration deli
 | 2026-08-12 | 2.2 | Equipes exibidas como cards-pasta animados na seção Notas de equipe | Dex (Dev) |
 | 2026-08-12 | 2.3 | Clique da pasta corrigido para abrir notas filtradas; engrenagem isolada para configurações | Dex (Dev) |
 | 2026-08-12 | 2.4 | Raiz de Notas de equipe isolada para exibir somente pastas | Dex (Dev) |
+| 2026-08-12 | 2.5 | Painel lateral de ações limitado à viewport com scroll interno sutil | Dex (Dev) |
 
 ## Dev Agent Record
 
@@ -273,6 +274,7 @@ Codex GPT-5.
 - Equipes aparecem como pastas responsivas com membros e quantidade de notas.
 - Clique principal abre as notas da equipe; somente a engrenagem abre o gerenciamento, com navegação de retorno às pastas.
 - Cards de notas não são consultados nem renderizados na raiz da seção; aparecem somente dentro de uma pasta aberta.
+- Painel de ações usa altura flexível, rolagem interna e scrollbar discreto para não cortar conteúdo em telas menores.
 
 ### File List
 
@@ -294,6 +296,7 @@ Codex GPT-5.
 - `src/components/Notas/Central/NoteTeamFolderGrid.tsx` (novo)
 - `tests/notas/equipes.test.ts` (novo)
 - `tests/notas/equipes-acesso.test.ts` (novo)
+- `tests/notas/painel-propriedades-responsivo.test.ts` (novo)
 - `tests/notas/acesso-e-lixeira.test.ts`
 - `.bibble/memory/architecture.md`
 - `.bibble/memory/codebase-map.md`

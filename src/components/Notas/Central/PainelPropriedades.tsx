@@ -116,7 +116,10 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
   }
 
   return (
-    <div className="flex h-full w-64 shrink-0 flex-col gap-4 overflow-y-auto p-4">
+    <aside
+      aria-label="Ações e propriedades da nota"
+      className="custom-scrollbar flex h-full min-h-0 w-64 shrink-0 flex-col gap-4 overflow-y-auto overscroll-contain p-4 pr-3 [scrollbar-gutter:stable]"
+    >
       <div data-guia-notas="propriedades-acoes">
         <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-600">Ações</p>
         <Dock orientation="vertical" magnification={40} distance={70} className="gap-0.5">
@@ -300,6 +303,6 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
         <p>Criada em: {new Date(nota.createdAt).toLocaleDateString("pt-BR")}</p>
         <p>Atualizada em: {new Date(nota.updatedAt).toLocaleDateString("pt-BR")}</p>
       </div>
-    </div>
+    </aside>
   );
 }
