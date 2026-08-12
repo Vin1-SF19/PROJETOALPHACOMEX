@@ -5,6 +5,7 @@ import { auth } from "../../../auth";
 import { criarTarefaSchema, concluirTarefaSchema, criarTarefaPresetSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard, isAdminRole } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "./Cards";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -39,6 +40,7 @@ export async function CriarTarefaBpm(dados: unknown) {
     revalidatePath(`${ROTA_BASE}/pipeline`);
     revalidatePath(ROTA_BASE);
     revalidatePath(`${ROTA_BASE}/tarefas`);
+    await notificarPipelineBpm({ cardId, tipo: "TAREFA_ALTERADA" });
     return { success: true, data: tarefa };
   } catch (error) {
     console.error("[CriarTarefaBpm]", error);
@@ -96,6 +98,7 @@ export async function AplicarPresetTarefaBpm(dados: { cardId: string; presetId: 
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    await notificarPipelineBpm({ cardId: dados.cardId, tipo: "TAREFA_ALTERADA" });
     return { success: true, data: tarefas };
   } catch (error) {
     console.error("[AplicarPresetTarefaBpm]", error);
@@ -138,6 +141,7 @@ export async function ConcluirTarefaBpm(dados: unknown) {
     revalidatePath(`${ROTA_BASE}/pipeline`);
     revalidatePath(ROTA_BASE);
     revalidatePath(`${ROTA_BASE}/tarefas`);
+    await notificarPipelineBpm({ cardId: tarefa.cardId, tipo: "TAREFA_ALTERADA" });
     return { success: true };
   } catch (error) {
     console.error("[ConcluirTarefaBpm]", error);

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { criarCampoSchema, atualizarCampoSchema } from "@/lib/validations/bpm";
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -43,6 +44,7 @@ export async function CriarCampoBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
+    await notificarPipelineBpm({ pipelineId, tipo: "CAMPO_ALTERADO" });
     return { success: true, data: campo };
   } catch (error) {
     console.error("[CriarCampoBpm]", error);
@@ -84,6 +86,7 @@ export async function AtualizarCampoBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${campoAnterior.pipelineId}`);
+    await notificarPipelineBpm({ pipelineId: campoAnterior.pipelineId, tipo: "CAMPO_ALTERADO" });
     return { success: true, data: campo };
   } catch (error) {
     console.error("[AtualizarCampoBpm]", error);

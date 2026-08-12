@@ -9,3 +9,5 @@ Texto rico agora permite estilizar intervalos e usa 15 fontes compartilhadas com
 2026-08-10 — Correção definitiva das fontes do Alpha Motion: o catálogo remoto foi substituído por 32 WOFF2 locais (15 famílias, subconjunto latino, pesos usados pelo editor), servidos com HTTP 200 pelo Next.
 O HTML exportado agora incorpora as fontes em base64 e funciona sem rede; 285/285 testes do módulo, lint direcionado, build do player e build Next aprovados.
 2026-08-10 — Corrigido erro do Turbopack ao resolver a folha recém-gerada: CSS movido para `src/app`, imports sincronizados e `next dev` reiniciado de forma seletiva. Build Next e runtime da rota de Apresentações voltaram a responder normalmente.
+2026-08-12 — Alpha CRM passou a sincronizar criação, edição, movimentação e atividades de cards em tempo real por canal Pusher privado de pipeline, com payload mínimo de invalidação e reconciliação deduplicada do board/modal.
+Sem migration. Teste realtime 4/4 e ESLint direcionado aprovados; typecheck não apresentou erro novo no CRM e manteve 4 falhas de baseline fora do módulo.

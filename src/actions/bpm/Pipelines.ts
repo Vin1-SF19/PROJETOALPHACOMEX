@@ -7,6 +7,7 @@ import {
   atualizarPipelineSchema,
 } from "@/lib/validations/bpm";
 import { exigirAcessoConfigPipeline, isAdminRole } from "@/lib/bpm/ownership";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -96,6 +97,7 @@ export async function CriarPipelineBpm(dados: unknown) {
 
     revalidatePath(ROTA_BASE);
     revalidatePath(`${ROTA_BASE}/admin`);
+    await notificarPipelineBpm({ pipelineId: pipeline.id, tipo: "PIPELINE_ALTERADO" });
     return { success: true, data: pipeline };
   } catch (error) {
     console.error("[CriarPipelineBpm]", error);
@@ -132,6 +134,7 @@ export async function AtualizarPipelineBpm(dados: unknown) {
     });
 
     revalidatePath(ROTA_BASE);
+    await notificarPipelineBpm({ pipelineId, tipo: "PIPELINE_ALTERADO" });
     return { success: true, data: pipeline };
   } catch (error) {
     console.error("[AtualizarPipelineBpm]", error);

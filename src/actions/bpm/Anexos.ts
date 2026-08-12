@@ -5,6 +5,7 @@ import { auth } from "../../../auth";
 import { registrarAnexoSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "./Cards";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -37,6 +38,7 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    await notificarPipelineBpm({ cardId, tipo: "ANEXO_ALTERADO" });
     return { success: true, data: anexo };
   } catch (error) {
     console.error("[RegistrarAnexoBpm]", error);
@@ -70,6 +72,7 @@ export async function ExcluirAnexoBpm(anexoId: string) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    await notificarPipelineBpm({ cardId: anexo.cardId, tipo: "ANEXO_ALTERADO" });
     return { success: true };
   } catch (error) {
     console.error("[ExcluirAnexoBpm]", error);

@@ -2,7 +2,8 @@ import db from "@/lib/prisma";
 import { isAdminRole, isSameRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import { MODULOS_REGISTRY } from "@/lib/modulos-registry";
-import type { RolePermissaoNota } from "@/lib/validations/notas";
+import { ROLE_PERMISSAO_NOTA, type RolePermissaoNota } from "@/lib/validations/notas";
+import { maiorPapelNota } from "@/lib/notas/equipes";
 
 interface UsuarioContexto {
   id: number;
@@ -27,7 +28,14 @@ interface NotaComRelacoes {
   createdById: number;
   deletedAt: Date | null;
   permissions: { subjectType: string; subjectId: string; role: string }[];
+  teamShares: {
+    team: { ownerId: number; members: { userId: number; role: string }[] };
+  }[];
   contexts: { moduleKey: string }[];
+}
+
+function papelValido(papel: string): papel is RolePermissaoNota {
+  return ROLE_PERMISSAO_NOTA.includes(papel as RolePermissaoNota);
 }
 
 /**
@@ -40,19 +48,28 @@ async function resolverPapelEfetivo(
 ): Promise<RolePermissaoNota | "OWNER" | null> {
   if (nota.ownerId === usuario.id) return "OWNER";
 
+  const papeis: RolePermissaoNota[] = [];
   for (const permissao of nota.permissions) {
-    if (permissao.subjectType === "USUARIO" && permissao.subjectId === String(usuario.id)) {
-      return permissao.role as RolePermissaoNota;
+    if (!papelValido(permissao.role)) continue;
+    const correspondeAoUsuario =
+      permissao.subjectType === "USUARIO" && permissao.subjectId === String(usuario.id);
+    const correspondeAoSetor =
+      (permissao.subjectType === "SETOR" || permissao.subjectType === "ROLE") &&
+      isSameRole(permissao.subjectId, usuario.role);
+    if (correspondeAoUsuario || correspondeAoSetor) papeis.push(permissao.role);
+  }
+
+  for (const compartilhamento of nota.teamShares) {
+    if (compartilhamento.team.ownerId === usuario.id) {
+      papeis.push("ADMIN");
+      continue;
     }
-    if (permissao.subjectType === "SETOR" && isSameRole(permissao.subjectId, usuario.role)) {
-      return permissao.role as RolePermissaoNota;
-    }
-    if (permissao.subjectType === "ROLE" && isSameRole(permissao.subjectId, usuario.role)) {
-      return permissao.role as RolePermissaoNota;
+    for (const membro of compartilhamento.team.members) {
+      if (membro.userId === usuario.id && papelValido(membro.role)) papeis.push(membro.role);
     }
   }
 
-  return null;
+  return maiorPapelNota(papeis);
 }
 
 /**
@@ -77,7 +94,7 @@ async function respeitaPermissaoDeContexto(
   });
 }
 
-async function carregarNotaComRelacoes(noteId: string): Promise<NotaComRelacoes | null> {
+async function carregarNotaComRelacoes(noteId: string, usuarioId: number): Promise<NotaComRelacoes | null> {
   return db.note.findUnique({
     where: { id: noteId },
     select: {
@@ -85,6 +102,19 @@ async function carregarNotaComRelacoes(noteId: string): Promise<NotaComRelacoes 
       createdById: true,
       deletedAt: true,
       permissions: { select: { subjectType: true, subjectId: true, role: true } },
+      teamShares: {
+        select: {
+          team: {
+            select: {
+              ownerId: true,
+              members: {
+                where: { userId: usuarioId },
+                select: { userId: true, role: true },
+              },
+            },
+          },
+        },
+      },
       contexts: { select: { moduleKey: true } },
     },
   });
@@ -95,7 +125,7 @@ async function checarAcesso(
   noteId: string,
   papeisAceitos: (RolePermissaoNota | "OWNER" | "ADMIN")[],
 ): Promise<boolean> {
-  const nota = await carregarNotaComRelacoes(noteId);
+  const nota = await carregarNotaComRelacoes(noteId, usuario.id);
   if (!nota) return false;
 
   const papel = await resolverPapelEfetivo(usuario, nota);
@@ -144,7 +174,7 @@ export async function podeExcluirDefinitivamenteNota(
   usuario: UsuarioContexto,
   noteId: string,
 ): Promise<boolean> {
-  const nota = await carregarNotaComRelacoes(noteId);
+  const nota = await carregarNotaComRelacoes(noteId, usuario.id);
   if (!nota) return false;
   return nota.ownerId === usuario.id;
 }

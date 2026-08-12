@@ -1352,3 +1352,18 @@ Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove a
 **Testes de contrato:** `tests/bibble/attachment-readiness.test.ts`, `attachment-security.test.ts`, `context-budget.test.ts`, `completion-budget-stream.test.ts`, `client-stream-protocol.test.ts`, `pdf-extraction-chain.test.ts`.
 
 **Última atualização:** 2026-08-11 por Scribe
+## Equipes privadas no Bloco de Notas (2026-08-12)
+
+- Entrada: botão `Equipes` em `CentralNotasHeader` e ação `Gerenciar` em `NoteShareDialog`.
+- Acesso: `criarFiltroAcessoNota`, `resolverPapelEfetivo` e seções `COMPARTILHADAS_COMIGO`/`EQUIPE` usam `NoteTeamShare`.
+- Compatibilidade: `NotePermission` permanece limitado a `USUARIO | SETOR | ROLE`.
+- Banco: tabelas `NoteTeam`, `NoteTeamMember`, `NoteTeamShare` aplicadas ao Turso após gate Vault.
+### Alpha CRM — invalidação em tempo real por pipeline
+
+**Arquivos:** `src/lib/bpm/realtime.ts`, `src/lib/bpm/realtime-server.ts`, `src/app/api/pusher/auth/route.ts`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
+**Propósito:** sincroniza criação, edição, movimentação e atividades dos cards entre usuários/abas sem refresh manual.
+**Editado quando:** uma nova Server Action passar a alterar dados visíveis no board ou no modal do Alpha CRM.
+
+**Como integrar:** após a persistência bem-sucedida, chamar `notificarPipelineBpm` com o tipo adequado. O cliente trata o evento `alpha-crm-atualizado` como sinal de invalidação e relê os dados autenticados; nunca enviar dados do lead no payload Pusher.
+
+**Última atualização:** 2026-08-12 por Codex/Bibble.

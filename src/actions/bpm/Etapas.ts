@@ -8,6 +8,7 @@ import {
   reordenarEtapasSchema,
 } from "@/lib/validations/bpm";
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -45,6 +46,7 @@ export async function CriarEtapaBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
+    await notificarPipelineBpm({ pipelineId, tipo: "ETAPA_ALTERADA" });
     return { success: true, data: etapa };
   } catch (error) {
     console.error("[CriarEtapaBpm]", error);
@@ -81,6 +83,7 @@ export async function AtualizarEtapaBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${etapaAnterior.pipelineId}`);
+    await notificarPipelineBpm({ pipelineId: etapaAnterior.pipelineId, tipo: "ETAPA_ALTERADA" });
     return { success: true, data: etapa };
   } catch (error) {
     console.error("[AtualizarEtapaBpm]", error);
@@ -108,6 +111,7 @@ export async function ReordenarEtapasBpm(dados: unknown) {
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
     revalidatePath(`${ROTA_BASE}/pipeline/${pipelineId}`);
+    await notificarPipelineBpm({ pipelineId, tipo: "ETAPA_ALTERADA" });
     return { success: true };
   } catch (error) {
     console.error("[ReordenarEtapasBpm]", error);

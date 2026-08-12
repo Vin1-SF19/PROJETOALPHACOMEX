@@ -36,6 +36,15 @@ export async function criarFiltroAcessoNota(usuario: UsuarioAcessoNota): Promise
     OR: [
       { ownerId: usuario.id },
       { permissions: { some: { subjectType: "USUARIO", subjectId: String(usuario.id) } } },
+      {
+        teamShares: {
+          some: {
+            team: {
+              OR: [{ ownerId: usuario.id }, { members: { some: { userId: usuario.id } } }],
+            },
+          },
+        },
+      },
       ...(setoresEquivalentes.length > 0
         ? [
             { permissions: { some: { subjectType: "SETOR" as const, subjectId: { in: setoresEquivalentes } } } },
@@ -43,6 +52,19 @@ export async function criarFiltroAcessoNota(usuario: UsuarioAcessoNota): Promise
           ]
         : []),
     ],
+  };
+}
+
+/** Notas compartilhadas com qualquer equipe privada da qual o usuário seja dono ou membro. */
+export function criarCondicaoAcessoPorEquipe(usuarioId: number): Prisma.NoteWhereInput {
+  return {
+    teamShares: {
+      some: {
+        team: {
+          OR: [{ ownerId: usuarioId }, { members: { some: { userId: usuarioId } } }],
+        },
+      },
+    },
   };
 }
 

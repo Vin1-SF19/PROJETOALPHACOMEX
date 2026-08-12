@@ -28,7 +28,7 @@ model usuarios {
   bibble_ativo     Boolean @default(true)
 
   // Onboarding: vídeo obrigatório de introdução ao IAlpha (some após marcar visto)
-  onboarding_ialpha_visto Boolean @default(false)
+  onboarding_ialpha_visto    Boolean @default(false)
   // Onboarding: tour guiado do módulo Alpha Blueprint (some após marcar visto, botão "? Ajuda" reabre)
   onboarding_blueprint_visto Boolean @default(false)
 
@@ -102,37 +102,40 @@ model usuarios {
 
   googleCalendarConexao GoogleCalendarConexao?
 
-  colegasQueEuVejo GoogleCalendarColegaVisivel[] @relation("ColegaViewer")
-  colegasQueMeVeem GoogleCalendarColegaVisivel[] @relation("ColegaDono")
+  colegasQueEuVejo           GoogleCalendarColegaVisivel[]   @relation("ColegaViewer")
+  colegasQueMeVeem           GoogleCalendarColegaVisivel[]   @relation("ColegaDono")
   permissaoColegasCalendario GoogleCalendarPermissaoColegas? @relation("PermissaoColegasCalendario")
 
   confirmacoesLeituraDocumento ConfirmacaoLeituraDocumento[]
 
-  blueprintProjetosSolicitados BlueprintProject[] @relation("BlueprintRequester")
-  blueprintProjetosPropriedade BlueprintProject[] @relation("BlueprintOwner")
+  blueprintProjetosSolicitados     BlueprintProject[] @relation("BlueprintRequester")
+  blueprintProjetosPropriedade     BlueprintProject[] @relation("BlueprintOwner")
   blueprintProjetosDesenvolvimento BlueprintProject[] @relation("BlueprintDeveloper")
-  blueprintProjetosCriados BlueprintProject[] @relation("BlueprintCreatedBy")
-  blueprintMembros BlueprintMember[]
+  blueprintProjetosCriados         BlueprintProject[] @relation("BlueprintCreatedBy")
+  blueprintMembros                 BlueprintMember[]
 
-  notasPropriedade      Note[]              @relation("NoteOwner")
-  notasCriadas          Note[]              @relation("NoteCreatedBy")
-  notasAtualizadas      Note[]              @relation("NoteUpdatedBy")
-  notaPermissoesCriadas NotePermission[]    @relation("NotePermissionCreatedBy")
-  notaTagsProprias      Tag[]               @relation("TagOwner")
-  notaVersoesAlteradas  NoteVersion[]       @relation("NoteVersionChangedBy")
-  notaComentarios       NoteComment[]       @relation("NoteCommentAuthor")
-  notaAnexosEnviados    NoteAttachment[]    @relation("NoteAttachmentUploadedBy")
-  notaLembretes         NoteReminder[]      @relation("NoteReminderUser")
-  notaAbasAbertas       UserOpenNoteTab[]   @relation("UserOpenNoteTabUser")
-  notaWorkspace         UserNotesWorkspace? @relation("UserNotesWorkspaceUser")
+  notasPropriedade        Note[]              @relation("NoteOwner")
+  notasCriadas            Note[]              @relation("NoteCreatedBy")
+  notasAtualizadas        Note[]              @relation("NoteUpdatedBy")
+  notaPermissoesCriadas   NotePermission[]    @relation("NotePermissionCreatedBy")
+  notaEquipesPropriedade  NoteTeam[]          @relation("NoteTeamOwner")
+  notaEquipesMembro       NoteTeamMember[]    @relation("NoteTeamMemberUser")
+  notaEquipeSharesCriados NoteTeamShare[]     @relation("NoteTeamShareCreatedBy")
+  notaTagsProprias        Tag[]               @relation("TagOwner")
+  notaVersoesAlteradas    NoteVersion[]       @relation("NoteVersionChangedBy")
+  notaComentarios         NoteComment[]       @relation("NoteCommentAuthor")
+  notaAnexosEnviados      NoteAttachment[]    @relation("NoteAttachmentUploadedBy")
+  notaLembretes           NoteReminder[]      @relation("NoteReminderUser")
+  notaAbasAbertas         UserOpenNoteTab[]   @relation("UserOpenNoteTabUser")
+  notaWorkspace           UserNotesWorkspace? @relation("UserNotesWorkspaceUser")
 
-  bpmCardsResponsavel BpmCard[] @relation("BpmCardResponsavel")
-  bpmCardMembros      BpmCardMembro[]
-  bpmTarefas          BpmTarefa[]
-  bpmCardHistorico    BpmCardHistorico[]
-  bpmPipelineConfigAuditoria BpmPipelineConfigAuditoria[]
-  bpmCardAnexosEnviados BpmCardAnexo[]
-  bpmInteracoesRegistradas BpmInteracaoCard[]
+  bpmCardsResponsavel          BpmCard[]                    @relation("BpmCardResponsavel")
+  bpmCardMembros               BpmCardMembro[]
+  bpmTarefas                   BpmTarefa[]
+  bpmCardHistorico             BpmCardHistorico[]
+  bpmPipelineConfigAuditoria   BpmPipelineConfigAuditoria[]
+  bpmCardAnexosEnviados        BpmCardAnexo[]
+  bpmInteracoesRegistradas     BpmInteracaoCard[]
   bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
 
   justificativasMetaEnviadas JustificativaMeta[]
@@ -1120,7 +1123,6 @@ model DocumentoChecklist {
 
 // ─── Alpha CRM ────────────────────────────────────────────────────────────────
 
-
 // ─── Alpha Metas ──────────────────────────────────────────────────────────────
 
 model ContratoComercial {
@@ -1400,22 +1402,22 @@ model ContratoColaborador {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model CommissionEvent {
-  id                       String    @id @default(cuid())
-  eventType                String // CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL
-  clienteId                Int?
-  contratoComercialId      String?
-  businessProcessId        String?
+  id                  String  @id @default(cuid())
+  eventType           String // CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL
+  clienteId           Int?
+  contratoComercialId String?
+  businessProcessId   String?
 
-  cnpj                     String
-  razaoSocial              String
-  nomeFantasia             String?
-  servico                  String
-  eventDate                DateTime
+  cnpj         String
+  razaoSocial  String
+  nomeFantasia String?
+  servico      String
+  eventDate    DateTime
 
   grossContractAmountCents Int
-  partnerSpreadCents       Int    @default(0)
-  thirdPartyCostsCents     Int    @default(0)
-  discountAmountCents      Int    @default(0)
+  partnerSpreadCents       Int     @default(0)
+  thirdPartyCostsCents     Int     @default(0)
+  discountAmountCents      Int     @default(0)
   netContractAmountCents   Int
   commissionableBaseCents  Int?
   formaPagamento           String?
@@ -1424,25 +1426,25 @@ model CommissionEvent {
   // resolvido via ContratoComercial.usuarioId/BusinessProcess.analistaResponsavelId; nome
   // manual (string, sem FK) quando só existe como texto livre ou foi preenchido à mão porque
   // nenhuma fonte tinha o dado. Nunca inventar um FK a partir de string sem garantia de match.
-  closerUsuarioId                Int?
-  closerNomeManual               String?
-  analistaResponsavelUsuarioId   Int?
-  analistaResponsavelNomeManual  String?
+  closerUsuarioId               Int?
+  closerNomeManual              String?
+  analistaResponsavelUsuarioId  Int?
+  analistaResponsavelNomeManual String?
 
-  status                   String @default("PENDING_REVIEW") // PENDING_REVIEW|OK|BLOCKED|INTEGRATION_ERROR
+  status String @default("PENDING_REVIEW") // PENDING_REVIEW|OK|BLOCKED|INTEGRATION_ERROR
 
-  sourceSystem             String
-  sourceEntity             String
-  sourceId                 String
-  sourceUpdatedAt          DateTime?
-  lastSyncAt               DateTime?
-  syncStatus               String @default("SYNCED")
+  sourceSystem    String
+  sourceEntity    String
+  sourceId        String
+  sourceUpdatedAt DateTime?
+  lastSyncAt      DateTime?
+  syncStatus      String    @default("SYNCED")
 
-  entries                  CommissionEntry[]
-  divergencias             CommissionDivergence[]
+  entries      CommissionEntry[]
+  divergencias CommissionDivergence[]
 
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([sourceSystem, sourceEntity, sourceId, eventType])
   @@index([cnpj])
@@ -1481,7 +1483,7 @@ model SyncRun {
   totalProcessed Int       @default(0)
   totalErrors    Int       @default(0)
 
-  erros          SyncError[]
+  erros SyncError[]
 }
 
 model SyncError {
@@ -1514,15 +1516,15 @@ model CommissionRule {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  versoes          CommissionRuleVersion[]
+  versoes CommissionRuleVersion[]
 }
 
 model CommissionRuleVersion {
-  id                  String    @id @default(cuid())
+  id                  String         @id @default(cuid())
   ruleId              String
   rule                CommissionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   version             Int
-  status              String    @default("DRAFT") // DRAFT|PUBLISHED|INACTIVE
+  status              String         @default("DRAFT") // DRAFT|PUBLISHED|INACTIVE
   validFrom           DateTime
   validTo             DateTime?
   conditionsJson      String
@@ -1530,7 +1532,7 @@ model CommissionRuleVersion {
   paymentScheduleJson String
   publishedById       Int?
   publishedAt         DateTime?
-  createdAt           DateTime  @default(now())
+  createdAt           DateTime       @default(now())
 
   @@unique([ruleId, version])
 }
@@ -1558,27 +1560,27 @@ model EligibilityOverride {
 }
 
 model CommissionEntry {
-  id                       String    @id @default(cuid())
-  eventId                  String
-  event                    CommissionEvent @relation(fields: [eventId], references: [id])
-  collaboratorId           Int
-  cargoId                  Int
-  vinculo                  String // "CLT" | "PJ" resolvido na data do evento
-  ruleVersionId            String?
+  id             String          @id @default(cuid())
+  eventId        String
+  event          CommissionEvent @relation(fields: [eventId], references: [id])
+  collaboratorId Int
+  cargoId        Int
+  vinculo        String // "CLT" | "PJ" resolvido na data do evento
+  ruleVersionId  String?
 
-  totalCents               Int       @default(0)
-  status                   String    @default("Pendente") // Pendente|AguardandoAprovacao|Programado|Pago|ParcialmentePago|Vencido|Bloqueado|EmDivergencia|Cancelado|Estornado
+  totalCents Int    @default(0)
+  status     String @default("Pendente") // Pendente|AguardandoAprovacao|Programado|Pago|ParcialmentePago|Vencido|Bloqueado|EmDivergencia|Cancelado|Estornado
 
   contractualDueDate       DateTime?
   operationalSuggestedDate DateTime?
   scheduledPaymentDate     DateTime?
   actualPaymentDate        DateTime?
 
-  componentes              EntryComponent[]
-  ajustes                  ManualAdjustment[]
-  alocacoes                PaymentAllocation[]
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  componentes EntryComponent[]
+  ajustes     ManualAdjustment[]
+  alocacoes   PaymentAllocation[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   @@unique([eventId, collaboratorId])
   @@index([collaboratorId])
@@ -1586,18 +1588,18 @@ model CommissionEntry {
 }
 
 model EntryComponent {
-  id                 String   @id @default(cuid())
+  id                 String          @id @default(cuid())
   entryId            String
   entry              CommissionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   tipo               String // COMISSAO|PREMIO|DSR|AJUSTE
   valorCents         Int
   percentual         Float?
   memoriaCalculoJson String
-  createdAt          DateTime @default(now())
+  createdAt          DateTime        @default(now())
 }
 
 model ManualAdjustment {
-  id                 String    @id @default(cuid())
+  id                 String          @id @default(cuid())
   entryId            String
   entry              CommissionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   valorOriginalCents Int
@@ -1606,29 +1608,29 @@ model ManualAdjustment {
   aprovadoById       Int?
   aprovadoEm         DateTime?
   createdById        Int
-  createdAt          DateTime  @default(now())
+  createdAt          DateTime        @default(now())
 }
 
 model Payment {
-  id                    String   @id @default(cuid())
-  data                  DateTime
-  valorCents            Int
-  meio                  String
-  referencia            String?
-  observacao            String?
-  comprovanteUrl        String?
-  usuarioResponsavelId  Int
-  tipo                  String   @default("PAGAMENTO") // PAGAMENTO|ESTORNO
-  estornoDeId           String?
-  createdAt             DateTime @default(now())
+  id                   String   @id @default(cuid())
+  data                 DateTime
+  valorCents           Int
+  meio                 String
+  referencia           String?
+  observacao           String?
+  comprovanteUrl       String?
+  usuarioResponsavelId Int
+  tipo                 String   @default("PAGAMENTO") // PAGAMENTO|ESTORNO
+  estornoDeId          String?
+  createdAt            DateTime @default(now())
 
-  alocacoes             PaymentAllocation[]
+  alocacoes PaymentAllocation[]
 }
 
 model PaymentAllocation {
-  id         String  @id @default(cuid())
+  id         String          @id @default(cuid())
   paymentId  String
-  payment    Payment @relation(fields: [paymentId], references: [id])
+  payment    Payment         @relation(fields: [paymentId], references: [id])
   entryId    String
   entry      CommissionEntry @relation(fields: [entryId], references: [id])
   valorCents Int
@@ -1649,7 +1651,7 @@ model TariffVersion {
 }
 
 model CommissionDivergence {
-  id            String    @id @default(cuid())
+  id            String           @id @default(cuid())
   eventId       String?
   event         CommissionEvent? @relation(fields: [eventId], references: [id])
   entryId       String?
@@ -1658,7 +1660,7 @@ model CommissionDivergence {
   detalhes      String
   resolvidoEm   DateTime?
   resolvidoById Int?
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime         @default(now())
 }
 
 model ExportDocument {
@@ -1673,11 +1675,11 @@ model ExportDocument {
   geradoPorId       Int
   createdAt         DateTime @default(now())
 
-  itens             ExportDocumentItem[]
+  itens ExportDocumentItem[]
 }
 
 model ExportDocumentItem {
-  id         String  @id @default(cuid())
+  id         String         @id @default(cuid())
   documentId String
   document   ExportDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
   entryId    String?
@@ -2296,8 +2298,8 @@ model GoogleCalendarPushChannel {
 
   lastMessageNumber  String?
   lastNotificationAt DateTime?
-  lastErrorCode       String?
-  lastErrorAt         DateTime?
+  lastErrorCode      String?
+  lastErrorAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2320,7 +2322,7 @@ model GoogleCalendarPendingOperation {
 
   operationType  String // SYNC_CALENDAR | RENEW_CHANNEL | STOP_CHANNEL | RECONCILE_CHANNEL
   source         String // WEBHOOK | MANUAL | SCHEDULED | ADMIN
-  idempotencyKey String @unique
+  idempotencyKey String  @unique
   payloadJson    String?
 
   status       String   @default("PENDING") // PENDING | PROCESSING | RETRY | SUCCEEDED | DEAD_LETTER | CANCELLED
@@ -2405,28 +2407,28 @@ model GoogleCalendarPermissaoColegas {
 // no journal desta sessão.
 
 model BlueprintProject {
-  id                  String    @id @default(cuid())
-  code                String    @unique
-  title               String
-  slug                String?
-  summary             String?
-  problem             String?
-  objective           String?
+  id        String  @id @default(cuid())
+  code      String  @unique
+  title     String
+  slug      String?
+  summary   String?
+  problem   String?
+  objective String?
 
-  status              String    @default("IDEA")
-  priority            String    @default("NORMAL")
-  progress            Int       @default(0)
+  status              String  @default("IDEA")
+  priority            String  @default("NORMAL")
+  progress            Int     @default(0)
   progressDetailsJson String?
 
-  setor        String?
-  requesterId  Int
-  ownerId      Int?
-  developerId  Int?
+  setor       String?
+  requesterId Int
+  ownerId     Int?
+  developerId Int?
 
-  dueDate    DateTime?
-  coverUrl   String?
-  icon       String?
-  tagsJson   String?
+  dueDate     DateTime?
+  coverUrl    String?
+  icon        String?
+  tagsJson    String?
   premioCents Int?
 
   createdById Int
@@ -2487,6 +2489,7 @@ model Note {
 
   contexts    NoteContext[]
   permissions NotePermission[]
+  teamShares  NoteTeamShare[]
   tags        NoteTag[]
   versions    NoteVersion[]
   comments    NoteComment[]
@@ -2532,6 +2535,52 @@ model NotePermission {
 
   @@unique([noteId, subjectType, subjectId])
   @@index([subjectType, subjectId])
+}
+
+model NoteTeam {
+  id        String   @id @default(cuid())
+  name      String
+  nameKey   String
+  ownerId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   usuarios         @relation("NoteTeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members NoteTeamMember[]
+  shares  NoteTeamShare[]
+
+  @@unique([ownerId, nameKey])
+  @@index([ownerId])
+}
+
+model NoteTeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    Int
+  role      String   @default("LEITOR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team NoteTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user usuarios @relation("NoteTeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+model NoteTeamShare {
+  id          String   @id @default(cuid())
+  noteId      String
+  teamId      String
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  team      NoteTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy usuarios @relation("NoteTeamShareCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([noteId, teamId])
+  @@index([teamId])
 }
 
 model Tag {
@@ -2595,15 +2644,15 @@ model NoteComment {
 }
 
 model NoteAttachment {
-  id         String    @id @default(cuid())
-  noteId     String
-  fileName   String
-  mimeType   String
-  size       Int
-  storageKey String
+  id           String    @id @default(cuid())
+  noteId       String
+  fileName     String
+  mimeType     String
+  size         Int
+  storageKey   String
   uploadedById Int
-  createdAt  DateTime  @default(now())
-  deletedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
 
   note       Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   uploadedBy usuarios @relation("NoteAttachmentUploadedBy", fields: [uploadedById], references: [id])
@@ -2627,14 +2676,14 @@ model NoteReminder {
 }
 
 model UserOpenNoteTab {
-  id         String   @id @default(cuid())
-  userId     Int
-  noteId     String
-  position   Int
-  isActive   Boolean  @default(false)
-  isPinned   Boolean  @default(false)
-  openedAt   DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    Int
+  noteId    String
+  position  Int
+  isActive  Boolean  @default(false)
+  isPinned  Boolean  @default(false)
+  openedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   note Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   user usuarios @relation("UserOpenNoteTabUser", fields: [userId], references: [id])
@@ -2825,11 +2874,11 @@ model BpmPipeline {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  setores       BpmPipelineSetor[]
-  etapas        BpmEtapa[]
-  campos        BpmCampo[]
-  cards         BpmCard[]
-  configAuditoria BpmPipelineConfigAuditoria[]
+  setores            BpmPipelineSetor[]
+  etapas             BpmEtapa[]
+  campos             BpmCampo[]
+  cards              BpmCard[]
+  configAuditoria    BpmPipelineConfigAuditoria[]
   checklistPerguntas BpmChecklistFollowUpPergunta[]
 
   @@index([ativo])
@@ -2863,8 +2912,8 @@ model BpmEtapa {
   campos   BpmCampo[]
   cards    BpmCard[]
 
-  transicoesOrigem  BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
-  transicoesDestino BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
+  transicoesOrigem   BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
+  transicoesDestino  BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
   camposObrigatorios BpmCampoObrigatorioEtapa[]
 
   @@index([pipelineId])
@@ -2872,21 +2921,21 @@ model BpmEtapa {
 }
 
 model BpmCampo {
-  id         String  @id @default(cuid())
-  pipelineId String
-  etapaId    String?
-  nome       String
-  tipo       String // "texto" | "numero" | "data" | "selecao" | "booleano" (validado via Zod na action)
-  opcoesJson String? // opções quando tipo = "selecao"
+  id          String  @id @default(cuid())
+  pipelineId  String
+  etapaId     String?
+  nome        String
+  tipo        String // "texto" | "numero" | "data" | "selecao" | "booleano" (validado via Zod na action)
+  opcoesJson  String? // opções quando tipo = "selecao"
   obrigatorio Boolean @default(false)
-  ordem      Int     @default(0)
+  ordem       Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  etapa    BpmEtapa?   @relation(fields: [etapaId], references: [id], onDelete: Cascade)
-  valores  BpmCardCampoValor[]
+  pipeline            BpmPipeline                @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapa               BpmEtapa?                  @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  valores             BpmCardCampoValor[]
   obrigatorioEmEtapas BpmCampoObrigatorioEtapa[]
 
   @@index([pipelineId])
@@ -2894,13 +2943,13 @@ model BpmCampo {
 }
 
 model BpmCard {
-  id         String  @id @default(cuid())
-  empresaId  Int
-  pipelineId String
-  etapaId    String
+  id            String  @id @default(cuid())
+  empresaId     Int
+  pipelineId    String
+  etapaId       String
   responsavelId Int
-  servico    String?
-  status     String  @default("ATIVO") // "ATIVO" | "CONCLUIDO" | "CANCELADO"
+  servico       String?
+  status        String  @default("ATIVO") // "ATIVO" | "CONCLUIDO" | "CANCELADO"
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -2912,23 +2961,23 @@ model BpmCard {
   primeiraVisualizacaoEm DateTime? // primeiro acesso ao card, por qualquer usuário — indicador "nunca acessado" some após preenchido
   proximoContatoEm       DateTime? // interrompe a automação de 8 dias (cobrança de follow-up); também validado como obrigatório na ENTRADA de "Em Tratativa"/"Sem Viabilidade"
   dataReuniao            DateTime? // data+hora combinadas da reunião (Coluna "Agendar Reunião"), timezone America/Sao_Paulo — mesmo contrato da Agenda Alpha
-  googleEventId          String?   // id do evento no Google Calendar, criado via botão "Agendar pelo Google Meet" — permite reagendar/atualizar o mesmo evento depois
-  googleCalendarId       String?   // GoogleCalendarSelecionado.googleCalendarId usado ao criar a reunião — necessário para reagendar via atualizarEventoParcialNoCalendario (achado na Fase D)
-  googleMeetLink         String?   // cache do hangoutLink retornado pela API, evita nova chamada só para exibir o link
-  statusPosFechamento    String?   // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
-  transcricaoReuniao     String?   // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)
+  googleEventId          String? // id do evento no Google Calendar, criado via botão "Agendar pelo Google Meet" — permite reagendar/atualizar o mesmo evento depois
+  googleCalendarId       String? // GoogleCalendarSelecionado.googleCalendarId usado ao criar a reunião — necessário para reagendar via atualizarEventoParcialNoCalendario (achado na Fase D)
+  googleMeetLink         String? // cache do hangoutLink retornado pela API, evita nova chamada só para exibir o link
+  statusPosFechamento    String? // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
+  transcricaoReuniao     String? // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)
 
   empresa     clientes    @relation(fields: [empresaId], references: [id])
   pipeline    BpmPipeline @relation(fields: [pipelineId], references: [id])
   etapa       BpmEtapa    @relation(fields: [etapaId], references: [id])
   responsavel usuarios    @relation("BpmCardResponsavel", fields: [responsavelId], references: [id])
 
-  campoValores BpmCardCampoValor[]
-  membros      BpmCardMembro[]
-  tarefas      BpmTarefa[]
-  historico    BpmCardHistorico[]
-  anexos       BpmCardAnexo[]
-  interacoes   BpmInteracaoCard[]
+  campoValores       BpmCardCampoValor[]
+  membros            BpmCardMembro[]
+  tarefas            BpmTarefa[]
+  historico          BpmCardHistorico[]
+  anexos             BpmCardAnexo[]
+  interacoes         BpmInteracaoCard[]
   checklistsFollowUp BpmChecklistFollowUp[]
 
   vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
@@ -2942,7 +2991,7 @@ model BpmCard {
 }
 
 model BpmCardCampoValor {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   cardId  String
   campoId String
   valor   String?
@@ -2955,10 +3004,10 @@ model BpmCardCampoValor {
 }
 
 model BpmCardMembro {
-  id       String   @id @default(cuid())
-  cardId   String
-  userId   Int
-  role     String // "RESPONSAVEL" | "ADMINISTRADOR" | "PARTICIPANTE"
+  id        String   @id @default(cuid())
+  cardId    String
+  userId    Int
+  role      String // "RESPONSAVEL" | "ADMINISTRADOR" | "PARTICIPANTE"
   createdAt DateTime @default(now())
 
   card    BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
@@ -2969,10 +3018,10 @@ model BpmCardMembro {
 }
 
 model BpmCardVinculo {
-  id             String   @id @default(cuid())
-  cardOrigemId   String
-  cardDestinoId  String
-  createdAt      DateTime @default(now())
+  id            String   @id @default(cuid())
+  cardOrigemId  String
+  cardDestinoId String
+  createdAt     DateTime @default(now())
 
   cardOrigem  BpmCard @relation("CardOrigem", fields: [cardOrigemId], references: [id], onDelete: Cascade)
   cardDestino BpmCard @relation("CardDestino", fields: [cardDestinoId], references: [id], onDelete: Cascade)
@@ -2997,8 +3046,8 @@ model BpmTarefa {
   updatedAt   DateTime  @updatedAt
   concluidaEm DateTime?
 
-  card        BpmCard        @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  responsavel usuarios?      @relation(fields: [responsavelId], references: [id])
+  card        BpmCard          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  responsavel usuarios?        @relation(fields: [responsavelId], references: [id])
   preset      BpmTarefaPreset? @relation(fields: [presetId], references: [id])
 
   @@index([cardId])
@@ -3007,11 +3056,11 @@ model BpmTarefa {
 }
 
 model BpmTarefaPreset {
-  id          String  @id @default(cuid())
-  pipelineId  String?
-  nome        String
-  descricao   String?
-  tipoGeracao String  @default("UNICA") // "UNICA" | "MULTIPLA" | "FLUXO" (configurável via UI — D-026)
+  id           String  @id @default(cuid())
+  pipelineId   String?
+  nome         String
+  descricao    String?
+  tipoGeracao  String  @default("UNICA") // "UNICA" | "MULTIPLA" | "FLUXO" (configurável via UI — D-026)
   templateJson String
 
   createdAt DateTime @default(now())
@@ -3023,14 +3072,14 @@ model BpmTarefaPreset {
 }
 
 model BpmCardHistorico {
-  id               String   @id @default(cuid())
-  cardId           String
-  acao             String
+  id                String   @id @default(cuid())
+  cardId            String
+  acao              String
   valorAnteriorJson String?
   valorNovoJson     String?
-  usuarioId        Int?
-  automacaoOrigem  String?
-  createdAt        DateTime @default(now())
+  usuarioId         Int?
+  automacaoOrigem   String?
+  createdAt         DateTime @default(now())
 
   card    BpmCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
   usuario usuarios? @relation(fields: [usuarioId], references: [id])
@@ -3040,13 +3089,13 @@ model BpmCardHistorico {
 }
 
 model BpmPipelineConfigAuditoria {
-  id             String   @id @default(cuid())
-  pipelineId     String
-  adminId        Int
-  campoAlterado  String
+  id                String   @id @default(cuid())
+  pipelineId        String
+  adminId           Int
+  campoAlterado     String
   valorAnteriorJson String?
   valorNovoJson     String?
-  createdAt      DateTime @default(now())
+  createdAt         DateTime @default(now())
 
   pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   admin    usuarios    @relation(fields: [adminId], references: [id])
@@ -3056,14 +3105,14 @@ model BpmPipelineConfigAuditoria {
 }
 
 model BpmCardAnexo {
-  id        String   @id @default(cuid())
-  cardId    String
-  url       String
-  nome      String
-  tipo      String?
-  tamanho   Int?
+  id           String   @id @default(cuid())
+  cardId       String
+  url          String
+  nome         String
+  tipo         String?
+  tamanho      Int?
   enviadoPorId Int
-  createdAt DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   card       BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
   enviadoPor usuarios @relation(fields: [enviadoPorId], references: [id])
@@ -3127,7 +3176,7 @@ model BpmChecklistFollowUp {
   id            String   @id @default(cuid())
   cardId        String
   card          BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  perguntasJson String   // snapshot das perguntas NO MOMENTO do follow-up — perguntas podem mudar no catálogo depois sem afetar registros passados
+  perguntasJson String // snapshot das perguntas NO MOMENTO do follow-up — perguntas podem mudar no catálogo depois sem afetar registros passados
   respostasJson String
   completo      Boolean  @default(false)
   criadoPorId   Int
@@ -3142,7 +3191,7 @@ model BpmChecklistFollowUpPergunta {
   id          String  @id @default(cuid())
   pipelineId  String
   pergunta    String
-  tipo        String  // "texto" | "selecao" | "booleano" — mesmo catálogo de BpmCampo
+  tipo        String // "texto" | "selecao" | "booleano" — mesmo catálogo de BpmCampo
   opcoesJson  String?
   obrigatoria Boolean @default(true)
   ordem       Int     @default(0)

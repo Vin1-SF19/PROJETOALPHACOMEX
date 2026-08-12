@@ -748,3 +748,17 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 `tests/bibble/attachment-readiness.test.ts`, `attachment-security.test.ts`, `context-budget.test.ts`, `completion-budget-stream.test.ts`, `client-stream-protocol.test.ts` e `pdf-extraction-chain.test.ts` cobrem a guarda de envio, limites/SSRF, seleção início-meio-fim, parâmetros do provider, protocolo de conclusão e fallbacks de extração.
 
 **Última atualização:** 2026-08-11 por Scribe
+## Notas — equipes privadas (2026-08-12)
+
+- `src/actions/NotasEquipes.ts`: CRUD, membros, busca segura, shares e notificações.
+- `src/lib/notas/equipes.ts`: normalização de nome e ranking de papéis.
+- `src/components/Notas/Colaboracao/NoteTeamsManager.tsx`: gerenciador responsivo.
+- `src/components/Notas/Colaboracao/NoteTeamMembersEditor.tsx`: funções e membros.
+- `src/components/Notas/Colaboracao/NoteTeamUserMultiSelect.tsx`: busca e seleção múltipla.
+## Alpha CRM — sincronização realtime (2026-08-12)
+
+- Contrato client-safe: `src/lib/bpm/realtime.ts`.
+- Emissão server-side best-effort: `src/lib/bpm/realtime-server.ts`.
+- Consumidor do canal privado por pipeline: `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`.
+- Autorização Pusher compartilhada: `src/app/api/pusher/auth/route.ts`.
+- Regressão do contrato: `tests/bpm/realtime.test.ts`.

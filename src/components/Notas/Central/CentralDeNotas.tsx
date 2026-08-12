@@ -24,6 +24,7 @@ import { CentralNotasHeader } from "./CentralNotasHeader";
 import { TutorialNotasModal } from "./TutorialNotasModal";
 import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { NoteTeamsManager } from "@/components/Notas/Colaboracao/NoteTeamsManager";
 import {
   marcarTutorialModuloComoVisto,
   tutorialModuloFoiVisto,
@@ -175,6 +176,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
   const [tourAberto, setTourAberto] = useState(false);
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [propriedadesAbertas, setPropriedadesAbertas] = useState(false);
+  const [equipesAbertas, setEquipesAbertas] = useState(false);
   const [secaoAtiva, setSecaoAtiva] = useState<SecaoCentralNotas>("RECENTES");
   // Sem seletor visual de ordenação no grid de cards — sempre por última edição, o critério
   // mais útil para "o que eu estava fazendo" num layout de galeria.
@@ -361,6 +363,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         onCriarNota={() => void criarNota()}
         onAbrirTutorial={() => setTutorialAberto(true)}
         onAbrirFiltros={() => setFiltrosAbertos(true)}
+        onAbrirEquipes={() => setEquipesAbertas(true)}
       />
 
       <div className="relative z-10 mx-3 mb-3 mt-3 flex min-h-0 flex-1 gap-4 md:mx-6 md:mb-6 md:mt-4">
@@ -506,6 +509,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         onIniciarTour={iniciarTourGuiado}
         accent={accent}
       />
+      <NoteTeamsManager open={equipesAbertas} onOpenChange={setEquipesAbertas} />
       <GuiaModuloTour aberto={tourAberto} config={TUTORIAL_NOTAS} accent={accent} onFinalizar={finalizarTour} />
     </div>
   );

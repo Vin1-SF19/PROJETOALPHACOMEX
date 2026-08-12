@@ -8,6 +8,11 @@ import {
   podeReceberNovosChamados,
 } from "@/lib/chamados/notificacoes";
 import { NOTA_USUARIO_CHANNEL_PREFIX, extrairUsuarioIdDoCanalNotas } from "@/lib/notas/notificacoes";
+import {
+  BPM_PIPELINE_CHANNEL_PREFIX,
+  extrairPipelineIdCanalBpm,
+} from "@/lib/bpm/realtime";
+import db from "@/lib/prisma";
 
 const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts", "private-metas-alpha"];
@@ -25,6 +30,24 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const socketId = formData.get("socket_id") as string;
     const channelName = formData.get("channel_name") as string;
+
+    if (channelName?.startsWith(BPM_PIPELINE_CHANNEL_PREFIX)) {
+      const pipelineId = extrairPipelineIdCanalBpm(channelName);
+      if (!pipelineId) {
+        return new NextResponse("Canal inválido", { status: 403 });
+      }
+
+      const pipeline = await db.bpmPipeline.findUnique({
+        where: { id: pipelineId },
+        select: { id: true },
+      });
+      if (!pipeline) {
+        return new NextResponse("Pipeline não encontrado", { status: 403 });
+      }
+
+      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(authResponse);
+    }
 
     if (ADMIN_CHANNELS.includes(channelName)) {
       const role = session.user.role ?? "";

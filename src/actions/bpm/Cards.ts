@@ -10,6 +10,7 @@ import {
 import { exigirAcessoBpmCard, isAdminRole } from "@/lib/bpm/ownership";
 import { executarAutomacaoFechamentoComercial } from "@/lib/bpm/automacoes";
 import { buscarServicosContratados } from "@/actions/Clientes";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -150,8 +151,18 @@ export async function ObterCardBpm(cardId: string) {
     // Indicador "nunca acessado" — primeiro acesso por QUALQUER usuário apaga a marcação.
     if (!card.primeiraVisualizacaoEm) {
       const agora = new Date();
-      await db.bpmCard.update({ where: { id: cardId }, data: { primeiraVisualizacaoEm: agora } });
+      const atualizacao = await db.bpmCard.updateMany({
+        where: { id: cardId, primeiraVisualizacaoEm: null },
+        data: { primeiraVisualizacaoEm: agora },
+      });
       card.primeiraVisualizacaoEm = agora;
+      if (atualizacao.count > 0) {
+        await notificarPipelineBpm({
+          pipelineId: card.pipelineId,
+          cardId,
+          tipo: "PRIMEIRA_VISUALIZACAO",
+        });
+      }
     }
 
     return { success: true, data: card };
@@ -273,6 +284,7 @@ export async function CriarCardBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline/${pipelineId}`);
+    await notificarPipelineBpm({ pipelineId, cardId: card.id, tipo: "CARD_CRIADO" });
     return { success: true, data: card };
   } catch (error) {
     console.error("[CriarCardBpm]", error);
@@ -333,6 +345,11 @@ export async function AtualizarCardBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline/${cardAnterior.pipelineId}`);
+    await notificarPipelineBpm({
+      pipelineId: cardAnterior.pipelineId,
+      cardId,
+      tipo: "CARD_ATUALIZADO",
+    });
     return { success: true };
   } catch (error) {
     console.error("[AtualizarCardBpm]", error);
@@ -444,6 +461,7 @@ export async function MoverCardBpm(dados: unknown) {
 
     // D-009/D-034: automação em código, disparada após o card mudar de etapa.
     await executarAutomacaoFechamentoComercial(cardId, userId);
+    await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId, tipo: "CARD_MOVIDO" });
 
     revalidatePath(`${ROTA_BASE}/pipeline/${card.pipelineId}`);
     revalidatePath(ROTA_BASE);

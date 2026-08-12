@@ -9,6 +9,7 @@ import {
   criarEventoNoCalendario,
   atualizarEventoParcialNoCalendario,
 } from "@/actions/google-calendar-eventos";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
@@ -125,6 +126,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
     return { success: true, data: { googleEventId: resultado.data.googleEventId } };
   } catch (error) {
     console.error("[AgendarReuniaoGoogleMeetBpm]", error);
@@ -189,6 +191,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
     return { success: true };
   } catch (error) {
     console.error("[ReagendarReuniaoBpm]", error);

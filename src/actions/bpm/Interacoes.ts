@@ -5,6 +5,7 @@ import { auth } from "../../../auth";
 import { criarInteracaoCardSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "./Cards";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -42,6 +43,7 @@ export async function CriarInteracaoCardBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/card/${cardId}`);
+    await notificarPipelineBpm({ cardId, tipo: "INTERACAO_CRIADA" });
     return { success: true, data: interacao };
   } catch (error) {
     console.error("[CriarInteracaoCardBpm]", error);

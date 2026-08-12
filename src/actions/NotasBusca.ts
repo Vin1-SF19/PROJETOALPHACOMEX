@@ -16,7 +16,11 @@ import {
   type AplicarTagInput,
 } from "@/lib/validations/notas";
 import { podeEditarNota, temAcessoAoModuloNotas } from "@/lib/notas/permissoes";
-import { criarFiltroAcessoNota, resolverCondicaoCompartilhadoPorSetor } from "@/lib/notas/acesso";
+import {
+  criarCondicaoAcessoPorEquipe,
+  criarFiltroAcessoNota,
+  resolverCondicaoCompartilhadoPorSetor,
+} from "@/lib/notas/acesso";
 
 async function sessaoUsuario() {
   const session = await auth();
@@ -45,6 +49,7 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
   // resolverCondicaoCompartilhadoPorSetor) — sem isso, um compartilhamento com "TI" nunca batia
   // com um setor cadastrado como "T.I" na comparação exata que o Prisma faz por padrão.
   const condicaoSetor = await resolverCondicaoCompartilhadoPorSetor(usuario);
+  const condicaoEquipe = criarCondicaoAcessoPorEquipe(usuario.id);
 
   const condicoesSecao: Record<string, object> = {
     RECENTES: { status: { not: "LIXEIRA" } },
@@ -53,14 +58,19 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
     COMPARTILHADAS_COMIGO: {
       status: { not: "LIXEIRA" },
       ownerId: { not: usuario.id },
-      permissions: {
-        some: {
-          OR: [{ subjectType: "USUARIO", subjectId: String(usuario.id) }, ...condicaoSetor],
+      OR: [
+        {
+          permissions: {
+            some: {
+              OR: [{ subjectType: "USUARIO", subjectId: String(usuario.id) }, ...condicaoSetor],
+            },
+          },
         },
-      },
+        condicaoEquipe,
+      ],
     },
     CRIADAS_POR_MIM: { ownerId: usuario.id, status: { not: "LIXEIRA" } },
-    EQUIPE: { visibility: "EQUIPE", status: { not: "LIXEIRA" } },
+    EQUIPE: { ...condicaoEquipe, status: { not: "LIXEIRA" } },
     CONTEXTUAIS: { status: { not: "LIXEIRA" }, contexts: { some: {} } },
     ARQUIVADAS: { status: "ARQUIVADA" },
     LIXEIRA: { status: "LIXEIRA", ownerId: usuario.id },

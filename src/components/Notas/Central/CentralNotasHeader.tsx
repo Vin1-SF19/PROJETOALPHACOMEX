@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CircleHelp, ListFilter, Plus, Search, StickyNote } from "lucide-react";
+import { CircleHelp, ListFilter, Plus, Search, StickyNote, Users } from "lucide-react";
 
 interface CentralNotasHeaderProps {
   accent: string;
@@ -9,6 +9,7 @@ interface CentralNotasHeaderProps {
   onCriarNota: () => void;
   onAbrirTutorial: () => void;
   onAbrirFiltros: () => void;
+  onAbrirEquipes: () => void;
 }
 
 export function CentralNotasHeader({
@@ -19,6 +20,7 @@ export function CentralNotasHeader({
   onCriarNota,
   onAbrirTutorial,
   onAbrirFiltros,
+  onAbrirEquipes,
 }: CentralNotasHeaderProps) {
   return (
     <motion.header
@@ -32,6 +34,15 @@ export function CentralNotasHeader({
       }}
     >
       <div className="flex items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          onClick={onAbrirEquipes}
+          title="Gerenciar equipes de notas"
+          className="flex h-10 shrink-0 items-center gap-2 rounded-2xl px-2.5 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:text-cyan-200 sm:h-11 sm:px-3"
+          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}
+        >
+          <Users size={15} /> <span className="hidden xl:inline">Equipes</span>
+        </button>
         <button
           type="button"
           onClick={onAbrirFiltros}
@@ -98,4 +109,3 @@ export function CentralNotasHeader({
     </motion.header>
   );
 }
-

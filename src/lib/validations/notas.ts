@@ -12,6 +12,73 @@ export type SubjectTypePermissao = (typeof SUBJECT_TYPE_PERMISSAO)[number];
 export const ROLE_PERMISSAO_NOTA = ["LEITOR", "COMENTARISTA", "EDITOR", "ADMIN"] as const;
 export type RolePermissaoNota = (typeof ROLE_PERMISSAO_NOTA)[number];
 
+export const MAX_MEMBROS_EQUIPE_NOTA = 50;
+
+const membroEquipeNotaSchema = z.object({
+  userId: z.number().int().positive(),
+  role: z.enum(ROLE_PERMISSAO_NOTA).default("LEITOR"),
+});
+
+const membrosEquipeNotaSchema = z
+  .array(membroEquipeNotaSchema)
+  .max(MAX_MEMBROS_EQUIPE_NOTA, `Adicione no máximo ${MAX_MEMBROS_EQUIPE_NOTA} membros por vez`)
+  .superRefine((membros, ctx) => {
+    const ids = new Set<number>();
+    membros.forEach((membro, index) => {
+      if (ids.has(membro.userId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "userId"],
+          message: "Usuário duplicado na equipe",
+        });
+      }
+      ids.add(membro.userId);
+    });
+  });
+
+export const criarEquipeNotaSchema = z.object({
+  name: z.string().trim().min(2, "Informe um nome com ao menos 2 caracteres").max(80),
+  members: membrosEquipeNotaSchema.default([]),
+});
+export type CriarEquipeNotaInput = z.infer<typeof criarEquipeNotaSchema>;
+
+export const renomearEquipeNotaSchema = z.object({
+  teamId: z.string().trim().min(1),
+  name: z.string().trim().min(2, "Informe um nome com ao menos 2 caracteres").max(80),
+});
+export type RenomearEquipeNotaInput = z.infer<typeof renomearEquipeNotaSchema>;
+
+export const adicionarMembrosEquipeNotaSchema = z.object({
+  teamId: z.string().trim().min(1),
+  members: membrosEquipeNotaSchema.min(1, "Selecione ao menos um usuário"),
+});
+export type AdicionarMembrosEquipeNotaInput = z.infer<typeof adicionarMembrosEquipeNotaSchema>;
+
+export const alterarPapelMembroEquipeNotaSchema = z.object({
+  teamId: z.string().trim().min(1),
+  userId: z.number().int().positive(),
+  role: z.enum(ROLE_PERMISSAO_NOTA),
+});
+export type AlterarPapelMembroEquipeNotaInput = z.infer<typeof alterarPapelMembroEquipeNotaSchema>;
+
+export const membroEquipeNotaAlvoSchema = z.object({
+  teamId: z.string().trim().min(1),
+  userId: z.number().int().positive(),
+});
+export type MembroEquipeNotaAlvoInput = z.infer<typeof membroEquipeNotaAlvoSchema>;
+
+export const equipeNotaAlvoSchema = z.object({ teamId: z.string().trim().min(1) });
+export type EquipeNotaAlvoInput = z.infer<typeof equipeNotaAlvoSchema>;
+
+export const compartilharNotaComEquipeSchema = z.object({
+  noteId: z.string().trim().min(1),
+  teamId: z.string().trim().min(1),
+});
+export type CompartilharNotaComEquipeInput = z.infer<typeof compartilharNotaComEquipeSchema>;
+
+export const removerCompartilhamentoEquipeSchema = z.object({ shareId: z.string().trim().min(1) });
+export type RemoverCompartilhamentoEquipeInput = z.infer<typeof removerCompartilhamentoEquipeSchema>;
+
 export const VIEWER_MODE = ["RECOLHIDO", "COMPACTO", "EXPANDIDO", "TELA_AMPLA"] as const;
 export type ViewerMode = (typeof VIEWER_MODE)[number];
 

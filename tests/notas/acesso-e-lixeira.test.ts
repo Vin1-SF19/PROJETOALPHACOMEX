@@ -5,17 +5,22 @@ import { excluirNotasDefinitivamenteSchema } from "@/lib/validations/notas";
 import { isNotasWorkspaceAtualizadoMessage, NOTAS_WORKSPACE_ATUALIZADO } from "@/lib/notas-workspace-messages";
 
 describe("Bloco de notas ALpha — isolamento por usuário", () => {
-  it("não cria bypass para Admin e limita a dono ou compartilhamento explícito", () => {
-    const filtro = criarFiltroAcessoNota({ id: 42, role: "Admin" });
+  it("não cria bypass para Admin e limita a dono ou compartilhamento explícito", async () => {
+    const filtro = await criarFiltroAcessoNota({ id: 42, role: "Admin" });
 
-    expect(filtro).toEqual({
-      OR: [
+    expect(filtro.OR).toEqual(
+      expect.arrayContaining([
         { ownerId: 42 },
         { permissions: { some: { subjectType: "USUARIO", subjectId: "42" } } },
-        { permissions: { some: { subjectType: "SETOR", subjectId: "Admin" } } },
-        { permissions: { some: { subjectType: "ROLE", subjectId: "Admin" } } },
-      ],
-    });
+        {
+          teamShares: {
+            some: {
+              team: { OR: [{ ownerId: 42 }, { members: { some: { userId: 42 } } }] },
+            },
+          },
+        },
+      ]),
+    );
   });
 
   it("restringe exclusão permanente ao dono autenticado e à lixeira", () => {

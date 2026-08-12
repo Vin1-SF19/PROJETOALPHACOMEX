@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -17,7 +17,13 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { Plus, Building2, User } from "lucide-react";
-import { MoverCardBpm, CriarCardBpm } from "@/actions/bpm/Cards";
+import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import {
+  BPM_PIPELINE_EVENT,
+  canalPipelineBpm,
+  type BpmRealtimePayload,
+} from "@/lib/bpm/realtime";
+import { pusherClient } from "@/lib/pusher";
 import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
@@ -195,7 +201,11 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [etapaNovoCard, setEtapaNovoCard] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [modalRevision, setModalRevision] = useState(0);
+  const ultimaRequisicaoRef = useRef(0);
+  const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardSelecionadoIdRef = useRef<string | null>(null);
+  const etapaOrigemDragRef = useRef<string | null>(null);
 
   const etapasOrdenadas = [...pipeline.etapas].sort((a, b) => a.ordem - b.ordem);
 
@@ -203,9 +213,66 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
   const getByEtapa = (etapaId: string) => cards.filter((c) => c.etapaId === etapaId);
 
+  const recarregarCards = useCallback(async () => {
+    const requisicao = ++ultimaRequisicaoRef.current;
+    const res = await ListarCardsPipelineBpm(pipeline.id);
+
+    if (requisicao !== ultimaRequisicaoRef.current) return false;
+    if (!res.success) {
+      setErro(typeof res.error === "string" ? res.error : "Nao foi possivel atualizar os cards");
+      return false;
+    }
+
+    setCards(res.data);
+    setErro(null);
+    return true;
+  }, [pipeline.id]);
+
+  useEffect(() => {
+    const canal = canalPipelineBpm(pipeline.id);
+    const channel = pusherClient.subscribe(canal);
+
+    const onAtualizado = (payload: BpmRealtimePayload) => {
+      if (payload.pipelineId !== pipeline.id) return;
+
+      if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
+      realtimeTimerRef.current = setTimeout(() => {
+        realtimeTimerRef.current = null;
+        void recarregarCards();
+        router.refresh();
+        if (cardSelecionadoIdRef.current) {
+          setModalRevision((revision) => revision + 1);
+        }
+      }, 100);
+    };
+
+    channel.bind(BPM_PIPELINE_EVENT, onAtualizado);
+
+    return () => {
+      if (realtimeTimerRef.current) {
+        clearTimeout(realtimeTimerRef.current);
+        realtimeTimerRef.current = null;
+      }
+      ultimaRequisicaoRef.current += 1;
+      channel.unbind(BPM_PIPELINE_EVENT, onAtualizado);
+      pusherClient.unsubscribe(canal);
+    };
+  }, [pipeline.id, recarregarCards, router]);
+
+  const abrirCard = useCallback((cardId: string) => {
+    cardSelecionadoIdRef.current = cardId;
+    setCardSelecionadoId(cardId);
+  }, []);
+
+  const fecharCard = useCallback(() => {
+    cardSelecionadoIdRef.current = null;
+    setCardSelecionadoId(null);
+  }, []);
+
   function onDragStart({ active }: DragStartEvent) {
     setActiveId(String(active.id));
     setErro(null);
+    etapaOrigemDragRef.current = cards.find((card) => card.id === active.id)?.etapaId ?? null;
   }
 
   function onDragOver({ active, over }: DragOverEvent) {
@@ -222,9 +289,13 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     }
   }
 
-  function onDragEnd({ active, over }: DragEndEvent) {
+  async function onDragEnd({ active, over }: DragEndEvent) {
     setActiveId(null);
-    if (!over) return;
+    if (!over) {
+      etapaOrigemDragRef.current = null;
+      await recarregarCards();
+      return;
+    }
 
     const activeCard = cards.find((c) => c.id === active.id);
     if (!activeCard) return;
@@ -233,15 +304,18 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     const overCard = cards.find((c) => c.id === over.id);
     const etapaDestinoId = overEtapa || overCard?.etapaId;
 
-    const etapaOriginal = cardsIniciais.find((c) => c.id === activeCard.id)?.etapaId;
+    const etapaOriginal = etapaOrigemDragRef.current;
+    etapaOrigemDragRef.current = null;
     if (etapaDestinoId && etapaDestinoId !== etapaOriginal) {
-      startTransition(async () => {
-        const res = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId });
-        if (!res.success) {
-          setErro(typeof res.error === "string" ? res.error : "Não foi possível mover o card");
-          router.refresh();
-        }
-      });
+      const res = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId });
+      if (!res.success) {
+        await recarregarCards();
+        setErro(typeof res.error === "string" ? res.error : "Nao foi possivel mover o card");
+        router.refresh();
+        return;
+      }
+      await recarregarCards();
+      router.refresh();
     }
   }
 
@@ -276,7 +350,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
                 cards={getByEtapa(etapa.id)}
                 accent={accent}
                 onAdd={setEtapaNovoCard}
-                onAbrirCard={setCardSelecionadoId}
+                onAbrirCard={abrirCard}
               />
             ))}
           </div>
@@ -304,6 +378,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
           onCriado={async (dados) => {
             const res = await CriarCardBpm(dados);
             if (res.success) {
+              await recarregarCards();
               setEtapaNovoCard(null);
               router.refresh();
               return { success: true as const };
@@ -315,13 +390,17 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
       {cardSelecionadoId && (
         <CardFullViewModal
+          key={`${cardSelecionadoId}-${modalRevision}`}
           cardId={cardSelecionadoId}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}
           accent={accent}
-          onClose={() => setCardSelecionadoId(null)}
-          onAtualizado={() => router.refresh()}
-          onAbrirCard={setCardSelecionadoId}
+          onClose={fecharCard}
+          onAtualizado={async () => {
+            await recarregarCards();
+            router.refresh();
+          }}
+          onAbrirCard={abrirCard}
         />
       )}
     </div>

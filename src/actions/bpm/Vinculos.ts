@@ -5,6 +5,7 @@ import { auth } from "../../../auth";
 import { criarVinculoCardSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "./Cards";
+import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -52,6 +53,10 @@ export async function CriarVinculoCardBpm(dados: unknown) {
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
+    await Promise.all([
+      notificarPipelineBpm({ cardId: cardOrigemId, tipo: "VINCULO_CRIADO" }),
+      notificarPipelineBpm({ cardId: cardDestinoId, tipo: "VINCULO_CRIADO" }),
+    ]);
     return { success: true, data: vinculo };
   } catch (error) {
     console.error("[CriarVinculoCardBpm]", error);
