@@ -56,10 +56,11 @@ export async function criarFiltroAcessoNota(usuario: UsuarioAcessoNota): Promise
 }
 
 /** Notas compartilhadas com qualquer equipe privada da qual o usuário seja dono ou membro. */
-export function criarCondicaoAcessoPorEquipe(usuarioId: number): Prisma.NoteWhereInput {
+export function criarCondicaoAcessoPorEquipe(usuarioId: number, teamId?: string): Prisma.NoteWhereInput {
   return {
     teamShares: {
       some: {
+        ...(teamId ? { teamId } : {}),
         team: {
           OR: [{ ownerId: usuarioId }, { members: { some: { userId: usuarioId } } }],
         },

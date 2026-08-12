@@ -198,6 +198,7 @@ export const buscarNotasSchema = z.object({
   secao: z.enum(SECAO_CENTRAL_NOTAS).default("RECENTES"),
   ordenarPor: z.enum(ORDENACAO_NOTAS).default("ATUALIZACAO"),
   tagIds: z.array(z.string().min(1)).max(20).optional(),
+  teamId: z.string().trim().min(1).optional(),
   moduleKey: z.string().trim().max(60).optional(),
   entityType: z.string().trim().max(60).optional(),
   comChecklistPendente: z.boolean().optional(),

@@ -28,11 +28,13 @@ interface Props {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  initialTeamId?: string | null;
+  onTeamsChanged?: () => void | Promise<void>;
 }
 
-export function NoteTeamsManager({ trigger, open, onOpenChange }: Props) {
+export function NoteTeamsManager({ trigger, open, onOpenChange, initialTeamId, onTeamsChanged }: Props) {
   const [equipes, setEquipes] = useState<EquipeNotaUI[]>([]);
-  const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
+  const [selecionadaId, setSelecionadaId] = useState<string | null>(initialTeamId ?? null);
   const [carregando, setCarregando] = useState(false);
   const [criando, setCriando] = useState(false);
   const [novoNome, setNovoNome] = useState("");
@@ -51,7 +53,8 @@ export function NoteTeamsManager({ trigger, open, onOpenChange }: Props) {
     const lista = res.data as EquipeNotaUI[];
     setEquipes(lista);
     setSelecionadaId((atual) => (atual && lista.some((equipe) => equipe.id === atual) ? atual : lista[0]?.id ?? null));
-  }, []);
+    void onTeamsChanged?.();
+  }, [onTeamsChanged]);
 
   useEffect(() => {
     if (open === false) return;

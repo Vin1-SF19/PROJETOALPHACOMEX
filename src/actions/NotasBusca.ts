@@ -49,7 +49,7 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
   // resolverCondicaoCompartilhadoPorSetor) — sem isso, um compartilhamento com "TI" nunca batia
   // com um setor cadastrado como "T.I" na comparação exata que o Prisma faz por padrão.
   const condicaoSetor = await resolverCondicaoCompartilhadoPorSetor(usuario);
-  const condicaoEquipe = criarCondicaoAcessoPorEquipe(usuario.id);
+  const condicaoEquipe = criarCondicaoAcessoPorEquipe(usuario.id, filtros.teamId);
 
   const condicoesSecao: Record<string, object> = {
     RECENTES: { status: { not: "LIXEIRA" } },

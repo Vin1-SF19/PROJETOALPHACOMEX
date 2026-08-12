@@ -243,6 +243,9 @@ O usuário autorizou inequivocamente a execução da feature e da migration deli
 | 2026-08-12 | 1.0 | Story criada a partir do pedido, blueprint anterior e reconhecimento Scout; modelagem corrigida para shares relacionais | River (SM) |
 | 2026-08-12 | 2.0 | Feature implementada, migration aplicada e validada, UI integrada e quality gates executados | Dex (Dev) |
 | 2026-08-12 | 2.1 | Acesso ao gerenciador movido do cabeçalho para a visualização contextual Notas de equipe | Dex (Dev) |
+| 2026-08-12 | 2.2 | Equipes exibidas como cards-pasta animados na seção Notas de equipe | Dex (Dev) |
+| 2026-08-12 | 2.3 | Clique da pasta corrigido para abrir notas filtradas; engrenagem isolada para configurações | Dex (Dev) |
+| 2026-08-12 | 2.4 | Raiz de Notas de equipe isolada para exibir somente pastas | Dex (Dev) |
 
 ## Dev Agent Record
 
@@ -267,6 +270,9 @@ Codex GPT-5.
 - Maior papel efetivo é calculado deterministicamente entre todos os caminhos.
 - Teste visual interno ficou limitado pela ausência de sessão autenticada no navegador isolado.
 - O botão de gerenciamento é exibido somente dentro da seção `Notas de equipe`.
+- Equipes aparecem como pastas responsivas com membros e quantidade de notas.
+- Clique principal abre as notas da equipe; somente a engrenagem abre o gerenciamento, com navegação de retorno às pastas.
+- Cards de notas não são consultados nem renderizados na raiz da seção; aparecem somente dentro de uma pasta aberta.
 
 ### File List
 
@@ -285,6 +291,7 @@ Codex GPT-5.
 - `src/components/Notas/Central/CentralDeNotas.tsx`
 - `src/components/Notas/Central/CentralNotasHeader.tsx`
 - `src/components/Notas/Central/ListaNotas.tsx`
+- `src/components/Notas/Central/NoteTeamFolderGrid.tsx` (novo)
 - `tests/notas/equipes.test.ts` (novo)
 - `tests/notas/equipes-acesso.test.ts` (novo)
 - `tests/notas/acesso-e-lixeira.test.ts`

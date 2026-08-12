@@ -84,7 +84,17 @@ Isto é mais que uma resposta pontual sobre o Checklist — **é um princípio d
   - **(a) O princípio vale para TODOS os módulos, inclusive Metas** — a decisão antiga de Metas ("cria automaticamente") precisa ser corrigida no plano geral para "só vincula, nunca cria", alinhando com o Checklist.
   - **(b) Metas é uma exceção deliberada** — porque Metas é o único módulo que também pode ser, na prática, uma origem legítima de cliente novo (um lead comercial que fecha contrato sem nunca ter passado pelo BPM/CRM antes), diferente do Checklist (que só faz sentido para uma empresa que já é cliente confirmado).
 
-**Volume real de impacto imediato:** com "só vincula, nunca cria", **3 dos 4 registros hoje existentes em `OperacionalClientes` ficariam sem `Cliente` correspondente** até alguém cadastrar essas 3 empresas no BPM primeiro — isso PRECISA ser resolvido manualmente (ou os 3 CNPJs cadastrados no BPM antes do backfill, ou aceitos como pendência temporária com `clienteId` nullable só para esses registros legados, nunca para cadastros novos a partir de agora). Decisão de saneamento a tomar na Fase 1 de execução, não aqui.
+**Volume real — lista levantada em 2026-08-12 (Vault aprovou leitura pura):** com "só vincula, nunca cria", estes 3 dos 4 registros existentes em `OperacionalClientes` ficam sem `Cliente` correspondente até serem cadastrados no BPM:
+
+| CNPJ | Razão Social | Status |
+|---|---|---|
+| 01957839000185 | ADICEL - INDUSTRIA E COMERCIO LTDA | ATIVO |
+| 44342670000161 | ALPHA COMEX BRASIL LTDA | ATIVO |
+| 42591651000143 | ARCOS DOURADOS COMERCIO DE ALIMENTOS SA | ATIVO |
+
+**Nota:** "ALPHA COMEX BRASIL LTDA" é provavelmente a própria empresa dona do painel (uso interno/teste) — vale confirmar antes de decidir se esse registro precisa mesmo de um `Cliente` real ou se é candidato a exclusão/dado de teste, ao contrário dos outros 2 que parecem clientes reais do Checklist.
+
+**Sem sobreposição com Metas** — nenhum destes 3 CNPJs coincide com os 17 órfãos de `contratos_comerciais` (ver `plano-cliente-master.md`). Precisam ser cadastrados manualmente no BPM antes do backfill, mesma mecânica de Metas.
 
 ---
 

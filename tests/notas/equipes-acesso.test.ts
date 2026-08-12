@@ -16,6 +16,19 @@ describe("Equipes privadas de notas — integração de acesso", () => {
     });
   });
 
+  it("restringe a pasta aberta à equipe selecionada", () => {
+    expect(criarCondicaoAcessoPorEquipe(42, "equipe-comercial")).toEqual({
+      teamShares: {
+        some: {
+          teamId: "equipe-comercial",
+          team: {
+            OR: [{ ownerId: 42 }, { members: { some: { userId: 42 } } }],
+          },
+        },
+      },
+    });
+  });
+
   it("mantém equipe como relação real e não amplia NotePermission com subject string", () => {
     const schema = readFileSync(resolve(process.cwd(), "prisma/schema.prisma"), "utf8");
     const validacoes = readFileSync(resolve(process.cwd(), "src/lib/validations/notas.ts"), "utf8");
@@ -49,8 +62,37 @@ describe("Equipes privadas de notas — integração de acesso", () => {
     );
 
     expect(header).not.toContain("Gerenciar equipes");
-    expect(lista).toContain("{isEquipe && (");
+    expect(lista).toContain("{isEquipe && !equipeSelecionada && (");
     expect(lista).toContain("Gerenciar equipes");
     expect(central).toContain('isEquipe={secaoAtiva === "EQUIPE"}');
+  });
+
+  it("renderiza cada equipe como uma pasta clicável junto aos cards de notas", () => {
+    const pastas = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/NoteTeamFolderGrid.tsx"),
+      "utf8",
+    );
+    const lista = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/ListaNotas.tsx"),
+      "utf8",
+    );
+    const central = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/CentralDeNotas.tsx"),
+      "utf8",
+    );
+
+    expect(pastas).toContain("Pastas das equipes");
+    expect(pastas).toContain("equipe._count.shares");
+    expect(pastas).toContain("onAbrirEquipe(equipe.id)");
+    expect(pastas).toContain("onConfigurarEquipe(equipe.id)");
+    expect(pastas).toContain("Abrir notas da equipe");
+    expect(pastas).toContain("Configurar equipe");
+    expect(lista).toContain("<NoteTeamFolderGrid");
+    expect(central).toContain("ListarMinhasEquipesNota()");
+    expect(central).toContain("initialTeamId={equipeInicialId}");
+    expect(central).toContain('teamId: secaoAtiva === "EQUIPE" ? equipeSelecionadaId ?? undefined : undefined');
+    expect(central).toContain('secaoAtiva === "EQUIPE" && !equipeSelecionadaId');
+    expect(lista).toContain("const exibirNotas = !isEquipe || Boolean(equipeSelecionada)");
+    expect(lista).toContain("{exibirNotas && !carregando && notas.length > 0 && (");
   });
 });

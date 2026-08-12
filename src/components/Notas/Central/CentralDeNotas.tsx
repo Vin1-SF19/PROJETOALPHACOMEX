@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import { BuscarNotas, ListarTagsDisponiveis } from "@/actions/NotasBusca";
 import { CriarNota, ObterNota } from "@/actions/Notas";
 import { AbrirAbaNota } from "@/actions/NotasWorkspace";
+import { ListarMinhasEquipesNota } from "@/actions/NotasEquipes";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
 import { getTema } from "@/lib/temas";
 import type { SecaoCentralNotas } from "@/lib/validations/notas";
@@ -25,6 +26,7 @@ import { TutorialNotasModal } from "./TutorialNotasModal";
 import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { NoteTeamsManager } from "@/components/Notas/Colaboracao/NoteTeamsManager";
+import type { EquipePastaNota } from "./NoteTeamFolderGrid";
 import {
   marcarTutorialModuloComoVisto,
   tutorialModuloFoiVisto,
@@ -177,6 +179,10 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [propriedadesAbertas, setPropriedadesAbertas] = useState(false);
   const [equipesAbertas, setEquipesAbertas] = useState(false);
+  const [equipeInicialId, setEquipeInicialId] = useState<string | null>(null);
+  const [equipeSelecionadaId, setEquipeSelecionadaId] = useState<string | null>(null);
+  const [equipes, setEquipes] = useState<EquipePastaNota[]>([]);
+  const [carregandoEquipes, setCarregandoEquipes] = useState(false);
   const [secaoAtiva, setSecaoAtiva] = useState<SecaoCentralNotas>("RECENTES");
   // Sem seletor visual de ordenação no grid de cards — sempre por última edição, o critério
   // mais útil para "o que eu estava fazendo" num layout de galeria.
@@ -201,6 +207,27 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
   } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const carregarEquipes = useCallback(async () => {
+    setCarregandoEquipes(true);
+    const res = await ListarMinhasEquipesNota();
+    setCarregandoEquipes(false);
+    if (!res.success) {
+      toast.error("Não foi possível carregar as equipes");
+      return;
+    }
+    const lista = res.data as EquipePastaNota[];
+    setEquipes(lista);
+    setEquipeSelecionadaId((atual) =>
+      atual && lista.some((equipe) => equipe.id === atual) ? atual : null,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (secaoAtiva !== "EQUIPE") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carrega as pastas ao entrar na seção contextual
+    void carregarEquipes();
+  }, [secaoAtiva, carregarEquipes]);
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -213,6 +240,13 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
   }, [queryInput]);
 
   const carregarNotas = useCallback(async () => {
+    if (secaoAtiva === "EQUIPE" && !equipeSelecionadaId) {
+      setNotas([]);
+      setTotalPages(1);
+      setTotalGeral(0);
+      setCarregando(false);
+      return;
+    }
     setCarregando(true);
     const res = await BuscarNotas({
       page,
@@ -221,6 +255,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
       secao: secaoAtiva,
       ordenarPor,
       tagIds: tagsSelecionadas.length > 0 ? tagsSelecionadas : undefined,
+      teamId: secaoAtiva === "EQUIPE" ? equipeSelecionadaId ?? undefined : undefined,
     });
     setCarregando(false);
 
@@ -232,7 +267,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
     setNotas(res.data as unknown as NotaListada[]);
     setTotalPages(res.totalPages ?? 1);
     setTotalGeral(res.total ?? 0);
-  }, [page, query, secaoAtiva, ordenarPor, tagsSelecionadas]);
+  }, [page, query, secaoAtiva, ordenarPor, tagsSelecionadas, equipeSelecionadaId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -377,6 +412,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
                   setPage(1);
                   lixeira.cancelarSelecao();
                   setNotaSelecionadaId(null);
+                  setEquipeSelecionadaId(null);
                 }}
                 tags={tags}
                 tagsSelecionadas={tagsSelecionadas}
@@ -411,7 +447,27 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
                 onExcluirSelecionadas={() => void lixeira.excluirSelecionadas()}
                 onEsvaziarLixeira={() => void lixeira.esvaziar()}
                 isEquipe={secaoAtiva === "EQUIPE"}
-                onAbrirEquipes={() => setEquipesAbertas(true)}
+                onAbrirEquipes={() => {
+                  setEquipeInicialId(null);
+                  setEquipesAbertas(true);
+                }}
+                equipes={equipes}
+                carregandoEquipes={carregandoEquipes}
+                onAbrirEquipe={(teamId) => {
+                  setEquipeSelecionadaId(teamId);
+                  setNotaSelecionadaId(null);
+                  setPage(1);
+                }}
+                selectedTeamId={equipeSelecionadaId}
+                onVoltarEquipes={() => {
+                  setEquipeSelecionadaId(null);
+                  setNotaSelecionadaId(null);
+                  setPage(1);
+                }}
+                onConfigurarEquipe={(teamId) => {
+                  setEquipeInicialId(teamId);
+                  setEquipesAbertas(true);
+                }}
               />
             </div>
           </NotasCard3D>
@@ -475,6 +531,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
               setPage(1);
               lixeira.cancelarSelecao();
               setNotaSelecionadaId(null);
+              setEquipeSelecionadaId(null);
               setFiltrosAbertos(false);
             }}
             tags={tags}
@@ -510,7 +567,13 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         onIniciarTour={iniciarTourGuiado}
         accent={accent}
       />
-      <NoteTeamsManager open={equipesAbertas} onOpenChange={setEquipesAbertas} />
+      <NoteTeamsManager
+        key={equipeInicialId ?? "todas-equipes"}
+        open={equipesAbertas}
+        initialTeamId={equipeInicialId}
+        onTeamsChanged={carregarEquipes}
+        onOpenChange={setEquipesAbertas}
+      />
       <GuiaModuloTour aberto={tourAberto} config={TUTORIAL_NOTAS} accent={accent} onFinalizar={finalizarTour} />
     </div>
   );

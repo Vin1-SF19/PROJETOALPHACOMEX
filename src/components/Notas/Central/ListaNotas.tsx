@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Pin, Star, Paperclip, MessageSquare, FileText, CheckSquare2, Square, Users } from "lucide-react";
+import { ChevronLeft, Pin, Star, Paperclip, MessageSquare, FileText, CheckSquare2, Square, Settings, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarraAcoesLixeira } from "./BarraAcoesLixeira";
+import { NoteTeamFolderGrid, type EquipePastaNota } from "./NoteTeamFolderGrid";
 
 export interface NotaListada {
   id: string;
@@ -42,6 +43,12 @@ interface ListaNotasProps {
   onEsvaziarLixeira: () => void;
   isEquipe: boolean;
   onAbrirEquipes: () => void;
+  equipes: EquipePastaNota[];
+  carregandoEquipes: boolean;
+  onAbrirEquipe: (teamId: string) => void;
+  selectedTeamId: string | null;
+  onVoltarEquipes: () => void;
+  onConfigurarEquipe: (teamId: string) => void;
 }
 
 function formatarData(data: Date | string): string {
@@ -82,7 +89,16 @@ export function ListaNotas({
   onEsvaziarLixeira,
   isEquipe,
   onAbrirEquipes,
+  equipes,
+  carregandoEquipes,
+  onAbrirEquipe,
+  selectedTeamId,
+  onVoltarEquipes,
+  onConfigurarEquipe,
 }: ListaNotasProps) {
+  const equipeSelecionada = equipes.find((equipe) => equipe.id === selectedTeamId) ?? null;
+  const exibirNotas = !isEquipe || Boolean(equipeSelecionada);
+
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
       {isLixeira && (
@@ -98,7 +114,7 @@ export function ListaNotas({
         />
       )}
 
-      {isEquipe && (
+      {isEquipe && !equipeSelecionada && (
         <div className="flex shrink-0 items-center gap-3 border-b border-white/5 bg-cyan-400/[0.035] px-3 py-3 sm:px-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/10 text-cyan-300">
             <Users size={17} aria-hidden="true" />
@@ -117,8 +133,43 @@ export function ListaNotas({
         </div>
       )}
 
+      {isEquipe && equipeSelecionada && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-cyan-400/10 bg-cyan-400/[0.035] px-3 py-3 sm:px-4">
+          <button
+            type="button"
+            onClick={onVoltarEquipes}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] text-slate-400 transition hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+            aria-label="Voltar para todas as equipes"
+            title="Todas as equipes"
+          >
+            <ChevronLeft size={17} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-black text-slate-100">{equipeSelecionada.name}</p>
+            <p className="text-[10px] text-slate-500">{equipeSelecionada._count.shares} nota{equipeSelecionada._count.shares === 1 ? "" : "s"} nesta pasta</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onConfigurarEquipe(equipeSelecionada.id)}
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.035] px-3 text-[10px] font-bold text-slate-400 transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.08] hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          >
+            <Settings size={13} /> Configurar
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-3" data-guia-notas="lista-cards">
-        {carregando && (
+        {isEquipe && !equipeSelecionada && (
+          <NoteTeamFolderGrid
+            equipes={equipes}
+            carregando={carregandoEquipes}
+            accent={accent}
+            onAbrirEquipe={onAbrirEquipe}
+            onConfigurarEquipe={onConfigurarEquipe}
+          />
+        )}
+
+        {exibirNotas && carregando && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <CardNotaSkeleton key={i} />
@@ -126,7 +177,7 @@ export function ListaNotas({
           </div>
         )}
 
-        {!carregando && notas.length > 0 && (
+        {exibirNotas && !carregando && notas.length > 0 && (
           <motion.div layout className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <AnimatePresence mode="popLayout">
               {notas.map((nota, index) => {
@@ -238,12 +289,14 @@ export function ListaNotas({
           </motion.div>
         )}
 
-        {!carregando && notas.length === 0 && (
-          <div className="flex h-full items-center justify-center px-3 py-4 text-xs text-slate-600">Nenhuma nota nesta seção.</div>
+        {exibirNotas && !carregando && notas.length === 0 && (
+          <div className={`flex items-center justify-center px-3 py-4 text-xs text-slate-600 ${isEquipe ? "min-h-20" : "h-full"}`}>
+            {isEquipe ? "Nenhuma nota compartilhada com suas equipes." : "Nenhuma nota nesta seção."}
+          </div>
         )}
       </div>
 
-      {totalPages > 1 && (
+      {exibirNotas && totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-white/5 px-3 py-2 text-xs text-slate-500">
           <button
             type="button"
