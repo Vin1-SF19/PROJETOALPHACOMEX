@@ -89,7 +89,6 @@ export default function PainelLayoutClient({
   // A barra de notas é `fixed bottom-0` no shell externo — os iframes de módulo não sabem que
   // ela existe (documentos isolados) e desenhariam conteúdo por baixo dela sem este respiro.
   const notasBarraVisivel = useNotasWorkspace((state) => state.isTaskbarVisible);
-  const ALTURA_BARRA_NOTAS_PX = 40;
 
   useChamadosNotifications(role, userId);
   useNotasNotifications(temAcessoNotas ? userId : 0);
@@ -315,10 +314,12 @@ export default function PainelLayoutClient({
 
         {/* Page content — reserva o espaço da barra de notas (fixed, fora dos iframes) para
             que nenhum módulo desenhe conteúdo por baixo dela (ex: rodapé da sidebar do Bibble
-            na Home). */}
+            na Home). A barra só ocupa a largura toda no desktop (lg+) — no mobile/tablet ela
+            vira um botão flutuante (FAB) que não precisa de respiro reservado no conteúdo. */}
         <div
-          className="flex-1 overflow-hidden relative transition-[padding] duration-200 ease-in-out"
-          style={{ paddingBottom: !tvMode && temAcessoNotas && notasBarraVisivel ? ALTURA_BARRA_NOTAS_PX : 0 }}
+          className={`flex-1 overflow-hidden relative transition-[padding] duration-200 ease-in-out ${
+            !tvMode && temAcessoNotas && notasBarraVisivel ? 'lg:pb-10' : ''
+          }`}
         >
 
           {/* SSR fallback shown while initial iframe loads */}

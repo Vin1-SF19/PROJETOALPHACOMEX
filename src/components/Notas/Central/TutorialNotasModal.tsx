@@ -150,36 +150,36 @@ export function TutorialNotasModal({ aberto, onFechar, onIniciarTour, accent }: 
       <DialogPortal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/75 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
-          className="fixed left-1/2 top-1/2 z-[100] grid max-h-[85vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_1fr_auto] gap-0 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/95 shadow-2xl outline-none backdrop-blur-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          className="fixed left-1/2 top-1/2 z-[100] grid max-h-[88vh] w-[calc(100%-1.5rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_1fr_auto] gap-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl outline-none backdrop-blur-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-h-[85vh] sm:w-full sm:rounded-3xl"
         >
           <div
-            className="flex items-center gap-3 border-b p-5"
+            className="flex items-center gap-2 border-b p-3.5 sm:gap-3 sm:p-5"
             style={{ borderColor: `rgba(${accent},0.18)`, background: `linear-gradient(135deg, rgba(${accent},0.14) 0%, rgba(2,6,23,0.4) 100%)` }}
           >
             <div
-              className="rounded-2xl border p-2.5"
+              className="hidden shrink-0 rounded-2xl border p-2.5 sm:flex"
               style={{ background: `rgba(${accent},0.2)`, borderColor: `rgba(${accent},0.25)` }}
             >
               <CircleHelp className="h-5 w-5" style={{ color: `rgba(${accent},1)` }} aria-hidden="true" />
             </div>
-            <div>
-              <DialogPrimitive.Title className="text-lg font-black uppercase italic tracking-tight text-white">
+            <div className="min-w-0">
+              <DialogPrimitive.Title className="truncate text-sm font-black uppercase italic tracking-tight text-white sm:text-lg">
                 Como usar o Bloco de notas Alpha
               </DialogPrimitive.Title>
-              <DialogPrimitive.Description className="mt-0.5 text-xs text-slate-400">
+              <DialogPrimitive.Description className="mt-0.5 hidden text-xs text-slate-400 sm:block">
                 Tudo o que o módulo oferece, incluindo cada botão de ação, explicado em um só lugar.
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close
               onClick={onFechar}
               aria-label="Fechar tutorial"
-              className="ml-auto rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <X size={18} />
             </DialogPrimitive.Close>
           </div>
 
-          <div className="overflow-y-auto p-5">
+          <div className="overflow-y-auto p-3.5 sm:p-5">
             <div className="flex flex-col gap-5">
               {SECOES.map((secao) => {
                 const Icone = secao.icone;
@@ -212,16 +212,16 @@ export function TutorialNotasModal({ aberto, onFechar, onIniciarTour, accent }: 
           </div>
 
           <div
-            className="flex items-center justify-between gap-3 border-t p-4"
+            className="flex flex-col items-stretch gap-2.5 border-t p-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4"
             style={{ borderColor: `rgba(${accent},0.18)` }}
           >
-            <p className="text-[11px] leading-relaxed text-slate-500">
+            <p className="hidden text-[11px] leading-relaxed text-slate-500 sm:block">
               Prefere ver na prática? O tour guiado destaca cada botão diretamente na tela.
             </p>
             <button
               type="button"
               onClick={onIniciarTour}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black text-black transition-[filter] hover:brightness-110"
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-black text-black transition-[filter] hover:brightness-110 sm:justify-start sm:py-2"
               style={{ background: `rgb(${accent})` }}
             >
               <PlayCircle size={14} /> Iniciar tour guiado

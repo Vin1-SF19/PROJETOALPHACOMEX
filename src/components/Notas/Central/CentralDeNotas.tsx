@@ -23,6 +23,7 @@ import { useLixeiraNotas } from "./useLixeiraNotas";
 import { CentralNotasHeader } from "./CentralNotasHeader";
 import { TutorialNotasModal } from "./TutorialNotasModal";
 import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   marcarTutorialModuloComoVisto,
   tutorialModuloFoiVisto,
@@ -172,6 +173,8 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
   const usuarioAtualId = Number((session?.user as { id?: string | number } | undefined)?.id ?? 0);
   const [tutorialAberto, setTutorialAberto] = useState(false);
   const [tourAberto, setTourAberto] = useState(false);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const [propriedadesAbertas, setPropriedadesAbertas] = useState(false);
   const [secaoAtiva, setSecaoAtiva] = useState<SecaoCentralNotas>("RECENTES");
   // Sem seletor visual de ordenação no grid de cards — sempre por última edição, o critério
   // mais útil para "o que eu estava fazendo" num layout de galeria.
@@ -256,8 +259,9 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
 
   useEffect(() => {
     if (!notaSelecionadaId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza notaCarregada com a ausência de seleção, sem Promise
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza notaCarregada/propriedadesAbertas com a ausência de seleção, sem Promise
       setNotaCarregada(null);
+      setPropriedadesAbertas(false);
       return;
     }
 
@@ -356,76 +360,135 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         onQueryChange={setQueryInput}
         onCriarNota={() => void criarNota()}
         onAbrirTutorial={() => setTutorialAberto(true)}
+        onAbrirFiltros={() => setFiltrosAbertos(true)}
       />
 
-      <div className="relative z-10 mx-4 mb-4 mt-4 flex min-h-0 flex-1 gap-4 md:mx-6 md:mb-6">
-        <NotasCard3D delay={0}>
-          <div className="overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
-            <SidebarFiltros
-              secaoAtiva={secaoAtiva}
-              onSelecionarSecao={(secao) => {
-                setSecaoAtiva(secao);
-                setPage(1);
-                lixeira.cancelarSelecao();
-                setNotaSelecionadaId(null);
-              }}
-              tags={tags}
-              tagsSelecionadas={tagsSelecionadas}
-              onToggleTag={toggleTag}
-              accent={accent}
-            />
-          </div>
-        </NotasCard3D>
-
-        <NotasCard3D delay={0.05} className="min-w-0 flex-1">
-          <div className="h-full overflow-hidden">
-            <ListaNotas
-              notas={notas}
-              notaSelecionadaId={notaSelecionadaId}
-              onSelecionar={setNotaSelecionadaId}
-              page={page}
-              totalPages={totalPages}
-              onMudarPage={setPage}
-              carregando={carregando}
-              accent={accent}
-              isLixeira={secaoAtiva === "LIXEIRA"}
-              modoSelecao={lixeira.modoSelecao}
-              notasSelecionadas={lixeira.notasSelecionadas}
-              processandoLixeira={lixeira.processando}
-              onAtivarSelecao={lixeira.ativarSelecao}
-              onCancelarSelecao={lixeira.cancelarSelecao}
-              onToggleSelecionada={lixeira.toggleSelecionada}
-              onExcluirSelecionadas={() => void lixeira.excluirSelecionadas()}
-              onEsvaziarLixeira={() => void lixeira.esvaziar()}
-            />
-          </div>
-        </NotasCard3D>
-
-        <NotasCard3D delay={0.1} className="min-w-0 flex-1">
-          <div className="h-full overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
-            {notaSelecionada && notaCarregada && notaCarregada.id === notaSelecionada.id ? (
-              <NoteEditor
-                key={notaCarregada.id}
-                noteId={notaCarregada.id}
-                initialTitle={notaCarregada.title}
-                initialContentJson={notaCarregada.contentJson}
-                initialVersion={notaCarregada.version}
-                onPreviewChange={atualizarPreview}
-                somenteLeitura={notaCarregada.somenteLeitura}
+      <div className="relative z-10 mx-3 mb-3 mt-3 flex min-h-0 flex-1 gap-4 md:mx-6 md:mb-6 md:mt-4">
+        {/* Filtros: coluna fixa no desktop (lg+), gaveta deslizante no mobile/tablet. */}
+        <div className="hidden lg:block">
+          <NotasCard3D delay={0}>
+            <div className="overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
+              <SidebarFiltros
+                secaoAtiva={secaoAtiva}
+                onSelecionarSecao={(secao) => {
+                  setSecaoAtiva(secao);
+                  setPage(1);
+                  lixeira.cancelarSelecao();
+                  setNotaSelecionadaId(null);
+                }}
+                tags={tags}
+                tagsSelecionadas={tagsSelecionadas}
+                onToggleTag={toggleTag}
+                accent={accent}
               />
-            ) : notaSelecionada ? (
-              // Nota escolhida na lista, mas o conteúdo (ObterNota) ainda está a caminho —
-              // sem isso o EstadoVazioNotas piscava por engano entre o clique e o carregamento.
-              <NoteEditorSkeleton />
-            ) : (
-              <EstadoVazioNotas onCriarNota={() => void criarNota()} accent={accent} />
-            )}
-          </div>
-        </NotasCard3D>
+            </div>
+          </NotasCard3D>
+        </div>
 
-        {notaSelecionada && (
-          <NotasCard3D delay={0.15}>
+        {/* Lista: tela cheia no mobile enquanto nenhuma nota está aberta; some quando o editor
+            assume a tela (< lg). No desktop, sempre visível lado a lado com o editor. */}
+        <div className={notaSelecionada ? "hidden min-w-0 flex-1 lg:block" : "min-w-0 flex-1"}>
+          <NotasCard3D delay={0.05} className="h-full">
+            <div className="h-full overflow-hidden">
+              <ListaNotas
+                notas={notas}
+                notaSelecionadaId={notaSelecionadaId}
+                onSelecionar={setNotaSelecionadaId}
+                page={page}
+                totalPages={totalPages}
+                onMudarPage={setPage}
+                carregando={carregando}
+                accent={accent}
+                isLixeira={secaoAtiva === "LIXEIRA"}
+                modoSelecao={lixeira.modoSelecao}
+                notasSelecionadas={lixeira.notasSelecionadas}
+                processandoLixeira={lixeira.processando}
+                onAtivarSelecao={lixeira.ativarSelecao}
+                onCancelarSelecao={lixeira.cancelarSelecao}
+                onToggleSelecionada={lixeira.toggleSelecionada}
+                onExcluirSelecionadas={() => void lixeira.excluirSelecionadas()}
+                onEsvaziarLixeira={() => void lixeira.esvaziar()}
+              />
+            </div>
+          </NotasCard3D>
+        </div>
+
+        {/* Editor: tela cheia no mobile assim que uma nota é selecionada, com botão de voltar
+            embutido no próprio NoteEditor (< lg). No desktop, coluna fixa sempre visível. */}
+        <div className={notaSelecionada ? "min-w-0 flex-1" : "hidden min-w-0 flex-1 lg:block"}>
+          <NotasCard3D delay={0.1} className="h-full">
             <div className="h-full overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
+              {notaSelecionada && notaCarregada && notaCarregada.id === notaSelecionada.id ? (
+                <NoteEditor
+                  key={notaCarregada.id}
+                  noteId={notaCarregada.id}
+                  initialTitle={notaCarregada.title}
+                  initialContentJson={notaCarregada.contentJson}
+                  initialVersion={notaCarregada.version}
+                  onPreviewChange={atualizarPreview}
+                  somenteLeitura={notaCarregada.somenteLeitura}
+                  onVoltarMobile={() => setNotaSelecionadaId(null)}
+                  onAbrirAcoesMobile={() => setPropriedadesAbertas(true)}
+                />
+              ) : notaSelecionada ? (
+                // Nota escolhida na lista, mas o conteúdo (ObterNota) ainda está a caminho —
+                // sem isso o EstadoVazioNotas piscava por engano entre o clique e o carregamento.
+                <NoteEditorSkeleton />
+              ) : (
+                <EstadoVazioNotas onCriarNota={() => void criarNota()} accent={accent} />
+              )}
+            </div>
+          </NotasCard3D>
+        </div>
+
+        {/* Propriedades: coluna fixa só no desktop — no mobile/tablet vira bottom sheet,
+            acionada pelo botão "Ações" dentro do próprio NoteEditor. */}
+        {notaSelecionada && (
+          <div className="hidden lg:block">
+            <NotasCard3D delay={0.15}>
+              <div className="h-full overflow-hidden rounded-3xl border border-white/5 bg-slate-950/40 shadow-2xl backdrop-blur-2xl transition-shadow duration-300 group-hover:border-white/10 group-hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)]">
+                <PainelPropriedades
+                  nota={notaSelecionada}
+                  usuarioAtualId={usuarioAtualId}
+                  onAtualizado={() => setRecarregarToken((token) => token + 1)}
+                  accent={accent}
+                />
+              </div>
+            </NotasCard3D>
+          </div>
+        )}
+      </div>
+
+      <Sheet open={filtrosAbertos} onOpenChange={setFiltrosAbertos}>
+        <SheetContent side="left" className="w-[85vw] max-w-xs p-0 lg:hidden">
+          <SheetHeader className="border-b border-white/5">
+            <SheetTitle className="text-sm">Seções e etiquetas</SheetTitle>
+          </SheetHeader>
+          <SidebarFiltros
+            secaoAtiva={secaoAtiva}
+            onSelecionarSecao={(secao) => {
+              setSecaoAtiva(secao);
+              setPage(1);
+              lixeira.cancelarSelecao();
+              setNotaSelecionadaId(null);
+              setFiltrosAbertos(false);
+            }}
+            tags={tags}
+            tagsSelecionadas={tagsSelecionadas}
+            onToggleTag={toggleTag}
+            accent={accent}
+            className="w-full"
+          />
+        </SheetContent>
+      </Sheet>
+
+      {notaSelecionada && (
+        <Sheet open={propriedadesAbertas} onOpenChange={setPropriedadesAbertas}>
+          <SheetContent side="bottom" className="max-h-[85vh] p-0 lg:hidden">
+            <SheetHeader className="border-b border-white/5">
+              <SheetTitle className="text-sm">Ações da nota</SheetTitle>
+            </SheetHeader>
+            <div className="overflow-y-auto">
               <PainelPropriedades
                 nota={notaSelecionada}
                 usuarioAtualId={usuarioAtualId}
@@ -433,9 +496,9 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
                 accent={accent}
               />
             </div>
-          </NotasCard3D>
-        )}
-      </div>
+          </SheetContent>
+        </Sheet>
+      )}
 
       <TutorialNotasModal
         aberto={tutorialAberto}

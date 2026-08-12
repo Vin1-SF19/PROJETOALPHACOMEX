@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Plus, LayoutGrid, Search, Loader2 } from "lucide-react";
+import { Plus, LayoutGrid, Search, Loader2, StickyNote, FileText, Pin, X } from "lucide-react";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
 import { CriarNota, ObterNota, ArquivarNota, MoverNotaParaLixeira } from "@/actions/Notas";
@@ -37,6 +37,8 @@ import { NoteShareDialog } from "@/components/Notas/Colaboracao/NoteShareDialog"
 import { NoteContextLinkDialog } from "@/components/Notas/Contexto/NoteContextLinkDialog";
 import { NoteColorPicker } from "./NoteColorPicker";
 import { Dock, DockItem, DockIcon, DockLabel } from "@/components/ui/dock";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 import { isNotasWorkspaceAtualizadoMessage } from "@/lib/notas-workspace-messages";
 
 interface NotesGlobalTaskbarProps {
@@ -89,6 +91,7 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
 
   const [notaAtiva, setNotaAtiva] = useState<NotaAtivaCarregada | null>(null);
   const [buscaAberta, setBuscaAberta] = useState(false);
+  const [menuMobileAberto, setMenuMobileAberto] = useState(false);
   const [carregandoAbertura, setCarregandoAbertura] = useState(true);
   const [noteIdCompartilhar, setNoteIdCompartilhar] = useState<string | null>(null);
   const [noteIdVincular, setNoteIdVincular] = useState<string | null>(null);
@@ -257,7 +260,8 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
       {/*
         Efeito de "parede saindo/voltando pra dentro da sidebar": a faixa cresce (abrindo) ou
         encolhe (fechando) em largura a partir da borda esquerda (transformOrigin: left —
-        exatamente onde a sidebar termina), em vez de um fade.
+        exatamente onde a sidebar termina), em vez de um fade. Barra completa só no desktop
+        (lg+) — no mobile/tablet ela vira o FAB logo abaixo, mais utilizável ao toque.
       */}
       <AnimatePresence>
         {isTaskbarVisible && carregandoAbertura && (
@@ -268,7 +272,7 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
             exit={{ scaleX: 0 }}
             transition={{ duration: 0.32, ease: "easeOut" }}
             style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left", left: sidebarWidth }}
-            className="fixed bottom-0 right-0 h-10 border-t border-amber-500/20 bg-[#030813] transition-[left] duration-200 ease-in-out"
+            className="fixed bottom-0 right-0 hidden h-10 border-t border-amber-500/20 bg-[#030813] transition-[left] duration-200 ease-in-out lg:block"
           >
             <motion.div
               initial={{ opacity: 0 }}
@@ -292,7 +296,7 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
             exit={{ scaleX: 0 }}
             transition={{ duration: 0.26, ease: "easeInOut" }}
             style={{ zIndex: Z_INDEX.barraNotas, transformOrigin: "left", left: sidebarWidth }}
-            className="fixed bottom-0 right-0 flex h-10 items-center gap-1 border-t border-white/[0.06] bg-[#030813] px-2 transition-[left] duration-200 ease-in-out"
+            className="fixed bottom-0 right-0 hidden h-10 items-center gap-1 border-t border-white/[0.06] bg-[#030813] px-2 transition-[left] duration-200 ease-in-out lg:flex"
           >
             <button
               type="button"
@@ -399,6 +403,111 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mobile/tablet (< lg): a barra completa (Nova nota, Central, Buscar, abas com
+          drag-and-drop e menu de contexto por clique direito) não é utilizável ao toque numa
+          tela estreita — vira um único botão flutuante que abre um menu simples de baixo. */}
+      {isTaskbarVisible && !carregandoAbertura && (
+        <button
+          type="button"
+          onClick={() => setMenuMobileAberto(true)}
+          title="Bloco de notas ALpha"
+          style={{ zIndex: Z_INDEX.barraNotas }}
+          className="fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full border border-amber-500/30 bg-[#0b1120] text-amber-300 shadow-[0_10px_30px_-8px_rgba(0,0,0,0.7)] transition-transform active:scale-95 lg:hidden"
+        >
+          <StickyNote size={20} aria-hidden="true" />
+          {tabs.length > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-black">
+              {tabs.length}
+            </span>
+          )}
+        </button>
+      )}
+
+      <Sheet open={menuMobileAberto} onOpenChange={setMenuMobileAberto}>
+        <SheetContent side="bottom" className="max-h-[75vh] p-0 lg:hidden">
+          <SheetHeader className="border-b border-white/5">
+            <SheetTitle className="text-sm">Bloco de notas ALpha</SheetTitle>
+          </SheetHeader>
+
+          <div className="flex flex-col gap-1 p-3">
+            <button
+              type="button"
+              onClick={() => {
+                setMenuMobileAberto(false);
+                void criarNovaNota();
+              }}
+              className="flex h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-medium text-slate-200 hover:bg-white/5"
+            >
+              <Plus size={16} /> Nova nota
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuMobileAberto(false);
+                onOpenCentral();
+              }}
+              className="flex h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium text-slate-300 hover:bg-white/5"
+            >
+              <LayoutGrid size={16} /> Central de notas
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuMobileAberto(false);
+                setBuscaAberta(true);
+              }}
+              className="flex h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium text-slate-300 hover:bg-white/5"
+            >
+              <Search size={16} /> Buscar notas
+            </button>
+          </div>
+
+          {tabs.length > 0 && (
+            <div className="flex-1 overflow-y-auto border-t border-white/5 p-3">
+              <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Abertas</p>
+              <div className="flex flex-col gap-1">
+                {tabs.map((tab) => (
+                  <div
+                    key={tab.id}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-3 py-2.5",
+                      tab.id === activeTabId && viewerMode !== "RECOLHIDO" ? "bg-amber-500/[0.08] text-amber-300" : "text-slate-300",
+                    )}
+                    style={tab.color ? { borderLeft: `3px solid ${tab.color}` } : undefined}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuMobileAberto(false);
+                        ativarAbaHandler(tab.id, tab.noteId);
+                      }}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      {tab.pinned ? (
+                        <Pin size={13} className="shrink-0 opacity-70" aria-label="Fixada" />
+                      ) : (
+                        <FileText size={13} className="shrink-0 opacity-60" aria-hidden="true" />
+                      )}
+                      <span className="truncate text-sm">{tab.title || "Sem título"}</span>
+                    </button>
+                    {!tab.pinned && (
+                      <button
+                        type="button"
+                        aria-label={`Fechar nota ${tab.title}`}
+                        onClick={() => fecharAbaHandler(tab.id, tab.noteId)}
+                        className="shrink-0 rounded p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-400"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <NotesSearchCommand open={buscaAberta} onOpenChange={setBuscaAberta} />
 

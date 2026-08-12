@@ -30,6 +30,7 @@ interface SidebarFiltrosProps {
   tagsSelecionadas: string[];
   onToggleTag: (tagId: string) => void;
   accent: string;
+  className?: string;
 }
 
 export function SidebarFiltros({
@@ -39,9 +40,10 @@ export function SidebarFiltros({
   tagsSelecionadas,
   onToggleTag,
   accent,
+  className,
 }: SidebarFiltrosProps) {
   return (
-    <nav className="flex h-full w-56 shrink-0 flex-col gap-1 overflow-y-auto p-3" data-guia-notas="secoes">
+    <nav className={cn("flex h-full w-56 shrink-0 flex-col gap-1 overflow-y-auto p-3", className)} data-guia-notas="secoes">
       {SECOES.map((secao) => {
         const Icon = secao.icon;
         const ativa = secao.id === secaoAtiva;

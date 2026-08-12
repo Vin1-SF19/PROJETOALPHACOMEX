@@ -21,7 +21,7 @@ import Mention from "@tiptap/extension-mention";
 import {
   Bold, Italic, UnderlineIcon, Strikethrough, List, ListOrdered,
   ListTodo, Quote, Code, Heading1, Heading2,
-  Highlighter, Minus, Undo2, Redo2, Lock,
+  Highlighter, Minus, Undo2, Redo2, Lock, ChevronLeft, SlidersHorizontal,
 } from "lucide-react";
 import { AtualizarNota } from "@/actions/Notas";
 import { SlashCommand } from "./slash-command";
@@ -70,6 +70,11 @@ interface NoteEditorProps {
   initialVersion: number;
   onPreviewChange?: (preview: { noteId: string; title: string; plainText: string }) => void;
   somenteLeitura?: boolean;
+  /** Só fornecido pela Central de Notas — mostra a barra superior mobile com "← Voltar" para a
+   *  lista. Ausente no NoteViewer flutuante da barra global, que não tem "lista" para voltar. */
+  onVoltarMobile?: () => void;
+  /** Idem: abre o painel de propriedades como bottom sheet no mobile (< lg). */
+  onAbrirAcoesMobile?: () => void;
 }
 
 type StatusSalvamento = "salvo" | "pendente" | "salvando" | "erro" | "conflito" | "offline";
@@ -81,6 +86,8 @@ export function NoteEditor({
   initialVersion,
   onPreviewChange,
   somenteLeitura = false,
+  onVoltarMobile,
+  onAbrirAcoesMobile,
 }: NoteEditorProps) {
   const [title, setTitle] = useState(initialTitle);
   const [tituloEditadoManualmente, setTituloEditadoManualmente] = useState(
@@ -261,9 +268,31 @@ export function NoteEditor({
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
+      {onVoltarMobile && (
+        <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-2 py-1.5 lg:hidden">
+          <button
+            type="button"
+            onClick={onVoltarMobile}
+            className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white"
+          >
+            <ChevronLeft size={16} /> Notas
+          </button>
+          {onAbrirAcoesMobile && (
+            <button
+              type="button"
+              onClick={onAbrirAcoesMobile}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-white/10 px-2.5 text-xs font-semibold text-slate-300 hover:bg-white/5 hover:text-white"
+            >
+              <SlidersHorizontal size={13} /> Ações
+            </button>
+          )}
+        </div>
+      )}
+
       {somenteLeitura ? (
-        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-amber-400">
-          <Lock size={12} /> Somente leitura — você não tem permissão para editar esta nota
+        <div className="flex items-center gap-2 border-b border-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-amber-400 sm:px-4">
+          <Lock size={12} className="shrink-0" />
+          <span className="truncate">Somente leitura — você não tem permissão para editar esta nota</span>
         </div>
       ) : (
         <div className="flex items-center gap-1 overflow-x-auto border-b border-white/5 px-2 py-1.5" data-guia-notas="editor-toolbar">

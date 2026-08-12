@@ -33,7 +33,7 @@ export function BarraAcoesLixeira({
   onEsvaziarLixeira,
 }: BarraAcoesLixeiraProps) {
   return (
-    <div className="flex min-h-12 items-center gap-2 border-b border-white/5 px-3 py-2">
+    <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-white/5 px-3 py-2">
       {modoSelecao ? (
         <>
           <button
@@ -51,7 +51,7 @@ export function BarraAcoesLixeira({
                 disabled={quantidadeSelecionadas === 0 || processando}
                 className="flex items-center gap-1.5 rounded-lg bg-rose-500/15 px-2.5 py-1.5 text-xs font-semibold text-rose-300 transition-colors hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Trash2 size={13} /> Excluir selecionadas ({quantidadeSelecionadas})
+                <Trash2 size={13} /> <span className="whitespace-nowrap">Excluir ({quantidadeSelecionadas})</span>
               </button>
             </AlertDialogTrigger>
             <AlertDialogContent>
