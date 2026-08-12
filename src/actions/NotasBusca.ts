@@ -16,7 +16,7 @@ import {
   type AplicarTagInput,
 } from "@/lib/validations/notas";
 import { podeEditarNota, temAcessoAoModuloNotas } from "@/lib/notas/permissoes";
-import { criarFiltroAcessoNota } from "@/lib/notas/acesso";
+import { criarFiltroAcessoNota, resolverCondicaoCompartilhadoPorSetor } from "@/lib/notas/acesso";
 
 async function sessaoUsuario() {
   const session = await auth();
@@ -40,7 +40,11 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
   if (!parsed.success) return { success: false as const, error: "Filtros inválidos", data: [], total: 0 };
   const filtros = parsed.data;
 
-  const acessoBase = criarFiltroAcessoNota(usuario);
+  const acessoBase = await criarFiltroAcessoNota(usuario);
+  // Setores/roles equivalentes ao do usuário (isSameRole tolera caixa/acento/pontuação — ver
+  // resolverCondicaoCompartilhadoPorSetor) — sem isso, um compartilhamento com "TI" nunca batia
+  // com um setor cadastrado como "T.I" na comparação exata que o Prisma faz por padrão.
+  const condicaoSetor = await resolverCondicaoCompartilhadoPorSetor(usuario);
 
   const condicoesSecao: Record<string, object> = {
     RECENTES: { status: { not: "LIXEIRA" } },
@@ -51,11 +55,7 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
       ownerId: { not: usuario.id },
       permissions: {
         some: {
-          OR: [
-            { subjectType: "USUARIO", subjectId: String(usuario.id) },
-            { subjectType: "SETOR", subjectId: usuario.role },
-            { subjectType: "ROLE", subjectId: usuario.role },
-          ],
+          OR: [{ subjectType: "USUARIO", subjectId: String(usuario.id) }, ...condicaoSetor],
         },
       },
     },

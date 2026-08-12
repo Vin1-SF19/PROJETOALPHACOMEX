@@ -22,10 +22,11 @@ export async function ObterWorkspaceNotas() {
   const usuario = await sessaoUsuario();
   if (!usuario) return { success: false as const, error: "Não autorizado" };
 
+  const filtroAcesso = await criarFiltroAcessoNota(usuario);
   const [workspace, abas] = await Promise.all([
     db.userNotesWorkspace.findUnique({ where: { userId: usuario.id } }),
     db.userOpenNoteTab.findMany({
-      where: { userId: usuario.id, note: criarFiltroAcessoNota(usuario) },
+      where: { userId: usuario.id, note: filtroAcesso },
       orderBy: { position: "asc" },
       include: { note: { select: { id: true, title: true, color: true, deletedAt: true } } },
     }),

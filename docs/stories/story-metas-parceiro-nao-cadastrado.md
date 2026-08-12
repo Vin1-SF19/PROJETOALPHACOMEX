@@ -74,11 +74,11 @@ quality_gate_tools:
   - [x] Validar e persistir a descrição em `canalOutro` somente para o canal correto.
   - [x] Listar valores distintos por Server Action autenticada, com select de reutilização e opção de novo valor.
   - [x] Atualizar o conhecimento do Bibble, a memória técnica e executar os quality gates.
-- [ ] Task 8 — Select pesquisável de parceiros (AC: 2)
-  - [ ] Substituir o select nativo por lista estilizada e alinhada ao visual do Painel Alpha.
-  - [ ] Adicionar pesquisa digitável com filtro por nome, nome fantasia e representante, sem diferenciar acentos ou caixa.
-  - [ ] Preservar seleção, limpeza, estado desabilitado, carregamento e acessibilidade do controle.
-  - [ ] Adicionar testes focados e executar os quality gates proporcionais.
+- [x] Task 8 — Select pesquisável de parceiros (AC: 2)
+  - [x] Substituir o select nativo por lista estilizada e alinhada ao visual do Painel Alpha.
+  - [x] Adicionar pesquisa digitável com filtro por nome, nome fantasia e representante, sem diferenciar acentos ou caixa.
+  - [x] Preservar seleção, limpeza, estado desabilitado, carregamento e acessibilidade do controle.
+  - [x] Adicionar testes focados e executar os quality gates proporcionais.
 
 ## Dev Notes
 
@@ -114,6 +114,7 @@ quality_gate_tools:
 | 2026-08-07 | 1.2 | Fluxo completo implementado, testado e preparado para revisão | Dex (Dev) |
 | 2026-08-07 | 1.3 | Refinamento visual solicitado: alternância no Metas e gaveta de pendências em Parceiros | Dex (Dev) |
 | 2026-08-07 | 1.4 | Novo canal Prospecção ativa com catálogo incremental solicitado | Dex (Dev) |
+| 2026-08-12 | 1.5 | Select de parceiros estilizado com pesquisa digitável e filtro tolerante a acentos | Dex (Dev) |
 
 ## Dev Agent Record
 
@@ -139,6 +140,12 @@ GPT-5 Codex (Dex / Builder).
 - O typecheck global manteve erros externos em Exclusão Fiscal, RADAR, Notas e Google Calendar; nenhum diagnóstico nos arquivos desta entrega.
 - `npm run build` parou no `prisma generate` por DLL em uso (`EPERM`) e `build:player` encontrou o entrypoint ausente de Apresentações; `npx next build` compilou e gerou 70 páginas com sucesso.
 - O lint global da rodada de Prospecção ativa também excedeu 120 segundos sem emitir diagnósticos; a validação focada permanece a fonte concluída da entrega.
+- Select pesquisável: lint focado dos dois componentes e do teste concluído sem erros; 11/11 testes focados de Metas aprovados.
+- Suíte completa do refinamento: 1087/1088 testes aprovados; o único timeout foi novamente `tests/google-calendar/cli.test.ts`, aprovado 2/2 isoladamente.
+- O typecheck global manteve somente erros preexistentes em Exclusão Fiscal, Habilitação RADAR e Google Calendar; nenhum diagnóstico nos arquivos deste refinamento.
+- `npm run build` parou antes da compilação na DLL do Prisma em uso (`EPERM`); `npx next build` compilou e gerou 70 páginas com sucesso.
+- O lint global permaneceu sem emitir diagnósticos por mais de 80 segundos e foi interrompido; o lint focado permanece aprovado.
+- CodeRabbit indisponível porque WSL não está instalado. A inspeção visual autenticada também ficou bloqueada pela tela de login do navegador isolado.
 
 ### Completion Notes List
 
@@ -152,6 +159,7 @@ GPT-5 Codex (Dex / Builder).
 - O tutorial de Parceiros e os manuais consultados pelo Bibble foram sincronizados com o novo comportamento.
 - `Prospecção ativa` agora grava a descrição normalizada em `canalOutro`, reutiliza valores globais dos contratos existentes e permite alimentar novas opções sem tabela adicional.
 - O Bibble ganhou um tópico específico ensinando o input inicial, o select e a opção `Adicionar nova prospecção`.
+- A lista de parceiros agora abre em um popover estilizado, permite pesquisar por parceiro, nome fantasia ou representante sem diferenciar acentos/caixa e mantém seleção, limpeza e estados de carregamento/vazio.
 
 ### File List
 
@@ -161,6 +169,7 @@ GPT-5 Codex (Dex / Builder).
 - `src/actions/ContratoComercial.ts`
 - `src/lib/comercial/prospeccao-ativa.ts` (novo)
 - `src/components/comercial/ModalGerenciamentoLeads.tsx`
+- `src/components/comercial/SeletorParceiroPesquisavel.tsx` (novo)
 - `src/components/comercial/CampoProspeccaoAtiva.tsx` (novo)
 - `src/actions/parceiros.ts`
 - `src/app/PainelAlpha/Parceiros/page.tsx`
@@ -172,10 +181,12 @@ GPT-5 Codex (Dex / Builder).
 - `src/components/Parceiros/NovoParceiro.tsx`
 - `tests/metas/parceiro-nao-cadastrado.test.ts` (novo)
 - `tests/metas/prospeccao-ativa.test.ts` (novo)
+- `tests/metas/seletor-parceiro-pesquisavel.test.ts` (novo)
 - `tests/bibble/module-knowledge.test.ts`
 - `tests/parceiros/responsavel.test.ts`
 - `.bibble/memory/architecture.md`
 - `.bibble/memory/components.md`
+- `plan/self-critique-story-metas-parceiro-select.json` (novo)
 
 ## QA Results
 

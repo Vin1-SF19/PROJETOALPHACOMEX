@@ -1,0 +1,32 @@
+{
+  "subtaskId": "story-metas-parceiro-select-pesquisavel",
+  "critiquedAt": "2026-08-12T11:19:00-03:00",
+  "step5_5": {
+    "predictedBugs": [
+      "O novo botão poderia submeter o formulário por acidente; todos os botões internos usam type=button.",
+      "Uma pesquisa com acentos ou caixa diferente poderia ocultar um parceiro válido; o texto é normalizado antes da comparação.",
+      "Uma resposta assíncrona poderia atualizar o formulário depois da troca de canal ou desmontagem; o effect invalida a resposta no cleanup.",
+      "Uma lista longa poderia ultrapassar o modal; o conteúdo usa portal e rolagem interna com altura máxima."
+    ],
+    "edgeCases": [
+      "Pesquisa vazia mantém a lista completa e a ordem recebida do servidor.",
+      "Lista vazia ou busca sem correspondência mostra estado vazio sem quebrar a seleção.",
+      "Termos múltiplos, acentos e caixa são tratados de forma determinística.",
+      "Parceiro não cadastrado mantém o combobox desabilitado e a seleção pode ser limpa explicitamente."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

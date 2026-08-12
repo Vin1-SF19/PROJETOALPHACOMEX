@@ -187,7 +187,7 @@ export async function ListarNotas(input?: ListarNotasInput) {
   if (!parsed.success) return { success: false as const, error: "Filtros inválidos", data: [], total: 0 };
   const filtros = parsed.data;
 
-  const acessoBase = criarFiltroAcessoNota(usuario);
+  const acessoBase = await criarFiltroAcessoNota(usuario);
 
   const where = {
     AND: [
