@@ -76,7 +76,7 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Admin | Gestão de Protocolos | `/PainelAlpha/GestaoProtocolos` | roles Admin/CEO/Suporte |
 | Admin | Onboarding | `/PainelAlpha/GestaoOnboarding` | admin only |
 | Admin | Conectores IAlpha | `/PainelAlpha/Conectores` | admin only |
-| Infra | Central de Notas | `/PainelAlpha/Notas` | `notas` ← **Fases 01-05/8 concluídas em 2026-08-07, migration APLICADA EM PRODUÇÃO** (schema+permissões, barra global+editor+autosave, Central de Notas, contextos, colaboração/histórico/notificações real-time — ver seção própria abaixo e `architecture.md`) |
+| Infra | Bloco de notas ALpha | `/PainelAlpha/Notas` | `notas` ← **Fases 01-05/8 concluídas em 2026-08-07, migration APLICADA EM PRODUÇÃO** (schema+permissões, barra global+editor+autosave, Central de Notas, contextos, colaboração/histórico/notificações real-time — ver seção própria abaixo e `architecture.md`) |
 
 ### Alpha CheckList — organização operacional (2026-07-14)
 
@@ -358,7 +358,13 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 ## Sistema de Notas — camada global (fila `prompt-phases/`, Fases 01-05/8 concluídas — ✅ MIGRATION APLICADA EM PRODUÇÃO em 2026-08-07)
 
-**Objetivo:** camada global de notas do Painel Alpha (barra inferior estilo abas de planilha, editor TipTap, Central de Notas, vínculo com módulos/registros, colaboração, anexos/lembretes). Prompt mestre e as 8 fases vivem em `prompt-phases/00-contexto-geral.md` a `08-testes-ia-hooks-documentacao-final.md` (fila ativa — ver `prompt-phases/_status.md`).
+**Objetivo:** camada global de notas do Painel Alpha (barra inferior estilo abas de planilha, editor TipTap, Bloco de notas ALpha, vínculo com módulos/registros, colaboração, anexos/lembretes). Prompt mestre e as 8 fases vivem em `prompt-phases/00-contexto-geral.md` a `08-testes-ia-hooks-documentacao-final.md` (fila ativa — ver `prompt-phases/_status.md`).
+
+**Atualização visual (2026-08-11):** o nome visível do módulo passou de “Central de Notas” para “Bloco de notas ALpha” em `CentralDeNotas.tsx`, `NotesGlobalTaskbar.tsx` e `modulos-registry.ts`. Os cards de `ListaNotas.tsx` usam `Note.color` no contorno quando a cor da aba está definida; cards sem cor preservam o estilo anterior. Nenhuma rota, permissão, action ou estrutura de banco mudou.
+
+**Navegação da barra global (2026-08-11):** `NotesGlobalTaskbar` recebe `onOpenCentral` de `PainelLayoutClient` e usa o mesmo `openTab` da `GlobalSidebar` no botão “Central” e no atalho `Ctrl+Alt+N`. Assim, `/PainelAlpha/Notas` é criado ou ativado como aba/iframe do shell, sem `router.push` no documento externo. O controle final com seta foi removido; a visibilidade da barra continua sob responsabilidade do `NotesLauncherButton` da sidebar.
+
+**Privacidade, lixeira e sincronização (2026-08-11):** o acesso a uma nota específica passou a ser sempre `ownerId` OU `NotePermission` explícita (`USUARIO`/`SETOR`/`ROLE`), inclusive para Admin/CEO/TI; o bypass administrativo permanece apenas no acesso ao módulo. `src/lib/notas/acesso.ts` centraliza os filtros Prisma. A lixeira da Central aceita seleção de cards, exclusão selecionada e esvaziamento, sempre com confirmação, Zod e filtro permanente `ownerId + status=LIXEIRA`. `NoteEditor` publica preview local de título/conteúdo a cada alteração. Fixações feitas dentro do iframe notificam o shell por `postMessage` same-origin (`notas-workspace-messages.ts`), e `NotesGlobalTaskbar` recarrega `UserOpenNoteTab` imediatamente.
 
 **✅ As 11 tabelas do sistema (`Note`, `NoteContext`, `NotePermission`, `Tag`, `NoteTag`, `NoteVersion`, `NoteComment`, `NoteAttachment`, `NoteReminder`, `UserOpenNoteTab`, `UserNotesWorkspace`) existem de verdade no Turso de produção desde 2026-08-07** — ver `decisions.md` para o histórico completo do desbloqueio.
 
@@ -395,7 +401,7 @@ O módulo `src/app/PainelAlpha/CadastroClientes/` oferece a Admin e CEO o botão
 
 **Próximas fases (não iniciadas ainda):** 02 (barra inferior + editor TipTap + autosave), 03 (Central de Notas — rota real nasce aqui), 04 (contextos/integração com módulos reais), 05 (colaboração/histórico/notificações), 06 (anexos/lembretes/auditoria), 07 (responsividade/acessibilidade/performance), 08 (testes/IA/documentação final).
 
-**Última atualização:** 2026-08-07 por Scribe
+**Última atualização:** 2026-08-11 por Scribe
 
 ---
 

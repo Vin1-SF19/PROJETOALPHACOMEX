@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Pin, Star, Paperclip, MessageSquare, FileText } from "lucide-react";
+import { Pin, Star, Paperclip, MessageSquare, FileText, CheckSquare2, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BarraAcoesLixeira } from "./BarraAcoesLixeira";
 
 export interface NotaListada {
   id: string;
@@ -30,6 +31,15 @@ interface ListaNotasProps {
   onMudarPage: (page: number) => void;
   carregando: boolean;
   accent: string;
+  isLixeira: boolean;
+  modoSelecao: boolean;
+  notasSelecionadas: ReadonlySet<string>;
+  processandoLixeira: boolean;
+  onAtivarSelecao: () => void;
+  onCancelarSelecao: () => void;
+  onToggleSelecionada: (noteId: string) => void;
+  onExcluirSelecionadas: () => void;
+  onEsvaziarLixeira: () => void;
 }
 
 function formatarData(data: Date | string): string {
@@ -59,9 +69,31 @@ export function ListaNotas({
   onMudarPage,
   carregando,
   accent,
+  isLixeira,
+  modoSelecao,
+  notasSelecionadas,
+  processandoLixeira,
+  onAtivarSelecao,
+  onCancelarSelecao,
+  onToggleSelecionada,
+  onExcluirSelecionadas,
+  onEsvaziarLixeira,
 }: ListaNotasProps) {
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
+      {isLixeira && (
+        <BarraAcoesLixeira
+          quantidadeNotas={notas.length}
+          quantidadeSelecionadas={notasSelecionadas.size}
+          modoSelecao={modoSelecao}
+          processando={processandoLixeira}
+          onAtivarSelecao={onAtivarSelecao}
+          onCancelarSelecao={onCancelarSelecao}
+          onExcluirSelecionadas={onExcluirSelecionadas}
+          onEsvaziarLixeira={onEsvaziarLixeira}
+        />
+      )}
+
       <div className="flex-1 overflow-y-auto p-3">
         {carregando && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -76,6 +108,7 @@ export function ListaNotas({
             <AnimatePresence mode="popLayout">
               {notas.map((nota, index) => {
                 const selecionada = nota.id === notaSelecionadaId;
+                const marcadaParaExcluir = notasSelecionadas.has(nota.id);
                 return (
                   <motion.button
                     key={nota.id}
@@ -87,18 +120,19 @@ export function ListaNotas({
                     transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.3) }}
                     whileHover={{ y: -6, scale: 1.015 }}
                     whileTap={{ scale: 0.99 }}
-                    onClick={() => onSelecionar(nota.id)}
+                    onClick={() => (modoSelecao ? onToggleSelecionada(nota.id) : onSelecionar(nota.id))}
+                    aria-pressed={modoSelecao ? marcadaParaExcluir : selecionada}
                     className={cn(
                       "group relative flex h-40 flex-col overflow-hidden rounded-2xl border p-3 text-left backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-300",
                       "shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_45px_-12px_rgba(0,0,0,0.65)]",
-                      selecionada
+                      selecionada || marcadaParaExcluir
                         ? "border-transparent"
                         : "border-white/[0.06] bg-white/[0.035] hover:border-white/[0.12] hover:bg-white/[0.06]",
                     )}
                     style={
-                      nota.color || selecionada
+                      nota.color || selecionada || marcadaParaExcluir
                         ? {
-                            ...(selecionada
+                            ...(selecionada || marcadaParaExcluir
                               ? {
                                   background: `rgba(${accent},0.12)`,
                                   boxShadow: `0 20px 45px -12px rgba(${accent},0.35)`,
@@ -109,6 +143,14 @@ export function ListaNotas({
                         : undefined
                     }
                   >
+                    {modoSelecao && (
+                      <span
+                        className="absolute right-2 top-2 z-10 rounded-md bg-slate-950/80 p-1 text-slate-300"
+                        aria-hidden="true"
+                      >
+                        {marcadaParaExcluir ? <CheckSquare2 size={15} className="text-rose-300" /> : <Square size={15} />}
+                      </span>
+                    )}
                     {nota.color && (
                       <span
                         className="absolute left-0 top-0 h-full w-1"

@@ -8,6 +8,8 @@ import {
   type CriarNotaInput,
   type AtualizarNotaInput,
   type ListarNotasInput,
+  excluirNotasDefinitivamenteSchema,
+  type ExcluirNotasDefinitivamenteInput,
 } from "@/lib/validations/notas";
 import {
   podeVisualizarNota,
@@ -18,7 +20,7 @@ import {
   podeExcluirDefinitivamenteNota,
   temAcessoAoModuloNotas,
 } from "@/lib/notas/permissoes";
-import { isAdminRole } from "@/lib/roles";
+import { criarFiltroAcessoNota, criarFiltroExclusaoLixeira } from "@/lib/notas/acesso";
 
 async function sessaoUsuario() {
   const session = await auth();
@@ -180,15 +182,7 @@ export async function ListarNotas(input?: ListarNotasInput) {
   if (!parsed.success) return { success: false as const, error: "Filtros inválidos", data: [], total: 0 };
   const filtros = parsed.data;
 
-  const acessoBase = isAdminRole(usuario.role)
-    ? {}
-    : {
-        OR: [
-          { ownerId: usuario.id },
-          { permissions: { some: { subjectType: "USUARIO", subjectId: String(usuario.id) } } },
-          { permissions: { some: { subjectType: "SETOR", subjectId: usuario.role } } },
-        ],
-      };
+  const acessoBase = criarFiltroAcessoNota(usuario);
 
   const where = {
     AND: [
@@ -280,10 +274,44 @@ export async function MoverNotaParaLixeira(noteId: string) {
 export async function ExcluirNotaDefinitivamente(noteId: string) {
   const usuario = await sessaoUsuario();
   if (!usuario) return { success: false as const, error: "Não autorizado" };
-  if (!(await podeExcluirDefinitivamenteNota(usuario, noteId))) {
+  const parsed = excluirNotasDefinitivamenteSchema.safeParse({ noteIds: [noteId] });
+  if (!parsed.success) return { success: false as const, error: "Nota inválida" };
+  const [noteIdValidado] = parsed.data.noteIds;
+
+  if (!(await podeExcluirDefinitivamenteNota(usuario, noteIdValidado))) {
     return { success: false as const, error: "Sem permissão" };
   }
 
-  await db.note.delete({ where: { id: noteId } });
-  return { success: true as const };
+  const removidas = await db.note.deleteMany({
+    where: criarFiltroExclusaoLixeira(usuario.id, [noteIdValidado]),
+  });
+  if (removidas.count === 0) {
+    return { success: false as const, error: "A nota precisa pertencer a você e estar na lixeira" };
+  }
+  return { success: true as const, count: removidas.count };
+}
+
+export async function ExcluirNotasDefinitivamente(input: ExcluirNotasDefinitivamenteInput) {
+  const usuario = await sessaoUsuario();
+  if (!usuario) return { success: false as const, error: "Não autorizado", count: 0 };
+
+  const parsed = excluirNotasDefinitivamenteSchema.safeParse(input);
+  if (!parsed.success) return { success: false as const, error: "Seleção inválida", count: 0 };
+
+  const removidas = await db.note.deleteMany({
+    where: criarFiltroExclusaoLixeira(usuario.id, parsed.data.noteIds),
+  });
+
+  return { success: true as const, count: removidas.count };
+}
+
+export async function EsvaziarLixeira() {
+  const usuario = await sessaoUsuario();
+  if (!usuario) return { success: false as const, error: "Não autorizado", count: 0 };
+
+  const removidas = await db.note.deleteMany({
+    where: criarFiltroExclusaoLixeira(usuario.id),
+  });
+
+  return { success: true as const, count: removidas.count };
 }

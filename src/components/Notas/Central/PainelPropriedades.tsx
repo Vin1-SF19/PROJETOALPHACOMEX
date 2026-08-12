@@ -28,6 +28,7 @@ import { NoteHistoryDialog } from "@/components/Notas/Colaboracao/NoteHistoryDia
 import { NoteCommentsPanel } from "@/components/Notas/Colaboracao/NoteCommentsPanel";
 import { ListaAnexos } from "@/components/Notas/Anexos/ListaAnexos";
 import { CriarLembreteDialog } from "@/components/Notas/Lembretes/CriarLembreteDialog";
+import { notificarWorkspaceNotasAtualizado } from "@/lib/notas-workspace-messages";
 
 interface PainelPropriedadesProps {
   nota: NotaListada;
@@ -39,7 +40,9 @@ interface PainelPropriedadesProps {
 export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent }: PainelPropriedadesProps) {
   const [processando, setProcessando] = useState(false);
   const tabs = useNotasWorkspace((state) => state.tabs);
-  const fecharAba = useNotasWorkspace((state) => state.fecharAba);
+  const removerAbaPorNota = useNotasWorkspace((state) => state.removerAbaPorNota);
+  const abrirAba = useNotasWorkspace((state) => state.abrirAba);
+  const definirPinnedAba = useNotasWorkspace((state) => state.definirPinnedAba);
   const removerNotificacoesDaNota = useNotasNotificacoes((state) => state.removerNotificacoesDaNota);
 
   // Chamado ao arquivar/excluir a partir da Central — a nota pode estar aberta como aba na
@@ -48,21 +51,29 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
   function limparResquiciosDaNota(noteId: string) {
     const tabAberta = tabs.find((tab) => tab.noteId === noteId);
     if (tabAberta) {
-      fecharAba(tabAberta.id);
+      removerAbaPorNota(noteId);
       void FecharAbaNota(noteId);
     }
     removerNotificacoesDaNota(noteId);
     limparRascunhoLocalDaNota(noteId);
+    notificarWorkspaceNotasAtualizado();
   }
 
   async function toggleFixar() {
+    const fixada = !nota.isPinned;
     setProcessando(true);
-    const res = await FixarNota({ noteId: nota.id, fixada: !nota.isPinned });
+    const res = await FixarNota({ noteId: nota.id, fixada });
     setProcessando(false);
     if (!res.success) {
       toast.error(res.error ?? "Não foi possível fixar a nota");
       return;
     }
+    if (fixada && !tabs.some((tab) => tab.noteId === nota.id)) {
+      abrirAba(nota.id, nota.title, { pinned: true, color: nota.color });
+    }
+    definirPinnedAba(nota.id, fixada);
+    notificarWorkspaceNotasAtualizado();
+    toast.success(fixada ? "Nota fixada na barra de tarefas" : "Nota desafixada");
     onAtualizado();
   }
 

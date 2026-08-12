@@ -68,17 +68,26 @@ interface NoteEditorProps {
   initialTitle: string;
   initialContentJson: JSONContent;
   initialVersion: number;
+  onPreviewChange?: (preview: { noteId: string; title: string; plainText: string }) => void;
 }
 
 type StatusSalvamento = "salvo" | "pendente" | "salvando" | "erro" | "conflito" | "offline";
 
-export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVersion }: NoteEditorProps) {
+export function NoteEditor({
+  noteId,
+  initialTitle,
+  initialContentJson,
+  initialVersion,
+  onPreviewChange,
+}: NoteEditorProps) {
   const [title, setTitle] = useState(initialTitle);
   const [tituloEditadoManualmente, setTituloEditadoManualmente] = useState(
     initialTitle.trim().length > 0 && initialTitle !== "Sem título",
   );
   const [status, setStatus] = useState<StatusSalvamento>("salvo");
   const versaoRef = useRef(initialVersion);
+  const titleRef = useRef(initialTitle);
+  const onPreviewChangeRef = useRef(onPreviewChange);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const carregouRef = useRef(false);
   const setSyncState = useNotasWorkspace((state) => state.setSyncState);
@@ -119,11 +128,17 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
     onUpdate: ({ editor }) => {
       if (!carregouRef.current) return;
 
-      if (!tituloEditadoManualmente && title.trim().length === 0) {
+      let tituloAtual = titleRef.current;
+      if (!tituloEditadoManualmente && tituloAtual.trim().length === 0) {
         const textoInicial = editor.getText().trim().slice(0, 60);
-        if (textoInicial) setTitle(textoInicial);
+        if (textoInicial) {
+          tituloAtual = textoInicial;
+          titleRef.current = textoInicial;
+          setTitle(textoInicial);
+        }
       }
 
+      onPreviewChangeRef.current?.({ noteId, title: tituloAtual, plainText: editor.getText() });
       setStatus("pendente");
       salvarRascunhoLocal(editor.getJSON(), editor.getText());
 
@@ -136,7 +151,7 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
     try {
       localStorage.setItem(
         rascunhoKey,
-        JSON.stringify({ title, contentJson, plainText, baseVersion: versaoRef.current, savedAt: Date.now() }),
+        JSON.stringify({ title: titleRef.current, contentJson, plainText, baseVersion: versaoRef.current, savedAt: Date.now() }),
       );
     } catch {
       /* localStorage indisponível — rascunho local é best-effort */
@@ -167,7 +182,7 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
 
     const res = await AtualizarNota({
       id: noteId,
-      title,
+      title: titleRef.current,
       contentJson,
       plainText,
       baseVersion: versaoRef.current,
@@ -192,6 +207,10 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
   }
 
   useEffect(() => {
+    onPreviewChangeRef.current = onPreviewChange;
+  }, [onPreviewChange]);
+
+  useEffect(() => {
     if (!editor) return;
 
     try {
@@ -206,6 +225,7 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
           editor.commands.setContent(rascunho.contentJson);
           // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura síncrona de localStorage ao montar, sem Promise para usar void
           setTitle(rascunho.title);
+          titleRef.current = rascunho.title;
           setStatus("pendente");
         }
       }
@@ -291,8 +311,14 @@ export function NoteEditor({ noteId, initialTitle, initialContentJson, initialVe
         onChange={(event) => {
           const novoTitulo = event.target.value;
           setTitle(novoTitulo);
+          titleRef.current = novoTitulo;
           setTituloEditadoManualmente(true);
           setStatus("pendente");
+          onPreviewChangeRef.current?.({
+            noteId,
+            title: novoTitulo,
+            plainText: editor?.getText() ?? "",
+          });
 
           // Reflete no rótulo da aba na barra de tarefas em tempo real — a aba não sabe do
           // título até a nota ser salva, então sem isso o usuário vê o valor antigo ali.

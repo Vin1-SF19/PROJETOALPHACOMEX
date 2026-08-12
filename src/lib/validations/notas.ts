@@ -172,6 +172,15 @@ export const aplicarTagSchema = z.object({
 });
 export type AplicarTagInput = z.infer<typeof aplicarTagSchema>;
 
+export const excluirNotasDefinitivamenteSchema = z.object({
+  noteIds: z
+    .array(z.string().trim().min(1))
+    .min(1, "Selecione ao menos uma nota")
+    .max(100, "Selecione no máximo 100 notas por vez")
+    .transform((ids) => [...new Set(ids)]),
+});
+export type ExcluirNotasDefinitivamenteInput = z.infer<typeof excluirNotasDefinitivamenteSchema>;
+
 export const NOTAS_ANEXO_MAX_SIZE = 25 * 1024 * 1024; // 25MB
 
 export const NOTAS_ANEXO_ALLOWED_MIME_TYPES = [

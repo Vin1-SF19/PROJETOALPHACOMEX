@@ -38,7 +38,6 @@ async function resolverPapelEfetivo(
   usuario: UsuarioContexto,
   nota: NotaComRelacoes,
 ): Promise<RolePermissaoNota | "OWNER" | null> {
-  if (isAdminRole(usuario.role)) return "ADMIN";
   if (nota.ownerId === usuario.id) return "OWNER";
 
   for (const permissao of nota.permissions) {
@@ -145,7 +144,6 @@ export async function podeExcluirDefinitivamenteNota(
   usuario: UsuarioContexto,
   noteId: string,
 ): Promise<boolean> {
-  if (isAdminRole(usuario.role)) return true;
   const nota = await carregarNotaComRelacoes(noteId);
   if (!nota) return false;
   return nota.ownerId === usuario.id;

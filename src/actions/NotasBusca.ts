@@ -1,7 +1,6 @@
 "use server";
 import db from "@/lib/prisma";
 import { auth } from "../../auth";
-import { isAdminRole } from "@/lib/roles";
 import {
   buscarNotasSchema,
   fixarNotaSchema,
@@ -17,6 +16,7 @@ import {
   type AplicarTagInput,
 } from "@/lib/validations/notas";
 import { podeEditarNota, temAcessoAoModuloNotas } from "@/lib/notas/permissoes";
+import { criarFiltroAcessoNota } from "@/lib/notas/acesso";
 
 async function sessaoUsuario() {
   const session = await auth();
@@ -40,15 +40,7 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
   if (!parsed.success) return { success: false as const, error: "Filtros inválidos", data: [], total: 0 };
   const filtros = parsed.data;
 
-  const acessoBase = isAdminRole(usuario.role)
-    ? {}
-    : {
-        OR: [
-          { ownerId: usuario.id },
-          { permissions: { some: { subjectType: "USUARIO", subjectId: String(usuario.id) } } },
-          { permissions: { some: { subjectType: "SETOR", subjectId: usuario.role } } },
-        ],
-      };
+  const acessoBase = criarFiltroAcessoNota(usuario);
 
   const condicoesSecao: Record<string, object> = {
     RECENTES: { status: { not: "LIXEIRA" } },
@@ -62,6 +54,7 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
           OR: [
             { subjectType: "USUARIO", subjectId: String(usuario.id) },
             { subjectType: "SETOR", subjectId: usuario.role },
+            { subjectType: "ROLE", subjectId: usuario.role },
           ],
         },
       },
@@ -70,7 +63,7 @@ export async function BuscarNotas(input?: BuscarNotasInput) {
     EQUIPE: { visibility: "EQUIPE", status: { not: "LIXEIRA" } },
     CONTEXTUAIS: { status: { not: "LIXEIRA" }, contexts: { some: {} } },
     ARQUIVADAS: { status: "ARQUIVADA" },
-    LIXEIRA: { status: "LIXEIRA" },
+    LIXEIRA: { status: "LIXEIRA", ownerId: usuario.id },
   };
 
   const orderBy =

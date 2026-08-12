@@ -50,7 +50,11 @@ Ao criar um novo módulo, verificar e registrar:
 ## Sistema de Notas (EM CONSTRUÇÃO — fila `prompt-phases/`, Fase 01/8 concluída em 2026-08-07)
 
 - **Rota:** `/PainelAlpha/Notas` — **existe de verdade desde a Fase 03** (`src/app/PainelAlpha/Notas/page.tsx`, mesmo padrão de auth/permissão do `AlphaBlueprintPage`).
-- **Registry:** entrada `notas` em `src/lib/modulos-registry.ts` (`category: 'infra'`, `permission: 'notas'`, `iconName: 'StickyNote'`) — confirmado por Probe que isso já é suficiente para aparecer em `GlobalSidebar.tsx`, `PainelAlphaClient.tsx`, `ModalGerenciarSetor.tsx`/`ModalOverrideUser.tsx`/`PreviewModulosSetor.tsx` sem tocar mais nenhum arquivo manual (reconfirma que o checklist antigo de 3 arrays do `CLAUDE.md` raiz está obsoleto).
+- **Registry:** entrada `notas` em `src/lib/modulos-registry.ts` (`label: 'Bloco de notas ALpha'`, `category: 'infra'`, `permission: 'notas'`, `iconName: 'StickyNote'`) — confirmado por Probe que isso já é suficiente para aparecer em `GlobalSidebar.tsx`, `PainelAlphaClient.tsx`, `ModalGerenciarSetor.tsx`/`ModalOverrideUser.tsx`/`PreviewModulosSetor.tsx` sem tocar mais nenhum arquivo manual (reconfirma que o checklist antigo de 3 arrays do `CLAUDE.md` raiz está obsoleto).
+- **Navegação a partir do shell global:** botões e atalhos fora dos iframes devem reutilizar o `openTab(url, label)` de `PainelLayoutClient.tsx`, como a sidebar. Exemplo real: `<NotesGlobalTaskbar onOpenCentral={() => openTab('/PainelAlpha/Notas', getLabelForUrl('/PainelAlpha/Notas'))} />`; não usar `router.push` para abrir um módulo gerenciado pelas abas do painel.
+- **Central ↔ barra global:** a Central roda dentro do iframe e não compartilha a instância Zustand do shell. Depois de fixar/desafixar ou remover notas, use `notificarWorkspaceNotasAtualizado()` (`src/lib/notas-workspace-messages.ts`); `NotesGlobalTaskbar` aceita somente a mensagem tipada de mesma origem e recarrega `ObterWorkspaceNotas`.
+- **Privacidade:** `src/lib/notas/acesso.ts` é a fonte única do filtro de listagem (`ownerId` ou compartilhamento `USUARIO`/`SETOR`/`ROLE`). Nunca adicione bypass de Admin em consultas ou helpers de uma nota específica; o bypass administrativo vale somente para entrar no módulo.
+- **Lixeira:** exclusão permanente em lote passa por `ExcluirNotasDefinitivamente`/`EsvaziarLixeira`, com filtro obrigatório `ownerId + status=LIXEIRA`; os cards selecionáveis e confirmações ficam em `Central/{ListaNotas,BarraAcoesLixeira,useLixeiraNotas}`.
 - **Ícone:** `StickyNote` importado em `ICON_MAP` de `GlobalSidebar.tsx`.
 - **Permissão necessária:** `getPermissoesEfetivas(userId).includes('notas')` — a ser checada na `page.tsx` quando ela existir (Fase 03), mesmo padrão dos demais módulos.
 - **Checklist de integração desta fase:**
@@ -61,6 +65,7 @@ Ao criar um novo módulo, verificar e registrar:
   - [x] Atalhos de teclado `Ctrl+Shift+N`/`Ctrl+Shift+B`/`Ctrl+Alt+N` — `src/hooks/useNotasAtalhos.ts`, confirmado sem conflito com nenhum listener existente
   - [x] Barra global inferior (`NotesGlobalTaskbar`) — construída como componente IRMÃO de `TabBar.tsx`/`PainelLayoutClient.tsx`, montada fora do container de iframes dos módulos
 - **Editado quando:** Cada fase seguinte da fila concluir — atualizar este checklist e adicionar entrada própria por fase, seguindo o padrão já usado por Alpha Presentation Studio/Alpha Blueprint (uma seção "Onda N"/"Fase N" por entrega).
+- **Última atualização:** 2026-08-11 por Scribe — privacidade por propriedade/compartilhamento, lixeira em lote e sincronização iframe→shell documentadas.
 
 ### Sistema de Notas — integração por módulo (Fase 04, 2026-08-07)
 

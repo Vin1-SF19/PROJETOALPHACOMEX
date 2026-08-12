@@ -12,8 +12,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Plus, LayoutGrid, ChevronUp, ChevronDown, Search, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Plus, LayoutGrid, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
 import { CriarNota, ObterNota, ArquivarNota, MoverNotaParaLixeira } from "@/actions/Notas";
@@ -38,9 +37,11 @@ import { NoteShareDialog } from "@/components/Notas/Colaboracao/NoteShareDialog"
 import { NoteContextLinkDialog } from "@/components/Notas/Contexto/NoteContextLinkDialog";
 import { NoteColorPicker } from "./NoteColorPicker";
 import { Dock, DockItem, DockIcon, DockLabel } from "@/components/ui/dock";
+import { isNotasWorkspaceAtualizadoMessage } from "@/lib/notas-workspace-messages";
 
 interface NotesGlobalTaskbarProps {
   userId: number;
+  onOpenCentral: () => void;
   /** Largura REAL da sidebar desktop em px, medida ao vivo via ResizeObserver (ver
    *  GlobalSidebar/useElementWidth) — a barra encosta exatamente aqui, nunca num valor fixo
    *  assumido que pode dessincronizar do CSS real. 0 no mobile/tablet (sidebar em "gaveta",
@@ -55,8 +56,7 @@ interface NotaAtivaCarregada {
   version: number;
 }
 
-export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTaskbarProps) {
-  const router = useRouter();
+export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: NotesGlobalTaskbarProps) {
   const tabs = useNotasWorkspace((state) => state.tabs);
   const activeTabId = useNotasWorkspace((state) => state.activeTabId);
   const isTaskbarVisible = useNotasWorkspace((state) => state.isTaskbarVisible);
@@ -96,6 +96,16 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
   const hidratadoDoServidorRef = useRef(false);
   const isTaskbarVisibleAnteriorRef = useRef(isTaskbarVisible);
 
+  const sincronizarWorkspaceDoServidor = useCallback(async () => {
+    const res = await ObterWorkspaceNotas();
+    if (!res.success) return;
+    hidratar({
+      tabs: res.data.abas.map((aba) => ({ id: aba.id, noteId: aba.noteId, title: aba.title, pinned: aba.isPinned, color: aba.color })),
+      activeId: res.data.abas.find((aba) => aba.isActive)?.id ?? null,
+    });
+    setViewerMode(res.data.workspace.viewerMode as never);
+  }, [hidratar, setViewerMode]);
+
   // Feedback visual de abertura breve e visível antes de revelar o conteúdo — dispara toda vez
   // que a barra transiciona de fechada para aberta (o componente nunca desmonta entre uma
   // abertura e outra, então não basta inicializar o estado uma vez só na montagem).
@@ -121,19 +131,22 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
         /* ignore */
       }
 
-      const res = await ObterWorkspaceNotas();
-      if (res.success) {
-        hidratar({
-          tabs: res.data.abas.map((aba) => ({ id: aba.id, noteId: aba.noteId, title: aba.title, pinned: aba.isPinned, color: aba.color })),
-          activeId: res.data.abas.find((aba) => aba.isActive)?.id ?? null,
-        });
-        setViewerMode(res.data.workspace.viewerMode as never);
-      }
+      await sincronizarWorkspaceDoServidor();
     }
 
     void carregarWorkspace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hidratar, storageKey, sincronizarWorkspaceDoServidor]);
+
+  useEffect(() => {
+    function receberAtualizacaoDoIframe(event: MessageEvent<unknown>) {
+      if (event.origin !== window.location.origin) return;
+      if (!isNotasWorkspaceAtualizadoMessage(event.data)) return;
+      void sincronizarWorkspaceDoServidor();
+    }
+
+    window.addEventListener("message", receberAtualizacaoDoIframe);
+    return () => window.removeEventListener("message", receberAtualizacaoDoIframe);
+  }, [sincronizarWorkspaceDoServidor]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -215,7 +228,7 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
   useNotasAtalhos({
     onNovaNota: () => void criarNovaNota(),
     onToggleBarra: toggleTaskbar,
-    onAbrirCentral: () => router.push("/PainelAlpha/Notas"),
+    onAbrirCentral: onOpenCentral,
   });
 
   useEffect(() => {
@@ -291,7 +304,7 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
             <button
               type="button"
               title="Bloco de notas ALpha (Ctrl+Alt+N)"
-              onClick={() => router.push("/PainelAlpha/Notas")}
+              onClick={onOpenCentral}
               className="flex h-7 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-slate-400 hover:bg-white/5 hover:text-white"
             >
               <LayoutGrid size={13} />
@@ -380,18 +393,6 @@ export function NotesGlobalTaskbar({ userId, sidebarWidth = 0 }: NotesGlobalTask
               </SortableContext>
             </DndContext>
 
-            <Dock orientation="horizontal" magnification={34} distance={60} panelSize={28} className="ml-1 gap-0.5">
-              <DockItem>
-                <button
-                  type="button"
-                  onClick={() => setViewerMode(viewerMode === "RECOLHIDO" ? "COMPACTO" : "RECOLHIDO")}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white"
-                >
-                  <DockIcon>{viewerMode === "RECOLHIDO" ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</DockIcon>
-                  <DockLabel>{viewerMode === "RECOLHIDO" ? "Expandir painel" : "Recolher painel"}</DockLabel>
-                </button>
-              </DockItem>
-            </Dock>
           </motion.div>
         )}
       </AnimatePresence>

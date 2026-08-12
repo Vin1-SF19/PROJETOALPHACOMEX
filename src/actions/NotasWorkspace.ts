@@ -10,6 +10,7 @@ import {
   type ReordenarAbasNotasInput,
 } from "@/lib/validations/notas";
 import { podeVisualizarNota } from "@/lib/notas/permissoes";
+import { criarFiltroAcessoNota } from "@/lib/notas/acesso";
 
 async function sessaoUsuario() {
   const session = await auth();
@@ -24,7 +25,7 @@ export async function ObterWorkspaceNotas() {
   const [workspace, abas] = await Promise.all([
     db.userNotesWorkspace.findUnique({ where: { userId: usuario.id } }),
     db.userOpenNoteTab.findMany({
-      where: { userId: usuario.id },
+      where: { userId: usuario.id, note: criarFiltroAcessoNota(usuario) },
       orderBy: { position: "asc" },
       include: { note: { select: { id: true, title: true, color: true, deletedAt: true } } },
     }),

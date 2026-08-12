@@ -9,7 +9,7 @@ interface UseNotasAtalhosParams {
 }
 
 /**
- * Ctrl+Shift+N (nova nota), Ctrl+Shift+B (abrir/recolher barra), Ctrl+Alt+N (Central de Notas).
+ * Ctrl+Shift+N (nova nota), Ctrl+Shift+B (abrir/recolher barra), Ctrl+Alt+N (Bloco de notas ALpha).
  * Nenhum conflito com atalhos globais existentes no painel — confirmado por Scout na Fase 02.
  */
 export function useNotasAtalhos({ onNovaNota, onToggleBarra, onAbrirCentral }: UseNotasAtalhosParams) {

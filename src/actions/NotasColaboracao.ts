@@ -18,7 +18,6 @@ import {
   podeVisualizarNota,
 } from "@/lib/notas/permissoes";
 import { canalNotasDoUsuario } from "@/lib/notas/notificacoes";
-import { isAdminRole } from "@/lib/roles";
 import { z } from "zod";
 
 async function sessaoUsuario() {
@@ -152,8 +151,8 @@ export async function TransferirPropriedadeNota(input: { noteId: string; novoOwn
   if (!nota) return { success: false as const, error: "Nota não encontrada" };
 
   const ehDono = nota.ownerId === usuario.id;
-  if (!ehDono && !isAdminRole(usuario.role)) {
-    return { success: false as const, error: "Somente o dono ou um administrador pode transferir a propriedade" };
+  if (!ehDono) {
+    return { success: false as const, error: "Somente o dono pode transferir a propriedade" };
   }
 
   const novoDono = await db.usuarios.findUnique({ where: { id: parsed.data.novoOwnerId }, select: { id: true } });
@@ -267,7 +266,7 @@ export async function ExcluirComentarioNota(commentId: string) {
   const comentario = await db.noteComment.findUnique({ where: { id: commentId }, select: { noteId: true, authorId: true } });
   if (!comentario) return { success: false as const, error: "Comentário não encontrado" };
 
-  const podeExcluir = comentario.authorId === usuario.id || isAdminRole(usuario.role) || (await podeAlterarPermissoesNota(usuario, comentario.noteId));
+  const podeExcluir = comentario.authorId === usuario.id || (await podeAlterarPermissoesNota(usuario, comentario.noteId));
   if (!podeExcluir) return { success: false as const, error: "Sem permissão" };
 
   await db.noteComment.update({ where: { id: commentId }, data: { deletedAt: new Date() } });

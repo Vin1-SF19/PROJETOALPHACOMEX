@@ -18,6 +18,7 @@ interface NotasWorkspaceStore {
   hidratar: (state: { tabs: NotaTab[]; activeId: string | null }) => void;
   abrirAba: (noteId: string, title: string, opts?: { pinned?: boolean; color?: string | null }) => void;
   fecharAba: (tabId: string) => void;
+  removerAbaPorNota: (noteId: string) => void;
   ativarAba: (tabId: string) => void;
   reordenarAbas: (draggedId: string, targetId: string) => void;
   renomearAba: (tabId: string, title: string) => void;
@@ -67,6 +68,20 @@ export const useNotasWorkspace = create<NotasWorkspaceStore>((set) => ({
           ? (restantes[Math.max(0, idx - 1)]?.id ?? null)
           : state.activeTabId;
       return { tabs: restantes, activeTabId };
+    }),
+
+  removerAbaPorNota: (noteId) =>
+    set((state) => {
+      const removida = state.tabs.find((tab) => tab.noteId === noteId);
+      if (!removida) return state;
+      const restantes = state.tabs.filter((tab) => tab.noteId !== noteId);
+      return {
+        tabs: restantes,
+        activeTabId:
+          state.activeTabId === removida.id
+            ? (restantes.at(-1)?.id ?? null)
+            : state.activeTabId,
+      };
     }),
 
   ativarAba: (tabId) => set({ activeTabId: tabId, viewerMode: "COMPACTO" }),

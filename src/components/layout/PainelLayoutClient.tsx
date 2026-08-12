@@ -382,7 +382,13 @@ export default function PainelLayoutClient({
           ResizeObserver em GlobalSidebar) — nunca um valor fixo assumido, então nunca sobrepõe a
           sidebar mesmo que a largura real dela mude ou dessincronize do CSS esperado. No mobile/
           tablet (< lg, sidebar em modo "gaveta") sidebarWidth fica 0 e a barra ocupa a largura toda. */}
-      {!tvMode && temAcessoNotas && <NotesGlobalTaskbar userId={userId} sidebarWidth={sidebarWidth} />}
+      {!tvMode && temAcessoNotas && (
+        <NotesGlobalTaskbar
+          userId={userId}
+          sidebarWidth={sidebarWidth}
+          onOpenCentral={() => openTab('/PainelAlpha/Notas', getLabelForUrl('/PainelAlpha/Notas'))}
+        />
+      )}
     </>
   );
 }

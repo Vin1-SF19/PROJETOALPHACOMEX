@@ -265,13 +265,17 @@ model UserNotesWorkspace { userId Int @id, isTaskbarVisible, viewerMode (default
 
 **Todas as FKs de usuário são `Int` com `@relation` nomeada explicitamente** (`"NoteOwner"`, `"NoteCreatedBy"`, `"NoteUpdatedBy"`, `"NotePermissionCreatedBy"`, `"TagOwner"`, `"NoteVersionChangedBy"`, `"NoteCommentAuthor"`, `"NoteAttachmentUploadedBy"`, `"NoteReminderUser"`, `"UserOpenNoteTabUser"`, `"UserNotesWorkspaceUser"`) — mesmo padrão real já usado em `BlueprintProject` (`"BlueprintRequester"` etc), obrigatório porque `Note` tem 3 FKs (`ownerId`/`createdById`/`updatedById`) para `usuarios`.
 
-**Herança de permissão contextual** (`src/lib/notas/permissoes.ts`): nota vinculada a um módulo restrito (`NoteContext.moduleKey`) só é visível a quem também tem a permissão daquele módulo via `getPermissoesEfetivas()` — owner/Admin/CEO/TI sempre bypassam. "Nota de equipe" (`NotePermission.subjectType = "SETOR"`) compara `subjectId` contra `usuarios.role` via `isSameRole()` (`src/lib/roles.ts`) — não existe tabela de membros de equipe no projeto, ver decisão em `decisions.md`.
+**Herança de permissão contextual** (`src/lib/notas/permissoes.ts`): nota vinculada a um módulo restrito (`NoteContext.moduleKey`) só é visível a quem também tem a permissão daquele módulo via `getPermissoesEfetivas()`. Admin/CEO/TI podem ignorar apenas essa checagem do módulo contextual, depois de já terem sido reconhecidos como dono ou destinatário de compartilhamento; isso nunca concede acesso à nota por si só. "Nota de equipe" (`NotePermission.subjectType = "SETOR"`) compara `subjectId` contra `usuarios.role` via `isSameRole()` (`src/lib/roles.ts`) — não existe tabela de membros de equipe no projeto, ver decisão em `decisions.md`.
 
-**Server Actions** (`src/actions/Notas.ts`): `CriarNota`, `AtualizarNota` (controle de versão otimista via `baseVersion`/`currentVersion`, retorna `error: "CONFLITO_VERSAO"` se desatualizado — nunca sobrescreve silenciosamente), `ObterNota`, `ListarNotas` (paginado, mesmo contrato `{success,data,total,page,pageSize,totalPages}` do resto do projeto), `ArquivarNota`, `RestaurarNota`, `MoverNotaParaLixeira`, `ExcluirNotaDefinitivamente`.
+**Server Actions** (`src/actions/Notas.ts`): `CriarNota`, `AtualizarNota` (controle de versão otimista via `baseVersion`/`currentVersion`, retorna `error: "CONFLITO_VERSAO"` se desatualizado — nunca sobrescreve silenciosamente), `ObterNota`, `ListarNotas` (paginado, mesmo contrato `{success,data,total,page,pageSize,totalPages}` do resto do projeto), `ArquivarNota`, `RestaurarNota`, `MoverNotaParaLixeira`, `ExcluirNotaDefinitivamente`, `ExcluirNotasDefinitivamente` e `EsvaziarLixeira`.
+
+**Regra de isolamento atual (2026-08-11):** Admin/CEO/TI não possuem bypass sobre notas específicas. Todas as listagens usam `criarFiltroAcessoNota()` (`src/lib/notas/acesso.ts`): a nota precisa pertencer ao usuário ou ter `NotePermission` explícita para usuário/setor/role. Exclusões permanentes usam `criarFiltroExclusaoLixeira()` com `ownerId` autenticado e `status=LIXEIRA`; exclusão selecionada também exige IDs validados por Zod. Nenhuma alteração de schema foi necessária.
+
+**Sincronização de iframe (2026-08-11):** como a Central e a barra global executam em documentos distintos, mudanças de workspace feitas na Central disparam a mensagem tipada `painel-alpha:notas-workspace-atualizado` para `window.parent`, limitada à mesma origem. `NotesGlobalTaskbar` valida origem+payload e recarrega o workspace do servidor. O preview dos cards da Central é atualizado localmente pelo callback opcional de `NoteEditor`, sem alterar o debounce de persistência.
 
 **Escala de z-index** (`src/lib/z-index.ts`, novo): `conteudoPrincipal`(0) → `headerSidebar`(50) → `barraNotas`(100) → `editorNotas`(110) → `dropdown`(150) → `modal`(250) → `toast`(300) → `alertaCritico`(400). Não existia escala formal antes — valores soltos pré-existentes (`z-40`, `z-50`, `z-[55]`, `z-[60]`, `z-[70]`, `z-[200]` em `GlobalSidebar.tsx`/`PainelLayoutClient.tsx`/`OnboardingModal.tsx`) **não foram tocados/renumerados** (fora de escopo desta fila, risco de regressão visual em código não relacionado).
 
-**Registry:** entrada `{ id: 'notas', label: 'Central de Notas', href: '/PainelAlpha/Notas', iconName: 'StickyNote', category: 'infra', permission: 'notas' }` em `MODULOS_REGISTRY` — rota ainda não existe (chega na Fase 03).
+**Registry:** entrada `{ id: 'notas', label: 'Bloco de notas ALpha', href: '/PainelAlpha/Notas', iconName: 'StickyNote', category: 'infra', permission: 'notas' }` em `MODULOS_REGISTRY`; a rota existe desde a Fase 03.
 
 ### Fase 02 — Barra global inferior + editor TipTap + autosave (2026-08-07)
 
@@ -301,7 +305,7 @@ model UserNotesWorkspace { userId Int @id, isTaskbarVisible, viewerMode (default
 
 **Reaproveitamento do editor confirmado (ponto crítico validado por Probe):** `NoteEditor.tsx` (Fase 02) é o ÚNICO editor no projeto — a Central o importa direto, sem duplicar autosave/versão otimista/rascunho local.
 
-**Coerência Barra Global × Central:** ambas leem/escrevem `Note` via Server Actions distintas, sem sincronização em tempo real entre si — comportamento aceito nesta fase (sem WebSocket/polling implementado ainda).
+**Coerência Barra Global × Central:** ambas leem/escrevem `Note` via Server Actions distintas. Desde 2026-08-11, mudanças de workspace originadas na Central sincronizam imediatamente com o shell por mensagem same-origin; não há polling nem WebSocket para conteúdo integral.
 
 ### Fase 04 — Contextos + Integração com Módulos (2026-08-07)
 
