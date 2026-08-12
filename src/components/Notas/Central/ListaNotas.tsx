@@ -94,7 +94,7 @@ export function ListaNotas({
         />
       )}
 
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto p-3" data-guia-notas="lista-cards">
         {carregando && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {Array.from({ length: 6 }).map((_, i) => (

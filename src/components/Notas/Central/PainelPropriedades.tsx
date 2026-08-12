@@ -117,7 +117,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
 
   return (
     <div className="flex h-full w-64 shrink-0 flex-col gap-4 overflow-y-auto p-4">
-      <div>
+      <div data-guia-notas="propriedades-acoes">
         <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-600">Ações</p>
         <Dock orientation="vertical" magnification={40} distance={70} className="gap-0.5">
           <DockItem>
@@ -125,6 +125,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
               type="button"
               disabled={processando}
               onClick={() => void toggleFixar()}
+              data-guia-notas="acao-fixar"
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs",
                 !nota.isPinned && "text-slate-400 hover:bg-white/5",
@@ -141,6 +142,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
               type="button"
               disabled={processando}
               onClick={() => void toggleFavorito()}
+              data-guia-notas="acao-favoritar"
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs",
                 !nota.isFavorite && "text-slate-400 hover:bg-white/5",
@@ -156,7 +158,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
             <NoteShareDialog
               noteId={nota.id}
               trigger={
-                <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
+                <button type="button" data-guia-notas="acao-compartilhar" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
                   <DockIcon><Share2 size={13} /></DockIcon>
                   <DockLabel>Compartilhar</DockLabel>
                 </button>
@@ -169,7 +171,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
               noteId={nota.id}
               onRestaurado={onAtualizado}
               trigger={
-                <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
+                <button type="button" data-guia-notas="acao-historico" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
                   <DockIcon><History size={13} /></DockIcon>
                   <DockLabel>Histórico de versões</DockLabel>
                 </button>
@@ -181,7 +183,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
             <CriarLembreteDialog
               noteId={nota.id}
               trigger={
-                <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
+                <button type="button" data-guia-notas="acao-lembretes" className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5">
                   <DockIcon><Bell size={13} /></DockIcon>
                   <DockLabel>Lembretes</DockLabel>
                 </button>
@@ -195,6 +197,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
                 type="button"
                 disabled={processando}
                 onClick={() => void arquivar()}
+                data-guia-notas="acao-arquivar"
                 className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-slate-400 hover:bg-white/5"
               >
                 <DockIcon><Archive size={13} /></DockIcon>
@@ -209,6 +212,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
                 type="button"
                 disabled={processando}
                 onClick={() => void moverParaLixeira()}
+                data-guia-notas="acao-lixeira"
                 className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-rose-400 hover:bg-rose-500/10"
               >
                 <DockIcon><Trash2 size={13} /></DockIcon>
@@ -224,6 +228,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
                   <button
                     type="button"
                     disabled={processando}
+                    data-guia-notas="acao-excluir-definitivo"
                     className="flex w-full items-center gap-2 rounded-lg px-2 h-8 text-left text-xs text-rose-400 hover:bg-rose-500/10"
                   >
                     <DockIcon><Trash2 size={13} /></DockIcon>
@@ -261,7 +266,7 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
         </div>
       )}
 
-      <div>
+      <div data-guia-notas="propriedades-etiquetas">
         <p className="mb-2 flex items-center gap-1 text-[10px] uppercase tracking-wide text-slate-600">
           <TagIcon size={11} /> Etiquetas
         </p>
@@ -279,7 +284,9 @@ export function PainelPropriedades({ nota, usuarioAtualId, onAtualizado, accent 
         </div>
       </div>
 
-      <ListaAnexos noteId={nota.id} />
+      <div data-guia-notas="propriedades-anexos">
+        <ListaAnexos noteId={nota.id} accent={accent} />
+      </div>
 
       {nota.visibility !== "PRIVADA" && (
         <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-slate-600">

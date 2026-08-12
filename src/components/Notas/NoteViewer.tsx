@@ -17,10 +17,11 @@ interface NoteViewerProps {
   initialTitle: string;
   initialContentJson: JSONContent;
   initialVersion: number;
+  somenteLeitura?: boolean;
   onFechar: () => void;
 }
 
-export function NoteViewer({ noteId, initialTitle, initialContentJson, initialVersion, onFechar }: NoteViewerProps) {
+export function NoteViewer({ noteId, initialTitle, initialContentJson, initialVersion, somenteLeitura, onFechar }: NoteViewerProps) {
   const viewerMode = useNotasWorkspace((state) => state.viewerMode);
   const viewerHeight = useNotasWorkspace((state) => state.viewerHeight);
   const setViewerMode = useNotasWorkspace((state) => state.setViewerMode);
@@ -119,6 +120,7 @@ export function NoteViewer({ noteId, initialTitle, initialContentJson, initialVe
           initialTitle={initialTitle}
           initialContentJson={initialContentJson}
           initialVersion={initialVersion}
+          somenteLeitura={somenteLeitura}
         />
       </div>
     </div>

@@ -21,7 +21,7 @@ import Mention from "@tiptap/extension-mention";
 import {
   Bold, Italic, UnderlineIcon, Strikethrough, List, ListOrdered,
   ListTodo, Quote, Code, Heading1, Heading2,
-  Highlighter, Minus, Undo2, Redo2,
+  Highlighter, Minus, Undo2, Redo2, Lock,
 } from "lucide-react";
 import { AtualizarNota } from "@/actions/Notas";
 import { SlashCommand } from "./slash-command";
@@ -69,6 +69,7 @@ interface NoteEditorProps {
   initialContentJson: JSONContent;
   initialVersion: number;
   onPreviewChange?: (preview: { noteId: string; title: string; plainText: string }) => void;
+  somenteLeitura?: boolean;
 }
 
 type StatusSalvamento = "salvo" | "pendente" | "salvando" | "erro" | "conflito" | "offline";
@@ -79,6 +80,7 @@ export function NoteEditor({
   initialContentJson,
   initialVersion,
   onPreviewChange,
+  somenteLeitura = false,
 }: NoteEditorProps) {
   const [title, setTitle] = useState(initialTitle);
   const [tituloEditadoManualmente, setTituloEditadoManualmente] = useState(
@@ -98,12 +100,15 @@ export function NoteEditor({
 
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !somenteLeitura,
     extensions: [
       StarterKit,
       Underline,
       Link.configure({ openOnClick: false }),
       Image,
-      Placeholder.configure({ placeholder: "Escreva sua nota... use / para comandos" }),
+      Placeholder.configure({
+        placeholder: somenteLeitura ? "" : "Escreva sua nota... use / para comandos",
+      }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Table.configure({ resizable: true }),
@@ -126,6 +131,10 @@ export function NoteEditor({
       },
     },
     onUpdate: ({ editor }) => {
+      // Defesa em profundidade: com editable=false o Tiptap não deveria disparar onUpdate por
+      // digitação, mas o autosave nunca pode rodar para quem só tem permissão de leitura —
+      // o servidor já recusa (AtualizarNota → podeEditarNota), isto apenas evita o round-trip.
+      if (somenteLeitura) return;
       if (!carregouRef.current) return;
 
       let tituloAtual = titleRef.current;
@@ -211,7 +220,18 @@ export function NoteEditor({
   }, [onPreviewChange]);
 
   useEffect(() => {
+    editor?.setEditable(!somenteLeitura);
+  }, [editor, somenteLeitura]);
+
+  useEffect(() => {
     if (!editor) return;
+    // Rascunho local pode ter sido salvo enquanto o usuário ainda tinha permissão de edição —
+    // restaurar por cima do conteúdo servido agora que ele é somente-leitura mostraria uma
+    // versão que nunca chegou a ser gravada no servidor.
+    if (somenteLeitura) {
+      carregouRef.current = true;
+      return;
+    }
 
     try {
       const rascunhoRaw = localStorage.getItem(rascunhoKey);
@@ -241,74 +261,82 @@ export function NoteEditor({
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col">
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-white/5 px-2 py-1.5">
-        <Dock orientation="horizontal" magnification={38} distance={80} panelSize={28} className="gap-0.5">
-        <ToolbarButton title="Título" ativo={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
-          <Heading1 size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Subtítulo" ativo={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
-          <Heading2 size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Negrito" ativo={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
-          <Bold size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Itálico" ativo={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()}>
-          <Italic size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Sublinhado" ativo={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}>
-          <UnderlineIcon size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Tachado" ativo={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
-          <Strikethrough size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Destaque" ativo={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight().run()}>
-          <Highlighter size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Lista" ativo={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
-          <List size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Lista numerada" ativo={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
-          <ListOrdered size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Checklist" ativo={editor.isActive("taskList")} onClick={() => editor.chain().focus().toggleTaskList().run()}>
-          <ListTodo size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Citação" ativo={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
-          <Quote size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Código" ativo={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
-          <Code size={15} />
-        </ToolbarButton>
-        <DockItem>
-          <TableSizePicker
-            onEscolher={(linhas, colunas) =>
-              editor.chain().focus().insertTable({ rows: linhas, cols: colunas, withHeaderRow: true }).run()
-            }
-          />
-        </DockItem>
-        <DockItem>
-          <TableEditPanel editor={editor} />
-        </DockItem>
-        <ToolbarButton title="Divisor" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
-          <Minus size={15} />
-        </ToolbarButton>
-        <div className="mx-1 h-4 w-px bg-white/10" />
-        <ToolbarButton title="Desfazer" onClick={() => editor.chain().focus().undo().run()}>
-          <Undo2 size={15} />
-        </ToolbarButton>
-        <ToolbarButton title="Refazer" onClick={() => editor.chain().focus().redo().run()}>
-          <Redo2 size={15} />
-        </ToolbarButton>
-        </Dock>
-
-        <div className="ml-auto flex items-center gap-2 pr-1 text-[10px] uppercase tracking-wide text-slate-500">
-          <StatusIndicador status={status} />
+      {somenteLeitura ? (
+        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-amber-400">
+          <Lock size={12} /> Somente leitura — você não tem permissão para editar esta nota
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-white/5 px-2 py-1.5" data-guia-notas="editor-toolbar">
+          <Dock orientation="horizontal" magnification={38} distance={80} panelSize={28} className="gap-0.5">
+          <ToolbarButton title="Título" ativo={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+            <Heading1 size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Subtítulo" ativo={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+            <Heading2 size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Negrito" ativo={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
+            <Bold size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Itálico" ativo={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()}>
+            <Italic size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Sublinhado" ativo={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+            <UnderlineIcon size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Tachado" ativo={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
+            <Strikethrough size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Destaque" ativo={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight().run()}>
+            <Highlighter size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Lista" ativo={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+            <List size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Lista numerada" ativo={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+            <ListOrdered size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Checklist" ativo={editor.isActive("taskList")} onClick={() => editor.chain().focus().toggleTaskList().run()}>
+            <ListTodo size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Citação" ativo={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+            <Quote size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Código" ativo={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+            <Code size={15} />
+          </ToolbarButton>
+          <DockItem>
+            <TableSizePicker
+              onEscolher={(linhas, colunas) =>
+                editor.chain().focus().insertTable({ rows: linhas, cols: colunas, withHeaderRow: true }).run()
+              }
+            />
+          </DockItem>
+          <DockItem>
+            <TableEditPanel editor={editor} />
+          </DockItem>
+          <ToolbarButton title="Divisor" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+            <Minus size={15} />
+          </ToolbarButton>
+          <div className="mx-1 h-4 w-px bg-white/10" />
+          <ToolbarButton title="Desfazer" onClick={() => editor.chain().focus().undo().run()}>
+            <Undo2 size={15} />
+          </ToolbarButton>
+          <ToolbarButton title="Refazer" onClick={() => editor.chain().focus().redo().run()}>
+            <Redo2 size={15} />
+          </ToolbarButton>
+          </Dock>
+
+          <div className="ml-auto flex items-center gap-2 pr-1 text-[10px] uppercase tracking-wide text-slate-500">
+            <StatusIndicador status={status} />
+          </div>
+        </div>
+      )}
 
       <input
         value={title}
+        readOnly={somenteLeitura}
         onChange={(event) => {
+          if (somenteLeitura) return;
           const novoTitulo = event.target.value;
           setTitle(novoTitulo);
           titleRef.current = novoTitulo;
@@ -333,7 +361,10 @@ export function NoteEditor({
           debounceRef.current = setTimeout(salvar, AUTOSAVE_DEBOUNCE_MS);
         }}
         placeholder="Sem título"
-        className="w-full border-b border-white/5 bg-transparent px-4 py-2 text-sm font-semibold text-white outline-none placeholder:text-slate-600"
+        className={cn(
+          "w-full border-b border-white/5 bg-transparent px-4 py-2 text-sm font-semibold text-white outline-none placeholder:text-slate-600",
+          somenteLeitura && "cursor-default text-slate-300",
+        )}
       />
 
       <div className="min-w-0 flex-1 overflow-y-auto">

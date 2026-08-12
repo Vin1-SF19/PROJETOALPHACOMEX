@@ -168,7 +168,12 @@ export async function ObterNota(noteId: string) {
   });
   if (!nota || nota.deletedAt) return { success: false as const, error: "Nota não encontrada" };
 
-  return { success: true as const, data: nota };
+  // O editor client-side (Tiptap) precisa saber antecipadamente se pode aceitar digitação —
+  // sem isso, quem só tem papel LEITOR/COMENTARISTA consegue digitar normalmente na tela e só
+  // descobre que a edição foi recusada quando o autosave falha silenciosamente no servidor.
+  const somenteLeitura = !(await podeEditarNota(usuario, noteId));
+
+  return { success: true as const, data: nota, somenteLeitura };
 }
 
 export async function ListarNotas(input?: ListarNotasInput) {

@@ -41,7 +41,7 @@ export function SidebarFiltros({
   accent,
 }: SidebarFiltrosProps) {
   return (
-    <nav className="flex h-full w-56 shrink-0 flex-col gap-1 overflow-y-auto p-3">
+    <nav className="flex h-full w-56 shrink-0 flex-col gap-1 overflow-y-auto p-3" data-guia-notas="secoes">
       {SECOES.map((secao) => {
         const Icon = secao.icon;
         const ativa = secao.id === secaoAtiva;
@@ -67,7 +67,7 @@ export function SidebarFiltros({
       })}
 
       {tags.length > 0 && (
-        <div className="mt-4 border-t border-white/5 pt-3">
+        <div className="mt-4 border-t border-white/5 pt-3" data-guia-notas="tags">
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Etiquetas</p>
           <div className="flex flex-wrap gap-1.5 px-3">
             {tags.map((tag) => {

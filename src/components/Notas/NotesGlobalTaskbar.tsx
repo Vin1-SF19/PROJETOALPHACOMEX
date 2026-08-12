@@ -54,6 +54,7 @@ interface NotaAtivaCarregada {
   title: string;
   contentJson: JSONContent;
   version: number;
+  somenteLeitura: boolean;
 }
 
 export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: NotesGlobalTaskbarProps) {
@@ -175,6 +176,7 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
           title: res.data.title,
           contentJson: (res.data.contentJson as JSONContent | null) ?? {},
           version: res.data.currentVersion,
+          somenteLeitura: res.somenteLeitura,
         });
       }
     }
@@ -247,6 +249,7 @@ export function NotesGlobalTaskbar({ userId, onOpenCentral, sidebarWidth = 0 }: 
           initialTitle={notaAtiva.title}
           initialContentJson={notaAtiva.contentJson}
           initialVersion={notaAtiva.version}
+          somenteLeitura={notaAtiva.somenteLeitura}
           onFechar={() => setViewerMode("RECOLHIDO")}
         />
       )}

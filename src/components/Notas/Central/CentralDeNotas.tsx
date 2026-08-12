@@ -21,6 +21,13 @@ import { NotasCard3D } from "./NotasCard3D";
 import { atualizarPreviewNaLista, type AtualizacaoPreviewNota } from "@/lib/notas/preview";
 import { useLixeiraNotas } from "./useLixeiraNotas";
 import { CentralNotasHeader } from "./CentralNotasHeader";
+import { TutorialNotasModal } from "./TutorialNotasModal";
+import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
+import {
+  marcarTutorialModuloComoVisto,
+  tutorialModuloFoiVisto,
+  type ConfigTutorialModulo,
+} from "@/lib/guias/tutorial-modulo";
 
 // O NoteEditor carrega o Tiptap inteiro (StarterKit, tabelas, mentions, slash-command) — pesado
 // demais para entrar no bundle inicial da Central se o usuário só está navegando a lista, sem
@@ -32,6 +39,127 @@ const NoteEditor = dynamic(() => import("@/components/Notas/NoteEditor/NoteEdito
 
 const DEBOUNCE_MS = 400;
 
+// Passos do tour guiado com spotlight — cada `seletor` precisa apontar para um elemento real,
+// marcado com data-guia-notas na respectiva JSX. Passos como os do painel de propriedades só
+// existem no DOM com uma nota aberta: filtrarPassosTutorialDisponiveis (chamado pelo
+// GuiaModuloTour) descarta automaticamente qualquer passo sem alvo no momento em que o tour
+// abre, então não é preciso tratar isso aqui.
+const TUTORIAL_NOTAS: ConfigTutorialModulo = {
+  modulo: "notas",
+  versao: 2,
+  titulo: "Tutoriais do Bloco de Notas",
+  passos: [
+    {
+      id: "visao-geral",
+      seletor: '[data-guia-notas="visao-geral"]',
+      titulo: "Bem-vindo ao Bloco de Notas Alpha",
+      descricao: "Aqui você cria, organiza e compartilha notas do painel. Vamos percorrer rapidamente cada área e cada botão de ação.",
+    },
+    {
+      id: "nova-nota",
+      seletor: '[data-guia-notas="nova-nota"]',
+      titulo: "Crie uma nova nota",
+      descricao: "Clique em Nova nota para abrir uma nota em branco direto no editor. Ela é salva automaticamente enquanto você digita.",
+    },
+    {
+      id: "busca",
+      seletor: '[data-guia-notas="busca"]',
+      titulo: "Pesquise suas notas",
+      descricao: "Digite qualquer trecho do título ou do conteúdo para filtrar a lista em tempo real.",
+    },
+    {
+      id: "secoes",
+      seletor: '[data-guia-notas="secoes"]',
+      titulo: "Navegue pelas seções",
+      descricao: "Recentes, Favoritas, Fixadas, Compartilhadas comigo, Criadas por mim, Notas de equipe, Contextuais, Arquivadas e Lixeira — cada seção filtra a lista automaticamente.",
+    },
+    {
+      id: "tags",
+      seletor: '[data-guia-notas="tags"]',
+      titulo: "Filtre por etiquetas",
+      descricao: "Clique em uma ou mais etiquetas para combinar filtros e encontrar notas relacionadas a um mesmo assunto.",
+    },
+    {
+      id: "lista-cards",
+      seletor: '[data-guia-notas="lista-cards"]',
+      titulo: "Seus cards de notas",
+      descricao: "Cada card mostra uma prévia da nota, autor, data e contadores de anexos e comentários. Clique em um card para abri-lo direto no editor.",
+    },
+    {
+      id: "editor-toolbar",
+      seletor: '[data-guia-notas="editor-toolbar"]',
+      titulo: "Formate o conteúdo",
+      descricao: "Use a barra de ferramentas para títulos, listas, checklist, citações, código e tabelas no estilo Word — inclusive edição de linhas e colunas.",
+    },
+    {
+      id: "propriedades-acoes",
+      seletor: '[data-guia-notas="propriedades-acoes"]',
+      titulo: "Botões de ação da nota",
+      descricao: "Este bloco vertical reúne todas as ações disponíveis para a nota aberta — vamos ver cada botão a seguir.",
+    },
+    {
+      id: "acao-fixar",
+      seletor: '[data-guia-notas="acao-fixar"]',
+      titulo: "Fixar",
+      descricao: "Fixa a nota como aba permanente na barra de tarefas — ela fica sempre visível, mesmo fechando a Central, e só pode ser fechada depois de desafixada.",
+    },
+    {
+      id: "acao-favoritar",
+      seletor: '[data-guia-notas="acao-favoritar"]',
+      titulo: "Favoritar",
+      descricao: "Marca a nota para aparecer na seção Favoritas, um atalho rápido para o que você mais usa.",
+    },
+    {
+      id: "acao-compartilhar",
+      seletor: '[data-guia-notas="acao-compartilhar"]',
+      titulo: "Compartilhar",
+      descricao: "Compartilha a nota com pessoas ou times do painel, escolhendo o papel de cada um: Leitor (só visualiza), Comentarista (visualiza e comenta), Editor (edita o conteúdo) ou Admin (também compartilha e exclui).",
+    },
+    {
+      id: "acao-historico",
+      seletor: '[data-guia-notas="acao-historico"]',
+      titulo: "Histórico de versões",
+      descricao: "Toda edição salva gera uma versão. Abra o histórico para consultar ou restaurar uma versão anterior da nota.",
+    },
+    {
+      id: "acao-lembretes",
+      seletor: '[data-guia-notas="acao-lembretes"]',
+      titulo: "Lembretes",
+      descricao: "Cria um lembrete vinculado à nota — você recebe uma notificação no painel na data e hora marcadas.",
+    },
+    {
+      id: "acao-arquivar",
+      seletor: '[data-guia-notas="acao-arquivar"]',
+      titulo: "Arquivar",
+      descricao: "Tira a nota das seções ativas sem apagar nada. Ela continua acessível pela seção Arquivadas.",
+    },
+    {
+      id: "acao-lixeira",
+      seletor: '[data-guia-notas="acao-lixeira"]',
+      titulo: "Mover para a lixeira",
+      descricao: "Envia a nota para a Lixeira. É reversível por um tempo — depois disso ela pode ser excluída definitivamente.",
+    },
+    {
+      id: "propriedades-etiquetas",
+      seletor: '[data-guia-notas="propriedades-etiquetas"]',
+      titulo: "Etiquetas da nota",
+      descricao: "Aqui aparecem as etiquetas aplicadas a esta nota específica, para organização e busca.",
+    },
+    {
+      id: "propriedades-anexos",
+      seletor: '[data-guia-notas="propriedades-anexos"]',
+      titulo: "Anexos",
+      descricao: "Clique em Anexar para enviar um arquivo à nota. Clique no nome de um anexo já enviado para abrir uma pré-visualização — imagens e PDFs abrem direto na tela, outros tipos oferecem download.",
+    },
+    {
+      id: "tutorial-botao",
+      seletor: '[data-guia-notas="tutorial-botao"]',
+      titulo: "Rever este tutorial",
+      descricao: "Sempre que precisar, clique em Como usar aqui no topo para reabrir o resumo completo ou repetir este tour guiado.",
+    },
+  ],
+};
+
 interface CentralDeNotasProps {
   temaName?: string;
 }
@@ -42,6 +170,8 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
 
   const { data: session } = useSession();
   const usuarioAtualId = Number((session?.user as { id?: string | number } | undefined)?.id ?? 0);
+  const [tutorialAberto, setTutorialAberto] = useState(false);
+  const [tourAberto, setTourAberto] = useState(false);
   const [secaoAtiva, setSecaoAtiva] = useState<SecaoCentralNotas>("RECENTES");
   // Sem seletor visual de ordenação no grid de cards — sempre por última edição, o critério
   // mais útil para "o que eu estava fazendo" num layout de galeria.
@@ -62,6 +192,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
     title: string;
     contentJson: JSONContent;
     version: number;
+    somenteLeitura: boolean;
   } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -139,6 +270,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         title: res.data.title,
         contentJson: (res.data.contentJson as JSONContent | null) ?? {},
         version: res.data.currentVersion,
+        somenteLeitura: res.somenteLeitura,
       });
       // Abrir uma nota na Central também a registra como aba na barra global de notas —
       // os dois pontos de entrada (Central e barra) compartilham o mesmo workspace de abas.
@@ -174,6 +306,45 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
     setNotas((atuais) => atualizarPreviewNaLista(atuais, preview));
   }, []);
 
+  useEffect(() => {
+    if (!usuarioAtualId) return;
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        if (!tutorialModuloFoiVisto(window.localStorage, TUTORIAL_NOTAS, usuarioAtualId)) {
+          setTutorialAberto(true);
+        }
+      } catch {
+        setTutorialAberto(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [usuarioAtualId]);
+
+  const finalizarTutorial = useCallback(() => {
+    try {
+      marcarTutorialModuloComoVisto(window.localStorage, TUTORIAL_NOTAS, usuarioAtualId);
+    } catch {
+      // O tour continua utilizável quando o navegador bloqueia armazenamento local.
+    }
+    setTutorialAberto(false);
+  }, [usuarioAtualId]);
+
+  const iniciarTourGuiado = useCallback(() => {
+    setTutorialAberto(false);
+    // Aguarda o modal terminar de fechar antes de medir posições de spotlight — abrir os dois
+    // ao mesmo tempo faria o GuiaModuloTour calcular retângulos com o modal ainda ocupando tela.
+    window.requestAnimationFrame(() => setTourAberto(true));
+  }, []);
+
+  const finalizarTour = useCallback(() => {
+    try {
+      marcarTutorialModuloComoVisto(window.localStorage, TUTORIAL_NOTAS, usuarioAtualId);
+    } catch {
+      // O tour continua utilizável quando o navegador bloqueia armazenamento local.
+    }
+    setTourAberto(false);
+  }, [usuarioAtualId]);
+
   return (
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#020617] text-slate-200">
       <NotasBackground accentRgb={accent} />
@@ -184,6 +355,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
         query={queryInput}
         onQueryChange={setQueryInput}
         onCriarNota={() => void criarNota()}
+        onAbrirTutorial={() => setTutorialAberto(true)}
       />
 
       <div className="relative z-10 mx-4 mb-4 mt-4 flex min-h-0 flex-1 gap-4 md:mx-6 md:mb-6">
@@ -239,6 +411,7 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
                 initialContentJson={notaCarregada.contentJson}
                 initialVersion={notaCarregada.version}
                 onPreviewChange={atualizarPreview}
+                somenteLeitura={notaCarregada.somenteLeitura}
               />
             ) : notaSelecionada ? (
               // Nota escolhida na lista, mas o conteúdo (ObterNota) ainda está a caminho —
@@ -263,6 +436,14 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
           </NotasCard3D>
         )}
       </div>
+
+      <TutorialNotasModal
+        aberto={tutorialAberto}
+        onFechar={finalizarTutorial}
+        onIniciarTour={iniciarTourGuiado}
+        accent={accent}
+      />
+      <GuiaModuloTour aberto={tourAberto} config={TUTORIAL_NOTAS} accent={accent} onFinalizar={finalizarTour} />
     </div>
   );
 }

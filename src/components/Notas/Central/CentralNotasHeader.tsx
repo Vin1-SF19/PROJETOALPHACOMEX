@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Plus, Search, StickyNote } from "lucide-react";
+import { CircleHelp, Plus, Search, StickyNote } from "lucide-react";
 
 interface CentralNotasHeaderProps {
   accent: string;
@@ -7,9 +7,10 @@ interface CentralNotasHeaderProps {
   query: string;
   onQueryChange: (query: string) => void;
   onCriarNota: () => void;
+  onAbrirTutorial: () => void;
 }
 
-export function CentralNotasHeader({ accent, total, query, onQueryChange, onCriarNota }: CentralNotasHeaderProps) {
+export function CentralNotasHeader({ accent, total, query, onQueryChange, onCriarNota, onAbrirTutorial }: CentralNotasHeaderProps) {
   return (
     <motion.header
       initial={{ opacity: 0, y: -10 }}
@@ -21,7 +22,7 @@ export function CentralNotasHeader({ accent, total, query, onQueryChange, onCria
         borderColor: `rgba(${accent},0.22)`,
       }}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" data-guia-notas="visao-geral">
         <div
           className="rounded-2xl border p-2.5"
           style={{ background: `rgba(${accent},0.2)`, borderColor: `rgba(${accent},0.25)` }}
@@ -42,6 +43,7 @@ export function CentralNotasHeader({ accent, total, query, onQueryChange, onCria
         <div
           className="flex items-center gap-2 rounded-2xl border bg-slate-950/50 px-3 py-2 backdrop-blur-xl"
           style={{ borderColor: `rgba(${accent},0.18)` }}
+          data-guia-notas="busca"
         >
           <Search size={14} className="text-slate-500" aria-hidden="true" />
           <input
@@ -54,7 +56,18 @@ export function CentralNotasHeader({ accent, total, query, onQueryChange, onCria
         </div>
         <button
           type="button"
+          onClick={onAbrirTutorial}
+          title="Como usar o bloco de notas"
+          data-guia-notas="tutorial-botao"
+          className="flex h-11 items-center gap-2 rounded-2xl px-3 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:text-white"
+          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}
+        >
+          <CircleHelp size={15} /> Como usar
+        </button>
+        <button
+          type="button"
           onClick={onCriarNota}
+          data-guia-notas="nova-nota"
           className="flex items-center gap-1.5 rounded-2xl px-4 py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-lg transition-transform active:scale-95"
           style={{ background: `rgba(${accent},0.9)`, boxShadow: `0 10px 30px -10px rgba(${accent},0.6)` }}
         >

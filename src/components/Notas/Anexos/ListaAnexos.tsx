@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Paperclip, Download, Trash2, Loader2 } from "lucide-react";
+import { Paperclip, Trash2, Loader2 } from "lucide-react";
 import { RegistrarAnexoNota, ListarAnexosNota, ExcluirAnexoNota } from "@/actions/NotasAnexos";
 import { NOTAS_ANEXO_MAX_SIZE } from "@/lib/validations/notas";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AnexoPreviewModal } from "./AnexoPreviewModal";
 
 interface AnexoListado {
   id: string;
@@ -18,6 +19,7 @@ interface AnexoListado {
 
 interface ListaAnexosProps {
   noteId: string;
+  accent?: string;
 }
 
 function formatarTamanho(bytes: number): string {
@@ -26,10 +28,11 @@ function formatarTamanho(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function ListaAnexos({ noteId }: ListaAnexosProps) {
+export function ListaAnexos({ noteId, accent = "37, 99, 235" }: ListaAnexosProps) {
   const [anexos, setAnexos] = useState<AnexoListado[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [enviando, setEnviando] = useState(false);
+  const [anexoEmPreview, setAnexoEmPreview] = useState<AnexoListado | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function carregar() {
@@ -130,16 +133,15 @@ export function ListaAnexos({ noteId }: ListaAnexosProps) {
         )}
         {!carregando && anexos.map((anexo) => (
           <div key={anexo.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2 py-1.5 text-xs">
-            <a
-              href={`/api/notas/anexos/${anexo.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-w-0 items-center gap-1.5 text-slate-300 hover:text-white"
+            <button
+              type="button"
+              onClick={() => setAnexoEmPreview(anexo)}
+              className="flex min-w-0 items-center gap-1.5 text-left text-slate-300 hover:text-white"
             >
-              <Download size={11} className="shrink-0" />
+              <Paperclip size={11} className="shrink-0" />
               <span className="truncate">{anexo.fileName}</span>
               <span className="shrink-0 text-[10px] text-slate-600">{formatarTamanho(anexo.size)}</span>
-            </a>
+            </button>
             <button type="button" onClick={() => void excluir(anexo.id)} className="shrink-0 text-slate-600 hover:text-rose-400">
               <Trash2 size={11} />
             </button>
@@ -147,6 +149,8 @@ export function ListaAnexos({ noteId }: ListaAnexosProps) {
         ))}
         {!carregando && anexos.length === 0 && <p className="text-xs text-slate-600">Nenhum anexo ainda.</p>}
       </div>
+
+      <AnexoPreviewModal anexo={anexoEmPreview} onFechar={() => setAnexoEmPreview(null)} accent={accent} />
     </div>
   );
 }
