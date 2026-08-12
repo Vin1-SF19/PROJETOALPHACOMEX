@@ -11,6 +11,18 @@ import { exigirAcessoBpmCard, isAdminRole } from "@/lib/bpm/ownership";
 import { executarAutomacaoFechamentoComercial } from "@/lib/bpm/automacoes";
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import {
+  carregarCamposFaltantesCardEtapa,
+  carregarCamposObrigatoriosEtapa,
+} from "@/lib/bpm/requisitos-etapa-server";
+import { listarCamposObrigatoriosFaltantes } from "@/lib/bpm/requisitos-etapa";
+import {
+  calcularDiaCicloNovosLeads,
+  contarDiasUteisDecorridos,
+  etapaEhNovosLeads,
+  intervaloDiaCivilSaoPaulo,
+  META_LIGACOES_NOVOS_LEADS,
+} from "@/lib/bpm/novos-leads";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -103,7 +115,50 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       orderBy: { createdAt: "desc" },
     });
 
-    return { success: true, data: cards };
+    const agora = new Date();
+    const { inicio, fim } = intervaloDiaCivilSaoPaulo(agora);
+    const etapaNovosLeads = await db.bpmEtapa.findFirst({
+      where: { pipelineId, nome: "Novos leads", ativo: true },
+      select: { id: true },
+    });
+    const cardsNovosLeads = etapaNovosLeads
+      ? cards.filter((card) => card.etapaId === etapaNovosLeads.id)
+      : [];
+    const interacoesHoje = cardsNovosLeads.length > 0
+      ? await db.bpmInteracaoCard.findMany({
+          where: {
+            cardId: { in: cardsNovosLeads.map((card) => card.id) },
+            tipo: "LIGACAO",
+            createdAt: { gte: inicio, lt: fim },
+          },
+          select: { cardId: true },
+        })
+      : [];
+    const ligacoesPorCard = new Map<string, number>();
+    for (const interacao of interacoesHoje) {
+      ligacoesPorCard.set(
+        interacao.cardId,
+        (ligacoesPorCard.get(interacao.cardId) ?? 0) + 1,
+      );
+    }
+
+    return {
+      success: true,
+      data: cards.map((card) => {
+        const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
+        return {
+          ...card,
+          ligacoesHoje: ehNovoLead ? (ligacoesPorCard.get(card.id) ?? 0) : 0,
+          metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
+          diasUteisDecorridos: ehNovoLead
+            ? contarDiasUteisDecorridos(card.createdAt, agora)
+            : 0,
+          diaCiclo: ehNovoLead
+            ? calcularDiaCicloNovosLeads(card.createdAt, agora)
+            : 1,
+        };
+      }),
+    };
   } catch (error) {
     console.error("[ListarCardsPipelineBpm]", error);
     return { success: false, error: "Erro ao buscar cards", data: [] };
@@ -238,12 +293,10 @@ export async function CriarCardBpm(dados: unknown) {
     }
 
     // D-024: bloqueio de avanço/criação quando campos obrigatórios da etapa não estão preenchidos.
-    const camposObrigatorios = await db.bpmCampo.findMany({
-      where: { pipelineId, etapaId, obrigatorio: true },
-      select: { id: true, nome: true },
-    });
-    const faltantes = camposObrigatorios.filter(
-      (c) => !camposValores?.[c.id] || camposValores[c.id].trim() === "",
+    const camposObrigatorios = await carregarCamposObrigatoriosEtapa(pipelineId, etapaId);
+    const faltantes = listarCamposObrigatoriosFaltantes(
+      camposObrigatorios,
+      camposValores ?? {},
     );
     if (faltantes.length > 0) {
       return {
@@ -371,7 +424,10 @@ export async function MoverCardBpm(dados: unknown) {
     // D-042: apenas o responsável do card ou um administrador pode movê-lo de etapa.
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "moverEtapa");
 
-    const card = await db.bpmCard.findUnique({ where: { id: cardId } });
+    const card = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      include: { etapa: { select: { nome: true } } },
+    });
     if (!card) return { success: false, error: "Card não encontrado" };
 
     const etapaDestino = await db.bpmEtapa.findUnique({ where: { id: etapaDestinoId } });
@@ -380,6 +436,20 @@ export async function MoverCardBpm(dados: unknown) {
     }
 
     if (card.etapaId === etapaDestinoId) return { success: true };
+
+    if (etapaEhNovosLeads(card.etapa.nome)) {
+      const faltantesOrigem = await carregarCamposFaltantesCardEtapa(
+        cardId,
+        card.pipelineId,
+        card.etapaId,
+      );
+      if (faltantesOrigem.length > 0) {
+        return {
+          success: false,
+          error: `Não é possível sair de Novos leads: campos obrigatórios pendentes (${faltantesOrigem.map((campo) => campo.nome).join(", ")}).`,
+        };
+      }
+    }
 
     // Máquina de estado do pipeline "Revisão de Radar" (plano-novos-leads-bpm.md): se a etapa de
     // ORIGEM tem QUALQUER transição cadastrada, só os destinos explicitamente permitidos valem.
@@ -403,36 +473,16 @@ export async function MoverCardBpm(dados: unknown) {
     // (b) BpmCampo de nível pipeline (etapaId: null) marcado como obrigatório NESTA etapa via
     // BpmCampoObrigatorioEtapa — permite reaproveitar o mesmo campo (ex: "Valor acordado no
     // contrato") como obrigatório em várias etapas sem duplicá-lo.
-    const [camposDiretos, camposViaJuncao] = await Promise.all([
-      db.bpmCampo.findMany({
-        where: { pipelineId: card.pipelineId, etapaId: etapaDestinoId, obrigatorio: true },
-        select: { id: true, nome: true },
-      }),
-      db.bpmCampoObrigatorioEtapa.findMany({
-        where: { etapaId: etapaDestinoId },
-        select: { campo: { select: { id: true, nome: true } } },
-      }),
-    ]);
-    const camposObrigatoriosDestino = [
-      ...camposDiretos,
-      ...camposViaJuncao.map((c) => c.campo),
-    ].filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i); // dedupe por id
-
-    if (camposObrigatoriosDestino.length > 0) {
-      const valoresPreenchidos = await db.bpmCardCampoValor.findMany({
-        where: { cardId, campoId: { in: camposObrigatoriosDestino.map((c) => c.id) } },
-        select: { campoId: true, valor: true },
-      });
-      const preenchidoPorCampo = new Map(valoresPreenchidos.map((v) => [v.campoId, v.valor]));
-      const faltantes = camposObrigatoriosDestino.filter(
-        (c) => !preenchidoPorCampo.get(c.id) || preenchidoPorCampo.get(c.id)?.trim() === "",
-      );
-      if (faltantes.length > 0) {
-        return {
-          success: false,
-          error: `Não é possível avançar: campos obrigatórios pendentes (${faltantes.map((f) => f.nome).join(", ")})`,
-        };
-      }
+    const faltantesDestino = await carregarCamposFaltantesCardEtapa(
+      cardId,
+      card.pipelineId,
+      etapaDestinoId,
+    );
+    if (faltantesDestino.length > 0) {
+      return {
+        success: false,
+        error: `Não é possível avançar: campos obrigatórios pendentes (${faltantesDestino.map((campo) => campo.nome).join(", ")})`,
+      };
     }
 
     // Validação de ENTRADA (diferente de "obrigatório para mover"): Em Tratativa/Sem Viabilidade

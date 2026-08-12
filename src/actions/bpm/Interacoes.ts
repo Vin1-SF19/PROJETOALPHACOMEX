@@ -28,7 +28,15 @@ export async function CriarInteracaoCardBpm(dados: unknown) {
 
     const interacao = await db.$transaction(async (tx) => {
       const criada = await tx.bpmInteracaoCard.create({
-        data: { cardId, agendadoEm, agendaLink, observacoes, resumo, registradoPorId: userId },
+        data: {
+          cardId,
+          tipo: "LIGACAO",
+          agendadoEm,
+          agendaLink,
+          observacoes,
+          resumo,
+          registradoPorId: userId,
+        },
       });
       await registrarHistoricoCard(
         {

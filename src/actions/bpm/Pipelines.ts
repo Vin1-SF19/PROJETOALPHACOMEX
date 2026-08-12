@@ -61,7 +61,13 @@ export async function ObterPipelineBpm(pipelineId: string) {
     const pipeline = await db.bpmPipeline.findUnique({
       where: { id: pipelineId },
       include: {
-        etapas: { where: { ativo: true }, orderBy: { ordem: "asc" } },
+        etapas: {
+          where: { ativo: true },
+          orderBy: { ordem: "asc" },
+          include: {
+            camposObrigatorios: { select: { campoId: true } },
+          },
+        },
         campos: { orderBy: { ordem: "asc" } },
         setores: { include: { setor: { select: { id: true, nome: true } } } },
       },

@@ -88,6 +88,16 @@ export default function NovoCardModal({ pipelineId, etapaId, campos, currentUser
       return;
     }
 
+    const camposFaltantes = campos.filter(
+      (campo) => campo.obrigatorio && !valoresCampos[campo.id]?.trim(),
+    );
+    if (camposFaltantes.length > 0) {
+      setErro(
+        `Preencha os campos obrigatórios: ${camposFaltantes.map((campo) => campo.nome).join(", ")}.`,
+      );
+      return;
+    }
+
     setSalvando(true);
     const resultado = await onCriado({
       empresaId: empresaSelecionada.id,
@@ -178,6 +188,8 @@ export default function NovoCardModal({ pipelineId, etapaId, campos, currentUser
               {campo.tipo === "selecao" && campo.opcoesJson ? (
                 <select
                   className={inputCls}
+                  required={campo.obrigatorio}
+                  aria-required={campo.obrigatorio}
                   value={valoresCampos[campo.id] ?? ""}
                   onChange={(e) => setValoresCampos((prev) => ({ ...prev, [campo.id]: e.target.value }))}
                 >
@@ -189,6 +201,8 @@ export default function NovoCardModal({ pipelineId, etapaId, campos, currentUser
               ) : (
                 <input
                   className={inputCls}
+                  required={campo.obrigatorio}
+                  aria-required={campo.obrigatorio}
                   type={campo.tipo === "numero" ? "number" : campo.tipo === "data" ? "date" : "text"}
                   value={valoresCampos[campo.id] ?? ""}
                   onChange={(e) => setValoresCampos((prev) => ({ ...prev, [campo.id]: e.target.value }))}

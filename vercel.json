@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/bpm/jobs/automacao-novos-leads",
+      "schedule": "0 12 * * 1-5"
+    }
+  ]
+}
+

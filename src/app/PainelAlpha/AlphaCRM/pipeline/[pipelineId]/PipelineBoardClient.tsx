@@ -33,6 +33,7 @@ interface EtapaBpm {
   nome: string;
   ordem: number;
   slaDias: number | null;
+  camposObrigatorios?: { campoId: string }[];
 }
 
 interface CampoBpm {
@@ -62,6 +63,10 @@ interface CardBpm {
   responsavel: { id: number; nome: string };
   _count: { tarefas: number; anexos: number };
   campoValores?: { valor: string | null }[];
+  ligacoesHoje?: number;
+  metaLigacoesDia?: number;
+  diasUteisDecorridos?: number;
+  diaCiclo?: number;
 }
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
@@ -75,7 +80,17 @@ const STATUS_POS_FECHAMENTO_CONFIG: Record<string, { label: string; classe: stri
   CONTRATO_ASSINADO: { label: "Contrato assinado", classe: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
 };
 
-function KanbanCard({ card, accent, onAbrir }: { card: CardBpm; accent: string; onAbrir: (cardId: string) => void }) {
+function KanbanCard({
+  card,
+  accent,
+  novosLeads,
+  onAbrir,
+}: {
+  card: CardBpm;
+  accent: string;
+  novosLeads: boolean;
+  onAbrir: (cardId: string) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
@@ -126,6 +141,22 @@ function KanbanCard({ card, accent, onAbrir }: { card: CardBpm; accent: string; 
           )}
         </div>
       )}
+      {novosLeads && (
+        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+          <div
+            className={`rounded-lg border px-2 py-1 text-[9px] font-semibold ${
+              (card.ligacoesHoje ?? 0) >= (card.metaLigacoesDia ?? 5)
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+            }`}
+          >
+            Ligações hoje: {card.ligacoesHoje ?? 0}/{card.metaLigacoesDia ?? 5}
+          </div>
+          <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-[9px] font-semibold text-sky-300">
+            Dia {card.diaCiclo ?? 1}/8
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between pt-0.5">
         <div className="flex items-center gap-2 text-[10px] text-slate-500">
           {card._count.tarefas > 0 && <span>{card._count.tarefas} tarefa(s)</span>}
@@ -148,6 +179,7 @@ function KanbanColumn({
 }: {
   etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; onAdd: (etapaId: string) => void; onAbrirCard: (cardId: string) => void;
 }) {
+  const novosLeads = etapa.nome.trim().toLocaleLowerCase("pt-BR") === "novos leads";
   return (
     <div className="flex flex-col min-w-[240px] max-w-[240px]">
       <div className="flex items-center justify-between mb-2 px-1">
@@ -177,7 +209,13 @@ function KanbanColumn({
           style={{ background: `rgba(${cor},0.03)` }}
         >
           {cards.map((c) => (
-            <KanbanCard key={c.id} card={c} accent={accent} onAbrir={onAbrirCard} />
+            <KanbanCard
+              key={c.id}
+              card={c}
+              accent={accent}
+              novosLeads={novosLeads}
+              onAbrir={onAbrirCard}
+            />
           ))}
         </div>
       </SortableContext>
@@ -320,6 +358,16 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   }
 
   const activeCard = cards.find((c) => c.id === activeId);
+  const etapaSelecionada = pipeline.etapas.find((etapa) => etapa.id === etapaNovoCard);
+  const camposObrigatoriosSelecionados = new Set(
+    etapaSelecionada?.camposObrigatorios?.map((item) => item.campoId) ?? [],
+  );
+  const camposNovoCard = pipeline.campos
+    .filter((campo) => !campo.etapaId || campo.etapaId === etapaNovoCard)
+    .map((campo) => ({
+      ...campo,
+      obrigatorio: campo.obrigatorio || camposObrigatoriosSelecionados.has(campo.id),
+    }));
 
   return (
     <div className="flex flex-col h-full">
@@ -371,7 +419,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         <NovoCardModal
           pipelineId={pipeline.id}
           etapaId={etapaNovoCard}
-          campos={pipeline.campos.filter((c) => !c.etapaId || c.etapaId === etapaNovoCard)}
+          campos={camposNovoCard}
           currentUserId={currentUserId}
           accent={accent}
           onClose={() => setEtapaNovoCard(null)}

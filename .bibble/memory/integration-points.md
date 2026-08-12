@@ -1367,3 +1367,15 @@ Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove a
 **Como integrar:** após a persistência bem-sucedida, chamar `notificarPipelineBpm` com o tipo adequado. O cliente trata o evento `alpha-crm-atualizado` como sinal de invalidação e relê os dados autenticados; nunca enviar dados do lead no payload Pusher.
 
 **Última atualização:** 2026-08-12 por Codex/Bibble.
+
+### Alpha CRM — regras e cadência de Novos leads
+
+**Arquivos:** `src/actions/bpm/Cards.ts`, `src/lib/bpm/requisitos-etapa-server.ts`, `src/lib/bpm/novos-leads.ts`, `src/lib/bpm/automacao-novos-leads.ts`, `src/app/api/bpm/jobs/automacao-novos-leads/route.ts`, `PipelineBoardClient.tsx`, `NovoCardModal.tsx`, `vercel.json`.
+
+**Propósito:** unifica obrigatórios diretos e configurados por `BpmCampoObrigatorioEtapa`, revalida a origem antes de sair de Novos leads, mostra a meta visual de cinco ligações por dia e move cards elegíveis para Standby após oito dias úteis.
+
+**Como integrar:** novas formas de criação ou movimento devem continuar passando por `CriarCardBpm`/`MoverCardBpm` ou pelos helpers compartilhados de requisitos. Ligações devem persistir `tipo: "LIGACAO"`. O job exige `CRON_SECRET`, usa atualização condicional para idempotência e emite `CARD_MOVIDO` no realtime após o commit.
+
+**Limite atual:** não existe flag canônica de “respondido”; enquanto não houver decisão estrutural separada, a permanência em Novos leads é a proxy operacional. Feriados não são descontados do ciclo nesta fase.
+
+**Última atualização:** 2026-08-12 por Codex/Bibble.

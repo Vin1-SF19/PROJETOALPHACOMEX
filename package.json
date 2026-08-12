@@ -15,7 +15,8 @@
     "calendar-alpha:doctor": "tsx scripts/calendar-alpha-doctor.mjs",
     "calendar-alpha:worker": "tsx scripts/calendar-alpha-worker.mjs",
     "calendar-alpha:maintenance": "tsx scripts/calendar-alpha-maintenance.mjs",
-    "calendar-alpha:queue": "tsx scripts/calendar-alpha-queue.mjs"
+    "calendar-alpha:queue": "tsx scripts/calendar-alpha-queue.mjs",
+    "bpm:novos-leads:run": "node scripts/bpm-novos-leads-job.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-textract": "^3.1014.0",

@@ -70,20 +70,29 @@ model DocumentoChecklist { id, itemId → ItemChecklist, nome, url, uploadedByCl
 
 ---
 
-## 3. Decisão pendente que este documento reabre: `OperacionalClientes.clienteId` obrigatório ou nullable?
+## 3. Decisão pendente — RESPONDIDA (2026-08-11): `OperacionalClientes.clienteId` obrigatório, SEM criação automática
 
-O plano já respondeu isso (2026-08-08): **obrigatório**. Mas a resposta foi dada **antes** da medição real ter aparecido no próprio plano (Fase 1, executada depois): **75% dos CNPJs do Operacional (3 de 4) não têm correspondência em `clientes`**. Isso significa que, se a decisão "obrigatório" for mantida como está, **3 dos 4 registros existentes vão gerar um `Cliente` novo automaticamente no backfill** — o que é aceitável (volume baixo, plano já classificou como "risco de execução baixo"), mas há uma implicação de fluxo que meREce sua atenção antes de confirmar:
+**Resposta do usuário, textual:** *"Tecnicamente todo cliente cadastrado na tabela cliente master já devem ter um cadastro no checklist, pois o primeiro cadastro do cliente sempre será no CRM (BPM) que utiliza a tabela Cliente Master como fonte da verdade."*
 
-- **Hoje**, `vincularEmpresaAoCliente` (`src/actions/ClientesOperacional.ts`) cria uma `OperacionalClientes` a partir de CNPJ digitado manualmente no cadastro — **sem nenhuma validação cruzada com `clientes` (CS&NPS)**. Uma empresa pode ser cadastrada no Checklist com uma razão social ligeiramente diferente da que está no CS&NPS para o mesmo CNPJ (nenhum dos dois sabe da existência do outro hoje).
-- **Com `clienteId` obrigatório**, o comportamento muda: ao cadastrar uma empresa no Checklist, o sistema primeiro busca `Cliente` por CNPJ normalizado — se existir, reaproveita (e a razão social passa a vir de lá, não mais editável separadamente no Checklist); se não existir, cria um `Cliente` novo. **Isso é uma mudança de comportamento visível para quem usa o módulo hoje**, não só uma migration de schema: a tela de cadastro do Checklist deixa de ser "meu próprio cadastro de empresa" e passa a ser "vincular-se ao cadastro central".
+Isto é mais que uma resposta pontual sobre o Checklist — **é um princípio de arquitetura que se aplica ao plano geral inteiro, não só a este módulo:**
 
-**Pergunta que precisa da sua confirmação explícita (não decidida por mim):** você quer que o cadastro pelo Checklist também **crie** um `Cliente` novo quando não existir (unificação forte), ou prefere que o Checklist só **encontre** clientes já existentes e bloqueie/alerte quando o CNPJ não estiver cadastrado em nenhum outro módulo ainda (unificação mais conservadora, exige que a empresa "já exista" no sistema antes de entrar no Checklist)? A primeira opção é consistente com o padrão já adotado para Metas (`ContratoComercial.clienteId` obrigatório, cria no ato); a segunda é mais rígida e pode gerar fricção real hoje, já que 75% dos casos atuais cairiam nesse bloqueio.
+> **O BPM/CRM é a ÚNICA porta de entrada de um `Cliente` novo no sistema.** Nenhum outro módulo satélite (Checklist, Extratos, Pré-Análise, Radar, Metas, Comissões) cria um `Cliente` — todos eles só **referenciam** um `Cliente` que o BPM já criou. Se um módulo satélite não encontra o `Cliente` pelo CNPJ, isso é tratado como **erro de processo** (a empresa deveria ter entrado pelo BPM primeiro), não como um caso normal a resolver criando um registro novo silenciosamente.
+
+**Implicação direta para `OperacionalClientes.clienteId`:** obrigatório, **mas `vincularEmpresaAoCliente` NUNCA cria um `Cliente` novo** — só busca por CNPJ normalizado e, se não encontrar, **bloqueia o cadastro com uma mensagem clara** ("Esta empresa ainda não está cadastrada no CRM — cadastre-a primeiro no Alpha CRM antes de vinculá-la ao Checklist"), nunca cria por conta própria.
+
+**⚠️ Contradição real a resolver antes da Fase de execução:** o `plano-cliente-master.md` (seção "Decisões", pergunta 5) já registrou o OPOSTO para Metas — `ContratoComercial.clienteId` obrigatório **com criação automática** ("`criarContrato` resolve/cria `Cliente` já na criação do contrato"). Se o princípio "só o BPM cria Cliente" for adotado como regra geral (o que a resposta desta sessão sugere fortemente), **essa decisão de Metas precisa ser revisitada** — hoje ela contradiz o que você acabou de estabelecer aqui. Duas leituras possíveis, e preciso que você escolha:
+  - **(a) O princípio vale para TODOS os módulos, inclusive Metas** — a decisão antiga de Metas ("cria automaticamente") precisa ser corrigida no plano geral para "só vincula, nunca cria", alinhando com o Checklist.
+  - **(b) Metas é uma exceção deliberada** — porque Metas é o único módulo que também pode ser, na prática, uma origem legítima de cliente novo (um lead comercial que fecha contrato sem nunca ter passado pelo BPM/CRM antes), diferente do Checklist (que só faz sentido para uma empresa que já é cliente confirmado).
+
+**Volume real de impacto imediato:** com "só vincula, nunca cria", **3 dos 4 registros hoje existentes em `OperacionalClientes` ficariam sem `Cliente` correspondente** até alguém cadastrar essas 3 empresas no BPM primeiro — isso PRECISA ser resolvido manualmente (ou os 3 CNPJs cadastrados no BPM antes do backfill, ou aceitos como pendência temporária com `clienteId` nullable só para esses registros legados, nunca para cadastros novos a partir de agora). Decisão de saneamento a tomar na Fase 1 de execução, não aqui.
 
 ---
 
-## 4. Achado técnico: `DocumentoUnidade` é código morto
+## 4. `DocumentoUnidade` — RESPONDIDO (2026-08-11): manter no schema
 
 Confirmado por grep exaustivo em `src/`: **nenhum arquivo lê ou escreve `db.documentoUnidade`**. O model existe no schema, com FKs reais para `OperacionalClientes` e `ClienteOperacional`, mas não há nenhuma Server Action, rota ou componente que o use. `DocumentoChecklist` (o model realmente usado para documentos, vinculado a `ItemChecklist`) parece ter suplantado a intenção original de `DocumentoUnidade` (talvez pensado para documentos "gerais" da empresa, fora de um item específico do checklist).
+
+**Decisão do usuário: manter — "utilizaremos no futuro".** Não remover do schema. `DocumentoUnidade` continua com `empresaId → OperacionalClientes` (que, após a fusão, aponta indiretamente para `Cliente` via `OperacionalClientes.clienteId`) — nenhuma mudança de FK necessária aqui, já que `OperacionalClientes` continua existindo como tabela auxiliar. Nenhuma ação na Fase de execução além de garantir que a migration de `OperacionalClientes` não quebre essa FK por engano.
 
 **Não é bloqueante para a fusão**, mas é um dado relevante: ao desenhar o schema final, `DocumentoUnidade` pode simplesmente ser **removida** (nunca teve uso real) em vez de migrada — evita carregar uma tabela morta para dentro da arquitetura nova. Decisão a confirmar com você antes de qualquer execução (mesma cautela do projeto: nunca remover sem confirmar que é seguro).
 
@@ -110,24 +119,29 @@ Assumindo a leitura mais provável (unificar cadastro de empresa, manter o check
 ```prisma
 model OperacionalClientes {
   // ...como já desenhado no plano-cliente-master.md
-  clienteId Int → Cliente   // obrigatório ou nullable — ver decisão pendente da seção 3 acima
+  clienteId Int → Cliente   // OBRIGATÓRIO, mas NUNCA criado por este módulo — só vincula a Cliente pré-existente (ver seção 3)
   embasamento, progresso, mesProtocolo, linkGrupo, pastaChecklistId? — mantidos como estão
-  // razaoSocial/nomeFantasia/cnpj/dados fiscais — REMOVIDOS, vêm de Cliente via include
+  // razaoSocial/nomeFantasia/cnpj/dados fiscais — REMOVIDOS, vêm de Cliente via include, SOMENTE LEITURA (ver decisão abaixo)
 }
 ```
 
 **`ClienteOperacional` (login), `NotificacaoCliente`, `PastaChecklist`, `Checklist`, `ModeloItemChecklist`, `ItemChecklist`, `DocumentoChecklist` continuam EXATAMENTE como estão** — nenhuma delas referencia dado cadastral de empresa diretamente (sempre passam por `OperacionalClientes`), então a unificação em `Cliente` já as beneficia automaticamente sem precisar tocá-las.
 
-**`DocumentoUnidade`**: recomendação de remover (código morto, seção 4) — decisão a confirmar, não assumida.
+**`DocumentoUnidade`**: mantida no schema, sem uso (decisão do usuário, seção 4).
+
+### Edição cadastral — RESPONDIDO (2026-08-11): vira exclusiva de outro módulo
+
+**Decisão do usuário:** a partir da fusão, o Checklist **para de permitir edição de razão social/dados fiscais**. Esses campos passam a ser **somente leitura** na tela do Checklist (exibidos via `include: { cliente }`), e qualquer edição real precisa acontecer no módulo dono do cadastro (CS&NPS, ou o próprio BPM/CRM — a decidir qual é "o" lugar canônico de edição, fora do escopo desta análise). Isso é consistente com o princípio da seção 3 (BPM é a fonte única de verdade) — se o Checklist pudesse editar o `Cliente`, ele deixaria de ser um satélite puro e voltaria a ser uma 2ª fonte de escrita cadastral.
 
 ### Impacto no código (Server Actions a reescrever, quando a Fase 5/Operacional do plano rodar)
 
 | Arquivo | Mudança necessária |
 |---|---|
-| `src/actions/ClientesOperacional.ts` — `vincularEmpresaAoCliente` | Passa a resolver/criar `Cliente` por CNPJ normalizado ANTES de criar `OperacionalClientes` (mesmo padrão já descrito no plano para este arquivo) |
+| `src/actions/ClientesOperacional.ts` — `vincularEmpresaAoCliente` | **Muda de "criar Cliente automaticamente" para "buscar e bloquear se não achar".** Busca `Cliente` por CNPJ normalizado; se encontrar, cria `OperacionalClientes` com `clienteId` preenchido; se NÃO encontrar, retorna erro claro ("Esta empresa ainda não está cadastrada no CRM — cadastre-a primeiro no Alpha CRM") e não cria nada. Formulário de cadastro do Checklist passa a exigir que o CNPJ já exista — não é mais um cadastro de empresa "do zero", é uma busca+vínculo. |
 | `src/actions/checklist.ts` — `getEmpresasChecklist`, `getEmpresaChecklist` | `include` ganha `cliente: { select: { razaoSocial, nomeFantasia, cnpj, uf, municipio, ... } }` no lugar dos campos que hoje vêm direto de `OperacionalClientes` |
-| `src/actions/checklist.ts` — `atualizarEmpresaChecklist` | Deixa de escrever razaoSocial/nomeFantasia/cnpj/dados fiscais em `OperacionalClientes` — esses campos passam a ser editados (se precisarem ser editáveis pelo Checklist) via uma Server Action de `Cliente`, não mais local ao módulo. **Decisão de produto a confirmar:** o Checklist hoje permite editar razão social/dados fiscais livremente — isso devia continuar possível a partir da tela do Checklist (editando o `Cliente` central), ou a edição cadastral vira exclusiva de outro módulo (CS&NPS)? |
+| `src/actions/checklist.ts` — `atualizarEmpresaChecklist` | **Deixa de escrever razaoSocial/nomeFantasia/cnpj/dados fiscais** — esses campos somem do formulário de edição do Checklist (viram somente leitura, decisão confirmada). A action continua existindo só para os campos que permanecem exclusivos do módulo (`embasamento`/`tipo`/`pastaChecklistId`/`status`). |
 | `src/actions/ClientesOperacional.ts` — `verificarCnpjsOperacional` | Passa a checar duplicidade contra `Cliente.cnpj` (normalizado) em vez de `OperacionalClientes.cnpj` isoladamente |
+| `src/app/PainelAlpha/CheckList/Modais/CadastroCliente.tsx` | Mudança de UX real: o formulário deixa de ser "digite CNPJ + preencha dados fiscais manualmente" e vira "busque CNPJ → se encontrado no CRM, mostra dados (read-only) + campos específicos do Checklist para preencher; se não encontrado, bloqueia com link/instrução para cadastrar no Alpha CRM primeiro" |
 
 ---
 
@@ -139,16 +153,20 @@ model OperacionalClientes {
 
 ---
 
-## 8. Resumo executivo — o que fazer com isto
+## 8. Resumo executivo — status final desta análise
 
-1. Este documento **não substitui** `plano-cliente-master.md` — é um adendo específico ao módulo Checklist, a ser incorporado nele (seção "Tabelas auxiliares" já tem a entrada "Operacional", só precisa ser expandida com os itens 3, 4 e 6 acima) quando você confirmar as decisões pendentes.
-2. **2 decisões bloqueantes para fechar antes de qualquer execução:**
-   - Seção 3: `clienteId` obrigatório com criação automática (como Metas) vs. obrigatório mas só vinculando a `Cliente` já existente (mais rígido, gera fricção hoje).
-   - Seção 4: remover `DocumentoUnidade` (código morto) ou manter no schema sem uso.
-3. **1 decisão de produto a confirmar:** se a edição de dados cadastrais (razão social, dados fiscais) continua acessível pela tela do Checklist (editando o `Cliente` central) ou se passa a ser exclusiva de outro módulo.
-4. **Sem necessidade de generalizar o checklist em si** (seção 5) — a menos que você tenha em mente um caso de uso concreto de checklist fora do módulo Operacional que eu não vi no código.
+1. Este documento **não substitui** `plano-cliente-master.md` — é um adendo específico ao módulo Checklist, a ser incorporado nele (seção "Tabelas auxiliares", entrada "Operacional") quando a pendência cross-plano abaixo for resolvida.
+2. **As 3 decisões pontuais do Checklist estão FECHADAS (2026-08-11):**
+   - `clienteId` obrigatório, **sem criação automática** — só vincula a `Cliente` já existente, bloqueia se não achar.
+   - `DocumentoUnidade` — **mantida** no schema, sem uso, para aproveitamento futuro.
+   - Edição cadastral — **vira exclusiva de outro módulo**; Checklist passa a ser somente leitura para razão social/dados fiscais.
+3. **Pendência cross-plano — RESOLVIDA (2026-08-11): regra geral, sem exceção.** Confirmado com o usuário: todo negócio real sempre nasce como card no BPM/CRM antes de virar contrato em Metas — não há fluxo legítimo de contrato fechado sem passar pelo Kanban primeiro. **`ContratoComercial.clienteId` deixa de criar `Cliente` automaticamente** — a decisão antiga registrada em `plano-cliente-master.md` (pergunta 5, "cria Cliente no ato") está **superada e precisa ser corrigida** no plano geral para o mesmo padrão do Checklist: só vincula a `Cliente` já existente (por CNPJ), bloqueia com mensagem clara se não encontrar. Ver a atualização já aplicada em `plano-cliente-master.md`.
+4. **Sem necessidade de generalizar o checklist em si** (seção 5) — não descartado por mim, mas você não sinalizou interesse nisso; segue como não-escopo a menos que você diga o contrário.
+5. **Saneamento de dado real necessário em 2 módulos, não só 1:**
+   - Checklist: 3 dos 4 registros hoje em `OperacionalClientes` não têm `Cliente` correspondente.
+   - Metas: a Fase 1 do plano geral já mediu **18 CNPJs de `contratos_comerciais` sem correspondente em `clientes`** (ver `plano-cliente-master.md`, resultado da Fase 1) — com a regra "nunca cria" agora valendo também para Metas, esses 18 precisam ser resolvidos manualmente (cadastrados no BPM) antes do backfill, não mais absorvidos automaticamente como o plano antigo previa.
 
-Nenhuma Fase de execução foi aberta para isto ainda — aguardando suas respostas antes de decidir se isso vira uma extensão do plano geral ou uma fase própria.
+**Nenhum bloqueio restante para esta análise específica do Checklist** — as 3 decisões da seção 3/4/6 e a regra geral do BPM como porta única já estão fechadas. O que falta é propagar a correção da pergunta 5 de Metas no documento do plano geral (já feito nesta sessão) e, na Fase de execução, tratar o saneamento dos 18+3 CNPJs órfãos como passo explícito antes de qualquer backfill.
 
 ---
 
