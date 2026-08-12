@@ -74,6 +74,11 @@ quality_gate_tools:
   - [x] Validar e persistir a descrição em `canalOutro` somente para o canal correto.
   - [x] Listar valores distintos por Server Action autenticada, com select de reutilização e opção de novo valor.
   - [x] Atualizar o conhecimento do Bibble, a memória técnica e executar os quality gates.
+- [ ] Task 8 — Select pesquisável de parceiros (AC: 2)
+  - [ ] Substituir o select nativo por lista estilizada e alinhada ao visual do Painel Alpha.
+  - [ ] Adicionar pesquisa digitável com filtro por nome, nome fantasia e representante, sem diferenciar acentos ou caixa.
+  - [ ] Preservar seleção, limpeza, estado desabilitado, carregamento e acessibilidade do controle.
+  - [ ] Adicionar testes focados e executar os quality gates proporcionais.
 
 ## Dev Notes
 

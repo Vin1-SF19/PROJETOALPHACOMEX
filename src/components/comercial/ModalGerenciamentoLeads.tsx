@@ -28,6 +28,7 @@ import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import QuadroSocios, { type Socio } from "./QuadroSocios";
 import ModalConfirmacaoFechamento from "./ModalConfirmacaoFechamento";
 import { CampoProspeccaoAtiva } from "./CampoProspeccaoAtiva";
+import { SeletorParceiroPesquisavel, type ParceiroOpcao } from "./SeletorParceiroPesquisavel";
 import { isAdminRole } from "@/lib/roles";
 import {
     CANAL_INDICACAO_CLIENTE,
@@ -252,7 +253,9 @@ function FormNovoContrato({
     const [parceiroPendenteNome, setParceiroPendenteNome] = useState(parceiroPendenteInicial?.nome ?? "");
     const [parceiroPendenteEmpresa, setParceiroPendenteEmpresa] = useState(parceiroPendenteInicial?.empresa ?? "");
     const [parceiroPendenteTelefone, setParceiroPendenteTelefone] = useState(parceiroPendenteInicial?.telefone ?? "");
-    const [parceirosLista, setParceirosLista] = useState<{ id: number; nome: string; nomeFantasia: string | null; nivel: string; representantes: string[] }[]>([]);
+    const [parceirosLista, setParceirosLista] = useState<ParceiroOpcao[]>([]);
+    const [parceirosCarregados, setParceirosCarregados] = useState(false);
+    const carregandoParceirosLista = canalAquisicao === CANAL_INDICACAO_PARCEIRO && !parceirosCarregados;
     const [parceiroDetalhe, setParceiroDetalhe] = useState<ParceiroDetalheSimples | null>(null);
     const [carregandoParceiroDetalhe, setCarregandoParceiroDetalhe] = useState(false);
     const [parceiroDetalheAberto, setParceiroDetalheAberto] = useState(false);
@@ -279,18 +282,32 @@ function FormNovoContrato({
 
     // Carrega parceiros quando o canal é indicação de parceiro.
     useEffect(() => {
-        if (canalAquisicao === CANAL_INDICACAO_PARCEIRO && parceirosLista.length === 0) {
+        if (canalAquisicao === CANAL_INDICACAO_PARCEIRO && !parceirosCarregados) {
+            let ativo = true;
             listarParceirosSimples()
-                .then(ps => setParceirosLista(ps.map(p => ({
-                    id: p.id,
-                    nome: p.nome,
-                    nomeFantasia: p.nomeFantasia,
-                    nivel: p.nivel,
-                    representantes: p.representantes.map(r => r.nome),
-                }))))
-                .catch(() => {});
+                .then((ps) => {
+                    if (!ativo) return;
+                    setParceirosLista(ps.map(p => ({
+                        id: p.id,
+                        nome: p.nome,
+                        nomeFantasia: p.nomeFantasia,
+                        nivel: p.nivel,
+                        representantes: p.representantes.map(r => r.nome),
+                    })));
+                })
+                .catch(() => {
+                    if (ativo) toast.error("Não foi possível carregar os parceiros");
+                })
+                .finally(() => {
+                    if (!ativo) return;
+                    setParceirosCarregados(true);
+                });
+
+            return () => {
+                ativo = false;
+            };
         }
-    }, [canalAquisicao, parceirosLista.length]);
+    }, [canalAquisicao, parceirosCarregados]);
 
     // Carrega os dados completos do parceiro selecionado (confirmação visual, só leitura)
     // — abre a gaveta automaticamente assim que os dados chegam.
@@ -766,21 +783,16 @@ function FormNovoContrato({
                     {canalAquisicao === CANAL_INDICACAO_PARCEIRO && (
                         <div className="mt-2 space-y-3">
                             <label className={labelCls}>Parceiro que indicou</label>
-                            <select
-                                value={indicadoPorParceiroId ?? ""}
-                                onChange={(e) => {
-                                    setIndicadoPorParceiroId(e.target.value ? Number(e.target.value) : null);
-                                    if (e.target.value) setParceiroNaoCadastrado(false);
+                            <SeletorParceiroPesquisavel
+                                parceiros={parceirosLista}
+                                value={indicadoPorParceiroId}
+                                onChange={(parceiroId) => {
+                                    setIndicadoPorParceiroId(parceiroId);
+                                    if (parceiroId) setParceiroNaoCadastrado(false);
                                 }}
                                 disabled={parceiroNaoCadastrado}
-                                className={inputCls}
-                            >
-                                <option value="">Selecione o parceiro...</option>
-                                {parceirosLista.map((p) => {
-                                    const label = `${p.nome}${p.nomeFantasia ? ` (${p.nomeFantasia})` : ""}${p.representantes.length ? ` - ${p.representantes.join(" / ")}` : ""}`;
-                                    return <option key={p.id} value={p.id}>{label}</option>;
-                                })}
-                            </select>
+                                carregando={carregandoParceirosLista}
+                            />
 
                             <button
                                 type="button"

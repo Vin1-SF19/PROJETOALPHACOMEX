@@ -13,7 +13,7 @@ import {
   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
   X, PanelLeft, User, Pin, ChevronLeft, ChevronRight,
   Instagram, Activity, Handshake, Cable, MonitorPlay, CalendarClock, Compass, HandCoins,
-  StickyNote,
+  StickyNote, Search,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -67,6 +67,14 @@ const TOOLTIP_ACCENT: Record<string, string> = {
   admin:       '148, 163, 184',
 };
 
+function normalizarTexto(valor: string): string {
+  return valor
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 // ── Props ─────────────────────────────────────────────────
 interface GlobalSidebarProps {
   permissoes: string[];
@@ -110,6 +118,7 @@ export default function GlobalSidebar({
 
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  const [busca, setBusca] = useState('');
   const tema = getTema(temaName ?? "blue");
 
   const asideRef = useRef<HTMLElement>(null);
@@ -190,12 +199,18 @@ export default function GlobalSidebar({
     return true;
   });
 
-  const adminModulos = isAdmin ? modulos.filter(m => m.category === 'admin') : [];
-  const nonAdminModulos = isAdmin ? modulos.filter(m => m.category !== 'admin') : modulos;
+  const buscaNormalizada = normalizarTexto(busca);
+  const modulosVisiveis = buscaNormalizada
+    ? modulos.filter(m => normalizarTexto(m.label).includes(buscaNormalizada))
+    : modulos;
+
+  const adminModulos = isAdmin ? modulosVisiveis.filter(m => m.category === 'admin') : [];
+  const nonAdminModulos = isAdmin ? modulosVisiveis.filter(m => m.category !== 'admin') : modulosVisiveis;
   const pinnedModulos = pinnedIds
     .map(id => nonAdminModulos.find(m => m.id === id))
     .filter((m): m is typeof nonAdminModulos[number] => !!m);
   const unpinnedModulos = nonAdminModulos.filter(m => !pinnedIds.includes(m.id));
+  const nenhumResultado = buscaNormalizada.length > 0 && modulosVisiveis.length === 0;
 
   const adminCat = CATEGORIAS.find(c => c.id === 'admin');
 
@@ -239,8 +254,31 @@ export default function GlobalSidebar({
         )}
       </div>
 
+      {/* Busca de módulos */}
+      {!isCollapsed && (
+        <div className="shrink-0 px-2 pt-3">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar módulo..."
+              aria-label="Buscar módulo"
+              className="w-full h-9 pl-8 pr-3 rounded-xl bg-white/5 border border-white/5 text-[11px] font-medium text-white placeholder:text-slate-600 outline-none focus:border-white/15 focus:bg-white/[0.07] transition-all"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-0.5 custom-scrollbar">
+        {nenhumResultado && (
+          <p className="px-3 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+            Nenhum módulo encontrado
+          </p>
+        )}
+
         {/* Pinned + unpinned non-admin modules — flat list */}
         {[...pinnedModulos, ...unpinnedModulos].map(mod => {
           const Icon = ICON_MAP[mod.iconName] ?? FileText;
