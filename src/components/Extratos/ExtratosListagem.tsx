@@ -48,7 +48,7 @@ interface PeriodoComBancos {
 
 interface ExtratoEmpresa {
   id: number;
-  cnpj: string;
+  cnpj: string | null;
   razaoSocial: string;
   nomeFantasia: string | null;
   municipio: string | null;

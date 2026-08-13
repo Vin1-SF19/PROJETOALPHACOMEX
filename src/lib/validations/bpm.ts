@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STATUS_POS_FECHAMENTO_CODIGOS } from "@/lib/bpm/status-pos-fechamento";
 
 export const BPM_CARD_STATUS = ["ATIVO", "CONCLUIDO", "CANCELADO"] as const;
 
@@ -66,13 +67,29 @@ export const atualizarCampoSchema = z.object({
   ordem: z.number().int().min(0).optional(),
 });
 
+// Cadastro real de empresa nova — só usado pelo botão "+" da etapa "Novos Leads"
+// (Fase 3.2 do Cliente Master): cria o `Cliente` na mesma transação do card, em
+// vez de exigir que a empresa já exista (única exceção do BPM — as demais
+// etapas continuam vinculando empresa já cadastrada via `empresaId`).
+export const novaEmpresaCardSchema = z.object({
+  cnpj: z.string().trim().min(14, "CNPJ inválido").max(20),
+  razaoSocial: z.string().trim().min(2, "Razão social é obrigatória").max(200),
+  nomeFantasia: z.string().trim().max(200).optional(),
+  uf: z.string().trim().length(2).optional(),
+  municipio: z.string().trim().max(120).optional(),
+});
+
 export const criarCardSchema = z.object({
-  empresaId: z.number().int().positive({ message: "Empresa é obrigatória" }),
+  empresaId: z.number().int().positive().optional(),
+  novaEmpresa: novaEmpresaCardSchema.optional(),
   pipelineId: z.string().cuid(),
   etapaId: z.string().cuid(),
   responsavelId: z.number().int().positive(),
   servico: z.string().trim().max(120).optional(),
   camposValores: z.record(z.string().cuid(), z.string().max(4000)).optional(),
+}).refine((d) => d.empresaId !== undefined || d.novaEmpresa !== undefined, {
+  message: "Empresa é obrigatória",
+  path: ["empresaId"],
 });
 
 export const atualizarCardSchema = z.object({
@@ -80,6 +97,8 @@ export const atualizarCardSchema = z.object({
   responsavelId: z.number().int().positive().optional(),
   servico: z.string().trim().max(120).nullable().optional(),
   status: z.enum(BPM_CARD_STATUS).optional(),
+  statusPosFechamento: z.enum(STATUS_POS_FECHAMENTO_CODIGOS).optional(),
+  versaoEsperadaEm: z.coerce.date().optional(),
   proximoContatoEm: z.preprocess(
     (valor) => valor === "" ? null : valor,
     z.coerce.date().nullable().optional(),

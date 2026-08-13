@@ -772,3 +772,15 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - `PainelReuniao.tsx` e `PainelProximaEtapa.tsx`: estados pendente/recebida/erro e motivo visual do bloqueio.
 - `Cards.ts`: autoridade do guard para Em tratativa/Sem viabilidade; Standby continua livre.
 - A rota protegida de follow-up executa polling e o ciclo de oito dias para Reunião Agendada. Sem schema ou migration novos.
+
+## Alpha CRM — fluxo operacional de Fechado (2026-08-13)
+
+- `src/lib/bpm/status-pos-fechamento.ts` é a fonte compartilhada dos cinco status pós-fechamento, labels, classes de badge/tint, status inicial e validação fail-closed da configuração de entrada.
+- `src/actions/bpm/Cards.ts` concentra a autoridade server-side: criação direta e movimento para **Fechado** exigem **Valor acordado no contrato** e **Forma de pagamento** corretamente configurados/preenchidos; a primeira entrada com status nulo grava `AGUARDANDO_CONTRATO` na mesma transação.
+- A edição posterior usa `versaoEsperadaEm` como CAS, registra histórico e publica invalidação realtime somente após a persistência. Status inválido ou edição fora de **Fechado** é rejeitado pelo backend.
+- `PainelStatusPosFechamento.tsx`, montado no lado esquerdo por `PainelHistorico.tsx`, oferece o editor dos cinco status e preserva rascunho diante de atualização realtime concorrente.
+- `PipelineBoardClient.tsx` usa o mesmo contrato para exibir badge textual e tint visual exclusivamente em cards atualmente na etapa **Fechado**; status residual fora dela não ganha representação visual.
+- Cobertura dedicada: `tests/bpm/fechado-status-pos-fechamento.test.ts`, `tests/bpm/fechado-actions.test.ts`, `tests/bpm/fechado-ui.test.ts` e `tests/bpm/card-modal-integration.test.ts`.
+- Não houve schema, migration, seed ou backfill. Integração financeira/Comissões futura permanece fora deste fluxo e deve consumir o valor canônico sem introduzir efeito colateral implícito nas actions atuais.
+
+**Última atualização:** 2026-08-13 por Scribe

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClipboardCheck, X } from "lucide-react";
+import { ClipboardCheck, Loader2, Search, X } from "lucide-react";
 import { BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
+import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { CampoBpmInput, type CampoBpmEditavel } from "../../CampoBpmInput";
 
 type CampoBpm = CampoBpmEditavel;
@@ -11,7 +12,25 @@ interface EmpresaOpcao {
   id: number;
   razaoSocial: string;
   nomeFantasia: string | null;
+  cnpj: string | null;
+}
+
+interface NovaEmpresaForm {
   cnpj: string;
+  razaoSocial: string;
+  nomeFantasia: string;
+  uf: string;
+  municipio: string;
+}
+
+const NOVA_EMPRESA_VAZIA: NovaEmpresaForm = { cnpj: "", razaoSocial: "", nomeFantasia: "", uf: "", municipio: "" };
+
+function formatarCnpjInput(v: string): string {
+  return v.replace(/\D/g, "").slice(0, 14)
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{2}\.\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{2}\.\d{3}\.\d{3})(\d)/, "$1/$2")
+    .replace(/(\d{2}\.\d{3}\.\d{3}\/\d{4})(\d)/, "$1-$2");
 }
 
 interface UsuarioOpcao {
@@ -42,6 +61,8 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 export default function NovoCardModal({ pipelineId, etapaId, etapaNome, campos, currentUserId, accent, onClose, onCriado }: Props) {
+  const ehNovosLeads = etapaEhNovosLeads(etapaNome);
+
   const [buscaEmpresa, setBuscaEmpresa] = useState("");
   const [empresas, setEmpresas] = useState<EmpresaOpcao[]>([]);
   const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaOpcao | null>(null);
@@ -52,11 +73,24 @@ export default function NovoCardModal({ pipelineId, etapaId, etapaNome, campos, 
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
+  // Cadastro real de empresa nova — só na etapa "Novos Leads" (Fase 3.2 do Cliente
+  // Master, decisão do usuário 2026-08-12): esse é o único lugar do BPM que cria
+  // `Cliente` novo. Demais etapas continuam só vinculando empresa já existente.
+  const [modoCadastro, setModoCadastro] = useState(false);
+  const [novaEmpresa, setNovaEmpresa] = useState<NovaEmpresaForm>(NOVA_EMPRESA_VAZIA);
+  const [buscandoCnpj, setBuscandoCnpj] = useState(false);
+  const [erroBuscaCnpj, setErroBuscaCnpj] = useState<string | null>(null);
+
   useEffect(() => {
-    ListarUsuariosResponsavelBpm().then((res) => {
-      if (res.success && res.data) setUsuarios(res.data);
+    ListarUsuariosResponsavelBpm(pipelineId).then((res) => {
+      if (res.success && res.data) {
+        setUsuarios(res.data);
+        setResponsavelId((atual) =>
+          atual && res.data.some((usuario) => usuario.id === atual) ? atual : null,
+        );
+      }
     });
-  }, []);
+  }, [pipelineId]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -71,11 +105,50 @@ export default function NovoCardModal({ pipelineId, etapaId, etapaNome, campos, 
     return () => clearTimeout(timeout);
   }, [buscaEmpresa]);
 
+  async function buscarCnpjReceita() {
+    const cnpjLimpo = novaEmpresa.cnpj.replace(/\D/g, "");
+    if (cnpjLimpo.length !== 14) {
+      setErroBuscaCnpj("Informe um CNPJ válido (14 dígitos)");
+      return;
+    }
+    setErroBuscaCnpj(null);
+    setBuscandoCnpj(true);
+    try {
+      const r = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
+      const d = await r.json();
+      if (!r.ok || d.error) {
+        setErroBuscaCnpj(d.error || "Não foi possível buscar os dados do CNPJ");
+        return;
+      }
+      setNovaEmpresa((prev) => ({
+        ...prev,
+        razaoSocial: d.razaoSocial || prev.razaoSocial,
+        nomeFantasia: d.nomeFantasia || prev.nomeFantasia,
+        uf: d.uf || prev.uf,
+        municipio: d.municipio || prev.municipio,
+      }));
+    } catch {
+      setErroBuscaCnpj("Erro ao buscar CNPJ. Tente novamente.");
+    } finally {
+      setBuscandoCnpj(false);
+    }
+  }
+
   async function handleSalvar() {
     setErro(null);
 
     // D-021: empresa é sempre obrigatória para criar um card.
-    if (!empresaSelecionada) {
+    if (modoCadastro) {
+      const cnpjLimpo = novaEmpresa.cnpj.replace(/\D/g, "");
+      if (cnpjLimpo.length !== 14) {
+        setErro("Informe um CNPJ válido (14 dígitos).");
+        return;
+      }
+      if (!novaEmpresa.razaoSocial.trim()) {
+        setErro("Informe a razão social da empresa.");
+        return;
+      }
+    } else if (!empresaSelecionada) {
       setErro("Selecione uma empresa — todo card precisa estar vinculado a uma empresa.");
       return;
     }
@@ -96,7 +169,17 @@ export default function NovoCardModal({ pipelineId, etapaId, etapaNome, campos, 
 
     setSalvando(true);
     const resultado = await onCriado({
-      empresaId: empresaSelecionada.id,
+      ...(modoCadastro
+        ? {
+            novaEmpresa: {
+              cnpj: novaEmpresa.cnpj.replace(/\D/g, ""),
+              razaoSocial: novaEmpresa.razaoSocial.trim(),
+              nomeFantasia: novaEmpresa.nomeFantasia.trim() || undefined,
+              uf: novaEmpresa.uf.trim() || undefined,
+              municipio: novaEmpresa.municipio.trim() || undefined,
+            },
+          }
+        : { empresaId: empresaSelecionada!.id }),
       pipelineId,
       etapaId,
       responsavelId,
@@ -143,7 +226,64 @@ export default function NovoCardModal({ pipelineId, etapaId, etapaNome, campos, 
           </section>
 
           <FieldRow label="Empresa *">
-            {empresaSelecionada ? (
+            {modoCadastro ? (
+              <div className="space-y-2 rounded-xl border border-white/10 bg-slate-800/60 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Cadastrar empresa nova</span>
+                  <button
+                    onClick={() => { setModoCadastro(false); setNovaEmpresa(NOVA_EMPRESA_VAZIA); setErroBuscaCnpj(null); }}
+                    className="text-xs text-slate-400 hover:text-white"
+                  >
+                    Buscar existente
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    className={`${inputCls} font-mono`}
+                    placeholder="00.000.000/0000-00"
+                    value={novaEmpresa.cnpj}
+                    onChange={(e) => setNovaEmpresa((prev) => ({ ...prev, cnpj: formatarCnpjInput(e.target.value) }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={buscarCnpjReceita}
+                    disabled={buscandoCnpj}
+                    className="h-9 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shrink-0 transition-all disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {buscandoCnpj ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  </button>
+                </div>
+                {erroBuscaCnpj && <p className="text-[11px] text-rose-400">{erroBuscaCnpj}</p>}
+                <input
+                  className={inputCls}
+                  placeholder="Razão social *"
+                  value={novaEmpresa.razaoSocial}
+                  onChange={(e) => setNovaEmpresa((prev) => ({ ...prev, razaoSocial: e.target.value }))}
+                />
+                <input
+                  className={inputCls}
+                  placeholder="Nome fantasia"
+                  value={novaEmpresa.nomeFantasia}
+                  onChange={(e) => setNovaEmpresa((prev) => ({ ...prev, nomeFantasia: e.target.value }))}
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    className={`${inputCls} col-span-2`}
+                    placeholder="Município"
+                    value={novaEmpresa.municipio}
+                    onChange={(e) => setNovaEmpresa((prev) => ({ ...prev, municipio: e.target.value }))}
+                  />
+                  <input
+                    className={inputCls}
+                    placeholder="UF"
+                    maxLength={2}
+                    value={novaEmpresa.uf}
+                    onChange={(e) => setNovaEmpresa((prev) => ({ ...prev, uf: e.target.value.toUpperCase() }))}
+                  />
+                </div>
+              </div>
+            ) : empresaSelecionada ? (
               <div className="flex items-center justify-between bg-slate-800 border border-white/10 rounded-xl px-3 py-2">
                 <span className="text-sm text-white">{empresaSelecionada.nomeFantasia || empresaSelecionada.razaoSocial}</span>
                 <button onClick={() => setEmpresaSelecionada(null)} className="text-xs text-slate-400 hover:text-white">
@@ -172,6 +312,15 @@ export default function NovoCardModal({ pipelineId, etapaId, etapaNome, campos, 
                       </button>
                     ))}
                   </div>
+                )}
+                {ehNovosLeads && buscaEmpresa.trim().length >= 2 && empresas.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setModoCadastro(true); setNovaEmpresa((prev) => ({ ...prev, razaoSocial: buscaEmpresa })); setBuscaEmpresa(""); }}
+                    className="mt-1.5 w-full text-left px-3 py-2 rounded-xl text-xs text-blue-400 hover:bg-blue-500/10 border border-dashed border-blue-500/30"
+                  >
+                    Não encontrada — cadastrar empresa nova
+                  </button>
                 )}
               </div>
             )}

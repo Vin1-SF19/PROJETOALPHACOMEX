@@ -39,6 +39,12 @@ import {
   obterErroProximoContatoParaEntrada,
 } from "@/lib/bpm/em-tratativa";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
+import {
+  configuracaoEntradaFechadoEhValida,
+  CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM,
+  etapaEhFechado,
+  STATUS_POS_FECHAMENTO_INICIAL,
+} from "@/lib/bpm/status-pos-fechamento";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -65,7 +71,7 @@ export async function BuscarEmpresasBpm(termo: string) {
     const termoSeguro = termo.trim().slice(0, 120);
     if (termoSeguro.length < 2) return { success: true, data: [] };
 
-    const empresas = await db.clientes.findMany({
+    const empresas = await db.cliente.findMany({
       where: {
         OR: [
           { razaoSocial: { contains: termoSeguro } },
@@ -85,18 +91,27 @@ export async function BuscarEmpresasBpm(termo: string) {
   }
 }
 
-/** Lista usuários ativos para o seletor de responsável do card. */
-export async function ListarUsuariosResponsavelBpm() {
+/** Lista somente usuários ativos e elegíveis como responsáveis no pipeline. */
+export async function ListarUsuariosResponsavelBpm(pipelineId: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
-    await exigirAcessoModuloBpm(Number(session.user.id));
+    if (!pipelineId?.trim()) {
+      return { success: false, error: "Pipeline inválido", data: [] };
+    }
+    await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
 
-    const usuarios = await db.usuarios.findMany({
+    const candidatos = await db.usuarios.findMany({
       where: { status: "ATIVO" },
       select: { id: true, nome: true },
       orderBy: { nome: "asc" },
     });
+    const elegibilidades = await Promise.all(
+      candidatos.map((usuario) =>
+        usuarioElegivelResponsavelBpm(pipelineId, usuario.id),
+      ),
+    );
+    const usuarios = candidatos.filter((_, indice) => elegibilidades[indice]);
 
     return { success: true, data: usuarios };
   } catch (error) {
@@ -271,20 +286,15 @@ export async function ListarTelefonesCardBpm(cardId: string) {
     });
     if (!card) return { success: false, error: "Card não encontrado", data: [] };
 
-    const pessoas = await db.socios.findMany({
-      where: {
-        telefone: { not: null },
-        OR: [
-          { clienteId: card.empresaId },
-          { empresaVinculos: { some: { empresaId: card.empresaId } } },
-        ],
-      },
-      select: { id: true, nome: true, telefone: true },
-      orderBy: [{ nome: "asc" }, { id: "asc" }],
+    // Pessoa/PessoaClienteVinculo (Fase 3.2 do Cliente Master) — substitui `socios`.
+    const vinculos = await db.pessoaClienteVinculo.findMany({
+      where: { clienteId: card.empresaId },
+      select: { pessoa: { select: { id: true, nome: true, celular: true } } },
+      orderBy: { pessoa: { nome: "asc" } },
     });
 
-    const data = pessoas.flatMap((pessoa) => {
-      const telefone = pessoa.telefone?.trim();
+    const data = vinculos.flatMap(({ pessoa }) => {
+      const telefone = pessoa.celular?.trim();
       return telefone ? [{ id: pessoa.id, nome: pessoa.nome, telefone }] : [];
     });
 
@@ -306,20 +316,45 @@ export async function CriarCardBpm(dados: unknown) {
 
     const parsed = criarCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { empresaId, pipelineId, etapaId, responsavelId, servico, camposValores } = parsed.data;
+    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico, camposValores } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
     if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
     }
 
-    // D-021: empresa é sempre obrigatória — já garantido pelo schema Zod (empresaId obrigatório),
-    // aqui confirmamos que a empresa de fato existe.
-    const empresaExiste = await db.clientes.findUnique({ where: { id: empresaId }, select: { id: true } });
-    if (!empresaExiste) return { success: false, error: "Empresa não encontrada" };
+    // D-021: empresa é sempre obrigatória. `empresaId` vincula empresa já existente
+    // (fluxo padrão de todas as etapas); `novaEmpresa` cria um `Cliente` novo na mesma
+    // transação (Fase 3.2 do Cliente Master — único caminho do BPM que cria empresa,
+    // usado só pelo botão "+" da etapa "Novos Leads").
+    let cnpjNovaEmpresa: string | null = null;
+    if (novaEmpresa) {
+      cnpjNovaEmpresa = novaEmpresa.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      const jaExiste = await db.cliente.findUnique({ where: { cnpj: cnpjNovaEmpresa }, select: { id: true } });
+      if (jaExiste) {
+        return { success: false, error: "Já existe uma empresa cadastrada com este CNPJ — busque e selecione-a." };
+      }
+    } else {
+      const empresaExiste = await db.cliente.findUnique({ where: { id: empresaId }, select: { id: true } });
+      if (!empresaExiste) return { success: false, error: "Empresa não encontrada" };
+    }
 
-    const etapa = await db.bpmEtapa.findUnique({ where: { id: etapaId }, select: { pipelineId: true } });
+    const etapa = await db.bpmEtapa.findUnique({
+      where: { id: etapaId },
+      select: { pipelineId: true, nome: true },
+    });
     if (!etapa || etapa.pipelineId !== pipelineId) {
       return { success: false, error: "Etapa não pertence ao pipeline informado" };
+    }
+
+    const camposAplicaveis = etapaEhFechado(etapa.nome)
+      || (camposValores && Object.keys(camposValores).length > 0)
+      ? await carregarCamposAplicaveisEtapa(pipelineId, etapaId)
+      : [];
+    if (
+      etapaEhFechado(etapa.nome)
+      && !configuracaoEntradaFechadoEhValida(camposAplicaveis)
+    ) {
+      return { success: false, error: CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM };
     }
 
     // D-024: bloqueio de avanço/criação quando campos obrigatórios da etapa não estão preenchidos.
@@ -336,7 +371,6 @@ export async function CriarCardBpm(dados: unknown) {
     }
 
     if (camposValores && Object.keys(camposValores).length > 0) {
-      const camposAplicaveis = await carregarCamposAplicaveisEtapa(pipelineId, etapaId);
       const idsAplicaveis = new Set(camposAplicaveis.map((campo) => campo.id));
       if (Object.keys(camposValores).some((campoId) => !idsAplicaveis.has(campoId))) {
         return {
@@ -350,12 +384,32 @@ export async function CriarCardBpm(dados: unknown) {
 
     const card = await db.$transaction(async (tx) => {
       await exigirAcessoBpmPipeline(pipelineId, userId, tx);
+
+      let empresaIdResolvido = empresaId;
+      if (novaEmpresa && cnpjNovaEmpresa) {
+        // Reconfirma dentro da transação — outra requisição pode ter cadastrado
+        // o mesmo CNPJ entre a checagem acima e agora.
+        const jaExisteNaTx = await tx.cliente.findUnique({ where: { cnpj: cnpjNovaEmpresa }, select: { id: true } });
+        if (jaExisteNaTx) throw new Error("CNPJ_JA_CADASTRADO");
+        const criado = await tx.cliente.create({
+          data: {
+            cnpj: cnpjNovaEmpresa,
+            razaoSocial: novaEmpresa.razaoSocial.trim(),
+            nomeFantasia: novaEmpresa.nomeFantasia?.trim() || null,
+            uf: novaEmpresa.uf?.trim().toUpperCase() || null,
+            municipio: novaEmpresa.municipio?.trim() || null,
+          },
+        });
+        empresaIdResolvido = criado.id;
+      }
+      if (!empresaIdResolvido) throw new Error("CRIACAO_CARD_INVALIDA");
+
       const [etapaAtual, empresaAtual, responsavelElegivel] = await Promise.all([
         tx.bpmEtapa.findUnique({
           where: { id: etapaId },
-          select: { pipelineId: true, ativo: true },
+          select: { pipelineId: true, nome: true, ativo: true },
         }),
-        tx.clientes.findUnique({ where: { id: empresaId }, select: { id: true } }),
+        tx.cliente.findUnique({ where: { id: empresaIdResolvido }, select: { id: true } }),
         usuarioElegivelResponsavelBpm(pipelineId, responsavelId, tx),
       ]);
       if (!etapaAtual?.ativo || etapaAtual.pipelineId !== pipelineId) {
@@ -369,6 +423,12 @@ export async function CriarCardBpm(dados: unknown) {
         etapaId,
         tx,
       );
+      if (
+        etapaEhFechado(etapaAtual.nome)
+        && !configuracaoEntradaFechadoEhValida(camposAtuais)
+      ) {
+        throw new Error("CONFIGURACAO_FECHADO_INVALIDA");
+      }
       const validacaoAtual = validarValoresCamposBpm(camposAtuais, camposValores ?? {});
       if (!validacaoAtual.success) {
         throw new Error(`CAMPO_INVALIDO:${validacaoAtual.error}`);
@@ -380,8 +440,18 @@ export async function CriarCardBpm(dados: unknown) {
       );
       if (faltantesAtuais.length > 0) throw new Error("CRIACAO_CARD_INVALIDA");
 
+      const statusPosFechamento = etapaEhFechado(etapaAtual.nome)
+        ? STATUS_POS_FECHAMENTO_INICIAL
+        : undefined;
       const novoCard = await tx.bpmCard.create({
-        data: { empresaId, pipelineId, etapaId, responsavelId, servico },
+        data: {
+          empresaId: empresaIdResolvido,
+          pipelineId,
+          etapaId,
+          responsavelId,
+          servico,
+          ...(statusPosFechamento ? { statusPosFechamento } : {}),
+        },
       });
 
       // D-041: responsável principal também é registrado como membro RESPONSAVEL.
@@ -403,7 +473,14 @@ export async function CriarCardBpm(dados: unknown) {
           cardId: novoCard.id,
           acao: "CARD_CRIADO",
           usuarioId: userId,
-          valorNovoJson: JSON.stringify({ empresaId, pipelineId, etapaId, responsavelId }),
+          valorNovoJson: JSON.stringify({
+            empresaId: empresaIdResolvido,
+            pipelineId,
+            etapaId,
+            responsavelId,
+            empresaCriada: !!novaEmpresa,
+            ...(statusPosFechamento ? { statusPosFechamento } : {}),
+          }),
         },
       });
 
@@ -417,11 +494,15 @@ export async function CriarCardBpm(dados: unknown) {
     console.error("[CriarCardBpm]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
-      : error instanceof Error && error.message === "CRIACAO_CARD_INVALIDA"
-        ? "Os dados de criação mudaram ou não são mais válidos. Recarregue e tente novamente."
-        : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
-          ? error.message.slice("CAMPO_INVALIDO:".length)
-          : "Erro ao criar card";
+      : error instanceof Error && error.message === "CNPJ_JA_CADASTRADO"
+        ? "Já existe uma empresa cadastrada com este CNPJ — busque e selecione-a."
+        : error instanceof Error && error.message === "CONFIGURACAO_FECHADO_INVALIDA"
+          ? CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM
+        : error instanceof Error && error.message === "CRIACAO_CARD_INVALIDA"
+          ? "Os dados de criação mudaram ou não são mais válidos. Recarregue e tente novamente."
+          : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
+            ? error.message.slice("CAMPO_INVALIDO:".length)
+            : "Erro ao criar card";
     return { success: false, error: msg };
   }
 }
@@ -433,13 +514,38 @@ export async function AtualizarCardBpm(dados: unknown) {
     const userId = Number(session.user.id);
 
     const parsed = atualizarCardSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, camposValores, ...campos } = parsed.data;
+    if (!parsed.success) {
+      const statusInvalido = parsed.error.issues.some(
+        (issue) => issue.path[0] === "statusPosFechamento",
+      );
+      return {
+        success: false,
+        error: statusInvalido
+          ? "Status pós-fechamento inválido."
+          : parsed.error.flatten(),
+      };
+    }
+    const { cardId, camposValores, versaoEsperadaEm, ...campos } = parsed.data;
+    if (campos.statusPosFechamento !== undefined && !versaoEsperadaEm) {
+      return {
+        success: false,
+        error: "A versão atual do card é obrigatória para alterar o status pós-fechamento.",
+      };
+    }
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
     const cardAnterior = await db.bpmCard.findUnique({ where: { id: cardId } });
     if (!cardAnterior) return { success: false, error: "Card não encontrado" };
+    if (
+      versaoEsperadaEm
+      && cardAnterior.updatedAt.getTime() !== versaoEsperadaEm.getTime()
+    ) {
+      return {
+        success: false,
+        error: "O card mudou enquanto era editado. Recarregue e tente novamente.",
+      };
+    }
     if (
       campos.responsavelId !== undefined
       && !(await usuarioElegivelResponsavelBpm(
@@ -456,6 +562,9 @@ export async function AtualizarCardBpm(dados: unknown) {
         : {}),
       ...(campos.servico !== undefined ? { servico: cardAnterior.servico } : {}),
       ...(campos.status !== undefined ? { status: cardAnterior.status } : {}),
+      ...(campos.statusPosFechamento !== undefined
+        ? { statusPosFechamento: cardAnterior.statusPosFechamento }
+        : {}),
       ...(campos.proximoContatoEm !== undefined
         ? { proximoContatoEm: cardAnterior.proximoContatoEm }
         : {}),
@@ -463,14 +572,34 @@ export async function AtualizarCardBpm(dados: unknown) {
     };
 
     await db.$transaction(async (tx) => {
-      const cardAtual = await tx.bpmCard.findUnique({ where: { id: cardId } });
+      await exigirAcessoBpmCard(
+        cardId,
+        userId,
+        session.user.role ?? null,
+        "editarCard",
+        tx,
+      );
+      const cardAtual = await tx.bpmCard.findUnique({
+        where: { id: cardId },
+        include: { etapa: { select: { nome: true } } },
+      });
       if (
         !cardAtual
         || cardAtual.etapaId !== cardAnterior.etapaId
         || cardAtual.status !== cardAnterior.status
         || cardAtual.updatedAt.getTime() !== cardAnterior.updatedAt.getTime()
+        || (
+          versaoEsperadaEm
+          && cardAtual.updatedAt.getTime() !== versaoEsperadaEm.getTime()
+        )
       ) {
         throw new Error("CONFLITO_ATUALIZACAO_CARD");
+      }
+      if (
+        campos.statusPosFechamento !== undefined
+        && !etapaEhFechado(cardAtual.etapa.nome)
+      ) {
+        throw new Error("STATUS_POS_FECHAMENTO_FORA_DE_FECHADO");
       }
       if (
         campos.responsavelId !== undefined
@@ -501,9 +630,12 @@ export async function AtualizarCardBpm(dados: unknown) {
           id: cardId,
           etapaId: cardAnterior.etapaId,
           status: cardAnterior.status,
-          updatedAt: cardAnterior.updatedAt,
+          updatedAt: versaoEsperadaEm ?? cardAnterior.updatedAt,
         },
-        data: campos,
+        // Avanca explicitamente a versao mesmo quando a edicao contem apenas
+        // campos dinamicos. Um update vazio nao aciona @updatedAt no Prisma e
+        // permitiria que duas abas passassem pelo mesmo CAS.
+        data: { ...campos, updatedAt: new Date() },
       });
       if (atualizacao.count !== 1) throw new Error("CONFLITO_ATUALIZACAO_CARD");
 
@@ -557,6 +689,8 @@ export async function AtualizarCardBpm(dados: unknown) {
       ? "Não autorizado"
       : error instanceof Error && error.message === "CONFLITO_ATUALIZACAO_CARD"
         ? "O card mudou enquanto era editado. Recarregue e tente novamente."
+        : error instanceof Error && error.message === "STATUS_POS_FECHAMENTO_FORA_DE_FECHADO"
+          ? "O status pós-fechamento só pode ser alterado enquanto o card estiver em Fechado."
         : error instanceof Error && error.message.startsWith("CAMPO_INVALIDO:")
           ? error.message.slice("CAMPO_INVALIDO:".length)
           : error instanceof Error && error.message === "RESPONSAVEL_INVALIDO"
@@ -644,7 +778,7 @@ async function carregarCamposTransicao(params: {
     const destino = destinoPorId.get(id);
     const campo = destino ?? origem;
     if (!campo) throw new Error("Campo da transição não encontrado");
-    const contexto = origem && destino
+    const contexto: "ORIGEM" | "DESTINO" | "AMBOS" = origem && destino
       ? "AMBOS"
       : origem
         ? "ORIGEM"
@@ -778,6 +912,12 @@ async function executarMovimentoComRequisitos(
     etapaDestinoId,
     etapaDestinoNome: etapaDestino.nome,
   });
+  if (
+    etapaEhFechado(etapaDestino.nome)
+    && !configuracaoEntradaFechadoEhValida(camposTransicao)
+  ) {
+    return { success: false, error: CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM };
+  }
   const idsTransicao = new Set(camposTransicao.map((campo) => campo.id));
   if (Object.keys(camposValores).some((campoId) => !idsTransicao.has(campoId))) {
     return {
@@ -827,7 +967,11 @@ async function executarMovimentoComRequisitos(
       throw new Error(`MOVIMENTO_INVALIDO:${contextoAtual.error}`);
     }
     const { card: cardAtual, etapaDestino: destinoAtual } = contextoAtual;
-    if (cardAtual.etapaId !== card.etapaId || cardAtual.status !== card.status) {
+    if (
+      cardAtual.etapaId !== card.etapaId
+      || cardAtual.status !== card.status
+      || cardAtual.updatedAt.getTime() !== card.updatedAt.getTime()
+    ) {
       throw new Error("CONFLITO_MOVIMENTO_CARD");
     }
 
@@ -839,11 +983,25 @@ async function executarMovimentoComRequisitos(
       etapaDestinoId,
       etapaDestinoNome: destinoAtual.nome,
     }, tx);
+    if (
+      etapaEhFechado(destinoAtual.nome)
+      && !configuracaoEntradaFechadoEhValida(camposAtuais)
+    ) {
+      throw new Error("CONFIGURACAO_FECHADO_INVALIDA");
+    }
     const idsAtuais = new Set(camposAtuais.map((campo) => campo.id));
     if (Object.keys(camposValores).some((campoId) => !idsAtuais.has(campoId))) {
       throw new Error("MOVIMENTO_INVALIDO:Um ou mais campos não pertencem aos requisitos desta transição.");
     }
-    const validacaoAtual = validarValoresCamposBpm(camposAtuais, camposValores);
+    const valoresParaValidar = etapaEhFechado(destinoAtual.nome)
+      ? Object.fromEntries(
+          camposAtuais.map((campo) => [
+            campo.id,
+            camposValores[campo.id] ?? campo.valor ?? "",
+          ]),
+        )
+      : camposValores;
+    const validacaoAtual = validarValoresCamposBpm(camposAtuais, valoresParaValidar);
     if (!validacaoAtual.success) {
       throw new Error(`MOVIMENTO_INVALIDO:${validacaoAtual.error}`);
     }
@@ -876,17 +1034,34 @@ async function executarMovimentoComRequisitos(
       throw new Error(`MOVIMENTO_INVALIDO:${guardasAtuais[0]}`);
     }
 
-    for (const [campoId, valor] of Object.entries(validacaoAtual.valores)) {
+    const valoresSubmetidosValidados = Object.fromEntries(
+      Object.keys(camposValores).map((campoId) => [
+        campoId,
+        validacaoAtual.valores[campoId],
+      ]),
+    );
+    for (const [campoId, valor] of Object.entries(valoresSubmetidosValidados)) {
       await tx.bpmCardCampoValor.upsert({
         where: { cardId_campoId: { cardId, campoId } },
         create: { cardId, campoId, valor },
         update: { valor },
       });
     }
+    const inicializarStatusPosFechamento = etapaEhFechado(destinoAtual.nome)
+      && cardAtual.statusPosFechamento === null;
     const movimento = await tx.bpmCard.updateMany({
-      where: { id: cardId, etapaId: cardAtual.etapaId, status: cardAtual.status },
+      where: {
+        id: cardId,
+        etapaId: cardAtual.etapaId,
+        status: cardAtual.status,
+        updatedAt: cardAtual.updatedAt,
+      },
       data: {
         etapaId: etapaDestinoId,
+        updatedAt: new Date(),
+        ...(inicializarStatusPosFechamento
+          ? { statusPosFechamento: STATUS_POS_FECHAMENTO_INICIAL }
+          : {}),
         ...(proximoContatoEm !== undefined ? { proximoContatoEm } : {}),
       },
     });
@@ -901,7 +1076,13 @@ async function executarMovimentoComRequisitos(
         valorAnteriorJson: JSON.stringify({ etapaId: cardAtual.etapaId }),
         valorNovoJson: JSON.stringify({
           etapaId: etapaDestinoId,
-          camposPreenchidos: Object.keys(validacaoAtual.valores),
+          camposPreenchidos: Object.keys(valoresSubmetidosValidados),
+          ...(etapaEhFechado(destinoAtual.nome)
+            ? {
+                statusPosFechamento: cardAtual.statusPosFechamento
+                  ?? STATUS_POS_FECHAMENTO_INICIAL,
+              }
+            : {}),
           ...(proximoContatoEm !== undefined ? { proximoContatoEm } : {}),
         }),
       },
@@ -934,6 +1115,8 @@ export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
       ? "Não autorizado"
       : error instanceof Error && error.message === "CONFLITO_MOVIMENTO_CARD"
         ? "O card mudou enquanto você preenchia os requisitos. Recarregue e tente novamente."
+        : error instanceof Error && error.message === "CONFIGURACAO_FECHADO_INVALIDA"
+          ? CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("MOVIMENTO_INVALIDO:")
           ? error.message.slice("MOVIMENTO_INVALIDO:".length)
         : "Erro ao salvar requisitos e mover card";
@@ -958,6 +1141,8 @@ export async function MoverCardBpm(dados: unknown) {
       ? "Não autorizado"
       : error instanceof Error && error.message === "CONFLITO_MOVIMENTO_CARD"
         ? "O card mudou enquanto era movido. Recarregue e tente novamente."
+        : error instanceof Error && error.message === "CONFIGURACAO_FECHADO_INVALIDA"
+          ? CONFIGURACAO_FECHADO_INVALIDA_MENSAGEM
         : error instanceof Error && error.message.startsWith("MOVIMENTO_INVALIDO:")
           ? error.message.slice("MOVIMENTO_INVALIDO:".length)
         : "Erro ao mover card";
@@ -991,16 +1176,22 @@ export async function ObterHistoricoServicoEmpresa(cardId: string, servico: stri
     });
     if (!card) return { success: false, error: "Card não encontrado" };
 
+    // Empresa "em constituição" (Cliente.cnpj nullable, Fase 2 do Cliente Master) não
+    // tem CNPJ para cruzar com CS&NPS/Metas — essas 2 fontes ficam vazias, mas os
+    // outros cards do BPM da mesma empresa (via empresaId, não CNPJ) continuam.
+    const cnpjEmpresa = card.empresa.cnpj;
     const [registrosClientesTodos, contratosTodos, outrosCardsTodos] = await Promise.all([
-      db.clientes.findMany({
-        where: { cnpj: card.empresa.cnpj },
-        select: {
-          id: true, servicos: true, status: true, analistaResponsavel: true,
-          dataContratacao: true, dataExito: true,
-        },
-        orderBy: { id: "desc" },
-      }),
-      buscarServicosContratados(card.empresa.cnpj),
+      cnpjEmpresa
+        ? db.clientes.findMany({
+            where: { cnpj: cnpjEmpresa },
+            select: {
+              id: true, servicos: true, status: true, analistaResponsavel: true,
+              dataContratacao: true, dataExito: true,
+            },
+            orderBy: { id: "desc" },
+          })
+        : Promise.resolve([]),
+      cnpjEmpresa ? buscarServicosContratados(cnpjEmpresa) : Promise.resolve([]),
       db.bpmCard.findMany({
         where: { empresaId: card.empresaId, id: { not: cardId } },
         select: {

@@ -45,7 +45,7 @@ function converterDataRef(ref: string): string {
 export function criarRelatorioExcel(
   transacoes: TransacaoParaExportar[],
   razaoSocial: string,
-  cnpj: string,
+  cnpj: string | null,
 ): ExcelJS.Workbook {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Relatório Radar");
@@ -183,7 +183,7 @@ export function criarRelatorioExcel(
 export async function exportarRelatorioExcel(
   transacoes: TransacaoParaExportar[],
   razaoSocial: string,
-  cnpj: string,
+  cnpj: string | null,
 ): Promise<void> {
   const workbook = criarRelatorioExcel(transacoes, razaoSocial, cnpj);
   const buffer = await workbook.xlsx.writeBuffer();

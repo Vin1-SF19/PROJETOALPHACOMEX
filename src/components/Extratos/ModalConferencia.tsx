@@ -12,7 +12,7 @@ interface LinhaConferencia extends TransacaoParaExportar {
 }
 
 interface ModalConferenciaProps {
-  empresa: { razaoSocial: string; cnpj: string };
+  empresa: { razaoSocial: string; cnpj: string | null };
   linhas: LinhaConferencia[];
   onClose: () => void;
   onExport: (dados: LinhaConferencia[]) => void;

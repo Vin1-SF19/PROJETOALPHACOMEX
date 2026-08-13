@@ -2,10 +2,21 @@
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
-import { extratoInputSchema } from "@/lib/validations/extrato";
+import { vincularEmpresaExtratoSchema } from "@/lib/validations/extrato";
 import { criarFiltrosPesquisaExtratos } from "@/lib/extrato/pesquisa-extratos";
 
 const EXTRATOS_INCLUDE = {
+  cliente: {
+    select: {
+      cnpj: true,
+      razaoSocial: true,
+      nomeFantasia: true,
+      dataConstituicao: true,
+      municipio: true,
+      uf: true,
+      regimeTributario: true,
+    },
+  },
   periodos: {
     include: {
       bancos: {
@@ -17,6 +28,18 @@ const EXTRATOS_INCLUDE = {
   },
 } as const;
 
+/**
+ * Achata `Extratos` + `Cliente` no mesmo shape que os componentes já esperavam
+ * (campos cadastrais direto no objeto, ex: `empresa.razaoSocial`) — Fase 3.3 do
+ * Cliente Master: os campos migraram para `Cliente`, mas a UI não precisa mudar.
+ */
+function achatarExtrato<T extends { cliente: { cnpj: string | null; razaoSocial: string; nomeFantasia: string | null; dataConstituicao: string | null; municipio: string | null; uf: string | null; regimeTributario: string | null } }>(
+  extrato: T,
+) {
+  const { cliente, ...resto } = extrato;
+  return { ...resto, ...cliente };
+}
+
 export async function ListarExtratos(params?: { page?: number; pageSize?: number; busca?: string }) {
   try {
     const session = await auth();
@@ -24,14 +47,13 @@ export async function ListarExtratos(params?: { page?: number; pageSize?: number
 
     const page = params?.page && params.page > 0 ? params.page : 1;
     const pageSize = params?.pageSize && params.pageSize > 0 ? Math.min(params.pageSize, 100) : 20;
-    const filtrosBusca = criarFiltrosPesquisaExtratos(params?.busca);
-    const where = filtrosBusca.length > 0 ? { OR: filtrosBusca } : {};
+    const where = criarFiltrosPesquisaExtratos(params?.busca);
 
     const [dados, total] = await Promise.all([
       db.extratos.findMany({
         where,
         include: EXTRATOS_INCLUDE,
-        orderBy: { razaoSocial: "asc" },
+        orderBy: { cliente: { razaoSocial: "asc" } },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -40,7 +62,7 @@ export async function ListarExtratos(params?: { page?: number; pageSize?: number
 
     return {
       success: true,
-      data: dados,
+      data: dados.map(achatarExtrato),
       total,
       page,
       pageSize,
@@ -53,36 +75,38 @@ export async function ListarExtratos(params?: { page?: number; pageSize?: number
   }
 }
 
+/**
+ * Vincula uma empresa já cadastrada no CRM/CS&NPS (Cliente Master) ao módulo de
+ * Extratos — Fase 3.3 do Cliente Master. NUNCA cria `Cliente` novo (mesma regra
+ * dos demais módulos satélite: BPM é a única porta de entrada de Cliente novo no
+ * sistema). Se o CNPJ não existir ainda, bloqueia com mensagem orientando a
+ * cadastrar a empresa no Alpha CRM primeiro.
+ */
 export async function ExtratosClientes(dados: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const nomeUsuario = session.user.nome || "Usuário Alpha";
 
-    const parsed = extratoInputSchema.safeParse(dados);
+    const parsed = vincularEmpresaExtratoSchema.safeParse(dados);
     if (!parsed.success) {
       return { success: false, error: parsed.error.flatten().fieldErrors };
     }
-    const input = parsed.data;
+    const cnpjNormalizado = parsed.data.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+
+    const cliente = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
+    if (!cliente) {
+      return {
+        success: false,
+        error: "Esta empresa ainda não está cadastrada no CRM — cadastre-a primeiro no Alpha CRM antes de vincular ao Extratos.",
+      };
+    }
 
     await db.extratos.upsert({
-      where: { cnpj: input.cnpj },
-      update: {
-        razaoSocial: input.razaoSocial.toUpperCase(),
-        nomeFantasia: input.nomeFantasia?.toUpperCase() || null,
-        uf: input.uf || null,
-        municipio: input.municipio || null,
-        regimeTributario: input.regimeTributario || null,
-        updatedAt: new Date(),
-      },
+      where: { clienteId: cliente.id },
+      update: {},
       create: {
-        cnpj: input.cnpj,
-        razaoSocial: input.razaoSocial.toUpperCase(),
-        nomeFantasia: input.nomeFantasia?.toUpperCase() || null,
-        dataConstituicao: input.dataConstituicao || null,
-        uf: input.uf || null,
-        municipio: input.municipio || null,
-        regimeTributario: input.regimeTributario || null,
+        clienteId: cliente.id,
         criadoPorNome: nomeUsuario,
       },
     });
@@ -91,7 +115,7 @@ export async function ExtratosClientes(dados: unknown) {
     return { success: true };
   } catch (error) {
     console.error("[ExtratosClientes]", error);
-    return { success: false, error: "Erro ao salvar cliente." };
+    return { success: false, error: "Erro ao vincular empresa." };
   }
 }
 
@@ -108,6 +132,17 @@ export async function BuscarEmpresaPorId(id: string | number) {
     const empresa = await db.extratos.findUnique({
       where: { id: idNumerico },
       include: {
+        cliente: {
+          select: {
+            cnpj: true,
+            razaoSocial: true,
+            nomeFantasia: true,
+            dataConstituicao: true,
+            municipio: true,
+            uf: true,
+            regimeTributario: true,
+          },
+        },
         periodos: {
           include: {
             bancos: {
@@ -125,7 +160,7 @@ export async function BuscarEmpresaPorId(id: string | number) {
       return { success: false, error: "Empresa não encontrada no banco de dados." };
     }
 
-    return { success: true, data: empresa };
+    return { success: true, data: achatarExtrato(empresa) };
   } catch (error) {
     console.error("[BuscarEmpresaPorId]", error);
     return { success: false, error: "Erro interno ao buscar dados." };

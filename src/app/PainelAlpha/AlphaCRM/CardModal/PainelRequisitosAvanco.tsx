@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -9,6 +9,7 @@ import {
   SalvarRequisitosEMoverCardBpm,
 } from "@/actions/bpm/Cards";
 import { CampoBpmInput } from "../CampoBpmInput";
+import { montarPayloadCamposDestino, separarCamposRequisitos } from "@/lib/bpm/card-modal-ui";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Requisitos = NonNullable<Awaited<ReturnType<typeof ObterRequisitosTransicaoBpm>>["data"]>;
@@ -21,6 +22,8 @@ interface PainelRequisitosAvancoProps {
   onAtualizado: () => void;
   podeEditar: boolean;
   podeMover: boolean;
+  realtimeRevision: number;
+  onFocarPainelReuniao: () => void;
 }
 
 const inputClassName = "w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-white/25";
@@ -32,7 +35,7 @@ function paraInputDatetimeLocal(data: Date | string | null): string {
   return `${valor.getFullYear()}-${pad(valor.getMonth() + 1)}-${pad(valor.getDate())}T${pad(valor.getHours())}:${pad(valor.getMinutes())}`;
 }
 
-export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, podeEditar, podeMover }: PainelRequisitosAvancoProps) {
+export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, podeEditar, podeMover, realtimeRevision, onFocarPainelReuniao }: PainelRequisitosAvancoProps) {
   const destinos = etapas.filter((etapa) => etapa.id !== card.etapa.id);
   const [destinoId, setDestinoId] = useState(destinos[0]?.id ?? "");
   const [requisitos, setRequisitos] = useState<Requisitos | null>(null);
@@ -41,11 +44,20 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
   const [carregando, setCarregando] = useState(Boolean(destinos[0]));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [conflitoRealtime, setConflitoRealtime] = useState(false);
+  const draftSujoRef = useRef(false);
+  const revisaoAnteriorRef = useRef(realtimeRevision);
 
   useEffect(() => {
     if (!destinoId) {
       return;
     }
+    if (realtimeRevision !== revisaoAnteriorRef.current && draftSujoRef.current) {
+      revisaoAnteriorRef.current = realtimeRevision;
+      setConflitoRealtime(true);
+      return;
+    }
+    revisaoAnteriorRef.current = realtimeRevision;
     let cancelado = false;
     ObterRequisitosTransicaoBpm(card.id, destinoId).then((resultado) => {
       if (cancelado) return;
@@ -58,13 +70,18 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
       setRequisitos(resultado.data);
       setValores(Object.fromEntries(resultado.data.campos.map((campo) => [campo.id, campo.valor ?? ""])));
       setProximoContato(paraInputDatetimeLocal(resultado.data.proximoContatoEm));
+      draftSujoRef.current = false;
+      setConflitoRealtime(false);
     });
     return () => { cancelado = true; };
-  }, [card.id, destinoId]);
+  }, [card.id, destinoId, realtimeRevision]);
 
   const faltantes = requisitos?.campos.filter(
     (campo) => campo.obrigatorio && !valores[campo.id]?.trim(),
   ) ?? [];
+  const camposSeparados = separarCamposRequisitos(requisitos?.campos ?? [], new Set(card.camposEtapa.map((campo) => campo.id)));
+  const camposOrigem = camposSeparados.origem;
+  const camposExibidos = camposSeparados.editaveisDestino;
   const exigeProximoContato = requisitos?.guardas.some((guarda) => guarda.includes("Próximo Contato")) ?? false;
   const guardasBloqueantes = requisitos?.guardas.filter(
     (guarda) => !(guarda.includes("Próximo Contato") && proximoContato),
@@ -83,7 +100,7 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
     const resultado = await SalvarRequisitosEMoverCardBpm({
       cardId: card.id,
       etapaDestinoId: destinoId,
-      camposValores: valores,
+      camposValores: montarPayloadCamposDestino(camposExibidos, valores),
       ...(exigeProximoContato || proximoContato
         ? { proximoContatoEm: proximoContato ? new Date(proximoContato).toISOString() : null }
         : {}),
@@ -96,6 +113,7 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
       return;
     }
     toast.success(`Card movido para ${requisitos.etapaDestino.nome}`);
+    draftSujoRef.current = false;
     onAtualizado();
   }
 
@@ -115,6 +133,7 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
         <div className="space-y-1.5">
           <label htmlFor={`destino-card-${card.id}`} className="text-[11px] font-medium text-slate-400">Etapa de destino</label>
           <select id={`destino-card-${card.id}`} disabled={!podeMover} className={inputClassName} value={destinoId} onChange={(evento) => {
+            draftSujoRef.current = false;
             setDestinoId(evento.target.value);
             setCarregando(true);
             setErro(null);
@@ -132,7 +151,14 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
 
       {requisitos && !carregando && (
         <div className="space-y-3 border-t border-white/5 pt-3">
-          {requisitos.campos.map((campo) => {
+          {conflitoRealtime && <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">Os requisitos receberam uma atualização externa. Seu rascunho foi preservado; revise antes de avançar.</p>}
+          {camposOrigem.length > 0 && (
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-400">
+              <p>{camposOrigem.length} requisito(s) pertencem à etapa atual e devem ser preenchidos no editor acima.</p>
+              <button type="button" onClick={() => focarSecao(`campos-etapa-atual-${card.id}`)} className="mt-2 rounded-lg border border-white/10 px-2 py-1 font-semibold text-slate-300 hover:border-white/20">Ir aos campos da etapa atual</button>
+            </div>
+          )}
+          {camposExibidos.map((campo) => {
             const pendente = campo.obrigatorio && !valores[campo.id]?.trim();
             return (
               <div key={campo.id} className="space-y-1.5">
@@ -147,7 +173,10 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
                     ? <AlertCircle size={12} className="text-amber-400" aria-label="Pendente" />
                     : <CheckCircle2 size={12} className="text-emerald-400" aria-label="Preenchido" />)}
                 </label>
-                <CampoBpmInput campo={campo} disabled={!podeEditar} className={inputClassName} value={valores[campo.id] ?? ""} onChange={(valor) => setValores((atuais) => ({ ...atuais, [campo.id]: valor }))} />
+                <CampoBpmInput campo={campo} disabled={!podeEditar} className={inputClassName} value={valores[campo.id] ?? ""} onChange={(valor) => {
+                  draftSujoRef.current = true;
+                  setValores((atuais) => ({ ...atuais, [campo.id]: valor }));
+                }} />
               </div>
             );
           })}
@@ -155,7 +184,10 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
           {exigeProximoContato && (
             <div className="space-y-1.5">
               <label htmlFor={`proximo-contato-transicao-${card.id}`} className="text-[11px] font-medium text-slate-400">Próximo Contato *</label>
-              <input id={`proximo-contato-transicao-${card.id}`} disabled={!podeEditar} type="datetime-local" className={inputClassName} value={proximoContato} onChange={(evento) => setProximoContato(evento.target.value)} />
+              <input id={`proximo-contato-transicao-${card.id}`} disabled={!podeEditar} type="datetime-local" className={inputClassName} value={proximoContato} onChange={(evento) => {
+                draftSujoRef.current = true;
+                setProximoContato(evento.target.value);
+              }} />
             </div>
           )}
 
@@ -168,6 +200,9 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
               {/campo/i.test(guarda) && !/follow[- ]?up|checklist/i.test(guarda) && (
                 <button type="button" onClick={() => focarSecao(`campos-etapa-atual-${card.id}`)} className="shrink-0 rounded-lg border border-amber-300/30 px-2 py-1 font-semibold hover:bg-amber-200/10">Ir aos campos</button>
               )}
+              {/reuni[aã]o|data|hora|transcri[cç][aã]o/i.test(guarda) && (
+                <button type="button" onClick={onFocarPainelReuniao} className="shrink-0 rounded-lg border border-amber-300/30 px-2 py-1 font-semibold hover:bg-amber-200/10">Ir à reunião</button>
+              )}
             </div>
           ))}
 
@@ -175,7 +210,7 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
             <p className="text-[11px] text-amber-200/80">Complete a data, a hora ou a transcrição no painel Reunião à direita.</p>
           )}
 
-          {requisitos.campos.length === 0 && guardasBloqueantes.length === 0 && !exigeProximoContato && (
+          {camposExibidos.length === 0 && camposOrigem.length === 0 && guardasBloqueantes.length === 0 && !exigeProximoContato && (
             <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-300"><CheckCircle2 size={14} /> Nenhuma pendência para este destino.</div>
           )}
 

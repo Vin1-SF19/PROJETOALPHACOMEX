@@ -336,9 +336,9 @@ model clientes {
   canalOutro     String?
   // `indicacao Indicacao?` removida em 2026-08-12 (Fase 3.1 Cliente Master) —
   // Indicacao.clienteId agora aponta para `Cliente`, não mais para `clientes` legado.
+  // `bpmCards BpmCard[]` removida em 2026-08-13 (Fase 3.2 Cliente Master) —
+  // BpmCard.empresaId agora aponta para `Cliente`, não mais para `clientes` legado.
 
-  // Alpha BPM (2026-08-03) — reaproveita `clientes` como Empresa do BPM (D-049)
-  bpmCards              BpmCard[]
   pessoaEmpresaVinculos PessoaEmpresaVinculo[]
 
   @@unique([cnpj, servicos])
@@ -446,9 +446,12 @@ model Cliente {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  servicos  ClienteServico[]
-  pessoas   PessoaClienteVinculo[]
-  indicacao Indicacao?
+  servicos           ClienteServico[]
+  pessoas            PessoaClienteVinculo[]
+  indicacao          Indicacao?
+  bpmCards           BpmCard[]
+  extratos           Extratos?
+  consultaPreAnalise ConsultaPreAnalise?
 
   @@index([razaoSocial])
   @@index([status])
@@ -729,15 +732,15 @@ model conversas {
   @@unique([p1Id, p2Id])
 }
 
+// Fase 3.3 do Cliente Master (2026-08-13) — campos cadastrais de empresa
+// (cnpj/razaoSocial/nomeFantasia/dataConstituicao/municipio/uf/regimeTributario)
+// removidos, substituídos por `clienteId @unique → Cliente`. Extratos não cria
+// Cliente novo — só vincula empresa já cadastrada (mesma regra dos demais
+// módulos satélite; BPM é a única porta de entrada de Cliente novo).
 model Extratos {
-  id               Int     @id @default(autoincrement())
-  cnpj             String  @unique
-  razaoSocial      String
-  nomeFantasia     String?
-  dataConstituicao String?
-  municipio        String?
-  uf               String?
-  regimeTributario String?
+  id        Int     @id @default(autoincrement())
+  clienteId Int     @unique
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
 
   criadoPorNome String?
   periodos      PeriodosAnalise[]
@@ -749,7 +752,6 @@ model Extratos {
   updatedAt DateTime @updatedAt
 
   @@index([criadoPorNome])
-  @@index([razaoSocial])
   @@map("Extratos")
 }
 
@@ -879,6 +881,12 @@ model ListaCompra {
   categoria   Categoria? @relation(fields: [categoriaId], references: [id])
 }
 
+// Fase 3.4 do Cliente Master (2026-08-13) — mantém snapshot cadastral próprio
+// (decisão da pergunta 3 do plano: auditoria histórica da consulta à Receita
+// Federal no momento em que foi feita, não deve depender de Cliente para
+// exibir seu próprio histórico). Ganha `clienteId` nullable como FK adicional,
+// sem perder nenhum campo. `clienteId` é nullable porque pode consultar CNPJ
+// que ainda não é Cliente cadastrado.
 model ConsultaPreAnalise {
   id           String  @id @default(cuid())
   cnpj         String  @unique
@@ -898,6 +906,9 @@ model ConsultaPreAnalise {
   nomeResponsavel String?
   telefoneContato String?
   observacoes     String?
+
+  clienteId Int?     @unique
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3131,7 +3142,7 @@ model BpmCard {
   statusPosFechamento    String? // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
   transcricaoReuniao     String? // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)
 
-  empresa     clientes    @relation(fields: [empresaId], references: [id])
+  empresa     Cliente     @relation(fields: [empresaId], references: [id])
   pipeline    BpmPipeline @relation(fields: [pipelineId], references: [id])
   etapa       BpmEtapa    @relation(fields: [etapaId], references: [id])
   responsavel usuarios    @relation("BpmCardResponsavel", fields: [responsavelId], references: [id])

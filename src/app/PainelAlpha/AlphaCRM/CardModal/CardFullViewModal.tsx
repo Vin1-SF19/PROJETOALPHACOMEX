@@ -51,6 +51,11 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
   const atualizarEstadoFollowUp = useCallback((estado: EstadoFollowUpModal) => {
     setEstadoFollowUpPorCard((estados) => ({ ...estados, [cardId]: estado }));
   }, [cardId]);
+  const focarPainelReuniao = useCallback(() => {
+    const painel = document.getElementById(`painel-reuniao-${cardId}`);
+    painel?.scrollIntoView({ behavior: "smooth", block: "center" });
+    painel?.focus({ preventScroll: true });
+  }, [cardId]);
 
   const carregando = card?.id !== cardId && erro === null;
 
@@ -83,8 +88,10 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
   useEffect(() => {
     if (realtimeRevision === 0) return;
     let cancelado = false;
-    ObterCardBpm(cardId).then((res) => {
-      if (!cancelado && res.success && res.data) setCard(res.data);
+    Promise.all([ObterCardBpm(cardId), ListarInteracoesCardBpm(cardId)]).then(([cardRes, interacoesRes]) => {
+      if (cancelado) return;
+      if (cardRes.success && cardRes.data) setCard(cardRes.data);
+      setInteracoes(interacoesRes.data ?? []);
     });
     return () => { cancelado = true; };
   }, [cardId, realtimeRevision]);
@@ -111,7 +118,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
         )
       : etapas;
   const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
-  const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual, podeEditar);
+  const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual);
 
   return (
     <Sheet open onOpenChange={(open) => {
@@ -259,6 +266,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                       podeEditar={podeEditar}
                       podeMoverEtapa={podeMoverEtapa}
                       realtimeRevision={realtimeRevision}
+                      onFocarPainelReuniao={focarPainelReuniao}
                     />
                   </TabsContent>
                   {SERVICOS_FIXOS.map((servico) => (
@@ -279,7 +287,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                 accent={accent}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
               />
-              <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
+              <div id={`painel-reuniao-${card.id}`} tabIndex={-1} className="flex flex-col gap-4 min-h-0 overflow-y-auto">
                 <PainelReuniao
                   card={card}
                   accent={accent}

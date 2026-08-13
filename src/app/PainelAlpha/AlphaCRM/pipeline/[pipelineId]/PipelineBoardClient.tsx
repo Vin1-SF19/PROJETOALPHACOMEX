@@ -27,6 +27,8 @@ import { pusherClient } from "@/lib/pusher";
 import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
+import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
+import { cn } from "@/lib/utils";
 
 interface EtapaBpm {
   id: string;
@@ -71,22 +73,15 @@ interface CardBpm {
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
 
-// Progressão do menos ao mais avançado no pós-fechamento (ver plano-novos-leads-bpm.md, Bloco 8).
-const STATUS_POS_FECHAMENTO_CONFIG: Record<string, { label: string; classe: string }> = {
-  AGUARDANDO_CONTRATO: { label: "Aguardando contrato", classe: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
-  CONTRATO_A_ENVIAR: { label: "Contrato a enviar", classe: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
-  CONTRATO_ENVIADO: { label: "Contrato enviado", classe: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  PAGAMENTO_CONFIRMADO: { label: "Pagamento confirmado", classe: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
-  CONTRATO_ASSINADO: { label: "Contrato assinado", classe: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-};
-
 function KanbanCard({
   card,
+  etapaNome,
   accent,
   novosLeads,
   onAbrir,
 }: {
   card: CardBpm;
+  etapaNome: string;
   accent: string;
   novosLeads: boolean;
   onAbrir: (cardId: string) => void;
@@ -96,7 +91,8 @@ function KanbanCard({
 
   const naoAcessado = !card.primeiraVisualizacaoEm;
   const canalOrigem = card.campoValores?.[0]?.valor;
-  const statusConfig = card.statusPosFechamento ? STATUS_POS_FECHAMENTO_CONFIG[card.statusPosFechamento] : null;
+  const statusConfig = obterStatusPosFechamentoVisivel({ etapaNome, status: card.statusPosFechamento });
+  const nomeEmpresa = card.empresa.nomeFantasia || card.empresa.razaoSocial;
 
   return (
     <div
@@ -105,9 +101,16 @@ function KanbanCard({
       {...attributes}
       {...listeners}
       onClick={() => onAbrir(card.id)}
-      className={`bg-slate-800/80 border rounded-xl p-3 space-y-2 cursor-grab active:cursor-grabbing transition-colors select-none ${
-        naoAcessado ? "border-cyan-400/50 hover:border-cyan-400/70" : "border-white/5 hover:border-white/10"
-      }`}
+      aria-label={statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
+      className={cn(
+        "border bg-slate-800/80 rounded-xl p-3 space-y-2 cursor-grab active:cursor-grabbing transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        statusConfig?.cardClassName,
+        naoAcessado
+          ? "border-cyan-400/50 hover:border-cyan-400/70"
+          : statusConfig
+            ? "hover:brightness-110"
+            : "border-white/5 hover:border-white/10",
+      )}
     >
       <div className="flex items-center gap-1.5 text-sm font-semibold text-white leading-tight">
         {naoAcessado && (
@@ -123,7 +126,7 @@ function KanbanCard({
           onPointerDown={(e) => e.stopPropagation()}
           className="hover:underline"
         >
-          {card.empresa.nomeFantasia || card.empresa.razaoSocial}
+          {nomeEmpresa}
         </Link>
       </div>
       {card.servico && <p className="text-[11px] text-slate-400 leading-tight">{card.servico}</p>}
@@ -135,7 +138,7 @@ function KanbanCard({
             </span>
           )}
           {statusConfig && (
-            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md border ${statusConfig.classe}`}>
+            <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded-md border", statusConfig.badgeClassName)}>
               {statusConfig.label}
             </span>
           )}
@@ -212,6 +215,7 @@ function KanbanColumn({
             <KanbanCard
               key={c.id}
               card={c}
+              etapaNome={etapa.nome}
               accent={accent}
               novosLeads={novosLeads}
               onAbrir={onAbrirCard}

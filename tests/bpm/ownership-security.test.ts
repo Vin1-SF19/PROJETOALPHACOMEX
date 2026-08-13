@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizarPermissaoBpm,
   podeAcessarPipelineBpm,
+  podeSerResponsavelPipelineBpm,
   possuiPermissaoCrm,
 } from "@/lib/bpm/ownership";
 
@@ -64,6 +65,27 @@ describe("permissão CRM normalizada", () => {
       permissoes: [],
       setoresPipeline: ["Operacional"],
       ehMembroPipeline: false,
+    })).toBe(true);
+  });
+
+  it("não torna membro de outro setor elegível como responsável", () => {
+    expect(podeSerResponsavelPipelineBpm({
+      role: "Comercial",
+      permissoes: ["crm"],
+      setoresPipeline: ["Operacional"],
+    })).toBe(false);
+  });
+
+  it("permite responsável admin ou com CRM no setor do pipeline", () => {
+    expect(podeSerResponsavelPipelineBpm({
+      role: "Comercial",
+      permissoes: ["CRM"],
+      setoresPipeline: ["COMERCIAL"],
+    })).toBe(true);
+    expect(podeSerResponsavelPipelineBpm({
+      role: "TI",
+      permissoes: [],
+      setoresPipeline: ["Operacional"],
     })).toBe(true);
   });
 });

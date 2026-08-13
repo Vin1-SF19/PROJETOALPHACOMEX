@@ -1856,3 +1856,37 @@ O IAlpha perdia PDFs enviados ao Bibble e, quando o arquivo chegava a ser lido, 
 ### Refletido também em
 - `docs/stories/story-ialpha-bibble-leitura-confiavel-pdf-respostas-completas.md`: causas, critérios, implementação, testes, gates e pendências consolidados no Dev Agent Record.
 - `codebase-map.md` e `integration-points.md`: fluxo de anexos, orçamento, SSE e controles de segurança atualizados por Scribe.
+
+---
+
+## [2026-08-13 10:54] — Alpha CRM: fluxo operacional completo da etapa Fechado
+
+**Tags:** #feature #bugfix #integration #nextjs #prisma #security
+**Agentes envolvidos:** Bibble, Scout, River, Echo, Nova, Sage, Forge, Probe, Anubis, Scribe, Kowalski
+**Arquivos tocados:** `docs/stories/story-alpha-crm-fechado-status-pos-fechamento.md`, `src/lib/bpm/status-pos-fechamento.ts`, `src/lib/validations/bpm.ts`, `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/{PainelStatusPosFechamento,PainelHistorico}.tsx`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `tests/bpm/{fechado-status-pos-fechamento,fechado-actions,fechado-ui,card-modal-integration}.test.ts`
+
+### Contexto
+O schema já possuía `BpmCard.statusPosFechamento` e a associação de campos obrigatórios por etapa, mas esse mapa estava operacionalmente morto: não havia inicialização, edição protegida nem representação consistente do status. A etapa Fechado também precisava impedir entrada sem Valor acordado no contrato e Forma de pagamento em todos os caminhos.
+
+### O que foi feito
+- A story foi criada e concluída com guard server-side fail-closed para Valor/Forma na criação direta, drag, modal e action direta; a entrada inicializa `AGUARDANDO_CONTRATO` atomicamente e preserva status existente em reentrada.
+- Os cinco status canônicos — Aguardando contrato, Contrato a enviar, Contrato enviado, Pagamento confirmado e Contrato assinado — ganharam fonte única, Select editável no painel esquerdo, histórico, CAS versionado, reautorização dentro da transação e realtime somente após commit.
+- O modal preserva rascunho local diante de atualização externa; o board exibe badge textual e tint visual específicos por status somente em Fechado.
+- Regressão BPM aprovada em 19 arquivos/105 testes, além de ESLint focado e `git diff --check` limpos.
+
+### Decisões tomadas
+- Requisitos contratuais falham fechados quando a configuração está ausente ou inconsistente, sem confiar em label, ID ou estado enviados pelo cliente.
+- `AGUARDANDO_CONTRATO` é default apenas na primeira entrada com status nulo; cards legados não recebem backfill e reentradas não perdem progresso.
+- O status canônico permanece em `BpmCard.statusPosFechamento`; integração financeira futura ficou fora do escopo.
+
+### Problemas encontrados / resolvidos
+- Auditorias iniciais reprovaram pontos de concorrência/integração, incluindo falso conflito no realtime; o CAS passou a comparar o snapshot versionado correto, com reautorização transacional e preservação explícita do rascunho. Probe revalidou o fluxo e Anubis aprovou sem achados críticos ou importantes.
+- A existência do campo no schema mascarava a falta de writers e leitores operacionais; ações, modal, board, histórico e realtime foram conectados sem duplicar fonte de dados.
+
+### Pendências
+- Cinco erros basais de typecheck permanecem fora do CRM: dois em Exclusão Fiscal, um em `HabilitacaoRadarClient.tsx` e dois em `sync-queue.ts`; lint/test/build globais e CodeRabbit continuam pendentes conforme a story.
+- Nenhuma alteração de schema, migration, seed ou backfill foi realizada.
+
+### Refletido também em
+- `docs/stories/story-alpha-crm-fechado-status-pos-fechamento.md`: escopo, decisões, matriz de testes, gates e File List finais.
+- `codebase-map.md` e `integration-points.md`: contrato dos status, guard de entrada, edição protegida, realtime e representação no board.

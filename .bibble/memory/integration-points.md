@@ -1370,6 +1370,37 @@ Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove a
 
 **Última atualização:** 2026-08-12 por Codex/Bibble.
 
+### Alpha CRM — entrada e status operacional de Fechado
+
+**Arquivos:** `src/lib/bpm/status-pos-fechamento.ts`, `src/lib/validations/bpm.ts`, `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `src/lib/bpm/realtime-server.ts`.
+
+**Propósito:** mantém criação, movimento, edição, modal e board alinhados sobre os cinco status pós-fechamento. A entrada em **Fechado** falha de forma fechada sem **Valor acordado no contrato** e **Forma de pagamento** válidos e inicializa `AGUARDANDO_CONTRATO` atomicamente quando o card ainda não possui status.
+
+**Editado quando:** um status/label/paleta mudar, um novo entrypoint criar ou mover cards, a regra de entrada em **Fechado** mudar, ou outro consumidor precisar reagir ao status pós-fechamento.
+
+**Como integrar:** reutilize `status-pos-fechamento.ts`; não replique enum, labels ou classes na UI/action. Todo entrypoint deve convergir nas guards server-side de `Cards.ts`. Edições enviam o snapshot `versaoEsperadaEm`, persistem por CAS e só depois disparam realtime.
+
+```typescript
+const statusConfig = obterStatusPosFechamentoVisivel({
+  etapaNome: card.etapa.nome,
+  status: card.statusPosFechamento,
+});
+
+await AtualizarCardBpm({
+  cardId: card.id,
+  statusPosFechamento: novoStatus,
+  versaoEsperadaEm: card.updatedAt,
+});
+```
+
+No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça resolução explícita do conflito. No board, badge textual e tint só aparecem quando `obterStatusPosFechamentoVisivel` retorna configuração, ou seja, apenas em **Fechado** com código persistido reconhecido.
+
+**Limite de integração:** esta feature não cria evento financeiro, card financeiro, adapter de Comissões nem outro efeito colateral. Uma integração financeira futura deve ser desenhada como requisito separado e consumir `BpmCard.statusPosFechamento` como fonte canônica.
+
+**Testes de contrato:** `tests/bpm/fechado-status-pos-fechamento.test.ts`, `tests/bpm/fechado-actions.test.ts`, `tests/bpm/fechado-ui.test.ts` e `tests/bpm/card-modal-integration.test.ts`.
+
+**Última atualização:** 2026-08-13 por Scribe.
+
 ### Alpha CRM — Agendar reunião e ciclo de follow-up
 
 **Arquivos:** `src/lib/bpm/agendar-reuniao.ts`, `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`, `src/lib/bpm/automacao-novos-leads.ts`.

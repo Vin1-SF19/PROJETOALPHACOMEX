@@ -36,6 +36,14 @@ export function podeAcessarPipelineBpm(params: {
     || params.setoresPipeline.some((setor) => isSameRole(setor, params.role));
 }
 
+export function podeSerResponsavelPipelineBpm(params: {
+  role: string;
+  permissoes: readonly string[];
+  setoresPipeline: readonly string[];
+}): boolean {
+  return podeAcessarPipelineBpm({ ...params, ehMembroPipeline: false });
+}
+
 async function carregarUsuarioEPermissoesBpm(
   userId: number,
   client: ClienteAcessoBpm = db,
@@ -142,11 +150,10 @@ export async function usuarioElegivelResponsavelBpm(
     select: { setores: { select: { setor: { select: { nome: true } } } } },
   });
   if (!pipeline) return false;
-  return podeAcessarPipelineBpm({
+  return podeSerResponsavelPipelineBpm({
     role: acesso.usuario.role,
     permissoes: acesso.permissoes,
     setoresPipeline: pipeline.setores.map(({ setor }) => setor.nome),
-    ehMembroPipeline: false,
   });
 }
 

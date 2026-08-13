@@ -20,7 +20,13 @@ export function formatarValorBRL(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function formatarCnpj(cnpj: string): string {
+/**
+ * `Cliente.cnpj` é nullable desde a Fase 2 do Cliente Master (empresa "em
+ * constituição" sem CNPJ ainda) — trata ausência explicitamente em vez de
+ * quebrar em runtime.
+ */
+export function formatarCnpj(cnpj: string | null | undefined): string {
+  if (!cnpj) return "CNPJ pendente";
   return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 }
 

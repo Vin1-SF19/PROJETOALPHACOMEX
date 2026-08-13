@@ -3,8 +3,23 @@ export type EstadoFollowUpModal = "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_A
 export function followUpBloqueiaFechamento(
   etapaNome: string | null | undefined,
   estado: EstadoFollowUpModal,
-  podeEditar: boolean,
 ): boolean {
-  if (!podeEditar || etapaNome?.trim().toLocaleLowerCase("pt-BR") !== "em tratativa") return false;
+  if (etapaNome?.trim().toLocaleLowerCase("pt-BR") !== "em tratativa") return false;
   return estado === "CARREGANDO" || estado === "ERRO" || estado === "EM_ANDAMENTO";
+}
+
+export type CampoRequisitoUi = { id: string; contexto: "ORIGEM" | "DESTINO" | "AMBOS" };
+
+export function separarCamposRequisitos<T extends CampoRequisitoUi>(campos: T[], idsEtapaAtual: Set<string>) {
+  const origem: T[] = [];
+  const editaveisDestino: T[] = [];
+  for (const campo of campos) {
+    if (campo.contexto === "ORIGEM" || idsEtapaAtual.has(campo.id)) origem.push(campo);
+    else editaveisDestino.push(campo);
+  }
+  return { origem, editaveisDestino };
+}
+
+export function montarPayloadCamposDestino<T extends { id: string }>(campos: T[], valores: Record<string, string>) {
+  return Object.fromEntries(campos.map((campo) => [campo.id, valores[campo.id] ?? ""]));
 }

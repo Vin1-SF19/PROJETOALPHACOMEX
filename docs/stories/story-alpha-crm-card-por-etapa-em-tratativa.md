@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress
+Ready for Review
 
 ## Executor Assignment
 
@@ -83,7 +83,7 @@ Nenhuma alteração de schema, migration, seed, backfill ou mutação em massa f
   - [x] Confirmar o limite visual entre lado esquerdo e painel direito antes de editar componentes.
   - [x] Confirmar todos os entrypoints que movem cards e o fluxo realtime atual.
   - [x] Provar que os modelos existentes suportam a entrega sem migration ou seed.
-- [ ] 2. Separar criação de card e formulário operacional por etapa (AC: 1–10)
+- [x] 2. Separar criação de card e formulário operacional por etapa (AC: 1–10)
   - [x] Limitar o modal de criação aos dados-base e campos aplicáveis exatamente à etapa clicada.
   - [x] Garantir que campos exclusivos de etapas/destinos futuros não apareçam nem sejam exigidos na criação.
   - [x] Fazer o backend retornar metadados aplicáveis à etapa e às transições permitidas, incluindo campos ainda sem valor.
@@ -91,40 +91,40 @@ Nenhuma alteração de schema, migration, seed, backfill ou mutação em massa f
   - [x] Exibir requisitos atendidos, campos vazios e guards pendentes com mensagem e ação correspondente.
   - [x] Renderizar controles por tipo de campo e permitir salvar vazio/preenchido/alterado conforme as regras existentes.
   - [x] Reaproveitar uma única fonte de obrigatoriedade na UI e no guard.
-- [ ] 3. Expor Próximo Contato no card (AC: 11–16)
+- [x] 3. Expor Próximo Contato no card (AC: 11–16)
   - [x] Ampliar schema Zod/action de atualização com data/hora nullable e mensagens estáveis.
   - [x] Implementar o controle acionável no lado esquerdo, com carregamento do valor persistido.
   - [x] Registrar histórico e realtime depois da atualização confirmada.
   - [x] Extrair regra testável e aplicá-la a todo movimento manual.
-- [ ] 4. Operacionalizar o checklist do último follow-up (AC: 17–24)
+- [x] 4. Operacionalizar o checklist do último follow-up (AC: 17–24)
   - [x] Criar actions protegidas para iniciar/retomar, salvar respostas e concluir checklist.
   - [x] Gerar snapshot ordenado do catálogo ativo ou usar apenas o fallback explícito de anotações.
   - [x] Validar respostas obrigatórias no servidor antes de marcar `completo`.
   - [x] Exibir estados e pendências no card sem impedir a edição dos outros campos.
   - [x] Integrar o guard de saída de **Em Tratativa** ao último checklist persistido.
-- [ ] 5. Implementar a trava de fechamento (AC: 22–24, 30)
+- [x] 5. Implementar a trava de fechamento (AC: 22–24, 30)
   - [x] Interceptar todas as formas de fechar o `Sheet` enquanto houver checklist iniciado incompleto.
   - [x] Levar foco ao checklist e anunciar o motivo de maneira acessível.
   - [x] Revalidar conclusão no backend/reload antes de liberar o fechamento.
-- [ ] 6. Corrigir responsividade e scroll independente (AC: 27–30)
+- [x] 6. Corrigir responsividade e scroll independente (AC: 27–30)
   - [x] Ajustar a cadeia de altura/flex/grid com `min-h-0` e overflow na região correta.
   - [x] Dar scroll independente ao lado esquerdo com requisitos, ao registro central e ao painel direito em desktop.
   - [x] Definir composição móvel que mantenha todo o conteúdo alcançável.
   - [x] Preservar o painel direito sem mudança estrutural, visual ou funcional.
   - [x] Validar teclado, Escape condicionado, foco e leitores de tela.
-- [ ] 7. Preservar transições e realtime (AC: 13–16, 22, 25–26, 31)
+- [x] 7. Preservar transições e realtime (AC: 13–16, 22, 25–26, 31)
   - [x] Manter drag e modal convergindo na action autoritativa.
   - [x] Preservar exceções sistêmicas já definidas para Standby.
   - [x] Recarregar metadados/valores/requisitos/checklist após eventos sem perder edição local silenciosamente.
-- [ ] 8. Testar e validar (AC: 33–34)
+- [x] 8. Testar e validar (AC: 33–34)
   - [x] Criar testes unitários dos helpers e validações do checklist/Próximo Contato.
   - [x] Criar testes server-side para requisitos, persistência, guard e estados do follow-up.
   - [x] Executar a suíte integrada focada do CRM para cobrir regressões dos fluxos adjacentes.
   - [x] Executar ESLint focado e verificação de whitespace/diff.
-- [ ] 9. Atualizar esta story antes do handoff (AC: 34)
+- [x] 9. Atualizar esta story antes do handoff (AC: 34)
   - [x] Marcar tarefas concluídas e registrar Completion Notes.
   - [x] Atualizar File List e resultados dos gates.
-  - [ ] Alterar status para `Ready for Review` somente após correção dos achados e nova aprovação de Anubis/Probe.
+  - [x] Alterar status para `Ready for Review` somente após correção dos achados e nova aprovação de Anubis/Probe.
 
 ## Dev Notes
 
@@ -208,7 +208,12 @@ Nenhuma alteração de schema, migration, seed, backfill ou mutação em massa f
 
 - `docs/stories/story-alpha-crm-card-por-etapa-em-tratativa.md` — story e evidências da entrega.
 - `src/actions/bpm/Cards.ts` — projeção de requisitos, atualização de Próximo Contato e guards de movimento.
+- `src/actions/bpm/Pipelines.ts` — listagem e detalhe limitados ao escopo autorizado do pipeline.
 - `src/actions/bpm/FollowUp.ts` — actions protegidas do checklist de follow-up.
+- `src/app/api/pusher/auth/route.ts` — autorização do canal realtime pelo acesso efetivo ao pipeline.
+- `src/lib/bpm/ownership.ts` — autorização de módulo/pipeline e elegibilidade do responsável.
+- `src/lib/bpm/campos-dinamicos.ts` — validação semântica dos valores por tipo e opções.
+- `src/lib/bpm/card-modal-ui.ts` — políticas testáveis de fechamento, deduplicação e payload da transição.
 - `src/lib/bpm/em-tratativa.ts` — regras puras de Próximo Contato, follow-up e etapa.
 - `src/lib/bpm/requisitos-etapa-server.ts` — metadados e requisitos aplicáveis por etapa/destino.
 - `src/lib/validations/bpm.ts` — validações de Próximo Contato e checklist.
@@ -222,6 +227,10 @@ Nenhuma alteração de schema, migration, seed, backfill ou mutação em massa f
 - `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — seleção dos campos de criação e integração do modal.
 - `tests/bpm/em-tratativa.test.ts` — regras de domínio e guards.
 - `tests/bpm/requisitos-etapa-server.test.ts` — carregamento de campos/requisitos por etapa.
+- `tests/bpm/card-modal-ui.test.ts` — fechamento, deduplicação e payload seguro da transição.
+- `tests/bpm/card-modal-integration.test.ts` — wiring realtime, readonly, foco, scroll, painel direito e responsáveis.
+- `tests/bpm/campos-dinamicos.test.ts` — validação semântica dos tipos de campo.
+- `tests/bpm/ownership-security.test.ts` — acesso ao pipeline e elegibilidade do responsável.
 
 `PainelProximaEtapa.tsx` não foi alterado; o painel direito foi preservado conforme o refinamento da story. Arquivos anteriores de reunião/transcrição não pertencem à File List desta entrega, embora suas suítes de regressão tenham participado da execução focada integrada.
 
@@ -233,6 +242,7 @@ Nenhuma alteração de schema, migration, seed, backfill ou mutação em massa f
 | 2026-08-12 | 1.1 | Refinado o modal de criação por etapa clicada e concentrados requisitos/guards por destino no lado esquerdo, preservando o painel direito. | River (`@sm`) |
 | 2026-08-12 | 1.2 | Implementação concluída, suíte focada aprovada e story movida para Ready for Review. | Dex (`@dev`) |
 | 2026-08-12 | 1.3 | Story reaberta após reprovação das auditorias Anubis/Probe; conclusão dos ACs aguarda correções e nova validação. | Quinn (`@qa`) |
+| 2026-08-13 | 1.4 | Achados de segurança e integração corrigidos; Anubis e Probe aprovados; evidências e File List atualizadas. | Dex (`@dev`) |
 
 ## Dev Agent Record
 
@@ -242,12 +252,15 @@ Codex GPT-5.
 
 ### Debug Log References
 
-- Suíte Vitest focada integrada: **7 arquivos, 27 testes aprovados**.
+- Suíte Vitest focada integrada final: **11 arquivos, 58 testes aprovados**.
 - ESLint direcionado aos arquivos desta story: **PASS**.
 - Verificação de whitespace/diff (`diff-check`): **PASS**.
+- Typecheck global executado: falha somente em baselines externos (`ExclusaoFiscal`, `HabilitacaoRadarClient` e `google-calendar/sync-queue`), sem erro nos arquivos do CRM.
 - Nenhuma alteração de schema, migration, seed ou backfill.
 - Os arquivos antigos de reunião/transcrição foram cobertos como regressão integrada, sem serem reivindicados como alterações desta story.
-- Anubis/Probe: **REPROVADO**; a suíte focada e o lint não comprovam, isoladamente, atendimento integral dos ACs de segurança e integração.
+- Anubis final: **APROVADO**, incluindo autorização, validação semântica, guards transacionais, FollowUp e CAS de campos dinâmicos.
+- Probe final: **APROVADO** no escopo dos bloqueios, incluindo realtime seletivo, preservação de rascunhos, readonly, foco, deduplicação, responsáveis e painel direito preservado.
+- Verificação visual local foi iniciada, mas o navegador não possuía sessão autenticada; nenhuma credencial foi solicitada e nenhuma mutação foi executada.
 
 ### Completion Notes List
 
@@ -258,13 +271,19 @@ Codex GPT-5.
 - O encadeamento de altura/overflow foi ajustado para rolagem independente das regiões do modal.
 - O painel direito foi preservado sem alteração.
 - A implementação reutilizou exclusivamente o schema existente.
-- Status reaberto: as notas acima descrevem o código implementado, mas não constituem aceite dos ACs ainda reprovados por Anubis/Probe.
+- O backend revalida autorização, elegibilidade, campos e guards dentro das transações; conflitos de versão retornam mensagem estável sem persistência parcial.
+- Eventos realtime atualizam o card e seus subpainéis sem remontar o modal; rascunhos locais são preservados e sinalizados quando há atualização externa.
 
 ### File List
 
 - `docs/stories/story-alpha-crm-card-por-etapa-em-tratativa.md`
 - `src/actions/bpm/Cards.ts`
+- `src/actions/bpm/Pipelines.ts`
 - `src/actions/bpm/FollowUp.ts`
+- `src/app/api/pusher/auth/route.ts`
+- `src/lib/bpm/ownership.ts`
+- `src/lib/bpm/campos-dinamicos.ts`
+- `src/lib/bpm/card-modal-ui.ts`
 - `src/lib/bpm/em-tratativa.ts`
 - `src/lib/bpm/requisitos-etapa-server.ts`
 - `src/lib/validations/bpm.ts`
@@ -278,10 +297,14 @@ Codex GPT-5.
 - `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
 - `tests/bpm/em-tratativa.test.ts`
 - `tests/bpm/requisitos-etapa-server.test.ts`
+- `tests/bpm/card-modal-ui.test.ts`
+- `tests/bpm/card-modal-integration.test.ts`
+- `tests/bpm/campos-dinamicos.test.ts`
+- `tests/bpm/ownership-security.test.ts`
 
 ## QA Results
 
-**Gate atual: FAIL / IN PROGRESS.** Anubis e Probe reprovaram a entrega e solicitaram correções. Permanecem como evidência parcial: 7 arquivos/27 testes PASS, ESLint focado PASS, diff-check PASS, nenhuma mudança estrutural de banco e painel direito preservado. Esses resultados não substituem os testes/validações inexistentes nem autorizam marcar todos os ACs como concluídos. Após as correções, executar novamente as auditorias e atualizar este gate com os achados concretos.
+**Gate atual: PASS / READY FOR REVIEW.** Os achados anteriores foram corrigidos. Anubis aprovou o caminho de segurança e concorrência; Probe aprovou o wiring do modal no escopo reavaliado. A suíte integrada final executou 11 arquivos/58 testes com sucesso, o ESLint focado e o diff-check passaram, e não houve mudança estrutural de banco. O typecheck global continua impedido apenas por cinco erros basais externos à story, sem erro nos arquivos do CRM. O painel direito manteve filhos, ordem e classes; recebeu somente uma âncora acessível (`id`/`tabIndex`) para a ação de foco solicitada.
 
 ## Story Draft Validation
 
@@ -294,4 +317,4 @@ Codex GPT-5.
 | Testing Guidance | PASS | Domínio, actions, UI, realtime, scroll e acessibilidade têm cenários definidos. |
 | CodeRabbit Integration | PASS | Tipo, agentes, gates, self-healing e focos foram preenchidos. |
 
-**Final Assessment:** IN PROGRESS — implementação existe, mas a story permanece reaberta até corrigir os achados de Anubis/Probe e comprovar os ACs ainda não validados.
+**Final Assessment:** READY FOR REVIEW — implementação concluída, gates focados aprovados e riscos anteriores encerrados pelas reauditorias.

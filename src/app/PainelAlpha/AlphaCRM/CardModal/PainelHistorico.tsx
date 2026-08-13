@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   PhoneCall,
@@ -26,7 +26,9 @@ import { isAdminRole } from "@/lib/roles";
 import { PainelRequisitosAvanco } from "./PainelRequisitosAvanco";
 import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
 import { PainelProximoContato } from "./PainelProximoContato";
+import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
 import { CampoBpmInput } from "../CampoBpmInput";
+import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -44,6 +46,7 @@ interface Props {
   podeEditar: boolean;
   podeMoverEtapa: boolean;
   realtimeRevision: number;
+  onFocarPainelReuniao: () => void;
 }
 
 function formatarBytes(bytes: number | null): string {
@@ -93,7 +96,7 @@ export function SectionCard({
   );
 }
 
-export default function PainelHistorico({ card, interacoes, accent, currentUserId, currentUserRole, onAtualizado, onAbrirCard, etapasParaMover, onEstadoFollowUpChange, podeEditar, podeMoverEtapa, realtimeRevision }: Props) {
+export default function PainelHistorico({ card, interacoes, accent, currentUserId, currentUserRole, onAtualizado, onAbrirCard, etapasParaMover, onEstadoFollowUpChange, podeEditar, podeMoverEtapa, realtimeRevision, onFocarPainelReuniao }: Props) {
   const [novaTarefaTitulo, setNovaTarefaTitulo] = useState("");
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
@@ -103,13 +106,33 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
   const [valoresCamposAtuais, setValoresCamposAtuais] = useState<Record<string, string>>(() =>
     Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""])),
   );
+  const [baseCamposAtuais, setBaseCamposAtuais] = useState<Record<string, string>>(() =>
+    Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""])),
+  );
+  const [conflitoCamposAtuais, setConflitoCamposAtuais] = useState(false);
+  const camposAtuaisSujosRef = useRef(false);
   const [salvandoCamposAtuais, setSalvandoCamposAtuais] = useState(false);
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeExcluirAnexo = isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR";
-  const camposAtuaisAlterados = card.camposEtapa.some(
-    (campo) => (valoresCamposAtuais[campo.id] ?? "") !== (campo.valor ?? ""),
+  const camposAtuaisAlterados = Object.keys({ ...baseCamposAtuais, ...valoresCamposAtuais }).some(
+    (campoId) => (valoresCamposAtuais[campoId] ?? "") !== (baseCamposAtuais[campoId] ?? ""),
   );
+  const snapshotCamposEtapa = JSON.stringify(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""]));
+
+  useEffect(() => {
+    const novosValores = Object.fromEntries(JSON.parse(snapshotCamposEtapa) as [string, string][]);
+    const timer = setTimeout(() => {
+      if (camposAtuaisSujosRef.current) {
+        setConflitoCamposAtuais(true);
+        return;
+      }
+      setValoresCamposAtuais(novosValores);
+      setBaseCamposAtuais(novosValores);
+      setConflitoCamposAtuais(false);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [snapshotCamposEtapa, realtimeRevision]);
 
   async function salvarCamposAtuais() {
     if (!podeEditar || !camposAtuaisAlterados) return;
@@ -121,6 +144,9 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
       return;
     }
     toast.success("Campos da etapa atualizados");
+    setBaseCamposAtuais({ ...valoresCamposAtuais });
+    camposAtuaisSujosRef.current = false;
+    setConflitoCamposAtuais(false);
     onAtualizado();
   }
 
@@ -265,6 +291,7 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
           <p className="text-xs text-slate-500">Esta etapa não possui campos configurados.</p>
         ) : (
           <div className="space-y-3 border-t border-white/5 pt-3">
+            {conflitoCamposAtuais && <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">Os campos receberam uma atualização externa. Seu rascunho foi preservado; revise antes de salvar.</p>}
             {card.camposEtapa.map((campo) => (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
@@ -273,7 +300,10 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
                 <CampoBpmInput
                   campo={campo}
                   value={valoresCamposAtuais[campo.id] ?? ""}
-                  onChange={(valor) => setValoresCamposAtuais((atuais) => ({ ...atuais, [campo.id]: valor }))}
+                  onChange={(valor) => {
+                    camposAtuaisSujosRef.current = true;
+                    setValoresCamposAtuais((atuais) => ({ ...atuais, [campo.id]: valor }));
+                  }}
                   className={inputCls}
                   disabled={!podeEditar}
                 />
@@ -288,14 +318,26 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
         )}
       </section>
 
-      <PainelRequisitosAvanco card={card} etapas={etapasParaMover} accent={accent} onAtualizado={onAtualizado} podeEditar={podeEditar} podeMover={podeMoverEtapa} />
+      {etapaEhFechado(card.etapa.nome) && (
+        <PainelStatusPosFechamento
+          cardId={card.id}
+          statusPersistido={card.statusPosFechamento}
+          versaoPersistidaEm={card.updatedAt}
+          podeEditar={podeEditar}
+          realtimeRevision={realtimeRevision}
+          accent={accent}
+          onAtualizado={onAtualizado}
+        />
+      )}
+
+      <PainelRequisitosAvanco card={card} etapas={etapasParaMover} accent={accent} onAtualizado={onAtualizado} podeEditar={podeEditar} podeMover={podeMoverEtapa} realtimeRevision={realtimeRevision} onFocarPainelReuniao={onFocarPainelReuniao} />
 
       {["em tratativa", "sem viabilidade"].includes(card.etapa.nome.trim().toLocaleLowerCase("pt-BR")) && (
-        <PainelProximoContato card={card} accent={accent} onAtualizado={onAtualizado} podeEditar={podeEditar} />
+        <PainelProximoContato card={card} accent={accent} onAtualizado={onAtualizado} podeEditar={podeEditar} realtimeRevision={realtimeRevision} />
       )}
 
       {card.etapa.nome.trim().toLocaleLowerCase("pt-BR") === "em tratativa" && (
-        <PainelChecklistFollowUp cardId={card.id} accent={accent} onAtualizado={onAtualizado} onEstadoChange={onEstadoFollowUpChange} podeEditar={podeEditar} />
+        <PainelChecklistFollowUp cardId={card.id} accent={accent} onAtualizado={onAtualizado} onEstadoChange={onEstadoFollowUpChange} podeEditar={podeEditar} realtimeRevision={realtimeRevision} />
       )}
 
       <SectionCard icon={ListTodo} title="Tarefas" count={card.tarefas.length} accent={accent} defaultOpen>
