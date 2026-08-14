@@ -3,11 +3,9 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  PhoneCall,
   Loader2,
   Upload,
   Trash2,
-  Link as LinkIcon,
   History,
   ChevronDown,
   Paperclip,
@@ -16,28 +14,24 @@ import {
 import { fmtDateTime } from "@/lib/format-date";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { RegistrarAnexoBpm, ExcluirAnexoBpm } from "@/actions/bpm/Anexos";
-import { CriarVinculoCardBpm } from "@/actions/bpm/Vinculos";
-import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { isAdminRole } from "@/lib/roles";
 import { PainelRequisitosAvanco } from "./PainelRequisitosAvanco";
 import { PainelResumoEtapas } from "./PainelResumoEtapas";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
-type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
 interface Props {
   card: CardDetalhe;
-  interacoes: Interacao[];
   accent: string;
   currentUserId: number | null;
   currentUserRole: string | null;
   onAtualizado: () => void;
-  onAbrirCard: (cardId: string) => void;
   etapasParaMover: { id: string; nome: string }[];
   etapas: { id: string; nome: string; ordem: number }[];
   podeEditar: boolean;
   podeMoverEtapa: boolean;
+  podeTrabalharTarefas: boolean;
   realtimeRevision: number;
   onFocarPainelReuniao: () => void;
 }
@@ -89,14 +83,13 @@ export function SectionCard({
   );
 }
 
-export default function PainelHistorico({ card, interacoes, accent, currentUserId, currentUserRole, onAtualizado, onAbrirCard, etapasParaMover, etapas, podeEditar, podeMoverEtapa, realtimeRevision, onFocarPainelReuniao }: Props) {
+export default function PainelHistorico({ card, accent, currentUserId, currentUserRole, onAtualizado, etapasParaMover, etapas, podeEditar, podeMoverEtapa, podeTrabalharTarefas, realtimeRevision, onFocarPainelReuniao }: Props) {
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const inputAnexoRef = useRef<HTMLInputElement>(null);
-  const [vinculoBusca, setVinculoBusca] = useState("");
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
-  const podeExcluirAnexo = isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR";
+  const podeExcluirAnexo = isAdminRole(currentUserRole) || Boolean(meuVinculo);
   async function enviarAnexo(file: File) {
     setEnviandoAnexo(true);
     try {
@@ -129,82 +122,8 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
     else toast.error(typeof res.error === "string" ? res.error : "Erro ao excluir anexo");
   }
 
-  async function handleCriarVinculo() {
-    if (!vinculoBusca.trim()) return;
-    const res = await CriarVinculoCardBpm({ cardOrigemId: card.id, cardDestinoId: vinculoBusca.trim() });
-    if (res.success) { toast.success("Vínculo criado"); setVinculoBusca(""); onAtualizado(); }
-    else toast.error(typeof res.error === "string" ? res.error : "Erro ao criar vínculo");
-  }
-
-  const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
-
-  const ultimaInteracao = interacoes[0] ?? null;
-  const interacoesAnteriores = interacoes.slice(1);
-
   return (
     <div className="min-h-0 rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 space-y-3 lg:h-full lg:overflow-y-auto">
-      {/* Status + última interação, estrutura fixa */}
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PhoneCall size={14} style={{ color: `rgb(${accent})` }} />
-            <span className="text-sm font-bold text-white">Tentando contato</span>
-          </div>
-          <button disabled title="Em breve" className="p-1 rounded-lg text-slate-600 opacity-40 cursor-not-allowed">
-            <ChevronDown size={14} />
-          </button>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Ligação: Transcrição</p>
-          <p className="text-xs text-slate-400">
-            {ultimaInteracao ? fmtDateTime(ultimaInteracao.createdAt) : "Nenhuma ligação registrada ainda."}
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Agendamento</p>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-300">
-            <span>Data: {ultimaInteracao?.agendadoEm ? fmtDateTime(ultimaInteracao.agendadoEm).split(",")[0] : "—"}</span>
-            <span>Hora: {ultimaInteracao?.agendadoEm ? fmtDateTime(ultimaInteracao.agendadoEm).split(",")[1] : "—"}</span>
-          </div>
-          {ultimaInteracao?.agendaLink ? (
-            <a href={ultimaInteracao.agendaLink} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline break-all block" style={{ color: `rgb(${accent})` }}>
-              {ultimaInteracao.agendaLink}
-            </a>
-          ) : (
-            <p className="text-xs text-slate-600">Link: —</p>
-          )}
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Anotação</p>
-          <p className="text-xs text-slate-400">{ultimaInteracao?.observacoes || "—"}</p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Resumo da reunião</p>
-          <p className="text-xs text-slate-400">{ultimaInteracao?.resumo || "—"}</p>
-          {ultimaInteracao && <p className="text-[11px] text-slate-600">Data: {fmtDateTime(ultimaInteracao.createdAt)}</p>}
-        </div>
-      </div>
-
-      {interacoesAnteriores.length > 0 && (
-        <SectionCard icon={PhoneCall} title="Ligações anteriores" count={interacoesAnteriores.length} accent={accent}>
-          <div className="space-y-1.5 mt-2">
-            {interacoesAnteriores.map((i) => (
-              <div key={i.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-1">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <span className="font-semibold text-slate-300">{i.registradoPor.nome}</span>
-                  <span className="text-slate-700">·</span>
-                  <span>{fmtDateTime(i.createdAt)}</span>
-                </div>
-                {i.observacoes && <p className="text-xs text-slate-400">{i.observacoes}</p>}
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      )}
 
       <PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} />
 
@@ -216,7 +135,7 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
           responsavelId={card.responsavel?.id ?? null}
           tarefas={card.tarefas}
           accent={accent}
-          podeEditar={podeEditar}
+          podeTrabalharTarefas={podeTrabalharTarefas}
           onAtualizado={onAtualizado}
         />
       </SectionCard>
@@ -248,45 +167,6 @@ export default function PainelHistorico({ card, interacoes, accent, currentUserI
           <input ref={inputAnexoRef} type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           {enviandoAnexo ? <Loader2 size={18} className="animate-spin text-slate-400" /> : <Upload size={18} className="text-slate-500" />}
           <p className="text-xs text-slate-500">Arraste ou clique para enviar</p>
-        </div>
-      </SectionCard>
-
-      <SectionCard icon={LinkIcon} title="Vínculos" count={card.vinculosOrigem.length + card.vinculosDestino.length} accent={accent}>
-        <div className="space-y-1.5 mt-2">
-          {card.vinculosOrigem.map((v) => (
-            <button
-              key={v.cardDestino.id}
-              onClick={() => onAbrirCard(v.cardDestino.id)}
-              className="w-full flex items-center gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2 text-left hover:border-white/10"
-            >
-              <LinkIcon size={13} className="text-slate-500" />
-              <span className="text-xs text-slate-300">Card vinculado</span>
-            </button>
-          ))}
-          {card.vinculosDestino.map((v) => (
-            <button
-              key={v.cardOrigem.id}
-              onClick={() => onAbrirCard(v.cardOrigem.id)}
-              className="w-full flex items-center gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2 text-left hover:border-white/10"
-            >
-              <LinkIcon size={13} className="text-slate-500" />
-              <span className="text-xs text-slate-300">Card de origem</span>
-            </button>
-          ))}
-          {card.vinculosOrigem.length === 0 && card.vinculosDestino.length === 0 && (
-            <p className="text-xs text-slate-600">Nenhum vínculo ainda.</p>
-          )}
-        </div>
-        <div className="flex gap-2 mt-2">
-          <input
-            className={`${inputCls} flex-1`}
-            placeholder="ID do card para vincular"
-            value={vinculoBusca}
-            onChange={(e) => setVinculoBusca(e.target.value)}
-          />
-          <button onClick={handleCriarVinculo} className="px-3 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: `rgba(${accent},0.85)` }}>
-            Vincular
-          </button>
         </div>
       </SectionCard>
 

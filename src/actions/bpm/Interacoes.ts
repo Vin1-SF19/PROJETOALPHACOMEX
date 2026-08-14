@@ -11,7 +11,7 @@ const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
 /**
  * Coluna "Presente" da nova visão de card (Fase 4): registra uma nova interação
- * (ligação) com data/hora/link/observações/resumo. Também gera uma entrada em
+ * (ligação ou anotação) com data/hora/link/observações/resumo. Também gera uma entrada em
  * BpmCardHistorico para manter o feed de atividade do dashboard/perfil da empresa.
  */
 export async function CriarInteracaoCardBpm(dados: unknown) {
@@ -22,7 +22,7 @@ export async function CriarInteracaoCardBpm(dados: unknown) {
 
     const parsed = criarInteracaoCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, agendadoEm, agendaLink, observacoes, resumo } = parsed.data;
+    const { cardId, tipo, agendadoEm, agendaLink, observacoes, resumo } = parsed.data;
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
@@ -31,20 +31,21 @@ export async function CriarInteracaoCardBpm(dados: unknown) {
       const criada = await tx.bpmInteracaoCard.create({
         data: {
           cardId,
-          tipo: "LIGACAO",
+          tipo,
           agendadoEm,
           agendaLink,
           observacoes,
           resumo,
           registradoPorId: userId,
         },
+        include: { registradoPor: { select: { id: true, nome: true } } },
       });
       await registrarHistoricoCard(
         {
           cardId,
-          acao: "INTERACAO_REGISTRADA",
+          acao: tipo === "ANOTACAO" ? "ANOTACAO_REGISTRADA" : "INTERACAO_REGISTRADA",
           usuarioId: userId,
-          valorNovoJson: JSON.stringify({ agendadoEm, resumo }),
+          valorNovoJson: JSON.stringify({ tipo, agendadoEm, resumo }),
         },
         tx,
       );

@@ -43,7 +43,7 @@ export async function resolverParticipantesAutomaticosEvento(eventId: string): P
     where: { id: eventId },
     select: {
       eventType: true,
-      clienteId: true,
+      clienteServicoId: true,
       businessProcessId: true,
       closerUsuarioId: true,
       analistaResponsavelUsuarioId: true,
@@ -61,9 +61,9 @@ export async function resolverParticipantesAutomaticosEvento(eventId: string): P
           diretorId: true,
         },
       })
-    : event.clienteId !== null
+    : event.clienteServicoId !== null
       ? await db.businessProcess.findFirst({
-          where: { clienteId: event.clienteId },
+          where: { clienteServicoId: event.clienteServicoId },
           select: {
             analistaResponsavelId: true,
             analistaAuxiliarId: true,

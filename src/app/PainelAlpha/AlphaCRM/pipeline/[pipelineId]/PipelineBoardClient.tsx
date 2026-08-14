@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, PhoneCall, Plus, RefreshCw, StickyNote, User } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, PhoneCall, Plus, RefreshCw, StickyNote } from "lucide-react";
 import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import {
   BPM_PIPELINE_EVENT,
@@ -27,6 +27,7 @@ import { pusherClient } from "@/lib/pusher";
 import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
+import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
 import { etapaEhBoasVindas } from "@/lib/bpm/boas-vindas";
@@ -62,6 +63,7 @@ interface CardBpm {
   statusPosFechamento?: string | null;
   empresa: { id: number; razaoSocial: string; nomeFantasia: string | null };
   responsavel: { id: number; nome: string };
+  membros: MembroCard[];
   _count: { tarefas: number; anexos: number };
   tarefas: { titulo: string; prazo: Date | string | null; tipo: string }[];
   campoValores?: { valor: string | null; campo: { nome: string } }[];
@@ -114,6 +116,13 @@ function KanbanCard({
   const inicialEmpresa = nomeEmpresa.trim().charAt(0).toUpperCase() || "?";
   const proximaTarefaComPrazo = card.tarefas.find((tarefa) => tarefa.prazo);
   const anotacaoRapidaPendente = card.tarefas.find((tarefa) => tarefa.tipo === "LEMBRETE_RAPIDO");
+  const membrosVisiveis = card.membros.length > 0
+    ? card.membros
+    : [{
+        userId: card.responsavel.id,
+        role: "RESPONSAVEL",
+        usuario: { id: card.responsavel.id, nome: card.responsavel.nome, imagemUrl: null },
+      }];
 
   return (
     <div
@@ -260,15 +269,11 @@ function KanbanCard({
               <span className="text-slate-500">Sem pendências</span>
             )}
           </div>
-          <span
-            role="img"
-            aria-label={`Responsável: ${card.responsavel.nome}`}
-            className="flex h-7 w-7 items-center justify-center rounded-xl border border-white/10 text-[10px] font-black text-white shadow-sm shadow-black/30"
-            style={{ background: `rgba(${accent},0.5)` }}
-            title={card.responsavel.nome}
-          >
-            {card.responsavel.nome?.[0]?.toUpperCase() || <User size={11} aria-hidden="true" />}
-          </span>
+          <GrupoAvataresMembrosCard
+            membros={membrosVisiveis}
+            limite={3}
+            className="[&_[data-slot=avatar]]:shadow-sm [&_[data-slot=avatar]]:shadow-black/30"
+          />
         </div>
       </div>
     </div>

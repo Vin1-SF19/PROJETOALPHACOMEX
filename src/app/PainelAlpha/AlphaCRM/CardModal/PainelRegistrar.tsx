@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, ScrollText } from "lucide-react";
+import { CalendarClock, MessageSquareText, ScrollText } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CriarInteracaoCardBpm, type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
@@ -26,6 +26,7 @@ interface Props {
   etapaAtual: EtapaOpcao | null;
   accent: string;
   onInteracaoCriada: (interacao: Interacao) => void;
+  anotacoes: Interacao[];
   podeEditar: boolean;
   realtimeRevision: number;
   onAtualizado: () => void;
@@ -34,35 +35,31 @@ interface Props {
 
 const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
 
-export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoCriada, podeEditar, realtimeRevision, onAtualizado, onEstadoFollowUpChange }: Props) {
-  const [agendaData, setAgendaData] = useState("");
-  const [agendaHora, setAgendaHora] = useState("");
-  const [agendaLink, setAgendaLink] = useState("");
+export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoCriada, anotacoes, podeEditar, realtimeRevision, onAtualizado, onEstadoFollowUpChange }: Props) {
   const [anotacao, setAnotacao] = useState("");
-  const [salvando, setSalvando] = useState(false);
+  const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
 
-  async function handleSalvar() {
-    setSalvando(true);
-    let agendadoEm: Date | undefined;
-    if (agendaData) agendadoEm = new Date(`${agendaData}T${agendaHora || "00:00"}`);
+  async function salvarAnotacao() {
+    if (!podeEditar || salvandoAnotacao || !anotacao.trim()) return;
+    setSalvandoAnotacao(true);
+    try {
+      const res = await CriarInteracaoCardBpm({
+        cardId: card.id,
+        tipo: "ANOTACAO",
+        observacoes: anotacao.trim(),
+      });
 
-    const res = await CriarInteracaoCardBpm({
-      cardId: card.id,
-      agendadoEm,
-      agendaLink: agendaLink.trim() || undefined,
-      observacoes: anotacao.trim() || undefined,
-    });
-    setSalvando(false);
-
-    if (res.success && res.data) {
-      toast.success("Interação registrada");
-      onInteracaoCriada(res.data as unknown as Interacao);
-      setAgendaData("");
-      setAgendaHora("");
-      setAgendaLink("");
-      setAnotacao("");
-    } else {
-      toast.error(typeof res.error === "string" ? res.error : "Erro ao registrar interação");
+      if (res.success && res.data) {
+        toast.success("Anotação salva");
+        onInteracaoCriada(res.data as unknown as Interacao);
+        setAnotacao("");
+      } else {
+        toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar anotação");
+      }
+    } catch {
+      toast.error("Erro ao salvar anotação");
+    } finally {
+      setSalvandoAnotacao(false);
     }
   }
 
@@ -116,7 +113,6 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
           {etapaExigeProximoContato(card.etapa.nome) && (
             <PainelProximoContato
               card={card}
-              accent={accent}
               onAtualizado={onAtualizado}
               podeEditar={podeEditar}
               realtimeRevision={realtimeRevision}
@@ -144,23 +140,6 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             />
           )}
 
-          <div className="border-t border-white/5 pt-4">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Registrar interação</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[11px] text-slate-400 font-medium block mb-1.5">Data</label>
-              <input type="date" className={inputCls} value={agendaData} onChange={(e) => setAgendaData(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-[11px] text-slate-400 font-medium block mb-1.5">Hora</label>
-              <input type="time" className={inputCls} value={agendaHora} onChange={(e) => setAgendaHora(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] text-slate-400 font-medium block mb-1.5">Link</label>
-            <input type="url" className={inputCls} placeholder="https://..." value={agendaLink} onChange={(e) => setAgendaLink(e.target.value)} />
-          </div>
-          </div>
         </TabsContent>
 
         <TabsContent value="script" className="m-0 mt-5 min-h-0 flex-1 overflow-y-auto px-5 pb-5">
@@ -178,22 +157,26 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
           <label htmlFor={`anotacao-card-${card.id}`} className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Anotação</label>
           <span className="text-[10px] text-slate-600">Visível em todas as etapas</span>
         </div>
+        <div aria-live="polite" className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+          {anotacoes.length > 0 ? anotacoes.slice(0, 3).map((item) => (
+            <div key={item.id} className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-2.5 py-2">
+              <p className="whitespace-pre-wrap text-xs text-slate-300">{item.observacoes}</p>
+              <p className="mt-1 text-[10px] text-slate-600">Salva por {item.registradoPor.nome}</p>
+            </div>
+          )) : (
+            <p className="text-[11px] text-slate-600">Nenhuma anotação salva ainda.</p>
+          )}
+        </div>
         <textarea
           id={`anotacao-card-${card.id}`}
           className={`${inputCls} mt-2 min-h-20 resize-none`}
           placeholder="Registre uma anotação sobre este contato..."
           value={anotacao}
           onChange={(e) => setAnotacao(e.target.value)}
-          disabled={!podeEditar || salvando}
+          onBlur={() => void salvarAnotacao()}
+          disabled={!podeEditar || salvandoAnotacao}
         />
-        <button
-          onClick={handleSalvar}
-          disabled={!podeEditar || salvando}
-          className="mt-3 w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ background: `rgb(${accent})`, boxShadow: `0 8px 24px -8px rgba(${accent},0.6)` }}
-        >
-          {salvando ? "Salvando..." : "Registrar interação"}
-        </button>
+        {salvandoAnotacao && <p className="mt-2 inline-flex items-center gap-2 text-[11px] text-slate-500"><MessageSquareText size={13} /> Salvando anotação...</p>}
       </footer>
     </div>
   );

@@ -78,7 +78,7 @@ function toRuleConditionsFacts(event: {
 async function buscarOverridesVigentes(query: {
   collaboratorId: number;
   cargoId: number | null;
-  clienteId: number | null;
+  clienteServicoId: number | null;
   contratoComercialId: string | null;
 }): Promise<EligibilityOverrideRecord[]> {
   const rows = await db.eligibilityOverride.findMany({
@@ -86,9 +86,9 @@ async function buscarOverridesVigentes(query: {
       OR: [
         { collaboratorId: query.collaboratorId },
         { cargoId: query.cargoId ?? undefined },
-        { clienteId: query.clienteId ?? undefined },
+        { clienteServicoId: query.clienteServicoId ?? undefined },
         { contratoComercialId: query.contratoComercialId ?? undefined },
-        { collaboratorId: null, cargoId: null, clienteId: null, contratoComercialId: null },
+        { collaboratorId: null, cargoId: null, clienteServicoId: null, contratoComercialId: null },
       ],
     },
   });
@@ -142,9 +142,9 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
               },
             })
           : Promise.resolve(null),
-        event.clienteId !== null
+        event.clienteServicoId !== null
           ? db.commissionEvent.findFirst({
-              where: { clienteId: event.clienteId, eventType: "CONTRACTING" },
+              where: { clienteServicoId: event.clienteServicoId, eventType: "CONTRACTING" },
               select: { eventDate: true },
               orderBy: { eventDate: "asc" },
             })
@@ -177,14 +177,14 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
     const overrides = await buscarOverridesVigentes({
       collaboratorId,
       cargoId: colaborador.cargoId,
-      clienteId: event.clienteId,
+      clienteServicoId: event.clienteServicoId,
       contratoComercialId: event.contratoComercialId,
     });
 
     const decisao = resolverEligibilityOverride(overrides, {
       collaboratorId,
       cargoId: colaborador.cargoId,
-      clienteId: event.clienteId,
+      clienteServicoId: event.clienteServicoId,
       contratoComercialId: event.contratoComercialId,
       servico: event.servico,
       eventType: event.eventType,

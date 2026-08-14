@@ -31,7 +31,8 @@ export interface EligibilityOverrideRecord {
   id: string;
   collaboratorId: number | null;
   cargoId: number | null;
-  clienteId: number | null;
+  /** ClienteServico.id — Fase 3.7 do Cliente Master (2026-08-14), nome corrigido (era "clienteId"), mesmo comportamento de hierarquia por serviço. */
+  clienteServicoId: number | null;
   contratoComercialId: string | null;
   servico: string | null;
   eventType: string | null;
@@ -49,7 +50,7 @@ export interface EligibilityOverrideRecord {
 export interface EligibilityFilterQuery {
   collaboratorId: number;
   cargoId: number | null;
-  clienteId: number | null;
+  clienteServicoId: number | null;
   contratoComercialId: string | null;
   servico: string;
   eventType: string;
@@ -73,7 +74,7 @@ function vigenteNaData(override: EligibilityOverrideRecord, data: Date): boolean
 function casaComQuery(override: EligibilityOverrideRecord, query: EligibilityFilterQuery): boolean {
   if (override.collaboratorId !== null && override.collaboratorId !== query.collaboratorId) return false;
   if (override.cargoId !== null && override.cargoId !== query.cargoId) return false;
-  if (override.clienteId !== null && override.clienteId !== query.clienteId) return false;
+  if (override.clienteServicoId !== null && override.clienteServicoId !== query.clienteServicoId) return false;
   if (override.contratoComercialId !== null && override.contratoComercialId !== query.contratoComercialId) return false;
   if (override.servico !== null && override.servico !== query.servico) return false;
   if (override.eventType !== null && override.eventType !== query.eventType) return false;
@@ -83,7 +84,7 @@ function casaComQuery(override: EligibilityOverrideRecord, query: EligibilityFil
 /** Especificidade decrescente: contrato > empresa > individual > cargo — mesma ordem da seção 15. */
 function especificidade(override: EligibilityOverrideRecord): number {
   if (override.contratoComercialId !== null) return 4;
-  if (override.clienteId !== null) return 3;
+  if (override.clienteServicoId !== null) return 3;
   if (override.collaboratorId !== null) return 2;
   if (override.cargoId !== null) return 1;
   return 0;

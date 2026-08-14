@@ -94,8 +94,14 @@ export async function sincronizarComissoes(params: {
         : null;
       const clienteSource = clienteCorrespondente ? await buscarClientePorId(clienteCorrespondente.id) : null;
 
+      // Fase 3.7 do Cliente Master (2026-08-14): clienteServicoId é a correlação por serviço
+      // (comportamento preservado, era chamado "clienteId"); clienteId agora é o Cliente.id
+      // real da empresa — vem de ClienteServico.clienteId (via cs-nps-adapter) quando há
+      // correspondência no CS&NPS, senão do próprio ContratoComercial.clienteId (sempre presente,
+      // Fase 3.6 já tornou obrigatório).
       const merged = mergeCompanyEvent({
-        clienteId: clienteCorrespondente?.id ?? null,
+        clienteServicoId: clienteCorrespondente?.id ?? null,
+        clienteId: clienteSource?.clienteId ?? contrato.clienteId,
         contratoComercialId: contrato.id,
         cliente: clienteSource,
         contrato,
@@ -106,6 +112,7 @@ export async function sincronizarComissoes(params: {
       const evento = await db.commissionEvent.create({
         data: {
           eventType: "CONTRACTING",
+          clienteServicoId: merged.clienteServicoId,
           clienteId: merged.clienteId,
           contratoComercialId: merged.contratoComercialId,
           cnpj: merged.cnpj,
@@ -163,33 +170,34 @@ export async function sincronizarComissoes(params: {
   }
 
   // ─── Fase 2: eventos de ÊXITO via ClienteServico.dataExito ───
-  const clienteIdsComExito = await listarClientesComExitoNaoProcessado();
+  const clienteServicoIdsComExito = await listarClientesComExitoNaoProcessado();
 
-  for (const clienteId of clienteIdsComExito) {
+  for (const clienteServicoId of clienteServicoIdsComExito) {
     try {
-      const cliente = await buscarClientePorId(clienteId);
+      const cliente = await buscarClientePorId(clienteServicoId);
       if (!cliente || !cliente.dataExito) continue;
 
-      const sourceId = `exito:${clienteId}`;
+      const sourceId = `exito:${clienteServicoId}`;
 
-      // Closer: herdado do evento de CONTRATAÇÃO já sincronizado para o mesmo cliente (já
+      // Closer: herdado do evento de CONTRATAÇÃO já sincronizado para o mesmo serviço (já
       // resolvido lá via merge ContratoComercial+ClienteServico) — evita duplicar a lógica de merge.
       const eventoContratacao = await db.commissionEvent.findFirst({
-        where: { clienteId, eventType: "CONTRACTING" },
+        where: { clienteServicoId, eventType: "CONTRACTING" },
         select: { closerUsuarioId: true, closerNomeManual: true },
         orderBy: { createdAt: "desc" },
       });
 
       // Analista responsável + dados de tentativas: FK real via BusinessProcess quando existir.
       const processo = await db.businessProcess.findFirst({
-        where: { clienteId },
+        where: { clienteServicoId },
         select: { id: true, analistaResponsavelId: true, tentativas: true, deferidoPrimeiraTentativa: true },
       });
 
       const evento = await db.commissionEvent.create({
         data: {
           eventType: "PROCESS_SUCCESS",
-          clienteId,
+          clienteServicoId,
+          clienteId: cliente.clienteId,
           cnpj: cliente.cnpj,
           razaoSocial: cliente.razaoSocial,
           nomeFantasia: cliente.nomeFantasia,
@@ -219,7 +227,7 @@ export async function sincronizarComissoes(params: {
             eventId: evento.id,
             tipo: "EXITO_SEM_BUSINESS_PROCESS",
             severidade: "PENDING_REVIEW",
-            detalhes: `Evento de êxito gerado para clienteId=${clienteId}, mas não há BusinessProcess correspondente com tentativas/responsáveis.`,
+            detalhes: `Evento de êxito gerado para clienteServicoId=${clienteServicoId}, mas não há BusinessProcess correspondente com tentativas/responsáveis.`,
           },
         });
       }
@@ -238,7 +246,7 @@ export async function sincronizarComissoes(params: {
         data: {
           syncRunId: syncRun.id,
           sourceEntity: "exito",
-          sourceId: String(clienteId),
+          sourceId: String(clienteServicoId),
           mensagem: err instanceof Error ? err.message : "Erro desconhecido ao processar êxito.",
         },
       });

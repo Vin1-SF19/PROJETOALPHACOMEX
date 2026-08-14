@@ -11,6 +11,7 @@ import type { CompanyEventSource } from "./types";
 
 interface ClienteServicoAdapterRow {
   id: number;
+  clienteId: number;
   servico: string;
   formaPagamento: string | null;
   valorContrato: number | null;
@@ -29,6 +30,7 @@ export function mapClienteServicoToCompanyEventSource(registro: ClienteServicoAd
   const dataExito = parseClienteDateString(registro.dataExito);
 
   return {
+    clienteId: registro.clienteId,
     cnpj: registro.cliente.cnpj ?? "",
     razaoSocial: registro.cliente.razaoSocial,
     nomeFantasia: registro.cliente.nomeFantasia,
@@ -48,6 +50,7 @@ export function mapClienteServicoToCompanyEventSource(registro: ClienteServicoAd
 
 const SELECT_CLIENTE_SERVICO_ADAPTER = {
   id: true,
+  clienteId: true,
   servico: true,
   formaPagamento: true,
   valorContrato: true,

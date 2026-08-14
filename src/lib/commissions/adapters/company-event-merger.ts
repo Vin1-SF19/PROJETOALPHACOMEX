@@ -2,11 +2,11 @@ import type { ContratoComercialSource } from "./metas-adapter";
 import type { AdapterFieldConflict, CompanyEventSource, MergedCompanyEvent } from "./types";
 
 /**
- * Merge de ContratoComercial (Alpha Metas) + clientes (CS&NPS) por cnpj+servico
+ * Merge de ContratoComercial (Alpha Metas) + ClienteServico (CS&NPS) por cnpj+servico
  * normalizado — decisão confirmada pelo usuário (Fase 01, não reabrir): nenhuma das duas
  * fontes é descartada. Campo presente em ContratoComercial prevalece quando ambas têm
  * valor (fonte contratual formal); campo ausente em ContratoComercial mas presente em
- * clientes (analistaResponsavel, dataExito, embasamento, origemLead) é herdado de lá.
+ * ClienteServico (analistaResponsavel, dataExito, embasamento, origemLead) é herdado de lá.
  * Conflito real (mesmo campo, valores DIFERENTES nas duas fontes) nunca é resolvido em
  * silêncio — vira entrada em `conflicts`, que o chamador (sync-engine) transforma em
  * CommissionDivergence (PENDING_REVIEW).
@@ -17,7 +17,7 @@ function normalizarServico(servico: string): string {
 }
 
 function normalizarCnpj(cnpj: string): string {
-  return cnpj.replace(/\D/g, "");
+  return cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
 
 export function chaveDeCasamento(cnpj: string, servico: string): string {
@@ -31,12 +31,13 @@ function difereRealmente(a: unknown, b: unknown): boolean {
 }
 
 export function mergeCompanyEvent(params: {
+  clienteServicoId: number | null;
   clienteId: number | null;
   contratoComercialId: string | null;
   cliente: CompanyEventSource | null;
   contrato: ContratoComercialSource | null;
 }): MergedCompanyEvent {
-  const { clienteId, contratoComercialId, cliente, contrato } = params;
+  const { clienteServicoId, clienteId, contratoComercialId, cliente, contrato } = params;
 
   if (!cliente && !contrato) {
     throw new Error("mergeCompanyEvent requer pelo menos uma fonte (cliente ou contrato) presente.");
@@ -72,6 +73,7 @@ export function mergeCompanyEvent(params: {
   const dataContratacao = contrato?.pagamentoConfirmadoEm ?? cliente?.dataContratacao ?? null;
 
   return {
+    clienteServicoId,
     clienteId,
     contratoComercialId,
     cnpj,

@@ -22,7 +22,9 @@ const criarEligibilityOverrideSchema = z
   .object({
     collaboratorId: z.number().int().positive().optional(),
     cargoId: z.number().int().positive().optional(),
-    clienteId: z.number().int().positive().optional(),
+    // Fase 3.7 do Cliente Master (2026-08-14): renomeado de "clienteId" — sempre foi
+    // ClienteServico.id (escopo por serviço contratado, não por empresa).
+    clienteServicoId: z.number().int().positive().optional(),
     contratoComercialId: z.string().min(1).optional(),
     servico: z.string().min(1).optional(),
     eventType: z.string().min(1).optional(),
@@ -36,7 +38,7 @@ const criarEligibilityOverrideSchema = z
     approvalRequired: z.boolean().default(false),
   })
   .refine(
-    (data) => data.collaboratorId || data.cargoId || data.clienteId || data.contratoComercialId || data.servico || data.eventType,
+    (data) => data.collaboratorId || data.cargoId || data.clienteServicoId || data.contratoComercialId || data.servico || data.eventType,
     { message: "Ao menos um escopo (colaborador, cargo, empresa, contrato, serviço ou evento) deve ser informado." },
   );
 
@@ -86,7 +88,7 @@ const atualizarEligibilityOverrideSchema = z.object({
   id: z.string().min(1),
   collaboratorId: z.number().int().positive().nullable().optional(),
   cargoId: z.number().int().positive().nullable().optional(),
-  clienteId: z.number().int().positive().nullable().optional(),
+  clienteServicoId: z.number().int().positive().nullable().optional(),
   contratoComercialId: z.string().min(1).nullable().optional(),
   servico: z.string().min(1).nullable().optional(),
   eventType: z.string().min(1).nullable().optional(),
@@ -120,7 +122,7 @@ export async function AtualizarEligibilityOverride(input: z.infer<typeof atualiz
     if (
       !proximo.collaboratorId &&
       !proximo.cargoId &&
-      !proximo.clienteId &&
+      !proximo.clienteServicoId &&
       !proximo.contratoComercialId &&
       !proximo.servico &&
       !proximo.eventType

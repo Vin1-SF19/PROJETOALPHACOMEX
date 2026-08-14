@@ -370,6 +370,9 @@ model Cliente {
   operacionalClientes OperacionalClientes[]
   contratosComerciais ContratoComercial[]
   historicoAlteracoes HistoricoAlteracaoCliente[]
+  commissionEvents     CommissionEvent[]
+  businessProcesses    BusinessProcess[]
+  eligibilityOverrides EligibilityOverride[]
 
   @@index([razaoSocial])
   @@index([status])
@@ -400,6 +403,9 @@ model ClienteServico {
   logCs               ClienteServicoLogCs[]
   logFeedback         ClienteServicoLogFeedback[]
   historicoAlteracoes ClienteServicoHistorico[]
+  commissionEvents     CommissionEvent[]
+  businessProcesses    BusinessProcess[]
+  eligibilityOverrides EligibilityOverride[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1270,6 +1276,10 @@ model ContratoComercial {
   usuario     usuarios             @relation("ContratosComerciais", fields: [usuarioId], references: [id], onDelete: Cascade)
   observacoes ObservacaoContrato[]
 
+  commissionEvents     CommissionEvent[]
+  businessProcesses    BusinessProcess[]
+  eligibilityOverrides EligibilityOverride[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1509,14 +1519,26 @@ model ContratoColaborador {
 model CommissionEvent {
   id                  String  @id @default(cuid())
   eventType           String // CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL
-  clienteId           Int?
-  contratoComercialId String?
-  businessProcessId   String?
 
-  cnpj         String
-  razaoSocial  String
-  nomeFantasia String?
-  servico      String
+  // Fase 3.7 do Cliente Master (2026-08-14): campo antigo "clienteId" continha na verdade
+  // ClienteServico.id (correlação por serviço contratado, não por empresa) — renomeado para
+  // clienteServicoId com FK real, preservando o valor e o comportamento de correlação
+  // existentes. clienteId agora aponta de fato para Cliente (derivado via ClienteServico.clienteId),
+  // adicional e nullable (evento manual nunca preenche nenhum dos dois).
+  clienteServicoId Int?
+  clienteServico   ClienteServico? @relation(fields: [clienteServicoId], references: [id])
+  clienteId        Int?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id])
+
+  contratoComercialId String?
+  contratoComercial   ContratoComercial? @relation(fields: [contratoComercialId], references: [id])
+  businessProcessId   String?
+  businessProcess     BusinessProcess?   @relation(fields: [businessProcessId], references: [id])
+
+  cnpj         String // snapshot intencional (auditoria financeira) — nunca substituído por FK, ver plano-cliente-master.md
+  razaoSocial  String // snapshot intencional
+  nomeFantasia String? // snapshot intencional
+  servico      String // snapshot intencional
   eventDate    DateTime
 
   grossContractAmountCents Int
@@ -1555,12 +1577,25 @@ model CommissionEvent {
   @@index([cnpj])
   @@index([eventType])
   @@index([status])
+  @@index([clienteServicoId])
+  @@index([clienteId])
+  @@index([contratoComercialId])
 }
 
 model BusinessProcess {
-  id                        String    @id @default(cuid())
-  clienteId                 Int?
-  contratoComercialId       String?
+  id String @id @default(cuid())
+
+  // Fase 3.7 do Cliente Master (2026-08-14): mesma dupla clienteServicoId/clienteId de
+  // CommissionEvent, aplicada por consistência mesmo sem dado real hoje (model sempre
+  // esteve vazio em produção — nenhum código o escreve ainda).
+  clienteServicoId Int?
+  clienteServico   ClienteServico? @relation(fields: [clienteServicoId], references: [id])
+  clienteId        Int?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id])
+
+  contratoComercialId String?
+  contratoComercial   ContratoComercial? @relation(fields: [contratoComercialId], references: [id])
+
   analistaResponsavelId     Int
   analistaAuxiliarId        Int?
   auditorId                 Int?
@@ -1574,7 +1609,11 @@ model BusinessProcess {
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
 
+  eventos CommissionEvent[]
+
+  @@index([clienteServicoId])
   @@index([clienteId])
+  @@index([contratoComercialId])
 }
 
 model SyncRun {
@@ -1643,12 +1682,21 @@ model CommissionRuleVersion {
 }
 
 model EligibilityOverride {
-  id                   String    @id @default(cuid())
-  collaboratorId       Int?
-  cargoId              Int?
-  clienteId            Int?
-  contratoComercialId  String?
-  servico              String?
+  id             String @id @default(cuid())
+  collaboratorId Int?
+  cargoId        Int?
+
+  // Fase 3.7 do Cliente Master (2026-08-14): mesma dupla clienteServicoId/clienteId, aplicada
+  // por consistência mesmo sem dado real hoje (campo nunca exposto pela UI de exceções).
+  clienteServicoId Int?
+  clienteServico   ClienteServico? @relation(fields: [clienteServicoId], references: [id])
+  clienteId        Int?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id])
+
+  contratoComercialId String?
+  contratoComercial   ContratoComercial? @relation(fields: [contratoComercialId], references: [id])
+
+  servico              String? // filtro de elegibilidade, não snapshot histórico
   eventType            String?
   dataInicial          DateTime?
   dataFinal            DateTime?
@@ -1662,6 +1710,10 @@ model EligibilityOverride {
   aprovadoEm           DateTime?
   createdById          Int
   createdAt            DateTime  @default(now())
+
+  @@index([clienteServicoId])
+  @@index([clienteId])
+  @@index([contratoComercialId])
 }
 
 model CommissionEntry {

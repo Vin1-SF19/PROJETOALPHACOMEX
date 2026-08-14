@@ -53,6 +53,10 @@ describe("BPM - tarefas por tipo", () => {
     expect(painel).toContain('tipo === "LEMBRETE_RAPIDO"');
     expect(painel).toContain('type="datetime-local"');
     expect(historico).toContain("<PainelTarefasPorTipo");
+    expect(historico).toContain("podeTrabalharTarefas={podeTrabalharTarefas}");
+    expect(painel).toContain("podeTrabalharTarefas: boolean");
+    expect(painel).toContain("disabled={!podeTrabalharTarefas || tarefa.status === \"CONCLUIDA\"}");
+    expect(painel).toContain("disabled={!podeTrabalharTarefas}");
     expect(job).toContain("alertaDisparadoEm: null");
     expect(job).toContain('acao: "TAREFA_ALERTA_DISPARADO"');
   });

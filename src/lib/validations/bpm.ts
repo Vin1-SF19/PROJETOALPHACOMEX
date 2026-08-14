@@ -114,6 +114,30 @@ export const atualizarCardSchema = z.object({
   camposValores: camposValoresBpmSchema.optional(),
 });
 
+export const MAX_MEMBROS_CARD_BPM = 50;
+
+export const listarUsuariosVinculaveisCardSchema = z.object({
+  cardId: z.string().cuid(),
+});
+
+export const atualizarMembrosCardSchema = z.object({
+  cardId: z.string().cuid(),
+  userIds: z
+    .array(z.number().int().positive())
+    .max(
+      MAX_MEMBROS_CARD_BPM,
+      `Selecione no máximo ${MAX_MEMBROS_CARD_BPM} pessoas para o card.`,
+    )
+    .superRefine((userIds, contexto) => {
+      if (new Set(userIds).size !== userIds.length) {
+        contexto.addIssue({
+          code: "custom",
+          message: "Uma pessoa não pode ser vinculada mais de uma vez ao mesmo card.",
+        });
+      }
+    }),
+});
+
 export const salvarChecklistFollowUpSchema = z.object({
   cardId: z.string().cuid(),
   checklistId: z.string().cuid().optional(),
@@ -149,10 +173,19 @@ export const criarVinculoCardSchema = z.object({
 
 export const criarInteracaoCardSchema = z.object({
   cardId: z.string().cuid(),
+  tipo: z.enum(["LIGACAO", "ANOTACAO"]).default("LIGACAO"),
   agendadoEm: z.coerce.date().optional(),
   agendaLink: z.string().trim().url().max(500).optional(),
   observacoes: z.string().trim().max(MAX_DESCRICAO).optional(),
   resumo: z.string().trim().max(MAX_DESCRICAO).optional(),
+}).superRefine((dados, contexto) => {
+  if (dados.tipo === "ANOTACAO" && !dados.observacoes?.trim()) {
+    contexto.addIssue({
+      code: "custom",
+      path: ["observacoes"],
+      message: "A anotação não pode ficar vazia.",
+    });
+  }
 });
 
 export const criarTarefaSchema = z.object({

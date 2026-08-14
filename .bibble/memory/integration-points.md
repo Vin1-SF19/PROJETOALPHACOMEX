@@ -1370,6 +1370,31 @@ Em erro, truncamento, timeout ou EOF sem `done`, `BibbleChatLayout.tsx` remove a
 
 **Última atualização:** 2026-08-12 por Codex/Bibble.
 
+### Alpha CRM — vínculo de pessoas ao card
+
+**Arquivos:** `prisma/schema.prisma` (`BpmCardMembro` existente), `src/actions/bpm/Membros.ts`, `src/lib/bpm/ownership.ts`, `src/lib/validations/bpm.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/{CardFullViewModal,SeletorMembrosCard}.tsx`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `src/lib/bpm/realtime{,-server}.ts`.
+
+**Propósito:** controla quem pode trabalhar em cada card do CRM. O cabeçalho do modal aberto permite selecionar pessoas vinculadas; o Kanban fechado mostra seus avatares. A seleção não é apenas visual: o vínculo em `BpmCardMembro` é a fonte da autorização operacional por card.
+
+**Editado quando:** uma nova action passar a executar trabalho em card, o formato do membro/usuário mudar, a UI de cabeçalho/Kanban alterar a representação de pessoas ou a política de revogação/realtime for modificada.
+
+**Como integrar:** toda action que lê ou altera card deve chamar `exigirAcessoBpmCard(cardId, userId, role, acao)` com uma ação de `BpmAcao`; nunca aceite membro, papel ou usuário elegível do cliente. Gestão de participantes usa exclusivamente as actions de `Membros.ts`: a action revalida na transação que a pessoa está `ATIVO` e possui CRM efetivo, adiciona o responsável obrigatoriamente, persiste por CAS e registra histórico. `PARTICIPANTE` recebe as ações operacionais, mas nunca `adicionarParticipantes` ou `excluirCard`.
+
+```typescript
+await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
+
+const resultado = await AtualizarMembrosCardBpm({
+  cardId,
+  userIds: membrosSelecionados,
+});
+```
+
+Após mutação confirmada, publique somente `CARD_ATUALIZADO` via `notificarPipelineBpm`. O payload do canal deve permanecer genérico, sem `cardId`, IDs de usuários, foto, nome ou dados do lead; o `PipelineBoardClient` relê o board sob a autorização atual. Esse contrato é necessário para a revogação correta: o membro removido recebe a invalidação, mas perde o conteúdo ao recarregar; o modal deve fechar se a nova leitura devolver não autorizado.
+
+**Testes de contrato:** `tests/bpm/membros-card-actions.test.ts`, `tests/bpm/membros-card-ownership.test.ts`, `tests/bpm/membros-card-ui.test.ts`, além das regressões BPM de autorização e realtime.
+
+**Última atualização:** 2026-08-14 por Scribe/Kowalski.
+
 ### Alpha CRM — entrada e status operacional de Fechado
 
 **Arquivos:** `src/lib/bpm/status-pos-fechamento.ts`, `src/lib/validations/bpm.ts`, `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `src/lib/bpm/realtime-server.ts`.

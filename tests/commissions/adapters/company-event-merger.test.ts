@@ -24,6 +24,7 @@ function contratoBase(overrides: Partial<ContratoComercialSource> = {}): Contrat
 
 function clienteBase(overrides: Partial<CompanyEventSource> = {}): CompanyEventSource {
   return {
+    clienteId: 501,
     cnpj: "12345678000190",
     razaoSocial: "Alpha Importação e Distribuição Ltda.",
     nomeFantasia: "Alpha Import",
@@ -53,7 +54,8 @@ describe("chaveDeCasamento", () => {
 describe("mergeCompanyEvent — decisão confirmada: merge de ContratoComercial + clientes", () => {
   it("campos ausentes em ContratoComercial mas presentes em clientes são herdados (analistaResponsavel, dataExito)", () => {
     const merged = mergeCompanyEvent({
-      clienteId: 1,
+      clienteServicoId: 1,
+      clienteId: 501,
       contratoComercialId: "contrato-1",
       contrato: contratoBase(),
       cliente: clienteBase({ analistaResponsavel: "Maria", dataExito: new Date("2026-07-20T00:00:00.000Z") }),
@@ -66,7 +68,8 @@ describe("mergeCompanyEvent — decisão confirmada: merge de ContratoComercial 
 
   it("ContratoComercial prevalece quando ambas as fontes têm o mesmo campo com valores DIFERENTES — mas gera conflito registrado", () => {
     const merged = mergeCompanyEvent({
-      clienteId: 1,
+      clienteServicoId: 1,
+      clienteId: 501,
       contratoComercialId: "contrato-1",
       contrato: contratoBase({ closerNome: "Sheila" }),
       cliente: clienteBase({ closerNome: "OutroNome" }),
@@ -79,7 +82,8 @@ describe("mergeCompanyEvent — decisão confirmada: merge de ContratoComercial 
 
   it("valores IGUAIS entre as fontes não geram conflito", () => {
     const merged = mergeCompanyEvent({
-      clienteId: 1,
+      clienteServicoId: 1,
+      clienteId: 501,
       contratoComercialId: "contrato-1",
       contrato: contratoBase({ razaoSocial: "Mesma Razão Social" }),
       cliente: clienteBase({ razaoSocial: "Mesma Razão Social" }),
@@ -90,7 +94,8 @@ describe("mergeCompanyEvent — decisão confirmada: merge de ContratoComercial 
 
   it("funciona apenas com ContratoComercial (sem cliente correspondente ainda)", () => {
     const merged = mergeCompanyEvent({
-      clienteId: null,
+      clienteServicoId: null,
+      clienteId: 501,
       contratoComercialId: "contrato-1",
       contrato: contratoBase(),
       cliente: null,
@@ -102,7 +107,7 @@ describe("mergeCompanyEvent — decisão confirmada: merge de ContratoComercial 
 
   it("lança erro se nenhuma das duas fontes existir", () => {
     expect(() =>
-      mergeCompanyEvent({ clienteId: null, contratoComercialId: null, contrato: null, cliente: null }),
+      mergeCompanyEvent({ clienteServicoId: null, clienteId: null, contratoComercialId: null, contrato: null, cliente: null }),
     ).toThrow();
   });
 });

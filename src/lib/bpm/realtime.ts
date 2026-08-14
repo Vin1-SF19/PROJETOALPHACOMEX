@@ -20,7 +20,6 @@ export type BpmRealtimeTipo = (typeof BPM_REALTIME_TIPOS)[number];
 
 export type BpmRealtimePayload = {
   pipelineId: string;
-  cardId?: string;
   tipo: BpmRealtimeTipo;
   timestamp: string;
 };
@@ -45,7 +44,6 @@ export function extrairPipelineIdCanalBpm(channelName: string): string | null {
 
 export function criarBpmRealtimePayload(params: {
   pipelineId: string;
-  cardId?: string;
   tipo: BpmRealtimeTipo;
   agora?: Date;
 }): BpmRealtimePayload {
@@ -55,6 +53,5 @@ export function criarBpmRealtimePayload(params: {
     timestamp: (params.agora ?? new Date()).toISOString(),
   };
 
-  if (params.cardId) payload.cardId = params.cardId;
   return payload;
 }

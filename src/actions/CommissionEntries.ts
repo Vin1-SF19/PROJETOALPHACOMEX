@@ -153,7 +153,7 @@ export async function BuscarEventosComLancamentosEmLote(input: z.infer<typeof bu
     ];
     const processIds = [...new Set(events.map((event) => event.businessProcessId).filter((id): id is string => Boolean(id)))];
     const contratoIds = [...new Set(events.map((event) => event.contratoComercialId).filter((id): id is string => Boolean(id)))];
-    const clienteIds = [...new Set(events.map((event) => event.clienteId).filter((id): id is number => id !== null))];
+    const clienteServicoIds = [...new Set(events.map((event) => event.clienteServicoId).filter((id): id is number => id !== null))];
 
     const [usuarios, processos, eventosContratacao] = await Promise.all([
       usuarioIds.length
@@ -168,13 +168,13 @@ export async function BuscarEventosComLancamentosEmLote(input: z.infer<typeof bu
             select: { id: true, dataExito: true, tentativas: true, deferidoPrimeiraTentativa: true, status: true },
           })
         : [],
-      contratoIds.length || clienteIds.length
+      contratoIds.length || clienteServicoIds.length
         ? db.commissionEvent.findMany({
             where: {
               eventType: "CONTRACTING",
               OR: [
                 ...(contratoIds.length ? [{ contratoComercialId: { in: contratoIds } }] : []),
-                ...(clienteIds.length ? [{ clienteId: { in: clienteIds } }] : []),
+                ...(clienteServicoIds.length ? [{ clienteServicoId: { in: clienteServicoIds } }] : []),
               ],
             },
             orderBy: { eventDate: "asc" },
@@ -223,7 +223,7 @@ export async function BuscarEventosComLancamentosEmLote(input: z.infer<typeof bu
         : eventosContratacao.find(
             (item) =>
               (event.contratoComercialId && item.contratoComercialId === event.contratoComercialId) ||
-              (event.clienteId !== null && item.clienteId === event.clienteId),
+              (event.clienteServicoId !== null && item.clienteServicoId === event.clienteServicoId),
           );
       const setorComercial: CommissionEntryComColaborador[] = [];
       const setorOperacional: CommissionEntryComColaborador[] = [];

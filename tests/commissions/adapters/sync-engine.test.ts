@@ -165,6 +165,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     prismaMock.commissionEvent.findFirst.mockResolvedValue(null); // sem CONTRACTING prévio para herdar closer
     prismaMock.clienteServico.findUnique.mockResolvedValue({
       id: 5,
+      clienteId: 501,
       servico: "Revisão de RADAR Ilimitado",
       formaPagamento: "A_VISTA_DESCONTO",
       valorContrato: 22000,
@@ -182,7 +183,9 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     const result = await sincronizarComissoes({ triggeredBy: "manual" });
 
     expect(prismaMock.commissionEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ eventType: "PROCESS_SUCCESS", clienteId: 5 }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ eventType: "PROCESS_SUCCESS", clienteServicoId: 5, clienteId: 501 }),
+      }),
     );
     expect(prismaMock.commissionDivergence.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ tipo: "EXITO_SEM_BUSINESS_PROCESS" }) }),
@@ -197,6 +200,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     prismaMock.commissionEvent.findFirst.mockResolvedValue({ closerUsuarioId: 10, closerNomeManual: null });
     prismaMock.clienteServico.findUnique.mockResolvedValue({
       id: 5,
+      clienteId: 501,
       servico: "Revisão de RADAR Ilimitado",
       formaPagamento: "A_VISTA_DESCONTO",
       valorContrato: 22000,
@@ -251,6 +255,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     prismaMock.commissionEvent.findFirst.mockResolvedValue(null);
     prismaMock.clienteServico.findUnique.mockResolvedValue({
       id: 5,
+      clienteId: 501,
       servico: "Revisão de RADAR Ilimitado",
       formaPagamento: "A_VISTA_DESCONTO",
       valorContrato: 22000,
@@ -282,8 +287,8 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
   it("êxito já processado (idempotência): listarClientesComExitoNaoProcessado já filtra, não reprocessa", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([]);
     prismaMock.clienteServico.findMany.mockResolvedValue([{ id: 5 }]);
-    // Simula que já existe evento de êxito para o cliente 5 — filtro deve excluí-lo.
-    prismaMock.commissionEvent.findMany.mockResolvedValue([{ clienteId: 5 }]);
+    // Simula que já existe evento de êxito para o serviço 5 — filtro deve excluí-lo.
+    prismaMock.commissionEvent.findMany.mockResolvedValue([{ clienteServicoId: 5 }]);
 
     const result = await sincronizarComissoes({ triggeredBy: "manual" });
 

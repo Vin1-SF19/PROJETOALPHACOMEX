@@ -270,7 +270,7 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
 
           <button type="button" onClick={() => void salvarEAvancar()} disabled={!pronto || salvando} className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-45" style={{ background: `rgba(${accent},0.85)` }}>
             {salvando && <Loader2 size={14} className="animate-spin" />}
-            {salvando ? "Salvando..." : `Salvar e avançar para ${requisitos.etapaDestino.nome}`}
+            {salvando ? "Avançando..." : `Avançar para ${requisitos.etapaDestino.nome}`}
           </button>
         </div>
       )}

@@ -12,6 +12,7 @@ interface CampoBpmInputProps {
   campo: CampoBpmEditavel;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   className: string;
   disabled?: boolean;
   invalid?: boolean;
@@ -34,6 +35,7 @@ export function CampoBpmInput({
   campo,
   value,
   onChange,
+  onBlur,
   className,
   disabled = false,
   invalid = false,
@@ -55,6 +57,7 @@ export function CampoBpmInput({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
       >
         <option value="">Selecione...</option>
         {opcoes.map((opcao) => (
@@ -76,6 +79,7 @@ export function CampoBpmInput({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
       />
     );
   }
@@ -94,6 +98,7 @@ export function CampoBpmInput({
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
+      onBlur={onBlur}
     />
   );
 }

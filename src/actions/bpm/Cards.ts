@@ -280,6 +280,14 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         statusPosFechamento: true,
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true } },
         responsavel: { select: { id: true, nome: true } },
+        membros: {
+          select: {
+            userId: true,
+            role: true,
+            usuario: { select: { id: true, nome: true, imagemUrl: true } },
+          },
+          orderBy: { usuario: { nome: "asc" } },
+        },
         _count: { select: { tarefas: true, anexos: true } },
         // Dados operacionais compactos para o card do board: próximo prazo e
         // anotação rápida pendente, sem carregar o histórico inteiro.
@@ -372,7 +380,14 @@ export async function ObterCardBpm(cardId: string) {
         },
         responsavel: { select: { id: true, nome: true } },
         campoValores: { include: { campo: true } },
-        membros: { include: { usuario: { select: { id: true, nome: true } } } },
+        membros: {
+          select: {
+            userId: true,
+            role: true,
+            usuario: { select: { id: true, nome: true, imagemUrl: true } },
+          },
+          orderBy: { usuario: { nome: "asc" } },
+        },
         tarefas: { orderBy: { createdAt: "desc" } },
         anexos: { orderBy: { createdAt: "desc" } },
         historico: {

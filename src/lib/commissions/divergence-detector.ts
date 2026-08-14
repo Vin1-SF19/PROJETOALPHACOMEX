@@ -157,15 +157,15 @@ export async function detectarDivergenciasDeEvento(eventId: string): Promise<Det
   }
 
   // 8. Êxito sem contratação
-  if (event.eventType === "PROCESS_SUCCESS" && event.clienteId !== null) {
+  if (event.eventType === "PROCESS_SUCCESS" && event.clienteServicoId !== null) {
     const contratacaoPrevia = await db.commissionEvent.findFirst({
-      where: { clienteId: event.clienteId, servico: event.servico, eventType: "CONTRACTING" },
+      where: { clienteServicoId: event.clienteServicoId, servico: event.servico, eventType: "CONTRACTING" },
     });
     if (!contratacaoPrevia) {
       divergencias.push({
         tipo: "EXITO_SEM_CONTRATACAO",
         severidade: "PENDING_REVIEW",
-        detalhes: `Evento de êxito para clienteId=${event.clienteId} sem evento de contratação correspondente para o serviço "${event.servico}".`,
+        detalhes: `Evento de êxito para clienteServicoId=${event.clienteServicoId} sem evento de contratação correspondente para o serviço "${event.servico}".`,
       });
     }
   }
@@ -252,13 +252,13 @@ export async function detectarDivergenciasDeEvento(eventId: string): Promise<Det
   }
 
   // 13. Primeira tentativa inconsistente
-  if (event.eventType === "FIRST_ATTEMPT_SUCCESS" && event.clienteId !== null) {
-    const processo = await db.businessProcess.findFirst({ where: { clienteId: event.clienteId } });
+  if (event.eventType === "FIRST_ATTEMPT_SUCCESS" && event.clienteServicoId !== null) {
+    const processo = await db.businessProcess.findFirst({ where: { clienteServicoId: event.clienteServicoId } });
     if (!processo || !processo.deferidoPrimeiraTentativa) {
       divergencias.push({
         tipo: "PRIMEIRA_TENTATIVA_INCONSISTENTE",
         severidade: "PENDING_REVIEW",
-        detalhes: `Evento FIRST_ATTEMPT_SUCCESS para clienteId=${event.clienteId} sem BusinessProcess.deferidoPrimeiraTentativa=true correspondente.`,
+        detalhes: `Evento FIRST_ATTEMPT_SUCCESS para clienteServicoId=${event.clienteServicoId} sem BusinessProcess.deferidoPrimeiraTentativa=true correspondente.`,
       });
     }
   }

@@ -5,6 +5,8 @@
  */
 
 export interface CompanyEventSource {
+  /** Cliente.id real (empresa) — Fase 3.7 do Cliente Master (2026-08-14), adicional ao clienteServicoId. */
+  clienteId: number;
   cnpj: string;
   razaoSocial: string;
   nomeFantasia: string | null;
@@ -30,6 +32,9 @@ export interface AdapterFieldConflict {
 }
 
 export interface MergedCompanyEvent {
+  /** ClienteServico.id — correlação por serviço contratado (Fase 3.7 do Cliente Master, 2026-08-14; era chamado "clienteId" antes, nome corrigido). */
+  clienteServicoId: number | null;
+  /** Cliente.id real (empresa) — adicional ao clienteServicoId acima. */
   clienteId: number | null;
   contratoComercialId: string | null;
   cnpj: string;

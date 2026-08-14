@@ -82,6 +82,7 @@ model ApresentacaoComentario { id (cuid), apresentacaoId → Apresentacao, slide
 | Tipo | Caminho | Método | Auth | Descrição |
 |------|---------|--------|------|-----------|
 | Route Handler | `/api/...` | GET | Sim | |
+| Server Action | `src/actions/bpm/Membros.ts` (2026-08-14) | — | Sim, CRM + ownership do card | `ListarUsuariosVinculaveisCardBpm({cardId})` lista apenas contas ativas com CRM efetivo para o seletor de gestão. `AtualizarMembrosCardBpm({cardId,userIds})` substitui participantes sob transação e CAS por `updatedAt`, preserva o responsável e revalida autorização/elegibilidade dentro da transação. Somente responsável, administrador do card ou Admin/CEO/TI global pode gerir; o histórico armazena apenas IDs e há evento realtime pós-commit. |
 | Route Handler | `/api/cs-nps/exportar` | GET | Sim, permissão efetiva `Cliente` | Exporta clientes ativos e arquivados e suas relações diretas confirmadas em workbook `.xlsx`, com uma aba por entidade. |
 | Route Handler | `/api/cs-nps/importar/modelo` | GET | Sim, usuário ativo Admin/CEO + permissão efetiva `Cliente` | Gera o modelo `.xlsx` com `Instrucoes` e as abas `Socios`, `CS` e/ou `Feedbacks` escolhidas em `tipos`. |
 | Route Handler | `/api/cs-nps/importar/previsualizar` | POST multipart | Sim, usuário ativo Admin/CEO + permissão efetiva `Cliente` | Faz preflight ZIP streaming, parseia até 2.000 linhas e resolve candidatos de empresa/serviço sem gravar dados. |

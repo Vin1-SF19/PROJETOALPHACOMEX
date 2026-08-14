@@ -784,3 +784,14 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - Não houve schema, migration, seed ou backfill. Integração financeira/Comissões futura permanece fora deste fluxo e deve consumir o valor canônico sem introduzir efeito colateral implícito nas actions atuais.
 
 **Última atualização:** 2026-08-13 por Scribe
+
+## Alpha CRM — membros vinculados por card (2026-08-14)
+
+- `BpmCardMembro` já é a relação canônica card × `usuarios`; a unicidade `(cardId, userId)` sustenta um conjunto de participantes sem criar nova estrutura de banco.
+- `src/actions/bpm/Membros.ts` concentra `ListarUsuariosVinculaveisCardBpm` e `AtualizarMembrosCardBpm`. O seletor só recebe contas `ATIVO` com permissão CRM efetiva; a gravação é transacional, preserva o responsável como membro obrigatório, usa CAS pelo `updatedAt`, mantém papéis existentes quando cabível, audita `MEMBROS_ATUALIZADOS` e só notifica realtime após commit.
+- `src/lib/bpm/ownership.ts` aplica a segunda camada de acesso por card: `PARTICIPANTE` pode executar o trabalho operacional (ler, editar, mover, tarefas, anexos, interações e histórico), enquanto gestão de participantes e exclusão ficam limitadas a responsável, administrador do card ou administrador global. Revogação corta o acesso ao modal e à leitura do board na próxima recarga autenticada.
+- `CardFullViewModal.tsx` renderiza `SeletorMembrosCard.tsx` no cabeçalho do card aberto. O board em `pipeline/[pipelineId]/PipelineBoardClient.tsx` apresenta os avatares/foto dos membros no card fechado, sem duplicar pessoas no payload do realtime.
+- O canal de pipeline continua enviando apenas invalidação genérica (`pipelineId`, tipo e timestamp), sem `cardId` ou dados do lead. Isso permite que uma pessoa removida receba a invalidação e tenha a revogação aplicada pela releitura autorizada, sem expor a identidade ou dados do card.
+- Cobertura específica: `tests/bpm/membros-card-actions.test.ts`, `membros-card-ownership.test.ts`, `membros-card-ui.test.ts`, com regressões de autorização/realtime relacionadas. Nenhuma migration, seed ou backfill foi executado.
+
+**Última atualização:** 2026-08-14 por Scribe/Kowalski

@@ -7,7 +7,7 @@ function override(overrides: Partial<EligibilityOverrideRecord> = {}): Eligibili
     id: "override-1",
     collaboratorId: null,
     cargoId: null,
-    clienteId: null,
+    clienteServicoId: null,
     contratoComercialId: null,
     servico: null,
     eventType: null,
@@ -27,7 +27,7 @@ function override(overrides: Partial<EligibilityOverrideRecord> = {}): Eligibili
 const queryBase = {
   collaboratorId: 42,
   cargoId: 5,
-  clienteId: 1,
+  clienteServicoId: 1,
   contratoComercialId: "contrato-1",
   servico: "Revisão de RADAR Ilimitado",
   eventType: "CONTRACTING",

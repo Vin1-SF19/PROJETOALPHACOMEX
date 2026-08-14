@@ -2008,3 +2008,35 @@ Lost precisava expor o motivo corretamente e impedir bypass por criação, drag,
 - BPM: 23 arquivos/158 testes PASS; ESLint focado e diff-check PASS.
 - Forge, Probe, Anubis e Lens aprovaram. O typecheck mantém somente os cinco baselines externos conhecidos.
 - Story: `docs/stories/story-alpha-crm-sem-viabilidade-proximo-contato.md`, Ready for Review.
+
+---
+
+## [2026-08-14 14:09] — Alpha CRM: participantes vinculados e autorização por card
+
+**Tags:** #feature #integration #security #nextjs #prisma
+**Agentes envolvidos:** Bibble, Scout, Echo, Nova, Sage, Forge, Probe, Anubis, Scribe, Kowalski
+**Arquivos tocados:** `src/actions/bpm/Membros.ts`, `src/lib/bpm/ownership.ts`, `src/lib/validations/bpm.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/{CardFullViewModal,SeletorMembrosCard}.tsx`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `src/lib/bpm/realtime{,-server}.ts`, `tests/bpm/{membros-card-actions,membros-card-ownership,membros-card-ui}.test.ts`
+
+### Contexto
+O CRM precisava permitir vincular pessoas já existentes em `usuarios` a um card e fazer dessa seleção o controle real de quem pode trabalhar nele. A interface deveria editar os membros no cabeçalho do card aberto e exibir seus avatares no card fechado.
+
+### O que foi feito
+- Reutilizada a relação já existente `BpmCardMembro` para persistir participantes, sem migration, seed ou backfill.
+- Criadas actions protegidas para listar pessoas elegíveis e substituir o conjunto de membros; a escrita revalida autorização e elegibilidade na transação, preserva o responsável, usa CAS, registra histórico e só emite realtime depois do commit.
+- O seletor de pessoas foi integrado ao cabeçalho do modal; o board passou a mostrar os avatares dos membros no card fechado.
+- Participantes receberam acesso operacional completo ao card, enquanto gestão de membros e exclusão continuam restritas a responsável, administrador do card ou administrador global. A revogação é tratada no modal e no board por releitura autorizada.
+
+### Decisões tomadas
+- `usuarios` vinculáveis precisam estar `ATIVO` e ter acesso CRM efetivo; nome, foto, papel ou elegibilidade jamais são confiados ao payload do cliente.
+- O canal realtime permanece uma invalidação genérica sem `cardId` nem dados de membros; essa forma evita vazamento e permite que a pessoa removida descubra a revogação na recarga autenticada.
+
+### Problemas encontrados / resolvidos
+- Permissão apenas de módulo não bastava para isolar cards: o ownership por `BpmCardMembro` passou a ser a segunda camada obrigatória para leitura e trabalho operacional.
+- Remover uma pessoa exigia sincronizar também o modal aberto e o Kanban: a invalidação pós-commit força ambos a relerem sob a permissão atual, fechando/removendo conteúdo quando o vínculo já não existe.
+
+### Pendências
+- Não há pendência estrutural: a relação de membros já existia e a entrega não exigiu alteração de banco.
+
+### Refletido também em
+- `codebase-map.md`: mapa do vínculo, UI, ownership e realtime.
+- `integration-points.md`: contrato de autorização, mutação, revogação e testes.

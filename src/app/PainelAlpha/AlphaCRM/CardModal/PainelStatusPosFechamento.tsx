@@ -90,15 +90,14 @@ export function PainelStatusPosFechamento({
     return () => clearTimeout(timer);
   }, [base, statusReconhecido, versaoBase, versaoRemota, realtimeRevision]);
 
-  const alterado = rascunho !== base;
   const configAtual = obterStatusPosFechamentoConfig(rascunho);
 
-  async function salvar() {
-    if (!podeEditar || !rascunho || !alterado) return;
+  async function salvar(status: StatusPosFechamento) {
+    if (!podeEditar || status === base) return;
     setSalvando(true);
     const resultado = await AtualizarCardBpm({
       cardId,
-      statusPosFechamento: rascunho,
+      statusPosFechamento: status,
       versaoEsperadaEm: versaoBase,
     });
     setSalvando(false);
@@ -115,11 +114,11 @@ export function PainelStatusPosFechamento({
     }
 
     confirmacaoLocalPendenteRef.current = {
-      status: rascunho,
+      status,
       versaoAnterior: versaoBase,
     };
     rascunhoSujoRef.current = false;
-    setBase(rascunho);
+    setBase(status);
     setConflitoRealtime(false);
     toast.success("Status pós-fechamento atualizado");
     onAtualizado();
@@ -177,6 +176,7 @@ export function PainelStatusPosFechamento({
             if (!statusPosFechamentoEhValido(event.target.value)) return;
             rascunhoSujoRef.current = event.target.value !== base;
             setRascunho(event.target.value);
+            void salvar(event.target.value);
           }}
           disabled={!podeEditar || salvando}
           aria-describedby={`status-pos-fechamento-ajuda-${cardId}`}
@@ -198,18 +198,7 @@ export function PainelStatusPosFechamento({
         </div>
       </div>
 
-      {podeEditar && (
-        <button
-          type="button"
-          onClick={() => void salvar()}
-          disabled={!rascunho || !alterado || salvando}
-          className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45"
-          style={{ background: `rgba(${accent},0.85)` }}
-        >
-          {salvando && <Loader2 size={14} className="animate-spin" />}
-          {salvando ? "Salvando..." : "Salvar status"}
-        </button>
-      )}
+      {salvando && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando status...</p>}
     </section>
   );
 }

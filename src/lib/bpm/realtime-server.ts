@@ -41,7 +41,6 @@ export async function notificarPipelineBpm(params: NotificarPipelineBpmParams): 
 
     const payload = criarBpmRealtimePayload({
       pipelineId,
-      cardId: params.cardId,
       tipo: params.tipo,
     });
 

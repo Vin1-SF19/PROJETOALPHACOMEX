@@ -26,6 +26,16 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(modal).toContain("Promise.all([ObterCardBpm(cardId), ListarInteracoesCardBpm(cardId)])");
   });
 
+  it("fecha o modal de forma controlada quando o realtime revoga o acesso ao card", () => {
+    expect(modal).toContain("function resultadoRevogaAcessoCard");
+    expect(modal).toContain('resultado.error === "Não autorizado"');
+    expect(modal).toContain("const acessoRevogadoRef = useRef(false)");
+    expect(modal).toContain('toast.error("Seu acesso a este card foi removido.")');
+    expect(modal).toContain("if (resultadoRevogaAcessoCard(cardRes))");
+    expect(modal).toContain("fecharPorAcessoRevogado();");
+    expect(cardsAction).toContain("...(admin ? {} : { membros: { some: { userId } } }),");
+  });
+
   it("propaga realtime aos quatro editores e preserva drafts sujos", () => {
     expect(registrar).toContain("realtimeRevision={realtimeRevision}");
     expect(registrar).toContain("<PainelCamposEtapaAtual");
@@ -66,6 +76,14 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(requisitos).toContain("disabled={!podeEditar");
     expect(proximoContato).toContain("disabled={!podeEditar");
     expect(checklist).toContain("disabled={!podeEditar");
+  });
+
+  it("permite operação completa ao participante vinculado e restringe somente a gestão de membros", () => {
+    expect(modal).toContain("const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo)");
+    expect(modal).toContain("const podeMoverEtapa = podeTrabalharNoCard");
+    expect(modal).toContain("const podeEditar = podeTrabalharNoCard");
+    expect(modal).toContain("const podeGerenciarMembros = isAdminRole(currentUserRole)");
+    expect(historico).toContain("const podeExcluirAnexo = isAdminRole(currentUserRole) || Boolean(meuVinculo)");
   });
 
   it("lista responsaveis elegiveis no contexto do pipeline", () => {
@@ -116,7 +134,8 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(kanbanCard).toContain("<PhoneCall");
     expect(kanbanCard).toContain("<CalendarClock");
     expect(kanbanCard).toContain("<ClipboardList");
-    expect(kanbanCard).toContain('aria-label={`Responsável: ${card.responsavel.nome}`}');
+    expect(kanbanCard).toContain("const membrosVisiveis = card.membros.length > 0");
+    expect(kanbanCard).toContain("<GrupoAvataresMembrosCard");
   });
 
   it("limita o novo card aos dados-base e preserva cadastro de empresa", () => {
@@ -136,6 +155,17 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(modal.indexOf("<PainelHistorico")).toBeLessThan(modal.indexOf("<PainelRegistrar"));
   });
 
+  it("remove somente a seção visual de vínculos do card", () => {
+    const painelHistoricoNoModal = modal.slice(
+      modal.indexOf("<PainelHistorico\n"),
+      modal.indexOf("<PainelHistoricoServico"),
+    );
+    expect(historico).not.toContain("CriarVinculoCardBpm");
+    expect(historico).not.toContain('title="Vínculos"');
+    expect(historico).not.toContain("vinculosOrigem");
+    expect(painelHistoricoNoModal).not.toContain("onAbrirCard={onAbrirCard}");
+  });
+
   it("mantem o resumo progressivo das etapas no lado esquerdo do card", () => {
     expect(historico).toContain('<PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} />');
     expect(historico.indexOf("<PainelResumoEtapas")).toBeLessThan(historico.indexOf("<PainelRequisitosAvanco"));
@@ -147,20 +177,18 @@ describe("CRM - wiring do modal por etapa", () => {
   it("compõe o status pós-fechamento no formulário central somente em Fechado", () => {
     expect(registrar).toContain("etapaEhFechado(card.etapa.nome)");
     expect(registrar).toContain("<PainelStatusPosFechamento");
-    expect(registrar.indexOf("<PainelStatusPosFechamento")).toBeLessThan(
-      registrar.indexOf("Registrar interação"),
-    );
     expect(statusPosFechamento).toContain("STATUS_POS_FECHAMENTO_OPCOES.map");
     expect(statusPosFechamento).toContain("disabled={!podeEditar || salvando}");
     expect(statusPosFechamento).toContain("Status ainda não definido");
-    expect(statusPosFechamento).toContain("Salvar status");
+    expect(statusPosFechamento).toContain("void salvar(event.target.value)");
+    expect(statusPosFechamento).not.toContain("Salvar status");
   });
 
   it("preserva o rascunho de status diante de realtime e informa conflito", () => {
     expect(statusPosFechamento).toContain("rascunhoSujoRef.current");
     expect(statusPosFechamento).toContain("setConflitoRealtime(true)");
     expect(statusPosFechamento).toContain("Seu rascunho foi preservado");
-    expect(statusPosFechamento).toContain("statusPosFechamento: rascunho");
+    expect(statusPosFechamento).toContain("statusPosFechamento: status");
     expect(statusPosFechamento).toContain("versaoEsperadaEm: versaoBase");
     expect(statusPosFechamento).toContain("if (houveConflito) onAtualizado()");
     expect(registrar).toContain("versaoPersistidaEm={card.updatedAt}");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BriefcaseBusiness, Building2, Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -20,6 +20,7 @@ import {
 } from "./DadosEmpresaDrawer";
 import { TelefonesCardButton } from "./TelefonesCardButton";
 import { EmpresaPerfilModal } from "./EmpresaPerfilModal";
+import { SeletorMembrosCard } from "./SeletorMembrosCard";
 import { toast } from "sonner";
 import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
 import { destinoEhReuniaoAgendada } from "@/lib/bpm/agendar-reuniao";
@@ -29,6 +30,10 @@ type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | nu
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
 const SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"];
+
+function resultadoRevogaAcessoCard(resultado: Awaited<ReturnType<typeof ObterCardBpm>>) {
+  return (!resultado.success && resultado.error === "Não autorizado") || (resultado.success && !resultado.data);
+}
 
 interface Props {
   cardId: string;
@@ -49,7 +54,14 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
   const [perfilEmpresaAberto, setPerfilEmpresaAberto] = useState(false);
   const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
+  const acessoRevogadoRef = useRef(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
+  const fecharPorAcessoRevogado = useCallback(() => {
+    if (acessoRevogadoRef.current) return;
+    acessoRevogadoRef.current = true;
+    toast.error("Seu acesso a este card foi removido.");
+    onClose();
+  }, [onClose]);
   const atualizarEstadoFollowUp = useCallback((estado: EstadoFollowUpModal) => {
     setEstadoFollowUpPorCard((estados) => ({ ...estados, [cardId]: estado }));
   }, [cardId]);
@@ -67,6 +79,10 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
     ObterCardBpm(cardId).then((res) => {
       if (cancelado) return;
       if (!res.success || !res.data) {
+        if (resultadoRevogaAcessoCard(res)) {
+          fecharPorAcessoRevogado();
+          return;
+        }
         setErro(typeof res.error === "string" ? res.error : "Erro ao carregar card");
         return;
       }
@@ -85,27 +101,40 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
     });
 
     return () => { cancelado = true; };
-  }, [cardId]);
+  }, [cardId, fecharPorAcessoRevogado]);
 
   useEffect(() => {
     if (realtimeRevision === 0) return;
     let cancelado = false;
     Promise.all([ObterCardBpm(cardId), ListarInteracoesCardBpm(cardId)]).then(([cardRes, interacoesRes]) => {
       if (cancelado) return;
+      if (resultadoRevogaAcessoCard(cardRes)) {
+        fecharPorAcessoRevogado();
+        return;
+      }
       if (cardRes.success && cardRes.data) setCard(cardRes.data);
       setInteracoes(interacoesRes.data ?? []);
     });
     return () => { cancelado = true; };
-  }, [cardId, realtimeRevision]);
+  }, [cardId, fecharPorAcessoRevogado, realtimeRevision]);
 
   async function recarregar() {
     const res = await ObterCardBpm(cardId);
+    if (resultadoRevogaAcessoCard(res)) {
+      fecharPorAcessoRevogado();
+      return;
+    }
     if (res.success && res.data) setCard(res.data);
   }
 
   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
-  const podeMoverEtapa = isAdminRole(currentUserRole) || meuVinculo?.role === "RESPONSAVEL" || meuVinculo?.role === "ADMINISTRADOR";
-  const podeEditar = podeMoverEtapa;
+  const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo);
+  const podeMoverEtapa = podeTrabalharNoCard;
+  const podeEditar = podeTrabalharNoCard;
+  const podeTrabalharTarefas = podeTrabalharNoCard;
+  const podeGerenciarMembros = isAdminRole(currentUserRole)
+    || meuVinculo?.role === "RESPONSAVEL"
+    || meuVinculo?.role === "ADMINISTRADOR";
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
   // Máquina de estado (BpmEtapaTransicaoPermitida, ver plano-novos-leads-bpm.md): se a etapa
@@ -224,10 +253,22 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                   />
                 </div>
 
-                <TelefonesCardButton
-                  cardId={card.id}
-                  empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
-                />
+                <div className="flex shrink-0 items-center gap-2">
+                  <SeletorMembrosCard
+                    cardId={card.id}
+                    membros={card.membros}
+                    podeGerenciar={podeGerenciarMembros}
+                    accent={accent}
+                    onMembrosAtualizados={(membros) => {
+                      setCard((atual) => atual ? { ...atual, membros } : atual);
+                    }}
+                    onAtualizado={() => { void recarregar(); onAtualizado(); }}
+                  />
+                  <TelefonesCardButton
+                    cardId={card.id}
+                    empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
+                  />
+                </div>
               </div>
 
               <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="mt-4">
@@ -280,16 +321,15 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                   <TabsContent value="card" className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
                     <PainelHistorico
                       card={card}
-                      interacoes={interacoes}
                       accent={accent}
                       currentUserId={currentUserId}
                       currentUserRole={currentUserRole}
                       onAtualizado={() => { recarregar(); onAtualizado(); }}
-                      onAbrirCard={onAbrirCard}
                       etapasParaMover={etapasParaMover}
                       etapas={etapas}
                       podeEditar={podeEditar}
                       podeMoverEtapa={podeMoverEtapa}
+                      podeTrabalharTarefas={podeTrabalharTarefas}
                       realtimeRevision={realtimeRevision}
                       onFocarPainelReuniao={focarPainelReuniao}
                     />
@@ -311,6 +351,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                 etapaAtual={etapaAtual}
                 accent={accent}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
+                anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
                 podeEditar={podeEditar}
                 realtimeRevision={realtimeRevision}
                 onAtualizado={() => { recarregar(); onAtualizado(); }}

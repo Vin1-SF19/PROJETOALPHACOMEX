@@ -3,13 +3,16 @@ import db from "@/lib/prisma";
 /**
  * Adapter somente-leitura de `BusinessProcess` — complemento operacional ao evento de
  * êxito (tentativas, deferimento na 1ª tentativa, analista auxiliar/auditor/diretor).
- * NÃO é fonte da data do êxito em si (essa vem de `clientes.dataExito`, ver
- * exito-detector.ts) — é o complemento que `clientes` não tem.
+ * NÃO é fonte da data do êxito em si (essa vem de `ClienteServico.dataExito`, ver
+ * exito-detector.ts) — é o complemento que `ClienteServico` não tem.
+ * Fase 3.7 do Cliente Master (2026-08-14): busca por `clienteServicoId` (correlação por
+ * serviço contratado, mesmo padrão de `CommissionEvent`) — model está vazio em produção
+ * hoje (feature nunca ativada), migração de schema só, sem backfill de dado.
  */
 
 export interface BusinessProcessSnapshot {
   id: string;
-  clienteId: number | null;
+  clienteServicoId: number | null;
   analistaResponsavelId: number;
   analistaAuxiliarId: number | null;
   auditorId: number | null;
@@ -19,12 +22,12 @@ export interface BusinessProcessSnapshot {
   status: string;
 }
 
-export async function buscarProcessoPorClienteId(clienteId: number): Promise<BusinessProcessSnapshot | null> {
+export async function buscarProcessoPorClienteId(clienteServicoId: number): Promise<BusinessProcessSnapshot | null> {
   const processo = await db.businessProcess.findFirst({
-    where: { clienteId },
+    where: { clienteServicoId },
     select: {
       id: true,
-      clienteId: true,
+      clienteServicoId: true,
       analistaResponsavelId: true,
       analistaAuxiliarId: true,
       auditorId: true,

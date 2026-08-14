@@ -15,6 +15,39 @@ type ClienteAcessoBpm = Pick<
   | "bpmCardMembro"
 >;
 
+type UsuarioComAcessoBpm = {
+  id: number;
+  role: string;
+  status: string;
+  permissoes: string | null;
+};
+
+type PermissaoSetorBpm = { setor: string; modulo: string };
+type OverridePermissaoBpm = { modulo: string; acao: string };
+
+function resolverPermissoesEfetivasBpm(
+  usuario: UsuarioComAcessoBpm,
+  permissoesSetorTodas: readonly PermissaoSetorBpm[],
+  overrides: readonly OverridePermissaoBpm[],
+): string[] {
+  if (isAdminRole(usuario.role)) return [PERMISSAO_CRM];
+
+  const permissoesSetor = permissoesSetorTodas
+    .filter((permissao) => isSameRole(permissao.setor, usuario.role))
+    .map((permissao) => normalizarPermissaoBpm(permissao.modulo));
+  const legado = (usuario.permissoes ?? "")
+    .split(",")
+    .map(normalizarPermissaoBpm)
+    .filter(Boolean);
+  const efetivas = new Set(permissoesSetor.length > 0 ? permissoesSetor : legado);
+  for (const override of overrides) {
+    const modulo = normalizarPermissaoBpm(override.modulo);
+    if (override.acao === "ADD") efetivas.add(modulo);
+    if (override.acao === "REMOVE") efetivas.delete(modulo);
+  }
+  return [...efetivas];
+}
+
 export function normalizarPermissaoBpm(permissao: string): string {
   return permissao.trim().toLocaleLowerCase("pt-BR");
 }
@@ -55,10 +88,6 @@ async function carregarUsuarioEPermissoesBpm(
     select: { id: true, role: true, status: true, permissoes: true },
   });
   if (!usuario || usuario.status !== "ATIVO") return null;
-  if (isAdminRole(usuario.role)) {
-    return { usuario, permissoes: [PERMISSAO_CRM] };
-  }
-
   const [permissoesSetorTodas, overrides] = await Promise.all([
     client.setorPermissao.findMany({ select: { setor: true, modulo: true } }),
     client.usuarioPermissaoOverride.findMany({
@@ -66,20 +95,63 @@ async function carregarUsuarioEPermissoesBpm(
       select: { modulo: true, acao: true },
     }),
   ]);
-  const permissoesSetor = permissoesSetorTodas
-    .filter((permissao) => isSameRole(permissao.setor, usuario.role))
-    .map((permissao) => normalizarPermissaoBpm(permissao.modulo));
-  const legado = (usuario.permissoes ?? "")
-    .split(",")
-    .map(normalizarPermissaoBpm)
-    .filter(Boolean);
-  const efetivas = new Set(permissoesSetor.length > 0 ? permissoesSetor : legado);
+  return {
+    usuario,
+    permissoes: resolverPermissoesEfetivasBpm(usuario, permissoesSetorTodas, overrides),
+  };
+}
+
+export type UsuarioVinculavelBpm = {
+  id: number;
+  nome: string;
+  imagemUrl: string | null;
+};
+
+/**
+ * Retorna somente contas ativas que têm acesso efetivo ao CRM. A mesma regra é
+ * reaplicada durante a mutação, para que um payload antigo nunca consiga
+ * vincular uma conta desativada ou sem a permissão CRM.
+ */
+export async function listarUsuariosVinculaveisBpm(
+  client: ClienteAcessoBpm = db,
+): Promise<UsuarioVinculavelBpm[]> {
+  const [usuarios, permissoesSetorTodas] = await Promise.all([
+    client.usuarios.findMany({
+      where: { status: "ATIVO" },
+      select: {
+        id: true,
+        nome: true,
+        imagemUrl: true,
+        role: true,
+        status: true,
+        permissoes: true,
+      },
+      orderBy: { nome: "asc" },
+    }),
+    client.setorPermissao.findMany({ select: { setor: true, modulo: true } }),
+  ]);
+  if (usuarios.length === 0) return [];
+
+  const overrides = await client.usuarioPermissaoOverride.findMany({
+    where: { usuarioId: { in: usuarios.map((usuario) => usuario.id) } },
+    select: { usuarioId: true, modulo: true, acao: true },
+  });
+  const overridesPorUsuario = new Map<number, OverridePermissaoBpm[]>();
   for (const override of overrides) {
-    const modulo = normalizarPermissaoBpm(override.modulo);
-    if (override.acao === "ADD") efetivas.add(modulo);
-    if (override.acao === "REMOVE") efetivas.delete(modulo);
+    const atuais = overridesPorUsuario.get(override.usuarioId) ?? [];
+    atuais.push(override);
+    overridesPorUsuario.set(override.usuarioId, atuais);
   }
-  return { usuario, permissoes: [...efetivas] };
+
+  return usuarios
+    .filter((usuario) => usuario.status === "ATIVO" && possuiPermissaoCrm(
+      resolverPermissoesEfetivasBpm(
+        usuario,
+        permissoesSetorTodas,
+        overridesPorUsuario.get(usuario.id) ?? [],
+      ),
+    ))
+    .map(({ id, nome, imagemUrl }) => ({ id, nome, imagemUrl }));
 }
 
 export async function checarAcessoModuloBpm(
@@ -188,18 +260,33 @@ export type BpmAcao =
   | "excluirCard"
   | "visualizarHistorico";
 
+/** Operações necessárias para executar o trabalho cotidiano do card. */
+const ACOES_TRABALHO_CARD: BpmAcao[] = [
+  "visualizar",
+  "editarCard",
+  "moverEtapa",
+  "criarTarefa",
+  "concluirTarefa",
+  "enviarArquivo",
+  "excluirArquivo",
+  "visualizarHistorico",
+];
+
 const PERMISSOES_POR_ROLE: Record<string, BpmAcao[]> = {
   RESPONSAVEL: [
-    "visualizar", "editarCard", "moverEtapa", "criarTarefa", "concluirTarefa",
-    "enviarArquivo", "excluirArquivo", "adicionarParticipantes",
-    "excluirCard", "visualizarHistorico",
+    ...ACOES_TRABALHO_CARD,
+    "adicionarParticipantes",
+    "excluirCard",
   ],
   ADMINISTRADOR: [
-    "visualizar", "editarCard", "moverEtapa", "criarTarefa", "concluirTarefa",
-    "enviarArquivo", "excluirArquivo", "adicionarParticipantes",
-    "excluirCard", "visualizarHistorico",
+    ...ACOES_TRABALHO_CARD,
+    "adicionarParticipantes",
+    "excluirCard",
   ],
-  PARTICIPANTE: ["visualizar", "criarTarefa", "concluirTarefa", "visualizarHistorico"],
+  // Pessoas vinculadas precisam conseguir atender o card de ponta a ponta:
+  // campos/anotações, anexos, interações, tarefas, reunião e movimento usam
+  // as capacidades abaixo. Gestão de pessoas e exclusão continuam restritas.
+  PARTICIPANTE: ACOES_TRABALHO_CARD,
 };
 
 export interface AcessoBpmCard {
@@ -213,10 +300,10 @@ export interface AcessoBpmCard {
  * vinda do cliente — sempre resolve do banco a partir de userId + cardId.
  * Admin/CEO globais têm acesso pleno a qualquer card (mesmo padrão do Blueprint).
  *
- * Regra de negócio (D-042): apenas o responsável do card ou um administrador
- * pode movê-lo de etapa — participantes têm acesso de leitura/colaboração, não de
- * movimentação. Isso é refletido em PERMISSOES_POR_ROLE: só RESPONSAVEL e
- * ADMINISTRADOR têm "moverEtapa".
+ * Pessoas vinculadas podem executar o trabalho do card, inclusive editar e
+ * mover etapa. A gestão da composição (`adicionarParticipantes`) e a exclusão
+ * do card permanecem restritas ao responsável, administrador do card ou
+ * administrador global.
  */
 export async function checarAcessoBpmCard(
   cardId: string,
@@ -300,9 +387,10 @@ export async function checarAcessoConfigPipeline(
 }
 
 /**
- * Eventos no canal do pipeline carregam `cardId`. Por isso, associação a um
- * único card não basta para assinar o canal: somente CRM + setor do pipeline
- * (ou administrador) pode observar o stream completo do board.
+ * Eventos no canal do pipeline são apenas invalidações genéricas e não carregam
+ * `cardId` nem dados do card. Assim, uma pessoa CRM ativa vinculada a qualquer
+ * card daquele pipeline pode assinar o canal para perceber a revogação do
+ * próprio vínculo; a recarga posterior continua filtrando cards por membro.
  */
 export async function checarAcessoRealtimeBpmPipeline(
   pipelineId: string,
@@ -314,13 +402,20 @@ export async function checarAcessoRealtimeBpmPipeline(
   if (isAdminRole(acesso.usuario.role)) return true;
   if (!possuiPermissaoCrm(acesso.permissoes)) return false;
 
-  const pipeline = await client.bpmPipeline.findUnique({
-    where: { id: pipelineId },
-    select: { setores: { select: { setor: { select: { nome: true } } } } },
-  });
+  const [pipeline, membro] = await Promise.all([
+    client.bpmPipeline.findUnique({
+      where: { id: pipelineId },
+      select: { setores: { select: { setor: { select: { nome: true } } } } },
+    }),
+    client.bpmCardMembro.findFirst({
+      where: { userId, card: { pipelineId } },
+      select: { id: true },
+    }),
+  ]);
   if (!pipeline) return false;
   return pipeline.setores.length === 0
-    || pipeline.setores.some(({ setor }) => isSameRole(setor.nome, acesso.usuario.role));
+    || pipeline.setores.some(({ setor }) => isSameRole(setor.nome, acesso.usuario.role))
+    || Boolean(membro);
 }
 
 export async function exigirAcessoConfigPipeline(

@@ -35,7 +35,7 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
   }
 
   return (
-    <div className="rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-4 space-y-2">
+    <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-3 space-y-1.5">
       {aguardandoDataHora && (
         <div className="mb-3 flex gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
           <CalendarClock size={14} className="mt-0.5 shrink-0" />
@@ -68,7 +68,7 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
             onClick={() => handleMover(etapa.id)}
             disabled={!podeMoverEtapa || bloqueadaPorDataHora || bloqueadaPorTranscricao}
             title={motivoBloqueio}
-            className="w-full flex items-center justify-between gap-2 text-left px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-60 not-disabled:hover:-translate-y-0.5 not-disabled:active:translate-y-0"
+            className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 not-disabled:hover:bg-white/[0.07]"
             style={
               ativa
                 ? {

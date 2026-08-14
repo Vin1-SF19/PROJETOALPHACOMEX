@@ -27,18 +27,17 @@ describe("realtime do AlphaCRM", () => {
   it("constrói payload com somente os campos permitidos", () => {
     const payload = criarBpmRealtimePayload({
       pipelineId: "pipeline-1",
-      cardId: "card-1",
       tipo: "CARD_MOVIDO",
       agora: new Date("2026-08-12T12:34:56.000Z"),
     });
 
     expect(payload).toEqual({
       pipelineId: "pipeline-1",
-      cardId: "card-1",
       tipo: "CARD_MOVIDO",
       timestamp: "2026-08-12T12:34:56.000Z",
     });
-    expect(Object.keys(payload).sort()).toEqual(["cardId", "pipelineId", "timestamp", "tipo"]);
+    expect(payload).not.toHaveProperty("cardId");
+    expect(Object.keys(payload).sort()).toEqual(["pipelineId", "timestamp", "tipo"]);
   });
 
   it("omite cardId em alterações de configuração do pipeline", () => {

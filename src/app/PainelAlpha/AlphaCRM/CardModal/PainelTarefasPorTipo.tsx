@@ -16,7 +16,7 @@ interface Props {
   responsavelId: number | null;
   tarefas: Tarefa[];
   accent: string;
-  podeEditar: boolean;
+  podeTrabalharTarefas: boolean;
   onAtualizado: () => void;
 }
 
@@ -30,7 +30,7 @@ function IconeTipo({ tipo, size = 15 }: { tipo: string; size?: number }) {
   return <Bell size={size} />;
 }
 
-export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, podeEditar, onAtualizado }: Props) {
+export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, podeTrabalharTarefas, onAtualizado }: Props) {
   const [aberto, setAberto] = useState(false);
   const [tipo, setTipo] = useState<BpmTarefaTipo>("TAREFA");
   const [titulo, setTitulo] = useState("");
@@ -90,7 +90,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         return (
           <div key={tarefa.id} className={`rounded-xl border px-3 py-2.5 ${alertaAtivo ? "border-amber-400/35 bg-amber-400/[0.07]" : "border-white/5 bg-white/[0.03]"}`}>
             <div className="flex items-start gap-2">
-              <button type="button" onClick={() => void ConcluirTarefaBpm({ tarefaId: tarefa.id }).then((res) => res.success ? onAtualizado() : toast.error(typeof res.error === "string" ? res.error : "Erro ao concluir tarefa"))} disabled={!podeEditar || tarefa.status === "CONCLUIDA"} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed">
+              <button type="button" onClick={() => void ConcluirTarefaBpm({ tarefaId: tarefa.id }).then((res) => res.success ? onAtualizado() : toast.error(typeof res.error === "string" ? res.error : "Erro ao concluir tarefa"))} disabled={!podeTrabalharTarefas || tarefa.status === "CONCLUIDA"} className="mt-0.5 text-slate-500 disabled:cursor-not-allowed">
                 <CheckCircle2 size={16} className={tarefa.status === "CONCLUIDA" ? "text-emerald-400" : ""} />
               </button>
               <div className="min-w-0 flex-1">
@@ -108,7 +108,7 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
       })}
 
       {!aberto ? (
-        <button type="button" onClick={() => setAberto(true)} disabled={!podeEditar} className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:border-white/30 hover:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="button" onClick={() => setAberto(true)} disabled={!podeTrabalharTarefas} className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-3 py-2.5 text-xs font-bold text-slate-300 transition hover:border-white/30 hover:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-50">
           <Plus size={14} /> Criar tarefa por tipo
         </button>
       ) : (

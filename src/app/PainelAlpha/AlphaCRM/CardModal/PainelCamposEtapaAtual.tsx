@@ -221,6 +221,7 @@ export function PainelCamposEtapaAtual({
                     camposAtuaisSujosRef.current = true;
                     setValoresCamposAtuais((atuais) => ({ ...atuais, [campo.id]: valor }));
                   }}
+                  onBlur={() => void salvarCamposAtuais()}
                   className={inputCls}
                   disabled={!podeEditar}
                 />
@@ -232,10 +233,7 @@ export function PainelCamposEtapaAtual({
               </div>
             );
           })}
-          <button type="button" onClick={() => void salvarCamposAtuais()} disabled={!podeEditar || !camposAtuaisAlterados || complementoLostPendente || conflitoCamposAtuais || salvandoCamposAtuais} className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45" style={{ background: `rgba(${accent},0.85)` }}>
-            {salvandoCamposAtuais && <Loader2 size={14} className="animate-spin" />}
-            {salvandoCamposAtuais ? "Salvando..." : "Salvar campos da etapa"}
-          </button>
+          {salvandoCamposAtuais && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando alterações...</p>}
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}
         </div>
       )}
