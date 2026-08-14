@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useSyncExternalStore, type CSSProperties 
 import { motion, useReducedMotion } from "framer-motion";
 import type { FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
 import { hexParaRgb } from "./fundos-utils";
+import { useVisibilidadeIframe } from "./useVisibilidadeIframe";
 
 type PlanetId = "mercury" | "venus" | "earth" | "mars" | "jupiter" | "saturn" | "uranus" | "neptune";
 
@@ -318,6 +319,7 @@ function spinAnimationStyle(spin: SpinState, reduceMotion: boolean): CSSProperti
 }
 
 export function CosmosIAlphaFundo({ componente }: { componente: FundoAnimadoComponente }) {
+  const { ref, visivel } = useVisibilidadeIframe<HTMLDivElement>();
   const reduceMotion = useReducedMotion();
   const accent = hexParaRgb(componente.corPrimaria);
   const velocidade = Math.max(0.1, componente.velocidade);
@@ -354,9 +356,7 @@ export function CosmosIAlphaFundo({ componente }: { componente: FundoAnimadoComp
   const spinTimeLapse = SPIN_TIME_LAPSE_BASE * velocidade;
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#020617]">
-      <style>{`@keyframes ialpha-planet-spin { from { background-position-x: 0px; } to { background-position-x: ${NOISE_TILE}px; } }`}</style>
-
+    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#020617]">
       <div
         className="absolute inset-0"
         style={{
@@ -372,6 +372,13 @@ export function CosmosIAlphaFundo({ componente }: { componente: FundoAnimadoComp
         className="absolute left-[-20%] top-[6%] h-[58%] w-[140%] rotate-[-16deg] blur-3xl"
         style={{ background: "linear-gradient(90deg, transparent 0%, rgba(96,165,250,0.07) 26%, rgba(147,197,253,0.13) 50%, rgba(96,165,250,0.07) 74%, transparent 100%)" }}
       />
+
+      {/* Conteúdo animado só monta com o módulo realmente visível — evita dezenas de animações
+          `repeat: Infinity` rodando em segundo plano enquanto a aba do Alpha Motion fica
+          escondida (mas montada) atrás de outra aba do painel. */}
+      {visivel && (
+      <>
+      <style>{`@keyframes ialpha-planet-spin { from { background-position-x: 0px; } to { background-position-x: ${NOISE_TILE}px; } }`}</style>
 
       <motion.div
         className="absolute left-[58%] top-[12%] h-96 w-96 rounded-full blur-3xl"
@@ -538,6 +545,8 @@ export function CosmosIAlphaFundo({ componente }: { componente: FundoAnimadoComp
         animate={reduceMotion ? undefined : { x: [0, -560], y: [0, 220], opacity: [0, 0.4, 0] }}
         transition={{ duration: 5 / velocidade, repeat: Infinity, repeatDelay: isNight ? 7 : 13, ease: "easeInOut" }}
       />
+      </>
+      )}
 
       <div className="absolute inset-0 z-20 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(2,6,23,0.16)_52%,rgba(2,6,23,0.68)_100%)]" />
       <div className="absolute inset-x-0 bottom-0 z-20 h-48 bg-gradient-to-t from-[#020617] via-[#020617]/72 to-transparent" />

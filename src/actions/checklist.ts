@@ -9,9 +9,16 @@ import { z } from "zod";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
+// Fase 3.5 do Cliente Master (2026-08-13): campos cadastrais (razaoSocial,
+// nomeFantasia, cnpj, municipio, uf, regimeTributario, capitalSocial,
+// dataConstituicao) agora vêm só de `Cliente`, somente leitura a partir daqui.
+// situacaoRadar/submodalidade/dataSituacao/contribuinte foram removidos — eram
+// dados de Radar/Receita Federal, fora do escopo do Cliente Master (decisão do
+// usuário, 2026-08-13: consultas_radar/radar_fiscal ficam fora permanentemente)
+// e não existe mais fonte para eles nesta tabela.
 export type EmpresaComProgresso = {
   id: string;
-  cnpj: string;
+  cnpj: string | null;
   razaoSocial: string;
   nomeFantasia: string | null;
   status: string;
@@ -20,15 +27,11 @@ export type EmpresaComProgresso = {
   progresso: number;
   mesProtocolo: string | null;
   linkGrupo: string | null;
-  situacaoRadar: string | null;
-  submodalidade: string | null;
-  dataSituacao: string | null;
   municipio: string | null;
   uf: string | null;
   regimeTributario: string | null;
   capitalSocial: string | null;
   dataConstituicao: string | null;
-  contribuinte: string | null;
   clienteNome: string;
   checklistId: string | null;
   progressoReal: number;
@@ -47,6 +50,17 @@ async function requireSession() {
   return session;
 }
 
+const SELECT_CLIENTE_OPERACIONAL = {
+  cnpj: true,
+  razaoSocial: true,
+  nomeFantasia: true,
+  municipio: true,
+  uf: true,
+  regimeTributario: true,
+  capitalSocial: true,
+  dataConstituicao: true,
+} as const;
+
 // ─── LISTAR EMPRESAS ─────────────────────────────────────────────────────────
 
 export async function getEmpresasChecklist(): Promise<{ data?: EmpresaComProgresso[]; error?: string }> {
@@ -56,7 +70,8 @@ export async function getEmpresasChecklist(): Promise<{ data?: EmpresaComProgres
     const empresas = await db.operacionalClientes.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        cliente: { select: { nome: true } },
+        cliente: { select: SELECT_CLIENTE_OPERACIONAL },
+        clienteOperacional: { select: { nome: true } },
         pastaChecklist: { select: { id: true, nome: true } },
         checklists: {
           include: {
@@ -74,25 +89,21 @@ export async function getEmpresasChecklist(): Promise<{ data?: EmpresaComProgres
 
       return {
         id: e.id,
-        cnpj: e.cnpj,
-        razaoSocial: e.razaoSocial,
-        nomeFantasia: e.nomeFantasia,
+        cnpj: e.cliente.cnpj,
+        razaoSocial: e.cliente.razaoSocial,
+        nomeFantasia: e.cliente.nomeFantasia,
         status: e.status,
         embasamento: e.embasamento,
         tipo: e.tipo,
         progresso: e.progresso,
         mesProtocolo: e.mesProtocolo,
         linkGrupo: e.linkGrupo,
-        situacaoRadar: e.situacaoRadar,
-        submodalidade: e.submodalidade,
-        dataSituacao: e.dataSituacao,
-        municipio: e.municipio,
-        uf: e.uf,
-        regimeTributario: e.regimeTributario,
-        capitalSocial: e.capitalSocial,
-        dataConstituicao: e.dataConstituicao,
-        contribuinte: e.contribuinte,
-        clienteNome: e.cliente.nome,
+        municipio: e.cliente.municipio,
+        uf: e.cliente.uf,
+        regimeTributario: e.cliente.regimeTributario,
+        capitalSocial: e.cliente.capitalSocial,
+        dataConstituicao: e.cliente.dataConstituicao,
+        clienteNome: e.clienteOperacional.nome,
         checklistId: checklist?.id ?? null,
         progressoReal,
         temChecklist: e.checklists.length > 0,
@@ -150,7 +161,8 @@ export async function getEmpresaChecklist(empresaId: string) {
     const empresa = await db.operacionalClientes.findUnique({
       where: { id: empresaId },
       include: {
-        cliente: { select: { nome: true, email: true } },
+        cliente: { select: SELECT_CLIENTE_OPERACIONAL },
+        clienteOperacional: { select: { nome: true, email: true } },
         checklists: {
           include: {
             itens: {
@@ -164,7 +176,19 @@ export async function getEmpresaChecklist(empresaId: string) {
 
     if (!empresa) return { error: "Empresa não encontrada" };
 
-    return { data: empresa };
+    // Achata Cliente (dados cadastrais) dentro do shape que ChecklistView espera,
+    // e renomeia clienteOperacional -> cliente (contrato local: conta de login).
+    const { cliente, clienteOperacional, ...resto } = empresa;
+    const data = {
+      ...resto,
+      cnpj: cliente.cnpj,
+      razaoSocial: cliente.razaoSocial,
+      nomeFantasia: cliente.nomeFantasia,
+      regimeTributario: cliente.regimeTributario,
+      cliente: clienteOperacional,
+    };
+
+    return { data };
   } catch (err: any) {
     return { error: err.message };
   }
@@ -224,26 +248,19 @@ export async function criarChecklist(empresaId: string, tipo: TipoEmbasamento) {
   }
 }
 
+// Fase 3.5 do Cliente Master (2026-08-13): campos cadastrais de empresa
+// (razaoSocial, nomeFantasia, cnpj, municipio, uf, regimeTributario,
+// capitalSocial, dataConstituicao) saíram deste schema — passaram a ser
+// somente-leitura via `Cliente`. Quem precisa corrigir esses dados usa o
+// Alpha CRM (BPM), não mais a tela do Operacional.
 const atualizarEmpresaChecklistSchema = z.object({
   empresaId: z.string().min(1),
-  razaoSocial: z.string().trim().min(1).max(180),
-  nomeFantasia: z.string().trim().max(180).nullable(),
-  cnpj: z.string().trim().min(14).max(24),
   status: z.string().trim().min(1).max(40),
   embasamento: z.string().trim().max(120),
   tipo: z.enum(TIPOS_VALIDOS).nullable(),
   pastaChecklistId: z.string().min(1).nullable(),
   mesProtocolo: z.string().trim().max(40).nullable(),
   linkGrupo: z.string().trim().max(1000).nullable(),
-  situacaoRadar: z.string().trim().max(120).nullable(),
-  submodalidade: z.string().trim().max(120).nullable(),
-  dataSituacao: z.string().trim().max(40).nullable(),
-  municipio: z.string().trim().max(120).nullable(),
-  uf: z.string().trim().max(8).nullable(),
-  regimeTributario: z.string().trim().max(120).nullable(),
-  capitalSocial: z.string().trim().max(80).nullable(),
-  dataConstituicao: z.string().trim().max(40).nullable(),
-  contribuinte: z.string().trim().max(120).nullable(),
 });
 
 export type DadosEmpresaChecklist = z.infer<typeof atualizarEmpresaChecklistSchema>;
@@ -287,24 +304,12 @@ export async function atualizarEmpresaChecklist(dados: DadosEmpresaChecklist) {
       await tx.operacionalClientes.update({
         where: { id: parsed.empresaId },
         data: {
-          razaoSocial: parsed.razaoSocial,
-          nomeFantasia: parsed.nomeFantasia || null,
-          cnpj: parsed.cnpj,
           status: parsed.status,
           embasamento: parsed.embasamento,
           tipo: parsed.tipo,
           pastaChecklistId: parsed.pastaChecklistId,
           mesProtocolo: parsed.mesProtocolo || null,
           linkGrupo: parsed.linkGrupo || null,
-          situacaoRadar: parsed.situacaoRadar || null,
-          submodalidade: parsed.submodalidade || null,
-          dataSituacao: parsed.dataSituacao || null,
-          municipio: parsed.municipio || null,
-          uf: parsed.uf || null,
-          regimeTributario: parsed.regimeTributario || null,
-          capitalSocial: parsed.capitalSocial || null,
-          dataConstituicao: parsed.dataConstituicao || null,
-          contribuinte: parsed.contribuinte || null,
         },
       });
     });
@@ -376,7 +381,7 @@ export async function atualizarItemChecklist(
         checklist: {
           include: {
             itens: { select: { status: true, obrigatorio: true } },
-            empresa: { include: { cliente: { select: { id: true } } } },
+            empresa: { include: { clienteOperacional: { select: { id: true } } } },
           },
         },
       },
@@ -389,7 +394,7 @@ export async function atualizarItemChecklist(
     });
 
     // Notificar cliente
-    const clienteId = item.checklist.empresa.cliente?.id;
+    const clienteId = item.checklist.empresa.clienteOperacional?.id;
     if (clienteId) {
       const tipo = parsed.observacao ? "OBSERVACAO_ITEM" : "STATUS_MUDOU";
       const titulo = parsed.observacao
@@ -550,7 +555,7 @@ export type DocHistorico = {
   itemCodigo: string;
   empresaId: string;
   razaoSocial: string;
-  cnpj: string;
+  cnpj: string | null;
   clienteNome: string;
 };
 
@@ -571,9 +576,8 @@ export async function getHistoricoDocumentosExcluidos(): Promise<{ data?: DocHis
                 empresa: {
                   select: {
                     id: true,
-                    razaoSocial: true,
-                    cnpj: true,
-                    cliente: { select: { nome: true } },
+                    cliente: { select: { razaoSocial: true, cnpj: true } },
+                    clienteOperacional: { select: { nome: true } },
                   },
                 },
               },
@@ -597,9 +601,9 @@ export async function getHistoricoDocumentosExcluidos(): Promise<{ data?: DocHis
         itemDescricao: d.item.descricao,
         itemCodigo: d.item.codigo,
         empresaId: d.item.checklist.empresa.id,
-        razaoSocial: d.item.checklist.empresa.razaoSocial,
-        cnpj: d.item.checklist.empresa.cnpj,
-        clienteNome: d.item.checklist.empresa.cliente?.nome ?? "—",
+        razaoSocial: d.item.checklist.empresa.cliente.razaoSocial,
+        cnpj: d.item.checklist.empresa.cliente.cnpj,
+        clienteNome: d.item.checklist.empresa.clienteOperacional?.nome ?? "—",
       }));
 
     return { data };

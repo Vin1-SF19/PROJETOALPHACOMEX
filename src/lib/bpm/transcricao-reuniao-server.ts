@@ -1,6 +1,7 @@
 import "server-only";
 
 import db from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import {
   carregarArtefatoTranscricaoMeet,
   GoogleMeetIntegracaoError,
@@ -23,6 +24,10 @@ export type ResultadoSincronizacaoTranscricao =
   | { status: "RECEBIDA"; atualizada: boolean; caracteres: number }
   | { status: "PENDENTE"; motivo: string }
   | { status: "ERRO"; erro: string; recuperavel: boolean };
+
+export type RevalidarPersistenciaTranscricao = (
+  tx: Prisma.TransactionClient,
+) => Promise<void>;
 
 export type ResumoPollingTranscricoes = {
   examinados: number;
@@ -64,6 +69,7 @@ async function resolverEmailOrganizador(params: {
 async function executarSincronizacaoTranscricaoCardBpm(
   cardId: string,
   origem: "manual" | "automatica",
+  revalidarPersistencia?: RevalidarPersistenciaTranscricao,
 ): Promise<ResultadoSincronizacaoTranscricao> {
   try {
     const card = await db.bpmCard.findUnique({
@@ -135,6 +141,10 @@ async function executarSincronizacaoTranscricaoCardBpm(
     }
 
     const atualizada = await db.$transaction(async (tx) => {
+      // A ação manual pode ficar aguardando a API do Google por algum tempo.
+      // Revalida o acesso dentro da transação, imediatamente antes da escrita,
+      // para não persistir depois de uma revogação de permissão.
+      if (origem === "manual") await revalidarPersistencia?.(tx);
       const update = await tx.bpmCard.updateMany({
         where: {
           id: card.id,
@@ -180,6 +190,9 @@ async function executarSincronizacaoTranscricaoCardBpm(
     }
     return { status: "RECEBIDA", atualizada, caracteres: transcricao.length };
   } catch (erro) {
+    if (erro instanceof Error && erro.message === "Não autorizado") {
+      return { status: "ERRO", erro: "Não autorizado", recuperavel: false };
+    }
     const falha = erro instanceof GoogleMeetIntegracaoError
       ? erro
       : new GoogleMeetIntegracaoError("Não foi possível sincronizar a transcrição.");
@@ -190,10 +203,11 @@ async function executarSincronizacaoTranscricaoCardBpm(
 export function sincronizarTranscricaoCardBpm(
   cardId: string,
   origem: "manual" | "automatica",
+  revalidarPersistencia?: RevalidarPersistenciaTranscricao,
 ): Promise<ResultadoSincronizacaoTranscricao> {
   const existente = sincronizacoesEmAndamento.get(cardId);
   if (existente) return existente;
-  const sincronizacao = executarSincronizacaoTranscricaoCardBpm(cardId, origem)
+  const sincronizacao = executarSincronizacaoTranscricaoCardBpm(cardId, origem, revalidarPersistencia)
     .finally(() => sincronizacoesEmAndamento.delete(cardId));
   sincronizacoesEmAndamento.set(cardId, sincronizacao);
   return sincronizacao;

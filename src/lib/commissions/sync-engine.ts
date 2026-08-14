@@ -59,12 +59,18 @@ export async function sincronizarComissoes(params: {
   let totalProcessed = 0;
   let totalErrors = 0;
 
-  // ─── Fase 1: eventos de CONTRATAÇÃO via merge ContratoComercial + clientes ───
+  // ─── Fase 1: eventos de CONTRATAÇÃO via merge ContratoComercial + ClienteServico (CS&NPS) ───
   const contratos = await listarContratosComerciaisParaSync(null);
 
   for (const contrato of contratos) {
     try {
-      const sourceId = `merged:${chaveDeCasamento(contrato.cnpj, contrato.servico)}`;
+      // Empresa "em constituição" (Cliente.cnpj nullable, Fase 3.6 do Cliente Master)
+      // não tem CNPJ para casar com CS&NPS/`ClienteServico` (chave sempre por CNPJ) — usa
+      // o Cliente master (id estável, único) como base da chave de casamento nesse caso,
+      // e nunca tenta o merge com CS&NPS (fica só com a fonte ContratoComercial).
+      const sourceId = contrato.cnpj
+        ? `merged:${chaveDeCasamento(contrato.cnpj, contrato.servico)}`
+        : `merged:cliente-${contrato.clienteId}::${contrato.servico.trim().toUpperCase()}`;
 
       const jaExiste = await db.commissionEvent.findUnique({
         where: {
@@ -83,7 +89,9 @@ export async function sincronizarComissoes(params: {
         continue;
       }
 
-      const clienteCorrespondente = await buscarClientePorCnpjEServico(contrato.cnpj, contrato.servico);
+      const clienteCorrespondente = contrato.cnpj
+        ? await buscarClientePorCnpjEServico(contrato.cnpj, contrato.servico)
+        : null;
       const clienteSource = clienteCorrespondente ? await buscarClientePorId(clienteCorrespondente.id) : null;
 
       const merged = mergeCompanyEvent({
@@ -154,7 +162,7 @@ export async function sincronizarComissoes(params: {
     }
   }
 
-  // ─── Fase 2: eventos de ÊXITO via clientes.dataExito ───
+  // ─── Fase 2: eventos de ÊXITO via ClienteServico.dataExito ───
   const clienteIdsComExito = await listarClientesComExitoNaoProcessado();
 
   for (const clienteId of clienteIdsComExito) {
@@ -165,7 +173,7 @@ export async function sincronizarComissoes(params: {
       const sourceId = `exito:${clienteId}`;
 
       // Closer: herdado do evento de CONTRATAÇÃO já sincronizado para o mesmo cliente (já
-      // resolvido lá via merge ContratoComercial+clientes) — evita duplicar a lógica de merge.
+      // resolvido lá via merge ContratoComercial+ClienteServico) — evita duplicar a lógica de merge.
       const eventoContratacao = await db.commissionEvent.findFirst({
         where: { clienteId, eventType: "CONTRACTING" },
         select: { closerUsuarioId: true, closerNomeManual: true },

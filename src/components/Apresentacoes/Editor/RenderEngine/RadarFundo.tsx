@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
 import { hexParaRgb, hashStringParaSeed, criarGeradorSeed } from "./fundos-utils";
+import { useVisibilidadeIframe } from "./useVisibilidadeIframe";
 
 type Blip = { x: number; y: number; size: number; delay: number; duration: number };
 
@@ -28,6 +29,7 @@ function criarBlips(quantidade: number, duracaoBase: number, seed: number): Blip
 
 /** Adaptado de RadarBackground.tsx (Consulta RADAR) — cor, velocidade, densidade e direção viram props editáveis no Presentation Studio. */
 export function RadarFundo({ componente }: { componente: FundoAnimadoComponente }) {
+  const { ref, visivel } = useVisibilidadeIframe<HTMLDivElement>();
   const reduceMotion = useReducedMotion();
   const accentRgb = hexParaRgb(componente.corPrimaria);
   const velocidade = componente.velocidade;
@@ -44,7 +46,7 @@ export function RadarFundo({ componente }: { componente: FundoAnimadoComponente 
   }, [quantidadeBlips, duracaoBlipBase, componente.id]);
 
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div ref={ref} className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
       <div
         className="absolute inset-0"
         style={{ background: "linear-gradient(135deg, #020617 0%, #0a2146 45%, #020617 100%)" }}
@@ -64,6 +66,10 @@ export function RadarFundo({ componente }: { componente: FundoAnimadoComponente 
         ))}
       </div>
 
+      {/* Conteúdo animado só monta com o módulo realmente visível — evita animações
+          `repeat: Infinity` rodando em segundo plano com a aba escondida (mas montada). */}
+      {visivel && (
+      <>
       {!reduceMotion && (
         <motion.div
           className="absolute inset-0"
@@ -90,6 +96,8 @@ export function RadarFundo({ componente }: { componente: FundoAnimadoComponente 
           transition={{ duration: blip.duration, delay: blip.delay, repeat: Infinity, ease: "easeInOut" }}
         />
       ))}
+      </>
+      )}
 
       <div
         className="absolute inset-0"

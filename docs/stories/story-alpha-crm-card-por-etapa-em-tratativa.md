@@ -4,6 +4,8 @@
 
 Ready for Review
 
+> **Supersessão de criação — 2026-08-13:** o trecho que permitia criar na etapa clicada foi substituído pela story `story-alpha-crm-criacao-somente-novos-leads-formularios-no-card.md`. O botão `+` existe somente em **Novos Leads**, o modal recebe apenas dados-base e todo formulário operacional por etapa continua dentro do card, no lado esquerdo/Hoje.
+
 ## Executor Assignment
 
 - executor: `@dev`

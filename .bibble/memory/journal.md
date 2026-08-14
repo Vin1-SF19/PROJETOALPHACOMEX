@@ -34,6 +34,60 @@
 
 ---
 
+## [2026-08-14] — Alpha Motion: diagnóstico e correção de 2 causas reais de travamento (Dashboard + Editor)
+
+**Tags:** #bugfix #performance #webgl #diagnosis
+
+**Agentes envolvidos:** Bibble (orquestração direta) → Scout (reconhecimento) → Explore agent (investigação profunda do RenderEngine) → Forge (tsc/lint/build reais) — sessão conduzida sem squad completa por ser predominantemente investigação + correção cirúrgica, não feature nova.
+
+### O que foi feito
+- Diagnosticado e corrigido o travamento do Chrome inteiro ao abrir o módulo Alpha Motion: Dashboard renderizava miniaturas via motor de renderização ao vivo (incluindo `<Canvas>` WebGL para Globo/Partículas/Objeto3D), sem limite de contextos simultâneos.
+- Diagnosticado e corrigido um segundo travamento (lentidão sustentada, sem erro, só normalizava ao fechar a aba): fundos animados do Editor (Cosmos/Estelar/Radar/Blueprint) rodavam animações `repeat: Infinity` sem parar mesmo com o módulo escondido (mas montado) atrás de outra aba do painel.
+- Descartada, com confirmação do usuário, a hipótese inicial de que o componente Container Alpha (porta 3D) fosse a causa do segundo travamento — não estava em uso nos slides atuais, mas o bug real nesse componente (double live-render do próximo slide) foi documentado como achado válido, não corrigido (fora do escopo pedido).
+
+### Decisões tomadas
+- Ver `decisions.md`, entradas 2026-08-13/14 (miniatura estática) e 2026-08-14 (gate de visibilidade nos fundos animados) para o detalhe técnico completo.
+
+### Arquivos criados/modificados
+- `src/app/api/apresentacoes/[id]/miniatura/route.ts` — novo, upload da miniatura estática.
+- `src/lib/apresentacoes/miniatura-captura.ts` — novo, captura client-side via `html-to-image`.
+- `src/lib/apresentacoes/proximo-slide.ts` — `ehPrimeiroSlide()` adicionada.
+- `src/components/Apresentacoes/Editor/ApresentacaoEditor.tsx` — dispara captura após autosave do primeiro slide.
+- `src/actions/apresentacoes.ts` (`ListarApresentacoes`) — parou de buscar `slides`/`dadosJson`.
+- `src/components/Apresentacoes/Dashboard/CardApresentacao.tsx` — usa `thumbnailUrl` + fallback estático, sem live-render.
+- `src/components/Apresentacoes/Dashboard/MiniaturaSlideApresentacao.tsx` — **deletado** (código morto/causa raiz).
+- `src/lib/apresentacoes/miniatura-slide.ts` — **deletado** (só usado pelo componente acima).
+- `tests/apresentacoes/miniatura-slide.test.ts` — **deletado** (teste órfão do lib acima).
+- `src/components/Apresentacoes/Editor/RenderEngine/{CosmosIAlphaFundo,EstelarFundo,RadarFundo,BlueprintFundo}.tsx` — gate de visibilidade via `useVisibilidadeIframe`.
+
+### Erros encontrados e fixes
+- EPERM em `query_engine-windows.dll.node` durante `npm run build` (2x nesta sessão) — fix já catalogado em `known-errors.md`, aplicado com autorização explícita do usuário (`taskkill //F //IM node.exe`) nas duas ocorrências.
+- `tsc --noEmit` mostrou 3 erros novos em `ModalGerenciamentoLeads.tsx` — confirmado via `git status` que já estavam modificados/pendentes ANTES desta sessão (não introduzidos por este trabalho); não corrigidos por estarem fora de escopo.
+
+### Pendências para próxima sessão
+- `ContainerCargaRender.tsx`/`SlidePortalPreview.tsx`: o componente Container Alpha (porta 3D) faz live-render completo do próximo slide o tempo todo que a porta está com `estadoEditor: "aberto"` (que é o padrão ao criar um novo — `registry-3d.ts`), sem gate de `pausado`/visibilidade. Não corrigido porque o usuário não usa esse componente atualmente — reavaliar se/quando alguém passar a usar.
+- Probe/Lens/Sage completos não foram executados como agentes formais separados nesta sessão (Forge real rodou; revisão de qualidade foi feita inline pelo Bibble). Considerar rodar `/probe` e `/sage` numa sessão futura se o padrão precisar de validação mais formal (ex: teste automatizado cobrindo o novo endpoint de miniatura).
+- Apresentações importadas de PPTX ANTES de 2026-08-14 (exceto "teste 2", apagada) ainda têm os SVGs de recorte pesados (base64 embutido) salvos em produção — se algum usuário reportar lentidão parecida em outra apresentação importada, ver a entrada de `decisions.md` desta data; corrigir exigiria backfill (Vault, mutação em massa).
+
+### Continuação [2026-08-14, mesma sessão] — 3º achado real: importador PPTX embutia imagens em base64 dentro do SVG de recorte
+
+**O que foi feito:**
+- Consulta somente-leitura ao Turso de produção (script pontual, descartado) identificou que a apresentação "teste 2" (reportada pelo usuário como ainda lenta) tinha SVGs de até ~2 MB por imagem recortada — nada a ver com 3D/fundo animado, os 2 fixes anteriores não cobriam esse caso.
+- Corrigido `src/lib/apresentacoes/pptx/{parser,tipos,mapear}.ts`: SVG de recorte agora referencia a URL real da imagem já enviada ao Blob, em vez de embutir a imagem inteira em base64. Ver `decisions.md` para o detalhe técnico completo.
+- Apresentação "teste 2" excluída do banco de produção a pedido explícito do usuário (tinha o `.pptx` original, vai reimportar depois do fix) — `db.apresentacao.delete`, mesmo caminho de `ExcluirApresentacao` (CRUD normal do app, cascade do schema, sem Vault por não ser migration/mutação em massa).
+- Forge real rodado de novo (tsc/lint/build) — baseline preservado, build OK.
+
+**Arquivos modificados (3º fix):**
+- `src/lib/apresentacoes/pptx/tipos.ts` — `FormaImagemExtraida.recorte?` novo.
+- `src/lib/apresentacoes/pptx/parser.ts` — não monta mais o SVG com base64 embutido, só devolve imagem bruta + geometria do recorte.
+- `src/lib/apresentacoes/pptx/mapear.ts` — envia imagem bruta primeiro, monta o SVG leve com a URL real depois.
+
+**Erros encontrados e fixes:**
+- EPERM em `query_engine-windows.dll.node` reincidiu mais uma vez (3ª vez nesta sessão) — mesmo fix já autorizado, aplicado sem perguntar de novo.
+- `tsc` apontou `recorte.opacidade` como `number` obrigatório mas `lerOpacidadeBlip()` retorna `number | undefined` — corrigido tornando o campo opcional em `tipos.ts`.
+
+---
+
 ## [2026-07-28] — Gestão de Comissões e Prêmios: novo módulo completo, execução via fila de 17 fases
 
 **Tags:** #feature #decision #prisma #security #critical #integration #nextjs #financeiro
@@ -1890,3 +1944,50 @@ O schema já possuía `BpmCard.statusPosFechamento` e a associação de campos o
 ### Refletido também em
 - `docs/stories/story-alpha-crm-fechado-status-pos-fechamento.md`: escopo, decisões, matriz de testes, gates e File List finais.
 - `codebase-map.md` e `integration-points.md`: contrato dos status, guard de entrada, edição protegida, realtime e representação no board.
+
+---
+
+## [2026-08-13 11:36] — Alpha CRM: Motivo de Lost sem bypass
+
+**Tags:** #feature #bugfix #integration #nextjs #security
+**Agentes envolvidos:** Bibble, Scout, River, Echo, Nova, Sage, Forge, Probe, Anubis, Lens, Scribe, Kowalski
+**Arquivos tocados:** `docs/stories/story-alpha-crm-lost-motivo.md`, `src/lib/bpm/lost.ts`, `src/lib/validations/bpm.ts`, `src/actions/bpm/Cards.ts`, UI do Alpha CRM em `CardModal`/`NovoCardModal`, `tests/bpm/{lost,lost-actions,lost-ui,card-modal-ui}.test.ts`
+
+### Contexto
+Lost precisava expor o motivo corretamente e impedir bypass por criação, drag, modal, action direta ou edição concorrente.
+
+### O que foi feito
+- Catálogo canônico com quatro motivos e **Outro**; este exige companion textual condicional.
+- Helper `lost.ts` e guards fail-closed antes/dentro da transação, com CAS/realtime de resolução explícita, teto de 100 campos e histórico somente por IDs.
+- UI condicional ficou no lado esquerdo e na criação; painel direito e banco não foram alterados.
+
+### Decisões tomadas
+- Configuração ausente ou divergente bloqueia a operação; nenhuma migration, seed ou backfill foi necessário.
+
+### Problemas encontrados / resolvidos
+- Forge aprovou 22 arquivos/150 testes BPM, lint focado e diff-check; Probe/Anubis aprovaram e a ressalva documental do Lens foi corrigida.
+
+### Pendências
+- Cinco erros basais de typecheck permanecem fora do CRM; build global e CodeRabbit não foram executados, conforme a story.
+
+### Refletido também em
+- `docs/stories/story-alpha-crm-lost-motivo.md`: contrato, gates e File List finais.
+
+---
+
+## [2026-08-13 12:05] — Alpha CRM: Próximo Contato na entrada de Sem Viabilidade
+
+**Tags:** #bugfix #crm #integration #security
+**Agentes envolvidos:** Bibble, Scout, Echo, Nova, Forge, Probe, Anubis, Lens, Kowalski
+
+### O que foi feito
+- `etapaExigeProximoContato` virou a fonte única client-safe para Em Tratativa e Sem Viabilidade, tolerando caixa, acentos e espaços.
+- A criação pelo `+` passou a exibir Data/Hora obrigatória, validar o valor e enviar ISO.
+- `CriarCardBpm` valida antes e dentro da transação, persiste `proximoContatoEm` atomicamente e publica realtime somente após commit.
+- Drag e modal continuam no executor comum já protegido; `PainelProximoContato` permanece no lado esquerdo para edição posterior.
+- Nenhuma alteração de banco, rota ou painel direito.
+
+### Qualidade
+- BPM: 23 arquivos/158 testes PASS; ESLint focado e diff-check PASS.
+- Forge, Probe, Anubis e Lens aprovaram. O typecheck mantém somente os cinco baselines externos conhecidos.
+- Story: `docs/stories/story-alpha-crm-sem-viabilidade-proximo-contato.md`, Ready for Review.

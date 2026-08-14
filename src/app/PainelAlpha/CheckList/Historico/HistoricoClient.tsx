@@ -27,7 +27,7 @@ export default function HistoricoClient({ docs }: { docs: DocHistorico[] }) {
         !q ||
         d.nome.toLowerCase().includes(q) ||
         d.razaoSocial.toLowerCase().includes(q) ||
-        d.cnpj.includes(q) ||
+        d.cnpj?.includes(q) ||
         d.clienteNome.toLowerCase().includes(q) ||
         d.itemDescricao.toLowerCase().includes(q);
       const matchOrigem =

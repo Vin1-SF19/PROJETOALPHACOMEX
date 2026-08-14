@@ -14,7 +14,7 @@ export async function CriarCampoBpm(dados: unknown) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
 
-    exigirAcessoConfigPipeline(session.user.role ?? null, "configurarCampos");
+    await exigirAcessoConfigPipeline(userId, "configurarCampos");
 
     const parsed = criarCampoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
@@ -59,7 +59,7 @@ export async function AtualizarCampoBpm(dados: unknown) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
 
-    exigirAcessoConfigPipeline(session.user.role ?? null, "configurarCampos");
+    await exigirAcessoConfigPipeline(userId, "configurarCampos");
 
     const parsed = atualizarCampoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };

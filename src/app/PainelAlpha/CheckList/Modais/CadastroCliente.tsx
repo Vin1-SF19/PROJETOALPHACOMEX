@@ -2,9 +2,19 @@
 
 import { useState } from 'react';
 import { Search, CheckCircle2, Loader2, Lock, AlertCircle, X, UserPlus } from 'lucide-react';
-import { cadastrarApenasCliente, vincularEmpresaAoCliente } from '@/actions/ClientesOperacional';
+import { cadastrarApenasCliente, vincularEmpresaAoCliente, buscarClienteParaVincularOperacional } from '@/actions/ClientesOperacional';
 
-export default function ModalCadastroCliente({ isOpen, onClose, clientesExistentes }: any) {
+type ClienteAcesso = { id: string; nome: string; email: string };
+
+export default function ModalCadastroCliente({
+    isOpen,
+    onClose,
+    clientesExistentes,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    clientesExistentes: ClienteAcesso[];
+}) {
     const [loadingConsulta, setLoadingConsulta] = useState(false);
     const [loadingUsuario, setLoadingUsuario] = useState(false);
     const [loadingFinal, setLoadingFinal] = useState(false);
@@ -22,46 +32,29 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
         nomeCliente: '',
         emailCliente: '',
         senhaProvisoria: '',
-        situacaoRadar: '',
-        submodalidade: '',
-        dataSituacao: '',
-        municipio: '',
-        uf: '',
-        regimeTributario: '',
-        capitalSocial: '',
-        dataConstituicao: '',
-        contribuinte: ''
     });
 
     const handleConsultar = async () => {
-        const cnpjLimpo = form.cnpj.replace(/\D/g, '');
-        if (cnpjLimpo.length < 14) return setErro("CNPJ incompleto.");
+        const cnpjLimpo = form.cnpj.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        if (cnpjLimpo.length < 11) return setErro("CNPJ incompleto.");
 
         setLoadingConsulta(true);
         setErro("");
         try {
-            const response = await fetch(`/api/ConsultaCompleta?cnpj=${cnpjLimpo}&forcar=true`);
-            const dados = await response.json();
-            if (dados.error) return setErro(dados.error);
+            const resposta = await buscarClienteParaVincularOperacional(cnpjLimpo);
+            if (!resposta.success || !resposta.data) {
+                setConsultado(false);
+                return setErro(resposta.error || "Empresa não encontrada no CRM.");
+            }
 
             setForm(prev => ({
                 ...prev,
-                cnpj: cnpjLimpo,
-                razaoSocial: (dados.razao_social || "").toUpperCase(),
-                nomeFantasia: (dados.nome_fantasia || "").toUpperCase(),
-                situacaoRadar: dados.situacao_radar,
-                submodalidade: dados.submodalidade,
-                dataSituacao: dados.data_situacao,
-                municipio: dados.municipio,
-                uf: dados.uf,
-                regimeTributario: dados.regime_tributario,
-                capitalSocial: dados.capital_social,
-                dataConstituicao: dados.data_constituicao,
-                contribuinte: dados.contribuinte
+                cnpj: resposta.data.cnpj || cnpjLimpo,
+                razaoSocial: resposta.data.razaoSocial,
+                nomeFantasia: resposta.data.nomeFantasia || "",
             }));
             setConsultado(true);
-            console.log("Dados da empresa: ",dados)
-        } catch (e) {
+        } catch {
             setErro("Erro na consulta.");
         } finally {
             setLoadingConsulta(false);
@@ -88,7 +81,7 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
             } else {
                 setErro(res.error || "Erro ao criar usuário.");
             }
-        } catch (e) {
+        } catch {
             setErro("Falha ao conectar com o servidor.");
         } finally {
             setLoadingUsuario(false);
@@ -105,8 +98,8 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
         try {
 
             const res = await vincularEmpresaAoCliente({
-                ...form,
-                clienteId: finalId
+                cnpj: form.cnpj,
+                clienteOperacionalId: finalId,
             });
 
             if (res.success) {
@@ -138,6 +131,7 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
                     <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">CNPJ da Empresa</label>
+                            <p className="text-[10px] text-slate-500 ml-2">A empresa precisa já estar cadastrada no Alpha CRM.</p>
                             <div className="flex gap-2">
                                 <input
                                     type="text"
@@ -155,7 +149,7 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
 
                     {consultado && (
                         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                            <p className="text-[10px] font-black text-emerald-500 uppercase mb-2 ml-2 tracking-widest">Empresa Localizada</p>
+                            <p className="text-[10px] font-black text-emerald-500 uppercase mb-2 ml-2 tracking-widest">Empresa Localizada no CRM</p>
                             <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
                                 <p className="text-xs font-bold text-white truncate">{form.razaoSocial}</p>
                                 <p className="text-[10px] text-slate-500 font-medium mt-1">{form.nomeFantasia || 'SEM NOME FANTASIA'}</p>
@@ -174,7 +168,7 @@ export default function ModalCadastroCliente({ isOpen, onClose, clientesExistent
                             className="w-full bg-blue-600/10 border border-blue-500/30 rounded-2xl py-4 px-6 text-sm text-white outline-none focus:border-blue-500 transition-all"
                         >
                             <option value="novo" className="bg-slate-900 text-blue-400 font-bold">+ CRIAR NOVO USUÁRIO</option>
-                            {clientesExistentes?.map((c: any) => (
+                            {clientesExistentes?.map((c) => (
                                 <option key={c.id} value={c.id} className="bg-slate-900">{c.nome} ({c.email})</option>
                             ))}
                         </select>

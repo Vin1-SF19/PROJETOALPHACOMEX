@@ -7,7 +7,8 @@ import db from "@/lib/prisma";
 
 export interface ContratoComercialSource {
   id: string;
-  cnpj: string;
+  clienteId: number;
+  cnpj: string | null;
   razaoSocial: string;
   nomeFantasia: string | null;
   valorContratoCents: number;
@@ -22,9 +23,7 @@ export interface ContratoComercialSource {
 
 interface ContratoComercialRow {
   id: string;
-  cnpj: string;
-  razaoSocial: string;
-  nomeFantasia: string | null;
+  clienteId: number;
   valorContrato: number;
   formaPagamento: string;
   servico: string;
@@ -33,14 +32,16 @@ interface ContratoComercialRow {
   pagamentoConfirmado: boolean;
   pagamentoConfirmadoEm: Date | null;
   updatedAt: Date;
+  cliente: { cnpj: string | null; razaoSocial: string; nomeFantasia: string | null };
 }
 
 export function mapContratoComercialToSource(row: ContratoComercialRow): ContratoComercialSource {
   return {
     id: row.id,
-    cnpj: row.cnpj,
-    razaoSocial: row.razaoSocial,
-    nomeFantasia: row.nomeFantasia,
+    clienteId: row.clienteId,
+    cnpj: row.cliente.cnpj,
+    razaoSocial: row.cliente.razaoSocial,
+    nomeFantasia: row.cliente.nomeFantasia,
     valorContratoCents: Math.round(row.valorContrato * 100),
     formaPagamento: row.formaPagamento,
     servico: row.servico,
@@ -56,6 +57,8 @@ export function mapContratoComercialToSource(row: ContratoComercialRow): Contrat
  * Lista contratos comerciais com pagamento confirmado (evento de CONTRATAÇÃO só nasce
  * quando o pagamento é de fato confirmado — mesmo critério já usado por
  * `criarRegistroClienteAPartirDeContrato`, ver `architecture.md`), atualizados desde `since`.
+ * Fase 3.6 do Cliente Master (2026-08-14): cnpj/razaoSocial/nomeFantasia vêm de `Cliente`
+ * via include, não são mais campos próprios de ContratoComercial.
  */
 export async function listarContratosComerciaisParaSync(since: Date | null): Promise<ContratoComercialSource[]> {
   const rows = await db.contratoComercial.findMany({
@@ -65,9 +68,7 @@ export async function listarContratosComerciaisParaSync(since: Date | null): Pro
     },
     select: {
       id: true,
-      cnpj: true,
-      razaoSocial: true,
-      nomeFantasia: true,
+      clienteId: true,
       valorContrato: true,
       formaPagamento: true,
       servico: true,
@@ -76,6 +77,7 @@ export async function listarContratosComerciaisParaSync(since: Date | null): Pro
       pagamentoConfirmado: true,
       pagamentoConfirmadoEm: true,
       updatedAt: true,
+      cliente: { select: { cnpj: true, razaoSocial: true, nomeFantasia: true } },
     },
     take: 500,
   });

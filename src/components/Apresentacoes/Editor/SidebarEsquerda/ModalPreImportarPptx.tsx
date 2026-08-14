@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useInView } from "framer-motion";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import { Loader2, TriangleAlert, X, RotateCcw, FileWarning } from "lucide-react";
@@ -59,34 +60,47 @@ function caminhoDoUploadPptx(apresentacaoId: string, nome: string): string {
 
 /** 1 slide em miniatura — mesma técnica de palco escalado do Modo Apresentação (canvas em
  * tamanho real, `transform: scale()` pra caber na miniatura), renderizando os componentes de
- * verdade via `RenderComponente` — não é uma simulação, é o mesmo motor de render do editor. */
-function ThumbnailSlide({ componentes, canvas, captureRef }: { componentes: ComponenteSlide[]; canvas: CanvasConfig; captureRef?: (node: HTMLDivElement | null) => void }) {
+ * verdade via `RenderComponente` — não é uma simulação, é o mesmo motor de render do editor.
+ * Lazy-mount via `useInView`: um deck com muitos slides não pode montar dezenas de árvores de
+ * componentes reais (imagens em resolução real, potencialmente 3D) todas de uma vez — mesma
+ * causa raiz já corrigida na Dashboard (`CardApresentacao`/miniatura estática), aqui resolvida
+ * só renderizando o slide quando ele está perto da viewport do modal. */
+function ThumbnailSlide({ componentes, canvas, captureRef, onVisivel }: { componentes: ComponenteSlide[]; canvas: CanvasConfig; captureRef?: (node: HTMLDivElement | null) => void; onVisivel?: () => void }) {
   const escala = LARGURA_THUMBNAIL / canvas.width;
   const altura = Math.round(canvas.height * escala);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const estaVisivel = useInView(containerRef, { margin: "300px" });
+
+  useEffect(() => {
+    if (estaVisivel) onVisivel?.();
+  }, [estaVisivel, onVisivel]);
 
   return (
     <div
+      ref={containerRef}
       className="relative overflow-hidden rounded-md"
       style={{ width: LARGURA_THUMBNAIL, height: altura, backgroundColor: canvas.backgroundColor, backgroundImage: canvas.backgroundImage }}
     >
-      <div
-        ref={captureRef}
-        style={{
-          width: canvas.width,
-          height: canvas.height,
-          transform: `scale(${escala})`,
-          transformOrigin: "top left",
-          position: "relative",
-          backgroundColor: canvas.backgroundColor,
-          backgroundImage: canvas.backgroundImage,
-        }}
-      >
-        {componentes.map((c) => (
-          <div key={c.id} style={stylePosicaoAbsoluta(c)}>
-            <RenderComponente componente={c} modo="apresentacao" />
-          </div>
-        ))}
-      </div>
+      {estaVisivel && (
+        <div
+          ref={captureRef}
+          style={{
+            width: canvas.width,
+            height: canvas.height,
+            transform: `scale(${escala})`,
+            transformOrigin: "top left",
+            position: "relative",
+            backgroundColor: canvas.backgroundColor,
+            backgroundImage: canvas.backgroundImage,
+          }}
+        >
+          {componentes.map((c) => (
+            <div key={c.id} style={stylePosicaoAbsoluta(c)}>
+              <RenderComponente componente={c} modo="apresentacao" />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -111,6 +125,8 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const [referenceImages, setReferenceImages] = useState<Array<{ slideNumber: number; url: string }>>([]);
   const [referenceRenderer, setReferenceRenderer] = useState<{ available: boolean; name?: string; reason?: string } | null>(null);
   const [visualDiffs, setVisualDiffs] = useState<Record<number, { importedUrl: string; diffUrl: string; similarity: number }>>({});
+  const [slidesVisiveis, setSlidesVisiveis] = useState<Set<number>>(new Set());
+  const diffCalculadoRef = useRef<Set<number>>(new Set());
   const captureRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [excluidos, setExcluidos] = useState<Set<number>>(new Set());
   const [confirmando, setConfirmando] = useState(false);
@@ -136,6 +152,8 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       setErro(null);
       setExcluidos(new Set());
       setVisualDiffs({});
+      setSlidesVisiveis(new Set());
+      diffCalculadoRef.current = new Set();
       setFontes([]);
       setFontesDetectadas([]);
       setFontesEmbutidas([]);
@@ -224,17 +242,21 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
     return () => { cancelado = true; };
   }, [fontesDetectadas, fontesEmbutidas, status]);
 
+  // Só calcula o diff visual dos slides que já ficaram visíveis (lazy-mount de `ThumbnailSlide`
+  // significa que slides fora de vista ainda não têm `captureRefs.current[index]` preenchido) —
+  // reprocessa a lista sempre que um novo slide entra em vista rolando o grid.
   useEffect(() => {
-    if (status !== "pronto" || !canvas || referenceImages.length === 0) return;
+    if (status !== "pronto" || !canvas || referenceImages.length === 0 || slidesVisiveis.size === 0) return;
     let cancelled = false;
     (async () => {
       await document.fonts?.ready;
-      const results: Record<number, { importedUrl: string; diffUrl: string; similarity: number }> = {};
-      for (let index = 0; index < slides.length; index += 1) {
+      for (const index of slidesVisiveis) {
         if (cancelled) return;
+        if (diffCalculadoRef.current.has(index)) continue;
         const node = captureRefs.current[index];
         const reference = referenceImages.find((item) => item.slideNumber === index + 1);
         if (!node || !reference) continue;
+        diffCalculadoRef.current.add(index);
         try {
           const slideCanvas = slides[index].canvas ?? canvas;
           const importedUrl = await toPng(node, {
@@ -248,15 +270,14 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
             width: 320,
             height: Math.max(1, Math.round(320 * slideCanvas.height / slideCanvas.width)),
           });
-          results[index] = { importedUrl, diffUrl: diff.diffUrl, similarity: diff.similarity };
-          if (!cancelled) setVisualDiffs({ ...results });
+          if (!cancelled) setVisualDiffs((atual) => ({ ...atual, [index]: { importedUrl, diffUrl: diff.diffUrl, similarity: diff.similarity } }));
         } catch (error) {
           console.warn(`[PPTX Import] Falha no diff visual do slide ${index + 1}`, error);
         }
       }
     })();
     return () => { cancelled = true; };
-  }, [status, canvas, referenceImages, slides]);
+  }, [status, canvas, referenceImages, slides, slidesVisiveis]);
 
   function alternarExclusao(indice: number) {
     setExcluidos((atual) => {
@@ -400,6 +421,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                         componentes={slide.componentes}
                         canvas={slide.canvas ?? canvas}
                         captureRef={(node) => { captureRefs.current[indice] = node; }}
+                        onVisivel={() => setSlidesVisiveis((atual) => (atual.has(indice) ? atual : new Set(atual).add(indice)))}
                       />
                       <button
                         type="button"

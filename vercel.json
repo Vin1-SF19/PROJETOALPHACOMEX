@@ -2,8 +2,11 @@
   "crons": [
     {
       "path": "/api/bpm/jobs/automacao-novos-leads",
-      "schedule": "0 12 * * 1-5"
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/bpm/jobs/alertas-tarefas",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
-

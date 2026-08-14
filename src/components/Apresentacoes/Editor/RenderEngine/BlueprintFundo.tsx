@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
 import type { FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
 import { hexParaRgb, hashStringParaSeed, criarGeradorSeed } from "./fundos-utils";
+import { useVisibilidadeIframe } from "./useVisibilidadeIframe";
 
 interface Ancora {
   x: number;
@@ -30,6 +31,7 @@ function criarAncoras(quantidade: number, duracaoBase: number, seed: number): An
 
 /** Adaptado de BlueprintBackground.tsx (Alpha Blueprint) — cor, velocidade, densidade e a grade viram editáveis. */
 export function BlueprintFundo({ componente }: { componente: FundoAnimadoComponente }) {
+  const { ref, visivel } = useVisibilidadeIframe<HTMLDivElement>();
   const reduceMotion = useReducedMotion();
   const accentRgb = hexParaRgb(componente.corPrimaria);
   const accentSecundariaRgb = hexParaRgb(componente.corSecundaria, "14, 165, 233");
@@ -69,7 +71,7 @@ export function BlueprintFundo({ componente }: { componente: FundoAnimadoCompone
   }, [pointerX, pointerY, reduceMotion]);
 
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div ref={ref} className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
       <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #020617 0%, #0a1830 45%, #020617 100%)" }} />
 
       {componente.mostrarGrade && (
@@ -102,6 +104,10 @@ export function BlueprintFundo({ componente }: { componente: FundoAnimadoCompone
         style={{ background: `linear-gradient(115deg, transparent 68%, rgba(${accentRgb},0.05) 68.6%, rgba(${accentRgb},0.05) 68.9%, transparent 69.5%)` }}
       />
 
+      {/* Conteúdo animado só monta com o módulo realmente visível — evita animações
+          `repeat: Infinity` rodando em segundo plano com a aba escondida (mas montada). */}
+      {visivel && (
+      <>
       {ancoras.map((a, i) => (
         <motion.div
           key={i}
@@ -135,6 +141,8 @@ export function BlueprintFundo({ componente }: { componente: FundoAnimadoCompone
           }}
         />
       </motion.div>
+      </>
+      )}
 
       <div
         className="absolute inset-0"

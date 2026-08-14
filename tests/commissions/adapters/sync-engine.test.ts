@@ -11,7 +11,7 @@ const prismaMock = vi.hoisted(() => ({
   contratoComercial: {
     findMany: vi.fn(),
   },
-  clientes: {
+  clienteServico: {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     findMany: vi.fn(),
@@ -44,11 +44,12 @@ vi.mock("@/lib/commissions/participant-resolver", () => ({
 import { sincronizarComissoes } from "@/lib/commissions/sync-engine";
 
 function contratoRow(overrides: Record<string, unknown> = {}) {
+  const { cnpj, razaoSocial, nomeFantasia, ...resto } = overrides as {
+    cnpj?: string | null; razaoSocial?: string; nomeFantasia?: string | null;
+  };
   return {
     id: "contrato-1",
-    cnpj: "12345678000190",
-    razaoSocial: "Alpha Import",
-    nomeFantasia: null,
+    clienteId: 501,
     valorContrato: 22000,
     formaPagamento: "A_VISTA_DESCONTO",
     servico: "Revisão de RADAR Ilimitado",
@@ -57,7 +58,12 @@ function contratoRow(overrides: Record<string, unknown> = {}) {
     pagamentoConfirmado: true,
     pagamentoConfirmadoEm: new Date("2026-07-15T00:00:00.000Z"),
     updatedAt: new Date("2026-07-15T00:00:00.000Z"),
-    ...overrides,
+    cliente: {
+      cnpj: cnpj ?? "12345678000190",
+      razaoSocial: razaoSocial ?? "Alpha Import",
+      nomeFantasia: nomeFantasia ?? null,
+    },
+    ...resto,
   };
 }
 
@@ -66,7 +72,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
     vi.clearAllMocks();
     prismaMock.syncRun.create.mockResolvedValue({ id: "sync-run-1" });
     prismaMock.syncRun.update.mockResolvedValue({});
-    prismaMock.clientes.findMany.mockResolvedValue([]); // sem êxitos pendentes por padrão
+    prismaMock.clienteServico.findMany.mockResolvedValue([]); // sem êxitos pendentes por padrão
     prismaMock.commissionEvent.findMany.mockResolvedValue([]);
     prismaMock.commissionEvent.findFirst.mockResolvedValue(null); // sem CONTRACTING prévio por padrão
     prismaMock.businessProcess.findFirst.mockResolvedValue(null); // sem BusinessProcess por padrão
@@ -92,7 +98,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
   it("contratação nova (sem evento prévio): cria CommissionEvent uma única vez", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow()]);
     prismaMock.commissionEvent.findUnique.mockResolvedValue(null); // ainda não processado
-    prismaMock.clientes.findFirst.mockResolvedValue(null); // sem cliente correspondente ainda
+    prismaMock.clienteServico.findFirst.mockResolvedValue(null); // sem cliente correspondente ainda
     prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo" });
 
     const result = await sincronizarComissoes({ triggeredBy: "manual" });
@@ -105,7 +111,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
   it("contratação nova grava closerUsuarioId (FK real) quando ContratoComercial.usuarioId existe — nunca usa nome manual junto com o FK", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ usuarioId: 10, closerNome: "Sheila" })]);
     prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
-    prismaMock.clientes.findFirst.mockResolvedValue(null);
+    prismaMock.clienteServico.findFirst.mockResolvedValue(null);
     prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo" });
 
     await sincronizarComissoes({ triggeredBy: "manual" });
@@ -120,7 +126,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
   it("contratação nova com closer resolvido (FK): gera lançamento automático só para o closer", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ usuarioId: 10 })]);
     prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
-    prismaMock.clientes.findFirst.mockResolvedValue(null);
+    prismaMock.clienteServico.findFirst.mockResolvedValue(null);
     prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo", closerUsuarioId: 10 });
 
     await sincronizarComissoes({ triggeredBy: "manual" });
@@ -131,7 +137,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
   it("contratação nova sem closer resolvido: NÃO chama geração automática (nada a gerar)", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ usuarioId: null as unknown as number, closerNome: null })]);
     prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
-    prismaMock.clientes.findFirst.mockResolvedValue(null);
+    prismaMock.clienteServico.findFirst.mockResolvedValue(null);
     prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-novo", closerUsuarioId: null });
     resolverParticipantesMock.mockResolvedValue({ collaboratorIds: [], ambiguidades: [] });
 
@@ -143,7 +149,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
   it("dado ausente (falha ao processar 1 contrato) vira SyncError e é registrado, sem derrubar o resto da sincronização", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([contratoRow({ id: "contrato-com-erro" })]);
     prismaMock.commissionEvent.findUnique.mockResolvedValue(null);
-    prismaMock.clientes.findFirst.mockRejectedValue(new Error("Falha simulada de leitura"));
+    prismaMock.clienteServico.findFirst.mockRejectedValue(new Error("Falha simulada de leitura"));
 
     const result = await sincronizarComissoes({ triggeredBy: "manual" });
 
@@ -154,15 +160,12 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
 
   it("êxito detectado (clientes.dataExito preenchida, sem evento prévio) gera CommissionEvent de PROCESS_SUCCESS", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([]);
-    prismaMock.clientes.findMany.mockResolvedValue([{ id: 5 }]); // 1 cliente com dataExito não processado
+    prismaMock.clienteServico.findMany.mockResolvedValue([{ id: 5 }]); // 1 cliente com dataExito não processado
     prismaMock.commissionEvent.findMany.mockResolvedValue([]); // nenhum evento de êxito já existe
     prismaMock.commissionEvent.findFirst.mockResolvedValue(null); // sem CONTRACTING prévio para herdar closer
-    prismaMock.clientes.findUnique.mockResolvedValue({
+    prismaMock.clienteServico.findUnique.mockResolvedValue({
       id: 5,
-      cnpj: "12345678000190",
-      razaoSocial: "Alpha Import",
-      nomeFantasia: null,
-      servicos: "Revisão de RADAR Ilimitado",
+      servico: "Revisão de RADAR Ilimitado",
       formaPagamento: "A_VISTA_DESCONTO",
       valorContrato: 22000,
       closerNome: "Sheila",
@@ -171,6 +174,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
       dataExito: "2026-07-20",
       embasamento: null,
       origemLead: null,
+      cliente: { cnpj: "12345678000190", razaoSocial: "Alpha Import", nomeFantasia: null },
     });
     prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-exito" });
     prismaMock.businessProcess.findFirst.mockResolvedValue(null); // sem BusinessProcess -> divergência
@@ -188,15 +192,12 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
 
   it("êxito herda closerUsuarioId do evento de CONTRATAÇÃO já sincronizado, e analistaResponsavelUsuarioId do BusinessProcess (FK real)", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([]);
-    prismaMock.clientes.findMany.mockResolvedValue([{ id: 5 }]);
+    prismaMock.clienteServico.findMany.mockResolvedValue([{ id: 5 }]);
     prismaMock.commissionEvent.findMany.mockResolvedValue([]);
     prismaMock.commissionEvent.findFirst.mockResolvedValue({ closerUsuarioId: 10, closerNomeManual: null });
-    prismaMock.clientes.findUnique.mockResolvedValue({
+    prismaMock.clienteServico.findUnique.mockResolvedValue({
       id: 5,
-      cnpj: "12345678000190",
-      razaoSocial: "Alpha Import",
-      nomeFantasia: null,
-      servicos: "Revisão de RADAR Ilimitado",
+      servico: "Revisão de RADAR Ilimitado",
       formaPagamento: "A_VISTA_DESCONTO",
       valorContrato: 22000,
       closerNome: "Sheila",
@@ -205,6 +206,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
       dataExito: "2026-07-20",
       embasamento: null,
       origemLead: null,
+      cliente: { cnpj: "12345678000190", razaoSocial: "Alpha Import", nomeFantasia: null },
     });
     prismaMock.commissionEvent.create.mockResolvedValue({
       id: "evento-exito",
@@ -244,15 +246,12 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
 
   it("êxito sem CONTRACTING prévio nem BusinessProcess: cai para nome manual (clientes.closerNome/analistaResponsavel), nunca inventa FK", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([]);
-    prismaMock.clientes.findMany.mockResolvedValue([{ id: 5 }]);
+    prismaMock.clienteServico.findMany.mockResolvedValue([{ id: 5 }]);
     prismaMock.commissionEvent.findMany.mockResolvedValue([]);
     prismaMock.commissionEvent.findFirst.mockResolvedValue(null);
-    prismaMock.clientes.findUnique.mockResolvedValue({
+    prismaMock.clienteServico.findUnique.mockResolvedValue({
       id: 5,
-      cnpj: "12345678000190",
-      razaoSocial: "Alpha Import",
-      nomeFantasia: null,
-      servicos: "Revisão de RADAR Ilimitado",
+      servico: "Revisão de RADAR Ilimitado",
       formaPagamento: "A_VISTA_DESCONTO",
       valorContrato: 22000,
       closerNome: "Sheila",
@@ -261,6 +260,7 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
       dataExito: "2026-07-20",
       embasamento: null,
       origemLead: null,
+      cliente: { cnpj: "12345678000190", razaoSocial: "Alpha Import", nomeFantasia: null },
     });
     prismaMock.commissionEvent.create.mockResolvedValue({ id: "evento-exito" });
     prismaMock.businessProcess.findFirst.mockResolvedValue(null);
@@ -281,13 +281,13 @@ describe("sincronizarComissoes — idempotência e divergência", () => {
 
   it("êxito já processado (idempotência): listarClientesComExitoNaoProcessado já filtra, não reprocessa", async () => {
     prismaMock.contratoComercial.findMany.mockResolvedValue([]);
-    prismaMock.clientes.findMany.mockResolvedValue([{ id: 5 }]);
+    prismaMock.clienteServico.findMany.mockResolvedValue([{ id: 5 }]);
     // Simula que já existe evento de êxito para o cliente 5 — filtro deve excluí-lo.
     prismaMock.commissionEvent.findMany.mockResolvedValue([{ clienteId: 5 }]);
 
     const result = await sincronizarComissoes({ triggeredBy: "manual" });
 
-    expect(prismaMock.clientes.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.clienteServico.findUnique).not.toHaveBeenCalled();
     expect(result.totalProcessed).toBe(0);
   });
 });

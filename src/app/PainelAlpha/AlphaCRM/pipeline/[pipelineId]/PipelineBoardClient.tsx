@@ -12,11 +12,11 @@ import {
   useSensors,
   DragOverlay,
   closestCorners,
+  useDroppable,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import Link from "next/link";
-import { Plus, Building2, User } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, PhoneCall, Plus, RefreshCw, StickyNote, User } from "lucide-react";
 import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import {
   BPM_PIPELINE_EVENT,
@@ -28,6 +28,16 @@ import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
+import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
+import { etapaEhBoasVindas } from "@/lib/bpm/boas-vindas";
+import { campoEhResumoAlinhamento, etapaEhAlinhamentoEstrategico } from "@/lib/bpm/alinhamento-estrategico";
+import {
+  criarSnapshotBoard,
+  moverCardOtimistaNoBoard,
+  podeIniciarArrastoBoard,
+  resolverMovimentoOtimistaBoard,
+  restaurarSnapshotBoard,
+} from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
 
 interface EtapaBpm {
@@ -35,23 +45,12 @@ interface EtapaBpm {
   nome: string;
   ordem: number;
   slaDias: number | null;
-  camposObrigatorios?: { campoId: string }[];
-}
-
-interface CampoBpm {
-  id: string;
-  etapaId: string | null;
-  nome: string;
-  tipo: string;
-  obrigatorio: boolean;
-  opcoesJson: string | null;
 }
 
 interface PipelineBpm {
   id: string;
   nome: string;
   etapas: EtapaBpm[];
-  campos: CampoBpm[];
 }
 
 interface CardBpm {
@@ -64,7 +63,8 @@ interface CardBpm {
   empresa: { id: number; razaoSocial: string; nomeFantasia: string | null };
   responsavel: { id: number; nome: string };
   _count: { tarefas: number; anexos: number };
-  campoValores?: { valor: string | null }[];
+  tarefas: { titulo: string; prazo: Date | string | null; tipo: string }[];
+  campoValores?: { valor: string | null; campo: { nome: string } }[];
   ligacoesHoje?: number;
   metaLigacoesDia?: number;
   diasUteisDecorridos?: number;
@@ -73,26 +73,47 @@ interface CardBpm {
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
 
+function formatarPrazoNoCard(data: Date | string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(data));
+}
+
 function KanbanCard({
   card,
   etapaNome,
   accent,
   novosLeads,
+  arrastoDesabilitado,
   onAbrir,
 }: {
   card: CardBpm;
   etapaNome: string;
   accent: string;
   novosLeads: boolean;
+  arrastoDesabilitado: boolean;
   onAbrir: (cardId: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    disabled: arrastoDesabilitado,
+  });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
   const naoAcessado = !card.primeiraVisualizacaoEm;
-  const canalOrigem = card.campoValores?.[0]?.valor;
+  const alertaBoasVindas = etapaEhBoasVindas(etapaNome) && naoAcessado;
+  const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
+  const resumoAlinhamento = card.campoValores?.find((campo) => campoEhResumoAlinhamento(campo.campo.nome))?.valor;
+  const alertaAlinhamento = etapaEhAlinhamentoEstrategico(etapaNome) && !resumoAlinhamento?.trim();
   const statusConfig = obterStatusPosFechamentoVisivel({ etapaNome, status: card.statusPosFechamento });
   const nomeEmpresa = card.empresa.nomeFantasia || card.empresa.razaoSocial;
+  const inicialEmpresa = nomeEmpresa.trim().charAt(0).toUpperCase() || "?";
+  const proximaTarefaComPrazo = card.tarefas.find((tarefa) => tarefa.prazo);
+  const anotacaoRapidaPendente = card.tarefas.find((tarefa) => tarefa.tipo === "LEMBRETE_RAPIDO");
 
   return (
     <div
@@ -103,86 +124,164 @@ function KanbanCard({
       onClick={() => onAbrir(card.id)}
       aria-label={statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
-        "border bg-slate-800/80 rounded-xl p-3 space-y-2 cursor-grab active:cursor-grabbing transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        "group relative isolate overflow-hidden rounded-2xl border bg-slate-900/80 p-0 shadow-lg shadow-black/20 backdrop-blur-sm cursor-grab active:cursor-grabbing select-none transition-[border-color,box-shadow,filter,opacity] duration-150 hover:shadow-xl hover:shadow-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         statusConfig?.cardClassName,
-        naoAcessado
-          ? "border-cyan-400/50 hover:border-cyan-400/70"
+        alertaBoasVindas || alertaAlinhamento
+          ? "border-red-500/70 bg-red-950/25 shadow-red-950/40 hover:border-red-400 animate-pulse"
+          : naoAcessado
+            ? "border-cyan-400/50 hover:border-cyan-400/70"
           : statusConfig
             ? "hover:brightness-110"
             : "border-white/5 hover:border-white/10",
+        isDragging && "cursor-grabbing border-white/20 shadow-2xl shadow-black/40 ring-1 ring-white/15",
       )}
     >
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-white leading-tight">
-        {naoAcessado && (
-          <span
-            className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 animate-pulse"
-            title="Nunca acessado"
-          />
-        )}
-        <Building2 size={12} className="text-slate-400 shrink-0" />
-        <Link
-          href={`/PainelAlpha/AlphaCRM/empresa/${card.empresa.id}`}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="hover:underline"
-        >
-          {nomeEmpresa}
-        </Link>
-      </div>
-      {card.servico && <p className="text-[11px] text-slate-400 leading-tight">{card.servico}</p>}
-      {(canalOrigem || statusConfig) && (
-        <div className="flex flex-wrap items-center gap-1">
-          {canalOrigem && (
-            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-white/5 text-slate-300 border border-white/10">
-              {canalOrigem}
-            </span>
-          )}
-          {statusConfig && (
-            <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded-md border", statusConfig.badgeClassName)}>
-              {statusConfig.label}
-            </span>
-          )}
-        </div>
-      )}
-      {novosLeads && (
-        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-1 bg-white/20 transition-[width] duration-150 group-hover:w-1.5"
+        style={{ background: `rgb(${accent})` }}
+      />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br from-white/[0.08] via-transparent to-transparent" />
+
+      <div className="relative space-y-3 px-3 pb-3 pt-3.5">
+        <div className="flex items-start gap-2.5">
           <div
-            className={`rounded-lg border px-2 py-1 text-[9px] font-semibold ${
-              (card.ligacoesHoje ?? 0) >= (card.metaLigacoesDia ?? 5)
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-300"
-            }`}
+            aria-hidden="true"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black tracking-tight text-white shadow-inner shadow-white/5"
           >
-            Ligações hoje: {card.ligacoesHoje ?? 0}/{card.metaLigacoesDia ?? 5}
+            {inicialEmpresa}
           </div>
-          <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-[9px] font-semibold text-sky-300">
-            Dia {card.diaCiclo ?? 1}/8
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-white">
+              {naoAcessado && (
+                <span
+                  className={cn("h-1.5 w-1.5 shrink-0 rounded-full animate-pulse", alertaBoasVindas ? "bg-red-400" : "bg-cyan-400")}
+                  title="Nunca acessado"
+                />
+              )}
+              <Building2 size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAbrir(card.id);
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                className="line-clamp-2 text-left decoration-white/40 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                aria-label={`Abrir card de ${nomeEmpresa}`}
+              >
+                {nomeEmpresa}
+              </button>
+            </div>
+            {card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
           </div>
         </div>
-      )}
-      <div className="flex items-center justify-between pt-0.5">
-        <div className="flex items-center gap-2 text-[10px] text-slate-500">
-          {card._count.tarefas > 0 && <span>{card._count.tarefas} tarefa(s)</span>}
-          {card._count.anexos > 0 && <span>{card._count.anexos} anexo(s)</span>}
+
+        {(alertaBoasVindas || alertaAlinhamento) && (
+          <div
+            role="status"
+            className="flex items-center gap-1.5 rounded-xl border border-red-400/35 bg-red-500/15 px-2.5 py-2 text-[10px] font-extrabold uppercase tracking-wide text-red-100"
+          >
+            <AlertTriangle size={13} aria-hidden="true" className="shrink-0 text-red-300" />
+            <span>{alertaBoasVindas ? "Nunca acessado — requer atenção" : "Chamada de alinhamento pendente"}</span>
+          </div>
+        )}
+
+        {(canalOrigem || statusConfig) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {canalOrigem && (
+              <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
+                {canalOrigem}
+              </span>
+            )}
+            {statusConfig && (
+              <span className={cn("rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide", statusConfig.badgeClassName)}>
+                {statusConfig.label}
+              </span>
+            )}
+          </div>
+        )}
+
+        {novosLeads && (
+          <div className="grid grid-cols-2 gap-1.5 border-t border-white/[0.06] pt-2.5">
+            <div
+              className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[9px] font-bold ${
+                (card.ligacoesHoje ?? 0) >= (card.metaLigacoesDia ?? 5)
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+              }`}
+            >
+              <PhoneCall size={11} aria-hidden="true" />
+              <span className="tabular-nums">{card.ligacoesHoje ?? 0}/{card.metaLigacoesDia ?? 5}</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-[9px] font-bold text-sky-300">
+              <CalendarClock size={11} aria-hidden="true" />
+              <span className="tabular-nums">Dia {card.diaCiclo ?? 1}/8</span>
+            </div>
+          </div>
+        )}
+
+        {(proximaTarefaComPrazo || anotacaoRapidaPendente) && (
+          <div className="space-y-1.5 border-t border-white/[0.06] pt-2.5">
+            {proximaTarefaComPrazo && (
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-sky-200" title={`Próximo prazo: ${proximaTarefaComPrazo.titulo}`}>
+                <CalendarClock size={12} aria-hidden="true" className="shrink-0 text-sky-300" />
+                <span className="shrink-0 uppercase tracking-wide text-sky-300/75">Prazo</span>
+                <span className="truncate tabular-nums">{formatarPrazoNoCard(proximaTarefaComPrazo.prazo!)}</span>
+              </div>
+            )}
+            {anotacaoRapidaPendente && (
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-amber-100" title={`Anotação rápida pendente: ${anotacaoRapidaPendente.titulo}`}>
+                <StickyNote size={12} aria-hidden="true" className="shrink-0 text-amber-300" />
+                <span className="shrink-0 uppercase tracking-wide text-amber-300/75">Anotação</span>
+                <span className="truncate">{anotacaoRapidaPendente.titulo}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5">
+          <div className="flex min-h-6 items-center gap-2 text-[10px] font-medium text-slate-400">
+            {card._count.tarefas > 0 && (
+              <span className="inline-flex items-center gap-1" title={`${card._count.tarefas} tarefa(s)`}>
+                <ClipboardList size={12} aria-hidden="true" />
+                <span className="tabular-nums">{card._count.tarefas}</span>
+                <span className="sr-only">tarefa(s)</span>
+              </span>
+            )}
+            {card._count.anexos > 0 && (
+              <span className="inline-flex items-center gap-1" title={`${card._count.anexos} anexo(s)`}>
+                <Paperclip size={12} aria-hidden="true" />
+                <span className="tabular-nums">{card._count.anexos}</span>
+                <span className="sr-only">anexo(s)</span>
+              </span>
+            )}
+            {card._count.tarefas === 0 && card._count.anexos === 0 && (
+              <span className="text-slate-500">Sem pendências</span>
+            )}
+          </div>
+          <span
+            role="img"
+            aria-label={`Responsável: ${card.responsavel.nome}`}
+            className="flex h-7 w-7 items-center justify-center rounded-xl border border-white/10 text-[10px] font-black text-white shadow-sm shadow-black/30"
+            style={{ background: `rgba(${accent},0.5)` }}
+            title={card.responsavel.nome}
+          >
+            {card.responsavel.nome?.[0]?.toUpperCase() || <User size={11} aria-hidden="true" />}
+          </span>
         </div>
-        <span
-          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-white"
-          style={{ background: `rgba(${accent},0.5)` }}
-          title={card.responsavel.nome}
-        >
-          {card.responsavel.nome?.[0]?.toUpperCase() || <User size={10} />}
-        </span>
       </div>
     </div>
   );
 }
 
 function KanbanColumn({
-  etapa, cor, cards, accent, onAdd, onAbrirCard,
+  etapa, cor, cards, accent, arrastoDesabilitado, onAdd, onAbrirCard,
 }: {
-  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; onAdd: (etapaId: string) => void; onAbrirCard: (cardId: string) => void;
+  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; onAdd?: () => void; onAbrirCard: (cardId: string) => void;
 }) {
-  const novosLeads = etapa.nome.trim().toLocaleLowerCase("pt-BR") === "novos leads";
+  const novosLeads = etapaEhNovosLeads(etapa.nome);
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
   return (
     <div className="flex flex-col min-w-[240px] max-w-[240px]">
       <div className="flex items-center justify-between mb-2 px-1">
@@ -196,20 +295,28 @@ function KanbanColumn({
             {cards.length}
           </span>
         </div>
-        <button
-          onClick={() => onAdd(etapa.id)}
-          className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          <Plus size={13} />
-        </button>
+        {onAdd && (
+          <button
+            type="button"
+            onClick={onAdd}
+            aria-label="Criar card em Novos Leads"
+            className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Plus size={13} aria-hidden="true" />
+          </button>
+        )}
       </div>
       {etapa.slaDias && (
         <p className="text-[10px] text-slate-500 mb-2 px-1">SLA: {etapa.slaDias}d</p>
       )}
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div
+          ref={setDroppableRef}
           className="flex-1 rounded-2xl p-2 space-y-2 min-h-[60px] border border-dashed border-white/5"
-          style={{ background: `rgba(${cor},0.03)` }}
+          style={{
+            background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},0.03)`,
+            borderColor: isOver ? `rgba(${cor},0.5)` : undefined,
+          }}
         >
           {cards.map((c) => (
             <KanbanCard
@@ -218,6 +325,7 @@ function KanbanColumn({
               etapaNome={etapa.nome}
               accent={accent}
               novosLeads={novosLeads}
+              arrastoDesabilitado={arrastoDesabilitado}
               onAbrir={onAbrirCard}
             />
           ))}
@@ -235,6 +343,16 @@ interface Props {
   currentUserRole: string | null;
 }
 
+interface SnapshotArrasto {
+  cards: CardBpm[];
+  generation: number;
+}
+
+interface OpcoesRecarregarCards {
+  generation?: number;
+  preservarErro?: boolean;
+}
+
 export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, currentUserId, currentUserRole }: Props) {
   const accent = visual.accent;
   const router = useRouter();
@@ -242,33 +360,70 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [etapaNovoCard, setEtapaNovoCard] = useState<string | null>(null);
+  const [novoCardAberto, setNovoCardAberto] = useState(false);
+  const [movimentoPendente, setMovimentoPendente] = useState(false);
+  const [atualizandoManual, setAtualizandoManual] = useState(false);
   const [realtimeRevision, setRealtimeRevision] = useState(0);
   const ultimaRequisicaoRef = useRef(0);
   const realtimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardSelecionadoIdRef = useRef<string | null>(null);
-  const etapaOrigemDragRef = useRef<string | null>(null);
+  const snapshotArrastoRef = useRef<SnapshotArrasto | null>(null);
+  const generationBoardRef = useRef(0);
+  const sincronizacaoRealtimePendenteRef = useRef(false);
+  const movimentoPendenteRef = useRef(false);
+  const atualizacaoManualRef = useRef(false);
 
   const etapasOrdenadas = [...pipeline.etapas].sort((a, b) => a.ordem - b.ordem);
+  // A entrada de um lead é única: só a primeira coluna pode ser Novos Leads.
+  // Se a configuração do pipeline estiver inconsistente, falhamos fechados e não
+  // oferecemos criação em nenhuma outra etapa.
+  const primeiraEtapa = etapasOrdenadas[0];
+  const etapaNovosLeads = primeiraEtapa && etapaEhNovosLeads(primeiraEtapa.nome)
+    ? primeiraEtapa
+    : undefined;
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const getByEtapa = (etapaId: string) => cards.filter((c) => c.etapaId === etapaId);
 
-  const recarregarCards = useCallback(async () => {
+  const recarregarCards = useCallback(async (opcoes: OpcoesRecarregarCards = {}) => {
     const requisicao = ++ultimaRequisicaoRef.current;
-    const res = await ListarCardsPipelineBpm(pipeline.id);
+    const generation = opcoes.generation ?? generationBoardRef.current;
+    let res: Awaited<ReturnType<typeof ListarCardsPipelineBpm>>;
+    try {
+      res = await ListarCardsPipelineBpm(pipeline.id);
+    } catch {
+      if (requisicao === ultimaRequisicaoRef.current && generation === generationBoardRef.current && !opcoes.preservarErro) {
+        setErro("Nao foi possivel atualizar os cards");
+      }
+      return false;
+    }
 
-    if (requisicao !== ultimaRequisicaoRef.current) return false;
+    if (requisicao !== ultimaRequisicaoRef.current || generation !== generationBoardRef.current) return false;
     if (!res.success) {
-      setErro(typeof res.error === "string" ? res.error : "Nao foi possivel atualizar os cards");
+      if (!opcoes.preservarErro) {
+        setErro(typeof res.error === "string" ? res.error : "Nao foi possivel atualizar os cards");
+      }
       return false;
     }
 
     setCards(res.data);
-    setErro(null);
+    if (!opcoes.preservarErro) setErro(null);
     return true;
   }, [pipeline.id]);
+
+  const atualizarPipeline = useCallback(async () => {
+    if (atualizacaoManualRef.current || movimentoPendenteRef.current || snapshotArrastoRef.current) return;
+
+    atualizacaoManualRef.current = true;
+    setAtualizandoManual(true);
+    try {
+      await recarregarCards();
+    } finally {
+      atualizacaoManualRef.current = false;
+      setAtualizandoManual(false);
+    }
+  }, [recarregarCards]);
 
   useEffect(() => {
     const canal = canalPipelineBpm(pipeline.id);
@@ -280,8 +435,11 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       if (realtimeTimerRef.current) clearTimeout(realtimeTimerRef.current);
       realtimeTimerRef.current = setTimeout(() => {
         realtimeTimerRef.current = null;
+        if (snapshotArrastoRef.current) {
+          sincronizacaoRealtimePendenteRef.current = true;
+          return;
+        }
         void recarregarCards();
-        router.refresh();
         if (cardSelecionadoIdRef.current) setRealtimeRevision((revision) => revision + 1);
       }, 100);
     };
@@ -310,12 +468,18 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   }, []);
 
   function onDragStart({ active }: DragStartEvent) {
+    if (!podeIniciarArrastoBoard(movimentoPendenteRef.current) || snapshotArrastoRef.current) return;
+    const generation = ++generationBoardRef.current;
+    snapshotArrastoRef.current = {
+      cards: criarSnapshotBoard(cards),
+      generation,
+    };
     setActiveId(String(active.id));
     setErro(null);
-    etapaOrigemDragRef.current = cards.find((card) => card.id === active.id)?.etapaId ?? null;
   }
 
   function onDragOver({ active, over }: DragOverEvent) {
+    if (movimentoPendenteRef.current || !snapshotArrastoRef.current) return;
     if (!over) return;
     const activeCard = cards.find((c) => c.id === active.id);
     if (!activeCard) return;
@@ -325,63 +489,130 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     const targetEtapaId = overEtapa || overCard?.etapaId;
 
     if (targetEtapaId && targetEtapaId !== activeCard.etapaId) {
-      setCards((prev) => prev.map((c) => (c.id === activeCard.id ? { ...c, etapaId: targetEtapaId } : c)));
+      setCards((prev) => moverCardOtimistaNoBoard(prev, activeCard.id, targetEtapaId));
+    }
+  }
+
+  async function restaurarArrasto(snapshot: SnapshotArrasto, mensagem?: string) {
+    if (snapshotArrastoRef.current !== snapshot) return;
+    const generationRollback = ++generationBoardRef.current;
+    setCards(restaurarSnapshotBoard(snapshot.cards));
+    if (mensagem) setErro(mensagem);
+
+    // A c\u00f3pia local \u00e9 a fonte imediata de verdade. A recarga \u00e9 somente uma
+    // reconcilia\u00e7\u00e3o em segundo plano e n\u00e3o pode apagar o motivo do bloqueio.
+    try {
+      await recarregarCards({ generation: generationRollback, preservarErro: Boolean(mensagem) });
+    } finally {
+      if (snapshotArrastoRef.current !== snapshot) return;
+      snapshotArrastoRef.current = null;
+      movimentoPendenteRef.current = false;
+      setMovimentoPendente(false);
+
+      if (sincronizacaoRealtimePendenteRef.current) {
+        sincronizacaoRealtimePendenteRef.current = false;
+        void recarregarCards({ generation: generationBoardRef.current, preservarErro: Boolean(mensagem) });
+      }
     }
   }
 
   async function onDragEnd({ active, over }: DragEndEvent) {
     setActiveId(null);
+    const snapshot = snapshotArrastoRef.current;
+    if (!snapshot) return;
+    movimentoPendenteRef.current = true;
+    setMovimentoPendente(true);
+
     if (!over) {
-      etapaOrigemDragRef.current = null;
-      await recarregarCards();
+      await restaurarArrasto(snapshot);
       return;
     }
 
-    const activeCard = cards.find((c) => c.id === active.id);
-    if (!activeCard) return;
+    const activeCard = snapshot.cards.find((c) => c.id === active.id);
+    if (!activeCard) {
+      await restaurarArrasto(snapshot);
+      return;
+    }
 
     const overEtapa = etapasOrdenadas.find((e) => e.id === over.id)?.id;
     const overCard = cards.find((c) => c.id === over.id);
     const etapaDestinoId = overEtapa || overCard?.etapaId;
 
-    const etapaOriginal = etapaOrigemDragRef.current;
-    etapaOrigemDragRef.current = null;
-    if (etapaDestinoId && etapaDestinoId !== etapaOriginal) {
-      const res = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId });
-      if (!res.success) {
-        await recarregarCards();
-        setErro(typeof res.error === "string" ? res.error : "Nao foi possivel mover o card");
-        router.refresh();
-        return;
+    if (!etapaDestinoId || etapaDestinoId === activeCard.etapaId) {
+      await restaurarArrasto(snapshot);
+      return;
+    }
+
+    let motivoRejeicao = "Nao foi possivel mover o card";
+    try {
+      const resultado = await resolverMovimentoOtimistaBoard({
+        mover: async () => {
+          try {
+            const res = await MoverCardBpm({ cardId: activeCard.id, etapaDestinoId });
+            if (!res.success) {
+              motivoRejeicao = typeof res.error === "string" ? res.error : motivoRejeicao;
+              return false;
+            }
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        reconciliar: () => recarregarCards({ generation: snapshot.generation }),
+        restaurar: () => restaurarArrasto(snapshot, motivoRejeicao),
+      });
+
+      if (snapshotArrastoRef.current !== snapshot) return;
+      if (resultado === "SINCRONIZACAO_PENDENTE") {
+        setErro("Movimento salvo, mas nao foi possivel sincronizar o board agora.");
       }
-      await recarregarCards();
-      router.refresh();
+    } finally {
+      if (snapshotArrastoRef.current !== snapshot) return;
+      snapshotArrastoRef.current = null;
+      movimentoPendenteRef.current = false;
+      setMovimentoPendente(false);
+
+      if (sincronizacaoRealtimePendenteRef.current) {
+        sincronizacaoRealtimePendenteRef.current = false;
+        void recarregarCards({ generation: generationBoardRef.current });
+      }
+    }
+  }
+
+  function onDragCancel() {
+    setActiveId(null);
+    const snapshot = snapshotArrastoRef.current;
+    if (snapshot) {
+      movimentoPendenteRef.current = true;
+      setMovimentoPendente(true);
+      void restaurarArrasto(snapshot);
     }
   }
 
   const activeCard = cards.find((c) => c.id === activeId);
-  const etapaSelecionada = pipeline.etapas.find((etapa) => etapa.id === etapaNovoCard);
-  const camposObrigatoriosSelecionados = new Set(
-    etapaSelecionada?.camposObrigatorios?.map((item) => item.campoId) ?? [],
-  );
-  const camposNovoCard = pipeline.campos
-    .filter(
-      (campo) =>
-        campo.etapaId === etapaNovoCard || camposObrigatoriosSelecionados.has(campo.id),
-    )
-    .map((campo) => ({
-      ...campo,
-      obrigatorio: campo.obrigatorio || camposObrigatoriosSelecionados.has(campo.id),
-    }));
-
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between p-6 pb-4">
-        <h1 className="text-xl font-black text-white">{pipeline.nome}</h1>
+      <div className="flex items-center justify-between gap-3 p-6 pb-4">
+        <h1 className="min-w-0 truncate text-xl font-black text-white">{pipeline.nome}</h1>
+        <button
+          type="button"
+          onClick={() => void atualizarPipeline()}
+          disabled={atualizandoManual || movimentoPendente}
+          aria-label="Atualizar pipeline"
+          title="Atualizar pipeline"
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-slate-200 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-wait disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${atualizandoManual ? "animate-spin" : ""}`} aria-hidden="true" />
+          <span className="hidden sm:inline">Atualizar</span>
+        </button>
       </div>
 
       {erro && (
-        <div className="mx-6 mb-3 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mx-6 mb-3 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"
+        >
           {erro}
         </div>
       )}
@@ -392,6 +623,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
+        onDragCancel={onDragCancel}
       >
         <div className="flex-1 overflow-x-auto px-6 pb-6">
           <div className="flex gap-4 h-full min-w-max">
@@ -402,7 +634,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
                 cor={CORES_ETAPA[i % CORES_ETAPA.length]}
                 cards={getByEtapa(etapa.id)}
                 accent={accent}
-                onAdd={setEtapaNovoCard}
+                arrastoDesabilitado={movimentoPendente}
+                onAdd={etapa.id === etapaNovosLeads?.id ? () => setNovoCardAberto(true) : undefined}
                 onAbrirCard={abrirCard}
               />
             ))}
@@ -420,20 +653,18 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         </DragOverlay>
       </DndContext>
 
-      {etapaNovoCard && (
+      {novoCardAberto && etapaNovosLeads && (
         <NovoCardModal
           pipelineId={pipeline.id}
-          etapaId={etapaNovoCard}
-          etapaNome={etapaSelecionada?.nome ?? "Etapa selecionada"}
-          campos={camposNovoCard}
+          etapaId={etapaNovosLeads.id}
           currentUserId={currentUserId}
           accent={accent}
-          onClose={() => setEtapaNovoCard(null)}
+          onClose={() => setNovoCardAberto(false)}
           onCriado={async (dados) => {
             const res = await CriarCardBpm(dados);
             if (res.success) {
               await recarregarCards();
-              setEtapaNovoCard(null);
+              setNovoCardAberto(false);
               router.refresh();
               return { success: true as const };
             }

@@ -22,6 +22,8 @@ import {
     arquivarContrato,
     restaurarContrato,
     criarObservacaoContrato,
+    buscarClienteParaContrato,
+    listarClientesEmConstituicao,
 } from "@/actions/ContratoComercial";
 import { listarParceirosSimples, buscarParceiroDetalheSimples } from "@/actions/parceiros";
 import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
@@ -74,7 +76,8 @@ interface ObservacaoContrato {
 
 interface Contrato {
     id: string;
-    cnpj: string;
+    clienteId: number;
+    cnpj: string | null;
     razaoSocial: string;
     nomeFantasia: string | null;
     valorContrato: number;
@@ -150,7 +153,8 @@ function formatBRL(v: number) {
     return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function formatCNPJ(cnpj: string) {
+function formatCNPJ(cnpj: string | null | undefined) {
+    if (!cnpj) return "Em constituição";
     const d = cnpj.replace(/\D/g, "");
     if (d.length !== 14) return cnpj;
     return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
@@ -214,7 +218,10 @@ function FormNovoContrato({
 }: FormNovoContratoProps) {
     const isEdicao = !!editandoId;
     const cnpjInicial = initialData?.cnpj ? formatCNPJ(initialData.cnpj) : "";
-    const eConstituicaoInicial = initialData?.cnpj === "00000000000000";
+    // Fase 3.6 do Cliente Master (2026-08-14): "em constituição" passou a ser
+    // Cliente.cnpj === null (sem sentinela) — o clienteId já existente é o vínculo,
+    // não um CNPJ inventado.
+    const eConstituicaoInicial = isEdicao && !initialData?.cnpj;
     const parceiroPendenteInicial = parseParceiroNaoCadastrado(initialData?.canalOutro);
 
     const [cnpj, setCnpj] = useState(cnpjInicial);
@@ -228,6 +235,12 @@ function FormNovoContrato({
     });
     const [consultado, setConsultado] = useState(isEdicao);
     const [empresaEmConstituicao, setEmpresaEmConstituicao] = useState(eConstituicaoInicial);
+    const [clienteEncontrado, setClienteEncontrado] = useState(isEdicao);
+    const [clientesConstituicao, setClientesConstituicao] = useState<{ id: number; razaoSocial: string }[]>([]);
+    const [carregandoConstituicao, setCarregandoConstituicao] = useState(false);
+    const [clienteConstituicaoId, setClienteConstituicaoId] = useState<number | null>(
+        isEdicao && eConstituicaoInicial ? initialData!.clienteId : null,
+    );
 
     const padraoFormaPag = (v: string) => (["ENTRADA_EXITO","PARCELADO_CC","INTEGRAL_PIX"].includes(v) ? v : v === "OUTRO" ? "" : "");
     const isCustomPag = initialData ? !["ENTRADA_EXITO","PARCELADO_CC","INTEGRAL_PIX"].includes(initialData.formaPagamento) : false;
@@ -325,19 +338,37 @@ function FormNovoContrato({
             .finally(() => setCarregandoParceiroDetalhe(false));
     }, [indicadoPorParceiroId]);
 
+    // Fase 3.6 do Cliente Master (2026-08-14): "Empresa em Constituição" NUNCA cria
+    // Cliente novo — só vincula um já existente (cnpj null, cadastrado no BPM).
     const ativarConstituicao = (ativo: boolean) => {
         setEmpresaEmConstituicao(ativo);
-        if (ativo) {
-            setCnpj("00.000.000/0000-00");
-            setDadosEmpresa({ razaoSocial: "Em constituição", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
-            setConsultado(true);
-        } else {
-            setCnpj("");
-            setDadosEmpresa({ razaoSocial: "", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
-            setConsultado(false);
+        setCnpj("");
+        setDadosEmpresa({ razaoSocial: "", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
+        setConsultado(false);
+        setClienteEncontrado(false);
+        setClienteConstituicaoId(null);
+        if (ativo && clientesConstituicao.length === 0) {
+            setCarregandoConstituicao(true);
+            listarClientesEmConstituicao()
+                .then((res) => {
+                    if (res.success) setClientesConstituicao(res.clientes);
+                    else toast.error(res.error);
+                })
+                .catch(() => toast.error("Erro ao listar empresas em constituição"))
+                .finally(() => setCarregandoConstituicao(false));
         }
     };
 
+    const selecionarClienteConstituicao = (id: number, razaoSocial: string) => {
+        setClienteConstituicaoId(id);
+        setDadosEmpresa({ razaoSocial, nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
+        setConsultado(true);
+    };
+
+    // Consulta o Cliente já cadastrado no CRM (não a Receita Federal) — Fase 3.6 do
+    // Cliente Master. Se não encontrar, os dados ficam editáveis para o usuário
+    // preencher: `criarContrato` resolve OU CRIA o Cliente (o BPM ainda não é a porta
+    // de entrada real, ver `resolverClienteDoContrato`).
     const consultarCNPJ = async () => {
         const cnpjLimpo = cnpj.replace(/\D/g, "");
         if (cnpjLimpo.length !== 14) {
@@ -346,21 +377,27 @@ function FormNovoContrato({
         }
         setConsultando(true);
         try {
-            const res = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
-            const data = await res.json() as { razaoSocial?: string; nomeFantasia?: string; dataConstituicao?: string; regimeTributario?: string; uf?: string; error?: string };
-            if (data.error) {
-                toast.error(data.error);
+            const res = await buscarClienteParaContrato(cnpjLimpo);
+            if (!res.success) {
+                toast.error(res.error);
                 return;
             }
-            setDadosEmpresa({
-                razaoSocial: data.razaoSocial ?? "",
-                nomeFantasia: data.nomeFantasia ?? "",
-                dataConstituicao: data.dataConstituicao ?? "",
-                regimeTributario: data.regimeTributario ?? "",
-                uf: data.uf ?? "",
-            });
+            if (res.cliente) {
+                setDadosEmpresa({
+                    razaoSocial: res.cliente.razaoSocial,
+                    nomeFantasia: res.cliente.nomeFantasia ?? "",
+                    dataConstituicao: res.cliente.dataConstituicao ?? "",
+                    regimeTributario: res.cliente.regimeTributario ?? "",
+                    uf: res.cliente.uf ?? "",
+                });
+                setClienteEncontrado(true);
+                toast.success("Empresa já cadastrada no CRM!");
+            } else {
+                setDadosEmpresa({ razaoSocial: "", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
+                setClienteEncontrado(false);
+                toast.info("Empresa não encontrada no CRM — preencha os dados abaixo");
+            }
             setConsultado(true);
-            toast.success("Dados importados!");
         } catch {
             toast.error("Erro ao consultar CNPJ");
         } finally {
@@ -381,6 +418,8 @@ function FormNovoContrato({
 
     const handleSalvar = async () => {
         if (!consultado) { toast.error("Consulte o CNPJ primeiro"); return; }
+        if (empresaEmConstituicao && !clienteConstituicaoId) { toast.error("Selecione a empresa em constituição"); return; }
+        if (!empresaEmConstituicao && !dadosEmpresa.razaoSocial.trim()) { toast.error("Informe a razão social"); return; }
         if (!valorContrato) { toast.error("Informe o valor do contrato"); return; }
         if (!formaPagamentoFinal) { toast.error("Selecione a forma de pagamento"); return; }
         if (mostraFormaPagCustom && !formaPagamentoCustom.trim()) { toast.error("Informe a forma de pagamento"); return; }
@@ -404,13 +443,22 @@ function FormNovoContrato({
 
         setSalvando(true);
         try {
+            // Fase 3.6 do Cliente Master (2026-08-14): identifica a empresa por CNPJ
+            // (resolve OU cria o Cliente) ou por clienteId direto (empresa em
+            // constituição, sempre um Cliente já existente).
+            const identificacaoEmpresa = empresaEmConstituicao
+                ? { clienteId: clienteConstituicaoId! }
+                : {
+                    cnpj: cnpj.replace(/\D/g, ""),
+                    razaoSocial: dadosEmpresa.razaoSocial,
+                    nomeFantasia: dadosEmpresa.nomeFantasia || undefined,
+                    dataConstituicao: dadosEmpresa.dataConstituicao || undefined,
+                    regimeTributario: dadosEmpresa.regimeTributario || undefined,
+                    uf: dadosEmpresa.uf || undefined,
+                };
+
             const payload = {
-                cnpj: cnpj.replace(/\D/g, ""),
-                razaoSocial: dadosEmpresa.razaoSocial,
-                nomeFantasia: dadosEmpresa.nomeFantasia || undefined,
-                dataConstituicao: dadosEmpresa.dataConstituicao || undefined,
-                regimeTributario: dadosEmpresa.regimeTributario || undefined,
-                uf: dadosEmpresa.uf || undefined,
+                ...identificacaoEmpresa,
                 valorContrato,
                 formaPagamento: formaPagamentoFinal,
                 servico,
@@ -485,42 +533,86 @@ function FormNovoContrato({
                             Empresa em Constituição
                         </button>
                     </div>
-                    <div>
-                        <label className={labelCls}>CNPJ *</label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="00.000.000/0000-00"
-                                value={cnpj}
-                                disabled={empresaEmConstituicao}
-                                onChange={(e) => { setCnpj(e.target.value); setConsultado(false); }}
-                                className={`${inputCls} flex-1`}
-                            />
-                            {!empresaEmConstituicao && (
-                                <button
-                                    type="button"
-                                    onClick={consultarCNPJ}
-                                    disabled={consultando}
-                                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50 transition-colors whitespace-nowrap"
+                    {empresaEmConstituicao ? (
+                        <div>
+                            <label className={labelCls}>Empresa em constituição (cadastrada no BPM) *</label>
+                            {carregandoConstituicao ? (
+                                <div className={`${inputCls} flex items-center gap-2 text-slate-500`}>
+                                    <Loader2 size={13} className="animate-spin" /> Carregando...
+                                </div>
+                            ) : clientesConstituicao.length === 0 ? (
+                                <p className="text-[10px] text-amber-400">
+                                    Nenhuma empresa em constituição cadastrada no BPM — cadastre-a lá primeiro.
+                                </p>
+                            ) : (
+                                <select
+                                    value={clienteConstituicaoId ?? ""}
+                                    onChange={(e) => {
+                                        const id = Number(e.target.value);
+                                        const cliente = clientesConstituicao.find((c) => c.id === id);
+                                        if (cliente) selecionarClienteConstituicao(cliente.id, cliente.razaoSocial);
+                                    }}
+                                    className={inputCls}
                                 >
-                                    {consultando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-                                    Consultar
-                                </button>
+                                    <option value="">Selecionar empresa...</option>
+                                    {clientesConstituicao.map((c) => (
+                                        <option key={c.id} value={c.id}>{c.razaoSocial}</option>
+                                    ))}
+                                </select>
                             )}
                         </div>
-                    </div>
+                    ) : (
+                        <>
+                            <div>
+                                <label className={labelCls}>CNPJ *</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="00.000.000/0000-00"
+                                        value={cnpj}
+                                        onChange={(e) => { setCnpj(e.target.value); setConsultado(false); setClienteEncontrado(false); }}
+                                        className={`${inputCls} flex-1`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={consultarCNPJ}
+                                        disabled={consultando}
+                                        className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50 transition-colors whitespace-nowrap"
+                                    >
+                                        {consultando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                                        Consultar
+                                    </button>
+                                </div>
+                            </div>
 
-                    {consultado && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label className={labelCls}>Razão Social</label>
-                                <input readOnly value={dadosEmpresa.razaoSocial} className={`${inputCls} cursor-not-allowed`} />
-                            </div>
-                            <div>
-                                <label className={labelCls}>Nome Fantasia</label>
-                                <input readOnly value={dadosEmpresa.nomeFantasia} className={`${inputCls} cursor-not-allowed`} />
-                            </div>
-                        </div>
+                            {consultado && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className={labelCls}>Razão Social</label>
+                                        <input
+                                            readOnly={clienteEncontrado}
+                                            value={dadosEmpresa.razaoSocial}
+                                            onChange={(e) => setDadosEmpresa((d) => ({ ...d, razaoSocial: e.target.value }))}
+                                            className={`${inputCls} ${clienteEncontrado ? "cursor-not-allowed" : ""}`}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Nome Fantasia</label>
+                                        <input
+                                            readOnly={clienteEncontrado}
+                                            value={dadosEmpresa.nomeFantasia}
+                                            onChange={(e) => setDadosEmpresa((d) => ({ ...d, nomeFantasia: e.target.value }))}
+                                            className={`${inputCls} ${clienteEncontrado ? "cursor-not-allowed" : ""}`}
+                                        />
+                                    </div>
+                                    {!clienteEncontrado && (
+                                        <p className="sm:col-span-2 text-[10px] text-amber-400">
+                                            Empresa não encontrada no CRM — os dados acima serão usados para cadastrá-la.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 

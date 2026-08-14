@@ -12,7 +12,7 @@ import {
   BPM_PIPELINE_CHANNEL_PREFIX,
   extrairPipelineIdCanalBpm,
 } from "@/lib/bpm/realtime";
-import { checarAcessoBpmPipeline } from "@/lib/bpm/ownership";
+import { checarAcessoRealtimeBpmPipeline } from "@/lib/bpm/ownership";
 
 const ADMIN_CHANNELS = ["private-admin-chamados", "private-parceiros-precadastros"];
 const ALL_USER_CHANNELS = ["private-holerite-alerts", "private-metas-alpha"];
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
         return new NextResponse("Canal inválido", { status: 403 });
       }
 
-      const podeAcessar = await checarAcessoBpmPipeline(
+      const podeAcessar = await checarAcessoRealtimeBpmPipeline(
         pipelineId,
         Number(session.user.id),
       );

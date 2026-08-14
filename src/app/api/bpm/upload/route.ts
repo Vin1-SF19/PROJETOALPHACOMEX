@@ -3,10 +3,14 @@ import { put } from "@vercel/blob";
 import { auth } from "../../../../../auth";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { BPM_ANEXO_ALLOWED_MIME, BPM_ANEXO_MAX_BYTES, validarUploadAnexo } from "@/lib/validations/bpm";
+import { criarReciboUploadAnexoBpm, recibosAnexoBpmConfigurados } from "@/lib/bpm/anexos-storage";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  if (!recibosAnexoBpmConfigurados()) {
+    return NextResponse.json({ success: false, error: "Recibos de anexos não configurados" }, { status: 503 });
+  }
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: "Não autorizado" }, { status: 401 });
@@ -40,18 +44,25 @@ export async function POST(request: NextRequest) {
 
   try {
     const blob = await put(uploadPath, new Blob([arrayBuffer], { type: file.type }), {
-      access: "public",
+      access: "private",
       token: process.env.CRM_READ_WRITE_TOKEN,
+    });
+
+    const recibo = criarReciboUploadAnexoBpm({
+      cardId,
+      pathname: blob.pathname,
+      nome: file.name,
+      tipo: file.type || "application/octet-stream",
+      tamanho: file.size,
     });
 
     return NextResponse.json({
       success: true,
       file: {
-        name: uniqueName,
         originalName: file.name,
         mimeType: file.type || "application/octet-stream",
         size: file.size,
-        url: blob.url,
+        recibo,
       },
     });
   } catch (error) {

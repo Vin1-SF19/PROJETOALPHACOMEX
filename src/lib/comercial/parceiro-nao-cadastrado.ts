@@ -27,7 +27,7 @@ export interface ParceiroPendenteCadastro extends ParceiroNaoCadastrado {
   contratoId: string;
   clienteRazaoSocial: string;
   clienteNomeFantasia: string | null;
-  cnpj: string;
+  cnpj: string | null;
   criadoEm: Date;
 }
 

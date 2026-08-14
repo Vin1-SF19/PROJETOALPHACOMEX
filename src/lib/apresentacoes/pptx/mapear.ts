@@ -1,4 +1,5 @@
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
+import { construirSvgImagemRecortada } from "./geometria";
 import type { FormaExtraida, FormaTextoExtraida, SlideExtraido } from "./tipos";
 
 const TAMANHO_FONTE_TITULO_PADRAO = 44;
@@ -107,14 +108,30 @@ async function mapearForma(
   }
 
   if (forma.tipo === "imagem") {
-    const url = await enviarImagem(forma.bytes, forma.mimeType, forma.nomeArquivo);
+    let url: string;
+    let crop: typeof forma.crop;
+    if (forma.recorte) {
+      // Envia a imagem BRUTA primeiro (dedupe por hash em `enviarImagem` reaproveita o upload
+      // se o mesmo asset já foi enviado sem recorte em outro slide/forma), depois monta o SVG
+      // de recorte referenciando essa URL real — nunca embutindo a imagem em base64 no SVG.
+      const urlBruta = await enviarImagem(forma.bytes, forma.mimeType, forma.nomeArquivo);
+      const svgMarkup = construirSvgImagemRecortada(
+        forma.recorte.pathSvg, forma.recorte.viewBoxW, forma.recorte.viewBoxH,
+        urlBruta, forma.recorte.crop, forma.recorte.opacidade,
+      );
+      url = await enviarImagem(new TextEncoder().encode(svgMarkup), "image/svg+xml", `${forma.nomeArquivo}-recortada.svg`);
+      crop = undefined; // já embutido no clip-path do SVG, não reaplicar via CSS
+    } else {
+      url = await enviarImagem(forma.bytes, forma.mimeType, forma.nomeArquivo);
+      crop = forma.crop;
+    }
     return {
       id: crypto.randomUUID(), tipo: "imagem", x: forma.x, y: forma.y, w: forma.w, h: forma.h,
       // OOXML: stretch sem srcRect distorce a imagem até o quadro; srcRect é aplicado
       // separadamente pelo renderer. Portanto o modo base correto é "fill", sem o recorte
       // implícito que object-fit "cover" introduziria.
       zIndex, rotacao: forma.rotacao, url, objectFit: "fill",
-      ...(forma.crop ? { crop: forma.crop } : {}),
+      ...(crop ? { crop } : {}),
       ...(forma.tile ? { tile: true } : {}),
       ...(forma.flipH ? { flipH: true } : {}),
       ...(forma.flipV ? { flipV: true } : {}),

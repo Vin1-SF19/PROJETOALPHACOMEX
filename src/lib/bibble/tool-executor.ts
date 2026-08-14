@@ -106,30 +106,29 @@ export async function executarTool(
 
       if (!busca) return "Informe um nome ou CNPJ para buscar.";
 
-      const clientes = await db.clientes.findMany({
+      const registros = await db.clienteServico.findMany({
         where: {
-          OR: [
-            { razaoSocial: { contains: busca } },
-            { nomeFantasia: { contains: busca } },
-            { cnpj: { contains: busca.replace(/\D/g, "") } },
-          ],
+          cliente: {
+            OR: [
+              { razaoSocial: { contains: busca } },
+              { nomeFantasia: { contains: busca } },
+              { cnpj: { contains: busca.replace(/[^A-Za-z0-9]/g, "").toUpperCase() } },
+            ],
+          },
         },
         take: limite,
         select: {
-          cnpj: true,
-          razaoSocial: true,
-          nomeFantasia: true,
           status: true,
-          regimeTributario: true,
           analistaResponsavel: true,
-          uf: true,
+          cliente: { select: { cnpj: true, razaoSocial: true, nomeFantasia: true, regimeTributario: true, uf: true } },
         },
       });
 
-      if (!clientes.length) {
+      if (!registros.length) {
         return `Nenhum cliente encontrado para "${busca}".`;
       }
 
+      const clientes = registros.map((r) => ({ ...r.cliente, status: r.status, analistaResponsavel: r.analistaResponsavel }));
       return JSON.stringify(clientes);
     }
 
@@ -625,13 +624,13 @@ export async function executarTool(
           ...(usuarioId !== undefined ? { usuarioId } : {}),
         },
         select: {
-          razaoSocial: true,
           valorContrato: true,
           servico: true,
           canalAquisicao: true,
           status: true,
           pagamentoConfirmado: true,
           createdAt: true,
+          cliente: { select: { razaoSocial: true } },
         },
         orderBy: { createdAt: "desc" },
       });
@@ -668,7 +667,7 @@ export async function executarTool(
         meta_individual: metaMensal !== null ? { quantidade: metaMensal, progresso: `${total}/${metaMensal} (${metaMensal > 0 ? Math.round((total / metaMensal) * 100) : 0}%)` } : null,
         meta_equipe: metaEquipe?.metaMensal ?? null,
         contratos: contratos.map(c => ({
-          empresa: c.razaoSocial,
+          empresa: c.cliente.razaoSocial,
           valor: `R$ ${c.valorContrato.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
           servico: c.servico,
           canal: c.canalAquisicao,

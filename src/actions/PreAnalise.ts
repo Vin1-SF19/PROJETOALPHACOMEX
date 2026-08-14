@@ -10,6 +10,12 @@ export async function upsertConsulta(payload: any) {
     const cnpjLimpo = rfb.dados.cnpj.replace(/\D/g, "");
 
     try {
+        // Fase 3.4 do Cliente Master — resolve o Cliente já cadastrado por CNPJ,
+        // se existir. `clienteId` é nullable: consultar um CNPJ que ainda não é
+        // Cliente continua funcionando normalmente, sem bloquear (mesma regra
+        // de snapshot próprio — esta tabela não depende de Cliente existir).
+        const cliente = await db.cliente.findUnique({ where: { cnpj: cnpjLimpo }, select: { id: true } });
+
         const registro = await db.consultaPreAnalise.upsert({
             where: { cnpj: cnpjLimpo },
             update: {
@@ -26,6 +32,7 @@ export async function upsertConsulta(payload: any) {
                 nomeResponsavel: extra?.nomeResponsavel,
                 telefoneContato: extra?.telefone,
                 observacoes: extra?.observacoes,
+                clienteId: cliente?.id ?? null,
             },
             create: {
                 cnpj: cnpjLimpo,
@@ -42,6 +49,7 @@ export async function upsertConsulta(payload: any) {
                 nomeResponsavel: extra?.nomeResponsavel,
                 telefoneContato: extra?.telefone,
                 observacoes: extra?.observacoes,
+                clienteId: cliente?.id ?? null,
             },
         });
 

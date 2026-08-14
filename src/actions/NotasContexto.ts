@@ -30,7 +30,7 @@ async function entidadeReferenciadaExiste(moduleKey: string, entityType: string,
   }
 
   if (moduleKey === "Cliente" && entityType === "cliente") {
-    const cliente = await db.clientes.findUnique({ where: { id: idNumerico }, select: { id: true } });
+    const cliente = await db.cliente.findUnique({ where: { id: idNumerico }, select: { id: true } });
     return cliente !== null;
   }
 
@@ -189,7 +189,7 @@ export async function BuscarRegistrosVinculaveis(input: { moduleKey: string; que
 
   if (input.moduleKey === "Cliente") {
     const idNumerico = Number(query);
-    const clientes = await db.clientes.findMany({
+    const clientes = await db.cliente.findMany({
       where: Number.isSafeInteger(idNumerico)
         ? { OR: [{ id: idNumerico }, { razaoSocial: { contains: query } }, { nomeFantasia: { contains: query } }, { cnpj: { contains: query } }] }
         : { OR: [{ razaoSocial: { contains: query } }, { nomeFantasia: { contains: query } }, { cnpj: { contains: query } }] },

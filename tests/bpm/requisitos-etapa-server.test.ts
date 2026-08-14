@@ -93,4 +93,70 @@ describe("campos aplicáveis por etapa", () => {
     expect(campos).toHaveLength(1);
     expect(campos[0].obrigatorio).toBe(true);
   });
+
+  it("preserva a definição sem valor, ordena por ordem/nome e não duplica associação", async () => {
+    const campoRepetido = {
+      id: "campo-repetido",
+      pipelineId: "pipeline-1",
+      etapaId: "etapa-2",
+      nome: "Zeta",
+      tipo: "texto",
+      opcoesJson: null,
+      obrigatorio: false,
+      ordem: 2,
+    };
+    const client = {
+      bpmCampo: {
+        findMany: vi.fn().mockResolvedValue([
+          campoRepetido,
+          {
+            id: "campo-alpha",
+            pipelineId: "pipeline-1",
+            etapaId: "etapa-2",
+            nome: "Alpha",
+            tipo: "texto",
+            opcoesJson: null,
+            obrigatorio: false,
+            ordem: 2,
+          },
+        ]),
+      },
+      bpmCampoObrigatorioEtapa: {
+        findMany: vi.fn().mockResolvedValue([
+          { campo: campoRepetido },
+          {
+            campo: {
+              id: "campo-primeiro",
+              pipelineId: "pipeline-1",
+              etapaId: null,
+              nome: "Obrigatório primeiro",
+              tipo: "texto",
+              opcoesJson: null,
+              obrigatorio: false,
+              ordem: 1,
+            },
+          },
+        ]),
+      },
+      bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-1",
+      "pipeline-1",
+      "etapa-2",
+      client as never,
+    );
+
+    expect(campos.map((campo) => campo.id)).toEqual([
+      "campo-primeiro",
+      "campo-alpha",
+      "campo-repetido",
+    ]);
+    expect(campos).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "campo-primeiro", obrigatorio: true, valor: null }),
+      expect.objectContaining({ id: "campo-repetido", obrigatorio: true, valor: null }),
+      expect.objectContaining({ id: "campo-alpha", obrigatorio: false, valor: null }),
+    ]));
+  });
 });

@@ -77,7 +77,7 @@ export default function PainelHistoricoServico({ cardId, servico, accent, onAbri
             {dados.registrosClientes.map((c) => (
               <div key={c.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-200">{c.servicos || "—"}</span>
+                  <span className="text-xs font-semibold text-slate-200">{c.servico || "—"}</span>
                   <span className="text-[10px] text-slate-500">{c.status}</span>
                 </div>
                 <div className="text-[11px] text-slate-500">

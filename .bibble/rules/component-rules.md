@@ -137,3 +137,14 @@ if (!data?.length) return (
 - ❌ Props com `any`
 - ❌ Máximo 300 linhas por componente — se ultrapassar, divida
 - ❌ Criar componente que já existe em `.bibble/memory/components.md`
+
+---
+
+## ALPHA CRM — CRIAÇÃO E FORMULÁRIOS POR ETAPA (2026-08-13)
+
+- Cards novos só podem ser criados na etapa **Novos Leads**.
+- Colunas posteriores não exibem botão, atalho ou modal de criação direta.
+- O modal de criação recebe somente os dados iniciais próprios de Novos Leads; não antecipa formulários de etapas futuras.
+- Campos e formulários específicos da etapa atual são exibidos e editados dentro do card, no painel central, na aba **Formulário da Etapa**. Requisitos de avanço continuam no painel esquerdo.
+- O formulário de criação/reagendamento do Google Meet só é exibido na etapa **Agendar Reunião**, dentro da aba central **Formulário da Etapa**. Em **Reunião Agendada**, apenas o acompanhamento/transcrição pode ser mostrado, sem formulário de criação.
+- A restrição visual nunca substitui o guard do backend: qualquer chamada direta tentando criar fora de Novos Leads deve ser recusada.

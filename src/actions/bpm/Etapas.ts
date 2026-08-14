@@ -28,7 +28,7 @@ export async function CriarEtapaBpm(dados: unknown) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
 
-    exigirAcessoConfigPipeline(session.user.role ?? null, "configurarEtapas");
+    await exigirAcessoConfigPipeline(userId, "configurarEtapas");
 
     const parsed = criarEtapaSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
@@ -61,7 +61,7 @@ export async function AtualizarEtapaBpm(dados: unknown) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
 
-    exigirAcessoConfigPipeline(session.user.role ?? null, "configurarEtapas");
+    await exigirAcessoConfigPipeline(userId, "configurarEtapas");
 
     const parsed = atualizarEtapaSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
@@ -97,7 +97,7 @@ export async function ReordenarEtapasBpm(dados: unknown) {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    exigirAcessoConfigPipeline(session.user.role ?? null, "configurarEtapas");
+    await exigirAcessoConfigPipeline(Number(session.user.id), "configurarEtapas");
 
     const parsed = reordenarEtapasSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };

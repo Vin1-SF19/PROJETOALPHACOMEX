@@ -25,6 +25,18 @@ function lerOpcoesSeguras(campo: CampoDinamicoBpm): string[] | null {
   }
 }
 
+function cpfEhValido(valor: string): boolean {
+  const cpf = valor.replace(/\D/g, "");
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digito = (base: string, pesoInicial: number) => {
+    const soma = [...base].reduce((total, caractere, indice) => total + Number(caractere) * (pesoInicial - indice), 0);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return Number(cpf[9]) === digito(cpf.slice(0, 9), 10)
+    && Number(cpf[10]) === digito(cpf.slice(0, 10), 11);
+}
+
 export function validarValoresCamposBpm(
   campos: readonly CampoDinamicoBpm[],
   valores: Readonly<Record<string, string>>,
@@ -43,8 +55,15 @@ export function validarValoresCamposBpm(
       continue;
     }
 
-    if (campo.tipo === "texto") {
+    if (campo.tipo === "texto" || campo.tipo === "texto_longo") {
       validados[campoId] = valor;
+      continue;
+    }
+    if (campo.tipo === "cpf") {
+      if (!cpfEhValido(valor)) {
+        return { success: false, error: `O campo "${campo.nome}" deve conter um CPF válido.` };
+      }
+      validados[campoId] = valor.replace(/\D/g, "");
       continue;
     }
     if (campo.tipo === "numero") {

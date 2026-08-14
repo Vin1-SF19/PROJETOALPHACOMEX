@@ -88,7 +88,7 @@ model usuarios {
   onyxAgentesFixados OnyxAgenteFixado[]
 
   historicoAlteracoesCliente HistoricoAlteracaoCliente[]
-  clienteServicoHistoricos ClienteServicoHistorico[] @relation("ClienteServicoHistoricoUsuario")
+  clienteServicoHistoricos   ClienteServicoHistorico[]   @relation("ClienteServicoHistoricoUsuario")
 
   parceirosCriados        Parceiro[]
   indicacoesCriadas       Indicacao[]       @relation("IndicacaoAutor")
@@ -300,115 +300,30 @@ model ConfirmacaoLeituraDocumento {
   @@index([documentoId])
 }
 
-model clientes {
-  id                  Int                         @id @default(autoincrement())
-  status              String                      @default("Em Andamento")
-  cnpj                String
-  razaoSocial         String
-  nomeFantasia        String?
-  dataConstituicao    String?
-  uf                  String?
-  municipio           String?
-  regimeTributario    String?
-  servicos            String?
-  analistaResponsavel String?
-  dataContratacao     String?
-  dataExito           String?
-  formaPagamento      String?
-  valorContrato       Float?
-  closerNome          String?
-  ultimoCs            Int?                        @default(0)
-  nps                 Int?
-  feedbackGoogle      Boolean                     @default(false)
-  createdAt           String?                     @default("")
-  updatedAt           String?                     @default("")
-  log_cs              log_cs[]
-  socios              socios[]
-  logFeedback         logFeedback[]
-  logAlteracao        logAlteracao[]
-  historicoAlteracoes HistoricoAlteracaoCliente[]
-  nomeGoogle          String?
-  embasamento         String?
-  origemLead          String?
-
-  // Canal de aquisição (Painel de Metas) + indicação por parceiro
-  canalAquisicao String?
-  canalOutro     String?
-  // `indicacao Indicacao?` removida em 2026-08-12 (Fase 3.1 Cliente Master) —
-  // Indicacao.clienteId agora aponta para `Cliente`, não mais para `clientes` legado.
-  // `bpmCards BpmCard[]` removida em 2026-08-13 (Fase 3.2 Cliente Master) —
-  // BpmCard.empresaId agora aponta para `Cliente`, não mais para `clientes` legado.
-
-  pessoaEmpresaVinculos PessoaEmpresaVinculo[]
-
-  @@unique([cnpj, servicos])
-  @@map("clientes")
-}
-
-model socios {
-  id             Int     @id @default(autoincrement())
-  nome           String
-  telefone       String?
-  obs            String?
-  dataNascimento String?
-  vinculo        String?
-
-  clienteId Int
-  cliente   clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-
-  // Alpha BPM (2026-08-03) — reaproveita `socios` como Pessoa do BPM (D-049),
-  // vínculo N:N com empresas via PessoaEmpresaVinculo (socios.clienteId continua 1:1, intocado)
-  empresaVinculos PessoaEmpresaVinculo[]
-
-  @@map("socios")
-}
-
-model log_cs {
-  id           Int      @id @default(autoincrement())
-  dataRegistro DateTime @default(now())
-  colaborador  String
-  sentimento   String
-  observacao   String?
-  clienteId    Int
-  clientes     clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-
-  @@map("log_cs")
-}
-
-model logFeedback {
-  id           Int      @id @default(autoincrement())
-  dataRegistro DateTime @default(now())
-  colaborador  String
-  sentimento   String
-  observacao   String?
-  clienteId    Int
-  clientes     clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-
-  @@map("logFeedback")
-}
-
-model logAlteracao {
-  id              Int      @id @default(autoincrement())
-  dataAlteracao   DateTime @default(now())
-  colaborador     String
-  acao            String
-  dadosAnteriores String?
-  clienteId       Int
-  clientes        clientes @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-
-  @@map("logAlteracao")
-}
+// `model clientes`, `socios`, `log_cs`, `logFeedback` removidos em 2026-08-14
+// (Fase 3.6 do Cliente Master) — substituídos por `Cliente`+`ClienteServico`
+// (empresa + serviço contratado, separados) e `Pessoa`+`PessoaClienteVinculo`
+// (sócios, celular como chave, global). `logAlteracao` (699 linhas, nunca escrita
+// por nenhuma action, só lida na exportação Excel) preservada como histórico morto
+// na tabela física do Turso, sem equivalente novo no schema — decisão do usuário
+// 2026-08-14.
 
 /// Reconstrução do log de auditoria do CS&NPS (2026-07-13, ver decisions.md).
 /// Substitui `logAlteracao` (desativado, sem gravação nova) por granularidade
 /// por campo: cada campo alterado em 1 "Salvar" vira 1 linha, agrupadas por
 /// `loteId`. Reversão é por linha/campo específico, nunca o cliente inteiro.
+// Fase 3.6 do Cliente Master (2026-08-14): passou a pendurar em `Cliente` (dados
+// cadastrais: razaoSocial/nomeFantasia/uf/municipio/regimeTributario/dataConstituicao/
+// cnpj), não mais em `clientes` (legado). Histórico de campos de NEGÓCIO (status,
+// analistaResponsavel, dataContratacao, etc) vive em `ClienteServicoHistorico`,
+// pendurado em `clienteServicoId` — são dois históricos por natureza (decisão do
+// usuário 2026-08-14).
 model HistoricoAlteracaoCliente {
   id                 String    @id @default(cuid())
   loteId             String // agrupa todas as linhas de 1 mesma ação de "Salvar"
   clienteId          Int
-  cliente            clientes  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  campo              String // nome do campo alterado (ex: "status", "analistaResponsavel")
+  cliente            Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  campo              String // nome do campo alterado (ex: "razaoSocial", "nomeFantasia")
   valorAnterior      String?
   valorNovo          String?
   userId             Int?
@@ -431,27 +346,30 @@ model HistoricoAlteracaoCliente {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Cliente {
-  id                  Int      @id @default(autoincrement())
-  cnpj                String?  @unique // nullable — empresa "em constituição" sem CNPJ ainda (ver decisions.md pergunta 11)
-  razaoSocial         String
-  nomeFantasia        String?
-  dataConstituicao    String?
-  uf                  String?
-  municipio           String?
-  regimeTributario    String?
-  capitalSocial       String?
-  situacaoCadastral   String?
-  status              String   @default("ATIVO") // ATIVO | ARQUIVADO — status da EMPRESA, não de um serviço
+  id                Int     @id @default(autoincrement())
+  cnpj              String? @unique // nullable — empresa "em constituição" sem CNPJ ainda (ver decisions.md pergunta 11)
+  razaoSocial       String
+  nomeFantasia      String?
+  dataConstituicao  String?
+  uf                String?
+  municipio         String?
+  regimeTributario  String?
+  capitalSocial     String?
+  situacaoCadastral String?
+  status            String  @default("ATIVO") // ATIVO | ARQUIVADO — status da EMPRESA, não de um serviço
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  servicos           ClienteServico[]
-  pessoas            PessoaClienteVinculo[]
-  indicacao          Indicacao?
-  bpmCards           BpmCard[]
-  extratos           Extratos?
-  consultaPreAnalise ConsultaPreAnalise?
+  servicos            ClienteServico[]
+  pessoas             PessoaClienteVinculo[]
+  indicacao           Indicacao?
+  bpmCards            BpmCard[]
+  extratos            Extratos?
+  consultaPreAnalise  ConsultaPreAnalise?
+  operacionalClientes OperacionalClientes[]
+  contratosComerciais ContratoComercial[]
+  historicoAlteracoes HistoricoAlteracaoCliente[]
 
   @@index([razaoSocial])
   @@index([status])
@@ -517,7 +435,7 @@ model ClienteServicoLogFeedback {
 /// Sucessora de HistoricoAlteracaoCliente, penduradas em ClienteServico (decisão da
 /// pergunta 2 do plano — Opção B). Mesma granularidade por campo + agrupamento por loteId.
 model ClienteServicoHistorico {
-  id                 String   @id @default(cuid())
+  id                 String         @id @default(cuid())
   loteId             String
   clienteServicoId   Int
   clienteServico     ClienteServico @relation(fields: [clienteServicoId], references: [id], onDelete: Cascade)
@@ -525,10 +443,10 @@ model ClienteServicoHistorico {
   valorAnterior      String?
   valorNovo          String?
   userId             Int?
-  usuario            usuarios? @relation("ClienteServicoHistoricoUsuario", fields: [userId], references: [id], onDelete: SetNull)
+  usuario            usuarios?      @relation("ClienteServicoHistoricoUsuario", fields: [userId], references: [id], onDelete: SetNull)
   nomeUsuarioNaEpoca String
-  acao               String   @default("EDICAO")
-  criadoEm           DateTime @default(now())
+  acao               String         @default("EDICAO")
+  criadoEm           DateTime       @default(now())
 
   @@index([clienteServicoId, criadoEm])
   @@index([loteId])
@@ -538,8 +456,8 @@ model ClienteServicoHistorico {
 /// Parceiro. Substitui `socios` (1:N preso a 1 cliente) e `ParceiroResponsavel`/
 /// `ParceiroRepresentante` (decisão do usuário, 2026-08-08, pergunta 10).
 model Pessoa {
-  id             Int      @id @default(autoincrement())
-  celular        String   @unique
+  id             Int     @id @default(autoincrement())
+  celular        String  @unique
   nome           String
   cpf            String?
   dataNascimento String?
@@ -1163,36 +1081,35 @@ model OperacionalClientes {
   id           String  @id @default(cuid())
   status       String  @default("ATIVO")
   embasamento  String
-  razaoSocial  String
-  nomeFantasia String?
-  cnpj         String  @unique
   progresso    Int     @default(0)
   mesProtocolo String?
   linkGrupo    String?
-
-  situacaoRadar    String?
-  submodalidade    String?
-  dataSituacao     String?
-  municipio        String?
-  uf               String?
-  regimeTributario String?
-  capitalSocial    String?
-  dataConstituicao String?
-  contribuinte     String?
 
   tipo TipoEmbasamento?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  clienteId        String
-  cliente          ClienteOperacional @relation(fields: [clienteId], references: [id])
+  // Fase 3.5 do Cliente Master (2026-08-13): campo antigo `clienteId/cliente` (conta de
+  // login do portal) renomeado para `clienteOperacionalId/clienteOperacional` para abrir
+  // espaço ao novo `clienteId/cliente` abaixo, que aponta para o Cliente master (empresa).
+  clienteOperacionalId String
+  clienteOperacional   ClienteOperacional @relation(fields: [clienteOperacionalId], references: [id])
+
+  // Cliente master (empresa) — obrigatório, sem criação automática (vincularEmpresaAoCliente
+  // busca por CNPJ e bloqueia se não encontrar). razaoSocial/nomeFantasia/cnpj/situacaoRadar/
+  // submodalidade/municipio/uf/regimeTributario/capitalSocial/dataConstituicao/contribuinte/
+  // dataSituacao deixaram de existir aqui — vêm sempre via include: { cliente }.
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
   pastaChecklistId String?
   pastaChecklist   PastaChecklist?    @relation(fields: [pastaChecklistId], references: [id])
   documentos       DocumentoUnidade[]
   checklists       Checklist[]
 
   @@index([pastaChecklistId])
+  @@index([clienteId])
   @@map("operacional_clientes")
 }
 
@@ -1311,12 +1228,16 @@ model DocumentoChecklist {
 model ContratoComercial {
   id String @id @default(cuid())
 
-  cnpj             String
-  razaoSocial      String
-  nomeFantasia     String?
-  dataConstituicao String?
-  regimeTributario String?
-  uf               String?
+  // Fase 3.6 do Cliente Master (2026-08-14): cnpj/razaoSocial/nomeFantasia/
+  // dataConstituicao/regimeTributario/uf deixaram de existir aqui — vêm sempre
+  // via include: { cliente }. Diferente de Extratos/Operacional (busca-e-bloqueia),
+  // aqui `clienteId` é resolvido OU CRIADO por criarContrato: o BPM ainda não é a
+  // porta de entrada real de Cliente novo (time comercial usa CRM externo hoje,
+  // enquanto o BPM não está em uso operacional) — bloquear quebraria o fluxo
+  // comercial diário. Ajuste futuro (fora desta fase) quando o BPM assumir esse
+  // papel de verdade: trocar para busca-e-bloqueia, igual às demais fases satélite.
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
 
   valorContrato         Float
   formaPagamento        String
@@ -1355,6 +1276,7 @@ model ContratoComercial {
   @@index([usuarioId])
   @@index([mes, ano])
   @@index([status])
+  @@index([clienteId])
   @@map("contratos_comerciais")
 }
 
@@ -3133,14 +3055,19 @@ model BpmCard {
   // Pipeline "Revisão de Radar" — automações e regras por etapa (2026-08-10, ver
   // .bibble/memory/plano-novos-leads-bpm.md). Todas nullable — nenhum card legado precisa
   // ser retroativamente preenchido; automações tratam ausência como "ainda não se aplica".
-  primeiraVisualizacaoEm DateTime? // primeiro acesso ao card, por qualquer usuário — indicador "nunca acessado" some após preenchido
-  proximoContatoEm       DateTime? // interrompe a automação de 8 dias (cobrança de follow-up); também validado como obrigatório na ENTRADA de "Em Tratativa"/"Sem Viabilidade"
-  dataReuniao            DateTime? // data+hora combinadas da reunião (Coluna "Agendar Reunião"), timezone America/Sao_Paulo — mesmo contrato da Agenda Alpha
-  googleEventId          String? // id do evento no Google Calendar, criado via botão "Agendar pelo Google Meet" — permite reagendar/atualizar o mesmo evento depois
-  googleCalendarId       String? // GoogleCalendarSelecionado.googleCalendarId usado ao criar a reunião — necessário para reagendar via atualizarEventoParcialNoCalendario (achado na Fase D)
-  googleMeetLink         String? // cache do hangoutLink retornado pela API, evita nova chamada só para exibir o link
-  statusPosFechamento    String? // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
-  transcricaoReuniao     String? // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)
+  primeiraVisualizacaoEm        DateTime? // primeiro acesso ao card, por qualquer usuário — indicador "nunca acessado" some após preenchido
+  proximoContatoEm              DateTime? // interrompe a automação de 8 dias (cobrança de follow-up); também validado como obrigatório na ENTRADA de "Em Tratativa"/"Sem Viabilidade"
+  // Standby - Follow Up: estado independente de proximoContatoEm.
+  // `ultimo` limita a automação a uma tarefa por ciclo de 7 dias; `interrompido`
+  // é NoLoss: pedido do lead para não receber mais follow-up e nunca é retomado automaticamente.
+  standbyFollowUpUltimoEm       DateTime?
+  standbyFollowUpInterrompidoEm DateTime?
+  dataReuniao                   DateTime? // data+hora combinadas da reunião (Coluna "Agendar Reunião"), timezone America/Sao_Paulo — mesmo contrato da Agenda Alpha
+  googleEventId                 String? // id do evento no Google Calendar, criado via botão "Agendar pelo Google Meet" — permite reagendar/atualizar o mesmo evento depois
+  googleCalendarId              String? // GoogleCalendarSelecionado.googleCalendarId usado ao criar a reunião — necessário para reagendar via atualizarEventoParcialNoCalendario (achado na Fase D)
+  googleMeetLink                String? // cache do hangoutLink retornado pela API, evita nova chamada só para exibir o link
+  statusPosFechamento           String? // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
+  transcricaoReuniao            String? // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)
 
   empresa     Cliente     @relation(fields: [empresaId], references: [id])
   pipeline    BpmPipeline @relation(fields: [pipelineId], references: [id])
@@ -3206,16 +3133,19 @@ model BpmCardVinculo {
 }
 
 model BpmTarefa {
-  id            String    @id @default(cuid())
-  cardId        String
-  titulo        String
-  descricao     String?
-  responsavelId Int?
-  prazo         DateTime?
-  prioridade    String    @default("NORMAL") // "BAIXA" | "NORMAL" | "ALTA"
-  status        String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
-  checklistJson String?
-  presetId      String?
+  id                String    @id @default(cuid())
+  cardId            String
+  titulo            String
+  descricao         String?
+  responsavelId     Int?
+  prazo             DateTime?
+  tipo              String    @default("TAREFA") // CHECKLIST | LIGACAO | WHATSAPP | EMAIL | TAREFA | LEMBRETE_RAPIDO
+  alertaEm          DateTime?
+  alertaDisparadoEm DateTime?
+  prioridade        String    @default("NORMAL") // "BAIXA" | "NORMAL" | "ALTA"
+  status            String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
+  checklistJson     String?
+  presetId          String?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -3228,6 +3158,7 @@ model BpmTarefa {
   @@index([cardId])
   @@index([responsavelId])
   @@index([status])
+  @@index([status, alertaEm])
 }
 
 model BpmTarefaPreset {
@@ -3292,6 +3223,7 @@ model BpmCardAnexo {
   card       BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
   enviadoPor usuarios @relation(fields: [enviadoPorId], references: [id])
 
+  @@unique([cardId, url]) // recibo de upload é idempotente mesmo sob requisições concorrentes
   @@index([cardId])
 }
 
@@ -3375,17 +3307,6 @@ model BpmChecklistFollowUpPergunta {
   pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
 }
 
-model PessoaEmpresaVinculo {
-  id        String  @id @default(cuid())
-  pessoaId  Int
-  empresaId Int
-  funcao    String?
-
-  createdAt DateTime @default(now())
-
-  pessoa  socios   @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
-  empresa clientes @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-
-  @@unique([pessoaId, empresaId])
-  @@index([empresaId])
-}
+// `model PessoaEmpresaVinculo` removido em 2026-08-14 (Fase 3.6 do Cliente Master) —
+// dependia de `socios`/`clientes` (ambos removidos), tabela física vazia (0 linhas)
+// desde antes desta fase, nunca chegou a ser usada de fato.

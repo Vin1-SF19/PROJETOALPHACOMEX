@@ -3,11 +3,13 @@ import { buscarClientePorId } from "./cs-nps-adapter";
 
 /**
  * Detecta o evento de ÊXITO (PROCESS_SUCCESS) — decisão confirmada pelo usuário (Fase 01,
- * não reabrir): nasce da presença de `clientes.dataExito` passando de vazio para
- * preenchido. NÃO vem do Checklist RADAR nem é registro manual. A detecção compara o
- * estado atual contra o último `CommissionEvent` de CONTRACTING já sincronizado para o
- * mesmo `clienteId` — se já existe um evento de PROCESS_SUCCESS para esse cliente, a
- * detecção é idempotente (não gera de novo).
+ * não reabrir): nasce da presença de `ClienteServico.dataExito` passando de vazio para
+ * preenchido (Fase 3.6 do Cliente Master, 2026-08-14 — antes era `clientes.dataExito`).
+ * NÃO vem do Checklist RADAR nem é registro manual. A detecção compara o estado atual
+ * contra o último `CommissionEvent` de CONTRACTING já sincronizado para o mesmo
+ * `clienteId` (aqui, `ClienteServico.id` — nome do campo preservado por compatibilidade
+ * com o histórico de comissões já geradas) — se já existe um evento de PROCESS_SUCCESS
+ * para esse cliente, a detecção é idempotente (não gera de novo).
  */
 
 export interface ExitoDetectionResult {
@@ -38,7 +40,7 @@ export async function detectarExitoParaCliente(clienteId: number): Promise<Exito
  * Usado pelo sync-engine para detectar êxitos novos em lote (não busca 1 cliente por vez).
  */
 export async function listarClientesComExitoNaoProcessado(): Promise<number[]> {
-  const clientesComExito = await db.clientes.findMany({
+  const clientesComExito = await db.clienteServico.findMany({
     where: { dataExito: { not: null } },
     select: { id: true },
     take: 500,

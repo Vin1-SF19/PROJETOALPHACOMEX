@@ -1,6 +1,7 @@
 import db from "@/lib/prisma";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
+import { etapaEhBoasVindas, usuarioEhDiretoriaBpm } from "@/lib/bpm/boas-vindas";
 
 const PERMISSAO_CRM = "crm";
 
@@ -10,6 +11,7 @@ type ClienteAcessoBpm = Pick<
   | "setorPermissao"
   | "usuarioPermissaoOverride"
   | "bpmPipeline"
+  | "bpmCard"
   | "bpmCardMembro"
 >;
 
@@ -82,16 +84,33 @@ async function carregarUsuarioEPermissoesBpm(
 
 export async function checarAcessoModuloBpm(
   userId: number,
+  client: ClienteAcessoBpm = db,
 ): Promise<boolean> {
-  const acesso = await carregarUsuarioEPermissoesBpm(userId);
+  const acesso = await carregarUsuarioEPermissoesBpm(userId, client);
   return Boolean(
     acesso
     && (isAdminRole(acesso.usuario.role) || possuiPermissaoCrm(acesso.permissoes)),
   );
 }
 
-export async function exigirAcessoModuloBpm(userId: number): Promise<void> {
-  if (!(await checarAcessoModuloBpm(userId))) throw new Error("Não autorizado");
+export async function exigirAcessoModuloBpm(
+  userId: number,
+  client: ClienteAcessoBpm = db,
+): Promise<void> {
+  if (!(await checarAcessoModuloBpm(userId, client))) throw new Error("Não autorizado");
+}
+
+/**
+ * Diretoria do pipeline Operacional. Não use `isAdminRole` aqui: CEO/TI têm
+ * privilégios administrativos no produto, mas não podem ver a triagem de
+ * Boas-vindas, que é reservada à conta de diretoria (`Admin`).
+ */
+export async function checarAcessoDiretoriaBpm(
+  userId: number,
+  client: ClienteAcessoBpm = db,
+): Promise<boolean> {
+  const acesso = await carregarUsuarioEPermissoesBpm(userId, client);
+  return Boolean(acesso && usuarioEhDiretoriaBpm(acesso.usuario.role));
 }
 
 export async function checarAcessoBpmPipeline(
@@ -206,8 +225,17 @@ export async function checarAcessoBpmCard(
   acao: BpmAcao,
   client: ClienteAcessoBpm = db,
 ): Promise<AcessoBpmCard> {
-  const acessoModulo = await carregarUsuarioEPermissoesBpm(userId, client);
-  if (!acessoModulo) {
+  const [acessoModulo, card] = await Promise.all([
+    carregarUsuarioEPermissoesBpm(userId, client),
+    client.bpmCard.findUnique({
+      where: { id: cardId },
+      select: { etapa: { select: { nome: true } } },
+    }),
+  ]);
+  if (!acessoModulo || !card) {
+    return { autorizado: false, isAdminGlobal: false, role: null };
+  }
+  if (etapaEhBoasVindas(card.etapa.nome) && !usuarioEhDiretoriaBpm(acessoModulo.usuario.role)) {
     return { autorizado: false, isAdminGlobal: false, role: null };
   }
   if (isAdminRole(acessoModulo.usuario.role)) {
@@ -261,19 +289,46 @@ export type BpmAcaoPipeline =
  * podem criar/editar etapas, campos, SLA e layout de um pipeline — não há papel
  * intermediário aqui, diferente do ownership por card acima.
  */
-export function checarAcessoConfigPipeline(
-  userRoleGlobal: string | null,
+export async function checarAcessoConfigPipeline(
+  userId: number,
   _acao: BpmAcaoPipeline,
-): boolean {
+  client: ClienteAcessoBpm = db,
+): Promise<boolean> {
   void _acao;
-  return isAdminRole(userRoleGlobal);
+  const acesso = await carregarUsuarioEPermissoesBpm(userId, client);
+  return Boolean(acesso && isAdminRole(acesso.usuario.role));
 }
 
-export function exigirAcessoConfigPipeline(
-  userRoleGlobal: string | null,
+/**
+ * Eventos no canal do pipeline carregam `cardId`. Por isso, associação a um
+ * único card não basta para assinar o canal: somente CRM + setor do pipeline
+ * (ou administrador) pode observar o stream completo do board.
+ */
+export async function checarAcessoRealtimeBpmPipeline(
+  pipelineId: string,
+  userId: number,
+  client: ClienteAcessoBpm = db,
+): Promise<boolean> {
+  const acesso = await carregarUsuarioEPermissoesBpm(userId, client);
+  if (!acesso) return false;
+  if (isAdminRole(acesso.usuario.role)) return true;
+  if (!possuiPermissaoCrm(acesso.permissoes)) return false;
+
+  const pipeline = await client.bpmPipeline.findUnique({
+    where: { id: pipelineId },
+    select: { setores: { select: { setor: { select: { nome: true } } } } },
+  });
+  if (!pipeline) return false;
+  return pipeline.setores.length === 0
+    || pipeline.setores.some(({ setor }) => isSameRole(setor.nome, acesso.usuario.role));
+}
+
+export async function exigirAcessoConfigPipeline(
+  userId: number,
   acao: BpmAcaoPipeline,
-): void {
-  if (!checarAcessoConfigPipeline(userRoleGlobal, acao)) {
+  client: ClienteAcessoBpm = db,
+): Promise<void> {
+  if (!(await checarAcessoConfigPipeline(userId, acao, client))) {
     throw new Error("Não autorizado — apenas administradores configuram pipelines");
   }
 }

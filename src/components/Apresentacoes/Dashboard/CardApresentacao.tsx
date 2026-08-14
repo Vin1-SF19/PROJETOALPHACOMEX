@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
@@ -26,12 +25,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DuplicarApresentacao, ExcluirApresentacao } from "@/actions/apresentacoes";
-import type { MiniaturaSlideDados } from "@/lib/apresentacoes/miniatura-slide";
-
-const MiniaturaSlideApresentacao = dynamic(
-  () => import("./MiniaturaSlideApresentacao").then((modulo) => modulo.MiniaturaSlideApresentacao),
-  { ssr: false },
-);
 
 export interface ApresentacaoCard {
   id: string;
@@ -42,7 +35,6 @@ export interface ApresentacaoCard {
   updatedAt: Date;
   autor: { id: number; nome: string };
   _count: { slides: number };
-  primeiroSlide: MiniaturaSlideDados | null;
 }
 
 const STATUS_BADGE: Record<string, { label: string; variant: "secondary" | "default" | "outline" }> = {
@@ -110,9 +102,7 @@ export function CardApresentacao({ apresentacao, accent, onAlterado }: CardApres
         aria-label={`Editar apresentação ${apresentacao.titulo}`}
         className="relative aspect-video w-full overflow-hidden bg-slate-900 cursor-pointer"
       >
-        {apresentacao.primeiroSlide ? (
-          <MiniaturaSlideApresentacao miniatura={apresentacao.primeiroSlide} />
-        ) : apresentacao.thumbnailUrl ? (
+        {apresentacao.thumbnailUrl ? (
           <Image
             src={apresentacao.thumbnailUrl}
             alt=""

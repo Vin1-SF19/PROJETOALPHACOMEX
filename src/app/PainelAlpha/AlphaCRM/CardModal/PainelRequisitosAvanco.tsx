@@ -9,7 +9,12 @@ import {
   SalvarRequisitosEMoverCardBpm,
 } from "@/actions/bpm/Cards";
 import { CampoBpmInput } from "../CampoBpmInput";
-import { montarPayloadCamposDestino, separarCamposRequisitos } from "@/lib/bpm/card-modal-ui";
+import {
+  montarPayloadCamposDestino,
+  prepararCamposMotivoLostUi,
+  separarCamposRequisitos,
+} from "@/lib/bpm/card-modal-ui";
+import { MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM } from "@/lib/bpm/lost";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Requisitos = NonNullable<Awaited<ReturnType<typeof ObterRequisitosTransicaoBpm>>["data"]>;
@@ -76,17 +81,33 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
     return () => { cancelado = true; };
   }, [card.id, destinoId, realtimeRevision]);
 
-  const faltantes = requisitos?.campos.filter(
+  const configuracaoLostUi = prepararCamposMotivoLostUi(
+    requisitos?.etapaDestino.nome,
+    requisitos?.campos ?? [],
+    valores,
+  );
+  const camposRequisitosVisiveis = configuracaoLostUi.camposVisiveis;
+  const faltantes = camposRequisitosVisiveis.filter(
     (campo) => campo.obrigatorio && !valores[campo.id]?.trim(),
-  ) ?? [];
-  const camposSeparados = separarCamposRequisitos(requisitos?.campos ?? [], new Set(card.camposEtapa.map((campo) => campo.id)));
+  );
+  const complementoLostPendente = Boolean(
+    configuracaoLostUi.exigeComplemento
+    && configuracaoLostUi.campoComplementoId
+    && !valores[configuracaoLostUi.campoComplementoId]?.trim(),
+  );
+  const camposSeparados = separarCamposRequisitos(camposRequisitosVisiveis, new Set(card.camposEtapa.map((campo) => campo.id)));
   const camposOrigem = camposSeparados.origem;
   const camposExibidos = camposSeparados.editaveisDestino;
   const exigeProximoContato = requisitos?.guardas.some((guarda) => guarda.includes("Próximo Contato")) ?? false;
   const guardasBloqueantes = requisitos?.guardas.filter(
     (guarda) => !(guarda.includes("Próximo Contato") && proximoContato),
   ) ?? [];
-  const pronto = podeEditar && podeMover && Boolean(requisitos) && faltantes.length === 0 && guardasBloqueantes.length === 0;
+  const pronto = podeEditar
+    && podeMover
+    && Boolean(requisitos)
+    && !conflitoRealtime
+    && faltantes.length === 0
+    && guardasBloqueantes.length === 0;
 
   function focarSecao(id: string) {
     const elemento = document.getElementById(id);
@@ -94,8 +115,26 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
     elemento?.focus({ preventScroll: true });
   }
 
+  async function usarRequisitosAtualizados() {
+    if (!destinoId) return;
+    setCarregando(true);
+    setErro(null);
+    const resultado = await ObterRequisitosTransicaoBpm(card.id, destinoId);
+    setCarregando(false);
+    if (!resultado.success || !resultado.data) {
+      setErro(typeof resultado.error === "string" ? resultado.error : "Não foi possível recarregar os requisitos");
+      return;
+    }
+    setRequisitos(resultado.data);
+    setValores(Object.fromEntries(resultado.data.campos.map((campo) => [campo.id, campo.valor ?? ""])));
+    setProximoContato(paraInputDatetimeLocal(resultado.data.proximoContatoEm));
+    revisaoAnteriorRef.current = realtimeRevision;
+    draftSujoRef.current = false;
+    setConflitoRealtime(false);
+  }
+
   async function salvarEAvancar() {
-    if (!requisitos || !destinoId) return;
+    if (!requisitos || !destinoId || conflitoRealtime) return;
     setSalvando(true);
     const resultado = await SalvarRequisitosEMoverCardBpm({
       cardId: card.id,
@@ -151,7 +190,14 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
 
       {requisitos && !carregando && (
         <div className="space-y-3 border-t border-white/5 pt-3">
-          {conflitoRealtime && <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">Os requisitos receberam uma atualização externa. Seu rascunho foi preservado; revise antes de avançar.</p>}
+          {conflitoRealtime && (
+            <div className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200" role="alert">
+              <p>Os requisitos receberam uma atualização externa. Seu rascunho foi preservado e o avanço está bloqueado.</p>
+              <button type="button" onClick={() => void usarRequisitosAtualizados()} disabled={carregando} className="mt-2 rounded-lg border border-sky-300/30 px-2 py-1 font-semibold hover:bg-sky-200/10 disabled:opacity-50">
+                Usar requisitos atualizados
+              </button>
+            </div>
+          )}
           {camposOrigem.length > 0 && (
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-400">
               <p>{camposOrigem.length} requisito(s) pertencem à etapa atual e devem ser preenchidos no editor acima.</p>
@@ -160,6 +206,9 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
           )}
           {camposExibidos.map((campo) => {
             const pendente = campo.obrigatorio && !valores[campo.id]?.trim();
+            const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId
+              && complementoLostPendente;
+            const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
             return (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="flex items-center justify-between gap-2 text-[11px] font-medium text-slate-400">
@@ -173,10 +222,15 @@ export function PainelRequisitosAvanco({ card, etapas, accent, onAtualizado, pod
                     ? <AlertCircle size={12} className="text-amber-400" aria-label="Pendente" />
                     : <CheckCircle2 size={12} className="text-emerald-400" aria-label="Preenchido" />)}
                 </label>
-                <CampoBpmInput campo={campo} disabled={!podeEditar} className={inputClassName} value={valores[campo.id] ?? ""} onChange={(valor) => {
+                <CampoBpmInput campo={campo} disabled={!podeEditar} className={inputClassName} value={valores[campo.id] ?? ""} invalid={complementoPendente} describedBy={descricaoId} onChange={(valor) => {
                   draftSujoRef.current = true;
                   setValores((atuais) => ({ ...atuais, [campo.id]: valor }));
                 }} />
+                {complementoPendente && (
+                  <p id={descricaoId} role="alert" className="text-[11px] text-amber-300">
+                    {MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM}
+                  </p>
+                )}
               </div>
             );
           })}

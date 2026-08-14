@@ -7,7 +7,7 @@ import {
 } from "./xml-utils";
 import { buscarPosicaoNoLayout, lerCorOoxml, lerFundo, resolverContextoTema, resolverReferenciasEstilo, type ContextoTema } from "./tema";
 import { ConsumidorPorTipo, construirArvoreOrdem, xmlDoNo, type NoOrdem } from "./ordem-xml";
-import { construirSvgFormaColorida, construirSvgFormaGradiente, construirSvgImagemRecortada, extrairGeometriaCustGeom, type GeometriaCustGeom } from "./geometria";
+import { construirSvgFormaColorida, construirSvgFormaGradiente, extrairGeometriaCustGeom, type GeometriaCustGeom } from "./geometria";
 import { MATRIZ_IDENTIDADE, matrizDoGrupo, matrizEscala, matrizRotacao, matrizTranslacao, multiplicarMatrizes, transformarRetangulo } from "./matriz-transformacao";
 import type { PptxCrop, PptxEffects, PptxElement, PptxFill, PptxIntermediateSlide, PptxLine, PptxMatrix, PptxSourceRef } from "./modelo-intermediario";
 import { PPTX_IMPORTER_VERSION } from "./modelo-intermediario";
@@ -380,12 +380,16 @@ async function processarFormaImagemDeShape(
 
   // custGeom não-retangular → recorta a imagem pelo path real (clipPath), em vez de mostrá-la
   // como um retângulo (que destoaria visualmente da forma original — ex.: foto com crop arredondado).
+  // A imagem BRUTA (não um SVG já pronto) é o que vai em `bytes` aqui — `mapear.ts` envia essa
+  // imagem bruta pro Blob primeiro e só então monta o SVG de recorte referenciando a URL real,
+  // em vez de embutir o PNG/JPEG inteiro em base64 dentro do SVG (ver `FormaImagemExtraida.recorte`).
   if (geometria && !geometria.ehRetangulo && geometria.pathSvg) {
-    const dataUriOriginal = `data:${asset.mimeType};base64,${Buffer.from(asset.bytes).toString("base64")}`;
-    const svgMarkup = construirSvgImagemRecortada(geometria.pathSvg, geometria.viewBoxW, geometria.viewBoxH, dataUriOriginal, crop, opacidade);
-    const bytesSvg = new TextEncoder().encode(svgMarkup);
     return {
-      forma: { tipo: "imagem", x, y, w, h, rotacao, flipH, flipV, opacidade, bytes: bytesSvg, mimeType: "image/svg+xml", nomeArquivo: `${asset.caminhoMedia.split("/").pop() ?? "imagem"}-recortada.svg` },
+      forma: {
+        tipo: "imagem", x, y, w, h, rotacao, flipH, flipV, opacidade,
+        bytes: asset.bytes, mimeType: asset.mimeType, nomeArquivo: asset.caminhoMedia.split("/").pop() ?? "imagem",
+        recorte: { pathSvg: geometria.pathSvg, viewBoxW: geometria.viewBoxW, viewBoxH: geometria.viewBoxH, crop, opacidade },
+      },
       motivo: null, fillEncontrado: "blipFill (com recorte custGeom)", relationshipId: rEmbed ?? null, assetResolvido: asset.caminhoMedia, geometria: null,
     };
   }

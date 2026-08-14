@@ -10,7 +10,8 @@ const notificarPipelineBpmMock = vi.hoisted(() => vi.fn());
 
 const prismaMock = vi.hoisted(() => ({
   cliente: { findUnique: vi.fn(), create: vi.fn() },
-  bpmEtapa: { findUnique: vi.fn() },
+  bpmPipeline: { findUnique: vi.fn() },
+  bpmEtapa: { findUnique: vi.fn(), findMany: vi.fn() },
   bpmCard: { create: vi.fn() },
   bpmCardMembro: { create: vi.fn() },
   bpmCardCampoValor: { createMany: vi.fn() },
@@ -45,6 +46,7 @@ const ETAPA_ID = "clw0000000000000etap";
 function mockTransacaoFeliz() {
   prismaMock.$transaction.mockImplementation(async (callback) => callback({
     cliente: prismaMock.cliente,
+    bpmPipeline: prismaMock.bpmPipeline,
     bpmEtapa: prismaMock.bpmEtapa,
     bpmCard: prismaMock.bpmCard,
     bpmCardMembro: prismaMock.bpmCardMembro,
@@ -62,7 +64,10 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     carregarCamposObrigatoriosEtapaMock.mockResolvedValue([]);
     carregarCamposAplicaveisEtapaMock.mockResolvedValue([]);
     validarValoresCamposBpmMock.mockReturnValue({ success: true, valores: {} });
-    prismaMock.bpmEtapa.findUnique.mockResolvedValue({ pipelineId: PIPELINE_ID, ativo: true });
+    prismaMock.bpmPipeline.findUnique.mockResolvedValue({ ativo: true });
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([
+      { id: ETAPA_ID, nome: "Novos Leads" },
+    ]);
     prismaMock.bpmCardMembro.create.mockResolvedValue({});
     prismaMock.bpmCardHistorico.create.mockResolvedValue({});
     mockTransacaoFeliz();
@@ -164,6 +169,117 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     });
 
     expect(resultado.success).toBe(false);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejeita destino fora da etapa canônica antes de persistir", async () => {
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([
+      { id: ETAPA_ID, nome: "Fechado" },
+      { id: "clw0000000000000novo", nome: "Novos Leads" },
+    ]);
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "Novos cards só podem ser criados na etapa Novos Leads.",
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCard.create).not.toHaveBeenCalled();
+    expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
+  });
+
+  it("rejeita chamada direta se Novos Leads não estiver na primeira etapa ativa", async () => {
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([
+      { id: "clw0000000000000ante", nome: "Entrada anterior", ordem: 1 },
+      { id: ETAPA_ID, nome: "Novos Leads", ordem: 2 },
+    ]);
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "Novos cards só podem ser criados na etapa Novos Leads.",
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCard.create).not.toHaveBeenCalled();
+  });
+
+  it("rejeita drift transacional sem efeitos nem realtime", async () => {
+    prismaMock.bpmEtapa.findMany
+      .mockResolvedValueOnce([{ id: ETAPA_ID, nome: "Novos Leads" }])
+      .mockResolvedValueOnce([{ id: ETAPA_ID, nome: "Fechado" }]);
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "A etapa Novos Leads mudou durante a criação. Recarregue e tente novamente.",
+    });
+    expect(prismaMock.bpmCard.create).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCardMembro.create).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCardHistorico.create).not.toHaveBeenCalled();
+    expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
+  });
+
+  it("ignora payload legado sem validar nem persistir controles de etapa", async () => {
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 42 });
+    prismaMock.bpmCard.create.mockResolvedValue({ id: "card-legado", empresaId: 42 });
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+      camposValores: { clw0000000000000camp: "não persistir" },
+      proximoContatoEm: "2026-08-20T15:00:00.000Z",
+      statusPosFechamento: "CONTRATO_ASSINADO",
+    });
+
+    expect(resultado.success).toBe(true);
+    expect(validarValoresCamposBpmMock).not.toHaveBeenCalled();
+    expect(carregarCamposObrigatoriosEtapaMock).not.toHaveBeenCalled();
+    expect(carregarCamposAplicaveisEtapaMock).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCardCampoValor.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
+      data: {
+        empresaId: 42,
+        pipelineId: PIPELINE_ID,
+        etapaId: ETAPA_ID,
+        responsavelId: 7,
+        servico: undefined,
+      },
+    });
+  });
+
+  it("nega sessão antes de consultar o contexto de criação", async () => {
+    authMock.mockResolvedValueOnce(null);
+
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado).toEqual({ success: false, error: "Não autorizado" });
+    expect(prismaMock.bpmPipeline.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 });

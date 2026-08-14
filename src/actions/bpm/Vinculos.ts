@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { criarVinculoCardSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
-import { registrarHistoricoCard } from "./Cards";
+import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
@@ -28,8 +28,11 @@ export async function CriarVinculoCardBpm(dados: unknown) {
     }
 
     await exigirAcessoBpmCard(cardOrigemId, userId, session.user.role ?? null, "editarCard");
+    await exigirAcessoBpmCard(cardDestinoId, userId, session.user.role ?? null, "editarCard");
 
     const vinculo = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(cardOrigemId, userId, session.user.role ?? null, "editarCard", tx);
+      await exigirAcessoBpmCard(cardDestinoId, userId, session.user.role ?? null, "editarCard", tx);
       const criado = await tx.bpmCardVinculo.create({ data: { cardOrigemId, cardDestinoId } });
       await registrarHistoricoCard(
         {
@@ -89,8 +92,19 @@ export async function ObterHistoricoCruzadoBpm(cardId: string) {
       ...card.vinculosDestino.map((v) => v.cardOrigemId),
     ];
 
+    const acessosRelacionados = await Promise.all(
+      cardIdsRelacionados.map(async (id) => {
+        try {
+          await exigirAcessoBpmCard(id, userId, session.user.role ?? null, "visualizarHistorico");
+          return id;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const cardIdsVisiveis = acessosRelacionados.filter((id): id is string => Boolean(id));
     const historico = await db.bpmCardHistorico.findMany({
-      where: { cardId: { in: cardIdsRelacionados } },
+      where: { cardId: { in: cardIdsVisiveis } },
       include: {
         card: {
           select: {

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { criarInteracaoCardSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
-import { registrarHistoricoCard } from "./Cards";
+import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
@@ -27,6 +27,7 @@ export async function CriarInteracaoCardBpm(dados: unknown) {
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
     const interacao = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
       const criada = await tx.bpmInteracaoCard.create({
         data: {
           cardId,

@@ -61,43 +61,18 @@ model BpmEtapaTransicaoPermitida {
 
 ### 5. Automação de ligações (5 tentativas/dia) para leads "sem resposta"
 
-**Schema novo (migration 🟢):**
-```prisma
-model BpmCardTentativaLigacao {
-  id        String   @id @default(cuid())
-  cardId    String
-  card      BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  dia       DateTime // data civil (só a data, sem hora) — 1 contador por dia
-  tentativas Int     @default(0)
-  usuarioId Int
-  usuario   usuarios @relation(fields: [usuarioId], references: [id])
+**Implementada em 2026-08-14, sem schema adicional:** `BpmInteracaoCard` com `tipo: "LIGACAO"` é a fonte de verdade de cada tentativa real. O cron conta as interações no dia civil de São Paulo e cria apenas as tarefas operacionais `LIGACAO` faltantes até cinco para cards ativos em Novos Leads, sem Próximo Contato.
 
-  @@unique([cardId, dia, usuarioId])
-}
-```
-Reaproveita `BpmInteracaoCard` (`tipo: "LIGACAO"`) como o registro individual de cada ligação — `BpmCardTentativaLigacao` seria redundante se `BpmInteracaoCard` já for suficiente para contar "quantas ligações hoje" via `COUNT(*) WHERE cardId=X AND tipo='LIGACAO' AND DATE(createdAt)=hoje`. **Decisão a confirmar na Fase de execução:** usar `BpmInteracaoCard` existente (sem tabela nova) ou criar tabela de contador dedicada (mais simples de consultar, mas duplica o que já existe). Recomendação do Bibble: reaproveitar `BpmInteracaoCard`, sem tabela nova.
+`BpmCardHistorico` registra `NOVOS_LEADS_LIGACOES_PLANEJADAS` com o dia do ciclo e os IDs das tarefas, e o CAS por card/etapa/status/Próximo Contato/`updatedAt` impede planejamento duplicado em retry ou concorrência. As tarefas têm prazo e alerta, mas não simulam nem enviam contato externo. A permanência em Novos Leads é o proxy operacional para “sem resposta”, pois não existe flag canônica de resposta.
 
-"Travar"/"cobrar" o responsável: precisa de UI que mostre "faltam N de 5 ligações hoje" no card/detalhe — sem bloquear ações do sistema (travar de verdade, ex: impedir mover o card, é uma escolha de produto a confirmar).
+O card exibe o progresso diário `realizadas/5`; a meta não bloqueia ações manuais. Ver `docs/stories/story-alpha-crm-automacoes-gerais-tentativas.md`.
 
 ### 6. Automação de 8 dias (mover para Standby se "Próximo Contato" não preenchido)
 
-**Schema novo (migration 🟢):**
-```prisma
-model BpmCard {
-  // ...existente
-  proximoContatoEm DateTime?  // preenchido manualmente pelo responsável — presença interrompe a automação
-}
-```
-**Job diário via Vercel Cron:**
-```json
-// vercel.json
-{
-  "crons": [{ "path": "/api/bpm/jobs/cobranca-novos-leads", "schedule": "0 12 * * *" }]
-}
-```
-Route Handler protegida (header secreto `CRON_SECRET`, comparado antes de processar — nunca pública sem proteção) roda 1x/dia:
-1. Para cada `BpmCard` na etapa "Novos leads" com `proximoContatoEm IS NULL`: calcular dias desde `createdAt`. Se >= 8 dias, mover automaticamente para "Standby - Follow Up" (reaproveitando a mesma lógica de `MoverCardBpm`, ou uma versão interna sem checagem de `auth()` de sessão, já que é processo de sistema).
-2. Registrar em `BpmCardHistorico` com `automacaoOrigem` preenchido (campo já existe no schema!) para diferenciar de movimentação manual.
+`BpmCard.proximoContatoEm` já existe como campo nativo. A presença de um valor válido interrompe a automação de ligação e o ciclo de oito dias; não houve migration nesta entrega.
+**Implementada:** a mesma rota cron protegida por `CRON_SECRET` roda diariamente às 09:00 de Brasília (`0 12 * * *`). Para cada card em Novos Leads com `proximoContatoEm IS NULL`, conta oito dias úteis completos desde a entrada na etapa e então move uma única vez para Standby - Follow Up, com `CARD_MOVIDO_POR_AUTOMACAO` e origem auditável.
+
+O preenchimento de Próximo Contato interrompe tanto novas tarefas de ligação quanto o encaminhamento para Standby. Saída manual, mudança de status ou CAS perdido também retiram o card da elegibilidade; o job não cria efeitos parciais.
 
 ---
 
@@ -307,17 +282,23 @@ Idêntica à validação de entrada já desenhada para "Em Tratativa" (Coluna 4)
 
 ## Coluna 8 — "Standby - Follow Up": desenho técnico por sub-feature
 
-**Marcada como pendência explícita pelo próprio usuário** — "A automação de follow-up será desenvolvida posteriormente [...] documentar detalhadamente [...] incluindo regras, canais, agendamento, interrupção e comportamento do NoLoss." Nenhum schema/código proposto aqui — só a intenção registrada:
-- Cadência: 1 follow-up por semana (diferente da automação de 5×/dia das colunas anteriores — cadência mais espaçada).
-- "NoLoss": continua indefinidamente, sem encerramento automático por tentativas esgotadas (diferente da automação de 8 dias que EMPURRA pra Standby — aqui, uma vez QUE JÁ ESTÁ em Standby, não sai sozinho por tempo).
-- Interrupção manual: "lead solicitou não ser mais contatado" — precisa de um campo/flag (`BpmCard.contatoInterrompido Boolean?` ou similar) que pause a automação sem mover o card, quando essa automação for desenhada.
-- **Não implementar nada agora** — só é mencionada aqui para não perder o contexto de que esta coluna eventualmente ganhará uma automação, e ela é estruturalmente diferente das automações de 8 dias já desenhadas (recorrente sem prazo final vs finita com prazo de 8 dias).
+**Implementada em 2026-08-13.** A automação usa estado próprio, sem reutilizar `proximoContatoEm`:
+- `BpmCard.standbyFollowUpUltimoEm` limita a cadência a uma tarefa operacional interna por sete dias corridos; a primeira só fica elegível sete dias após a entrada atual em Standby. Uma reentrada em Standby reinicia essa referência.
+- `BpmCard.standbyFollowUpInterrompidoEm` persiste o pedido de não receber mais contatos. É NoLoss: o cron ignora permanentemente o card, inclusive se ele sair e voltar à etapa; não existe retomada automática neste fluxo.
+- O cron protegido por `CRON_SECRET` roda diariamente às 12:00 UTC e, no ciclo elegível, cria uma `BpmTarefa` PENDENTE para o responsável e histórico `STANDBY_FOLLOW_UP_EXECUTADO`. O CAS transacional impede tarefa/histórico duplicados sob retry ou concorrência.
+- A interrupção exige motivo, confirmação explícita, autenticação e permissão `editarCard`; registra ator e motivo no histórico. O controle fica exclusivamente em **Formulário da Etapa**, no centro do card Standby.
+- Não existe integração de canal externo neste fluxo: o sistema cria tarefa operacional, não simula envio de WhatsApp, e-mail ou mensagem.
 
 ---
 
-## Coluna 9 — "Monitoramento": desenho técnico por sub-feature
+## Coluna 9 — "Monitoramento": regra operacional e automação mensal
 
-**Marcada como pendência explícita pelo próprio usuário** — "A etapa terá uma automação de monitoramento automático [...] será especificada posteriormente." **Zero detalhe técnico a registrar ainda** — nem schema, nem mecanismo. Fica só como lembrete de que esta etapa tem uma automação pendente de especificação, sem suposição de formato.
+**Implementada em 2026-08-14:** Monitoramento é uma etapa de acompanhamento interno contínuo. Só recebe cards de **Em Tratativa** e só permite saída manual para **Em Tratativa** ou **Lost**; não há criação direta, saída automática ou contato externo automático.
+
+- Enquanto o card estiver `ATIVO` em Monitoramento, o cron diário avalia uma revisão a cada **30 dias corridos**, a partir da entrada atual ou da última execução válida.
+- No vencimento, cria uma `BpmTarefa` pendente (`Revisar monitoramento`), com prazo e alerta imediatos, e registra `MONITORAMENTO_AUTOMATICO_EXECUTADO` / `monitoramento_mensal` no histórico.
+- O estado é derivado do histórico de movimento e do histórico da automação; não exige coluna, migration, seed ou backfill. Reentrada reinicia a janela de 30 dias.
+- CAS transacional garante que tarefa e histórico sejam únicos por ciclo concorrente; realtime é emitido após o commit. A tarefa pendente permanece visível se não for concluída; a automação não envia WhatsApp, e-mail ou qualquer mensagem.
 
 ---
 
@@ -331,7 +312,7 @@ Idêntica à validação de entrada já desenhada para "Em Tratativa" (Coluna 4)
 6. **Fase F — Automação de ligações (5/dia, só Coluna 1) + Automação de 8 dias (Colunas 1, 2, 3, 4)** (Echo): lógica de negócio dentro do job, usando a infra da Fase E, generalizada para varrer as 4 etapas com essa automação.
 7. **Fase G — Checklist de follow-up com trava de UI (Coluna 4)** (Echo + Nova): a peça de maior risco de UX de todo o plano — feita por último, depois de validar o restante do fluxo, e só depois do catálogo de perguntas ser definido.
 8. **Fase H (bloqueada, sem data) — Transcrição automática do Google Meet (Coluna 3)**: só começa depois de (1) usuário decidir entre integração automática vs campo manual, e (2) se automática, Super Admin do Workspace autorizar os escopos da Google Meet API.
-9. **Fase I (bloqueada, sem data) — Automações de Standby (Coluna 8) e Monitoramento (Coluna 9)**: aguardando especificação detalhada do usuário, conforme ele mesmo marcou como pendência.
+9. **Fase I — Automação de Monitoramento (Coluna 9) — ✅ entregue em 2026-08-14:** ciclo mensal interno, tarefa com alerta, histórico/CAS/realtime e sem contato externo.
 
 Cada fase passa por Forge → Probe → (Anubis se tocar auth/rota pública ou dado do Google/PII) → Sage, antes da próxima começar.
 
@@ -388,9 +369,9 @@ Todos os blocos abaixo foram percorridos via `AskUserQuestion`. Decisões marcad
 
 A confirmar/ajustar visualmente na Fase B, quando o componente existir de verdade (mais fácil validar cor vendo o badge real no board do que em texto).
 
-### Bloco 9 — Automações ainda não especificadas (Colunas 8 e 9) — ⏳ SEM MUDANÇA
-22. Standby - Follow Up: aguardando especificação completa do usuário (semanal, NoLoss, interrupção manual — só a intenção registrada).
-23. Monitoramento: aguardando especificação completa do usuário — zero detalhe ainda.
+### Bloco 9 — Automação de Monitoramento (Coluna 9) — ✅
+22. **Standby - Follow Up — ✅ implementado:** tarefa interna semanal, NoLoss, interrupção manual permanente, estado em `BpmCard`, CAS, histórico e UI central. Ver `docs/stories/story-alpha-crm-standby-follow-up.md`.
+23. Monitoramento — ✅ implementado: entrada apenas de Em Tratativa, saída apenas para Em Tratativa/Lost, revisão interna mensal enquanto o card estiver na etapa, com tarefa+alerta e estado em histórico. Ver `docs/stories/story-alpha-crm-monitoramento-automatico.md`.
 
 ---
 
@@ -399,6 +380,6 @@ A confirmar/ajustar visualmente na Fase B, quando o componente existir de verdad
 Apesar de quase todas as decisões estarem fechadas, ainda há 3 bloqueios reais de conteúdo (não mais de arquitetura):
 1. **Catálogo de perguntas do checklist de follow-up** (Bloco 7, item 19) — bloqueia só a Fase G, não as demais.
 2. **Autorização do escopo Google Meet API no Admin Console + confirmação de gravação/transcrição habilitada** (Bloco 3, item 10) — ação do usuário/Super Admin fora do código, bloqueia só a Fase H.
-3. **Especificação de Standby (Coluna 8) e Monitoramento (Coluna 9)** — bloqueia só a Fase I.
+3. **Especificação de Monitoramento (Coluna 9)** — resolvida em 2026-08-14; a Fase I foi entregue sem alteração estrutural.
 
 **Nenhum desses 3 bloqueia as Fases A-F** (schema base, indicador visual, badge de canal, campos obrigatórios, regra de avanço, Google Meet criar/reagendar, Cron, automações de ligação/8-dias) — essas já têm tudo que precisam para começar.

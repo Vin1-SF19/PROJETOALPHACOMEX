@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { Building2, ExternalLink, Loader2 } from "lucide-react";
+import { BriefcaseBusiness, Building2, Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { isAdminRole } from "@/lib/roles";
@@ -20,8 +19,10 @@ import {
   useDadosEmpresaDrawer,
 } from "./DadosEmpresaDrawer";
 import { TelefonesCardButton } from "./TelefonesCardButton";
+import { EmpresaPerfilModal } from "./EmpresaPerfilModal";
 import { toast } from "sonner";
 import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
+import { destinoEhReuniaoAgendada } from "@/lib/bpm/agendar-reuniao";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -46,13 +47,14 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
+  const [perfilEmpresaAberto, setPerfilEmpresaAberto] = useState(false);
   const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
   const atualizarEstadoFollowUp = useCallback((estado: EstadoFollowUpModal) => {
     setEstadoFollowUpPorCard((estados) => ({ ...estados, [cardId]: estado }));
   }, [cardId]);
   const focarPainelReuniao = useCallback(() => {
-    const painel = document.getElementById(`painel-reuniao-${cardId}`);
+    const painel = document.getElementById(`formulario-etapa-${cardId}`);
     painel?.scrollIntoView({ behavior: "smooth", block: "center" });
     painel?.focus({ preventScroll: true });
   }, [cardId]);
@@ -184,13 +186,36 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                       <span>{card.empresa.cnpj}</span>
                       <span className="text-slate-700">·</span>
-                      <Link
-                        href={`/PainelAlpha/AlphaCRM/empresa/${card.empresa.id}`}
-                        className="flex items-center gap-1 hover:text-white transition-colors"
+                      <button
+                        type="button"
+                        onClick={() => setPerfilEmpresaAberto(true)}
+                        className="hover:text-white transition-colors"
                       >
-                        Perfil da empresa <ExternalLink size={10} />
-                      </Link>
+                        Perfil da empresa
+                      </button>
                     </div>
+                    {card.servico?.trim() && (
+                      <div
+                        className="mt-2 inline-flex max-w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs shadow-[0_8px_20px_-14px_rgba(var(--accent-rgb),0.9)]"
+                        style={{
+                          background: `linear-gradient(110deg, rgba(${accent},0.22), rgba(${accent},0.06))`,
+                          borderColor: `rgba(${accent},0.42)`,
+                        }}
+                      >
+                        <BriefcaseBusiness
+                          aria-hidden="true"
+                          size={13}
+                          className="shrink-0"
+                          style={{ color: `rgb(${accent})` }}
+                        />
+                        <span className="shrink-0 font-bold uppercase tracking-[0.11em] text-slate-300">
+                          Serviço ativo
+                        </span>
+                        <span className="truncate font-extrabold text-white" title={card.servico}>
+                          {card.servico}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <DadosEmpresaToggle
                     aberto={dadosEmpresaDrawer.aberto}
@@ -262,7 +287,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                       onAtualizado={() => { recarregar(); onAtualizado(); }}
                       onAbrirCard={onAbrirCard}
                       etapasParaMover={etapasParaMover}
-                      onEstadoFollowUpChange={atualizarEstadoFollowUp}
+                      etapas={etapas}
                       podeEditar={podeEditar}
                       podeMoverEtapa={podeMoverEtapa}
                       realtimeRevision={realtimeRevision}
@@ -286,13 +311,20 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                 etapaAtual={etapaAtual}
                 accent={accent}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
+                podeEditar={podeEditar}
+                realtimeRevision={realtimeRevision}
+                onAtualizado={() => { recarregar(); onAtualizado(); }}
+                onEstadoFollowUpChange={atualizarEstadoFollowUp}
               />
-              <div id={`painel-reuniao-${card.id}`} tabIndex={-1} className="flex flex-col gap-4 min-h-0 overflow-y-auto">
-                <PainelReuniao
-                  card={card}
-                  accent={accent}
-                  onAtualizado={() => { recarregar(); onAtualizado(); }}
-                />
+              <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
+                {destinoEhReuniaoAgendada(card.etapa.nome) && (
+                  <PainelReuniao
+                    card={card}
+                    accent={accent}
+                    mostrarFormulario={false}
+                    onAtualizado={() => { recarregar(); onAtualizado(); }}
+                  />
+                )}
                 <PainelProximaEtapa
                   card={card}
                   etapas={etapasParaMover}
@@ -302,6 +334,13 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                 />
               </div>
             </div>
+            <EmpresaPerfilModal
+              empresaId={card.empresa.id}
+              aberto={perfilEmpresaAberto}
+              accent={accent}
+              onAbertoChange={setPerfilEmpresaAberto}
+              onAbrirCard={onAbrirCard}
+            />
           </div>
         )}
       </SheetContent>

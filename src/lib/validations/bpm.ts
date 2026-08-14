@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { STATUS_POS_FECHAMENTO_CODIGOS } from "@/lib/bpm/status-pos-fechamento";
+import { BPM_TAREFA_TIPOS } from "@/lib/bpm/tarefas-tipo";
 
 export const BPM_CARD_STATUS = ["ATIVO", "CONCLUIDO", "CANCELADO"] as const;
 
 export const BPM_CARD_MEMBRO_ROLE = ["RESPONSAVEL", "ADMINISTRADOR", "PARTICIPANTE"] as const;
 
-export const BPM_CAMPO_TIPO = ["texto", "numero", "data", "selecao", "booleano"] as const;
+export const BPM_CAMPO_TIPO = ["texto", "texto_longo", "numero", "data", "selecao", "booleano", "cpf"] as const;
 
 export const BPM_TAREFA_PRIORIDADE = ["BAIXA", "NORMAL", "ALTA"] as const;
 
@@ -15,6 +16,14 @@ export const BPM_TAREFA_PRESET_TIPO_GERACAO = ["UNICA", "MULTIPLA", "FLUXO"] as 
 
 const MAX_NOME = 200;
 const MAX_DESCRICAO = 4000;
+export const MAX_CAMPOS_VALORES_BPM = 100;
+
+const camposValoresBpmSchema = z
+  .record(z.string().cuid(), z.string().max(4000))
+  .refine(
+    (valores) => Object.keys(valores).length <= MAX_CAMPOS_VALORES_BPM,
+    `No máximo ${MAX_CAMPOS_VALORES_BPM} campos podem ser enviados por operação.`,
+  );
 
 export const criarPipelineSchema = z.object({
   nome: z.string().trim().min(1, "Nome do pipeline é obrigatório").max(MAX_NOME),
@@ -86,7 +95,6 @@ export const criarCardSchema = z.object({
   etapaId: z.string().cuid(),
   responsavelId: z.number().int().positive(),
   servico: z.string().trim().max(120).optional(),
-  camposValores: z.record(z.string().cuid(), z.string().max(4000)).optional(),
 }).refine((d) => d.empresaId !== undefined || d.novaEmpresa !== undefined, {
   message: "Empresa é obrigatória",
   path: ["empresaId"],
@@ -103,7 +111,7 @@ export const atualizarCardSchema = z.object({
     (valor) => valor === "" ? null : valor,
     z.coerce.date().nullable().optional(),
   ),
-  camposValores: z.record(z.string().cuid(), z.string().max(4000)).optional(),
+  camposValores: camposValoresBpmSchema.optional(),
 });
 
 export const salvarChecklistFollowUpSchema = z.object({
@@ -116,13 +124,18 @@ export const salvarChecklistFollowUpSchema = z.object({
   concluir: z.boolean().default(false),
 });
 
+export const interromperStandbyFollowUpSchema = z.object({
+  cardId: z.string().cuid(),
+  motivo: z.string().trim().min(2, "Informe o motivo da interrupção").max(MAX_DESCRICAO),
+});
+
 export const moverCardSchema = z.object({
   cardId: z.string().cuid(),
   etapaDestinoId: z.string().cuid(),
 });
 
 export const salvarRequisitosEMoverCardSchema = moverCardSchema.extend({
-  camposValores: z.record(z.string().cuid(), z.string().max(4000)).default({}),
+  camposValores: camposValoresBpmSchema.default({}),
   proximoContatoEm: z.preprocess(
     (valor) => valor === "" ? null : valor,
     z.coerce.date().nullable().optional(),
@@ -144,12 +157,38 @@ export const criarInteracaoCardSchema = z.object({
 
 export const criarTarefaSchema = z.object({
   cardId: z.string().cuid(),
-  titulo: z.string().trim().min(1, "Título é obrigatório").max(MAX_NOME),
+  tipo: z.enum(BPM_TAREFA_TIPOS),
+  titulo: z.string().trim().max(MAX_NOME).optional(),
   descricao: z.string().trim().max(MAX_DESCRICAO).optional(),
+  contato: z.string().trim().max(200).optional(),
+  telefone: z.string().trim().max(40).optional(),
+  emailDestino: z.string().trim().email("E-mail de destino inválido").max(320).optional(),
+  mensagem: z.string().trim().max(MAX_DESCRICAO).optional(),
+  checklistItens: z.array(z.string().trim().min(1).max(300)).min(1).max(30).optional(),
   responsavelId: z.number().int().positive().optional(),
-  prazo: z.coerce.date().optional(),
+  prazo: z.coerce.date({ error: "Prazo é obrigatório" }),
+  alertaEm: z.coerce.date({ error: "Alerta é obrigatório" }),
   prioridade: z.enum(BPM_TAREFA_PRIORIDADE).default("NORMAL"),
   presetId: z.string().cuid().optional(),
+}).superRefine((dados, contexto) => {
+  if (dados.alertaEm > dados.prazo) {
+    contexto.addIssue({ code: "custom", path: ["alertaEm"], message: "O alerta deve ocorrer antes do prazo." });
+  }
+  if (["CHECKLIST", "TAREFA", "LEMBRETE_RAPIDO", "EMAIL"].includes(dados.tipo) && !dados.titulo?.trim()) {
+    contexto.addIssue({ code: "custom", path: ["titulo"], message: "Título é obrigatório." });
+  }
+  if (dados.tipo === "CHECKLIST" && !dados.checklistItens?.length) {
+    contexto.addIssue({ code: "custom", path: ["checklistItens"], message: "Inclua ao menos um item no checklist." });
+  }
+  if (dados.tipo === "LIGACAO" && !dados.telefone?.trim()) {
+    contexto.addIssue({ code: "custom", path: ["telefone"], message: "Telefone é obrigatório para ligação." });
+  }
+  if (dados.tipo === "WHATSAPP" && (!dados.contato?.trim() || !dados.mensagem?.trim())) {
+    contexto.addIssue({ code: "custom", path: ["mensagem"], message: "Informe contato e mensagem do WhatsApp." });
+  }
+  if (dados.tipo === "EMAIL" && (!dados.emailDestino?.trim() || !dados.mensagem?.trim())) {
+    contexto.addIssue({ code: "custom", path: ["mensagem"], message: "Informe destinatário e mensagem do e-mail." });
+  }
 });
 
 export const concluirTarefaSchema = z.object({
@@ -165,7 +204,18 @@ export const criarTarefaPresetSchema = z.object({
     z.object({
       titulo: z.string().trim().min(1).max(MAX_NOME),
       descricao: z.string().trim().max(MAX_DESCRICAO).optional(),
+      tipo: z.enum(BPM_TAREFA_TIPOS).default("TAREFA"),
+      prazo: z.coerce.date({ error: "Prazo é obrigatório" }),
+      alertaEm: z.coerce.date({ error: "Alerta é obrigatório" }),
       prioridade: z.enum(BPM_TAREFA_PRIORIDADE).default("NORMAL"),
+    }).superRefine((tarefa, contexto) => {
+      if (tarefa.alertaEm > tarefa.prazo) {
+        contexto.addIssue({
+          code: "custom",
+          path: ["alertaEm"],
+          message: "O alerta deve ocorrer antes do prazo.",
+        });
+      }
     }),
   ).min(1),
 });
@@ -184,10 +234,7 @@ const BPM_ANEXO_ALLOWED_MIME = [
 
 export const registrarAnexoSchema = z.object({
   cardId: z.string().cuid(),
-  url: z.string().url(),
-  nome: z.string().trim().min(1).max(255),
-  tipo: z.string().max(120).optional(),
-  tamanho: z.number().int().positive().max(BPM_ANEXO_MAX_BYTES).optional(),
+  recibo: z.string().trim().min(20).max(4_096),
 });
 
 export function validarUploadAnexo(file: { size: number; type: string }): string | null {

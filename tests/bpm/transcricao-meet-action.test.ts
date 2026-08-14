@@ -53,6 +53,11 @@ describe("SincronizarTranscricaoReuniaoBpm", () => {
         motivo: "A transcrição ainda está sendo processada pelo Google Meet.",
       },
     });
-    expect(sincronizarMock).toHaveBeenCalledWith("card-1", "manual");
+    expect(sincronizarMock).toHaveBeenCalledWith("card-1", "manual", expect.any(Function));
+
+    const revalidar = sincronizarMock.mock.calls[0][2] as (tx: object) => Promise<void>;
+    const tx = { bpmCard: {} };
+    await expect(revalidar(tx)).resolves.toBeUndefined();
+    expect(exigirAcessoMock).toHaveBeenLastCalledWith("card-1", 42, "User", "editarCard", tx);
   });
 });

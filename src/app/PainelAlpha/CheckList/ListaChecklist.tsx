@@ -30,24 +30,12 @@ function texto(valor: string | null) {
 function dadosDoCard(empresa: EmpresaComProgresso): DadosEmpresaChecklist {
   return {
     empresaId: empresa.id,
-    razaoSocial: empresa.razaoSocial,
-    nomeFantasia: empresa.nomeFantasia,
-    cnpj: empresa.cnpj,
     status: empresa.status,
     embasamento: empresa.embasamento,
     tipo: empresa.tipo,
     pastaChecklistId: empresa.pastaChecklistId,
     mesProtocolo: empresa.mesProtocolo,
     linkGrupo: empresa.linkGrupo,
-    situacaoRadar: empresa.situacaoRadar,
-    submodalidade: empresa.submodalidade,
-    dataSituacao: empresa.dataSituacao,
-    municipio: empresa.municipio,
-    uf: empresa.uf,
-    regimeTributario: empresa.regimeTributario,
-    capitalSocial: empresa.capitalSocial,
-    dataConstituicao: empresa.dataConstituicao,
-    contribuinte: empresa.contribuinte,
   };
 }
 
@@ -84,7 +72,7 @@ export default function ListaChecklist({
       const matchBusca = !termo ||
         empresa.razaoSocial.toLowerCase().includes(termo) ||
         empresa.nomeFantasia?.toLowerCase().includes(termo) ||
-        empresa.cnpj.includes(termo);
+        empresa.cnpj?.includes(termo);
       const matchTipo = filtroTipo === "TODOS" || empresa.tipo === filtroTipo;
       const matchStatus = filtroStatus === "TODOS" || empresa.status === filtroStatus;
       const matchPasta = filtroPasta === "TODAS" ||
@@ -336,7 +324,7 @@ function EmpresaCard({ empresa, pastas, editando }: { empresa: EmpresaComProgres
             <Velocimetro percent={empresa.progressoReal} size="sm" />
           </div>
           <div className="grid grid-cols-2 gap-3 border-y border-white/5 py-4 text-xs">
-            <Info titulo="CNPJ" valor={empresa.cnpj} />
+            <Info titulo="CNPJ" valor={empresa.cnpj ?? "—"} />
             <Info titulo="Status" valor={empresa.status} />
             <Info titulo="Embasamento" valor={empresa.tipo ? TIPO_LABELS[empresa.tipo] : "Não definido"} />
             <Info titulo="Pasta" valor={empresa.pastaChecklistNome ?? "Sem pasta"} />
@@ -354,23 +342,27 @@ function EmpresaCard({ empresa, pastas, editando }: { empresa: EmpresaComProgres
             <p className="text-xs font-black uppercase tracking-widest text-blue-300">Editar empresa</p>
             <span className="text-[10px] font-bold text-slate-500">{empresa.clienteNome}</span>
           </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
+            <p className="mb-3 text-[9px] font-black uppercase tracking-widest text-slate-500">
+              Dados cadastrais (somente leitura — edite no Alpha CRM)
+            </p>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <CampoLeitura label="Razão social" valor={empresa.razaoSocial} />
+              <CampoLeitura label="Nome fantasia" valor={empresa.nomeFantasia || "—"} />
+              <CampoLeitura label="CNPJ" valor={empresa.cnpj || "—"} />
+              <CampoLeitura label="Município" valor={empresa.municipio || "—"} />
+              <CampoLeitura label="UF" valor={empresa.uf || "—"} />
+              <CampoLeitura label="Regime tributário" valor={empresa.regimeTributario || "—"} />
+              <CampoLeitura label="Capital social" valor={empresa.capitalSocial || "—"} />
+              <CampoLeitura label="Data de constituição" valor={empresa.dataConstituicao || "—"} />
+            </div>
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Campo label="Razão social" value={dados.razaoSocial} onChange={(valor) => atualizar("razaoSocial", valor)} />
-            <Campo label="Nome fantasia" value={texto(dados.nomeFantasia)} onChange={(valor) => atualizar("nomeFantasia", valor || null)} />
-            <Campo label="CNPJ" value={dados.cnpj} onChange={(valor) => atualizar("cnpj", valor)} />
             <Campo label="Status" value={dados.status} onChange={(valor) => atualizar("status", valor)} opcoes={[...new Set([...STATUS_EMPRESA, dados.status])]} />
             <Campo label="Tipo do checklist" value={dados.tipo ?? ""} onChange={(valor) => atualizar("tipo", valor || null)} opcoes={["", ...TIPOS]} formatar={(valor) => valor ? TIPO_LABELS[valor as TipoEmbasamento] : "Não definido"} />
             <Campo label="Pasta" value={dados.pastaChecklistId ?? ""} onChange={(valor) => atualizar("pastaChecklistId", valor || null)} opcoes={["", ...pastas.map((pasta) => pasta.id)]} formatar={(valor) => valor ? pastas.find((pasta) => pasta.id === valor)?.nome ?? valor : "Sem pasta"} />
             <Campo label="Embasamento cadastral" value={dados.embasamento} onChange={(valor) => atualizar("embasamento", valor)} />
             <Campo label="Mês de protocolo" value={texto(dados.mesProtocolo)} onChange={(valor) => atualizar("mesProtocolo", valor || null)} />
-            <Campo label="Situação RADAR" value={texto(dados.situacaoRadar)} onChange={(valor) => atualizar("situacaoRadar", valor || null)} />
-            <Campo label="Submodalidade" value={texto(dados.submodalidade)} onChange={(valor) => atualizar("submodalidade", valor || null)} />
-            <Campo label="Município" value={texto(dados.municipio)} onChange={(valor) => atualizar("municipio", valor || null)} />
-            <Campo label="UF" value={texto(dados.uf)} onChange={(valor) => atualizar("uf", valor || null)} />
-            <Campo label="Regime tributário" value={texto(dados.regimeTributario)} onChange={(valor) => atualizar("regimeTributario", valor || null)} />
-            <Campo label="Capital social" value={texto(dados.capitalSocial)} onChange={(valor) => atualizar("capitalSocial", valor || null)} />
-            <Campo label="Data de constituição" value={texto(dados.dataConstituicao)} onChange={(valor) => atualizar("dataConstituicao", valor || null)} />
-            <Campo label="Contribuinte" value={texto(dados.contribuinte)} onChange={(valor) => atualizar("contribuinte", valor || null)} />
           </div>
           <Campo label="Link do grupo" value={texto(dados.linkGrupo)} onChange={(valor) => atualizar("linkGrupo", valor || null)} />
           {erro && <p className="text-xs font-bold text-rose-300">{erro}</p>}
@@ -406,5 +398,14 @@ function Campo({ label, value, onChange, opcoes, formatar }: {
         <input value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-blue-400/50" />
       )}
     </label>
+  );
+}
+
+function CampoLeitura({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div>
+      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+      <p className="w-full truncate rounded-xl border border-white/5 bg-slate-900/50 px-3 py-2.5 text-xs text-slate-400">{valor}</p>
+    </div>
   );
 }

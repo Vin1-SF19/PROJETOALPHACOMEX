@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { autorizarCron } from "@/lib/bpm/cron-auth";
 import {
   calcularDiaCicloNovosLeads,
+  calcularLigacoesPendentesNoDia,
   cicloNovosLeadsVencido,
   contarDiasUteisDecorridos,
   intervaloDiaCivilSaoPaulo,
@@ -60,6 +61,15 @@ describe("cadência de oito dias úteis", () => {
   });
 });
 
+describe("meta operacional de ligações", () => {
+  it("planeja somente as ligações faltantes sem ultrapassar a meta diária", () => {
+    expect(calcularLigacoesPendentesNoDia(0)).toBe(5);
+    expect(calcularLigacoesPendentesNoDia(3)).toBe(2);
+    expect(calcularLigacoesPendentesNoDia(5)).toBe(0);
+    expect(calcularLigacoesPendentesNoDia(8)).toBe(0);
+  });
+});
+
 describe("autorização do cron", () => {
   it("aceita somente bearer com o segredo exato", () => {
     expect(autorizarCron("Bearer segredo-forte", "segredo-forte")).toBe(true);
@@ -68,4 +78,3 @@ describe("autorização do cron", () => {
     expect(autorizarCron("Bearer segredo-forte", undefined)).toBe(false);
   });
 });
-

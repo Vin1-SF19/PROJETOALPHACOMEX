@@ -13,6 +13,8 @@ interface Props {
   card: CardDetalhe;
   accent: string;
   onAtualizado: () => void;
+  /** No estágio Reunião Agendada, mantém apenas o acompanhamento/transcrição. */
+  mostrarFormulario?: boolean;
 }
 
 function paraInputDatetimeLocal(data: Date | string | null): string {
@@ -22,7 +24,7 @@ function paraInputDatetimeLocal(data: Date | string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function PainelReuniao({ card, accent, onAtualizado }: Props) {
+export default function PainelReuniao({ card, accent, onAtualizado, mostrarFormulario = true }: Props) {
   const [dataHora, setDataHora] = useState(() => paraInputDatetimeLocal(card.dataReuniao));
   const [salvando, setSalvando] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
@@ -73,42 +75,46 @@ export default function PainelReuniao({ card, accent, onAtualizado }: Props) {
         Reunião
       </div>
 
-      <input
-        type="datetime-local"
-        value={dataHora}
-        onChange={(e) => setDataHora(e.target.value)}
-        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs text-slate-200 outline-none"
-      />
+      {mostrarFormulario && (
+        <>
+          <input
+            type="datetime-local"
+            value={dataHora}
+            onChange={(e) => setDataHora(e.target.value)}
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs text-slate-200 outline-none"
+          />
 
-      <button
-        type="button"
-        onClick={() => void handleAgendar()}
-        disabled={salvando || (jaAgendada && transcricaoRecebida)}
-        title={jaAgendada && transcricaoRecebida
-          ? "A reunião concluída não pode ser reutilizada após a chegada da transcrição."
-          : undefined}
-        className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all disabled:opacity-60"
-        style={{ background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, border: `1px solid rgba(${accent},0.35)` }}
-      >
-        <Video size={13} />
-        {salvando
-          ? "Salvando..."
-          : jaAgendada && transcricaoRecebida
-            ? "Reunião concluída"
-            : jaAgendada
-              ? "Reagendar"
-              : "Agendar pelo Google Meet"}
-      </button>
+          <button
+            type="button"
+            onClick={() => void handleAgendar()}
+            disabled={salvando || (jaAgendada && transcricaoRecebida)}
+            title={jaAgendada && transcricaoRecebida
+              ? "A reunião concluída não pode ser reutilizada após a chegada da transcrição."
+              : undefined}
+            className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all disabled:opacity-60"
+            style={{ background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, border: `1px solid rgba(${accent},0.35)` }}
+          >
+            <Video size={13} />
+            {salvando
+              ? "Salvando..."
+              : jaAgendada && transcricaoRecebida
+                ? "Reunião concluída"
+                : jaAgendada
+                  ? "Reagendar"
+                  : "Agendar pelo Google Meet"}
+          </button>
 
-      {card.googleMeetLink && (
-        <a
-          href={card.googleMeetLink}
-          target="_blank"
-          rel="noreferrer"
-          className="block text-center text-[11px] text-slate-400 hover:text-slate-300 underline underline-offset-2"
-        >
-          Abrir link da reunião
-        </a>
+          {card.googleMeetLink && (
+            <a
+              href={card.googleMeetLink}
+              target="_blank"
+              rel="noreferrer"
+              className="block text-center text-[11px] text-slate-400 hover:text-slate-300 underline underline-offset-2"
+            >
+              Abrir link da reunião
+            </a>
+          )}
+        </>
       )}
 
       {jaAgendada && (

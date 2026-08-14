@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { z } from "zod";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
-import { registrarHistoricoCard } from "./Cards";
+import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import {
   criarEventoNoCalendario,
 } from "@/actions/google-calendar-eventos";
@@ -20,9 +20,15 @@ import {
 } from "@/lib/google-calendar/usuario-google";
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
+import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
+const ERRO_ETAPA_REUNIAO = "O Google Meet só pode ser agendado ou reagendado na etapa Agendar Reunião.";
+
+function cardEstaNaEtapaDeReuniao(card: { etapa: { nome: string } } | null): boolean {
+  return Boolean(card && etapaEhAgendarReuniao(card.etapa.nome));
+}
 
 async function confirmarLinkMeetCriado(params: {
   userId: number;
@@ -188,9 +194,17 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
 
     const card = await db.bpmCard.findUnique({
       where: { id: cardId },
-      select: { id: true, googleEventId: true, empresa: { select: { razaoSocial: true, nomeFantasia: true } } },
+      select: {
+        id: true,
+        etapaId: true,
+        updatedAt: true,
+        googleEventId: true,
+        etapa: { select: { nome: true } },
+        empresa: { select: { razaoSocial: true, nomeFantasia: true } },
+      },
     });
     if (!card) return { success: false, error: "Card não encontrado" };
+    if (!cardEstaNaEtapaDeReuniao(card)) return { success: false, error: ERRO_ETAPA_REUNIAO };
     if (card.googleEventId) {
       return { success: false, error: "Este card já tem uma reunião agendada — use Reagendar em vez de criar uma nova." };
     }
@@ -203,6 +217,24 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
     const fim = new Date(inicio.getTime() + DURACAO_PADRAO_MINUTOS * 60_000);
     const nomeEmpresa = card.empresa.nomeFantasia || card.empresa.razaoSocial;
 
+    // Não basta a UI ocultar o formulário: a etapa é reavaliada junto da
+    // versão que será usada no CAS, imediatamente antes da chamada externa.
+    const cardAntesDeCriarEvento = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: {
+        etapaId: true,
+        updatedAt: true,
+        googleEventId: true,
+        etapa: { select: { nome: true } },
+      },
+    });
+    if (!cardAntesDeCriarEvento || !cardEstaNaEtapaDeReuniao(cardAntesDeCriarEvento)) {
+      return { success: false, error: ERRO_ETAPA_REUNIAO };
+    }
+    if (cardAntesDeCriarEvento.googleEventId) {
+      return { success: false, error: "Este card já tem uma reunião agendada — use Reagendar em vez de criar uma nova." };
+    }
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const resultado = await criarEventoNoCalendario({
       calendarId: calendario.googleCalendarId,
       titulo: `Reunião — ${nomeEmpresa}`,
@@ -235,9 +267,28 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
       };
     }
 
-    await db.$transaction(async (tx) => {
-      await tx.bpmCard.update({
+    const persistencia = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
+      const cardAntesDePersistir = await tx.bpmCard.findUnique({
         where: { id: cardId },
+        select: {
+          etapa: { select: { nome: true } },
+          googleEventId: true,
+        },
+      });
+      if (!cardAntesDePersistir || !cardEstaNaEtapaDeReuniao(cardAntesDePersistir)) {
+        return { success: false as const, error: ERRO_ETAPA_REUNIAO };
+      }
+      if (cardAntesDePersistir.googleEventId) {
+        return { success: false as const, error: "Este card já tem uma reunião agendada — use Reagendar em vez de criar uma nova." };
+      }
+      const atualizado = await tx.bpmCard.updateMany({
+        where: {
+          id: cardId,
+          etapaId: cardAntesDeCriarEvento.etapaId,
+          updatedAt: cardAntesDeCriarEvento.updatedAt,
+          googleEventId: null,
+        },
         data: {
           dataReuniao: inicio,
           googleEventId: resultado.data.googleEventId,
@@ -245,6 +296,9 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
           googleMeetLink,
         },
       });
+      if (atualizado.count !== 1) {
+        return { success: false as const, error: "O card mudou enquanto a reunião era agendada. Recarregue e tente novamente." };
+      }
       await registrarHistoricoCard(
         {
           cardId,
@@ -254,7 +308,9 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
         },
         tx,
       );
+      return { success: true as const };
     });
+    if (!persistencia.success) return persistencia;
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
     await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });
@@ -289,6 +345,9 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       where: { id: cardId },
       select: {
         id: true,
+        etapaId: true,
+        updatedAt: true,
+        etapa: { select: { nome: true } },
         googleEventId: true,
         googleCalendarId: true,
         googleMeetLink: true,
@@ -297,6 +356,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       },
     });
     if (!card) return { success: false, error: "Card não encontrado" };
+    if (!cardEstaNaEtapaDeReuniao(card)) return { success: false, error: ERRO_ETAPA_REUNIAO };
     if (!card.googleEventId || !card.googleCalendarId || !card.googleMeetLink) {
       return { success: false, error: "Este card ainda não tem reunião agendada — use Agendar pelo Google Meet primeiro." };
     }
@@ -310,6 +370,35 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
     const inicio = dataHora;
     const fim = new Date(inicio.getTime() + DURACAO_PADRAO_MINUTOS * 60_000);
 
+    const cardAntesDeReagendar = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: {
+        etapaId: true,
+        updatedAt: true,
+        etapa: { select: { nome: true } },
+        googleEventId: true,
+        googleCalendarId: true,
+        googleMeetLink: true,
+        transcricaoReuniao: true,
+      },
+    });
+    if (!cardAntesDeReagendar || !cardEstaNaEtapaDeReuniao(cardAntesDeReagendar)) {
+      return { success: false, error: ERRO_ETAPA_REUNIAO };
+    }
+    if (
+      cardAntesDeReagendar.googleEventId !== card.googleEventId
+      || cardAntesDeReagendar.googleCalendarId !== card.googleCalendarId
+      || cardAntesDeReagendar.googleMeetLink !== card.googleMeetLink
+    ) {
+      return { success: false, error: "A reunião mudou enquanto era reagendada. Recarregue e tente novamente." };
+    }
+    if (cardAntesDeReagendar.transcricaoReuniao?.trim()) {
+      return {
+        success: false,
+        error: "Esta reunião já possui transcrição recebida e não pode ser reutilizada em outra data. Avance o card para preservar o vínculo da evidência.",
+      };
+    }
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const resultado = await reagendarEventoVinculado({
       googleCalendarId: card.googleCalendarId,
       googleEventId: card.googleEventId,
@@ -320,8 +409,41 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
 
     if (!resultado.success) return { success: false, error: resultado.error };
 
-    await db.$transaction(async (tx) => {
-      await tx.bpmCard.update({ where: { id: cardId }, data: { dataReuniao: inicio } });
+    const persistencia = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
+      const cardAntesDePersistir = await tx.bpmCard.findUnique({
+        where: { id: cardId },
+        select: {
+          etapa: { select: { nome: true } },
+          googleEventId: true,
+          googleCalendarId: true,
+          googleMeetLink: true,
+          transcricaoReuniao: true,
+        },
+      });
+      if (!cardAntesDePersistir || !cardEstaNaEtapaDeReuniao(cardAntesDePersistir)) {
+        return { success: false as const, error: ERRO_ETAPA_REUNIAO };
+      }
+      if (cardAntesDePersistir.transcricaoReuniao?.trim()) {
+        return {
+          success: false as const,
+          error: "Esta reunião já possui transcrição recebida e não pode ser reutilizada em outra data. Avance o card para preservar o vínculo da evidência.",
+        };
+      }
+      const atualizado = await tx.bpmCard.updateMany({
+        where: {
+          id: cardId,
+          etapaId: cardAntesDeReagendar.etapaId,
+          updatedAt: cardAntesDeReagendar.updatedAt,
+          googleEventId: card.googleEventId,
+          googleCalendarId: card.googleCalendarId,
+          googleMeetLink: card.googleMeetLink,
+        },
+        data: { dataReuniao: inicio },
+      });
+      if (atualizado.count !== 1) {
+        return { success: false as const, error: "O card mudou enquanto a reunião era reagendada. Recarregue e tente novamente." };
+      }
       await registrarHistoricoCard(
         {
           cardId,
@@ -337,7 +459,9 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
         },
         tx,
       );
+      return { success: true as const };
     });
+    if (!persistencia.success) return persistencia;
 
     revalidatePath(`${ROTA_BASE}/pipeline`);
     await notificarPipelineBpm({ cardId, tipo: "REUNIAO_ALTERADA" });

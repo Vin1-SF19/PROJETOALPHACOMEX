@@ -54,10 +54,10 @@ interface Item {
 }
 interface ChecklistData { id: string; tipo: TipoEmbasamento; itens: Item[]; }
 interface Empresa {
-  id: string; cnpj: string; razaoSocial: string; nomeFantasia: string | null;
+  id: string; cnpj: string | null; razaoSocial: string; nomeFantasia: string | null;
   status: string; embasamento: string; tipo: TipoEmbasamento | null;
-  progresso: number; mesProtocolo: string | null; submodalidade: string | null;
-  situacaoRadar: string | null; regimeTributario: string | null;
+  progresso: number; mesProtocolo: string | null;
+  regimeTributario: string | null;
   cliente: { nome: string; email: string }; checklists: ChecklistData[];
 }
 
@@ -225,7 +225,6 @@ export default function ChecklistView({
                   highlight: empresaInicial.status === "ATIVO" ? "text-emerald-400" : "text-rose-400" },
                 { label: "Cliente", value: empresaInicial.cliente.nome, full: true },
                 { label: "Regime Tributário", value: empresaInicial.regimeTributario || "—" },
-                { label: "Radar Atual", value: empresaInicial.submodalidade || "—" },
                 { label: "Mês Protocolo", value: empresaInicial.mesProtocolo || "—" },
               ].map((cell, i) => (
                 <div

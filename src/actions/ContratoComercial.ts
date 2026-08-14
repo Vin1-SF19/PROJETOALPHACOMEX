@@ -54,13 +54,29 @@ const SocioSchema = z.object({
     obs: z.string().optional().default(""),
 });
 
+// Fase 3.6 do Cliente Master (2026-08-14): identificação da empresa passa a ser
+// resolução/criação de `Cliente` por CNPJ — cnpj/razaoSocial/nomeFantasia/etc não
+// são mais gravados como campos próprios de ContratoComercial. Duas formas de
+// identificar a empresa: (1) `cnpj` real, resolvido OU CRIADO em `Cliente` (o BPM
+// ainda não é a porta de entrada real de Cliente novo — time comercial usa CRM
+// externo hoje; bloquear quebraria o fluxo diário, diferente de Extratos/Operacional);
+// (2) `clienteId` explícito, usado pelo fluxo "Empresa em Constituição" — sempre um
+// `Cliente` já existente com `cnpj: null` (criado no BPM), NUNCA cria um novo.
+const IdentificacaoEmpresaSchema = z.union([
+    z.object({
+        cnpj: z.string().min(14).max(18),
+        razaoSocial: z.string().min(1),
+        nomeFantasia: z.string().optional(),
+        dataConstituicao: z.string().optional(),
+        regimeTributario: z.string().optional(),
+        uf: z.string().optional(),
+    }),
+    z.object({
+        clienteId: z.number().int().positive(),
+    }),
+]);
+
 const CriarContratoSchema = z.object({
-    cnpj: z.string().min(14).max(18),
-    razaoSocial: z.string().min(1),
-    nomeFantasia: z.string().optional(),
-    dataConstituicao: z.string().optional(),
-    regimeTributario: z.string().optional(),
-    uf: z.string().optional(),
     valorContrato: z.number().positive(),
     formaPagamento: z.string().min(1),
     servico: z.string().min(1),
@@ -72,16 +88,10 @@ const CriarContratoSchema = z.object({
     mes: z.number().int().min(1).max(12),
     ano: z.number().int().min(2024).max(2099),
     socios: z.array(SocioSchema).optional(),
-});
+}).and(IdentificacaoEmpresaSchema);
 
 const AtualizarContratoSchema = z.object({
     id: z.string().cuid(),
-    cnpj: z.string().min(14).max(18),
-    razaoSocial: z.string().min(1),
-    nomeFantasia: z.string().optional(),
-    dataConstituicao: z.string().optional(),
-    regimeTributario: z.string().optional(),
-    uf: z.string().optional(),
     valorContrato: z.number().positive(),
     formaPagamento: z.string().min(1),
     servico: z.string().min(1),
@@ -91,7 +101,48 @@ const AtualizarContratoSchema = z.object({
     parceiroNaoCadastrado: ParceiroNaoCadastradoInputSchema.optional(),
     closerNome: z.string().min(1),
     socios: z.array(SocioSchema).optional(),
-});
+}).and(IdentificacaoEmpresaSchema);
+
+/**
+ * Resolve o `Cliente` master a partir da identificação recebida no formulário —
+ * por `clienteId` explícito (fluxo "Empresa em Constituição": Cliente já existe,
+ * cnpj null, NUNCA cria) ou por `cnpj` (resolve OU CRIA, ver nota acima do schema).
+ */
+async function resolverClienteDoContrato(
+    d: { cnpj: string; razaoSocial: string; nomeFantasia?: string; dataConstituicao?: string; regimeTributario?: string; uf?: string }
+    | { clienteId: number },
+): Promise<{ success: true; clienteId: number } | { success: false; error: string }> {
+    if ("clienteId" in d) {
+        const cliente = await db.cliente.findUnique({ where: { id: d.clienteId }, select: { id: true } });
+        if (!cliente) return { success: false, error: "Empresa em constituição não encontrada" };
+        return { success: true, clienteId: cliente.id };
+    }
+
+    const cnpjNormalizado = d.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    const existente = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
+    if (existente) return { success: true, clienteId: existente.id };
+
+    try {
+        const novo = await db.cliente.create({
+            data: {
+                cnpj: cnpjNormalizado,
+                razaoSocial: d.razaoSocial,
+                nomeFantasia: d.nomeFantasia ?? null,
+                dataConstituicao: d.dataConstituicao ?? null,
+                regimeTributario: d.regimeTributario ?? null,
+                uf: d.uf ?? null,
+            },
+            select: { id: true },
+        });
+        return { success: true, clienteId: novo.id };
+    } catch (err) {
+        // Corrida rara entre o findUnique e o create (P2002) — resolve de novo por CNPJ.
+        const fallback = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
+        if (fallback) return { success: true, clienteId: fallback.id };
+        console.error("resolverClienteDoContrato:", err);
+        return { success: false, error: "Erro ao identificar a empresa" };
+    }
+}
 
 const ConfirmarFechamentoSchema = z.object({
     id: z.string().cuid(),
@@ -173,15 +224,13 @@ export async function criarContrato(raw: unknown) {
     const origem = resolverOrigemParceiro(d);
     if (!origem.success) return origem;
 
+    const clienteResolvido = await resolverClienteDoContrato(d);
+    if (!clienteResolvido.success) return { success: false as const, error: clienteResolvido.error };
+
     try {
         const contrato = await db.contratoComercial.create({
             data: {
-                cnpj: d.cnpj.replace(/\D/g, ""),
-                razaoSocial: d.razaoSocial,
-                nomeFantasia: d.nomeFantasia ?? null,
-                dataConstituicao: d.dataConstituicao ?? null,
-                regimeTributario: d.regimeTributario ?? null,
-                uf: d.uf ?? null,
+                clienteId: clienteResolvido.clienteId,
                 valorContrato: d.valorContrato,
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
@@ -229,16 +278,14 @@ export async function atualizarContrato(raw: unknown) {
         return { success: false as const, error: "Sem permissão" };
     }
 
+    const clienteResolvido = await resolverClienteDoContrato(d);
+    if (!clienteResolvido.success) return { success: false as const, error: clienteResolvido.error };
+
     try {
         const atualizado = await db.contratoComercial.update({
             where: { id: d.id },
             data: {
-                cnpj: d.cnpj.replace(/\D/g, ""),
-                razaoSocial: d.razaoSocial,
-                nomeFantasia: d.nomeFantasia ?? null,
-                dataConstituicao: d.dataConstituicao ?? null,
-                regimeTributario: d.regimeTributario ?? null,
-                uf: d.uf ?? null,
+                clienteId: clienteResolvido.clienteId,
                 valorContrato: d.valorContrato,
                 formaPagamento: d.formaPagamento,
                 servico: d.servico,
@@ -305,58 +352,54 @@ export async function confirmarFechamento(raw: unknown) {
                 contratoAssinado: d.contratoAssinado,
                 contratoUrl: d.contratoUrl || null,
             },
+            include: { cliente: { select: { cnpj: true, razaoSocial: true, nomeFantasia: true, dataConstituicao: true, regimeTributario: true, uf: true, indicacao: { select: { parceiroId: true } } } } },
         });
 
         // Sincroniza com o CS&NPS na confirmação de pagamento (efeito colateral
         // resiliente — nunca reverte o fechamento do contrato). Ver decisions.md
         // 2026-07-13 ("sincronização move de criação do contrato para confirmação
         // de pagamento"). Dados fiscais (nomeFantasia/dataConstituicao/regimeTributario/uf)
-        // já vêm salvos no contrato desde a criação — não reconsulta a Receita Federal.
+        // já vêm salvos no Cliente master desde a criação — não reconsulta a Receita Federal.
         try {
             type SocioJson = { nome?: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string };
             const sociosJson = ((atualizado.socios ?? []) as SocioJson[])
                 .filter((s) => s.nome?.trim())
                 .map((s) => ({ nome: s.nome!, telefone: s.telefone, dataNascimento: s.dataNascimento, vinculo: s.vinculo, obs: s.obs }));
 
-            const resultadoSync = await criarRegistroClienteAPartirDeContrato({
-                cnpj: atualizado.cnpj,
-                razaoSocial: atualizado.razaoSocial,
-                servico: atualizado.servico,
-                nomeFantasia: atualizado.nomeFantasia,
-                dataConstituicao: atualizado.dataConstituicao,
-                regimeTributario: atualizado.regimeTributario,
-                uf: atualizado.uf,
-                dataContratacao: atualizado.pagamentoConfirmadoEm
-                    ? atualizado.pagamentoConfirmadoEm.toISOString()
-                    : new Date().toISOString(),
-                socios: sociosJson,
-            });
+            const resultadoSync = atualizado.cliente.cnpj
+                ? await criarRegistroClienteAPartirDeContrato({
+                    cnpj: atualizado.cliente.cnpj,
+                    razaoSocial: atualizado.cliente.razaoSocial,
+                    servico: atualizado.servico,
+                    nomeFantasia: atualizado.cliente.nomeFantasia,
+                    dataConstituicao: atualizado.cliente.dataConstituicao,
+                    regimeTributario: atualizado.cliente.regimeTributario,
+                    uf: atualizado.cliente.uf,
+                    dataContratacao: atualizado.pagamentoConfirmadoEm
+                        ? atualizado.pagamentoConfirmadoEm.toISOString()
+                        : new Date().toISOString(),
+                    socios: sociosJson,
+                })
+                : { success: true as const, criado: false };
 
             // Vínculo de indicação de parceiro: só faz sentido na PRIMEIRA criação real
-            // do registro (não em reativação nem quando já existia ativo).
-            // `resultadoSync.clienteId` é o id de `clientes` (legado — Metas/ContratoComercial
-            // ainda não migrou para o Cliente Master, isso é a Fase 3.6). `Indicacao.clienteId`
-            // já aponta para `Cliente` (Fase 3.1) — resolve o `Cliente` pelo MESMO CNPJ em vez
-            // de usar o id legado direto, senão a FK grava um id de tabela errada.
+            // do registro (não em reativação nem quando já existia ativo). Fase 3.6 do
+            // Cliente Master — `atualizado.clienteId` já é o id certo direto (não precisa
+            // mais buscar `Cliente` por CNPJ como bridge temporário, e elimina a
+            // normalização incorreta que descartava letras de CNPJ alfanumérico).
             if (resultadoSync.criado && atualizado.indicadoPorParceiroId) {
                 try {
-                    const clienteMaster = await db.cliente.findFirst({
-                        where: { cnpj: atualizado.cnpj.replace(/\D/g, "").toUpperCase() },
-                        select: { id: true, indicacao: { select: { parceiroId: true } } },
-                    });
-                    if (clienteMaster && !clienteMaster.indicacao) {
+                    if (!atualizado.cliente.indicacao) {
                         await db.indicacao.create({
                             data: {
                                 parceiroId: atualizado.indicadoPorParceiroId,
-                                clienteId: clienteMaster.id,
+                                clienteId: atualizado.clienteId,
                                 criadoPorId: userId,
                             },
                         });
                         const { recalcularNivel } = await import("@/actions/parceiros");
                         await recalcularNivel(atualizado.indicadoPorParceiroId);
                         revalidatePath("/PainelAlpha/Parceiros");
-                    } else if (!clienteMaster) {
-                        console.error("vincular indicação parceiro: Cliente Master ainda não sincronizado para o CNPJ", atualizado.cnpj);
                     }
                 } catch (indErr) {
                     console.error("vincular indicação parceiro:", indErr);
@@ -391,6 +434,27 @@ export interface GetContratosOptions {
     filtroUsuarioId?: number;
 }
 
+const SELECT_CLIENTE_CONTRATO = {
+    cnpj: true,
+    razaoSocial: true,
+    nomeFantasia: true,
+    dataConstituicao: true,
+    regimeTributario: true,
+    uf: true,
+} as const;
+
+/**
+ * Achata `ContratoComercial` + `Cliente` no shape que os componentes já esperavam
+ * (campos cadastrais direto no objeto, ex: `contrato.razaoSocial`) — Fase 3.6 do
+ * Cliente Master: os campos migraram para `Cliente`, mas a UI não precisa mudar.
+ */
+function achatarContrato<T extends { cliente: { cnpj: string | null; razaoSocial: string; nomeFantasia: string | null; dataConstituicao: string | null; regimeTributario: string | null; uf: string | null } }>(
+    contrato: T,
+) {
+    const { cliente, ...resto } = contrato;
+    return { ...resto, ...cliente };
+}
+
 export async function getContratos(options: GetContratosOptions) {
     const session = await auth();
     if (!session?.user) return { success: false as const, error: "Não autorizado" };
@@ -423,6 +487,7 @@ export async function getContratos(options: GetContratosOptions) {
                 include: {
                     usuario: { select: { id: true, nome: true, imagemUrl: true } },
                     observacoes: { orderBy: { criadoEm: "desc" } },
+                    cliente: { select: SELECT_CLIENTE_CONTRATO },
                 },
                 orderBy: { createdAt: "desc" },
             }),
@@ -437,6 +502,7 @@ export async function getContratos(options: GetContratosOptions) {
                 include: {
                     usuario: { select: { id: true, nome: true, imagemUrl: true } },
                     observacoes: { orderBy: { criadoEm: "desc" } },
+                    cliente: { select: SELECT_CLIENTE_CONTRATO },
                 },
                 orderBy: { pagamentoConfirmadoEm: "desc" },
             }),
@@ -446,12 +512,18 @@ export async function getContratos(options: GetContratosOptions) {
                 include: {
                     usuario: { select: { id: true, nome: true, imagemUrl: true } },
                     observacoes: { orderBy: { criadoEm: "desc" } },
+                    cliente: { select: SELECT_CLIENTE_CONTRATO },
                 },
                 orderBy: { createdAt: "desc" },
             }),
         ]);
 
-        return { success: true as const, enviados, fechados, arquivados };
+        return {
+            success: true as const,
+            enviados: enviados.map(achatarContrato),
+            fechados: fechados.map(achatarContrato),
+            arquivados: arquivados.map(achatarContrato),
+        };
     } catch (err) {
         console.error("getContratos:", err);
         return { success: false as const, error: "Erro ao buscar contratos" };
@@ -472,6 +544,53 @@ export async function getColaboradoresComerciais() {
     } catch (err) {
         console.error("getColaboradoresComerciais:", err);
         return { success: false as const, error: "Erro ao buscar colaboradores" };
+    }
+}
+
+/**
+ * Busca um `Cliente` já cadastrado no CRM pelo CNPJ, para pré-visualização no
+ * formulário de novo contrato — Fase 3.6 do Cliente Master. Não bloqueia (ver
+ * `resolverClienteDoContrato`, que resolve OU CRIA na hora de salvar); serve só
+ * para o usuário ver se a empresa já existe antes de confirmar.
+ */
+export async function buscarClienteParaContrato(cnpj: string) {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+
+    const cnpjNormalizado = cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (cnpjNormalizado.length < 11) return { success: false as const, error: "CNPJ incompleto" };
+
+    try {
+        const cliente = await db.cliente.findUnique({
+            where: { cnpj: cnpjNormalizado },
+            select: { cnpj: true, razaoSocial: true, nomeFantasia: true, dataConstituicao: true, regimeTributario: true, uf: true },
+        });
+        return { success: true as const, cliente };
+    } catch (err) {
+        console.error("buscarClienteParaContrato:", err);
+        return { success: false as const, error: "Erro ao consultar o CRM" };
+    }
+}
+
+/**
+ * Lista `Cliente`s "em constituição" (cnpj null) já cadastrados no BPM — Fase 3.6
+ * do Cliente Master. O fluxo "Empresa em Constituição" do Metas NUNCA cria um
+ * `Cliente` novo, só vincula um já existente (única porta de entrada é o BPM).
+ */
+export async function listarClientesEmConstituicao() {
+    const session = await auth();
+    if (!session?.user) return { success: false as const, error: "Não autorizado" };
+
+    try {
+        const clientes = await db.cliente.findMany({
+            where: { cnpj: null },
+            select: { id: true, razaoSocial: true },
+            orderBy: { razaoSocial: "asc" },
+        });
+        return { success: true as const, clientes };
+    } catch (err) {
+        console.error("listarClientesEmConstituicao:", err);
+        return { success: false as const, error: "Erro ao listar empresas em constituição" };
     }
 }
 

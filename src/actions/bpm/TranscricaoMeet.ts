@@ -24,7 +24,19 @@ export async function SincronizarTranscricaoReuniaoBpm(dados: unknown) {
       session.user.role ?? null,
       "editarCard",
     );
-    const resultado = await sincronizarTranscricaoCardBpm(parsed.data.cardId, "manual");
+    const resultado = await sincronizarTranscricaoCardBpm(
+      parsed.data.cardId,
+      "manual",
+      async (tx) => {
+        await exigirAcessoBpmCard(
+          parsed.data.cardId,
+          Number(session.user.id),
+          session.user.role ?? null,
+          "editarCard",
+          tx,
+        );
+      },
+    );
     if (resultado.status === "ERRO") {
       return { success: false as const, error: resultado.erro, recuperavel: resultado.recuperavel };
     }

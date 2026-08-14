@@ -10,7 +10,7 @@ import { confirmarFechamento } from "@/actions/ContratoComercial";
 
 interface Contrato {
     id: string;
-    cnpj: string;
+    cnpj: string | null;
     razaoSocial: string;
     nomeFantasia: string | null;
     valorContrato: number;

@@ -10,3 +10,13 @@ export function obterProximoSlide<T extends { id: string; ordem: number }>(
   const indiceAtivo = slidesOrdenados.findIndex((slide) => slide.id === slideAtivoId);
   return indiceAtivo >= 0 ? slidesOrdenados[indiceAtivo + 1] : undefined;
 }
+
+/** Usado para saber quando o slide salvo é o que aparece como miniatura da apresentação. */
+export function ehPrimeiroSlide<T extends { id: string; ordem: number }>(
+  slides: T[],
+  slideId: string | null,
+): boolean {
+  if (!slideId || slides.length === 0) return false;
+  const primeiro = slides.reduce((menor, atual) => (atual.ordem < menor.ordem ? atual : menor));
+  return primeiro.id === slideId;
+}

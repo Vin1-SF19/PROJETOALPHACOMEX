@@ -14,6 +14,8 @@ interface CampoBpmInputProps {
   onChange: (value: string) => void;
   className: string;
   disabled?: boolean;
+  invalid?: boolean;
+  describedBy?: string;
 }
 
 function lerOpcoes(opcoesJson: string | null): string[] {
@@ -28,7 +30,15 @@ function lerOpcoes(opcoesJson: string | null): string[] {
   }
 }
 
-export function CampoBpmInput({ campo, value, onChange, className, disabled = false }: CampoBpmInputProps) {
+export function CampoBpmInput({
+  campo,
+  value,
+  onChange,
+  className,
+  disabled = false,
+  invalid = false,
+  describedBy,
+}: CampoBpmInputProps) {
   const opcoes = campo.tipo === "booleano"
     ? ["Sim", "Não"]
     : lerOpcoes(campo.opcoesJson);
@@ -40,6 +50,8 @@ export function CampoBpmInput({ campo, value, onChange, className, disabled = fa
         className={className}
         required={campo.obrigatorio}
         aria-required={campo.obrigatorio}
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -52,13 +64,33 @@ export function CampoBpmInput({ campo, value, onChange, className, disabled = fa
     );
   }
 
+  if (campo.tipo === "texto_longo") {
+    return (
+      <textarea
+        id={`campo-bpm-${campo.id}`}
+        className={`${className} min-h-44 resize-y`}
+        required={campo.obrigatorio}
+        aria-required={campo.obrigatorio}
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
   return (
     <input
       id={`campo-bpm-${campo.id}`}
       className={className}
       required={campo.obrigatorio}
       aria-required={campo.obrigatorio}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
       type={campo.tipo === "numero" ? "number" : campo.tipo === "data" ? "date" : "text"}
+      inputMode={campo.tipo === "cpf" ? "numeric" : undefined}
+      maxLength={campo.tipo === "cpf" ? 14 : undefined}
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}

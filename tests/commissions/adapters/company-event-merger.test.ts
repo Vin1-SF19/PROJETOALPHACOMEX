@@ -6,6 +6,7 @@ import type { CompanyEventSource } from "@/lib/commissions/adapters/types";
 function contratoBase(overrides: Partial<ContratoComercialSource> = {}): ContratoComercialSource {
   return {
     id: "contrato-1",
+    clienteId: 501,
     cnpj: "12345678000190",
     razaoSocial: "Alpha Importação e Distribuição Ltda.",
     nomeFantasia: "Alpha Import",

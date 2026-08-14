@@ -90,6 +90,7 @@ export async function SalvarChecklistFollowUpBpm(dados: unknown) {
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
     const resultado = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard", tx);
       const card = await tx.bpmCard.findUnique({
         where: { id: cardId },
         select: {

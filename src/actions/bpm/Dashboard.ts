@@ -1,7 +1,13 @@
 "use server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
-import { isAdminRole } from "@/lib/bpm/ownership";
+import {
+  checarAcessoBpmPipeline,
+  checarAcessoConfigPipeline,
+  checarAcessoDiretoriaBpm,
+  exigirAcessoModuloBpm,
+} from "@/lib/bpm/ownership";
+import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
 
 /**
  * Agregação central do módulo BPM (Fase 3): métricas por pipeline, tarefas
@@ -13,7 +19,12 @@ export async function ObterDashboardBpm() {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
-    const admin = isAdminRole(session.user.role ?? null);
+    await exigirAcessoModuloBpm(userId);
+    const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
+    const diretoria = await checarAcessoDiretoriaBpm(userId);
+    const filtroCardBoasVindas = diretoria
+      ? {}
+      : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } };
 
     const [pipelines, contagemPorPipelineStatus] = await Promise.all([
       db.bpmPipeline.findMany({
@@ -21,12 +32,12 @@ export async function ObterDashboardBpm() {
         select: {
           id: true,
           nome: true,
-          _count: { select: { cards: true } },
         },
         orderBy: { nome: "asc" },
       }),
       db.bpmCard.groupBy({
         by: ["pipelineId", "status"],
+        where: filtroCardBoasVindas,
         _count: { _all: true },
       }),
     ]);
@@ -35,10 +46,15 @@ export async function ObterDashboardBpm() {
       ? null
       : (
           await db.bpmCardMembro.findMany({
-            where: { userId },
+            where: { userId, card: filtroCardBoasVindas },
             select: { cardId: true },
           })
         ).map((m) => m.cardId);
+    const acessoPipelines = await Promise.all(
+      pipelines.map((pipeline) => checarAcessoBpmPipeline(pipeline.id, userId)),
+    );
+    const pipelinesVisiveis = pipelines.filter((_, index) => acessoPipelines[index]);
+    const pipelineIdsVisiveis = pipelinesVisiveis.map((pipeline) => pipeline.id);
 
     const agora = new Date();
 
@@ -46,6 +62,7 @@ export async function ObterDashboardBpm() {
       db.bpmTarefa.findMany({
         where: {
           status: "PENDENTE",
+          ...(diretoria ? {} : { card: filtroCardBoasVindas }),
           ...(admin ? {} : { cardId: { in: cardIdsDoUsuario ?? [] } }),
         },
         select: {
@@ -69,10 +86,14 @@ export async function ObterDashboardBpm() {
         where: {
           status: "PENDENTE",
           prazo: { lt: agora },
+          ...(diretoria ? {} : { card: filtroCardBoasVindas }),
           ...(admin ? {} : { cardId: { in: cardIdsDoUsuario ?? [] } }),
         },
       }),
       db.bpmCardHistorico.findMany({
+        where: admin
+          ? { card: { pipelineId: { in: pipelineIdsVisiveis }, ...filtroCardBoasVindas } }
+          : { cardId: { in: cardIdsDoUsuario ?? [] } },
         select: {
           id: true,
           acao: true,
@@ -93,19 +114,41 @@ export async function ObterDashboardBpm() {
         where: {
           status: "CONCLUIDO",
           concluidoEm: { gte: new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000) },
+          ...(admin
+            ? { pipelineId: { in: pipelineIdsVisiveis }, ...filtroCardBoasVindas }
+            : { id: { in: cardIdsDoUsuario ?? [] } }),
         },
       }),
     ]);
 
-    const totalAtivos = contagemPorPipelineStatus
+    const contagemVisivel = admin
+      ? contagemPorPipelineStatus.filter((item) => pipelineIdsVisiveis.includes(item.pipelineId))
+      : await db.bpmCard.groupBy({
+          by: ["pipelineId", "status"],
+          where: {
+            id: { in: cardIdsDoUsuario ?? [] },
+            pipelineId: { in: pipelineIdsVisiveis },
+            ...filtroCardBoasVindas,
+          },
+          _count: { _all: true },
+        });
+    const totalAtivos = contagemVisivel
       .filter((c) => c.status === "ATIVO")
       .reduce((acc, c) => acc + c._count._all, 0);
+    const pipelinesComContagemVisivel = pipelinesVisiveis.map((pipeline) => ({
+      ...pipeline,
+      _count: {
+        cards: contagemVisivel
+          .filter((item) => item.pipelineId === pipeline.id)
+          .reduce((total, item) => total + item._count._all, 0),
+      },
+    }));
 
     return {
       success: true,
       data: {
-        pipelines,
-        contagemPorPipelineStatus,
+        pipelines: pipelinesComContagemVisivel,
+        contagemPorPipelineStatus: contagemVisivel,
         totalAtivos,
         concluidasSemana,
         tarefasPendentes,

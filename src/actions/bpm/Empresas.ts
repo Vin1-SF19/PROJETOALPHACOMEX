@@ -1,7 +1,13 @@
 "use server";
 import db from "@/lib/prisma";
 import { auth } from "../../../auth";
-import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
+import {
+  checarAcessoConfigPipeline,
+  checarAcessoDiretoriaBpm,
+  exigirAcessoBpmCard,
+  exigirAcessoModuloBpm,
+} from "@/lib/bpm/ownership";
+import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
 import { normalizarDadosEmpresaBpm, type ClienteEmpresaFonte } from "@/lib/bpm/dados-empresa";
 
 const SELECT_SERVICO_CLIENTE = {
@@ -242,6 +248,12 @@ export async function ObterDadosEmpresaCardBpm(cardId: string) {
 export async function ObterPerfilEmpresaBpm(empresaId: number) {
   try {
     const session = await auth();
+    const userId = Number(session?.user?.id);
+    if (Number.isFinite(userId)) await exigirAcessoModuloBpm(userId);
+    const admin = Number.isFinite(userId)
+      && await checarAcessoConfigPipeline(userId, "visualizarPipeline");
+    const diretoria = Number.isFinite(userId)
+      && await checarAcessoDiretoriaBpm(userId);
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
     const empresa = await db.cliente.findUnique({
@@ -251,7 +263,11 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     if (!empresa) return { success: false, error: "Empresa não encontrada" };
 
     const cards = await db.bpmCard.findMany({
-      where: { empresaId },
+      where: {
+        empresaId,
+        ...(diretoria ? {} : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } }),
+        ...(admin ? {} : { membros: { some: { userId } } }),
+      },
       select: {
         id: true,
         status: true,
@@ -267,6 +283,7 @@ export async function ObterPerfilEmpresaBpm(empresaId: number) {
     });
 
     const cardIds = cards.map((c) => c.id);
+    if (cardIds.length === 0) return { success: false, error: "Empresa nÃ£o encontrada" };
 
     const historico = cardIds.length
       ? await db.bpmCardHistorico.findMany({

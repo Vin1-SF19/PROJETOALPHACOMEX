@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ID_PERGUNTA_ANOTACOES_ULTIMO_FOLLOW_UP,
+  etapaExigeProximoContato,
   montarSnapshotPerguntasFollowUp,
   obterErroChecklistParaSaidaEmTratativa,
   obterErroProximoContatoParaEntrada,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/bpm/em-tratativa";
 import {
   atualizarCardSchema,
+  criarCardSchema,
   salvarChecklistFollowUpSchema,
   salvarRequisitosEMoverCardSchema,
 } from "@/lib/validations/bpm";
@@ -17,6 +19,15 @@ import {
 const CUID_CARD = "clz123456789012345678901";
 const CUID_ETAPA = "clz223456789012345678901";
 const CUID_CAMPO = "clz323456789012345678901";
+
+describe("etapaExigeProximoContato", () => {
+  it("normaliza nomes e reconhece somente as etapas declaradas pelo dominio", () => {
+    expect(etapaExigeProximoContato("  EM TRATATIVA ")).toBe(true);
+    expect(etapaExigeProximoContato(" sem   viabilidade ")).toBe(true);
+    expect(etapaExigeProximoContato("SÉM VIABILIDADE")).toBe(true);
+    expect(etapaExigeProximoContato("Fechado")).toBe(false);
+  });
+});
 
 describe("Próximo Contato e movimento em Em Tratativa", () => {
   it("normaliza o nome da etapa e exige Próximo Contato na entrada", () => {
@@ -49,7 +60,19 @@ describe("Próximo Contato e movimento em Em Tratativa", () => {
     })).toBeNull();
   });
 
-  it("aceita criar, alterar e limpar Próximo Contato no schema", () => {
+  it("mantém Próximo Contato fora da criação e permite alterar ou limpar dentro do card", () => {
+    const baseCriacao = {
+      empresaId: 1,
+      pipelineId: "clz423456789012345678901",
+      etapaId: CUID_ETAPA,
+      responsavelId: 2,
+    };
+    const criacao = criarCardSchema.parse({
+      ...baseCriacao,
+      proximoContatoEm: "2026-08-20T15:00:00.000Z",
+    });
+    expect(criacao).not.toHaveProperty("proximoContatoEm");
+
     expect(atualizarCardSchema.parse({
       cardId: CUID_CARD,
       proximoContatoEm: "2026-08-20T15:00:00.000Z",

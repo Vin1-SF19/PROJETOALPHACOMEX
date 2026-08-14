@@ -1436,3 +1436,22 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 **Limite atual:** não existe flag canônica de “respondido”; enquanto não houver decisão estrutural separada, a permanência em Novos leads é a proxy operacional. Feriados não são descontados do ciclo nesta fase.
 
 **Última atualização:** 2026-08-12 por Codex/Bibble.
+### Alpha CRM — ponto único de criação e formulários dentro do card
+
+**Regra permanente:** card novo nasce somente em **Novos Leads**. `PipelineBoardClient` pode abrir `NovoCardModal` apenas nessa etapa, e `CriarCardBpm` deve repetir a restrição usando a etapa persistida do pipeline, inclusive dentro da transação.
+
+**Formulários por etapa:** campos personalizados e controles nativos da etapa atual pertencem ao painel central do detalhe do card, na aba **Formulário da Etapa** (`CardFullViewModal`/`PainelRegistrar`/`PainelCamposEtapaAtual`). Requisitos de transição continuam no painel esquerdo (`PainelHistorico`). Eles não devem ser antecipados no modal de criação.
+
+**Google Meet:** o formulário de criação/reagendamento é renderizado somente em **Agendar Reunião**, dentro da aba central **Formulário da Etapa**. Em **Reunião Agendada**, `PainelReuniao` opera em modo de acompanhamento, sem controles para criar ou reagendar.
+
+**Compatibilidade:** guards de movimento para Fechado, Lost, Em Tratativa, Sem Viabilidade e outras etapas permanecem ativos. Eles validam a entrada por movimento e não constituem permissão para criar diretamente no destino.
+
+**Última atualização:** 2026-08-13 por Bibble/Codex.
+
+### Alpha CRM — Standby — Follow Up NoLoss
+
+**Automação:** `src/app/api/bpm/jobs/automacao-novos-leads/route.ts` continua protegido por `CRON_SECRET`; `vercel.json` o agenda diariamente às 12:00 UTC. `executarAutomacaoFollowUpBpm` processa também cards de Standby em Revisão de Radar, usando `standbyFollowUpUltimoEm`/`standbyFollowUpInterrompidoEm` e CAS antes de criar tarefa/histórico. Publique `TAREFA_ALTERADA` somente após o commit.
+
+**UI e ação:** `PainelRegistrar` monta `PainelStandbyFollowUp` somente quando `etapaEhStandbyFollowUp(card.etapa.nome)` dentro da aba central **Formulário da Etapa**. `InterromperStandbyFollowUpBpm` é a única ação de opt-out: exige `editarCard`, etapa Standby e motivo; não criar endpoint ou botão de retomada automática. O estado detalhado é carregado por `ObterEstadoStandbyFollowUpBpm`.
+
+**Limite operacional:** o job cria tarefa interna; não envia comunicação externa sem uma integração de canal definida separadamente.

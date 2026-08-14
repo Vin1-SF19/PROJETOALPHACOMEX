@@ -3,11 +3,50 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { criarTarefaSchema, concluirTarefaSchema, criarTarefaPresetSchema } from "@/lib/validations/bpm";
-import { exigirAcessoBpmCard, isAdminRole } from "@/lib/bpm/ownership";
-import { registrarHistoricoCard } from "./Cards";
+import {
+  checarAcessoConfigPipeline,
+  checarAcessoDiretoriaBpm,
+  exigirAcessoBpmCard,
+  exigirAcessoBpmPipeline,
+  exigirAcessoConfigPipeline,
+  exigirAcessoModuloBpm,
+} from "@/lib/bpm/ownership";
+import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
+import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { tipoTarefaEhValido } from "@/lib/bpm/tarefas-tipo";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
+
+function montarDetalhesTarefa(dados: {
+  tipo: string;
+  descricao?: string;
+  contato?: string;
+  telefone?: string;
+  emailDestino?: string;
+  mensagem?: string;
+}) {
+  const linhas = [dados.descricao?.trim()].filter((linha): linha is string => Boolean(linha));
+  if (dados.tipo === "LIGACAO") {
+    linhas.push(`Telefone: ${dados.telefone}`);
+    if (dados.contato) linhas.push(`Contato: ${dados.contato}`);
+  }
+  if (dados.tipo === "WHATSAPP") {
+    linhas.push(`Contato: ${dados.contato}`, `Mensagem: ${dados.mensagem}`);
+  }
+  if (dados.tipo === "EMAIL") {
+    linhas.push(`Para: ${dados.emailDestino}`, `Mensagem: ${dados.mensagem}`);
+  }
+  return linhas.join("\n") || undefined;
+}
+
+function tituloTarefaPorTipo(dados: { tipo: string; titulo?: string; contato?: string; telefone?: string; emailDestino?: string }) {
+  if (dados.titulo?.trim()) return dados.titulo.trim();
+  if (dados.tipo === "LIGACAO") return `Ligação: ${dados.contato?.trim() || dados.telefone}`;
+  if (dados.tipo === "WHATSAPP") return `WhatsApp: ${dados.contato}`;
+  if (dados.tipo === "EMAIL") return `E-mail: ${dados.emailDestino}`;
+  return "Tarefa";
+}
 
 export async function CriarTarefaBpm(dados: unknown) {
   try {
@@ -17,20 +56,33 @@ export async function CriarTarefaBpm(dados: unknown) {
 
     const parsed = criarTarefaSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, titulo, descricao, responsavelId, prazo, prioridade, presetId } = parsed.data;
+    const {
+      cardId,
+      tipo,
+      responsavelId,
+      prazo,
+      alertaEm,
+      prioridade,
+      presetId,
+      checklistItens,
+    } = parsed.data;
+    const titulo = tituloTarefaPorTipo(parsed.data);
+    const descricao = montarDetalhesTarefa(parsed.data);
+    const checklistJson = tipo === "CHECKLIST" ? JSON.stringify(checklistItens ?? []) : null;
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "criarTarefa");
 
     const tarefa = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "criarTarefa", tx);
       const criada = await tx.bpmTarefa.create({
-        data: { cardId, titulo, descricao, responsavelId, prazo, prioridade, presetId },
+        data: { cardId, titulo, descricao, responsavelId, prazo, alertaEm, tipo, checklistJson, prioridade, presetId },
       });
       await registrarHistoricoCard(
         {
           cardId,
           acao: "TAREFA_CRIADA",
           usuarioId: userId,
-          valorNovoJson: JSON.stringify({ titulo, responsavelId, prazo }),
+          valorNovoJson: JSON.stringify({ tipo, responsavelId, prazo, alertaConfigurado: true }),
         },
         tx,
       );
@@ -65,20 +117,57 @@ export async function AplicarPresetTarefaBpm(dados: { cardId: string; presetId: 
     const preset = await db.bpmTarefaPreset.findUnique({ where: { id: dados.presetId } });
     if (!preset) return { success: false, error: "Preset não encontrado" };
 
+    const card = await db.bpmCard.findUnique({
+      where: { id: dados.cardId },
+      select: { pipelineId: true },
+    });
+    if (!card || (preset.pipelineId && preset.pipelineId !== card.pipelineId)) {
+      return { success: false, error: "Preset indisponÃ­vel para este card" };
+    }
+
     const template = JSON.parse(preset.templateJson) as {
       titulo: string;
       descricao?: string;
+      tipo?: string;
+      prazo?: string;
+      alertaEm?: string;
       prioridade: string;
     }[];
 
+    const tarefasDoPreset = template.map((item) => {
+      const prazo = item.prazo ? new Date(item.prazo) : null;
+      const alertaEm = item.alertaEm ? new Date(item.alertaEm) : null;
+      if (
+        !item.titulo?.trim() ||
+        !tipoTarefaEhValido(item.tipo ?? "TAREFA") ||
+        !prazo || Number.isNaN(prazo.getTime()) ||
+        !alertaEm || Number.isNaN(alertaEm.getTime()) ||
+        alertaEm > prazo
+      ) {
+        return null;
+      }
+      return { ...item, tipo: item.tipo ?? "TAREFA", prazo, alertaEm };
+    });
+    if (tarefasDoPreset.some((tarefa) => !tarefa)) {
+      return {
+        success: false,
+        error: "Este preset não possui prazo e alerta válidos para todas as tarefas.",
+      };
+    }
+    const tarefasValidas = tarefasDoPreset.filter((tarefa): tarefa is NonNullable<typeof tarefa> => tarefa !== null);
+
     const tarefas = await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(dados.cardId, userId, session.user.role ?? null, "criarTarefa", tx);
       const criadas = await Promise.all(
-        template.map((item) =>
+        tarefasValidas.map((item) =>
           tx.bpmTarefa.create({
             data: {
               cardId: dados.cardId,
               titulo: item.titulo,
               descricao: item.descricao,
+              tipo: item.tipo,
+              prazo: item.prazo,
+              alertaEm: item.alertaEm,
               prioridade: item.prioridade,
               presetId: preset.id,
             },
@@ -123,6 +212,7 @@ export async function ConcluirTarefaBpm(dados: unknown) {
     await exigirAcessoBpmCard(tarefa.cardId, userId, session.user.role ?? null, "concluirTarefa");
 
     await db.$transaction(async (tx) => {
+      await exigirAcessoBpmCard(tarefa.cardId, userId, session.user.role ?? null, "concluirTarefa", tx);
       await tx.bpmTarefa.update({
         where: { id: tarefaId },
         data: { status: "CONCLUIDA", concluidaEm: new Date() },
@@ -158,6 +248,7 @@ export async function CriarTarefaPresetBpm(dados: unknown) {
     const parsed = criarTarefaPresetSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { pipelineId, nome, descricao, tipoGeracao, template } = parsed.data;
+    await exigirAcessoConfigPipeline(Number(session.user.id), "configurarEtapas");
 
     const preset = await db.bpmTarefaPreset.create({
       data: { pipelineId, nome, descricao, tipoGeracao, templateJson: JSON.stringify(template) },
@@ -180,12 +271,17 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
     const userId = Number(session.user.id);
-    const admin = isAdminRole(session.user.role ?? null);
+    await exigirAcessoModuloBpm(userId);
+    const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
+    const diretoria = await checarAcessoDiretoriaBpm(userId);
 
     let cardIdsPermitidos: string[] | undefined;
     if (!admin) {
       const membros = await db.bpmCardMembro.findMany({
-        where: { userId },
+        where: {
+          userId,
+          ...(diretoria ? {} : { card: { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } } }),
+        },
         select: { cardId: true },
       });
       cardIdsPermitidos = membros.map((m) => m.cardId);
@@ -195,6 +291,7 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
       where: {
         ...(filtros?.status ? { status: filtros.status } : {}),
         ...(filtros?.responsavelId ? { responsavelId: filtros.responsavelId } : {}),
+        ...(diretoria ? {} : { card: { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } } }),
         ...(cardIdsPermitidos ? { cardId: { in: cardIdsPermitidos } } : {}),
       },
       include: {
@@ -222,8 +319,14 @@ export async function ListarTarefaPresetsBpm(pipelineId?: string) {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
 
+    const userId = Number(session.user.id);
+    await exigirAcessoModuloBpm(userId);
+    if (pipelineId) await exigirAcessoBpmPipeline(pipelineId, userId);
+
+    // Sem contexto de pipeline, nunca exponha presets específicos de outros
+    // pipelines. A tela que precisa de presets locais sempre informa pipelineId.
     const presets = await db.bpmTarefaPreset.findMany({
-      where: pipelineId ? { OR: [{ pipelineId }, { pipelineId: null }] } : undefined,
+      where: pipelineId ? { OR: [{ pipelineId }, { pipelineId: null }] } : { pipelineId: null },
       orderBy: { nome: "asc" },
     });
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { followUpBloqueiaFechamento, montarPayloadCamposDestino, separarCamposRequisitos } from "@/lib/bpm/card-modal-ui";
+import {
+  followUpBloqueiaFechamento,
+  montarPayloadCamposDestino,
+  resolverSnapshotCamposRealtime,
+  separarCamposRequisitos,
+} from "@/lib/bpm/card-modal-ui";
 
 describe("CRM - fechamento do card com follow-up", () => {
   it.each(["CARREGANDO", "ERRO", "EM_ANDAMENTO"] as const)("bloqueia Em Tratativa no estado %s", (estado) => {
@@ -40,5 +45,34 @@ describe("CRM - requisitos sem duplicar campos da origem", () => {
       destino: "valor-novo",
     });
     expect(payload).toEqual({ destino: "valor-novo" });
+  });
+});
+
+describe("CRM - snapshot e versao dos campos diante de realtime", () => {
+  const atual = { valores: { motivo: "Outro", complemento: "rascunho" }, versao: "v1" };
+  const remoto = { valores: { motivo: "Sem resposta", complemento: "" }, versao: "v2" };
+
+  it("congela valores e versao-base enquanto existe rascunho sujo", () => {
+    const resultado = resolverSnapshotCamposRealtime({
+      rascunhoSujo: true,
+      snapshotAtual: atual,
+      snapshotRemoto: remoto,
+    });
+
+    expect(resultado.aplicarRemoto).toBe(false);
+    expect(resultado.snapshotAtivo).toBe(atual);
+    expect(resultado.snapshotPendente).toBe(remoto);
+  });
+
+  it("aplica valores e versao remotos juntos quando o formulario esta limpo", () => {
+    const resultado = resolverSnapshotCamposRealtime({
+      rascunhoSujo: false,
+      snapshotAtual: atual,
+      snapshotRemoto: remoto,
+    });
+
+    expect(resultado.aplicarRemoto).toBe(true);
+    expect(resultado.snapshotAtivo).toBe(remoto);
+    expect(resultado.snapshotPendente).toBeNull();
   });
 });

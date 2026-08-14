@@ -46,6 +46,14 @@ export interface FormaImagemExtraida extends RetanguloExtraido {
   nomeArquivo: string;
   crop?: PptxCrop;
   tile?: boolean;
+  /**
+   * Presente só quando a forma tem `custGeom` não-retangular (recorte livre) — `bytes`/`mimeType`
+   * acima são da imagem BRUTA (não um SVG pronto). Quem consome (`mapear.ts`) deve enviar a
+   * imagem bruta pro Blob PRIMEiro, e só então montar o SVG de recorte referenciando essa URL —
+   * nunca embutir a imagem em base64 dentro do SVG (arquivo final ficava várias vezes maior que
+   * o necessário, e o download some era pago de novo a cada abertura do slide).
+   */
+  recorte?: { pathSvg: string; viewBoxW: number; viewBoxH: number; crop?: PptxCrop; opacidade?: number };
 }
 
 export interface FormaTabelaExtraida extends RetanguloExtraido {

@@ -226,15 +226,20 @@ export function etapaEhEmTratativa(nome: string): boolean {
   return normalizarNomeEtapa(nome) === normalizarNomeEtapa(NOME_ETAPA_EM_TRATATIVA);
 }
 
+export function etapaExigeProximoContato(nome: string): boolean {
+  if (!nome) return false;
+  const nomeNormalizado = normalizarNomeEtapa(nome)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+  return ETAPAS_EXIGEM_PROXIMO_CONTATO.includes(nomeNormalizado);
+}
+
 export function obterErroProximoContatoParaEntrada(params: {
   etapaDestinoNome: string;
   proximoContatoEm: Date | string | null | undefined;
 }): string | null {
-  if (
-    !ETAPAS_EXIGEM_PROXIMO_CONTATO.includes(
-      normalizarNomeEtapa(params.etapaDestinoNome),
-    )
-  ) {
+  if (!etapaExigeProximoContato(params.etapaDestinoNome)) {
     return null;
   }
 

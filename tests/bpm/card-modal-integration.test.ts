@@ -12,6 +12,10 @@ const statusPosFechamento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelSt
 const requisitos = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelRequisitosAvanco.tsx");
 const proximoContato = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx");
 const checklist = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx");
+const registrar = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx");
+const camposEtapa = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx");
+const painelReuniao = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx");
+const resumoEtapas = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelResumoEtapas.tsx");
 const novoCard = ler("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx");
 const cardsAction = ler("src/actions/bpm/Cards.ts");
 
@@ -23,10 +27,12 @@ describe("CRM - wiring do modal por etapa", () => {
   });
 
   it("propaga realtime aos quatro editores e preserva drafts sujos", () => {
-    expect(historico).toContain("realtimeRevision={realtimeRevision}");
+    expect(registrar).toContain("realtimeRevision={realtimeRevision}");
+    expect(registrar).toContain("<PainelCamposEtapaAtual");
+    expect(camposEtapa).toContain("resolverSnapshotCamposRealtime");
     expect(historico).toContain("<PainelRequisitosAvanco");
-    expect(historico).toContain("<PainelProximoContato");
-    expect(historico).toContain("<PainelChecklistFollowUp");
+    expect(registrar).toContain("<PainelProximoContato");
+    expect(registrar).toContain("<PainelChecklistFollowUp");
     expect(requisitos).toContain("draftSujoRef.current");
     expect(proximoContato).toContain("sujoRef.current");
     expect(checklist).toContain("draftSujoRef.current");
@@ -37,15 +43,26 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(historico).toContain("lg:h-full lg:overflow-y-auto");
   });
 
-  it("preserva a composicao direita e adiciona apenas ancora de foco", () => {
-    expect(modal).toContain('id={`painel-reuniao-${card.id}`} tabIndex={-1} className="flex flex-col gap-4 min-h-0 overflow-y-auto"');
-    expect(modal.indexOf("<PainelReuniao")).toBeLessThan(modal.indexOf("<PainelProximaEtapa"));
+  it("destaca o serviço ativo no cabeçalho do card", () => {
+    expect(modal).toContain("BriefcaseBusiness");
+    expect(modal).toContain("Serviço ativo");
+    expect(modal).toContain("card.servico?.trim()");
+    expect(modal).toContain('title={card.servico}');
+  });
+
+  it("centraliza o formulário da etapa e mantém o painel direito para avanço/transcrição", () => {
+    expect(registrar).toContain('value="formulario-etapa"');
+    expect(registrar).toContain('id={`formulario-etapa-${card.id}`}');
+    expect(registrar).toContain("etapaEhAgendarReuniao(card.etapa.nome)");
+    expect(registrar).toContain("<PainelReuniao");
+    expect(modal).toContain("mostrarFormulario={false}");
+    expect(painelReuniao).toContain("{mostrarFormulario && (");
     expect(requisitos).toContain("onFocarPainelReuniao");
     expect(requisitos).toContain("Ir à reunião");
   });
 
   it("aplica readonly aos controles operacionais", () => {
-    expect(historico).toContain("disabled={!podeEditar}");
+    expect(camposEtapa).toContain("disabled={!podeEditar}");
     expect(requisitos).toContain("disabled={!podeEditar");
     expect(proximoContato).toContain("disabled={!podeEditar");
     expect(checklist).toContain("disabled={!podeEditar");
@@ -57,16 +74,81 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(cardsAction).toContain("usuarioElegivelResponsavelBpm(pipelineId, usuario.id)");
   });
 
+  it("oferece criacao somente na etapa canonica Novos Leads", () => {
+    expect(board).toContain('import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads"');
+    expect(board).toContain("const primeiraEtapa = etapasOrdenadas[0]");
+    expect(board).toContain("const etapaNovosLeads = primeiraEtapa && etapaEhNovosLeads(primeiraEtapa.nome)");
+    expect(board).toContain("onAdd={etapa.id === etapaNovosLeads?.id ? () => setNovoCardAberto(true) : undefined}");
+    expect(board).toContain("{novoCardAberto && etapaNovosLeads && (");
+    expect(board).not.toContain("camposNovoCard");
+  });
+
+  it("oferece atualizacao manual do board sem recarregar a pagina", () => {
+    expect(board).toContain("const [atualizandoManual, setAtualizandoManual]");
+    expect(board).toContain("const atualizacaoManualRef = useRef(false)");
+    expect(board).toContain("const atualizarPipeline = useCallback(async () => {");
+    expect(board).toContain("if (atualizacaoManualRef.current || movimentoPendenteRef.current || snapshotArrastoRef.current) return");
+    expect(board).toContain("await recarregarCards()");
+    expect(board).toContain('aria-label="Atualizar pipeline"');
+    expect(board).toContain("atualizandoManual ? \"animate-spin\" : \"\"");
+
+    const atualizacaoManual = board.slice(
+      board.indexOf("const atualizarPipeline = useCallback"),
+      board.indexOf("useEffect(() => {", board.indexOf("const atualizarPipeline = useCallback")),
+    );
+    expect(atualizacaoManual).not.toContain("router.refresh");
+    expect(atualizacaoManual).not.toContain("window.location.reload");
+  });
+
+  it("abre o card ao clicar no nome da empresa do board", () => {
+    const kanbanCard = board.slice(board.indexOf("function KanbanCard"), board.indexOf("function KanbanColumn"));
+    expect(kanbanCard).toContain("<button");
+    expect(kanbanCard).toContain("onAbrir(card.id)");
+    expect(kanbanCard).toContain("onPointerDown={(event) => event.stopPropagation()}");
+    expect(kanbanCard).not.toContain("/PainelAlpha/AlphaCRM/empresa/");
+  });
+
+  it("mantem uma hierarquia visual acessivel no card do Kanban", () => {
+    const kanbanCard = board.slice(board.indexOf("function KanbanCard"), board.indexOf("function KanbanColumn"));
+    expect(kanbanCard).toContain("rounded-2xl");
+    expect(kanbanCard).toContain("group-hover:w-1.5");
+    expect(kanbanCard).toContain("const inicialEmpresa");
+    expect(kanbanCard).toContain("<PhoneCall");
+    expect(kanbanCard).toContain("<CalendarClock");
+    expect(kanbanCard).toContain("<ClipboardList");
+    expect(kanbanCard).toContain('aria-label={`Responsável: ${card.responsavel.nome}`}');
+  });
+
+  it("limita o novo card aos dados-base e preserva cadastro de empresa", () => {
+    expect(novoCard).toContain("novaEmpresa:");
+    expect(novoCard).toContain("empresaId: empresaSelecionada!.id");
+    expect(novoCard).toContain("servico: servico.trim() || undefined");
+    expect(novoCard).toContain("Os detalhes da etapa são preenchidos ao abrir o card, na aba Formulário da Etapa.");
+    expect(novoCard).not.toContain("CampoBpm");
+    expect(novoCard).not.toContain("camposValores");
+    expect(novoCard).not.toContain("proximoContato");
+    expect(novoCard).not.toContain("statusPosFechamento");
+    expect(novoCard).not.toContain("Motivo Lost");
+  });
+
   it("mantem os requisitos no lado esquerdo do card", () => {
     expect(historico).toContain("<PainelRequisitosAvanco");
     expect(modal.indexOf("<PainelHistorico")).toBeLessThan(modal.indexOf("<PainelRegistrar"));
   });
 
-  it("compoe o status pos-fechamento no painel esquerdo somente em Fechado", () => {
-    expect(historico).toContain("etapaEhFechado(card.etapa.nome)");
-    expect(historico).toContain("<PainelStatusPosFechamento");
-    expect(historico.indexOf("<PainelStatusPosFechamento")).toBeLessThan(
-      historico.indexOf("<PainelRequisitosAvanco"),
+  it("mantem o resumo progressivo das etapas no lado esquerdo do card", () => {
+    expect(historico).toContain('<PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} />');
+    expect(historico.indexOf("<PainelResumoEtapas")).toBeLessThan(historico.indexOf("<PainelRequisitosAvanco"));
+    expect(resumoEtapas).toContain("etapasAnterioresParaResumo(etapas, card.etapa.id)");
+    expect(resumoEtapas).toContain('aria-label="Resumo das etapas anteriores"');
+    expect(resumoEtapas).toContain("aria-expanded={aberta}");
+  });
+
+  it("compõe o status pós-fechamento no formulário central somente em Fechado", () => {
+    expect(registrar).toContain("etapaEhFechado(card.etapa.nome)");
+    expect(registrar).toContain("<PainelStatusPosFechamento");
+    expect(registrar.indexOf("<PainelStatusPosFechamento")).toBeLessThan(
+      registrar.indexOf("Registrar interação"),
     );
     expect(statusPosFechamento).toContain("STATUS_POS_FECHAMENTO_OPCOES.map");
     expect(statusPosFechamento).toContain("disabled={!podeEditar || salvando}");
@@ -81,7 +163,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(statusPosFechamento).toContain("statusPosFechamento: rascunho");
     expect(statusPosFechamento).toContain("versaoEsperadaEm: versaoBase");
     expect(statusPosFechamento).toContain("if (houveConflito) onAtualizado()");
-    expect(historico).toContain("versaoPersistidaEm={card.updatedAt}");
+    expect(registrar).toContain("versaoPersistidaEm={card.updatedAt}");
   });
 
   it("mantem a versao-base suja e permite aceitar o snapshot remoto sem remontar", () => {

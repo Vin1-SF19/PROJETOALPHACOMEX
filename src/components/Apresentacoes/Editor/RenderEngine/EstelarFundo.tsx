@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
 import type { FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
 import { hexParaRgb, hashStringParaSeed, criarGeradorSeed } from "./fundos-utils";
+import { useVisibilidadeIframe } from "./useVisibilidadeIframe";
 
 type StarLayer = "distant" | "medium" | "near";
 
@@ -39,6 +40,7 @@ function criarStars(amount: number, size: number, color: string, seed: number): 
  * inicial (ver registry-fundos.ts) — depois de adicionado, tudo aqui é editável livremente.
  */
 export function EstelarFundo({ componente }: { componente: FundoAnimadoComponente }) {
+  const { ref, visivel } = useVisibilidadeIframe<HTMLDivElement>();
   const reduceMotion = useReducedMotion();
   const corGlow1 = hexParaRgb(componente.corPrimaria);
   const corGlow2 = hexParaRgb(componente.corSecundaria, "14, 165, 233");
@@ -84,9 +86,13 @@ export function EstelarFundo({ componente }: { componente: FundoAnimadoComponent
   }, [pointerX, pointerY, reduceMotion]);
 
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div ref={ref} className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
       <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #020617 0%, #0a2146 45%, #020617 100%)" }} />
 
+      {/* Conteúdo animado só monta com o módulo realmente visível — evita animações
+          `repeat: Infinity` rodando em segundo plano com a aba escondida (mas montada). */}
+      {visivel && (
+      <>
       <motion.div className="absolute inset-0" style={{ x: starsX, y: starsY }}>
         {(["distant", "medium", "near"] as const).map((layer) => {
           const config = STAR_BASE[layer];
@@ -166,6 +172,8 @@ export function EstelarFundo({ componente }: { componente: FundoAnimadoComponent
             transition={{ duration: 48 / velocidade, repeat: Infinity, ease: "linear" }}
           />
         </div>
+      )}
+      </>
       )}
 
       <div

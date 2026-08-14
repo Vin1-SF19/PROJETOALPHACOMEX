@@ -4,6 +4,8 @@
 
 Ready for Review
 
+> **Supersessão de criação — 2026-08-13:** a criação direta em **Fechado** foi substituída pela story `story-alpha-crm-criacao-somente-novos-leads-formularios-no-card.md`. Os requisitos de Valor/Forma e o status pós-fechamento continuam válidos para movimento, entrada e edição dentro do card; referências abaixo a criação direta permanecem apenas como histórico do contrato anterior.
+
 ## Executor Assignment
 
 - executor: `@dev`

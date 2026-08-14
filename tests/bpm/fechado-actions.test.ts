@@ -12,7 +12,8 @@ const executarAutomacaoMock = vi.hoisted(() => vi.fn());
 
 const prismaMock = vi.hoisted(() => ({
   cliente: { findUnique: vi.fn(), create: vi.fn() },
-  bpmEtapa: { findUnique: vi.fn() },
+  bpmPipeline: { findUnique: vi.fn() },
+  bpmEtapa: { findUnique: vi.fn(), findMany: vi.fn() },
   bpmCard: { findUnique: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   bpmEtapaTransicaoPermitida: { findMany: vi.fn() },
   bpmChecklistFollowUp: { findFirst: vi.fn() },
@@ -130,18 +131,14 @@ describe("actions de Fechado", () => {
     notificarPipelineBpmMock.mockResolvedValue(undefined);
     executarAutomacaoMock.mockResolvedValue(undefined);
     instalarTransaction();
+    prismaMock.bpmPipeline.findUnique.mockResolvedValue({ ativo: true });
+    prismaMock.bpmEtapa.findMany.mockResolvedValue([
+      { id: "clw0000000000000novo", nome: "Novos Leads" },
+      { id: FECHADO_ID, nome: "Fechado" },
+    ]);
   });
 
-  it("cria diretamente em Fechado com status inicial na mesma transação", async () => {
-    prismaMock.bpmEtapa.findUnique
-      .mockResolvedValueOnce({ pipelineId: PIPELINE_ID })
-      .mockResolvedValueOnce({ pipelineId: PIPELINE_ID, nome: "Fechado", ativo: true });
-    carregarCamposObrigatoriosEtapaMock.mockResolvedValue(
-      CAMPOS_FECHADO.map(({ id, nome }) => ({ id, nome })),
-    );
-    carregarCamposAplicaveisEtapaMock.mockResolvedValue(CAMPOS_FECHADO_CONFIG);
-    prismaMock.bpmCard.create.mockResolvedValue({ id: CARD_ID });
-
+  it("rejeita criação direta em Fechado sem executar os guards de movimento", async () => {
     const resultado = await CriarCardBpm({
       empresaId: 42,
       pipelineId: PIPELINE_ID,
@@ -153,33 +150,14 @@ describe("actions de Fechado", () => {
       },
     });
 
-    expect(resultado.success).toBe(true);
-    expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        etapaId: FECHADO_ID,
-        statusPosFechamento: "AGUARDANDO_CONTRATO",
-      }),
+    expect(resultado).toEqual({
+      success: false,
+      error: "Novos cards só podem ser criados na etapa Novos Leads.",
     });
-    expect(prismaMock.bpmCardHistorico.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        acao: "CARD_CRIADO",
-        valorNovoJson: expect.stringContaining("AGUARDANDO_CONTRATO"),
-      }),
-    });
-    expect(notificarPipelineBpmMock).toHaveBeenCalledAfter(
-      prismaMock.bpmCardHistorico.create,
-    );
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it("bloqueia criação direta quando um ou ambos os requisitos faltam", async () => {
-    prismaMock.bpmEtapa.findUnique.mockResolvedValue({
-      pipelineId: PIPELINE_ID,
-      nome: "Fechado",
-    });
-    carregarCamposObrigatoriosEtapaMock.mockResolvedValue(
-      CAMPOS_FECHADO.map(({ id, nome }) => ({ id, nome })),
-    );
-
     for (const camposValores of [
       {},
       { [CAMPOS_FECHADO[0].id]: "12000" },
@@ -192,44 +170,27 @@ describe("actions de Fechado", () => {
         responsavelId: 7,
         camposValores,
       });
-      expect(resultado.success).toBe(false);
+      expect(resultado).toEqual({
+        success: false,
+        error: "Novos cards só podem ser criados na etapa Novos Leads.",
+      });
     }
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
     expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
   });
 
-  it("falha fechado quando a configuração canônica está ausente ou inconsistente", async () => {
-    prismaMock.bpmEtapa.findUnique.mockResolvedValue({
+  it("não consulta configuração de Fechado ao rejeitar criação direta", async () => {
+    const resultado = await CriarCardBpm({
+      empresaId: 42,
       pipelineId: PIPELINE_ID,
-      nome: "Fechado",
+      etapaId: FECHADO_ID,
+      responsavelId: 7,
+      camposValores: {},
     });
-    for (const configuracao of [
-      [],
-      [CAMPOS_FECHADO_CONFIG[0]],
-      [
-        CAMPOS_FECHADO_CONFIG[0],
-        { ...CAMPOS_FECHADO_CONFIG[1], tipo: "texto" },
-      ],
-      [
-        CAMPOS_FECHADO_CONFIG[0],
-        { ...CAMPOS_FECHADO_CONFIG[1], opcoesJson: null },
-      ],
-    ]) {
-      carregarCamposAplicaveisEtapaMock.mockResolvedValueOnce(configuracao);
-      const resultado = await CriarCardBpm({
-        empresaId: 42,
-        pipelineId: PIPELINE_ID,
-        etapaId: FECHADO_ID,
-        responsavelId: 7,
-        camposValores: {},
-      });
-      expect(resultado).toEqual({
-        success: false,
-        error: "A configuração da etapa Fechado está inconsistente. Contate um administrador.",
-      });
-    }
+    expect(resultado).toEqual({ success: false, error: "Novos cards só podem ser criados na etapa Novos Leads." });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
     expect(prismaMock.bpmCard.create).not.toHaveBeenCalled();
+    expect(carregarCamposAplicaveisEtapaMock).not.toHaveBeenCalled();
   });
 
   it("move para Fechado inicializando somente status nulo e registra o status", async () => {

@@ -377,15 +377,16 @@ function normalizarNomeServico(texto: string): string {
  * o CNPJ com/sem máscara.
  */
 export async function buscarServicosContratados(cnpj: string) {
-  const cnpjLimpo = cnpj.replace(/\D/g, "");
-  if (!cnpjLimpo) return [];
+  // Fase 3.6 do Cliente Master (2026-08-14): ContratoComercial não tem mais `cnpj`
+  // próprio — filtra por `cliente.cnpj` normalizado (mesmo padrão das demais fases).
+  const cnpjNormalizado = cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  if (!cnpjNormalizado) return [];
 
   try {
     const contratos = await db.contratoComercial.findMany({
-      where: { arquivado: false },
+      where: { arquivado: false, cliente: { cnpj: cnpjNormalizado } },
       select: {
         id: true,
-        cnpj: true,
         servico: true,
         valorContrato: true,
         formaPagamento: true,
@@ -395,9 +396,7 @@ export async function buscarServicosContratados(cnpj: string) {
       orderBy: { createdAt: "desc" },
     });
 
-    return contratos
-      .filter((c) => c.cnpj.replace(/\D/g, "") === cnpjLimpo)
-      .map(({ cnpj: _cnpj, ...resto }) => resto);
+    return contratos;
   } catch (error: any) {
     console.error("ERRO buscarServicosContratados:", error?.message ?? error);
     return [];

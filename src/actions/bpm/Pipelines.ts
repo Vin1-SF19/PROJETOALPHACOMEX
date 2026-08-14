@@ -53,6 +53,8 @@ export async function ListarPipelinesBpm(incluirInativos = false) {
 export async function ListarSetoresParaPipelineBpm() {
   try {
     const session = await auth();
+    // Resolve permission server-side; a valid session alone cannot enumerate sectors.
+    if (session?.user?.id) await exigirAcessoModuloBpm(Number(session.user.id));
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
 
     const setores = await db.setor.findMany({
@@ -102,7 +104,7 @@ export async function CriarPipelineBpm(dados: unknown) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
     // D-031: apenas administradores configuram pipelines (criação inclusa).
-    exigirAcessoConfigPipeline(session.user.role ?? null, "criarPipeline");
+    await exigirAcessoConfigPipeline(Number(session.user.id), "criarPipeline");
 
     const parsed = criarPipelineSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
@@ -132,7 +134,7 @@ export async function AtualizarPipelineBpm(dados: unknown) {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    exigirAcessoConfigPipeline(session.user.role ?? null, "configurarEtapas");
+    await exigirAcessoConfigPipeline(Number(session.user.id), "configurarEtapas");
 
     const parsed = atualizarPipelineSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };

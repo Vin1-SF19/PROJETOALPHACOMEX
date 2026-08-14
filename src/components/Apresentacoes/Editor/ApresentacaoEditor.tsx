@@ -5,6 +5,8 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { toast } from "sonner";
 import { AtualizarSlide } from "@/actions/slides";
 import { serializarPersistenciaSlide, useEditorStore, type SlideResumo } from "./store/useEditorStore";
+import { ehPrimeiroSlide } from "@/lib/apresentacoes/proximo-slide";
+import { capturarMiniaturaPrimeiroSlide } from "@/lib/apresentacoes/miniatura-captura";
 import { COMPONENTES_REGISTRY, type TipoComponente } from "./registry/componentes-registry";
 import { BarraSuperiorEditor } from "./BarraSuperior/BarraSuperiorEditor";
 import { SidebarComponentes } from "./SidebarEsquerda/SidebarComponentes";
@@ -119,12 +121,15 @@ export function ApresentacaoEditor({
         } finally {
           useEditorStore.getState().concluirSalvamento(slideAtivoId, versaoSnapshot, sucesso);
         }
+        if (sucesso && ehPrimeiroSlide(useEditorStore.getState().slides, slideAtivoId)) {
+          void capturarMiniaturaPrimeiroSlide(apresentacaoId);
+        }
       })();
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [componentes, canvas, animacaoConfig, transicaoEntrada, isDirty, slideAtivoId, versaoEdicao, setSaving]);
+  }, [componentes, canvas, animacaoConfig, transicaoEntrada, isDirty, slideAtivoId, versaoEdicao, setSaving, apresentacaoId]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;

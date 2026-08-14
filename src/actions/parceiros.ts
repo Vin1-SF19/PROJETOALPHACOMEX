@@ -191,7 +191,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
       canalOutro: string | null;
       indicadoPorParceiroId: number | null;
       status: string;
-      cnpj: string;
+      clienteId: number;
       servico: string;
     } | null = null;
     if (origemContratoId) {
@@ -202,7 +202,7 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
           canalOutro: true,
           indicadoPorParceiroId: true,
           status: true,
-          cnpj: true,
+          clienteId: true,
           servico: true,
         },
       });
@@ -306,18 +306,17 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
     // Indicação retroativa (contrato já FECHADO antes do parceiro existir) —
     // best-effort, fora da transação de criação: um conflito aqui não pode
     // reverter o cadastro do parceiro, que já está completo e válido.
-    // Busca por CNPJ em `Cliente` (empresa, Cliente Master) — não mais em `clientes`
-    // (legado) nem filtrando por `servico` (que agora é granularidade de `ClienteServico`,
-    // não da empresa: a indicação é da EMPRESA, não de um serviço específico dela).
+    // Fase 3.6 do Cliente Master (2026-08-14): `contratoOrigem.clienteId` já é o id
+    // certo direto (não precisa mais buscar `Cliente` por CNPJ como bridge).
     let avisoIndicacao: string | undefined;
     if (origemContratoId && contratoOrigem?.status === "FECHADO") {
       try {
-        const cliente = await db.cliente.findFirst({
-          where: { cnpj: contratoOrigem.cnpj.replace(/\D/g, "").toUpperCase() },
+        const cliente = await db.cliente.findUnique({
+          where: { id: contratoOrigem.clienteId },
           select: { id: true, indicacao: { select: { parceiroId: true } } },
         });
         if (!cliente) {
-          avisoIndicacao = "Parceiro cadastrado, mas o cliente fechado ainda não foi sincronizado com CS & NPS — vincule a indicação manualmente depois.";
+          avisoIndicacao = "Parceiro cadastrado, mas a empresa do contrato fechado não foi encontrada no CRM — vincule a indicação manualmente depois.";
         } else if (cliente.indicacao) {
           avisoIndicacao = "Parceiro cadastrado, mas o cliente desta venda já possui outro parceiro indicador — revise a indicação manualmente em CS & NPS.";
         } else {
@@ -469,19 +468,20 @@ export async function buscarParceiro(id: number) {
     },
   }));
 
-  // Serviço contratado + valor do contrato (ContratoComercial vinculado só por CNPJ,
-  // sem FK — pega o contrato FECHADO mais recente de cada CNPJ indicado).
-  const cnpjs = indicacoesComCliente.map((ind) => ind.cliente.cnpj).filter((c): c is string => c !== null);
-  const contratos = cnpjs.length
+  // Serviço contratado + valor do contrato (ContratoComercial.clienteId, Fase 3.6 do
+  // Cliente Master — FK real, não mais casamento por CNPJ — pega o contrato FECHADO
+  // mais recente de cada Cliente indicado).
+  const clienteIds = indicacoesComCliente.map((ind) => ind.cliente.id);
+  const contratos = clienteIds.length
     ? await db.contratoComercial.findMany({
-        where: { cnpj: { in: cnpjs }, status: "FECHADO" },
+        where: { clienteId: { in: clienteIds }, status: "FECHADO" },
         orderBy: { createdAt: "desc" },
-        select: { cnpj: true, servico: true, valorContrato: true },
+        select: { clienteId: true, servico: true, valorContrato: true },
       })
     : [];
-  const contratoPorCnpj = new Map<string, { servico: string; valorContrato: number }>();
+  const contratoPorCliente = new Map<number, { servico: string; valorContrato: number }>();
   for (const c of contratos) {
-    if (!contratoPorCnpj.has(c.cnpj)) contratoPorCnpj.set(c.cnpj, { servico: c.servico, valorContrato: c.valorContrato });
+    if (!contratoPorCliente.has(c.clienteId)) contratoPorCliente.set(c.clienteId, { servico: c.servico, valorContrato: c.valorContrato });
   }
 
   // Comissão que o parceiro recebe por empresa indicada — mesma regra do portal:
@@ -507,7 +507,7 @@ export async function buscarParceiro(id: number) {
     ...parceiro,
     representantes,
     indicacoes: indicacoesComCliente.map((ind) => {
-      const contrato = ind.cliente.cnpj ? contratoPorCnpj.get(ind.cliente.cnpj) : undefined;
+      const contrato = contratoPorCliente.get(ind.cliente.id);
       const valorContrato = contrato?.valorContrato ?? null;
 
       const nivelHistorico = (ind.cliente.cnpj && nivelHistoricoPorCnpj.get(ind.cliente.cnpj)) || null;
@@ -576,11 +576,9 @@ export async function getPermissaoParceiros() {
 
 type ContratoComPendencia = {
   id: string;
-  razaoSocial: string;
-  nomeFantasia: string | null;
-  cnpj: string;
   canalOutro: string | null;
   createdAt: Date;
+  cliente: { razaoSocial: string; nomeFantasia: string | null; cnpj: string | null };
 };
 
 function mapearPendenciaParceiro(contrato: ContratoComPendencia): ParceiroPendenteCadastro | null {
@@ -588,9 +586,9 @@ function mapearPendenciaParceiro(contrato: ContratoComPendencia): ParceiroPenden
   if (!dados) return null;
   return {
     contratoId: contrato.id,
-    clienteRazaoSocial: contrato.razaoSocial,
-    clienteNomeFantasia: contrato.nomeFantasia,
-    cnpj: contrato.cnpj,
+    clienteRazaoSocial: contrato.cliente.razaoSocial,
+    clienteNomeFantasia: contrato.cliente.nomeFantasia,
+    cnpj: contrato.cliente.cnpj,
     criadoEm: contrato.createdAt,
     ...dados,
   };
@@ -609,11 +607,9 @@ export async function listarParceirosPendentesCadastro(): Promise<ParceiroPenden
     },
     select: {
       id: true,
-      razaoSocial: true,
-      nomeFantasia: true,
-      cnpj: true,
       canalOutro: true,
       createdAt: true,
+      cliente: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -637,11 +633,9 @@ export async function buscarParceiroPendenteCadastro(contratoId: string): Promis
     },
     select: {
       id: true,
-      razaoSocial: true,
-      nomeFantasia: true,
-      cnpj: true,
       canalOutro: true,
       createdAt: true,
+      cliente: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
     },
   });
 
