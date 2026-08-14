@@ -180,6 +180,7 @@ export function RenderImagem({ componente }: { componente: ImagemComponente }) {
         <img
           src={componente.url}
           alt={componente.alt ?? ""}
+          loading="lazy"
           style={{
             position: "absolute",
             width: `${100 / visibleWidth}%`,
@@ -198,6 +199,7 @@ export function RenderImagem({ componente }: { componente: ImagemComponente }) {
     <img
       src={componente.url}
       alt={componente.alt ?? ""}
+      loading="lazy"
       style={{ width: "100%", height: "100%", objectFit: componente.objectFit ?? "cover", display: "block" }}
     />
   ) : (

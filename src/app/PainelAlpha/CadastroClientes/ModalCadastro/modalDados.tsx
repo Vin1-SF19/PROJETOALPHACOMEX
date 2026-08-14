@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from "react-dom";
 import { fmtDate, fmtDateTime } from "@/lib/format-date";
 import { X, Plus, ThumbsUp, ThumbsDown, Minus, Calendar, MessageSquare, Save, Star, Search, CheckCircle2, TrendingUp, LockOpen, Edit3, Check, Trash2, AlertTriangle, Briefcase, Wallet, CreditCard, UserCircle2, Loader2 } from "lucide-react";
-import { adicionarSocio, atualizarLogCS, atualizarLogFeedback, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, excluirSocio, salvarAlteracoesGeral, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
+import { adicionarSocio, atualizarLogCS, atualizarLogFeedback, atualizarSocio, atualizarStatusCliente, excluirLogCS, excluirLogFeedback, excluirSocio, salvarAlteracoesCliente, salvarAlteracoesServico, salvarLogCS, salvarLogFeedback, buscarServicoContratadoPorCliente, buscarUsuariosPorRole, type ClienteCS } from '@/actions/Clientes';
 import { toast } from 'sonner';
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,6 @@ import { ModalSelecionarUsuario } from './ModalSelecionarUsuario';
 import { FORMAS_PAGAMENTO, FORMAS_LABEL, formatarFormaPagamento } from './formas-pagamento';
 import { ORIGENS_LEAD_PADRAO } from './origens-lead';
 import { CsNpsModal3DShell } from "../CsNpsMotion";
-import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 
 /**
  * `dataContratacao` é salva como `.toISOString()` de uma data "só o dia" (sem
@@ -30,27 +29,6 @@ function fmtDataSemHora(value: string | Date | null | undefined): string {
     const dataCorrigida = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
     return fmtDate(dataCorrigida);
 }
-
-
-interface ModalDadosProps {
-    editandoDados: boolean;
-    cnpj: string;
-    setCnpj: (val: string) => void;
-    razaoSocial: string;
-    setRazaoSocial: (val: string) => void;
-    nomeFantasia: string;
-    setNomeFantasia: (val: string) => void;
-    dataConstituicao: string;
-    setDataConstituicao: (val: string) => void;
-    regimeTributario: string;
-    setRegimeTributario: (val: string) => void;
-    uf: string;
-    setUf: (val: string) => void;
-    servicosSelecionados: string[];
-    analistaSelecionado: string;
-    style: any;
-}
-
 
 
 
@@ -136,8 +114,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         }));
     }
 
-    const [servicosSelecionados, setServicosSelecionados] = useState<string[]>([]);
-    const [analistaSelecionado, setAnalistaSelecionado] = useState("");
     const [showConfirmarOcultar, setShowConfirmarOcultar] = useState(false);
 
     const router = useRouter();
@@ -164,11 +140,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [listaLogsFeedback, setListaLogsFeedback] = useState<any[]>(cliente?.logFeedback ?? []);
     const [editandoDados, setEditandoDados] = useState(false);
 
-    const [showServicos, setShowServicos] = useState(false);
-    const [isCriandoServico, setIsCriandoServico] = useState(false);
-    const [novoServicoNome, setNovoServicoNome] = useState("");
-
-    const listaServicos: string[] = [...SERVICOS_COMERCIAIS_PADRAO];
     const SERVICOS_COM_EMBASAMENTO = ["Revisão RADAR - 150K", "Revisão RADAR - ILIMITADO"];
 
     const listaEmbasamentos = ["Disponibilidade Financeira", "Início ou Retomada", "Receita Bruta (DAS)", "Receita Bruta (CPRB)"];
@@ -227,14 +198,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
     const [salvandoEdicaoCS, setSalvandoEdicaoCS] = useState(false);
 
 
-    useEffect(() => {
-        if (cliente) {
-            setCnpj(cliente.cnpj || "");
-            setRazaoSocial(cliente.razaoSocial || "");
-            setServicosSelecionados(cliente.servicos?.split(",") || []);
-            setAnalistaSelecionado(cliente.analistaResponsavel || "");
-        }
-    }, [cliente]);
 
 
 
@@ -278,7 +241,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         }
     };
 
-    const handleExcluirCS = async (logId: number) => {
+    const handleExcluirCS = async (logId: string) => {
         if (!confirm("Deseja realmente apagar este relato de CS?")) return;
 
         // Registro só existe no rascunho local (nunca foi salvo) — remove sem chamar o servidor.
@@ -451,7 +414,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
     useEffect(() => {
         if (cliente) {
-            setCnpj(cliente.cnpj);
+            setCnpj(cliente.cnpj || "");
             setRazaoSocial(cliente.razaoSocial);
             setNomeFantasia(cliente.nomeFantasia || "");
             setDataConstituicao(cliente.dataConstituicao || "");
@@ -471,7 +434,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
     useEffect(() => {
         if (isOpen && cliente?.id) {
-            const logsDoCliente = [...(cliente.log_cs || [])].sort((a, b) => {
+            const logsDoCliente = [...(cliente.logCs || [])].sort((a, b) => {
                 const dataA = new Date(a.dataRegistro).getTime();
                 const dataB = new Date(b.dataRegistro).getTime();
                 return dataB - dataA;
@@ -500,7 +463,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             setRegimeTributario(cliente.regimeTributario || "");
             setUf(cliente.uf || "");
             setMunicipio(cliente.municipio || "");
-            setServicosSelecionados(cliente.servicos ? cliente.servicos.split(",").map((s: string) => s.trim()) : []);
 
             setEditandoDados(false);
         }
@@ -529,7 +491,9 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
             setCarregandoContratos(true);
             const entradas = await Promise.all(
                 registrosDoGrupo.map(async (registro) => {
-                    const contrato = await buscarServicoContratadoPorCliente(registro.cnpj, registro.servicos);
+                    const contrato = registro.cnpj
+                        ? await buscarServicoContratadoPorCliente(registro.cnpj, registro.servico)
+                        : null;
                     return [registro.id, contrato] as const;
                 })
             );
@@ -647,7 +611,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         }
     };
 
-    const handleExcluirFeedback = async (logId: number) => {
+    const handleExcluirFeedback = async (logId: string) => {
         if (!logId) return toast.error("ID do log não encontrado");
         if (!confirm("Deseja realmente excluir este pedido de feedback?")) return;
 
@@ -699,41 +663,45 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
 
         const falhas: string[] = [];
 
-        // 1) Registro principal: dados fiscais + status/NPS/feedback do cliente + seu próprio card de serviço.
-        const formPrincipal = formPorCard[cliente!.id];
-        const desbloqueadoPrincipal = SERVICOS_COM_EMBASAMENTO.includes(cliente!.servicos || "");
-        const resPrincipal = await salvarAlteracoesGeral(cliente!.id, {
-            cnpj,
+        // 1) Dados CADASTRAIS do Cliente master (razão social, nome fantasia, UF, município,
+        // regime tributário, data de constituição) — CNPJ é somente-leitura (Fase 3.6 do
+        // Cliente Master). 1 única chamada por Cliente, não por serviço.
+        const resCliente = await salvarAlteracoesCliente(cliente!.clienteId, {
             razaoSocial,
-            nomeFantasia,
-            dataConstituicao,
-            regimeTributario,
-            uf,
-            municipio,
-            servicos: servicosSelecionados,
+            nomeFantasia: nomeFantasia || null,
+            dataConstituicao: dataConstituicao || null,
+            regimeTributario: regimeTributario || null,
+            uf: uf || null,
+            municipio: municipio || null,
+        });
+        if (!resCliente.success) falhas.push("dados cadastrais da empresa");
+
+        // 2) NPS/feedback Google — hoje só existe 1 vez por Cliente (não por serviço),
+        // gravados via o card do serviço PRINCIPAL (mais recente).
+        const resDadosGestaoPrincipal = await salvarAlteracoesServico(cliente!.id, {
+            analistaResponsavel: formPorCard[cliente!.id]?.analistaResponsavel ?? cliente!.analistaResponsavel,
+            dataContratacao: formPorCard[cliente!.id]?.dataContratacao ?? cliente!.dataContratacao,
+            status: formPorCard[cliente!.id]?.status ?? cliente!.status,
             nps,
             feedbackGoogle: feedbackSim,
-            nomeGoogle: nomeFeedback,
-            status: formPrincipal?.status ?? cliente!.status,
-            dataContratacao: formPrincipal?.dataContratacao ?? cliente!.dataContratacao,
-            dataExito: formPrincipal?.dataExitoManual ?? cliente!.dataExito,
-            analistaResponsavel: formPrincipal?.analistaResponsavel ?? cliente!.analistaResponsavel,
-            embasamento: formPrincipal
-                ? (desbloqueadoPrincipal ? formPrincipal.embasamento || null : null)
-                : (cliente!.embasamento ?? null),
-            origemLead: formPrincipal?.origemLead ?? cliente!.origemLead ?? null,
-            formaPagamento: formPrincipal?.formaPagamento || null,
-            valorContrato: formPrincipal?.valorContrato ? Number(formPrincipal.valorContrato) : null,
-            closerNome: formPrincipal?.closerNome || null,
+            nomeGoogle: nomeFeedback || null,
+            embasamento: SERVICOS_COM_EMBASAMENTO.includes(cliente!.servico || "")
+                ? formPorCard[cliente!.id]?.embasamento || null
+                : null,
+            origemLead: formPorCard[cliente!.id]?.origemLead || cliente!.origemLead || null,
+            dataExito: formPorCard[cliente!.id]?.dataExitoManual || cliente!.dataExito,
+            formaPagamento: formPorCard[cliente!.id]?.formaPagamento || null,
+            valorContrato: formPorCard[cliente!.id]?.valorContrato ? Number(formPorCard[cliente!.id].valorContrato) : null,
+            closerNome: formPorCard[cliente!.id]?.closerNome || null,
         });
-        if (!resPrincipal.success) falhas.push("dados do cliente");
+        if (!resDadosGestaoPrincipal.success) falhas.push("dados do serviço principal");
 
-        // 2) Demais serviços contratados do mesmo CNPJ — cada um com seu próprio card.
+        // 3) Demais serviços contratados do mesmo Cliente — cada um com seu próprio card.
         for (const registro of outrosServicos) {
             const form = formPorCard[registro.id];
             if (!form) continue;
-            const desbloqueado = SERVICOS_COM_EMBASAMENTO.includes(registro.servicos || "");
-            const res = await salvarAlteracoesGeral(registro.id, {
+            const desbloqueado = SERVICOS_COM_EMBASAMENTO.includes(registro.servico || "");
+            const res = await salvarAlteracoesServico(registro.id, {
                 analistaResponsavel: form.analistaResponsavel,
                 dataContratacao: form.dataContratacao,
                 status: form.status,
@@ -741,27 +709,22 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                 feedbackGoogle: registro.feedbackGoogle,
                 nomeGoogle: registro.nomeGoogle,
                 dataExito: form.dataExitoManual,
-                cnpj: registro.cnpj,
-                razaoSocial: registro.razaoSocial,
-                nomeFantasia: registro.nomeFantasia,
-                dataConstituicao: registro.dataConstituicao,
-                regimeTributario: registro.regimeTributario,
-                uf: registro.uf,
-                servicos: registro.servicos,
                 embasamento: desbloqueado ? form.embasamento || null : null,
                 origemLead: form.origemLead || null,
                 formaPagamento: form.formaPagamento || null,
                 valorContrato: form.valorContrato ? Number(form.valorContrato) : null,
                 closerNome: form.closerNome || null,
             });
-            if (!res.success) falhas.push(`serviço "${registro.servicos || registro.id}"`);
+            if (!res.success) falhas.push(`serviço "${registro.servico || registro.id}"`);
         }
 
-        // 3) Sócios pendentes (criar/editar/excluir).
+        // 4) Sócios pendentes (criar/editar/excluir) — vinculados ao Cliente master
+        // (Pessoa/PessoaClienteVinculo, Fase 3.6 do Cliente Master), não ao serviço.
         for (const s of listaSocios) {
             if (s._pendente === "criar") {
-                const res = await adicionarSocio(cliente!.id, {
-                    nome: s.nome, telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
+                if (!s.telefone) { falhas.push(`sócio "${s.nome}" (telefone obrigatório)`); continue; }
+                const res = await adicionarSocio(cliente!.clienteId, {
+                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });
                 if (res.success && res.data) {
                     const novoId = res.data.id;
@@ -770,8 +733,9 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     falhas.push(`sócio "${s.nome}"`);
                 }
             } else if (s._pendente === "editar") {
-                const res = await atualizarSocio(s.id, {
-                    nome: s.nome, telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
+                if (!s.telefone) { falhas.push(`sócio "${s.nome}" (telefone obrigatório)`); continue; }
+                const res = await atualizarSocio(s.id, cliente!.clienteId, {
+                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });
                 if (res.success) {
                     setListaSocios((prev) => prev.map((x) => x.id === s.id ? { ...x, _pendente: undefined } : x));
@@ -779,7 +743,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     falhas.push(`sócio "${s.nome}"`);
                 }
             } else if (s._pendente === "excluir") {
-                const res = await excluirSocio(s.id);
+                const res = await excluirSocio(s.id, cliente!.clienteId);
                 if (res.success) {
                     setListaSocios((prev) => prev.filter((x) => x.id !== s.id));
                 } else {
@@ -864,11 +828,13 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     <section className={`grid grid-cols-1 md:grid-cols-12 gap-5 transition-all duration-500 ${editandoDados ? "opacity-100" : "opacity-70"}`}>
                         <div className="md:col-span-4 space-y-1">
                             <label className="text-[9px] font-black uppercase text-slate-500 ml-1 tracking-widest">CNPJ</label>
+                            {/* Somente leitura — Fase 3.6 do Cliente Master (2026-08-14): mudar o CNPJ
+                                significaria trocar de Cliente master inteiro. Corrige no Alpha CRM (BPM). */}
                             <input
-                                disabled={!editandoDados}
+                                disabled
                                 value={cnpj}
-                                onChange={(e) => setCnpj(e.target.value)}
-                                className={`w-full bg-slate-950/50 border rounded-xl py-3.5 px-4 text-sm transition-all outline-none ${editandoDados ? "border-alpha/30 text-white focus:border-alpha" : "border-white/5 text-slate-500 cursor-not-allowed"}`}
+                                readOnly
+                                className="w-full bg-slate-950/50 border border-white/5 rounded-xl py-3.5 px-4 text-sm text-slate-500 cursor-not-allowed transition-all outline-none"
                             />
                         </div>
 
@@ -943,43 +909,12 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                             <label className="text-[10px] font-black uppercase text-indigo-400 ml-1 tracking-widest">
                                 Serviço Contratado Recentemente
                             </label>
-
-                            {editandoDados ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowServicos(!showServicos)}
-                                    className="w-full bg-slate-950/50 border border-alpha/30 rounded-xl py-3 px-4 text-sm font-black text-white hover:border-alpha transition-all text-left flex justify-between items-center italic uppercase group"
-                                >
-                                    {servicosSelecionados.length > 0 ? servicosSelecionados.join(" + ") : "SELECIONAR SERVIÇO"}
-                                    <Plus size={14} className="text-alpha group-hover:scale-125 transition-transform shrink-0 ml-2" />
-                                </button>
-                            ) : (
-                                <div className={`w-full bg-slate-900/30 border border-slate-800/50 rounded-xl py-3 px-4 text-sm font-black ${servicosSelecionados.length > 0 ? style.text : "text-slate-600"} italic uppercase truncate`}>
-                                    {servicosSelecionados.length > 0 ? servicosSelecionados.join(" + ") : "NENHUM SERVIÇO DEFINIDO"}
-                                </div>
-                            )}
-
-
-
-                            {showServicos && editandoDados && (
-                                <div className="absolute top-full mt-2 w-full bg-slate-900 border border-white/10 rounded-2xl p-4 z-50 shadow-2xl animate-in zoom-in-95 duration-200">
-                                    <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
-                                        {listaServicos.map(s => (
-                                            <button
-                                                key={s}
-                                                type="button"
-                                                onClick={() => {
-                                                    setServicosSelecionados([s]);
-                                                    setShowServicos(false);
-                                                }}
-                                                className="w-full text-left p-3 rounded-xl text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-alpha transition-all"
-                                            >
-                                                {s}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            {/* Somente leitura — Fase 3.6 do Cliente Master: serviço é identidade do
+                                ClienteServico (junto com o Cliente), não um campo editável solto. Para
+                                contratar um serviço novo, use "Serviços Contratados" abaixo (novo card). */}
+                            <div className={`w-full bg-slate-900/30 border border-slate-800/50 rounded-xl py-3 px-4 text-sm font-black ${cliente?.servico ? style.text : "text-slate-600"} italic uppercase truncate`}>
+                                {cliente?.servico || "NENHUM SERVIÇO DEFINIDO"}
+                            </div>
                         </div>
                     </section>
 
@@ -1008,7 +943,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                     const contrato = contratosPorRegistro[registro.id];
                                     const form = formPorCard[registro.id];
                                     const ehPrincipal = registro.id === cliente.id;
-                                    const embasamentoDesbloqueadoCard = SERVICOS_COM_EMBASAMENTO.includes(registro.servicos || "");
+                                    const embasamentoDesbloqueadoCard = SERVICOS_COM_EMBASAMENTO.includes(registro.servico || "");
 
                                     return (
                                         <div
@@ -1017,7 +952,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                                         >
                                             <div className="flex items-start justify-between gap-3">
                                                 <span className="text-sm font-black text-white uppercase italic tracking-tight">
-                                                    {registro.servicos || "Serviço não definido"}
+                                                    {registro.servico || "Serviço não definido"}
                                                 </span>
                                                 <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-1 rounded-full border ${getStatusColor(registro.status)}`}>
                                                     {registro.status || "Em Andamento"}

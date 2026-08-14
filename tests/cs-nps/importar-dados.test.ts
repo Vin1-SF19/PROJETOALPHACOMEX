@@ -7,7 +7,7 @@ import type {
 } from "@/lib/cs-nps/importacao-tipos";
 
 const prismaMock = vi.hoisted(() => ({
-  clientes: { findMany: vi.fn() },
+  clienteServico: { findMany: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -49,12 +49,14 @@ interface AbaTeste {
   linhas?: ExcelJS.CellValue[][];
 }
 
+// Fase 3.6 do Cliente Master (2026-08-14): `clienteA` representa a linha crua de
+// `db.clienteServico.findMany` (id = ClienteServico.id, cliente = Cliente master aninhado).
 const clienteA = {
   id: 10,
-  cnpj: "12.345.678/0001-90",
-  razaoSocial: "Empresa Árvore Ltda",
-  servicos: "Contábil",
+  clienteId: 501,
+  servico: "Contábil",
   status: "ATIVO",
+  cliente: { cnpj: "12.345.678/0001-90", razaoSocial: "Empresa Árvore Ltda" },
 };
 
 function paraArrayBuffer(buffer: Buffer): ArrayBuffer {
@@ -78,10 +80,11 @@ async function criarPlanilha(abas: AbaTeste[]): Promise<ArrayBuffer> {
 function criarTx() {
   return {
     usuarios: { findUnique: vi.fn() },
-    clientes: { findMany: vi.fn() },
-    socios: { createMany: vi.fn() },
-    log_cs: { createMany: vi.fn() },
-    logFeedback: { createMany: vi.fn() },
+    clienteServico: { findMany: vi.fn() },
+    pessoa: { upsert: vi.fn() },
+    pessoaClienteVinculo: { upsert: vi.fn() },
+    clienteServicoLogCs: { createMany: vi.fn() },
+    clienteServicoLogFeedback: { createMany: vi.fn() },
     auditoria: { create: vi.fn() },
   };
 }
@@ -91,7 +94,7 @@ const linhaSocio: LinhaSalvarImportacao = {
   tipo: "socios",
   aba: "Socios",
   numeroLinha: 2,
-  identificador: { cnpj: clienteA.cnpj, razaoSocial: null },
+  identificador: { cnpj: clienteA.cliente.cnpj, razaoSocial: null },
   dados: {
     nome: "Maria da Silva",
     telefone: "0011999999999",
@@ -107,7 +110,7 @@ const linhaCs: LinhaSalvarImportacao = {
   tipo: "cs",
   aba: "CS",
   numeroLinha: 2,
-  identificador: { cnpj: null, razaoSocial: clienteA.razaoSocial },
+  identificador: { cnpj: null, razaoSocial: clienteA.cliente.razaoSocial },
   dados: {
     colaborador: "Ana",
     sentimento: "pos",
@@ -122,7 +125,7 @@ const linhaFeedback: LinhaSalvarImportacao = {
   tipo: "feedbacks",
   aba: "Feedbacks",
   numeroLinha: 2,
-  identificador: { cnpj: clienteA.cnpj, razaoSocial: clienteA.razaoSocial },
+  identificador: { cnpj: clienteA.cliente.cnpj, razaoSocial: clienteA.cliente.razaoSocial },
   dados: {
     colaborador: "Carlos",
     sentimento: "neg",
@@ -134,7 +137,7 @@ const linhaFeedback: LinhaSalvarImportacao = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  prismaMock.clientes.findMany.mockResolvedValue([clienteA]);
+  prismaMock.clienteServico.findMany.mockResolvedValue([clienteA]);
 });
 
 describe("modelo de importação", () => {
@@ -160,8 +163,8 @@ describe("pré-visualização", () => {
     const arquivo = await criarPlanilha([{
       nome: "Socios",
       linhas: [
-        [clienteA.cnpj, null, "Maria", "0011999999999", null, "29/02/1984", "Sócia"],
-        [clienteA.cnpj, null, "João", "0011888888888", null, "01/01/1980", "Sócio"],
+        [clienteA.cliente.cnpj, null, "Maria", "0011999999999", null, "29/02/1984", "Sócia"],
+        [clienteA.cliente.cnpj, null, "João", "0011888888888", null, "01/01/1980", "Sócio"],
       ],
     }]);
 
@@ -175,23 +178,23 @@ describe("pré-visualização", () => {
   });
 
   it("resolve CNPJ único, marca CNPJ duplicado como ambíguo e encontra por razão social", async () => {
-    prismaMock.clientes.findMany.mockResolvedValue([
+    prismaMock.clienteServico.findMany.mockResolvedValue([
       clienteA,
-      { ...clienteA, id: 11, servicos: "Fiscal" },
+      { ...clienteA, id: 11, servico: "Fiscal" },
       {
         id: 20,
-        cnpj: "98.765.432/0001-10",
-        razaoSocial: "Razão Exclusiva SA",
-        servicos: "RH",
+        clienteId: 502,
+        servico: "RH",
         status: "ATIVO",
+        cliente: { cnpj: "98.765.432/0001-10", razaoSocial: "Razão Exclusiva SA" },
       },
     ]);
     const arquivo = await criarPlanilha([{
       nome: "Socios",
       linhas: [
-        [clienteA.cnpj, null, "Ambíguo", null, null, null, null],
-        ["98.765.432/0001-10", null, "Único", null, null, null, null],
-        [null, "  RAZAO exclusiva sa ", "Por razão", null, null, null, null],
+        [clienteA.cliente.cnpj, null, "Ambíguo", "0011999999999", null, null, null],
+        ["98.765.432/0001-10", null, "Único", "0011999999998", null, null, null],
+        [null, "  RAZAO exclusiva sa ", "Por razão", "0011999999997", null, null, null],
       ],
     }]);
 
@@ -204,19 +207,19 @@ describe("pré-visualização", () => {
   });
 
   it("rejeita CNPJ e razão social que apontam para cadastros diferentes", async () => {
-    prismaMock.clientes.findMany.mockResolvedValue([
+    prismaMock.clienteServico.findMany.mockResolvedValue([
       clienteA,
       {
         id: 20,
-        cnpj: "98.765.432/0001-10",
-        razaoSocial: "Outra Empresa SA",
-        servicos: null,
+        clienteId: 502,
+        servico: null,
         status: "ATIVO",
+        cliente: { cnpj: "98.765.432/0001-10", razaoSocial: "Outra Empresa SA" },
       },
     ]);
     const arquivo = await criarPlanilha([{
       nome: "Socios",
-      linhas: [[clienteA.cnpj, "Outra Empresa SA", "Conflito", null, null, null, null]],
+      linhas: [[clienteA.cliente.cnpj, "Outra Empresa SA", "Conflito", "0011999999999", null, null, null]],
     }]);
 
     const preview = await previsualizarImportacao(arquivo, "conflito.xlsx", ["socios"]);
@@ -232,13 +235,13 @@ describe("pré-visualização", () => {
       {
         nome: "Socios",
         linhas: [
-          [clienteA.cnpj, null, "Data válida", null, null, "29/02/2024", null],
-          [clienteA.cnpj, null, "Data inválida", null, null, "31/02/2024", null],
+          [clienteA.cliente.cnpj, null, "Data válida", "0011999999999", null, "29/02/2024", null],
+          [clienteA.cliente.cnpj, null, "Data inválida", "0011999999999", null, "31/02/2024", null],
         ],
       },
       {
         nome: "CS",
-        linhas: [[clienteA.cnpj, null, "Ana", "pos", "Contato realizado com sucesso", "2026-07-15"]],
+        linhas: [[clienteA.cliente.cnpj, null, "Ana", "pos", "Contato realizado com sucesso", "2026-07-15"]],
       },
     ]);
 
@@ -256,22 +259,22 @@ describe("pré-visualização", () => {
     ["fórmula", "FORMULA_NOT_ALLOWED", async () => {
       const arquivo = await criarPlanilha([{
         nome: "Socios",
-        linhas: [[clienteA.cnpj, null, { formula: '"Maria"', result: "Maria" }, null, null, null, null]],
+        linhas: [[clienteA.cliente.cnpj, null, { formula: '"Maria"', result: "Maria" }, null, null, null, null]],
       }]);
       return arquivo;
     }],
     ["coluna extra", "UNEXPECTED_COLUMN", async () => criarPlanilha([{
       nome: "Socios",
-      linhas: [[clienteA.cnpj, null, "Maria", null, null, null, null, "inesperado"]],
+      linhas: [[clienteA.cliente.cnpj, null, "Maria", null, null, null, null, "inesperado"]],
     }])],
     ["aba extra", "UNEXPECTED_SHEET", async () => criarPlanilha([
-      { nome: "Socios", linhas: [[clienteA.cnpj, null, "Maria", null, null, null, null]] },
+      { nome: "Socios", linhas: [[clienteA.cliente.cnpj, null, "Maria", null, null, null, null]] },
       { nome: "Oculta", cabecalhos: ["x"], linhas: [["y"]] },
     ])],
     ["cabeçalho alterado", "INVALID_HEADER", async () => criarPlanilha([{
       nome: "Socios",
       cabecalhos: ["cnpj", "razaoSocial", "apelido"],
-      linhas: [[clienteA.cnpj, null, "Maria"]],
+      linhas: [[clienteA.cliente.cnpj, null, "Maria"]],
     }])],
   ])("bloqueia %s", async (_cenario, codigo, montar) => {
     const arquivo = await montar();
@@ -285,35 +288,43 @@ describe("confirmação transacional", () => {
   it("bloqueia clienteId adulterado antes de qualquer gravação", async () => {
     const tx = criarTx();
     tx.usuarios.findUnique.mockResolvedValue({ role: "Admin", status: "ATIVO" });
-    tx.clientes.findMany.mockResolvedValue([clienteA]);
+    tx.clienteServico.findMany.mockResolvedValue([clienteA]);
     prismaMock.$transaction.mockImplementation(async (callback) => callback(tx));
 
     await expect(salvarImportacao([{ ...linhaSocio, clienteId: 999 }], 7))
       .rejects.toMatchObject({ code: "INVALID_CLIENT_TARGET" });
-    expect(tx.socios.createMany).not.toHaveBeenCalled();
+    expect(tx.pessoa.upsert).not.toHaveBeenCalled();
     expect(tx.auditoria.create).not.toHaveBeenCalled();
   });
 
   it("salva sócios, CS e feedbacks juntos e audita o resumo", async () => {
     const tx = criarTx();
     tx.usuarios.findUnique.mockResolvedValue({ role: "Admin", status: "ATIVO" });
-    tx.clientes.findMany.mockResolvedValue([clienteA]);
-    tx.socios.createMany.mockResolvedValue({ count: 1 });
-    tx.log_cs.createMany.mockResolvedValue({ count: 1 });
-    tx.logFeedback.createMany.mockResolvedValue({ count: 1 });
+    tx.clienteServico.findMany.mockResolvedValue([clienteA]);
+    tx.pessoa.upsert.mockResolvedValue({ id: 900 });
+    tx.pessoaClienteVinculo.upsert.mockResolvedValue({ pessoaId: 900, clienteId: clienteA.clienteId });
+    tx.clienteServicoLogCs.createMany.mockResolvedValue({ count: 1 });
+    tx.clienteServicoLogFeedback.createMany.mockResolvedValue({ count: 1 });
     tx.auditoria.create.mockResolvedValue({ id: 1 });
     prismaMock.$transaction.mockImplementation(async (callback) => callback(tx));
 
     const resumo = await salvarImportacao([linhaSocio, linhaCs, linhaFeedback], 7);
 
-    expect(tx.socios.createMany).toHaveBeenCalledWith({
-      data: [expect.objectContaining({ clienteId: 10, nome: "Maria da Silva" })],
+    expect(tx.pessoa.upsert).toHaveBeenCalledWith({
+      where: { celular: "0011999999999" },
+      update: { nome: "Maria da Silva" },
+      create: expect.objectContaining({ celular: "0011999999999", nome: "Maria da Silva" }),
     });
-    expect(tx.log_cs.createMany).toHaveBeenCalledWith({
-      data: [expect.objectContaining({ clienteId: 10, colaborador: "Ana" })],
+    expect(tx.pessoaClienteVinculo.upsert).toHaveBeenCalledWith({
+      where: { pessoaId_clienteId: { pessoaId: 900, clienteId: clienteA.clienteId } },
+      update: { vinculo: "Administradora" },
+      create: { pessoaId: 900, clienteId: clienteA.clienteId, vinculo: "Administradora" },
     });
-    expect(tx.logFeedback.createMany).toHaveBeenCalledWith({
-      data: [expect.objectContaining({ clienteId: 10, colaborador: "Carlos" })],
+    expect(tx.clienteServicoLogCs.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ clienteServicoId: 10, colaborador: "Ana" })],
+    });
+    expect(tx.clienteServicoLogFeedback.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ clienteServicoId: 10, colaborador: "Carlos" })],
     });
     expect(tx.auditoria.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ userId: 7, acao: "IMPORTAR_CS_NPS_SALVO" }),
@@ -332,8 +343,8 @@ describe("confirmação transacional", () => {
   it("propaga a falha da transação e não tenta auditar sucesso", async () => {
     const tx = criarTx();
     tx.usuarios.findUnique.mockResolvedValue({ role: "CEO", status: "ATIVO" });
-    tx.clientes.findMany.mockResolvedValue([clienteA]);
-    tx.log_cs.createMany.mockRejectedValue(new Error("banco indisponível"));
+    tx.clienteServico.findMany.mockResolvedValue([clienteA]);
+    tx.clienteServicoLogCs.createMany.mockRejectedValue(new Error("banco indisponível"));
     prismaMock.$transaction.mockImplementation(async (callback) => callback(tx));
 
     await expect(salvarImportacao([linhaCs], 7)).rejects.toThrow("banco indisponível");
@@ -348,7 +359,7 @@ describe("confirmação transacional", () => {
     await expect(salvarImportacao([linhaSocio], 7)).rejects.toEqual(
       expect.objectContaining<Partial<ErroImportacao>>({ code: "AUTHORIZATION_CHANGED" }),
     );
-    expect(tx.clientes.findMany).not.toHaveBeenCalled();
+    expect(tx.clienteServico.findMany).not.toHaveBeenCalled();
   });
 });
 

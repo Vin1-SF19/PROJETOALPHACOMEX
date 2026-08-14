@@ -71,7 +71,7 @@ export function PainelCamposEtapaAtual({
   const resumoAlinhamento = camposEtapaBase.find((campo) => campoEhResumoAlinhamento(campo.nome));
   const alertaAlinhamento = etapaEhAlinhamentoEstrategico(card.etapa.nome)
     && Boolean(resumoAlinhamento)
-    && !(valoresCamposAtuais[resumoAlinhamento.id] ?? "").trim();
+    && !(valoresCamposAtuais[resumoAlinhamento?.id ?? ""] ?? "").trim();
   const camposAtuaisAlterados = camposAtuaisVisiveis.some(
     (campo) => (valoresCamposAtuais[campo.id] ?? "") !== (baseCamposAtuais[campo.id] ?? ""),
   );

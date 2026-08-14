@@ -62,7 +62,10 @@ import {
   type ConfiguracaoLost,
 } from "@/lib/bpm/lost";
 import { obterErroTransicaoMonitoramento } from "@/lib/bpm/monitoramento";
-import { obterErroCamposAlinhamentoParaSaida } from "@/lib/bpm/alinhamento-estrategico";
+import {
+  etapaEhAlinhamentoEstrategico,
+  obterErroCamposAlinhamentoParaSaida,
+} from "@/lib/bpm/alinhamento-estrategico";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -980,7 +983,9 @@ async function carregarCamposOrigemParaGuard(params: {
   cardId: string;
   pipelineId: string;
   etapaOrigemId: string;
+  etapaOrigemNome: string;
 }, client: Parameters<typeof carregarCamposAplicaveisCardEtapa>[3] = db) {
+  if (!etapaEhAlinhamentoEstrategico(params.etapaOrigemNome)) return [];
   return carregarCamposAplicaveisCardEtapa(
     params.cardId,
     params.pipelineId,
@@ -1052,6 +1057,7 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       cardId,
       pipelineId: card.pipelineId,
       etapaOrigemId: card.etapaId,
+      etapaOrigemNome: card.etapa.nome,
     });
     const campos = await carregarCamposTransicao({
       cardId,
@@ -1172,6 +1178,7 @@ async function executarMovimentoComRequisitos(
     cardId,
     pipelineId: card.pipelineId,
     etapaOrigemId: card.etapaId,
+    etapaOrigemNome: card.etapa.nome,
   });
   const guardas = await carregarGuardasNativasMovimento({
     cardId,
@@ -1265,6 +1272,7 @@ async function executarMovimentoComRequisitos(
       cardId,
       pipelineId: cardAtual.pipelineId,
       etapaOrigemId: cardAtual.etapaId,
+      etapaOrigemNome: cardAtual.etapa.nome,
     }, tx);
     const guardasAtuais = await carregarGuardasNativasMovimento({
       cardId,

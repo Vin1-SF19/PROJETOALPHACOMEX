@@ -9,9 +9,13 @@ export interface IdentificadorEmpresaImportacao {
   razaoSocial: string | null;
 }
 
+// Fase 3.6 do Cliente Master (2026-08-14): `clienteId` aqui é o id de `ClienteServico`
+// (o serviço contratado específico, antes era `clientes.id`) — nome mantido por
+// compatibilidade de contrato com o resto do fluxo de importação (payload salvo,
+// telas de revisão), mas semanticamente é sempre `ClienteServico.id`.
 export interface CandidatoEmpresaImportacao {
   clienteId: number;
-  cnpj: string;
+  cnpj: string | null;
   razaoSocial: string;
   servico: string | null;
   status: string;
@@ -77,7 +81,7 @@ export interface LinhaSalvarImportacao {
 
 export interface ResumoEmpresaImportacao {
   clienteId: number;
-  cnpj: string;
+  cnpj: string | null;
   razaoSocial: string;
   servico: string | null;
   status: string;

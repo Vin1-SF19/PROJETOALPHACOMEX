@@ -287,7 +287,7 @@ export default function CadastroCliente() {
                                                     </span>
                                                     {temMultiplosServicos && (
                                                         <span
-                                                            title={grupo.servicos.map((s: ClienteCS) => s.servicos).filter(Boolean).join(" • ")}
+                                                            title={grupo.servicos.map((s: ClienteCS) => s.servico).filter(Boolean).join(" • ")}
                                                             className="w-fit flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-black uppercase tracking-widest"
                                                         >
                                                             <Layers size={10} /> {grupo.servicos.length} serviços
@@ -346,8 +346,8 @@ export default function CadastroCliente() {
                                             {/* ÚLTIMO CS */}
                                             <td className="px-6 py-4 text-center">
                                                 <span className="text-[11px] font-mono text-slate-400">
-                                                    {c.log_cs && c.log_cs.length > 0 ? (() => {
-                                                        const datas = c.log_cs.map((l: any) => new Date(l.data_registro || l.dataRegistro).getTime());
+                                                    {c.logCs && c.logCs.length > 0 ? (() => {
+                                                        const datas = c.logCs.map((l: any) => new Date(l.data_registro || l.dataRegistro).getTime());
                                                         const ultimaData = new Date(Math.max(...datas));
                                                         return fmtDate(ultimaData);
                                                     })() : "---"}

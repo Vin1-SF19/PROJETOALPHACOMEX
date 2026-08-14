@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { z } from "zod";
 import crypto from "crypto";
+import {
+  cadastrarClienteSchema,
+  socioSchema,
+  logRegistroSchema,
+  alteracoesClienteSchema,
+  alteracoesServicoSchema,
+} from "@/lib/validations/cs-nps";
 
 async function getColaboradorNome(): Promise<string> {
   const session = await auth();
@@ -12,10 +19,10 @@ async function getColaboradorNome(): Promise<string> {
 }
 
 /**
- * Resolve o usuário da sessão atual para o novo sistema de histórico
- * (`HistoricoAlteracaoCliente`), que precisa de um `userId` real (FK para
- * `usuarios`) além do nome. `session.user.id` é `string` na sessão
- * (Next-Auth v5 / JWT) — convertido para `Number` para bater com
+ * Resolve o usuário da sessão atual para o sistema de histórico
+ * (`HistoricoAlteracaoCliente`/`ClienteServicoHistorico`), que precisa de um
+ * `userId` real (FK para `usuarios`) além do nome. `session.user.id` é `string` na
+ * sessão (Next-Auth v5 / JWT) — convertido para `Number` para bater com
  * `usuarios.id Int`. Se a sessão estiver ausente ou o id não for um número
  * válido, retorna `userId: null` (o model aceita, com `onDelete: SetNull`).
  */
@@ -29,23 +36,17 @@ async function getUsuarioSessao(): Promise<{ userId: number | null; nome: string
 }
 
 /**
- * Monta as linhas de `HistoricoAlteracaoCliente` prontas para `createMany`,
- * comparando `estadoAnterior` com `dadosNovos` campo a campo. Só gera 1 linha
- * para campos que realmente mudaram — comparação normalizada
- * (`String(a ?? "").trim() === String(b ?? "").trim()`) para não poluir o
- * histórico com falsos positivos de tipo (`null` vs `""` vs `undefined`),
- * mesmo padrão já usado em `modalLogAuditoria.tsx`.
+ * Compara `estadoAnterior` com `dadosNovos` campo a campo e retorna só os que
+ * realmente mudaram — comparação normalizada (`String(a ?? "").trim() ===
+ * String(b ?? "").trim()`) para não poluir o histórico com falsos positivos
+ * de tipo (`null` vs `""` vs `undefined`).
  */
-function montarLinhasHistorico(params: {
-  clienteId: number;
-  loteId: string;
+function camposAlterados(params: {
   estadoAnterior: Record<string, unknown>;
   dadosNovos: Record<string, unknown>;
-  userId: number | null;
-  nomeUsuarioNaEpoca: string;
   campos: string[];
 }) {
-  const { clienteId, loteId, estadoAnterior, dadosNovos, userId, nomeUsuarioNaEpoca, campos } = params;
+  const { estadoAnterior, dadosNovos, campos } = params;
 
   return campos
     .filter((campo) => {
@@ -54,8 +55,6 @@ function montarLinhasHistorico(params: {
       return anterior !== novo;
     })
     .map((campo) => ({
-      loteId,
-      clienteId,
       campo,
       valorAnterior: estadoAnterior[campo] === null || estadoAnterior[campo] === undefined
         ? null
@@ -63,28 +62,69 @@ function montarLinhasHistorico(params: {
       valorNovo: dadosNovos[campo] === null || dadosNovos[campo] === undefined
         ? null
         : String(dadosNovos[campo]),
-      userId,
-      nomeUsuarioNaEpoca,
-      acao: "EDICAO" as const,
     }));
 }
 
-/** Campos do cliente rastreados pelo histórico de alterações do CS&NPS. */
+/** Monta linhas de `HistoricoAlteracaoCliente` (cadastral) prontas para `createMany`. */
+function montarLinhasHistoricoCliente(params: {
+  clienteId: number;
+  loteId: string;
+  estadoAnterior: Record<string, unknown>;
+  dadosNovos: Record<string, unknown>;
+  userId: number | null;
+  nomeUsuarioNaEpoca: string;
+  campos: string[];
+}) {
+  const { clienteId, loteId, userId, nomeUsuarioNaEpoca } = params;
+  return camposAlterados(params).map((alteracao) => ({
+    ...alteracao,
+    clienteId,
+    loteId,
+    userId,
+    nomeUsuarioNaEpoca,
+    acao: "EDICAO" as const,
+  }));
+}
+
+/** Monta linhas de `ClienteServicoHistorico` (negócio) prontas para `createMany`. */
+function montarLinhasHistoricoServico(params: {
+  clienteServicoId: number;
+  loteId: string;
+  estadoAnterior: Record<string, unknown>;
+  dadosNovos: Record<string, unknown>;
+  userId: number | null;
+  nomeUsuarioNaEpoca: string;
+  campos: string[];
+}) {
+  const { clienteServicoId, loteId, userId, nomeUsuarioNaEpoca } = params;
+  return camposAlterados(params).map((alteracao) => ({
+    ...alteracao,
+    clienteServicoId,
+    loteId,
+    userId,
+    nomeUsuarioNaEpoca,
+    acao: "EDICAO" as const,
+  }));
+}
+
+/** Campos de `Cliente` (cadastral) rastreados pelo histórico de alterações. */
 const CAMPOS_HISTORICO_CLIENTE = [
-  "analistaResponsavel",
-  "dataContratacao",
-  "status",
-  "nps",
-  "feedbackGoogle",
-  "nomeGoogle",
-  "cnpj",
   "razaoSocial",
   "nomeFantasia",
   "dataConstituicao",
   "regimeTributario",
   "uf",
   "municipio",
-  "servicos",
+] as const;
+
+/** Campos de `ClienteServico` (negócio) rastreados pelo histórico de alterações. */
+const CAMPOS_HISTORICO_SERVICO = [
+  "analistaResponsavel",
+  "dataContratacao",
+  "status",
+  "nps",
+  "feedbackGoogle",
+  "nomeGoogle",
   "embasamento",
   "origemLead",
   "dataExito",
@@ -106,25 +146,24 @@ export async function buscarUsuariosPorRole(roles: string[]): Promise<{ id: numb
       orderBy: { nome: "asc" },
     });
     return usuarios;
-  } catch (error: any) {
-    console.error("ERRO buscarUsuariosPorRole:", error?.message ?? error);
+  } catch (error) {
+    console.error("ERRO buscarUsuariosPorRole:", error);
     return [];
   }
 }
 
 /**
  * Verifica se o CNPJ já existe na base (qualquer serviço) — usada como aviso
- * informativo na consulta de CNPJ (Receita Federal), ANTES do usuário escolher
- * o serviço. Não bloqueia o cadastro: o mesmo CNPJ pode ter múltiplos serviços
- * contratados em registros separados. O bloqueio real de duplicidade exata
- * (mesmo CNPJ + mesmo serviço) acontece em `CadastrarCliente`, via constraint
- * composta `@@unique([cnpj, servicos])` do banco.
+ * informativo na consulta de CNPJ, ANTES do usuário escolher o serviço. Não
+ * bloqueia o cadastro: o mesmo Cliente pode ter múltiplos ClienteServico. O
+ * bloqueio real de duplicidade exata (mesmo Cliente + mesmo serviço) acontece
+ * em `CadastrarCliente`, via constraint composta `@@unique([clienteId, servico])`.
  */
 export async function verificarCNPJDuplicado(cnpj: string): Promise<{ existe: boolean; razaoSocial?: string }> {
-  const cnpjLimpo = cnpj.replace(/\D/g, "");
+  const cnpjNormalizado = cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   try {
-    const cliente = await db.clientes.findFirst({
-      where: { cnpj: cnpjLimpo },
+    const cliente = await db.cliente.findUnique({
+      where: { cnpj: cnpjNormalizado },
       select: { razaoSocial: true },
     });
     return { existe: !!cliente, razaoSocial: cliente?.razaoSocial };
@@ -133,59 +172,126 @@ export async function verificarCNPJDuplicado(cnpj: string): Promise<{ existe: bo
   }
 }
 
-export async function CadastrarCliente(dados: any, socios: any[]) {
+/**
+ * Resolve o `Cliente` master a partir do CNPJ — busca OU CRIA (mesmo padrão de
+ * `resolverClienteDoContrato` em `ContratoComercial.ts`: o BPM ainda não é a
+ * porta de entrada real de Cliente novo, bloquear quebraria o cadastro manual
+ * do time de CS&NPS).
+ */
+async function resolverClienteCsNps(dados: {
+  cnpj: string;
+  razaoSocial: string;
+  nomeFantasia?: string;
+  dataConstituicao?: string;
+  uf?: string;
+  municipio?: string;
+  regimeTributario?: string;
+}): Promise<{ success: true; clienteId: number } | { success: false; error: string }> {
+  const cnpjNormalizado = dados.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const existente = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
+  if (existente) return { success: true, clienteId: existente.id };
+
   try {
-    const res = await db.clientes.create({
+    const novo = await db.cliente.create({
       data: {
-        cnpj: dados.cnpj.replace(/\D/g, ""),
-        razaoSocial: dados.razaoSocial || "",
-        nomeFantasia: dados.nomeFantasia || "",
-        dataConstituicao: dados.dataConstituicao || "",
-        uf: dados.uf || "",
+        cnpj: cnpjNormalizado,
+        razaoSocial: dados.razaoSocial,
+        nomeFantasia: dados.nomeFantasia || null,
+        dataConstituicao: dados.dataConstituicao || null,
+        uf: dados.uf || null,
         municipio: dados.municipio || null,
-        regimeTributario: dados.regimeTributario || "",
-        servicos: Array.isArray(dados.servicos) ? dados.servicos.join(", ") : dados.servicos,
-        analistaResponsavel: dados.analistaResponsavel || "",
-        embasamento: dados.embasamento || null,
-        origemLead: dados.origemLead || null,
-        dataContratacao: dados.dataContratacao ? new Date(dados.dataContratacao).toISOString() : null,
-        dataExito: null,
-        formaPagamento: dados.formaPagamento || null,
-        valorContrato: dados.valorContrato ? Number(dados.valorContrato) : null,
-        closerNome: dados.closerNome || null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        socios: {
-          create: socios.map(s => ({
-            nome: s.nome,
-            telefone: s.telefone || "",
-            obs: s.obs || "",
-            dataNascimento: s.dataNascimento || "",
-            vinculo: s.vinculo
-          }))
-        }
+        regimeTributario: dados.regimeTributario || null,
+      },
+      select: { id: true },
+    });
+    return { success: true, clienteId: novo.id };
+  } catch (err) {
+    const fallback = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
+    if (fallback) return { success: true, clienteId: fallback.id };
+    console.error("resolverClienteCsNps:", err);
+    return { success: false, error: "Erro ao identificar a empresa" };
+  }
+}
+
+export async function CadastrarCliente(dados: unknown, socios: unknown[]) {
+  try {
+    const parsed = cadastrarClienteSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+    }
+    const sociosValidados = z.array(socioSchema).safeParse(socios.filter((s) => (s as { nome?: string })?.nome?.trim()));
+    if (!sociosValidados.success) {
+      return { success: false, error: sociosValidados.error.issues[0]?.message ?? "Sócio inválido" };
+    }
+
+    const d = parsed.data;
+    const clienteResolvido = await resolverClienteCsNps(d);
+    if (!clienteResolvido.success) return clienteResolvido;
+
+    // Resolve/cria Pessoa por celular (reaproveita se já existe — mesmo padrão de
+    // sincronizarRepresentantesParceiro em parceiros.ts) + PessoaClienteVinculo.
+    const clienteServico = await db.$transaction(async (tx) => {
+      const servico = await tx.clienteServico.create({
+        data: {
+          clienteId: clienteResolvido.clienteId,
+          servico: d.servico,
+          analistaResponsavel: d.analistaResponsavel || "",
+          embasamento: d.embasamento || null,
+          origemLead: d.origemLead || null,
+          dataContratacao: d.dataContratacao || null,
+          dataExito: null,
+          formaPagamento: d.formaPagamento || null,
+          valorContrato: d.valorContrato ?? null,
+          closerNome: d.closerNome || null,
+        },
+      });
+
+      for (const socio of sociosValidados.data) {
+        const pessoa = await tx.pessoa.upsert({
+          where: { celular: socio.telefone },
+          update: { nome: socio.nome },
+          create: {
+            celular: socio.telefone,
+            nome: socio.nome,
+            dataNascimento: socio.dataNascimento || null,
+          },
+        });
+        await tx.pessoaClienteVinculo.upsert({
+          where: { pessoaId_clienteId: { pessoaId: pessoa.id, clienteId: clienteResolvido.clienteId } },
+          update: { vinculo: socio.vinculo },
+          create: {
+            pessoaId: pessoa.id,
+            clienteId: clienteResolvido.clienteId,
+            vinculo: socio.vinculo,
+          },
+        });
       }
+
+      return servico;
     });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
-    return { success: true };
-  } catch (error: any) {
-    console.error("ERRO CADASTRO:", error.message);
-    if (error.code === 'P2002') return { success: false, error: "Este CNPJ já possui esse serviço contratado!" };
+    return { success: true, clienteServicoId: clienteServico.id };
+  } catch (error) {
+    const err = error as { code?: string; message?: string };
+    console.error("ERRO CADASTRO:", err.message);
+    if (err.code === "P2002") return { success: false, error: "Este CNPJ já possui esse serviço contratado!" };
     return { success: false, error: "Erro na base de dados. Verifique os campos." };
   }
 }
 
 
 /**
- * Cria o registro correspondente em `clientes` (CS&NPS) quando um contrato é
- * fechado no Painel de Metas — decisão tomada em 2026-07-13 (ver decisions.md)
- * para eliminar a lacuna onde um serviço novo cadastrado só no Metas nunca
- * aparecia no CS&NPS (a mesclagem por CNPJ só junta registros que já existem
- * em `clientes`, nunca cria nada novo sozinha).
+ * Cria o `ClienteServico` correspondente quando um contrato é fechado no
+ * Painel de Metas — decisão tomada em 2026-07-13 (ver decisions.md) para
+ * eliminar a lacuna onde um serviço novo cadastrado só no Metas nunca aparecia
+ * no CS&NPS. Fase 3.6 do Cliente Master (2026-08-14): `Cliente` já vem
+ * resolvido pelo chamador (`clienteId`, do `ContratoComercial.clienteId`) —
+ * esta função só cuida do `ClienteServico` (o serviço em si), nunca criou
+ * `Cliente`, isso não muda.
  *
- * Checa primeiro (via `findFirst`, não reagindo a erro de constraint) se já
- * existe um registro com esse cnpj+serviço:
+ * Checa primeiro (via `findUnique`, não reagindo a erro de constraint) se já
+ * existe um `ClienteServico` com esse clienteId+serviço:
  * - Não existe → cria (`criado: true`).
  * - Existe e está "Arquivado" → REATIVA (volta pra "Em Andamento"), porque um
  *   registro arquivado é invisível na listagem do CS&NPS (`buscarClientes`
@@ -202,157 +308,130 @@ export async function CadastrarCliente(dados: any, socios: any[]) {
  * embasamento, origemLead) ficam com o mesmo default do cadastro manual —
  * o time de CS completa depois, mesmo fluxo de sempre para clientes novos.
  */
-interface SocioParaSincronizacao {
-  nome: string;
-  telefone?: string | null;
-  dataNascimento?: string | null;
-  vinculo?: string | null;
-  obs?: string | null;
-}
-
 interface DadosContratoParaSincronizacao {
-  cnpj: string;
-  razaoSocial: string;
+  clienteId: number;
   servico: string;
-  nomeFantasia?: string | null;
-  dataConstituicao?: string | null;
-  regimeTributario?: string | null;
-  uf?: string | null;
-  municipio?: string | null;
   dataContratacao?: string | null;
-  socios?: SocioParaSincronizacao[];
 }
 
 export async function criarRegistroClienteAPartirDeContrato(
   dados: DadosContratoParaSincronizacao
-): Promise<{ success: true; criado: boolean; reativado?: boolean; clienteId: number }> {
-  const cnpjLimpo = dados.cnpj.replace(/\D/g, "");
-
+): Promise<{ success: true; criado: boolean; reativado?: boolean; clienteServicoId: number }> {
   try {
-    const existente = await db.clientes.findFirst({
-      where: { cnpj: cnpjLimpo, servicos: dados.servico },
-      select: { id: true, status: true, nomeFantasia: true, dataConstituicao: true, regimeTributario: true, uf: true, municipio: true, dataContratacao: true },
+    const existente = await db.clienteServico.findUnique({
+      where: { clienteId_servico: { clienteId: dados.clienteId, servico: dados.servico } },
+      select: { id: true, status: true, dataContratacao: true },
     });
 
     if (existente) {
       if (existente.status === "Arquivado") {
-        // Dados fiscais (objetivos, vindos da Receita Federal) são atualizados na
-        // reativação — mas nunca sobrescrevem um valor já preenchido com um novo
-        // valor vazio (não perder dado bom por um cadastro incompleto).
-        await db.clientes.update({
+        await db.clienteServico.update({
           where: { id: existente.id },
           data: {
             status: "Em Andamento",
-            nomeFantasia: dados.nomeFantasia || existente.nomeFantasia,
-            dataConstituicao: dados.dataConstituicao || existente.dataConstituicao,
-            regimeTributario: dados.regimeTributario || existente.regimeTributario,
-            uf: dados.uf || existente.uf,
-            municipio: dados.municipio || existente.municipio,
             dataContratacao: dados.dataContratacao || existente.dataContratacao,
-            updatedAt: new Date().toISOString(),
           },
         });
         revalidatePath("/PainelAlpha/CadastroClientes");
-        return { success: true, criado: false, reativado: true, clienteId: existente.id };
+        return { success: true, criado: false, reativado: true, clienteServicoId: existente.id };
       }
       // Já existe e está ativo — idempotente, não sobrescreve nada.
-      return { success: true, criado: false, clienteId: existente.id };
+      return { success: true, criado: false, clienteServicoId: existente.id };
     }
 
-    const sociosComNome = (dados.socios ?? []).filter((s) => s.nome?.trim());
-
-    const novoCliente = await db.clientes.create({
+    const novoServico = await db.clienteServico.create({
       data: {
-        cnpj: cnpjLimpo,
-        razaoSocial: dados.razaoSocial || "",
-        nomeFantasia: dados.nomeFantasia || null,
-        dataConstituicao: dados.dataConstituicao || null,
-        regimeTributario: dados.regimeTributario || null,
-        uf: dados.uf || null,
-        municipio: dados.municipio || null,
-        servicos: dados.servico,
+        clienteId: dados.clienteId,
+        servico: dados.servico,
         analistaResponsavel: "",
         embasamento: null,
         origemLead: null,
         dataContratacao: dados.dataContratacao || null,
         dataExito: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        socios: {
-          create: sociosComNome.map((s) => ({
-            nome: s.nome,
-            telefone: s.telefone || "",
-            obs: s.obs || "",
-            dataNascimento: s.dataNascimento || "",
-            vinculo: s.vinculo || "",
-          })),
-        },
       },
     });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
-    return { success: true, criado: true, clienteId: novoCliente.id };
-  } catch (error: any) {
-    // Qualquer erro (incluindo P2002 em corrida rara entre o findFirst e o create)
+    return { success: true, criado: true, clienteServicoId: novoServico.id };
+  } catch (error) {
+    // Qualquer erro (incluindo P2002 em corrida rara entre o findUnique e o create)
     // é logado, mas NUNCA deve derrubar a criação do contrato no Metas.
-    console.error("ERRO criarRegistroClienteAPartirDeContrato:", error?.message ?? error);
-    // Sem clienteId confiável nesse caminho de erro — resolve o registro de novo por cnpj+serviço
-    // como melhor esforço (pode retornar null se nem isso funcionar, tratado pelo chamador).
-    const fallback = await db.clientes.findFirst({
-      where: { cnpj: cnpjLimpo, servicos: dados.servico },
+    console.error("ERRO criarRegistroClienteAPartirDeContrato:", error);
+    // Sem clienteServicoId confiável nesse caminho de erro — resolve de novo por
+    // clienteId+serviço como melhor esforço (pode retornar 0 se nem isso funcionar).
+    const fallback = await db.clienteServico.findUnique({
+      where: { clienteId_servico: { clienteId: dados.clienteId, servico: dados.servico } },
       select: { id: true },
     }).catch(() => null);
-    return { success: true, criado: false, clienteId: fallback?.id ?? 0 };
+    return { success: true, criado: false, clienteServicoId: fallback?.id ?? 0 };
   }
 }
 
+const SELECT_CLIENTE_CS_NPS = {
+  cnpj: true,
+  razaoSocial: true,
+  nomeFantasia: true,
+  dataConstituicao: true,
+  uf: true,
+  municipio: true,
+  regimeTributario: true,
+  historicoAlteracoes: { orderBy: { criadoEm: "desc" as const } },
+  pessoas: {
+    where: { ativo: true },
+    include: { pessoa: true },
+  },
+  indicacao: {
+    where: { status: "ATIVA" as const },
+    include: { parceiro: { select: { id: true, nome: true, nivel: true } } },
+  },
+} as const;
+
+/**
+ * Lista os serviços (CS&NPS) não arquivados, achatando `ClienteServico` +
+ * `Cliente` no shape que a UI já esperava (padrão "achatar" já usado em
+ * Extratos/BPM/Operacional/ContratoComercial). `socios` (agora `Pessoa` via
+ * `PessoaClienteVinculo`) e `log_cs`/`logFeedback` (agora `ClienteServicoLogCs`/
+ * `ClienteServicoLogFeedback`) são achatados no mesmo shape de campo solto que
+ * a UI antiga usava.
+ */
 export async function buscarClientes() {
   try {
-    const lista = await db.clientes.findMany({
-      where: {
-        status: {
-          not: "Arquivado"
-        }
-      },
+    const registros = await db.clienteServico.findMany({
+      where: { status: { not: "Arquivado" } },
       include: {
-        socios: true,
-        log_cs: {
-          orderBy: { dataRegistro: 'desc' },
-        },
-        logFeedback: {
-          orderBy: { dataRegistro: 'desc' },
-        },
-        historicoAlteracoes: {
-          orderBy: { criadoEm: 'desc' },
-        },
+        cliente: { select: SELECT_CLIENTE_CS_NPS },
+        logCs: { orderBy: { dataRegistro: "desc" } },
+        logFeedback: { orderBy: { dataRegistro: "desc" } },
+        historicoAlteracoes: { orderBy: { criadoEm: "desc" } },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
 
-    // `indicacao` (empresa ↔ parceiro) migrou para o Cliente Master (`Cliente`, Fase 3.1
-    // do plano de unificação) — `clientes` (legado, CS&NPS) não tem mais essa relação
-    // direta. Resolve por CNPJ normalizado, mesma ponte usada em outros pontos da Fase 3.1.
-    const cnpjs = [...new Set(lista.map((c) => c.cnpj?.replace(/\D/g, "").toUpperCase()).filter((c): c is string => !!c))];
-    const clientesMaster = cnpjs.length
-      ? await db.cliente.findMany({
-          where: { cnpj: { in: cnpjs } },
-          select: {
-            cnpj: true,
-            indicacao: {
-              where: { status: "ATIVA" },
-              include: { parceiro: { select: { id: true, nome: true, nivel: true } } },
-            },
-          },
-        })
-      : [];
-    const indicacaoPorCnpj = new Map(clientesMaster.map((c) => [c.cnpj, c.indicacao]));
-
-    return lista.map((c) => ({
-      ...c,
-      indicacao: indicacaoPorCnpj.get(c.cnpj?.replace(/\D/g, "").toUpperCase() ?? "") ?? null,
-    }));
-  } catch (error: any) {
-    console.error("ERRO DO PRISMA buscarClientes:", error?.message ?? error);
+    return registros.map((r) => {
+      const { cliente, ...resto } = r;
+      const { historicoAlteracoes: historicoCliente, pessoas, indicacao, ...clienteDados } = cliente;
+      return {
+        ...resto,
+        ...clienteDados,
+        socios: pessoas.map((v) => ({
+          id: v.pessoa.id,
+          nome: v.pessoa.nome,
+          telefone: v.pessoa.celular,
+          obs: v.pessoa.observacao,
+          dataNascimento: v.pessoa.dataNascimento,
+          vinculo: v.vinculo,
+          clienteId: v.clienteId,
+        })),
+        // Histórico exibido é o do SERVIÇO (negócio) + o do CLIENTE (cadastral), mesclados
+        // e ordenados por data — reflete a decisão do usuário 2026-08-14 (2 históricos
+        // separados por natureza, mas exibidos juntos na timeline por conveniência).
+        historicoAlteracoes: [...resto.historicoAlteracoes, ...historicoCliente]
+          .sort((a, b) => b.criadoEm.getTime() - a.criadoEm.getTime()),
+        indicacao,
+      };
+    });
+  } catch (error) {
+    console.error("ERRO DO PRISMA buscarClientes:", error);
     throw error;
   }
 }
@@ -373,12 +452,9 @@ function normalizarNomeServico(texto: string): string {
  * mais recente primeiro. Um mesmo CNPJ pode ter vários contratos (serviços
  * diferentes vendidos em momentos diferentes) — no Comercial eles continuam
  * como linhas separadas; aqui mesclamos só para exibição no card do CS&NPS.
- * Casamento por CNPJ normalizado (só dígitos), pois os dois lados podem salvar
- * o CNPJ com/sem máscara.
+ * Casamento por CNPJ normalizado (`Cliente.cnpj`, já sem máscara).
  */
 export async function buscarServicosContratados(cnpj: string) {
-  // Fase 3.6 do Cliente Master (2026-08-14): ContratoComercial não tem mais `cnpj`
-  // próprio — filtra por `cliente.cnpj` normalizado (mesmo padrão das demais fases).
   const cnpjNormalizado = cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   if (!cnpjNormalizado) return [];
 
@@ -397,24 +473,24 @@ export async function buscarServicosContratados(cnpj: string) {
     });
 
     return contratos;
-  } catch (error: any) {
-    console.error("ERRO buscarServicosContratados:", error?.message ?? error);
+  } catch (error) {
+    console.error("ERRO buscarServicosContratados:", error);
     return [];
   }
 }
 
 /**
  * Igual a `buscarServicosContratados`, mas casa também pelo nome do serviço —
- * usada quando o CS&NPS tem múltiplos registros de `clientes` para o mesmo
- * CNPJ (um por serviço contratado) e precisa ligar CADA registro ao seu
- * contrato correspondente no Painel de Metas, não a todos os contratos do
- * CNPJ de uma vez. Normaliza acentuação/caixa dos dois lados antes de comparar
- * (ambos os campos são texto livre hoje, sem enum compartilhado).
+ * usada quando o CS&NPS tem múltiplos `ClienteServico` para o mesmo `Cliente`
+ * (um por serviço contratado) e precisa ligar CADA registro ao seu contrato
+ * correspondente no Painel de Metas, não a todos os contratos do CNPJ de uma
+ * vez. Normaliza acentuação/caixa dos dois lados antes de comparar (ambos os
+ * campos são texto livre hoje, sem enum compartilhado).
  */
-export async function buscarServicoContratadoPorCliente(cnpj: string, servicos: string | null) {
-  if (!servicos) return null;
+export async function buscarServicoContratadoPorCliente(cnpj: string, servico: string | null) {
+  if (!servico) return null;
   const candidatos = await buscarServicosContratados(cnpj);
-  const alvo = normalizarNomeServico(servicos);
+  const alvo = normalizarNomeServico(servico);
 
   return (
     candidatos.find((c) => normalizarNomeServico(c.servico) === alvo) ??
@@ -439,19 +515,22 @@ function mensagemDoErro(error: unknown): string {
   return error instanceof Error ? error.message : "Erro inesperado";
 }
 
-export async function salvarLogCS(clienteId: number, dados: { sentimento: string, observacao: string, data_registro: string }) {
+export async function salvarLogCS(clienteServicoId: number, dados: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
+    const parsed = logRegistroSchema.safeParse(dados);
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+
     const colaborador = await getColaboradorNome();
-    const novoLog = await db.log_cs.create({
+    const novoLog = await db.clienteServicoLogCs.create({
       data: {
         colaborador,
-        sentimento: dados.sentimento,
-        observacao: dados.observacao,
-        clienteId,
-        dataRegistro: normalizarDataRegistro(dados.data_registro),
+        sentimento: parsed.data.sentimento,
+        observacao: parsed.data.observacao,
+        clienteServicoId,
+        dataRegistro: normalizarDataRegistro(parsed.data.data_registro),
       },
     });
 
@@ -464,42 +543,41 @@ export async function salvarLogCS(clienteId: number, dados: { sentimento: string
   }
 }
 
-export async function atualizarDadosGestao(clienteId: number, dados: any) {
+export async function atualizarDadosGestao(clienteServicoId: number, dados: { nps?: string | number; feedbackGoogle?: boolean; nomeGoogle?: string; status?: string }) {
   try {
-    await db.clientes.update({
-      where: { id: clienteId },
+    await db.clienteServico.update({
+      where: { id: clienteServicoId },
       data: {
-        nps: Number(dados.nps),
-        feedbackGoogle: Boolean(dados.feedbackGoogle),
+        nps: dados.nps !== undefined ? Number(dados.nps) : undefined,
+        feedbackGoogle: dados.feedbackGoogle,
         nomeGoogle: dados.nomeGoogle,
-        status: dados.status
+        status: dados.status,
       }
     });
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };
   } catch (error) {
+    console.error("ERRO atualizarDadosGestao:", error);
     return { success: false };
   }
 }
 
-export async function salvarLogFeedback(
-  clienteId: number,
-  dados: { sentimento?: string; observacao?: string; data_registro: string },
-) {
+export async function salvarLogFeedback(clienteServicoId: number, dados: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
+    const parsed = logRegistroSchema.safeParse(dados);
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+
     const colaborador = await getColaboradorNome();
-    const sentimento = dados.sentimento || "N/A";
-    const observacao = dados.observacao || "";
-    const novoLog = await db.logFeedback.create({
+    const novoLog = await db.clienteServicoLogFeedback.create({
       data: {
         colaborador,
-        sentimento,
-        observacao,
-        clienteId: Number(clienteId),
-        dataRegistro: normalizarDataRegistro(dados.data_registro),
+        sentimento: parsed.data.sentimento || "N/A",
+        observacao: parsed.data.observacao,
+        clienteServicoId: Number(clienteServicoId),
+        dataRegistro: normalizarDataRegistro(parsed.data.data_registro),
       },
     });
 
@@ -512,51 +590,33 @@ export async function salvarLogFeedback(
   }
 }
 
-export async function salvarAlteracoesGeral(clienteId: number, dadosNovos: any) {
+/**
+ * Salva os campos CADASTRAIS de `Cliente` (razão social, nome fantasia, UF,
+ * município, regime tributário, data de constituição) — CNPJ deliberadamente
+ * de fora: somente-leitura fora do BPM (Fase 3.6 do Cliente Master, decisão do
+ * usuário 2026-08-14, mesmo princípio já aplicado em Extratos/Operacional/
+ * ContratoComercial).
+ */
+export async function salvarAlteracoesCliente(clienteId: number, dadosNovos: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    const { userId, nome } = await getUsuarioSessao();
-    const estadoAnterior = await db.clientes.findUnique({ where: { id: clienteId } });
+    const parsed = alteracoesClienteSchema.safeParse(dadosNovos);
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
 
+    const { userId, nome } = await getUsuarioSessao();
+    const estadoAnterior = await db.cliente.findUnique({ where: { id: clienteId } });
     if (!estadoAnterior) return { success: false, error: "Cliente não encontrado" };
 
-    const dadosParaAtualizar = {
-      analistaResponsavel: dadosNovos.analistaResponsavel,
-      dataContratacao: dadosNovos.dataContratacao ? new Date(dadosNovos.dataContratacao).toISOString() : null,
-      status: dadosNovos.status,
-      nps: (dadosNovos.nps === "" || dadosNovos.nps === null) ? null : Number(dadosNovos.nps),
-      feedbackGoogle: dadosNovos.feedbackGoogle,
-      nomeGoogle: dadosNovos.nomeGoogle,
-      cnpj: dadosNovos.cnpj?.replace(/\D/g, ""),
-      razaoSocial: dadosNovos.razaoSocial,
-      nomeFantasia: dadosNovos.nomeFantasia,
-      dataConstituicao: dadosNovos.dataConstituicao,
-      regimeTributario: dadosNovos.regimeTributario,
-      uf: dadosNovos.uf,
-      municipio: dadosNovos.municipio,
-      servicos: Array.isArray(dadosNovos.servicos) ? dadosNovos.servicos.join(", ") : dadosNovos.servicos,
-      embasamento: dadosNovos.embasamento ?? null,
-      origemLead: dadosNovos.origemLead ?? null,
-      dataExito: dadosNovos.dataExito ? new Date(dadosNovos.dataExito).toISOString() : (dadosNovos.status === "Deferido" ? new Date().toISOString() : null),
-      formaPagamento: dadosNovos.formaPagamento,
-      valorContrato: dadosNovos.valorContrato === "" || dadosNovos.valorContrato === undefined ? undefined : (dadosNovos.valorContrato === null ? null : Number(dadosNovos.valorContrato)),
-      closerNome: dadosNovos.closerNome,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await db.clientes.update({
-      where: { id: clienteId },
-      data: dadosParaAtualizar,
-    });
+    await db.cliente.update({ where: { id: clienteId }, data: parsed.data });
 
     const loteId = crypto.randomUUID();
-    const linhasHistorico = montarLinhasHistorico({
+    const linhasHistorico = montarLinhasHistoricoCliente({
       clienteId,
       loteId,
       estadoAnterior,
-      dadosNovos: dadosParaAtualizar,
+      dadosNovos: parsed.data,
       userId,
       nomeUsuarioNaEpoca: nome,
       campos: [...CAMPOS_HISTORICO_CLIENTE],
@@ -568,139 +628,221 @@ export async function salvarAlteracoesGeral(clienteId: number, dadosNovos: any) 
 
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };
-  } catch (error: any) {
-    console.error("ERRO NO UPDATE:", error.message);
-    return { success: false, error: error.message };
+  } catch (error) {
+    console.error("ERRO salvarAlteracoesCliente:", error);
+    return { success: false, error: mensagemDoErro(error) };
+  }
+}
+
+/**
+ * Salva os campos de NEGÓCIO de `ClienteServico` (status, analista, datas,
+ * pagamento, NPS, feedback Google, etc). Fase 3.6 do Cliente Master — sucessora
+ * de `salvarAlteracoesGeral`, agora separada de `salvarAlteracoesCliente`
+ * porque os dois passaram a ser entidades (e históricos) diferentes.
+ */
+export async function salvarAlteracoesServico(clienteServicoId: number, dadosNovos: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
+    const parsed = alteracoesServicoSchema.safeParse(dadosNovos);
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+
+    const { userId, nome } = await getUsuarioSessao();
+    const estadoAnterior = await db.clienteServico.findUnique({ where: { id: clienteServicoId } });
+    if (!estadoAnterior) return { success: false, error: "Serviço não encontrado" };
+
+    const dadosParaAtualizar = {
+      ...parsed.data,
+      dataExito: parsed.data.dataExito ?? (parsed.data.status === "Deferido" ? new Date().toISOString() : null),
+    };
+
+    await db.clienteServico.update({ where: { id: clienteServicoId }, data: dadosParaAtualizar });
+
+    const loteId = crypto.randomUUID();
+    const linhasHistorico = montarLinhasHistoricoServico({
+      clienteServicoId,
+      loteId,
+      estadoAnterior,
+      dadosNovos: dadosParaAtualizar,
+      userId,
+      nomeUsuarioNaEpoca: nome,
+      campos: [...CAMPOS_HISTORICO_SERVICO],
+    });
+
+    if (linhasHistorico.length > 0) {
+      await db.clienteServicoHistorico.createMany({ data: linhasHistorico });
+    }
+
+    revalidatePath("/PainelAlpha/CadastroClientes");
+    return { success: true };
+  } catch (error) {
+    console.error("ERRO salvarAlteracoesServico:", error);
+    return { success: false, error: mensagemDoErro(error) };
   }
 }
 
 const reverterCampoHistoricoSchema = z.object({
   historicoId: z.string().cuid(),
+  tipo: z.enum(["cliente", "servico"]),
 });
 
 /**
- * Campos de `clientes` que são numéricos ou booleanos no schema — usados para
- * fazer o parse reverso correto do `valorAnterior` (que é sempre `String?` no
- * histórico) de volta ao tipo esperado pelo Prisma. Os demais campos rastreados
- * (incluindo os de data) permanecem `String` como já são hoje no schema de
- * `clientes` — nenhuma conversão de tipo é inventada além do que o schema pede.
+ * Campos que são numéricos ou booleanos no schema — usados para fazer o parse
+ * reverso correto do `valorAnterior` (que é sempre `String?` no histórico) de
+ * volta ao tipo esperado pelo Prisma. Os demais campos rastreados (incluindo os
+ * de data) permanecem `String`.
  */
-const CAMPOS_NUMERICOS_CLIENTE = new Set(["nps", "valorContrato"]);
-const CAMPOS_BOOLEANOS_CLIENTE = new Set(["feedbackGoogle"]);
+const CAMPOS_NUMERICOS = new Set(["nps", "valorContrato"]);
+const CAMPOS_BOOLEANOS = new Set(["feedbackGoogle"]);
 
 function converterValorParaCampo(campo: string, valor: string | null): unknown {
-  if (CAMPOS_NUMERICOS_CLIENTE.has(campo)) {
+  if (CAMPOS_NUMERICOS.has(campo)) {
     if (valor === null || valor === "") return null;
     const numero = Number(valor);
     return Number.isFinite(numero) ? numero : null;
   }
-  if (CAMPOS_BOOLEANOS_CLIENTE.has(campo)) {
+  if (CAMPOS_BOOLEANOS.has(campo)) {
     return valor === "true";
   }
   return valor;
 }
 
 /**
- * Reverte 1 campo específico de `clientes` para o valor que ele tinha antes de
- * uma alteração registrada em `HistoricoAlteracaoCliente`. Substitui
- * completamente o antigo `restaurarVersaoCliente` (que restaurava o cliente
- * inteiro a partir de um snapshot JSON) — no modelo por-campo não existe mais
- * um snapshot completo para restaurar de uma vez.
- *
- * Após aplicar o `update`, cria uma NOVA linha de histórico (não reaproveita o
- * `loteId` da edição original) registrando a própria reversão: `valorAnterior`
- * é o valor que estava ANTES de reverter (o `valorNovo` da linha original),
- * `valorNovo` é o valor restaurado, `acao: "REVERSAO"`, autoria de quem está
- * revertendo AGORA (não de quem editou originalmente) — preserva a cadeia de
- * auditoria em vez de apagar o rastro da edição revertida.
+ * Reverte 1 campo específico (de `Cliente` ou `ClienteServico`, conforme
+ * `tipo`) para o valor que ele tinha antes de uma alteração registrada no
+ * histórico correspondente. Após aplicar o `update`, cria uma NOVA linha de
+ * histórico (não reaproveita o `loteId` da edição original) registrando a
+ * própria reversão: `valorAnterior` é o valor que estava ANTES de reverter (o
+ * `valorNovo` da linha original), `valorNovo` é o valor restaurado,
+ * `acao: "REVERSAO"`, autoria de quem está revertendo AGORA (não de quem
+ * editou originalmente) — preserva a cadeia de auditoria em vez de apagar o
+ * rastro da edição revertida.
  */
-export async function reverterCampoHistorico(historicoId: string) {
+export async function reverterCampoHistorico(historicoId: string, tipo: "cliente" | "servico") {
   try {
-    const { historicoId: idValidado } = reverterCampoHistoricoSchema.parse({ historicoId });
-
-    const linhaOriginal = await db.historicoAlteracaoCliente.findUnique({
-      where: { id: idValidado },
-    });
-
-    if (!linhaOriginal) return { success: false, error: "Registro de histórico não encontrado" };
-
-    const { campo, valorAnterior, clienteId } = linhaOriginal;
-    const valorRestaurado = converterValorParaCampo(campo, valorAnterior);
-
-    await db.clientes.update({
-      where: { id: clienteId },
-      data: {
-        [campo]: valorRestaurado,
-        updatedAt: new Date().toISOString(),
-      },
-    });
-
+    const { historicoId: idValidado, tipo: tipoValidado } = reverterCampoHistoricoSchema.parse({ historicoId, tipo });
     const { userId, nome } = await getUsuarioSessao();
 
-    await db.historicoAlteracaoCliente.create({
-      data: {
-        loteId: crypto.randomUUID(),
-        clienteId,
-        campo,
-        valorAnterior: linhaOriginal.valorNovo,
-        valorNovo: valorAnterior,
-        userId,
-        nomeUsuarioNaEpoca: nome,
-        acao: "REVERSAO",
-      },
-    });
+    if (tipoValidado === "cliente") {
+      const linhaOriginal = await db.historicoAlteracaoCliente.findUnique({ where: { id: idValidado } });
+      if (!linhaOriginal) return { success: false, error: "Registro de histórico não encontrado" };
+
+      const { campo, valorAnterior, clienteId } = linhaOriginal;
+      const valorRestaurado = converterValorParaCampo(campo, valorAnterior);
+
+      await db.cliente.update({ where: { id: clienteId }, data: { [campo]: valorRestaurado } });
+      await db.historicoAlteracaoCliente.create({
+        data: {
+          loteId: crypto.randomUUID(),
+          clienteId,
+          campo,
+          valorAnterior: linhaOriginal.valorNovo,
+          valorNovo: valorAnterior,
+          userId,
+          nomeUsuarioNaEpoca: nome,
+          acao: "REVERSAO",
+        },
+      });
+    } else {
+      const linhaOriginal = await db.clienteServicoHistorico.findUnique({ where: { id: idValidado } });
+      if (!linhaOriginal) return { success: false, error: "Registro de histórico não encontrado" };
+
+      const { campo, valorAnterior, clienteServicoId } = linhaOriginal;
+      const valorRestaurado = converterValorParaCampo(campo, valorAnterior);
+
+      await db.clienteServico.update({ where: { id: clienteServicoId }, data: { [campo]: valorRestaurado } });
+      await db.clienteServicoHistorico.create({
+        data: {
+          loteId: crypto.randomUUID(),
+          clienteServicoId,
+          campo,
+          valorAnterior: linhaOriginal.valorNovo,
+          valorNovo: valorAnterior,
+          userId,
+          nomeUsuarioNaEpoca: nome,
+          acao: "REVERSAO",
+        },
+      });
+    }
 
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof z.ZodError) {
       return { success: false, error: "ID de histórico inválido" };
     }
-    console.error("ERRO reverterCampoHistorico:", error?.message ?? error);
-    return { success: false, error: error.message };
+    console.error("ERRO reverterCampoHistorico:", error);
+    return { success: false, error: mensagemDoErro(error) };
   }
 }
 
-
-
-
-
-export async function adicionarSocio(clienteId: number, dadosSocio: { nome: string; telefone?: string; obs?: string, dataNascimento: string, vinculo: string }) {
+/**
+ * Adiciona um sócio ao `Cliente` — resolve/cria `Pessoa` por celular
+ * (reaproveita se já existe, mesmo padrão de `sincronizarRepresentantesParceiro`
+ * em `parceiros.ts`) + `PessoaClienteVinculo`. Fase 3.6 do Cliente Master:
+ * `socios` (por-serviço, legado) virou `Pessoa`+`PessoaClienteVinculo`
+ * (global, por-empresa) — celular obrigatório a partir de agora.
+ */
+export async function adicionarSocio(clienteId: number, dadosSocio: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    const novoSocio = await db.socios.create({
-      data: {
-        clienteId: clienteId,
-        nome: dadosSocio.nome,
-        telefone: dadosSocio.telefone || "",
-        obs: dadosSocio.obs || "",
-        dataNascimento: dadosSocio.dataNascimento || "",
-        vinculo: dadosSocio.vinculo,
-      }
+    const parsed = socioSchema.safeParse(dadosSocio);
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+    const d = parsed.data;
+
+    const vinculo = await db.$transaction(async (tx) => {
+      const pessoa = await tx.pessoa.upsert({
+        where: { celular: d.telefone },
+        update: { nome: d.nome },
+        create: { celular: d.telefone, nome: d.nome, dataNascimento: d.dataNascimento || null },
+      });
+      return tx.pessoaClienteVinculo.upsert({
+        where: { pessoaId_clienteId: { pessoaId: pessoa.id, clienteId } },
+        update: { vinculo: d.vinculo },
+        create: { pessoaId: pessoa.id, clienteId, vinculo: d.vinculo },
+        include: { pessoa: true },
+      });
     });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
-    return { success: true, data: novoSocio };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+    return {
+      success: true,
+      data: {
+        id: vinculo.pessoa.id,
+        nome: vinculo.pessoa.nome,
+        telefone: vinculo.pessoa.celular,
+        obs: vinculo.pessoa.observacao,
+        dataNascimento: vinculo.pessoa.dataNascimento,
+        vinculo: vinculo.vinculo,
+        clienteId: vinculo.clienteId,
+      },
+    };
+  } catch (error) {
+    console.error("ERRO adicionarSocio:", error);
+    return { success: false, error: mensagemDoErro(error) };
   }
 }
 
-
-export async function excluirSocio(socioId: number) {
+/**
+ * Desvincula a `Pessoa` do `Cliente` — remove só o `PessoaClienteVinculo`
+ * (nunca deleta `Pessoa`, que é global e pode estar vinculada a outras
+ * empresas ou a um Parceiro).
+ */
+export async function excluirSocio(pessoaId: number, clienteId: number) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    const idValidado = z.number().int().positive().safeParse(socioId);
+    const idValidado = z.number().int().positive().safeParse(pessoaId);
     if (!idValidado.success) {
       return { success: false, error: "ID de sócio inválido" };
     }
 
-    await db.socios.delete({
-      where: { id: idValidado.data },
+    await db.pessoaClienteVinculo.delete({
+      where: { pessoaId_clienteId: { pessoaId: idValidado.data, clienteId } },
     });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
@@ -711,66 +853,71 @@ export async function excluirSocio(socioId: number) {
   }
 }
 
-
-export async function excluirLogCS(logId: number) {
+export async function excluirLogCS(logId: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    await db.$executeRawUnsafe(
-      `DELETE FROM log_cs WHERE id = ?`,
-      logId
-    );
+    await db.clienteServicoLogCs.delete({ where: { id: logId } });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };
-  } catch (error: any) {
-    console.error("ERRO AO EXCLUIR LOG CS:", error.message);
+  } catch (error) {
+    console.error("ERRO AO EXCLUIR LOG CS:", error);
     return { success: false, error: "Não foi possível excluir o registro." };
   }
 }
 
-
-export async function excluirLogFeedback(logId: number) {
+export async function excluirLogFeedback(logId: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    await db.$executeRawUnsafe(
-      `DELETE FROM logFeedback WHERE id = ?`,
-      logId
-    );
+    await db.clienteServicoLogFeedback.delete({ where: { id: logId } });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };
-  } catch (error: any) {
-    console.error("ERRO AO EXCLUIR FEEDBACK:", error.message);
+  } catch (error) {
+    console.error("ERRO AO EXCLUIR FEEDBACK:", error);
     return { success: false };
   }
 }
 
-export async function atualizarSocio(socioId: number, dados: { nome: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string }) {
+export async function atualizarSocio(pessoaId: number, clienteId: number, dados: { nome: string; telefone: string; dataNascimento?: string; vinculo?: string; obs?: string }) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    await db.socios.update({
-      where: { id: socioId },
-      data: dados,
+    await db.$transaction(async (tx) => {
+      await tx.pessoa.update({
+        where: { id: pessoaId },
+        data: {
+          nome: dados.nome,
+          celular: dados.telefone,
+          dataNascimento: dados.dataNascimento,
+          observacao: dados.obs,
+        },
+      });
+      if (dados.vinculo !== undefined) {
+        await tx.pessoaClienteVinculo.update({
+          where: { pessoaId_clienteId: { pessoaId, clienteId } },
+          data: { vinculo: dados.vinculo },
+        });
+      }
     });
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error) {
+    return { success: false, error: mensagemDoErro(error) };
   }
 }
 
-export async function atualizarLogCS(logId: number, dados: { sentimento: string; observacao: string; dataRegistro?: string }) {
+export async function atualizarLogCS(logId: string, dados: { sentimento: string; observacao: string; dataRegistro?: string }) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    const logAtualizado = await db.log_cs.update({
+    const logAtualizado = await db.clienteServicoLogCs.update({
       where: { id: logId },
       data: {
         sentimento: dados.sentimento,
@@ -786,14 +933,14 @@ export async function atualizarLogCS(logId: number, dados: { sentimento: string;
 }
 
 export async function atualizarLogFeedback(
-  logId: number,
+  logId: string,
   dados: { sentimento: string; observacao: string; dataRegistro?: string },
 ) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    const logAtualizado = await db.logFeedback.update({
+    const logAtualizado = await db.clienteServicoLogFeedback.update({
       where: { id: logId },
       data: {
         sentimento: dados.sentimento,
@@ -808,20 +955,17 @@ export async function atualizarLogFeedback(
   }
 }
 
-export async function atualizarStatusCliente(clienteId: number, novoStatus: string) {
+export async function atualizarStatusCliente(clienteServicoId: number, novoStatus: string) {
   try {
-    await db.clientes.update({
-      where: { id: clienteId },
-      data: {
-        status: novoStatus, 
-        updatedAt: new Date().toISOString(),
-      }
+    await db.clienteServico.update({
+      where: { id: clienteServicoId },
+      data: { status: novoStatus },
     });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };
-  } catch (error: any) {
-    console.error("ERRO AO OCULTAR:", error.message);
+  } catch (error) {
+    console.error("ERRO AO OCULTAR:", error);
     return { success: false };
   }
 }

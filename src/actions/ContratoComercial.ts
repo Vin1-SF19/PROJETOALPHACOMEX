@@ -352,35 +352,24 @@ export async function confirmarFechamento(raw: unknown) {
                 contratoAssinado: d.contratoAssinado,
                 contratoUrl: d.contratoUrl || null,
             },
-            include: { cliente: { select: { cnpj: true, razaoSocial: true, nomeFantasia: true, dataConstituicao: true, regimeTributario: true, uf: true, indicacao: { select: { parceiroId: true } } } } },
+            include: { cliente: { select: { indicacao: { select: { parceiroId: true } } } } },
         });
 
         // Sincroniza com o CS&NPS na confirmação de pagamento (efeito colateral
         // resiliente — nunca reverte o fechamento do contrato). Ver decisions.md
         // 2026-07-13 ("sincronização move de criação do contrato para confirmação
-        // de pagamento"). Dados fiscais (nomeFantasia/dataConstituicao/regimeTributario/uf)
-        // já vêm salvos no Cliente master desde a criação — não reconsulta a Receita Federal.
+        // de pagamento"). Fase 3.6 do Cliente Master (2026-08-14): `criarRegistroClienteAPartirDeContrato`
+        // recebe `clienteId` já resolvido — cuida só do `ClienteServico`, `Cliente`
+        // já existe (resolvido/criado na criação do contrato). Funciona igual para
+        // empresa "em constituição" (clienteId sempre existe, com ou sem CNPJ).
         try {
-            type SocioJson = { nome?: string; telefone?: string; dataNascimento?: string; vinculo?: string; obs?: string };
-            const sociosJson = ((atualizado.socios ?? []) as SocioJson[])
-                .filter((s) => s.nome?.trim())
-                .map((s) => ({ nome: s.nome!, telefone: s.telefone, dataNascimento: s.dataNascimento, vinculo: s.vinculo, obs: s.obs }));
-
-            const resultadoSync = atualizado.cliente.cnpj
-                ? await criarRegistroClienteAPartirDeContrato({
-                    cnpj: atualizado.cliente.cnpj,
-                    razaoSocial: atualizado.cliente.razaoSocial,
-                    servico: atualizado.servico,
-                    nomeFantasia: atualizado.cliente.nomeFantasia,
-                    dataConstituicao: atualizado.cliente.dataConstituicao,
-                    regimeTributario: atualizado.cliente.regimeTributario,
-                    uf: atualizado.cliente.uf,
-                    dataContratacao: atualizado.pagamentoConfirmadoEm
-                        ? atualizado.pagamentoConfirmadoEm.toISOString()
-                        : new Date().toISOString(),
-                    socios: sociosJson,
-                })
-                : { success: true as const, criado: false };
+            const resultadoSync = await criarRegistroClienteAPartirDeContrato({
+                clienteId: atualizado.clienteId,
+                servico: atualizado.servico,
+                dataContratacao: atualizado.pagamentoConfirmadoEm
+                    ? atualizado.pagamentoConfirmadoEm.toISOString()
+                    : new Date().toISOString(),
+            });
 
             // Vínculo de indicação de parceiro: só faz sentido na PRIMEIRA criação real
             // do registro (não em reativação nem quando já existia ativo). Fase 3.6 do

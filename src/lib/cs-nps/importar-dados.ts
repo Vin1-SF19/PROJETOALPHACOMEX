@@ -74,10 +74,14 @@ const identificadorSchema = z
     message: "Informe CNPJ ou razão social",
   });
 
+// Telefone obrigatório (não mais `nullable`) — Fase 3.6 do Cliente Master (2026-08-14):
+// sócio vira `Pessoa` (celular como chave, obrigatório) + `PessoaClienteVinculo`. Linha
+// de planilha sem telefone falha a validação e não é salva (decisão do plano, pergunta 8:
+// registros sem celular ficam retidos como pendência de saneamento manual).
 const socioSchema = z
   .object({
     nome: z.string().trim().min(1).max(200),
-    telefone: z.string().trim().max(50).nullable(),
+    telefone: z.string().trim().min(8, "Telefone é obrigatório").max(50),
     observacao: z.string().trim().max(1_000).nullable(),
     dataNascimento: z
       .string()
@@ -143,9 +147,10 @@ export const payloadSalvarImportacaoSchema = z
   })
   .strict();
 
+// `id` aqui é `ClienteServico.id` (Fase 3.6 do Cliente Master) — antes era `clientes.id`.
 type ClienteMatch = {
   id: number;
-  cnpj: string;
+  cnpj: string | null;
   razaoSocial: string;
   servicos: string | null;
   status: string;
@@ -460,6 +465,9 @@ function lerDadosSocio(row: ExcelJS.Row, date1904: boolean, erros: string[]): Da
   const nome = validarTexto(textoCelula(row.getCell(3)), "Nome", 200, erros);
   if (!nome) erros.push("Nome do sócio é obrigatório");
   const telefone = validarTexto(textoCelula(row.getCell(4)), "Telefone", 50, erros);
+  // Telefone obrigatório — Fase 3.6 do Cliente Master: sócio vira Pessoa (celular como
+  // chave). Linha sem telefone é inválida, fica retida como pendência de saneamento manual.
+  if (!telefone) erros.push("Telefone é obrigatório");
   const observacao = validarTexto(textoCelula(row.getCell(5)), "Observação", 1_000, erros);
   const data = lerData(row.getCell(6), date1904, "br");
   if (data.erro) erros.push(data.erro);
@@ -526,11 +534,18 @@ function validarEstruturaAba(worksheet: ExcelJS.Worksheet, tipo: TipoImportacao)
 }
 
 async function carregarClientesParaMatch(): Promise<ClienteMatch[]> {
-  const clientes = await db.clientes.findMany({
+  const registros = await db.clienteServico.findMany({
     take: LIMITE_CLIENTES_PARA_MATCH + 1,
-    select: { id: true, cnpj: true, razaoSocial: true, servicos: true, status: true },
+    select: { id: true, servico: true, status: true, cliente: { select: { cnpj: true, razaoSocial: true } } },
     orderBy: { id: "asc" },
   });
+  const clientes: ClienteMatch[] = registros.map((r) => ({
+    id: r.id,
+    cnpj: r.cliente.cnpj,
+    razaoSocial: r.cliente.razaoSocial,
+    servicos: r.servico,
+    status: r.status,
+  }));
   if (clientes.length > LIMITE_CLIENTES_PARA_MATCH) {
     throw new ErroImportacao(
       "A base excede o limite operacional para conferência; contate o suporte",
@@ -907,11 +922,22 @@ export async function salvarImportacao(
       );
     }
 
-    const clientes = await tx.clientes.findMany({
+    // Fase 3.6 do Cliente Master (2026-08-14): `linha.clienteId` continua sendo o id de
+    // `ClienteServico` (nome do payload preservado por compatibilidade) — resolve também
+    // o `Cliente.id` pai (via include), necessário para gravar sócios em `Pessoa`/
+    // `PessoaClienteVinculo` (que é por Cliente/empresa, não por ClienteServico).
+    const registros = await tx.clienteServico.findMany({
       take: LIMITE_CLIENTES_PARA_MATCH + 1,
-      select: { id: true, cnpj: true, razaoSocial: true, servicos: true, status: true },
+      select: { id: true, servico: true, status: true, clienteId: true, cliente: { select: { cnpj: true, razaoSocial: true } } },
       orderBy: { id: "asc" },
     });
+    const clientes: ClienteMatch[] = registros.map((r) => ({
+      id: r.id,
+      cnpj: r.cliente.cnpj,
+      razaoSocial: r.cliente.razaoSocial,
+      servicos: r.servico,
+      status: r.status,
+    }));
     if (clientes.length > LIMITE_CLIENTES_PARA_MATCH) {
       throw new ErroImportacao(
         "A base excede o limite operacional para conferência; contate o suporte",
@@ -921,6 +947,7 @@ export async function salvarImportacao(
     }
     const indiceClientes = criarIndiceClientes(clientes);
     const clientesPorId = new Map(clientes.map((cliente) => [cliente.id, cliente]));
+    const clienteMasterIdPorServicoId = new Map(registros.map((r) => [r.id, r.clienteId]));
     for (const linha of validacao.data.linhas) {
       const resultado = candidatosDaLinha(linha.identificador, indiceClientes);
       if (!resultado.candidatos.some((candidato) => candidato.id === linha.clienteId)) {
@@ -932,22 +959,29 @@ export async function salvarImportacao(
       }
     }
 
-    if (linhasSocios.length > 0) {
-      await tx.socios.createMany({
-        data: linhasSocios.map((linha) => ({
-          clienteId: linha.clienteId,
+    for (const linha of linhasSocios) {
+      const clienteMasterId = clienteMasterIdPorServicoId.get(linha.clienteId);
+      if (!clienteMasterId) continue;
+      const pessoa = await tx.pessoa.upsert({
+        where: { celular: linha.dados.telefone },
+        update: { nome: linha.dados.nome },
+        create: {
+          celular: linha.dados.telefone,
           nome: linha.dados.nome,
-          telefone: linha.dados.telefone,
-          obs: linha.dados.observacao,
+          observacao: linha.dados.observacao,
           dataNascimento: linha.dados.dataNascimento,
-          vinculo: linha.dados.vinculo,
-        })),
+        },
+      });
+      await tx.pessoaClienteVinculo.upsert({
+        where: { pessoaId_clienteId: { pessoaId: pessoa.id, clienteId: clienteMasterId } },
+        update: { vinculo: linha.dados.vinculo },
+        create: { pessoaId: pessoa.id, clienteId: clienteMasterId, vinculo: linha.dados.vinculo },
       });
     }
     if (linhasCs.length > 0) {
-      await tx.log_cs.createMany({
+      await tx.clienteServicoLogCs.createMany({
         data: linhasCs.map((linha) => ({
-          clienteId: linha.clienteId,
+          clienteServicoId: linha.clienteId,
           colaborador: linha.dados.colaborador,
           sentimento: linha.dados.sentimento,
           observacao: linha.dados.observacao,
@@ -956,9 +990,9 @@ export async function salvarImportacao(
       });
     }
     if (linhasFeedbacks.length > 0) {
-      await tx.logFeedback.createMany({
+      await tx.clienteServicoLogFeedback.createMany({
         data: linhasFeedbacks.map((linha) => ({
-          clienteId: linha.clienteId,
+          clienteServicoId: linha.clienteId,
           colaborador: linha.dados.colaborador,
           sentimento: linha.dados.sentimento,
           observacao: linha.dados.observacao,

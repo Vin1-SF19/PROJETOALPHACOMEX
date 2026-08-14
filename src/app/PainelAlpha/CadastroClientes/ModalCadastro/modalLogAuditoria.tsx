@@ -60,9 +60,14 @@ export default function ModalLogAuditoria({ isOpen, onClose, cliente, aoSalvar }
   const handleConfirmarReversao = async () => {
     if (!linhaParaReverter) return;
 
+    // Fase 3.6 do Cliente Master (2026-08-14): o histórico mesclado tem 2 origens —
+    // HistoricoAlteracaoCliente (cadastral, tem `clienteId`) e ClienteServicoHistorico
+    // (negócio, tem `clienteServicoId`) — o tipo determina qual endpoint reverter.
+    const tipo = "clienteServicoId" in linhaParaReverter ? "servico" : "cliente";
+
     setRevertendoId(linhaParaReverter.id);
     try {
-      const res = await reverterCampoHistorico(linhaParaReverter.id);
+      const res = await reverterCampoHistorico(linhaParaReverter.id, tipo);
 
       if (res.success) {
         toast.success("Campo revertido com sucesso!");

@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
-  log_cs: {
+  clienteServicoLogCs: {
     create: vi.fn(),
     update: vi.fn(),
+    delete: vi.fn(),
   },
-  logFeedback: {
+  clienteServicoLogFeedback: {
     create: vi.fn(),
     update: vi.fn(),
+    delete: vi.fn(),
   },
-  socios: {
+  pessoaClienteVinculo: {
     delete: vi.fn(),
   },
 }));
@@ -29,7 +31,7 @@ import {
   salvarLogFeedback,
 } from "@/actions/Clientes";
 
-describe("ações dos modais de CS e Feedback", () => {
+describe("ações dos modais de CS e Feedback (Fase 3.6 do Cliente Master)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue({
@@ -40,14 +42,14 @@ describe("ações dos modais de CS e Feedback", () => {
   it("cria o CS imediatamente e devolve o registro persistido", async () => {
     const dataRegistro = new Date("2026-07-23T15:00:00.000Z");
     const registro = {
-      id: 31,
+      id: "log-cs-1",
       colaborador: "Ana Responsável",
       sentimento: "pos",
       observacao: "Cliente está satisfeito",
-      clienteId: 10,
+      clienteServicoId: 10,
       dataRegistro,
     };
-    prismaMock.log_cs.create.mockResolvedValue(registro);
+    prismaMock.clienteServicoLogCs.create.mockResolvedValue(registro);
 
     const resultado = await salvarLogCS(10, {
       sentimento: "pos",
@@ -56,12 +58,12 @@ describe("ações dos modais de CS e Feedback", () => {
     });
 
     expect(resultado).toEqual({ success: true, data: registro });
-    expect(prismaMock.log_cs.create).toHaveBeenCalledWith({
+    expect(prismaMock.clienteServicoLogCs.create).toHaveBeenCalledWith({
       data: {
         colaborador: "Ana Responsável",
         sentimento: "pos",
         observacao: "Cliente está satisfeito",
-        clienteId: 10,
+        clienteServicoId: 10,
         dataRegistro,
       },
     });
@@ -71,24 +73,24 @@ describe("ações dos modais de CS e Feedback", () => {
   it("edita o CS aceitando uma data ISO sem formar uma data inválida", async () => {
     const dataRegistro = new Date("2026-07-22T15:00:00.000Z");
     const registro = {
-      id: 31,
+      id: "log-cs-1",
       colaborador: "Ana Responsável",
       sentimento: "neg",
       observacao: "Cliente pediu novo retorno",
-      clienteId: 10,
+      clienteServicoId: 10,
       dataRegistro,
     };
-    prismaMock.log_cs.update.mockResolvedValue(registro);
+    prismaMock.clienteServicoLogCs.update.mockResolvedValue(registro);
 
-    const resultado = await atualizarLogCS(31, {
+    const resultado = await atualizarLogCS("log-cs-1", {
       sentimento: "neg",
       observacao: "Cliente pediu novo retorno",
       dataRegistro: dataRegistro.toISOString(),
     });
 
     expect(resultado).toEqual({ success: true, data: registro });
-    expect(prismaMock.log_cs.update).toHaveBeenCalledWith({
-      where: { id: 31 },
+    expect(prismaMock.clienteServicoLogCs.update).toHaveBeenCalledWith({
+      where: { id: "log-cs-1" },
       data: {
         sentimento: "neg",
         observacao: "Cliente pediu novo retorno",
@@ -99,23 +101,23 @@ describe("ações dos modais de CS e Feedback", () => {
 
   it("preserva a semântica de data local ao editar pelo input de data", async () => {
     const dataRegistro = new Date("2026-07-22T12:00:00");
-    prismaMock.log_cs.update.mockResolvedValue({
-      id: 31,
+    prismaMock.clienteServicoLogCs.update.mockResolvedValue({
+      id: "log-cs-1",
       colaborador: "Ana Responsável",
       sentimento: "pos",
       observacao: "Atendimento atualizado hoje",
-      clienteId: 10,
+      clienteServicoId: 10,
       dataRegistro,
     });
 
-    await atualizarLogCS(31, {
+    await atualizarLogCS("log-cs-1", {
       sentimento: "pos",
       observacao: "Atendimento atualizado hoje",
       dataRegistro: "2026-07-22",
     });
 
-    expect(prismaMock.log_cs.update).toHaveBeenCalledWith({
-      where: { id: 31 },
+    expect(prismaMock.clienteServicoLogCs.update).toHaveBeenCalledWith({
+      where: { id: "log-cs-1" },
       data: {
         sentimento: "pos",
         observacao: "Atendimento atualizado hoje",
@@ -127,14 +129,14 @@ describe("ações dos modais de CS e Feedback", () => {
   it("cria o Feedback imediatamente pelo mesmo contrato seguro", async () => {
     const dataRegistro = new Date("2026-07-23T15:00:00.000Z");
     const registro = {
-      id: 19,
+      id: "log-fb-1",
       colaborador: "Ana Responsável",
       sentimento: "na",
       observacao: "Cliente ainda não respondeu",
-      clienteId: 10,
+      clienteServicoId: 10,
       dataRegistro,
     };
-    prismaMock.logFeedback.create.mockResolvedValue(registro);
+    prismaMock.clienteServicoLogFeedback.create.mockResolvedValue(registro);
 
     const resultado = await salvarLogFeedback(10, {
       sentimento: "na",
@@ -143,12 +145,12 @@ describe("ações dos modais de CS e Feedback", () => {
     });
 
     expect(resultado).toEqual({ success: true, data: registro });
-    expect(prismaMock.logFeedback.create).toHaveBeenCalledWith({
+    expect(prismaMock.clienteServicoLogFeedback.create).toHaveBeenCalledWith({
       data: {
         colaborador: "Ana Responsável",
         sentimento: "na",
         observacao: "Cliente ainda não respondeu",
-        clienteId: 10,
+        clienteServicoId: 10,
         dataRegistro,
       },
     });
@@ -157,24 +159,24 @@ describe("ações dos modais de CS e Feedback", () => {
   it("edita o Feedback e devolve o registro atualizado", async () => {
     const dataRegistro = new Date("2026-07-21T12:00:00");
     const registro = {
-      id: 19,
+      id: "log-fb-1",
       colaborador: "Ana Responsável",
       sentimento: "pos",
       observacao: "Cliente publicou o feedback",
-      clienteId: 10,
+      clienteServicoId: 10,
       dataRegistro,
     };
-    prismaMock.logFeedback.update.mockResolvedValue(registro);
+    prismaMock.clienteServicoLogFeedback.update.mockResolvedValue(registro);
 
-    const resultado = await atualizarLogFeedback(19, {
+    const resultado = await atualizarLogFeedback("log-fb-1", {
       sentimento: "pos",
       observacao: "Cliente publicou o feedback",
       dataRegistro: "2026-07-21",
     });
 
     expect(resultado).toEqual({ success: true, data: registro });
-    expect(prismaMock.logFeedback.update).toHaveBeenCalledWith({
-      where: { id: 19 },
+    expect(prismaMock.clienteServicoLogFeedback.update).toHaveBeenCalledWith({
+      where: { id: "log-fb-1" },
       data: {
         sentimento: "pos",
         observacao: "Cliente publicou o feedback",
@@ -185,7 +187,7 @@ describe("ações dos modais de CS e Feedback", () => {
   });
 });
 
-describe("exclusão de sócio", () => {
+describe("exclusão de sócio — desvincula Pessoa do Cliente (Fase 3.6 do Cliente Master)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue({
@@ -193,36 +195,38 @@ describe("exclusão de sócio", () => {
     });
   });
 
-  it("exclui o sócio e revalida o módulo para uma sessão autenticada", async () => {
-    prismaMock.socios.delete.mockResolvedValue({ id: 42 });
+  it("exclui o vínculo e revalida o módulo para uma sessão autenticada", async () => {
+    prismaMock.pessoaClienteVinculo.delete.mockResolvedValue({ pessoaId: 42, clienteId: 501 });
 
-    const resultado = await excluirSocio(42);
+    const resultado = await excluirSocio(42, 501);
 
     expect(resultado).toEqual({ success: true });
-    expect(prismaMock.socios.delete).toHaveBeenCalledWith({ where: { id: 42 } });
+    expect(prismaMock.pessoaClienteVinculo.delete).toHaveBeenCalledWith({
+      where: { pessoaId_clienteId: { pessoaId: 42, clienteId: 501 } },
+    });
     expect(revalidatePathMock).toHaveBeenCalledWith("/PainelAlpha/CadastroClientes");
   });
 
   it("não acessa o banco sem uma sessão autenticada", async () => {
     authMock.mockResolvedValue(null);
 
-    const resultado = await excluirSocio(42);
+    const resultado = await excluirSocio(42, 501);
 
     expect(resultado).toEqual({ success: false, error: "Não autorizado" });
-    expect(prismaMock.socios.delete).not.toHaveBeenCalled();
+    expect(prismaMock.pessoaClienteVinculo.delete).not.toHaveBeenCalled();
   });
 
-  it("rejeita um ID de sócio inválido antes de acessar o banco", async () => {
-    const resultado = await excluirSocio(0);
+  it("rejeita um ID de pessoa inválido antes de acessar o banco", async () => {
+    const resultado = await excluirSocio(0, 501);
 
     expect(resultado).toEqual({ success: false, error: "ID de sócio inválido" });
-    expect(prismaMock.socios.delete).not.toHaveBeenCalled();
+    expect(prismaMock.pessoaClienteVinculo.delete).not.toHaveBeenCalled();
   });
 
   it("retorna uma mensagem tratável quando a exclusão falha", async () => {
-    prismaMock.socios.delete.mockRejectedValue(new Error("falha de banco"));
+    prismaMock.pessoaClienteVinculo.delete.mockRejectedValue(new Error("falha de banco"));
 
-    const resultado = await excluirSocio(42);
+    const resultado = await excluirSocio(42, 501);
 
     expect(resultado).toEqual({ success: false, error: "Não foi possível excluir o sócio." });
   });

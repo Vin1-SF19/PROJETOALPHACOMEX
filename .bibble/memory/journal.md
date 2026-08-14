@@ -86,6 +86,23 @@
 - EPERM em `query_engine-windows.dll.node` reincidiu mais uma vez (3ª vez nesta sessão) — mesmo fix já autorizado, aplicado sem perguntar de novo.
 - `tsc` apontou `recorte.opacidade` como `number` obrigatório mas `lerOpacidadeBlip()` retorna `number | undefined` — corrigido tornando o campo opcional em `tipos.ts`.
 
+### Continuação [2026-08-14, mesma sessão] — 4º achado: modal de prévia do PPTX ainda travava com deck real de 21 slides/101 imagens
+
+**O que foi feito:**
+- Usuário testou com o arquivo real (`Plano de Marketing.pptx`, em Downloads) e ainda travava. Rodei um script de diagnóstico pontual (vitest temporário, descartado) chamando `extrairApresentacaoPptx` direto no arquivo — confirmou 224 formas, 101 imagens (52 recortadas), 66 MB de imagem bruta somada, distribuídos em 21 slides. Confirmou que "teste 2" (apagada antes) era exatamente esse mesmo arquivo.
+- Apresentei 4 recomendações ao usuário (sem implementar ainda) para reduzir o peso do modal de prévia sem perder fidelidade; usuário pediu pra implementar todas.
+- Implementadas as 4: miniatura padrão passou a ser o PNG de referência real do PowerPoint (`reference-renderer.ts`, já existia, agora é o padrão visível em vez de só diff escondido); resize server-side (`sharp`, dependência nova) só nas imagens da prévia (nunca no commit real); paginação real (6 slides por página) substituindo scroll infinito com `useInView`; diff visual virou sob demanda (botão) em vez de automático. Também adicionado `loading="lazy"` nos `<img>` de `RenderImagem` (ganho universal).
+- Forge: `tsc`/`eslint` limpos nos arquivos tocados. `next build` completo NÃO pôde ser verificado — bloqueado por um refactor não relacionado, já em andamento no schema/módulo CS&NPS (`ModalCadastro/modalDados.tsx` importando `salvarAlteracoesGeral`, que não existe mais em `actions/Clientes.ts` — claramente trabalho do usuário em outra sessão/ferramenta, fora do escopo do Alpha Motion).
+
+**Arquivos modificados (4º fix):**
+- `src/app/api/apresentacoes/[id]/pptx-preview/route.ts` — `prepararBytesParaPreview()` com `sharp`, resize só na prévia.
+- `src/components/Apresentacoes/Editor/SidebarEsquerda/ModalPreImportarPptx.tsx` — reescrito: miniatura por referência + live-render sob demanda, paginação, diff sob demanda.
+- `src/components/Apresentacoes/Editor/RenderEngine/render/RenderBasicos.tsx` — `loading="lazy"` nos 2 `<img>` de `RenderImagem`.
+- `package.json` — nova dependência `sharp`.
+
+**Pendência nova para próxima sessão:**
+- Build de produção completo (`next build`) não foi validado nesta sessão por bloqueio alheio (refactor CS&NPS em andamento: `salvarAlteracoesGeral` não existe mais em `actions/Clientes.ts`, `ModalCadastro/modalDados.tsx` e outros arquivos de `CadastroClientes`/`cs-nps` com múltiplos erros de tipo). Rodar `npm run build` completo assim que esse refactor for concluído/commitado, pra confirmar que as mudanças do Alpha Motion desta sessão não têm nenhuma interação inesperada com o resto do projeto.
+
 ---
 
 ## [2026-07-28] — Gestão de Comissões e Prêmios: novo módulo completo, execução via fila de 17 fases

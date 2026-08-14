@@ -2,17 +2,15 @@ import ExcelJS from "exceljs";
 
 import db from "@/lib/prisma";
 
-const clienteSelect = {
+// Fase 3.6 do Cliente Master (2026-08-14): exporta a partir de `ClienteServico`
+// (1 linha por serviço contratado, como era `clientes`), com `Cliente` (dados
+// cadastrais) e `Pessoa` (sócios, via `PessoaClienteVinculo`) aninhados. `logAlteracao`
+// saiu da exportação — tabela morta, nunca escrita, preservada só no Turso sem
+// equivalente no schema novo (decisão do usuário 2026-08-14).
+const clienteServicoSelect = {
   id: true,
   status: true,
-  cnpj: true,
-  razaoSocial: true,
-  nomeFantasia: true,
-  dataConstituicao: true,
-  uf: true,
-  municipio: true,
-  regimeTributario: true,
-  servicos: true,
+  servico: true,
   analistaResponsavel: true,
   dataContratacao: true,
   dataExito: true,
@@ -29,25 +27,50 @@ const clienteSelect = {
   origemLead: true,
   canalAquisicao: true,
   canalOutro: true,
-  socios: {
+  cliente: {
     select: {
       id: true,
-      nome: true,
-      telefone: true,
-      obs: true,
-      dataNascimento: true,
-      vinculo: true,
-      clienteId: true,
+      cnpj: true,
+      razaoSocial: true,
+      nomeFantasia: true,
+      dataConstituicao: true,
+      uf: true,
+      municipio: true,
+      regimeTributario: true,
+      pessoas: {
+        select: {
+          vinculo: true,
+          pessoa: {
+            select: { id: true, nome: true, celular: true, observacao: true, dataNascimento: true },
+          },
+        },
+      },
+      indicacao: {
+        select: {
+          id: true,
+          parceiroId: true,
+          clienteId: true,
+          dataIndicacao: true,
+          status: true,
+          criadoPorId: true,
+          comprovanteUrl: true,
+          comprovanteNome: true,
+          comprovanteTipo: true,
+          comprovanteEnviadoEm: true,
+          comprovanteEnviadoPor: true,
+          createdAt: true,
+        },
+      },
     },
   },
-  log_cs: {
+  logCs: {
     select: {
       id: true,
       dataRegistro: true,
       colaborador: true,
       sentimento: true,
       observacao: true,
-      clienteId: true,
+      clienteServicoId: true,
     },
   },
   logFeedback: {
@@ -57,24 +80,14 @@ const clienteSelect = {
       colaborador: true,
       sentimento: true,
       observacao: true,
-      clienteId: true,
-    },
-  },
-  logAlteracao: {
-    select: {
-      id: true,
-      dataAlteracao: true,
-      colaborador: true,
-      acao: true,
-      dadosAnteriores: true,
-      clienteId: true,
+      clienteServicoId: true,
     },
   },
   historicoAlteracoes: {
     select: {
       id: true,
       loteId: true,
-      clienteId: true,
+      clienteServicoId: true,
       campo: true,
       valorAnterior: true,
       valorNovo: true,
@@ -82,22 +95,6 @@ const clienteSelect = {
       nomeUsuarioNaEpoca: true,
       acao: true,
       criadoEm: true,
-    },
-  },
-  indicacao: {
-    select: {
-      id: true,
-      parceiroId: true,
-      clienteId: true,
-      dataIndicacao: true,
-      status: true,
-      criadoPorId: true,
-      comprovanteUrl: true,
-      comprovanteNome: true,
-      comprovanteTipo: true,
-      comprovanteEnviadoEm: true,
-      comprovanteEnviadoPor: true,
-      createdAt: true,
     },
   },
 } as const;
@@ -422,46 +419,57 @@ function adicionarAba(workbook: ExcelJS.Workbook, sheet: ExportSheet) {
 }
 
 export async function gerarExportacaoCompletaCsNps(): Promise<{ buffer: Buffer; totalClientes: number } | null> {
-  const clientes = await db.clientes.findMany({
-    select: clienteSelect,
+  const registros = await db.clienteServico.findMany({
+    select: clienteServicoSelect,
     orderBy: { id: "asc" },
   });
 
-  if (clientes.length === 0) return null;
+  if (registros.length === 0) return null;
+
+  const sociosAchatados = (r: (typeof registros)[number]) =>
+    r.cliente.pessoas.map((v) => ({
+      id: v.pessoa.id,
+      nome: v.pessoa.nome,
+      telefone: v.pessoa.celular,
+      obs: v.pessoa.observacao,
+      dataNascimento: v.pessoa.dataNascimento,
+      vinculo: v.vinculo,
+      clienteId: r.cliente.id,
+    }));
 
   const sheets: ExportSheet[] = [
     {
       name: "Empresas",
       headers: ["id", "status", "cnpj", "razaoSocial", "nomeFantasia", "dataConstituicao", "uf", "municipio", "regimeTributario", "servicos", "analistaResponsavel", "dataContratacao", "dataExito", "formaPagamento", "valorContrato", "closerNome", "ultimoCs", "nps", "feedbackGoogle", "quantidadeSocios", "sociosResumo", "createdAt", "updatedAt", "nomeGoogle", "embasamento", "origemLead", "canalAquisicao", "canalOutro"],
-      rows: clientes.map((cliente) => ({
-        id: cliente.id,
-        status: cliente.status,
-        cnpj: cliente.cnpj,
-        razaoSocial: cliente.razaoSocial,
-        nomeFantasia: cliente.nomeFantasia,
-        dataConstituicao: cliente.dataConstituicao,
-        uf: cliente.uf,
-        municipio: cliente.municipio,
-        regimeTributario: cliente.regimeTributario,
-        servicos: cliente.servicos,
-        analistaResponsavel: cliente.analistaResponsavel,
-        dataContratacao: cliente.dataContratacao,
-        dataExito: cliente.dataExito,
-        formaPagamento: cliente.formaPagamento,
-        valorContrato: cliente.valorContrato,
-        closerNome: cliente.closerNome,
-        ultimoCs: cliente.ultimoCs,
-        nps: cliente.nps,
-        feedbackGoogle: cliente.feedbackGoogle ? "SIM" : "NÃO",
-        quantidadeSocios: cliente.socios.length,
-        sociosResumo: resumirSocios(cliente.socios),
-        createdAt: cliente.createdAt,
-        updatedAt: cliente.updatedAt,
-        nomeGoogle: cliente.nomeGoogle,
-        embasamento: cliente.embasamento,
-        origemLead: cliente.origemLead,
-        canalAquisicao: cliente.canalAquisicao,
-        canalOutro: cliente.canalOutro,
+      rows: registros.map((r) => ({
+        id: r.id,
+        status: r.status,
+        cnpj: r.cliente.cnpj,
+        razaoSocial: r.cliente.razaoSocial,
+        nomeFantasia: r.cliente.nomeFantasia,
+        dataConstituicao: r.cliente.dataConstituicao,
+        uf: r.cliente.uf,
+        municipio: r.cliente.municipio,
+        regimeTributario: r.cliente.regimeTributario,
+        servicos: r.servico,
+        analistaResponsavel: r.analistaResponsavel,
+        dataContratacao: r.dataContratacao,
+        dataExito: r.dataExito,
+        formaPagamento: r.formaPagamento,
+        valorContrato: r.valorContrato,
+        closerNome: r.closerNome,
+        ultimoCs: r.ultimoCs,
+        nps: r.nps,
+        feedbackGoogle: r.feedbackGoogle ? "SIM" : "NÃO",
+        quantidadeSocios: r.cliente.pessoas.length,
+        sociosResumo: resumirSocios(sociosAchatados(r)),
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        nomeGoogle: r.nomeGoogle,
+        embasamento: r.embasamento,
+        origemLead: r.origemLead,
+        canalAquisicao: r.canalAquisicao,
+        canalOutro: r.canalOutro,
       })),
       dateColumns: {
         dataConstituicao: "date-only",
@@ -472,28 +480,31 @@ export async function gerarExportacaoCompletaCsNps(): Promise<{ buffer: Buffer; 
       },
     },
     {
+      // Pessoa/PessoaClienteVinculo é por Cliente (empresa), não por ClienteServico
+      // (Fase 3.6 do Cliente Master) — dedup por Cliente.id, sem repetir 1 linha por
+      // serviço contratado daquele Cliente (diferente do comportamento legado).
       name: "Socios",
-      headers: [
-        ...Object.keys(clienteSelect.socios.select),
-        "clienteRazaoSocial",
-        "clienteCnpj",
-        "clienteServico",
-      ],
-      rows: clientes.flatMap((cliente) =>
-        cliente.socios.map((socio) => ({
+      headers: ["id", "nome", "telefone", "obs", "dataNascimento", "vinculo", "clienteId", "clienteRazaoSocial", "clienteCnpj"],
+      rows: [...new Map(registros.map((r) => [r.cliente.id, r])).values()].flatMap((r) =>
+        sociosAchatados(r).map((socio) => ({
           ...socio,
-          clienteRazaoSocial: cliente.razaoSocial,
-          clienteCnpj: cliente.cnpj,
-          clienteServico: cliente.servicos,
+          clienteRazaoSocial: r.cliente.razaoSocial,
+          clienteCnpj: r.cliente.cnpj,
         })),
       ),
       dateColumns: { dataNascimento: "date-only" },
     },
-    { name: "CS", headers: Object.keys(clienteSelect.log_cs.select), rows: clientes.flatMap((cliente) => cliente.log_cs), dateColumns: { dataRegistro: "date-time" } },
-    { name: "Feedbacks", headers: Object.keys(clienteSelect.logFeedback.select), rows: clientes.flatMap((cliente) => cliente.logFeedback), dateColumns: { dataRegistro: "date-time" } },
-    { name: "Log Alteracoes", headers: Object.keys(clienteSelect.logAlteracao.select), rows: clientes.flatMap((cliente) => cliente.logAlteracao), dateColumns: { dataAlteracao: "date-time" } },
-    { name: "Historico Cliente", headers: Object.keys(clienteSelect.historicoAlteracoes.select), rows: clientes.flatMap((cliente) => cliente.historicoAlteracoes), dateColumns: { criadoEm: "date-time" } },
-    { name: "Indicacoes", headers: Object.keys(clienteSelect.indicacao.select), rows: clientes.flatMap((cliente) => cliente.indicacao ? [cliente.indicacao] : []), dateColumns: { dataIndicacao: "date-time", comprovanteEnviadoEm: "date-time", createdAt: "date-time" } },
+    { name: "CS", headers: ["id", "dataRegistro", "colaborador", "sentimento", "observacao", "clienteServicoId"], rows: registros.flatMap((r) => r.logCs), dateColumns: { dataRegistro: "date-time" } },
+    { name: "Feedbacks", headers: ["id", "dataRegistro", "colaborador", "sentimento", "observacao", "clienteServicoId"], rows: registros.flatMap((r) => r.logFeedback), dateColumns: { dataRegistro: "date-time" } },
+    { name: "Historico Servico", headers: ["id", "loteId", "clienteServicoId", "campo", "valorAnterior", "valorNovo", "userId", "nomeUsuarioNaEpoca", "acao", "criadoEm"], rows: registros.flatMap((r) => r.historicoAlteracoes), dateColumns: { criadoEm: "date-time" } },
+    {
+      name: "Indicacoes",
+      headers: ["id", "parceiroId", "clienteId", "dataIndicacao", "status", "criadoPorId", "comprovanteUrl", "comprovanteNome", "comprovanteTipo", "comprovanteEnviadoEm", "comprovanteEnviadoPor", "createdAt"],
+      // Indicacao pertence ao Cliente (empresa), não ao ClienteServico — dedup por
+      // Cliente.id para não repetir 1 linha por serviço contratado daquele Cliente.
+      rows: [...new Map(registros.filter((r) => r.cliente.indicacao).map((r) => [r.cliente.id, r.cliente.indicacao!])).values()],
+      dateColumns: { dataIndicacao: "date-time", comprovanteEnviadoEm: "date-time", createdAt: "date-time" },
+    },
   ];
 
   const workbook = new ExcelJS.Workbook();
@@ -502,6 +513,7 @@ export async function gerarExportacaoCompletaCsNps(): Promise<{ buffer: Buffer; 
   workbook.modified = new Date();
   for (const sheet of sheets) adicionarAba(workbook, sheet);
 
+  const totalClientesDistintos = new Set(registros.map((r) => r.cliente.id)).size;
   const arrayBuffer = await workbook.xlsx.writeBuffer();
-  return { buffer: Buffer.from(arrayBuffer), totalClientes: clientes.length };
+  return { buffer: Buffer.from(arrayBuffer), totalClientes: totalClientesDistintos };
 }

@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useInView } from "framer-motion";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
-import { Loader2, TriangleAlert, X, RotateCcw, FileWarning } from "lucide-react";
+import { Loader2, TriangleAlert, X, RotateCcw, FileWarning, ChevronLeft, ChevronRight, Eye, ImageOff } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +38,7 @@ interface ModalPreImportarPptxProps {
 type Status = "carregando" | "pronto" | "erro";
 
 const LARGURA_THUMBNAIL = 220;
+const SLIDES_POR_PAGINA = 6;
 const PPTX_MAX_BYTES = 80 * 1024 * 1024;
 const PPTX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
@@ -54,62 +54,97 @@ async function limparUploadsTemporarios(apresentacaoId: string, urls: string[]):
 }
 
 function caminhoDoUploadPptx(apresentacaoId: string, nome: string): string {
-  const nomeSeguro = nome.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 160);
+  const semAcentos = nome.normalize("NFKD").split("").filter((char) => {
+    const codigo = char.codePointAt(0) ?? 0;
+    return !(codigo >= 0x0300 && codigo <= 0x036f);
+  }).join("");
+  const nomeSeguro = semAcentos.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 160);
   return `apresentacoes/${apresentacaoId}/originais/${crypto.randomUUID()}-${nomeSeguro || "apresentacao.pptx"}`;
 }
 
-/** 1 slide em miniatura — mesma técnica de palco escalado do Modo Apresentação (canvas em
- * tamanho real, `transform: scale()` pra caber na miniatura), renderizando os componentes de
- * verdade via `RenderComponente` — não é uma simulação, é o mesmo motor de render do editor.
- * Lazy-mount via `useInView`: um deck com muitos slides não pode montar dezenas de árvores de
- * componentes reais (imagens em resolução real, potencialmente 3D) todas de uma vez — mesma
- * causa raiz já corrigida na Dashboard (`CardApresentacao`/miniatura estática), aqui resolvida
- * só renderizando o slide quando ele está perto da viewport do modal. */
-function ThumbnailSlide({ componentes, canvas, captureRef, onVisivel }: { componentes: ComponenteSlide[]; canvas: CanvasConfig; captureRef?: (node: HTMLDivElement | null) => void; onVisivel?: () => void }) {
+/**
+ * 1 slide em miniatura. Por padrão mostra o PNG de referência já gerado no servidor pelo
+ * PowerPoint de verdade (`reference-renderer.ts`) — barato (é só um `<img>`) e, na prática,
+ * MAIS fiel que a reinterpretação do parser (é o PowerPoint renderizando). A renderização ao
+ * vivo via `RenderComponente` (o mesmo motor do editor) só monta quando o usuário pede
+ * explicitamente ("Conferir renderização real") ou quando não há PNG de referência disponível
+ * neste servidor — nesse caso cai pro comportamento antigo, mas já limitado pela paginação.
+ */
+function ThumbnailSlide({
+  componentes, canvas, captureRef, referenceUrl, renderizarAoVivo, onConferir, onVoltarReferencia,
+}: {
+  componentes: ComponenteSlide[];
+  canvas: CanvasConfig;
+  captureRef?: (node: HTMLDivElement | null) => void;
+  referenceUrl?: string;
+  renderizarAoVivo: boolean;
+  onConferir?: () => void;
+  onVoltarReferencia?: () => void;
+}) {
   const escala = LARGURA_THUMBNAIL / canvas.width;
   const altura = Math.round(canvas.height * escala);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const estaVisivel = useInView(containerRef, { margin: "300px" });
 
-  useEffect(() => {
-    if (estaVisivel) onVisivel?.();
-  }, [estaVisivel, onVisivel]);
+  if (referenceUrl && !renderizarAoVivo) {
+    return (
+      <div className="relative overflow-hidden rounded-md" style={{ width: LARGURA_THUMBNAIL, height: altura, backgroundColor: canvas.backgroundColor }}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- PNG já gerado/redimensionado no servidor, thumbnail de modal só */}
+        <img src={referenceUrl} alt="" className="h-full w-full object-cover" />
+        {onConferir && (
+          <button
+            type="button"
+            onClick={onConferir}
+            className="absolute inset-x-0 bottom-0 flex cursor-pointer items-center justify-center gap-1 bg-black/70 py-1 text-[10px] text-white hover:bg-black/90"
+          >
+            <Eye size={11} aria-hidden="true" /> Conferir renderização real
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
-      ref={containerRef}
       className="relative overflow-hidden rounded-md"
       style={{ width: LARGURA_THUMBNAIL, height: altura, backgroundColor: canvas.backgroundColor, backgroundImage: canvas.backgroundImage }}
     >
-      {estaVisivel && (
-        <div
-          ref={captureRef}
-          style={{
-            width: canvas.width,
-            height: canvas.height,
-            transform: `scale(${escala})`,
-            transformOrigin: "top left",
-            position: "relative",
-            backgroundColor: canvas.backgroundColor,
-            backgroundImage: canvas.backgroundImage,
-          }}
+      <div
+        ref={captureRef}
+        style={{
+          width: canvas.width,
+          height: canvas.height,
+          transform: `scale(${escala})`,
+          transformOrigin: "top left",
+          position: "relative",
+          backgroundColor: canvas.backgroundColor,
+          backgroundImage: canvas.backgroundImage,
+        }}
+      >
+        {componentes.map((c) => (
+          <div key={c.id} style={stylePosicaoAbsoluta(c)}>
+            <RenderComponente componente={c} modo="apresentacao" />
+          </div>
+        ))}
+      </div>
+      {referenceUrl && onVoltarReferencia && (
+        <button
+          type="button"
+          onClick={onVoltarReferencia}
+          className="absolute inset-x-0 bottom-0 flex cursor-pointer items-center justify-center gap-1 bg-black/70 py-1 text-[10px] text-white hover:bg-black/90"
         >
-          {componentes.map((c) => (
-            <div key={c.id} style={stylePosicaoAbsoluta(c)}>
-              <RenderComponente componente={c} modo="apresentacao" />
-            </div>
-          ))}
-        </div>
+          <ImageOff size={11} aria-hidden="true" /> Ver imagem original
+        </button>
       )}
     </div>
   );
 }
 
 /**
- * Pré-importador do PPTX: mostra o que o parser extraiu de cada slide (via `RenderComponente`
- * de verdade, não um resumo em texto) ANTES de gravar qualquer coisa no banco. Usuário pode
- * remover slides individuais e só então confirmar ou cancelar — cancelar não deixa nenhum
- * resíduo (a prévia nunca fez upload de imagem nem criou Slide).
+ * Pré-importador do PPTX: mostra o que o parser extraiu de cada slide ANTES de gravar qualquer
+ * coisa no banco. Usuário pode remover slides individuais e só então confirmar ou cancelar —
+ * cancelar não deixa nenhum resíduo (a prévia nunca fez upload de imagem nem criou Slide).
+ * Paginado (`SLIDES_POR_PAGINA`) para nunca montar dezenas de slides simultaneamente — decks
+ * grandes (muitas imagens, ou várias dezenas de slides) travavam o navegador quando a grade
+ * inteira renderizava tudo de uma vez via `RenderComponente`.
  */
 export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arquivo, onImportado }: ModalPreImportarPptxProps) {
   const [status, setStatus] = useState<Status>("carregando");
@@ -125,10 +160,11 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const [referenceImages, setReferenceImages] = useState<Array<{ slideNumber: number; url: string }>>([]);
   const [referenceRenderer, setReferenceRenderer] = useState<{ available: boolean; name?: string; reason?: string } | null>(null);
   const [visualDiffs, setVisualDiffs] = useState<Record<number, { importedUrl: string; diffUrl: string; similarity: number }>>({});
-  const [slidesVisiveis, setSlidesVisiveis] = useState<Set<number>>(new Set());
-  const diffCalculadoRef = useRef<Set<number>>(new Set());
+  const [renderizarAoVivo, setRenderizarAoVivo] = useState<Set<number>>(new Set());
+  const diffPendenteRef = useRef<Set<number>>(new Set());
   const captureRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [excluidos, setExcluidos] = useState<Set<number>>(new Set());
+  const [pagina, setPagina] = useState(0);
   const [confirmando, setConfirmando] = useState(false);
   const [progressoUpload, setProgressoUpload] = useState(0);
   const arquivoRef = useRef<File | null>(null);
@@ -152,8 +188,9 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       setErro(null);
       setExcluidos(new Set());
       setVisualDiffs({});
-      setSlidesVisiveis(new Set());
-      diffCalculadoRef.current = new Set();
+      setRenderizarAoVivo(new Set());
+      setPagina(0);
+      diffPendenteRef.current = new Set();
       setFontes([]);
       setFontesDetectadas([]);
       setFontesEmbutidas([]);
@@ -242,42 +279,47 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
     return () => { cancelado = true; };
   }, [fontesDetectadas, fontesEmbutidas, status]);
 
-  // Só calcula o diff visual dos slides que já ficaram visíveis (lazy-mount de `ThumbnailSlide`
-  // significa que slides fora de vista ainda não têm `captureRefs.current[index]` preenchido) —
-  // reprocessa a lista sempre que um novo slide entra em vista rolando o grid.
-  useEffect(() => {
-    if (status !== "pronto" || !canvas || referenceImages.length === 0 || slidesVisiveis.size === 0) return;
-    let cancelled = false;
-    (async () => {
-      await document.fonts?.ready;
-      for (const index of slidesVisiveis) {
-        if (cancelled) return;
-        if (diffCalculadoRef.current.has(index)) continue;
-        const node = captureRefs.current[index];
-        const reference = referenceImages.find((item) => item.slideNumber === index + 1);
-        if (!node || !reference) continue;
-        diffCalculadoRef.current.add(index);
-        try {
-          const slideCanvas = slides[index].canvas ?? canvas;
-          const importedUrl = await toPng(node, {
-            canvasWidth: slideCanvas.width,
-            canvasHeight: slideCanvas.height,
-            pixelRatio: 1,
-            backgroundColor: slideCanvas.backgroundColor,
-            style: { transform: "none", transformOrigin: "top left" },
-          });
-          const diff = await compararImagens(reference.url, importedUrl, {
-            width: 320,
-            height: Math.max(1, Math.round(320 * slideCanvas.height / slideCanvas.width)),
-          });
-          if (!cancelled) setVisualDiffs((atual) => ({ ...atual, [index]: { importedUrl, diffUrl: diff.diffUrl, similarity: diff.similarity } }));
-        } catch (error) {
-          console.warn(`[PPTX Import] Falha no diff visual do slide ${index + 1}`, error);
-        }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [status, canvas, referenceImages, slides, slidesVisiveis]);
+  /** Sob demanda (nunca automático) — chamado quando o usuário clica "Conferir renderização
+   * real". Ativa o live-render daquele slide e, assim que ele montar, captura e compara contra
+   * o PNG de referência. `diffPendenteRef` é lido dentro do callback de `captureRef` (dispara no
+   * exato momento em que o node monta, sem precisar de IntersectionObserver). */
+  async function calcularDiffVisual(indice: number) {
+    if (!canvas) return;
+    const node = captureRefs.current[indice];
+    const reference = referenceImages.find((item) => item.slideNumber === indice + 1);
+    if (!node || !reference) return;
+    await document.fonts?.ready;
+    try {
+      const slideCanvas = slides[indice]?.canvas ?? canvas;
+      const importedUrl = await toPng(node, {
+        canvasWidth: slideCanvas.width,
+        canvasHeight: slideCanvas.height,
+        pixelRatio: 1,
+        backgroundColor: slideCanvas.backgroundColor,
+        style: { transform: "none", transformOrigin: "top left" },
+      });
+      const diff = await compararImagens(reference.url, importedUrl, {
+        width: 320,
+        height: Math.max(1, Math.round(320 * slideCanvas.height / slideCanvas.width)),
+      });
+      setVisualDiffs((atual) => ({ ...atual, [indice]: { importedUrl, diffUrl: diff.diffUrl, similarity: diff.similarity } }));
+    } catch (error) {
+      console.warn(`[PPTX Import] Falha no diff visual do slide ${indice + 1}`, error);
+    }
+  }
+
+  function conferirRenderizacaoReal(indice: number) {
+    diffPendenteRef.current.add(indice);
+    setRenderizarAoVivo((atual) => new Set(atual).add(indice));
+  }
+
+  function voltarParaReferencia(indice: number) {
+    setRenderizarAoVivo((atual) => {
+      const novo = new Set(atual);
+      novo.delete(indice);
+      return novo;
+    });
+  }
 
   function alternarExclusao(indice: number) {
     setExcluidos((atual) => {
@@ -341,6 +383,11 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const totalIgnoradosPreview = Object.values(ignorados).reduce((soma, n) => soma + n, 0);
   const fontesAusentes = fontes.filter((font) => !font.available);
   const problemasVisuais = diagnosticos.filter((item) => item.severity !== "INFO");
+  const totalPaginas = Math.max(1, Math.ceil(slides.length / SLIDES_POR_PAGINA));
+  const indiceInicialPagina = pagina * SLIDES_POR_PAGINA;
+  const indicesDaPagina = slides
+    .slice(indiceInicialPagina, indiceInicialPagina + SLIDES_POR_PAGINA)
+    .map((_, i) => indiceInicialPagina + i);
 
   return (
     <>
@@ -409,9 +456,11 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
               </div>
             )}
 
-            <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 overflow-y-auto p-5">
-              {slides.map((slide, indice) => {
+            <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start gap-3 overflow-y-auto p-5">
+              {indicesDaPagina.map((indice) => {
+                const slide = slides[indice];
                 const excluido = excluidos.has(indice);
+                const referenceUrl = referenceImages.find((item) => item.slideNumber === indice + 1)?.url;
                 return (
                   <div key={indice} className="flex flex-col gap-1.5">
                     <div
@@ -420,8 +469,17 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                       <ThumbnailSlide
                         componentes={slide.componentes}
                         canvas={slide.canvas ?? canvas}
-                        captureRef={(node) => { captureRefs.current[indice] = node; }}
-                        onVisivel={() => setSlidesVisiveis((atual) => (atual.has(indice) ? atual : new Set(atual).add(indice)))}
+                        captureRef={(node) => {
+                          captureRefs.current[indice] = node;
+                          if (node && diffPendenteRef.current.has(indice)) {
+                            diffPendenteRef.current.delete(indice);
+                            void calcularDiffVisual(indice);
+                          }
+                        }}
+                        referenceUrl={referenceUrl}
+                        renderizarAoVivo={renderizarAoVivo.has(indice)}
+                        onConferir={referenceUrl ? () => conferirRenderizacaoReal(indice) : undefined}
+                        onVoltarReferencia={referenceUrl ? () => voltarParaReferencia(indice) : undefined}
                       />
                       <button
                         type="button"
@@ -433,10 +491,10 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                         {excluido ? <RotateCcw size={12} aria-hidden="true" /> : <X size={12} aria-hidden="true" />}
                       </button>
                     </div>
-                    {visualDiffs[indice] && referenceImages.find((item) => item.slideNumber === indice + 1) && (
+                    {visualDiffs[indice] && referenceUrl && (
                       <div className="grid grid-cols-3 gap-1 text-center text-[9px] text-slate-500">
                         {[
-                          ["Original", referenceImages.find((item) => item.slideNumber === indice + 1)!.url],
+                          ["Original", referenceUrl],
                           ["Importado", visualDiffs[indice].importedUrl],
                           ["Diferença", visualDiffs[indice].diffUrl],
                         ].map(([label, url]) => (
@@ -446,7 +504,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                             <span>{label}</span>
                           </div>
                         ))}
-                        <span className="col-span-3">Similaridade de pixels: {(visualDiffs[indice].similarity * 100).toFixed(1)}% (inspeção visual obrigatória)</span>
+                        <span className="col-span-3">Similaridade de pixels: {(visualDiffs[indice].similarity * 100).toFixed(1)}%</span>
                       </div>
                     )}
                     <span className="text-center text-[11px] text-slate-500">Slide {indice + 1}{excluido ? " (removido)" : ""}</span>
@@ -454,6 +512,32 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                 );
               })}
             </div>
+
+            {totalPaginas > 1 && (
+              <div className="flex items-center justify-center gap-3 border-t border-white/5 py-2">
+                <button
+                  type="button"
+                  onClick={() => setPagina((p) => Math.max(0, p - 1))}
+                  disabled={pagina <= 0}
+                  aria-label="Página anterior de slides"
+                  className="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronLeft size={16} aria-hidden="true" />
+                </button>
+                <span className="text-xs font-medium text-slate-400">
+                  Página {pagina + 1} de {totalPaginas}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPagina((p) => Math.min(totalPaginas - 1, p + 1))}
+                  disabled={pagina >= totalPaginas - 1}
+                  aria-label="Próxima página de slides"
+                  className="cursor-pointer rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 border-t border-white/5 px-5 py-3">
               <button

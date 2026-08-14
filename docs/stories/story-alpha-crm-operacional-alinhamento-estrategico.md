@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Dev
+Ready for Review
 
 ## Objetivo
 
@@ -30,13 +30,27 @@ Tornar a etapa **Alinhamento Estratégico agendado** operacional: lembrar visual
 
 ## Tasks
 
-- [ ] Criar helpers de etapa, template e validação de CPF.
-- [ ] Suportar os tipos de campo `texto_longo` e `cpf` no editor/validador.
-- [ ] Configurar os campos obrigatórios da etapa no pipeline Operacional.
-- [ ] Aplicar alerta e template no formulário e no board.
-- [ ] Estender o guard de transição, com validação pré e transacional.
-- [ ] Cobrir os fluxos com testes e executar quality gates.
+- [x] Criar helpers de etapa, template e validação de CPF.
+- [x] Suportar os tipos de campo `texto_longo` e `cpf` no editor/validador.
+- [x] Configurar os campos obrigatórios da etapa no pipeline Operacional.
+- [x] Aplicar alerta e template no formulário e no board.
+- [x] Estender o guard de transição, com validação pré e transacional.
+- [x] Cobrir os fluxos com testes e executar quality gates.
 
 ## File List
 
-- A preencher após a implementação.
+- `src/lib/bpm/alinhamento-estrategico.ts`
+- `src/lib/bpm/campos-dinamicos.ts`
+- `src/lib/validations/bpm.ts`
+- `src/actions/bpm/Cards.ts`
+- `src/app/PainelAlpha/AlphaCRM/CampoBpmInput.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
+- `tests/bpm/alinhamento-estrategico.test.ts`
+
+## Validação
+
+- `npx vitest run tests/bpm` — 42 arquivos / 247 testes passaram.
+- ESLint focado — passou.
+- `git diff --check` — passou.
+- `npx tsc --noEmit` permanece bloqueado por erros anteriores fora deste recorte, incluindo cliente Prisma desatualizado e módulos de CS/NPS, Exclusão Fiscal, Habilitação Radar e testes de Google Calendar. O único erro novo desta story foi corrigido antes da regressão BPM.

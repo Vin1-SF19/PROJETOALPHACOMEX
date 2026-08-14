@@ -1,6 +1,7 @@
 import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
@@ -19,6 +20,35 @@ export const maxDuration = 120;
 
 function isAdmin(role?: string) {
   return isAdminRole(role);
+}
+
+const PREVIEW_IMAGEM_MAX_DIMENSAO = 480;
+const MIME_REDIMENSIONAVEL: Readonly<Record<string, "png" | "jpeg" | "webp">> = {
+  "image/png": "png",
+  "image/jpeg": "jpeg",
+  "image/webp": "webp",
+  "image/gif": "png",
+};
+
+/**
+ * Só a PRÉVIA reduz imagens (o commit real em `importar-pptx/route.ts` sempre usa os bytes
+ * originais — fidelidade da apresentação final nunca é afetada). Miniatura de 220px de largura
+ * não precisa da imagem em resolução nativa (as do PPTX frequentemente passam de 2000px) —
+ * baixar/decodificar isso pra só escalar via CSS depois é o principal peso do grid de prévia.
+ */
+async function prepararBytesParaPreview(bytes: Uint8Array, mimeType: string): Promise<{ bytes: Uint8Array; mimeType: string }> {
+  const formato = MIME_REDIMENSIONAVEL[mimeType];
+  if (!formato) return { bytes, mimeType };
+  try {
+    const redimensionado = await sharp(Buffer.from(bytes))
+      .resize({ width: PREVIEW_IMAGEM_MAX_DIMENSAO, height: PREVIEW_IMAGEM_MAX_DIMENSAO, fit: "inside", withoutEnlargement: true })
+      .toFormat(formato)
+      .toBuffer();
+    return { bytes: new Uint8Array(redimensionado), mimeType: `image/${formato}` };
+  } catch (erro) {
+    console.warn("[pptx-preview] Falha ao reduzir imagem para prévia, usando original", erro);
+    return { bytes, mimeType };
+  }
 }
 
 async function podeEditar(apresentacaoId: string, userId: number, role?: string): Promise<boolean> {
@@ -100,12 +130,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const existente = cacheUploads.get(hash);
       if (existente) return existente;
       const upload = (async () => {
-        const extensao = nomeArquivo.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "bin";
+        const preparado = await prepararBytesParaPreview(bytes, mimeType);
+        const extensao = preparado.mimeType !== mimeType
+          ? (preparado.mimeType === "image/png" ? "png" : preparado.mimeType === "image/webp" ? "webp" : "jpg")
+          : (nomeArquivo.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "bin");
         const caminho = `${prefixoPreviewPptx(apresentacaoId)}${crypto.randomUUID()}-${hash.slice(0, 12)}.${extensao}`;
-        const blob = await put(caminho, Buffer.from(bytes), {
+        const blob = await put(caminho, Buffer.from(preparado.bytes), {
           access: "public",
           addRandomSuffix: false,
-          contentType: mimeType,
+          contentType: preparado.mimeType,
           token: obterTokenMotion(),
         });
         urlsTemporarias.push(blob.url);

@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
-  clientes: {
+  cliente: {
     create: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
   },
-  historicoAlteracaoCliente: {
+  clienteServico: {
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
+  },
+  clienteServicoHistorico: {
     createMany: vi.fn(),
   },
+  $transaction: vi.fn(),
 }));
 
 const authMock = vi.hoisted(() => vi.fn());
@@ -19,7 +25,7 @@ vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
 import { ORIGENS_LEAD_PADRAO } from "@/app/PainelAlpha/CadastroClientes/ModalCadastro/origens-lead";
-import { CadastrarCliente, salvarAlteracoesGeral } from "@/actions/Clientes";
+import { CadastrarCliente, salvarAlteracoesServico } from "@/actions/Clientes";
 
 const NOVAS_ORIGENS = [
   "Discadora",
@@ -31,13 +37,20 @@ beforeEach(() => {
   authMock.mockResolvedValue({
     user: { id: "7", nome: "Ana Responsável" },
   });
-  prismaMock.clientes.create.mockResolvedValue({ id: 10 });
-  prismaMock.clientes.findUnique.mockResolvedValue({
+  prismaMock.cliente.findUnique.mockResolvedValue(null);
+  prismaMock.cliente.create.mockResolvedValue({ id: 501 });
+  prismaMock.$transaction.mockImplementation(async (fn) => fn({
+    clienteServico: { create: prismaMock.clienteServico.create },
+    pessoa: { upsert: vi.fn() },
+    pessoaClienteVinculo: { upsert: vi.fn() },
+  }));
+  prismaMock.clienteServico.create.mockResolvedValue({ id: 10 });
+  prismaMock.clienteServico.findUnique.mockResolvedValue({
     id: 10,
     origemLead: "Evento",
   });
-  prismaMock.clientes.update.mockResolvedValue({ id: 10 });
-  prismaMock.historicoAlteracaoCliente.createMany.mockResolvedValue({ count: 1 });
+  prismaMock.clienteServico.update.mockResolvedValue({ id: 10 });
+  prismaMock.clienteServicoHistorico.createMany.mockResolvedValue({ count: 1 });
 });
 
 describe("origens padrão do lead no CS & NPS", () => {
@@ -67,26 +80,39 @@ describe("origens padrão do lead no CS & NPS", () => {
   });
 });
 
-describe("persistência das novas origens", () => {
+describe("persistência das novas origens (Fase 3.6 do Cliente Master)", () => {
   it.each(NOVAS_ORIGENS)("salva %s integralmente no cadastro", async (origemLead) => {
     const resultado = await CadastrarCliente({
       cnpj: "12.345.678/0001-90",
       razaoSocial: "Empresa Teste",
-      servicos: "Consultoria",
+      servico: "Consultoria",
       origemLead,
     }, []);
 
-    expect(resultado).toEqual({ success: true });
-    expect(prismaMock.clientes.create).toHaveBeenCalledWith({
+    expect(resultado).toEqual({ success: true, clienteServicoId: 10 });
+    expect(prismaMock.clienteServico.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ origemLead }),
     });
   });
 
   it.each(NOVAS_ORIGENS)("salva %s integralmente na edição", async (origemLead) => {
-    const resultado = await salvarAlteracoesGeral(10, { origemLead });
+    const resultado = await salvarAlteracoesServico(10, {
+      analistaResponsavel: null,
+      dataContratacao: null,
+      status: "Em Andamento",
+      nps: null,
+      feedbackGoogle: false,
+      nomeGoogle: null,
+      embasamento: null,
+      origemLead,
+      dataExito: null,
+      formaPagamento: null,
+      valorContrato: null,
+      closerNome: null,
+    });
 
     expect(resultado).toEqual({ success: true });
-    expect(prismaMock.clientes.update).toHaveBeenCalledWith({
+    expect(prismaMock.clienteServico.update).toHaveBeenCalledWith({
       where: { id: 10 },
       data: expect.objectContaining({ origemLead }),
     });
