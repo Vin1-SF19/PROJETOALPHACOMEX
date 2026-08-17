@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,6 +49,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { RoadmapModuleSnapshot } from "@/lib/roadmap-alpha/catalog";
+import { RoadmapProductionPanel } from "@/components/RoadmapAlpha/RoadmapProductionPanel";
 
 interface RoadmapArtifact {
   id: string;
@@ -89,6 +91,7 @@ interface Props {
   initialObjectives: RoadmapObjectiveView[];
   modules: RoadmapModuleSnapshot[];
   canMutate: boolean;
+  canAccessProduction: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -135,6 +138,7 @@ export function RoadmapDashboard({
   initialObjectives,
   modules,
   canMutate,
+  canAccessProduction,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -152,6 +156,7 @@ export function RoadmapDashboard({
   const [mobilePane, setMobilePane] = useState<
     "modules" | "objectives" | "docs"
   >("objectives");
+  const [view, setView] = useState<"roadmap" | "production">("roadmap");
 
   const refreshObjectives = useCallback(async () => {
     if (refreshInFlight.current || document.visibilityState === "hidden")
@@ -239,6 +244,10 @@ export function RoadmapDashboard({
     return Array.from(groups);
   }, [modules]);
 
+  if (view === "production") {
+    return <RoadmapProductionPanel canManage={canMutate} onBack={() => setView("roadmap")} />;
+  }
+
   return (
     <main className="flex h-[calc(100dvh-1rem)] min-h-[680px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#07101f] text-slate-100 shadow-2xl">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur-xl">
@@ -254,6 +263,15 @@ export function RoadmapDashboard({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {canAccessProduction && (
+            <Button
+              variant="outline"
+              onClick={() => setView("production")}
+              className="border-violet-400/20 bg-violet-400/[.06] text-violet-200 hover:bg-violet-400/10"
+            >
+              <Workflow size={16} /> Produção
+            </Button>
+          )}
           <span className="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs text-slate-400 sm:inline-flex">
             <span
               className={`size-1.5 rounded-full ${hasActiveDocumentation ? "animate-pulse bg-cyan-400" : "bg-emerald-400"}`}

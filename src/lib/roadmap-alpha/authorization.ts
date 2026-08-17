@@ -7,6 +7,7 @@ export interface RoadmapAccess {
   userId: number;
   role: string;
   canMutate: boolean;
+  canAccessProduction: boolean;
 }
 
 export async function requireRoadmapAccess(requireMutation = false): Promise<RoadmapAccess> {
@@ -23,11 +24,21 @@ export async function requireRoadmapAccess(requireMutation = false): Promise<Roa
   if (!user || user.status !== "ATIVO") throw new Error("FORBIDDEN");
 
   const canMutate = isAdminRole(user.role);
+  let canAccessProduction = canMutate;
   if (!canMutate) {
     const permissions = await getPermissoesEfetivas(userId);
     if (!permissions.includes("roadmap")) throw new Error("FORBIDDEN");
+    canAccessProduction = permissions.includes("roadmapProduction");
   }
   if (requireMutation && !canMutate) throw new Error("FORBIDDEN");
 
-  return { userId, role: user.role, canMutate };
+  return { userId, role: user.role, canMutate, canAccessProduction };
+}
+
+export async function requireRoadmapProductionAccess(requireAdmin = false): Promise<RoadmapAccess> {
+  const access = await requireRoadmapAccess();
+  if (!access.canAccessProduction || (requireAdmin && !access.canMutate)) {
+    throw new Error("FORBIDDEN");
+  }
+  return access;
 }

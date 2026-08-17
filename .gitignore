@@ -64,3 +64,6 @@ next-env.d.ts
 
 # Estado e logs locais do worker contínuo do Roadmap Alpha
 /.roadmap-worker/
+
+# Configuração, telemetria e logs locais da execução em Produção do Roadmap
+/.roadmap-production/

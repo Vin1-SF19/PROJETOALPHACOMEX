@@ -40,6 +40,7 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
     return {
       success: true as const,
       canMutate: access.canMutate,
+      canAccessProduction: access.canAccessProduction,
       data: objectives.map((objective) => ({
         ...objective,
         acceptanceCriteria: JSON.parse(objective.acceptanceCriteriaJson) as string[],
@@ -52,7 +53,7 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
       })),
     };
   } catch (error) {
-    return { success: false as const, error: publicError(error), data: [], canMutate: false };
+    return { success: false as const, error: publicError(error), data: [], canMutate: false, canAccessProduction: false };
   }
 }
 

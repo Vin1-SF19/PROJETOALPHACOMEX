@@ -18,6 +18,8 @@
 
 6. Uma edição material cria uma nova revisão; mudar apenas a prioridade não regenera a documentação.
 
+A UI consulta o estado automaticamente a cada dois segundos enquanto houver item na fila. O painel mostra a transição **Na fila → Documentando → Documentado** e exibe as fases assim que a publicação termina, sem recarregar a página.
+
 O Roadmap documenta prompts, mas nunca os executa.
 
 ## Comandos

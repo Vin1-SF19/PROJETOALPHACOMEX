@@ -130,6 +130,7 @@ O snapshot remoto de `2026-08-15 11:54 BRT` foi formalmente selecionado como bas
 - 2026-08-15: story criada pelo `@sm`, revisada pelo `@architect`, auditada pelo Vault e mantida em Draft pelo `@po`.
 - 2026-08-15: migration explicitamente autorizada, aplicada e validada; domínio, CLI, worker Qwen, projeção e UI implementados pelo `@dev`. Story mantida em `In Progress` até instalar o worker como serviço contínuo.
 - 2026-08-15: versão 1.0.0 concluída; worker persistente instalado, edição material/versionamento e fencing reforçados, E2E real de duas revisões aprovado. Status alterado para `Ready for Review`.
+- 2026-08-17: versão 1.0.1; polling ao vivo da fila/documentação implementado, objetivo pendente recuperado com cinco fases e tarefa agendada reforçada com watchdog de um minuto validado por parada real.
 
 ## Dev Agent Record
 
@@ -148,6 +149,7 @@ Codex (GPT-5)
 - CLI implementado: doctor, check/sync modules, enqueue, worker, reconcile e export.
 - Worker persistente instalado como tarefa agendada no Windows; parada/reinício foi validada sem processos órfãos e o estado final é `Running`.
 - Dois E2Es reais via serviço comprovaram criação, Qwen, persistência, projeção e revisão `r0001 → r0002`; todos os dados técnicos foram removidos ao final.
+- UI acompanha fila e geração a cada dois segundos e publica visualmente os prompts sem F5; watchdog religa o worker em até um minuto se a tarefa parar.
 - ESLint direcionado passou; 26 testes do Roadmap passaram; build Next de produção passou. Typecheck mantém somente cinco diagnósticos preexistentes fora do Roadmap.
 - Verificação visual automatizada ficou bloqueada na autenticação do navegador isolado; nenhuma credencial foi solicitada ou usada.
 

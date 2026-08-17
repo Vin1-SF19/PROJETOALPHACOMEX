@@ -7,7 +7,10 @@ import db from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { MODULOS_REGISTRY } from '@/lib/modulos-registry';
 
-const KNOWN_MODULOS = new Set(MODULOS_REGISTRY.map(m => m.permission).filter(Boolean) as string[]);
+const KNOWN_MODULOS = new Set([
+  ...(MODULOS_REGISTRY.map(m => m.permission).filter(Boolean) as string[]),
+  "roadmapProduction",
+]);
 
 async function requireAdminSession() {
   const session = await auth();
@@ -188,6 +191,7 @@ export async function toggleAcessoModulo(usuarioId: number, modulo: string) {
   if (existing?.acao === 'ADD') {
     await db.usuarioPermissaoOverride.delete({ where: { id: existing.id } });
     revalidatePath('/PainelAlpha/AlphaSkills/Gerenciamento');
+    revalidatePath('/PainelAlpha/Roadmap');
     return { success: true as const, hasAccess: false };
   }
 
@@ -197,6 +201,7 @@ export async function toggleAcessoModulo(usuarioId: number, modulo: string) {
     update: { acao: 'ADD', criadoPor: adminId },
   });
   revalidatePath('/PainelAlpha/AlphaSkills/Gerenciamento');
+  revalidatePath('/PainelAlpha/Roadmap');
   return { success: true as const, hasAccess: true };
 }
 

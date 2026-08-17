@@ -15,6 +15,7 @@ export default async function RoadmapAlphaPage() {
       initialObjectives={result.data}
       modules={getRoadmapModuleCatalog()}
       canMutate={result.canMutate}
+      canAccessProduction={result.canAccessProduction}
     />
   );
 }
