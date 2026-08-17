@@ -78,6 +78,41 @@ Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array
 | Admin | Conectores IAlpha | `/PainelAlpha/Conectores` | admin only |
 | Infra | Bloco de notas ALpha | `/PainelAlpha/Notas` | `notas` ← **Fases 01-05/8 concluídas em 2026-08-07, migration APLICADA EM PRODUÇÃO** (schema+permissões, barra global+editor+autosave, Central de Notas, contextos, colaboração/histórico/notificações real-time — ver seção própria abaixo e `architecture.md`) |
 
+### Alpha CRM — Padronizar layout dos pipelines do quadro Kanban (RM-2026-41E240, 2026-08-17)
+
+Objetivo concluído. Três defeitos de layout corrigidos em `PipelineBoardClient.tsx` e `crm-pipeline-border.tsx`:
+
+1. **Altura total:** pipelines ocupam 100% da área visível. Cadeia: contêiner `flex-1 min-h-0 overflow-y-hidden` → coluna `h-full min-h-0` → área de cards `flex-1 min-h-0 overflow-y-auto`. Margem inferior responsiva `pb-[clamp(8px,2vh,24px)]`.
+2. **Largura proporcional:** colunas `md:w-[260px] lg:w-[280px] xl:w-[300px]` + `gap-3` (12px). Cards `px-2.5 pb-2.5 pt-3`. Capacidade: ≥ 4 colunas em 1280px, ≥ 6 em 1920px.
+3. **Linha vermelha contida:** card `overflow-hidden` (era `overflow-y-auto overflow-x-hidden`); rolagem interna migrada para inner content do `CrmPipelineBorder` (`overflow-y-auto`). Accent bar `absolute inset-y-0 left-0 w-1` e `border-red-500/70` contidas.
+
+**Arquivos alterados:**
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — altura, largura, contenção
+- `src/components/ui/crm-pipeline-border.tsx` — `overflow-y-auto` no inner content
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardSkeleton.tsx` — largura 260px
+- `src/app/PainelAlpha/AlphaCRM/README.md` — dimensões atualizadas
+
+**Notas de manutenção:**
+- Largura: respeitar `min-width: 200px` / `max-width: 340px` em ajustes futuros.
+- `overflow-hidden` no card é necessário para contenção; ao adicionar elementos `position: absolute` ou `overflow: visible`, verificar que não quebrem a contenção.
+- Margem inferior `clamp(8px,2vh,24px)` — ao alterar header/toolbar, ajustar o `calc()` da altura do contêiner.
+
+**Verificação:** Probe aprovou 8/8 ACs. Zero regressões.
+
+**Última atualização:** 2026-08-17 por Scribe
+
+### Alpha CRM — Melhoria Visual da Sidebar (RM-2026-4F34CC, 2026-08-17)
+
+Objetivo concluído. Sidebar do CRM agora usa o componente `FlowButton` (`src/components/ui/flow-button.tsx`) para os botões de navegação, com transições 700ms `cubic-bezier(0.22,1,0.36,1)`, borda animada, elementos decorativos (seta + ponto), `active:scale-[0.97]` e espaçamento `space-y-2` (8px). O fundo da sidebar foi reduzido para `bg-slate-950/20 backdrop-blur-md` para o `CrmSpaceBackground` ser visível através dela.
+
+**Arquivos alterados:**
+- `src/components/ui/flow-button.tsx` — CRIADO (componente FlowButton, padrão shadcn)
+- `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx` — EDITADO (NAV usa FlowButton, espaçamento, fundo)
+
+**Verificação:** Probe aprovou 6/6 critérios de aceitação. Zero regressão funcional.
+
+**Última atualização:** 2026-08-17 por Scribe
+
 ### Alpha CheckList — organização operacional (2026-07-14)
 
 O módulo continua em `src/app/PainelAlpha/CheckList/`, com as Server Actions em
@@ -795,3 +830,22 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - Cobertura específica: `tests/bpm/membros-card-actions.test.ts`, `membros-card-ownership.test.ts`, `membros-card-ui.test.ts`, com regressões de autorização/realtime relacionadas. Nenhuma migration, seed ou backfill foi executado.
 
 **Última atualização:** 2026-08-14 por Scribe/Kowalski
+
+---
+
+### Alpha CRM — Melhoria Visual da Sidebar (RM-2026-4F34CC, 2026-08-17)
+
+**Arquivo único alterado:** `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`
+
+**Alterações (exclusivamente visual, zero mudança de lógica):**
+1. `<aside>`: `bg-slate-950` → `bg-slate-950/40 backdrop-blur-xl` — o `CrmSpaceBackground` (já `absolute inset-0 z-0`) agora é visível através da sidebar.
+2. Mobile top bar: `bg-slate-950/80` → `bg-slate-950/40 backdrop-blur-xl` — consistência visual.
+3. NAV links: adicionados `bg-white/[0.04] border border-white/[0.06] rounded-xl` (destaque base), `hover:bg-white/[0.08] hover:shadow-[0_2px_8px_rgba(0,0,0,0.15)] hover:translate-x-0.5` (hover), `active:scale-[0.98] active:shadow-none` (active), `transition-all duration-200 ease-in-out` (transição), `cursor-pointer`.
+4. Ícone NAV: `group-hover:scale-110 transition-transform duration-200`.
+5. Item ativo: `boxShadow: 0 0 12px rgba(accent,0.1)` (glow de accent via `style` inline).
+
+**Padrão adotado:** "Sidebar sobre background vivo" — extensão do "vidro sobre hero" do Aurora Financeira. Ver `design-tokens.md` e `patterns.md`.
+
+**Verificação:** Probe aprovou todos os 6 critérios de aceitação. Sem regressão funcional. Observação menor (não bloqueante): área de toque vertical ~40px (ideal 44px) — `py-2.5` → `py-3` seria a correção.
+
+**Última atualização:** 2026-08-17 por Scribe

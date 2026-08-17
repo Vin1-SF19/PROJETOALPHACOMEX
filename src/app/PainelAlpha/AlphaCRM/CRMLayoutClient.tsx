@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getTema } from "@/lib/temas";
 import { CrmSpaceBackground } from "./CRMBackground";
+import { FlowButton } from "@/components/ui/flow-button";
 import type { Session } from "next-auth";
 import { isAdminRole } from "@/lib/roles";
 import {
@@ -57,24 +57,19 @@ export default function CRMLayout({ children, session }: { children: React.React
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5">
+      <nav className="flex-1 p-3 space-y-2">
         {NAV.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
-            <Link
+            <FlowButton
               key={href}
+              icon={Icon}
+              label={label}
               href={href}
+              active={active}
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={
-                active
-                  ? { background: `rgba(${accent},0.15)`, color: `rgb(${accent})` }
-                  : { color: "#94a3b8" }
-              }
-            >
-              <Icon size={16} />
-              {label}
-            </Link>
+              accent={accent}
+            />
           );
         })}
       </nav>
@@ -99,7 +94,7 @@ export default function CRMLayout({ children, session }: { children: React.React
         className={[
           "fixed md:static inset-y-0 left-0 z-50 w-64 md:w-56",
           "flex flex-col shrink-0",
-          "border-r border-white/5 bg-slate-950",
+          "border-r border-white/5 bg-slate-950/20 backdrop-blur-md",
           "transition-transform duration-200 ease-in-out",
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         ].join(" ")}
@@ -112,7 +107,7 @@ export default function CRMLayout({ children, session }: { children: React.React
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
         {/* Mobile top bar */}
         <div
-          className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-slate-950/80 sticky top-0 z-30"
+          className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-slate-950/20 backdrop-blur-md sticky top-0 z-30"
           style={{ borderColor: `rgba(${accent},0.1)` }}
         >
           <button

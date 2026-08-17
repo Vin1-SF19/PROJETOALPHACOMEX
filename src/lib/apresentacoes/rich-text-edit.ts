@@ -1,8 +1,10 @@
 import type { TextoComponente } from "@/lib/validations/slide-componentes";
 
 export type RichTextAlpha = NonNullable<TextoComponente["richText"]>;
-type RichRun = RichTextAlpha["paragraphs"][number]["runs"][number];
+type RichParagraph = RichTextAlpha["paragraphs"][number];
+type RichRun = RichParagraph["runs"][number];
 export type RichRunPatch = Partial<Omit<RichRun, "text">>;
+export type RichParagraphPatch = Partial<Omit<RichParagraph, "runs">>;
 
 export function textoPlanoDoRichText(richText: RichTextAlpha): string {
   return richText.paragraphs
@@ -136,6 +138,32 @@ export function sincronizarRichTextComTexto(richText: RichTextAlpha, textoNovo: 
       };
     }),
   };
+}
+
+/** Aplica propriedades de PARÁGRAFO (espaçamento antes/depois, recuo, margem — estilo Word)
+ * a TODOS os parágrafos do rich text, criando o rich text a partir do texto plano quando o
+ * componente ainda não tiver um (texto digitado do zero no editor, nunca importado de PPTX). */
+export function aplicarPropriedadeParagrafo(
+  richText: RichTextAlpha,
+  patch: RichParagraphPatch,
+): RichTextAlpha {
+  return {
+    paragraphs: richText.paragraphs.map((paragraph) => ({ ...paragraph, ...patch })),
+  };
+}
+
+/** Remove marcador/numeração (`bullet`/`numbering`) de TODOS os parágrafos — o prefixo
+ * ("1.", "•") é sintetizado na renderização a partir desses campos, fora da string editável
+ * de `componente.texto`, então o usuário nunca consegue "selecionar e apagar" via textarea
+ * (bug relatado: "fica o número 1 e não consigo apagar"). Este é o único jeito de removê-lo. */
+export function removerListaDoRichText(richText: RichTextAlpha): RichTextAlpha {
+  return {
+    paragraphs: richText.paragraphs.map((paragraph) => ({ ...paragraph, bullet: undefined, numbering: undefined })),
+  };
+}
+
+export function richTextTemLista(richText: RichTextAlpha | undefined): boolean {
+  return richText?.paragraphs.some((paragraph) => paragraph.bullet || paragraph.numbering) ?? false;
 }
 
 export function atualizarRunRichText(

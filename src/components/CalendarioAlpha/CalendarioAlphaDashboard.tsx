@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 
 import type { StatusConexaoCalendarioAlpha } from "@/actions/google-calendar-conexao";
+import { GuiaModuloTour } from "@/components/Guias/GuiaModuloTour";
+import { marcarTutorialModuloComoVisto, tutorialModuloFoiVisto } from "@/lib/guias/tutorial-modulo";
 import { getTema } from "@/lib/temas";
 
 import { AgendaOverlays } from "./AgendaOverlays";
@@ -12,8 +15,10 @@ import { ConteudoAgenda } from "./ConteudoAgenda";
 import { EstadoDesconectado } from "./EstadoDesconectado";
 import { HeaderCalendario } from "./HeaderCalendario";
 import { StatusSincronizacao } from "./StatusSincronizacao";
+import { TutorialAgendaModal } from "./TutorialAgendaModal";
 import { dataAnterior, proximaData, type VisaoCalendario } from "./lib/datas";
 import type { CalendarioSelecionadoView, EventoExibicao } from "./lib/tipos";
+import { TUTORIAL_AGENDA } from "./lib/tutorial-agenda";
 import { useAgendaAlphaController } from "./lib/useAgendaAlphaController";
 
 interface CalendarioAlphaDashboardProps {
@@ -45,6 +50,7 @@ export function CalendarioAlphaDashboard({
   algumaFalhaSync,
 }: CalendarioAlphaDashboardProps) {
   const tema = getTema(temaName);
+  const accent = tema.accent;
   const agenda = useAgendaAlphaController({
     statusConexao,
     conexaoId,
@@ -52,6 +58,50 @@ export function CalendarioAlphaDashboard({
     dataReferenciaISO,
     algumaFalhaSync,
   });
+
+  const { data: session } = useSession();
+  const usuarioAtualId = Number((session?.user as { id?: string | number } | undefined)?.id ?? 0);
+  const [tutorialAberto, setTutorialAberto] = useState(false);
+  const [tourAberto, setTourAberto] = useState(false);
+
+  useEffect(() => {
+    if (!usuarioAtualId) return;
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        if (!tutorialModuloFoiVisto(window.localStorage, TUTORIAL_AGENDA, usuarioAtualId)) {
+          setTutorialAberto(true);
+        }
+      } catch {
+        setTutorialAberto(true);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [usuarioAtualId]);
+
+  const finalizarTutorial = useCallback(() => {
+    try {
+      marcarTutorialModuloComoVisto(window.localStorage, TUTORIAL_AGENDA, usuarioAtualId);
+    } catch {
+      // O tour continua utilizável quando o navegador bloqueia armazenamento local.
+    }
+    setTutorialAberto(false);
+  }, [usuarioAtualId]);
+
+  const iniciarTourGuiado = useCallback(() => {
+    setTutorialAberto(false);
+    // Aguarda o modal terminar de fechar antes de medir posições de spotlight — abrir os dois
+    // ao mesmo tempo faria o GuiaModuloTour calcular retângulos com o modal ainda ocupando tela.
+    window.requestAnimationFrame(() => setTourAberto(true));
+  }, []);
+
+  const finalizarTour = useCallback(() => {
+    try {
+      marcarTutorialModuloComoVisto(window.localStorage, TUTORIAL_AGENDA, usuarioAtualId);
+    } catch {
+      // O tour continua utilizável quando o navegador bloqueia armazenamento local.
+    }
+    setTourAberto(false);
+  }, [usuarioAtualId]);
 
   useEffect(() => {
     function atalhos(evento: KeyboardEvent) {
@@ -119,6 +169,7 @@ export function CalendarioAlphaDashboard({
         onNovoEvento={() => agenda.abrirNovoEvento()}
         onAbrirSidebar={() => agenda.setSidebarMobileAberta(true)}
         onAbrirConfiguracoes={agenda.abrirConfiguracoes}
+        onAbrirTutorial={() => setTutorialAberto(true)}
       />
 
       <div className="flex min-h-0 flex-1 gap-3">
@@ -214,6 +265,14 @@ export function CalendarioAlphaDashboard({
         onAtualizarPermissoes={agenda.abrirPermissoes}
         onConfirmarDesativacao={agenda.confirmarDesativacao}
       />
+
+      <TutorialAgendaModal
+        aberto={tutorialAberto}
+        onFechar={finalizarTutorial}
+        onIniciarTour={iniciarTourGuiado}
+        accent={accent}
+      />
+      <GuiaModuloTour aberto={tourAberto} config={TUTORIAL_AGENDA} accent={accent} onFinalizar={finalizarTour} />
     </div>
   );
 }

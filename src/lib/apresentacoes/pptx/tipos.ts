@@ -54,6 +54,14 @@ export interface FormaImagemExtraida extends RetanguloExtraido {
    * o necessário, e o download some era pago de novo a cada abertura do slide).
    */
   recorte?: { pathSvg: string; viewBoxW: number; viewBoxH: number; crop?: PptxCrop; opacidade?: number };
+  /**
+   * `true` quando o retângulo (x/y/w/h acima) foi HERDADO de um placeholder de layout/master
+   * (`buscarPosicaoNoLayout`), não do `<a:xfrm>` próprio da imagem — nesse caso a proporção da
+   * caixa é genérica (pensada pra qualquer conteúdo) e pode não bater com a proporção real da
+   * imagem inserida, então `mapear.ts` decide "cover" (preserva proporção) em vez de "fill"
+   * (estica) quando as proporções divergem. Ver bug "imagens espichadas no import PPTX".
+   */
+  retanguloHerdado?: boolean;
 }
 
 export interface FormaTabelaExtraida extends RetanguloExtraido {

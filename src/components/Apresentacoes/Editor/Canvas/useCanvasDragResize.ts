@@ -33,6 +33,7 @@ export function useCanvasDragResize(componente: ComponenteSlide) {
   const { id: componenteId, x, y, w, h, rotacao } = componente;
   const atualizarComponente = useEditorStore((s) => s.atualizarComponente);
   const moverComponentes = useEditorStore((s) => s.moverComponentes);
+  const duplicarComponentes = useEditorStore((s) => s.duplicarComponentes);
   const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
   const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
   const setGuiasAlinhamento = useEditorStore((s) => s.setGuiasAlinhamento);
@@ -64,10 +65,20 @@ export function useCanvasDragResize(componente: ComponenteSlide) {
 
   const onMouseDownMover = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    const estado = useEditorStore.getState();
-    const ids = estado.componentesSelecionadosIds.includes(componenteId)
+    let estado = useEditorStore.getState();
+    let ids = estado.componentesSelecionadosIds.includes(componenteId)
       ? estado.componentesSelecionadosIds
       : [componenteId];
+
+    // Alt+arrastar (padrão Canva/Figma): duplica o(s) elemento(s) ANTES de iniciar o gesto,
+    // sem offset (o próprio drag já move a cópia) — o usuário arrasta a cópia, o original
+    // fica no lugar. `duplicarComponentes` já seleciona as cópias, então relê o estado.
+    if (e.altKey) {
+      duplicarComponentes(ids, false);
+      estado = useEditorStore.getState();
+      ids = estado.componentesSelecionadosIds;
+    }
+
     const origens = coletarOrigensMoviveis(estado.componentes, new Set(ids));
     const idsMovidos = new Set(origens.map((origem) => origem.id));
     const caixasMoveis = estado.componentes
@@ -106,7 +117,7 @@ export function useCanvasDragResize(componente: ComponenteSlide) {
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [componenteId, finalizarTransacaoHistorico, iniciarTransacaoHistorico, moverComponentes, setGuiasAlinhamento]);
+  }, [componenteId, duplicarComponentes, finalizarTransacaoHistorico, iniciarTransacaoHistorico, moverComponentes, setGuiasAlinhamento]);
 
   const onMouseDownRedimensionar = useCallback((handle: HandlePosicao) => (e: React.MouseEvent) => {
     e.stopPropagation();

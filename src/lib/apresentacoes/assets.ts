@@ -58,3 +58,22 @@ export function formatarTamanhoAsset(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/** Envia um arquivo pro Blob Store da apresentação (`/api/apresentacoes/assets`) e devolve o
+ * asset criado — pipeline único e compartilhado, usado tanto pela Biblioteca de Assets quanto
+ * pelo upload direto de imagem no painel de propriedades do elemento. */
+export async function enviarArquivoAsset(apresentacaoId: string, arquivo: File): Promise<AssetApresentacao> {
+  const formData = new FormData();
+  formData.set("apresentacaoId", apresentacaoId);
+  formData.set("file", arquivo);
+  const response = await fetch("/api/apresentacoes/assets", { method: "POST", body: formData });
+  const payload: unknown = await response.json();
+  if (!response.ok || typeof payload !== "object" || payload === null || !("asset" in payload)) {
+    const mensagem = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+      ? payload.error : "Falha ao enviar arquivo.";
+    throw new Error(mensagem);
+  }
+  const asset = assetApresentacaoSchema.safeParse(payload.asset);
+  if (!asset.success) throw new Error("O servidor retornou um arquivo inválido.");
+  return asset.data;
+}

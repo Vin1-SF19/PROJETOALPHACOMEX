@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
-import { Loader2, TriangleAlert, X, RotateCcw, FileWarning, ChevronLeft, ChevronRight, Eye, ImageOff } from "lucide-react";
+import { Loader2, TriangleAlert, X, RotateCcw, FileWarning, ChevronLeft, ChevronRight, Eye, ImageOff, RefreshCw, RefreshCcw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,20 @@ async function limparUploadsTemporarios(apresentacaoId: string, urls: string[]):
     body: JSON.stringify({ urls: unicas }),
     keepalive: true,
   }).catch(() => undefined);
+}
+
+/** Coleta URLs de imagem (`componente.url`) de uma árvore de componentes, recursivo em
+ * containers (card/grid/container) — usado pra limpar assets temporários de um slide
+ * substituído após reprocessamento individual (ver `reprocessarSlide`). */
+function coletarUrlsDeImagem(componentes: ComponenteSlide[]): string[] {
+  const urls: string[] = [];
+  for (const c of componentes) {
+    if (c.tipo === "imagem" && c.url) urls.push(c.url);
+    if ((c.tipo === "card" || c.tipo === "grid" || c.tipo === "container") && c.filhos.length > 0) {
+      urls.push(...coletarUrlsDeImagem(c.filhos));
+    }
+  }
+  return urls;
 }
 
 function caminhoDoUploadPptx(apresentacaoId: string, nome: string): string {
@@ -167,6 +181,8 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   const [pagina, setPagina] = useState(0);
   const [confirmando, setConfirmando] = useState(false);
   const [progressoUpload, setProgressoUpload] = useState(0);
+  const [reprocessandoTodos, setReprocessandoTodos] = useState(false);
+  const [reprocessandoIndice, setReprocessandoIndice] = useState<number | null>(null);
   const arquivoRef = useRef<File | null>(null);
   const originalUploadRef = useRef<string | null>(null);
   const previewAssetsRef = useRef<string[]>([]);
@@ -278,6 +294,120 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       });
     return () => { cancelado = true; };
   }, [fontesDetectadas, fontesEmbutidas, status]);
+
+  /** Reprocessa TODO o arquivo contra o mesmo blob já enviado (`originalUploadRef`, sem
+   * reenvio) — mais simples que reprocessar 1 slide, pois reaproveita 100% do fluxo de
+   * `pptx-preview` já usado na carga inicial. Útil quando o parser errou algo (imagem não
+   * captada, texto colado) e o usuário quer tentar de novo, sem fechar e reabrir o modal. */
+  async function reprocessarTudo() {
+    const originalUrl = originalUploadRef.current;
+    const arquivoAtual = arquivoRef.current;
+    if (!originalUrl || !arquivoAtual || reprocessandoTodos || reprocessandoIndice !== null) return;
+    setReprocessandoTodos(true);
+    const assetsAntigos = previewAssetsRef.current;
+    try {
+      const resposta = await fetch(`/api/apresentacoes/${apresentacaoId}/pptx-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl: originalUrl, fileName: arquivoAtual.name }),
+      });
+      const resultado = await resposta.json().catch(() => null);
+      if (!resposta.ok || !resultado?.success) {
+        toast.error(typeof resultado?.error === "string" ? resultado.error : "Erro ao reprocessar o PowerPoint.");
+        const urlsNovas = Array.isArray(resultado?.data?.temporaryAssetUrls)
+          ? resultado.data.temporaryAssetUrls.filter((url: unknown): url is string => typeof url === "string")
+          : [];
+        if (urlsNovas.length > 0) await limparUploadsTemporarios(apresentacaoId, urlsNovas);
+        return;
+      }
+
+      setSlides(resultado.data.slides);
+      setCanvas(resultado.data.canvas);
+      setIgnorados(resultado.data.ignorados ?? {});
+      setDiagnosticos(resultado.data.diagnosticos ?? []);
+      setResumoDiagnosticos(resultado.data.resumoDiagnosticos ?? { INFO: 0, WARNING: 0, FALLBACK: 0, ERROR: 0 });
+      setReferenceImages(resultado.data.referenceImages ?? []);
+      setReferenceRenderer(resultado.data.referenceRenderer ?? null);
+      setFontesDetectadas(resultado.data.fontesDetectadas ?? []);
+      setFontesEmbutidas(resultado.data.fontesEmbutidas ?? []);
+      const urlsNovas = Array.isArray(resultado.data.temporaryAssetUrls)
+        ? resultado.data.temporaryAssetUrls.filter((url: unknown): url is string => typeof url === "string")
+        : [];
+      previewAssetsRef.current = urlsNovas;
+      setVisualDiffs({});
+      setRenderizarAoVivo(new Set());
+      diffPendenteRef.current = new Set();
+      toast.success("Slides reprocessados.");
+      // Só limpa os assets ANTIGOS depois que os novos já estão referenciados no estado —
+      // senão uma miniatura ainda em tela poderia apontar para uma URL já excluída.
+      await limparUploadsTemporarios(apresentacaoId, assetsAntigos);
+    } catch {
+      toast.error("Erro de conexão ao reprocessar o PowerPoint.");
+    } finally {
+      setReprocessandoTodos(false);
+    }
+  }
+
+  /** Reprocessa só 1 slide: o parser não tem modo "processar 1 slide isolado", então roda o
+   * arquivo inteiro de novo (mesma rota) mas descarta tudo, exceto o resultado daquele índice —
+   * mais chamada de rede que o ideal, porém correto e sem exigir endpoint/parâmetro novo no
+   * backend. Os assets temporários dos OUTROS slides (não usados) são limpos imediatamente. */
+  async function reprocessarSlide(indice: number) {
+    const originalUrl = originalUploadRef.current;
+    const arquivoAtual = arquivoRef.current;
+    if (!originalUrl || !arquivoAtual || reprocessandoTodos || reprocessandoIndice !== null) return;
+    setReprocessandoIndice(indice);
+    try {
+      const resposta = await fetch(`/api/apresentacoes/${apresentacaoId}/pptx-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl: originalUrl, fileName: arquivoAtual.name }),
+      });
+      const resultado = await resposta.json().catch(() => null);
+      const urlsRecebidas: string[] = Array.isArray(resultado?.data?.temporaryAssetUrls)
+        ? resultado.data.temporaryAssetUrls.filter((url: unknown): url is string => typeof url === "string")
+        : [];
+      if (!resposta.ok || !resultado?.success) {
+        toast.error(typeof resultado?.error === "string" ? resultado.error : "Erro ao reprocessar o slide.");
+        if (urlsRecebidas.length > 0) await limparUploadsTemporarios(apresentacaoId, urlsRecebidas);
+        return;
+      }
+
+      const slideNovo = resultado.data.slides?.[indice] as SlideExtraidoPreview | undefined;
+      const referenceNova = (resultado.data.referenceImages ?? []).find((item: { slideNumber: number }) => item.slideNumber === indice + 1);
+      if (!slideNovo) {
+        toast.error("O slide não foi encontrado no reprocessamento.");
+        if (urlsRecebidas.length > 0) await limparUploadsTemporarios(apresentacaoId, urlsRecebidas);
+        return;
+      }
+
+      const slideAntigo = slides[indice];
+      setSlides((atuais) => atuais.map((s, i) => (i === indice ? slideNovo : s)));
+      if (referenceNova) {
+        setReferenceImages((atuais) => [...atuais.filter((item) => item.slideNumber !== indice + 1), referenceNova]);
+      }
+      setVisualDiffs((atuais) => Object.fromEntries(Object.entries(atuais).filter(([chave]) => Number(chave) !== indice)));
+      setRenderizarAoVivo((atuais) => {
+        const novo = new Set(atuais);
+        novo.delete(indice);
+        return novo;
+      });
+      toast.success(`Slide ${indice + 1} reprocessado.`);
+
+      // Assets do slide antigo (naquele índice) somem da tela — limpa junto com os assets dos
+      // OUTROS slides desta resposta completa que não foram usados (só o índice pedido importa).
+      const urlsSlideAntigo = coletarUrlsDeImagem(slideAntigo?.componentes ?? []);
+      await limparUploadsTemporarios(apresentacaoId, urlsSlideAntigo);
+      const urlsSlideNovo = new Set(coletarUrlsDeImagem(slideNovo.componentes));
+      if (referenceNova) urlsSlideNovo.add(referenceNova.url);
+      const urlsNaoUsadas = urlsRecebidas.filter((url) => !urlsSlideNovo.has(url));
+      if (urlsNaoUsadas.length > 0) await limparUploadsTemporarios(apresentacaoId, urlsNaoUsadas);
+    } catch {
+      toast.error("Erro de conexão ao reprocessar o slide.");
+    } finally {
+      setReprocessandoIndice(null);
+    }
+  }
 
   /** Sob demanda (nunca automático) — chamado quando o usuário clica "Conferir renderização
    * real". Ativa o live-render daquele slide e, assim que ele montar, captura e compara contra
@@ -425,7 +555,19 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
         {status === "pronto" && canvas && (
           <>
             <div className="flex items-center justify-between gap-3 border-b border-white/5 px-5 py-2.5 text-xs text-slate-400">
-              <span>{slides.length} slide{slides.length === 1 ? "" : "s"} encontrado{slides.length === 1 ? "" : "s"}</span>
+              <div className="flex items-center gap-3">
+                <span>{slides.length} slide{slides.length === 1 ? "" : "s"} encontrado{slides.length === 1 ? "" : "s"}</span>
+                <button
+                  type="button"
+                  onClick={() => void reprocessarTudo()}
+                  disabled={reprocessandoTodos || reprocessandoIndice !== null}
+                  title="Reprocessa o arquivo inteiro — útil se algum slide veio com imagem ou texto incorreto"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-slate-300 hover:border-indigo-400/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {reprocessandoTodos ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={12} aria-hidden="true" />}
+                  Reprocessar todos
+                </button>
+              </div>
               {totalIgnoradosPreview > 0 && (
                 <span className="flex items-center gap-1.5 text-amber-400">
                   <FileWarning size={13} aria-hidden="true" />
@@ -490,6 +632,18 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                       >
                         {excluido ? <RotateCcw size={12} aria-hidden="true" /> : <X size={12} aria-hidden="true" />}
                       </button>
+                      {!excluido && (
+                        <button
+                          type="button"
+                          onClick={() => void reprocessarSlide(indice)}
+                          disabled={reprocessandoTodos || reprocessandoIndice !== null}
+                          aria-label={`Reprocessar slide ${indice + 1}`}
+                          title="Reprocessar só este slide — caso a imagem ou o texto tenham vindo incorretos"
+                          className="absolute left-1.5 top-1.5 flex size-6 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {reprocessandoIndice === indice ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <RefreshCcw size={12} aria-hidden="true" />}
+                        </button>
+                      )}
                     </div>
                     {visualDiffs[indice] && referenceUrl && (
                       <div className="grid grid-cols-3 gap-1 text-center text-[9px] text-slate-500">

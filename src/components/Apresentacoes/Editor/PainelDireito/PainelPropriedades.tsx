@@ -8,6 +8,7 @@ import { CardProps } from "./camposPorTipo/CardProps";
 import { GridProps } from "./camposPorTipo/GridProps";
 import { IconeProps } from "./camposPorTipo/IconeProps";
 import { DivisorProps } from "./camposPorTipo/DivisorProps";
+import { FormaProps } from "./camposPorTipo/FormaProps";
 import { GloboProps } from "./camposPorTipo/GloboProps";
 import { ParticulasProps } from "./camposPorTipo/ParticulasProps";
 import { ObjetoGlbProps } from "./camposPorTipo/ObjetoGlbProps";
@@ -31,6 +32,8 @@ import { AnimacaoProps } from "./camposPorTipo/AnimacaoProps";
 import { AnimacaoPropsV2 } from "./camposPorTipo/AnimacaoPropsV2";
 import { SharedElementIdInput } from "./camposPorTipo/SharedElementIdInput";
 import { ControleOpacidade } from "./ControleOpacidade";
+import { ControleBrilho } from "./ControleBrilho";
+import { PainelPropriedadesSlide } from "./PainelPropriedadesSlide";
 
 function buscarNaArvore(lista: ComponenteSlide[], id: string): ComponenteSlide | null {
   for (const c of lista) {
@@ -47,6 +50,7 @@ export function PainelPropriedades() {
   const componentes = useEditorStore((s) => s.componentes);
   const selecionadoId = useEditorStore((s) => s.componenteSelecionadoId);
   const selecionadosIds = useEditorStore((s) => s.componentesSelecionadosIds);
+  const slideAtivoId = useEditorStore((s) => s.slideAtivoId);
   const atualizarComponente = useEditorStore((s) => s.atualizarComponente);
   const atualizarComponentes = useEditorStore((s) => s.atualizarComponentes);
   const removerComponentes = useEditorStore((s) => s.removerComponentes);
@@ -57,6 +61,7 @@ export function PainelPropriedades() {
   const componente = selecionadoId ? buscarNaArvore(componentes, selecionadoId) : null;
 
   if (!componente) {
+    if (slideAtivoId) return <PainelPropriedadesSlide />;
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-sm text-slate-600">
         Selecione um componente para editar suas propriedades
@@ -83,8 +88,15 @@ export function PainelPropriedades() {
     atualizarComponentes(Object.fromEntries(ids.map((id) => [id, { opacidade }])));
   }
 
+  function atualizarBrilho(percentual: number) {
+    const brilho = Math.min(200, Math.max(0, percentual));
+    const ids = selecionadosIds.length > 0 ? selecionadosIds : [componente!.id];
+    atualizarComponentes(Object.fromEntries(ids.map((id) => [id, { brilho }])));
+  }
+
   const ehFundo = componente.tipo === "fundoAnimado";
   const opacidadePercentual = Math.round((componente.opacidade ?? 1) * 100);
+  const brilhoPercentual = Math.round(componente.brilho ?? 100);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
@@ -212,6 +224,15 @@ export function PainelPropriedades() {
         onFinalizarAlteracao={finalizarTransacaoHistorico}
       />
 
+      <ControleBrilho
+        elementoId={componente.id}
+        percentual={brilhoPercentual}
+        quantidadeSelecionada={selecionadosIds.length}
+        onChange={atualizarBrilho}
+        onIniciarAlteracao={iniciarTransacaoHistorico}
+        onFinalizarAlteracao={finalizarTransacaoHistorico}
+      />
+
       <div className="h-px bg-white/5" />
 
       {componente.tipo === "texto" && <TextoProps componente={componente} onChange={onChange} />}
@@ -221,6 +242,7 @@ export function PainelPropriedades() {
       {componente.tipo === "grid" && <GridProps componente={componente} onChange={onChange} />}
       {componente.tipo === "icone" && <IconeProps componente={componente} onChange={onChange} />}
       {componente.tipo === "divisor" && <DivisorProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "forma" && <FormaProps componente={componente} onChange={onChange} />}
       {componente.tipo === "globo" && <GloboProps componente={componente} onChange={onChange} />}
       {componente.tipo === "particulas" && <ParticulasProps componente={componente} onChange={onChange} />}
       {componente.tipo === "objeto3d" && <ObjetoGlbProps componente={componente} onChange={onChange} />}

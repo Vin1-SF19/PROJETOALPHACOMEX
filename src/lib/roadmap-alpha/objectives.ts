@@ -104,7 +104,7 @@ export async function moveRoadmapObjective(objectiveId: string, requestedPriorit
   });
 }
 
-export async function archiveRoadmapObjective(objectiveId: string) {
+async function retireRoadmapObjective(objectiveId: string, status: "ARCHIVED" | "DELETED") {
   return db.$transaction(async (tx) => {
     const objective = await tx.roadmapObjective.findUnique({ where: { id: objectiveId } });
     if (!objective || objective.archivedAt) throw new Error("OBJECTIVE_NOT_FOUND");
@@ -112,7 +112,7 @@ export async function archiveRoadmapObjective(objectiveId: string) {
     const archivedPriority = Math.min(minimum._min.globalPriority ?? 0, 0) - 1;
     await tx.roadmapObjective.update({
       where: { id: objectiveId },
-      data: { globalPriority: archivedPriority, archivedAt: new Date(), status: "ARCHIVED", documentationStatus: "SUPERSEDED" },
+      data: { globalPriority: archivedPriority, archivedAt: new Date(), status, documentationStatus: "SUPERSEDED" },
     });
     await shiftPrioritiesDown(tx, objective.globalPriority + 1, await openPriorityCount(tx) + 1);
     await tx.roadmapDocumentationJob.updateMany({
@@ -128,9 +128,25 @@ export async function archiveRoadmapObjective(objectiveId: string) {
     });
     await tx.roadmapDocumentationAttempt.updateMany({
       where: { job: { objectiveId }, status: "RUNNING" },
-      data: { status: "FAILED", finishedAt: new Date(), errorCode: "OBJECTIVE_ARCHIVED", errorMessage: "OBJECTIVE_ARCHIVED" },
+      data: { status: "FAILED", finishedAt: new Date(), errorCode: `OBJECTIVE_${status}`, errorMessage: `OBJECTIVE_${status}` },
     });
   });
+}
+
+export async function archiveRoadmapObjective(objectiveId: string) {
+  return retireRoadmapObjective(objectiveId, "ARCHIVED");
+}
+
+export async function deleteRoadmapObjective(objectiveId: string) {
+  return retireRoadmapObjective(objectiveId, "DELETED");
+}
+
+export async function purgeExpiredDeletedRoadmapObjectives(referenceDate = new Date()): Promise<number> {
+  const expiresBefore = new Date(referenceDate.getTime() - 3 * 24 * 60 * 60 * 1_000);
+  const result = await db.roadmapObjective.deleteMany({
+    where: { status: "DELETED", archivedAt: { lte: expiresBefore } },
+  });
+  return result.count;
 }
 
 export async function retryRoadmapObjective(objectiveId: string) {
@@ -148,7 +164,7 @@ export async function retryRoadmapObjective(objectiveId: string) {
     });
     const updated = await tx.roadmapObjective.update({
       where: { id: objectiveId },
-      data: { sourceVersion: nextVersion, documentationStatus: "PENDING" },
+      data: { sourceVersion: nextVersion, status: "ACTIVE", documentationStatus: "PENDING" },
     });
     const job = await tx.roadmapDocumentationJob.create({
       data: {
@@ -199,6 +215,7 @@ export async function updateRoadmapObjective(objectiveId: string, input: Roadmap
         constraints: input.constraints ?? null,
         acceptanceCriteriaJson,
         sourceVersion: nextVersion,
+        status: "ACTIVE",
         documentationStatus: "PENDING",
       },
     });

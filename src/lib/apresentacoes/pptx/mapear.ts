@@ -129,8 +129,11 @@ async function mapearForma(
       id: crypto.randomUUID(), tipo: "imagem", x: forma.x, y: forma.y, w: forma.w, h: forma.h,
       // OOXML: stretch sem srcRect distorce a imagem até o quadro; srcRect é aplicado
       // separadamente pelo renderer. Portanto o modo base correto é "fill", sem o recorte
-      // implícito que object-fit "cover" introduziria.
-      zIndex, rotacao: forma.rotacao, url, objectFit: "fill",
+      // implícito que object-fit "cover" introduziria — EXCETO quando o retângulo não veio do
+      // `xfrm` próprio da imagem, e sim herdado de um placeholder de layout com proporção
+      // genérica: aí "fill" espicharia a imagem, então preserva a proporção real com "cover"
+      // (ver `retanguloHerdado`/`proporcaoDivergeDoRetangulo` em parser.ts).
+      zIndex, rotacao: forma.rotacao, url, objectFit: forma.retanguloHerdado ? "cover" : "fill",
       ...(crop ? { crop } : {}),
       ...(forma.tile ? { tile: true } : {}),
       ...(forma.flipH ? { flipH: true } : {}),

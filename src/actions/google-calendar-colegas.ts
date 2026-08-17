@@ -102,7 +102,7 @@ export async function listarUsuariosParaCompartilhar(): Promise<ResultadoAcao<{ 
   return { success: true, data: usuarios };
 }
 
-/** Colegas já adicionados à visão do usuário logado, com cor e visibilidade. */
+/** Colegas já adicionados à visão do usuário logado, com cor, papel e visibilidade. */
 export async function listarColegasVisiveis() {
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { success: false as const, error: "Não autorizado." };
@@ -113,7 +113,12 @@ export async function listarColegasVisiveis() {
     orderBy: { createdAt: "asc" },
   });
 
-  return { success: true as const, data: colegas };
+  // `papel` é gravado exclusivamente por aprovarSolicitacao (google-calendar-solicitacoes.ts),
+  // sempre "VISUALIZADOR" | "EDITOR" — a coluna é `String` no Prisma (SQLite não tem enum nativo).
+  return {
+    success: true as const,
+    data: colegas.map((colega) => ({ ...colega, papel: colega.papel as "VISUALIZADOR" | "EDITOR" })),
+  };
 }
 
 /**

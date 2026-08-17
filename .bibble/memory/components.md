@@ -22,6 +22,13 @@
 
 <!-- Adicionar aqui conforme o projeto cresce -->
 
+### FlowButton
+**Arquivo:** `src/components/ui/flow-button.tsx`
+**Tipo:** Client Component
+**Props:** `icon: LucideIcon`, `label: string`, `active?: boolean`, `href?: string`, `onClick?: () => void`, `className?: string`, `accent?: string` (RGB string, default `"59, 130, 246"`)
+**Uso:** `<FlowButton icon={LayoutDashboard} label="Dashboard" href="/..." active={isActive} accent={accent} onClick={() => setOpen(false)} />`
+**Notas:** Criado em 2026-08-17 (RM-2026-4F34CC) para a sidebar do Alpha CRM. Transições 700ms `cubic-bezier(0.22,1,0.36,1)`. Hover: borda transparente→preenchida, texto muda de cor, seta decorativa desliza, ponto decorativo escala. Active: `scale-[0.97]`. Item ativo: fundo/borda/texto na cor do accent (via `style` inline). Renderiza `<Link>` quando `href` presente, `<button>` caso contrário. `aria-current="page"` quando ativo. Área de toque 44px (`px-4 py-3`).
+
 ### ControleOpacidade (Alpha Motion)
 **Arquivo:** `src/components/Apresentacoes/Editor/PainelDireito/ControleOpacidade.tsx`
 **Tipo:** Client-compatible presentational component
@@ -417,3 +424,19 @@
 **Notas:** sem catálogo, mostra um input obrigatório com a informação de que o valor será reutilizado. Com valores persistidos, mostra um select e oferece `Adicionar nova prospecção`; o usuário também pode voltar às opções cadastradas. O estado é local e a persistência ocorre somente ao salvar o contrato.
 
 **Última atualização:** 2026-08-07 por Nova
+
+### CrmSpaceBackground (Alpha CRM)
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CRMBackground.tsx`
+**Tipo:** Client Component
+**Props:** `className?: string`, `intensity?: 'low' | 'medium' | 'high'` (default `'medium'`)
+**Uso:** `<CrmSpaceBackground intensity="medium" />` como primeira camada do container raiz em `CRMLayoutClient.tsx`
+**Notas:** Background "espaço profundo" do módulo CRM — 60 partículas desktop / 25 mobile, 3 nébulas temáticas (Checklist azul-ciano, CS&NPS verde-âmbar, Extratos violeta), ícones sutis `CheckSquare`/`TrendingUp`/`Banknote` a 3% de opacidade. `pointer-events-none` + `aria-hidden`, `useReducedMotion()` respeitado. Localização no folder do módulo (não em `components/ui/`) — mesmo padrão de `ChecklistBackground.tsx` e `CsNpsBackground.tsx`. Ver `docs/components/crm-space-background.md`.
+**Última atualização:** 2026-08-15 por Scribe (RM-2026-C4A90D)
+
+### CrmPipelineBorder (Alpha CRM)
+**Arquivo:** `src/components/ui/crm-pipeline-border.tsx`
+**Tipo:** Client Component
+**Props:** `children`, `className?`, `duration?` (default `1.2`), `highlightColor?` (default `'#6366f1'`), `idleColor?` (default `'rgba(255,255,255,0.08)'`), `borderRadius?` (default `'12px'`)
+**Uso:** `<CrmPipelineBorder highlightColor="#6366f1">{card}</CrmPipelineBorder>` — envolver KanbanCard (board) e cards de pipeline do Dashboard
+**Notas:** Borda com gradiente radial animado — rotação cíclica TOP→LEFT→BOTTOM→RIGHT em repouso (pausa no hover/focus), highlight `#6366f1` no hover, transição 300ms ease-out, `useReducedMotion()` → borda estática. Inspirado em Aceternity `HoverBorderGradient` mas com cor/timing/raio próprios do CRM + `focus-visible` + inner `bg-[#0f1629]`. Funciona com `overflow-hidden`. Ver `docs/components/crm-pipeline-border.md`.
+**Última atualização:** 2026-08-15 por Scribe (RM-2026-C4A90D)

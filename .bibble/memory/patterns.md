@@ -86,6 +86,32 @@ Funcionalidade reutilizável formada por três partes:
 
 Persistência padrão: `localStorage` isolado por `usuarioId + módulo + versão`, no formato `painelalpha:guia-modulo:<modulo>:v<versao>:usuario:<id>`. Aumentar a versão reexibe o tour quando houver mudança material. Como a persistência é local, não sincroniza entre navegadores/dispositivos e não exige migration. Passos cujo seletor não exista por permissão ou estado da tela são removidos automaticamente.
 
-**Referência visual real:** `AlphaBlueprint/BlueprintOnboarding.tsx`. Gestão de Comissões e Prêmios não possui tour sequencial no checkout de 2026-08-07; não citá-la como implementação de código até que isso mude.
+**Referência visual real:** `AlphaBlueprint/BlueprintOnboarding.tsx` (precursor mais antigo, 3 passos via `data-onboarding` — NÃO é o mesmo motor). O motor atual e correto a reaproveitar é `src/components/Guias/GuiaModuloTour.tsx` + `src/lib/guias/tutorial-modulo.ts`, 100% genérico, sem lib externa.
 
-**Última atualização:** 2026-08-07 por Scribe
+**Módulos que já usam o motor genérico (`GuiaModuloTour`):**
+- **Notas** — `CentralDeNotas.tsx`, `TutorialNotasModal.tsx`, seletor `data-guia-notas="..."`, 19 passos, `modulo: "notas"`.
+- **Parceiros** — `ParceirosClient.tsx` + `GavetaParceirosPendentes.tsx`, seletor `data-guia-parceiros="pendentes-metas"`.
+- **Agenda Alpha** (2026-08-17) — `CalendarioAlphaDashboard.tsx` + `TutorialAgendaModal.tsx`, config extraída em `CalendarioAlpha/lib/tutorial-agenda.ts` (não inline no dashboard — ver `decisions.md`, esse arquivo tem um teste de arquitetura travando em 300 linhas), seletor `data-guia-agenda="..."`, 10 passos, `modulo: "agenda"`. Inclui 1 passo condicional (`permissoes`, só existe pra Admin/CEO) — confirma que o motor já trata isso automaticamente via `filtrarPassosTutorialDisponiveis`, sem código extra no módulo consumidor.
+
+**Padrão de código para adicionar um novo módulo:** (1) criar `ConfigTutorialModulo` num arquivo próprio de `lib/` do módulo (nunca inline no componente principal); (2) instrumentar `data-guia-<modulo>="<passo-id>"` nos elementos-alvo; (3) criar um `TutorialXModal.tsx` copiando a estrutura de `TutorialNotasModal.tsx` (Radix `Dialog`/`DialogPortal` puro, array `SECOES`); (4) no componente raiz do módulo: `useSession()` para `usuarioAtualId`, estados `tutorialAberto`/`tourAberto`, `useEffect` de auto-abertura na primeira visita (`tutorialModuloFoiVisto`), handlers `finalizarTutorial`/`iniciarTourGuiado`/`finalizarTour`, renderizar `TutorialXModal` + `GuiaModuloTour` (este último sem alteração nenhuma) no fim da árvore.
+
+**Última atualização:** 2026-08-17 por Bibble (integração Agenda Alpha)
+
+---
+
+## Sidebar sobre background vivo (Alpha CRM, 2026-08-17)
+
+**Estreado em:** `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx` (RM-2026-4F34CC).
+
+Quando um módulo possui background animado próprio (`CrmSpaceBackground`, `ChecklistBackground`, etc.) posicionado em `absolute inset-0 z-0` do root, a sidebar **nunca** usa fundo opaco — isso "corta" o background e cria descontinuidade visual perceptível.
+
+**Regras:**
+1. `<aside>`: `bg-slate-950/40 backdrop-blur-xl` — translúcido + blur, o background "vaza" através da sidebar.
+2. Mobile top bar: mesmo tratamento (`bg-slate-950/40 backdrop-blur-xl`).
+3. Botões NAV: destaque base sem hover (`bg-white/[0.04] border border-white/[0.06] rounded-xl`) + hover (`hover:bg-white/[0.08] hover:shadow hover:translate-x-0.5`) + active (`active:scale-[0.98]`) + transição (`transition-all duration-200 ease-in-out`).
+4. Ícone: `group-hover:scale-110 transition-transform duration-200`.
+5. Item ativo: glow de accent via `style` inline (`boxShadow: 0 0 12px rgba(accent,0.1)`) — `style` inline tem prioridade sobre classes `hover:`, então o hover nos itens inativos usa classes e o ativo usa `style`.
+6. **Nunca** remover o fundo totalmente — o padrão "vidro" exige uma camada de opacidade para legibilidade dos textos sobre nébulas.
+
+**Referência visual:** `design-tokens.md` → "Sidebar sobre background vivo".
+**Precedente de hover em sidebar:** `PopSidebarPastas.tsx` (DocsAlpha).

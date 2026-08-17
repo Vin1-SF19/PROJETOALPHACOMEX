@@ -34,6 +34,133 @@
 
 ---
 
+## [2026-08-17 17:15] — Alpha Motion: diagnóstico dos 18 pontos + correção dos 3 bugs priorizados
+
+**Tags:** #bugfix #feature #diagnostic #pptx #canvas
+**Agentes envolvidos:** Scout (Explore agent, background) — diagnóstico → Bibble (implementação direta) → Forge → Probe → Lens
+**Arquivos tocados:** `src/components/Apresentacoes/Editor/Canvas/ComponenteNoCanvas.tsx`, `src/lib/apresentacoes/pptx/xml-utils.ts`, `src/lib/apresentacoes/pptx/parser.ts`, `src/lib/apresentacoes/pptx/tipos.ts`, `src/lib/apresentacoes/pptx/mapear.ts`, `.bibble/memory/known-errors.md`
+
+### Contexto
+Usuário trouxe 18 tópicos de melhoria pro Alpha Motion (apelido do usuário pro Alpha Presentation Studio, módulo `apresentacoes`) e pediu diagnóstico primeiro. Depois de ver o diagnóstico, priorizou "bugs primeiro": #5 (resize trava com elemento sobreposto), #16 (texto colado no import PPTX) e #17 (imagem espichada no import PPTX).
+
+### O que foi feito
+- Scout (Explore agent) mapeou os 18 pontos no código real — arquivo por arquivo, causa raiz de cada bug, caminho de implementação sugerido pra cada feature faltante. Diagnóstico apresentado ao usuário organizado por categoria (bugs reais / dado existe falta UI / não existe precisa construir / só mapeamento).
+- Bug #5 corrigido: handles de resize/rotação (`ComponenteNoCanvas.tsx`) ganharam `HANDLE_Z_INDEX = 100000` fixo; o elemento raiz selecionado sobe pra esse zIndex durante a interação, em vez de ficar preso a `componente.zIndex` (que podia ser menor que um vizinho e deixar o handle coberto, roubando o mousedown).
+- Bug #16 corrigido: `trimValues: false` no `XMLParser` (`xml-utils.ts`) — o parser estava descartando espaços protegidos por `xml:space="preserve"` do PowerPoint antes da concatenação dos runs de texto.
+- Bug #17 corrigido: quando o retângulo de uma imagem é herdado de um placeholder de layout (proporção genérica), nova função `proporcaoDivergeDoRetangulo()` usa `sharp` (já era dependência do projeto) pra comparar a proporção real do arquivo com a da caixa; se divergir mais de 5% (`TOLERANCIA_PROPORCAO`), `mapear.ts` usa `objectFit: "cover"` em vez de `"fill"`.
+- Pipeline completo: Forge (tsc/lint limpos, 15/15 testes PPTX específicos, 324/325 da suite ampla, `next build` completo) → Probe (aprovado, checklist de não-regressão em zIndex/store/schema) → Lens (aprovado, 2 sugestões de polimento aplicadas: import estático do `sharp` em vez de dinâmico, threshold nomeado).
+
+### Decisões tomadas
+- Bugs corrigidos com implementação direta (Bibble), sem subagentes Nova/Echo dedicados — escopo pequeno e cirúrgico o suficiente.
+- Não migrado `useCanvasDragResize.ts` pra Pointer Events/capture — o fix de zIndex já resolveu a causa raiz confirmada do bug #5; migração de todo o sistema de mouse events pra pointer events ficou fora de escopo (mudança maior, não necessária aqui).
+- `trimValues: false` aplicado globalmente ao parser XML (não escopado só ao texto) após confirmar que `textValue()` é o único consumidor de `#text` em todo `src/lib/apresentacoes/` — atributos (`@_...`) não são afetados por essa opção.
+
+### Problemas encontrados / resolvidos
+- **Achado não relacionado, catalogado, não corrigido:** durante a suite ampliada (325 testes), 1 teste pré-existente falha (`pptx-parser.test.ts` — "custGeom curvo + blipFill"). Confirmado via `git stash` de todas as mudanças da sessão que já falhava no HEAD antes de qualquer edição — não é regressão desta sessão. Documentado em `known-errors.md` com hipótese de causa raiz para investigação futura.
+- **EPERM do Prisma (erro já catalogado)** reincidiu no primeiro `npm run build`. Usuário autorizado explicitamente a matar todos os node.exe do projeto; fix já documentado aplicado (taskkill + prisma generate em sequência imediata), build seguiu normal depois.
+
+### Pendências
+- 15 dos 18 pontos do diagnóstico ainda não implementados: upload de imagem local, 40 elementos/formas estilo Canva, 20 molduras, espaçamento de texto estilo Word, edição inline de texto no canvas, estilo semântico com efeito visual real, bug do "1." fantasma em lista numerada, Ctrl+D/Alt+drag, painel de propriedades do slide (fundo/molduras/efeitos/animação de slide), gradiente + color picker visual, Brand Kit expandido (múltiplos logos/upload direto/paleta livre/fontes do projeto), redesign visual do editor estilo Canva, brilho/escurecer elemento, Ctrl+C/Ctrl+V entre slides, zoom com Ctrl+Scroll, reprocessar slide/todos no import PPTX, link clicável em texto. Usuário ainda não definiu a ordem dos próximos grupos.
+- Bug pré-existente `pptx-parser.test.ts` (custGeom curvo + blipFill) catalogado em `known-errors.md`, não investigado a fundo.
+
+---
+
+## [2026-08-17] — Alpha CRM: Melhoria Visual da Sidebar (RM-2026-4F34CC) — CONCLUÍDO
+
+**Tags:** #visual #crm #sidebar #design-tokens
+**Agentes envolvidos:** Scout (reconhecimento) → Nova (implementação) → Forge (gates) → Probe (verificação) → Scribe (documentação)
+
+### Contexto
+Objetivo RM-2026-4F34CC: a sidebar do CRM (`CRMLayoutClient.tsx`) usava fundo opaco `bg-slate-950` que "cortava" o `CrmSpaceBackground` animado já renderizado em `inset-0` do root. Botões de navegação não tinham estado de hover. Correção exclusivamente visual.
+
+### O que foi feito
+- **Fase 1 (Scout):** mapeou o problema estrutural (fundo opaco esconde background), identificou padrão "vidro sobre hero" do `design-tokens.md` como referência, blueprint de 1 arquivo / 3 pontos de edição.
+- **Fase 2 (Nova):** implementou em `CRMLayoutClient.tsx`: `<aside>` → `bg-slate-950/40 backdrop-blur-xl`; mobile top bar → mesmo tratamento; NAV links → hover/active/transition/destaque base; ícone → `group-hover:scale-110`; item ativo → glow de accent.
+- **Fase 3 (Probe):** aprovou todos os 6 critérios de aceitação. Sem regressão funcional. Observação menor: área de toque ~40px (ideal 44px) — não bloqueante.
+- **Fase 4 (Scribe):** documentou padrão em `design-tokens.md`, `patterns.md` e `codebase-map.md`.
+
+### Arquivos alterados
+- `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx` — único arquivo de código (exclusivamente classes CSS, zero lógica)
+- `.bibble/memory/design-tokens.md` — novo padrão "Sidebar sobre background vivo"
+- `.bibble/memory/patterns.md` — novo padrão "Sidebar sobre background vivo"
+- `.bibble/memory/codebase-map.md` — seção Alpha CRM sidebar
+
+### Pendências
+- Área de toque vertical ~40px (ideal 44px): trocar `py-2.5` → `py-3` nos NAV links — sugestão opcional, não bloqueante.
+- Notificação de conclusão aos stakeholders (canal de status/changelog interno) — pendência manual.
+
+---
+
+## [2026-08-17] — Agenda Alpha: tutorial "Como usar" + tour guiado
+
+**Tags:** #feature #ux #onboarding
+**Agentes envolvidos:** Bibble (orquestração + implementação direta) → Explore agent (Scout de reconhecimento, background) → Forge (tsc/lint/testes/build) — sem Vault (sem mudança de schema/banco).
+
+### Contexto
+Usuário pediu para replicar na Agenda Alpha o mesmo sistema de tutorial + tour guiado que já existe no Bloco de Notas ("Como usar" + tour com spotlight), cobrindo todas as funcionalidades do módulo, incluindo as 3 features implementadas na sessão anterior no mesmo dia (notificação de compromisso, compartilhamento com aprovação, paleta de cores).
+
+### O que foi feito
+- Scout mapeou o sistema de tutorial de Notas e descobriu que o motor (`GuiaModuloTour.tsx` + `tutorial-modulo.ts`) já é genérico e reutilizável, sem lib externa, já usado em 2 módulos (Notas e Parceiros). Também inventariou TODAS as funcionalidades atuais da Agenda Alpha (visões, navegação, atalhos de teclado C/T/M/W/D não documentados em lugar nenhum, criar/editar evento, sync com Google, cor, compartilhamento, permissões, notificações).
+- Criada `TUTORIAL_AGENDA` (config de 10 passos) em `CalendarioAlpha/lib/tutorial-agenda.ts`.
+- Criado `TutorialAgendaModal.tsx` (modal "Como usar", 7 seções, mesmo padrão visual de `TutorialNotasModal.tsx`).
+- Instrumentado `data-guia-agenda="..."` em `HeaderCalendario.tsx`, `AgendaSidebar.tsx`, `MiniCalendarioAgenda.tsx`, `SinoNotificacoesCompromissos.tsx` — nenhum elemento tinha esse atributo antes.
+- Botão "Como usar" (ícone `CircleHelp`) adicionado no header, desktop e mobile.
+- Plugado em `CalendarioAlphaDashboard.tsx`: `useSession`, estados, auto-abertura na primeira visita, handlers, `TutorialAgendaModal` + `GuiaModuloTour` (reaproveitado sem qualquer alteração).
+- **Achado durante Forge:** teste `page-cache-wiring.test.ts` trava `CalendarioAlphaDashboard.tsx` em 300 linhas — a config do tour inline estourou para 355. Corrigido extraindo a config para `lib/tutorial-agenda.ts` (278 linhas finais).
+- Forge: tsc limpo, eslint limpo, 207/207 testes (incluindo o `cli.test.ts` que antes era flaky), `next build` completo sem erros.
+
+### Decisões tomadas
+Ver `decisions.md` — reaproveitamento total do motor de tour sem alteração, extração da config para respeitar o limite de linhas do dashboard, não incluir feriados no tutorial (não existem na Agenda Alpha, só em Comissões).
+
+### Problemas encontrados / resolvidos
+- Teste de arquitetura (limite de 300 linhas) pegou um inchaço real antes de virar problema — resolvido com extração, não com aumento do limite.
+- Builds neste ambiente continuam lentos quando o `next dev` do usuário roda em paralelo (competição de CPU) — não é um bug, só a realidade do ambiente local compartilhado.
+
+### Pendências
+- Nenhuma validação visual em browser real (sem sessão autenticada no ambiente de preview) — recomenda-se o usuário abrir a Agenda Alpha, clicar em "Como usar" e rodar o tour guiado completo (inclusive como Admin, para ver o passo de Permissões).
+
+### Refletido também em
+- `decisions.md`: entrada sobre a integração do tutorial na Agenda Alpha.
+- `patterns.md`: atualizada a entrada "Guia Inteligente de Módulo" com a 3ª integração real e o padrão de código a seguir para próximos módulos.
+
+---
+
+## [2026-08-17] — Agenda Alpha: 3 features novas (notificações, compartilhamento com aprovação, paleta de cores)
+
+**Tags:** #feature #vault #realtime #pusher #cron
+**Agentes envolvidos:** Bibble (orquestração + implementação direta) → Explore agent (Scout de reconhecimento, background) → Vault (2 rodadas de migration com backup) → Forge (múltiplas rodadas de tsc/lint/testes/build) — pipeline completo, sem Nova/Echo dedicados (Bibble implementou diretamente).
+
+### Contexto
+Usuário pediu 3 features pro módulo Agenda Alpha antes do beta: (1) notificação de compromisso 10min/5min antes com sino de recentes; (2) sistema de permissão estilo Google Calendar (Visualizador/Editor) com aprovação obrigatória — hoje era acesso direto sem aprovação, decisão consciente documentada no schema; (3) paleta de cores fixa (16 bolinhas) no lugar do `<input type="color">` nativo "bugado".
+
+### O que foi feito
+- Scout (Explore agent em background) mapeou 3 padrões de notificação existentes (Chamados/Notas/cron do BPM), confirmou `NotificationCenter.tsx` órfão (nunca importado, não usar de referência), confirmou zero uso de Pusher no módulo de Agenda antes desta sessão, e identificou a causa raiz do bug de cor (picker nativo dispara `onChange` a cada frame de arraste, sem debounce).
+- 6 rodadas de `AskUserQuestion` fecharam decisões de arquitetura antes de codar: escopo de notificação (também colegas visíveis), tipo de permissão (agenda inteira + convite por evento), gatilho do cron (usa cache já persistido, sem sync extra), quem recebe alerta (dono + colegas visualizadores), escopo da aprovação (todos, sem exceção de Admin), desenho do schema (tabela nova de solicitação), migração de dados existentes (reset completo), poder do Editor (escrita real).
+- Feature 3 implementada primeiro (mais simples, sem schema): `SeletorCorPaleta.tsx` novo.
+- Feature 1: model `GoogleCalendarAlertaCompromisso`, cron via Vercel (`vercel.json`), lógica espelhando `alertas-tarefas.ts` do BPM, canal Pusher privado, store+hook+toast+sino (plugado ao lado do widget de clima, pedido explícito do usuário).
+- Feature 2: model `GoogleCalendarSolicitacaoCompartilhamento` + campo `papel`, novo arquivo de Server Actions de solicitação/aprovação/recusa, remoção total do bypass de acesso direto e do bypass de Admin, UI com seção de pedidos pendentes.
+- **2 migrations aplicadas no Turso `basetestes-alphacomex` via Vault**, cada uma com backup pré-mudança gerado e validado: (1) `GoogleCalendarAlertaCompromisso` (🟢 segura, CREATE TABLE puro); (2) `GoogleCalendarSolicitacaoCompartilhamento` + coluna `papel` + reset de vínculos existentes (🔴 mutação em massa, autorizada explicitamente — só 1 linha afetada no banco de testes).
+- Forge rodou múltiplas rodadas (tsc, eslint, vitest, next build) ao longo da sessão. Resultado final: tsc limpo (só 4 erros pré-existentes catalogados), eslint limpo em todos os ~20 arquivos tocados, 203/204 testes (única falha pré-existente/flaky), `next build` completo sem erros.
+
+### Decisões tomadas
+Ver `decisions.md`, 2 entradas: uma com o blueprint/decisões de escopo, outra com o resultado final da implementação.
+
+### Problemas encontrados / resolvidos
+- **`scripts/roadmap-alpha.mjs worker`/`roadmap-production.mjs worker` têm auto-restart real** — travavam `prisma generate` repetidamente (mesmo erro EPERM já catalogado, mas causa raiz nova: não é só processo residual, é supervisor ativo). Fix: matar todos os `node.exe` do projeto + `prisma generate` imediatamente em sequência, vencendo a corrida. Documentado em `known-errors.md`.
+- **Erro de sintaxe pré-existente em `PipelineBoardClient.tsx`** (AlphaCRM, não relacionado a esta sessão — já estava modificado antes da conversa começar) quebrava o `next build` do projeto INTEIRO. Identificado, diagnosticado (chaves de fechamento fora de ordem numa refatoração incompleta envolvendo `<CrmPipelineBorder>`) e corrigido com autorização explícita do usuário, fora do escopo original mas bloqueante.
+- Servidor `next dev` do usuário e workers de roadmap foram encerrados várias vezes ao longo da sessão (sempre com confirmação prévia) para destravar `prisma generate`/`next build`.
+
+### Pendências
+- **Nenhuma validação visual em browser real** foi feita nesta sessão (sem sessão autenticada no ambiente de preview) — recomenda-se fortemente o usuário testar as 3 features na UI: paleta de cores (clicar numa bolinha), notificação de compromisso (criar evento em ~10min, esperar o cron rodar — só dispara em produção/Vercel, `CRON_SECRET` não está configurado localmente), fluxo de solicitação/aprovação de compartilhamento (pedir acesso a um colega, aprovar do outro lado).
+- Convite por evento específico (participantes) continua 100% delegado ao Google, sem melhoria de UX (campo de texto livre, sem autocomplete de colaborador) — mencionado no pedido original ("os dois" tipos de permissão) mas não expandido nesta sessão além do que já existia.
+- `FormularioEvento.tsx` (`dataDoGoogle`) mantém padrão inconsistente de timezone de uma sessão anterior — não tocado.
+
+### Refletido também em
+- `decisions.md`: 2 entradas (blueprint de decisões + resultado final).
+- `known-errors.md`: atualização da entrada de EPERM do Prisma com a causa do auto-restart dos workers de roadmap.
+
+---
+
 ## [2026-08-17] — Agenda Alpha: fix de feriados aparecendo 1 dia antes na grade (bug em 2 camadas)
 
 **Tags:** #bugfix #calendario #timezone #vault

@@ -10,8 +10,11 @@ import type {
   BotaoComponente,
   IconeComponente,
   DivisorComponente,
+  FormaComponente,
 } from "@/lib/validations/slide-componentes";
 import { pilhaCssDaFonte } from "@/lib/apresentacoes/pptx/texto";
+import { FORMAS_CATALOGO } from "@/lib/apresentacoes/formas-catalogo";
+import { MOLDURAS_CATALOGO } from "@/lib/apresentacoes/molduras-catalogo";
 import { AnimacaoWrapper } from "../nucleo";
 
 /**
@@ -70,7 +73,7 @@ function useCounterValue(valorFinal: number, ativo: boolean, duracao: number, de
  * Componente próprio para o tipo "texto" — os hooks de typing/counter precisam
  * rodar incondicionalmente no topo de UM componente (regra dos hooks do React).
  */
-export function TextoAnimado({ componente }: { componente: TextoComponente }) {
+export function TextoAnimado({ componente, modo = "apresentacao" }: { componente: TextoComponente; modo?: "editor" | "apresentacao" }) {
   const anim = componente.animacao?.entrada;
   const Tag = componente.tag;
   const ehTyping = anim?.tipo === "typing";
@@ -114,7 +117,27 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
             verticalAlign: run.baseline ? `${run.baseline / 1000}%` : undefined,
             textTransform: run.caps === "all" ? "uppercase" : run.caps === "small" ? "lowercase" : undefined,
           };
-          return <span key={runIndex} style={style}>{run.text}</span>;
+          // Link clicável de verdade só no Modo Apresentação/export — no Editor, o link fica
+          // visualmente indicado (sublinhado, cor de link) mas não navegável, senão clicar no
+          // texto pra editar/selecionar o elemento abriria a URL sem querer.
+          if (run.hyperlink && modo === "apresentacao") {
+            return (
+              <a
+                key={runIndex}
+                href={run.hyperlink}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ ...style, textDecoration: style.textDecoration ?? "underline", cursor: "pointer" }}
+              >
+                {run.text}
+              </a>
+            );
+          }
+          return (
+            <span key={runIndex} style={run.hyperlink ? { ...style, textDecoration: style.textDecoration ?? "underline" } : style}>
+              {run.text}
+            </span>
+          );
         })}
         {paragraphIndex < (componente.richText?.paragraphs.length ?? 0) - 1 ? "\n" : null}
       </span>
@@ -167,7 +190,7 @@ export function TextoAnimado({ componente }: { componente: TextoComponente }) {
   return ehTyping || ehCounter ? conteudo : <AnimacaoWrapper animacao={anim}>{conteudo}</AnimacaoWrapper>;
 }
 
-export function RenderImagem({ componente }: { componente: ImagemComponente }) {
+function RenderImagemConteudo({ componente }: { componente: ImagemComponente }) {
   if (componente.tile && componente.url) {
     return <div role="img" aria-label={componente.alt ?? ""} style={{ width: "100%", height: "100%", backgroundImage: `url(${JSON.stringify(componente.url)})`, backgroundRepeat: "repeat" }} />;
   }
@@ -204,6 +227,30 @@ export function RenderImagem({ componente }: { componente: ImagemComponente }) {
     />
   ) : (
     <div className="flex h-full w-full items-center justify-center bg-slate-800/50 text-slate-600 text-xs">Sem imagem</div>
+  );
+}
+
+/** Moldura (catálogo em `molduras-catalogo.ts`) recorta a imagem inteira via clip-path SVG,
+ * envolvendo qualquer um dos 3 ramos de render (tile/crop/normal) sem duplicar a lógica deles. */
+export function RenderImagem({ componente }: { componente: ImagemComponente }) {
+  const moldura = componente.moldura;
+  const entrada = moldura ? MOLDURAS_CATALOGO[moldura] : undefined;
+  if (!entrada?.clipPathD) return <RenderImagemConteudo componente={componente} />;
+
+  const clipId = `moldura-${componente.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+        <defs>
+          <clipPath id={clipId} clipPathUnits="objectBoundingBox" transform="scale(0.01 0.01)">
+            <path d={entrada.clipPathD} />
+          </clipPath>
+        </defs>
+      </svg>
+      <div style={{ width: "100%", height: "100%", clipPath: `url(#${clipId})` }}>
+        <RenderImagemConteudo componente={componente} />
+      </div>
+    </div>
   );
 }
 
@@ -287,6 +334,33 @@ export function RenderDivisor({ componente }: { componente: DivisorComponente })
         markerStart={componente.beginArrow && componente.beginArrow !== "none" ? `url(#${markerId}-start)` : undefined}
         markerEnd={componente.endArrow && componente.endArrow !== "none" ? `url(#${markerId}-end)` : undefined}
       />
+    </svg>
+  );
+}
+
+/** 40 formas decorativas (catálogo em `formas-catalogo.ts`) — um único componente que despacha
+ * por `tipoElemento` (path/polygon/ellipse/rect), preenchendo o viewBox 0-100x100 inteiro e
+ * escalando junto com w/h via `preserveAspectRatio="none"` (mesmo padrão de `RenderDivisor`). */
+export function RenderForma({ componente }: { componente: FormaComponente }) {
+  const entrada = FORMAS_CATALOGO[componente.variante];
+  const fill = componente.corPreenchimento ?? "#4f46e5";
+  const stroke = componente.larguraBorda ? (componente.corBorda ?? "#ffffff") : undefined;
+  const strokeWidth = componente.larguraBorda;
+
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style={{ display: "block", overflow: "visible" }}>
+      {entrada.tipoElemento === "rect" && (
+        <rect x="2" y="2" width="96" height="96" rx={componente.variante === "retanguloArredondado" ? 14 : 0} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      )}
+      {entrada.tipoElemento === "ellipse" && (
+        <ellipse cx="50" cy="50" rx="48" ry="48" fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      )}
+      {entrada.tipoElemento === "polygon" && (
+        <polygon points={entrada.points} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" />
+      )}
+      {entrada.tipoElemento === "path" && (
+        <path d={entrada.d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" />
+      )}
     </svg>
   );
 }

@@ -8,6 +8,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEditorStore } from "../store/useEditorStore";
 import { COMPONENTES_REGISTRY } from "../registry/componentes-registry";
 import { registryFundoParaEstilo } from "../registry/registry-fundos";
+import { registryFormaParaEstilo } from "../registry/registry-formas";
 import { useTimelineDrag } from "./useTimelineDrag";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { normalizarConfigAnimacaoContainerAlpha } from "@/lib/apresentacoes/animacao-container-alpha";
@@ -18,6 +19,7 @@ const LARGURA_REGUA = MAX_TEMPO * PIXELS_POR_SEGUNDO;
 
 function resolverEntradaRegistry(componente: ComponenteSlide) {
   if (componente.tipo === "fundoAnimado") return registryFundoParaEstilo(componente.estilo, componente.preset);
+  if (componente.tipo === "forma") return registryFormaParaEstilo(componente.variante);
   return COMPONENTES_REGISTRY[componente.tipo];
 }
 

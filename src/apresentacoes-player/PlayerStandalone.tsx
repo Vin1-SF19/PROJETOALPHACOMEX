@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { RenderComponenteAnimado } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
 import { EfeitosGlobaisSlide } from "@/components/Apresentacoes/Editor/RenderEngine/EfeitosGlobaisSlide";
-import { stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
+import { filtroCss, stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
 import { calcularEscalaApresentacao } from "@/lib/apresentacoes/viewport";
 import { TransicaoSlide } from "@/components/Apresentacoes/ModoApresentacao/TransicaoSlide";
 import { TransicaoContainerAlphaLayer } from "@/components/Apresentacoes/ModoApresentacao/TransicaoContainerAlphaLayer";
@@ -212,7 +212,7 @@ export function PlayerStandalone({ dados }: { dados: DadosApresentacaoExportada 
               <EfeitosGlobaisSlide componentes={slideAtual.componentes} animacaoConfig={slideAtual.animacaoConfig ?? undefined}>
                 {(componente, ajuste) => (
                   <div key={componente.id} style={stylePosicaoAbsoluta(componente)}>
-                    <div style={{ width: "100%", height: "100%", opacity: ajuste.opacityAjustada, filter: ajuste.blurAjustado ? "blur(3px)" : undefined, transform: ajuste.escalaAjustada ? `scale(${ajuste.escalaAjustada})` : undefined }}>
+                    <div style={{ width: "100%", height: "100%", opacity: ajuste.opacityAjustada, filter: filtroCss(componente.brilho, ajuste.blurAjustado), transform: ajuste.escalaAjustada ? `scale(${ajuste.escalaAjustada})` : undefined }}>
                       <RenderComponenteAnimado componente={componente} modo="apresentacao" animacaoConfig={slideAtual.animacaoConfig ?? undefined} />
                     </div>
                   </div>

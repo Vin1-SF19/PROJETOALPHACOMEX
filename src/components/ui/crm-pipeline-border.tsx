@@ -131,7 +131,7 @@ export function CrmPipelineBorder({
 
       {/* Inner content */}
       <div
-        className="relative z-10 h-full bg-[#0f1629]"
+        className="relative z-10 h-full overflow-y-auto bg-[#0f1629]"
         style={{ borderRadius: innerRadius }}
       >
         {children}

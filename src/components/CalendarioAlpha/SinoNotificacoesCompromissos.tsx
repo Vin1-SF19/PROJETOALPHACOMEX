@@ -135,6 +135,7 @@ export function SinoNotificacoesCompromissos() {
         onClick={handleAbrir}
         title="Notificações de compromissos"
         aria-label="Notificações de compromissos"
+        data-guia-agenda="sino-notificacoes"
         className={`relative inline-flex size-6 items-center justify-center rounded-full transition-all ${
           temNotificacoes ? "text-slate-300 hover:text-white" : "text-slate-700 hover:text-slate-500"
         }`}

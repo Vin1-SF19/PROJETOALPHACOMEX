@@ -14,6 +14,9 @@ export const baseComponenteSchema = z.object({
   flipH: z.boolean().optional(),
   flipV: z.boolean().optional(),
   opacidade: z.number().min(0).max(1).optional(),
+  /** Brilho (0-200, default 100) — diferente de opacidade: nunca revela o que está atrás do
+   * elemento, só escurece/clareia o próprio pixel (`filter: brightness()`). */
+  brilho: z.number().min(0).max(200).optional(),
   /** Metadados OOXML opcionais e retrocompatíveis para debug/reimportação. */
   pptxOrigem: z.object({
     slide: z.number().int().positive(),

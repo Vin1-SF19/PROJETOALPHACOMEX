@@ -52,6 +52,8 @@ interface EditorStore {
   carregarSlide: (slideId: string, componentes: ComponenteSlide[], canvas?: CanvasConfig, animacaoConfig?: SlideAnimationConfig, transicaoEntrada?: string | null) => void;
   setSlideAtivo: (slideId: string) => void;
   adicionarComponente: (c: ComponenteSlide) => void;
+  duplicarComponentes: (ids: string[], comOffset?: boolean) => void;
+  colarComponentes: (componentes: ComponenteSlide[]) => void;
   aplicarFundo: (fundo: FundoAnimadoComponente) => void;
   substituirComponentes: (componentes: ComponenteSlide[]) => void;
   atualizarComponente: (id: string, patch: Partial<ComponenteSlide>) => void;
@@ -70,6 +72,7 @@ interface EditorStore {
   setGuiasAlinhamento: (guias: GuiasAlinhamento) => void;
   redimensionarCanvas: (canvas: CanvasConfig) => void;
   atualizarFundoCanvas: (backgroundColor: string) => void;
+  atualizarFundoCanvasImagem: (backgroundImage: string | undefined) => void;
   atualizarTransicaoSlide: (transicaoEntrada: string | null) => void;
   adicionarAnimacaoElemento: (animacao: ElementAnimation) => void;
   adicionarAnimacoesElementos: (animacoes: ElementAnimation[]) => void;
@@ -168,6 +171,22 @@ function removerDaArvore(lista: ComponenteSlide[], ids: Set<string>): Componente
   return lista
     .filter((c) => !ids.has(c.id))
     .map((c) => (ehContainerComFilhos(c) ? { ...c, filhos: removerDaArvore(c.filhos, ids) } : c));
+}
+
+/** Clona um componente com novo `id` (recursivo — inclui filhos de container), deslocando
+ * x/y pra a cópia não ficar exatamente em cima do original (padrão Ctrl+D/Alt+drag do Canva). */
+const OFFSET_DUPLICACAO = 16;
+function clonarComponenteComNovosIds(componente: ComponenteSlide, comOffset: boolean): ComponenteSlide {
+  const base: ComponenteSlide = {
+    ...componente,
+    id: crypto.randomUUID(),
+    x: comOffset ? componente.x + OFFSET_DUPLICACAO : componente.x,
+    y: comOffset ? componente.y + OFFSET_DUPLICACAO : componente.y,
+  };
+  if (ehContainerComFilhos(base)) {
+    return { ...base, filhos: base.filhos.map((filho) => clonarComponenteComNovosIds(filho, false)) };
+  }
+  return base;
 }
 
 function limparAnimacoesDeElementos(config: SlideAnimationConfig | undefined, ids: Set<string>): SlideAnimationConfig | undefined {
@@ -278,6 +297,45 @@ export const useEditorStore = create<EditorStore>((set) => ({
     componentesSelecionadosIds: [c.id],
     ...estadoAlterado(state),
   })),
+  duplicarComponentes: (ids, comOffset = true) => set((state) => {
+    if (ids.length === 0) return state;
+    // Só duplica raízes selecionadas (nunca um filho isolado de dentro de um container aqui —
+    // duplicar filho isolado exigiria reinserir na árvore do pai certo, fora de escopo do
+    // Ctrl+D/Alt+drag, que no Canva sempre opera nos elementos soltos do slide).
+    const idsRaiz = new Set(ids);
+    const originais = state.componentes.filter((c) => idsRaiz.has(c.id));
+    if (originais.length === 0) return state;
+    const maiorZIndex = Math.max(0, ...state.componentes.map((c) => c.zIndex));
+    const copias = originais.map((original, index) => ({
+      ...clonarComponenteComNovosIds(original, comOffset),
+      zIndex: maiorZIndex + index + 1,
+    }));
+    return {
+      ...registrarHistorico(state),
+      componentes: [...state.componentes, ...copias],
+      componenteSelecionadoId: copias.at(-1)?.id ?? null,
+      componentesSelecionadosIds: copias.map((c) => c.id),
+      ...estadoAlterado(state),
+    };
+  }),
+  /** Cola componentes vindos do clipboard (Ctrl+C de qualquer slide/apresentação nesta sessão)
+   * no slide ATUALMENTE ativo — sempre com novos IDs, nunca reutiliza os do clipboard, senão
+   * colar 2x geraria IDs duplicados no mesmo slide. */
+  colarComponentes: (componentesEntrada) => set((state) => {
+    if (componentesEntrada.length === 0) return state;
+    const maiorZIndex = Math.max(0, ...state.componentes.map((c) => c.zIndex));
+    const copias = componentesEntrada.map((original, index) => ({
+      ...clonarComponenteComNovosIds(original, false),
+      zIndex: maiorZIndex + index + 1,
+    }));
+    return {
+      ...registrarHistorico(state),
+      componentes: [...state.componentes, ...copias],
+      componenteSelecionadoId: copias.at(-1)?.id ?? null,
+      componentesSelecionadosIds: copias.map((c) => c.id),
+      ...estadoAlterado(state),
+    };
+  }),
   aplicarFundo: (fundo) => set((state) => {
     const semFundo = state.componentes.filter((componente) => componente.tipo !== "fundoAnimado");
     const menorZIndex = semFundo.length > 0 ? Math.min(...semFundo.map((componente) => componente.zIndex)) - 1 : 0;
@@ -454,6 +512,11 @@ export const useEditorStore = create<EditorStore>((set) => ({
   atualizarFundoCanvas: (backgroundColor) => set((state) => ({
     ...registrarHistorico(state),
     canvas: { ...state.canvas, backgroundColor, backgroundImage: undefined },
+    ...estadoAlterado(state),
+  })),
+  atualizarFundoCanvasImagem: (backgroundImage) => set((state) => ({
+    ...registrarHistorico(state),
+    canvas: { ...state.canvas, backgroundImage },
     ...estadoAlterado(state),
   })),
   atualizarTransicaoSlide: (transicaoEntrada) => set((state) => ({

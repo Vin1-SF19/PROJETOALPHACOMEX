@@ -8,6 +8,7 @@ import {
   botaoComponenteSchema,
   iconeComponenteSchema,
   divisorComponenteSchema,
+  formaComponenteSchema,
 } from "./slide-componentes-basicos";
 import {
   globoComponenteSchema,
@@ -44,6 +45,7 @@ export {
   botaoComponenteSchema,
   iconeComponenteSchema,
   divisorComponenteSchema,
+  formaComponenteSchema,
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
@@ -66,9 +68,18 @@ export {
 // porque usam z.lazy() referenciando componenteSchema, que só existe depois de todos os
 // tipos serem declarados. O getter só é avaliado quando usado (lazy de verdade), então a
 // referência a `componenteSchema` (declarada mais abaixo) funciona por hoisting de `const`.
+export const gradienteComponenteSchema = z.object({
+  angulo: z.number().default(135),
+  corInicio: z.string(),
+  corFim: z.string(),
+});
+
 export const cardComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("card"),
   corFundo: z.string().optional(),
+  /** Quando presente, tem precedência visual sobre `corFundo` (mistura de cor sem exigir hex
+   * digitado — o usuário escolhe as duas cores e o ângulo via UI, ver `CardProps.tsx`). */
+  gradiente: gradienteComponenteSchema.optional(),
   borderRadius: z.number().optional(),
   padding: z.number().optional(),
   corBorda: z.string().optional(),
@@ -119,6 +130,7 @@ export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion
   containerComponenteSchema,
   iconeComponenteSchema,
   divisorComponenteSchema,
+  formaComponenteSchema,
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
@@ -178,6 +190,7 @@ export type AudioComponente = z.infer<typeof audioComponenteSchema>;
 export type BotaoComponente = z.infer<typeof botaoComponenteSchema>;
 export type IconeComponente = z.infer<typeof iconeComponenteSchema>;
 export type DivisorComponente = z.infer<typeof divisorComponenteSchema>;
+export type FormaComponente = z.infer<typeof formaComponenteSchema>;
 export type GloboComponente = z.infer<typeof globoComponenteSchema>;
 export type ParticulasComponente = z.infer<typeof particulasComponenteSchema>;
 export type Objeto3dComponente = z.infer<typeof objeto3dComponenteSchema>;
@@ -198,6 +211,7 @@ export type { FundoAnimadoComponente };
 export interface CardComponente extends z.infer<typeof baseComponenteSchema> {
   tipo: "card";
   corFundo?: string;
+  gradiente?: { angulo: number; corInicio: string; corFim: string };
   borderRadius?: number;
   padding?: number;
   corBorda?: string;
@@ -232,6 +246,7 @@ export type ComponenteSlide =
   | ContainerComponente
   | IconeComponente
   | DivisorComponente
+  | FormaComponente
   | GloboComponente
   | ParticulasComponente
   | Objeto3dComponente

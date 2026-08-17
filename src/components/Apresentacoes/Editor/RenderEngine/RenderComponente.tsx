@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import type { SlideAnimationConfig } from "@/lib/apresentacoes/animacao/tipos";
 import { resolverAnimacoesDoElemento } from "@/lib/apresentacoes/animacao/resolver";
 import { AnimacaoWrapper, FilhosContainer } from "./nucleo";
+import { cssBackgroundDoCard } from "./posicionamento";
 import { AnimacaoElementoWrapper } from "./AnimacaoElementoWrapper";
 import { ScrollRevealWrapper } from "./ScrollRevealWrapper";
 import { GloboRender } from "./GloboRender";
 import { ParticulasRender } from "./ParticulasRender";
 import { ObjetoGlbRender } from "./ObjetoGlbRender";
 import { ContainerCargaRender } from "./ContainerCargaRender";
-import { TextoAnimado, RenderImagem, RenderVideo, RenderAudio, RenderBotao, RenderIcone, RenderDivisor } from "./render/RenderBasicos";
+import { TextoAnimado, RenderImagem, RenderVideo, RenderAudio, RenderBotao, RenderIcone, RenderDivisor, RenderForma } from "./render/RenderBasicos";
 import {
   RenderGrafico,
   RenderTabela,
@@ -80,7 +81,7 @@ export function RenderComponente({
 
   switch (componente.tipo) {
     case "texto":
-      return <TextoAnimado componente={componente} />;
+      return <TextoAnimado componente={componente} modo={modo} />;
 
     case "imagem":
       return (
@@ -115,7 +116,7 @@ export function RenderComponente({
         <AnimacaoWrapper animacao={anim}>
           <FilhosContainer
             style={{
-              background: componente.corFundo ?? "transparent",
+              background: cssBackgroundDoCard(componente),
               borderRadius: componente.borderRadius ?? 0,
               padding: componente.padding ?? 0,
               position: "relative",
@@ -182,6 +183,13 @@ export function RenderComponente({
       return (
         <AnimacaoWrapper animacao={anim}>
           <RenderDivisor componente={componente} />
+        </AnimacaoWrapper>
+      );
+
+    case "forma":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <RenderForma componente={componente} />
         </AnimacaoWrapper>
       );
 

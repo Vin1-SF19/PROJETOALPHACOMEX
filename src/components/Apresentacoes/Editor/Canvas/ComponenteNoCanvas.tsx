@@ -1,3 +1,4 @@
+import { useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { useEditorStore } from "../store/useEditorStore";
 import { RenderComponenteAnimado } from "../RenderEngine/RenderComponente";
@@ -6,9 +7,10 @@ import { AnimacaoElementoWrapper } from "../RenderEngine/AnimacaoElementoWrapper
 import { staggerContainerVariants, staggerItemVariants } from "../RenderEngine/nucleo";
 import { useCanvasDragResize } from "./useCanvasDragResize";
 import { resolverAnimacoesDoElemento } from "@/lib/apresentacoes/animacao/resolver";
+import { sincronizarRichTextComTexto } from "@/lib/apresentacoes/rich-text-edit";
+import { cssBackgroundDoCard, filtroCss } from "../RenderEngine/posicionamento";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import type { AjusteVisualEfeitoGlobal } from "../RenderEngine/EfeitosGlobaisSlide";
-import type { ReactNode } from "react";
 import { RotateCw } from "lucide-react";
 
 const HANDLES = [
@@ -17,6 +19,15 @@ const HANDLES = [
   { pos: "sw" as const, className: "-left-1.5 -bottom-1.5 cursor-nesw-resize" },
   { pos: "se" as const, className: "-right-1.5 -bottom-1.5 cursor-nwse-resize" },
 ];
+
+/**
+ * z-index fixo e muito alto para os handles de seleção (resize/rotação). Precisa ficar
+ * acima de QUALQUER componente do slide, senão um elemento vizinho com zIndex maior
+ * sobrepõe visualmente o handle e rouba o mousedown — o gesto de resize nunca inicia
+ * corretamente e o listener de mousemove/mouseup em `window` fica órfão (bug relatado:
+ * "mouse trava" ao redimensionar elemento sobreposto por outro).
+ */
+const HANDLE_Z_INDEX = 100000;
 
 /**
  * Envolve o RenderComponente com seleção e drag/resize — a seleção é
@@ -45,7 +56,12 @@ export function ComponenteNoCanvas({
   const selecionado = useEditorStore((s) => s.componentesSelecionadosIds.includes(componente.id));
   const selecaoMultipla = useEditorStore((s) => s.componentesSelecionadosIds.length > 1);
   const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
+  const atualizarComponente = useEditorStore((s) => s.atualizarComponente);
+  const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
+  const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
   const { onMouseDownMover, onMouseDownRedimensionar, onMouseDownRotacionar } = useCanvasDragResize(componente);
+  const [editandoTexto, setEditandoTexto] = useState(false);
+  const textareaEdicaoRef = useRef<HTMLTextAreaElement>(null);
 
   const ehContainer = componente.tipo === "card" || componente.tipo === "grid" || componente.tipo === "container";
   // Fase 08 — Scroll Reveal no preview do Editor. `animacaoConfig` é do SLIDE ATIVO (mesma
@@ -87,6 +103,30 @@ export function ComponenteNoCanvas({
     if (!dentroDeContainer) onMouseDownMover(e);
   }
 
+  /** Digitação direto dentro do próprio elemento (WYSIWYG), em vez de exigir o painel direito
+   * aberto — duplo-clique num elemento de texto entra em edição inline; Escape/blur sai. */
+  function handleDoubleClick(e: React.MouseEvent) {
+    if (componente.tipo !== "texto" || dentroDeContainer) return;
+    e.stopPropagation();
+    setEditandoTexto(true);
+    requestAnimationFrame(() => {
+      textareaEdicaoRef.current?.focus();
+      textareaEdicaoRef.current?.select();
+    });
+  }
+
+  function sairDaEdicaoTexto() {
+    setEditandoTexto(false);
+  }
+
+  function handleTextoEditadoChange(texto: string) {
+    if (componente.tipo !== "texto") return;
+    atualizarComponente(componente.id, {
+      texto,
+      ...(componente.richText ? { richText: sincronizarRichTextComTexto(componente.richText, texto) } : {}),
+    });
+  }
+
   return (
     <div
       role="button"
@@ -94,13 +134,17 @@ export function ComponenteNoCanvas({
       aria-label={`Componente ${componente.tipo}`}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
       style={{
         position: dentroDeContainer ? "relative" : "absolute",
         left: dentroDeContainer ? undefined : componente.x,
         top: dentroDeContainer ? undefined : componente.y,
         width: componente.w,
         height: componente.h,
-        zIndex: componente.zIndex,
+        // Selecionado sobe para o topo da pilha (independente do zIndex de outros
+        // componentes do slide), garantindo que os handles de resize/rotação nunca
+        // fiquem cobertos por um elemento vizinho durante o gesto de arrastar/redimensionar.
+        zIndex: selecionado && !dentroDeContainer ? HANDLE_Z_INDEX : componente.zIndex,
         transform: [
           componente.rotacao ? `rotate(${componente.rotacao}deg)` : "",
           componente.flipH || componente.flipV ? `scale(${componente.flipH ? -1 : 1}, ${componente.flipV ? -1 : 1})` : "",
@@ -110,7 +154,7 @@ export function ComponenteNoCanvas({
         outlineOffset: 2,
         cursor: dentroDeContainer ? "pointer" : "grab",
         opacity: (ajusteVisual?.opacityAjustada ?? 1) * (componente.opacidade ?? 1),
-        filter: ajusteVisual?.blurAjustado ? "blur(3px)" : undefined,
+        filter: filtroCss(componente.brilho, ajusteVisual?.blurAjustado),
         transition: ajusteVisual ? "opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease" : undefined,
       }}
     >
@@ -124,6 +168,48 @@ export function ComponenteNoCanvas({
             </div>
           </AnimacaoElementoWrapper>
         </ScrollRevealWrapper>
+      ) : editandoTexto && componente.tipo === "texto" ? (
+        <textarea
+          ref={textareaEdicaoRef}
+          data-editor-only="true"
+          value={componente.texto}
+          onChange={(e) => handleTextoEditadoChange(e.target.value)}
+          onFocus={() => iniciarTransacaoHistorico()}
+          onBlur={() => {
+            finalizarTransacaoHistorico();
+            sairDaEdicaoTexto();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              textareaEdicaoRef.current?.blur();
+            }
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: "100%",
+            height: "100%",
+            resize: "none",
+            border: "none",
+            outline: "2px solid rgb(99,102,241)",
+            outlineOffset: -2,
+            background: "transparent",
+            color: componente.corTexto ?? "#ffffff",
+            fontFamily: componente.fontFamily ? `"${componente.fontFamily}", sans-serif` : undefined,
+            fontSize: componente.fontSize ?? 16,
+            fontWeight: componente.fontWeight === "bold" ? 700 : 400,
+            fontStyle: componente.fontStyle,
+            textAlign: componente.alinhamento ?? "left",
+            lineHeight: componente.lineHeight,
+            letterSpacing: componente.letterSpacing,
+            padding: componente.padding
+              ? `${componente.padding.top}px ${componente.padding.right}px ${componente.padding.bottom}px ${componente.padding.left}px`
+              : 0,
+            boxSizing: "border-box",
+            cursor: "text",
+          }}
+        />
       ) : (
         <RenderComponenteAnimado componente={componente} modo="editor" portalProximoSlide={portalProximoSlide} animacaoConfig={animacaoConfigSlide} />
       )}
@@ -137,7 +223,8 @@ export function ComponenteNoCanvas({
             onMouseDown={onMouseDownRotacionar}
             aria-label="Rotacionar componente"
             title="Arraste para rotacionar"
-            className="absolute left-1/2 top-0 z-20 flex size-6 -translate-x-1/2 -translate-y-[calc(100%+28px)] cursor-grab items-center justify-center rounded-full border border-white bg-indigo-500 text-white shadow-lg active:cursor-grabbing"
+            style={{ zIndex: HANDLE_Z_INDEX }}
+            className="absolute left-1/2 top-0 flex size-6 -translate-x-1/2 -translate-y-[calc(100%+28px)] cursor-grab items-center justify-center rounded-full border border-white bg-indigo-500 text-white shadow-lg active:cursor-grabbing"
           >
             <RotateCw size={12} aria-hidden="true" />
           </button>
@@ -146,6 +233,7 @@ export function ComponenteNoCanvas({
               key={h.pos}
               data-editor-only="true"
               onMouseDown={onMouseDownRedimensionar(h.pos)}
+              style={{ zIndex: HANDLE_Z_INDEX }}
               className={`absolute h-3 w-3 rounded-sm border border-white bg-indigo-500 ${h.className}`}
             />
           ))}
@@ -211,7 +299,7 @@ function RenderComponenteContainer({
     const style: React.CSSProperties = {
       width: "100%",
       height: "100%",
-      background: componente.corFundo ?? "transparent",
+      background: cssBackgroundDoCard(componente),
       borderRadius: componente.borderRadius ?? 0,
       padding: componente.padding ?? 0,
       position: "relative",

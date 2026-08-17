@@ -35,7 +35,7 @@ export function MiniCalendarioAgenda({
   });
 
   return (
-    <div className="rounded-2xl border border-white/5 bg-white/[0.025] p-2.5 xl:p-3">
+    <div className="rounded-2xl border border-white/5 bg-white/[0.025] p-2.5 xl:p-3" data-guia-agenda="mini-calendario">
       <p className="mb-1.5 text-[11px] font-bold capitalize text-slate-200 xl:mb-2 xl:text-xs">
         {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(dataReferencia)}
       </p>

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ExcluirAssetApresentacao } from "@/actions/apresentacao-assets";
-import { assetApresentacaoSchema, formatarTamanhoAsset, type AssetApresentacao, type TipoAsset } from "@/lib/apresentacoes/assets";
+import { enviarArquivoAsset, formatarTamanhoAsset, type AssetApresentacao, type TipoAsset } from "@/lib/apresentacoes/assets";
 import { criarContornoImagem, removerFundoPelasBordas } from "@/lib/apresentacoes/remover-fundo";
 
 interface BibliotecaAssetsProps {
@@ -21,22 +21,6 @@ const FILTROS: Array<{ tipo: TipoAsset | "TODOS"; label: string }> = [
   { tipo: "TODOS", label: "Todos" }, { tipo: "IMAGEM", label: "Imagens" },
   { tipo: "VIDEO", label: "Vídeos" }, { tipo: "AUDIO", label: "Áudios" }, { tipo: "MODELO_3D", label: "3D" },
 ];
-
-async function enviarArquivo(apresentacaoId: string, arquivo: File): Promise<AssetApresentacao> {
-  const formData = new FormData();
-  formData.set("apresentacaoId", apresentacaoId);
-  formData.set("file", arquivo);
-  const response = await fetch("/api/apresentacoes/assets", { method: "POST", body: formData });
-  const payload: unknown = await response.json();
-  if (!response.ok || typeof payload !== "object" || payload === null || !("asset" in payload)) {
-    const mensagem = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
-      ? payload.error : "Falha ao enviar arquivo.";
-    throw new Error(mensagem);
-  }
-  const asset = assetApresentacaoSchema.safeParse(payload.asset);
-  if (!asset.success) throw new Error("O servidor retornou um arquivo inválido.");
-  return asset.data;
-}
 
 function AssetPreview({ asset }: { asset: AssetApresentacao }) {
   if (asset.tipo === "IMAGEM") return <Image src={asset.url} alt="" fill unoptimized sizes="180px" className="object-cover" />;
@@ -67,7 +51,7 @@ export function BibliotecaAssets({ apresentacaoId, assets, onAssetsChange, onIns
     setEnviando(true);
     const novos: AssetApresentacao[] = [];
     try {
-      for (const arquivo of Array.from(arquivos).slice(0, 8)) novos.push(await enviarArquivo(apresentacaoId, arquivo));
+      for (const arquivo of Array.from(arquivos).slice(0, 8)) novos.push(await enviarArquivoAsset(apresentacaoId, arquivo));
       onAssetsChange([...novos.reverse(), ...assets]);
       toast.success(`${novos.length} arquivo(s) adicionado(s) à biblioteca.`);
     } catch (error) {
@@ -86,7 +70,7 @@ export function BibliotecaAssets({ apresentacaoId, assets, onAssetsChange, onIns
         : await criarContornoImagem(asset.url, tolerancia, { cor: corContorno, espessura: espessuraContorno });
       const nomeBase = asset.nomeOriginal.replace(/\.[^.]+$/, "");
       const sufixo = acao === "remover-fundo" ? "sem-fundo" : "com-contorno";
-      const novo = await enviarArquivo(apresentacaoId, new File([blob], `${nomeBase}-${sufixo}.png`, { type: "image/png" }));
+      const novo = await enviarArquivoAsset(apresentacaoId, new File([blob], `${nomeBase}-${sufixo}.png`, { type: "image/png" }));
       onAssetsChange([novo, ...assets]);
       toast.success(acao === "remover-fundo" ? "PNG transparente criado e salvo na biblioteca." : "PNG com contorno criado e salvo na biblioteca.");
       setAssetProcessar(null);

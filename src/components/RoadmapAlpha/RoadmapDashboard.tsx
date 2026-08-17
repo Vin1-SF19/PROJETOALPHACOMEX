@@ -14,6 +14,7 @@ import remarkGfm from "remark-gfm";
 import {
   AlertTriangle,
   Archive,
+  BrainCircuit,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -27,6 +28,7 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  Trash2,
   Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,7 +37,9 @@ import {
   ArquivarObjetivoRoadmap,
   AtualizarObjetivoRoadmap,
   CriarObjetivoRoadmap,
+  ExcluirObjetivoRoadmap,
   ListarRoadmapAlpha,
+  MelhorarCampoObjetivoRoadmap,
   MoverObjetivoRoadmap,
   ReenfileirarObjetivoRoadmap,
 } from "@/actions/RoadmapAlpha";
@@ -49,6 +53,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { RoadmapModuleSnapshot } from "@/lib/roadmap-alpha/catalog";
+import type { RoadmapImproveField } from "@/lib/roadmap-alpha/improve-with-ai";
 import { RoadmapProductionPanel } from "@/components/RoadmapAlpha/RoadmapProductionPanel";
 
 interface RoadmapArtifact {
@@ -73,10 +78,14 @@ interface RoadmapObjectiveView {
   desiredOutcome: string | null;
   constraints: string | null;
   globalPriority: number;
+  status: string;
   documentationStatus: string;
   sourceVersion: number;
+  developmentProvider: "claude" | "codex";
   acceptanceCriteria: string[];
   createdAt: string;
+  archivedAt: string | null;
+  trashExpiresAt: string | null;
   createdBy: { id: number; nome: string };
   documentationJobs: Array<{
     status: string;
@@ -134,6 +143,49 @@ const STATUS_META: Record<
   },
 };
 
+type LifecycleFilter =
+  "pending" | "development" | "completed" | "deleted" | "archived";
+const LIFECYCLE_TABS: Array<{ id: LifecycleFilter; label: string }> = [
+  { id: "pending", label: "Pendentes" },
+  { id: "development", label: "Em desenvolvimento" },
+  { id: "completed", label: "Concluídos" },
+  { id: "deleted", label: "Excluídos" },
+  { id: "archived", label: "Arquivados" },
+];
+const LIFECYCLE_META: Record<
+  Exclude<LifecycleFilter, "pending">,
+  { label: string; className: string; icon: typeof Clock3 }
+> = {
+  development: {
+    label: "Em desenvolvimento",
+    className: "text-cyan-300 bg-cyan-400/10 border-cyan-400/20",
+    icon: Loader2,
+  },
+  completed: {
+    label: "Concluído",
+    className: "text-emerald-300 bg-emerald-400/10 border-emerald-400/20",
+    icon: CheckCircle2,
+  },
+  deleted: {
+    label: "Na lixeira",
+    className: "text-rose-300 bg-rose-400/10 border-rose-400/20",
+    icon: Trash2,
+  },
+  archived: {
+    label: "Arquivado",
+    className: "text-slate-300 bg-slate-400/10 border-slate-400/20",
+    icon: Archive,
+  },
+};
+
+function lifecycleOf(objective: RoadmapObjectiveView): LifecycleFilter {
+  if (objective.status === "DELETED") return "deleted";
+  if (objective.status === "ARCHIVED") return "archived";
+  if (objective.status === "COMPLETED") return "completed";
+  if (objective.status === "IN_DEVELOPMENT") return "development";
+  return "pending";
+}
+
 export function RoadmapDashboard({
   initialObjectives,
   modules,
@@ -147,7 +199,9 @@ export function RoadmapDashboard({
   const refreshInFlight = useRef(false);
   const [moduleFilter, setModuleFilter] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState(
+  const [lifecycleFilter, setLifecycleFilter] =
+    useState<LifecycleFilter>("pending");
+  const [selectedId, setSelectedId] = useState<string | null>(
     initialObjectives[0]?.id ?? null,
   );
   const [selectedPhase, setSelectedPhase] = useState(0);
@@ -178,6 +232,9 @@ export function RoadmapDashboard({
       objective.documentationStatus,
     ),
   );
+  const activeObjectiveCount = objectives.filter(
+    (objective) => objective.archivedAt === null,
+  ).length;
 
   useEffect(() => {
     const interval = window.setInterval(
@@ -197,6 +254,7 @@ export function RoadmapDashboard({
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("pt-BR");
     return objectives.filter((objective) => {
+      if (lifecycleOf(objective) !== lifecycleFilter) return false;
       if (moduleFilter && objective.moduleKey !== moduleFilter) return false;
       return (
         !query ||
@@ -205,9 +263,9 @@ export function RoadmapDashboard({
           .includes(query)
       );
     });
-  }, [objectives, moduleFilter, search]);
+  }, [objectives, lifecycleFilter, moduleFilter, search]);
   const selected =
-    objectives.find((objective) => objective.id === selectedId) ??
+    filtered.find((objective) => objective.id === selectedId) ??
     filtered[0] ??
     null;
   const artifact =
@@ -245,7 +303,12 @@ export function RoadmapDashboard({
   }, [modules]);
 
   if (view === "production") {
-    return <RoadmapProductionPanel canManage={canMutate} onBack={() => setView("roadmap")} />;
+    return (
+      <RoadmapProductionPanel
+        canManage={canMutate}
+        onBack={() => setView("roadmap")}
+      />
+    );
   }
 
   return (
@@ -289,6 +352,30 @@ export function RoadmapDashboard({
         </div>
       </header>
 
+      <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-slate-950/40 px-3 py-2">
+        {LIFECYCLE_TABS.map((tab) => {
+          const count = objectives.filter(
+            (objective) => lifecycleOf(objective) === tab.id,
+          ).length;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setLifecycleFilter(tab.id);
+                setSelectedId(null);
+              }}
+              className={`shrink-0 rounded-lg border px-3 py-2 text-xs transition ${lifecycleFilter === tab.id ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-300" : "border-transparent text-slate-500 hover:bg-white/5 hover:text-slate-300"}`}
+            >
+              {tab.label}{" "}
+              <span className="ml-1 rounded bg-black/20 px-1.5 py-0.5">
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
       <nav className="grid grid-cols-3 border-b border-white/10 lg:hidden">
         {(["modules", "objectives", "docs"] as const).map((pane) => (
           <button
@@ -323,7 +410,13 @@ export function RoadmapDashboard({
               <span className="flex items-center gap-2">
                 <Layers3 size={15} /> Todos
               </span>
-              <span>{objectives.length}</span>
+              <span>
+                {
+                  objectives.filter(
+                    (objective) => lifecycleOf(objective) === lifecycleFilter,
+                  ).length
+                }
+              </span>
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -334,7 +427,9 @@ export function RoadmapDashboard({
                 </p>
                 {items.map((module) => {
                   const count = objectives.filter(
-                    (objective) => objective.moduleKey === module.id,
+                    (objective) =>
+                      objective.moduleKey === module.id &&
+                      lifecycleOf(objective) === lifecycleFilter,
                   ).length;
                   return (
                     <button
@@ -385,9 +480,12 @@ export function RoadmapDashboard({
             )}
             <div className="space-y-2">
               {filtered.map((objective) => {
+                const lifecycle = lifecycleOf(objective);
                 const meta =
-                  STATUS_META[objective.documentationStatus] ??
-                  STATUS_META.PENDING;
+                  lifecycle === "pending"
+                    ? (STATUS_META[objective.documentationStatus] ??
+                      STATUS_META.PENDING)
+                    : LIFECYCLE_META[lifecycle];
                 const StatusIcon = meta.icon;
                 return (
                   <article
@@ -423,7 +521,8 @@ export function RoadmapDashboard({
                             <StatusIcon
                               size={11}
                               className={
-                                objective.documentationStatus === "DOCUMENTING"
+                                objective.documentationStatus ===
+                                  "DOCUMENTING" || lifecycle === "development"
                                   ? "animate-spin"
                                   : ""
                               }
@@ -432,68 +531,113 @@ export function RoadmapDashboard({
                           </span>
                           {canMutate && (
                             <div className="flex opacity-70 transition group-hover:opacity-100">
-                              <button
-                                aria-label="Subir prioridade"
-                                disabled={
-                                  isPending || objective.globalPriority === 1
-                                }
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  execute(
-                                    () =>
-                                      MoverObjetivoRoadmap({
-                                        objectiveId: objective.id,
-                                        globalPriority:
-                                          objective.globalPriority - 1,
-                                      }),
-                                    "Prioridade atualizada",
-                                  );
-                                }}
-                                className="rounded p-1 hover:bg-white/10 disabled:opacity-20"
-                              >
-                                <ChevronUp size={14} />
-                              </button>
-                              <button
-                                aria-label="Descer prioridade"
-                                disabled={
-                                  isPending ||
-                                  objective.globalPriority === objectives.length
-                                }
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  execute(
-                                    () =>
-                                      MoverObjetivoRoadmap({
-                                        objectiveId: objective.id,
-                                        globalPriority:
-                                          objective.globalPriority + 1,
-                                      }),
-                                    "Prioridade atualizada",
-                                  );
-                                }}
-                                className="rounded p-1 hover:bg-white/10 disabled:opacity-20"
-                              >
-                                <ChevronDown size={14} />
-                              </button>
-                              <button
-                                aria-label="Arquivar"
-                                disabled={isPending}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (window.confirm("Arquivar este objetivo?"))
-                                    execute(
-                                      () =>
-                                        ArquivarObjetivoRoadmap(objective.id),
-                                      "Objetivo arquivado",
-                                    );
-                                }}
-                                className="rounded p-1 text-slate-500 hover:bg-rose-400/10 hover:text-rose-300"
-                              >
-                                <Archive size={14} />
-                              </button>
+                              {!["deleted", "archived"].includes(
+                                lifecycleFilter,
+                              ) && (
+                                <>
+                                  <button
+                                    aria-label="Subir prioridade"
+                                    disabled={
+                                      isPending ||
+                                      objective.globalPriority === 1
+                                    }
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      execute(
+                                        () =>
+                                          MoverObjetivoRoadmap({
+                                            objectiveId: objective.id,
+                                            globalPriority:
+                                              objective.globalPriority - 1,
+                                          }),
+                                        "Prioridade atualizada",
+                                      );
+                                    }}
+                                    className="rounded p-1 hover:bg-white/10 disabled:opacity-20"
+                                  >
+                                    <ChevronUp size={14} />
+                                  </button>
+                                  <button
+                                    aria-label="Descer prioridade"
+                                    disabled={
+                                      isPending ||
+                                      objective.globalPriority ===
+                                        activeObjectiveCount
+                                    }
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      execute(
+                                        () =>
+                                          MoverObjetivoRoadmap({
+                                            objectiveId: objective.id,
+                                            globalPriority:
+                                              objective.globalPriority + 1,
+                                          }),
+                                        "Prioridade atualizada",
+                                      );
+                                    }}
+                                    className="rounded p-1 hover:bg-white/10 disabled:opacity-20"
+                                  >
+                                    <ChevronDown size={14} />
+                                  </button>
+                                  <button
+                                    aria-label="Arquivar"
+                                    disabled={isPending}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (
+                                        window.confirm(
+                                          "Arquivar este objetivo?",
+                                        )
+                                      )
+                                        execute(
+                                          () =>
+                                            ArquivarObjetivoRoadmap(
+                                              objective.id,
+                                            ),
+                                          "Objetivo arquivado",
+                                        );
+                                    }}
+                                    className="rounded p-1 text-slate-500 hover:bg-rose-400/10 hover:text-rose-300"
+                                  >
+                                    <Archive size={14} />
+                                  </button>
+                                  <button
+                                    aria-label="Excluir"
+                                    disabled={isPending}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (
+                                        window.confirm(
+                                          "Mover este objetivo para a lixeira por 3 dias?",
+                                        )
+                                      )
+                                        execute(
+                                          () =>
+                                            ExcluirObjetivoRoadmap(
+                                              objective.id,
+                                            ),
+                                          "Objetivo movido para a lixeira",
+                                        );
+                                    }}
+                                    className="rounded p-1 text-slate-500 hover:bg-rose-400/10 hover:text-rose-300"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
+                        {lifecycleFilter === "deleted" &&
+                          objective.trashExpiresAt && (
+                            <p className="mt-2 text-[10px] text-rose-300/80">
+                              Exclusão definitiva em{" "}
+                              {new Date(
+                                objective.trashExpiresAt,
+                              ).toLocaleString("pt-BR")}
+                            </p>
+                          )}
                       </div>
                     </div>
                   </article>
@@ -657,7 +801,7 @@ export function RoadmapDashboard({
         open={createOpen}
         onOpenChange={setCreateOpen}
         modules={modules}
-        nextPriority={objectives.length + 1}
+        nextPriority={activeObjectiveCount + 1}
         onCreated={() => {
           setCreateOpen(false);
           void refreshObjectives();
@@ -682,6 +826,49 @@ export function RoadmapDashboard({
   );
 }
 
+function ImproveWithAIButton({
+  field,
+  value,
+  context,
+  onImproved,
+}: {
+  field: RoadmapImproveField;
+  value: string;
+  context: { title?: string; description?: string; desiredOutcome?: string };
+  onImproved: (value: string) => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await MelhorarCampoObjetivoRoadmap({
+            field,
+            value,
+            context,
+          });
+          if (!result.success) {
+            toast.error(result.error);
+            return;
+          }
+          onImproved(result.improved);
+          toast.success("Campo melhorado com Qwen 3.8");
+        })
+      }
+      className="inline-flex items-center gap-1 rounded-md border border-violet-400/20 bg-violet-400/[.06] px-2 py-1 text-[10px] font-medium text-violet-300 transition hover:bg-violet-400/10 disabled:opacity-50"
+    >
+      {pending ? (
+        <Loader2 className="animate-spin" size={11} />
+      ) : (
+        <Sparkles size={11} />
+      )}{" "}
+      Melhorar com IA
+    </button>
+  );
+}
+
 function CreateObjectiveDialog({
   open,
   onOpenChange,
@@ -703,6 +890,9 @@ function CreateObjectiveDialog({
   const [constraints, setConstraints] = useState("");
   const [criteria, setCriteria] = useState("");
   const [priority, setPriority] = useState(nextPriority);
+  const [developmentProvider, setDevelopmentProvider] = useState<
+    "claude" | "codex"
+  >("claude");
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -719,6 +909,7 @@ function CreateObjectiveDialog({
           .map((item) => item.trim())
           .filter(Boolean),
         globalPriority: priority,
+        developmentProvider,
       });
       if (!result.success) {
         toast.error(result.error);
@@ -759,7 +950,15 @@ function CreateObjectiveDialog({
             </select>
           </label>
           <label className="block text-xs text-slate-400">
-            Título
+            <span className="flex items-center justify-between gap-2">
+              Título{" "}
+              <ImproveWithAIButton
+                field="title"
+                value={title}
+                context={{ description, desiredOutcome }}
+                onImproved={setTitle}
+              />
+            </span>
             <Input
               required
               minLength={3}
@@ -770,7 +969,15 @@ function CreateObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Contexto
+            <span className="flex items-center justify-between gap-2">
+              Contexto{" "}
+              <ImproveWithAIButton
+                field="description"
+                value={description}
+                context={{ title, desiredOutcome }}
+                onImproved={setDescription}
+              />
+            </span>
             <textarea
               required
               minLength={10}
@@ -782,7 +989,15 @@ function CreateObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Resultado desejado
+            <span className="flex items-center justify-between gap-2">
+              Resultado desejado{" "}
+              <ImproveWithAIButton
+                field="desiredOutcome"
+                value={desiredOutcome}
+                context={{ title, description }}
+                onImproved={setDesiredOutcome}
+              />
+            </span>
             <textarea
               maxLength={4000}
               rows={2}
@@ -792,7 +1007,15 @@ function CreateObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Restrições
+            <span className="flex items-center justify-between gap-2">
+              Restrições{" "}
+              <ImproveWithAIButton
+                field="constraints"
+                value={constraints}
+                context={{ title, description, desiredOutcome }}
+                onImproved={setConstraints}
+              />
+            </span>
             <textarea
               maxLength={8000}
               rows={2}
@@ -802,8 +1025,18 @@ function CreateObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Critérios de aceite{" "}
-            <span className="text-slate-600">(um por linha)</span>
+            <span className="flex items-center justify-between gap-2">
+              <span>
+                Critérios de aceite{" "}
+                <span className="text-slate-600">(um por linha)</span>
+              </span>
+              <ImproveWithAIButton
+                field="acceptanceCriteria"
+                value={criteria}
+                context={{ title, description, desiredOutcome }}
+                onImproved={setCriteria}
+              />
+            </span>
             <textarea
               required
               rows={4}
@@ -823,6 +1056,48 @@ function CreateObjectiveDialog({
               className="mt-1.5 border-white/10 bg-slate-950"
             />
           </label>
+          <fieldset className="space-y-2">
+            <legend className="flex items-center gap-2 text-xs text-slate-400">
+              <BrainCircuit size={14} className="text-violet-300" /> Cérebro de
+              desenvolvimento
+            </legend>
+            <p className="text-[11px] text-slate-500">
+              Qwen 3.8 documenta o objetivo. O cérebro escolhido executa os
+              prompts com os agentes Bibble; se ficar sem créditos, o outro
+              assume automaticamente.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    id: "claude",
+                    label: "Claude",
+                    description: "Prioridade 1 · fallback Codex",
+                  },
+                  {
+                    id: "codex",
+                    label: "Codex",
+                    description: "Prioridade 1 · fallback Claude",
+                  },
+                ] as const
+              ).map((brain) => (
+                <button
+                  key={brain.id}
+                  type="button"
+                  aria-pressed={developmentProvider === brain.id}
+                  onClick={() => setDevelopmentProvider(brain.id)}
+                  className={`rounded-xl border p-3 text-left transition ${developmentProvider === brain.id ? "border-violet-400/40 bg-violet-400/10" : "border-white/10 bg-slate-950 hover:border-white/20"}`}
+                >
+                  <span className="block text-sm font-medium text-slate-100">
+                    {brain.label}
+                  </span>
+                  <span className="mt-1 block text-[10px] text-slate-500">
+                    {brain.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
@@ -927,7 +1202,15 @@ function EditObjectiveDialog({
             </select>
           </label>
           <label className="block text-xs text-slate-400">
-            Título
+            <span className="flex items-center justify-between gap-2">
+              Título{" "}
+              <ImproveWithAIButton
+                field="title"
+                value={title}
+                context={{ description, desiredOutcome }}
+                onImproved={setTitle}
+              />
+            </span>
             <Input
               required
               minLength={3}
@@ -938,7 +1221,15 @@ function EditObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Contexto
+            <span className="flex items-center justify-between gap-2">
+              Contexto{" "}
+              <ImproveWithAIButton
+                field="description"
+                value={description}
+                context={{ title, desiredOutcome }}
+                onImproved={setDescription}
+              />
+            </span>
             <textarea
               required
               minLength={10}
@@ -950,7 +1241,15 @@ function EditObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Resultado desejado
+            <span className="flex items-center justify-between gap-2">
+              Resultado desejado{" "}
+              <ImproveWithAIButton
+                field="desiredOutcome"
+                value={desiredOutcome}
+                context={{ title, description }}
+                onImproved={setDesiredOutcome}
+              />
+            </span>
             <textarea
               maxLength={4000}
               rows={2}
@@ -960,7 +1259,15 @@ function EditObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Restrições
+            <span className="flex items-center justify-between gap-2">
+              Restrições{" "}
+              <ImproveWithAIButton
+                field="constraints"
+                value={constraints}
+                context={{ title, description, desiredOutcome }}
+                onImproved={setConstraints}
+              />
+            </span>
             <textarea
               maxLength={8000}
               rows={2}
@@ -970,8 +1277,18 @@ function EditObjectiveDialog({
             />
           </label>
           <label className="block text-xs text-slate-400">
-            Critérios de aceite{" "}
-            <span className="text-slate-600">(um por linha)</span>
+            <span className="flex items-center justify-between gap-2">
+              <span>
+                Critérios de aceite{" "}
+                <span className="text-slate-600">(um por linha)</span>
+              </span>
+              <ImproveWithAIButton
+                field="acceptanceCriteria"
+                value={criteria}
+                context={{ title, description, desiredOutcome }}
+                onImproved={setCriteria}
+              />
+            </span>
             <textarea
               required
               rows={4}

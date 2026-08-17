@@ -30,7 +30,6 @@ vi.mock("@/lib/google-calendar/client", () => ({
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 
 import {
-  adicionarColegaVisivel,
   alternarPermissaoColegas,
   alternarVisibilidadeColega,
   listarEventosDeColega,
@@ -75,20 +74,13 @@ describe("privacidade da agenda de colegas", () => {
     });
   });
 
-  it("usuário comum recebe somente blocos Ocupado sem identificadores sensíveis", async () => {
-    prismaMock.usuarios.findUnique
-      .mockResolvedValueOnce({
-        role: "OPERACIONAL",
-        email: "viewer@alpha.com",
-        nome: "Viewer",
-      })
-      .mockResolvedValueOnce(colegaAtivo);
-    prismaMock.googleCalendarPermissaoColegas.findUnique.mockResolvedValue({
-      userId: 7,
+  it("vínculo VISUALIZADOR recebe somente blocos Ocupado sem identificadores sensíveis", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce(colegaAtivo);
+    prismaMock.googleCalendarColegaVisivel.findUnique.mockResolvedValue({
+      cor: "#f97316",
+      papel: "VISUALIZADOR",
+      visivel: true,
     });
-    prismaMock.googleCalendarColegaVisivel.findUnique
-      .mockResolvedValueOnce({ visivel: true })
-      .mockResolvedValueOnce({ cor: "#f97316" });
 
     const resultado = await listarEventosDeColega(
       8,
@@ -114,16 +106,14 @@ describe("privacidade da agenda de colegas", () => {
     expect(JSON.stringify(resultado)).not.toContain("Reunião aquisição");
   });
 
-  it("Admin/CEO mantém detalhes e escrita", async () => {
-    prismaMock.usuarios.findUnique
-      .mockResolvedValueOnce({
-        role: "Admin",
-        email: "admin@alpha.com",
-        nome: "Admin",
-      })
-      .mockResolvedValueOnce(colegaAtivo);
+  // Regressão: aprovação obrigatória vale para TODOS, inclusive Admin/CEO (decisão de
+  // 2026-08-17) — não existe mais bypass por role, só o `papel` do vínculo aprovado importa.
+  it("vínculo EDITOR mantém detalhes e escrita, mesmo para Admin/CEO", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce(colegaAtivo);
     prismaMock.googleCalendarColegaVisivel.findUnique.mockResolvedValue({
       cor: "#f97316",
+      papel: "EDITOR",
+      visivel: true,
     });
 
     const resultado = await listarEventosDeColega(
@@ -147,17 +137,46 @@ describe("privacidade da agenda de colegas", () => {
     });
   });
 
+  it("Admin/CEO SEM vínculo aprovado não acessa a agenda do colega", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce(colegaAtivo);
+    prismaMock.googleCalendarColegaVisivel.findUnique.mockResolvedValue(null);
+
+    const resultado = await listarEventosDeColega(
+      8,
+      "2026-07-30T00:00:00.000Z",
+      "2026-07-31T00:00:00.000Z",
+    );
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "Você não tem acesso à agenda deste colaborador. Envie um pedido de compartilhamento.",
+    });
+    expect(listarEventosPaginaMock).not.toHaveBeenCalled();
+  });
+
+  it("vínculo com visivel=false bloqueia acesso mesmo já aprovado", async () => {
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce(colegaAtivo);
+    prismaMock.googleCalendarColegaVisivel.findUnique.mockResolvedValue({
+      cor: "#f97316",
+      papel: "EDITOR",
+      visivel: false,
+    });
+
+    const resultado = await listarEventosDeColega(
+      8,
+      "2026-07-30T00:00:00.000Z",
+      "2026-07-31T00:00:00.000Z",
+    );
+
+    expect(resultado.success).toBe(false);
+    expect(listarEventosPaginaMock).not.toHaveBeenCalled();
+  });
+
   it("bloqueia alvo inativo ou sem conexão ativa", async () => {
-    prismaMock.usuarios.findUnique
-      .mockResolvedValueOnce({
-        role: "Admin",
-        email: "admin@alpha.com",
-        nome: "Admin",
-      })
-      .mockResolvedValueOnce({
-        ...colegaAtivo,
-        googleCalendarConexao: { status: "DESATIVADA" },
-      });
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce({
+      ...colegaAtivo,
+      googleCalendarConexao: { status: "DESATIVADA" },
+    });
 
     const resultado = await listarEventosDeColega(
       8,
@@ -185,10 +204,6 @@ describe("privacidade da agenda de colegas", () => {
   });
 
   it("valida estritamente as mutações de colega antes de gravar", async () => {
-    await expect(adicionarColegaVisivel(0)).resolves.toEqual({
-      success: false,
-      error: "Colega inválido.",
-    });
     await expect(removerColegaVisivel(0)).resolves.toMatchObject({
       success: false,
     });

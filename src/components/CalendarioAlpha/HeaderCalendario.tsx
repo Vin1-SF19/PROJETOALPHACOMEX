@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   Grid3x3,
   Menu,
   Settings2,
@@ -35,6 +36,7 @@ interface HeaderCalendarioProps {
   onNovoEvento: () => void;
   onAbrirSidebar: () => void;
   onAbrirConfiguracoes: () => void;
+  onAbrirTutorial: () => void;
 }
 
 const OPCOES_VISAO: { visao: VisaoCalendario; label: string; Icon: typeof CalendarDays }[] = [
@@ -85,6 +87,7 @@ export function HeaderCalendario({
   onNovoEvento,
   onAbrirSidebar,
   onAbrirConfiguracoes,
+  onAbrirTutorial,
 }: HeaderCalendarioProps) {
   return (
     <header className="mb-3 shrink-0 rounded-[1.75rem] border border-white/10 bg-slate-950/55 p-2.5 shadow-2xl backdrop-blur-2xl sm:p-3 [@media(max-height:760px)]:mb-2 [@media(max-height:760px)]:py-2">
@@ -95,7 +98,7 @@ export function HeaderCalendario({
           </BotaoIcone>
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1" data-guia-agenda="visao-geral">
           <div className="flex items-center gap-2">
             <CalendarDays className={cn("hidden size-5 shrink-0 sm:block", tema.text)} aria-hidden="true" />
             <div className="min-w-0">
@@ -109,7 +112,7 @@ export function HeaderCalendario({
           </div>
         </div>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="hidden items-center gap-2 lg:flex" data-guia-agenda="navegacao-data">
           <button
             type="button"
             onClick={onHoje}
@@ -125,7 +128,7 @@ export function HeaderCalendario({
           </BotaoIcone>
         </div>
 
-        {status}
+        <div data-guia-agenda="status-sincronizacao">{status}</div>
 
         <div className="hidden lg:block">
           <BotaoIcone label="Gerenciar agendas" onClick={onAbrirConfiguracoes}>
@@ -133,9 +136,16 @@ export function HeaderCalendario({
           </BotaoIcone>
         </div>
 
+        <div className="hidden lg:block">
+          <BotaoIcone label="Como usar a Agenda Alpha" onClick={onAbrirTutorial}>
+            <CircleHelp className="size-4" />
+          </BotaoIcone>
+        </div>
+
         <button
           type="button"
           onClick={onNovoEvento}
+          data-guia-agenda="criar-evento"
           className={cn(
             "flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-black uppercase tracking-wide text-white transition-transform hover:scale-[1.02] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:px-4 lg:min-h-9",
             tema.bg,
@@ -161,9 +171,12 @@ export function HeaderCalendario({
           <BotaoIcone label="Próximo período" onClick={onProximo}>
             <ChevronRight className="size-4" />
           </BotaoIcone>
+          <BotaoIcone label="Como usar a Agenda Alpha" onClick={onAbrirTutorial}>
+            <CircleHelp className="size-4" />
+          </BotaoIcone>
         </div>
 
-        <div className="flex shrink-0 items-center rounded-xl border border-white/10 bg-white/[0.025] p-0.5">
+        <div className="flex shrink-0 items-center rounded-xl border border-white/10 bg-white/[0.025] p-0.5" data-guia-agenda="trocar-visao">
           {OPCOES_VISAO.map(({ visao: opcao, label, Icon }) => (
             <button
               key={opcao}

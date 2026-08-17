@@ -125,7 +125,7 @@ export function CentralCriativaModal({
             <PresetsAnimacaoPanel />
           </TabsContent>
           <TabsContent value="marca" className="min-h-0 overflow-y-auto p-3 sm:p-5 lg:p-6">
-            <BrandKitPanel apresentacaoId={apresentacaoId} assets={assets} temaAtual={temaAtual} onTemaAplicado={aplicarTemaCriado} onInsertLogo={inserirAsset} />
+            <BrandKitPanel apresentacaoId={apresentacaoId} assets={assets} temaAtual={temaAtual} onTemaAplicado={aplicarTemaCriado} onInsertLogo={inserirAsset} onAssetsChange={setAssets} />
           </TabsContent>
           <TabsContent value="formato" className="min-h-0 overflow-y-auto p-3 sm:p-5 lg:p-6">
             <ResizeExportPanel titulo={titulo} temaId={temaAtual?.id ?? null} assets={assets} />

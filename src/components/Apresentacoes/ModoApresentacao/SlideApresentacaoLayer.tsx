@@ -4,7 +4,7 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { RenderComponenteAnimado } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
 import { EfeitosGlobaisSlide, type AjusteVisualEfeitoGlobal } from "@/components/Apresentacoes/Editor/RenderEngine/EfeitosGlobaisSlide";
-import { stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
+import { filtroCss, stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
 import type { ContainerIntroEvent } from "@/lib/apresentacoes/container-intro";
 import { CLIP_SLIDE_COMPLETO } from "@/lib/apresentacoes/container-intro";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
@@ -108,7 +108,7 @@ function ComponenteNoSlide({
 
   return (
     <div style={stylePosicaoAbsoluta(componenteRenderizado)}>
-      <div style={{ width: "100%", height: "100%", opacity: ajusteVisual.opacityAjustada, filter: ajusteVisual.blurAjustado ? "blur(3px)" : undefined, transform: ajusteVisual.escalaAjustada ? `scale(${ajusteVisual.escalaAjustada})` : undefined }}>
+      <div style={{ width: "100%", height: "100%", opacity: ajusteVisual.opacityAjustada, filter: filtroCss(componenteRenderizado.brilho, ajusteVisual.blurAjustado), transform: ajusteVisual.escalaAjustada ? `scale(${ajusteVisual.escalaAjustada})` : undefined }}>
       <RenderComponenteAnimado
         componente={componenteRenderizado}
         onContainerIntroStart={proximoSlide ? iniciarIntroNoPalco : undefined}

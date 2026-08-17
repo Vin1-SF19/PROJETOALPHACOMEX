@@ -37,7 +37,7 @@ export const SkeletonColumn = memo(function SkeletonColumn({
     <div
       aria-hidden="true"
       className={cn(
-        "alpha-pipeline-column-shell flex flex-col min-w-[240px] max-w-[240px]",
+        "alpha-pipeline-column-shell flex flex-col w-full md:w-[220px] lg:w-[240px] xl:w-[260px] max-w-full",
         className,
       )}
     >

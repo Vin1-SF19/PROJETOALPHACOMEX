@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import sharp from "sharp";
 import type { ApresentacaoPptxExtraida, DiagnosticoElemento, FormaExtraida, FormaImagemExtraida, FormaLinhaExtraida, FormaTabelaExtraida, FormaTextoExtraida, SlideExtraido } from "./tipos";
 import { SLIDE_SIZE_FALLBACK_EMU, calcularEscalaPptx, converterRetanguloEmu, type EscalaPptx } from "./unidades";
 import {
@@ -72,6 +73,8 @@ interface RetanguloBruto {
   rot: number;
   flipH: boolean;
   flipV: boolean;
+  /** `true` quando este retângulo veio de um placeholder herdado (layout/master), não do `xfrm` próprio da forma. */
+  herdado?: boolean;
 }
 
 function lerFlagBooleana(valor: unknown): boolean {
@@ -101,8 +104,9 @@ function lerRetanguloComHeranca(sp: NoXml, spTreeLayout: NoXml | null, spTreeMas
 
   const ph = sp?.["p:nvSpPr"]?.["p:nvPr"]?.["p:ph"] ?? sp?.["p:nvPicPr"]?.["p:nvPr"]?.["p:ph"];
   if (!ph) return null;
-  return buscarPosicaoNoLayout(spTreeLayout, ph["@_type"] ?? "body", ph["@_idx"])
+  const herdado = buscarPosicaoNoLayout(spTreeLayout, ph["@_type"] ?? "body", ph["@_idx"])
     ?? buscarPosicaoNoLayout(spTreeMaster, ph["@_type"] ?? "body", ph["@_idx"]);
+  return herdado ? { ...herdado, herdado: true } : null;
 }
 
 function converterComTransform(bruto: RetanguloBruto, transform: TransformoEmu, escalaInfo: EscalaPptx) {
@@ -619,10 +623,38 @@ async function processarImagem(
   const crop = lerCrop(blipFill);
   const tile = blipFill?.["a:tile"] !== undefined;
   const opacidade = lerOpacidadeBlip(blip);
+  // Retângulo herdado de um placeholder de layout (não `xfrm` próprio da imagem) tem proporção
+  // genérica — se divergir muito da proporção real do arquivo, "fill" (mapear.ts) estica a
+  // imagem visivelmente. Só nesse cenário vale o custo de ler as dimensões reais.
+  const retanguloHerdado = bruto.herdado === true && !crop && !tile
+    ? await proporcaoDivergeDoRetangulo(asset.bytes, w, h)
+    : false;
   return {
-    forma: { tipo: "imagem", x, y, w, h, rotacao, flipH, flipV, crop, tile, opacidade, bytes: asset.bytes, mimeType: asset.mimeType, nomeArquivo: asset.caminhoMedia.split("/").pop() ?? "imagem" },
+    forma: { tipo: "imagem", x, y, w, h, rotacao, flipH, flipV, crop, tile, opacidade, bytes: asset.bytes, mimeType: asset.mimeType, nomeArquivo: asset.caminhoMedia.split("/").pop() ?? "imagem", retanguloHerdado },
     motivo: null, fillEncontrado: "blipFill", relationshipId: rEmbed ?? null, assetResolvido: asset.caminhoMedia, geometria: null,
   };
+}
+
+/** Tolerância de divergência entre a proporção real da imagem e a do retângulo herdado do
+ * placeholder — acima disso, "fill" (mapear.ts) estica a imagem visivelmente o bastante para
+ * justificar "cover" em vez disso. */
+const TOLERANCIA_PROPORCAO = 0.05;
+
+/** Compara a proporção real da imagem (lida via `sharp`) com a do retângulo herdado do
+ * placeholder. Nunca lança: falha de leitura (formato não suportado pelo `sharp`, ex. WMF/EMF)
+ * preserva o comportamento anterior ("fill", retorna `false`). */
+async function proporcaoDivergeDoRetangulo(bytes: Uint8Array, w: number, h: number): Promise<boolean> {
+  if (w <= 0 || h <= 0) return false;
+  try {
+    const metadata = await sharp(Buffer.from(bytes)).metadata();
+    if (!metadata.width || !metadata.height) return false;
+    const proporcaoImagem = metadata.width / metadata.height;
+    const proporcaoCaixa = w / h;
+    const razao = proporcaoImagem / proporcaoCaixa;
+    return razao < 1 - TOLERANCIA_PROPORCAO || razao > 1 + TOLERANCIA_PROPORCAO;
+  } catch {
+    return false;
+  }
 }
 
 // ---------- Tabela ----------

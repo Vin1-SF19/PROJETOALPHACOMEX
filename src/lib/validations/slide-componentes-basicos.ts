@@ -48,6 +48,13 @@ export const textoComponenteSchema = baseComponenteSchema.extend({
   }).optional(),
 });
 
+export const MOLDURA_IMAGEM_TIPOS = [
+  "nenhuma", "circulo", "retanguloArredondado", "retanguloArredondadoGrande", "elipse",
+  "triangulo", "losango", "pentagono", "hexagono", "octogono", "estrela5", "estrela6",
+  "coracao", "escudo", "gota", "nuvem", "hexagonoAlongado", "arco", "anel", "explosao", "cruz",
+] as const;
+export type MolduraImagemTipo = (typeof MOLDURA_IMAGEM_TIPOS)[number];
+
 export const imagemComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("imagem"),
   url: z.string(),
@@ -60,6 +67,9 @@ export const imagemComponenteSchema = baseComponenteSchema.extend({
     bottom: z.number().min(0).max(0.999),
   }).optional(),
   tile: z.boolean().optional(),
+  /** Recorta a imagem inteira num formato decorativo (catálogo em `molduras-catalogo.ts`) via
+   * clip-path SVG — "nenhuma"/ausente preserva o retângulo padrão (comportamento anterior). */
+  moldura: z.enum(MOLDURA_IMAGEM_TIPOS).optional(),
 });
 
 /** Vídeo HTML5 nativo — mesmo padrão de imagem (URL, sem upload próprio nesta onda). */
@@ -105,4 +115,25 @@ export const divisorComponenteSchema = baseComponenteSchema.extend({
   cap: z.enum(["butt", "round", "square"]).optional(),
   beginArrow: z.string().optional(),
   endArrow: z.string().optional(),
+});
+
+/** 40 variantes de forma decorativa estilo Canva — um único tipo `"forma"` parametrizado por
+ * `variante` (catálogo completo em `src/lib/apresentacoes/formas-catalogo.ts`), em vez de 40
+ * tipos Zod/case distintos: mesma técnica de SVG on-the-fly já usada em `RenderDivisor`. */
+export const FORMA_VARIANTE_TIPOS = [
+  "retangulo", "retanguloArredondado", "circulo", "elipse", "triangulo", "trianguloInvertido",
+  "losango", "pentagono", "hexagono", "heptagono", "octogono", "estrela4", "estrela5", "estrela6",
+  "estrela8", "seta-direita", "seta-esquerda", "seta-cima", "seta-baixo", "setaDupla-horizontal",
+  "setaDupla-vertical", "coracao", "balaoFala", "balaoPensamento", "cruz", "meiaLua", "raio",
+  "nuvem", "gota", "escudo", "hexagonoAlongado", "paralelogramo", "trapezio", "pentagonoSeta",
+  "engrenagem", "explosao", "fitaHorizontal", "placaSuspensa", "octogonoStop", "arco", "anel",
+] as const;
+export type FormaVarianteTipo = (typeof FORMA_VARIANTE_TIPOS)[number];
+
+export const formaComponenteSchema = baseComponenteSchema.extend({
+  tipo: z.literal("forma"),
+  variante: z.enum(FORMA_VARIANTE_TIPOS),
+  corPreenchimento: z.string().optional(),
+  corBorda: z.string().optional(),
+  larguraBorda: z.number().nonnegative().optional(),
 });

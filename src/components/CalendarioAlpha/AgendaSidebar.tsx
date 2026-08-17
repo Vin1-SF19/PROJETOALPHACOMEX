@@ -70,14 +70,16 @@ function GrupoAgenda({
   titulo,
   children,
   recolhida,
+  guia,
 }: {
   titulo: string;
   children: ReactNode;
   recolhida: boolean;
+  guia?: string;
 }) {
   if (recolhida) return <div className="space-y-1">{children}</div>;
   return (
-    <section aria-labelledby={`agenda-grupo-${titulo}`}>
+    <section aria-labelledby={`agenda-grupo-${titulo}`} data-guia-agenda={guia}>
       <h3
         id={`agenda-grupo-${titulo}`}
         className="mb-1.5 px-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-600"
@@ -122,7 +124,7 @@ function AgendaSidebarContent({
       )}
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-0.5 [@media(max-height:760px)]:space-y-2">
-        <GrupoAgenda titulo="Minhas agendas" recolhida={recolhida}>
+        <GrupoAgenda titulo="Minhas agendas" recolhida={recolhida} guia="minhas-agendas">
           {calendarios.map((calendario) => (
             <button
               key={calendario.id}
@@ -155,7 +157,7 @@ function AgendaSidebarContent({
           </button>
         </GrupoAgenda>
 
-        <GrupoAgenda titulo="Compartilhadas" recolhida={recolhida}>
+        <GrupoAgenda titulo="Compartilhadas" recolhida={recolhida} guia="compartilhadas">
           {colegas.map((item) => (
             <button
               key={item.colegaId}
@@ -194,6 +196,7 @@ function AgendaSidebarContent({
           <button
             type="button"
             onClick={onGerenciarPermissoes}
+            data-guia-agenda="permissoes"
             title={recolhida ? "Permissões" : undefined}
             className={cn(
               "flex min-h-10 w-full items-center gap-2 rounded-xl px-2 text-xs font-semibold text-slate-500 hover:bg-white/5 hover:text-slate-200",

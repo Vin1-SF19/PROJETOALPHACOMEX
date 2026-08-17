@@ -56,6 +56,26 @@ export function CanvasArea({ tema }: CanvasAreaProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setZoom é uma ação estável do Zustand
   }, [canvas.width, canvas.height]);
 
+  // Ctrl+Scroll dá zoom no slide (padrão universal de editores) — sem Ctrl, o scroll continua
+  // seu comportamento nativo de rolar a área. `passive: false` é necessário porque
+  // `preventDefault` dentro de um handler React onWheel sintético não bloqueia o scroll nativo
+  // do navegador em todos os casos; o listener nativo garante o preventDefault de verdade.
+  useEffect(() => {
+    const area = areaVisualizacaoRef.current;
+    if (!area) return;
+    function onWheel(event: WheelEvent) {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const zoomAtual = useEditorStore.getState().zoom;
+      const passo = zoomAtual < 0.5 ? 0.05 : 0.1;
+      const proximo = Math.min(4, Math.max(0.1, zoomAtual + (event.deltaY < 0 ? passo : -passo)));
+      setZoom(Number(proximo.toFixed(2)));
+    }
+    area.addEventListener("wheel", onWheel, { passive: false });
+    return () => area.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setZoom é uma ação estável do Zustand
+  }, []);
+
   return (
     <div ref={areaVisualizacaoRef} className="relative flex h-full w-full items-center justify-center overflow-auto bg-slate-950 p-4 lg:p-8 2xl:p-12">
       <button

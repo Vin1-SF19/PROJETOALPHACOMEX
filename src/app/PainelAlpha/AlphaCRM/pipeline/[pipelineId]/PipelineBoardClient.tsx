@@ -40,7 +40,8 @@ import {
   restaurarSnapshotBoard,
 } from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
-import { CrmPipelineBorder } from "@/components/ui/crm-pipeline-border";
+import GradientBlobCard from "@/components/ui/gradient-blob-card";
+
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
 import { useLazyColumn } from "@/hooks/useLazyColumn";
 
@@ -138,10 +139,10 @@ function KanbanCard({
       onClick={() => onAbrir(card.id)}
       aria-label={statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
-        "alpha-pipeline-card alpha-card-enter group relative isolate p-0 min-h-[200px] max-h-[600px] overflow-y-auto overflow-x-hidden shadow-[0_4px_16px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] backdrop-blur-sm cursor-grab active:cursor-grabbing select-none hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.25)] transition-shadow duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
-        statusConfig?.cardClassName,
+        "cursor-grab active:cursor-grabbing select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        (alertaBoasVindas || alertaAlinhamento) && "animate-pulse",
         alertaBoasVindas || alertaAlinhamento
-          ? "border-red-500/70 bg-red-950/25 shadow-red-950/40 hover:border-red-400 animate-pulse"
+          ? "animate-pulse"
           : naoAcessado
             ? "border-cyan-400/50 hover:border-cyan-400/70"
           : statusConfig
@@ -152,13 +153,13 @@ function KanbanCard({
     >
       <span
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-1 bg-white/20 transition-[width] duration-150 group-hover:w-1.5"
+        className="hidden"
         style={{ background: `rgb(${accent})` }}
       />
-      <CrmPipelineBorder>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br from-white/[0.08] via-transparent to-transparent" />
 
-      <div className="relative space-y-3 px-3 pb-3 pt-3.5">
+      <GradientBlobCard>
+
+      <div className="relative space-y-2.5">
         <div className="flex items-start gap-2.5">
           <div
             aria-hidden="true"
@@ -282,7 +283,8 @@ function KanbanCard({
           />
         </div>
       </div>
-      </CrmPipelineBorder>
+
+      </GradientBlobCard>
     </div>
   );
 }
@@ -295,7 +297,7 @@ function KanbanColumn({
   const novosLeads = etapaEhNovosLeads(etapa.nome);
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
   return (
-    <div className="alpha-pipeline-column-shell flex flex-col w-full md:w-[340px] lg:w-[380px] xl:w-[420px] max-w-full">
+    <div className="alpha-pipeline-column-shell flex flex-col h-full min-h-0 w-full md:w-[220px] lg:w-[240px] xl:w-[260px] max-w-full">
       <div className="alpha-pipeline-column-header flex items-center justify-between mb-2 px-1 py-1">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: `rgb(${cor})` }} />
@@ -325,7 +327,7 @@ function KanbanColumn({
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div
           ref={setDroppableRef}
-          className={cn("alpha-pipeline-column flex-1 rounded-2xl p-2 space-y-2 min-h-[60px] border border-dashed border-white/5", isOver && "is-over")}
+          className={cn("alpha-pipeline-column flex-1 min-h-0 overflow-y-auto rounded-2xl p-2 space-y-2 border border-dashed border-white/5", isOver && "is-over")}
           style={{
             background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},0.03)`,
             borderColor: isOver ? `rgba(${cor},0.5)` : undefined,
@@ -358,11 +360,11 @@ function LazyPipelineColumn({
   const showSkeleton = atualizandoManual || !inView;
 
   return (
-    <div ref={ref}>
+    <div ref={ref} className="h-full">
       {showSkeleton ? (
         <SkeletonColumn cardCount={cards.length || 4} />
       ) : (
-        <div className="alpha-content-enter">
+        <div className="alpha-content-enter h-full">
           <KanbanColumn
             etapa={etapa}
             cor={cor}
@@ -675,8 +677,8 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         onDragEnd={onDragEnd}
         onDragCancel={onDragCancel}
       >
-        <div className="flex-1 overflow-x-auto px-6 pb-6" style={{ perspective: "1200px" }}>
-          <div className="flex gap-4 h-full min-w-max">
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden px-6 pb-[clamp(8px,2vh,24px)]" style={{ perspective: "1200px" }}>
+          <div className="flex gap-3 h-full min-w-max">
             <span role="status" aria-live="polite" className="sr-only">
               {atualizandoManual ? "Carregando pipeline…" : ""}
             </span>
@@ -698,7 +700,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
         <DragOverlay>
           {activeCard && (
-            <div className="bg-slate-800 border border-white/20 rounded-xl p-3 shadow-2xl w-[220px] rotate-2 opacity-90">
+            <div className="bg-slate-800 border border-white/20 rounded-xl p-3 shadow-2xl w-[240px] rotate-2 opacity-90">
               <p className="text-sm font-semibold text-white">
                 {activeCard.empresa.nomeFantasia || activeCard.empresa.razaoSocial}
               </p>

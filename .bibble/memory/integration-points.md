@@ -141,6 +141,22 @@ mesma autenticação do módulo. Novos checklists sempre consultam
 
 ---
 
+### Alpha CRM — CrmPipelineBorder: ponto crítico de contenção visual (RM-2026-41E240, 2026-08-17)
+
+**Arquivo:** `src/components/ui/crm-pipeline-border.tsx`
+**Propósito:** Borda animada (gradiente radial) renderizada DENTRO de cada card Kanban.
+**Editado quando:** Novos elementos `position: absolute` ou `overflow: visible` forem adicionados ao card.
+
+**Regra de contenção (RM-2026-41E240):**
+- O card pai (`KanbanCard` em `PipelineBoardClient.tsx`) usa `overflow-hidden` — NUNCA remover.
+- A rolagem interna do conteúdo vive no inner content do `CrmPipelineBorder` (`overflow-y-auto`), não no card.
+- A accent bar (`absolute inset-y-0 left-0 w-1`) e a `border-red-500/70` dependem do `overflow-hidden` do card para não vazar no gap entre cards.
+- Ao adicionar qualquer elemento com `position: absolute` ou `overflow: visible` dentro do card, verificar que não ultrapassa os limites.
+
+**Última atualização:** 2026-08-17 por Scribe
+
+---
+
 ### Template de Onboarding — Campo `tipo`
 
 **Adicionado em:** 2026-06-18 por Scribe (sessão Bibble). **Estendido em:** 2026-07-06 (tipo CONVITE).
@@ -1480,3 +1496,17 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 **UI e ação:** `PainelRegistrar` monta `PainelStandbyFollowUp` somente quando `etapaEhStandbyFollowUp(card.etapa.nome)` dentro da aba central **Formulário da Etapa**. `InterromperStandbyFollowUpBpm` é a única ação de opt-out: exige `editarCard`, etapa Standby e motivo; não criar endpoint ou botão de retomada automática. O estado detalhado é carregado por `ObterEstadoStandbyFollowUpBpm`.
 
 **Limite operacional:** o job cria tarefa interna; não envia comunicação externa sem uma integração de canal definida separadamente.
+
+### Alpha CRM — Background e Pipeline (RM-2026-C4A90D, 2026-08-15)
+
+**Arquivos:** `src/app/PainelAlpha/AlphaCRM/CRMBackground.tsx`, `src/components/ui/crm-pipeline-border.tsx`, `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`, `src/app/PainelAlpha/AlphaCRM/DashboardClient.tsx`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`.
+
+**Propósito:** background espacial com partículas e nébulas temáticas (Checklist/CS&NPS/Extratos), borda animada com gradiente radial nos cards de pipeline, e sizing fixo responsivo (340/380/420px) com altura min/max + scroll interno.
+
+**Como integrar:** `CrmSpaceBackground` é a primeira camada do container raiz em `CRMLayoutClient.tsx` (content com `relative z-10`). `CrmPipelineBorder` envolve o conteúdo de `KanbanCard` e dos cards de pipeline do Dashboard. Sizing: `w-full md:w-[340px] lg:w-[380px] xl:w-[420px] max-w-full`, `min-h-[200px]`/`max-h-[600px]` + `overflow-y-auto`, sombra dupla com elevação no hover (300ms).
+
+**Dependência:** `framer-motion` (já em `dependencies`).
+
+**Documentação:** `docs/components/crm-space-background.md`, `docs/components/crm-pipeline-border.md`, `docs/components/pipeline.md`, `src/app/PainelAlpha/AlphaCRM/README.md`, `CHANGELOG.md`.
+
+**Última atualização:** 2026-08-15 por Scribe

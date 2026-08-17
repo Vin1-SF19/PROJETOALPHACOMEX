@@ -48,7 +48,7 @@ export function PainelPermissoesColegas({
       onOpenChange={onOpenChange}
       tema={tema}
       title="Permissão de compartilhamento"
-      description="Controle quem pode adicionar agendas de colegas. Admin e CEO permanecem sempre liberados."
+      description="Controle quem pode pedir acesso à agenda de colegas. Admin e CEO sempre podem pedir — mas o dono da agenda ainda precisa aprovar."
       size="md"
     >
       <div className="space-y-2">

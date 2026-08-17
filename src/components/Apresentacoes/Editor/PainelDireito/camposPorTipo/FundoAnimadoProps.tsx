@@ -1,4 +1,5 @@
 import type { FundoAnimadoComponente } from "@/lib/validations/slide-componentes";
+import { ColorField } from "./ColorField";
 
 const NOMES_ESTILO: Record<FundoAnimadoComponente["estilo"], string> = {
   cosmosIAlpha: "Cosmos IAlpha",
@@ -9,41 +10,6 @@ const NOMES_ESTILO: Record<FundoAnimadoComponente["estilo"], string> = {
 };
 
 const inputClass = "w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500";
-const HEX_VALIDO = /^#[0-9a-fA-F]{6}$/;
-
-interface ColorFieldProps {
-  id: string;
-  label: string;
-  value: string;
-  fallback: string;
-  onChange: (value: string) => void;
-}
-
-/** Swatch nativo (`type="color"`) + campo de texto lado a lado — o usuário pode escolher vendo as cores OU continuar digitando o hex. */
-function ColorField({ id, label, value, fallback, onChange }: ColorFieldProps) {
-  const corSwatch = HEX_VALIDO.test(value) ? value : fallback;
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="text-[11px] text-slate-400">{label}</label>
-      <div className="flex items-center gap-2">
-        <input
-          id={id}
-          type="color"
-          value={corSwatch}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-9 w-11 shrink-0 cursor-pointer rounded-lg border border-white/10 bg-slate-900 p-1"
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={fallback}
-          className={`${inputClass} min-w-0 flex-1`}
-        />
-      </div>
-    </div>
-  );
-}
 
 export function FundoAnimadoProps({ componente, onChange }: { componente: FundoAnimadoComponente; onChange: (patch: Partial<FundoAnimadoComponente>) => void }) {
   const { estilo } = componente;

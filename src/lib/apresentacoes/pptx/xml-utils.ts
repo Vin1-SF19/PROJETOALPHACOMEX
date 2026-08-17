@@ -8,6 +8,12 @@ export const XML_PARSER = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   textNodeName: "#text",
+  // `trimValues: false` é obrigatório aqui: o PowerPoint grava espaços/quebras entre runs
+  // como `<a:t xml:space="preserve"> </a:t>` — o padrão da lib (`trimValues: true`) apaga
+  // esse conteúdo antes mesmo da concatenação dos runs em `texto.ts`, colando palavras sem
+  // separador ("Olámundo"). `#text` só é lido por `textValue()` (texto de `<a:t>`), então
+  // isso não afeta atributos (`@_...`) em nenhum outro ponto do parser.
+  trimValues: false,
   isArray: (name) => [
     "p:sldId", "Relationship",
     "p:sp", "p:pic", "p:graphicFrame", "p:grpSp", "p:cxnSp",

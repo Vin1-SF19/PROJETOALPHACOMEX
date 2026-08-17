@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
 
 import db from "@/lib/prisma";
+import { purgeExpiredDeletedRoadmapObjectives } from "@/lib/roadmap-alpha/objectives";
 import { generateRoadmapManifest } from "@/lib/roadmap-alpha/qwen-generator";
-import { markdownSha256, publishRoadmapProjection } from "@/lib/roadmap-alpha/projection";
+import {
+  markdownSha256,
+  publishRoadmapProjection,
+} from "@/lib/roadmap-alpha/projection";
 
 const LEASE_MS = 4 * 60_000;
 const HEARTBEAT_MS = 30_000;
 
 function sanitizedErrorCode(error: unknown): string {
-  if (error instanceof Error && /^[A-Z_]+$/.test(error.message)) return error.message.slice(0, 80);
+  if (error instanceof Error && /^[A-Z_]+$/.test(error.message))
+    return error.message.slice(0, 80);
   return "DOCUMENTATION_FAILED";
 }
 
@@ -24,13 +29,22 @@ async function claimNextJob(workerId: string) {
           { status: "PROCESSING", claimExpiresAt: { lt: now } },
         ],
       },
-      orderBy: [{ prioritySnapshot: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      orderBy: [
+        { prioritySnapshot: "asc" },
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
     });
     if (!candidate) return null;
     if (candidate.status === "PROCESSING") {
       await tx.roadmapDocumentationAttempt.updateMany({
         where: { jobId: candidate.id, status: "RUNNING" },
-        data: { status: "FAILED", finishedAt: now, errorCode: "LEASE_EXPIRED", errorMessage: "LEASE_EXPIRED" },
+        data: {
+          status: "FAILED",
+          finishedAt: now,
+          errorCode: "LEASE_EXPIRED",
+          errorMessage: "LEASE_EXPIRED",
+        },
       });
     }
     const claimed = await tx.roadmapDocumentationJob.updateMany({
@@ -57,12 +71,19 @@ async function claimNextJob(workerId: string) {
       where: { id: candidate.id },
       include: { objective: true },
     });
-    if (job) await tx.roadmapObjective.update({ where: { id: job.objectiveId }, data: { documentationStatus: "DOCUMENTING" } });
+    if (job)
+      await tx.roadmapObjective.update({
+        where: { id: job.objectiveId },
+        data: { documentationStatus: "DOCUMENTING" },
+      });
     return job;
   });
 }
 
-export async function processNextRoadmapJob(workerId = `roadmap-${randomUUID()}`) {
+export async function processNextRoadmapJob(
+  workerId = `roadmap-${randomUUID()}`,
+) {
+  await purgeExpiredDeletedRoadmapObjectives();
   const job = await claimNextJob(workerId);
   if (!job) return { processed: false as const };
   const attempt = await db.roadmapDocumentationAttempt.create({
@@ -77,14 +98,26 @@ export async function processNextRoadmapJob(workerId = `roadmap-${randomUUID()}`
   const startedAt = Date.now();
   const heartbeat = setInterval(() => {
     const now = new Date();
-    void db.roadmapDocumentationJob.updateMany({
-      where: { id: job.id, status: "PROCESSING", claimedBy: workerId, claimToken: job.claimToken },
-      data: { heartbeatAt: now, claimExpiresAt: new Date(now.getTime() + LEASE_MS) },
-    }).catch(() => undefined);
+    void db.roadmapDocumentationJob
+      .updateMany({
+        where: {
+          id: job.id,
+          status: "PROCESSING",
+          claimedBy: workerId,
+          claimToken: job.claimToken,
+        },
+        data: {
+          heartbeatAt: now,
+          claimExpiresAt: new Date(now.getTime() + LEASE_MS),
+        },
+      })
+      .catch(() => undefined);
   }, HEARTBEAT_MS);
 
   try {
-    const acceptanceCriteria = JSON.parse(job.objective.acceptanceCriteriaJson) as string[];
+    const acceptanceCriteria = JSON.parse(
+      job.objective.acceptanceCriteriaJson,
+    ) as string[];
     const generated = await generateRoadmapManifest({
       code: job.objective.code,
       moduleKey: job.objective.moduleKey,
@@ -96,8 +129,18 @@ export async function processNextRoadmapJob(workerId = `roadmap-${randomUUID()}`
       acceptanceCriteria,
     });
 
-    const current = await db.roadmapDocumentationJob.findUnique({ where: { id: job.id }, include: { objective: true } });
-    if (!current || current.objective.archivedAt || current.status !== "PROCESSING" || current.claimedBy !== workerId || current.claimToken !== job.claimToken || current.sourceVersion !== current.objective.sourceVersion) {
+    const current = await db.roadmapDocumentationJob.findUnique({
+      where: { id: job.id },
+      include: { objective: true },
+    });
+    if (
+      !current ||
+      current.objective.archivedAt ||
+      current.status !== "PROCESSING" ||
+      current.claimedBy !== workerId ||
+      current.claimToken !== job.claimToken ||
+      current.sourceVersion !== current.objective.sourceVersion
+    ) {
       throw new Error("STALE_WORKER_RESULT");
     }
 
@@ -110,12 +153,25 @@ export async function processNextRoadmapJob(workerId = `roadmap-${randomUUID()}`
     const relativeDirectory = projection.relativeDirectory;
 
     await db.$transaction(async (tx) => {
-      const fencing = await tx.roadmapDocumentationJob.findUnique({ where: { id: job.id }, include: { objective: true } });
-      if (!fencing || fencing.objective.archivedAt || fencing.status !== "PROCESSING" || fencing.claimToken !== job.claimToken || fencing.sourceVersion !== fencing.objective.sourceVersion) {
+      const fencing = await tx.roadmapDocumentationJob.findUnique({
+        where: { id: job.id },
+        include: { objective: true },
+      });
+      if (
+        !fencing ||
+        fencing.objective.archivedAt ||
+        fencing.status !== "PROCESSING" ||
+        fencing.claimToken !== job.claimToken ||
+        fencing.sourceVersion !== fencing.objective.sourceVersion
+      ) {
         throw new Error("STALE_WORKER_RESULT");
       }
       await tx.roadmapPromptArtifact.deleteMany({
-        where: { objectiveId: job.objectiveId, documentationVersion: job.sourceVersion, status: "DRAFT" },
+        where: {
+          objectiveId: job.objectiveId,
+          documentationVersion: job.sourceVersion,
+          status: "DRAFT",
+        },
       });
       await tx.roadmapPromptArtifact.createMany({
         data: generated.manifest.phases.map((phase) => ({
@@ -138,40 +194,90 @@ export async function processNextRoadmapJob(workerId = `roadmap-${randomUUID()}`
       });
       await tx.roadmapDocumentationAttempt.update({
         where: { id: attempt.id },
-        data: { status: "SUCCEEDED", finishedAt: new Date(), durationMs: Date.now() - startedAt, responseSha256: generated.responseSha256 },
+        data: {
+          status: "SUCCEEDED",
+          finishedAt: new Date(),
+          durationMs: Date.now() - startedAt,
+          responseSha256: generated.responseSha256,
+        },
       });
       await tx.roadmapDocumentationJob.update({
         where: { id: job.id },
-        data: { status: "SUCCEEDED", completedAt: new Date(), claimedBy: null, claimExpiresAt: null, heartbeatAt: null },
+        data: {
+          status: "SUCCEEDED",
+          completedAt: new Date(),
+          claimedBy: null,
+          claimExpiresAt: null,
+          heartbeatAt: null,
+        },
       });
-      await tx.roadmapObjective.update({ where: { id: job.objectiveId }, data: { documentationStatus: "DOCUMENTED" } });
+      await tx.roadmapObjective.update({
+        where: { id: job.objectiveId },
+        data: { documentationStatus: "DOCUMENTED" },
+      });
     });
-    return { processed: true as const, success: true as const, objectiveCode: job.objective.code, phaseCount: generated.manifest.phases.length };
+    return {
+      processed: true as const,
+      success: true as const,
+      objectiveCode: job.objective.code,
+      phaseCount: generated.manifest.phases.length,
+    };
   } catch (error) {
     const originalErrorCode = sanitizedErrorCode(error);
-    const delayMs = Math.min(30 * 60_000, 30_000 * 2 ** Math.max(0, job.attemptCount - 1));
+    const delayMs = Math.min(
+      30 * 60_000,
+      30_000 * 2 ** Math.max(0, job.attemptCount - 1),
+    );
     const failure = await db.$transaction(async (tx) => {
-      const fencing = await tx.roadmapDocumentationJob.findUnique({ where: { id: job.id }, include: { objective: true } });
-      const stale = originalErrorCode === "STALE_WORKER_RESULT"
-        || !fencing
-        || Boolean(fencing.objective.archivedAt)
-        || fencing.status !== "PROCESSING"
-        || fencing.claimedBy !== workerId
-        || fencing.claimToken !== job.claimToken
-        || fencing.sourceVersion !== fencing.objective.sourceVersion;
+      const fencing = await tx.roadmapDocumentationJob.findUnique({
+        where: { id: job.id },
+        include: { objective: true },
+      });
+      const stale =
+        originalErrorCode === "STALE_WORKER_RESULT" ||
+        !fencing ||
+        Boolean(fencing.objective.archivedAt) ||
+        fencing.status !== "PROCESSING" ||
+        fencing.claimedBy !== workerId ||
+        fencing.claimToken !== job.claimToken ||
+        fencing.sourceVersion !== fencing.objective.sourceVersion;
       const errorCode = stale ? "STALE_WORKER_RESULT" : originalErrorCode;
       await tx.roadmapDocumentationAttempt.updateMany({
         where: { id: attempt.id, status: "RUNNING" },
-        data: { status: "FAILED", finishedAt: new Date(), durationMs: Date.now() - startedAt, errorCode, errorMessage: errorCode },
+        data: {
+          status: "FAILED",
+          finishedAt: new Date(),
+          durationMs: Date.now() - startedAt,
+          errorCode,
+          errorMessage: errorCode,
+        },
       });
       if (stale) return { errorCode, retry: false, superseded: true };
 
-      const retry = job.attemptCount < job.maxAttempts && originalErrorCode !== "PROJECTION_CONFLICT";
+      const retry =
+        job.attemptCount < job.maxAttempts &&
+        originalErrorCode !== "PROJECTION_CONFLICT";
       await tx.roadmapDocumentationJob.update({
         where: { id: job.id },
         data: retry
-          ? { status: "RETRY_WAIT", availableAt: new Date(Date.now() + delayMs), lastErrorCode: errorCode, lastErrorMessage: errorCode, claimedBy: null, claimExpiresAt: null, heartbeatAt: null }
-          : { status: "DEAD_LETTER", deadLetteredAt: new Date(), lastErrorCode: errorCode, lastErrorMessage: errorCode, claimedBy: null, claimExpiresAt: null, heartbeatAt: null },
+          ? {
+              status: "RETRY_WAIT",
+              availableAt: new Date(Date.now() + delayMs),
+              lastErrorCode: errorCode,
+              lastErrorMessage: errorCode,
+              claimedBy: null,
+              claimExpiresAt: null,
+              heartbeatAt: null,
+            }
+          : {
+              status: "DEAD_LETTER",
+              deadLetteredAt: new Date(),
+              lastErrorCode: errorCode,
+              lastErrorMessage: errorCode,
+              claimedBy: null,
+              claimExpiresAt: null,
+              heartbeatAt: null,
+            },
       });
       await tx.roadmapObjective.update({
         where: { id: job.objectiveId },
@@ -179,7 +285,12 @@ export async function processNextRoadmapJob(workerId = `roadmap-${randomUUID()}`
       });
       return { errorCode, retry, superseded: false };
     });
-    return { processed: true as const, success: false as const, objectiveCode: job.objective.code, ...failure };
+    return {
+      processed: true as const,
+      success: false as const,
+      objectiveCode: job.objective.code,
+      ...failure,
+    };
   } finally {
     clearInterval(heartbeat);
   }

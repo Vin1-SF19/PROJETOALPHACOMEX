@@ -89,3 +89,23 @@ Direção visual escolhida para o módulo de Comissões e Prêmios. Mood: termin
 - **Rodapé do card de evento**: barra fina `border-t border-white/5`, total geral à direita em fonte grande `tabular-nums`, botão "Marcar todos como pagos" à esquerda (outline, preenche só no hover).
 
 Ver especificação completa (3 opções apresentadas, A escolhida) na Fase 03 da fila `prompt-phases/`.
+
+---
+
+## Padrão "Sidebar sobre background vivo" (Alpha CRM, 2026-08-17 — Scribe)
+
+Extensão do padrão "vidro sobre hero" do Aurora Financeira, aplicada especificamente a sidebars de módulos que possuem background animado próprio.
+
+**Regra:** quando um módulo tem um `Background` animado (ex: `CrmSpaceBackground`) posicionado em `absolute inset-0 z-0` do root, a sidebar **nunca** usa fundo opaco (`bg-slate-950`) — isso "corta" o background e cria descontinuidade visual.
+
+**Implementação aprovada (RM-2026-4F34CC, rodada 2 — FlowButton):**
+- `<aside>`: `bg-slate-950/20 backdrop-blur-md` (translúcido + blur moderado — o `CrmSpaceBackground` é visível através da sidebar)
+- Mobile top bar: mesmo tratamento (`bg-slate-950/20 backdrop-blur-md`)
+- Botões NAV: componente **`FlowButton`** (`src/components/ui/flow-button.tsx`) — transições 700ms `cubic-bezier(0.22,1,0.36,1)`, borda transparente→preenchida no hover, mudança de cor do texto, seta decorativa que desliza, ponto decorativo que escala, `active:scale-[0.97]`
+- Espaçamento entre botões: `space-y-2` (8px)
+- Item ativo: `background: rgba(accent,0.1)`, `borderColor: rgba(accent,0.25)`, `color: rgb(accent)`, `boxShadow: 0 0 20px rgba(accent,0.06)` (via `style` inline com accent do tema)
+- `aria-current="page"` quando ativo
+
+**Arquivo de referência:** `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx` + `src/components/ui/flow-button.tsx`
+
+**Última atualização:** 2026-08-17 por Scribe (rodada 2 — FlowButton)

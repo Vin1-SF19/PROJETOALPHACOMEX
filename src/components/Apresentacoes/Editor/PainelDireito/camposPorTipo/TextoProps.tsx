@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, FileUp, Italic, Minus, Plus, Underline, X } from "lucide-react";
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, ChevronsDown, ChevronsUp, FileUp, Italic, Link2, Minus, Plus, Underline, X } from "lucide-react";
 import { toast } from "sonner";
 import type { TextoComponente } from "@/lib/validations/slide-componentes";
 import { FONTES_ALPHA_MOTION } from "@/lib/apresentacoes/fontes";
 import {
   aplicarEstiloNoIntervaloRichText,
+  aplicarPropriedadeParagrafo,
   atualizarRunRichText,
   criarRichTextDoTexto,
+  removerListaDoRichText,
+  richTextTemLista,
   sincronizarRichTextComTexto,
   textoPlanoDoRichText,
+  type RichParagraphPatch,
   type RichRunPatch,
 } from "@/lib/apresentacoes/rich-text-edit";
 import { useFontesPersonalizadas } from "../../FontesPersonalizadasContext";
@@ -28,6 +32,15 @@ function estiloBase(componente: TextoComponente): RichRunPatch {
     underline: componente.textDecoration?.includes("underline") ? "sng" : "none",
   };
 }
+
+/** Preset de tamanho/peso aplicado ao trocar o "Estilo semântico" — sem isso, trocar H1↔Parágrafo
+ * só mudava a tag HTML invisível, sem nenhum efeito visual perceptível (bug relatado pelo usuário). */
+const PRESET_ESTILO_SEMANTICO: Record<TextoComponente["tag"], { fontSize: number; fontWeight: "normal" | "bold" }> = {
+  h1: { fontSize: 44, fontWeight: "bold" },
+  h2: { fontSize: 32, fontWeight: "bold" },
+  p: { fontSize: 18, fontWeight: "normal" },
+  span: { fontSize: 14, fontWeight: "normal" },
+};
 
 function BotaoFormato({ ativo, label, onClick, children }: { ativo: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -54,6 +67,8 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
   const [arquivoNovaFonte, setArquivoNovaFonte] = useState<File | null>(null);
   const [enviandoFonte, setEnviandoFonte] = useState(false);
   const [tamanhoDigitado, setTamanhoDigitado] = useState(String(componente.fontSize ?? 16));
+  const [editandoLink, setEditandoLink] = useState(false);
+  const [urlDigitada, setUrlDigitada] = useState("");
   const { fontesPersonalizadas, adicionarFonte } = useFontesPersonalizadas();
   const runs = componente.richText?.paragraphs.flatMap((paragraph) => paragraph.runs) ?? [];
   const todosEmNegrito = runs.length > 0 ? runs.every((run) => run.bold) : componente.fontWeight === "bold";
@@ -62,6 +77,18 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
     ? runs.every((run) => Boolean(run.underline && run.underline !== "none"))
     : componente.textDecoration?.includes("underline") === true;
   const temTrechoSelecionado = intervalo.fim > intervalo.inicio;
+  const linkDoTrechoAtual = (() => {
+    if (runs.length === 0) return undefined;
+    if (!temTrechoSelecionado) return runs.find((run) => run.hyperlink)?.hyperlink;
+    let cursor = 0;
+    for (const run of runs) {
+      const inicioRun = cursor;
+      const fimRun = cursor + run.text.length;
+      cursor = fimRun;
+      if (inicioRun < intervalo.fim && fimRun > intervalo.inicio) return run.hyperlink;
+    }
+    return undefined;
+  })();
 
   function atualizarSelecao() {
     const campo = textareaRef.current;
@@ -119,6 +146,15 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
     const richText = atualizarRunRichText(componente.richText, paragraphIndex, runIndex, patch);
     onChange({ richText, texto: textoPlanoDoRichText(richText) });
   }
+
+  /** Espaçamento de parágrafo estilo Word (espaço antes/depois, recuo, margem) — aplica a
+   * TODOS os parágrafos, mesmo padrão de "Altura da linha"/"Espaço entre letras" (globais). */
+  function aplicarParagrafo(patch: RichParagraphPatch) {
+    const richTextBase = componente.richText ?? criarRichTextDoTexto(componente.texto, estiloBase(componente));
+    const richText = aplicarPropriedadeParagrafo(richTextBase, patch);
+    onChange({ richText, texto: textoPlanoDoRichText(richText) });
+  }
+  const paragrafoAtual = componente.richText?.paragraphs[0];
 
   const categorias = Array.from(new Set(FONTES_ALPHA_MOTION.map((fonte) => fonte.categoria)));
   const fonteAtual = componente.fontFamily ?? "Inter";
@@ -302,7 +338,56 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
             aplicarEstilo({ underline }, { textDecoration: todosSublinhados ? "none" : "underline" }, true);
           }}
         ><Underline size={15} aria-hidden="true" /></BotaoFormato>
+        <BotaoFormato
+          ativo={Boolean(linkDoTrechoAtual)}
+          label="Link"
+          onClick={() => {
+            setUrlDigitada(linkDoTrechoAtual ?? "");
+            setEditandoLink((aberto) => !aberto);
+          }}
+        ><Link2 size={15} aria-hidden="true" /></BotaoFormato>
       </div>
+
+      {editandoLink && (
+        <div className="space-y-2 rounded-lg border border-indigo-400/20 bg-indigo-950/20 p-2.5">
+          <label className="block space-y-1">
+            <span className="text-[10px] font-medium text-slate-300">
+              {temTrechoSelecionado ? "Link do trecho selecionado" : "Link do texto inteiro"}
+            </span>
+            <input
+              type="url"
+              value={urlDigitada}
+              onChange={(event) => setUrlDigitada(event.target.value)}
+              placeholder="https://exemplo.com"
+              className="w-full rounded-md border border-white/10 bg-slate-950 px-2.5 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-indigo-500"
+            />
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                aplicarEstilo({ hyperlink: urlDigitada.trim() || undefined }, {}, true);
+                setEditandoLink(false);
+              }}
+              className="flex-1 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-500"
+            >
+              Aplicar
+            </button>
+            {linkDoTrechoAtual && (
+              <button
+                type="button"
+                onClick={() => {
+                  aplicarEstilo({ hyperlink: undefined }, {}, true);
+                  setEditandoLink(false);
+                }}
+                className="rounded-md border border-white/10 px-3 py-2 text-xs font-medium text-slate-400 hover:text-white"
+              >
+                Remover
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <span className="text-[11px] text-slate-400">Alinhamento no componente</span>
@@ -345,14 +430,96 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
       </div>
 
       <div className="space-y-1.5">
+        <span className="text-[11px] text-slate-400">Espaçamento de parágrafo</span>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1">
+            <span className="text-[10px] text-slate-500">Antes (px)</span>
+            <input
+              type="number"
+              min={0}
+              max={200}
+              step={1}
+              value={paragrafoAtual?.spaceBefore ?? 0}
+              onChange={(event) => aplicarParagrafo({ spaceBefore: Math.max(0, Number(event.target.value)) })}
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-[10px] text-slate-500">Depois (px)</span>
+            <input
+              type="number"
+              min={0}
+              max={200}
+              step={1}
+              value={paragrafoAtual?.spaceAfter ?? 0}
+              onChange={(event) => aplicarParagrafo({ spaceAfter: Math.max(0, Number(event.target.value)) })}
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-[10px] text-slate-500">Recuo primeira linha (px)</span>
+            <input
+              type="number"
+              min={-200}
+              max={200}
+              step={1}
+              value={paragrafoAtual?.indent ?? 0}
+              onChange={(event) => aplicarParagrafo({ indent: Number(event.target.value) })}
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-[10px] text-slate-500">Margem esquerda (px)</span>
+            <input
+              type="number"
+              min={0}
+              max={400}
+              step={1}
+              value={paragrafoAtual?.marginLeft ?? 0}
+              onChange={(event) => aplicarParagrafo({ marginLeft: Math.max(0, Number(event.target.value)) })}
+              className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+            />
+          </label>
+        </div>
+        <p className="text-[10px] leading-relaxed text-slate-600">Aplica a todos os parágrafos do texto — igual ao espaçamento do Word.</p>
+      </div>
+
+      <div className="space-y-1.5">
         <label className="text-[11px] text-slate-400">Estilo semântico</label>
-        <select value={componente.tag} onChange={(event) => onChange({ tag: event.target.value as TextoComponente["tag"] })} className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500">
+        <select
+          value={componente.tag}
+          onChange={(event) => {
+            const tag = event.target.value as TextoComponente["tag"];
+            const preset = PRESET_ESTILO_SEMANTICO[tag];
+            setTamanhoDigitado(String(preset.fontSize));
+            aplicarEstilo(
+              { fontSize: preset.fontSize, bold: preset.fontWeight === "bold" },
+              { tag, fontSize: preset.fontSize, fontWeight: preset.fontWeight },
+            );
+          }}
+          className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+        >
           <option value="h1">Título grande</option>
           <option value="h2">Título</option>
           <option value="p">Parágrafo</option>
           <option value="span">Texto simples</option>
         </select>
+        <p className="text-[10px] leading-relaxed text-slate-600">Aplica um tamanho e peso padrão junto com o estilo — ajuste fino continua disponível nos campos acima.</p>
       </div>
+
+      {richTextTemLista(componente.richText) && (
+        <button
+          type="button"
+          onClick={() => {
+            if (!componente.richText) return;
+            const richText = removerListaDoRichText(componente.richText);
+            onChange({ richText, texto: textoPlanoDoRichText(richText) });
+          }}
+          className="w-full rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-500/20"
+        >
+          Remover marcador/numeração da lista
+        </button>
+      )}
 
       {componente.richText && (
         <details className="group rounded-lg border border-white/10 bg-slate-950/40">
