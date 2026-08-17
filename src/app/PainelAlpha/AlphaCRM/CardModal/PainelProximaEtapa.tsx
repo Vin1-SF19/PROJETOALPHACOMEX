@@ -42,15 +42,7 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
           <span>{ERRO_DATA_REUNIAO_OBRIGATORIA} A saída para Standby continua disponível.</span>
         </div>
       )}
-      {aguardandoTranscricao && (
-        <div className="mb-3 flex gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
-          <CalendarClock size={14} className="mt-0.5 shrink-0" />
-          <span>
-            A transcrição da reunião ainda não foi recebida. Sincronize-a antes de avançar.
-            A saída para Standby continua disponível.
-          </span>
-        </div>
-      )}
+      
       {etapas.map((etapa) => {
         const ativa = etapa.id === card.etapa.id;
         const bloqueadaPorDataHora = aguardandoDataHora && destinoEhReuniaoAgendada(etapa.nome);

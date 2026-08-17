@@ -140,6 +140,133 @@ model usuarios {
   bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
 
   justificativasMetaEnviadas JustificativaMeta[]
+  roadmapObjectives          RoadmapObjective[]
+}
+
+/// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;
+/// os snapshots preservam o rótulo e a categoria vistos na criação.
+model RoadmapObjective {
+  id                     String  @id @default(cuid())
+  code                   String  @unique
+  moduleKey              String
+  moduleLabelSnapshot    String
+  moduleCategorySnapshot String
+  title                  String
+  description            String
+  desiredOutcome         String?
+  constraints            String?
+  acceptanceCriteriaJson String
+  globalPriority         Int     @unique
+  status                 String  @default("ACTIVE")
+  documentationStatus    String  @default("PENDING")
+  sourceVersion          Int     @default(1)
+
+  createdById Int
+  createdBy   usuarios @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  documentationJobs RoadmapDocumentationJob[]
+  promptArtifacts   RoadmapPromptArtifact[]
+
+  @@index([archivedAt, globalPriority, createdAt, id])
+  @@index([moduleKey, archivedAt, globalPriority, createdAt, id])
+  @@index([documentationStatus, globalPriority, createdAt, id])
+}
+
+/// Job idempotente de documentação. Lease, heartbeat e claimToken fornecem
+/// exclusão distribuída e fencing para o worker contínuo.
+model RoadmapDocumentationJob {
+  id               String           @id @default(cuid())
+  objectiveId      String
+  objective        RoadmapObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  sourceVersion    Int
+  idempotencyKey   String           @unique
+  status           String           @default("PENDING")
+  prioritySnapshot Int
+  availableAt      DateTime         @default(now())
+  attemptCount     Int              @default(0)
+  maxAttempts      Int              @default(5)
+
+  claimedBy      String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  heartbeatAt    DateTime?
+  claimToken     Int       @default(0)
+
+  lastErrorCode    String?
+  lastErrorMessage String?
+  completedAt      DateTime?
+  deadLetteredAt   DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  attempts  RoadmapDocumentationAttempt[]
+  artifacts RoadmapPromptArtifact[]
+
+  @@unique([objectiveId, sourceVersion])
+  @@index([status, availableAt, prioritySnapshot, createdAt, id])
+  @@index([status, claimExpiresAt])
+  @@index([objectiveId, status])
+}
+
+/// Tentativa sanitizada de chamada ao provedor. Tokens, URLs autenticadas e
+/// respostas brutas nunca são armazenados.
+model RoadmapDocumentationAttempt {
+  id             String                  @id @default(cuid())
+  jobId          String
+  job            RoadmapDocumentationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attemptNumber  Int
+  provider       String
+  model          String
+  status         String
+  startedAt      DateTime                @default(now())
+  finishedAt     DateTime?
+  durationMs     Int?
+  httpStatus     Int?
+  errorCode      String?
+  errorMessage   String?
+  responseSha256 String?
+  createdAt      DateTime                @default(now())
+
+  artifacts RoadmapPromptArtifact[]
+
+  @@unique([jobId, attemptNumber])
+  @@index([jobId, status])
+}
+
+/// Conteúdo Markdown canônico; o filesystem em prompt-phases é uma projeção
+/// reconciliável e nunca a fonte primária.
+model RoadmapPromptArtifact {
+  id                   String                       @id @default(cuid())
+  objectiveId          String
+  objective            RoadmapObjective             @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  jobId                String
+  job                  RoadmapDocumentationJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attemptId            String?
+  attempt              RoadmapDocumentationAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  documentationVersion Int
+  phaseNumber          Int
+  slug                 String
+  title                String
+  kind                 String
+  agent                String
+  dependsOnJson        String
+  contentMarkdown      String
+  relativePath         String?
+  sha256               String
+  status               String                       @default("DRAFT")
+  publishedAt          DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  @@unique([objectiveId, documentationVersion, phaseNumber])
+  @@index([jobId, phaseNumber])
+  @@index([attemptId])
+  @@index([objectiveId, status])
 }
 
 model OnboardingTemplate {

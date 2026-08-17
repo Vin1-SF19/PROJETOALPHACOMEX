@@ -83,11 +83,13 @@ export interface ProviderConfig {
  * a env está setada — necessário em produção, onde o Ollama é exposto via proxy
  * autenticado (Cloudflare). Sem o token o proxy responde 403. Só roda no servidor.
  */
-export function getOllamaHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  const key = process.env.OLLAMA_API_KEY;
+export function getOllamaHeaders(
+  extra: Record<string, string> = {},
+  apiKey: string | undefined = process.env.OLLAMA_API_KEY,
+): Record<string, string> {
   return {
     ...extra,
-    ...(key ? { Authorization: `Bearer ${key}` } : {}),
+    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
   };
 }
 

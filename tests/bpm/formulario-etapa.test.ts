@@ -40,8 +40,8 @@ describe("CRM - formulário unificado por etapa", () => {
   it("oferece criação ou reagendamento do Meet somente em Agendar Reunião", () => {
     expect(formulario).toContain("etapaEhAgendarReuniao(card.etapa.nome)");
     expect(formulario).toContain("<PainelReuniao");
-    expect(modal).toContain("destinoEhReuniaoAgendada(card.etapa.nome)");
-    expect(modal).toContain("mostrarFormulario={false}");
+    expect(modal).not.toContain("<PainelReuniao");
+    expect(modal).not.toContain("destinoEhReuniaoAgendada");
     expect(reuniao).toContain("{mostrarFormulario && (");
   });
 
@@ -53,17 +53,17 @@ describe("CRM - formulário unificado por etapa", () => {
   it("remove o bloco Tentando contato do painel esquerdo", () => {
     expect(historico).not.toContain("Tentando contato");
   });
-  it("mantém a Anotação no rodapé estático do painel central", () => {
-    expect(formulario).toContain('htmlFor={`anotacao-card-${card.id}`}');
+  it("mantém a Anotação como accordion compacto no rodapé, com botão Salvar explícito", () => {
     expect(formulario).toContain("Anotação");
-    expect(formulario).toContain("Visível em todas as etapas");
+    expect(formulario).toContain("<details");
+    expect(formulario).toContain("<summary");
     expect(formulario).toContain("sticky bottom-0 z-10 shrink-0");
     expect(formulario).toContain("value={anotacao}");
     expect(formulario).toContain("salvarAnotacao");
-    expect(formulario).toContain("anotacoes.length > 0");
-    expect(formulario).toContain("onBlur={() => void salvarAnotacao()}");
-    expect(formulario).not.toContain("Salvar anotação");
-    expect(formulario.indexOf("</Tabs>")).toBeLessThan(formulario.indexOf("<footer"));
+    expect(formulario).toContain("onClick={() => void salvarAnotacao()}");
+    expect(formulario).not.toContain("onBlur={() => void salvarAnotacao()}");
+    expect(formulario).not.toContain("anotacoes.length > 0");
+    expect(formulario.indexOf("</Tabs>")).toBeLessThan(formulario.indexOf("<details"));
   });
 
   it("persiste a anotação identificada, com autor, sem tratá-la como ligação", () => {

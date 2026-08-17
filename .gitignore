@@ -61,3 +61,6 @@ next-env.d.ts
 
 # Logs do sync automático com o servidor interno (scripts/sync-servidor.ps1)
 /.sync-logs/
+
+# Estado e logs locais do worker contínuo do Roadmap Alpha
+/.roadmap-worker/

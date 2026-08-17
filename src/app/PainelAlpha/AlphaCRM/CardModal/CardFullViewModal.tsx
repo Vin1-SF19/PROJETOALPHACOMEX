@@ -11,7 +11,6 @@ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoServico from "./PainelHistoricoServico";
 import PainelRegistrar from "./PainelRegistrar";
-import PainelReuniao from "./PainelReuniao";
 import PainelProximaEtapa from "./PainelProximaEtapa";
 import {
   DadosEmpresaDrawer,
@@ -23,7 +22,6 @@ import { EmpresaPerfilModal } from "./EmpresaPerfilModal";
 import { SeletorMembrosCard } from "./SeletorMembrosCard";
 import { toast } from "sonner";
 import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
-import { destinoEhReuniaoAgendada } from "@/lib/bpm/agendar-reuniao";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -332,6 +330,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                       podeTrabalharTarefas={podeTrabalharTarefas}
                       realtimeRevision={realtimeRevision}
                       onFocarPainelReuniao={focarPainelReuniao}
+                      anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
                     />
                   </TabsContent>
                   {SERVICOS_FIXOS.map((servico) => (
@@ -351,21 +350,12 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                 etapaAtual={etapaAtual}
                 accent={accent}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
-                anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
                 podeEditar={podeEditar}
                 realtimeRevision={realtimeRevision}
                 onAtualizado={() => { recarregar(); onAtualizado(); }}
                 onEstadoFollowUpChange={atualizarEstadoFollowUp}
               />
               <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
-                {destinoEhReuniaoAgendada(card.etapa.nome) && (
-                  <PainelReuniao
-                    card={card}
-                    accent={accent}
-                    mostrarFormulario={false}
-                    onAtualizado={() => { recarregar(); onAtualizado(); }}
-                  />
-                )}
                 <PainelProximaEtapa
                   card={card}
                   etapas={etapasParaMover}

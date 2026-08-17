@@ -16,7 +16,18 @@
     "calendar-alpha:worker": "tsx scripts/calendar-alpha-worker.mjs",
     "calendar-alpha:maintenance": "tsx scripts/calendar-alpha-maintenance.mjs",
     "calendar-alpha:queue": "tsx scripts/calendar-alpha-queue.mjs",
-    "bpm:novos-leads:run": "node scripts/bpm-novos-leads-job.mjs"
+    "bpm:novos-leads:run": "node scripts/bpm-novos-leads-job.mjs",
+    "roadmap:doctor": "tsx scripts/roadmap-alpha.mjs doctor",
+    "roadmap:check-modules": "tsx scripts/roadmap-alpha.mjs check-modules",
+    "roadmap:sync-modules": "tsx scripts/roadmap-alpha.mjs sync-modules",
+    "roadmap:worker": "tsx scripts/roadmap-alpha.mjs worker",
+    "roadmap:worker:once": "tsx scripts/roadmap-alpha.mjs worker --once",
+    "roadmap:enqueue": "tsx scripts/roadmap-alpha.mjs enqueue",
+    "roadmap:reconcile": "tsx scripts/roadmap-alpha.mjs reconcile",
+    "roadmap:export": "tsx scripts/roadmap-alpha.mjs export",
+    "roadmap:e2e": "tsx scripts/roadmap-alpha-e2e.mjs",
+    "roadmap:e2e:service": "tsx scripts/roadmap-alpha-e2e.mjs --service",
+    "roadmap:e2e:revision": "tsx scripts/roadmap-alpha-e2e.mjs --service --revision"
   },
   "dependencies": {
     "@aws-sdk/client-textract": "^3.1014.0",
@@ -129,6 +140,7 @@
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0",
     "yauzl": "^2.10.0",
+    "zod": "4.4.3",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

@@ -34,6 +34,37 @@
 
 ---
 
+## [2026-08-15] — AlphaCRM/BPM: accordions do painel esquerdo do card viram Tabs
+
+**Tags:** #feature #refactor #nextjs
+**Agentes envolvidos:** Bibble → Scout → Nova → Forge → Probe → Lens → Scribe → Kowalski (pipeline serial completo)
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelResumoEtapas.tsx`
+
+### Contexto
+Usuário pediu para transformar os accordions do lado esquerdo do card do pipeline BPM em 4 Tabs: Etapas concluídas, Tarefas, Anexos, Histórico.
+
+### O que foi feito
+- Scout mapeou `PainelHistorico.tsx` (3 accordions `<details>` via helper `SectionCard`: Tarefas/Anexos/Histórico) e `PainelResumoEtapas.tsx` (accordion próprio "Etapas concluídas"), identificando que `PainelRequisitosAvanco` (requisitos da etapa atual) não se encaixava em nenhuma das 4 abas pedidas.
+- Nova implementou as 4 `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` (shadcn, já usado no `CardFullViewModal.tsx` pai), badges de contagem preservados, `PainelResumoEtapas` ganhou prop opcional `ocultarTitulo` (com estado vazio "Nenhuma etapa concluída ainda."), `SectionCard` preservado intacto por ainda servir `PainelHistoricoServico.tsx`.
+- Forge rodou `tsc`/`lint`/`build` reais — todos limpos nos arquivos alterados.
+- Probe validou por leitura de código; teste visual em browser real não foi possível (dev server não se sustentou no ambiente de preview).
+- Lens aprovou sem bloqueantes.
+
+### Decisões tomadas
+- `PainelRequisitosAvanco` fica fixo, fora das novas Tabs (não vira aba): usuário escolheu essa opção quando Scout apresentou a ambiguidade.
+
+### Problemas encontrados / resolvidos
+- Build falhou 1x com o EPERM já catalogado em `known-errors.md` (`query_engine-windows.dll.node` travado por processo `node.exe` residual). Usuário autorizou `taskkill //F //IM node.exe`; build passou limpo na 2ª tentativa.
+
+### Pendências
+- 2 sugestões não-bloqueantes do Lens, não corrigidas nesta sessão: badge de contagem repetido 4x como string idêntica (candidato a pequeno componente local `BadgeContagem`); `TabsList` com `flex-wrap` pode quebrar em 2 linhas em telas `lg` mais estreitas — recomenda-se confirmação visual humana.
+- Teste visual real em browser não foi possível nesta sessão (sem servidor estável no preview, sem credenciais de login documentadas) — recomenda-se validação manual humana do fluxo de troca de abas.
+
+### Refletido também em
+- `patterns.md`: nova entrada "Accordions → Tabs no painel esquerdo do card BPM".
+
+---
+
 ## [2026-08-14] — Alpha Motion: diagnóstico e correção de 2 causas reais de travamento (Dashboard + Editor)
 
 **Tags:** #bugfix #performance #webgl #diagnosis
@@ -2040,3 +2071,32 @@ O CRM precisava permitir vincular pessoas já existentes em `usuarios` a um card
 ### Refletido também em
 - `codebase-map.md`: mapa do vínculo, UI, ownership e realtime.
 - `integration-points.md`: contrato de autorização, mutação, revogação e testes.
+
+---
+
+## [2026-08-15] — Alpha CRM: anotação sai do meio do modal, entra no histórico à esquerda como accordion em destaque
+
+**Tags:** #ui #ux #frontend #nextjs
+**Agentes envolvidos:** Bibble, Scout, Nova, Forge
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/CardModal/{PainelRegistrar,PainelHistorico,CardFullViewModal}.tsx`
+
+### Contexto
+No modal de empresa do CRM/BPM (3 colunas: Histórico à esquerda, Registrar no meio, Próxima Etapa à direita), o rodapé do painel do meio (`PainelRegistrar`) exibia as últimas anotações soltas ali mesmo, competindo por espaço com o formulário da etapa. O usuário queria esse histórico de anotações só aparecendo no painel de Histórico à esquerda (que já existe), o bloco de anotação bem visualmente destacado, e — pedido no meio da sessão — que virasse um accordion (fechado por padrão) com botão "Salvar" explícito em vez de auto-save no blur.
+
+### O que foi feito
+- `PainelRegistrar.tsx`: removida a listagem de anotações do rodapé. O rodapé virou um `<details>` (accordion, fechado por padrão) com `<summary>` estilizado como badge pill na cor accent (gradiente + glow + `ChevronDown` que gira ao abrir) — a única "porta de entrada" visualmente chamativa para registrar anotação. Trocado auto-save (`onBlur`) por botão "Salvar" explícito, desabilitado quando vazio/sem permissão/salvando.
+- `PainelHistorico.tsx`: recebe nova prop `anotacoes` (mesmas `Interacao` tipo "ANOTACAO" já buscadas no modal) e mescla no feed da seção "Histórico" já existente, junto com os eventos de `card.historico`, ordenado por data. A entrada genérica `ANOTACAO_REGISTRADA` (que o backend já grava automaticamente a cada anotação) é filtrada do feed para não duplicar — cada anotação aparece uma única vez, com o texto completo, ícone e destaque na cor accent.
+- `CardFullViewModal.tsx`: `anotacoes` passou a ser passada para `PainelHistorico` em vez de `PainelRegistrar`.
+
+### Decisões tomadas
+- Não criar uma seção nova de "Anotações" no painel esquerdo — reaproveitar a seção "Histórico" já existente, mesclando os dois tipos de item numa timeline cronológica única (pedido explícito do usuário: "no histórico que já tem").
+- Accordion fechado por padrão para não competir por espaço vertical com o restante do painel do meio (pedido explícito do usuário no meio da sessão).
+
+### Problemas encontrados / resolvidos
+- `npm run build` falhou com `EPERM` no `.dll` do Prisma engine — erro de infraestrutura Windows já catalogado em `known-errors.md` (dev server rodando em paralelo travando o arquivo). Como a mudança não tocou `prisma/schema.prisma`, contornado rodando `npx next build` direto (pulando `prisma generate`), conforme fix documentado.
+
+### Pendências
+- Nenhuma. Forge validou tsc, lint e build limpos nos três arquivos tocados.
+
+### Refletido também em
+- `patterns.md`: padrão de accordion com badge accent para ação em destaque + padrão de feed de histórico mesclado (evento de sistema + conteúdo do usuário).

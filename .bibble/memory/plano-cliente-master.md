@@ -364,13 +364,25 @@ Para CADA módulo desta lista, o ciclo completo é:
 - **Anubis audita especificamente na Fase 3.1 (Parceiros)**: revisão de LGPD/exposição de dado pessoal concentrado em `Pessoa` (CPF de responsável legal + sócio + representante convergidos num único cadastro lido por múltiplos módulos) — ver seção 2.4a risco 3. Não é opcional, é a única fase deste plano com esse gate extra de segurança explícito.
 - Só então o próximo módulo da lista começa.
 
-### Fase 4 — Descontinuação de `clientes` (só depois de TODOS os módulos migrados)
+### Fase 4 — Descontinuação de `clientes` (só depois de TODOS os módulos migrados) — ✅ CONCLUÍDA (2026-08-15)
+
 1. Confirmar (via `PRAGMA foreign_key_list` em todas as tabelas, regra permanente desde o incidente de 2026-07-13) que nenhuma tabela do banco ainda referencia `clientes` pelo nome antigo.
 2. Confirmar que nenhum arquivo de código ainda importa/chama `db.clientes.*` (grep final de varredura).
 3. Vault aprova o `DROP TABLE clientes` (ou rename para `clientes_deprecated_2026xxxx` mantido por um período de segurança, em vez de drop imediato — recomendação: manter renomeada por pelo menos 30 dias antes do drop definitivo, dado o histórico de incidente).
 4. Backup final dedicado antes do drop/rename.
 5. Kowalski arquiva a sessão completa da migração em `journal.md`.
 6. Scribe atualiza `architecture.md`/`codebase-map.md`/`components.md` com o novo modelo definitivo.
+
+**Resultado real da execução (2026-08-15):**
+
+1. **Auditoria de integridade prévia (pedido explícito do usuário, "os dados das tabelas antigas devem estar nas tabelas novas, para não perdermos nenhum dado"):** todas as 12 tabelas `_old_*` existentes no banco auditadas linha a linha, não só por contagem. Resultado: `clientes_old_fase36` (259), `socios_old_fase36` (216/216 elegíveis com telefone), `log_cs_old_fase36` (326), `logFeedback_old_fase36` (6), `historico_alteracao_cliente_old_fase36` (334, + 2 edições orgânicas pós-migração), `contratos_comerciais_old_fase36` (88), `CommissionEvent_old_fase37` (274), `BpmCard_old_fixfk` (4) — **100% confirmados presentes na tabela nova correspondente**. Duas exceções, ambas pendências JÁ conhecidas de fases anteriores (não são perda nova): `operacional_clientes_old_fase35` (3 de 4 sem `Cliente` correspondente — Fase 3.5, saneamento manual pendente) e `Extratos_old_fase33` (6 de 27 sem `Cliente` correspondente — Fase 3.3, mesma pendência já documentada). Nenhum dado real foi perdido em nenhuma tabela.
+2. **`PRAGMA foreign_key_list` geral confirmou**: nenhuma tabela ATIVA referencia `clientes`/`clientes_old_fase36`. Só tabelas já legadas/mortas (as próprias `_old_*`, mais `logAlteracao`/`PessoaEmpresaVinculo`, preservadas sem uso por decisão já tomada em fases anteriores).
+3. **⚠️ Achado extra fora do escopo original, corrigido nesta fase:** `indicacoes.clienteId` (módulo Parceiros) tinha a FK física ainda presa em `clientes_old_fase36`, nunca recriada quando a tabela foi renomeada — mesmo padrão de "constraint órfã pós-rename" já visto em `BpmCard` (Fase 3.6). Investigação confirmou que os 7 valores gravados já eram `Cliente.id` novos e corretos (cross-check contra `ContratoComercial`: cada um com exatamente 1 contrato vinculado, padrão de negócio esperado) — não era corrupção de dado, só a constraint desatualizada. Corrigido via recriação da tabela (backup dedicado, 7/7 linhas preservadas, índices recriados com sufixo `_v2` por colisão de nome preso na tabela renomeada), FK agora aponta para `Cliente` de verdade.
+4. Grep final confirmou zero `db.clientes.*`/`prisma.clientes.*` em `src/`; `model clientes` já removido do schema Prisma desde a Fase 3.6.
+5. Backup final dedicado: `database-backups/pre-change/basetestes_pre_fase4_descontinuar_clientes_2026-08-15T14-05-24-371Z.json` (259 linhas).
+6. **Decisão do usuário: manter `clientes_old_fase36` apenas renomeada, sem DROP, por 30 dias de segurança** (até 2026-09-14) — consistente com a recomendação original deste item, dado o histórico do incidente de 2026-07-13. `DROP TABLE` definitivo requer nova confirmação explícita do usuário quando esse prazo passar.
+
+**Lição registrada em memória de feedback do projeto** (aplica a qualquer migration futura, não só esta): nunca copiar um FK numérico antigo para uma tabela recriada com autoincrement do zero sem revalidar por chave natural — o mesmo bug de "ID reaproveitado apontando para registro errado" apareceu 2 vezes nesta sessão (`CommissionEvent`, Fase 3.7; `indicacoes`, achado na Fase 4) e quase passou despercebido em ambos os casos.
 
 ---
 

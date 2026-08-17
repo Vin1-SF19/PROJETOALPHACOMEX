@@ -13,7 +13,24 @@
 
 ## Padrões de Componentes
 
-<!-- Adicionar aqui -->
+### Accordions → Tabs no painel esquerdo do card BPM
+**Estreado em:** `PainelHistorico.tsx` (AlphaCRM/CardModal, 2026-08-15).
+
+Quando um painel empilha múltiplos blocos de conteúdo relacionado mas mutuamente exclusivo (o usuário só quer ver um de cada vez, não vários simultaneamente), preferir `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` (`@/components/ui/tabs`, shadcn/Radix) a múltiplos `<details>` empilhados — troca "revelar tudo com scroll único" por "1 conteúdo visível por vez, navegação por clique". `Tabs value={x} onValueChange={setX}` sempre controlado (nunca não-controlado). Badge de contagem no `TabsTrigger` (`text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300`, condicional a `count > 0`) substitui o badge que existia no header do accordion antigo. Cada `TabsContent` recebe `min-h-0 lg:h-full lg:overflow-y-auto` próprio — o scroll deixa de ser da coluna inteira e passa a ser por aba ativa; a `Tabs` raiz e o container pai precisam manter a cadeia de `min-h-0`/`flex` para o overflow funcionar em flexbox aninhado. Um subcomponente com título/accordion próprio (ex: `PainelResumoEtapas`, que já tinha seu accordion interno por item) ganha uma prop opcional (`ocultarTitulo`) para suprimir o cabeçalho duplicado quando o título passa a ser o label da própria aba — o accordion interno dele continua intocado, só o wrapper de título externo é condicional. Um helper de accordion pré-existente (`SectionCard`) que ainda serve outro consumidor no mesmo arquivo NUNCA deve ser removido só porque um novo consumidor parou de usá-lo — verificar todos os `import` antes de apagar.
+
+Bloco de ação/estado sempre-visível e não mutuamente exclusivo com o resto (ex: requisitos de avanço da etapa atual) fica FORA da nova `Tabs`, como irmão fixo antes dela — não é candidato a virar aba só porque as abas vizinhas migraram.
+
+### Accordion de ação em destaque (rodapé sticky com `<details>` + badge accent)
+**Estreado em:** `PainelRegistrar.tsx` (AlphaCRM/CardModal, painel de Anotação, 2026-08-15).
+
+Para um bloco de ação secundária que precisa (a) chamar atenção visualmente e (b) não ocupar espaço fixo na tela: usar `<details className="group">` no lugar de `div` estático. O `<summary>` funciona como "botão" — vira um badge pill com `background: linear-gradient(110deg, rgba(accent,0.4), rgba(accent,0.15))`, borda `rgba(accent,0.55)` e `boxShadow` de glow (`0 6px 18px -10px rgba(accent,0.9)`), mais um `ChevronDown` com `group-open:rotate-180`. O container recebe `border-t-2` + gradiente de fundo na cor do accent (`linear-gradient(180deg, rgba(accent,0.12), rgba(2,6,23,0.92) 65%)`) para se destacar do resto do painel. Fechado por padrão (sem atributo `open`). Ação de salvar usa botão explícito (`disabled` quando vazio/salvando) em vez de auto-save no `onBlur` — mais prevísivel para o usuário quando o campo está dentro de um accordion.
+
+### Feed de histórico mesclado (eventos de sistema + conteúdo do usuário)
+**Estreado em:** `PainelHistorico.tsx` (AlphaCRM/CardModal, seção "Histórico", 2026-08-15).
+
+Quando uma ação do usuário (ex: Anotação) já gera uma entrada genérica em `BpmCardHistorico` (via `registrarHistoricoCard`) E os dados completos existem em outra tabela (ex: `BpmInteracaoCard`), não duplicar a exibição: filtrar a entrada genérica do histórico (`h.acao !== "ANOTACAO_REGISTRADA"`) e mesclar os itens ricos no mesmo array, normalizados para um tipo comum (`{ tipo, id, data, ... }`), ordenados por data desc. Cada tipo tem sua própria renderização (evento simples = 1 linha cinza; anotação = card com borda/fundo accent, ícone e texto completo), mas convivem na mesma lista cronológica em vez de seções separadas.
+
+
 
 ---
 

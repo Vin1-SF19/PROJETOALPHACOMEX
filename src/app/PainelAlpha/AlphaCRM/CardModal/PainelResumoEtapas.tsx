@@ -12,6 +12,7 @@ interface Props {
   card: CardDetalhe;
   etapas: EtapaResumoPipeline[];
   accent: string;
+  ocultarTitulo?: boolean;
 }
 
 function obterEtapaDoHistorico(valorJson: string | null): string | null {
@@ -30,18 +31,23 @@ function formatarValorResumo(valor: string): string {
   return valor;
 }
 
-export function PainelResumoEtapas({ card, etapas, accent }: Props) {
+export function PainelResumoEtapas({ card, etapas, accent, ocultarTitulo }: Props) {
   const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
   const [etapaAbertaId, setEtapaAbertaId] = useState(() => etapaResumoInicialId(etapas, card.etapa.id));
 
-  if (etapasAnteriores.length === 0) return null;
+  if (etapasAnteriores.length === 0) {
+    if (!ocultarTitulo) return null;
+    return <p className="text-xs text-slate-600">Nenhuma etapa concluída ainda.</p>;
+  }
 
   return (
     <section aria-label="Resumo das etapas anteriores" className="space-y-2">
-      <div className="flex items-center gap-2 px-1 pt-1">
-        <ClipboardList size={14} style={{ color: `rgb(${accent})` }} aria-hidden="true" />
-        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Etapas concluídas</p>
-      </div>
+      {!ocultarTitulo && (
+        <div className="flex items-center gap-2 px-1 pt-1">
+          <ClipboardList size={14} style={{ color: `rgb(${accent})` }} aria-hidden="true" />
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Etapas concluídas</p>
+        </div>
+      )}
 
       {etapasAnteriores.map((etapa) => {
         const aberta = etapaAbertaId === etapa.id;

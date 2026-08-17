@@ -60,12 +60,13 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(modal).toContain('title={card.servico}');
   });
 
-  it("centraliza o formulário da etapa e mantém o painel direito para avanço/transcrição", () => {
+  it("centraliza o formulário da etapa e mantém o painel direito somente com a próxima etapa", () => {
     expect(registrar).toContain('value="formulario-etapa"');
     expect(registrar).toContain('id={`formulario-etapa-${card.id}`}');
     expect(registrar).toContain("etapaEhAgendarReuniao(card.etapa.nome)");
     expect(registrar).toContain("<PainelReuniao");
-    expect(modal).toContain("mostrarFormulario={false}");
+    expect(modal).not.toContain("<PainelReuniao");
+    expect(modal).not.toContain("destinoEhReuniaoAgendada");
     expect(painelReuniao).toContain("{mostrarFormulario && (");
     expect(requisitos).toContain("onFocarPainelReuniao");
     expect(requisitos).toContain("Ir à reunião");
