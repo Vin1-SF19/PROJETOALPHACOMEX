@@ -29,7 +29,12 @@ if ($existingTask) {
 
 $actionArguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}"' -f $runnerPath
 $action = New-ScheduledTaskAction -Execute $powerShellPath -Argument $actionArguments -WorkingDirectory $projectRoot
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
+$logonTrigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
+$watchdogTrigger = New-ScheduledTaskTrigger `
+  -Once `
+  -At ((Get-Date).AddMinutes(1)) `
+  -RepetitionInterval (New-TimeSpan -Minutes 5) `
+  -RepetitionDuration (New-TimeSpan -Days 3650)
 $principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet `
   -MultipleInstances IgnoreNew `
@@ -40,7 +45,7 @@ $settings = New-ScheduledTaskSettingsSet `
   -AllowStartIfOnBatteries `
   -DontStopIfGoingOnBatteries
 
-$task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Worker contínuo do Roadmap Alpha: fila Qwen e projeção prompt-phases.'
+$task = New-ScheduledTask -Action $action -Trigger @($logonTrigger, $watchdogTrigger) -Principal $principal -Settings $settings -Description 'Worker contínuo do Roadmap Alpha: fila Qwen e projeção prompt-phases.'
 Register-ScheduledTask -TaskName $taskName -InputObject $task -Force | Out-Null
 
 if ($Start) {

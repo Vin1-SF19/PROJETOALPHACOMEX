@@ -19,7 +19,7 @@ import { parserGenerico } from "./generico";
 export type { ParserExtrato } from "./types";
 
 export interface ParserDetectado {
-  bancoId: "itau" | "santander";
+  bancoId: "itau" | "santander" | "mercadoPago";
   parser: ParserExtrato;
 }
 
@@ -68,6 +68,14 @@ export function detectarParserExtrato(texto: string): ParserDetectado | null {
     normalizado.includes("movimentacao")
   ) {
     return { bancoId: "santander", parser: parserSantander };
+  }
+
+  if (
+    normalizado.includes("extrato de conta") &&
+    normalizado.includes("detalhe dos movimentos") &&
+    normalizado.includes("mercado pago")
+  ) {
+    return { bancoId: "mercadoPago", parser: parserMercadoPago };
   }
 
   return null;
