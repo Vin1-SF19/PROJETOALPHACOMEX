@@ -53,9 +53,10 @@ try {
   } else if (command === "retry") {
     const executionId = process.argv.find((argument) => argument.startsWith("--execution="))?.slice("--execution=".length);
     if (!executionId) throw new Error("EXECUTION_ID_REQUIRED");
+    const adoptedChanges = process.argv.filter((argument) => argument.startsWith("--adopt-change=")).map((argument) => argument.slice("--adopt-change=".length));
     const { retryProductionExecution } = await import("../src/lib/roadmap-production/worker.ts");
-    await retryProductionExecution(executionId);
-    emit({ ok: true, code: 0, command, executionId });
+    await retryProductionExecution(executionId, adoptedChanges);
+    emit({ ok: true, code: 0, command, executionId, adoptedChanges });
     const { default: db } = await import("../src/lib/prisma.ts");
     await db.$disconnect();
   } else if (command === "worker") {

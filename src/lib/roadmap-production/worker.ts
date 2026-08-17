@@ -12,6 +12,10 @@ function executionId(objectiveId: string, sourceVersion: number): string {
   return `${objectiveId}:v${sourceVersion}`;
 }
 
+function appendActivity(executionPhase: ProductionExecution["phases"][number], activity: ProductionActivity): void {
+  executionPhase.activities = [...executionPhase.activities, activity].slice(-200);
+}
+
 async function documentedObjectives() {
   return db.roadmapObjective.findMany({
     where: { archivedAt: null, documentationStatus: "DOCUMENTED" },
@@ -72,6 +76,7 @@ export async function syncProductionExecutions(): Promise<ProductionState> {
         finishedAt: null,
         summary: null,
         errorCode: null,
+        changedFiles: [],
         activities: [],
       })),
     });
@@ -102,6 +107,10 @@ async function addActivity(executionIdValue: string, phaseNumber: number, agentI
       message: message.slice(0, 2_000),
     };
     phase.activities = [...phase.activities, activity].slice(-200);
+    const changedPath = message.match(/^(?:Alterou|Criou) (.+)$/)?.[1];
+    if (changedPath && !phase.changedFiles.includes(changedPath)) {
+      phase.changedFiles = [...phase.changedFiles, changedPath].slice(-100);
+    }
   });
 }
 
@@ -113,7 +122,7 @@ export async function recoverInterruptedProduction(): Promise<number> {
       if (phase.status !== "RUNNING") continue;
       phase.status = "PENDING";
       phase.errorCode = "WORKER_INTERRUPTED_RETRY";
-      phase.activities.push({ at: now(), agentId: phase.resolvedAgent, type: "STATUS", message: "Worker reiniciado; fase devolvida à fila." });
+      appendActivity(phase, { at: now(), agentId: phase.resolvedAgent, type: "STATUS", message: "Worker reiniciado; fase devolvida à fila." });
       execution.status = "PENDING";
       recovered += 1;
     }
@@ -122,14 +131,19 @@ export async function recoverInterruptedProduction(): Promise<number> {
   return recovered;
 }
 
-export async function retryProductionExecution(id: string): Promise<void> {
+export async function retryProductionExecution(id: string, adoptedChanges: string[] = []): Promise<void> {
   await mutateExecution(id, (execution) => {
     const failed = execution.phases.find((phase) => phase.status === "FAILED" || phase.status === "BLOCKED");
     if (!failed) throw new Error("NO_FAILED_PHASE");
     failed.status = "PENDING";
     failed.errorCode = null;
     failed.finishedAt = null;
-    failed.activities.push({ at: now(), agentId: failed.resolvedAgent, type: "STATUS", message: "Nova tentativa solicitada pelo administrador." });
+    for (const changedPath of adoptedChanges) {
+      if (!changedPath || changedPath.length > 500 || changedPath.includes("..") || /^[a-z]:/i.test(changedPath)) throw new Error("INVALID_ADOPTED_PATH");
+      if (!failed.changedFiles.includes(changedPath)) failed.changedFiles.push(changedPath);
+    }
+    failed.changedFiles = failed.changedFiles.slice(-100);
+    appendActivity(failed, { at: now(), agentId: failed.resolvedAgent, type: "STATUS", message: "Nova tentativa solicitada pelo administrador." });
     execution.status = "PENDING";
     execution.finishedAt = null;
   });
@@ -181,7 +195,7 @@ export async function processNextProductionPhase() {
   phase.startedAt = now();
   phase.finishedAt = null;
   phase.errorCode = null;
-  phase.activities.push({ at: now(), agentId: phase.resolvedAgent, type: "STATUS", message: `Agente ${phase.resolvedAgent} iniciou a fase.` });
+  appendActivity(phase, { at: now(), agentId: phase.resolvedAgent, type: "STATUS", message: `Agente ${phase.resolvedAgent} iniciou a fase.` });
   execution.status = "RUNNING";
   execution.startedAt ??= now();
   await writeProductionState(state);
@@ -200,6 +214,7 @@ export async function processNextProductionPhase() {
       ...(phase.attemptCount > 1 && phase.summary ? [`Resumo da tentativa anterior desta fase — use-o para agir sem repetir a investigação:\n${phase.summary}`] : []),
     ],
     allowWrite: phase.kind === "EXECUTION",
+    priorChangesApplied: phase.changedFiles.length > 0,
   }, (message) => addActivity(execution.id, phase.phaseNumber, phase.resolvedAgent, message));
 
   const updated = await mutateExecution(execution.id, (current) => {
@@ -209,7 +224,7 @@ export async function processNextProductionPhase() {
     currentPhase.finishedAt = now();
     currentPhase.summary = result.summary;
     currentPhase.errorCode = result.errorCode ?? null;
-    currentPhase.activities.push({
+    appendActivity(currentPhase, {
       at: now(), agentId: currentPhase.resolvedAgent, type: result.success ? "RESULT" : "ERROR",
       message: result.success ? "Fase concluída." : `Fase interrompida: ${result.errorCode ?? "AGENT_FAILED"}`,
     });

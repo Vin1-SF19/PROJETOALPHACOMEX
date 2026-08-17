@@ -20,7 +20,41 @@
 
 A UI consulta o estado automaticamente a cada dois segundos enquanto houver item na fila. O painel mostra a transição **Na fila → Documentando → Documentado** e exibe as fases assim que a publicação termina, sem recarregar a página.
 
-O Roadmap documenta prompts, mas nunca os executa.
+O worker de documentação apenas cria os prompts. A aba **Produção local**, quando habilitada, executa separadamente as fases documentadas e mantém todas as mudanças sem commit para revisão humana.
+
+## Produção local com Bibble
+
+- A navegação **Produção** aparece para Admin/CEO/TI e usuários com o override `roadmapProduction`.
+- Somente Admin/CEO/TI veem **Configurar IA** e **Acessos**.
+- Ollama/Qwen é o motor padrão. Codex CLI e Claude Code permanecem indisponíveis até que seus adapters seguros e CLIs sejam diagnosticados como prontos.
+- A gaveta **Agentes** deriva dos skills instalados em `.claude/skills/bibble-squad/` e destaca agente, fase e atividade em andamento.
+- O executor oferece apenas leitura/busca, escrita textual confinada e gates allowlisted. Não há tool de Git mutável, shell arbitrário, banco ou migration.
+- Configuração, retomada, arquivos alterados e telemetria ficam em `.roadmap-production/`, ignorado pelo Git.
+
+Comandos CLI:
+
+```powershell
+npm run roadmap:production:doctor
+npm run roadmap:production:status
+npm run roadmap:production:once
+npm run roadmap:production:retry -- --execution=<objective-id>:v<version>
+```
+
+Instalar ou atualizar o supervisor singleton:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-roadmap-production-worker.ps1 -Start
+Get-ScheduledTask -TaskName PainelAlpha-RoadmapProductionWorker
+Get-Content .roadmap-production/worker.log -Tail 30
+```
+
+Remover o supervisor:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-roadmap-production-worker.ps1
+```
+
+O usuário revisa o working tree e realiza `git add`/`git commit` manualmente. O worker nunca executa essas operações.
 
 ## Comandos
 

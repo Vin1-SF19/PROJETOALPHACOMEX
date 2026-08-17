@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress
+Ready for Review
 
 ## Executor Assignment
 
@@ -50,12 +50,12 @@ In Progress
 
 ## Tarefas
 
-- [ ] Criar contrato, armazenamento atômico local e catálogo dinâmico de agentes (AC 4–8, 13–15).
-- [ ] Implementar autorização e gestão de acesso sem schema novo (AC 2, 3).
-- [ ] Implementar loop Ollama com tools confinadas e adapters diagnosticáveis (AC 4, 5, 9–12).
-- [ ] Implementar fila/worker local singleton e retomada (AC 7, 13, 15–18).
-- [ ] Implementar UI Produção, configuração e gaveta de agentes (AC 1–6, 14).
-- [ ] Instalar supervisor, executar E2E real e atualizar documentação (AC 17–19).
+- [x] Criar contrato, armazenamento atômico local e catálogo dinâmico de agentes (AC 4–8, 13–15).
+- [x] Implementar autorização e gestão de acesso sem schema novo (AC 2, 3).
+- [x] Implementar loop Ollama com tools confinadas e adapters diagnosticáveis (AC 4, 5, 9–12).
+- [x] Implementar fila/worker local singleton e retomada (AC 7, 13, 15–18).
+- [x] Implementar UI Produção, configuração e gaveta de agentes (AC 1–6, 14).
+- [x] Instalar supervisor, executar E2E real e atualizar documentação (AC 17–19).
 
 ## Segurança
 
@@ -76,6 +76,7 @@ In Progress
 | Date | Version | Description | Author |
 |---|---:|---|---|
 | 2026-08-17 | 0.1.0 | Story criada a partir da solicitação de Produção local orientada pelo Bibble. | Codex / `@dev` |
+| 2026-08-17 | 1.0.0 | Produção local, acesso, adapters, worker, tools, UI, supervisor e E2E real concluídos. | Codex / `@dev` |
 
 ## Dev Agent Record
 
@@ -85,12 +86,44 @@ Codex (GPT-5)
 
 ### Completion Notes
 
-- Pendente.
+- CLI-first entregue com doctor, status, execução unitária, retry e worker contínuo.
+- Ollama remoto validado com `qwen3.8:27b`; 21 skills Bibble descobertos dinamicamente.
+- Execução real `RM-2026-879ABA` concluiu as cinco fases e aplicou mudanças no CRM sem commit automático.
+- Supervisor `PainelAlpha-RoadmapProductionWorker` instalado, singleton e ativo com watchdog de um minuto.
+- Segurança validada: traversal, segredos, schema/migrations, escrita read-only e shell arbitrário bloqueados.
+- Lint direcionado e 37 testes Roadmap passaram. Gate global mantém baseline legado fora do escopo; o build via `prisma generate` pode falhar com EPERM enquanto o dev server mantém o engine carregado.
 
 ### File List
 
+- `.gitignore`
+- `docs/roadmap-alpha/README.md`
 - `docs/stories/story-roadmap-alpha-producao-local-bibble.md`
+- `package.json`
+- `scripts/install-roadmap-production-worker.ps1`
+- `scripts/roadmap-production-worker.ps1`
+- `scripts/roadmap-production.mjs`
+- `scripts/uninstall-roadmap-production-worker.ps1`
+- `src/actions/PermissoesSetor.ts`
+- `src/actions/RoadmapAlpha.ts`
+- `src/actions/RoadmapProduction.ts`
+- `src/app/PainelAlpha/Roadmap/page.tsx`
+- `src/components/RoadmapAlpha/RoadmapDashboard.tsx`
+- `src/components/RoadmapAlpha/RoadmapProductionPanel.tsx`
+- `src/lib/roadmap-alpha/authorization.ts`
+- `src/lib/roadmap-production/agents.ts`
+- `src/lib/roadmap-production/contracts.ts`
+- `src/lib/roadmap-production/providers.ts`
+- `src/lib/roadmap-production/storage.ts`
+- `src/lib/roadmap-production/tools.ts`
+- `src/lib/roadmap-production/worker.ts`
+- `tests/roadmap-production/agents.test.ts`
+- `tests/roadmap-production/contracts.test.ts`
+- `tests/roadmap-production/providers.test.ts`
+- `tests/roadmap-production/storage.test.ts`
+- `tests/roadmap-production/tools.test.ts`
 
 ## QA Results
 
-- Pendente.
+- E2E real: PASS — objetivo `RM-2026-879ABA`, fases Scout → Nova → Nova → Probe → Scribe em `SUCCEEDED`.
+- Revisão visual autenticada não automatizada porque a sessão isolada do navegador abriu a tela de login; nenhum acesso a credenciais foi tentado.
+- Nenhum CRITICAL identificado na revisão local de segurança.

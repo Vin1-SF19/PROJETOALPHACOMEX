@@ -36,6 +36,7 @@ export const productionPhaseStateSchema = z.object({
   finishedAt: z.string().datetime().nullable(),
   summary: z.string().max(8_000).nullable(),
   errorCode: z.string().max(100).nullable(),
+  changedFiles: z.array(z.string().min(1).max(500)).max(100).default([]),
   activities: z.array(productionActivitySchema).max(200),
 }).strict();
 
@@ -66,4 +67,3 @@ export type ProductionActivity = z.infer<typeof productionActivitySchema>;
 export type ProductionPhaseState = z.infer<typeof productionPhaseStateSchema>;
 export type ProductionExecution = z.infer<typeof productionExecutionSchema>;
 export type ProductionState = z.infer<typeof productionStateSchema>;
-

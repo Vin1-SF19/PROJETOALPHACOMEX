@@ -34,6 +34,37 @@
 
 ---
 
+## [2026-08-17] — Agenda Alpha: fix de feriados aparecendo 1 dia antes na grade
+
+**Tags:** #bugfix #calendario #timezone
+**Agentes envolvidos:** Bibble (orquestração direta) → Explore agent (Scout de reconhecimento) → Forge (tsc/lint/testes reais) — sessão de bugfix cirúrgico, não feature nova.
+
+### Contexto
+Usuário reportou: no módulo Agenda Alpha (Calendário Alpha), feriados nacionais brasileiros aparecem 1 dia antes do correto — exemplo dado, Dia dos Pais (domingo 09/08/2026) marcado no sábado 08. Pedido para resolver como item final antes de liberar o módulo para beta teste.
+
+### O que foi feito
+- Explore agent mapeou o pipeline completo: Google Calendar API → `client.ts` (mapEventoParaDTO) → `cache-eventos.ts` (BUG aqui) → `sync.ts` (grava no Prisma) → actions → `CalendarioAlpha/lib/datas.ts` (formata em America/Sao_Paulo) → grade visual.
+- Causa raiz confirmada: `paraDataOuNull` em `src/lib/google-calendar/cache-eventos.ts` fazia `new Date(evento.inicio.dataHora ?? evento.inicio.data)`. Para eventos "dia inteiro" (feriados, sem `.dataHora`, só `.data = "YYYY-MM-DD"`), `new Date("YYYY-MM-DD")` é interpretado como meia-noite UTC; ao formatar em `America/Sao_Paulo` (UTC-3) na grade, regride pro dia civil anterior.
+- Corrigido: nova função `paraDataDeEventoOuNull(detalhe: GoogleEventoDataDTO)` substitui `paraDataOuNull` (removida, sem outros consumidores) — trata `.dataHora` (com offset, comportamento inalterado) separado de `.data` pura (ancorada via `Date.UTC(ano, mes-1, dia)`), mesmo padrão de `civilDate()` já usado em `src/lib/commissions/calendar-engine.ts`.
+- Teste de regressão `tests/google-calendar/cache-eventos.test.ts` atualizado: renomeado describe/import para `paraDataDeEventoOuNull`, adicionado teste específico ancorando `"2026-08-09"` em `Date.UTC(2026,7,9)` e validando `getUTCDate() === 9`; caso de regressão pré-existente (evento dia inteiro usa `.data`) ajustado para esperar o valor correto em vez do valor com bug.
+- Forge rodou `tsc --noEmit` (0 erros novos — 4 erros pré-existentes confirmados via `git stash`, não relacionados), `eslint` nos arquivos tocados (limpo), `vitest run tests/google-calendar/cache-eventos.test.ts` (7/7 passando) e a suíte inteira de `tests/google-calendar/` (197/198 — única falha é timeout pré-existente e não relacionado em `cli.test.ts`, confirmado via `git stash`, catalogado em `known-errors.md`).
+
+### Decisões tomadas
+- Corrigir na ingestão (`cache-eventos.ts`), não na exibição (`datas.ts`) — `datas.ts` já estava correto; o valor errado nascia na gravação do cache, então qualquer consumidor futuro herdaria o bug se só a exibição fosse corrigida. Ver `decisions.md`.
+
+### Problemas encontrados / resolvidos
+- Timeout intermitente pré-existente em `tests/google-calendar/cli.test.ts` (só reproduz com a suíte inteira, não isolado) — não relacionado a esta correção, confirmado via `git stash`, documentado em `known-errors.md` para não ser reinvestigado à toa numa próxima sessão.
+
+### Pendências
+- `FormularioEvento.tsx` (`dataDoGoogle`) tem padrão inconsistente (`new Date("...T00:00:00")` sem `Z`, client-side) — não corrigido por estar fora do escopo relatado e não reproduzir o bug na prática (roda no fuso do navegador do usuário). Ver `decisions.md` para detalhe, caso apareça sintoma parecido no formulário de edição.
+- Teste visual real em browser não foi feito nesta sessão (mudança é em lib de dados server-side, sem UI nova) — recomenda-se o usuário conferir a grade da Agenda Alpha num feriado real após deploy.
+
+### Refletido também em
+- `decisions.md`: nova entrada "Agenda Alpha: feriados/eventos dia inteiro do Google apareciam 1 dia antes".
+- `known-errors.md`: nova entrada sobre o timeout flaky de `cli.test.ts`.
+
+---
+
 ## [2026-08-15] — AlphaCRM/BPM: accordions do painel esquerdo do card viram Tabs
 
 **Tags:** #feature #refactor #nextjs

@@ -77,6 +77,15 @@ Manter `auth()`/checagem de permissão ANTES de buscar o registro no banco — o
 
 ---
 
+### `tests/google-calendar/cli.test.ts` — timeout intermitente só quando roda com a suíte inteira
+**Sintoma:** `it("não devolve argumento bruto nos erros das CLIs")` estoura `Test timed out in 5000ms` quando `npx vitest run tests/google-calendar/` roda a pasta inteira (27 arquivos). Rodando o arquivo isolado (`npx vitest run tests/google-calendar/cli.test.ts`), passa normal (2/2) em ~5s.
+**Causa:** não investigada a fundo — sintoma de contenção de recursos (provavelmente spawn de processo filho da CLI disputando CPU/IO com os outros 26 arquivos rodando em paralelo no mesmo worker pool do Vitest), não um bug de lógica. Confirmado via `git stash` que o timeout já existia ANTES de qualquer mudança relacionada (reproduz igual no estado limpo do `main`).
+**Fix:** nenhum aplicado ainda — não bloqueia PRs; se precisar rodar a suíte com confiança, rodar `cli.test.ts` isolado ou aumentar o timeout desse `it` especificamente (`it("...", async () => {...}, 15000)`). Investigar `poolOptions`/paralelismo do Vitest se o flake incomodar em CI.
+**Contexto:** Só reproduz com a pasta `tests/google-calendar/` inteira, não isolado. Observado pela 1ª vez durante a correção do bug de feriado 1 dia antes (`cache-eventos.ts`), mas não relacionado a ele.
+**Adicionado em:** 2026-08-17 (Forge, verificação da correção de feriados na Agenda Alpha)
+
+---
+
 ### Bibble confirma "chamado aberto" via chat mesmo quando a abertura falhou (ou nunca foi tentada)
 **Sintoma:** Usuário pede para o Bibble abrir um chamado de suporte pelo chat; o Bibble responde confirmando a abertura com um número de chamado (ex.: `#PAA-2026/789` — formato que não existe no sistema; o ID real é sequencial simples `#1`, `#2`...), mas o chamado não existe de verdade em `/PainelAlpha/Chamados` — ninguém no admin recebe a notificação. Persiste mesmo perguntando várias vezes: o Bibble reafirma a confirmação inventada.
 **Causa raiz (2 camadas):**

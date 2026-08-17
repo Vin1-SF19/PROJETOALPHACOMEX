@@ -52,6 +52,7 @@ export interface ProductionAgentInput {
   phaseMarkdown: string;
   previousSummaries: string[];
   allowWrite: boolean;
+  priorChangesApplied?: boolean;
 }
 
 export interface ProductionAgentResult {
@@ -110,9 +111,9 @@ function safeErrorCode(error: unknown): string {
 
 function phaseResult(content: string, toolSteps: number): ProductionAgentResult {
   const summary = content.trim().slice(0, 8_000) || "Fase concluída sem resumo textual.";
-  const failure = /RESULT(?:ADO)?\s*:\s*(FAIL|FAILED|BLOCKED|REPROVADO)/i.test(summary);
-  if (failure) return { success: false, summary, errorCode: /BLOCKED/i.test(summary) ? "AGENT_BLOCKED" : "AGENT_REPORTED_FAILURE", toolSteps };
-  if (!/RESULT(?:ADO)?\s*:\s*(PASS|PASSED|APROVADO)/i.test(summary)) {
+  const failure = /RESULT(?:ADO)?\s*:\s*(FAIL|FAILED|BLOCKED|REPROVADO)/i.test(content);
+  if (failure) return { success: false, summary, errorCode: /BLOCKED/i.test(content) ? "AGENT_BLOCKED" : "AGENT_REPORTED_FAILURE", toolSteps };
+  if (!/RESULT(?:ADO)?\s*:\s*(PASS|PASSED|APROVADO)/i.test(content)) {
     return { success: false, summary, errorCode: "AGENT_RESULT_MISSING", toolSteps };
   }
   return { success: true, summary, toolSteps };
@@ -182,7 +183,12 @@ export async function runProductionAgent(
       }
       if (!assistant.tool_calls?.length) {
         const result = phaseResult(assistant.content ?? "", step);
-        if (result.success && input.allowWrite && successfulWrites === 0) {
+        if (result.errorCode === "AGENT_RESULT_MISSING" && step + 1 < config.maxToolSteps) {
+          await onActivity("Solicitando marcador de resultado obrigatório");
+          messages.push({ role: "user", content: "Responda agora em uma única linha: RESULT: PASS, RESULT: FAIL ou RESULT: BLOCKED." });
+          continue;
+        }
+        if (result.success && input.allowWrite && successfulWrites === 0 && !input.priorChangesApplied) {
           return { ...result, success: false, errorCode: "NO_CHANGES_APPLIED" };
         }
         return result;

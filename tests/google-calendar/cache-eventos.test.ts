@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dadosCacheDeEvento, paraDataOuNull } from "@/lib/google-calendar/cache-eventos";
+import { dadosCacheDeEvento, paraDataDeEventoOuNull } from "@/lib/google-calendar/cache-eventos";
 import type { GoogleEventoDTO } from "@/lib/google-calendar/types";
 
 function eventoBase(overrides: Partial<GoogleEventoDTO> = {}): GoogleEventoDTO {
@@ -24,10 +24,25 @@ function eventoBase(overrides: Partial<GoogleEventoDTO> = {}): GoogleEventoDTO {
   };
 }
 
-describe("paraDataOuNull", () => {
-  it("retorna null para undefined e Date para string válida", () => {
-    expect(paraDataOuNull(undefined)).toBeNull();
-    expect(paraDataOuNull("2026-07-18T00:00:00Z")).toEqual(new Date("2026-07-18T00:00:00Z"));
+describe("paraDataDeEventoOuNull", () => {
+  it("retorna null quando não há dataHora nem data", () => {
+    expect(paraDataDeEventoOuNull({})).toBeNull();
+  });
+
+  it("usa dataHora (com offset) quando presente", () => {
+    expect(paraDataDeEventoOuNull({ dataHora: "2026-07-18T00:00:00Z" })).toEqual(
+      new Date("2026-07-18T00:00:00Z"),
+    );
+  });
+
+  // Regressão: `new Date("YYYY-MM-DD")` é meia-noite UTC — ao formatar em America/Sao_Paulo
+  // (UTC-3) regride para o dia civil anterior (feriado do dia 9 aparecendo no dia 8).
+  it("ancora `data` (dia inteiro, sem horário) em meia-noite UTC do próprio dia civil", () => {
+    const resultado = paraDataDeEventoOuNull({ data: "2026-08-09" });
+    expect(resultado).toEqual(new Date(Date.UTC(2026, 7, 9)));
+    expect(resultado?.getUTCFullYear()).toBe(2026);
+    expect(resultado?.getUTCMonth()).toBe(7);
+    expect(resultado?.getUTCDate()).toBe(9);
   });
 });
 
@@ -49,8 +64,8 @@ describe("dadosCacheDeEvento", () => {
 
     const dados = dadosCacheDeEvento(eventoDiaInteiro);
 
-    expect(dados.inicioEm).toEqual(new Date("2026-07-20"));
-    expect(dados.fimEm).toEqual(new Date("2026-07-21"));
+    expect(dados.inicioEm).toEqual(new Date(Date.UTC(2026, 6, 20)));
+    expect(dados.fimEm).toEqual(new Date(Date.UTC(2026, 6, 21)));
     expect(dados.diaInteiro).toBe(true);
   });
 

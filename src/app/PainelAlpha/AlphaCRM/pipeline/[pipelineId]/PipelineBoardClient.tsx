@@ -40,6 +40,8 @@ import {
   restaurarSnapshotBoard,
 } from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
+import { SkeletonColumn } from "./PipelineBoardSkeleton";
+import { useLazyColumn } from "@/hooks/useLazyColumn";
 
 interface EtapaBpm {
   id: string;
@@ -92,6 +94,7 @@ function KanbanCard({
   novosLeads,
   arrastoDesabilitado,
   onAbrir,
+  index = 0,
 }: {
   card: CardBpm;
   etapaNome: string;
@@ -99,12 +102,13 @@ function KanbanCard({
   novosLeads: boolean;
   arrastoDesabilitado: boolean;
   onAbrir: (cardId: string) => void;
+  index?: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     disabled: arrastoDesabilitado,
   });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, animationDelay: `${index * 40}ms` };
 
   const naoAcessado = !card.primeiraVisualizacaoEm;
   const alertaBoasVindas = etapaEhBoasVindas(etapaNome) && naoAcessado;
@@ -133,7 +137,7 @@ function KanbanCard({
       onClick={() => onAbrir(card.id)}
       aria-label={statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
-        "group relative isolate overflow-hidden rounded-2xl border bg-slate-900/80 p-0 shadow-lg shadow-black/20 backdrop-blur-sm cursor-grab active:cursor-grabbing select-none transition-[border-color,box-shadow,filter,opacity] duration-150 hover:shadow-xl hover:shadow-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        "alpha-pipeline-card alpha-card-enter group relative isolate overflow-hidden rounded-2xl border bg-slate-900/80 p-0 shadow-lg shadow-black/20 backdrop-blur-sm cursor-grab active:cursor-grabbing select-none hover:shadow-xl hover:shadow-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         statusConfig?.cardClassName,
         alertaBoasVindas || alertaAlinhamento
           ? "border-red-500/70 bg-red-950/25 shadow-red-950/40 hover:border-red-400 animate-pulse"
@@ -288,12 +292,13 @@ function KanbanColumn({
   const novosLeads = etapaEhNovosLeads(etapa.nome);
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
   return (
-    <div className="flex flex-col min-w-[240px] max-w-[240px]">
-      <div className="flex items-center justify-between mb-2 px-1">
+    <div className="alpha-pipeline-column-shell flex flex-col min-w-[240px] max-w-[240px]">
+      <div className="alpha-pipeline-column-header flex items-center justify-between mb-2 px-1 py-1">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: `rgb(${cor})` }} />
           <span className="text-xs font-bold text-white">{etapa.nome}</span>
           <span
+            aria-live="polite"
             className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
             style={{ background: `rgba(${cor},0.2)`, color: `rgb(${cor})` }}
           >
@@ -317,13 +322,13 @@ function KanbanColumn({
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div
           ref={setDroppableRef}
-          className="flex-1 rounded-2xl p-2 space-y-2 min-h-[60px] border border-dashed border-white/5"
+          className={cn("alpha-pipeline-column flex-1 rounded-2xl p-2 space-y-2 min-h-[60px] border border-dashed border-white/5", isOver && "is-over")}
           style={{
             background: isOver ? `rgba(${cor},0.1)` : `rgba(${cor},0.03)`,
             borderColor: isOver ? `rgba(${cor},0.5)` : undefined,
           }}
         >
-          {cards.map((c) => (
+          {cards.map((c, i) => (
             <KanbanCard
               key={c.id}
               card={c}
@@ -332,10 +337,40 @@ function KanbanColumn({
               novosLeads={novosLeads}
               arrastoDesabilitado={arrastoDesabilitado}
               onAbrir={onAbrirCard}
+              index={i}
             />
           ))}
         </div>
       </SortableContext>
+    </div>
+  );
+}
+
+function LazyPipelineColumn({
+  etapa, cor, cards, accent, arrastoDesabilitado, onAdd, onAbrirCard, atualizandoManual,
+}: {
+  etapa: EtapaBpm; cor: string; cards: CardBpm[]; accent: string; arrastoDesabilitado: boolean; onAdd?: () => void; onAbrirCard: (cardId: string) => void; atualizandoManual: boolean;
+}) {
+  const [ref, inView] = useLazyColumn(200);
+  const showSkeleton = atualizandoManual || !inView;
+
+  return (
+    <div ref={ref}>
+      {showSkeleton ? (
+        <SkeletonColumn cardCount={cards.length || 4} />
+      ) : (
+        <div className="alpha-content-enter">
+          <KanbanColumn
+            etapa={etapa}
+            cor={cor}
+            cards={cards}
+            accent={accent}
+            arrastoDesabilitado={arrastoDesabilitado}
+            onAdd={onAdd}
+            onAbrirCard={onAbrirCard}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -616,9 +651,16 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         <div
           role="alert"
           aria-live="assertive"
-          className="mx-6 mb-3 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"
+          className="mx-6 mb-3 flex items-center justify-between gap-3 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"
         >
-          {erro}
+          <span>{erro}</span>
+          <button
+            type="button"
+            onClick={() => void atualizarPipeline()}
+            className="shrink-0 rounded-lg border border-rose-400/30 px-2.5 py-1 text-xs font-bold text-rose-200 transition hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50"
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
 
@@ -630,10 +672,13 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         onDragEnd={onDragEnd}
         onDragCancel={onDragCancel}
       >
-        <div className="flex-1 overflow-x-auto px-6 pb-6">
+        <div className="flex-1 overflow-x-auto px-6 pb-6" style={{ perspective: "1200px" }}>
           <div className="flex gap-4 h-full min-w-max">
+            <span role="status" aria-live="polite" className="sr-only">
+              {atualizandoManual ? "Carregando pipeline…" : ""}
+            </span>
             {etapasOrdenadas.map((etapa, i) => (
-              <KanbanColumn
+              <LazyPipelineColumn
                 key={etapa.id}
                 etapa={etapa}
                 cor={CORES_ETAPA[i % CORES_ETAPA.length]}
@@ -642,6 +687,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
                 arrastoDesabilitado={movimentoPendente}
                 onAdd={etapa.id === etapaNovosLeads?.id ? () => setNovoCardAberto(true) : undefined}
                 onAbrirCard={abrirCard}
+                atualizandoManual={atualizandoManual}
               />
             ))}
           </div>

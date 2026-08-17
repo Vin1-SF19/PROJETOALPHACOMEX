@@ -205,6 +205,9 @@ html {
   --alpha-shadow-lg: 0 12px 28px rgba(0,0,0,.14), 0 4px 8px rgba(0,0,0,.08);
   --alpha-transition: 220ms cubic-bezier(.4,0,.2,1);
   --alpha-focus-ring: rgb(var(--alpha-primary));
+  --alpha-skeleton-base: #e8ecf1;
+  --alpha-skeleton-shine: #f4f6f9;
+  --alpha-skeleton-column-bg: rgba(255,255,255,0.03);
 }
 
 @keyframes alphaCardEnter {
@@ -216,10 +219,59 @@ html {
   animation: alphaCardEnter 300ms cubic-bezier(.4,0,.2,1) backwards;
 }
 
+/* ── Alpha Skeleton Shimmer ─────────── */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.alpha-skeleton {
+  background: linear-gradient(90deg, var(--alpha-skeleton-base) 25%, var(--alpha-skeleton-shine) 50%, var(--alpha-skeleton-base) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+  box-shadow: var(--alpha-shadow-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alpha-skeleton {
+    animation: none;
+    background: var(--alpha-skeleton-base);
+  }
+}
+
+/* ── Alpha Skeleton → Content Transition ─────────── */
+@keyframes alphaContentEnter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.alpha-content-enter {
+  animation: alphaContentEnter 200ms cubic-bezier(.4,0,.2,1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alpha-content-enter {
+    animation: none;
+  }
+}
+
 /* ── Alpha Pipeline Board Elevation ─────────── */
 .alpha-pipeline-card {
-  transition: box-shadow var(--alpha-transition), translate var(--alpha-transition), scale var(--alpha-transition), border-color var(--alpha-transition);
-  will-change: translate, scale, box-shadow;
+  transition: translate var(--alpha-transition), scale var(--alpha-transition), box-shadow var(--alpha-transition), border-color var(--alpha-transition);
+  will-change: translate, scale;
+}
+.alpha-pipeline-card:hover {
+  translate: 0 -3px;
+  scale: 1.015;
+  box-shadow: var(--alpha-shadow-lg);
+}
+.alpha-pipeline-column-header {
+  border-radius: 0.5rem;
+  transition: background-color var(--alpha-transition);
+}
+.alpha-pipeline-column-shell:hover .alpha-pipeline-column-header {
+  background-color: rgba(255, 255, 255, 0.04);
 }
 .alpha-pipeline-column {
   box-shadow: var(--alpha-shadow-sm);
@@ -235,6 +287,13 @@ html {
   }
   .alpha-pipeline-card {
     transition: box-shadow var(--alpha-transition), border-color var(--alpha-transition);
+  }
+  .alpha-pipeline-card:hover {
+    translate: none;
+    scale: none;
+  }
+  .alpha-pipeline-column-header {
+    transition: none;
   }
 }
 
