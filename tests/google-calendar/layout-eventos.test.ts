@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { parsearDataCivil } from "@/components/CalendarioAlpha/lib/datas";
 import { calcularPosicoesEventosDoDia, eventosDiaInteiroDoDia } from "@/components/CalendarioAlpha/lib/layout-eventos";
 import type { EventoExibicao } from "@/components/CalendarioAlpha/lib/tipos";
 
@@ -93,12 +94,33 @@ describe("calcularPosicoesEventosDoDia", () => {
 
 describe("eventosDiaInteiroDoDia", () => {
   it("retorna só os eventos de dia inteiro do dia certo", () => {
+    // inicioEm no formato real gravado por paraDataDeEventoOuNull para eventos "dia inteiro":
+    // Date.UTC(ano, mes, dia) — meia-noite UTC, serializado com "Z", não hora local do processo.
     const eventos = [
-      evento({ id: "a", diaInteiro: true, inicioEm: "2026-07-20T00:00:00" }),
-      evento({ id: "b", diaInteiro: true, inicioEm: "2026-07-21T00:00:00" }),
+      evento({ id: "a", diaInteiro: true, inicioEm: "2026-07-20T00:00:00.000Z" }),
+      evento({ id: "b", diaInteiro: true, inicioEm: "2026-07-21T00:00:00.000Z" }),
       evento({ id: "c", diaInteiro: false }),
     ];
     const resultado = eventosDiaInteiroDoDia(DIA, eventos);
     expect(resultado.map((e) => e.id)).toEqual(["a"]);
+  });
+
+  // Regressão: feriado "Dia dos Pais" (domingo 09/08/2026) aparecia no dia 08 (sábado) na
+  // grade — inicioEm gravado como "2026-08-09T00:00:00.000Z" (meia-noite UTC civil), mas
+  // eventosDiaInteiroDoDia comparava via `mesmodia` (fuso America/Sao_Paulo, UTC-3), que
+  // subtrai 3h e cai no dia civil anterior. Corrigido usando `mesmodiaDiaInteiro`.
+  it("não desloca feriado (dia inteiro) para o dia anterior — regressão Dia dos Pais 09/08/2026", () => {
+    const diaCivilNove = parsearDataCivil("2026-08-09")!;
+    const feriado = evento({
+      id: "feriado",
+      diaInteiro: true,
+      titulo: "Dia dos Pais",
+      inicioEm: "2026-08-09T00:00:00.000Z",
+    });
+
+    expect(eventosDiaInteiroDoDia(diaCivilNove, [feriado]).map((e) => e.id)).toEqual(["feriado"]);
+
+    const diaCivilOito = parsearDataCivil("2026-08-08")!;
+    expect(eventosDiaInteiroDoDia(diaCivilOito, [feriado])).toHaveLength(0);
   });
 });

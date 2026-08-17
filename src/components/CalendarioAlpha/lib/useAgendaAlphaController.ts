@@ -12,6 +12,7 @@ import {
   listarUsuariosParaCompartilhar,
   type UsuarioPermissaoColegaDTO,
 } from "@/actions/google-calendar-colegas";
+import { listarSolicitacoesPendentesRecebidas } from "@/actions/google-calendar-solicitacoes";
 import {
   desativarCalendarioAlpha,
   type StatusConexaoCalendarioAlpha,
@@ -34,6 +35,7 @@ import type { GoogleCalendarioDTO, GoogleEventoDTO } from "@/lib/google-calendar
 import { formatarDataCivil, type VisaoCalendario } from "./datas";
 import type { CalendarioSelecionadoView, EventoExibicao } from "./tipos";
 import { useAgendasCompartilhadas } from "./useAgendasCompartilhadas";
+import type { SolicitacaoRecebidaView } from "../PainelColegas";
 
 interface UseAgendaAlphaControllerParams {
   statusConexao: StatusConexaoCalendarioAlpha;
@@ -79,6 +81,7 @@ export function useAgendaAlphaController({
   const [colegasDisponiveis, setColegasDisponiveis] = useState<
     { id: number; nome: string; email: string }[]
   >([]);
+  const [solicitacoesRecebidas, setSolicitacoesRecebidas] = useState<SolicitacaoRecebidaView[]>([]);
   const [permissoesAberto, setPermissoesAberto] = useState(false);
   const [usuariosPermissao, setUsuariosPermissao] = useState<UsuarioPermissaoColegaDTO[]>([]);
   const [desativarAberto, setDesativarAberto] = useState(false);
@@ -135,13 +138,15 @@ export function useAgendaAlphaController({
   async function abrirColegas() {
     setSidebarMobileAberta(false);
     setColegasAberto(true);
-    const [disponiveis, visiveis] = await Promise.all([
+    const [disponiveis, visiveis, pendentes] = await Promise.all([
       listarUsuariosParaCompartilhar(),
       listarColegasVisiveis(),
+      listarSolicitacoesPendentesRecebidas(),
     ]);
     if (disponiveis.success) setColegasDisponiveis(disponiveis.data);
     else toast.error(disponiveis.error);
     if (visiveis.success) compartilhadas.substituirColegas(visiveis.data);
+    if (pendentes.success) setSolicitacoesRecebidas(pendentes.data);
     void compartilhadas.carregar();
   }
 
@@ -294,6 +299,7 @@ export function useAgendaAlphaController({
     colegasAberto,
     setColegasAberto,
     colegasDisponiveis,
+    solicitacoesRecebidas,
     permissoesAberto,
     setPermissoesAberto,
     usuariosPermissao,

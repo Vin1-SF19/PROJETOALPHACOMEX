@@ -47,6 +47,8 @@ Ready for Review
 17. O worker é singleton, supervisionado e possui watchdog no Agendador do Windows.
 18. Alterações ficam no working tree para inspeção e commit manual do usuário.
 19. Lint direcionado, testes, typecheck sem regressão e build Next passam.
+20. Cada execução na fila permite excluir, tentar novamente, pausar e retomar; uma revisão falha ou pausada não bloqueia outras revisões pendentes.
+21. Uma reprovação devolve automaticamente o feedback para a implementação, que corrige e é verificada novamente; bloqueios corrigíveis usam retry com cooldown e limite de segurança, e fases de implementação atribuídas a agentes read-only são roteadas para Nova/Echo.
 
 ## Tarefas
 
@@ -56,6 +58,8 @@ Ready for Review
 - [x] Implementar fila/worker local singleton e retomada (AC 7, 13, 15–18).
 - [x] Implementar UI Produção, configuração e gaveta de agentes (AC 1–6, 14).
 - [x] Instalar supervisor, executar E2E real e atualizar documentação (AC 17–19).
+- [x] Adicionar controles seguros por execução e remover o bloqueio global causado por falhas antigas (AC 20).
+- [x] Implementar ciclo automático implementação → verificação → correção, com feedback persistido e cooldown (AC 21).
 
 ## Segurança
 
@@ -77,6 +81,9 @@ Ready for Review
 |---|---:|---|---|
 | 2026-08-17 | 0.1.0 | Story criada a partir da solicitação de Produção local orientada pelo Bibble. | Codex / `@dev` |
 | 2026-08-17 | 1.0.0 | Produção local, acesso, adapters, worker, tools, UI, supervisor e E2E real concluídos. | Codex / `@dev` |
+| 2026-08-17 | 1.0.1 | Controles por execução e isolamento de falhas entre revisões adicionados à fila. | Codex / `@dev` |
+| 2026-08-17 | 1.0.2 | Fases analíticas separadas de escrita, encerramento obrigatório do modelo e troca atômica do estado local. | Codex / `@dev` |
+| 2026-08-17 | 1.0.3 | Autocorreção após reprovação, retry automático e reparo de fases de implementação atribuídas a agentes read-only. | Codex / `@dev` |
 
 ## Dev Agent Record
 
@@ -90,8 +97,10 @@ Codex (GPT-5)
 - Ollama remoto validado com `qwen3.8:27b`; 21 skills Bibble descobertos dinamicamente.
 - Execução real `RM-2026-879ABA` concluiu as cinco fases e aplicou mudanças no CRM sem commit automático.
 - Supervisor `PainelAlpha-RoadmapProductionWorker` instalado, singleton e ativo com watchdog de um minuto.
+- Fila permite excluir, pausar, retomar e tentar novamente; revisões falhas não bloqueiam a próxima revisão.
+- Execução real da revisão v3 retomada, implementada, aprovada pelo Probe e encerrada pelo Scribe com todas as cinco fases concluídas.
 - Segurança validada: traversal, segredos, schema/migrations, escrita read-only e shell arbitrário bloqueados.
-- Lint direcionado e 37 testes Roadmap passaram. Gate global mantém baseline legado fora do escopo; o build via `prisma generate` pode falhar com EPERM enquanto o dev server mantém o engine carregado.
+- Lint direcionado e 43 testes Roadmap passaram. Gate global mantém baseline legado fora do escopo; o build via `prisma generate` pode falhar com EPERM enquanto o dev server mantém o engine carregado.
 
 ### File List
 

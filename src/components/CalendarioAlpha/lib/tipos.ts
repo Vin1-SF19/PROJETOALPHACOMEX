@@ -15,6 +15,7 @@ export interface CalendarioSelecionadoView {
 export interface ColegaAgendaView {
   colegaId: number;
   cor: string;
+  papel: "VISUALIZADOR" | "EDITOR";
   visivel: boolean;
   colega: {
     id: number;

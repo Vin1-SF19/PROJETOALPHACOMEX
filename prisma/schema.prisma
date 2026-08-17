@@ -106,6 +106,8 @@ model usuarios {
   colegasQueEuVejo           GoogleCalendarColegaVisivel[]   @relation("ColegaViewer")
   colegasQueMeVeem           GoogleCalendarColegaVisivel[]   @relation("ColegaDono")
   permissaoColegasCalendario GoogleCalendarPermissaoColegas? @relation("PermissaoColegasCalendario")
+  solicitacoesCompartilhamentoEnviadas  GoogleCalendarSolicitacaoCompartilhamento[] @relation("SolicitacaoCompartilhamentoOrigem")
+  solicitacoesCompartilhamentoRecebidas GoogleCalendarSolicitacaoCompartilhamento[] @relation("SolicitacaoCompartilhamentoAlvo")
 
   confirmacoesLeituraDocumento ConfirmacaoLeituraDocumento[]
 
@@ -2644,16 +2646,38 @@ model GoogleCalendarSyncLease {
   @@index([leaseExpiresAt])
 }
 
-/// Compartilhamento de agenda entre colegas (cultura interna: todo mundo vê a agenda de todo
-/// mundo para marcar reunião em horário livre). Não é um "convite" que o dono aprova — qualquer
-/// usuário pode adicionar outro à própria lista de visualização (mesmo espírito de confiança
-/// interna descrito pelo usuário). `cor` é atribuída automaticamente na criação, para diferenciar
-/// visualmente cada colega na grade. Admin/CEO enxergam qualquer colega mesmo sem esta linha
-/// existir (ver `verificarAcessoColega` em `colegas.ts`) — esta tabela só controla o "meu mural".
+/// Controle de idempotência dos alertas de compromisso próximo (10min/5min antes), disparados
+/// pelo cron `/api/calendario-alpha/jobs/alertas-compromissos` a cada 5min. Uma linha por
+/// (evento, destinatário, janela) — o mesmo evento pode gerar 1 linha para o dono do compromisso
+/// e outras para cada colega que visualiza aquela agenda (GoogleCalendarColegaVisivel.visivel).
+/// googleEventId (não um FK direto pro cache) porque o alerta de um destinatário-colega não tem
+/// necessariamente uma linha própria em GoogleCalendarEventoCache — todos leem o cache do DONO.
+model GoogleCalendarAlertaCompromisso {
+  id            String @id @default(cuid())
+  calendarioId  String // GoogleCalendarSelecionado.id do calendário DONO do compromisso (fonte do cache)
+  googleEventId String
+  destinatarioId Int   // usuários.id de quem recebe o alerta (dono OU colega visualizador)
+  janela        String // "10min" | "5min"
+
+  notificadoEm DateTime @default(now())
+
+  @@unique([calendarioId, googleEventId, destinatarioId, janela])
+  @@index([notificadoEm])
+}
+
+/// Compartilhamento de agenda entre colegas. Desde 2026-08-17, uma linha aqui só é criada
+/// depois de aprovação explícita do dono via GoogleCalendarSolicitacaoCompartilhamento — decisão
+/// revertida pelo usuário (a versão anterior deste comentário dizia "não é um convite que o dono
+/// aprova"; agora é exatamente isso, inclusive para Admin/CEO, sem bypass). `papel` substitui a
+/// antiga visão única — VISUALIZADOR só lê a agenda do colega, EDITOR também pode criar/editar/
+/// excluir eventos nela (checagem de ownership nas Server Actions de evento, não só aqui). `cor`
+/// continua atribuída automaticamente na criação (mantém a lógica antiga), agora no momento em
+/// que a solicitação é aprovada, não mais no clique de "adicionar".
 model GoogleCalendarColegaVisivel {
   id       String  @id @default(cuid())
   userId   Int // quem está vendo (o "viewer")
-  colegaId Int // o colega cuja agenda aparece na visão do viewer
+  colegaId Int // o colega cuja agenda aparece na visão do viewer (o "dono")
+  papel    String  @default("VISUALIZADOR") // VISUALIZADOR | EDITOR
   cor      String // hex atribuído para diferenciar este colega na grade do viewer
   visivel  Boolean @default(true)
 
@@ -2665,6 +2689,31 @@ model GoogleCalendarColegaVisivel {
 
   @@unique([userId, colegaId])
   @@index([colegaId])
+}
+
+/// Solicitação de compartilhamento de agenda — fluxo de convite/aprovação (substituiu o acesso
+/// direto antigo, decisão de 2026-08-17). `solicitanteId` pede para ver/editar a agenda de
+/// `alvoId`; só o `alvoId` pode aprovar/recusar. Ao aprovar, a Server Action cria a linha
+/// correspondente em GoogleCalendarColegaVisivel com o `papel` pedido — esta tabela nunca vira
+/// a fonte de verdade de acesso, só o histórico/estado do pedido (mesmo espírito de
+/// ConviteParceiro→PreCadastroParceiro→aprovação→entidade real, adaptado para 2 usuários já
+/// autenticados, sem token público).
+model GoogleCalendarSolicitacaoCompartilhamento {
+  id            String   @id @default(cuid())
+  solicitanteId Int
+  alvoId        Int
+  papelPedido   String // VISUALIZADOR | EDITOR
+  status        String   @default("PENDENTE") // PENDENTE | ACEITO | RECUSADO
+  respondidoEm  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  solicitante usuarios @relation("SolicitacaoCompartilhamentoOrigem", fields: [solicitanteId], references: [id], onDelete: Cascade)
+  alvo        usuarios @relation("SolicitacaoCompartilhamentoAlvo", fields: [alvoId], references: [id], onDelete: Cascade)
+
+  @@index([alvoId, status])
+  @@index([solicitanteId, status])
 }
 
 /// Permissão administrativa para usar o compartilhamento de agenda entre colegas (Calendário

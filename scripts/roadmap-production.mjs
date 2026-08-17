@@ -59,6 +59,14 @@ try {
     emit({ ok: true, code: 0, command, executionId, adoptedChanges });
     const { default: db } = await import("../src/lib/prisma.ts");
     await db.$disconnect();
+  } else if (command === "control") {
+    const executionId = process.argv.find((argument) => argument.startsWith("--execution="))?.slice("--execution=".length);
+    const action = process.argv.find((argument) => argument.startsWith("--action="))?.slice("--action=".length)?.toUpperCase();
+    if (!executionId) throw new Error("EXECUTION_ID_REQUIRED");
+    if (!["PAUSE", "RESUME", "RETRY", "EXCLUDE"].includes(action ?? "")) throw new Error("CONTROL_ACTION_REQUIRED");
+    const { enqueueProductionControl } = await import("../src/lib/roadmap-production/storage.ts");
+    const queued = await enqueueProductionControl(action, executionId);
+    emit({ ok: true, code: 0, command, executionId, action: queued.type, queued: true });
   } else if (command === "worker") {
     const { processNextProductionPhase, recoverInterruptedProduction } = await import("../src/lib/roadmap-production/worker.ts");
     const once = process.argv.includes("--once");

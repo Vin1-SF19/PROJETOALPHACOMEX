@@ -1,4 +1,4 @@
-import { mesmodia } from "./datas";
+import { mesmodia, mesmodiaDiaInteiro } from "./datas";
 import type { EventoExibicao } from "./tipos";
 
 const MINUTOS_POR_DIA = 24 * 60;
@@ -84,5 +84,7 @@ export function calcularPosicoesEventosDoDia(dia: Date, eventos: EventoExibicao[
 }
 
 export function eventosDiaInteiroDoDia(dia: Date, eventos: EventoExibicao[]): EventoExibicao[] {
-  return eventos.filter((evento) => evento.diaInteiro && evento.inicioEm && mesmodia(new Date(evento.inicioEm), dia));
+  return eventos.filter(
+    (evento) => evento.diaInteiro && evento.inicioEm && mesmodiaDiaInteiro(new Date(evento.inicioEm), dia),
+  );
 }

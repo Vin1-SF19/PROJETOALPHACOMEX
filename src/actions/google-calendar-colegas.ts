@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizacao";
 import { listarEventosPagina } from "@/lib/google-calendar/client";
-import { isAdminRole, proximaCorColega } from "@/lib/google-calendar/colegas";
+import { isAdminRole } from "@/lib/google-calendar/colegas";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import { corHexSchema } from "@/lib/validations/google-calendar";
 import db from "@/lib/prisma";
@@ -116,52 +116,12 @@ export async function listarColegasVisiveis() {
   return { success: true as const, data: colegas };
 }
 
-export async function adicionarColegaVisivel(colegaId: number): Promise<ResultadoAcao<{ id: string }>> {
-  const acesso = await verificarAcessoCalendarioAlpha();
-  if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
-
-  const validacao = colegaIdInputSchema.safeParse({ colegaId });
-  if (!validacao.success || validacao.data.colegaId === acesso.userId) {
-    return { success: false, error: "Colega inválido." };
-  }
-  const colegaIdValidado = validacao.data.colegaId;
-
-  const usuarioAtual = await obterUsuarioAtual(acesso.userId);
-  const callerPermitido = await temPermissaoCompartilhamento(acesso.userId, usuarioAtual?.role);
-  if (!callerPermitido) {
-    return { success: false, error: "Você ainda não tem permissão para compartilhar agenda com colegas. Peça a um Admin para liberar." };
-  }
-
-  // Só quem adiciona precisa estar permitido — o alvo pode ser qualquer colaborador ativo,
-  // permitido ou não (ex.: líder liberado adicionando a agenda de alguém do time).
-  const colega = await db.usuarios.findUnique({
-    where: { id: colegaIdValidado },
-    select: { id: true, status: true },
-  });
-  if (!colega || colega.status !== "ATIVO") return { success: false, error: "Colaborador não encontrado." };
-
-  const totalAtual = await db.googleCalendarColegaVisivel.count({ where: { userId: acesso.userId } });
-
-  const registro = await db.googleCalendarColegaVisivel.upsert({
-    where: {
-      userId_colegaId: {
-        userId: acesso.userId,
-        colegaId: colegaIdValidado,
-      },
-    },
-    create: {
-      userId: acesso.userId,
-      colegaId: colegaIdValidado,
-      cor: proximaCorColega(totalAtual),
-      visivel: true,
-    },
-    update: { visivel: true },
-    select: { id: true },
-  });
-
-  revalidatePath("/PainelAlpha/CalendarioAlpha");
-  return { success: true, data: registro };
-}
+/**
+ * Vínculos ativos (já aprovados) são criados SOMENTE por `aprovarSolicitacao`
+ * (`google-calendar-solicitacoes.ts`) — decisão de 2026-08-17. Não existe mais um caminho de
+ * acesso direto sem aprovação do dono; para pedir acesso à agenda de um colega, use
+ * `solicitarCompartilhamento`.
+ */
 
 export async function removerColegaVisivel(colegaId: number): Promise<{ success: boolean; error?: string }> {
   const acesso = await verificarAcessoCalendarioAlpha();
@@ -227,12 +187,11 @@ export interface EventoColegaDTO {
 
 /**
  * Lê a agenda de um colega ao vivo (sem cache/syncToken — é uma visão "de relance", não a agenda
- * própria do usuário). Exige que o colega esteja na lista de visibilidade do viewer OU que o
- * viewer seja Admin/CEO (que enxerga qualquer colaborador, decisão confirmada com o usuário).
- * Também exige que o viewer continue com a permissão de compartilhamento ativa — se um Admin
- * revogar depois de o compartilhamento já existir, o acesso para de funcionar imediatamente. O
- * colega (dono da agenda) NÃO precisa ter essa permissão — ela só controla quem pode usar o botão
- * de adicionar/consultar, não quem pode ser consultado.
+ * própria do usuário). Exige um vínculo APROVADO em GoogleCalendarColegaVisivel — sem exceção de
+ * Admin/CEO (decisão de 2026-08-17: aprovação obrigatória vale para todos, sem bypass). O nível
+ * de detalhe exibido depende do `papel` do vínculo: EDITOR vê o evento completo (título real,
+ * pode escrever); VISUALIZADOR só vê "Ocupado" no horário, sem detalhes (mesmo espírito de
+ * free/busy do Google Calendar real).
  */
 export async function listarEventosDeColega(
   colegaId: number,
@@ -255,9 +214,6 @@ export async function listarEventosDeColega(
   }
   const dados = validacao.data;
 
-  const usuarioAtual = await obterUsuarioAtual(acesso.userId);
-  const admin = isAdminRole(usuarioAtual?.role);
-
   const colega = await db.usuarios.findUnique({
     where: { id: dados.colegaId },
     select: {
@@ -276,25 +232,15 @@ export async function listarEventosDeColega(
     return { success: false, error: "Agenda do colaborador não está ativa." };
   }
 
-  if (!admin) {
-    const callerPermitido = await temPermissaoCompartilhamento(acesso.userId, usuarioAtual?.role);
-    if (!callerPermitido) {
-      return { success: false, error: "Você não tem mais permissão para usar o compartilhamento de agenda." };
-    }
-
-    const compartilhado = await db.googleCalendarColegaVisivel.findUnique({
-      where: { userId_colegaId: { userId: acesso.userId, colegaId } },
-    });
-    if (!compartilhado || !compartilhado.visivel) {
-      return { success: false, error: "Você não tem acesso à agenda deste colaborador." };
-    }
-  }
-
-  const corRegistro = await db.googleCalendarColegaVisivel.findUnique({
+  const vinculo = await db.googleCalendarColegaVisivel.findUnique({
     where: { userId_colegaId: { userId: acesso.userId, colegaId } },
-    select: { cor: true },
+    select: { cor: true, papel: true, visivel: true },
   });
-  const cor = corRegistro?.cor ?? "#f97316";
+  if (!vinculo || !vinculo.visivel) {
+    return { success: false, error: "Você não tem acesso à agenda deste colaborador. Envie um pedido de compartilhamento." };
+  }
+  const podeEditar = vinculo.papel === "EDITOR";
+  const cor = vinculo.cor;
 
   try {
     const eventos: EventoColegaDTO[] = [];
@@ -314,22 +260,22 @@ export async function listarEventosDeColega(
       for (const [indice, evento] of pagina.eventos.entries()) {
         if (evento.status === "cancelled") continue;
         eventos.push({
-          id: admin
+          id: podeEditar
             ? `colega-${colega.id}-${evento.googleEventId}`
             : `ocupado-${colega.id}-${paginas}-${indice}`,
-          googleEventId: admin ? evento.googleEventId : "",
+          googleEventId: podeEditar ? evento.googleEventId : "",
           status: evento.status,
-          titulo: admin ? evento.titulo : "Ocupado",
+          titulo: podeEditar ? evento.titulo : "Ocupado",
           inicioEm: evento.inicio.dataHora ?? evento.inicio.data ?? null,
           fimEm: evento.fim.dataHora ?? evento.fim.data ?? null,
           diaInteiro: Boolean(evento.inicio.data && !evento.inicio.dataHora),
-          etag: admin ? evento.etag : "",
-          linkMeet: admin ? evento.linkMeet : null,
+          etag: podeEditar ? evento.etag : "",
+          linkMeet: podeEditar ? evento.linkMeet : null,
           colegaId: colega.id,
           colegaNome: colega.nome,
-          colegaEmail: admin ? colega.email : "",
+          colegaEmail: podeEditar ? colega.email : "",
           cor,
-          gravavel: admin,
+          gravavel: podeEditar,
         });
       }
 

@@ -20,6 +20,9 @@ import { NotaNotificacaoToast } from '@/components/Notas/NotaNotificacaoToast';
 import { useNotasWorkspace } from '@/store/useNotasWorkspace';
 import { useNotasNotifications } from '@/hooks/useNotasNotifications';
 import { useNotasLembretesPendentes } from '@/hooks/useNotasLembretesPendentes';
+import { useCalendarioAlphaNotifications } from '@/hooks/useCalendarioAlphaNotifications';
+import { CompromissoNotificacaoToast } from '@/components/CalendarioAlpha/CompromissoNotificacaoToast';
+import { SinoNotificacoesCompromissos } from '@/components/CalendarioAlpha/SinoNotificacoesCompromissos';
 import { isAdminRole } from '@/lib/roles';
 import type { OnboardingVideo } from '@/lib/onboarding';
 import { signOut } from 'next-auth/react';
@@ -86,6 +89,7 @@ export default function PainelLayoutClient({
   // Sistema de Notas é uma camada global, mas ainda assim respeita a permissão do módulo 'notas'
   // (bypass padrão Admin/CEO/TI, mesmo critério usado em todo o restante do painel).
   const temAcessoNotas = isAdminRole(role) || permissoes.includes('notas');
+  const temAcessoCalendarioAlpha = isAdminRole(role) || permissoes.includes('calendarioAlpha');
   // A barra de notas é `fixed bottom-0` no shell externo — os iframes de módulo não sabem que
   // ela existe (documentos isolados) e desenhariam conteúdo por baixo dela sem este respiro.
   const notasBarraVisivel = useNotasWorkspace((state) => state.isTaskbarVisible);
@@ -94,6 +98,7 @@ export default function PainelLayoutClient({
   useNotasNotifications(temAcessoNotas ? userId : 0);
   useNotasLembretesPendentes(temAcessoNotas);
   useChecklistNotifications(role);
+  useCalendarioAlphaNotifications(temAcessoCalendarioAlpha ? userId : 0);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────
   // Lazy initializer: detecta no primeiro render client-side, evita flash de sidebar dupla
@@ -265,6 +270,7 @@ export default function PainelLayoutClient({
       <ChecklistNotificationToast />
       <HoleriteNotificacaoGlobal authenticated />
       <NotaNotificacaoToast />
+      {temAcessoCalendarioAlpha && <CompromissoNotificacaoToast />}
 
       {!tvMode && (
         <GlobalSidebar
@@ -306,7 +312,8 @@ export default function PainelLayoutClient({
                 onReorder={reorderTabs}
               />
             </div>
-            <div className="shrink-0 pr-3">
+            <div className="shrink-0 flex items-center gap-2 pr-3">
+              {temAcessoCalendarioAlpha && <SinoNotificacoesCompromissos />}
               <BibbleWeatherWidget />
             </div>
           </div>

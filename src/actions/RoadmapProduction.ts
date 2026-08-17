@@ -9,8 +9,8 @@ import { requireRoadmapProductionAccess } from "@/lib/roadmap-alpha/authorizatio
 import { listBibbleAgents } from "@/lib/roadmap-production/agents";
 import { productionProviderSchema } from "@/lib/roadmap-production/contracts";
 import { diagnoseProductionProviders } from "@/lib/roadmap-production/providers";
-import { readProductionConfig, readProductionState, writeProductionConfig } from "@/lib/roadmap-production/storage";
-import { retryProductionExecution, syncProductionExecutions } from "@/lib/roadmap-production/worker";
+import { enqueueProductionControl, readProductionConfig, readProductionState, writeProductionConfig } from "@/lib/roadmap-production/storage";
+import { syncProductionExecutions } from "@/lib/roadmap-production/worker";
 import { isAdminRole } from "@/lib/roles";
 
 const ROUTE = "/PainelAlpha/Roadmap";
@@ -103,7 +103,20 @@ export async function AlternarAcessoRoadmapProduction(usuarioId: unknown) {
 export async function RepetirExecucaoRoadmapProduction(executionId: unknown) {
   try {
     await requireRoadmapProductionAccess(true);
-    await retryProductionExecution(executionIdSchema.parse(executionId));
+    await enqueueProductionControl("RETRY", executionIdSchema.parse(executionId));
+    revalidatePath(ROUTE);
+    return { success: true as const };
+  } catch (error) {
+    return { success: false as const, error: publicError(error) };
+  }
+}
+
+export async function ControlarExecucaoRoadmapProduction(executionId: unknown, control: unknown) {
+  try {
+    await requireRoadmapProductionAccess(true);
+    const id = executionIdSchema.parse(executionId);
+    const type = z.enum(["PAUSE", "RESUME", "EXCLUDE"]).parse(control);
+    await enqueueProductionControl(type, id);
     revalidatePath(ROUTE);
     return { success: true as const };
   } catch (error) {

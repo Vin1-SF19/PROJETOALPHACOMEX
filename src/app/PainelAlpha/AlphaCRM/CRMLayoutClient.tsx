@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getTema } from "@/lib/temas";
+import { CrmSpaceBackground } from "./CRMBackground";
 import type { Session } from "next-auth";
 import { isAdminRole } from "@/lib/roles";
 import {
@@ -81,7 +82,10 @@ export default function CRMLayout({ children, session }: { children: React.React
   );
 
   return (
-    <div className="min-h-screen bg-[#020617] flex">
+    <div className="min-h-screen bg-[#020617] flex relative">
+      {/* ── Background espacial ── */}
+      <CrmSpaceBackground />
+
       {/* ── Mobile overlay ── */}
       {open && (
         <div
@@ -105,7 +109,7 @@ export default function CRMLayout({ children, session }: { children: React.React
       </aside>
 
       {/* ── Content ── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
         {/* Mobile top bar */}
         <div
           className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-slate-950/80 sticky top-0 z-30"

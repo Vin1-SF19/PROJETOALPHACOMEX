@@ -37,17 +37,16 @@ export const SkeletonColumn = memo(function SkeletonColumn({
     <div
       aria-hidden="true"
       className={cn(
-        "flex flex-col min-w-[240px] max-w-[240px] rounded-2xl border border-dashed border-white/5 p-2",
+        "alpha-pipeline-column-shell flex flex-col min-w-[240px] max-w-[240px]",
         className,
       )}
-      style={{ background: "var(--alpha-skeleton-column-bg, rgba(255,255,255,0.03))" }}
     >
       {/* Header placeholder */}
-      <div className="mb-2 px-1">
-        <div className="alpha-skeleton h-6 w-[60%] rounded-md" />
+      <div className="alpha-pipeline-column-header mb-2 px-1 py-1">
+        <div className="alpha-skeleton h-5 w-[60%] rounded-md" />
       </div>
       {/* Cards empilhados */}
-      <div className="flex flex-col gap-3">
+      <div className="flex-1 flex flex-col gap-2 p-2 min-h-[60px]">
         {cards.map((_, i) => (
           <SkeletonCard key={i} />
         ))}

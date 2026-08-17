@@ -9,6 +9,10 @@ import {
 } from "@/lib/chamados/notificacoes";
 import { NOTA_USUARIO_CHANNEL_PREFIX, extrairUsuarioIdDoCanalNotas } from "@/lib/notas/notificacoes";
 import {
+  CALENDARIO_ALPHA_USUARIO_CHANNEL_PREFIX,
+  extrairUsuarioIdDoCanalCalendarioAlpha,
+} from "@/lib/google-calendar/notificacoes";
+import {
   BPM_PIPELINE_CHANNEL_PREFIX,
   extrairPipelineIdCanalBpm,
 } from "@/lib/bpm/realtime";
@@ -69,6 +73,15 @@ export async function POST(req: Request) {
 
     if (channelName.startsWith(NOTA_USUARIO_CHANNEL_PREFIX)) {
       const channelUserId = extrairUsuarioIdDoCanalNotas(channelName);
+      if (channelUserId === null || channelUserId !== Number(session.user.id)) {
+        return new NextResponse("Proibido", { status: 403 });
+      }
+      const authResponse = pusherServer.authorizeChannel(socketId, channelName);
+      return NextResponse.json(authResponse);
+    }
+
+    if (channelName.startsWith(CALENDARIO_ALPHA_USUARIO_CHANNEL_PREFIX)) {
+      const channelUserId = extrairUsuarioIdDoCanalCalendarioAlpha(channelName);
       if (channelUserId === null || channelUserId !== Number(session.user.id)) {
         return new NextResponse("Proibido", { status: 403 });
       }

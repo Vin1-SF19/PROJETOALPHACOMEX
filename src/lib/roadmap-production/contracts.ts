@@ -14,8 +14,15 @@ export const productionPhaseStatusSchema = z.enum([
   "PENDING", "RUNNING", "SUCCEEDED", "FAILED", "BLOCKED",
 ]);
 export const productionExecutionStatusSchema = z.enum([
-  "PENDING", "RUNNING", "SUCCEEDED", "FAILED", "BLOCKED",
+  "PENDING", "RUNNING", "PAUSED", "SUCCEEDED", "FAILED", "BLOCKED",
 ]);
+
+export const productionControlCommandSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["PAUSE", "RESUME", "RETRY", "EXCLUDE"]),
+  executionId: z.string().min(1).max(240),
+  createdAt: z.string().datetime(),
+}).strict();
 
 export const productionActivitySchema = z.object({
   at: z.string().datetime(),
@@ -31,7 +38,9 @@ export const productionPhaseStateSchema = z.object({
   requestedAgent: z.string().min(1).max(80),
   resolvedAgent: z.string().min(1).max(80),
   status: productionPhaseStatusSchema,
-  attemptCount: z.number().int().min(0).max(20),
+  attemptCount: z.number().int().min(0).max(100),
+  autoRetryCount: z.number().int().min(0).max(20).default(0),
+  retryAt: z.string().datetime().nullable().default(null),
   startedAt: z.string().datetime().nullable(),
   finishedAt: z.string().datetime().nullable(),
   summary: z.string().max(8_000).nullable(),
@@ -58,6 +67,7 @@ export const productionExecutionSchema = z.object({
 export const productionStateSchema = z.object({
   version: z.literal(1),
   updatedAt: z.string().datetime(),
+  ignoredExecutionIds: z.array(z.string().min(1).max(240)).max(500).default([]),
   executions: z.array(productionExecutionSchema).max(200),
 }).strict();
 
@@ -67,3 +77,4 @@ export type ProductionActivity = z.infer<typeof productionActivitySchema>;
 export type ProductionPhaseState = z.infer<typeof productionPhaseStateSchema>;
 export type ProductionExecution = z.infer<typeof productionExecutionSchema>;
 export type ProductionState = z.infer<typeof productionStateSchema>;
+export type ProductionControlCommand = z.infer<typeof productionControlCommandSchema>;

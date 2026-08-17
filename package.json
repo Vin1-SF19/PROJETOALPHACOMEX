@@ -31,6 +31,7 @@
     "roadmap:production:doctor": "tsx scripts/roadmap-production.mjs doctor",
     "roadmap:production:status": "tsx scripts/roadmap-production.mjs status",
     "roadmap:production:retry": "tsx scripts/roadmap-production.mjs retry",
+    "roadmap:production:control": "tsx scripts/roadmap-production.mjs control",
     "roadmap:production:worker": "tsx scripts/roadmap-production.mjs worker",
     "roadmap:production:once": "tsx scripts/roadmap-production.mjs worker --once"
   },

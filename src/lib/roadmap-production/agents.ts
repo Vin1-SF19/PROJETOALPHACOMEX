@@ -66,8 +66,10 @@ export async function listBibbleAgents(root = process.cwd()): Promise<BibbleAgen
 
 export function resolvePhaseAgent(requestedAgent: string, title: string, markdown: string): string {
   if (requestedAgent === "context") return "scout";
-  if (requestedAgent !== "dev") return requestedAgent;
   const normalized = `${title} ${markdown}`.toLocaleLowerCase("pt-BR");
+  const implementationIntent = /\b(implementar|criar|adicionar|corrigir|desenvolver|integrar)\b/.test(title.toLocaleLowerCase("pt-BR"));
+  const misroutedReadOnlyAgent = ["forge", "probe", "scout"].includes(requestedAgent) && implementationIntent;
+  if (requestedAgent !== "dev" && !misroutedReadOnlyAgent) return requestedAgent;
   if (/(ui|ux|css|tailwind|layout|componente|frontend|visual|hover|skeleton|anima)/.test(normalized)) return "nova";
   if (/(api|server action|backend|rota|serviço|worker|fila|integração)/.test(normalized)) return "echo";
   return "echo";

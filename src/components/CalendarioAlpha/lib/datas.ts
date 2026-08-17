@@ -162,6 +162,22 @@ export function formatarDataCivil(data: Date): string {
   return `${String(ano).padStart(4, "0")}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 }
 
+/**
+ * Serializa a data civil UTC de uma data (sem passar pelo fuso de São Paulo).
+ *
+ * Eventos "dia inteiro" do Google (`inicioEm`/`fimEm` de feriados, aniversários etc.) são
+ * gravados por `paraDataDeEventoOuNull` (`lib/google-calendar/cache-eventos.ts`) ancorados em
+ * `Date.UTC(ano, mes, dia)` — não representam um instante real, representam a data civil pura.
+ * Formatá-los com `formatarDataCivil` (fuso de São Paulo, UTC-3) subtrai 3h e cruza a
+ * fronteira do dia (feriado do dia 9 caindo no dia 8). Usar esta função para esses eventos.
+ */
+export function formatarDataCivilUtc(data: Date): string {
+  const ano = data.getUTCFullYear();
+  const mes = data.getUTCMonth() + 1;
+  const dia = data.getUTCDate();
+  return `${String(ano).padStart(4, "0")}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
 /** Interpreta `YYYY-MM-DD` como meia-noite em São Paulo e rejeita datas impossíveis. */
 export function parsearDataCivil(valor: string | null | undefined): Date | null {
   if (!valor) return null;
@@ -283,11 +299,19 @@ export function mesmodia(a: Date, b: Date): boolean {
   return formatarDataCivil(a) === formatarDataCivil(b);
 }
 
-export function agruparPorDia<T extends { inicioEm: Date | string | null }>(eventos: T[]): Map<string, T[]> {
+/** Variante de `mesmodia` para eventos "dia inteiro" — compara `a` pela data civil UTC (ver `formatarDataCivilUtc`) contra `b` pela data civil de São Paulo (grade). */
+export function mesmodiaDiaInteiro(a: Date, b: Date): boolean {
+  return formatarDataCivilUtc(a) === formatarDataCivil(b);
+}
+
+export function agruparPorDia<T extends { inicioEm: Date | string | null; diaInteiro?: boolean }>(
+  eventos: T[],
+): Map<string, T[]> {
   const mapa = new Map<string, T[]>();
   for (const evento of eventos) {
     if (!evento.inicioEm) continue;
-    const chave = formatarDataCivil(new Date(evento.inicioEm));
+    const data = new Date(evento.inicioEm);
+    const chave = evento.diaInteiro ? formatarDataCivilUtc(data) : formatarDataCivil(data);
     const lista = mapa.get(chave) ?? [];
     lista.push(evento);
     mapa.set(chave, lista);

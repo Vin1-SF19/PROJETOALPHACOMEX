@@ -22,8 +22,8 @@ describe("adapter Ollama de Produção", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { role: "assistant", content: "RESULT: PASS\nContexto validado." } }] }), { status: 200 }));
     const activities: string[] = [];
     const result = await runProductionAgent(
-      { version: 1, provider: "ollama", model: "qwen3.8:27b", autoRun: true, maxToolSteps: 4, updatedAt: new Date().toISOString() },
-      { agentId: "scout", objectiveCode: "RM-TEST", objectiveTitle: "Teste", moduleKey: "crm", phaseNumber: 0, phaseTitle: "Contexto", phaseKind: "CONTEXT", phaseMarkdown: "Mapeie o contexto da aplicação sem alterar arquivos.", previousSummaries: [], allowWrite: false },
+      { version: 1, provider: "ollama", model: "qwen3.8:27b", autoRun: true, maxToolSteps: 2, updatedAt: new Date().toISOString() },
+      { agentId: "scout", objectiveCode: "RM-TEST", objectiveTitle: "Teste", moduleKey: "crm", phaseNumber: 0, phaseTitle: "Contexto", phaseKind: "CONTEXT", phaseMarkdown: "Mapeie o contexto da aplicação sem alterar arquivos.", previousSummaries: [], allowWrite: false, requireChanges: false },
       (message) => { activities.push(message); },
       root,
       { fetchImpl: fetchImpl as typeof fetch },
@@ -31,8 +31,9 @@ describe("adapter Ollama de Produção", () => {
     expect(result.success).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(activities).toContain("Resposta parcial; solicitando conclusão objetiva");
-    const secondBody = JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)) as { reasoning_effort: string; messages: Array<{ content: string }> };
+    const secondBody = JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)) as { reasoning_effort: string; tool_choice: string; messages: Array<{ content: string }> };
     expect(secondBody.reasoning_effort).toBe("low");
-    expect(secondBody.messages.at(-1)?.content).toContain("Conclua agora");
+    expect(secondBody.tool_choice).toBe("none");
+    expect(secondBody.messages.at(-1)?.content).toContain("Encerramento obrigatório");
   });
 });

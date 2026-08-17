@@ -2,7 +2,19 @@ import db from "@/lib/prisma";
 import { resolvePhaseAgent } from "@/lib/roadmap-production/agents";
 import type { ProductionActivity, ProductionExecution, ProductionState } from "@/lib/roadmap-production/contracts";
 import { runProductionAgent } from "@/lib/roadmap-production/providers";
-import { readProductionConfig, readProductionState, writeProductionState } from "@/lib/roadmap-production/storage";
+import { readProductionConfig, readProductionControls, readProductionState, removeProductionControlFiles, writeProductionState } from "@/lib/roadmap-production/storage";
+
+const AUTO_RETRY_DELAY_MS = 5_000;
+const AUTO_RETRY_LIMIT = 12;
+const TRANSIENT_ERROR_CODES = new Set([
+  "AGENT_RESULT_MISSING",
+  "AGENT_STEP_LIMIT",
+  "INVALID_PROVIDER_RESPONSE",
+  "NO_CHANGES_APPLIED",
+  "PRODUCTION_PROVIDER_FAILED",
+  "PROVIDER_HTTP_ERROR",
+  "TRUNCATED_MODEL_RESPONSE",
+]);
 
 function now(): string {
   return new Date().toISOString();
@@ -10,6 +22,35 @@ function now(): string {
 
 function executionId(objectiveId: string, sourceVersion: number): string {
   return `${objectiveId}:v${sourceVersion}`;
+}
+
+export function isImplementationPhase(
+  phase: Pick<ProductionExecution["phases"][number], "kind" | "requestedAgent">
+    & Partial<Pick<ProductionExecution["phases"][number], "resolvedAgent" | "title">>,
+): boolean {
+  return phase.kind === "EXECUTION" && (phase.requestedAgent === "dev" || ["nova", "echo"].includes(phase.resolvedAgent ?? ""));
+}
+
+export function phaseRequiresWrite(
+  phase: Pick<ProductionExecution["phases"][number], "kind" | "requestedAgent" | "resolvedAgent" | "title">,
+  markdown = "",
+): boolean {
+  if (isImplementationPhase(phase)) return true;
+  if (phase.kind !== "CLOSURE" || !["scribe", "kowalski"].includes(phase.resolvedAgent)) return false;
+  return /\b(criar|atualizar|editar|registrar|documentar|escrever)\b/i.test(`${phase.title}\n${markdown}`);
+}
+
+function retryDate(at: string): string {
+  return new Date(new Date(at).getTime() + AUTO_RETRY_DELAY_MS).toISOString();
+}
+
+function isReady(phase: ProductionExecution["phases"][number], referenceTime: number): boolean {
+  return phase.status === "PENDING" && (!phase.retryAt || Date.parse(phase.retryAt) <= referenceTime);
+}
+
+function nextReadyPhase(execution: ProductionExecution, referenceTime: number): ProductionExecution["phases"][number] | undefined {
+  const nextPending = execution.phases.find((phase) => phase.status === "PENDING");
+  return nextPending && isReady(nextPending, referenceTime) ? nextPending : undefined;
 }
 
 function appendActivity(executionPhase: ProductionExecution["phases"][number], activity: ProductionActivity): void {
@@ -41,12 +82,26 @@ export async function syncProductionExecutions(): Promise<ProductionState> {
   let changed = false;
   for (const objective of objectives) {
     const id = executionId(objective.id, objective.sourceVersion);
+    if (state.ignoredExecutionIds.includes(id)) continue;
     const existing = state.executions.find((execution) => execution.id === id);
     if (existing) {
       if (existing.globalPriority !== objective.globalPriority || existing.objectiveTitle !== objective.title) {
         existing.globalPriority = objective.globalPriority;
         existing.objectiveTitle = objective.title;
         changed = true;
+      }
+      for (const artifact of objective.promptArtifacts) {
+        const existingPhase = existing.phases.find((phase) => phase.phaseNumber === artifact.phaseNumber);
+        if (!existingPhase) continue;
+        const desiredAgent = resolvePhaseAgent(artifact.agent, artifact.title, artifact.contentMarkdown);
+        if (existingPhase.resolvedAgent !== desiredAgent) {
+          existingPhase.resolvedAgent = desiredAgent;
+          appendActivity(existingPhase, {
+            at: now(), agentId: desiredAgent, type: "STATUS",
+            message: `Roteamento corrigido automaticamente: ${artifact.agent} → ${desiredAgent}.`,
+          });
+          changed = true;
+        }
       }
       continue;
     }
@@ -72,6 +127,8 @@ export async function syncProductionExecutions(): Promise<ProductionState> {
         resolvedAgent: resolvePhaseAgent(phase.agent, phase.title, phase.contentMarkdown),
         status: "PENDING",
         attemptCount: 0,
+        autoRetryCount: 0,
+        retryAt: null,
         startedAt: null,
         finishedAt: null,
         summary: null,
@@ -85,6 +142,50 @@ export async function syncProductionExecutions(): Promise<ProductionState> {
   state.executions.sort((a, b) => a.globalPriority - b.globalPriority || a.createdAt.localeCompare(b.createdAt));
   if (changed) await writeProductionState(state);
   return state;
+}
+
+export async function applyProductionControls(root = process.cwd()): Promise<number> {
+  const controls = await readProductionControls(root);
+  if (!controls.length) return 0;
+  const state = await readProductionState(root);
+  for (const { command } of controls) {
+    const index = state.executions.findIndex((execution) => execution.id === command.executionId);
+    const execution = index >= 0 ? state.executions[index] : null;
+    if (command.type === "EXCLUDE") {
+      if (execution) state.executions.splice(index, 1);
+      if (!state.ignoredExecutionIds.includes(command.executionId)) state.ignoredExecutionIds.push(command.executionId);
+      state.ignoredExecutionIds = state.ignoredExecutionIds.slice(-500);
+    } else if (command.type === "PAUSE" && execution && ["PENDING", "RUNNING"].includes(execution.status)) {
+      execution.status = "PAUSED";
+      execution.finishedAt = null;
+    } else if (command.type === "RESUME" && execution?.status === "PAUSED") {
+      execution.status = "PENDING";
+      execution.finishedAt = null;
+    } else if (command.type === "RETRY" && execution && ["FAILED", "BLOCKED"].includes(execution.status)) {
+      const failed = execution.phases.find((phase) => phase.status === "FAILED" || phase.status === "BLOCKED");
+      if (failed) {
+        failed.status = "PENDING";
+        failed.autoRetryCount = 0;
+        failed.retryAt = null;
+        failed.errorCode = null;
+        failed.finishedAt = null;
+        appendActivity(failed, { at: now(), agentId: failed.resolvedAgent, type: "STATUS", message: "Nova tentativa solicitada pelo administrador." });
+        execution.status = "PENDING";
+        execution.finishedAt = null;
+      }
+    }
+  }
+  await writeProductionState(state, root);
+  await removeProductionControlFiles(controls.map((control) => control.filePath));
+  return controls.length;
+}
+
+export function selectNextProductionExecution(state: ProductionState): ProductionExecution | undefined {
+  const referenceTime = Date.now();
+  return state.executions.find((execution) =>
+    ["PENDING", "RUNNING"].includes(execution.status)
+    && Boolean(nextReadyPhase(execution, referenceTime)),
+  );
 }
 
 async function mutateExecution(executionIdValue: string, mutate: (execution: ProductionExecution) => void): Promise<ProductionExecution> {
@@ -122,6 +223,7 @@ export async function recoverInterruptedProduction(): Promise<number> {
       if (phase.status !== "RUNNING") continue;
       phase.status = "PENDING";
       phase.errorCode = "WORKER_INTERRUPTED_RETRY";
+      phase.retryAt = null;
       appendActivity(phase, { at: now(), agentId: phase.resolvedAgent, type: "STATUS", message: "Worker reiniciado; fase devolvida à fila." });
       execution.status = "PENDING";
       recovered += 1;
@@ -136,6 +238,8 @@ export async function retryProductionExecution(id: string, adoptedChanges: strin
     const failed = execution.phases.find((phase) => phase.status === "FAILED" || phase.status === "BLOCKED");
     if (!failed) throw new Error("NO_FAILED_PHASE");
     failed.status = "PENDING";
+    failed.autoRetryCount = 0;
+    failed.retryAt = null;
     failed.errorCode = null;
     failed.finishedAt = null;
     for (const changedPath of adoptedChanges) {
@@ -149,15 +253,96 @@ export async function retryProductionExecution(id: string, adoptedChanges: strin
   });
 }
 
+interface FailedAgentResult {
+  success: boolean;
+  summary: string;
+  errorCode?: string;
+}
+
+export function scheduleAutomaticRecovery(
+  execution: ProductionExecution,
+  failedPhaseNumber: number,
+  result: FailedAgentResult,
+  at = now(),
+): "IMPLEMENTATION_FEEDBACK" | "SAME_PHASE" | null {
+  const failed = execution.phases.find((phase) => phase.phaseNumber === failedPhaseNumber);
+  if (!failed || failed.autoRetryCount >= AUTO_RETRY_LIMIT) return null;
+  const errorCode = result.errorCode ?? "AGENT_FAILED";
+
+  if (failed.kind === "VERIFICATION" && ["AGENT_BLOCKED", "AGENT_REPORTED_FAILURE"].includes(errorCode)) {
+    const implementation = [...execution.phases]
+      .reverse()
+      .find((phase) => phase.phaseNumber < failed.phaseNumber && isImplementationPhase(phase));
+    if (!implementation) return null;
+    failed.status = "PENDING";
+    failed.autoRetryCount += 1;
+    failed.retryAt = null;
+    implementation.status = "PENDING";
+    implementation.finishedAt = null;
+    implementation.errorCode = "VERIFICATION_FEEDBACK";
+    implementation.retryAt = retryDate(at);
+    implementation.summary = `Feedback obrigatório da verificação — corrija antes de concluir:\n${result.summary}`.slice(0, 8_000);
+    appendActivity(implementation, {
+      at,
+      agentId: implementation.resolvedAgent,
+      type: "STATUS",
+      message: `Verificação reprovou a entrega. Correção automática ${failed.autoRetryCount}/${AUTO_RETRY_LIMIT} agendada.`,
+    });
+    appendActivity(failed, {
+      at,
+      agentId: failed.resolvedAgent,
+      type: "STATUS",
+      message: "Feedback devolvido automaticamente para a fase de implementação.",
+    });
+    execution.status = "PENDING";
+    execution.finishedAt = null;
+    return "IMPLEMENTATION_FEEDBACK";
+  }
+
+  const writableClosure = failed.kind === "CLOSURE" && ["scribe", "kowalski"].includes(failed.resolvedAgent);
+  if (isImplementationPhase(failed) || writableClosure || TRANSIENT_ERROR_CODES.has(errorCode)) {
+    failed.status = "PENDING";
+    failed.autoRetryCount += 1;
+    failed.retryAt = retryDate(at);
+    appendActivity(failed, {
+      at,
+      agentId: failed.resolvedAgent,
+      type: "STATUS",
+      message: `Nova tentativa automática ${failed.autoRetryCount}/${AUTO_RETRY_LIMIT} agendada após analisar ${errorCode}.`,
+    });
+    execution.status = "PENDING";
+    execution.finishedAt = null;
+    return "SAME_PHASE";
+  }
+
+  return null;
+}
+
+export function recoverCorrectableFailures(state: ProductionState, at = now()): number {
+  let recovered = 0;
+  for (const execution of state.executions) {
+    if (!["FAILED", "BLOCKED"].includes(execution.status)) continue;
+    const failed = execution.phases.find((phase) => phase.status === "FAILED" || phase.status === "BLOCKED");
+    if (!failed) continue;
+    const recovery = scheduleAutomaticRecovery(execution, failed.phaseNumber, {
+      success: false,
+      summary: failed.summary ?? "A fase anterior não foi concluída; reinspecione o estado atual e corrija a causa.",
+      errorCode: failed.errorCode ?? undefined,
+    }, at);
+    if (recovery) recovered += 1;
+  }
+  return recovered;
+}
+
 export async function processNextProductionPhase() {
+  await applyProductionControls();
   const config = await readProductionConfig();
   if (!config.autoRun) return { processed: false as const, healthy: true as const, paused: true as const };
   const state = await syncProductionExecutions();
-  const blocking = state.executions.find((execution) => execution.status === "FAILED" || execution.status === "BLOCKED");
-  if (blocking) return { processed: false as const, healthy: true as const, blockedBy: blocking.objectiveCode };
-  const execution = state.executions.find((item) => item.status === "PENDING" || item.status === "RUNNING");
+  if (recoverCorrectableFailures(state)) await writeProductionState(state);
+  const execution = selectNextProductionExecution(state);
   if (!execution) return { processed: false as const, healthy: true as const };
-  const phase = execution.phases.find((item) => item.status === "PENDING");
+  const phase = nextReadyPhase(execution, Date.now());
   if (!phase) {
     execution.status = "SUCCEEDED";
     execution.finishedAt = now();
@@ -195,11 +380,13 @@ export async function processNextProductionPhase() {
   phase.startedAt = now();
   phase.finishedAt = null;
   phase.errorCode = null;
+  phase.retryAt = null;
   appendActivity(phase, { at: now(), agentId: phase.resolvedAgent, type: "STATUS", message: `Agente ${phase.resolvedAgent} iniciou a fase.` });
   execution.status = "RUNNING";
   execution.startedAt ??= now();
   await writeProductionState(state);
 
+  const requiresWrite = phaseRequiresWrite(phase, artifact.contentMarkdown);
   const result = await runProductionAgent(config, {
     agentId: phase.resolvedAgent,
     objectiveCode: execution.objectiveCode,
@@ -213,7 +400,8 @@ export async function processNextProductionPhase() {
       ...execution.phases.filter((item) => item.status === "SUCCEEDED" && item.summary).map((item) => item.summary!),
       ...(phase.attemptCount > 1 && phase.summary ? [`Resumo da tentativa anterior desta fase — use-o para agir sem repetir a investigação:\n${phase.summary}`] : []),
     ],
-    allowWrite: phase.kind === "EXECUTION",
+    allowWrite: requiresWrite,
+    requireChanges: requiresWrite,
     priorChangesApplied: phase.changedFiles.length > 0,
   }, (message) => addActivity(execution.id, phase.phaseNumber, phase.resolvedAgent, message));
 
@@ -229,8 +417,17 @@ export async function processNextProductionPhase() {
       message: result.success ? "Fase concluída." : `Fase interrompida: ${result.errorCode ?? "AGENT_FAILED"}`,
     });
     if (!result.success) {
-      current.status = currentPhase.status === "BLOCKED" ? "BLOCKED" : "FAILED";
-      current.finishedAt = now();
+      const recovery = scheduleAutomaticRecovery(current, currentPhase.phaseNumber, result);
+      if (!recovery) {
+        current.status = currentPhase.status === "BLOCKED" ? "BLOCKED" : "FAILED";
+        current.finishedAt = now();
+        if (currentPhase.autoRetryCount >= AUTO_RETRY_LIMIT) {
+          appendActivity(currentPhase, {
+            at: now(), agentId: currentPhase.resolvedAgent, type: "ERROR",
+            message: `Limite de ${AUTO_RETRY_LIMIT} correções automáticas atingido; intervenção administrativa necessária.`,
+          });
+        }
+      }
     } else if (current.phases.every((item) => item.status === "SUCCEEDED")) {
       current.status = "SUCCEEDED";
       current.finishedAt = now();
@@ -245,5 +442,6 @@ export async function processNextProductionPhase() {
     phaseNumber: phase.phaseNumber,
     agentId: phase.resolvedAgent,
     errorCode: result.errorCode,
+    autoRetryScheduled: !result.success && updated.status === "PENDING",
   };
 }

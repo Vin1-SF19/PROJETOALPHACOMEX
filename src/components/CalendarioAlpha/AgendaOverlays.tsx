@@ -10,7 +10,7 @@ import type { TemaAlpha } from "@/lib/temas";
 import { AgendaModal3D } from "./AgendaModal3D";
 import { FormularioEvento } from "./FormularioEvento";
 import type { CalendarioSelecionadoView, ColegaAgendaView, EventoExibicao } from "./lib/tipos";
-import { PainelColegas } from "./PainelColegas";
+import { PainelColegas, type SolicitacaoRecebidaView } from "./PainelColegas";
 import { PainelPermissoesColegas } from "./PainelPermissoesColegas";
 import { SeletorCalendarios } from "./SeletorCalendarios";
 
@@ -27,6 +27,7 @@ interface AgendaOverlaysProps {
   isAdmin: boolean;
   colegasDisponiveis: { id: number; nome: string; email: string }[];
   colegas: ColegaAgendaView[];
+  solicitacoesRecebidas: SolicitacaoRecebidaView[];
   permissoesAberto: boolean;
   onPermissoesAbertoChange: (open: boolean) => void;
   usuariosPermissao: UsuarioPermissaoColegaDTO[];
@@ -70,6 +71,7 @@ export function AgendaOverlays(props: AgendaOverlaysProps) {
         isAdmin={props.isAdmin}
         disponiveis={props.colegasDisponiveis}
         visiveis={props.colegas}
+        solicitacoesRecebidas={props.solicitacoesRecebidas}
         onAtualizado={props.onAtualizarColegas}
       />
       {props.isAdmin && (

@@ -15,5 +15,6 @@ describe("catálogo dos agentes Bibble", () => {
     expect(resolvePhaseAgent("dev", "Interface", "Criar UI e skeleton com Tailwind")).toBe("nova");
     expect(resolvePhaseAgent("dev", "API", "Criar server action backend")).toBe("echo");
     expect(resolvePhaseAgent("probe", "Validar", "Executar testes")).toBe("probe");
+    expect(resolvePhaseAgent("forge", "Implementar background espacial", "Criar componente visual no layout do CRM")).toBe("nova");
   });
 });

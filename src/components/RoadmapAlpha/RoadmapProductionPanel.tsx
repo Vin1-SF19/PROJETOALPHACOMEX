@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Activity, ArrowLeft, Bot, CheckCircle2, Clock3, Cpu, Loader2,
-  PauseCircle, PlayCircle, RefreshCw, Settings2, ShieldCheck, Users, X,
+  PauseCircle, PlayCircle, RefreshCw, Settings2, ShieldCheck, Trash2, Users, X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   AlternarAcessoRoadmapProduction,
+  ControlarExecucaoRoadmapProduction,
   ListarAcessosRoadmapProduction,
   ObterRoadmapProduction,
   RepetirExecucaoRoadmapProduction,
@@ -23,7 +24,7 @@ interface ActivityView { at: string; agentId: string; type: "STATUS" | "TOOL" | 
 interface PhaseView {
   phaseNumber: number; title: string; kind: string; requestedAgent: string; resolvedAgent: string;
   status: string; attemptCount: number; startedAt: string | null; finishedAt: string | null;
-  summary: string | null; errorCode: string | null; activities: ActivityView[];
+  autoRetryCount: number; retryAt: string | null; summary: string | null; errorCode: string | null; activities: ActivityView[];
 }
 interface ExecutionView {
   id: string; objectiveCode: string; objectiveTitle: string; moduleKey: string; sourceVersion: number;
@@ -37,15 +38,22 @@ interface ProductionData {
 }
 interface AccessView { id: number; nome: string; usuario: string; role: string; status: string; imagemUrl: string | null; locked: boolean; hasAccess: boolean }
 
+const AUTO_RETRY_LIMIT = 12;
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Na fila", RUNNING: "Executando", SUCCEEDED: "Concluído", FAILED: "Falhou", BLOCKED: "Bloqueado",
+  PENDING: "Na fila", RUNNING: "Executando", PAUSED: "Pausado", SUCCEEDED: "Concluído", FAILED: "Falhou", BLOCKED: "Bloqueado",
 };
 
 function statusClass(status: string): string {
   if (status === "SUCCEEDED") return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
   if (status === "RUNNING") return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
+  if (status === "PAUSED") return "border-slate-400/20 bg-slate-400/10 text-slate-300";
   if (status === "FAILED" || status === "BLOCKED") return "border-rose-400/20 bg-rose-400/10 text-rose-300";
   return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+}
+
+function executionStatusLabel(execution: ExecutionView): string {
+  if (execution.phases.some((phase) => phase.status === "PENDING" && phase.retryAt)) return "Correção automática";
+  return STATUS_LABEL[execution.status] ?? execution.status;
 }
 
 export function RoadmapProductionPanel({ canManage, onBack }: { canManage: boolean; onBack: () => void }) {
@@ -83,6 +91,14 @@ export function RoadmapProductionPanel({ canManage, onBack }: { canManage: boole
   const activePhase = useMemo(() => executions.flatMap((execution) => execution.phases.map((phase) => ({ execution, phase }))).find(({ phase }) => phase.status === "RUNNING") ?? null, [executions]);
   const selected = executions.find((execution) => execution.id === selectedExecution) ?? executions[0] ?? null;
 
+  async function controlExecution(execution: ExecutionView, control: "PAUSE" | "RESUME" | "EXCLUDE") {
+    if (control === "EXCLUDE" && !window.confirm(`Excluir ${execution.objectiveCode} r${String(execution.sourceVersion).padStart(4, "0")} da fila local?`)) return;
+    const result = await ControlarExecucaoRoadmapProduction(execution.id, control);
+    if (!result.success) { toast.error(result.error); return; }
+    toast.success(control === "PAUSE" ? "Pausa solicitada" : control === "RESUME" ? "Execução retomada" : "Exclusão solicitada");
+    window.setTimeout(() => void refresh(false), 1_000);
+  }
+
   if (error && !data) return <div className="grid min-h-[680px] place-items-center rounded-2xl border border-rose-400/20 bg-[#07101f] text-rose-300">{error}</div>;
 
   return (
@@ -116,10 +132,19 @@ export function RoadmapProductionPanel({ canManage, onBack }: { canManage: boole
           <div className="space-y-2">
             {!executions.length && <p className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">Nenhum objetivo documentado aguardando produção.</p>}
             {executions.map((execution) => (
-              <button key={execution.id} onClick={() => setSelectedExecution(execution.id)} className={`w-full rounded-xl border p-3 text-left transition ${selected?.id === execution.id ? "border-violet-400/30 bg-violet-400/[.08]" : "border-white/10 bg-white/[.025] hover:bg-white/[.05]"}`}>
-                <div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-950 font-bold text-violet-300">{execution.globalPriority}</span><div className="min-w-0 flex-1"><p className="text-[10px] uppercase tracking-wider text-slate-500">{execution.objectiveCode} · r{String(execution.sourceVersion).padStart(4, "0")}</p><p className="mt-1 line-clamp-2 text-sm font-medium">{execution.objectiveTitle}</p></div></div>
-                <div className="mt-3 flex items-center justify-between"><span className={`rounded-full border px-2 py-1 text-[10px] ${statusClass(execution.status)}`}>{STATUS_LABEL[execution.status] ?? execution.status}</span><span className="text-[10px] text-slate-500">{execution.phases.filter((phase) => phase.status === "SUCCEEDED").length}/{execution.phases.length} fases</span></div>
-              </button>
+              <article key={execution.id} className={`w-full rounded-xl border p-3 text-left transition ${selected?.id === execution.id ? "border-violet-400/30 bg-violet-400/[.08]" : "border-white/10 bg-white/[.025] hover:bg-white/[.05]"}`}>
+                <button type="button" onClick={() => setSelectedExecution(execution.id)} className="flex w-full items-start gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-950 font-bold text-violet-300">{execution.globalPriority}</span><span className="min-w-0 flex-1"><span className="block text-[10px] uppercase tracking-wider text-slate-500">{execution.objectiveCode} · r{String(execution.sourceVersion).padStart(4, "0")}</span><span className="mt-1 line-clamp-2 block text-sm font-medium">{execution.objectiveTitle}</span></span></button>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <span className={`rounded-full border px-2 py-1 text-[10px] ${statusClass(execution.status)}`}>{executionStatusLabel(execution)}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="mr-1 text-[10px] text-slate-500">{execution.phases.filter((phase) => phase.status === "SUCCEEDED").length}/{execution.phases.length}</span>
+                    {canManage && ["FAILED", "BLOCKED"].includes(execution.status) && <button type="button" title="Tentar novamente" aria-label="Tentar novamente" onClick={async (event) => { event.stopPropagation(); const result = await RepetirExecucaoRoadmapProduction(execution.id); if (result.success) toast.success("Execução reenfileirada"); else toast.error(result.error); await refresh(false); }} className="rounded p-1 text-amber-300 hover:bg-amber-400/10"><RefreshCw size={13} /></button>}
+                    {canManage && execution.status === "PAUSED" && <button type="button" title="Retomar" aria-label="Retomar execução" onClick={(event) => { event.stopPropagation(); void controlExecution(execution, "RESUME"); }} className="rounded p-1 text-emerald-300 hover:bg-emerald-400/10"><PlayCircle size={14} /></button>}
+                    {canManage && ["PENDING", "RUNNING"].includes(execution.status) && <button type="button" title="Pausar" aria-label="Pausar execução" onClick={(event) => { event.stopPropagation(); void controlExecution(execution, "PAUSE"); }} className="rounded p-1 text-slate-300 hover:bg-white/10"><PauseCircle size={14} /></button>}
+                    {canManage && <button type="button" title="Excluir da fila local" aria-label="Excluir da fila local" onClick={(event) => { event.stopPropagation(); void controlExecution(execution, "EXCLUDE"); }} className="rounded p-1 text-rose-300 hover:bg-rose-400/10"><Trash2 size={14} /></button>}
+                  </div>
+                </div>
+              </article>
             ))}
           </div>
         </aside>
@@ -145,8 +170,9 @@ function Metric({ icon: Icon, label, value, active = false }: { icon: typeof Bot
 
 function PhaseCard({ phase }: { phase: PhaseView }) {
   const latest = phase.activities.at(-1);
+  const phaseLabel = phase.status === "PENDING" && phase.retryAt ? `Corrigindo automaticamente · ${phase.autoRetryCount}/${AUTO_RETRY_LIMIT}` : (STATUS_LABEL[phase.status] ?? phase.status);
   return <article className={`rounded-xl border p-4 ${phase.status === "RUNNING" ? "border-cyan-400/30 bg-cyan-400/[.05]" : "border-white/10 bg-white/[.025]"}`}>
-    <div className="flex items-start justify-between gap-3"><div className="flex gap-3"><span className="grid size-9 place-items-center rounded-lg bg-slate-950 text-sm text-violet-300">{phase.phaseNumber}</span><div><h3 className="text-sm font-medium">{phase.title}</h3><p className="mt-1 text-xs text-slate-500">{phase.resolvedAgent} · solicitado: {phase.requestedAgent} · {phase.kind}</p></div></div><span className={`rounded-full border px-2 py-1 text-[10px] ${statusClass(phase.status)}`}>{phase.status === "RUNNING" && <Loader2 className="mr-1 inline animate-spin" size={10} />}{STATUS_LABEL[phase.status] ?? phase.status}</span></div>
+    <div className="flex items-start justify-between gap-3"><div className="flex gap-3"><span className="grid size-9 place-items-center rounded-lg bg-slate-950 text-sm text-violet-300">{phase.phaseNumber}</span><div><h3 className="text-sm font-medium">{phase.title}</h3><p className="mt-1 text-xs text-slate-500">{phase.resolvedAgent} · solicitado: {phase.requestedAgent} · {phase.kind}</p></div></div><span className={`rounded-full border px-2 py-1 text-[10px] ${statusClass(phase.status)}`}>{phase.status === "RUNNING" && <Loader2 className="mr-1 inline animate-spin" size={10} />}{phaseLabel}</span></div>
     {latest && <div className="mt-3 flex gap-2 rounded-lg bg-slate-950/60 px-3 py-2 text-xs text-slate-400"><Clock3 size={13} className="mt-0.5 shrink-0" /><span>{latest.message}</span></div>}
     {phase.summary && <pre className="mt-3 max-h-52 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-slate-950/50 p-3 font-sans text-xs leading-5 text-slate-300">{phase.summary}</pre>}
   </article>;

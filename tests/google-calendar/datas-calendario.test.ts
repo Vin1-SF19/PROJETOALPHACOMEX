@@ -7,8 +7,10 @@ import {
   diasDaSemana,
   diasDoGridMes,
   formatarDataCivil,
+  formatarDataCivilUtc,
   mesesDoAno,
   mesmodia,
+  mesmodiaDiaInteiro,
   parsearDataCivil,
   proximaData,
 } from "@/components/CalendarioAlpha/lib/datas";
@@ -156,6 +158,27 @@ describe("mesmodia", () => {
   });
 });
 
+describe("formatarDataCivilUtc", () => {
+  it("lê ano/mês/dia diretamente em UTC, sem passar pelo fuso de São Paulo", () => {
+    // Contraste direto com formatarDataCivil: mesmo instante, resultado diferente.
+    expect(formatarDataCivilUtc(new Date("2026-08-09T00:00:00.000Z"))).toBe("2026-08-09");
+    expect(formatarDataCivil(new Date("2026-08-09T00:00:00.000Z"))).toBe("2026-08-08");
+  });
+});
+
+describe("mesmodiaDiaInteiro", () => {
+  // Regressão: evento "dia inteiro" (feriado) ancorado em Date.UTC(ano,mes,dia) precisa
+  // continuar batendo com o dia civil correto da grade (que é ancorada em fuso São Paulo).
+  it("compara a data civil UTC do evento com a data civil de São Paulo da grade", () => {
+    const feriadoDiaDosPais = new Date("2026-08-09T00:00:00.000Z");
+    const diaGradeNove = parsearDataCivil("2026-08-09")!;
+    const diaGradeOito = parsearDataCivil("2026-08-08")!;
+
+    expect(mesmodiaDiaInteiro(feriadoDiaDosPais, diaGradeNove)).toBe(true);
+    expect(mesmodiaDiaInteiro(feriadoDiaDosPais, diaGradeOito)).toBe(false);
+  });
+});
+
 describe("agruparPorDia", () => {
   it("ignora eventos sem inicioEm e agrupa os demais pela data de São Paulo", () => {
     const eventos = [
@@ -168,5 +191,18 @@ describe("agruparPorDia", () => {
     expect(mapa.get("2026-07-31")).toHaveLength(2);
     expect(mapa.get("2026-08-01")).toHaveLength(1);
     expect(mapa.size).toBe(2);
+  });
+
+  // Regressão: feriado "Dia dos Pais" (domingo 09/08/2026, inicioEm "2026-08-09T00:00:00.000Z")
+  // caía no grupo "2026-08-08" quando agrupado pela data de São Paulo — grade do mês mostrava
+  // o feriado 1 dia antes. Eventos diaInteiro devem agrupar pela data civil UTC.
+  it("agrupa eventos diaInteiro pela data civil UTC, não pela de São Paulo", () => {
+    const eventos = [
+      { inicioEm: "2026-08-09T00:00:00.000Z", diaInteiro: true }, // Dia dos Pais
+      { inicioEm: "2026-08-09T14:00:00.000Z", diaInteiro: false }, // reunião normal, mesmo dia
+    ];
+    const mapa = agruparPorDia(eventos);
+    expect(mapa.get("2026-08-09")).toHaveLength(2);
+    expect(mapa.get("2026-08-08")).toBeUndefined();
   });
 });

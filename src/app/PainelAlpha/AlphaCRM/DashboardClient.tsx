@@ -15,6 +15,7 @@ import type { TemaAlpha } from "@/lib/temas";
 import { fmtDateTime } from "@/lib/format-date";
 import { ObterDashboardBpm } from "@/actions/bpm/Dashboard";
 import CardFullViewModal from "./CardModal/CardFullViewModal";
+import { CrmPipelineBorder } from "@/components/ui/crm-pipeline-border";
 
 type DashboardData = NonNullable<Awaited<ReturnType<typeof ObterDashboardBpm>>["data"]>;
 
@@ -100,25 +101,26 @@ export default function DashboardClient({ dashboard, erro, visual, currentUserId
         {pipelines.length === 0 ? (
           <p className="text-sm text-slate-500">Nenhum pipeline configurado ainda.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex flex-wrap gap-6">
             {pipelines.map((pipeline) => (
-              <Link
-                key={pipeline.id}
-                href={`/PainelAlpha/AlphaCRM/pipeline/${pipeline.id}`}
-                className="bg-slate-900/60 border border-white/5 rounded-2xl p-5 hover:border-white/15 transition-colors group"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center"
-                    style={{ background: `rgba(${accent},0.15)` }}
-                  >
-                    <KanbanSquare size={17} style={{ color: `rgb(${accent})` }} />
+              <CrmPipelineBorder key={pipeline.id} className="w-full md:w-[340px] lg:w-[380px] xl:w-[420px] max-w-full min-h-[200px] shadow-[0_4px_16px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] transition-shadow duration-300 ease-out hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.25)]">
+                <Link
+                  href={`/PainelAlpha/AlphaCRM/pipeline/${pipeline.id}`}
+                  className="block p-5 transition-colors group"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: `rgba(${accent},0.15)` }}
+                    >
+                      <KanbanSquare size={17} style={{ color: `rgb(${accent})` }} />
+                    </div>
+                    <ArrowRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
                   </div>
-                  <ArrowRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
-                </div>
-                <h3 className="font-bold text-white mb-1">{pipeline.nome}</h3>
-                <p className="text-xs text-slate-400">{pipeline._count.cards} card(s)</p>
-              </Link>
+                  <h3 className="font-bold text-white mb-1">{pipeline.nome}</h3>
+                  <p className="text-xs text-slate-400">{pipeline._count.cards} card(s)</p>
+                </Link>
+              </CrmPipelineBorder>
             ))}
           </div>
         )}

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 import { AgendaModal3D } from "./AgendaModal3D";
 import { COR_CALENDARIO_PADRAO, type CalendarioSelecionadoView } from "./lib/tipos";
+import { SeletorCorPaleta } from "./SeletorCorPaleta";
 
 interface SeletorCalendariosProps {
   open: boolean;
@@ -90,12 +91,10 @@ export function SeletorCalendarios({
           return (
             <div key={calendario.googleCalendarId} className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.025] px-4 py-3">
               {selecionado ? (
-                <input
-                  type="color"
-                  value={selecionado.corHex ?? COR_CALENDARIO_PADRAO}
-                  onChange={(evento) => personalizarCor(selecionado.id, evento.target.value)}
-                  aria-label={`Cor da agenda ${calendario.nome}`}
-                  className="size-4 shrink-0 cursor-pointer appearance-none rounded-full border-0 bg-transparent p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch-wrapper]:p-0"
+                <SeletorCorPaleta
+                  corAtual={selecionado.corHex ?? COR_CALENDARIO_PADRAO}
+                  onEscolher={(cor) => personalizarCor(selecionado.id, cor)}
+                  label={`Cor da agenda ${calendario.nome}`}
                 />
               ) : (
                 <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: calendario.corHex ?? COR_CALENDARIO_PADRAO }} aria-hidden="true" />

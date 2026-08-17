@@ -38,6 +38,10 @@ npm run roadmap:production:doctor
 npm run roadmap:production:status
 npm run roadmap:production:once
 npm run roadmap:production:retry -- --execution=<objective-id>:v<version>
+npm run roadmap:production:control -- --execution=<objective-id>:v<version> --action=pause
+npm run roadmap:production:control -- --execution=<objective-id>:v<version> --action=resume
+npm run roadmap:production:control -- --execution=<objective-id>:v<version> --action=retry
+npm run roadmap:production:control -- --execution=<objective-id>:v<version> --action=exclude
 ```
 
 Instalar ou atualizar o supervisor singleton:
@@ -55,6 +59,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-roadmap-pr
 ```
 
 O usuário revisa o working tree e realiza `git add`/`git commit` manualmente. O worker nunca executa essas operações.
+
+Na **Fila por prioridade global**, cada execução possui controles administrativos de tentar novamente, pausar/retomar e excluir. Pausar ou excluir durante uma fase ativa é processado com segurança após a fase atual. Uma execução falha ou bloqueada permanece visível, mas não impede revisões novas ou outros objetivos de avançarem.
+
+Reprovações de verificação entram no ciclo de autocorreção: o relatório do Probe volta para a última fase de implementação, o agente `dev` corrige os itens apontados e a verificação é executada novamente. Bloqueios de implementação e falhas transitórias do provider também são reenfileirados automaticamente após cinco segundos. A UI mostra **Correção automática** e o contador; após 12 tentativas da mesma fase, o worker preserva o bloqueio para intervenção administrativa, evitando um loop local sem controle. Erros de autorização, configuração inválida, objetivo substituído ou proteção de segurança nunca são repetidos automaticamente.
+
+Se o manifesto atribuir por engano uma fase com título explícito de implementação ao Scout, Forge ou Probe, o worker mantém o agente solicitado no histórico, mas roteia a execução para Nova (frontend/UI) ou Echo (backend). Essa reconciliação também corrige execuções locais que já estavam bloqueadas antes da atualização.
 
 ## Comandos
 

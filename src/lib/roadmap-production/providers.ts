@@ -52,6 +52,7 @@ export interface ProductionAgentInput {
   phaseMarkdown: string;
   previousSummaries: string[];
   allowWrite: boolean;
+  requireChanges?: boolean;
   priorChangesApplied?: boolean;
 }
 
@@ -154,10 +155,14 @@ export async function runProductionAgent(
     let truncatedResponses = 0;
     let successfulWrites = 0;
     for (let step = 0; step < config.maxToolSteps; step += 1) {
+      const forceConclusion = step >= Math.max(1, config.maxToolSteps - 2);
       if (step === 12) {
         messages.push({ role: "user", content: input.allowWrite
           ? "Limite de investigação alcançado. Pare de buscar: aplique agora a menor alteração segura com os caminhos já descobertos, rode um gate direcionado e conclua. Se não for seguro, responda RESULT: BLOCKED."
           : "Limite de investigação alcançado. Pare de buscar e conclua agora com RESULT: PASS ou RESULT: BLOCKED e o resumo verificável." });
+      }
+      if (forceConclusion) {
+        messages.push({ role: "user", content: "Encerramento obrigatório: não há mais ferramentas disponíveis. Responda agora com RESULT: PASS, RESULT: FAIL ou RESULT: BLOCKED, seguido de resumo, arquivos afetados e gates." });
       }
       await onActivity(`Consultando ${config.model} · passo ${step + 1}`);
       const controller = new AbortController();
@@ -166,7 +171,7 @@ export async function runProductionAgent(
         method: "POST",
         headers: getOllamaHeaders({ "Content-Type": "application/json", Accept: "application/json" }, runtime.config.ollamaApiKey),
         signal: controller.signal,
-        body: JSON.stringify({ model: config.model, stream: false, temperature: 0.15, max_tokens: 8_192, reasoning_effort: "low", messages, tools: PRODUCTION_TOOL_DEFINITIONS, tool_choice: "auto" }),
+        body: JSON.stringify({ model: config.model, stream: false, temperature: 0.15, max_tokens: 8_192, reasoning_effort: "low", messages, tools: PRODUCTION_TOOL_DEFINITIONS, tool_choice: forceConclusion ? "none" : "auto" }),
       }).finally(() => clearTimeout(timeout));
       if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "PROVIDER_AUTH_FAILED" : "PROVIDER_HTTP_ERROR");
       const parsed = completionSchema.safeParse(await response.json());
@@ -188,7 +193,7 @@ export async function runProductionAgent(
           messages.push({ role: "user", content: "Responda agora em uma única linha: RESULT: PASS, RESULT: FAIL ou RESULT: BLOCKED." });
           continue;
         }
-        if (result.success && input.allowWrite && successfulWrites === 0 && !input.priorChangesApplied) {
+        if (result.success && input.requireChanges && successfulWrites === 0 && !input.priorChangesApplied) {
           return { ...result, success: false, errorCode: "NO_CHANGES_APPLIED" };
         }
         return result;

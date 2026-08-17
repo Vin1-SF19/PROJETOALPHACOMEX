@@ -197,6 +197,7 @@ export function CalendarioAlphaDashboard({
         isAdmin={isAdmin}
         colegasDisponiveis={agenda.colegasDisponiveis}
         colegas={agenda.compartilhadas.colegas}
+        solicitacoesRecebidas={agenda.solicitacoesRecebidas}
         permissoesAberto={agenda.permissoesAberto}
         onPermissoesAbertoChange={agenda.setPermissoesAberto}
         usuariosPermissao={agenda.usuariosPermissao}

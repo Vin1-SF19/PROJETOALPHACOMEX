@@ -4,21 +4,24 @@ import path from "node:path";
 
 import {
   productionConfigSchema,
+  productionControlCommandSchema,
   productionStateSchema,
   type ProductionConfig,
+  type ProductionControlCommand,
   type ProductionState,
 } from "@/lib/roadmap-production/contracts";
 
 const STATE_DIRECTORY = ".roadmap-production";
 const CONFIG_FILE = "config.json";
 const STATE_FILE = "state.json";
+const COMMAND_DIRECTORY = "commands";
 
 function directory(root = process.cwd()): string {
   return path.resolve(root, STATE_DIRECTORY);
 }
 
 function emptyState(): ProductionState {
-  return { version: 1, updatedAt: new Date().toISOString(), executions: [] };
+  return { version: 1, updatedAt: new Date().toISOString(), ignoredExecutionIds: [], executions: [] };
 }
 
 function defaultConfig(): ProductionConfig {
@@ -49,7 +52,6 @@ async function writeJson(filePath: string, value: unknown): Promise<void> {
   const temporary = `${filePath}.tmp-${randomUUID()}`;
   await fs.writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
   try {
-    await fs.rm(filePath, { force: true });
     await fs.rename(temporary, filePath);
   } catch (error) {
     await fs.rm(temporary, { force: true });
@@ -95,4 +97,39 @@ export async function writeProductionState(state: ProductionState, root = proces
 
 export function productionStateDirectory(root = process.cwd()): string {
   return directory(root);
+}
+
+export async function enqueueProductionControl(
+  type: ProductionControlCommand["type"],
+  executionId: string,
+  root = process.cwd(),
+): Promise<ProductionControlCommand> {
+  const command = productionControlCommandSchema.parse({ id: randomUUID(), type, executionId, createdAt: new Date().toISOString() });
+  await writeJson(path.join(directory(root), COMMAND_DIRECTORY, `${command.id}.json`), command);
+  return command;
+}
+
+export async function readProductionControls(root = process.cwd()): Promise<Array<{ command: ProductionControlCommand; filePath: string }>> {
+  const commandDirectory = path.join(directory(root), COMMAND_DIRECTORY);
+  let names: string[];
+  try {
+    names = (await fs.readdir(commandDirectory)).filter((name) => name.endsWith(".json")).sort();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+  const controls: Array<{ command: ProductionControlCommand; filePath: string }> = [];
+  for (const name of names) {
+    const filePath = path.join(commandDirectory, name);
+    try {
+      controls.push({ command: productionControlCommandSchema.parse(await readJsonWithRetry(filePath)), filePath });
+    } catch {
+      await fs.rm(filePath, { force: true });
+    }
+  }
+  return controls.sort((left, right) => left.command.createdAt.localeCompare(right.command.createdAt) || left.command.id.localeCompare(right.command.id));
+}
+
+export async function removeProductionControlFiles(filePaths: string[]): Promise<void> {
+  await Promise.all(filePaths.map((filePath) => fs.rm(filePath, { force: true })));
 }

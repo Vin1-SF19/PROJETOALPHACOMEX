@@ -1,4 +1,9 @@
-/** Paleta fixa para diferenciar colegas na grade — atribuída automaticamente por ordem de adição. */
+/**
+ * Paleta fixa para diferenciar colegas/calendários na grade — atribuída automaticamente por
+ * ordem de adição (`proximaCorColega`) e também oferecida como opção de escolha manual em
+ * `SeletorCorPaleta` (substituiu o `<input type="color">` nativo, que disparava `onChange` a
+ * cada frame de arraste do picker do SO — dezenas de Server Actions concorrentes sem debounce).
+ */
 import { isAdminRole as hasAdminAccess } from "@/lib/roles";
 
 export const PALETA_CORES_COLEGAS = [
@@ -12,6 +17,12 @@ export const PALETA_CORES_COLEGAS = [
   "#eab308", // amarelo
   "#8b5cf6", // violeta
   "#22c55e", // verde
+  "#3b82f6", // azul
+  "#ef4444", // vermelho
+  "#10b981", // esmeralda
+  "#6366f1", // índigo
+  "#d946ef", // fúcsia
+  "#78716c", // pedra
 ] as const;
 
 export function proximaCorColega(quantidadeAtual: number): string {

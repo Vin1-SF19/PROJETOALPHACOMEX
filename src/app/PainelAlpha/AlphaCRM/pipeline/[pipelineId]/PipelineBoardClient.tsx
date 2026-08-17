@@ -40,6 +40,7 @@ import {
   restaurarSnapshotBoard,
 } from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
+import { CrmPipelineBorder } from "@/components/ui/crm-pipeline-border";
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
 import { useLazyColumn } from "@/hooks/useLazyColumn";
 
@@ -137,7 +138,7 @@ function KanbanCard({
       onClick={() => onAbrir(card.id)}
       aria-label={statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
-        "alpha-pipeline-card alpha-card-enter group relative isolate overflow-hidden rounded-2xl border bg-slate-900/80 p-0 shadow-lg shadow-black/20 backdrop-blur-sm cursor-grab active:cursor-grabbing select-none hover:shadow-xl hover:shadow-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        "alpha-pipeline-card alpha-card-enter group relative isolate p-0 min-h-[200px] max-h-[600px] overflow-y-auto overflow-x-hidden shadow-[0_4px_16px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] backdrop-blur-sm cursor-grab active:cursor-grabbing select-none hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.25)] transition-shadow duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         statusConfig?.cardClassName,
         alertaBoasVindas || alertaAlinhamento
           ? "border-red-500/70 bg-red-950/25 shadow-red-950/40 hover:border-red-400 animate-pulse"
@@ -145,7 +146,7 @@ function KanbanCard({
             ? "border-cyan-400/50 hover:border-cyan-400/70"
           : statusConfig
             ? "hover:brightness-110"
-            : "border-white/5 hover:border-white/10",
+            : "",
         isDragging && "cursor-grabbing border-white/20 shadow-2xl shadow-black/40 ring-1 ring-white/15",
       )}
     >
@@ -154,6 +155,7 @@ function KanbanCard({
         className="absolute inset-y-0 left-0 w-1 bg-white/20 transition-[width] duration-150 group-hover:w-1.5"
         style={{ background: `rgb(${accent})` }}
       />
+      <CrmPipelineBorder>
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br from-white/[0.08] via-transparent to-transparent" />
 
       <div className="relative space-y-3 px-3 pb-3 pt-3.5">
@@ -280,6 +282,7 @@ function KanbanCard({
           />
         </div>
       </div>
+      </CrmPipelineBorder>
     </div>
   );
 }
@@ -292,7 +295,7 @@ function KanbanColumn({
   const novosLeads = etapaEhNovosLeads(etapa.nome);
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({ id: etapa.id });
   return (
-    <div className="alpha-pipeline-column-shell flex flex-col min-w-[240px] max-w-[240px]">
+    <div className="alpha-pipeline-column-shell flex flex-col w-full md:w-[340px] lg:w-[380px] xl:w-[420px] max-w-full">
       <div className="alpha-pipeline-column-header flex items-center justify-between mb-2 px-1 py-1">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: `rgb(${cor})` }} />
