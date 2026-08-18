@@ -19,7 +19,7 @@ import {
   readProductionState,
   writeProductionConfig,
 } from "@/lib/roadmap-production/storage";
-import { syncProductionExecutions } from "@/lib/roadmap-production/worker";
+import { refreshProductionExecutions } from "@/lib/roadmap-production/worker";
 import { isAdminRole } from "@/lib/roles";
 
 const ROUTE = "/PainelAlpha/Roadmap";
@@ -53,16 +53,27 @@ function publicError(error: unknown): string {
   return "Não foi possível concluir a operação";
 }
 
-export async function ObterRoadmapProduction(includeCatalog = true) {
+const moduleKeySchema = z.string().trim().min(1).max(120);
+
+export async function ObterRoadmapProduction(
+  includeCatalog: boolean,
+  moduleKey: string,
+) {
   try {
     const access = await requireRoadmapProductionAccess();
-    await syncProductionExecutions();
-    const [config, state, agents, providers] = await Promise.all([
+    const scopedModuleKey = moduleKeySchema.parse(moduleKey);
+    const [config, fullState, agents, providers] = await Promise.all([
       readProductionConfig(),
-      readProductionState(),
+      refreshProductionExecutions(),
       includeCatalog ? listBibbleAgents() : Promise.resolve([]),
       includeCatalog ? diagnoseProductionProviders() : Promise.resolve([]),
     ]);
+    const state = {
+      ...fullState,
+      executions: fullState.executions.filter(
+        (execution) => execution.moduleKey === scopedModuleKey,
+      ),
+    };
     const artifacts = state.executions.length
       ? await db.roadmapPromptArtifact.findMany({
           where: {
@@ -122,10 +133,7 @@ export async function SalvarConfiguracaoRoadmapProduction(payload: unknown) {
     if (input.provider === "ollama") throw new Error("PROVIDER_NOT_READY");
     const providers = await diagnoseProductionProviders();
     const provider = providers.find((item) => item.id === input.provider);
-    if (
-      !provider?.ready ||
-      (input.provider === "ollama" && !provider.models.includes(input.model))
-    ) {
+    if (!provider?.ready || !provider.models.includes(input.model)) {
       throw new Error("PROVIDER_NOT_READY");
     }
     const config = await writeProductionConfig({ version: 1, ...input });

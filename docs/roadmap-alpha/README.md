@@ -38,7 +38,7 @@ Arquivar ou excluir cancela jobs ainda abertos. Esses estados ficam fora da prio
 
 - A navegação **Produção** aparece para Admin/CEO/TI e usuários com o override `roadmapProduction`.
 - Somente Admin/CEO/TI veem **Configurar IA** e **Acessos**.
-- Ollama/Qwen é o motor padrão. Codex CLI e Claude Code permanecem indisponíveis até que seus adapters seguros e CLIs sejam diagnosticados como prontos.
+- Ollama/Qwen 3.8 documenta e melhora os prompts. A implementação usa Claude Code por padrão e Codex CLI como fallback, ou a ordem escolhida no objetivo, desde que os adapters estejam diagnosticados como prontos.
 - A gaveta **Agentes** deriva dos skills instalados em `.claude/skills/bibble-squad/` e destaca agente, fase e atividade em andamento.
 - O executor oferece apenas leitura/busca, escrita textual confinada e gates allowlisted. Não há tool de Git mutável, shell arbitrário, banco ou migration.
 - Configuração, retomada, arquivos alterados e telemetria ficam em `.roadmap-production/`, ignorado pelo Git.
@@ -76,11 +76,15 @@ Na **Fila por prioridade global**, cada execução possui controles administrati
 
 A fila apresenta cada objetivo como um accordion. Clicar no cabeçalho abre ou fecha sua gaveta de prompts; apenas um objetivo permanece expandido, priorizando automaticamente o que está em desenvolvimento. Dentro da gaveta, o prompt ativo recebe destaque e, ao clicar nele, seu Markdown ocupa o painel amplo à direita. Quando a última fase termina, o worker cria atomicamente `99-relatorio-conclusao.md` na pasta da revisão; esse documento registra resultado final, arquivos alterados, agentes, tentativas, o que foi feito e como foi feito, e também aparece como o último item clicável da execução.
 
+Produção sempre herda o projeto do objetivo selecionado no Roadmap. A seção **Prompts por prioridade global**, as métricas, os accordions e o painel de Markdown mostram somente objetivos desse projeto; a agregação de todos os projetos existe apenas na visão inicial do Roadmap.
+
 Cada card de objetivo possui um único **Relatar erro**. O administrador descreve o problema da implementação completa, pode usar **Melhorar com IA** para tornar o feedback mais claro e confirma em **Refazer com este feedback**. O worker registra o relato, invalida temporariamente o relatório anterior e reenfileira todas as fases do objetivo. Todos os agentes recebem o feedback como requisito obrigatório dentro do escopo original. Na nova conclusão, `99-relatorio-conclusao.md` lista cada relato, se houve melhoria com IA, quando a correção foi concluída e quantas vezes o objetivo completo precisou ser refeito.
 
 Reprovações de verificação entram no ciclo de autocorreção: o relatório do Probe volta para a última fase de implementação, o agente `dev` corrige os itens apontados e a verificação é executada novamente. Bloqueios de implementação e falhas transitórias do provider também são reenfileirados automaticamente após cinco segundos. A UI mostra **Correção automática** e o contador; após 12 tentativas da mesma fase, o worker preserva o bloqueio para intervenção administrativa, evitando um loop local sem controle. Erros de autorização, configuração inválida, objetivo substituído ou proteção de segurança nunca são repetidos automaticamente.
 
 Se o manifesto atribuir por engano uma fase com título explícito de implementação ao Scout, Forge ou Probe, o worker mantém o agente solicitado no histórico, mas roteia a execução para Nova (frontend/UI) ou Echo (backend). Essa reconciliação também corrige execuções locais que já estavam bloqueadas antes da atualização.
+
+Todo objetivo inclui uma auditoria de entregabilidade. Scout identifica o artefato final, o consumidor e o caminho real de acesso no sistema. Quando uma tela, rota, ação, visualizador, download ou integração necessária não existe, ele registra `AUTO_ADJUSTMENT_REQUIRED` e o aceite ponta a ponta. O worker promove automaticamente a próxima fase executável para Nova ou Echo e incorpora somente o suporte mínimo necessário ao objetivo. A verificação não aceita um arquivo isolado como entrega quando o usuário precisa consumi-lo pela interface. Esse mecanismo é genérico: ele detecta a lacuna no projeto real e não contém implementação pré-programada de visualizador Markdown ou de outra solução específica.
 
 Fases `CLOSURE` do Scribe que exigem README, CHANGELOG ou atualização de `.bibble/memory/` recebem escrita confinada para documentação. Se forem bloqueadas por modo read-only, o diagnóstico anterior é reutilizado e a própria fase é retomada automaticamente.
 

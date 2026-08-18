@@ -211,6 +211,9 @@ export function RoadmapDashboard({
     "modules" | "objectives" | "docs"
   >("objectives");
   const [view, setView] = useState<"roadmap" | "production">("roadmap");
+  const [productionModuleKey, setProductionModuleKey] = useState<string | null>(
+    null,
+  );
 
   const refreshObjectives = useCallback(async () => {
     if (refreshInFlight.current || document.visibilityState === "hidden")
@@ -302,10 +305,15 @@ export function RoadmapDashboard({
     return Array.from(groups);
   }, [modules]);
 
-  if (view === "production") {
+  if (view === "production" && productionModuleKey) {
     return (
       <RoadmapProductionPanel
         canManage={canMutate}
+        moduleKey={productionModuleKey}
+        moduleLabel={
+          modules.find((module) => module.id === productionModuleKey)?.label ??
+          null
+        }
         onBack={() => setView("roadmap")}
       />
     );
@@ -329,7 +337,15 @@ export function RoadmapDashboard({
           {canAccessProduction && (
             <Button
               variant="outline"
-              onClick={() => setView("production")}
+              onClick={() => {
+                const scopeModuleKey = moduleFilter ?? selected?.moduleKey;
+                if (!scopeModuleKey) {
+                  toast.error("Selecione um projeto antes de abrir Produção");
+                  return;
+                }
+                setProductionModuleKey(scopeModuleKey);
+                setView("production");
+              }}
               className="border-violet-400/20 bg-violet-400/[.06] text-violet-200 hover:bg-violet-400/10"
             >
               <Workflow size={16} /> Produção
@@ -515,20 +531,28 @@ export function RoadmapDashboard({
                           {objective.description}
                         </p>
                         <div className="mt-3 flex items-center justify-between gap-2">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] ${meta.className}`}
-                          >
-                            <StatusIcon
-                              size={11}
-                              className={
-                                objective.documentationStatus ===
-                                  "DOCUMENTING" || lifecycle === "development"
-                                  ? "animate-spin"
-                                  : ""
-                              }
-                            />
-                            {meta.label}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] ${meta.className}`}
+                            >
+                              <StatusIcon
+                                size={11}
+                                className={
+                                  objective.documentationStatus ===
+                                    "DOCUMENTING" || lifecycle === "development"
+                                    ? "animate-spin"
+                                    : ""
+                                }
+                              />
+                              {meta.label}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/20 bg-violet-400/[.06] px-2 py-1 text-[10px] text-violet-300">
+                              <BrainCircuit size={10} />
+                              {objective.developmentProvider === "claude"
+                                ? "Claude"
+                                : "Codex"}
+                            </span>
+                          </div>
                           {canMutate && (
                             <div className="flex opacity-70 transition group-hover:opacity-100">
                               {!["deleted", "archived"].includes(

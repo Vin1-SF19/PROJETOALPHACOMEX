@@ -1,7 +1,8 @@
 # GradientBlobCard
 
-Shell visual com gradiente animado (blob), sombra dupla neumófica e fundo
-glassy, usado nos cards do pipeline do Alpha CRM (RM-2026-57E057).
+Shell visual dos cards de oportunidade (`KanbanCard`) do pipeline Kanban do
+Alpha CRM. O nome foi mantido por compatibilidade, embora o blob decorativo
+tenha sido removido em RM-2026-5284A1.
 
 ## Arquivo
 
@@ -15,52 +16,49 @@ Client Component (`"use client"`).
 
 | Prop | Tipo | Default | Descrição |
 |------|------|---------|-----------|
-| `children` | `React.ReactNode` | — | Conteúdo interno do card (título, tags, avatares etc). |
+| `children` | `React.ReactNode` | — | Conteúdo interno do card. |
 | `className` | `string` | — | Classes Tailwind adicionais no wrapper. |
+| `surfaceClassName` | `string` | — | Tint opcional aplicado apenas à superfície interna. |
+| `accent` | `string` | `"37, 99, 235"` | Cor RGB crua da faixa semântica lateral. |
 
-## Exemplo de uso
+## Exemplo
 
 ```tsx
-import GradientBlobCard from "@/components/ui/gradient-blob-card";
+import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 
-<GradientBlobCard>
-  <div>
-    {/* conteúdo do card de pipeline */}
-  </div>
+<GradientBlobCard
+  accent={accent}
+  className="rounded-2xl"
+  surfaceClassName={statusConfig?.cardClassName}
+>
+  <div>{/* conteúdo do card */}</div>
 </GradientBlobCard>
 ```
 
 ## Comportamento
 
-- **Fundo glassy:** `backdrop-blur-[24px]`, `bg-white/80` (claro) /
-  `dark:bg-black/50` (escuro), `outline-2 outline-white`/`dark:outline-gray-700`.
-- **Blob animado:** gradiente `from-pink-500 via-red-500 to-yellow-500`,
-  `blur-[12px]`, posicionado em `z-[15]` (entre o glassy `z-10` e o conteúdo
-  `z-20`) para ficar visível em ambos os modos.
-- **Sombra dupla (neumófica):** `shadow-[20px_20px_60px_#bebebe,-20px_-20px_60px_#ffffff]`
-  claro / `dark:shadow-[20px_20px_60px_#111,-20px_-20px_60px_#222]` escuro.
-- **Altura:** não fixa, definida pelo conteúdo (`p-3`, `w-full`), permitindo
-  layout compacto nos cards do pipeline.
-- **`overflow-hidden`** no wrapper contém o blob e a sombra dentro dos limites
-  do card.
-- **`prefers-reduced-motion`:** os keyframes globais (`globals.css`) desligam
-  a animação do blob.
+- Borda de 1 px em `blue-600` (`#2563eb`, azul Alpha), sem glow.
+- Fundo `slate-800/95`, mais claro que o fundo do pipeline e com contraste AA
+  para o texto branco existente.
+- `shadow-none`; o feedback funcional de arraste permanece no wrapper externo.
+- Hover `scale(1.02)` com transição de 150 ms. Reduced motion conserva escala 1.
+- Faixa lateral absoluta e interna de 3 px, sem margem ou gap. A cor permanece
+  dinâmica pela prop `accent`.
+- `surfaceClassName` preserva o tint de status pós-fechamento sem substituir a
+  borda azul Alpha.
+- `overflow-hidden` mantém a faixa dentro do raio do card.
 
-## Performance
+## Acessibilidade
 
-Os `@keyframes blob` e a classe `.animate-blob` vivem em `src/app/globals.css`
-(não em `<style>` inline por instância), evitando duplicação de tags `<style>`
-quando há 20+ cards renderizados simultaneamente no board.
+As camadas decorativas usam `aria-hidden="true"`, e a microinteração respeita
+`prefers-reduced-motion`.
 
 ## Integração
 
-Usado no `KanbanCard` de
-`src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`,
-envolvendo o conteúdo do card (título, serviço/tags, avatares, contadores).
-Os handlers de dnd-kit (`useSortable`, `attributes`, `listeners`) e o `onClick`
-de abertura permanecem no wrapper externo, fora do `GradientBlobCard`.
+Usado dentro do `KanbanCard` em
+`src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`.
+Os handlers do dnd-kit e o clique de abertura permanecem no wrapper externo.
 
 ## Dependências
 
 - `@/lib/utils` (`cn`)
-- Nenhuma dependência nova instalada.

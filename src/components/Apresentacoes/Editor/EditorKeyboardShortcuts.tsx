@@ -19,7 +19,22 @@ let areaTransferenciaComponentes: ComponenteSlide[] = [];
 export function EditorKeyboardShortcuts() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey || alvoPossuiHistoricoProprio(event.target)) return;
+      if (alvoPossuiHistoricoProprio(event.target)) return;
+
+      // Delete/Backspace SEM modificador — exclui a seleção atual. Sem guarda de Ctrl/Meta
+      // porque é um atalho independente dos demais (undo/redo/duplicar/copiar/colar).
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && (event.key === "Delete" || event.key === "Backspace")) {
+        const estado = useEditorStore.getState();
+        const ids = estado.componentesSelecionadosIds.length > 0
+          ? estado.componentesSelecionadosIds
+          : estado.componenteSelecionadoId ? [estado.componenteSelecionadoId] : [];
+        if (ids.length === 0) return;
+        event.preventDefault();
+        estado.removerComponentes(ids);
+        return;
+      }
+
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
       const tecla = event.key.toLowerCase();
       const refazer = tecla === "y" || (tecla === "z" && event.shiftKey);
       const desfazer = tecla === "z" && !event.shiftKey;

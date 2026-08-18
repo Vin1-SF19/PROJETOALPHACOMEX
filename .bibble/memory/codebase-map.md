@@ -92,6 +92,32 @@ Objetivo concluído. Três defeitos de layout corrigidos em `PipelineBoardClient
 - `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardSkeleton.tsx` — largura 260px
 - `src/app/PainelAlpha/AlphaCRM/README.md` — dimensões atualizadas
 
+### Alpha CRM — Estilização dos cards do pipeline com GradientBlobCard (RM-2026-57E057, 2026-08-17)
+
+Implementação documentada, com encerramento bloqueado pelos gates em 2026-08-17. O novo componente de apresentação `GradientBlobCard` (`src/components/ui/gradient-blob-card.tsx`, Client Component, props `children`/`className`) substitui o shell visual inline do `KanbanCard` em `PipelineBoardClient.tsx`: gradiente animado (blob `pink-500→red-500→yellow-500`, `blur-[12px]`, `z-[15]`), sombra dupla neumórfica com efeito de flutuação (clara/escura), fundo glassy (`backdrop-blur-[24px]`, `bg-white/80`/`dark:bg-black/50`) e altura determinada pelo conteúdo (sem `min-h` fixo no shell). dnd-kit e o clique de abertura permanecem no `<div>` wrapper externo — o componente é puramente apresentacional. Keyframes do blob (`@keyframes blob`/`.animate-blob`, com guard `prefers-reduced-motion`) centralizados em `src/app/globals.css` para evitar `<style>` inline duplicada por card.
+
+**Gate pendente:** `npm test` falhou em 6 testes (3 diretamente ligados ao CRM: 2 em `tests/bpm/card-modal-integration.test.ts` e 1 em `tests/bpm/fechado-ui.test.ts`; os demais em PPTX, Agenda Alpha e Notas). O objetivo não deve ser marcado como concluído até a implementação ou os contratos de teste serem reconciliados e todos os gates obrigatórios passarem.
+
+**Arquivos alterados:**
+- `src/components/ui/gradient-blob-card.tsx` (novo)
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — integração do `GradientBlobCard` no `KanbanCard`
+- `src/app/globals.css` — keyframes globais do blob
+- `src/app/PainelAlpha/AlphaCRM/README.md` — seção "Estilização de Cards"
+- `docs/components/gradient-blob-card.md` (novo)
+- `CHANGELOG.md`
+
+**Última atualização:** 2026-08-17 por Scribe
+
+### Alpha CRM — cards do pipeline sem glow (RM-2026-5284A1, 2026-08-18)
+
+`GradientBlobCard` mantém o nome por compatibilidade, mas agora é o shell sóbrio
+do `KanbanCard`: superfície `slate-800/95`, borda Alpha azul de 1 px, sem blob ou
+sombra decorativa, hover `scale(1.02)` em 150 ms e faixa semântica interna de
+3 px. `PipelineBoardClient.tsx` passa `accent` e o tint pós-fechamento via
+`surfaceClassName`; handlers de clique e dnd-kit permanecem no wrapper externo.
+
+**Última atualização:** 2026-08-18 por Nova
+
 **Notas de manutenção:**
 - Largura: respeitar `min-width: 200px` / `max-width: 340px` em ajustes futuros.
 - `overflow-hidden` no card é necessário para contenção; ao adicionar elementos `position: absolute` ou `overflow: visible`, verificar que não quebrem a contenção.

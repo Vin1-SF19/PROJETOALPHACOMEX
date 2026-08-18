@@ -1,38 +1,52 @@
 "use client";
 
-import { cn } from '@/lib/utils';
+import type { ReactNode } from "react";
+
+import { cn } from "@/lib/utils";
 
 interface GradientBlobCardProps {
-  children?: React.ReactNode;
+  children?: ReactNode;
   className?: string;
+  surfaceClassName?: string;
+  accent?: string;
 }
 
-export function GradientBlobCard({ children, className }: GradientBlobCardProps) {
+export function GradientBlobCard({
+  children,
+  className,
+  surfaceClassName,
+  accent = "37, 99, 235",
+}: GradientBlobCardProps) {
   return (
     <div
       className={cn(
-        'relative w-full rounded-[14px]',
-        'shadow-[20px_20px_60px_#bebebe,-20px_-20px_60px_#ffffff] dark:shadow-[20px_20px_60px_#111,-20px_-20px_60px_#222]',
-        'overflow-hidden',
+        "relative w-full overflow-hidden rounded-[14px]",
         className,
+        "border border-blue-600 bg-slate-800/95 shadow-none",
+        "transition-transform duration-150 ease-out hover:scale-[1.02]",
+        "motion-reduce:transition-none motion-reduce:hover:scale-100",
       )}
     >
-      {/* Glassy Background */}
       <div
         aria-hidden="true"
-        className="absolute inset-[5px] bg-white/80 dark:bg-black/50 backdrop-blur-[24px] rounded-[10px] outline outline-2 outline-white dark:outline-gray-700 z-10"
+        className="absolute inset-0 z-0 bg-slate-800/95"
       />
 
-      {/* Animated Gradient Blob */}
-      <div
+      {surfaceClassName && (
+        <div
+          aria-hidden="true"
+          className={cn("absolute inset-0 z-0", surfaceClassName, "border-0")}
+        />
+      )}
+
+      <span
         aria-hidden="true"
-        className="absolute top-1/2 left-1/2 w-[150px] h-[150px] rounded-full opacity-100 filter blur-[12px] z-[15] animate-blob bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500"
+        className="pointer-events-none absolute inset-y-0 left-0 z-20 w-[3px]"
+        style={{ backgroundColor: `rgb(${accent})` }}
       />
 
-      {/* Conteúdo do card (props do pipeline) */}
-      <div className="relative z-20 p-3 w-full">{children}</div>
+      {/* Conteudo do card (props do pipeline) */}
+      <div className="relative z-10 w-full p-3">{children}</div>
     </div>
   );
 }
-
-export default GradientBlobCard;

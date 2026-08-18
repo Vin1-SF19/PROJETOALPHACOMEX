@@ -34,6 +34,40 @@
 
 ---
 
+## [2026-08-17 18:10] — Alpha Motion: implementação das 15 pendências do diagnóstico (6 ondas)
+
+**Tags:** #feature #bugfix #refactor #decision
+**Agentes envolvidos:** Bibble (implementação direta, sem subagentes Nova/Echo dedicados) → Forge (por onda) → Probe → Lens
+**Arquivos tocados:** ~30 arquivos modificados + 7 criados — ver `decisions.md` para lista completa por onda
+
+### Contexto
+Depois da correção dos 3 bugs prioritários (entrada anterior), usuário deu carta branca ("Siga na que você achar melhor, quero tudo pronto") para implementar as 15 pendências restantes do diagnóstico dos 18 pontos do Alpha Motion. Bibble definiu 6 ondas por dependência/risco técnico.
+
+### O que foi feito
+- **Onda A (texto):** espaçamento de parágrafo estilo Word, edição inline WYSIWYG (duplo-clique → textarea sobreposto), estilo semântico com preset visual real, botão remover lista/numeração fantasma, link clicável (`run.hyperlink` já existia no schema, nunca era renderizado).
+- **Onda B (atalhos):** Ctrl+D duplica, Alt+drag duplica ao arrastar, Ctrl+C/V com clipboard entre slides, zoom com Ctrl+Scroll.
+- **Onda C:** upload de imagem local (pipeline de Blob reaproveitado), gradiente em `card` + `ColorField` compartilhado com paleta de swatches, controle de brilho (`filter: brightness()`) aplicado nos 3 pontos de render real.
+- **Onda D:** painel de propriedades do SLIDE (fundo cor/imagem + transição) quando nenhum elemento está selecionado.
+- **Onda E (maior risco — tocou schema Zod):** 40 formas/elementos como tipo único `"forma"` parametrizado por `variante`; 20 molduras de imagem via `clipPath`; Brand Kit expandido (upload direto, múltiplos logos, paleta livre, fontes do catálogo do projeto).
+- **Onda F:** reprocessar slide individual / todos no import PPTX, sem reenviar o arquivo.
+
+### Decisões tomadas
+Ver `decisions.md` (entrada "Alpha Motion: 15 melhorias implementadas em 6 ondas") para o detalhamento completo por onda. Resumo: preset de estilo semântico seguindo convenção PowerPoint/Canva; catálogo de formas/molduras implementado direto (sem pausa de aprovação prévia da lista, por escolha do usuário); "molduras/efeitos do slide" NÃO implementados por falta de especificação clara — só fundo+transição.
+
+### Problemas encontrados / resolvidos
+- **Forge encontrou:** `TimelineReal.tsx` indexava `COMPONENTES_REGISTRY[componente.tipo]` diretamente — quebrava para `"forma"` (só as 40 variantes são chaves do registry, mesmo padrão de `fundoAnimado`). Fix: `registryFormaParaEstilo()` novo, análogo ao já existente para fundos.
+- **Probe encontrou:** `reprocessarSlide()` podia apagar um asset de imagem ainda usado por OUTRO slide não reprocessado (dedupe por hash da rota `pptx-preview` gera a mesma URL pra imagem repetida entre slides) — corrigido excluindo URLs em uso por outros slides antes de limpar. Também faltava checar `confirmando` na guarda dos botões de reprocessar.
+- **Lens encontrou (bloqueante, corrigido):** função `estrela()` em `formas-catalogo.ts` dividia por `pontos.length` (crescia dentro do loop, começava em 0) em vez de `passos` (fixo) — gerava `NaN` no primeiro ponto e colapsava o resto em 2 posições repetidas, quebrando visualmente 5 das 40 formas (estrela4/5/6/8 + explosao). Corrigido e validado isoladamente.
+
+### Pendências
+- **#11 (redesign visual completo estilo Canva)** deliberadamente NÃO implementado — pedido explícito do próprio usuário no prompt original ("deixe registrado para uma fase futura"). Fica para depois que os catálogos de conteúdo desta sessão já existirem.
+- Bug pré-existente não relacionado em `pptx-parser.test.ts` ("custGeom curvo + blipFill") continua catalogado em `known-errors.md`, não investigado.
+
+### Refletido também em
+- `decisions.md`: entrada "2026-08-17 — Alpha Motion: 15 melhorias implementadas em 6 ondas + #11 adiado conscientemente".
+
+---
+
 ## [2026-08-17 17:15] — Alpha Motion: diagnóstico dos 18 pontos + correção dos 3 bugs priorizados
 
 **Tags:** #bugfix #feature #diagnostic #pptx #canvas

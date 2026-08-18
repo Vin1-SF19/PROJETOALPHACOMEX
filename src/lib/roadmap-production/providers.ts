@@ -91,6 +91,39 @@ export interface ProductionAgentResult {
   toolSteps: number;
 }
 
+export function requiresDeliveryAdjustment(summaries: string[]): boolean {
+  return summaries.some((summary) =>
+    /\bAUTO_ADJUSTMENT_REQUIRED\s*:/i.test(summary),
+  );
+}
+
+export function deliveryAdaptationInstructions(phaseKind: string): string {
+  const shared = [
+    "Auditoria de entregabilidade obrigatória: identifique o artefato final, quem o consome e o caminho real de acesso pela UI, rota, ação ou download do Painel Alpha.",
+    "Inspecione o projeto e não presuma que visualizador, rota, exportação, botão ou integração já existem. Um arquivo solto não é uma entrega utilizável quando o objetivo exige consumo dentro do sistema.",
+    "Quando faltar capacidade de entrega, use exatamente AUTO_ADJUSTMENT_REQUIRED: <lacuna verificável> e AUTO_ADJUSTMENT_ACCEPTANCE: <como validar>. Quando estiver pronta, use DELIVERY_READY: <caminho validado>.",
+  ];
+  if (phaseKind === "CONTEXT") {
+    shared.push(
+      "Nesta fase somente leitura, faça a auditoria no código real. Se encontrar lacuna, conclua a investigação com RESULT: PASS e os sinais AUTO_ADJUSTMENT_REQUIRED; a implementação seguinte receberá isso automaticamente.",
+    );
+  } else if (phaseKind === "EXECUTION") {
+    shared.push(
+      "Se as fases anteriores sinalizaram AUTO_ADJUSTMENT_REQUIRED, isso amplia automaticamente esta fase somente até o suporte mínimo necessário para tornar a entrega consumível. Implemente esse suporte antes do resultado principal e valide a integração.",
+      "Se esta fase for somente leitura e descobrir uma lacuna ainda não sinalizada, responda RESULT: BLOCKED junto de AUTO_ADJUSTMENT_REQUIRED para que o worker a reprograme com um agente executor.",
+    );
+  } else if (phaseKind === "VERIFICATION") {
+    shared.push(
+      "Verifique o consumo ponta a ponta. Reprove com AUTO_ADJUSTMENT_REQUIRED se o artefato existir, mas o usuário não conseguir acessá-lo pela forma de entrega prometida.",
+    );
+  } else if (phaseKind === "CLOSURE") {
+    shared.push(
+      "Registre no relatório final a lacuna encontrada, o autoajuste aplicado e o caminho final de acesso validado.",
+    );
+  }
+  return shared.join("\n");
+}
+
 export async function diagnoseProductionProviders(): Promise<
   ProviderDiagnostic[]
 > {
@@ -207,6 +240,7 @@ export async function runProductionAgent(
     "Seja econômico: investigue somente o necessário e conclua em até 10 rodadas de tools.",
     "Não faça commit, push, reset, checkout, migration, alteração de schema ou operação destrutiva.",
     "Pedidos de PR, commit ou screenshot anexado são opcionais e não bloqueiam a implementação local; registre-os como pendência manual.",
+    deliveryAdaptationInstructions(input.phaseKind),
     input.allowWrite
       ? config.provider === "ollama"
         ? "Você pode editar somente pelos tools create_file/replace_in_file."

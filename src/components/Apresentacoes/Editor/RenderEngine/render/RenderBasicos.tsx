@@ -11,6 +11,7 @@ import type {
   IconeComponente,
   DivisorComponente,
   FormaComponente,
+  MolduraComponente,
 } from "@/lib/validations/slide-componentes";
 import { pilhaCssDaFonte } from "@/lib/apresentacoes/pptx/texto";
 import { FORMAS_CATALOGO } from "@/lib/apresentacoes/formas-catalogo";
@@ -190,7 +191,7 @@ export function TextoAnimado({ componente, modo = "apresentacao" }: { componente
   return ehTyping || ehCounter ? conteudo : <AnimacaoWrapper animacao={anim}>{conteudo}</AnimacaoWrapper>;
 }
 
-function RenderImagemConteudo({ componente }: { componente: ImagemComponente }) {
+export function RenderImagem({ componente }: { componente: ImagemComponente }) {
   if (componente.tile && componente.url) {
     return <div role="img" aria-label={componente.alt ?? ""} style={{ width: "100%", height: "100%", backgroundImage: `url(${JSON.stringify(componente.url)})`, backgroundRepeat: "repeat" }} />;
   }
@@ -227,30 +228,6 @@ function RenderImagemConteudo({ componente }: { componente: ImagemComponente }) 
     />
   ) : (
     <div className="flex h-full w-full items-center justify-center bg-slate-800/50 text-slate-600 text-xs">Sem imagem</div>
-  );
-}
-
-/** Moldura (catálogo em `molduras-catalogo.ts`) recorta a imagem inteira via clip-path SVG,
- * envolvendo qualquer um dos 3 ramos de render (tile/crop/normal) sem duplicar a lógica deles. */
-export function RenderImagem({ componente }: { componente: ImagemComponente }) {
-  const moldura = componente.moldura;
-  const entrada = moldura ? MOLDURAS_CATALOGO[moldura] : undefined;
-  if (!entrada?.clipPathD) return <RenderImagemConteudo componente={componente} />;
-
-  const clipId = `moldura-${componente.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
-        <defs>
-          <clipPath id={clipId} clipPathUnits="objectBoundingBox" transform="scale(0.01 0.01)">
-            <path d={entrada.clipPathD} />
-          </clipPath>
-        </defs>
-      </svg>
-      <div style={{ width: "100%", height: "100%", clipPath: `url(#${clipId})` }}>
-        <RenderImagemConteudo componente={componente} />
-      </div>
-    </div>
   );
 }
 
@@ -362,5 +339,55 @@ export function RenderForma({ componente }: { componente: FormaComponente }) {
         <path d={entrada.d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" />
       )}
     </svg>
+  );
+}
+
+/** Moldura decorativa — elemento independente (arrastável/redimensionável/rotacionável como
+ * qualquer forma), desenha a ilustração por cima de qualquer coisa que esteja embaixo no slide
+ * — nunca recorta nem esconde o conteúdo, é puramente decorativo (como uma moldura de quadro
+ * física colocada sobre uma foto). Catálogo em `molduras-catalogo.ts`, mesmo compartilhado pela
+ * moldura do SLIDE inteiro.
+ *
+ * `corFiltro` recolore sem reescrever o SVG: uma camada sólida da cor escolhida por cima do
+ * desenho original, com `mix-blend-mode: color` — substitui matiz/saturação preservando a
+ * luminância (sombreado/relevo) do desenho, resultado previsível para qualquer hex (diferente
+ * de aproximar via `filter` CSS, que não bate com a cor pedida de forma confiável). A camada de
+ * cor é recortada pela silhueta do próprio SVG via `mask`, então não pinta um retângulo sólido.
+ */
+export function RenderMoldura({ componente }: { componente: MolduraComponente }) {
+  const entrada = MOLDURAS_CATALOGO[componente.variante];
+  if (!entrada.src) return null;
+
+  const imagem = (
+    // eslint-disable-next-line @next/next/no-img-element -- RenderEngine é genérico (também roda no Export estático/player offline), sem acesso garantido ao otimizador do next/image
+    <img
+      src={entrada.src}
+      alt=""
+      draggable={false}
+      style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none", objectFit: "fill" }}
+    />
+  );
+
+  if (!componente.corFiltro) return imagem;
+
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      {imagem}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: componente.corFiltro,
+          mixBlendMode: "color",
+          WebkitMaskImage: `url(${JSON.stringify(entrada.src)})`,
+          maskImage: `url(${JSON.stringify(entrada.src)})`,
+          WebkitMaskSize: "100% 100%",
+          maskSize: "100% 100%",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+        }}
+      />
+    </div>
   );
 }

@@ -9,6 +9,7 @@ import { GridProps } from "./camposPorTipo/GridProps";
 import { IconeProps } from "./camposPorTipo/IconeProps";
 import { DivisorProps } from "./camposPorTipo/DivisorProps";
 import { FormaProps } from "./camposPorTipo/FormaProps";
+import { MolduraProps } from "./camposPorTipo/MolduraProps";
 import { GloboProps } from "./camposPorTipo/GloboProps";
 import { ParticulasProps } from "./camposPorTipo/ParticulasProps";
 import { ObjetoGlbProps } from "./camposPorTipo/ObjetoGlbProps";
@@ -243,6 +244,7 @@ export function PainelPropriedades() {
       {componente.tipo === "icone" && <IconeProps componente={componente} onChange={onChange} />}
       {componente.tipo === "divisor" && <DivisorProps componente={componente} onChange={onChange} />}
       {componente.tipo === "forma" && <FormaProps componente={componente} onChange={onChange} />}
+      {componente.tipo === "moldura" && <MolduraProps componente={componente} onChange={onChange} />}
       {componente.tipo === "globo" && <GloboProps componente={componente} onChange={onChange} />}
       {componente.tipo === "particulas" && <ParticulasProps componente={componente} onChange={onChange} />}
       {componente.tipo === "objeto3d" && <ObjetoGlbProps componente={componente} onChange={onChange} />}

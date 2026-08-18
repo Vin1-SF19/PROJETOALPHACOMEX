@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { RenderComponenteAnimado } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
 import { EfeitosGlobaisSlide } from "@/components/Apresentacoes/Editor/RenderEngine/EfeitosGlobaisSlide";
+import { MolduraSlideOverlay } from "@/components/Apresentacoes/Editor/RenderEngine/MolduraSlideOverlay";
 import { filtroCss, stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
 import { calcularEscalaApresentacao } from "@/lib/apresentacoes/viewport";
 import { TransicaoSlide } from "@/components/Apresentacoes/ModoApresentacao/TransicaoSlide";
@@ -218,6 +219,7 @@ export function PlayerStandalone({ dados }: { dados: DadosApresentacaoExportada 
                   </div>
                 )}
               </EfeitosGlobaisSlide>
+              <MolduraSlideOverlay canvas={slideAtual.canvas} />
             </div>
           </div>
         </TransicaoSlide>

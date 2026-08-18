@@ -18,6 +18,7 @@ import {
   isImplementationPhase,
   phaseRequiresWrite,
   recoverCorrectableFailures,
+  resolveDeliveryAdjustmentAgent,
   scheduleAutomaticRecovery,
   selectNextProductionExecution,
   shouldFallbackDevelopmentProvider,
@@ -38,6 +39,23 @@ afterEach(async () => {
 });
 
 describe("estado local de Produção", () => {
+  it("promove uma fase read-only quando o diagnóstico encontra lacuna de entrega", () => {
+    expect(
+      resolveDeliveryAdjustmentAgent(
+        {
+          kind: "EXECUTION",
+          requestedAgent: "scout",
+          resolvedAgent: "scout",
+          title: "Preparar diagnóstico em Markdown",
+        },
+        [
+          "AUTO_ADJUSTMENT_REQUIRED: não existe visualizador para o diagnóstico",
+        ],
+        "Integrar o resultado à interface do sistema.",
+      ),
+    ).toBe("nova");
+  });
+
   it("prioriza Claude e troca somente em falhas de disponibilidade", () => {
     expect(developmentProviderOrder("claude")).toEqual(["claude", "codex"]);
     expect(developmentProviderOrder("codex")).toEqual(["codex", "claude"]);
@@ -132,6 +150,7 @@ describe("estado local de Produção", () => {
       objectiveCode: "RM-TEST",
       objectiveTitle: "Teste",
       moduleKey: "crm",
+      developmentProvider: "claude" as const,
       sourceVersion: 2,
       globalPriority: 1,
       status: "PENDING" as const,
@@ -218,6 +237,7 @@ describe("estado local de Produção", () => {
       objectiveCode: "RM-TEST",
       objectiveTitle: "Teste",
       moduleKey: "crm",
+      developmentProvider: "claude" as const,
       sourceVersion: 7,
       globalPriority: 1,
       status: "SUCCEEDED" as const,
@@ -289,6 +309,7 @@ describe("estado local de Produção", () => {
       objectiveCode: "RM-TEST",
       objectiveTitle: "Teste",
       moduleKey: "crm",
+      developmentProvider: "claude" as const,
       globalPriority: 1,
       createdAt: timestamp,
       startedAt: null,
@@ -321,6 +342,90 @@ describe("estado local de Produção", () => {
     ).toBe("objective:v3");
   });
 
+  it("mantém o objetivo iniciado como exclusivo durante a autocorreção", () => {
+    const timestamp = new Date().toISOString();
+    const future = new Date(Date.now() + 60_000).toISOString();
+    const phase = {
+      phaseNumber: 1,
+      title: "Implementar",
+      kind: "EXECUTION",
+      requestedAgent: "dev",
+      resolvedAgent: "nova",
+      status: "PENDING" as const,
+      attemptCount: 1,
+      autoRetryCount: 1,
+      retryAt: future,
+      startedAt: timestamp,
+      finishedAt: null,
+      summary: "Aguardando autocorreção",
+      errorCode: "NO_CHANGES_APPLIED",
+      changedFiles: [],
+      reworkCount: 0,
+      manualFeedback: [],
+      activities: [],
+    };
+    const base = {
+      objectiveId: "objective",
+      objectiveCode: "RM-TEST",
+      objectiveTitle: "Teste",
+      moduleKey: "crm",
+      developmentProvider: "claude" as const,
+      sourceVersion: 1,
+      createdAt: timestamp,
+      finishedAt: null,
+      completionReportPath: null,
+      completionReportMarkdown: null,
+      reworkCount: 0,
+      manualFeedback: [],
+    };
+    const active = {
+      ...base,
+      id: "objective:v1",
+      globalPriority: 1,
+      status: "PENDING" as const,
+      startedAt: timestamp,
+      phases: [phase],
+    };
+    const next = {
+      ...base,
+      id: "objective-2:v1",
+      objectiveId: "objective-2",
+      globalPriority: 2,
+      status: "PENDING" as const,
+      startedAt: null,
+      phases: [{ ...phase, retryAt: null, startedAt: null }],
+    };
+    const state = {
+      version: 1 as const,
+      updatedAt: timestamp,
+      ignoredExecutionIds: [],
+      executions: [active, next],
+    };
+
+    expect(selectNextProductionExecution(state)).toBeUndefined();
+    const readyActive = {
+      ...active,
+      phases: [{ ...phase, retryAt: null }],
+    };
+    expect(
+      selectNextProductionExecution({
+        ...state,
+        executions: [readyActive, next],
+      })?.id,
+    ).toBe(active.id);
+    const runningActive = {
+      ...active,
+      status: "RUNNING" as const,
+      phases: [{ ...phase, status: "RUNNING" as const, retryAt: null }],
+    };
+    expect(
+      selectNextProductionExecution({
+        ...state,
+        executions: [runningActive, next],
+      }),
+    ).toBeUndefined();
+  });
+
   it("recoloca somente a fase falha na fila quando recebe retry", async () => {
     const project = await root();
     const timestamp = new Date().toISOString();
@@ -330,6 +435,7 @@ describe("estado local de Produção", () => {
       objectiveCode: "RM-TEST",
       objectiveTitle: "Teste",
       moduleKey: "crm",
+      developmentProvider: "claude" as const,
       sourceVersion: 3,
       globalPriority: 1,
       status: "FAILED" as const,
@@ -405,6 +511,7 @@ describe("estado local de Produção", () => {
       objectiveCode: "RM-TEST",
       objectiveTitle: "Teste",
       moduleKey: "crm",
+      developmentProvider: "claude" as const,
       sourceVersion: 4,
       globalPriority: 1,
       status: "RUNNING" as const,
@@ -478,6 +585,7 @@ describe("estado local de Produção", () => {
       objectiveCode: "RM-TEST",
       objectiveTitle: "Teste",
       moduleKey: "crm",
+      developmentProvider: "claude" as const,
       sourceVersion: 5,
       globalPriority: 1,
       status: "BLOCKED" as const,
@@ -532,6 +640,7 @@ describe("estado local de Produção", () => {
       objectiveCode: "RM-TEST",
       objectiveTitle: "Teste",
       moduleKey: "crm",
+      developmentProvider: "claude" as const,
       sourceVersion: 6,
       globalPriority: 1,
       status: "BLOCKED" as const,

@@ -1,5 +1,17 @@
 # Changelog
 
+## [crm] 2026-08-17 – RM-2026-57E057
+
+### Changed
+- Cards dos pipelines agora utilizam o componente `GradientBlobCard` (`src/components/ui/gradient-blob-card.tsx`) com gradiente animado (blob pink/red/yellow), sombras de flutuação (neumórfica dupla, dark mode) e altura compacta.
+
+### Added
+- `GradientBlobCard` em `src/components/ui/gradient-blob-card.tsx`, documentado em `docs/components/gradient-blob-card.md`.
+- Keyframes globais `@keyframes blob` / `.animate-blob` em `src/app/globals.css` (evita `<style>` duplicada por card).
+
+### Fixed
+- Restaurada a cor de status pós-fechamento (`statusConfig?.cardClassName`) e a accent bar de hover (`group-hover:w-1.5`) do `KanbanCard`, perdidas na integração inicial do `GradientBlobCard`.
+
 ## [Alpha CRM] – RM-2026-C4A90D
 
 ### Added

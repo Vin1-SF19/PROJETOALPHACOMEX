@@ -29,6 +29,13 @@
 **Uso:** `<FlowButton icon={LayoutDashboard} label="Dashboard" href="/..." active={isActive} accent={accent} onClick={() => setOpen(false)} />`
 **Notas:** Criado em 2026-08-17 (RM-2026-4F34CC) para a sidebar do Alpha CRM. Transições 700ms `cubic-bezier(0.22,1,0.36,1)`. Hover: borda transparente→preenchida, texto muda de cor, seta decorativa desliza, ponto decorativo escala. Active: `scale-[0.97]`. Item ativo: fundo/borda/texto na cor do accent (via `style` inline). Renderiza `<Link>` quando `href` presente, `<button>` caso contrário. `aria-current="page"` quando ativo. Área de toque 44px (`px-4 py-3`).
 
+### GradientBlobCard
+**Arquivo:** `src/components/ui/gradient-blob-card.tsx`
+**Tipo:** Client Component
+**Props:** `children?`, `className?`, `surfaceClassName?`, `accent?` (RGB cru; default `"37, 99, 235"`)
+**Uso:** `<GradientBlobCard accent={accent} surfaceClassName={statusConfig?.cardClassName}>{conteudo}</GradientBlobCard>`
+**Notas:** Shell visual do `KanbanCard` do Alpha CRM. Desde RM-2026-5284A1 usa fundo cinza `slate-800/95`, borda Alpha azul de 1 px, sem glow, hover `scale(1.02)`/150 ms e faixa semântica interna de 3 px sem gap. O nome foi preservado por compatibilidade.
+
 ### ControleOpacidade (Alpha Motion)
 **Arquivo:** `src/components/Apresentacoes/Editor/PainelDireito/ControleOpacidade.tsx`
 **Tipo:** Client-compatible presentational component

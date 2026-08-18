@@ -60,36 +60,36 @@ Pipelines têm largura proporcional responsiva (não crescem com o conteúdo):
 Gap entre colunas: `gap-3` (12px). Capacidade: ≥ 4 colunas em 1280px, ≥ 6 em 1920px.
 
 Altura: pipelines ocupam 100% da área visível (`h-full` + `flex-1` + `min-h-0`).
-Cards mantêm `min-h-[200px]` / `max-h-[600px]` + rolagem interna no
-`CrmPipelineBorder` inner content (`overflow-y-auto`). Margem inferior do
-contêiner: `pb-[clamp(8px,2vh,24px)]` (responsiva, não fixa em px).
+Cards usam altura determinada pelo conteúdo, sem `min-h` fixo no shell visual.
+Margem inferior do contêiner: `pb-[clamp(8px,2vh,24px)]` (responsiva, não
+fixa em px).
 
-Contenção da linha de destaque: card usa `overflow-hidden`; a accent bar
-(`absolute inset-y-0 left-0 w-1`) e a `border-red-500/70` ficam contidas nos
-limites do card. Sombra dupla de profundidade com elevação no hover (300ms).
+Contenção da linha de destaque: o shell usa `overflow-hidden`; a faixa semântica
+de 3 px fica integrada à borda esquerda, sem margem ou gap. O card não usa glow
+ou sombra decorativa e aplica somente `scale(1.02)` no hover (150 ms).
 
 Ver `docs/components/pipeline.md` para detalhes.
 
-### Estilização de Cards (RM-2026-57E057, 2026-08-17)
+### Estilização de Cards (RM-2026-5284A1, 2026-08-18)
 
 O shell visual dos cards do pipeline (`KanbanCard`, em
 `pipeline/[pipelineId]/PipelineBoardClient.tsx`) usa o componente
 `GradientBlobCard`:
 
 - **Localização:** `src/components/ui/gradient-blob-card.tsx`
-- **Import:** `import GradientBlobCard from "@/components/ui/gradient-blob-card";`
-- **Props:** `children` (`React.ReactNode`), `className` (`string`, opcional).
-- **Visual:** gradiente animado (blob) pink/red/yellow, sombra dupla
-  neumófica com efeito de flutuação, fundo glassy (`backdrop-blur`) e altura
-  compacta (definida pelo conteúdo, sem `min-h` fixo no shell).
-- **Dark mode e responsividade:** cores adaptadas via `dark:`, contido por
-  `overflow-hidden`; funciona nos breakpoints já existentes do grid de
-  pipelines (ver seção acima).
+- **Import:** `import { GradientBlobCard } from "@/components/ui/gradient-blob-card";`
+- **Props:** `children`, `className`, `surfaceClassName` e `accent`.
+- **Visual:** fundo cinza `slate-800/95`, borda Alpha azul de 1 px, sem glow,
+  hover `scale(1.02)` em 150 ms e faixa lateral interna de 3 px.
+- **Tema e status:** `accent` mantém a cor semântica da faixa; `surfaceClassName`
+  preserva o tint de status pós-fechamento sem substituir a borda Alpha.
+- **Acessibilidade:** camadas decorativas são ocultas da árvore acessível e a
+  escala é desativada em `prefers-reduced-motion`.
 
 ```tsx
-import GradientBlobCard from "@/components/ui/gradient-blob-card";
+import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 
-<GradientBlobCard>
+<GradientBlobCard accent={accent} surfaceClassName={statusConfig?.cardClassName}>
   <div>{/* conteúdo do card */}</div>
 </GradientBlobCard>
 ```

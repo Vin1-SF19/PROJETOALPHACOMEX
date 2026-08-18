@@ -3,8 +3,6 @@ import { FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ImagemComponente } from "@/lib/validations/slide-componentes";
 import { enviarArquivoAsset, validarArquivoAsset } from "@/lib/apresentacoes/assets";
-import { MOLDURAS_CATALOGO } from "@/lib/apresentacoes/molduras-catalogo";
-import { MOLDURA_IMAGEM_TIPOS } from "@/lib/validations/slide-componentes-basicos";
 import { useEditorStore } from "../../store/useEditorStore";
 
 export function ImagemProps({ componente, onChange }: { componente: ImagemComponente; onChange: (patch: Partial<ImagemComponente>) => void }) {
@@ -77,18 +75,6 @@ export function ImagemProps({ componente, onChange }: { componente: ImagemCompon
         >
           <option value="cover">Preencher (cover)</option>
           <option value="contain">Ajustar (contain)</option>
-        </select>
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-[11px] text-slate-400">Moldura</label>
-        <select
-          value={componente.moldura ?? "nenhuma"}
-          onChange={(e) => onChange({ moldura: e.target.value as ImagemComponente["moldura"] })}
-          className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-        >
-          {MOLDURA_IMAGEM_TIPOS.map((tipo) => (
-            <option key={tipo} value={tipo}>{MOLDURAS_CATALOGO[tipo].label}</option>
-          ))}
         </select>
       </div>
     </>

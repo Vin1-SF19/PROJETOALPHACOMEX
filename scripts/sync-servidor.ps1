@@ -2,8 +2,8 @@
 # bare repo em \\ALPHACOMEX\desenvolvimento\PainelAlpha.git). Roda via Task Scheduler
 # toda segunda e sexta. NAO mexe no remote "origin" (GitHub) — push la continua manual.
 #
-# Se nao houver nada para commitar, o autocommit e pulado e so o push roda (idempotente
-# quando o servidor ja esta em dia).
+# O commit e sempre manual. A tarefa apenas envia ao servidor commits que ja
+# tenham sido revisados e criados pelo administrador.
 
 $projectPath = "C:\Users\TI\Desktop\PainelAlpha"
 $logDir = "C:\Users\TI\Desktop\PainelAlpha\.sync-logs"
@@ -27,21 +27,12 @@ if ($branch -ne "main") {
     exit 1
 }
 
-# --untracked-files=all --ignore-submodules ignora o estado "dirty" de submodules
-# (ex: bibblesquad), que nao e commitavel via `git add -A` normal e nao deve
-# disparar autocommit.
+# Alteracoes locais nunca sao adicionadas nem commitadas por esta tarefa.
 $status = git status --porcelain --ignore-submodules
 if ($status) {
-    Log "Alteracoes pendentes detectadas, criando autocommit..."
-    git add -A
-    git commit -m "chore: sync automatico [$(Get-Date -Format 'yyyy-MM-dd HH:mm')]" | ForEach-Object { Log $_ }
-    if ($LASTEXITCODE -ne 0) {
-        Log "ERRO: git commit retornou codigo $LASTEXITCODE"
-        exit 1
-    }
-    Log "Commit criado."
+    Log "Alteracoes pendentes detectadas. Mantendo working tree intacto para revisao e commit manual."
 } else {
-    Log "Nenhuma alteracao pendente. Pulando commit."
+    Log "Working tree sem alteracoes pendentes."
 }
 
 Log "Enviando para o remote 'servidor'..."

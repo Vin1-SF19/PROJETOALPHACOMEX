@@ -11,7 +11,7 @@ import { GloboRender } from "./GloboRender";
 import { ParticulasRender } from "./ParticulasRender";
 import { ObjetoGlbRender } from "./ObjetoGlbRender";
 import { ContainerCargaRender } from "./ContainerCargaRender";
-import { TextoAnimado, RenderImagem, RenderVideo, RenderAudio, RenderBotao, RenderIcone, RenderDivisor, RenderForma } from "./render/RenderBasicos";
+import { TextoAnimado, RenderImagem, RenderVideo, RenderAudio, RenderBotao, RenderIcone, RenderDivisor, RenderForma, RenderMoldura } from "./render/RenderBasicos";
 import {
   RenderGrafico,
   RenderTabela,
@@ -190,6 +190,13 @@ export function RenderComponente({
       return (
         <AnimacaoWrapper animacao={anim}>
           <RenderForma componente={componente} />
+        </AnimacaoWrapper>
+      );
+
+    case "moldura":
+      return (
+        <AnimacaoWrapper animacao={anim}>
+          <RenderMoldura componente={componente} />
         </AnimacaoWrapper>
       );
 

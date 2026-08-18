@@ -9,6 +9,7 @@ import {
   iconeComponenteSchema,
   divisorComponenteSchema,
   formaComponenteSchema,
+  molduraComponenteSchema,
 } from "./slide-componentes-basicos";
 import {
   globoComponenteSchema,
@@ -46,6 +47,7 @@ export {
   iconeComponenteSchema,
   divisorComponenteSchema,
   formaComponenteSchema,
+  molduraComponenteSchema,
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
@@ -131,6 +133,7 @@ export const componenteSchema: z.ZodType<ComponenteSlide> = z.discriminatedUnion
   iconeComponenteSchema,
   divisorComponenteSchema,
   formaComponenteSchema,
+  molduraComponenteSchema,
   globoComponenteSchema,
   particulasComponenteSchema,
   objeto3dComponenteSchema,
@@ -191,6 +194,7 @@ export type BotaoComponente = z.infer<typeof botaoComponenteSchema>;
 export type IconeComponente = z.infer<typeof iconeComponenteSchema>;
 export type DivisorComponente = z.infer<typeof divisorComponenteSchema>;
 export type FormaComponente = z.infer<typeof formaComponenteSchema>;
+export type MolduraComponente = z.infer<typeof molduraComponenteSchema>;
 export type GloboComponente = z.infer<typeof globoComponenteSchema>;
 export type ParticulasComponente = z.infer<typeof particulasComponenteSchema>;
 export type Objeto3dComponente = z.infer<typeof objeto3dComponenteSchema>;
@@ -247,6 +251,7 @@ export type ComponenteSlide =
   | IconeComponente
   | DivisorComponente
   | FormaComponente
+  | MolduraComponente
   | GloboComponente
   | ParticulasComponente
   | Objeto3dComponente

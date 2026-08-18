@@ -10,7 +10,9 @@ import type {
   ProductionState,
 } from "@/lib/roadmap-production/contracts";
 import { writeCompletionReport } from "@/lib/roadmap-production/completion-report";
+import { acquireProductionExecutionLease } from "@/lib/roadmap-production/execution-lock";
 import {
+  requiresDeliveryAdjustment,
   runProductionAgent,
   type ProductionAgentInput,
   type ProductionAgentResult,
@@ -124,6 +126,28 @@ export function phaseRequiresWrite(
     return false;
   return /\b(criar|atualizar|editar|registrar|documentar|escrever)\b/i.test(
     `${phase.title}\n${markdown}`,
+  );
+}
+
+export function resolveDeliveryAdjustmentAgent(
+  phase: Pick<
+    ProductionExecution["phases"][number],
+    "kind" | "requestedAgent" | "resolvedAgent" | "title"
+  >,
+  summaries: string[],
+  markdown = "",
+): string | null {
+  if (
+    phase.kind !== "EXECUTION" ||
+    isImplementationPhase(phase) ||
+    !requiresDeliveryAdjustment(summaries)
+  ) {
+    return null;
+  }
+  return resolvePhaseAgent(
+    "dev",
+    phase.title,
+    `${markdown}\n${summaries.join("\n")}`,
   );
 }
 
@@ -310,6 +334,16 @@ export async function syncProductionExecutions(): Promise<ProductionState> {
   return state;
 }
 
+export async function refreshProductionExecutions(): Promise<ProductionState> {
+  const lease = await acquireProductionExecutionLease();
+  if (!lease) return readProductionState();
+  try {
+    return await syncProductionExecutions();
+  } finally {
+    await lease.release();
+  }
+}
+
 export async function applyProductionControls(
   root = process.cwd(),
 ): Promise<number> {
@@ -404,6 +438,17 @@ export function selectNextProductionExecution(
   state: ProductionState,
 ): ProductionExecution | undefined {
   const referenceTime = Date.now();
+  const activeExecution = state.executions.find(
+    (execution) =>
+      execution.startedAt !== null &&
+      execution.finishedAt === null &&
+      ["PENDING", "RUNNING"].includes(execution.status),
+  );
+  if (activeExecution) {
+    return nextReadyPhase(activeExecution, referenceTime)
+      ? activeExecution
+      : undefined;
+  }
   return state.executions.find(
     (execution) =>
       ["PENDING", "RUNNING"].includes(execution.status) &&
@@ -456,7 +501,7 @@ async function addActivity(
   });
 }
 
-export async function recoverInterruptedProduction(): Promise<number> {
+async function recoverInterruptedProductionUnlocked(): Promise<number> {
   const state = await readProductionState();
   let recovered = 0;
   for (const execution of state.executions) {
@@ -479,7 +524,17 @@ export async function recoverInterruptedProduction(): Promise<number> {
   return recovered;
 }
 
-export async function retryProductionExecution(
+export async function recoverInterruptedProduction(): Promise<number> {
+  const lease = await acquireProductionExecutionLease();
+  if (!lease) return 0;
+  try {
+    return await recoverInterruptedProductionUnlocked();
+  } finally {
+    await lease.release();
+  }
+}
+
+async function retryProductionExecutionUnlocked(
   id: string,
   adoptedChanges: string[] = [],
 ): Promise<void> {
@@ -514,6 +569,19 @@ export async function retryProductionExecution(
     execution.status = "PENDING";
     execution.finishedAt = null;
   });
+}
+
+export async function retryProductionExecution(
+  id: string,
+  adoptedChanges: string[] = [],
+): Promise<void> {
+  const lease = await acquireProductionExecutionLease();
+  if (!lease) throw new Error("PRODUCTION_EXECUTION_BUSY");
+  try {
+    await retryProductionExecutionUnlocked(id, adoptedChanges);
+  } finally {
+    await lease.release();
+  }
 }
 
 interface FailedAgentResult {
@@ -629,7 +697,7 @@ export function recoverCorrectableFailures(
   return recovered;
 }
 
-export async function processNextProductionPhase() {
+async function processNextProductionPhaseUnlocked() {
   await applyProductionControls();
   const config = await readProductionConfig();
   if (!config.autoRun)
@@ -709,6 +777,25 @@ export async function processNextProductionPhase() {
   const artifact = objective.promptArtifacts[0];
   if (!artifact) throw new Error("PRODUCTION_PHASE_ARTIFACT_MISSING");
 
+  const successfulSummaries = execution.phases
+    .filter((item) => item.status === "SUCCEEDED" && item.summary)
+    .map((item) => item.summary!);
+  const deliveryAdjustmentAgent = resolveDeliveryAdjustmentAgent(
+    phase,
+    successfulSummaries,
+    artifact.contentMarkdown,
+  );
+  if (deliveryAdjustmentAgent) {
+    const previousAgent = phase.resolvedAgent;
+    phase.resolvedAgent = deliveryAdjustmentAgent;
+    appendActivity(phase, {
+      at: now(),
+      agentId: phase.resolvedAgent,
+      type: "STATUS",
+      message: `Autoajuste de entrega: fase promovida de ${previousAgent} para ${phase.resolvedAgent}.`,
+    });
+  }
+
   phase.status = "RUNNING";
   phase.attemptCount += 1;
   phase.startedAt = now();
@@ -724,14 +811,24 @@ export async function processNextProductionPhase() {
   execution.status = "RUNNING";
   execution.startedAt ??= now();
   await writeProductionState(state);
-  await db.roadmapObjective.updateMany({
-    where: {
-      id: execution.objectiveId,
-      sourceVersion: execution.sourceVersion,
-      archivedAt: null,
-    },
-    data: { status: "IN_DEVELOPMENT" },
-  });
+  await db.$transaction([
+    db.roadmapObjective.updateMany({
+      where: {
+        id: { not: execution.objectiveId },
+        archivedAt: null,
+        status: "IN_DEVELOPMENT",
+      },
+      data: { status: "ACTIVE" },
+    }),
+    db.roadmapObjective.updateMany({
+      where: {
+        id: execution.objectiveId,
+        sourceVersion: execution.sourceVersion,
+        archivedAt: null,
+      },
+      data: { status: "IN_DEVELOPMENT" },
+    }),
+  ]);
 
   const requiresWrite = phaseRequiresWrite(phase, artifact.contentMarkdown);
   const pendingManualFeedback = execution.manualFeedback.filter(
@@ -748,9 +845,7 @@ export async function processNextProductionPhase() {
     phaseMarkdown: artifact.contentMarkdown,
     manualFeedback: pendingManualFeedback.map((feedback) => feedback.content),
     previousSummaries: [
-      ...execution.phases
-        .filter((item) => item.status === "SUCCEEDED" && item.summary)
-        .map((item) => item.summary!),
+      ...successfulSummaries,
       ...(phase.attemptCount > 1 && phase.summary
         ? [
             `Resumo da tentativa anterior desta fase — use-o para agir sem repetir a investigação:\n${phase.summary}`,
@@ -793,11 +888,35 @@ export async function processNextProductionPhase() {
         : `Fase interrompida: ${result.errorCode ?? "AGENT_FAILED"}`,
     });
     if (!result.success) {
-      const recovery = scheduleAutomaticRecovery(
-        current,
-        currentPhase.phaseNumber,
-        result,
+      let recovery: "IMPLEMENTATION_FEEDBACK" | "SAME_PHASE" | null;
+      const retryAgent = resolveDeliveryAdjustmentAgent(
+        currentPhase,
+        [result.summary],
+        artifact.contentMarkdown,
       );
+      if (retryAgent && currentPhase.autoRetryCount < AUTO_RETRY_LIMIT) {
+        const previousAgent = currentPhase.resolvedAgent;
+        currentPhase.resolvedAgent = retryAgent;
+        currentPhase.status = "PENDING";
+        currentPhase.autoRetryCount += 1;
+        currentPhase.retryAt = retryDate(now());
+        currentPhase.errorCode = "DELIVERY_AUTO_ADJUSTMENT";
+        appendActivity(currentPhase, {
+          at: now(),
+          agentId: currentPhase.resolvedAgent,
+          type: "STATUS",
+          message: `Lacuna de entrega detectada por ${previousAgent}; fase promovida automaticamente para ${currentPhase.resolvedAgent}.`,
+        });
+        current.status = "PENDING";
+        current.finishedAt = null;
+        recovery = "SAME_PHASE";
+      } else {
+        recovery = scheduleAutomaticRecovery(
+          current,
+          currentPhase.phaseNumber,
+          result,
+        );
+      }
       if (!recovery) {
         current.status =
           currentPhase.status === "BLOCKED" ? "BLOCKED" : "FAILED";
@@ -847,4 +966,20 @@ export async function processNextProductionPhase() {
     errorCode: result.errorCode,
     autoRetryScheduled: !result.success && updated.status === "PENDING",
   };
+}
+
+export async function processNextProductionPhase() {
+  const lease = await acquireProductionExecutionLease();
+  if (!lease) {
+    return {
+      processed: false as const,
+      healthy: true as const,
+      busy: true as const,
+    };
+  }
+  try {
+    return await processNextProductionPhaseUnlocked();
+  } finally {
+    await lease.release();
+  }
 }

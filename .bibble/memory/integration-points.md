@@ -103,6 +103,35 @@ Ao criar um novo módulo, verificar e registrar:
 
 ---
 
+### Molduras decorativas — Alpha Motion (2026-08-18)
+
+- **Módulo:** Alpha Presentation Studio (`/PainelAlpha/Apresentacoes/[id]/editor`), não é módulo próprio do PainelAlpha — não precisa do checklist de 3 arrays (`FormCadastro`/`Atalhos`/`PainelAlphaClient`).
+- **Fonte única da lista de variantes:** `MOLDURA_TIPOS`/`MOLDURA_VARIANTE_TIPOS` em `src/lib/validations/slide-componentes-basicos.ts` — usada tanto pelo elemento "moldura" independente quanto pela moldura do slide inteiro (`canvasConfigSchema`). Ao adicionar/remover uma moldura, sempre sincronizar com `MOLDURAS_CATALOGO` (`src/lib/apresentacoes/molduras-catalogo.ts`) e os arquivos físicos em `public/molduras/`. As 3 fontes (tipos, catálogo, arquivos) precisam bater 1:1 — Probe confirma isso rodando um script Node que cruza as chaves e faz `fs.existsSync` em cada `src`.
+- **Padrão "chave prefixada":** `REGISTRY_MOLDURAS` (`registry-molduras.ts`) usa chaves `moldura{Capitalize<variante>}` para não colidir com `REGISTRY_FORMAS` no `COMPONENTES_REGISTRY` combinado — mesmo padrão de `REGISTRY_FUNDOS`. Quem precisa da entrada a partir de um `ComponenteSlide` já montado usa `registryMolduraParaEstilo(variante)`, não indexa direto pela chave.
+- **Preview visual na sidebar:** `RegistryEntry.imagemPreview` (opcional, `registry-tipos.ts`) — quando presente, `ItemComponenteArrastavel.tsx` mostra a imagem real em vez do ícone Lucide. Populado em `registry-molduras.ts` a partir de `MOLDURAS_CATALOGO[variante].src`.
+- **Recoloração do ELEMENTO "moldura" (independente, arrastável):** overlay `mix-blend-mode: color` + CSS mask usando a própria imagem como máscara — implementado em `RenderMoldura` (`RenderBasicos.tsx`). Campo `corFiltro` (opcional, ausência preserva a cor original do arquivo). Funciona bem aqui porque o elemento cobre 100%×100% da própria caixa, sem distorção de proporção entre a imagem e a área.
+- **Moldura do SLIDE inteiro — via CSS `border-image` (não `<img>` esticada):** `MolduraSlideOverlay.tsx` + `src/lib/apresentacoes/moldura-estilo.ts` (`estiloBordaMoldura`). Corrigido em 2026-08-18 porque `objectFit: "fill"` distorcia o desenho inteiro para caber no retângulo 16:9 do slide, em vez de "envolver" as 4 bordas — `border-image` fatia a arte em 9 partes e cada lado estica só ao longo do seu próprio lado, preservando a moldura visualmente coerente independente da proporção do slide. **Sem cor customizável neste caso** (decisão consciente, ver comentário em `PainelPropriedadesSlide.tsx`): recolorir um `border-image` de forma confiável entre navegadores exige `mask-border`, sem suporte no Firefox — campo `corFiltroMoldura` foi removido do schema/store/UI.
+- **`border-width` em CSS não aceita `%`** (a spec exige comprimento absoluto) — `estiloBordaMoldura` recebe `larguraPx`/`alturaPx` do slide e calcula a espessura da borda em `px` a partir do menor lado (`Math.min(largura, altura) * 0.22`). Isso já causou um bug real (build silenciosamente ignorava a declaração `border-width: 22%` inteira) — se mexer nessa função, sempre validar com `getComputedStyle(el).borderTopWidth` no browser real antes de assumir que funcionou.
+- **Roteamento do painel direito:** `PainelPropriedades.tsx` — sem componente selecionado + slide ativo → `PainelPropriedadesSlide` (moldura do slide); componente tipo `"moldura"` selecionado → `MolduraProps` (moldura do elemento). Ambos usam a mesma `MOLDURA_TIPOS`/`MOLDURAS_CATALOGO`.
+- **Tecla Delete/Backspace:** `EditorKeyboardShortcuts.tsx`, guard `alvoPossuiHistoricoProprio` intercepta `input/textarea/select/[contenteditable]/[role=textbox]` antes de tratar a tecla como exclusão — a edição de texto inline do canvas usa `<textarea>` (`ComponenteNoCanvas.tsx`), então não há conflito.
+- **Fonte dos assets:** 100% CC0/domínio público (OpenClipart.org), baixados e otimizados com `svgo --multipass`. Licença documentada em `public/molduras/LICENCA.md`. Deliberadamente **não** usa Magnific/Freepik (banco comercial com atribuição obrigatória) — decisão explícita do usuário.
+- **Validação de "moldura vazada" (miolo transparente) não é confiável por inspeção de XML** (`fill:none` pode estar ausente mesmo em desenho vazado, ou presente em desenho fechado) — o teste que funcionou de verdade: renderizar o SVG num `<canvas>` real do browser e contar `alpha > 10` nos pixels da região central (35%–65% da imagem); moldura genuína dá ~0% de pixels pintados no centro. 11 molduras da leva CC0 original (`floco-neve-dourado`, `espiral-decorativa`, `floral-narciso`, `quadro-colorido`, `borda-retrato`, `borda-fina-60`, `moldura-quadro-simples`, `moldura-espelho`, `moldura-foto`, `moldura-quadro`, `foto-cantos-antigos`) eram na verdade ilustrações de objeto fechado (ex. "quadro pendurado na parede", mandala) sem buraco real — substituídas em 2026-08-18 por bordas genuinamente vazadas, mesmo nome de arquivo mantido (só o conteúdo SVG mudou, catálogo/schema não precisaram de alteração).
+- **Checklist de integração desta feature:**
+  - [x] Categoria "Molduras" em `CATEGORIAS_COMPONENTE`
+  - [x] Preview visual real na sidebar (não ícone genérico)
+  - [x] Drag-and-drop cria o componente (sem caso especial no `handleDragEnd`)
+  - [x] `RenderComponente.tsx` despacha `case "moldura"`
+  - [x] Painel de propriedades do elemento (`MolduraProps`) e do slide (`PainelPropriedadesSlide`)
+  - [x] Cor customizável no elemento (não no slide, ver nota acima)
+  - [x] Moldura do slide se adapta às 4 bordas via `border-image` (não distorce o desenho pro centro)
+  - [x] Todas as 82 molduras confirmadas com miolo vazado (medição de pixel, não só inspeção visual)
+  - [x] Tecla Delete/Backspace sem regressão em edição de texto
+  - [x] `tsc`/`eslint`/`next build` limpos
+- **Editado quando:** catálogo for expandido de novo, a técnica de `border-image` mudar, ou uma técnica de recoloração de `border-image` cross-browser for validada.
+- **Última atualização:** 2026-08-18 — border-image para a moldura do slide, 11 molduras substituídas por versões genuinamente vazadas (validado por medição de pixel).
+
+---
+
 ### Gestão de Comissões e Prêmios (2026-07-28)
 
 - **Rota:** `/PainelAlpha/Comissoes` (+ `/Simulador`, `/Divergencias`, `/Configuracoes`)

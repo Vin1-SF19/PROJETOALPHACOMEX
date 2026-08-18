@@ -6,6 +6,7 @@ const raiz = process.cwd();
 const ler = (arquivo: string) => readFileSync(resolve(raiz, arquivo), "utf8");
 
 const board = ler("src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx");
+const gradientBlobCard = ler("src/components/ui/gradient-blob-card.tsx");
 const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx");
 const historico = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
 const statusPosFechamento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx");
@@ -130,7 +131,14 @@ describe("CRM - wiring do modal por etapa", () => {
   it("mantem uma hierarquia visual acessivel no card do Kanban", () => {
     const kanbanCard = board.slice(board.indexOf("function KanbanCard"), board.indexOf("function KanbanColumn"));
     expect(kanbanCard).toContain("rounded-2xl");
-    expect(kanbanCard).toContain("group-hover:w-1.5");
+    expect(kanbanCard).toContain("accent={accent}");
+    expect(kanbanCard).toContain("surfaceClassName={statusConfig?.cardClassName}");
+    expect(gradientBlobCard).toContain("border border-blue-600 bg-slate-800/95 shadow-none");
+    expect(gradientBlobCard).toContain("hover:scale-[1.02]");
+    expect(gradientBlobCard).toContain("duration-150");
+    expect(gradientBlobCard).toContain("w-[3px]");
+    expect(gradientBlobCard).not.toContain("animate-blob");
+    expect(gradientBlobCard).not.toContain("dark:bg-black/50");
     expect(kanbanCard).toContain("const inicialEmpresa");
     expect(kanbanCard).toContain("<PhoneCall");
     expect(kanbanCard).toContain("<CalendarClock");

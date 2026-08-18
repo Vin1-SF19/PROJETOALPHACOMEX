@@ -4,6 +4,10 @@ import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 export interface RegistryEntry {
   label: string;
   icone: LucideIcon;
+  /** Quando presente, a sidebar (`ItemComponenteArrastavel.tsx`) mostra esta imagem em vez do
+   * ícone — usado pelas molduras/formas com arte própria, onde o usuário precisa VER a
+   * ilustração real (não um ícone genérico) para saber qual está escolhendo. */
+  imagemPreview?: string;
   criarComponentePadrao: (x: number, y: number) => ComponenteSlide;
 }
 

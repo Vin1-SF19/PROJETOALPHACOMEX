@@ -175,9 +175,13 @@ function executionStatusLabel(execution: ExecutionView): string {
 
 export function RoadmapProductionPanel({
   canManage,
+  moduleKey,
+  moduleLabel,
   onBack,
 }: {
   canManage: boolean;
+  moduleKey: string;
+  moduleLabel: string | null;
   onBack: () => void;
 }) {
   const [data, setData] = useState<ProductionData | null>(null);
@@ -194,28 +198,33 @@ export function RoadmapProductionPanel({
   );
   const polling = useRef(false);
 
-  const refresh = useCallback(async (includeCatalog = false) => {
-    if (polling.current || document.visibilityState === "hidden") return;
-    polling.current = true;
-    try {
-      const result = await ObterRoadmapProduction(includeCatalog);
-      if (!result.success) {
-        setError(result.error);
-        return;
+  const refresh = useCallback(
+    async (includeCatalog = false) => {
+      if (polling.current || document.visibilityState === "hidden") return;
+      polling.current = true;
+      try {
+        const result = await ObterRoadmapProduction(includeCatalog, moduleKey);
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        setData((current) => ({
+          config: result.config,
+          state: result.state,
+          agents: result.agents.length
+            ? result.agents
+            : (current?.agents ?? []),
+          providers: result.providers.length
+            ? result.providers
+            : (current?.providers ?? []),
+        }));
+        setError(null);
+      } finally {
+        polling.current = false;
       }
-      setData((current) => ({
-        config: result.config,
-        state: result.state,
-        agents: result.agents.length ? result.agents : (current?.agents ?? []),
-        providers: result.providers.length
-          ? result.providers
-          : (current?.providers ?? []),
-      }));
-      setError(null);
-    } finally {
-      polling.current = false;
-    }
-  }, []);
+    },
+    [moduleKey],
+  );
 
   useEffect(() => {
     void refresh(true);
@@ -326,7 +335,7 @@ export function RoadmapProductionPanel({
           <div>
             <h1 className="font-semibold">Produção local</h1>
             <p className="text-xs text-slate-400">
-              Bibble Squad executando o Roadmap no working tree
+              {moduleLabel ?? moduleKey} · objetivos deste projeto
             </p>
           </div>
         </div>
@@ -407,7 +416,7 @@ export function RoadmapProductionPanel({
           <div className="space-y-3">
             {!executions.length && (
               <p className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                Nenhum prompt aguardando produção.
+                Nenhum prompt de {moduleLabel ?? moduleKey} aguardando produção.
               </p>
             )}
             {executions.map((execution) => (
@@ -955,7 +964,8 @@ function SettingsDialog({
   const [maxToolSteps, setMaxToolSteps] = useState(data.config.maxToolSteps);
   const [pending, startTransition] = useTransition();
   const developmentProviders = data.providers.filter(
-    (item) => item.id !== "ollama",
+    (item): item is ProviderView & { id: "codex" | "claude" } =>
+      item.id !== "ollama",
   );
   const selectedProvider = data.providers.find((item) => item.id === provider);
   return (

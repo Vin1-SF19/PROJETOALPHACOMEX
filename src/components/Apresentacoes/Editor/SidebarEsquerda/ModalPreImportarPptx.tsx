@@ -302,7 +302,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   async function reprocessarTudo() {
     const originalUrl = originalUploadRef.current;
     const arquivoAtual = arquivoRef.current;
-    if (!originalUrl || !arquivoAtual || reprocessandoTodos || reprocessandoIndice !== null) return;
+    if (!originalUrl || !arquivoAtual || reprocessandoTodos || reprocessandoIndice !== null || confirmando) return;
     setReprocessandoTodos(true);
     const assetsAntigos = previewAssetsRef.current;
     try {
@@ -355,7 +355,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
   async function reprocessarSlide(indice: number) {
     const originalUrl = originalUploadRef.current;
     const arquivoAtual = arquivoRef.current;
-    if (!originalUrl || !arquivoAtual || reprocessandoTodos || reprocessandoIndice !== null) return;
+    if (!originalUrl || !arquivoAtual || reprocessandoTodos || reprocessandoIndice !== null || confirmando) return;
     setReprocessandoIndice(indice);
     try {
       const resposta = await fetch(`/api/apresentacoes/${apresentacaoId}/pptx-preview`, {
@@ -394,13 +394,20 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
       });
       toast.success(`Slide ${indice + 1} reprocessado.`);
 
-      // Assets do slide antigo (naquele índice) somem da tela — limpa junto com os assets dos
-      // OUTROS slides desta resposta completa que não foram usados (só o índice pedido importa).
-      const urlsSlideAntigo = coletarUrlsDeImagem(slideAntigo?.componentes ?? []);
-      await limparUploadsTemporarios(apresentacaoId, urlsSlideAntigo);
+      // Assets do slide antigo (naquele índice) somem da tela — mas o dedupe por hash da rota
+      // (`enviarImagemTemporaria` em pptx-preview/route.ts) reaproveita a MESMA URL para uma
+      // imagem repetida em vários slides do PPTX original (ex. logo de rodapé). Antes de
+      // limpar, exclui qualquer URL que ainda apareça em OUTRO slide não tocado — senão apaga
+      // um asset em uso e quebra a miniatura de um slide que nem foi reprocessado.
+      const urlsEmUsoPorOutrosSlides = new Set(
+        slides.flatMap((s, i) => (i === indice ? [] : coletarUrlsDeImagem(s.componentes))),
+      );
+      const urlsSlideAntigo = coletarUrlsDeImagem(slideAntigo?.componentes ?? [])
+        .filter((url) => !urlsEmUsoPorOutrosSlides.has(url));
+      if (urlsSlideAntigo.length > 0) await limparUploadsTemporarios(apresentacaoId, urlsSlideAntigo);
       const urlsSlideNovo = new Set(coletarUrlsDeImagem(slideNovo.componentes));
       if (referenceNova) urlsSlideNovo.add(referenceNova.url);
-      const urlsNaoUsadas = urlsRecebidas.filter((url) => !urlsSlideNovo.has(url));
+      const urlsNaoUsadas = urlsRecebidas.filter((url) => !urlsSlideNovo.has(url) && !urlsEmUsoPorOutrosSlides.has(url));
       if (urlsNaoUsadas.length > 0) await limparUploadsTemporarios(apresentacaoId, urlsNaoUsadas);
     } catch {
       toast.error("Erro de conexão ao reprocessar o slide.");
@@ -560,7 +567,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                 <button
                   type="button"
                   onClick={() => void reprocessarTudo()}
-                  disabled={reprocessandoTodos || reprocessandoIndice !== null}
+                  disabled={reprocessandoTodos || reprocessandoIndice !== null || confirmando}
                   title="Reprocessa o arquivo inteiro — útil se algum slide veio com imagem ou texto incorreto"
                   className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-slate-300 hover:border-indigo-400/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -636,7 +643,7 @@ export function ModalPreImportarPptx({ open, onOpenChange, apresentacaoId, arqui
                         <button
                           type="button"
                           onClick={() => void reprocessarSlide(indice)}
-                          disabled={reprocessandoTodos || reprocessandoIndice !== null}
+                          disabled={reprocessandoTodos || reprocessandoIndice !== null || confirmando}
                           aria-label={`Reprocessar slide ${indice + 1}`}
                           title="Reprocessar só este slide — caso a imagem ou o texto tenham vindo incorretos"
                           className="absolute left-1.5 top-1.5 flex size-6 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-40"

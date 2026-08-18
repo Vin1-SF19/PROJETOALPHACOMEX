@@ -55,6 +55,8 @@ Ready for Review
 25. Cada campo textual de criação e edição oferece **Melhorar com IA** usando o Qwen 3.8 configurado, sem persistir a sugestão antes do envio do formulário.
 26. Cada card de objetivo permite relatar um erro global, melhorar o feedback com Qwen 3.8 e reenfileirar todas as fases; o feedback é obrigatório para todos os agentes e fica rastreado no relatório final do objetivo.
 27. O modal de criação escolhe Claude ou Codex por objetivo, com Claude pré-selecionado; a preferência fica no estado local, acompanha todas as fases Bibble e alterna automaticamente para o outro adapter quando o primeiro esgota créditos ou fica indisponível. Qwen 3.8 permanece responsável pela documentação e pelos botões de melhoria.
+28. A visão inicial do Roadmap pode agregar todos os projetos; ao abrir Produção, o projeto do objetivo selecionado define o escopo de toda a tela, inclusive **Prompts por prioridade global**, accordions, métricas e painel de Markdown. Globalmente, apenas um objetivo pode permanecer em desenvolvimento por vez, inclusive durante cooldown de autocorreção, reinício ou concorrência entre workers.
+29. Toda documentação realiza auditoria de entregabilidade: identifica artefato, consumidor e caminho real de acesso. Uma capacidade ausente gera `AUTO_ADJUSTMENT_REQUIRED`; o worker promove automaticamente a próxima fase executável para Nova/Echo, implementa o suporte mínimo e exige verificação ponta a ponta. Arquivo solto não é aceito como entrega quando o objetivo exige consumo pelo sistema.
 
 ## Tarefas
 
@@ -70,6 +72,9 @@ Ready for Review
 - [x] Reestruturar Produção por prompt e adicionar melhoria assistida dos campos (AC 24, 25).
 - [x] Implementar relato de erro, retrabalho dirigido pelo feedback e rastreabilidade no relatório final (AC 26).
 - [x] Separar Qwen da implementação, persistir cérebro por objetivo e adicionar fallback Claude ↔ Codex (AC 27).
+- [x] Ajustar o shell visual dos cards do pipeline do Alpha CRM (RM-2026-5284A1).
+- [x] Isolar a Produção por projeto e garantir exclusividade global de um objetivo em desenvolvimento (AC 28).
+- [x] Adicionar auditoria de entregabilidade e autoajuste dirigido por lacunas detectadas no projeto real (AC 29).
 
 ## Segurança
 
@@ -99,6 +104,9 @@ Ready for Review
 | 2026-08-17 |   1.2.0 | Relato de erro global por objetivo, melhoria do feedback com IA e retrabalho rastreado no relatório final.                             | Codex / `@dev` |
 | 2026-08-17 |   1.2.1 | Cards de objetivos convertidos em accordions exclusivos para uma fila de Produção mais limpa.                                          | Codex / `@dev` |
 | 2026-08-17 |   1.3.0 | Claude/Codex definidos como cérebros por objetivo, com Claude padrão, fallback automático e Qwen exclusivo para documentação/melhoria. | Codex / `@dev` |
+| 2026-08-18 |   1.3.1 | Cards do pipeline do Alpha CRM ajustados para fundo cinza, borda azul sem glow, hover sutil e faixa lateral integrada.                 | Nova           |
+| 2026-08-18 |   1.4.0 | Produção filtrada pelo projeto de origem e worker protegido por afinidade de objetivo e lock global entre processos.                   | Codex / `@dev` |
+| 2026-08-18 |   1.5.0 | Qwen e agentes passaram a auditar a forma de entrega e promover automaticamente lacunas para implementação e validação ponta a ponta.  | Codex / `@dev` |
 
 ## Dev Agent Record
 
@@ -116,39 +124,57 @@ Codex (GPT-5)
 - Execução real da revisão v3 retomada, implementada, aprovada pelo Probe e encerrada pelo Scribe com todas as cinco fases concluídas.
 - Segurança validada: traversal, segredos, schema/migrations, escrita read-only e shell arbitrário bloqueados.
 - Fila de Produção reorganizada por prompt; relatório final real gerado para `RM-2026-C4A90D` em `99-relatorio-conclusao.md`.
-- Lint direcionado e 49 testes Roadmap passaram; o typecheck mantém somente o baseline externo já documentado.
+- Lint direcionado e 62 testes Roadmap passaram; o typecheck mantém somente o baseline externo já documentado.
 - O modal de objetivo persiste Claude/Codex localmente; Claude é o padrão, Codex assume em falta de crédito/limite e o relatório final registra a preferência usada.
+- Fallback real validado em `RM-2026-57E057`: Claude retornou `PROVIDER_RATE_LIMITED` e Codex assumiu automaticamente a mesma fase.
+- O sync interno deixou de criar commits automáticos; `git add` e `git commit` permanecem sob responsabilidade exclusiva do administrador.
+- O objetivo `RM-2026-5284A1` removeu o glow dos cards do pipeline e integrou a faixa lateral ao shell visual existente.
+- Gate local de `RM-2026-5284A1` (2026-08-18): lint direcionado aos dois arquivos do objetivo passou; `npm run typecheck`, `npm test` e `npm run build` foram executados, mas permanecem bloqueados por baselines externos ao ajuste (4 erros TypeScript fora do CRM, 4 testes alheios/contrato textual antigo e `EPERM` no binário do Prisma). O `next build` isolado também foi impedido pela rede restrita ao buscar Geist/Geist Mono.
+- A Produção agora respeita o projeto selecionado; somente a visão inicial agrega todos os projetos. Cooldown de autocorreção mantém afinidade com o objetivo atual e um lock atômico impede dois workers de desenvolverem objetivos simultaneamente.
+- O Qwen injeta auditoria de entrega nos prompts; Scout sinaliza lacunas com contrato estruturado e o worker promove fases read-only para Nova/Echo quando for necessário criar suporte de consumo, sem codificar previamente uma solução específica.
 
 ### File List
 
 - `.gitignore`
+- `.bibble/memory/codebase-map.md`
+- `.bibble/memory/components.md`
+- `docs/components/gradient-blob-card.md`
 - `docs/roadmap-alpha/README.md`
 - `docs/stories/story-roadmap-alpha-producao-local-bibble.md`
 - `package.json`
 - `scripts/install-roadmap-production-worker.ps1`
 - `scripts/roadmap-production-worker.ps1`
 - `scripts/roadmap-production.mjs`
+- `scripts/sync-servidor.ps1`
 - `scripts/uninstall-roadmap-production-worker.ps1`
 - `src/actions/PermissoesSetor.ts`
 - `src/actions/RoadmapAlpha.ts`
 - `src/actions/RoadmapProduction.ts`
+- `src/app/globals.css`
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
 - `src/app/PainelAlpha/Roadmap/page.tsx`
 - `src/components/RoadmapAlpha/RoadmapDashboard.tsx`
 - `src/components/RoadmapAlpha/RoadmapProductionPanel.tsx`
+- `src/components/ui/gradient-blob-card.tsx`
 - `src/lib/roadmap-alpha/authorization.ts`
 - `src/lib/roadmap-alpha/improve-with-ai.ts`
 - `src/lib/roadmap-alpha/objectives.ts`
 - `src/lib/roadmap-production/agents.ts`
+- `src/lib/roadmap-production/cli-providers.ts`
 - `src/lib/roadmap-production/contracts.ts`
 - `src/lib/roadmap-production/completion-report.ts`
+- `src/lib/roadmap-production/execution-lock.ts`
 - `src/lib/roadmap-production/providers.ts`
 - `src/lib/roadmap-production/storage.ts`
 - `src/lib/roadmap-production/tools.ts`
 - `src/lib/roadmap-production/worker.ts`
 - `tests/roadmap-production/agents.test.ts`
+- `tests/bpm/card-modal-integration.test.ts`
+- `tests/roadmap-alpha/contracts.test.ts`
 - `tests/roadmap-alpha/improve-with-ai.test.ts`
 - `tests/roadmap-production/completion-report.test.ts`
 - `tests/roadmap-production/contracts.test.ts`
+- `tests/roadmap-production/execution-lock.test.ts`
 - `tests/roadmap-production/providers.test.ts`
 - `tests/roadmap-production/storage.test.ts`
 - `tests/roadmap-production/tools.test.ts`

@@ -18,7 +18,7 @@ function estrela(pontas: number, raioInterno: number): string {
   const pontos: string[] = [];
   for (let i = 0; i < passos; i += 1) {
     const raio = i % 2 === 0 ? 50 : raioInterno;
-    const angulo = (Math.PI * i) / pontos.length * 2 - Math.PI / 2;
+    const angulo = (Math.PI * i) / passos * 2 - Math.PI / 2;
     const x = 50 + raio * Math.cos(angulo);
     const y = 50 + raio * Math.sin(angulo);
     pontos.push(`${x.toFixed(2)},${y.toFixed(2)}`);

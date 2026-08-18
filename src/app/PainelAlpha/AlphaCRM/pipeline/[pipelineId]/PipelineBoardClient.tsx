@@ -40,7 +40,7 @@ import {
   restaurarSnapshotBoard,
 } from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
-import GradientBlobCard from "@/components/ui/gradient-blob-card";
+import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
 import { useLazyColumn } from "@/hooks/useLazyColumn";
@@ -151,47 +151,44 @@ function KanbanCard({
         isDragging && "cursor-grabbing border-white/20 shadow-2xl shadow-black/40 ring-1 ring-white/15",
       )}
     >
-      <span
-        aria-hidden="true"
-        className="hidden"
-        style={{ background: `rgb(${accent})` }}
-      />
-
-      <GradientBlobCard>
-
-      <div className="relative space-y-2.5">
-        <div className="flex items-start gap-2.5">
-          <div
-            aria-hidden="true"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black tracking-tight text-white shadow-inner shadow-white/5"
-          >
-            {inicialEmpresa}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-white">
-              {naoAcessado && (
-                <span
-                  className={cn("h-1.5 w-1.5 shrink-0 rounded-full animate-pulse", alertaBoasVindas ? "bg-red-400" : "bg-cyan-400")}
-                  title="Nunca acessado"
-                />
-              )}
-              <Building2 size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onAbrir(card.id);
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                className="line-clamp-2 text-left decoration-white/40 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                aria-label={`Abrir card de ${nomeEmpresa}`}
-              >
-                {nomeEmpresa}
-              </button>
+      <GradientBlobCard
+        accent={accent}
+        className="rounded-2xl"
+        surfaceClassName={statusConfig?.cardClassName}
+      >
+        <div className="relative space-y-2.5">
+          <div className="flex items-start gap-2.5">
+            <div
+              aria-hidden="true"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black tracking-tight text-white shadow-inner shadow-white/5"
+            >
+              {inicialEmpresa}
             </div>
-            {card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-white">
+                {naoAcessado && (
+                  <span
+                    className={cn("h-1.5 w-1.5 shrink-0 rounded-full animate-pulse", alertaBoasVindas ? "bg-red-400" : "bg-cyan-400")}
+                    title="Nunca acessado"
+                  />
+                )}
+                <Building2 size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAbrir(card.id);
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  className="line-clamp-2 text-left decoration-white/40 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  aria-label={`Abrir card de ${nomeEmpresa}`}
+                >
+                  {nomeEmpresa}
+                </button>
+              </div>
+              {card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
+            </div>
           </div>
-        </div>
 
         {(alertaBoasVindas || alertaAlinhamento) && (
           <div
@@ -282,8 +279,7 @@ function KanbanCard({
             className="[&_[data-slot=avatar]]:shadow-sm [&_[data-slot=avatar]]:shadow-black/30"
           />
         </div>
-      </div>
-
+        </div>
       </GradientBlobCard>
     </div>
   );

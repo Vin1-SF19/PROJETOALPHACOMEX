@@ -114,6 +114,9 @@ describe("adapter Ollama de Produção", () => {
     expect(
       firstBody.messages.find((message) => message.role === "user")?.content,
     ).toContain("O fluxo mobile continua quebrado.");
+    expect(
+      firstBody.messages.find((message) => message.role === "system")?.content,
+    ).toContain("AUTO_ADJUSTMENT_REQUIRED");
   });
 });
 
