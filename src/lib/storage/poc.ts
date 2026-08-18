@@ -123,6 +123,7 @@ export async function runStoragePoc(
   const startedAt = Date.now();
   let completed = false;
   let selection: Awaited<ReturnType<typeof selectStorageProvider>> | undefined;
+  let stage = "provider-selection";
 
   try {
     selection = options.provider === "auto"
@@ -132,6 +133,7 @@ export async function runStoragePoc(
           selected: options.provider,
           reason: "EXPLICIT" as const,
         };
+    stage = "multipart-upload";
     const source = options.file
       ? filePartSource(options.file, config.partSizeBytes)
       : deterministicPartSource(size, config.partSizeBytes);
@@ -147,8 +149,11 @@ export async function runStoragePoc(
       source,
     });
     completed = true;
+    stage = "head-object";
     const head = await selection.provider.head(target, key);
+    stage = "download-object";
     const downloaded = await checksumStream(await selection.provider.download(target, key));
+    stage = "integrity-check";
     if (head.size !== size || downloaded.size !== size || downloaded.checksum !== uploaded.checksum) {
       throw new StorageError("CHECKSUM_MISMATCH", "Uploaded object failed integrity verification", {
         provider: selection.provider.id,
@@ -156,6 +161,7 @@ export async function runStoragePoc(
     }
 
     try {
+      stage = "delete-object";
       await selection.provider.delete(target, key);
       completed = false;
     } catch (error) {
@@ -211,6 +217,7 @@ export async function runStoragePoc(
         upload: {
           ok: false,
           provider: selection?.selected ?? options.provider,
+          stage,
           cleanupSucceeded,
           ...sanitizedError(error, storageSecretValues(config)),
         },

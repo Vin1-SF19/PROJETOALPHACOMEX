@@ -365,10 +365,14 @@ function FormNovoContrato({
         setConsultado(true);
     };
 
-    // Consulta o Cliente já cadastrado no CRM (não a Receita Federal) — Fase 3.6 do
-    // Cliente Master. Se não encontrar, os dados ficam editáveis para o usuário
-    // preencher: `criarContrato` resolve OU CRIA o Cliente (o BPM ainda não é a porta
-    // de entrada real, ver `resolverClienteDoContrato`).
+    // Consulta o Cliente já cadastrado no CRM primeiro (mais rápido, evita chamada
+    // externa se a empresa já existe) — Fase 3.6 do Cliente Master. Se não encontrar,
+    // cai para a Receita Federal (mesmo padrão usado no BPM/Extratos/CS&NPS,
+    // `/api/ReceitaFederal`) para autopreencher os dados — reintroduzido a pedido do
+    // usuário em 2026-08-15: o BPM/CRM ainda não foi lançado para os colaboradores,
+    // então bloquear a consulta só no CRM interno travaria o cadastro de empresa nova
+    // no fluxo comercial diário. `criarContrato` continua resolvendo OU CRIANDO o
+    // Cliente ao salvar (ver `resolverClienteDoContrato`), sem mudança nesse ponto.
     const consultarCNPJ = async () => {
         const cnpjLimpo = cnpj.replace(/\D/g, "");
         if (cnpjLimpo.length !== 14) {
@@ -377,27 +381,45 @@ function FormNovoContrato({
         }
         setConsultando(true);
         try {
-            const res = await buscarClienteParaContrato(cnpjLimpo);
-            if (!res.success) {
-                toast.error(res.error);
+            const resCrm = await buscarClienteParaContrato(cnpjLimpo);
+            if (!resCrm.success) {
+                toast.error(resCrm.error);
                 return;
             }
-            if (res.cliente) {
+            if (resCrm.cliente) {
                 setDadosEmpresa({
-                    razaoSocial: res.cliente.razaoSocial,
-                    nomeFantasia: res.cliente.nomeFantasia ?? "",
-                    dataConstituicao: res.cliente.dataConstituicao ?? "",
-                    regimeTributario: res.cliente.regimeTributario ?? "",
-                    uf: res.cliente.uf ?? "",
+                    razaoSocial: resCrm.cliente.razaoSocial,
+                    nomeFantasia: resCrm.cliente.nomeFantasia ?? "",
+                    dataConstituicao: resCrm.cliente.dataConstituicao ?? "",
+                    regimeTributario: resCrm.cliente.regimeTributario ?? "",
+                    uf: resCrm.cliente.uf ?? "",
                 });
                 setClienteEncontrado(true);
+                setConsultado(true);
                 toast.success("Empresa já cadastrada no CRM!");
-            } else {
+                return;
+            }
+
+            const respostaReceita = await fetch(`/api/ReceitaFederal?cnpj=${cnpjLimpo}`);
+            const dadosReceita = await respostaReceita.json();
+            if (!respostaReceita.ok || dadosReceita.error) {
                 setDadosEmpresa({ razaoSocial: "", nomeFantasia: "", dataConstituicao: "", regimeTributario: "", uf: "" });
                 setClienteEncontrado(false);
-                toast.info("Empresa não encontrada no CRM — preencha os dados abaixo");
+                setConsultado(true);
+                toast.error(dadosReceita.error || "Não foi possível buscar os dados do CNPJ — preencha manualmente");
+                return;
             }
+
+            setDadosEmpresa({
+                razaoSocial: dadosReceita.razaoSocial || "",
+                nomeFantasia: dadosReceita.nomeFantasia || "",
+                dataConstituicao: dadosReceita.dataConstituicao || "",
+                regimeTributario: dadosReceita.regimeTributario || "",
+                uf: dadosReceita.uf || "",
+            });
+            setClienteEncontrado(false);
             setConsultado(true);
+            toast.success("Dados encontrados na Receita Federal — empresa nova para o CRM");
         } catch {
             toast.error("Erro ao consultar CNPJ");
         } finally {

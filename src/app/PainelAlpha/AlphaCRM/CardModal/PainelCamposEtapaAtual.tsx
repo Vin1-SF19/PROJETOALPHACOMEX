@@ -17,6 +17,7 @@ import {
   etapaEhAlinhamentoEstrategico,
   TEMPLATE_RESUMO_ALINHAMENTO,
 } from "@/lib/bpm/alinhamento-estrategico";
+import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
@@ -193,11 +194,12 @@ export function PainelCamposEtapaAtual({
           )}
           {camposAtuaisVisiveis.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
+            const somenteLeitura = campoFinanceiroSomenteLeitura(campo.nome);
             const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
             return (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
-                  {campo.nome}{campo.obrigatorio ? " *" : ""}
+                  {campo.nome}{campo.obrigatorio ? " *" : ""}{somenteLeitura ? " · automático" : ""}
                 </label>
                 {campoEhResumoAlinhamento(campo.nome) && (
                   <button
@@ -224,6 +226,7 @@ export function PainelCamposEtapaAtual({
                   onBlur={() => void salvarCamposAtuais()}
                   className={inputCls}
                   disabled={!podeEditar}
+                  readOnly={somenteLeitura}
                 />
                 {complementoPendente && (
                   <p id={descricaoId} role="alert" className="text-[11px] text-amber-300">

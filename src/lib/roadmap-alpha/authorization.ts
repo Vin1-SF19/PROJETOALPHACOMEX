@@ -1,6 +1,10 @@
 import { auth } from "../../../auth";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import db from "@/lib/prisma";
+import {
+  assertRoadmapProductionRuntimeEnabled,
+  canUseRoadmapProduction,
+} from "@/lib/roadmap-production/runtime";
 import { isAdminRole } from "@/lib/roles";
 
 export interface RoadmapAccess {
@@ -24,19 +28,23 @@ export async function requireRoadmapAccess(requireMutation = false): Promise<Roa
   if (!user || user.status !== "ATIVO") throw new Error("FORBIDDEN");
 
   const canMutate = isAdminRole(user.role);
-  let canAccessProduction = canMutate;
+  let hasProductionPermission = canMutate;
   if (!canMutate) {
     const permissions = await getPermissoesEfetivas(userId);
     if (!permissions.includes("roadmap")) throw new Error("FORBIDDEN");
-    canAccessProduction = permissions.includes("roadmapProduction");
+    hasProductionPermission = permissions.includes("roadmapProduction");
   }
   if (requireMutation && !canMutate) throw new Error("FORBIDDEN");
 
+  const canAccessProduction = canUseRoadmapProduction(
+    hasProductionPermission,
+  );
   return { userId, role: user.role, canMutate, canAccessProduction };
 }
 
 export async function requireRoadmapProductionAccess(requireAdmin = false): Promise<RoadmapAccess> {
   const access = await requireRoadmapAccess();
+  assertRoadmapProductionRuntimeEnabled();
   if (!access.canAccessProduction || (requireAdmin && !access.canMutate)) {
     throw new Error("FORBIDDEN");
   }

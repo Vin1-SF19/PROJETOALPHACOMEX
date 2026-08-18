@@ -66,6 +66,7 @@ import {
   etapaEhAlinhamentoEstrategico,
   obterErroCamposAlinhamentoParaSaida,
 } from "@/lib/bpm/alinhamento-estrategico";
+import { etapaFinanceiraValida, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -941,7 +942,7 @@ async function carregarCamposTransicao(params: {
   etapaDestinoNome: string;
 }, client: Parameters<typeof carregarCamposAplicaveisCardEtapa>[3] = db) {
   const [camposOrigemTodos, camposDestinoBase] = await Promise.all([
-    etapaEhNovosLeads(params.etapaOrigemNome)
+    (etapaEhNovosLeads(params.etapaOrigemNome) || (etapaFinanceiraValida(params.etapaOrigemNome) && etapaFinanceiraValida(params.etapaDestinoNome)))
       ? carregarCamposAplicaveisCardEtapa(
           params.cardId,
           params.pipelineId,
@@ -956,7 +957,9 @@ async function carregarCamposTransicao(params: {
       client,
     ),
   ]);
-  let camposDestino = camposDestinoBase;
+  let camposDestino = etapaFinanceiraValida(params.etapaOrigemNome) && etapaFinanceiraValida(params.etapaDestinoNome)
+    ? []
+    : camposDestinoBase;
   if (etapaEhLost(params.etapaDestinoNome)) {
     const contextoLost = await carregarConfiguracaoLost({
       pipelineId: params.pipelineId,
@@ -1131,6 +1134,16 @@ async function executarMovimentoComRequisitos(
   const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
   if ("error" in contexto) return { success: false, error: contexto.error };
   const { card, etapaDestino } = contexto;
+  let camposFinanceirosPorId: Array<{ id: string; nome: string }> = [];
+  let validacaoFinanceira: ReturnType<typeof validateFinancialTransition> = { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
+  if (etapaFinanceiraValida(card.etapa.nome) && etapaFinanceiraValida(etapaDestino.nome)) {
+    const financeiro = await db.bpmCard.findUnique({ where: { id: cardId }, select: { pipeline: { select: { nome: true } }, campoValores: { select: { valor: true, campo: { select: { nome: true } } } }, anexos: { select: { nome: true } } } });
+    const valoresFinanceiros: Record<string, string | null> = Object.fromEntries((financeiro?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
+    camposFinanceirosPorId = await db.bpmCampo.findMany({ where: { pipelineId: card.pipelineId }, select: { id: true, nome: true } });
+    for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceiros[nome] = valor }
+    validacaoFinanceira = validateFinancialTransition({ pipelineName: financeiro?.pipeline.nome ?? "", fromStage: card.etapa.nome, toStage: etapaDestino.nome, values: valoresFinanceiros, attachmentNames: financeiro?.anexos.map((anexo) => anexo.nome) });
+  }
+  if (validacaoFinanceira.blocked) return { success: false, error: validacaoFinanceira.pendingFields.length > 0 ? `${validacaoFinanceira.message} Campos pendentes: ${validacaoFinanceira.pendingFields.join(", ")}.` : validacaoFinanceira.message };
   if (etapaEhBoasVindas(etapaDestino.nome) && !(await checarAcessoDiretoriaBpm(userId))) {
     return { success: false, error: ACESSO_BOAS_VINDAS_NEGADO_MENSAGEM };
   }
@@ -1213,6 +1226,14 @@ async function executarMovimentoComRequisitos(
       throw new Error(`MOVIMENTO_INVALIDO:${contextoAtual.error}`);
     }
     const { card: cardAtual, etapaDestino: destinoAtual } = contextoAtual;
+    let validacaoFinanceiraAtual: ReturnType<typeof validateFinancialTransition> = { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
+    if (etapaFinanceiraValida(cardAtual.etapa.nome) && etapaFinanceiraValida(destinoAtual.nome)) {
+      const financeiroAtual = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipeline: { select: { nome: true } }, campoValores: { select: { valor: true, campo: { select: { nome: true } } } }, anexos: { select: { nome: true } } } });
+      const valoresFinanceirosAtuais: Record<string, string | null> = Object.fromEntries((financeiroAtual?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
+      for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceirosAtuais[nome] = valor }
+      validacaoFinanceiraAtual = validateFinancialTransition({ pipelineName: financeiroAtual?.pipeline.nome ?? "", fromStage: cardAtual.etapa.nome, toStage: destinoAtual.nome, values: valoresFinanceirosAtuais, attachmentNames: financeiroAtual?.anexos.map((anexo) => anexo.nome) });
+    }
+    if (validacaoFinanceiraAtual.blocked) throw new Error(`MOVIMENTO_INVALIDO:${validacaoFinanceiraAtual.pendingFields.length > 0 ? `${validacaoFinanceiraAtual.message} Campos pendentes: ${validacaoFinanceiraAtual.pendingFields.join(", ")}.` : validacaoFinanceiraAtual.message}`);
     if (etapaEhBoasVindas(destinoAtual.nome) && !(await checarAcessoDiretoriaBpm(userId, tx))) {
       throw new Error(`MOVIMENTO_INVALIDO:${ACESSO_BOAS_VINDAS_NEGADO_MENSAGEM}`);
     }
@@ -1315,6 +1336,7 @@ async function executarMovimentoComRequisitos(
         update: { valor },
       });
     }
+    if (validacaoFinanceiraAtual.applicable) for (const [nome, valor] of Object.entries(validacaoFinanceiraAtual.automaticValues)) { const campo = camposFinanceirosPorId.find((item) => item.nome === nome); if (campo) await tx.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId, campoId: campo.id } }, create: { cardId, campoId: campo.id, valor }, update: { valor } }) }
     const inicializarStatusPosFechamento = etapaEhFechado(destinoAtual.nome)
       && cardAtual.statusPosFechamento === null;
     const movimento = await tx.bpmCard.updateMany({

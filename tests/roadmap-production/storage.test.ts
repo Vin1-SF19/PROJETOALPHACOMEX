@@ -132,6 +132,10 @@ describe("estado local de Produção", () => {
     expect(
       (await readObjectiveDevelopmentPreferences(project)).objectives,
     ).toEqual({ "objective-1": "codex", "objective-2": "claude" });
+    await writeObjectiveDevelopmentProvider("objective-1", "claude", project);
+    expect(
+      (await readObjectiveDevelopmentPreferences(project)).objectives,
+    ).toEqual({ "objective-1": "claude", "objective-2": "claude" });
   });
 
   it("persiste estado validado de forma recuperável", async () => {

@@ -1,0 +1,15 @@
+{
+  "ok": false,
+  "command": "poc",
+  "code": 1,
+  "checks": {
+    "upload": {
+      "ok": false,
+      "provider": "quobjects",
+      "cleanupSucceeded": true,
+      "errorCode": "AUTH_FAILED",
+      "message": "Storage operation failed (AUTH_FAILED)"
+    }
+  },
+  "timestamp": "2026-08-18T16:37:03.012Z"
+}

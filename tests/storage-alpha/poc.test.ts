@@ -22,6 +22,7 @@ class MemoryProvider implements StorageProvider {
   healthy: boolean;
   deleted = false;
   corruptDownload = false;
+  failHead = false;
   private chunks: Uint8Array[] = [];
   private session?: StorageMultipartSession;
 
@@ -61,6 +62,7 @@ class MemoryProvider implements StorageProvider {
   }
   async abortMultipart(): Promise<void> {}
   async head(target: StorageTarget, objectKey: string): Promise<StorageObjectMetadata> {
+    if (this.failHead) throw new Error("head failed");
     return {
       provider: this.id,
       logicalStorage: target.logicalStorage,
@@ -156,6 +158,19 @@ describe("storage:poc", () => {
       checks: { upload: { errorCode: "CHECKSUM_MISMATCH", cleanupSucceeded: true } },
     });
     expect(primary.deleted).toBe(true);
+  });
+
+  it("informa a etapa sanitizada que falhou", async () => {
+    const primary = new MemoryProvider("quobjects");
+    primary.failHead = true;
+    const result = await runStoragePoc(
+      { execute: true, confirm: "storage-alpha-poc", provider: "quobjects", size: 5 * MIB },
+      { env: pocEnv, providers: { primary, fallback: new MemoryProvider("vercel-blob") } },
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      checks: { upload: { stage: "head-object", cleanupSucceeded: true } },
+    });
   });
 
   it("não sobrescreve evidência existente e mantém a limpeza", async () => {

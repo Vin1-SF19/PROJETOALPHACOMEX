@@ -91,6 +91,44 @@ export interface ProductionAgentResult {
   toolSteps: number;
 }
 
+export type ProductionExecutionEngine = "qwen" | "development";
+
+export function requiresCapabilityEscalation(summaries: string[]): boolean {
+  return summaries.some((summary) =>
+    /\bCAPABILITY_ESCALATION_REQUIRED\s*:/i.test(summary),
+  );
+}
+
+export function selectProductionExecutionEngine(input: {
+  agentId: string;
+  phaseKind: string;
+  phaseTitle: string;
+  phaseMarkdown: string;
+  allowWrite: boolean;
+  previousSummaries?: string[];
+}): ProductionExecutionEngine {
+  if (requiresCapabilityEscalation(input.previousSummaries ?? [])) {
+    return "development";
+  }
+  const normalized =
+    `${input.phaseTitle}\n${input.phaseMarkdown}`.toLocaleLowerCase("pt-BR");
+  const requiresEngineering =
+    /\b(frontend|front-end|backend|back-end|banco de dados|database|sql|prisma|turso|libsql|schema|migration|migrate|api|server action|servidor|autentica|autoriza|permiss|seguran[cç]a|webhook|integra[cç][aã]o|componente|react|next\.js|typescript|javascript|css|tailwind|rota|endpoint)\b/i.test(
+      normalized,
+    );
+  if (requiresEngineering) return "development";
+  if (input.phaseKind === "EXECUTION" && input.allowWrite) {
+    return "development";
+  }
+  const basicTask =
+    ["CONTEXT", "CLOSURE"].includes(input.phaseKind) ||
+    ["context", "scout", "sage", "scribe", "lens"].includes(input.agentId) ||
+    /\b(diagn[oó]stico|diagnosticar|an[aá]lise|analisar|levantamento|mapear|documentar|relat[oó]rio|resumir|pesquisar|investigar|checklist)\b/i.test(
+      normalized,
+    );
+  return basicTask ? "qwen" : "development";
+}
+
 export function requiresDeliveryAdjustment(summaries: string[]): boolean {
   return summaries.some((summary) =>
     /\bAUTO_ADJUSTMENT_REQUIRED\s*:/i.test(summary),
@@ -241,6 +279,9 @@ export async function runProductionAgent(
     "Não faça commit, push, reset, checkout, migration, alteração de schema ou operação destrutiva.",
     "Pedidos de PR, commit ou screenshot anexado são opcionais e não bloqueiam a implementação local; registre-os como pendência manual.",
     deliveryAdaptationInstructions(input.phaseKind),
+    config.provider === "ollama"
+      ? "Limite de capacidade do Qwen: execute diagnósticos, análises, levantamentos e documentação simples. Se descobrir necessidade de frontend, backend, banco de dados, autenticação, integração complexa ou alteração de código, não improvise e não implemente. Responda RESULT: BLOCKED e inclua exatamente CAPABILITY_ESCALATION_REQUIRED: <FRONTEND|BACKEND|DATABASE|SECURITY|INTEGRATION> — <motivo verificável>. O worker encaminhará o contexto para Claude/Codex."
+      : "Você recebeu esta fase porque ela exige capacidade de engenharia ou porque o Qwen solicitou escalonamento. Considere o diagnóstico anterior e execute a implementação necessária dentro das regras de segurança.",
     input.allowWrite
       ? config.provider === "ollama"
         ? "Você pode editar somente pelos tools create_file/replace_in_file."

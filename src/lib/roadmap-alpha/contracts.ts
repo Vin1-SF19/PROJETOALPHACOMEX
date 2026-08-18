@@ -68,6 +68,10 @@ export const roadmapObjectiveContentSchema = roadmapObjectiveInputSchema.omit({
   globalPriority: true,
 });
 
+export const roadmapObjectiveEditSchema = roadmapObjectiveContentSchema.extend({
+  developmentProvider: developmentProviderSchema,
+});
+
 const dependsOnSchema = z
   .array(z.number().int().min(0).max(99))
   .max(10)
@@ -158,6 +162,7 @@ export type RoadmapObjectiveCreate = z.infer<
 export type RoadmapObjectiveContent = z.infer<
   typeof roadmapObjectiveContentSchema
 >;
+export type RoadmapObjectiveEdit = z.infer<typeof roadmapObjectiveEditSchema>;
 export type RoadmapPromptPhase = z.infer<typeof roadmapPromptPhaseSchema>;
 export type RoadmapPhaseManifest = z.infer<typeof roadmapPhaseManifestSchema>;
 

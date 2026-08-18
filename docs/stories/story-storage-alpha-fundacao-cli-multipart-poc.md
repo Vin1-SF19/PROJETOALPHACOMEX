@@ -87,11 +87,11 @@ O piloto existente usa o storage space `painel-alpha-poc`, o bucket privado `pa-
   - [x] Cobrir providers simulados, timeouts, retries, cancelamento e fallback.
   - [x] Cobrir sanitização para tokens, secrets, endpoints internos e URLs assinadas.
   - [x] Cobrir streaming/memória por comportamento, sem alocar arquivo de 2 GiB durante a suíte.
-- [ ] Executar o POC real e registrar evidência (AC: 8–10, 17)
-  - [ ] Testar objeto pequeno no NAS.
-  - [ ] Testar objeto de 2 GiB no NAS através de `storage-poc.alpha-comex.com`.
-  - [ ] Confirmar no QuObjects que não restou multipart incompleto ou objeto de teste após a limpeza.
-  - [ ] Testar fallback opt-in com objeto pequeno, sem remover qualquer Blob preexistente.
+- [x] Executar o POC real e registrar evidência (AC: 8–10, 17)
+  - [x] Testar objeto pequeno no NAS.
+  - [x] Testar objeto de 2 GiB no NAS através de `storage-poc.alpha-comex.com`.
+  - [x] Confirmar no QuObjects que não restou multipart incompleto ou objeto de teste após a limpeza.
+  - [x] Testar fallback opt-in com objeto pequeno, sem remover qualquer Blob preexistente.
 - [ ] Executar os quality gates e atualizar a story (AC: 18)
   - [ ] `npm run lint`
   - [ ] `npm run typecheck`
@@ -313,6 +313,7 @@ Esta story não depende de outra story, mas depende da infraestrutura POC já va
 | 2026-08-18 | 0.2.0 | Arquitetura aprovada: AWS SDK v3, S3 path-style, módulos server-only e fallback selecionado somente antes do multipart. Status: Draft → Ready. | Aria (`@architect`) |
 | 2026-08-18 | 0.3.0 | Desenvolvimento iniciado em modo autônomo. Status: Ready → InProgress. | Dex (`@dev`) |
 | 2026-08-18 | 0.4.0 | Fundação CLI, providers, orquestrador e 23 testes concluídos; POC real aguarda credenciais server-side. | Dex (`@dev`) |
+| 2026-08-18 | 0.5.0 | POC real concluído: QuObjects 10 MiB e 2 GiB, fallback Blob 10 MiB e auditoria de limpeza; compatibilidades de ETag, HeadObject e cache Blob corrigidas. | Dex (`@dev`) |
 
 ## Dev Agent Record
 
@@ -326,12 +327,17 @@ Codex (GPT-5)
 - `plan/self-critique-storage-alpha-foundation.json`
 - `npm run storage:inventory`: PASS, 35 consumidores encontrados.
 - `npm run storage:doctor`: CLI funcional; configuração POC ausente classificada com exit code 2 e sem vazamento.
-- `npx vitest run tests/storage-alpha`: 23/23 testes passaram.
+- `npx vitest run tests/storage-alpha`: 30/30 testes passaram.
 - ESLint direcionado: passou sem erros ou avisos.
 - `npx next build`: passou; o wrapper `npm run build` parou antes em `prisma generate` por DLL em uso.
-- Full suite: 1.489/1.491 passaram; duas falhas preexistentes fora do Storage Alpha.
+- Full suite: 1.499/1.502 passaram; três falhas fora do Storage Alpha (BPM, Apresentações e timeout do CLI Google Calendar).
 - Typecheck completo: somente erros preexistentes fora dos arquivos desta story.
 - CodeRabbit indisponível porque o WSL não está instalado.
+- `npm run storage:doctor`: PASS com QuObjects e Vercel Blob saudáveis.
+- QuObjects 10 MiB: PASS, checksum e limpeza confirmados.
+- QuObjects 2 GiB: PASS, 32 partes, checksum confirmado em 285.190 ms e limpeza confirmada.
+- Vercel Blob 10 MiB: PASS, checksum e limpeza confirmados.
+- Auditoria QuObjects: zero objetos e zero multiparts incompletos no prefixo de teste.
 
 ### Completion Notes List
 
@@ -341,7 +347,9 @@ Codex (GPT-5)
 - `storage:poc` exige confirmação explícita, gera stream determinístico até 2 GiB, valida SHA-256 e remove somente a chave criada.
 - O fallback é selecionado apenas no preflight; falha durante multipart cancela o provider atual sem troca silenciosa.
 - Nenhum upload atual, URL Blob, registro Turso, schema ou configuração de infraestrutura foi alterado.
-- A validação real está pendente porque as três variáveis do QuObjects ainda não estão configuradas localmente.
+- A validação real foi concluída sem alterar consumidores atuais, arquivos Blob preexistentes ou banco de dados.
+- Compatibilidade QuObjects: `UploadPart` sem ETag usa `ListParts`; `HeadObject` 403 usa busca exata por `ListObjects` sem download.
+- Compatibilidade Vercel Blob: `useCache: false` é aplicado somente a stores privados.
 
 ### File List
 
@@ -367,8 +375,17 @@ Codex (GPT-5)
 - `tests/storage-alpha/doctor.test.ts`
 - `tests/storage-alpha/orchestrator.test.ts`
 - `tests/storage-alpha/poc.test.ts`
+- `tests/storage-alpha/quobjects.test.ts`
+- `tests/storage-alpha/vercel-blob.test.ts`
 - `docs/qa/storage-alpha/README.md`
 - `docs/qa/storage-alpha/implementation-validation.md`
+- `docs/qa/storage-alpha/poc-small-20260818.json`
+- `docs/qa/storage-alpha/poc-small-20260818-retry1.json`
+- `docs/qa/storage-alpha/poc-small-20260818-retry2.json`
+- `docs/qa/storage-alpha/poc-small-20260818-retry3.json`
+- `docs/qa/storage-alpha/poc-2gib-20260818.json`
+- `docs/qa/storage-alpha/poc-fallback-20260818.json`
+- `docs/qa/storage-alpha/poc-fallback-20260818-retry1.json`
 - `plan/self-critique-storage-alpha-foundation.json`
 - `docs/stories/story-storage-alpha-fundacao-cli-multipart-poc.md`
 

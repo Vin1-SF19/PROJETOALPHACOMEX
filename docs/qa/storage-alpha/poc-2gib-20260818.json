@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "command": "poc",
+  "code": 0,
+  "checks": {
+    "safety": {
+      "ok": true,
+      "isolatedKey": true,
+      "cleanupSucceeded": true
+    },
+    "upload": {
+      "ok": true,
+      "provider": "quobjects",
+      "selectionReason": "EXPLICIT",
+      "bytes": 2147483648,
+      "parts": 32,
+      "checksumVerified": true,
+      "durationMs": 285190,
+      "throughputMiBPerSecond": 7.18
+    }
+  },
+  "timestamp": "2026-08-18T16:40:48.450Z"
+}

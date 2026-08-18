@@ -83,7 +83,7 @@ describe("generateRoadmapManifest", () => {
     );
   });
 
-  it("promove uma fase de execução somente leitura para permitir o autoajuste", async () => {
+  it("preserva diagnóstico read-only para o Qwen e injeta o contrato de autoajuste", async () => {
     const readOnlyManifest = structuredClone(manifest);
     readOnlyManifest.phases[1].agent = "scout";
     const fetchImpl = vi.fn(
@@ -105,7 +105,10 @@ describe("generateRoadmapManifest", () => {
       env,
       fetchImpl: fetchImpl as typeof fetch,
     });
-    expect(result.manifest.phases[1].agent).toBe("dev");
+    expect(result.manifest.phases[1].agent).toBe("scout");
+    expect(result.manifest.phases[1].markdown).toContain(
+      "Auditoria e autoajuste da entrega",
+    );
   });
 
   it("rejeita resposta truncada", async () => {

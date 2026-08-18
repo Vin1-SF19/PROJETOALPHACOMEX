@@ -12,8 +12,10 @@ import type {
 import { writeCompletionReport } from "@/lib/roadmap-production/completion-report";
 import { acquireProductionExecutionLease } from "@/lib/roadmap-production/execution-lock";
 import {
+  requiresCapabilityEscalation,
   requiresDeliveryAdjustment,
   runProductionAgent,
+  selectProductionExecutionEngine,
   type ProductionAgentInput,
   type ProductionAgentResult,
 } from "@/lib/roadmap-production/providers";
@@ -85,6 +87,70 @@ async function runDevelopmentAgentWithFallback(
     errorCode: "PRODUCTION_PROVIDER_FAILED",
     toolSteps: 0,
   };
+}
+
+async function runProductionAgentWithCapabilityRouting(
+  config: ProductionConfig,
+  preferred: DevelopmentProvider,
+  input: ProductionAgentInput,
+  onActivity: (message: string) => Promise<void> | void,
+): Promise<ProductionAgentResult> {
+  const engine = selectProductionExecutionEngine({
+    agentId: input.agentId,
+    phaseKind: input.phaseKind,
+    phaseTitle: input.phaseTitle,
+    phaseMarkdown: input.phaseMarkdown,
+    allowWrite: input.allowWrite,
+    previousSummaries: input.previousSummaries,
+  });
+  if (engine === "development") {
+    await onActivity("Roteamento de capacidade: Claude/Codex.");
+    return runDevelopmentAgentWithFallback(
+      config,
+      preferred,
+      input,
+      onActivity,
+    );
+  }
+
+  const qwenModel = process.env.ROADMAP_QWEN_MODEL?.trim();
+  if (!qwenModel?.startsWith("qwen3.8")) {
+    await onActivity(
+      "Qwen 3.8 sem configuração válida; encaminhando para Claude/Codex.",
+    );
+    return runDevelopmentAgentWithFallback(
+      config,
+      preferred,
+      input,
+      onActivity,
+    );
+  }
+  await onActivity("Roteamento de capacidade: Qwen 3.8 para tarefa básica.");
+  const qwenResult = await runProductionAgent(
+    { ...config, provider: "ollama", model: qwenModel },
+    input,
+    onActivity,
+  );
+  if (qwenResult.success) return qwenResult;
+
+  const escalatedByQwen = requiresCapabilityEscalation([qwenResult.summary]);
+  await onActivity(
+    escalatedByQwen
+      ? "Qwen identificou necessidade de engenharia; encaminhando o diagnóstico para Claude/Codex."
+      : `Qwen não concluiu a tarefa básica (${qwenResult.errorCode ?? "AGENT_FAILED"}); encaminhando para Claude/Codex.`,
+  );
+  return runDevelopmentAgentWithFallback(
+    config,
+    preferred,
+    {
+      ...input,
+      previousSummaries: [
+        ...input.previousSummaries,
+        `Diagnóstico do Qwen antes do escalonamento:\n${qwenResult.summary}`,
+      ],
+    },
+    onActivity,
+  );
 }
 
 function now(): string {
@@ -859,7 +925,7 @@ async function processNextProductionPhaseUnlocked() {
   };
   const onActivity = (message: string) =>
     addActivity(execution.id, phase.phaseNumber, phase.resolvedAgent, message);
-  const result = await runDevelopmentAgentWithFallback(
+  const result = await runProductionAgentWithCapabilityRouting(
     config,
     execution.developmentProvider,
     agentInput,

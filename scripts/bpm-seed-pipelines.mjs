@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import { FINANCIAL_STAGES } from "../src/lib/bpm/pipeline-financeiro.ts";
 
 config({ path: ".env" });
 config({ path: ".env.local", override: true });
@@ -40,7 +41,7 @@ async function main() {
       nome: "Financeiro",
       setorNome: "FINANCEIRO",
       // Etapas simplificadas do ciclo de contrato (D-010/D-038) — versão MVP simplificada (D-029).
-      etapas: ["Ativo", "Em Cobrança", "Encerrado"],
+      etapas: FINANCIAL_STAGES.map((stage) => stage.label),
     },
     {
       nome: "Radar",

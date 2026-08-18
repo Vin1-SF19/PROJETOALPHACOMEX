@@ -1,0 +1,15 @@
+{
+  "ok": false,
+  "command": "poc",
+  "code": 1,
+  "checks": {
+    "upload": {
+      "ok": false,
+      "provider": "quobjects",
+      "cleanupSucceeded": null,
+      "errorCode": "PART_FAILED",
+      "message": "S3 did not return an ETag"
+    }
+  },
+  "timestamp": "2026-08-18T16:34:43.862Z"
+}

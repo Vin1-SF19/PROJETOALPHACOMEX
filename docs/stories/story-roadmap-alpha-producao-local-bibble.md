@@ -57,6 +57,9 @@ Ready for Review
 27. O modal de criação escolhe Claude ou Codex por objetivo, com Claude pré-selecionado; a preferência fica no estado local, acompanha todas as fases Bibble e alterna automaticamente para o outro adapter quando o primeiro esgota créditos ou fica indisponível. Qwen 3.8 permanece responsável pela documentação e pelos botões de melhoria.
 28. A visão inicial do Roadmap pode agregar todos os projetos; ao abrir Produção, o projeto do objetivo selecionado define o escopo de toda a tela, inclusive **Prompts por prioridade global**, accordions, métricas e painel de Markdown. Globalmente, apenas um objetivo pode permanecer em desenvolvimento por vez, inclusive durante cooldown de autocorreção, reinício ou concorrência entre workers.
 29. Toda documentação realiza auditoria de entregabilidade: identifica artefato, consumidor e caminho real de acesso. Uma capacidade ausente gera `AUTO_ADJUSTMENT_REQUIRED`; o worker promove automaticamente a próxima fase executável para Nova/Echo, implementa o suporte mínimo e exige verificação ponta a ponta. Arquivo solto não é aceito como entrega quando o objetivo exige consumo pelo sistema.
+30. O worker roteia tarefas por capacidade: Qwen 3.8 executa diagnósticos, levantamentos, análises e documentação simples; frontend, backend, banco, autenticação, segurança, integrações e alterações de código usam Claude/Codex. Se o Qwen descobrir complexidade durante uma tarefa básica, emite `CAPABILITY_ESCALATION_REQUIRED` e o mesmo contexto é encaminhado automaticamente ao cérebro de desenvolvimento.
+31. O modal **Editar objetivo** permite trocar a IA preferencial entre Claude e Codex sem regenerar a documentação. A preferência atual aparece selecionada, é persistida por objetivo e passa a valer nas próximas tentativas e fases, mantendo a outra IA como fallback.
+32. A UI e as actions de Produção exigem `ROADMAP_PRODUCTION_ENABLED=true`: no hospedado a navegação fica oculta e chamadas diretas retornam uma mensagem específica, enquanto o executor local permanece habilitado por configuração não versionada.
 
 ## Tarefas
 
@@ -75,6 +78,9 @@ Ready for Review
 - [x] Ajustar o shell visual dos cards do pipeline do Alpha CRM (RM-2026-5284A1).
 - [x] Isolar a Produção por projeto e garantir exclusividade global de um objetivo em desenvolvimento (AC 28).
 - [x] Adicionar auditoria de entregabilidade e autoajuste dirigido por lacunas detectadas no projeto real (AC 29).
+- [x] Permitir execução de tarefas básicas pelo Qwen com escalonamento automático para Claude/Codex (AC 30).
+- [x] Permitir alterar Claude/Codex pelo modal de edição sem criar nova revisão (AC 31).
+- [x] Restringir UI/actions de Produção ao runtime local explicitamente habilitado (AC 32).
 
 ## Segurança
 
@@ -92,21 +98,24 @@ Ready for Review
 
 ## Change Log
 
-| Date       | Version | Description                                                                                                                            | Author         |
-| ---------- | ------: | -------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| 2026-08-17 |   0.1.0 | Story criada a partir da solicitação de Produção local orientada pelo Bibble.                                                          | Codex / `@dev` |
-| 2026-08-17 |   1.0.0 | Produção local, acesso, adapters, worker, tools, UI, supervisor e E2E real concluídos.                                                 | Codex / `@dev` |
-| 2026-08-17 |   1.0.1 | Controles por execução e isolamento de falhas entre revisões adicionados à fila.                                                       | Codex / `@dev` |
-| 2026-08-17 |   1.0.2 | Fases analíticas separadas de escrita, encerramento obrigatório do modelo e troca atômica do estado local.                             | Codex / `@dev` |
-| 2026-08-17 |   1.0.3 | Autocorreção após reprovação, retry automático e reparo de fases de implementação atribuídas a agentes read-only.                      | Codex / `@dev` |
-| 2026-08-17 |   1.0.4 | Escrita confinada do Scribe e recuperação automática de encerramentos bloqueados por read-only.                                        | Codex / `@dev` |
-| 2026-08-17 |   1.1.0 | Abas de ciclo de vida, lixeira de três dias, relatório final, fila por prompt e melhoria de campos com Qwen 3.8.                       | Codex / `@dev` |
-| 2026-08-17 |   1.2.0 | Relato de erro global por objetivo, melhoria do feedback com IA e retrabalho rastreado no relatório final.                             | Codex / `@dev` |
-| 2026-08-17 |   1.2.1 | Cards de objetivos convertidos em accordions exclusivos para uma fila de Produção mais limpa.                                          | Codex / `@dev` |
-| 2026-08-17 |   1.3.0 | Claude/Codex definidos como cérebros por objetivo, com Claude padrão, fallback automático e Qwen exclusivo para documentação/melhoria. | Codex / `@dev` |
-| 2026-08-18 |   1.3.1 | Cards do pipeline do Alpha CRM ajustados para fundo cinza, borda azul sem glow, hover sutil e faixa lateral integrada.                 | Nova           |
-| 2026-08-18 |   1.4.0 | Produção filtrada pelo projeto de origem e worker protegido por afinidade de objetivo e lock global entre processos.                   | Codex / `@dev` |
-| 2026-08-18 |   1.5.0 | Qwen e agentes passaram a auditar a forma de entrega e promover automaticamente lacunas para implementação e validação ponta a ponta.  | Codex / `@dev` |
+| Date       | Version | Description                                                                                                                              | Author         |
+| ---------- | ------: | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 2026-08-17 |   0.1.0 | Story criada a partir da solicitação de Produção local orientada pelo Bibble.                                                            | Codex / `@dev` |
+| 2026-08-17 |   1.0.0 | Produção local, acesso, adapters, worker, tools, UI, supervisor e E2E real concluídos.                                                   | Codex / `@dev` |
+| 2026-08-17 |   1.0.1 | Controles por execução e isolamento de falhas entre revisões adicionados à fila.                                                         | Codex / `@dev` |
+| 2026-08-17 |   1.0.2 | Fases analíticas separadas de escrita, encerramento obrigatório do modelo e troca atômica do estado local.                               | Codex / `@dev` |
+| 2026-08-17 |   1.0.3 | Autocorreção após reprovação, retry automático e reparo de fases de implementação atribuídas a agentes read-only.                        | Codex / `@dev` |
+| 2026-08-17 |   1.0.4 | Escrita confinada do Scribe e recuperação automática de encerramentos bloqueados por read-only.                                          | Codex / `@dev` |
+| 2026-08-17 |   1.1.0 | Abas de ciclo de vida, lixeira de três dias, relatório final, fila por prompt e melhoria de campos com Qwen 3.8.                         | Codex / `@dev` |
+| 2026-08-17 |   1.2.0 | Relato de erro global por objetivo, melhoria do feedback com IA e retrabalho rastreado no relatório final.                               | Codex / `@dev` |
+| 2026-08-17 |   1.2.1 | Cards de objetivos convertidos em accordions exclusivos para uma fila de Produção mais limpa.                                            | Codex / `@dev` |
+| 2026-08-17 |   1.3.0 | Claude/Codex definidos como cérebros por objetivo, com Claude padrão, fallback automático e Qwen exclusivo para documentação/melhoria.   | Codex / `@dev` |
+| 2026-08-18 |   1.3.1 | Cards do pipeline do Alpha CRM ajustados para fundo cinza, borda azul sem glow, hover sutil e faixa lateral integrada.                   | Nova           |
+| 2026-08-18 |   1.4.0 | Produção filtrada pelo projeto de origem e worker protegido por afinidade de objetivo e lock global entre processos.                     | Codex / `@dev` |
+| 2026-08-18 |   1.5.0 | Qwen e agentes passaram a auditar a forma de entrega e promover automaticamente lacunas para implementação e validação ponta a ponta.    | Codex / `@dev` |
+| 2026-08-18 |   1.6.0 | Roteamento híbrido permite tarefas básicas no Qwen e escala engenharia, banco e código para Claude/Codex com preservação do diagnóstico. | Codex / `@dev` |
+| 2026-08-18 |   1.6.1 | Modal de edição passou a alterar a IA preferencial do objetivo sem regenerar prompts, aplicando-a às próximas fases e tentativas.        | Codex / `@dev` |
+| 2026-08-18 |   1.6.2 | Feature gate local oculta Produção no hospedado e bloqueia actions diretas com diagnóstico específico.                               | Codex / `@dev` |
 
 ## Dev Agent Record
 
@@ -124,7 +133,7 @@ Codex (GPT-5)
 - Execução real da revisão v3 retomada, implementada, aprovada pelo Probe e encerrada pelo Scribe com todas as cinco fases concluídas.
 - Segurança validada: traversal, segredos, schema/migrations, escrita read-only e shell arbitrário bloqueados.
 - Fila de Produção reorganizada por prompt; relatório final real gerado para `RM-2026-C4A90D` em `99-relatorio-conclusao.md`.
-- Lint direcionado e 62 testes Roadmap passaram; o typecheck mantém somente o baseline externo já documentado.
+- Lint direcionado e 64 testes Roadmap passaram; o typecheck mantém somente o baseline externo já documentado.
 - O modal de objetivo persiste Claude/Codex localmente; Claude é o padrão, Codex assume em falta de crédito/limite e o relatório final registra a preferência usada.
 - Fallback real validado em `RM-2026-57E057`: Claude retornou `PROVIDER_RATE_LIMITED` e Codex assumiu automaticamente a mesma fase.
 - O sync interno deixou de criar commits automáticos; `git add` e `git commit` permanecem sob responsabilidade exclusiva do administrador.
@@ -132,9 +141,13 @@ Codex (GPT-5)
 - Gate local de `RM-2026-5284A1` (2026-08-18): lint direcionado aos dois arquivos do objetivo passou; `npm run typecheck`, `npm test` e `npm run build` foram executados, mas permanecem bloqueados por baselines externos ao ajuste (4 erros TypeScript fora do CRM, 4 testes alheios/contrato textual antigo e `EPERM` no binário do Prisma). O `next build` isolado também foi impedido pela rede restrita ao buscar Geist/Geist Mono.
 - A Produção agora respeita o projeto selecionado; somente a visão inicial agrega todos os projetos. Cooldown de autocorreção mantém afinidade com o objetivo atual e um lock atômico impede dois workers de desenvolverem objetivos simultaneamente.
 - O Qwen injeta auditoria de entrega nos prompts; Scout sinaliza lacunas com contrato estruturado e o worker promove fases read-only para Nova/Echo quando for necessário criar suporte de consumo, sem codificar previamente uma solução específica.
+- O Qwen executa tarefas básicas com tools confinadas; o roteador envia frontend, backend, banco e código diretamente para Claude/Codex e preserva o diagnóstico quando o próprio Qwen solicita escalonamento por capacidade.
+- O modal de edição exibe a preferência atual e permite trocar Claude/Codex sem nova revisão; o worker sincroniza a mudança antes do próximo processamento da execução.
+- A Produção deixou de ser anunciada no runtime hospedado; permissão e feature gate local agora são exigidos em conjunto, inclusive nas server actions.
 
 ### File List
 
+- `.env.example`
 - `.gitignore`
 - `.bibble/memory/codebase-map.md`
 - `.bibble/memory/components.md`
@@ -165,6 +178,7 @@ Codex (GPT-5)
 - `src/lib/roadmap-production/completion-report.ts`
 - `src/lib/roadmap-production/execution-lock.ts`
 - `src/lib/roadmap-production/providers.ts`
+- `src/lib/roadmap-production/runtime.ts`
 - `src/lib/roadmap-production/storage.ts`
 - `src/lib/roadmap-production/tools.ts`
 - `src/lib/roadmap-production/worker.ts`
@@ -176,6 +190,7 @@ Codex (GPT-5)
 - `tests/roadmap-production/contracts.test.ts`
 - `tests/roadmap-production/execution-lock.test.ts`
 - `tests/roadmap-production/providers.test.ts`
+- `tests/roadmap-production/runtime.test.ts`
 - `tests/roadmap-production/storage.test.ts`
 - `tests/roadmap-production/tools.test.ts`
 

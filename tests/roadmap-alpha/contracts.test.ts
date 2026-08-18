@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   roadmapObjectiveContentSchema,
   roadmapObjectiveCreateSchema,
+  roadmapObjectiveEditSchema,
   roadmapObjectiveInputSchema,
   roadmapPhaseFilename,
   roadmapPhaseManifestSchema,
@@ -88,6 +89,24 @@ describe("contratos do Roadmap Alpha", () => {
         developmentProvider: "codex",
       }).developmentProvider,
     ).toBe("codex");
+  });
+
+  it("exige uma IA de desenvolvimento válida ao editar", () => {
+    const content = {
+      contractVersion: 1 as const,
+      moduleKey: "crm",
+      title: "Trocar cérebro de desenvolvimento",
+      description:
+        "Permitir que o administrador altere a IA sem regenerar os prompts.",
+      acceptanceCriteria: ["A próxima fase deve usar a IA selecionada."],
+    };
+    expect(
+      roadmapObjectiveEditSchema.parse({
+        ...content,
+        developmentProvider: "codex",
+      }).developmentProvider,
+    ).toBe("codex");
+    expect(roadmapObjectiveEditSchema.safeParse(content).success).toBe(false);
   });
 
   it("rejeita módulo desconhecido e chaves extras", () => {

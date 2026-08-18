@@ -24,6 +24,8 @@ O worker de documentação apenas cria os prompts. A aba **Produção local**, q
 
 Na criação e edição, os campos textuais possuem **Melhorar com IA**. O botão usa exclusivamente o Qwen 3.8 configurado para ampliar clareza e critérios verificáveis, preservando a intenção e sem salvar o texto até o administrador confirmar o formulário.
 
+O modal **Editar objetivo** também permite trocar a IA de desenvolvimento entre Claude e Codex. Alterar somente essa preferência não cria revisão nem regenera prompts. Uma fase já em execução termina normalmente; o worker sincroniza a escolha antes da próxima tentativa ou fase e mantém a outra IA como fallback automático.
+
 ## Ciclo de vida dos objetivos
 
 - **Pendentes**: objetivos ativos que ainda não entraram em implementação.
@@ -36,7 +38,8 @@ Arquivar ou excluir cancela jobs ainda abertos. Esses estados ficam fora da prio
 
 ## Produção local com Bibble
 
-- A navegação **Produção** aparece para Admin/CEO/TI e usuários com o override `roadmapProduction`.
+- A navegação **Produção** aparece somente quando o runtime local define `ROADMAP_PRODUCTION_ENABLED=true` e o usuário é Admin/CEO/TI ou possui o override `roadmapProduction`.
+- O ambiente hospedado deve manter a flag ausente ou `false`. Assim, não anuncia uma função que depende do checkout, worker, CLIs e estado persistente locais; chamadas diretas recebem **Produção disponível apenas no executor local**.
 - Somente Admin/CEO/TI veem **Configurar IA** e **Acessos**.
 - Ollama/Qwen 3.8 documenta e melhora os prompts. A implementação usa Claude Code por padrão e Codex CLI como fallback, ou a ordem escolhida no objetivo, desde que os adapters estejam diagnosticados como prontos.
 - A gaveta **Agentes** deriva dos skills instalados em `.claude/skills/bibble-squad/` e destaca agente, fase e atividade em andamento.
@@ -85,6 +88,8 @@ Reprovações de verificação entram no ciclo de autocorreção: o relatório d
 Se o manifesto atribuir por engano uma fase com título explícito de implementação ao Scout, Forge ou Probe, o worker mantém o agente solicitado no histórico, mas roteia a execução para Nova (frontend/UI) ou Echo (backend). Essa reconciliação também corrige execuções locais que já estavam bloqueadas antes da atualização.
 
 Todo objetivo inclui uma auditoria de entregabilidade. Scout identifica o artefato final, o consumidor e o caminho real de acesso no sistema. Quando uma tela, rota, ação, visualizador, download ou integração necessária não existe, ele registra `AUTO_ADJUSTMENT_REQUIRED` e o aceite ponta a ponta. O worker promove automaticamente a próxima fase executável para Nova ou Echo e incorpora somente o suporte mínimo necessário ao objetivo. A verificação não aceita um arquivo isolado como entrega quando o usuário precisa consumi-lo pela interface. Esse mecanismo é genérico: ele detecta a lacuna no projeto real e não contém implementação pré-programada de visualizador Markdown ou de outra solução específica.
+
+O motor de Produção usa roteamento híbrido. Qwen 3.8 pode executar diagnósticos, pesquisas locais, levantamentos, análises, checklists, resumos e documentação simples usando as tools confinadas. Pedidos ou descobertas envolvendo frontend, backend, API, banco de dados, schema, autenticação, segurança, integrações ou alteração de código seguem para Claude/Codex. Se uma tarefa inicialmente básica revelar complexidade, o Qwen responde com `CAPABILITY_ESCALATION_REQUIRED`; o worker entrega o diagnóstico já realizado ao cérebro de desenvolvimento e continua sem perder contexto.
 
 Fases `CLOSURE` do Scribe que exigem README, CHANGELOG ou atualização de `.bibble/memory/` recebem escrita confinada para documentação. Se forem bloqueadas por modo read-only, o diagnóstico anterior é reutilizado e a própria fase é retomada automaticamente.
 

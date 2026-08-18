@@ -1,0 +1,16 @@
+{
+  "ok": false,
+  "command": "poc",
+  "code": 1,
+  "checks": {
+    "upload": {
+      "ok": false,
+      "provider": "vercel-blob",
+      "stage": "download-object",
+      "cleanupSucceeded": true,
+      "errorCode": "UNKNOWN",
+      "message": "Storage operation failed (UNKNOWN)"
+    }
+  },
+  "timestamp": "2026-08-18T16:45:41.799Z"
+}

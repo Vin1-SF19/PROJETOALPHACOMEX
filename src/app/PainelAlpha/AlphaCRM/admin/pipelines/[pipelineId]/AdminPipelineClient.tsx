@@ -6,6 +6,8 @@ import { Plus, GripVertical } from "lucide-react";
 import { CriarEtapaBpm, AtualizarEtapaBpm, ReordenarEtapasBpm } from "@/actions/bpm/Etapas";
 import { CriarCampoBpm, AtualizarCampoBpm } from "@/actions/bpm/Campos";
 import type { TemaAlpha } from "@/lib/temas";
+import { FINANCIAL_PIPELINE_NAME, hasConfiguredFinancialPipeline } from "@/lib/bpm/pipeline-financeiro";
+import { ConfigurarEtapasFinanceiroButton } from "./ConfigurarEtapasFinanceiroButton";
 
 interface EtapaBpm {
   id: string;
@@ -61,6 +63,15 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
     await AtualizarEtapaBpm({ etapaId, slaDias });
   }
 
+  async function handleRenomearEtapa(etapaId: string, nome: string) {
+    setEtapas((prev) => prev.map((e) => (e.id === etapaId ? { ...e, nome } : e)));
+    if (!nome.trim()) return;
+    const res = await AtualizarEtapaBpm({ etapaId, nome: nome.trim() });
+    if (!res.success) {
+      setErro(typeof res.error === "string" ? res.error : "Erro ao renomear etapa");
+    }
+  }
+
   async function handleMoverEtapa(index: number, direcao: -1 | 1) {
     const novoIndex = index + direcao;
     if (novoIndex < 0 || novoIndex >= etapas.length) return;
@@ -112,6 +123,24 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
         <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{erro}</div>
       )}
 
+      {pipeline.nome === FINANCIAL_PIPELINE_NAME && (
+        hasConfiguredFinancialPipeline(etapas, campos) ? (
+          <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200" role="status">
+            Pipeline Financeiro configurado com as seis etapas e campos oficiais.
+          </div>
+        ) : (
+          <ConfigurarEtapasFinanceiroButton
+            pipelineId={pipeline.id}
+            accent={accent}
+            onConfigured={(data) => {
+              setEtapas(data.etapas);
+              setCampos(data.campos);
+              router.refresh();
+            }}
+          />
+        )
+      )}
+
       {/* Etapas */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-white uppercase tracking-wide">Etapas</h2>
@@ -119,7 +148,13 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
           {etapas.map((etapa, i) => (
             <div key={etapa.id} className="flex items-center gap-3 bg-slate-800/60 border border-white/5 rounded-xl px-3 py-2">
               <GripVertical size={14} className="text-slate-600" />
-              <span className="flex-1 text-sm text-white">{etapa.nome}</span>
+              <input
+                aria-label={`Nome da etapa ${etapa.nome}`}
+                className={`${inputCls} flex-1`}
+                value={etapa.nome}
+                onChange={(e) => setEtapas((prev) => prev.map((it) => (it.id === etapa.id ? { ...it, nome: e.target.value } : it)))}
+                onBlur={(e) => handleRenomearEtapa(etapa.id, e.target.value)}
+              />
               <label className="flex items-center gap-1.5 text-xs text-slate-400">
                 SLA (dias)
                 <input

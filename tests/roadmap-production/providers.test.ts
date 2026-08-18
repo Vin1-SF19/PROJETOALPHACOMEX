@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { runProductionAgent } from "@/lib/roadmap-production/providers";
+import {
+  runProductionAgent,
+  selectProductionExecutionEngine,
+} from "@/lib/roadmap-production/providers";
 import { cliProviderInternals } from "@/lib/roadmap-production/cli-providers";
 
 const roots: string[] = [];
@@ -17,6 +20,45 @@ afterEach(async () => {
 });
 
 describe("adapter Ollama de Produção", () => {
+  it("separa tarefas básicas do Qwen das tarefas de engenharia", () => {
+    const base = {
+      agentId: "scout",
+      phaseKind: "CONTEXT",
+      allowWrite: false,
+      previousSummaries: [],
+    };
+    expect(
+      selectProductionExecutionEngine({
+        ...base,
+        phaseTitle: "Diagnóstico operacional",
+        phaseMarkdown: "Investigue o fluxo e produza um relatório.",
+      }),
+    ).toBe("qwen");
+    for (const task of [
+      "Diagnosticar o frontend React",
+      "Revisar o backend e a API",
+      "Analisar o banco de dados Prisma",
+    ]) {
+      expect(
+        selectProductionExecutionEngine({
+          ...base,
+          phaseTitle: task,
+          phaseMarkdown: task,
+        }),
+      ).toBe("development");
+    }
+    expect(
+      selectProductionExecutionEngine({
+        ...base,
+        phaseTitle: "Continuar diagnóstico",
+        phaseMarkdown: "Use os achados anteriores.",
+        previousSummaries: [
+          "CAPABILITY_ESCALATION_REQUIRED: BACKEND — precisa alterar a API",
+        ],
+      }),
+    ).toBe("development");
+  });
+
   it("solicita uma conclusão curta quando a primeira resposta é truncada", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "roadmap-provider-"));
     roots.push(root);
@@ -117,6 +159,9 @@ describe("adapter Ollama de Produção", () => {
     expect(
       firstBody.messages.find((message) => message.role === "system")?.content,
     ).toContain("AUTO_ADJUSTMENT_REQUIRED");
+    expect(
+      firstBody.messages.find((message) => message.role === "system")?.content,
+    ).toContain("CAPABILITY_ESCALATION_REQUIRED");
   });
 });
 

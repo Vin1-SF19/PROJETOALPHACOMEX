@@ -8,6 +8,8 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  ListObjectsCommand,
+  ListPartsCommand,
   S3Client,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
@@ -100,8 +102,23 @@ export class QuObjectsProvider implements StorageProvider {
         Body: body,
         ContentLength: body.byteLength,
       }), { abortSignal: signal });
-      if (!result.ETag) throw new StorageError("PART_FAILED", "S3 did not return an ETag", { provider: this.id });
-      return { partNumber, etag: result.ETag, size: body.byteLength };
+      let etag = result.ETag;
+
+      // Some S3-compatible gateways can omit the UploadPart ETag response
+      // header. QuObjects supports ListParts, so recover the authoritative
+      // value from the active multipart session instead of guessing a hash.
+      if (!etag) {
+        const listed = await this.client.send(new ListPartsCommand({
+          Bucket: session.bucketOrStore,
+          Key: session.objectKey,
+          UploadId: session.uploadId,
+          MaxParts: 10_000,
+        }), { abortSignal: signal });
+        etag = listed.Parts?.find((part) => part.PartNumber === partNumber)?.ETag;
+      }
+
+      if (!etag) throw new StorageError("PART_FAILED", "S3 did not expose the uploaded part ETag", { provider: this.id });
+      return { partNumber, etag, size: body.byteLength };
     } catch (error) {
       throw classifyStorageError(error, this.id);
     }
@@ -165,7 +182,34 @@ export class QuObjectsProvider implements StorageProvider {
         providerIdentifier: result.VersionId,
       };
     } catch (error) {
-      throw classifyStorageError(error, this.id);
+      const classified = classifyStorageError(error, this.id);
+      if (classified.code !== "AUTH_FAILED") throw classified;
+
+      // This QuObjects deployment accepts GET/PUT/DELETE but returns 403 for
+      // HeadObject through the public gateway. An exact ListObjects lookup
+      // retrieves size and ETag without downloading the object.
+      try {
+        const listed = await this.client.send(new ListObjectsCommand({
+          Bucket: target.bucket,
+          Prefix: objectKey,
+          MaxKeys: 1,
+        }), { abortSignal: signal });
+        const object = listed.Contents?.find((candidate) => candidate.Key === objectKey);
+        if (!object) {
+          throw new StorageError("OBJECT_NOT_FOUND", "S3 object was not found", { provider: this.id });
+        }
+        return {
+          provider: this.id,
+          logicalStorage: target.logicalStorage,
+          bucketOrStore: target.bucket,
+          objectKey,
+          size: object.Size ?? 0,
+          contentType: "application/octet-stream",
+          etag: object.ETag,
+        };
+      } catch (fallbackError) {
+        throw classifyStorageError(fallbackError, this.id);
+      }
     }
   }
 

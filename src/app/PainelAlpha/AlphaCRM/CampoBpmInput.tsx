@@ -15,6 +15,7 @@ interface CampoBpmInputProps {
   onBlur?: () => void;
   className: string;
   disabled?: boolean;
+  readOnly?: boolean;
   invalid?: boolean;
   describedBy?: string;
 }
@@ -38,9 +39,11 @@ export function CampoBpmInput({
   onBlur,
   className,
   disabled = false,
+  readOnly = false,
   invalid = false,
   describedBy,
 }: CampoBpmInputProps) {
+  const bloqueado = disabled || readOnly;
   const opcoes = campo.tipo === "booleano"
     ? ["Sim", "Não"]
     : lerOpcoes(campo.opcoesJson);
@@ -55,7 +58,7 @@ export function CampoBpmInput({
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         value={value}
-        disabled={disabled}
+        disabled={bloqueado}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
       >
@@ -77,7 +80,7 @@ export function CampoBpmInput({
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         value={value}
-        disabled={disabled}
+        disabled={bloqueado}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
       />
@@ -96,7 +99,7 @@ export function CampoBpmInput({
       inputMode={campo.tipo === "cpf" ? "numeric" : undefined}
       maxLength={campo.tipo === "cpf" ? 14 : undefined}
       value={value}
-      disabled={disabled}
+      disabled={bloqueado}
       onChange={(event) => onChange(event.target.value)}
       onBlur={onBlur}
     />

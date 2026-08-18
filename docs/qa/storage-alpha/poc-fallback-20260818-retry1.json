@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "command": "poc",
+  "code": 0,
+  "checks": {
+    "safety": {
+      "ok": true,
+      "isolatedKey": true,
+      "cleanupSucceeded": true
+    },
+    "upload": {
+      "ok": true,
+      "provider": "vercel-blob",
+      "selectionReason": "EXPLICIT",
+      "bytes": 10485760,
+      "parts": 1,
+      "checksumVerified": true,
+      "durationMs": 4939,
+      "throughputMiBPerSecond": 2.02
+    }
+  },
+  "timestamp": "2026-08-18T16:47:31.842Z"
+}

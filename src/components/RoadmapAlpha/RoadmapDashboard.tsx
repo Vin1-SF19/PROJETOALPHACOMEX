@@ -1168,6 +1168,9 @@ function EditObjectiveDialog({
   const [criteria, setCriteria] = useState(
     objective.acceptanceCriteria.join("\n"),
   );
+  const [developmentProvider, setDevelopmentProvider] = useState<
+    "claude" | "codex"
+  >(objective.developmentProvider);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -1185,6 +1188,7 @@ function EditObjectiveDialog({
             .split("\n")
             .map((item) => item.trim())
             .filter(Boolean),
+          developmentProvider,
         },
       });
       if (!result.success) {
@@ -1194,7 +1198,9 @@ function EditObjectiveDialog({
       toast.success(
         result.regenerated
           ? "Objetivo atualizado e nova revisão enfileirada"
-          : "Nenhuma alteração material detectada",
+          : result.providerChanged
+            ? `IA de desenvolvimento alterada para ${result.developmentProvider === "claude" ? "Claude" : "Codex"}`
+            : "Nenhuma alteração material detectada",
       );
       onUpdated();
     });
@@ -1321,6 +1327,48 @@ function EditObjectiveDialog({
               className="mt-1.5 w-full resize-y rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm"
             />
           </label>
+          <fieldset className="space-y-2">
+            <legend className="flex items-center gap-2 text-xs text-slate-400">
+              <BrainCircuit size={14} className="text-violet-300" /> IA de
+              desenvolvimento
+            </legend>
+            <p className="text-[11px] text-slate-500">
+              A troca não regenera os prompts. Uma fase já em execução termina;
+              próximas tentativas e fases usam a nova preferência, com fallback
+              automático para a outra IA.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    id: "claude",
+                    label: "Claude",
+                    description: "Preferencial · fallback Codex",
+                  },
+                  {
+                    id: "codex",
+                    label: "Codex",
+                    description: "Preferencial · fallback Claude",
+                  },
+                ] as const
+              ).map((brain) => (
+                <button
+                  key={brain.id}
+                  type="button"
+                  aria-pressed={developmentProvider === brain.id}
+                  onClick={() => setDevelopmentProvider(brain.id)}
+                  className={`rounded-xl border p-3 text-left transition ${developmentProvider === brain.id ? "border-violet-400/40 bg-violet-400/10" : "border-white/10 bg-slate-950 hover:border-white/20"}`}
+                >
+                  <span className="block text-sm font-medium text-slate-100">
+                    {brain.label}
+                  </span>
+                  <span className="mt-1 block text-[10px] text-slate-500">
+                    {brain.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"

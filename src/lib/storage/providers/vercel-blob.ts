@@ -23,7 +23,7 @@ import { StorageError } from "@/lib/storage/contracts";
 import type { StorageRuntimeConfig } from "@/lib/storage/runtime-config";
 import { classifyStorageError } from "@/lib/storage/sanitize";
 
-type BlobSdk = {
+export type BlobSdk = {
   list: typeof list;
   createMultipartUpload: typeof createMultipartUpload;
   uploadPart: typeof uploadPart;
@@ -172,7 +172,10 @@ export class VercelBlobProvider implements StorageProvider {
   async download(target: StorageTarget, objectKey: string, signal?: AbortSignal): Promise<AsyncIterable<Uint8Array>> {
     void target;
     try {
-      const result = await this.sdk.get(objectKey, { ...this.commonOptions(signal), useCache: false });
+      const result = await this.sdk.get(objectKey, {
+        ...this.commonOptions(signal),
+        ...(this.config.blobAccess === "private" ? { useCache: false } : {}),
+      });
       if (!result || result.statusCode !== 200 || !result.stream) {
         throw new StorageError("OBJECT_NOT_FOUND", "Blob object was not found", { provider: this.id });
       }

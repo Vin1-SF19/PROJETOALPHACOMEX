@@ -13,6 +13,7 @@ import { improveRoadmapField } from "@/lib/roadmap-alpha/improve-with-ai";
 import { listBibbleAgents } from "@/lib/roadmap-production/agents";
 import { productionProviderSchema } from "@/lib/roadmap-production/contracts";
 import { diagnoseProductionProviders } from "@/lib/roadmap-production/providers";
+import { ROADMAP_PRODUCTION_RUNTIME_DISABLED } from "@/lib/roadmap-production/runtime";
 import {
   enqueueProductionControl,
   readProductionConfig,
@@ -43,6 +44,11 @@ const implementationFeedbackSchema = z
 const userIdSchema = z.number().int().positive();
 
 function publicError(error: unknown): string {
+  if (
+    error instanceof Error &&
+    error.message === ROADMAP_PRODUCTION_RUNTIME_DISABLED
+  )
+    return "Produção disponível apenas no executor local";
   if (
     error instanceof Error &&
     ["UNAUTHORIZED", "FORBIDDEN"].includes(error.message)

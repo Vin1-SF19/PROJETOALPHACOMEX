@@ -6,8 +6,8 @@ import { z } from "zod";
 import db from "@/lib/prisma";
 import { requireRoadmapAccess } from "@/lib/roadmap-alpha/authorization";
 import {
-  roadmapObjectiveContentSchema,
   roadmapObjectiveCreateSchema,
+  roadmapObjectiveEditSchema,
 } from "@/lib/roadmap-alpha/contracts";
 import {
   improveRoadmapField,
@@ -156,15 +156,28 @@ export async function AtualizarObjetivoRoadmap(payload: unknown) {
   try {
     await requireRoadmapAccess(true);
     const parsed = z
-      .object({ objectiveId: idSchema, content: roadmapObjectiveContentSchema })
+      .object({ objectiveId: idSchema, content: roadmapObjectiveEditSchema })
       .strict()
       .parse(payload);
+    const { developmentProvider, ...objectiveContent } = parsed.content;
+    const preferences = await readObjectiveDevelopmentPreferences();
+    const previousDevelopmentProvider =
+      preferences.objectives[parsed.objectiveId] ?? "claude";
     const result = await updateRoadmapObjective(
       parsed.objectiveId,
-      parsed.content,
+      objectiveContent,
+    );
+    await writeObjectiveDevelopmentProvider(
+      parsed.objectiveId,
+      developmentProvider,
     );
     revalidatePath(ROUTE);
-    return { success: true as const, regenerated: result.regenerated };
+    return {
+      success: true as const,
+      regenerated: result.regenerated,
+      providerChanged: previousDevelopmentProvider !== developmentProvider,
+      developmentProvider,
+    };
   } catch (error) {
     if (error instanceof z.ZodError)
       return { success: false as const, error: "Revise os campos do objetivo" };
