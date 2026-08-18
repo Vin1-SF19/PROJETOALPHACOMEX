@@ -48,40 +48,6 @@ export const textoComponenteSchema = baseComponenteSchema.extend({
   }).optional(),
 });
 
-/** 82 variantes de moldura decorativa REAL (ilustração vetorial CC0/domínio público, catálogo
- * em `molduras-catalogo.ts` → arquivo SVG em `public/molduras/`) — usadas tanto pelo elemento
- * independente "moldura" (arrastável, desenha a arte por cima de qualquer coisa) quanto pela
- * moldura do SLIDE inteiro (`canvasConfigSchema`). Uma única lista para as duas nunca divergirem. */
-export const MOLDURA_TIPOS = [
-  "nenhuma", "borda-classica", "borda-clean", "borda-elegante", "borda-simples",
-  "circulo-decorado", "decorativa-classica", "decorativa-simples", "espiral-decorativa",
-  "floral-classica", "floral-decorativa", "floral-fluorescencia", "floral-narciso",
-  "floral-vintage-prismatica", "floral-vintage-silhueta", "geometrica-fina",
-  "ornamental-classica", "ornamental-quadrada", "ornamental-renovada",
-  "ornamental-silhueta-2", "quadro-colorido",
-  "borda-retrato", "circulo-arame-farpado", "elipse-arame-farpado", "triangulo-arame-farpado",
-  "moldura-preta", "moldura-azul", "borda-fina-118", "borda-fina-53", "borda-fina-54",
-  "borda-fina-55", "borda-fina-57", "borda-fina-60", "borda-fina-62", "borda-fina-63",
-  "borda-fina-64", "borda-fina-66", "borda-fina-69", "borda-fina-70", "borda-fina-71",
-  "borda-fina-74", "borda-fina-75", "borda-fina-77", "borda-fina-80",
-  "moldura-quadro-simples", "circulo-ornamental-colorido", "circulo-quadrado-duplo",
-  "borda-cidade", "ornamental-decorativa-2", "ornamental-renovada-2", "ornamental-renovada-3",
-  "ornamental-renovada-4", "borda-fogo", "borda-floral-2", "floral-flourish",
-  "floral-vintage-10", "floral-vintage-2", "floral-vintage-4", "floral-vintage-7",
-  "moldura-classica-2", "moldura-contorno-2", "ornamental-renovada-5", "floco-neve-dourado",
-  "grega-grande-2", "grega-grande", "moldura-verde", "moldura-espelho", "moldura-filme",
-  "vintage-linha-arte", "moldura-foto", "foto-cantos-antigos", "moldura-quadro",
-  "redonda-vintage", "moldura-tripla", "caligrafia-vintage", "vintage-estendida",
-  "vintage-estendida-10", "vintage-estendida-14", "vintage-estendida-18",
-  "vintage-estendida-2", "vintage-estendida-7", "vintage-folhas-uva", "borda-vime",
-] as const;
-export type MolduraTipo = (typeof MOLDURA_TIPOS)[number];
-
-/** As 20 variantes REAIS de desenho (exclui "nenhuma", que só faz sentido como opção "sem
- * moldura" do SLIDE — um elemento "moldura" real no canvas sempre tem um desenho concreto). */
-export const MOLDURA_VARIANTE_TIPOS = MOLDURA_TIPOS.filter((tipo): tipo is Exclude<MolduraTipo, "nenhuma"> => tipo !== "nenhuma");
-export type MolduraVarianteTipo = (typeof MOLDURA_VARIANTE_TIPOS)[number];
-
 export const imagemComponenteSchema = baseComponenteSchema.extend({
   tipo: z.literal("imagem"),
   url: z.string(),
@@ -94,18 +60,6 @@ export const imagemComponenteSchema = baseComponenteSchema.extend({
     bottom: z.number().min(0).max(0.999),
   }).optional(),
   tile: z.boolean().optional(),
-});
-
-/** Moldura decorativa REAL (ilustração vetorial pronta — floral, ornamental, vintage — não
- * geometria matemática). Cada `variante` referencia um arquivo SVG de arte em
- * `public/molduras/` (catálogo em `molduras-catalogo.ts`). A cor original vem desenhada no
- * arquivo; `corFiltro` (opcional) recolore via overlay `mix-blend-mode: color` + CSS mask
- * (ver `RenderMoldura` em `RenderBasicos.tsx`) sem reescrever o SVG — "nenhuma"/ausente
- * preserva a cor original do arquivo. */
-export const molduraComponenteSchema = baseComponenteSchema.extend({
-  tipo: z.literal("moldura"),
-  variante: z.enum(MOLDURA_VARIANTE_TIPOS),
-  corFiltro: z.string().optional(),
 });
 
 /** Vídeo HTML5 nativo — mesmo padrão de imagem (URL, sem upload próprio nesta onda). */
@@ -172,4 +126,28 @@ export const formaComponenteSchema = baseComponenteSchema.extend({
   corPreenchimento: z.string().optional(),
   corBorda: z.string().optional(),
   larguraBorda: z.number().nonnegative().optional(),
+});
+
+/** Moldura — forma geométrica que funciona como slot/recorte de imagem (estilo Canva): o
+ * `contorno` reaproveita o MESMO catálogo de `FORMA_VARIANTE_TIPOS` (retângulo, círculo,
+ * hexágono, coração, nuvem etc. — `formas-catalogo.ts`), sem vazado próprio. Sem `imagem`, o
+ * elemento mostra só o contorno vazio (stroke, sem preenchimento) — arrastável/redimensionável
+ * como qualquer elemento. Com `imagem`, a foto é recortada exatamente na silhueta do contorno
+ * (clip-path), com `crop` opcional (mesmo formato de `imagemComponenteSchema.crop`) para
+ * ajustar o enquadramento dentro do recorte. `raioArredondamento` (0-100, percentual) só se
+ * aplica quando `contorno === "retangulo"` — equivalente ao slider "Arredondamento dos cantos"
+ * do Canva. */
+export const molduraComponenteSchema = baseComponenteSchema.extend({
+  tipo: z.literal("moldura"),
+  contorno: z.enum(FORMA_VARIANTE_TIPOS),
+  raioArredondamento: z.number().min(0).max(100).optional(),
+  imagem: z.object({
+    url: z.string(),
+    crop: z.object({
+      left: z.number().min(0).max(0.999),
+      top: z.number().min(0).max(0.999),
+      right: z.number().min(0).max(0.999),
+      bottom: z.number().min(0).max(0.999),
+    }).optional(),
+  }).optional(),
 });

@@ -4,7 +4,6 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { RenderComponenteAnimado } from "@/components/Apresentacoes/Editor/RenderEngine/RenderComponente";
 import { EfeitosGlobaisSlide, type AjusteVisualEfeitoGlobal } from "@/components/Apresentacoes/Editor/RenderEngine/EfeitosGlobaisSlide";
-import { MolduraSlideOverlay } from "@/components/Apresentacoes/Editor/RenderEngine/MolduraSlideOverlay";
 import { filtroCss, stylePosicaoAbsoluta } from "@/components/Apresentacoes/Editor/RenderEngine/posicionamento";
 import type { ContainerIntroEvent } from "@/lib/apresentacoes/container-intro";
 import { CLIP_SLIDE_COMPLETO } from "@/lib/apresentacoes/container-intro";
@@ -168,7 +167,6 @@ export function SlideApresentacaoLayer({
           )}
         </EfeitosGlobaisSlide>
       </TransicaoSlide>
-      <MolduraSlideOverlay canvas={slide.canvas} />
     </motion.div>
   );
 }

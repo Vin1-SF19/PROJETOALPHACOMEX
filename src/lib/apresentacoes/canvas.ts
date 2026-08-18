@@ -1,18 +1,11 @@
 import { z } from "zod";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
-import { MOLDURA_TIPOS } from "@/lib/validations/slide-componentes-basicos";
 
 export const canvasConfigSchema = z.object({
   width: z.number().int().min(320).max(3840),
   height: z.number().int().min(320).max(3840),
   backgroundColor: z.string().min(1).max(64).default("#0f172a"),
   backgroundImage: z.string().max(4096).optional(),
-  /** Moldura decorativa REAL (ilustração vetorial pronta, catálogo em `molduras-catalogo.ts`)
-   * ao redor do SLIDE inteiro via CSS `border-image` (ver `MolduraSlideOverlay`/
-   * `moldura-estilo.ts`) — distinta do elemento "moldura" solto. "nenhuma"/ausente preserva o
-   * comportamento anterior (sem moldura). Sem cor customizável aqui: ver nota em
-   * `PainelPropriedadesSlide.tsx`. */
-  moldura: z.enum(MOLDURA_TIPOS).optional(),
 });
 
 export type CanvasConfig = z.infer<typeof canvasConfigSchema>;

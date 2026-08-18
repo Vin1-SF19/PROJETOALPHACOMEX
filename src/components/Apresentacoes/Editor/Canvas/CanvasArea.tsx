@@ -8,7 +8,6 @@ import { ComponenteNoCanvas } from "./ComponenteNoCanvas";
 import type { TemaResumo } from "../ApresentacaoEditor";
 import { SlidePortalPreview } from "../RenderEngine/SlidePortalPreview";
 import { EfeitosGlobaisSlide } from "../RenderEngine/EfeitosGlobaisSlide";
-import { MolduraSlideOverlay } from "../RenderEngine/MolduraSlideOverlay";
 import { obterProximoSlide } from "@/lib/apresentacoes/proximo-slide";
 import { GuiasAlinhamento } from "./GuiasAlinhamento";
 
@@ -129,7 +128,6 @@ export function CanvasArea({ tema }: CanvasAreaProps) {
           )}
         </EfeitosGlobaisSlide>
         <GuiasAlinhamento />
-        <MolduraSlideOverlay canvas={canvas} />
 
         {debugPptx && componentes.filter((component) => component.pptxOrigem).map((component) => (
           <div

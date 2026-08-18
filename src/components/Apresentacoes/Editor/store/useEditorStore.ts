@@ -73,7 +73,6 @@ interface EditorStore {
   redimensionarCanvas: (canvas: CanvasConfig) => void;
   atualizarFundoCanvas: (backgroundColor: string) => void;
   atualizarFundoCanvasImagem: (backgroundImage: string | undefined) => void;
-  atualizarMolduraCanvas: (moldura: CanvasConfig["moldura"]) => void;
   atualizarTransicaoSlide: (transicaoEntrada: string | null) => void;
   adicionarAnimacaoElemento: (animacao: ElementAnimation) => void;
   adicionarAnimacoesElementos: (animacoes: ElementAnimation[]) => void;
@@ -518,11 +517,6 @@ export const useEditorStore = create<EditorStore>((set) => ({
   atualizarFundoCanvasImagem: (backgroundImage) => set((state) => ({
     ...registrarHistorico(state),
     canvas: { ...state.canvas, backgroundImage },
-    ...estadoAlterado(state),
-  })),
-  atualizarMolduraCanvas: (moldura) => set((state) => ({
-    ...registrarHistorico(state),
-    canvas: { ...state.canvas, moldura },
     ...estadoAlterado(state),
   })),
   atualizarTransicaoSlide: (transicaoEntrada) => set((state) => ({

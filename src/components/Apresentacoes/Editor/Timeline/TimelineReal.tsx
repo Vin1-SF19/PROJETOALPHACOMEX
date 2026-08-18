@@ -21,7 +21,7 @@ const LARGURA_REGUA = MAX_TEMPO * PIXELS_POR_SEGUNDO;
 function resolverEntradaRegistry(componente: ComponenteSlide) {
   if (componente.tipo === "fundoAnimado") return registryFundoParaEstilo(componente.estilo, componente.preset);
   if (componente.tipo === "forma") return registryFormaParaEstilo(componente.variante);
-  if (componente.tipo === "moldura") return registryMolduraParaEstilo(componente.variante);
+  if (componente.tipo === "moldura") return registryMolduraParaEstilo(componente.contorno);
   return COMPONENTES_REGISTRY[componente.tipo];
 }
 

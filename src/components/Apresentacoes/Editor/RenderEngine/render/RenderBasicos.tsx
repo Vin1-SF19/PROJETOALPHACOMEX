@@ -15,7 +15,6 @@ import type {
 } from "@/lib/validations/slide-componentes";
 import { pilhaCssDaFonte } from "@/lib/apresentacoes/pptx/texto";
 import { FORMAS_CATALOGO } from "@/lib/apresentacoes/formas-catalogo";
-import { MOLDURAS_CATALOGO } from "@/lib/apresentacoes/molduras-catalogo";
 import { AnimacaoWrapper } from "../nucleo";
 
 /**
@@ -342,52 +341,57 @@ export function RenderForma({ componente }: { componente: FormaComponente }) {
   );
 }
 
-/** Moldura decorativa — elemento independente (arrastável/redimensionável/rotacionável como
- * qualquer forma), desenha a ilustração por cima de qualquer coisa que esteja embaixo no slide
- * — nunca recorta nem esconde o conteúdo, é puramente decorativo (como uma moldura de quadro
- * física colocada sobre uma foto). Catálogo em `molduras-catalogo.ts`, mesmo compartilhado pela
- * moldura do SLIDE inteiro.
- *
- * `corFiltro` recolore sem reescrever o SVG: uma camada sólida da cor escolhida por cima do
- * desenho original, com `mix-blend-mode: color` — substitui matiz/saturação preservando a
- * luminância (sombreado/relevo) do desenho, resultado previsível para qualquer hex (diferente
- * de aproximar via `filter` CSS, que não bate com a cor pedida de forma confiável). A camada de
- * cor é recortada pela silhueta do próprio SVG via `mask`, então não pinta um retângulo sólido.
- */
+/** Moldura — forma geométrica que funciona como slot/recorte de imagem (estilo Canva): sem
+ * `imagem`, mostra só o contorno vazio (stroke, sem preenchimento); com `imagem`, a foto é
+ * recortada exatamente na silhueta do `contorno` via `<clipPath>` SVG (mesmo catálogo/técnica
+ * de `RenderForma` — viewBox 0-100×100, `preserveAspectRatio="none"` para o contorno acompanhar
+ * `w`/`h` do componente livremente). O `id` do clipPath deriva de `componente.id` (já único por
+ * elemento) em vez de `useId()` — evita o prefixo `:r1:` do React, que teoricamente é um `id`
+ * HTML válido mas é mais frágil em contextos de export/SSR estático deste RenderEngine. */
 export function RenderMoldura({ componente }: { componente: MolduraComponente }) {
-  const entrada = MOLDURAS_CATALOGO[componente.variante];
-  if (!entrada.src) return null;
+  const clipId = `moldura-clip-${componente.id}`;
+  const entrada = FORMAS_CATALOGO[componente.contorno];
+  const raio = componente.contorno === "retanguloArredondado" ? 14 : componente.raioArredondamento ?? 0;
 
-  const imagem = (
-    // eslint-disable-next-line @next/next/no-img-element -- RenderEngine é genérico (também roda no Export estático/player offline), sem acesso garantido ao otimizador do next/image
-    <img
-      src={entrada.src}
-      alt=""
-      draggable={false}
-      style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none", objectFit: "fill" }}
-    />
+  const contornoSvg = (
+    <>
+      {entrada.tipoElemento === "rect" && <rect x="2" y="2" width="96" height="96" rx={raio} />}
+      {entrada.tipoElemento === "ellipse" && <ellipse cx="50" cy="50" rx="48" ry="48" />}
+      {entrada.tipoElemento === "polygon" && <polygon points={entrada.points} />}
+      {entrada.tipoElemento === "path" && <path d={entrada.d} />}
+    </>
   );
 
-  if (!componente.corFiltro) return imagem;
+  if (!componente.imagem?.url) {
+    return (
+      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style={{ display: "block", overflow: "visible" }}>
+        <g fill="none" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="3 2">
+          {contornoSvg}
+        </g>
+      </svg>
+    );
+  }
+
+  const crop = componente.imagem.crop;
+  const visibleWidth = crop ? Math.max(0.001, 1 - crop.left - crop.right) : 1;
+  const visibleHeight = crop ? Math.max(0.001, 1 - crop.top - crop.bottom) : 1;
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      {imagem}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundColor: componente.corFiltro,
-          mixBlendMode: "color",
-          WebkitMaskImage: `url(${JSON.stringify(entrada.src)})`,
-          maskImage: `url(${JSON.stringify(entrada.src)})`,
-          WebkitMaskSize: "100% 100%",
-          maskSize: "100% 100%",
-          WebkitMaskRepeat: "no-repeat",
-          maskRepeat: "no-repeat",
-        }}
+    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style={{ display: "block", overflow: "visible" }}>
+      <defs>
+        <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+          {contornoSvg}
+        </clipPath>
+      </defs>
+      <image
+        href={componente.imagem.url}
+        x={crop ? `${(-crop.left / visibleWidth) * 100}` : "0"}
+        y={crop ? `${(-crop.top / visibleHeight) * 100}` : "0"}
+        width={`${100 / visibleWidth}`}
+        height={`${100 / visibleHeight}`}
+        preserveAspectRatio="none"
+        clipPath={`url(#${clipId})`}
       />
-    </div>
+    </svg>
   );
 }
