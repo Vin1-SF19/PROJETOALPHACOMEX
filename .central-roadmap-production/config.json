@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "provider": "claude",
+  "model": "default",
+  "autoRun": true,
+  "maxToolSteps": 24,
+  "updatedAt": "2026-08-19T12:31:51.232Z"
+}
