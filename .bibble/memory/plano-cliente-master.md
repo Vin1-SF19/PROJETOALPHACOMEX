@@ -388,12 +388,14 @@ Para CADA módulo desta lista, o ciclo completo é:
 
 A Fase 4 (linha 379 acima) só confirmou "nenhuma tabela ATIVA referencia `clientes`/`clientes_old_fase36`" — não fez a varredura de `PRAGMA foreign_key_list` em TODAS as tabelas contra TODOS os nomes `_old_faseNN`/`_old_fixfk` gerados pelas fases 3.3/3.5/3.6/3.7. Um bug real reportado pelo usuário no módulo Extratos Bancários ("FOREIGN KEY constraint failed" ao criar período) levou a uma varredura completa nessa data, que encontrou o MESMO padrão em mais 8 relações, intocadas até então:
 
-- `PeriodosAnalise.extratoId` → `Extratos_old_fase33` (Fase 3.3) — **corrigido nesta data**, ver `known-errors.md`.
-- `Checklist.empresaId` → `operacional_clientes_old_fase35` (Fase 3.5) — **pendente**.
-- `observacoes_contratos.contratoId` → `contratos_comerciais_old_fase36` (Fase 3.6) — **pendente**.
-- `CommissionEntry.eventId`, `CommissionDivergence.eventId` → `CommissionEvent_old_fase37` (Fase 3.7) — **pendente**.
-- `CommissionEvent.businessProcessId` → `BusinessProcess_old_fase37` (Fase 3.7) — **pendente**.
-- 8 tabelas filhas de `BpmCard` (`BpmCardCampoValor/Membro/Vinculo/Historico/Anexo`, `BpmTarefa`, `BpmInteracaoCard`, `BpmChecklistFollowUp`) → `BpmCard_old_fixfk` — **pendente**.
+- `PeriodosAnalise.extratoId` → `Extratos_old_fase33` (Fase 3.3) — **corrigido em 2026-08-21**, ver `known-errors.md`.
+- `Checklist.empresaId` → `operacional_clientes_old_fase35` (Fase 3.5) — **pendente, achado bloqueante próprio** (ver abaixo).
+- `observacoes_contratos.contratoId` → `contratos_comerciais_old_fase36` (Fase 3.6) — **corrigido em 2026-08-21** (0 órfãos, 88/88 IDs batiam).
+- `CommissionEntry.eventId`, `CommissionDivergence.eventId` → `CommissionEvent_old_fase37` (Fase 3.7) — **corrigido em 2026-08-21** (0 órfãos, 274/274 IDs batiam).
+- `CommissionEvent.businessProcessId` → `BusinessProcess_old_fase37` (Fase 3.7) — **corrigido em 2026-08-21** (ambas as tabelas vazias, 0 risco).
+- 8 tabelas filhas de `BpmCard` (`BpmCardCampoValor/Membro/Vinculo/Historico/Anexo`, `BpmTarefa`, `BpmInteracaoCard`, `BpmChecklistFollowUp`) → `BpmCard_old_fixfk` — **corrigidas em 2026-08-21** (0 órfãos, 4/4 IDs batiam).
+
+**Achado bloqueante em `Checklist`/`operacional_clientes` (2026-08-21):** ao investigar antes de corrigir, `operacional_clientes_old_fase35` (4 linhas) tem só 1 ID em comum com `operacional_clientes` atual (1 linha) — 3 empresas nunca migraram: `ADICEL - INDUSTRIA E COMERCIO LTDA`, `ARCOS DOURADOS COMERCIO DE ALIMENTOS SA`, e **`ALPHA COMEX BRASIL LTDA` de novo** (mesma empresa já restaurada em Extratos nesta sessão, agora achada órfã também no módulo Operacional/CheckList) — cada uma com 1 `Checklist` vinculado (dado real, não descartável). Diferente dos outros casos (rename 1:1 simples), aqui o campo `clienteId` MUDOU DE SIGNIFICADO entre as tabelas: na antiga aponta para `ClienteOperacional` (conta de login do portal Operacional — nome/email/senha, não é `Cliente` do CRM), na nova o mesmo dado foi desdobrado em `clienteOperacionalId` (login, preservado) + `clienteId` (empresa, novo, aponta pra `Cliente`/módulo master). A Alpha Comex já tem `Cliente.id: 288` (criado na correção de Extratos, mesmo CNPJ `44342670000161`) — reaproveitável. ADICEL (`01957839000185`) e Arcos Dourados (`42591651000143`) não têm `Cliente` nenhum ainda, precisam ser criados. Correção requer decisão do usuário sobre a estratégia exata (reaproveitar `Cliente` existente vs criar novo, e como popular `clienteOperacionalId`/login) antes de prosseguir.
 
 Ao corrigir `PeriodosAnalise`, `PRAGMA foreign_key_check` revelou que 6 empresas (`Extratos.id` 6, 7, 8, 10, 24, 33 — incluindo ALPHA COMEX BRASIL LTDA com 534 transações reais) nunca tinham sido migradas de `Extratos_old_fase33` para a nova `Extratos`/`Cliente` durante a Fase 3.3 original — ficaram com dados de análise (períodos, bancos, transações) vivos, mas sem `Cliente`/`Extratos` correspondente. Restauradas criando `Cliente` novo + `Extratos` vinculado (ID preservado) para cada uma, a pedido explícito do usuário.
 
