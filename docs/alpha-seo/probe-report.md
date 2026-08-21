@@ -31,10 +31,12 @@ O inventário source-authoritative também reconciliou o manifesto atual: 47 rot
 
 ### Consumidor real `GlobalSidebar` — PASS local
 
-- [✓] O componente filtra diretamente `MODULOS_REGISTRY`; não existe lista paralela para o Alpha SEO.
+- [✓] O componente filtra `MODULOS_REGISTRY` pelo helper autoritativo `podeVisualizarModulo`; não existe lista paralela nem uma segunda implementação de autorização na sidebar.
 - [✓] `Admin`, `CEO`, `TI` e `T.I` recebem o bypass de `isAdminRole` e veem o módulo mesmo com `permissoes=[]`.
 - [✓] Um não-admin com `alphaSeo` vê o link; um não-admin sem `alphaSeo` não recebe o item nem o `href`.
-- [✓] Renderização server-side de prova confirmou admin sem permissão, usuário com permissão e usuário sem permissão; nos dois casos visíveis, o Alpha SEO apareceu antes de Alpha CRM e com `href="/PainelAlpha/AlphaSEO"`.
+- [✓] `adminOnly` tem precedência sobre a permissão nominal: `User` com `permissoes=["cadastro"]` continua sem ver Gestão de Equipe; Admin vê o módulo.
+- [✓] Módulos sem permissão e restritos por `allowedRoles`, como `gestaoOnboarding`, ficam ausentes para usuário comum. Admin os vê; uma role permitida não-admin vê apenas o módulo explicitamente autorizado — `SUPORTE` exibiu Gestão de Protocolos, mas não Onboarding.
+- [✓] Renderização server-side de prova confirmou admin, usuário com `alphaSeo`, usuário sem permissão e `SUPORTE`; o Alpha SEO apareceu somente nos dois perfis autorizados e sempre com `href="/PainelAlpha/AlphaSEO"`.
 - [✓] O clique no `Link` chama `onOpenTab(mod.href, mod.label)`; `PainelLayoutClient` injeta `openTab`, ativa/reutiliza a tab e monta o conteúdo com `iframe src={tab.url}`.
 - [✓] A `TabBar` resolve a categoria pela rota exata ou prefixo filho, enquanto o layout raiz reforça sessão/permissão para acesso direto.
 
@@ -189,8 +191,8 @@ A suíte Alpha SEO também cobre contratos, inventário, providers, projetos, ra
 npx vitest run tests/alpha-seo/integration-wiring.test.ts --reporter=verbose
 → 1 arquivo, 8 testes PASS
 
-npx tsx -e <renderToStaticMarkup de GlobalSidebar para admin-zero, user-with e user-without>
-→ admin-zero: visível/href correto/antes do CRM; user-with: visível/href correto/antes do CRM; user-without: ausente/sem href
+npx tsx -e <renderToStaticMarkup de GlobalSidebar para admin, user-cadastro, user-alpha e user-none>
+→ admin: SEO + Gestão de Equipe + Onboarding visíveis; user-cadastro: todos ausentes; user-alpha: somente SEO visível; user-none: todos ausentes
 
 npx vitest run tests/alpha-seo --reporter=dot --testTimeout=30000
 → 37 arquivos, 161 testes PASS

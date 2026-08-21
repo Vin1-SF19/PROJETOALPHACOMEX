@@ -26,6 +26,20 @@
 
 **Adicionado em:** 2026-08-20 por Scribe/Kowalski.
 
+### 2026-08-21 — Catálogo Open SEO: evidência vem do componente renderizado e autorização é fail-closed
+
+**Contexto:** a investigação de “módulo não aparece” encontrou dois consumidores aparentes do registry, mas somente `GlobalSidebar` participa do shell atual. `PainelAlphaClient` está órfão; usá-lo como prova de integração produziria um falso positivo. A mesma revisão revelou que a combinação de `adminOnly`, `allowedRoles` e `permission` precisava de precedência única para não vazar módulo role-only nem liberar admin-only por string de permissão.
+
+**Decisão:** a cadeia autoritativa de catálogo é `PainelAlpha/layout.tsx` → `PainelLayoutClient` → `GlobalSidebar` → `MODULOS_REGISTRY`/`podeVisualizarModulo`. A entrada pública única é `Open SEO · Alpha SEO`, primeiro item Comercial, com aliases `Open SEO`, `Alpha SEO` e `OpenSEO`; a busca cobre label/id/tag/descrição/aliases. Visibilidade segue: admin bypass → `adminOnly` exige role permitida → role permitida → permission → irrestrito apenas sem roles. Condicionais paralelas em componentes não são fonte de verdade.
+
+**Consequências:** `gestaoOnboarding` continua restrito às roles configuradas; `cadastro` não pode ser liberado para usuário comum apenas pela permissão textual. Probe deve testar o componente realmente montado e casos de render, não só encontrar uma string em arquivo órfão.
+
+**Estado operacional:** o módulo e a primeira correção de catálogo constam no `HEAD`/`origin/main` `c2979beb6`, mas o deploy não foi verificado. O ajuste final de precedência `adminOnly` e seu teste reforçado continuam locais/uncommitted e só podem ser publicados pelo fluxo DevOps autorizado. Esta sessão não reivindica autoria de commit ou push.
+
+**Evidência:** Forge 161/161; Probe aprovou casos de admin, permissão, negação e aliases no render; Lens PASS sem issues.
+
+**Adicionado em:** 2026-08-21 por Scribe/Kowalski.
+
 ### 2026-08-20 — AlphaParceiros: login "senha correta mas não entra" — causa raiz era dessincronia de banco Turso, não bug de auth
 **Contexto:** Usuário reportou que parceiros não conseguiam logar em `C:\Users\TI\Desktop\PainelAlphaParceiros\alphaparceiros` mesmo com login/senha corretos. Scout investigou hash (bcrypt, mesmos parâmetros nos dois lados — `hashSync(senha, 10)` na criação/reset em `src/actions/parceiros.ts`, `compareSync` em `alphaparceiros/lib/parceiroAuth.ts`), checagem de `ativo`, e `authorize()` do Credentials provider — tudo correto, sem incompatibilidade.
 **Causa raiz real:** os dois projetos apontavam para bancos Turso DIFERENTES. `PainelAlpha/.env` usa `basetestes-alphacomex` (ativo, 35 parceiros); `alphaparceiros/.env` usava `banco-alpha-alphacomex` (desatualizado, 33 parceiros). Os 2 parceiros mais recentes cadastrados no PainelAlpha (ids 45/46, 15-18/08) simplesmente não existiam no banco que o portal consultava — login falhava porque o registro não existia, não porque a senha estava errada.

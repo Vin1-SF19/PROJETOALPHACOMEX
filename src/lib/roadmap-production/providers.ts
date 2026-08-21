@@ -225,10 +225,18 @@ export async function diagnoseProductionProviders(): Promise<
   ];
 }
 
-function safeErrorCode(error: unknown): string {
-  if (error instanceof Error && /^[A-Z0-9_]+$/.test(error.message))
-    return error.message.slice(0, 100);
-  return "PRODUCTION_PROVIDER_FAILED";
+// Erros lançados internamente usam a mensagem como código (ex.: "PROVIDER_HTTP_ERROR"); erros
+// externos (rede, parsing, runtime) trazem uma mensagem legível real que não deve se perder —
+// por isso o summary sempre carrega o texto original, mesmo quando o errorCode cai no fallback.
+function describeCaughtError(error: unknown): { errorCode: string; summary: string } {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/^[A-Z0-9_]+$/.test(message)) {
+    return { errorCode: message.slice(0, 100), summary: message.slice(0, 100) };
+  }
+  return {
+    errorCode: "PRODUCTION_PROVIDER_FAILED",
+    summary: message.trim().slice(0, 500) || "Erro desconhecido ao executar o provedor.",
+  };
 }
 
 function phaseResult(
@@ -338,8 +346,8 @@ export async function runProductionAgent(
       }
       return result;
     } catch (error) {
-      const errorCode = safeErrorCode(error);
-      return { success: false, summary: errorCode, errorCode, toolSteps: 0 };
+      const { errorCode, summary } = describeCaughtError(error);
+      return { success: false, summary, errorCode, toolSteps: 0 };
     }
   }
 
@@ -497,7 +505,7 @@ export async function runProductionAgent(
       toolSteps: config.maxToolSteps,
     };
   } catch (error) {
-    const errorCode = safeErrorCode(error);
-    return { success: false, summary: errorCode, errorCode, toolSteps: 0 };
+    const { errorCode, summary } = describeCaughtError(error);
+    return { success: false, summary, errorCode, toolSteps: 0 };
   }
 }

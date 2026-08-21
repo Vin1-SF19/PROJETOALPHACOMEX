@@ -39,6 +39,15 @@ Os componentes compartilhados finais para datasets são `PaginationControls.tsx`
 
 **Última atualização final:** 2026-08-20 por Scribe
 
+### GlobalSidebar — catálogo real de módulos
+**Arquivo:** `src/components/layout/GlobalSidebar.tsx`
+**Tipo:** Client Component do shell global
+**Props:** recebe `permissoes`, `role`, identidade/tema e callbacks do gerenciador de abas pelo `PainelLayoutClient`.
+**Uso:** montado em `src/components/layout/PainelLayoutClient.tsx`, que por sua vez é renderizado pelo layout `src/app/PainelAlpha/layout.tsx`.
+**Notas:** é o consumidor autoritativo para provar visibilidade e busca de módulos. Filtra `MODULOS_REGISTRY` por `podeVisualizarModulo`, depois busca em `label`, `id`, `tag`, `desc` e `aliases`. A entrada Open SEO é a primeira Comercial e responde a `Open SEO`, `Alpha SEO` e `OpenSEO`. `src/components/PainelAlphaClient.tsx` está órfão, sem import/render no app atual; não usar seu grid/filtro como evidência nem implementar wiring nele. A precedência final de autorização vive no helper do registry, não em condicionais locais do componente.
+
+**Última atualização:** 2026-08-21 por Scribe
+
 ### FlowButton
 **Arquivo:** `src/components/ui/flow-button.tsx`
 **Tipo:** Client Component

@@ -28,6 +28,70 @@
 
 ---
 
+## [2026-08-21 15:35] — Bugfix FK constraint + polish de UX no módulo Extratos Bancários
+
+**Tags:** #bugfix #prisma #ui-polish
+**Agentes envolvidos:** Bibble, Scout, Forge, Probe, Lens, Kowalski
+**Arquivos tocados:** `src/actions/periodos.ts`, `src/components/Extratos/ModalNovoPeriodo.tsx`, `src/components/Extratos/ExtratoDetalhe.tsx`, `.bibble/memory/known-errors.md`
+
+### Contexto
+Usuário reportou "Erro ao cadastrar período" ao criar mês/ano de análise dentro de uma empresa em Extratos Bancários, com `PrismaClientUnknownRequestError: FOREIGN KEY constraint failed` no log local. Pediu também loading no botão de registrar e lazy loading/skeleton na página, além de revisão de responsividade dos modais do módulo.
+
+### O que foi feito
+- Consultado o Turso remoto diretamente (leitura, sem alterar dados) e confirmado que existem registros órfãos em `PeriodosAnalise.extratoId` apontando para `Extratos.id` inexistentes (6, 7, 8, 24, 33 — só 22 `Extratos` válidos).
+- `CriarNovoPeriodo` (`src/actions/periodos.ts`) passou a validar `db.extratos.findUnique` antes do `create()`, retornando erro tratado em vez de deixar o Prisma estourar.
+- `ModalNovoPeriodo.tsx`: `onSave` virou `Promise<void>`; novo estado `salvando` com spinner/texto no botão e todos os controles desabilitados durante o submit; ajustes de responsividade (`max-h-[90vh] overflow-y-auto`, padding/rounded responsivos).
+- `ExtratoDetalhe.tsx`: loading fullscreen (spinner único) trocado por skeleton de conteúdo real usando o `Skeleton` já existente em `src/components/ui/skeleton.tsx`; import não usado de `Loader2` removido.
+
+### Decisões tomadas
+- Não investigar/limpar os registros órfãos já existentes no banco: fora do escopo pedido pelo usuário, que só queria o erro tratado — só a prevenção para o futuro foi implementada.
+- Não aplicar o mesmo padrão de "check antes de mutar" preventivamente em outras Server Actions do módulo (ex. `bancos.ts`, que recebe `periodoId`): risco real e análogo, mas não reportado pelo usuário nesta sessão — registrado como observação para se o sintoma aparecer lá também.
+
+### Problemas encontrados / resolvidos
+- FK constraint failed ao criar `PeriodosAnalise`: resolvido com validação de existência prévia (ver `known-errors.md`).
+- `npm run lint` completo do projeto demorou ~20min por rodar concorrente com `npm run dev` do usuário — usado `npx eslint` escopado nos 3 arquivos como verificação rápida adicional enquanto o lint completo terminava em background; ambos concluíram sem nenhum erro nos arquivos tocados.
+
+### Pendências
+- Teste manual humano do fluxo completo no browser autenticado — sem credenciais de login disponíveis nesta sessão (mesma limitação já documentada para Alpha Blueprint/Comissões/Notas).
+- **8 outras relações do banco com o MESMO padrão de FK órfã pós-rename continuam pendentes** (ver abaixo) — usuário optou por corrigir só Extratos nesta sessão.
+
+### Refletido também em
+- `known-errors.md`: nova entrada "Extratos Bancários — FOREIGN KEY constraint failed ao criar PeriodosAnalise" — atualizada com a causa raiz real (ver próxima entrada do journal).
+
+---
+
+## [2026-08-21 19:10] — Achado crítico: FK física órfã sistêmica pós-rename, afetando 9 relações em 4 módulos
+
+**Tags:** #bugfix #critical #decision #prisma
+**Agentes envolvidos:** Bibble, Vault
+**Arquivos tocados:** `.bibble/memory/known-errors.md`, `.bibble/memory/plano-cliente-master.md`, banco Turso de produção (`basetestes-alphacomex`)
+
+### Contexto
+Meu fix anterior em `periodos.ts` (checar `Extratos` existe antes de criar `PeriodosAnalise`) não resolveu o bug reportado pelo usuário — o erro `FOREIGN KEY constraint failed` continuou acontecendo mesmo com a checagem passando. Investigação revelou a causa raiz real, muito mais profunda do que um dado órfão isolado.
+
+### O que foi feito
+- Descoberto via `PRAGMA foreign_key_list(PeriodosAnalise)` que a constraint FÍSICA de FK estava presa em `Extratos_old_fase33` (tabela renomeada/congelada na Fase 3.3 do Cliente Master, 13/08/2026), não na tabela `Extratos` atual — o Prisma Client não tem visibilidade sobre esse desalinhamento, só o SQLite físico.
+- Varredura de `PRAGMA foreign_key_list` em TODAS as tabelas do banco encontrou o MESMO padrão em outras 8 relações: `Checklist` (CheckList), `observacoes_contratos`, `CommissionEntry`/`CommissionDivergence`/`CommissionEvent.businessProcessId` (Comissões), 8 tabelas filhas de `BpmCard` (BPM/Alpha Blueprint). Só `indicacoes` já tinha sido corrigida antes (Fase 4 do Cliente Master, 15/08).
+- Vault acionado: backup completo do Turso gerado e validado (242 tabelas, 38098 linhas, 71.4MB) antes de qualquer mudança.
+- Corrigida a constraint de `PeriodosAnalise` (recriação de tabela com FK correta para `Extratos`, 49 linhas preservadas).
+- `PRAGMA foreign_key_check` pós-correção revelou 7 linhas genuinamente órfãs: 6 empresas (períodos de análise) que nunca foram migradas de `Extratos_old_fase33` para a nova `Extratos`/`Cliente` na Fase 3.3 original — incluindo **ALPHA COMEX BRASIL LTDA, com 534 transações bancárias reais vinculadas**.
+- A pedido explícito do usuário, restauradas as 6 empresas: criado `Cliente` novo para cada CNPJ (dados vindos do snapshot congelado) + `Extratos` vinculado preservando o `id` original (para não precisar tocar em `PeriodosAnalise.extratoId` já existente).
+- Validação final: `PRAGMA foreign_key_check` zerado; teste real via Prisma Client criando e removendo período de teste para `extratoId: 37` (o caso original reportado) e `extratoId: 7` (Alpha Comex, ex-órfã) — ambos com sucesso.
+
+### Decisões tomadas
+- Corrigir só `PeriodosAnalise` nesta sessão (Opção A, escolha do usuário) — as outras 8 relações ficam como dívida técnica documentada, não corrigidas agora. Motivo: usuário precisava do Extratos resolvido imediatamente; as outras ainda não geraram erro visível (nenhum registro novo criado nas tabelas-pai desde o rename).
+- Restaurar as 6 empresas órfãs criando `Cliente`+`Extratos` novos (não descartar os dados) — decisão do usuário diante de dados reais em risco (534 transações da Alpha Comex).
+
+### Problemas encontrados / resolvidos
+- FK constraint failed com causa raiz em constraint física desalinhada (não em dado da aplicação): resolvido para `PeriodosAnalise` via recriação de tabela + backup + restauração dos 6 registros órfãos legítimos.
+
+### Pendências para próxima sessão
+- Corrigir as outras 8 relações com o mesmo padrão (`Checklist`, `observacoes_contratos`, `CommissionEntry`/`CommissionDivergence`/`CommissionEvent.businessProcessId`, 8 tabelas de `BpmCard`) — aguardando decisão do usuário sobre quando/se prosseguir. Antes de corrigir cada uma, repetir a checagem de "registros pai não migrados" (por CNPJ/chave natural) como feito aqui, pois o mesmo padrão de empresas órfãs provavelmente se repete nas Fases 3.5/3.6/3.7.
+
+### Refletido também em
+- `known-errors.md`: entrada expandida com a causa raiz real e o achado sistêmico.
+- `plano-cliente-master.md`: nova seção "Achado tardio (2026-08-21)" documentando a lacuna na varredura da Fase 4 e as 8 relações pendentes.
+
 ## Sessões
 
 <!-- Kowalski adiciona aqui ao final de cada sessão -->
@@ -2539,3 +2603,115 @@ O checkpoint anterior registrou a primeira suíte verde. O fechamento final cons
 ### Refletido também em
 - `decisions.md`: efeitos externos/concorrência exigem intenção, aprovação e disposição explícitas.
 - `components.md`: `AuditResultsWorkspace`, paginação/exportação integral e supersessão de `AuditDetailClient`.
+
+---
+
+## [2026-08-21 13:58] — Open SEO: correção de visibilidade no catálogo real
+
+**Tags:** #bugfix #integration #nextjs #auth #security
+**Agentes envolvidos:** Bibble, Forge, Probe, Lens, Scribe, Kowalski
+**Arquivos tocados:** `.bibble/memory/codebase-map.md`, `.bibble/memory/integration-points.md`, `.bibble/memory/components.md`, `.bibble/memory/decisions.md`, `.bibble/memory/journal.md`
+
+### Contexto
+O módulo precisava aparecer e ser encontrado no catálogo realmente renderizado pelo Painel Alpha, sem criar bypass para módulos administrativos durante a correção.
+
+### O que foi feito
+- Confirmado que o fluxo real é layout do Painel → `PainelLayoutClient` → `GlobalSidebar`; `PainelAlphaClient` está órfão e foi excluído como evidência de wiring.
+- Registry consolidou `Open SEO · Alpha SEO` como primeiro Comercial, com id/permissão `alphaSeo`, tag/descrição pesquisáveis e aliases `Open SEO`, `Alpha SEO` e `OpenSEO`.
+- Busca da sidebar passou a validar label, id, tag, descrição e aliases; visibilidade usa exclusivamente `podeVisualizarModulo`.
+- Precedência fail-closed impediu vazamento de `gestaoOnboarding` e bypass de `cadastro` por permissão textual.
+- Forge aprovou 161/161; Probe aprovou casos renderizados de admin, usuário com/sem permissão e aliases; Lens retornou PASS sem issues.
+
+### Decisões tomadas
+- Arquivo órfão não prova integração: testes devem seguir a árvore realmente montada.
+- `adminOnly` é resolvido antes de permission; módulo role-only nunca cai no fallback irrestrito.
+
+### Problemas encontrados / resolvidos
+- A suposição inicial de que o módulo não estava em `HEAD` ficou desatualizada durante a sessão: auditoria confirmou módulo e primeira correção no `HEAD`/`origin/main` `c2979beb6`.
+- O hardening final de `adminOnly` e o teste reforçado ainda estão somente no working tree; não há evidência de deploy dessa correção final.
+
+### Pendências
+- Publicar a correção final local pelo fluxo autorizado do agente DevOps e verificar o deploy efetivo; esta sessão documental não fez nem reivindica commit/push.
+
+### Refletido também em
+- `decisions.md`: catálogo real, precedência de autorização e evidência por componente renderizado.
+- `components.md`: `GlobalSidebar` autoritativa e `PainelAlphaClient` órfão.
+
+---
+
+## [2026-08-21] — Bloco de Notas Alpha: barra de tarefas abrindo sozinha e travada em "Carregando"
+
+**Tags:** #bugfix #frontend #zustand
+**Agentes envolvidos:** Bibble (investigação e fix diretos), Forge
+
+### O que foi feito
+- Corrigido `isTaskbarVisible: true` → `false` no estado inicial do store Zustand (`useNotasWorkspace.ts`). A barra de notas na sidebar agora nasce fechada.
+
+### Decisões tomadas
+- `isTaskbarVisible` não é persistido em localStorage nem lido de volta do servidor na hidratação (`sincronizarWorkspaceDoServidor` só aplica `tabs` e `viewerMode`) — por isso o único lugar que determina o estado inicial real é o default do store. Corrigir só ali resolve o comportamento em toda a aplicação, sem precisar de nova lógica.
+
+### Erros encontrados e fixes
+- Barra abrindo sozinha a cada load/refresh: causa era o default `true` no Zustand store (`src/store/useNotasWorkspace.ts:36`).
+- "Carregando" infinito ao abrir: em `NotesGlobalTaskbar.tsx`, `carregandoAbertura` só volta a `false` quando um `useEffect` detecta a transição `isTaskbarVisible` false→true comparando contra um `useRef` inicializado com o próprio valor atual. Como a barra já nascia com `isTaskbarVisible=true`, a ref também nascia `true` e a transição nunca era detectada — `carregandoAbertura` ficava travado em `true` (valor inicial do `useState`) para sempre. Corrigir o default para `false` restaura a detecção normal da transição na próxima abertura manual.
+
+### Arquivos criados/modificados
+- `src/store/useNotasWorkspace.ts` — `isTaskbarVisible` inicial: `true` → `false`.
+
+### Pendências para próxima sessão
+- Nenhuma. Fix pontual, Forge aprovado (tsc/lint limpos nos arquivos tocados).
+
+---
+
+## [2026-08-21] — Roadmap Alpha: removido o teto de 12 correções automáticas (fila 100% autônoma)
+
+**Tags:** #bugfix #decision #roadmap-alpha
+**Agentes envolvidos:** Bibble (investigação e fix diretos), Forge
+
+### O que foi feito
+- Removida a constante `AUTO_RETRY_LIMIT = 12` de `src/lib/roadmap-production/worker.ts` e todas as checagens que travavam a fase em `FAILED`/`BLOCKED` com a mensagem "Limite de 12 correções automáticas atingido; intervenção administrativa necessária" ao bater o teto.
+- Mensagens de atividade que exibiam `tentativa/12` passaram a exibir só o número da tentativa (`nº X`), já que não há mais denominador fixo.
+
+### Decisões tomadas
+- Não toquei na lógica que decide **se** um erro é recuperável automaticamente (`isImplementationPhase`, closure gravável por scribe/kowalski, `TRANSIENT_ERROR_CODES`) — só removi o teto de **quantas vezes** ela pode tentar. Erros que já não geravam retry automático (ex.: falha de verificação sem implementação anterior, erro definitivo fora da lista de transientes) continuam indo para `FAILED`/`BLOCKED` normalmente, só que agora sem a mensagem de "limite atingido" (que não existe mais).
+- Risco aceito e comunicado ao usuário: para fases genuinamente recuperáveis (implementação/closure/erro transiente) que falham por um motivo que não se resolve sozinho, o worker agora tenta indefinidamente em vez de parar em 12 e pedir intervenção — troca explícita pedida pelo usuário ("100% autônomo").
+
+### Arquivos criados/modificados
+- `src/lib/roadmap-production/worker.ts` — remoção de `AUTO_RETRY_LIMIT` e de todas as comparações/mensagens associadas.
+
+### Pendências para próxima sessão
+- Nenhuma. Forge aprovado (tsc/lint limpos no arquivo; as 2 falhas pré-existentes em `storage.test.ts`/`completion-report.test.ts` — fallback de provider `ollama` e texto do relatório — foram confirmadas como anteriores a esta mudança via `git stash`).
+
+---
+
+## [2026-08-21] — Roadmap Alpha: teto de retry ajustado para 30, erros mais específicos, Qwen ganha tentativas locais antes de escalar
+
+**Tags:** #decision #enhancement #roadmap-alpha
+**Agentes envolvidos:** Bibble (investigação e fix diretos), Forge, Probe, Lens
+
+### Contexto
+Sessão imediatamente anterior removeu por completo o teto de correções automáticas ("100% autônomo"). O usuário reavaliou: quer uma margem alta (30) em vez de ilimitado, mensagens de erro mais específicas, e que a Qwen (provider `ollama`) insista mais antes de escalar para Claude/Codex.
+
+### O que foi feito
+- Reintroduzido `AUTO_RETRY_LIMIT = 30` em `worker.ts` (era 12, ficou temporariamente removido) nos 3 pontos de checagem: `scheduleAutomaticRecovery`, o retry de `resolveDeliveryAdjustmentAgent`, e a mensagem final de limite atingido.
+- Criado `ERROR_CODE_DESCRIPTIONS` + `describeProductionErrorCode()` em `worker.ts`: mapeia cada código de erro conhecido (`PROVIDER_HTTP_ERROR`, `CLI_TIMEOUT`, `AGENT_STEP_LIMIT` etc.) para uma frase legível em pt-BR. Usado em todas as mensagens de atividade que antes só mostravam o código cru.
+- A mensagem final de "limite atingido" agora diferencia o motivo (limite de tentativas vs. erro que nunca foi elegível para retry automático) e inclui um trecho real do `summary` da última falha — não é mais só "intervenção administrativa necessária" sem contexto.
+- `providers.ts`: `safeErrorCode` renomeada para `describeCaughtError`, agora preserva a mensagem de erro real (até 500 caracteres) no `summary` mesmo quando o código cai no fallback genérico `PRODUCTION_PROVIDER_FAILED` — antes essa informação era descartada.
+- `cli-providers.ts`: quando a CLI (Claude Code/Codex) termina com `CLI_EXECUTION_FAILED`, o `content` agora inclui o código de saída e as últimas ~500 chars de stderr/stdout, em vez do texto fixo "A CLI terminou com erro."
+- `runProductionAgentWithCapabilityRouting` (worker.ts): novo loop de auto-retry local — a Qwen agora tenta até `QWEN_SELF_RETRY_LIMIT = 5` vezes sozinha antes de escalar para Claude/Codex, recebendo o erro da tentativa anterior como contexto adicional a cada rodada. Só escala imediatamente (sem gastar tentativas) quando ela mesma sinaliza `CAPABILITY_ESCALATION_REQUIRED` — nesse caso ela já declarou que a tarefa está fora da sua capacidade, então insistir não ajudaria.
+
+### Decisões tomadas
+- O retry local da Qwen é seu próprio laço, independente do `autoRetryCount` da fase — ele não consome tentativas do teto de 30 da fase; é uma segunda camada de resiliência mais barata (Ollama local, sem custo de API) antes de acionar Claude/Codex.
+- `QWEN_SELF_RETRY_LIMIT = 5` foi escolhido como "bastante generoso sem travar a fila indefinidamente" — cada tentativa já roda até `config.maxToolSteps` passos internos, então 5 rodadas completas já é um esforço substancial.
+- A UI (`RoadmapProductionPanel.tsx`) não precisou de nenhuma mudança: ela já renderiza `phase.activities.at(-1)?.message`, que é exatamente onde as mensagens mais específicas passaram a aparecer.
+
+### Erros encontrados e fixes
+- Nenhum erro introduzido. As 3 falhas de teste vistas ao rodar a suíte completa de `tests/roadmap-production/` (`completion-report.test.ts`, `storage.test.ts` sobre `developmentProviderOrder`, `execution-lock.test.ts`) foram confirmadas pré-existentes via `git stash` antes de declarar Forge aprovado.
+- Observação à parte: durante a sessão apareceram mudanças não relacionadas em `src/actions/periodos.ts` e dois componentes de `Extratos/` no working tree — não foram feitas por esta sessão; aparentam ser de uma execução real do próprio worker do Roadmap Alpha rodando em paralelo. Não foram tocadas.
+
+### Arquivos criados/modificados
+- `src/lib/roadmap-production/worker.ts` — `AUTO_RETRY_LIMIT = 30`, dicionário de descrições de erro, loop de self-retry da Qwen.
+- `src/lib/roadmap-production/providers.ts` — `describeCaughtError` preserva mensagem real do erro.
+- `src/lib/roadmap-production/cli-providers.ts` — inclui stderr/stdout truncado na falha de CLI.
+
+### Pendências para próxima sessão
+- Nenhuma. Forge aprovado (tsc/lint limpos nos 3 arquivos; falhas de teste pré-existentes confirmadas via stash).

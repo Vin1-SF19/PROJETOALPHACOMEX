@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Calendar, ChevronDown, Hash, Layers } from "lucide-react";
+import { X, Calendar, ChevronDown, Hash, Layers, Loader2 } from "lucide-react";
 import { modalVariants, MODAL_PERSPECTIVE } from "./lib/modal-variants";
 
 const MESES = [
@@ -15,19 +15,26 @@ const ANOS = Array.from({ length: 11 }, (_, i) => (2020 + i).toString());
 interface ModalNovoPeriodoProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (dados: { mes: string; ano: string }) => void;
+  onSave: (dados: { mes: string; ano: string }) => Promise<void>;
 }
 
 export function ModalNovoPeriodo({ isOpen, onClose, onSave }: ModalNovoPeriodoProps) {
   const [tipoRegistro, setTipoRegistro] = useState<"mensal" | "anual">("mensal");
   const [mes, setMes] = useState(MESES[new Date().getMonth()]);
   const [ano, setAno] = useState(new Date().getFullYear().toString());
+  const [salvando, setSalvando] = useState(false);
 
-  const handleSave = () => {
-    if (tipoRegistro === "anual") {
-      onSave({ mes: "Ano de referencia", ano });
-    } else {
-      onSave({ mes, ano });
+  const handleSave = async () => {
+    if (salvando) return;
+    setSalvando(true);
+    try {
+      if (tipoRegistro === "anual") {
+        await onSave({ mes: "Ano de referencia", ano });
+      } else {
+        await onSave({ mes, ano });
+      }
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -41,36 +48,43 @@ export function ModalNovoPeriodo({ isOpen, onClose, onSave }: ModalNovoPeriodoPr
         animate="visible"
         exit="exit"
         style={{ transformStyle: "preserve-3d" }}
-        className="bg-[#0f172a] border border-white/10 w-full max-w-md rounded-[3rem] overflow-hidden shadow-2xl relative"
+        className="bg-[#0f172a] border border-white/10 w-full max-w-md rounded-[2rem] sm:rounded-[3rem] overflow-hidden shadow-2xl relative max-h-[90vh] overflow-y-auto"
       >
         <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r transition-all duration-500 ${tipoRegistro === "mensal" ? "from-indigo-500 via-purple-500 to-indigo-500" : "from-emerald-500 via-teal-500 to-emerald-500"}`} />
 
-        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+        <div className="p-5 sm:p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
           <div className="flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-2xl flex items-center justify-center transition-colors ${tipoRegistro === "mensal" ? "bg-indigo-500/10 text-indigo-400" : "bg-emerald-500/10 text-emerald-400"}`}>
+            <div className={`h-10 w-10 shrink-0 rounded-2xl flex items-center justify-center transition-colors ${tipoRegistro === "mensal" ? "bg-indigo-500/10 text-indigo-400" : "bg-emerald-500/10 text-emerald-400"}`}>
               {tipoRegistro === "mensal" ? <Calendar size={20} aria-hidden="true" /> : <Layers size={20} aria-hidden="true" />}
             </div>
             <div>
-              <h2 className="text-xl font-black text-white uppercase italic tracking-tighter leading-none">Novo Ciclo</h2>
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase italic tracking-tighter leading-none">Novo Ciclo</h2>
               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">Configuração de Referência</p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Fechar" className="h-10 w-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 transition-all">
+          <button
+            onClick={onClose}
+            disabled={salvando}
+            aria-label="Fechar"
+            className="h-10 w-10 shrink-0 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="p-8 space-y-8">
+        <div className="p-5 sm:p-8 space-y-6 sm:space-y-8">
           <div className="flex p-1 bg-black/40 rounded-2xl border border-white/5">
             <button
               onClick={() => setTipoRegistro("mensal")}
-              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tipoRegistro === "mensal" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40" : "text-slate-500 hover:text-slate-300"}`}
+              disabled={salvando}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed ${tipoRegistro === "mensal" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40" : "text-slate-500 hover:text-slate-300"}`}
             >
               Mensal
             </button>
             <button
               onClick={() => setTipoRegistro("anual")}
-              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${tipoRegistro === "anual" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40" : "text-slate-500 hover:text-slate-300"}`}
+              disabled={salvando}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed ${tipoRegistro === "anual" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40" : "text-slate-500 hover:text-slate-300"}`}
             >
               Anual
             </button>
@@ -138,9 +152,18 @@ export function ModalNovoPeriodo({ isOpen, onClose, onSave }: ModalNovoPeriodoPr
 
           <button
             onClick={handleSave}
-            className={`cursor-pointer w-full group relative flex items-center justify-center gap-3 py-5 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.2em] transition-all shadow-xl active:scale-[0.98] ${tipoRegistro === "mensal" ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/40" : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/40"}`}
+            disabled={salvando}
+            aria-busy={salvando}
+            className={`cursor-pointer w-full group relative flex items-center justify-center gap-3 py-5 text-white rounded-[2rem] text-[11px] font-black uppercase tracking-[0.2em] transition-all shadow-xl active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 ${tipoRegistro === "mensal" ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/40" : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/40"}`}
           >
-            Confirmar e Criar Ciclo {tipoRegistro === "anual" ? "Anual" : "Mensal"}
+            {salvando ? (
+              <>
+                <Loader2 size={16} aria-hidden="true" className="animate-spin" />
+                Criando Ciclo...
+              </>
+            ) : (
+              <>Confirmar e Criar Ciclo {tipoRegistro === "anual" ? "Anual" : "Mensal"}</>
+            )}
           </button>
 
           <p className="text-center text-[9px] text-slate-600 font-bold uppercase tracking-widest italic leading-relaxed">

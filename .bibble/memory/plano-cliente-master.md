@@ -384,6 +384,21 @@ Para CADA módulo desta lista, o ciclo completo é:
 
 **Lição registrada em memória de feedback do projeto** (aplica a qualquer migration futura, não só esta): nunca copiar um FK numérico antigo para uma tabela recriada com autoincrement do zero sem revalidar por chave natural — o mesmo bug de "ID reaproveitado apontando para registro errado" apareceu 2 vezes nesta sessão (`CommissionEvent`, Fase 3.7; `indicacoes`, achado na Fase 4) e quase passou despercebido em ambos os casos.
 
+### Achado tardio (2026-08-21) — o padrão de FK órfã pós-rename era MAIOR do que só `indicacoes`
+
+A Fase 4 (linha 379 acima) só confirmou "nenhuma tabela ATIVA referencia `clientes`/`clientes_old_fase36`" — não fez a varredura de `PRAGMA foreign_key_list` em TODAS as tabelas contra TODOS os nomes `_old_faseNN`/`_old_fixfk` gerados pelas fases 3.3/3.5/3.6/3.7. Um bug real reportado pelo usuário no módulo Extratos Bancários ("FOREIGN KEY constraint failed" ao criar período) levou a uma varredura completa nessa data, que encontrou o MESMO padrão em mais 8 relações, intocadas até então:
+
+- `PeriodosAnalise.extratoId` → `Extratos_old_fase33` (Fase 3.3) — **corrigido nesta data**, ver `known-errors.md`.
+- `Checklist.empresaId` → `operacional_clientes_old_fase35` (Fase 3.5) — **pendente**.
+- `observacoes_contratos.contratoId` → `contratos_comerciais_old_fase36` (Fase 3.6) — **pendente**.
+- `CommissionEntry.eventId`, `CommissionDivergence.eventId` → `CommissionEvent_old_fase37` (Fase 3.7) — **pendente**.
+- `CommissionEvent.businessProcessId` → `BusinessProcess_old_fase37` (Fase 3.7) — **pendente**.
+- 8 tabelas filhas de `BpmCard` (`BpmCardCampoValor/Membro/Vinculo/Historico/Anexo`, `BpmTarefa`, `BpmInteracaoCard`, `BpmChecklistFollowUp`) → `BpmCard_old_fixfk` — **pendente**.
+
+Ao corrigir `PeriodosAnalise`, `PRAGMA foreign_key_check` revelou que 6 empresas (`Extratos.id` 6, 7, 8, 10, 24, 33 — incluindo ALPHA COMEX BRASIL LTDA com 534 transações reais) nunca tinham sido migradas de `Extratos_old_fase33` para a nova `Extratos`/`Cliente` durante a Fase 3.3 original — ficaram com dados de análise (períodos, bancos, transações) vivos, mas sem `Cliente`/`Extratos` correspondente. Restauradas criando `Cliente` novo + `Extratos` vinculado (ID preservado) para cada uma, a pedido explícito do usuário.
+
+**Regra permanente a aplicar em qualquer correção futura das 8 relações pendentes:** antes de recriar a FK de cada tabela, comparar o `Extratos`/tabela-pai atual contra a `_old_*` correspondente por chave natural (CNPJ, não ID) para achar registros pai que nunca migraram — o mesmo padrão descoberto aqui provavelmente se repete nas outras fases (3.5, 3.6, 3.7), com volume ainda não medido.
+
 ---
 
 ## 6. Riscos específicos já identificados (herdados do levantamento desta sessão)

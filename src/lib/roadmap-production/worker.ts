@@ -30,7 +30,13 @@ import {
 import { resolveProductionWorkspaceScope } from "@/lib/roadmap-production/workspace-scope";
 
 const AUTO_RETRY_DELAY_MS = 5_000;
-const AUTO_RETRY_LIMIT = 12;
+// Margem alta de propósito: fases recuperáveis (implementação, closure gravável, erro
+// transiente) devem insistir bastante antes de travar pedindo intervenção administrativa.
+const AUTO_RETRY_LIMIT = 30;
+// Quantas vezes a Qwen tenta resolver sozinha uma tarefa básica antes de escalar para
+// Claude/Codex — só não se aplica quando a própria Qwen sinaliza CAPABILITY_ESCALATION_REQUIRED,
+// caso em que ela já declarou não ter capacidade e o escalonamento é imediato.
+const QWEN_SELF_RETRY_LIMIT = 5;
 const TRANSIENT_ERROR_CODES = new Set([
   "AGENT_RESULT_MISSING",
   "AGENT_STEP_LIMIT",
@@ -48,6 +54,34 @@ const PROVIDER_FALLBACK_ERROR_CODES = new Set([
   "PROVIDER_QUOTA_EXHAUSTED",
   "PROVIDER_RATE_LIMITED",
 ]);
+
+// Descrição legível de cada código de erro conhecido do pipeline — usada nas mensagens de
+// atividade para que o histórico da fase explique a causa raiz, não só o código técnico.
+const ERROR_CODE_DESCRIPTIONS: Record<string, string> = {
+  AGENT_BLOCKED: "o agente bloqueou a fase por não conseguir validar um pré-requisito",
+  AGENT_REPORTED_FAILURE: "o agente reportou falha ao executar a fase",
+  AGENT_RESULT_MISSING: "o agente não retornou o marcador obrigatório de resultado (RESULT: PASS/FAIL/BLOCKED)",
+  AGENT_STEP_LIMIT: "o agente excedeu o número máximo de passos de ferramentas permitido para a fase",
+  CLI_EXECUTION_FAILED: "a CLI do provedor terminou com erro de execução",
+  CLI_NOT_FOUND: "a CLI do provedor não está instalada ou não foi encontrada no ambiente",
+  CLI_TIMEOUT: "a CLI do provedor excedeu o tempo limite de execução",
+  INVALID_PROVIDER_CONFIG: "a configuração do provedor Ollama/Qwen está inválida ou incompleta",
+  INVALID_PROVIDER_RESPONSE: "o provedor retornou uma resposta em formato inesperado",
+  NO_CHANGES_APPLIED: "a fase exigia alterações de arquivo, mas nenhuma foi aplicada",
+  PROHIBITED_GIT_MUTATION: "o agente tentou alterar o HEAD do repositório, operação proibida",
+  PRODUCTION_PROVIDER_FAILED: "nenhum provedor de IA configurado conseguiu executar a fase",
+  PROVIDER_AUTH_FAILED: "falha de autenticação com o provedor de IA",
+  PROVIDER_HTTP_ERROR: "erro de comunicação HTTP com o provedor de IA",
+  PROVIDER_QUOTA_EXHAUSTED: "o provedor atingiu o limite de créditos ou uso",
+  PROVIDER_RATE_LIMITED: "o provedor aplicou um limite temporário de requisições",
+  TRUNCATED_MODEL_RESPONSE: "o modelo retornou respostas truncadas repetidamente",
+};
+
+export function describeProductionErrorCode(errorCode?: string | null): string {
+  if (!errorCode) return "erro não identificado";
+  const description = ERROR_CODE_DESCRIPTIONS[errorCode];
+  return description ? `${description} (${errorCode})` : errorCode;
+}
 
 export function shouldFallbackDevelopmentProvider(errorCode?: string): boolean {
   return Boolean(errorCode && PROVIDER_FALLBACK_ERROR_CODES.has(errorCode));
@@ -102,7 +136,7 @@ async function runDevelopmentAgentWithFallback(
     if (!canFallback) return result;
     const fallback = providers[index + 1];
     await onActivity(
-      `${DEVELOPMENT_PROVIDER_LABEL[provider]} indisponível (${result.errorCode}); alternando automaticamente para ${DEVELOPMENT_PROVIDER_LABEL[fallback]}.`,
+      `${DEVELOPMENT_PROVIDER_LABEL[provider]} indisponível: ${describeProductionErrorCode(result.errorCode)}; alternando automaticamente para ${DEVELOPMENT_PROVIDER_LABEL[fallback]}.`,
     );
   }
   return {
@@ -156,19 +190,39 @@ async function runProductionAgentWithCapabilityRouting(
     );
   }
   await onActivity("Roteamento de capacidade: Qwen 3.8 para tarefa básica.");
-  const qwenResult = await runProductionAgent(
-    { ...config, provider: "ollama", model: qwenModel },
-    input,
-    onActivity,
-    root,
-  );
-  if (qwenResult.success) return qwenResult;
+  let qwenResult: ProductionAgentResult;
+  let qwenInput = input;
+  let escalatedByQwen = false;
+  let attempt = 1;
+  for (;;) {
+    qwenResult = await runProductionAgent(
+      { ...config, provider: "ollama", model: qwenModel },
+      qwenInput,
+      onActivity,
+      root,
+    );
+    if (qwenResult.success) return qwenResult;
 
-  const escalatedByQwen = requiresCapabilityEscalation([qwenResult.summary]);
+    escalatedByQwen = requiresCapabilityEscalation([qwenResult.summary]);
+    if (escalatedByQwen || attempt >= QWEN_SELF_RETRY_LIMIT) break;
+
+    await onActivity(
+      `Qwen não concluiu na tentativa ${attempt}/${QWEN_SELF_RETRY_LIMIT} (${describeProductionErrorCode(qwenResult.errorCode)}); tentando novamente sozinha antes de escalar.`,
+    );
+    qwenInput = {
+      ...qwenInput,
+      previousSummaries: [
+        ...qwenInput.previousSummaries,
+        `Tentativa ${attempt} da Qwen falhou (${describeProductionErrorCode(qwenResult.errorCode)}): ${qwenResult.summary}`,
+      ],
+    };
+    attempt += 1;
+  }
+
   await onActivity(
     escalatedByQwen
       ? "Qwen identificou necessidade de engenharia; encaminhando o diagnóstico para Claude/Codex."
-      : `Qwen não concluiu a tarefa básica (${qwenResult.errorCode ?? "AGENT_FAILED"}); encaminhando para Claude/Codex.`,
+      : `Qwen não concluiu a tarefa básica após ${attempt}/${QWEN_SELF_RETRY_LIMIT} tentativas (${describeProductionErrorCode(qwenResult.errorCode)}); encaminhando para Claude/Codex.`,
   );
   const escalationOrder =
     preferred === "ollama"
@@ -180,7 +234,7 @@ async function runProductionAgentWithCapabilityRouting(
     {
       ...input,
       previousSummaries: [
-        ...input.previousSummaries,
+        ...qwenInput.previousSummaries,
         `Diagnóstico do Qwen antes do escalonamento:\n${qwenResult.summary}`,
       ],
     },
@@ -792,7 +846,7 @@ export function scheduleAutomaticRecovery(
       at,
       agentId: failed.resolvedAgent,
       type: "STATUS",
-      message: `Nova tentativa automática ${failed.autoRetryCount}/${AUTO_RETRY_LIMIT} agendada após analisar ${errorCode}.`,
+      message: `Nova tentativa automática ${failed.autoRetryCount}/${AUTO_RETRY_LIMIT} agendada após analisar: ${describeProductionErrorCode(errorCode)}.`,
     });
     execution.status = "PENDING";
     execution.finishedAt = null;
@@ -1028,7 +1082,7 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
       type: result.success ? "RESULT" : "ERROR",
       message: result.success
         ? "Fase concluída."
-        : `Fase interrompida: ${result.errorCode ?? "AGENT_FAILED"}`,
+        : `Fase interrompida: ${describeProductionErrorCode(result.errorCode)}`,
     });
     if (!result.success) {
       let recovery: "IMPLEMENTATION_FEEDBACK" | "SAME_PHASE" | null;
@@ -1064,14 +1118,16 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
         current.status =
           currentPhase.status === "BLOCKED" ? "BLOCKED" : "FAILED";
         current.finishedAt = now();
-        if (currentPhase.autoRetryCount >= AUTO_RETRY_LIMIT) {
-          appendActivity(currentPhase, {
-            at: now(),
-            agentId: currentPhase.resolvedAgent,
-            type: "ERROR",
-            message: `Limite de ${AUTO_RETRY_LIMIT} correções automáticas atingido; intervenção administrativa necessária.`,
-          });
-        }
+        const motivo =
+          currentPhase.autoRetryCount >= AUTO_RETRY_LIMIT
+            ? `Limite de ${AUTO_RETRY_LIMIT} correções automáticas atingido`
+            : "Este erro não é recuperável automaticamente";
+        appendActivity(currentPhase, {
+          at: now(),
+          agentId: currentPhase.resolvedAgent,
+          type: "ERROR",
+          message: `${motivo}: ${describeProductionErrorCode(result.errorCode)}. Intervenção administrativa necessária. Última causa registrada: ${result.summary.slice(0, 400)}`,
+        });
       }
     } else if (current.phases.every((item) => item.status === "SUCCEEDED")) {
       current.status = "SUCCEEDED";

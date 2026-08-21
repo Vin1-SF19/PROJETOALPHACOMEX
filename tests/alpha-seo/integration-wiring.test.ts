@@ -46,10 +46,12 @@ describe("Alpha SEO module integration", () => {
     for (const adminRole of ["Admin", "CEO", "TI", "T.I"]) {
       expect(visibleModuleIds(adminRole, [])).toContain("alphaSeo");
       expect(visibleModuleIds(adminRole, [])).toContain("gestaoOnboarding");
+      expect(visibleModuleIds(adminRole, [])).toContain("cadastro");
     }
     expect(visibleModuleIds("User", ["alphaSeo"])).toContain("alphaSeo");
     expect(visibleModuleIds("User", [])).not.toContain("alphaSeo");
     expect(visibleModuleIds("User", [])).not.toContain("gestaoOnboarding");
+    expect(visibleModuleIds("User", ["cadastro"])).not.toContain("cadastro");
     expect(
       MODULOS_REGISTRY.filter((module) => module.category === "admin")
         .map((module) => module.id)

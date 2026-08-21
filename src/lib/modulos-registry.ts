@@ -25,11 +25,14 @@ export function podeVisualizarModulo(
   modulo: ModuloRegistryItem,
   { permissoes, role }: ModuloAccessContext,
 ): boolean {
+  const rolePermitido = Boolean(role && modulo.allowedRoles?.includes(role));
+
   if (isAdminRole(role)) return true;
-  if (role && modulo.allowedRoles?.includes(role)) return true;
+  if (modulo.adminOnly) return rolePermitido;
+  if (rolePermitido) return true;
   if (modulo.permission) return permissoes.includes(modulo.permission);
 
-  return !modulo.adminOnly && !modulo.allowedRoles?.length;
+  return !modulo.allowedRoles?.length;
 }
 
 export interface CategoriaItem {

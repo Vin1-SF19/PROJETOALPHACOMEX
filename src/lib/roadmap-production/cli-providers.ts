@@ -577,10 +577,13 @@ export async function runCliProductionAgent(
     const authenticationFailure = /auth|login|unauthorized|401|403/i.test(
       processResult.stderr,
     );
+    // As últimas linhas de stderr costumam trazer a causa real (stack trace ou mensagem do
+    // provedor) — sem isso, todo erro de CLI virava o mesmo texto genérico "terminou com erro".
+    const detail = (processResult.stderr || processResult.stdout).trim().slice(-500);
     return {
       content: authenticationFailure
         ? "A autenticação da CLI falhou."
-        : "A CLI terminou com erro.",
+        : `A CLI terminou com erro (código de saída ${processResult.exitCode}).${detail ? `\n${detail}` : ""}`,
       toolSteps: processResult.toolSteps,
       changedFiles: files,
       errorCode: authenticationFailure

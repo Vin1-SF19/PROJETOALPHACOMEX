@@ -33,7 +33,7 @@ interface NotasWorkspaceStore {
 export const useNotasWorkspace = create<NotasWorkspaceStore>((set) => ({
   tabs: [],
   activeTabId: null,
-  isTaskbarVisible: true,
+  isTaskbarVisible: false,
   viewerMode: "RECOLHIDO",
   viewerHeight: 320,
   hydrated: false,

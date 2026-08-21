@@ -15,6 +15,17 @@ export async function CriarNovoPeriodo(mes: string, ano: string, extratoId: numb
     }
     const input = parsed.data;
 
+    const extratoExiste = await db.extratos.findUnique({
+      where: { id: input.extratoId },
+      select: { id: true },
+    });
+    if (!extratoExiste) {
+      return {
+        success: false,
+        error: "Esta empresa não foi encontrada no banco de dados. Volte para a listagem e tente novamente.",
+      };
+    }
+
     const novo = await db.periodosAnalise.create({
       data: {
         mes: input.mes,
@@ -28,5 +39,21 @@ export async function CriarNovoPeriodo(mes: string, ano: string, extratoId: numb
   } catch (error) {
     console.error("[CriarNovoPeriodo]", error);
     return { success: false, error: "Erro ao criar período." };
+  }
+}
+
+export async function ExcluirPeriodo(periodoId: number) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
+    const idNumerico = Number(periodoId);
+    if (isNaN(idNumerico)) return { success: false, error: "Id inválido." };
+
+    await db.periodosAnalise.delete({ where: { id: idNumerico } });
+    return { success: true };
+  } catch (error) {
+    console.error("[ExcluirPeriodo]", error);
+    return { success: false, error: "Erro ao excluir período." };
   }
 }

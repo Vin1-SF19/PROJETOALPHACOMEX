@@ -116,6 +116,8 @@ src/
 
 Fonte de verdade: `src/lib/modulos-registry.ts` (`MODULOS_REGISTRY`) — **array único**, consumido por `GlobalSidebar.tsx`, `PainelAlphaClient.tsx` e `TabBar.tsx`. Adicionar um módulo novo = 1 entrada aqui (o padrão antigo de 3 arrays manuais documentado em versões antigas do CLAUDE.md está obsoleto).
 
+**Correção de cartografia (2026-08-21):** para provar que um módulo aparece no catálogo realmente renderizado, o consumidor autoritativo é `src/components/layout/GlobalSidebar.tsx`, montado por `PainelLayoutClient` no layout de `/PainelAlpha`. `src/components/PainelAlphaClient.tsx` permanece no repositório, mas está órfão, sem import/render no app atual; sua leitura do registry não vale como evidência de wiring e não deve orientar correções de visibilidade. Outros consumidores podem reutilizar metadados do registry, mas não substituem um teste do fluxo renderizado da `GlobalSidebar`.
+
 | Categoria | Módulo | Rota | Permissão |
 |---|---|---|---|
 | Operacional | Chamados | `/PainelAlpha/Chamados` | `chamados` |
@@ -223,6 +225,18 @@ Hardening incorporado no estado final:
 **Limites do fechamento:** providers reais, fluxos OAuth reais, execução real dos crons e navegador/E2E real não foram exercidos neste ambiente. Build e gates globais ainda carregam baselines/bloqueios externos ao Alpha SEO. O token Turso exposto no contexto da conversa precisa ser rotacionado; nenhum valor foi copiado para estas memórias.
 
 **Última atualização final:** 2026-08-20 por Scribe/Kowalski
+
+### Adendo — visibilidade do catálogo Open SEO (2026-08-21)
+
+- O catálogo real segue `src/app/PainelAlpha/layout.tsx` → `PainelLayoutClient.tsx` → `GlobalSidebar.tsx` → `MODULOS_REGISTRY`. `PainelAlphaClient.tsx` não possui consumidor e não pode ser usado como prova de renderização.
+- `alphaSeo` é o **primeiro item Comercial**, com label `Open SEO · Alpha SEO`, rota `/PainelAlpha/AlphaSEO`, permissão `alphaSeo`, tag `SEO`, descrição de pesquisa/monitoramento/auditoria/inteligência e aliases `Open SEO`, `Alpha SEO` e `OpenSEO`.
+- A busca da sidebar normaliza e compara `label`, `id`, `tag`, `desc` e `aliases`; portanto os três nomes públicos localizam o mesmo módulo sem duplicar registro.
+- `podeVisualizarModulo` é a autoridade única de visibilidade, nesta precedência: bypass de role administrativa → `adminOnly` restrito a role permitida → role permitida → permissão do módulo → módulo irrestrito somente quando não há `allowedRoles`. Isso preserva `gestaoOnboarding` como role-only e impede que a permissão textual `cadastro` contorne `adminOnly`.
+- Evidência final: Forge aprovou 161/161 testes; Probe cobriu casos renderizados de admin, usuário com/sem permissão e busca pelos aliases; Lens retornou PASS sem issues.
+
+**Estado operacional Git:** o módulo Alpha SEO e a primeira correção de catálogo já estão no `HEAD`/`origin/main` `c2979beb6`. O deploy efetivo desse commit não foi verificado. O endurecimento final da precedência `adminOnly` em `src/lib/modulos-registry.ts` e o teste reforçado em `tests/alpha-seo/integration-wiring.test.ts` permanecem locais/uncommitted; sua publicação exige o fluxo autorizado do agente DevOps. Nenhum commit ou push é atribuído a esta sessão documental.
+
+**Última atualização:** 2026-08-21 por Scribe/Kowalski
 
 ### Alpha CRM — cards do pipeline sem glow (RM-2026-5284A1, 2026-08-18)
 

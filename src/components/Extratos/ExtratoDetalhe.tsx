@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, PlusCircle, Database, MapPin, Calendar, Loader2,
+  ArrowLeft, PlusCircle, Database, MapPin, Calendar,
   ShieldCheck, Upload, TrendingUp, Trash2, AlertCircle, Eye,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { BuscarEmpresaPorId } from "@/actions/Extratos";
 import { AtualizarAnotacaoBanco, ExcluirBancoVinculado, VincularNovoBanco } from "@/actions/bancos";
-import { CriarNovoPeriodo } from "@/actions/periodos";
+import { CriarNovoPeriodo, ExcluirPeriodo } from "@/actions/periodos";
 import { ModalVincularBanco } from "./ModalVincularBanco";
 import { ModalNovoPeriodo } from "./ModalNovoPeriodo";
 import { ModalUploadExtrato } from "./ModalUploadExtrato";
@@ -26,6 +26,7 @@ import { prepararTransacaoParaRelatorio } from "./lib/relatorio-extrato";
 import { formatarCnpj } from "./lib/formatters";
 import type { BancoCatalogo } from "./lib/bancos-catalogo";
 import { getTema } from "@/lib/temas";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BancoVinculado {
   id: number;
@@ -80,6 +81,7 @@ export function ExtratoDetalhe({ extratoId, temaName = "blue" }: ExtratoDetalheP
   const [contextoOCR, setContextoOCR] = useState<ContextoOCR | null>(null);
   const [periodosAbertos, setPeriodosAbertos] = useState<number[]>([]);
   const [bancoParaExcluir, setBancoParaExcluir] = useState<BancoVinculado | null>(null);
+  const [periodoParaExcluir, setPeriodoParaExcluir] = useState<{ id: number; mes: string; ano: string } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [linhasPreview, setLinhasPreview] = useState<TransacaoParaExportar[]>([]);
   const [modalVisualizarSalvos, setModalVisualizarSalvos] = useState(false);
@@ -149,6 +151,19 @@ export function ExtratoDetalhe({ extratoId, temaName = "blue" }: ExtratoDetalheP
     }
   };
 
+  const handleExcluirPeriodo = async () => {
+    if (!periodoParaExcluir) return;
+    const res = await ExcluirPeriodo(periodoParaExcluir.id);
+    if (res.success) {
+      toast.success("Período removido");
+      setPeriodosAbertos((prev) => prev.filter((id) => id !== periodoParaExcluir.id));
+      setPeriodoParaExcluir(null);
+      await carregarDados();
+    } else {
+      toast.error(res.error || "Erro ao excluir período");
+    }
+  };
+
   const abrirPreviewGeral = () => {
     if (!empresa) return;
     const todasTransacoes: TransacaoParaExportar[] = empresa.periodos.flatMap((p) =>
@@ -173,8 +188,36 @@ export function ExtratoDetalhe({ extratoId, temaName = "blue" }: ExtratoDetalheP
 
   if (carregando || !empresa) {
     return (
-      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center h-screen">
-        <Loader2 className="w-12 h-12 animate-spin" style={{ color: `rgba(${accent},1)` }} aria-hidden="true" />
+      <div className="min-h-screen bg-[#020617]">
+        <div className="text-slate-200 p-4 md:p-8 font-sans">
+          <div className="max-w-[1400px] mx-auto space-y-10">
+            <div className="bg-slate-950/70 border border-white/5 rounded-[3rem] p-8 md:p-12 shadow-2xl">
+              <Skeleton className="h-4 w-40 mb-10 bg-slate-800/60" />
+              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10">
+                <div className="space-y-6 flex-1">
+                  <div className="flex gap-3">
+                    <Skeleton className="h-8 w-32 rounded-xl bg-slate-800/60" />
+                    <Skeleton className="h-8 w-40 rounded-xl bg-slate-800/60" />
+                  </div>
+                  <Skeleton className="h-12 w-3/4 max-w-md bg-slate-800/60" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4">
+                    <Skeleton className="h-14 w-full rounded-2xl bg-slate-800/60" />
+                    <Skeleton className="h-14 w-full rounded-2xl bg-slate-800/60" />
+                  </div>
+                </div>
+                <Skeleton className="h-12 w-64 rounded-xl bg-slate-800/60" />
+              </div>
+            </div>
+
+            <Skeleton className="h-32 w-full rounded-[3rem] bg-slate-900/60" />
+
+            <div className="space-y-6">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-28 w-full rounded-[3rem] bg-slate-900/60" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -302,6 +345,16 @@ export function ExtratoDetalhe({ extratoId, temaName = "blue" }: ExtratoDetalheP
                         className="px-8 py-4 bg-white/5 hover:bg-white/10 text-[10px] font-black text-white uppercase tracking-[0.2em] rounded-2xl border border-white/10 transition-all active:scale-95 flex items-center gap-2"
                       >
                         <Database size={16} aria-hidden="true" style={{ color: `rgba(${accent},1)` }} /> Vincular Instituição
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPeriodoParaExcluir({ id: periodo.id, mes: periodo.mes, ano: periodo.ano });
+                        }}
+                        aria-label={`Excluir período ${periodo.mes}/${periodo.ano}`}
+                        className="cursor-pointer h-[52px] w-[52px] flex items-center justify-center bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-2xl transition-all border border-rose-500/20 group/delete"
+                      >
+                        <Trash2 size={18} aria-hidden="true" className="group-hover/delete:scale-110 transition-transform" />
                       </button>
                       <div className={`transition-transform duration-500 text-slate-500 ${estaAberto ? "rotate-180" : ""}`}>
                         <TrendingUp size={24} aria-hidden="true" className="opacity-20" />
@@ -434,6 +487,26 @@ export function ExtratoDetalhe({ extratoId, temaName = "blue" }: ExtratoDetalheP
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleExcluirBanco} className="bg-rose-600 hover:bg-rose-500 text-white">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!periodoParaExcluir} onOpenChange={(open) => !open && setPeriodoParaExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="text-rose-500" size={20} aria-hidden="true" />
+              Excluir Período?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso apagará o período <strong>{periodoParaExcluir?.mes}/{periodoParaExcluir?.ano}</strong> e todas as instituições e transações vinculadas a ele. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExcluirPeriodo} className="bg-rose-600 hover:bg-rose-500 text-white">
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>

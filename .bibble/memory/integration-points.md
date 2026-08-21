@@ -1720,3 +1720,29 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 **Como adicionar:** mantenha `page/limit/totalCount/hasMore`, use `CompleteExportButtons` com loader que materializa páginas bounded e compare a versão da request antes de aplicar estado. Actions devem retornar `safeAlphaSeoActionError(error)`, não `error.message` arbitrário.
 
 **Última atualização:** 2026-08-20 por Scribe
+
+### Open SEO · Alpha SEO — catálogo renderizado e busca
+
+**Arquivos:** `src/app/PainelAlpha/layout.tsx`, `src/components/layout/PainelLayoutClient.tsx`, `src/components/layout/GlobalSidebar.tsx`, `src/lib/modulos-registry.ts`, `tests/alpha-seo/integration-wiring.test.ts`.
+
+**Propósito:** tornar o módulo visível no shell realmente usado pelo Painel Alpha. A cadeia autoritativa é layout → `PainelLayoutClient` → `GlobalSidebar`; `PainelAlphaClient.tsx` está órfão e não serve como prova de wiring.
+
+**Editado quando:** nome público, aliases, posição/categoria, permissão ou campos pesquisáveis de um módulo mudarem.
+
+**Como adicionar:** crie uma única entrada no `MODULOS_REGISTRY`; para Open SEO, o contrato é `{ id: "alphaSeo", label: "Open SEO · Alpha SEO", category: "comercial", permission: "alphaSeo", tag: "SEO", aliases: ["Open SEO", "Alpha SEO", "OpenSEO"] }`, posicionada como primeiro item Comercial. Confirme na `GlobalSidebar` que busca normalizada considera `label`, `id`, `tag`, `desc` e `aliases`; não valide pelo componente órfão.
+
+**Última atualização:** 2026-08-21 por Scribe
+
+### Catálogo de módulos — precedência autoritativa de visibilidade
+
+**Arquivo:** `src/lib/modulos-registry.ts` (`podeVisualizarModulo`) e consumidor `src/components/layout/GlobalSidebar.tsx`.
+
+**Propósito:** decidir fail-closed quem enxerga cada entrada do catálogo, sem divergência entre branches manuais de UI.
+
+**Editado quando:** surgir novo tipo de restrição (`adminOnly`, role ou permission) ou um consumidor novo do registry.
+
+**Como adicionar:** todo consumidor renderizado deve filtrar com `podeVisualizarModulo(modulo, { permissoes, role })`. Preserve a ordem: admin bypassa; `adminOnly` retorna somente role explicitamente permitida; depois vale `allowedRoles`; depois `permission`; só então um item sem permissão e sem roles é irrestrito. Casos mínimos de regressão: `gestaoOnboarding` nunca aparece para `User` e `cadastro` não aparece para `User` mesmo que receba a string de permissão `cadastro`.
+
+**Evidência/estado operacional:** Forge 161/161, Probe com casos de render/busca e Lens PASS. O módulo consta no `HEAD`/`origin/main` `c2979beb6`, mas deploy não foi verificado; a correção final de precedência e seu teste reforçado ainda estão no working tree e dependem de DevOps autorizado para publicação.
+
+**Última atualização:** 2026-08-21 por Scribe
