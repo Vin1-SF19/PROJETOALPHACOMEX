@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import db from "@/lib/prisma";
+import { isValidRoadmapModuleKey } from "@/lib/roadmap-alpha/catalog";
 import { requireRoadmapAccess } from "@/lib/roadmap-alpha/authorization";
 import {
   roadmapObjectiveCreateSchema,
@@ -44,6 +45,8 @@ function publicError(error: unknown): string {
     return "Não autorizado";
   if (error instanceof Error && error.message === "OBJECTIVE_NOT_FOUND")
     return "Objetivo não encontrado";
+  if (error instanceof Error && error.message === "MODULE_KEY_INVALID")
+    return "Projeto desconhecido — selecione um projeto ou sistema externo válido";
   return "Não foi possível concluir a operação";
 }
 
@@ -125,6 +128,8 @@ export async function CriarObjetivoRoadmap(payload: unknown) {
   try {
     const access = await requireRoadmapAccess(true);
     const input = roadmapObjectiveCreateSchema.parse(payload);
+    if (!(await isValidRoadmapModuleKey(input.moduleKey)))
+      throw new Error("MODULE_KEY_INVALID");
     const { developmentProvider, ...objectiveInput } = input;
     const result = await createRoadmapObjective(objectiveInput, access.userId);
     await writeObjectiveDevelopmentProvider(
@@ -159,6 +164,8 @@ export async function AtualizarObjetivoRoadmap(payload: unknown) {
       .object({ objectiveId: idSchema, content: roadmapObjectiveEditSchema })
       .strict()
       .parse(payload);
+    if (!(await isValidRoadmapModuleKey(parsed.content.moduleKey)))
+      throw new Error("MODULE_KEY_INVALID");
     const { developmentProvider, ...objectiveContent } = parsed.content;
     const preferences = await readObjectiveDevelopmentPreferences();
     const previousDevelopmentProvider =

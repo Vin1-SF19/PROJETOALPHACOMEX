@@ -126,7 +126,7 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
       {pipeline.nome === FINANCIAL_PIPELINE_NAME && (
         hasConfiguredFinancialPipeline(etapas, campos) ? (
           <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200" role="status">
-            Pipeline Financeiro configurado com as seis etapas e campos oficiais.
+            Pipeline Financeiro configurado com as cinco etapas e campos oficiais.
           </div>
         ) : (
           <ConfigurarEtapasFinanceiroButton

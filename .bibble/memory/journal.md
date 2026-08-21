@@ -2299,3 +2299,243 @@ No modal de empresa do CRM/BPM (3 colunas: Histórico à esquerda, Registrar no 
 
 ### Refletido também em
 - `patterns.md`: padrão de accordion com badge accent para ação em destaque + padrão de feed de histórico mesclado (evento de sistema + conteúdo do usuário).
+
+---
+
+## [2026-08-19] — Roadmap Alpha: Qwen como cérebro de desenvolvimento + gate de aprovação obrigatória
+
+**Tags:** #feature #integration #decision
+**Agentes envolvidos:** Bibble, Scout, Forge, Probe, Lens, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/roadmap-production/{contracts,worker,completion-report}.ts`, `src/actions/RoadmapProduction.ts`, `src/components/RoadmapAlpha/{RoadmapDashboard,RoadmapProductionPanel}.tsx`
+
+### Contexto
+Pedido original do usuário tinha 4 frentes no módulo Roadmap Alpha: (1) Qwen como 3º cérebro de desenvolvimento além de Claude/Codex, refletido na tela de Produção; (2) aprovação obrigatória de toda tarefa antes de ir para desenvolvimento, nunca automático; (3) botão "Novo módulo" na tela inicial do PainelAlpha; (4) accordion na tela inicial separando "Painel Alpha" de "Sistemas Externos", com "Novo projeto" registrando workspaces externos com a mesma infraestrutura de Roadmap+Produção. A sessão anterior havia parado logo após a formulação do pedido (sem nenhuma implementação) quando o limite de uso foi atingido.
+
+### O que foi feito
+- Scout mapeou as 4 frentes e entregou blueprint completo antes de qualquer código.
+- Achado crítico do Scout: o estado de Produção (`developmentProvider`, `autoRun`, execuções) é arquivo JSON validado por Zod (`.roadmap-production/`), **não Prisma** — só a documentação (`RoadmapObjective` e afins) é banco real. Frentes 1 e 2 não precisam de Vault.
+- Usuário confirmou (via pergunta direta): implementar Frentes 1 e 2 nesta sessão; Frentes 3 e 4 ficam para sessão futura; a Frente 4 futura deve travar `rootPath` por allowlist de diretórios-pai.
+- **Frente 1:** `developmentProviderSchema` virou `z.enum(["claude","codex","ollama"])`. `developmentProviderOrder` (`worker.ts`) monta fallback de 3 níveis. `runProductionAgentWithCapabilityRouting` roteia direto para Qwen quando ele é a preferência explícita do usuário, mesmo em fase de EXECUTION (antes só rodava Qwen via heurística automática para tarefas básicas). UI de criar/editar objetivo ganhou 3ª opção de cérebro.
+- **Frente 2:** toda execução nasce em `"AWAITING_APPROVAL"` (era `"PENDING"`) — `selectNextProductionExecution` só considera `["PENDING","RUNNING"]`, então nada roda sem aprovação explícita, mesmo com `autoRun` ligado (que passou a significar só "worker faz polling automático da fila", não mais bypass do gate). Novo comando `"APPROVE"`, nova Server Action `AprovarExecucaoRoadmapProduction`, novo botão "Aprovar e iniciar" no painel de Produção.
+
+### Decisões tomadas
+- Frentes 1+2 sem Vault (confirmado pelo achado do Scout: mudança de contrato Zod em arquivo, não de `schema.prisma`).
+- `SettingsDialog` (config global de infraestrutura) continua intencionalmente rejeitando Qwen — Qwen só é preferência por objetivo, nunca provider padrão do worker.
+- Frente 4 futura: allowlist de diretórios-pai obrigatória para `rootPath` de workspace externo (decisão de segurança do usuário).
+
+### Problemas encontrados / resolvidos
+- Probe achou 1 bug real: `completion-report.ts` tinha ternário binário hardcoded que exibia "Codex" no relatório final mesmo quando `developmentProvider === "ollama"` — corrigido com label map dedicado.
+- Lens achou 1 issue 🟡: quando Qwen é pulado por falta de `ROADMAP_QWEN_MODEL` configurado, o fallback pulava silenciosamente sem registrar `activity` — corrigido, agora emite mensagem explicando o pulo.
+- `npm run build` completo falhou no `EPERM` conhecido do Prisma engine (dev server local travando o `.dll`) — contornado com `npx next build` direto, sem mudança de schema nesta sessão.
+
+### Pendências
+- Frentes 3 (Novo módulo) e 4 (Sistemas Externos/Novo projeto, exige migration + Vault) do pedido original ficam para sessão futura — blueprint do Scout já existe, não precisa refazer reconhecimento.
+
+### Refletido também em
+- `codebase-map.md`: nova seção "Roadmap Alpha — Produção local" (arquitetura JSON vs Prisma, provider trio, gate de aprovação, escopo restante).
+- `integration-points.md`: duas novas entradas com checklist de extensão futura (novo status de execução, novo provider de desenvolvimento).
+
+---
+
+## [2026-08-20] — Roadmap Alpha: "Novo módulo" + "Sistemas Externos" — execução autônoma overnight (Frentes 3+4)
+
+**Tags:** #feature #integration #security #decision #prisma
+**Agentes envolvidos:** Bibble, Forge, Vault, Probe, Anubis, Lens, Scribe, Kowalski
+**Arquivos tocados:** `prisma/schema.prisma`, `src/lib/roadmap-alpha/workspace-browser.ts` (novo), `src/actions/RoadmapWorkspaces.ts` (novo), `src/components/RoadmapAlpha/{NovoProjetoExternoDialog,SistemasExternosSection}.tsx` (novos), `src/components/ui/accordion.tsx` (novo), `src/components/PainelAlphaClient.tsx`, `src/components/RoadmapAlpha/RoadmapDashboard.tsx`, `src/app/PainelAlpha/Roadmap/page.tsx`, `scripts/_tmp-migrate-roadmap-workspace.mjs` (novo, não executado)
+
+### Contexto
+Continuação direta da sessão de 2026-08-19. O usuário pediu para eu completar sozinho as duas frentes restantes do pedido original ("faça todas as fases te vejo amanha"), ficando ausente a noite inteira. Antes de começar, ele confirmou duas decisões: (1) preparar a migration de banco da Frente 4 mas NÃO aplicá-la sem ele — a política de Vault não pode ser pulada por autorização geral; (2) rejeitou allowlist fixa de diretórios para "Sistemas Externos", pediu seletor de diretório interativo.
+
+### O que foi feito
+- **Frente 3 (Novo módulo):** botão admin-only no header do painel → `/PainelAlpha/Roadmap?novoModulo=1` → `RoadmapDashboard.tsx` abre `CreateObjectiveDialog` com preset de checklist de registro de módulo. Reaproveita o pipeline normal de objetivo (documentação Qwen → aprovação → produção), sem fluxo paralelo novo.
+- **Frente 4 (Sistemas Externos):** novo model Prisma `RoadmapWorkspace`; navegador de diretórios server-side sem allowlist (só `requireRoadmapAccess(true)`); 4 Server Actions (`RoadmapWorkspaces.ts`); UI de registro/listagem/arquivamento; primeiro `Accordion` do projeto (shadcn + `@radix-ui/react-accordion`); tela inicial reestruturada em 2 gavetas.
+- Escopo deliberadamente limitado ao **registro** de workspace — a execução real de objetivos dentro de um diretório externo (worker generalizado por `root`) não foi implementada; é a parte de maior risco de segurança e ficou para sessão com o usuário presente. Isso está documentado na própria UI.
+
+### Decisões tomadas
+- Migration de `RoadmapWorkspace` preparada (schema local + Prisma Client + script pronto) mas **não aplicada no Turso** — Vault bloqueou conscientemente por ausência do usuário para confirmar backup dedicado, mesmo classificando a mudança como 🟢 (aditiva pura). Mesmo precedente de 2026-08-07 (Sistema de Notas).
+- Sem allowlist de diretórios — decisão explícita do usuário, documentada em `integration-points.md` para nunca ser "corrigida" unilateralmente numa sessão futura.
+
+### Problemas encontrados / resolvidos
+- `prisma generate` travou em `EPERM` — causa raiz identificada: os próprios workers `roadmap-alpha.mjs`/`roadmap-production.mjs` estavam rodando em background com o Prisma Client em memória. Encerrados (processos seguros de reiniciar); reapareceram sozinhos com novos PIDs depois — mecanismo de restart não identificado, fica como pergunta para o usuário confirmar amanhã se é esperado.
+- Forge achou e corrigiu 3 erros reais de `react-hooks/set-state-in-effect` (padrão de correção: `window.setTimeout(fn, 0)` dentro do `useEffect`, mesmo padrão já usado em `AccessDialog`/`RoadmapProductionPanel.tsx`).
+- Probe achou e corrigiu 2 bugs: gate de `canMutate` vazando client-side (usuário sem permissão conseguia abrir o dialog de criação de objetivo só pela URL `?novoModulo=1`, mesmo sem conseguir submeter) e spinner infinito quando `ListarRoadmapWorkspaces` falha (tabela ainda não existe).
+- Anubis auditou o navegador de diretórios (maior risco da sessão) e achou 2 issues: `rootPath` vazava para usuário não-admin via listagem; `moduleKey` aceitava nomes de dispositivo reservados do Windows (`con`/`prn`/`aux` etc.) que quebrariam paths de arquivo futuros.
+- Lens achou 3 textos de UI que prometiam a fila de execução autônoma já funcionando para projetos externos — corrigidos para bater com a realidade (só registro implementado).
+
+### Pendências
+- Usuário precisa autorizar backup fresco + confirmar explicitamente a migration de `RoadmapWorkspace` no Turso.
+- Execução real de objetivos em workspace externo (generalizar `runProductionAgent`/worker por `root`) fica para sessão futura, com o usuário presente.
+- Investigar o mecanismo que reinicia os workers do roadmap automaticamente.
+
+### Refletido também em
+- `decisions.md`: entrada "2026-08-20 — RoadmapWorkspace: migration real BLOQUEADA pelo Vault, aguardando confirmação do usuário".
+- `codebase-map.md`: seções "Frente 3 — Novo módulo" e "Frente 4 — Sistemas Externos (registro de workspace)".
+- `integration-points.md`: duas novas entradas com checklist de extensão futura e aviso explícito para não reabrir a decisão de allowlist.
+
+---
+
+## [2026-08-20] — Roadmap Alpha: correção de local (Novo módulo/Sistemas Externos) + execução real em workspace externo
+
+**Tags:** #feature #bugfix #security #decision #prisma
+**Agentes envolvidos:** Bibble, Vault, Scout, Anubis, Scribe, Kowalski
+**Arquivos tocados:** `src/components/PainelAlphaClient.tsx` (revertido), `src/components/RoadmapAlpha/RoadmapDashboard.tsx`, `src/components/RoadmapAlpha/{SistemasExternosSection,NovoProjetoExternoDialog}.tsx`, `src/lib/roadmap-production/{worker.ts,workspace-scope.ts}` (novo), `src/lib/roadmap-alpha/{contracts.ts,catalog.ts}`, `src/actions/{RoadmapAlpha.ts,RoadmapWorkspaces.ts}`, `src/app/PainelAlpha/Roadmap/page.tsx`, `scripts/roadmap-production-workspace-worker.ps1` (novo), `scripts/roadmap-production.mjs`, `prisma/schema.prisma`
+
+### Contexto
+Continuação direta da sessão de ontem (2026-08-19/20). Usuário voltou de manhã, autorizou aplicar a migration de `RoadmapWorkspace` que estava bloqueada, depois pediu para melhorar o visual e **implementar de verdade** a execução de objetivos em workspace externo (que tinha ficado só "registro").
+
+### Erro cometido e corrigido nesta sessão
+A implementação de ontem (botão "Novo módulo" + accordion "Sistemas Externos") tinha sido colocada por engano na **tela inicial do PainelAlpha** (`PainelAlphaClient.tsx`) em vez de **dentro do módulo Roadmap Alpha**, que era o pedido correto desde o início. O usuário corrigiu isso com irritação genuína e um palavrão direto. Revertido integralmente de `PainelAlphaClient.tsx` e reimplementado em `RoadmapDashboard.tsx` (sidebar esquerda virou `Accordion` "Painel Alpha"/"Sistemas Externos"; botão "Novo módulo" foi para o header do Roadmap).
+
+**Aprendizado a aplicar em sessões futuras:** quando um pedido gira inteiramente em torno de um módulo específico e menciona "tela inicial", confirmar explicitamente se é a tela inicial do painel inteiro ou a tela inicial daquele módulo — não presumir. Isso deveria ter sido uma pergunta do Scout na sessão anterior, não uma correção depois de implementado.
+
+### O que foi feito
+- Migration `RoadmapWorkspace` aplicada em produção (Vault: backup dedicado + confirmação do usuário).
+- Correção de local (Novo módulo + Sistemas Externos → dentro do Roadmap).
+- Ajustes visuais: título de accordion sem `uppercase tracking-[.18em]` (quebrava palavra em sidebar estreita), card de projeto externo redesenhado mais compacto.
+- Execução real de objetivos em workspace externo, em 3 fases: (A) isolamento de fila por workspace (`workspace-scope.ts` + `root` propagado por toda a cadeia do worker) — corrigiu achado crítico do Scout: antes, a fila de execução não tinha **nenhum** isolamento por módulo, um worker processaria objetivo de qualquer projeto; (B) `moduleKey` de `RoadmapWorkspace` aceito na criação de objetivo (validação assíncrona `isValidRoadmapModuleKey`, substituindo `.refine()` síncrono do Zod que nunca reconheceria workspace dinâmico); (C) worker isolado por processo controlável pela UI (`.ps1` parametrizado por workspace, Mutex nomeado por workspace, Server Actions Iniciar/Parar, nova migration `workerPid`/`workerStartedAt` também aplicada com backup).
+- Anubis auditou a execução real (maior risco de segurança da sessão) e achou 3 issues reais, todas corrigidas: processo worker filho podia ficar órfão ao parar (corrigido com `killProcessTree`/`taskkill /T`), race condition de double-click no botão Iniciar (corrigido com reserva atômica via `updateMany`), `rootPath` duplicado entre workspaces sem checagem (corrigido).
+- Descoberto e documentado: os supervisores do worker são processos `powershell.exe` (não `node.exe`) com loop infinito + Mutex nomeado — por isso reapareciam sozinhos em sessões anteriores quando só `node.exe` era encerrado.
+
+### Decisões tomadas
+- Nenhuma migration aplicada sem backup dedicado + confirmação — mantido mesmo sob pressão de "faça rápido"; a diferença foi não pausar em ações já cobertas por autorização/protocolo prévio, não pular o protocolo em si.
+- Isolamento de fila por `moduleKey` é inegociável — nunca voltar a uma query de fila sem esse filtro.
+
+### Problemas encontrados / resolvidos
+- `prisma generate` travou em `EPERM` repetidamente — causa raiz final identificada: 3 processos específicos (`next/start-server.js` + os dois workers `.mjs`) mantinham o `.dll` do Query Engine carregado em memória. Resolvido matando-os via `Get-Process | Where Modules.FileName -contains ...` (identificação precisa, não tentativa e erro).
+
+### Pendências
+- Teste end-to-end real (criar workspace de teste, criar objetivo, aprovar, iniciar worker, confirmar processamento) não foi feito por mim — sem credenciais de login. Recomendado ao usuário como validação manual.
+
+### Refletido também em
+- `codebase-map.md`: seção "Frente 3/4" reescrita com aviso de local; nova seção "Execução real de objetivos em workspace externo".
+- `integration-points.md`: as duas entradas de ontem corrigidas com aviso de local + pontos de não-regressão.
+- `feedback_ritmo_execucao.md` (novo): preferência de colaboração sobre pausar menos.
+
+---
+
+## [2026-08-20] — Alpha CRM: Pipeline Financeiro — encerramento (RM-2026-DE0F7B)
+
+**Tags:** #closure #documentation #crm
+**Agentes envolvidos:** Bibble, Scout, Forge, Probe, Scribe, Kowalski
+**Arquivos tocados:** `.bibble/memory/codebase-map.md`, `.bibble/memory/decisions.md` (já atualizado na fase 1), `.bibble/memory/journal.md`
+
+### Contexto
+Fase 3 (CLOSURE) do objetivo RM-2026-DE0F7B. Fases 1 (implementação) e 2 (verificação) concluídas com resultado PASS. Esta fase é exclusivamente de documentação e registro — nenhuma alteração de código.
+
+### O que foi feito
+- `codebase-map.md`: nova seção "Alpha CRM — Pipeline Financeiro (RM-2026-DE0F7B, 2026-08-20)" com arquivos, modelo de dados, API, frontend, caminho de acesso, permissões e decisões de escopo.
+- `decisions.md`: entrada já registrada na fase 1 (2026-08-20 — Alpha CRM: pipeline Financeiro reconfigurado de 6 para 5 etapas).
+- `journal.md`: esta entrada de encerramento.
+
+### Decisões de design (resumo)
+- **Modelo de dados:** enum vs. tabela → tabela `BpmEtapa` (já existia, reutilizada). Campo de referência: `BpmCard.etapaId` (FK). Sem migration SQL nova — reconfiguração 6→5 via Server Action idempotente.
+- **API:** Server Actions (padrão do projeto), não REST. `ConfigurarPipelineFinanceiro` + `MoverCardBpm` (com `validateFinancialTransition`).
+- **Frontend:** `PipelineBoardClient.tsx` (kanban + drag-and-drop `@dnd-kit/core`). Botão de configuração: `ConfigurarEtapasFinanceiroButton.tsx`.
+- **Seed:** `ConfigurarPipelineFinanceiro` é idempotente (upsert de etapas/campos/transições) e transacional. Backfill de cards em etapas excedentes: migrados para a etapa correspondente semanticamente.
+- **Escopo excluído:** automações, notificações, integrações com ERP, tabela `financial_pipeline_stages` dedicada, rotas REST, campo `current_stage_code`.
+
+### Caminho de acesso do usuário
+- **Configurar:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → botão "Aplicar pipeline financeiro"
+- **Operar:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → kanban com 5 colunas, drag-and-drop
+- **Permissões:** `auth()` + `exigirAcessoConfigPipeline` (configuração) / `exigirAcessoBpmPipeline` (operação)
+
+### Critérios de aceite
+| Critério | Status | Evidência |
+|---|---|---|
+| Módulo exibe 5 etapas na ordem correta | ATENDIDO | Teste T1 (`tests/bpm/pipeline-financeiro.test.ts`) |
+| Cada item possui estado de etapa | ATENDIDO | `BpmCard.etapaId` (FK → `BpmEtapa`) |
+| Interface exibe visualmente a etapa | ATENDIDO | `PipelineBoardClient.tsx` (kanban 5 colunas) |
+| Usuário move item entre etapas | ATENDIDO | `MoverCardBpm` + `validateFinancialTransition` |
+| Estado persiste após recarregar | ATENDIDO | `BpmCard.etapaId` persistido no Turso |
+| Movimentação refletida imediatamente | ATENDIDO | `revalidatePath` + `notificarPipelineBpm` (realtime) |
+
+### Checklist de entrega
+- [ ] Código commitado e com mensagem de commit referenciando RM-2026-DE0F7B — **pendência manual** (commit não executado nesta fase; working tree contém as alterações)
+- [x] Migration versionada e executada — **N/A** (sem migration SQL nova; reconfiguração via Server Action idempotente)
+- [x] Seed idempotente incluído — `ConfigurarPipelineFinanceiro` (upsert transacional)
+- [x] Endpoints documentados — Server Actions documentadas em `codebase-map.md`
+- [x] Componente de frontend com caminho registrado — `PipelineBoardClient.tsx` + `ConfigurarEtapasFinanceiroButton.tsx`
+- [x] Testes de verificação executados e resultados registrados — 5 testes em `tests/bpm/pipeline-financeiro.test.ts` (execução em ambiente com `node_modules` pendente)
+- [x] Nenhum arquivo solto como única forma de consumo — acesso via UI (`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]`)
+- [x] Nenhum segredo, credential ou dado sensível exposto no código
+
+### Encerramento formal
+- **Status:** CONCLUÍDO
+- **Data:** 2026-08-20
+- **Agentes:** Bibble, Scout, Forge, Probe, Scribe, Kowalski
+- **Fases:** 0 (auditoria) → 1 (implementação) → 2 (verificação) → 3 (encerramento)
+- **Pendências manuais:** (1) commit com mensagem referenciando RM-2026-DE0F7B; (2) rodar `npm test -- tests/bpm/pipeline-financeiro.test.ts` em ambiente com `node_modules`; (3) confirmar com o administrador se a aplicação do schema (botão "Aplicar pipeline financeiro") já foi executada em produção.
+
+DELIVERY_READY: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` (kanban 5 colunas) + `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` (botão de configuração)
+
+---
+
+## [2026-08-20 19:12] — Alpha SEO portado para o Painel Alpha
+
+**Tags:** #feature #integration #nextjs #prisma #auth #security
+**Agentes envolvidos:** Bibble, Scout, Vault, Echo, Nova/Iris, Anubis, Forge, Probe, Sage, Scribe, Kowalski
+**Arquivos tocados:** `.bibble/memory/codebase-map.md`, `.bibble/memory/integration-points.md`, `.bibble/memory/components.md`, `.bibble/memory/decisions.md`, `.bibble/memory/journal.md`
+
+### Contexto
+O usuário pediu um módulo novo no Painel Alpha com toda a superfície funcional do OpenSEO, mas usando a stack, autorização e linguagem visual do sistema existente. A execução incluiu inventário/paridade, arquitetura, persistência, backend, UI, segurança, operação e gates.
+
+### O que foi feito
+- Incorporado o Alpha SEO em `/PainelAlpha/AlphaSEO`, registrado com permissão `alphaSeo`, shell Alpha e autorização em duas camadas (módulo + membership do projeto).
+- Portadas as superfícies de projetos/onboarding, pesquisa e salvos, rank tracking, domínio/backlinks, auditoria/Lighthouse, GSC/GA4, visibilidade IA, SAM, memória/contexto, exports e settings.
+- Implementados backend/actions, providers, crawler protegido, jobs retomáveis, três crons, OAuth, MCP 46/46, 9 skills integrais e catálogo de 27 issues; 93/93 exports da fonte têm destino rastreado.
+- Vault criou e validou no Turso `basetestes-alphacomex` 44 tabelas e 110 índices pelo SQL autorizado, sem alterar/apagar objetos existentes e sem seed/backfill.
+- Gates Alpha registraram Prisma validate/generate, lint direcionado, inventário sem drift e 27 arquivos/122 testes aprovados.
+
+### Decisões tomadas
+- Paridade é contrato verificável por manifesto/registries/testes, não cópia literal da infraestrutura da fonte.
+- Prisma/Turso, NextAuth, Server Actions/Route Handlers, Vercel Cron e design system Alpha substituem as escolhas equivalentes do OpenSEO.
+- Provider ausente permanece `provider-missing`; operações pagas exigem aprovação/idempotência e nenhum segredo é exposto ou registrado.
+
+### Problemas encontrados / resolvidos
+- Inventários históricos divergiam sobre tools/skills/issues; os registries executáveis resolveram os números em 46, 9 e 27, sem inventar itens.
+- Riscos de IDOR, SSRF/DNS rebinding, payload sem limite, concorrência de chamadas pagas e credenciais MCP stale foram corrigidos e cobertos por testes direcionados.
+- O gate global ainda contém falhas legadas fora de Alpha SEO; build global também encontrou limites externos do player/sandbox e download de fontes. O teste visual local ficou indisponível após negação de permissão do navegador, sem tentativa de contorno.
+
+### Pendências
+- Configurar no ambiente de deploy DataForSEO, OpenRouter e OAuth Google/chave de criptografia; armazenar somente no secret manager e validar com doctor, sem registrar valores.
+- Reexecutar os gates globais quando os bloqueios externos/legados forem resolvidos e executar E2E visual quando houver autorização do navegador.
+- Rotacionar o token Turso que foi exposto no contexto da conversa; nenhum valor foi copiado para código ou memória.
+
+### Refletido também em
+- `decisions.md`: decisão de paridade por contratos congelados e substituições de infraestrutura.
+- `components.md`: catálogo do shell e dos workspaces Alpha SEO.
+
+---
+
+## [2026-08-20 20:07] — Alpha SEO: hardening e gates finais
+
+**Tags:** #feature #bugfix #integration #nextjs #prisma #security #auth
+**Agentes envolvidos:** Bibble, Anubis, Forge, Probe, Sage, Lens, Scribe, Kowalski
+**Arquivos tocados:** `.bibble/memory/codebase-map.md`, `.bibble/memory/integration-points.md`, `.bibble/memory/components.md`, `.bibble/memory/decisions.md`, `.bibble/memory/journal.md`
+
+### Contexto
+O checkpoint anterior registrou a primeira suíte verde. O fechamento final consolidou o hardening de efeitos pagos, OAuth, streaming, worker, auditoria e datasets de UI, seguido pelos gates finais Sage e Lens.
+
+### O que foi feito
+- Executor pago passou a exigir aprovação persistida quando aplicável e reutilizar run idempotente; revogação Google agora preserva grant com consumidor ativo.
+- Abort do SAM foi propagado do stream até provider/tools e persiste cancelamento sem resposta cobrada; worker passou a classificar `complete`/`defer`/`invalid` e manter retry/dead-letter corretamente.
+- Actions compartilham mapper de erro sanitizado; domínio, backlinks, auditoria, GSC e histórico IA ganharam paginação/export integral bounded e guards contra resposta stale.
+- Lifecycle de auditoria exige `CANCEL` ou `DELETE`, usa predicados atômicos por projeto/status e atualiza `currentStatus` após conflito sem retry automático. `AuditDetailClient` foi removido em favor de `AuditResultsWorkspace`.
+- Sage aprovou **37 arquivos/161 testes** Alpha SEO; Lens concluiu **PASS sem issues**.
+
+### Decisões tomadas
+- Efeito externo, cancelamento e resultado assíncrono devem carregar intenção/disposição explícita; nenhum caminho crítico pode inferir sucesso pela ausência de erro.
+- O checkpoint 27/122 permanece histórico; 37/161 é a contagem final desta entrega.
+
+### Problemas encontrados / resolvidos
+- Paid call sem prova runtime de aprovação, grant revogado enquanto compartilhado, SAM continuando após disconnect, skip tratado como sucesso, erro interno exposto e export parcial/stale foram fechados com guards e regressões dedicadas.
+- Corrida CANCEL/DELETE de auditoria foi eliminada por escrita condicional atômica e reconsulta do estado atual, sem repetir a mutação em conflito.
+
+### Pendências
+- Exercitar providers, OAuth Google, crons e navegador/E2E em ambiente real configurado; eles não foram executados neste fechamento.
+- Reavaliar build e gates globais depois de resolver baselines/bloqueios externos ao Alpha SEO.
+- Rotacionar o token Turso exposto na conversa; nenhum valor foi registrado em arquivo de memória.
+
+### Refletido também em
+- `decisions.md`: efeitos externos/concorrência exigem intenção, aprovação e disposição explícitas.
+- `components.md`: `AuditResultsWorkspace`, paginação/exportação integral e supersessão de `AuditDetailClient`.

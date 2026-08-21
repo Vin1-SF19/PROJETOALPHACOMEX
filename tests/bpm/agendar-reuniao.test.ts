@@ -4,6 +4,8 @@ import {
   ERRO_DATA_REUNIAO_OBRIGATORIA,
   obterErroDataReuniaoParaMovimento,
   resolverInicioCicloNaEtapa,
+  contarMaiorSequenciaDiasConsecutivos,
+  obterErroContatosConsecutivosParaMovimento,
 } from "@/lib/bpm/agendar-reuniao";
 import { cicloNovosLeadsVencido } from "@/lib/bpm/novos-leads";
 
@@ -62,6 +64,67 @@ describe("ciclo de oito dias em Agendar reunião", () => {
       createdAt,
       [{ createdAt: new Date(), valorNovoJson: "json inválido" }],
     )).toBe(createdAt);
+  });
+});
+
+describe("contarMaiorSequenciaDiasConsecutivos", () => {
+  it("retorna 0 quando não há datas", () => {
+    expect(contarMaiorSequenciaDiasConsecutivos([])).toBe(0);
+  });
+
+  it("conta corretamente 8 dias corridos consecutivos", () => {
+    const datas = Array.from({ length: 8 }, (_, indice) =>
+      new Date(`2026-08-${String(indice + 1).padStart(2, "0")}T12:00:00.000Z`));
+    expect(contarMaiorSequenciaDiasConsecutivos(datas)).toBe(8);
+  });
+
+  it("ignora duplicatas no mesmo dia", () => {
+    const datas = [
+      new Date("2026-08-01T08:00:00.000Z"),
+      new Date("2026-08-01T20:00:00.000Z"),
+      new Date("2026-08-02T08:00:00.000Z"),
+    ];
+    expect(contarMaiorSequenciaDiasConsecutivos(datas)).toBe(2);
+  });
+
+  it("encontra a maior sequência mesmo com lacunas", () => {
+    const datas = [
+      new Date("2026-08-01T12:00:00.000Z"),
+      new Date("2026-08-02T12:00:00.000Z"),
+      new Date("2026-08-10T12:00:00.000Z"),
+      new Date("2026-08-11T12:00:00.000Z"),
+      new Date("2026-08-12T12:00:00.000Z"),
+    ];
+    expect(contarMaiorSequenciaDiasConsecutivos(datas)).toBe(3);
+  });
+});
+
+describe("guard de 8 contatos consecutivos em Agendar reunião", () => {
+  it("bloqueia quando não há 8 dias consecutivos de contato", () => {
+    const datas = [
+      new Date("2026-08-01T12:00:00.000Z"),
+      new Date("2026-08-02T12:00:00.000Z"),
+    ];
+    expect(obterErroContatosConsecutivosParaMovimento({
+      etapaOrigemNome: "Agendar reunião",
+      datasContato: datas,
+    })).toContain("Contatos consecutivos registrados: 2 de 8");
+  });
+
+  it("permite avançar com 8 dias consecutivos de contato registrados", () => {
+    const datas = Array.from({ length: 8 }, (_, indice) =>
+      new Date(`2026-08-${String(indice + 1).padStart(2, "0")}T12:00:00.000Z`));
+    expect(obterErroContatosConsecutivosParaMovimento({
+      etapaOrigemNome: "Agendar reunião",
+      datasContato: datas,
+    })).toBeNull();
+  });
+
+  it("não se aplica a etapas diferentes de Agendar reunião", () => {
+    expect(obterErroContatosConsecutivosParaMovimento({
+      etapaOrigemNome: "Novos leads",
+      datasContato: [],
+    })).toBeNull();
   });
 });
 

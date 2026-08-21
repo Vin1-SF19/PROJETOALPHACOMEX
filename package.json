@@ -36,7 +36,12 @@
     "roadmap:production:once": "tsx scripts/roadmap-production.mjs worker --once",
     "storage:inventory": "tsx --conditions=react-server scripts/storage-alpha.mjs inventory",
     "storage:doctor": "tsx --conditions=react-server scripts/storage-alpha.mjs doctor",
-    "storage:poc": "tsx --conditions=react-server scripts/storage-alpha.mjs poc"
+    "storage:poc": "tsx --conditions=react-server scripts/storage-alpha.mjs poc",
+    "alpha-seo:inventory": "tsx scripts/alpha-seo.mjs inventory",
+    "alpha-seo:doctor": "tsx scripts/alpha-seo.mjs doctor",
+    "alpha-seo:worker": "tsx scripts/alpha-seo.mjs worker",
+    "alpha-seo:worker:once": "tsx scripts/alpha-seo.mjs worker --once",
+    "alpha-seo:worker:persistent:once": "tsx --conditions=react-server scripts/alpha-seo.mjs worker --once --persistent"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1112.0",
@@ -50,9 +55,11 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "5.7.1",
     "@libsql/client": "^0.17.3",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@prisma/adapter-libsql": "^7.8.0",
     "@prisma/client": "^6.19.2",
     "@pusher/pusher-websocket-react-native": "^1.3.3",
+    "@radix-ui/react-accordion": "^1.2.20",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-checkbox": "^1.3.3",

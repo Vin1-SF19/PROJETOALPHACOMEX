@@ -2,7 +2,81 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-11 (Bibble/IAlpha — leitura confiável de PDFs e respostas completas)
+> Última atualização: 2026-08-19 (Roadmap Alpha — Qwen como cérebro de desenvolvimento + gate de aprovação obrigatória)
+
+---
+
+## Roadmap Alpha — Produção local (`src/lib/roadmap-production/`)
+
+**⚠️ Achado arquitetural importante, não documentado antes:** o estado de execução da Produção (config, fila, execuções, `developmentProvider` por objetivo, `autoRun`) **NÃO é Prisma** — é um conjunto de arquivos JSON validados por Zod em `.roadmap-production/` (dentro do `root`, por padrão `process.cwd()`):
+
+```
+.roadmap-production/
+├── config.json                              # ProductionConfig (provider global de infra, model, autoRun, maxToolSteps)
+├── state.json                               # ProductionState (executions[], ignoredExecutionIds[])
+├── objective-development-providers.json     # preferência de developmentProvider POR OBJETIVO
+└── commands/                                # fila de comandos de controle (PAUSE/RESUME/RETRY/EXCLUDE/REPORT_ERROR/APPROVE), 1 arquivo por comando
+```
+
+Lido/escrito exclusivamente via `src/lib/roadmap-production/storage.ts` (`readProductionConfig`, `readProductionState`, `readObjectiveDevelopmentPreferences`, `enqueueProductionControl` etc.), todas as funções aceitam `root` parametrizável (hoje sempre `process.cwd()` na prática, mas a assinatura já suporta outro diretório — relevante para uma futura Frente "Sistemas Externos"/multi-workspace).
+
+**Só é Prisma de verdade:** `RoadmapObjective`, `RoadmapDocumentationJob`, `RoadmapDocumentationAttempt`, `RoadmapPromptArtifact` — a parte de **documentação** (Qwen gera os prompts). A parte de **produção/execução** (quem roda o quê, com qual IA, em qual status) é só arquivo.
+
+**Consequência prática:** mudanças em `developmentProviderSchema`, `productionExecutionStatusSchema`, `productionControlCommandSchema` (todos em `src/lib/roadmap-production/contracts.ts`) são mudanças de contrato Zod, **não acionam o Vault** — Vault só entra se algo tocar `prisma/schema.prisma` de verdade (ex.: uma futura tabela `RoadmapWorkspace` para multi-projeto).
+
+### Cérebro de desenvolvimento — trio Claude/Codex/Qwen (2026-08-19)
+
+`developmentProviderSchema` (`contracts.ts`) é `z.enum(["claude","codex","ollama"])`. Antes só existia o par claude/codex; Qwen (`"ollama"`) já era usado internamente para roteamento automático de tarefas básicas/diagnóstico via heurística de conteúdo (`selectProductionExecutionEngine` em `providers.ts`), mas nunca era uma escolha explícita do usuário para fases de EXECUTION (engenharia).
+
+Agora o usuário escolhe o cérebro preferido por objetivo (`CreateObjectiveDialog`/`EditObjectiveDialog` em `RoadmapDashboard.tsx`, 3 botões). `developmentProviderOrder()` (`worker.ts`) monta a ordem de fallback de 3 níveis: `[preferido, ...os outros dois em ordem fixa]`. `runDevelopmentAgentWithFallback` tenta cada um; quando o preferido é Qwen e ele falha/escala (`requiresCapabilityEscalation`), o fallback pula direto para `["claude","codex"]` via parâmetro `providersOverride`, sem re-tentar Qwen. Se `ROADMAP_QWEN_MODEL` não estiver configurado com um modelo `qwen3.8*`, a tentativa de Qwen é pulada (com `activity` registrada) e o fallback segue para o próximo provider.
+
+**Não confundir com o `SettingsDialog`** (config global de qual CLI usar como padrão — Claude Code CLI ou Codex CLI): esse continua **intencionalmente rejeitando `"ollama"`** (`SalvarConfiguracaoRoadmapProduction` em `src/actions/RoadmapProduction.ts` lança `PROVIDER_NOT_READY` se `input.provider === "ollama"`). Qwen só é selecionável como preferência **por objetivo**, nunca como provider de infraestrutura global do worker.
+
+### Gate de aprovação obrigatória (2026-08-19)
+
+Antes, com `config.autoRun === true`, uma execução nascia com `status: "PENDING"` e o worker (`processNextProductionPhaseUnlocked`) já podia selecioná-la e rodar a próxima fase sem qualquer intervenção humana.
+
+Agora **toda** execução nasce com `status: "AWAITING_APPROVAL"` (`syncProductionExecutions`, `worker.ts`) — nunca mais nasce diretamente executável. `selectNextProductionExecution`/`nextReadyPhase` só consideram execuções em `["PENDING","RUNNING"]`, então uma execução `AWAITING_APPROVAL` fica automaticamente fora da fila do worker, mesmo com `autoRun` ligado. `autoRun` continua existindo, mas agora só controla se o worker faz polling automático da fila — deixou de ser um bypass do gate de aprovação.
+
+Liberação: novo comando de controle `"APPROVE"` (`productionControlCommandSchema`), processado em `applyProductionControls` — só transiciona `AWAITING_APPROVAL → PENDING` (guard explícito, ignora silenciosamente se a execução já estiver em outro status). Nova Server Action `AprovarExecucaoRoadmapProduction` (`src/actions/RoadmapProduction.ts`), mesma auth dos demais controles (`requireRoadmapProductionAccess(true)`). Novo botão "Aprovar e iniciar" em `RoadmapProductionPanel.tsx`, visível só quando `canManage && execution.status === "AWAITING_APPROVAL"`.
+
+### Frente 3 — "Novo módulo" e Frente 4 — "Sistemas Externos" (2026-08-20)
+
+**⚠️ LOCAL CORRETO — leia antes de tocar em qualquer uma destas duas features:** ambas vivem **dentro do módulo Roadmap Alpha** (`RoadmapDashboard.tsx`, rota `/PainelAlpha/Roadmap`), **nunca** na tela inicial do PainelAlpha (`PainelAlphaClient.tsx`, aba "IALPHA"). Uma implementação inicial colocou por engano o botão e o accordion na tela inicial — foi revertido integralmente e refeito no lugar certo depois de correção explícita do usuário. Se uma sessão futura cogitar mexer nisso a partir de `PainelAlphaClient.tsx`, está no lugar errado — pare e confira aqui primeiro.
+
+**"Novo módulo":** botão no header de `RoadmapDashboard.tsx`, ao lado de "Novo objetivo" (ambos condicionados a `canMutate`). Aciona `setCreateNovoModuloPreset(true)` + `setCreateOpen(true)`, abrindo o mesmo `CreateObjectiveDialog` com um preset (`NOVO_MODULO_CONSTRAINTS`) pré-preenchendo o campo Restrições com a checklist real de registro de módulo (1 entrada em `MODULOS_REGISTRY`). Existe também suporte a `?novoModulo=1` via `useSearchParams` (link direto), com o mesmo gate de `canMutate` duplicado — tanto no `useEffect` que lê o param quanto na montagem condicional de `<CreateObjectiveDialog>`/`<EditObjectiveDialog>` no JSX (nunca monte esses dialogs incondicionalmente, só controlando por `open` — um usuário sem permissão conseguia abri-los por URL direta antes dessa correção). **Não é um fluxo paralelo** — "criar módulo" é um objetivo do Roadmap como outro qualquer, só nasce com um preset de contexto diferente; passa pelo mesmo pipeline documentação Qwen → `AWAITING_APPROVAL` → aprovação humana → produção.
+
+**"Sistemas Externos":** a sidebar esquerda do Roadmap ("Projetos do painel") virou um `Accordion` de 2 gavetas — `AccordionItem value="painel-alpha"` (todo o conteúdo/filtro de módulos internos, comportamento idêntico ao anterior) e `AccordionItem value="sistemas-externos"` (novo, renderiza `<SistemasExternosSection isAdmin={canMutate} />`). Título dos triggers usa `text-xs font-semibold` simples — evitar `uppercase tracking-[.18em]` em espaços estreitos (sidebar ~220px), quebra palavras de forma feia.
+
+**Decisão de segurança do usuário, já tomada — não reabrir:** sem allowlist fixa de diretórios-pai (ele rejeitou explicitamente); seletor de diretório interativo (`workspace-browser.ts`) é a interação, e `requireRoadmapAccess(true)` (só Admin) é a proteção real.
+
+**Arquivos:**
+- `prisma/schema.prisma` — model `RoadmapWorkspace` (`moduleKey` único, `label`, `rootPath`, `status`, `createdById → usuarios`, `archivedAt`, `workerPid Int?`, `workerStartedAt DateTime?`). **Migration aplicada em produção** (duas migrations pontuais, cada uma com backup dedicado + confirmação, ver `decisions.md`).
+- `src/lib/roadmap-alpha/workspace-browser.ts` — `listWorkspaceDirectories`/`assertWorkspaceRootPathUsable`, navegador server-side via `path.win32`.
+- `src/actions/RoadmapWorkspaces.ts` — CRUD (`CriarRoadmapWorkspace` valida `rootPath` duplicado normalizado, além de `moduleKey` único e nomes reservados do Windows) + controle de worker (`IniciarWorkerRoadmapWorkspace`/`PararWorkerRoadmapWorkspace`, ver seção "Execução real" abaixo).
+- `src/components/RoadmapAlpha/{NovoProjetoExternoDialog,SistemasExternosSection}.tsx` — UI de registro + status/controle do worker.
+- `src/components/ui/accordion.tsx` — primeiro uso de Accordion no projeto (`@radix-ui/react-accordion`); keyframes já vêm de `tw-animate-css`, nenhuma escrita manual necessária.
+
+### Execução real de objetivos em workspace externo (2026-08-20)
+
+Completa o que a Frente 4 tinha deixado como "registro apenas" — agora um workspace externo processa sua própria fila de objetivos de verdade, isolada por diretório.
+
+**Achado crítico corrigido (Fase A):** antes desta mudança, `documentedObjectives()` (`src/lib/roadmap-production/worker.ts`) não filtrava por origem — **todos** os objetivos documentados de **todos** os módulos entravam na mesma fila, então dois workers (um do PainelAlpha, um de workspace externo) processariam a fila cruzada, com risco real de um agente escrever no projeto errado. Corrigido com `src/lib/roadmap-production/workspace-scope.ts` (novo) — `resolveProductionWorkspaceScope(root)` resolve `allowedModuleKeys`: se `root` é o PainelAlpha, é todo `MODULOS_REGISTRY`; se é o `rootPath` de um `RoadmapWorkspace` ativo (comparação normalizada via `path.win32`), é **somente** aquele `moduleKey` — nunca cai em fallback silencioso, lança `WORKSPACE_ROOT_NOT_REGISTERED` se não encontrar correspondência. `root` agora é propagado por toda a cadeia do worker (`processNextProductionPhase` → `...Unlocked` → `syncProductionExecutions`/`mutateExecution`/`addActivity`/`runProductionAgentWithCapabilityRouting`/`runDevelopmentAgentWithFallback`/`runProductionAgent`), todas com default `process.cwd()` preservando o comportamento do PainelAlpha intacto.
+
+**Fase B — `moduleKey` de workspace na criação de objetivo:** `roadmapObjectiveInputSchema` (`src/lib/roadmap-alpha/contracts.ts`) não valida mais `moduleKey` contra `MODULOS_REGISTRY` no Zod (esse set era calculado uma vez no import do módulo — nunca reconheceria um `RoadmapWorkspace` dinâmico do banco). Validação real: `isValidRoadmapModuleKey()` (`catalog.ts`, assíncrona, checa `MODULOS_REGISTRY` OU `RoadmapWorkspace` ativo), chamada manualmente dentro de `CriarObjetivoRoadmap`/`AtualizarObjetivoRoadmap` logo após o parse Zod. `getRoadmapModuleCatalogWithWorkspaces()` combina os dois catálogos para a UI de criar objetivo listar workspaces externos como opção de "Projeto".
+
+**Fase C — worker isolado por processo, controlável pela UI:** `scripts/roadmap-production-workspace-worker.ps1` (novo, variante parametrizada de `scripts/roadmap-production-worker.ps1`) aceita `-WorkspaceId`/`-WorkerRoot`, usa Mutex nomeado **por workspace** (`Local\PainelAlphaRoadmapProductionWorker_<workspaceId>`, diferente do nome fixo do supervisor original — permite N workers simultâneos, um por workspace, nunca dois para o mesmo). `scripts/roadmap-production.mjs worker` lê `$env:ROADMAP_PRODUCTION_ROOT`. `IniciarWorkerRoadmapWorkspace`/`PararWorkerRoadmapWorkspace` (`RoadmapWorkspaces.ts`) fazem `spawn`/kill do processo supervisor (detached, sobrevive ao Next.js), PID em `RoadmapWorkspace.workerPid`. UI mostra badge "Ativo"/"Parado" + botões por workspace em `SistemasExternosSection.tsx`.
+
+**3 achados do Anubis, corrigidos:**
+1. `killProcessTree()` (novo helper em `RoadmapWorkspaces.ts`, usa `taskkill /PID <pid> /T /F`) substitui `process.kill()` simples — matar só o supervisor não garante matar o worker `.mjs` filho no Windows, que podia ficar órfão escrevendo no diretório sem rastro na UI.
+2. Reserva atômica em `IniciarWorkerRoadmapWorkspace` via `updateMany({ where: { id, workerPid: valorAntigo } })` antes do `spawn` — fecha a race condition de double-click que podia gerar 2 processos reais com o banco rastreando o PID errado.
+3. `CriarRoadmapWorkspace` agora rejeita `rootPath` duplicado (normalizado via `path.win32`) — antes, dois workspaces podiam apontar pra mesma pasta física e disputar a fila silenciosamente (`resolveProductionWorkspaceScope` pegava sempre o primeiro `find()`, sem erro).
+
+**Mecanismo dos supervisores (resolve um mistério registrado ontem):** `scripts/roadmap-production-worker.ps1` e `scripts/roadmap-alpha-worker.ps1` são processos **`powershell.exe`** (não `node.exe`) com loop infinito (`while ($true) { ...; Start-Sleep -Seconds 10 }`) protegido por `Mutex` nomeado fixo — por isso não apareciam em buscas por `node.exe` e reapareciam sozinhos minutos depois de matar só os workers Node. Qualquer sessão que precise parar de verdade o worker do PainelAlpha por um tempo tem que matar o `powershell.exe` supervisor também, não só o `node.exe`.
+
+**Fase D — lock de execução GLOBAL, um projeto por vez no sistema inteiro (regra do usuário, 2026-08-20):** cada workspace tem seu próprio worker/Mutex (Fase C, acima) — isso continua. Mas a **execução real de uma fase** (chamada ao modelo de IA) é serializada globalmente: `acquireProductionExecutionLease()` (`src/lib/roadmap-production/execution-lock.ts`) sempre grava o lock físico na pasta do PainelAlpha (`GLOBAL_LOCK_ROOT = process.cwd()`), **nunca** no `root` de cada workspace — o parâmetro `root` recebido é ignorado para fins de localização do lock. Isso funciona porque todo worker (interno e externos) roda fisicamente a partir da pasta do PainelAlpha (`Set-Location` no `.ps1` antes de invocar o `.mjs`), então `process.cwd()` resolve igual em todos. Quando ocupado, o worker que perdeu a disputa recebe `{ processed: false, busy: true }` e tenta de novo no próximo ciclo (5s) — funciona como fila, não como erro. **Nunca reverter para lock por-`root`** sem decisão explícita do usuário — ver `decisions.md`.
+
+**Última atualização:** 2026-08-20 por Scribe (sessão Bibble, execução autônoma overnight + lock global)
 
 ---
 
@@ -107,6 +181,48 @@ Implementação documentada, com encerramento bloqueado pelos gates em 2026-08-1
 - `CHANGELOG.md`
 
 **Última atualização:** 2026-08-17 por Scribe
+
+---
+
+## Alpha SEO — portabilidade funcional do OpenSEO (2026-08-20)
+
+**Propósito:** workspace SEO multiusuário incorporado ao Painel Alpha, com pesquisa de palavras-chave e domínio, backlinks, rank tracking, auditoria técnica/Lighthouse, Search Console, GA4, visibilidade em IA, SAM, memória de projeto, exportações e servidor MCP. A fonte congelada é o checkout OpenSEO; a implementação usa os padrões nativos do Painel Alpha.
+
+**Stack e entrada:** Next.js App Router + React/TypeScript, Server Components/Server Actions e Route Handlers; Tailwind/componentes do Painel Alpha; NextAuth e permissão de módulo; Prisma sobre Turso; Vitest; jobs persistentes e Vercel Cron. O registro canônico está em `src/lib/modulos-registry.ts` com `id/permission: "alphaSeo"`, ícone `ScanSearch`, categoria `comercial` e rota `/PainelAlpha/AlphaSEO`.
+
+**Mapa estrutural:**
+- `src/app/PainelAlpha/AlphaSEO/`: layout autenticado, lista/criação de projetos e aceite de convite. `[projectId]/layout.tsx` aplica o segundo gate de acesso ao projeto; as páginas filhas cobrem dashboard, keywords, saved, rank e detalhe, domain, backlinks, audit e Lighthouse, search performance, brand lookup, prompt explorer, SAM e settings.
+- `src/components/AlphaSEO/`: shell visual e workspaces por domínio (`dashboard`, `audit`, `gsc`, `projects`, `rank`, `research`, `sam`, `saved`, `settings`, `shared`, `visibility`), mantendo o design system do Painel Alpha.
+- `src/actions/AlphaSeo*.ts`: 16 fachadas de Server Actions para projetos/onboarding, dashboard, keywords/salvos, domínio/backlinks, rank, audit/Lighthouse, GSC/GA4, IA, SAM, memória, settings e exportações. Autorização e validação permanecem server-side.
+- `src/lib/alpha-seo/`: contratos, autorização, políticas de operação/custo, providers, serviços de domínio, crawler anti-SSRF, filas/locks, OAuth, MCP, SAM, exports, inventário, doctor e worker.
+- `src/app/api/alpha-seo/`: MCP Streamable HTTP e OAuth/API keys; OAuth Google; stream SSE do SAM; crons protegidos de schedules, worker e limpeza OAuth.
+- `scripts/alpha-seo.mjs` e scripts `alpha-seo:*` do `package.json`: inventory, doctor e workers executáveis por CLI. O manifesto sanitizado vive em `docs/alpha-seo/source-manifest.json`.
+- `tests/alpha-seo/`: 27 arquivos cobrindo contratos, providers, acesso, jobs, crawler/SSRF, MCP, skills, integrações, exports e UI wiring.
+
+**Persistência:** `prisma/schema.prisma` contém 44 modelos `AlphaSeo*`. O Vault aplicou no Turso `basetestes-alphacomex` somente o SQL autorizado de SHA-256 `acbec05894d0588ea949b4a7a8bd5d0e9fdfa6ed7462c8f201f48792c2810bef`: 44 tabelas e 110 índices novos, em transação, sem `ALTER`, `DROP`, seed ou backfill; validação final teve zero violações de FK. Mudança estrutural futura exige novo gate Vault, backup e autorização.
+
+**Contratos congelados:** 93/93 exports de servidor rastreados; registry MCP executável com 46/46 tools, sem nomes ausentes ou inesperados; 9 skills com instruções integrais e recurso HTML da skill de auditoria; catálogo de 27 audit issue IDs. Infraestrutura própria da fonte (D1/Drizzle/Cloudflare, Better Auth organizations e billing hosted) foi substituída, respectivamente, por Prisma/Turso + jobs/Route Handlers, NextAuth + membership por projeto e aprovações/ledger internos.
+
+**Integrações e operação:** DataForSEO atende dados SEO/rank; OpenRouter atende Brand Lookup, Prompt Explorer e SAM; Google OAuth com PKCE e tokens criptografados atende GSC/GA4. Nenhum valor de segredo pertence ao repositório ou a estas memórias. Schedules e worker rodam a cada cinco minutos; a limpeza bounded de nonces/codes/tokens OAuth expirados roda às 03:17 UTC. Operações pagas passam por estimativa/aprovação, idempotência, cache e mutex; crawler e SAM validam destino e limitam payload.
+
+**Qualidade registrada:** inventário `46/46` sem drift, Prisma validate/generate e lint direcionado aprovados; suíte `tests/alpha-seo` aprovou 27 arquivos/122 testes. O typecheck global conserva erros legados fora de Alpha SEO; o build global depende do player fora do sandbox e de download de fontes, e o E2E visual não pôde ser executado porque a permissão do navegador local foi negada. O doctor offline identifica configuração externa ausente como `provider-missing`, sem revelar valores. Essas ressalvas não devem ser convertidas em mocks ou sucesso fictício.
+
+**Última atualização:** 2026-08-20 por Scribe/Kowalski
+
+**Adendo de fechamento final (2026-08-20):** a contagem intermediária de 27 arquivos/122 testes acima foi supersedida pela suíte Sage final: **37 arquivos e 161 testes Alpha SEO aprovados**. Lens concluiu a revisão final com **PASS e zero issues**.
+
+Hardening incorporado no estado final:
+- `src/lib/alpha-seo/dataforseo/operations.ts` é o executor pago único: consulta run idempotente concluído, valida aprovação persistida acima do threshold antes de mutex/provider e preserva a deduplicação concorrente.
+- `src/lib/alpha-seo/google/oauth.ts` só reivindica/revoga um grant Google por `updateMany` relacional quando não há conexão consumidora do produto; desconectar uma integração não invalida token ainda compartilhado.
+- `src/app/api/alpha-seo/sam/stream/route.ts`, `src/lib/alpha-seo/sam/service.ts`, `tools.ts` e `safe-url.ts` propagam `AbortSignal` até OpenRouter/fetch/tools. Cancelamento do stream persiste sessão `CANCELLED` e não grava resposta cobrada após abort.
+- `src/lib/alpha-seo/jobs/processor-result.ts` classifica resultados como `complete`, `defer` ou `invalid`; `worker.ts` agenda defer/retry em vez de transformar busy/queued skip em sucesso. Rank sem snapshots volta ao retry, enquanto disposição terminal explícita encerra o job.
+- `src/lib/alpha-seo/action-error.ts` é o mapper compartilhado das Actions: preserva somente códigos/mensagens de negócio permitidos e erros tipados de acesso; mensagens internas arbitrárias são substituídas.
+- `AuditResultsWorkspace.tsx`, `DomainResearchWorkspace.tsx`, `BacklinksWorkspace.tsx`, `GscOverview.tsx`, `AiHistoryPanel.tsx`, `CompleteExportButtons.tsx` e `PaginationControls.tsx` materializam paginação/exportação completa com limites e guards contra resposta stale. Auditoria exige intenção explícita `CANCEL` ou `DELETE`, usa predicado atômico por projeto/status, mantém `currentStatus`, ressincroniza conflitos e não repete a mutação automaticamente.
+- `src/components/AlphaSEO/audit/AuditDetailClient.tsx` foi removido; `AuditResultsWorkspace.tsx` é o cliente canônico do detalhe de auditoria, montado por `shared/DetailViews.tsx`.
+
+**Limites do fechamento:** providers reais, fluxos OAuth reais, execução real dos crons e navegador/E2E real não foram exercidos neste ambiente. Build e gates globais ainda carregam baselines/bloqueios externos ao Alpha SEO. O token Turso exposto no contexto da conversa precisa ser rotacionado; nenhum valor foi copiado para estas memórias.
+
+**Última atualização final:** 2026-08-20 por Scribe/Kowalski
 
 ### Alpha CRM — cards do pipeline sem glow (RM-2026-5284A1, 2026-08-18)
 
@@ -873,5 +989,35 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 **Padrão adotado:** "Sidebar sobre background vivo" — extensão do "vidro sobre hero" do Aurora Financeira. Ver `design-tokens.md` e `patterns.md`.
 
 **Verificação:** Probe aprovou todos os 6 critérios de aceitação. Sem regressão funcional. Observação menor (não bloqueante): área de toque vertical ~40px (ideal 44px) — `py-2.5` → `py-3` seria a correção.
+
+## Alpha CRM — Pipeline Financeiro (RM-2026-DE0F7B, 2026-08-20)
+
+**Objetivo:** pipeline financeiro com exatamente 5 etapas (Contrato → Formalização → Pagamento → Nota Fiscal → Concluídos), com campos obrigatórios por etapa, validação de transição e cálculo automático de retenções (IRRF/CSRF).
+
+**Arquivos:**
+- `src/lib/bpm/pipeline-financeiro.ts` — fonte de verdade: `FINANCIAL_STAGES` (5 etapas), `FINANCIAL_FIELDS` (40+ campos com categoria OBRIGATORIO/OBRIGATORIO_CONDICIONAL/AUTOMATICO_CALCULADO), `financialStageKeyFromLabel` (mapeia 6 rótulos legados → 5 chaves), `validateFinancialTransition` (bloqueia pulo de etapa + lista campos pendentes), `calcularRetencoesFinanceiras` (IRRF + CSRF + memória de cálculo JSON), `hasConfiguredFinancialPipeline` (verificação de estado atual).
+- `src/actions/bpm/PipelineFinanceiro.ts` — `ConfigurarPipelineFinanceiro(pipelineId)`: Server Action idempotente e transacional (`db.$transaction`), renomeia etapas existentes semanticamente, desativa excedentes (migrando cards para a etapa correspondente), cria campos faltantes, upsert transições permitidas, grava auditoria em `BpmPipelineConfigAuditoria`.
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/ConfigurarEtapasFinanceiroButton.tsx` — botão de UI para aplicar a configuração (loading + feedback).
+- `tests/bpm/pipeline-financeiro.test.ts` — 5 testes: ordem das 5 etapas, mapeamento legado, classificação de campos, cálculo de retenções, validação de transição.
+
+**Modelo de dados:** reutiliza `BpmPipeline`/`BpmEtapa`/`BpmCard`/`BpmCampo`/`BpmEtapaTransicaoPermitida` (já existentes). `BpmCard.etapaId` (FK → `BpmEtapa`) é o campo de referência de etapa. Sem migration SQL nova — a reconfiguração 6→5 etapas é feita pela Server Action (idempotente, transacional), não por migration.
+
+**API:** Server Actions (padrão do projeto, não REST). `ConfigurarPipelineFinanceiro` (configuração) + `MoverCardBpm` (movimentação, já existia, agora com `validateFinancialTransition`).
+
+**Frontend:** `PipelineBoardClient.tsx` (kanban com drag-and-drop via `@dnd-kit/core`) — já existia, reutilizado. Botão de configuração em `ConfigurarEtapasFinanceiroButton.tsx`.
+
+**Caminho de acesso:**
+- Configurar: `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → botão "Aplicar pipeline financeiro"
+- Operar: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → kanban com 5 colunas, drag-and-drop
+
+**Permissões:** `auth()` + `exigirAcessoConfigPipeline` (configuração) / `exigirAcessoBpmPipeline` (operação).
+
+**Decisões de escopo (excluído conscientemente):**
+- Automações (notificações, e-mails, integrações com ERP) — fora do escopo do objetivo.
+- Tabela `financial_pipeline_stages` dedicada — rejeitada; `BpmEtapa` já cumpre o papel.
+- Rotas REST `/api/crm/financial/pipeline/*` — rejeitadas; Server Actions são o padrão do projeto (Artigo IV da Constituição).
+- Campo `current_stage_code` — rejeitado; `BpmCard.etapaId` (FK) já é o campo de referência.
+
+**Última atualização:** 2026-08-20 por Scribe
 
 **Última atualização:** 2026-08-17 por Scribe

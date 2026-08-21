@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getTema } from "@/lib/temas";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { isAdminRole } from "@/lib/bpm/ownership";
+import { garantirSchemaFinanceiro } from "@/lib/bpm/pipeline-financeiro-migration";
 import AdminPipelineClient from "./AdminPipelineClient";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,12 @@ export default async function AdminPipelinePage({
 
   const temaNome = (session.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
+
+  try {
+    await garantirSchemaFinanceiro(pipelineId);
+  } catch (error) {
+    console.error("[AdminPipelinePage] garantirSchemaFinanceiro", error);
+  }
 
   const pipelineResult = await ObterPipelineBpm(pipelineId);
   if (!pipelineResult.success || !pipelineResult.data) notFound();

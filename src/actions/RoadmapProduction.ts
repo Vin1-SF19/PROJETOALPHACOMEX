@@ -224,6 +224,18 @@ export async function ControlarExecucaoRoadmapProduction(
   }
 }
 
+export async function AprovarExecucaoRoadmapProduction(executionId: unknown) {
+  try {
+    await requireRoadmapProductionAccess(true);
+    const id = executionIdSchema.parse(executionId);
+    await enqueueProductionControl("APPROVE", id);
+    revalidatePath(ROUTE);
+    return { success: true as const };
+  } catch (error) {
+    return { success: false as const, error: publicError(error) };
+  }
+}
+
 export async function MelhorarFeedbackRoadmapProduction(payload: unknown) {
   try {
     await requireRoadmapProductionAccess(true);

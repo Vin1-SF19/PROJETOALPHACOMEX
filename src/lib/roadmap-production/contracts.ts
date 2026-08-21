@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const productionProviderSchema = z.enum(["ollama", "codex", "claude"]);
-export const developmentProviderSchema = z.enum(["claude", "codex"]);
+export const developmentProviderSchema = z.enum(["claude", "codex", "ollama"]);
 export const productionConfigSchema = z
   .object({
     version: z.literal(1),
@@ -21,6 +21,7 @@ export const productionPhaseStatusSchema = z.enum([
   "BLOCKED",
 ]);
 export const productionExecutionStatusSchema = z.enum([
+  "AWAITING_APPROVAL",
   "PENDING",
   "RUNNING",
   "PAUSED",
@@ -32,7 +33,14 @@ export const productionExecutionStatusSchema = z.enum([
 export const productionControlCommandSchema = z
   .object({
     id: z.string().uuid(),
-    type: z.enum(["PAUSE", "RESUME", "RETRY", "EXCLUDE", "REPORT_ERROR"]),
+    type: z.enum([
+      "APPROVE",
+      "PAUSE",
+      "RESUME",
+      "RETRY",
+      "EXCLUDE",
+      "REPORT_ERROR",
+    ]),
     executionId: z.string().min(1).max(240),
     phaseNumber: z.number().int().min(0).max(99).nullable().default(null),
     feedback: z.string().trim().min(5).max(4_000).nullable().default(null),

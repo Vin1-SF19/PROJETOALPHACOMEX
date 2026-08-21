@@ -7,12 +7,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CriarInteracaoCardBpm, type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
-import { etapaEhEmTratativa, etapaExigeProximoContato } from "@/lib/bpm/em-tratativa";
+import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
 import { etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
 import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 import { PainelCamposEtapaAtual } from "./PainelCamposEtapaAtual";
 import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
 import { PainelProximoContato } from "./PainelProximoContato";
+import { PainelContatos } from "./PainelContatos";
 import PainelReuniao from "./PainelReuniao";
 import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
 import { PainelStandbyFollowUp } from "./PainelStandbyFollowUp";
@@ -26,6 +27,7 @@ interface Props {
   etapaAtual: EtapaOpcao | null;
   accent: string;
   onInteracaoCriada: (interacao: Interacao) => void;
+  interacoes: Interacao[];
   podeEditar: boolean;
   realtimeRevision: number;
   onAtualizado: () => void;
@@ -34,7 +36,7 @@ interface Props {
 
 const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
 
-export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoCriada, podeEditar, realtimeRevision, onAtualizado, onEstadoFollowUpChange }: Props) {
+export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoCriada, interacoes, podeEditar, realtimeRevision, onAtualizado, onEstadoFollowUpChange }: Props) {
   const [anotacao, setAnotacao] = useState("");
   const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
 
@@ -109,14 +111,19 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             />
           )}
 
-          {etapaExigeProximoContato(card.etapa.nome) && (
-            <PainelProximoContato
-              card={card}
-              onAtualizado={onAtualizado}
-              podeEditar={podeEditar}
-              realtimeRevision={realtimeRevision}
-            />
-          )}
+          <PainelProximoContato
+            card={card}
+            onAtualizado={onAtualizado}
+            podeEditar={podeEditar}
+            realtimeRevision={realtimeRevision}
+          />
+
+          <PainelContatos
+            cardId={card.id}
+            interacoes={interacoes}
+            podeEditar={podeEditar}
+            onInteracaoCriada={onInteracaoCriada}
+          />
 
           {etapaEhEmTratativa(card.etapa.nome) && (
             <PainelChecklistFollowUp

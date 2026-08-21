@@ -977,6 +977,35 @@ export async function redefinirSenhaParceiro(parceiroId: number, novaSenha: stri
 }
 
 /**
+ * Gera uma nova senha temporária e retorna o login + senha em texto puro para
+ * reexibir a mensagem de acesso do parceiro (botão "Ver login"). A senha original
+ * nunca fica disponível depois do cadastro — só o hash é persistido — então
+ * "ver login" na prática sempre reseta a senha do parceiro para uma nova gerada
+ * na hora, igual ao fluxo de cadastro. Livre para qualquer usuário com acesso ao
+ * módulo Parceiros — sem exigir admin, por pedido explícito do usuário.
+ */
+export async function gerarMensagemLoginParceiro(parceiroId: number): Promise<
+  | { success: true; loginEmail: string; senhaGerada: string; nomeParceiro: string }
+  | { success: false; error: string }
+> {
+  const ctx = await getCtx();
+  if (!ctx) return { success: false, error: "Não autenticado" };
+
+  try {
+    const senhaGerada = gerarSenhaSegura();
+    const parceiro = await db.parceiro.update({
+      where: { id: parceiroId },
+      data: { senhaHash: hashSync(senhaGerada, 10), senhaTemporaria: true },
+      select: { loginEmail: true, nome: true },
+    });
+    revalidatePath(`/PainelAlpha/Parceiros/${parceiroId}`);
+    return { success: true, loginEmail: parceiro.loginEmail, senhaGerada, nomeParceiro: parceiro.nome };
+  } catch {
+    return { success: false, error: "Erro ao gerar a mensagem de login" };
+  }
+}
+
+/**
  * Ativa/desativa o acesso do parceiro ao portal (AlphaParceiros), sem excluir o
  * cadastro. Parceiro desativado tem o login bloqueado (ver findParceiroByCredentials
  * no projeto alphaparceiros). Admin only.

@@ -2,6 +2,7 @@ import { auth } from "../../../../../auth";
 import { redirect, notFound } from "next/navigation";
 import db from "@/lib/prisma";
 import { buscarParceiro, getPermissaoParceiros } from "@/actions/parceiros";
+import { getTemplateParadaoParceiro } from "@/actions/onboarding";
 import DetalheParceiroClient, { type DetalheParceiro } from "@/components/Parceiros/DetalheParceiroClient";
 
 export const dynamic = "force-dynamic";
@@ -13,15 +14,16 @@ export default async function DetalheParceiroPage({ params }: { params: Promise<
   const { id } = await params;
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
 
-  const [parceiroRaw, permissao, rec] = await Promise.all([
+  const [parceiroRaw, permissao, rec, template] = await Promise.all([
     buscarParceiro(Number(id)),
     getPermissaoParceiros(),
     userId ? db.usuarios.findUnique({ where: { id: userId }, select: { tema_interface: true } }) : null,
+    getTemplateParadaoParceiro(),
   ]);
   if (!parceiroRaw) notFound();
 
   const parceiro = parceiroRaw as unknown as DetalheParceiro;
   const temaName = rec?.tema_interface ?? "blue";
 
-  return <DetalheParceiroClient parceiro={parceiro} permissao={permissao} temaName={temaName} />;
+  return <DetalheParceiroClient parceiro={parceiro} permissao={permissao} temaName={temaName} template={template} />;
 }

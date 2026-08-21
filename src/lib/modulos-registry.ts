@@ -1,3 +1,5 @@
+import { isAdminRole } from '@/lib/roles';
+
 export interface ModuloRegistryItem {
   id: string;
   label: string;
@@ -10,7 +12,24 @@ export interface ModuloRegistryItem {
   img?: string;
   desc?: string;
   tag?: string;
+  aliases?: string[];
   color?: string;
+}
+
+export interface ModuloAccessContext {
+  permissoes: readonly string[];
+  role?: string | null;
+}
+
+export function podeVisualizarModulo(
+  modulo: ModuloRegistryItem,
+  { permissoes, role }: ModuloAccessContext,
+): boolean {
+  if (isAdminRole(role)) return true;
+  if (role && modulo.allowedRoles?.includes(role)) return true;
+  if (modulo.permission) return permissoes.includes(modulo.permission);
+
+  return !modulo.adminOnly && !modulo.allowedRoles?.length;
 }
 
 export interface CategoriaItem {
@@ -33,6 +52,7 @@ export const MODULOS_REGISTRY: ModuloRegistryItem[] = [
   { id: 'ServiçosGerais',     label: 'Serviços Gerais',       href: '/PainelAlpha/PainelTarefas/painelTarefaSG',                                     iconName: 'Wrench',        category: 'operacional', permission: 'ServiçosGerais',    img: '/cleaning.png',           desc: 'Bancada de tarefas diárias dos serviços gerais.',       tag: 'Serviços',   color: 'from-pink-600/20' },
 
   // ─── COMERCIAL ───
+  { id: 'alphaSeo',           label: 'Open SEO · Alpha SEO',  href: '/PainelAlpha/AlphaSEO',                                                         iconName: 'ScanSearch',    category: 'comercial',   permission: 'alphaSeo',           desc: 'Pesquisa, monitoramento, auditoria e inteligência SEO em um único workspace.', tag: 'SEO', aliases: ['Open SEO', 'Alpha SEO', 'OpenSEO'], color: 'from-cyan-600/20' },
   { id: 'crm',                label: 'Alpha CRM',             href: '/PainelAlpha/AlphaCRM',                                                         iconName: 'BarChart3',     category: 'comercial',   permission: 'crm',               img: '/management.png',         desc: 'Pipelines de processo com etapas, campos e SLA configuráveis.', tag: 'CRM',        color: 'from-violet-600/20' },
   { id: 'Cliente',            label: 'CS & NPS',              href: '/PainelAlpha/CadastroClientes',                                                 iconName: 'UserCheck',     category: 'comercial',   permission: 'Cliente',            img: '/local-na-rede-internet.png', desc: 'Controle de CS, NPS e feedbacks.',               tag: 'Clientes',   color: 'from-orange-600/20' },
   { id: 'parceiros',           label: 'Parceiros',              href: '/PainelAlpha/Parceiros',                                                        iconName: 'Handshake',     category: 'comercial',   permission: 'parceiros',          img: '/handshake.png',          desc: 'Cadastro e gestão de parceiros PF e PJ.',               tag: 'Parceiros',  color: 'from-yellow-600/20' },

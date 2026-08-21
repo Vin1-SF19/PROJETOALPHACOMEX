@@ -27,6 +27,7 @@ import {
   removeProductionControlFiles,
   writeProductionState,
 } from "@/lib/roadmap-production/storage";
+import { resolveProductionWorkspaceScope } from "@/lib/roadmap-production/workspace-scope";
 
 const AUTO_RETRY_DELAY_MS = 5_000;
 const AUTO_RETRY_LIMIT = 12;
@@ -52,10 +53,19 @@ export function shouldFallbackDevelopmentProvider(errorCode?: string): boolean {
   return Boolean(errorCode && PROVIDER_FALLBACK_ERROR_CODES.has(errorCode));
 }
 
+const DEVELOPMENT_PROVIDER_LABEL: Record<DevelopmentProvider, string> = {
+  claude: "Claude",
+  codex: "Codex",
+  ollama: "Qwen",
+};
+
 export function developmentProviderOrder(
   preferred: DevelopmentProvider,
-): [DevelopmentProvider, DevelopmentProvider] {
-  return preferred === "claude" ? ["claude", "codex"] : ["codex", "claude"];
+): [DevelopmentProvider, DevelopmentProvider, DevelopmentProvider] {
+  const rest: DevelopmentProvider[] = (
+    ["claude", "codex", "ollama"] as const
+  ).filter((provider) => provider !== preferred);
+  return [preferred, rest[0], rest[1]];
 }
 
 async function runDevelopmentAgentWithFallback(
@@ -63,22 +73,36 @@ async function runDevelopmentAgentWithFallback(
   preferred: DevelopmentProvider,
   input: ProductionAgentInput,
   onActivity: (message: string) => Promise<void> | void,
+  root = process.cwd(),
+  providersOverride?: DevelopmentProvider[],
 ): Promise<ProductionAgentResult> {
-  const providers = developmentProviderOrder(preferred);
+  const providers = providersOverride ?? developmentProviderOrder(preferred);
   for (let index = 0; index < providers.length; index += 1) {
     const provider = providers[index];
-    const model = config.provider === provider ? config.model : "default";
+    const model =
+      provider === "ollama"
+        ? (process.env.ROADMAP_QWEN_MODEL?.trim() ?? "")
+        : config.provider === provider
+          ? config.model
+          : "default";
+    if (provider === "ollama" && !model.startsWith("qwen3.8")) {
+      await onActivity("Qwen sem configuração válida; pulando esta tentativa.");
+      if (index === providers.length - 1) break;
+      continue;
+    }
     const result = await runProductionAgent(
       { ...config, provider, model },
       input,
       onActivity,
+      root,
     );
     const canFallback =
-      index === 0 && shouldFallbackDevelopmentProvider(result.errorCode);
+      index < providers.length - 1 &&
+      shouldFallbackDevelopmentProvider(result.errorCode);
     if (!canFallback) return result;
     const fallback = providers[index + 1];
     await onActivity(
-      `${provider === "claude" ? "Claude" : "Codex"} indisponível (${result.errorCode}); alternando automaticamente para ${fallback === "claude" ? "Claude" : "Codex"}.`,
+      `${DEVELOPMENT_PROVIDER_LABEL[provider]} indisponível (${result.errorCode}); alternando automaticamente para ${DEVELOPMENT_PROVIDER_LABEL[fallback]}.`,
     );
   }
   return {
@@ -94,15 +118,19 @@ async function runProductionAgentWithCapabilityRouting(
   preferred: DevelopmentProvider,
   input: ProductionAgentInput,
   onActivity: (message: string) => Promise<void> | void,
+  root = process.cwd(),
 ): Promise<ProductionAgentResult> {
-  const engine = selectProductionExecutionEngine({
-    agentId: input.agentId,
-    phaseKind: input.phaseKind,
-    phaseTitle: input.phaseTitle,
-    phaseMarkdown: input.phaseMarkdown,
-    allowWrite: input.allowWrite,
-    previousSummaries: input.previousSummaries,
-  });
+  const engine =
+    preferred === "ollama"
+      ? "qwen"
+      : selectProductionExecutionEngine({
+          agentId: input.agentId,
+          phaseKind: input.phaseKind,
+          phaseTitle: input.phaseTitle,
+          phaseMarkdown: input.phaseMarkdown,
+          allowWrite: input.allowWrite,
+          previousSummaries: input.previousSummaries,
+        });
   if (engine === "development") {
     await onActivity("Roteamento de capacidade: Claude/Codex.");
     return runDevelopmentAgentWithFallback(
@@ -110,6 +138,7 @@ async function runProductionAgentWithCapabilityRouting(
       preferred,
       input,
       onActivity,
+      root,
     );
   }
 
@@ -123,6 +152,7 @@ async function runProductionAgentWithCapabilityRouting(
       preferred,
       input,
       onActivity,
+      root,
     );
   }
   await onActivity("Roteamento de capacidade: Qwen 3.8 para tarefa básica.");
@@ -130,6 +160,7 @@ async function runProductionAgentWithCapabilityRouting(
     { ...config, provider: "ollama", model: qwenModel },
     input,
     onActivity,
+    root,
   );
   if (qwenResult.success) return qwenResult;
 
@@ -139,6 +170,10 @@ async function runProductionAgentWithCapabilityRouting(
       ? "Qwen identificou necessidade de engenharia; encaminhando o diagnóstico para Claude/Codex."
       : `Qwen não concluiu a tarefa básica (${qwenResult.errorCode ?? "AGENT_FAILED"}); encaminhando para Claude/Codex.`,
   );
+  const escalationOrder =
+    preferred === "ollama"
+      ? (["claude", "codex"] as DevelopmentProvider[])
+      : undefined;
   return runDevelopmentAgentWithFallback(
     config,
     preferred,
@@ -150,6 +185,8 @@ async function runProductionAgentWithCapabilityRouting(
       ],
     },
     onActivity,
+    root,
+    escalationOrder,
   );
 }
 
@@ -252,9 +289,13 @@ function appendActivity(
   );
 }
 
-async function documentedObjectives() {
+async function documentedObjectives(allowedModuleKeys: ReadonlySet<string>) {
   return db.roadmapObjective.findMany({
-    where: { archivedAt: null, documentationStatus: "DOCUMENTED" },
+    where: {
+      archivedAt: null,
+      documentationStatus: "DOCUMENTED",
+      moduleKey: { in: Array.from(allowedModuleKeys) },
+    },
     orderBy: [{ globalPriority: "asc" }, { createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
@@ -278,11 +319,16 @@ async function documentedObjectives() {
   });
 }
 
-export async function syncProductionExecutions(): Promise<ProductionState> {
+export async function syncProductionExecutions(
+  root = process.cwd(),
+  allowedModuleKeys?: ReadonlySet<string>,
+): Promise<ProductionState> {
+  const scopeModuleKeys =
+    allowedModuleKeys ?? (await resolveProductionWorkspaceScope(root)).allowedModuleKeys;
   const [state, objectives, developmentPreferences] = await Promise.all([
-    readProductionState(),
-    documentedObjectives(),
-    readObjectiveDevelopmentPreferences(),
+    readProductionState(root),
+    documentedObjectives(scopeModuleKeys),
+    readObjectiveDevelopmentPreferences(root),
   ]);
   let changed = false;
   for (const objective of objectives) {
@@ -336,7 +382,7 @@ export async function syncProductionExecutions(): Promise<ProductionState> {
       developmentProvider,
       sourceVersion: objective.sourceVersion,
       globalPriority: objective.globalPriority,
-      status: "PENDING",
+      status: "AWAITING_APPROVAL",
       createdAt,
       startedAt: null,
       finishedAt: null,
@@ -396,7 +442,7 @@ export async function syncProductionExecutions(): Promise<ProductionState> {
       a.globalPriority - b.globalPriority ||
       a.createdAt.localeCompare(b.createdAt),
   );
-  if (changed) await writeProductionState(state);
+  if (changed) await writeProductionState(state, root);
   return state;
 }
 
@@ -426,6 +472,21 @@ export async function applyProductionControls(
       if (!state.ignoredExecutionIds.includes(command.executionId))
         state.ignoredExecutionIds.push(command.executionId);
       state.ignoredExecutionIds = state.ignoredExecutionIds.slice(-500);
+    } else if (
+      command.type === "APPROVE" &&
+      execution &&
+      execution.status === "AWAITING_APPROVAL"
+    ) {
+      execution.status = "PENDING";
+      for (const phase of execution.phases) {
+        appendActivity(phase, {
+          at: now(),
+          agentId: phase.resolvedAgent,
+          type: "STATUS",
+          message: "Objetivo aprovado pelo administrador; liberado para produção.",
+        });
+        break;
+      }
     } else if (
       command.type === "PAUSE" &&
       execution &&
@@ -525,14 +586,15 @@ export function selectNextProductionExecution(
 async function mutateExecution(
   executionIdValue: string,
   mutate: (execution: ProductionExecution) => void,
+  root = process.cwd(),
 ): Promise<ProductionExecution> {
-  const state = await readProductionState();
+  const state = await readProductionState(root);
   const execution = state.executions.find(
     (item) => item.id === executionIdValue,
   );
   if (!execution) throw new Error("PRODUCTION_EXECUTION_NOT_FOUND");
   mutate(execution);
-  await writeProductionState(state);
+  await writeProductionState(state, root);
   return execution;
 }
 
@@ -541,6 +603,7 @@ async function addActivity(
   phaseNumber: number,
   agentId: string,
   message: string,
+  root = process.cwd(),
 ): Promise<void> {
   await mutateExecution(executionIdValue, (execution) => {
     const phase = execution.phases.find(
@@ -564,11 +627,13 @@ async function addActivity(
     if (changedPath && !phase.changedFiles.includes(changedPath)) {
       phase.changedFiles = [...phase.changedFiles, changedPath].slice(-100);
     }
-  });
+  }, root);
 }
 
-async function recoverInterruptedProductionUnlocked(): Promise<number> {
-  const state = await readProductionState();
+async function recoverInterruptedProductionUnlocked(
+  root = process.cwd(),
+): Promise<number> {
+  const state = await readProductionState(root);
   let recovered = 0;
   for (const execution of state.executions) {
     for (const phase of execution.phases) {
@@ -586,15 +651,17 @@ async function recoverInterruptedProductionUnlocked(): Promise<number> {
       recovered += 1;
     }
   }
-  if (recovered) await writeProductionState(state);
+  if (recovered) await writeProductionState(state, root);
   return recovered;
 }
 
-export async function recoverInterruptedProduction(): Promise<number> {
-  const lease = await acquireProductionExecutionLease();
+export async function recoverInterruptedProduction(
+  root = process.cwd(),
+): Promise<number> {
+  const lease = await acquireProductionExecutionLease(root);
   if (!lease) return 0;
   try {
-    return await recoverInterruptedProductionUnlocked();
+    return await recoverInterruptedProductionUnlocked(root);
   } finally {
     await lease.release();
   }
@@ -763,17 +830,18 @@ export function recoverCorrectableFailures(
   return recovered;
 }
 
-async function processNextProductionPhaseUnlocked() {
-  await applyProductionControls();
-  const config = await readProductionConfig();
+async function processNextProductionPhaseUnlocked(root = process.cwd()) {
+  const scope = await resolveProductionWorkspaceScope(root);
+  await applyProductionControls(root);
+  const config = await readProductionConfig(root);
   if (!config.autoRun)
     return {
       processed: false as const,
       healthy: true as const,
       paused: true as const,
     };
-  const state = await syncProductionExecutions();
-  if (recoverCorrectableFailures(state)) await writeProductionState(state);
+  const state = await syncProductionExecutions(root, scope.allowedModuleKeys);
+  if (recoverCorrectableFailures(state)) await writeProductionState(state, root);
   const execution = selectNextProductionExecution(state);
   if (!execution) return { processed: false as const, healthy: true as const };
   const phase = nextReadyPhase(execution, Date.now());
@@ -788,7 +856,7 @@ async function processNextProductionPhaseUnlocked() {
     const report = await writeCompletionReport(execution);
     execution.completionReportPath = report.relativePath;
     execution.completionReportMarkdown = report.markdown;
-    await writeProductionState(state);
+    await writeProductionState(state, root);
     await db.roadmapObjective.updateMany({
       where: {
         id: execution.objectiveId,
@@ -833,7 +901,7 @@ async function processNextProductionPhaseUnlocked() {
     phase.finishedAt = now();
     execution.status = "BLOCKED";
     execution.finishedAt = now();
-    await writeProductionState(state);
+    await writeProductionState(state, root);
     return {
       processed: true as const,
       success: false as const,
@@ -876,7 +944,7 @@ async function processNextProductionPhaseUnlocked() {
   });
   execution.status = "RUNNING";
   execution.startedAt ??= now();
-  await writeProductionState(state);
+  await writeProductionState(state, root);
   await db.$transaction([
     db.roadmapObjective.updateMany({
       where: {
@@ -924,15 +992,24 @@ async function processNextProductionPhaseUnlocked() {
       phase.changedFiles.length > 0 && pendingManualFeedback.length === 0,
   };
   const onActivity = (message: string) =>
-    addActivity(execution.id, phase.phaseNumber, phase.resolvedAgent, message);
+    addActivity(
+      execution.id,
+      phase.phaseNumber,
+      phase.resolvedAgent,
+      message,
+      root,
+    );
   const result = await runProductionAgentWithCapabilityRouting(
     config,
     execution.developmentProvider,
     agentInput,
     onActivity,
+    root,
   );
 
-  let updated = await mutateExecution(execution.id, (current) => {
+  let updated = await mutateExecution(
+    execution.id,
+    (current) => {
     const currentPhase = current.phases.find(
       (item) => item.phaseNumber === phase.phaseNumber,
     );
@@ -1007,13 +1084,17 @@ async function processNextProductionPhaseUnlocked() {
     } else {
       current.status = "PENDING";
     }
-  });
+  }, root);
   if (updated.status === "SUCCEEDED" && !updated.completionReportMarkdown) {
     const report = await writeCompletionReport(updated);
-    updated = await mutateExecution(updated.id, (current) => {
-      current.completionReportPath = report.relativePath;
-      current.completionReportMarkdown = report.markdown;
-    });
+    updated = await mutateExecution(
+      updated.id,
+      (current) => {
+        current.completionReportPath = report.relativePath;
+        current.completionReportMarkdown = report.markdown;
+      },
+      root,
+    );
     await db.roadmapObjective.updateMany({
       where: {
         id: updated.objectiveId,
@@ -1034,8 +1115,8 @@ async function processNextProductionPhaseUnlocked() {
   };
 }
 
-export async function processNextProductionPhase() {
-  const lease = await acquireProductionExecutionLease();
+export async function processNextProductionPhase(root = process.cwd()) {
+  const lease = await acquireProductionExecutionLease(root);
   if (!lease) {
     return {
       processed: false as const,
@@ -1044,7 +1125,7 @@ export async function processNextProductionPhase() {
     };
   }
   try {
-    return await processNextProductionPhaseUnlocked();
+    return await processNextProductionPhaseUnlocked(root);
   } finally {
     await lease.release();
   }

@@ -37,8 +37,16 @@ import {
   etapaEhBoasVindas,
   NOME_ETAPA_BOAS_VINDAS,
 } from "@/lib/bpm/boas-vindas";
-import { obterErroDataReuniaoParaMovimento } from "@/lib/bpm/agendar-reuniao";
+import {
+  obterErroDataReuniaoParaMovimento,
+  obterErroContatosConsecutivosParaMovimento,
+  etapaEhAgendarReuniao,
+} from "@/lib/bpm/agendar-reuniao";
 import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
+import {
+  obterErroProximoContatoParaMovimento,
+  pipelineEhRevisaoRadar,
+} from "@/lib/bpm/proximo-contato";
 import {
   etapaEhEmTratativa,
   obterErroChecklistParaSaidaEmTratativa,
@@ -278,6 +286,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         status: true,
         createdAt: true,
         primeiraVisualizacaoEm: true,
+        proximoContatoEm: true,
         statusPosFechamento: true,
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true } },
         responsavel: { select: { id: true, nome: true } },
@@ -658,7 +667,10 @@ export async function AtualizarCardBpm(dados: unknown) {
 
     const cardAnterior = await db.bpmCard.findUnique({
       where: { id: cardId },
-      include: { etapa: { select: { nome: true } } },
+      include: {
+        etapa: { select: { nome: true } },
+        pipeline: { select: { nome: true } },
+      },
     });
     if (!cardAnterior) return { success: false, error: "Card não encontrado" };
     if (
@@ -909,7 +921,10 @@ async function carregarContextoMovimento(
   const [card, etapaDestino] = await Promise.all([
     client.bpmCard.findUnique({
       where: { id: cardId },
-      include: { etapa: { select: { nome: true } } },
+      include: {
+        etapa: { select: { nome: true } },
+        pipeline: { select: { nome: true } },
+      },
     }),
     client.bpmEtapa.findUnique({ where: { id: etapaDestinoId } }),
   ]);
@@ -1014,13 +1029,14 @@ async function carregarCamposOrigemParaGuard(params: {
 
 async function carregarGuardasNativasMovimento(params: {
   cardId: string;
+  pipelineNome?: string;
   etapaOrigemNome: string;
   etapaDestinoNome: string;
   dataReuniao: Date | null;
   transcricaoReuniao: string | null;
   proximoContatoEm: Date | null;
   camposEtapaOrigem?: readonly { nome: string; valor: string | null }[];
-}, client: Pick<typeof db, "bpmChecklistFollowUp"> = db) {
+}, client: Pick<typeof db, "bpmChecklistFollowUp" | "bpmInteracaoCard"> = db) {
   const guardas = [
     obterErroTransicaoMonitoramento({
       etapaOrigemNome: params.etapaOrigemNome,
@@ -1046,6 +1062,11 @@ async function carregarGuardasNativasMovimento(params: {
     }),
   ].filter((erro): erro is string => Boolean(erro));
 
+  if (pipelineEhRevisaoRadar(params.pipelineNome)) {
+    const erroProximoContato = obterErroProximoContatoParaMovimento(params.proximoContatoEm);
+    if (erroProximoContato) guardas.unshift(erroProximoContato);
+  }
+
   if (etapaEhEmTratativa(params.etapaOrigemNome)) {
     const ultimoChecklist = await client.bpmChecklistFollowUp.findFirst({
       where: { cardId: params.cardId },
@@ -1058,6 +1079,22 @@ async function carregarGuardasNativasMovimento(params: {
     });
     if (erroChecklist) guardas.push(erroChecklist);
   }
+
+  if (etapaEhAgendarReuniao(params.etapaOrigemNome)) {
+    const interacoes = await client.bpmInteracaoCard.findMany({
+      where: {
+        cardId: params.cardId,
+        tipo: { in: ["LIGACAO", "EMAIL", "REUNIAO", "WHATSAPP"] },
+      },
+      select: { createdAt: true, agendadoEm: true },
+    });
+    const erroContatos = obterErroContatosConsecutivosParaMovimento({
+      etapaOrigemNome: params.etapaOrigemNome,
+      datasContato: interacoes.map((interacao) => interacao.agendadoEm ?? interacao.createdAt),
+    });
+    if (erroContatos) guardas.push(erroContatos);
+  }
+
   return guardas;
 }
 
@@ -1095,6 +1132,7 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       }));
     const guardas = await carregarGuardasNativasMovimento({
       cardId,
+      pipelineNome: card.pipeline?.nome,
       etapaOrigemNome: card.etapa.nome,
       etapaDestinoNome: etapaDestino.nome,
       dataReuniao: card.dataReuniao,
@@ -1210,6 +1248,7 @@ async function executarMovimentoComRequisitos(
   });
   const guardas = await carregarGuardasNativasMovimento({
     cardId,
+    pipelineNome: card.pipeline?.nome,
     etapaOrigemNome: card.etapa.nome,
     etapaDestinoNome: etapaDestino.nome,
     dataReuniao: card.dataReuniao,
@@ -1312,6 +1351,7 @@ async function executarMovimentoComRequisitos(
     }, tx);
     const guardasAtuais = await carregarGuardasNativasMovimento({
       cardId,
+      pipelineNome: cardAtual.pipeline?.nome,
       etapaOrigemNome: cardAtual.etapa.nome,
       etapaDestinoNome: destinoAtual.nome,
       dataReuniao: cardAtual.dataReuniao,

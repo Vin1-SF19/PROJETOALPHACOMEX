@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  obterErroProximoContatoParaMovimento,
+  pipelineEhRevisaoRadar,
+} from "@/lib/bpm/proximo-contato";
+import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -64,6 +70,7 @@ interface CardBpm {
   servico: string | null;
   status: string;
   primeiraVisualizacaoEm?: Date | string | null;
+  proximoContatoEm?: Date | string | null;
   statusPosFechamento?: string | null;
   empresa: { id: number; razaoSocial: string; nomeFantasia: string | null };
   responsavel: { id: number; nome: string };
@@ -87,6 +94,51 @@ function formatarPrazoNoCard(data: Date | string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(data));
+}
+
+type UrgenciaProximoContato = "ATRASADO" | "HOJE" | "FUTURO";
+
+function calcularUrgenciaProximoContato(proximoContatoEm: Date | string): UrgenciaProximoContato {
+  const hojeChave = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const contatoChave = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(proximoContatoEm));
+  if (contatoChave < hojeChave) return "ATRASADO";
+  if (contatoChave === hojeChave) return "HOJE";
+  return "FUTURO";
+}
+
+const BADGE_URGENCIA_CLASSNAME: Record<UrgenciaProximoContato, string> = {
+  ATRASADO: "border-red-500/40 bg-red-500/15 text-red-200 alpha-badge-blink",
+  HOJE: "border-amber-500/40 bg-amber-500/15 text-amber-200",
+  FUTURO: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
+};
+
+function BadgeProximoContato({ proximoContatoEm }: { proximoContatoEm: Date | string | null | undefined }) {
+  if (!proximoContatoEm) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-400"
+        title="Próximo contato: sem data definida"
+      >
+        <CalendarClock size={11} aria-hidden="true" />
+        Sem data
+      </span>
+    );
+  }
+
+  const urgencia = calcularUrgenciaProximoContato(proximoContatoEm);
+  return (
+    <span
+      role="status"
+      className={cn(
+        "inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide",
+        BADGE_URGENCIA_CLASSNAME[urgencia],
+      )}
+      title={`Próximo contato: ${formatarPrazoNoCard(proximoContatoEm)}`}
+    >
+      <CalendarClock size={11} aria-hidden="true" />
+      {formatarPrazoNoCard(proximoContatoEm)}
+    </span>
+  );
 }
 
 function KanbanCard({
@@ -200,7 +252,7 @@ function KanbanCard({
           </div>
         )}
 
-        {(canalOrigem || statusConfig) && (
+        {(canalOrigem || statusConfig || card.proximoContatoEm !== undefined) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {canalOrigem && (
               <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
@@ -211,6 +263,9 @@ function KanbanCard({
               <span className={cn("rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide", statusConfig.badgeClassName)}>
                 {statusConfig.label}
               </span>
+            )}
+            {card.proximoContatoEm !== undefined && (
+              <BadgeProximoContato proximoContatoEm={card.proximoContatoEm} />
             )}
           </div>
         )}
@@ -582,6 +637,18 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     if (!etapaDestinoId || etapaDestinoId === activeCard.etapaId) {
       await restaurarArrasto(snapshot);
       return;
+    }
+
+    if (pipelineEhRevisaoRadar(pipeline.nome)) {
+      const erroProximoContato = obterErroProximoContatoParaMovimento(activeCard.proximoContatoEm);
+      if (erroProximoContato) {
+        await restaurarArrasto(snapshot, erroProximoContato);
+        return;
+      }
+    }
+
+    if (etapaEhAgendarReuniao(etapasOrdenadas.find((etapa) => etapa.id === activeCard.etapaId)?.nome ?? "")) {
+      setErro("Verificando regra de 8 contatos consecutivos...");
     }
 
     let motivoRejeicao = "Nao foi possivel mover o card";

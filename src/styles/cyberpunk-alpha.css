@@ -305,3 +305,19 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.2; }
 }
+
+/* ── Alpha CRM: badge de próximo contato atrasado (blink) ───── */
+@keyframes alpha-badge-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.alpha-badge-blink {
+  animation: alpha-badge-blink 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alpha-badge-blink {
+    animation: none;
+  }
+}

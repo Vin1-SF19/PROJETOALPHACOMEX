@@ -1,9 +1,13 @@
+import path from "node:path";
 import { config } from "dotenv";
 
 config({ path: ".env", quiet: true });
 config({ path: ".env.local", override: true, quiet: true });
 
 const command = process.argv[2] ?? "doctor";
+const workerRoot = process.env.ROADMAP_PRODUCTION_ROOT
+  ? path.resolve(process.env.ROADMAP_PRODUCTION_ROOT)
+  : process.cwd();
 
 function supervisorIsAlive() {
   const supervisorPid = Number.parseInt(
@@ -120,15 +124,15 @@ try {
     const { processNextProductionPhase, recoverInterruptedProduction } =
       await import("../src/lib/roadmap-production/worker.ts");
     const once = process.argv.includes("--once");
-    await recoverInterruptedProduction();
+    await recoverInterruptedProduction(workerRoot);
     if (once) {
-      const result = await processNextProductionPhase();
+      const result = await processNextProductionPhase(workerRoot);
       emit(result);
       process.exitCode = result.success === false ? 1 : 0;
     } else {
       let lastHeartbeat = 0;
       while (supervisorIsAlive()) {
-        const result = await processNextProductionPhase();
+        const result = await processNextProductionPhase(workerRoot);
         const currentTime = Date.now();
         if (result.processed || currentTime - lastHeartbeat >= 60_000) {
           emit(

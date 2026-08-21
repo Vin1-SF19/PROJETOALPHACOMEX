@@ -2,6 +2,7 @@ import { auth } from "../../../../../../auth";
 import { getTema } from "@/lib/temas";
 import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import { garantirSchemaFinanceiro } from "@/lib/bpm/pipeline-financeiro-migration";
 import PipelineBoardClient from "./PipelineBoardClient";
 import { notFound } from "next/navigation";
 
@@ -16,6 +17,12 @@ export default async function PipelineBpmPage({
   const session = await auth();
   const temaNome = (session?.user as { tema_interface?: string })?.tema_interface || "blue";
   const visual = getTema(temaNome);
+
+  try {
+    await garantirSchemaFinanceiro(pipelineId);
+  } catch (error) {
+    console.error("[PipelineBpmPage] garantirSchemaFinanceiro", error);
+  }
 
   const [pipelineResult, cardsResult] = await Promise.all([
     ObterPipelineBpm(pipelineId),

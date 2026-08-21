@@ -8,7 +8,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -43,6 +43,12 @@ import {
   MoverObjetivoRoadmap,
   ReenfileirarObjetivoRoadmap,
 } from "@/actions/RoadmapAlpha";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,6 +61,7 @@ import { Input } from "@/components/ui/input";
 import type { RoadmapModuleSnapshot } from "@/lib/roadmap-alpha/catalog";
 import type { RoadmapImproveField } from "@/lib/roadmap-alpha/improve-with-ai";
 import { RoadmapProductionPanel } from "@/components/RoadmapAlpha/RoadmapProductionPanel";
+import { SistemasExternosSection } from "@/components/RoadmapAlpha/SistemasExternosSection";
 
 interface RoadmapArtifact {
   id: string;
@@ -81,7 +88,7 @@ interface RoadmapObjectiveView {
   status: string;
   documentationStatus: string;
   sourceVersion: number;
-  developmentProvider: "claude" | "codex";
+  developmentProvider: "claude" | "codex" | "ollama";
   acceptanceCriteria: string[];
   createdAt: string;
   archivedAt: string | null;
@@ -178,6 +185,11 @@ const LIFECYCLE_META: Record<
   },
 };
 
+const DEVELOPMENT_PROVIDER_LABEL: Record<
+  "claude" | "codex" | "ollama",
+  string
+> = { claude: "Claude", codex: "Codex", ollama: "Qwen" };
+
 function lifecycleOf(objective: RoadmapObjectiveView): LifecycleFilter {
   if (objective.status === "DELETED") return "deleted";
   if (objective.status === "ARCHIVED") return "archived";
@@ -193,6 +205,7 @@ export function RoadmapDashboard({
   canAccessProduction,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [objectives, setObjectives] = useState(initialObjectives);
   const [lastLiveUpdate, setLastLiveUpdate] = useState(() => new Date());
@@ -206,7 +219,20 @@ export function RoadmapDashboard({
   );
   const [selectedPhase, setSelectedPhase] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createNovoModuloPreset, setCreateNovoModuloPreset] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("novoModulo") !== "1") return;
+    const timer = window.setTimeout(() => {
+      if (canMutate) {
+        setCreateNovoModuloPreset(true);
+        setCreateOpen(true);
+      }
+      router.replace("/PainelAlpha/Roadmap");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [searchParams, router, canMutate]);
   const [mobilePane, setMobilePane] = useState<
     "modules" | "objectives" | "docs"
   >("objectives");
@@ -359,6 +385,18 @@ export function RoadmapDashboard({
           </span>
           {canMutate && (
             <Button
+              variant="outline"
+              onClick={() => {
+                setCreateNovoModuloPreset(true);
+                setCreateOpen(true);
+              }}
+              className="border-cyan-400/20 bg-cyan-400/[.06] text-cyan-200 hover:bg-cyan-400/10"
+            >
+              <Plus size={16} /> Novo módulo
+            </Button>
+          )}
+          {canMutate && (
+            <Button
               onClick={() => setCreateOpen(true)}
               className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
             >
@@ -410,62 +448,77 @@ export function RoadmapDashboard({
 
       <div className="grid min-h-0 flex-1 lg:grid-cols-[250px_400px_minmax(0,1fr)]">
         <aside
-          className={`${mobilePane === "modules" ? "flex" : "hidden"} min-h-0 flex-col border-r border-white/10 bg-slate-950/30 lg:flex`}
+          className={`${mobilePane === "modules" ? "flex" : "hidden"} min-h-0 flex-col overflow-y-auto border-r border-white/10 bg-slate-950/30 lg:flex`}
         >
-          <div className="border-b border-white/10 p-3">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">
-              Projetos do painel
-            </p>
-            <button
-              onClick={() => {
-                setModuleFilter(null);
-                setMobilePane("objectives");
-              }}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${moduleFilter === null ? "bg-cyan-400/10 text-cyan-300" : "text-slate-300 hover:bg-white/5"}`}
-            >
-              <span className="flex items-center gap-2">
-                <Layers3 size={15} /> Todos
-              </span>
-              <span>
-                {
-                  objectives.filter(
-                    (objective) => lifecycleOf(objective) === lifecycleFilter,
-                  ).length
-                }
-              </span>
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {moduleGroups.map(([category, items]) => (
-              <div key={category} className="mb-4">
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                  {CATEGORY_LABELS[category] ?? category}
-                </p>
-                {items.map((module) => {
-                  const count = objectives.filter(
-                    (objective) =>
-                      objective.moduleKey === module.id &&
-                      lifecycleOf(objective) === lifecycleFilter,
-                  ).length;
-                  return (
-                    <button
-                      key={module.id}
-                      onClick={() => {
-                        setModuleFilter(module.id);
-                        setMobilePane("objectives");
-                      }}
-                      className={`mb-0.5 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs ${moduleFilter === module.id ? "bg-cyan-400/10 text-cyan-300" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
-                    >
-                      <span className="truncate">{module.label}</span>
-                      <span className="ml-2 rounded bg-white/5 px-1.5 py-0.5 text-[10px]">
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+          <Accordion type="multiple" defaultValue={["painel-alpha"]}>
+            <AccordionItem value="painel-alpha" className="border-white/10">
+              <AccordionTrigger className="px-3 py-3 text-xs font-semibold text-slate-400 hover:text-slate-200 hover:no-underline">
+                Painel Alpha
+              </AccordionTrigger>
+              <AccordionContent className="pb-0">
+                <div className="px-3 pb-2">
+                  <button
+                    onClick={() => {
+                      setModuleFilter(null);
+                      setMobilePane("objectives");
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm ${moduleFilter === null ? "bg-cyan-400/10 text-cyan-300" : "text-slate-300 hover:bg-white/5"}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Layers3 size={15} /> Todos
+                    </span>
+                    <span>
+                      {
+                        objectives.filter(
+                          (objective) => lifecycleOf(objective) === lifecycleFilter,
+                        ).length
+                      }
+                    </span>
+                  </button>
+                </div>
+                <div className="p-2 pt-0">
+                  {moduleGroups.map(([category, items]) => (
+                    <div key={category} className="mb-4">
+                      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                        {CATEGORY_LABELS[category] ?? category}
+                      </p>
+                      {items.map((module) => {
+                        const count = objectives.filter(
+                          (objective) =>
+                            objective.moduleKey === module.id &&
+                            lifecycleOf(objective) === lifecycleFilter,
+                        ).length;
+                        return (
+                          <button
+                            key={module.id}
+                            onClick={() => {
+                              setModuleFilter(module.id);
+                              setMobilePane("objectives");
+                            }}
+                            className={`mb-0.5 flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs ${moduleFilter === module.id ? "bg-cyan-400/10 text-cyan-300" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
+                          >
+                            <span className="truncate">{module.label}</span>
+                            <span className="ml-2 rounded bg-white/5 px-1.5 py-0.5 text-[10px]">
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="sistemas-externos" className="border-white/10">
+              <AccordionTrigger className="px-3 py-3 text-xs font-semibold text-slate-400 hover:text-slate-200 hover:no-underline">
+                Sistemas Externos
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <SistemasExternosSection isAdmin={canMutate} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </aside>
 
         <section
@@ -548,9 +601,11 @@ export function RoadmapDashboard({
                             </span>
                             <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/20 bg-violet-400/[.06] px-2 py-1 text-[10px] text-violet-300">
                               <BrainCircuit size={10} />
-                              {objective.developmentProvider === "claude"
-                                ? "Claude"
-                                : "Codex"}
+                              {
+                                DEVELOPMENT_PROVIDER_LABEL[
+                                  objective.developmentProvider
+                                ]
+                              }
                             </span>
                           </div>
                           {canMutate && (
@@ -820,19 +875,26 @@ export function RoadmapDashboard({
         </section>
       </div>
 
+      {canMutate && (
       <CreateObjectiveDialog
         key={objectives.length}
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) setCreateNovoModuloPreset(false);
+        }}
         modules={modules}
         nextPriority={activeObjectiveCount + 1}
+        novoModuloPreset={createNovoModuloPreset}
         onCreated={() => {
           setCreateOpen(false);
+          setCreateNovoModuloPreset(false);
           void refreshObjectives();
           router.refresh();
         }}
       />
-      {selected && (
+      )}
+      {canMutate && selected && (
         <EditObjectiveDialog
           key={`${selected.id}:${selected.sourceVersion}`}
           open={editOpen}
@@ -893,17 +955,28 @@ function ImproveWithAIButton({
   );
 }
 
+const NOVO_MODULO_CONSTRAINTS =
+  "Este objetivo cria um MÓDULO NOVO do PainelAlpha (não é ajuste em módulo existente). " +
+  "Antes de qualquer implementação, a squad deve seguir a checklist obrigatória de registro de módulo: " +
+  "(1) adicionar 1 entrada em MODULOS_REGISTRY (src/lib/modulos-registry.ts) — id, label, href, iconName, category, permission; " +
+  "(2) confirmar que o ícone escolhido existe em ICON_MAP (src/components/layout/GlobalSidebar.tsx), importando se necessário; " +
+  "(3) só depois criar a rota em src/app/PainelAlpha/[NomeDoModulo]/page.tsx, actions e componentes. " +
+  "MODULOS_REGISTRY é a fonte única — não usar os 3 arrays manuais antigos (obsoletos). " +
+  "A fase de documentação (Qwen) deve detalhar o propósito do módulo, dados que ele vai manipular e quem deve ter acesso, antes de qualquer fase de execução escrever código.";
+
 function CreateObjectiveDialog({
   open,
   onOpenChange,
   modules,
   nextPriority,
+  novoModuloPreset = false,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   modules: RoadmapModuleSnapshot[];
   nextPriority: number;
+  novoModuloPreset?: boolean;
   onCreated: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -911,11 +984,13 @@ function CreateObjectiveDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [desiredOutcome, setDesiredOutcome] = useState("");
-  const [constraints, setConstraints] = useState("");
+  const [constraints, setConstraints] = useState(
+    novoModuloPreset ? NOVO_MODULO_CONSTRAINTS : "",
+  );
   const [criteria, setCriteria] = useState("");
   const [priority, setPriority] = useState(nextPriority);
   const [developmentProvider, setDevelopmentProvider] = useState<
-    "claude" | "codex"
+    "claude" | "codex" | "ollama"
   >("claude");
 
   function submit(event: React.FormEvent) {
@@ -952,12 +1027,22 @@ function CreateObjectiveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto border-white/10 bg-[#0b1524] text-slate-100 sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Novo objetivo</DialogTitle>
+          <DialogTitle>
+            {novoModuloPreset ? "Novo módulo do PainelAlpha" : "Novo objetivo"}
+          </DialogTitle>
           <DialogDescription>
-            Ao salvar, o objetivo entra imediatamente na fila do Qwen conforme
-            sua prioridade global.
+            {novoModuloPreset
+              ? "Documentação e checklist de integração do módulo serão gerados pelo Qwen antes de qualquer código. A execução só começa depois de você aprovar explicitamente."
+              : "Ao salvar, o objetivo entra imediatamente na fila do Qwen conforme sua prioridade global."}
           </DialogDescription>
         </DialogHeader>
+        {novoModuloPreset && (
+          <div className="rounded-xl border border-violet-400/20 bg-violet-400/[.06] px-3 py-2 text-[11px] leading-5 text-violet-200/90">
+            As restrições já foram pré-preenchidas com a checklist obrigatória
+            de registro de módulo (MODULOS_REGISTRY). Ajuste se necessário,
+            mas não remova os passos de integração.
+          </div>
+        )}
         <form onSubmit={submit} className="space-y-4">
           <label className="block text-xs text-slate-400">
             Projeto
@@ -1086,22 +1171,28 @@ function CreateObjectiveDialog({
               desenvolvimento
             </legend>
             <p className="text-[11px] text-slate-500">
-              Qwen 3.8 documenta o objetivo. O cérebro escolhido executa os
-              prompts com os agentes Bibble; se ficar sem créditos, o outro
-              assume automaticamente.
+              Qwen 3.8 sempre documenta o objetivo. O cérebro escolhido aqui
+              executa os prompts de desenvolvimento com os agentes Bibble; se
+              ficar indisponível, os outros dois assumem automaticamente, na
+              ordem de prioridade escolhida.
             </p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               {(
                 [
                   {
                     id: "claude",
                     label: "Claude",
-                    description: "Prioridade 1 · fallback Codex",
+                    description: "Prioridade 1 · fallback Codex → Qwen",
                   },
                   {
                     id: "codex",
                     label: "Codex",
-                    description: "Prioridade 1 · fallback Claude",
+                    description: "Prioridade 1 · fallback Claude → Qwen",
+                  },
+                  {
+                    id: "ollama",
+                    label: "Qwen",
+                    description: "Prioridade 1 · fallback Claude → Codex",
                   },
                 ] as const
               ).map((brain) => (
@@ -1169,7 +1260,7 @@ function EditObjectiveDialog({
     objective.acceptanceCriteria.join("\n"),
   );
   const [developmentProvider, setDevelopmentProvider] = useState<
-    "claude" | "codex"
+    "claude" | "codex" | "ollama"
   >(objective.developmentProvider);
 
   function submit(event: React.FormEvent) {
@@ -1199,7 +1290,7 @@ function EditObjectiveDialog({
         result.regenerated
           ? "Objetivo atualizado e nova revisão enfileirada"
           : result.providerChanged
-            ? `IA de desenvolvimento alterada para ${result.developmentProvider === "claude" ? "Claude" : "Codex"}`
+            ? `IA de desenvolvimento alterada para ${DEVELOPMENT_PROVIDER_LABEL[result.developmentProvider]}`
             : "Nenhuma alteração material detectada",
       );
       onUpdated();
@@ -1335,20 +1426,25 @@ function EditObjectiveDialog({
             <p className="text-[11px] text-slate-500">
               A troca não regenera os prompts. Uma fase já em execução termina;
               próximas tentativas e fases usam a nova preferência, com fallback
-              automático para a outra IA.
+              automático para as outras duas IAs, na ordem de prioridade.
             </p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               {(
                 [
                   {
                     id: "claude",
                     label: "Claude",
-                    description: "Preferencial · fallback Codex",
+                    description: "Preferencial · fallback Codex → Qwen",
                   },
                   {
                     id: "codex",
                     label: "Codex",
-                    description: "Preferencial · fallback Claude",
+                    description: "Preferencial · fallback Claude → Qwen",
+                  },
+                  {
+                    id: "ollama",
+                    label: "Qwen",
+                    description: "Preferencial · fallback Claude → Codex",
                   },
                 ] as const
               ).map((brain) => (

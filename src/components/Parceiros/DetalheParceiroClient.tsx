@@ -6,14 +6,15 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, User, Mail, Phone, MapPin, CreditCard, ShieldCheck,
   Pencil, X, Loader2, Save, Sparkles, Unlink, ChevronDown, Receipt, FileCheck2, Calendar,
-  CheckCircle2, Clock, TrendingUp, MessageSquareText, Plus, Trash2,
+  CheckCircle2, Clock, TrendingUp, MessageSquareText, Plus, Trash2, KeyRound,
 } from "lucide-react";
 import { toast } from "sonner";
-import { editarParceiro, desvincularIndicacao } from "@/actions/parceiros";
+import { editarParceiro, desvincularIndicacao, gerarMensagemLoginParceiro } from "@/actions/parceiros";
 import { getTema } from "@/lib/temas";
 import { TRIBUTOS } from "@/lib/tributos";
 import TrocarSenhaParceiro from "./TrocarSenhaParceiro";
 import ModalComprovante from "./ModalComprovante";
+import ModalCredenciais from "./ModalCredenciais";
 import {
   criarFormularioResponsaveis,
   criarResponsavelVazio,
@@ -76,17 +77,22 @@ function fmtBRL(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+type TemplateOnboarding = { id: number; nome: string; mensagem: string };
+
 export default function DetalheParceiroClient({
-  parceiro, permissao, temaName = "blue",
+  parceiro, permissao, temaName = "blue", template,
 }: {
   parceiro: DetalheParceiro;
   permissao: { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
   temaName?: string;
+  template?: TemplateOnboarding | null;
 }) {
   const router = useRouter();
   const tema = getTema(temaName);
   const [editando, setEditando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [carregandoLogin, setCarregandoLogin] = useState(false);
+  const [modalLogin, setModalLogin] = useState<{ loginEmail: string; senhaGerada: string; nomeParceiro: string } | null>(null);
 
   // Empresa indicada — expande os dados já salvos no CS&NPS (sem gastar API)
   const [empresaAberta, setEmpresaAberta] = useState<number | null>(null);
@@ -218,6 +224,17 @@ export default function DetalheParceiroClient({
     const res = await desvincularIndicacao(indicacaoId);
     if (res.success) { toast.success("Indicação desvinculada"); router.refresh(); }
     else toast.error(res.error ?? "Erro");
+  };
+
+  const verLogin = async () => {
+    setCarregandoLogin(true);
+    const res = await gerarMensagemLoginParceiro(parceiro.id);
+    setCarregandoLogin(false);
+    if (res.success) {
+      setModalLogin({ loginEmail: res.loginEmail, senhaGerada: res.senhaGerada, nomeParceiro: res.nomeParceiro });
+    } else {
+      toast.error(res.error ?? "Erro ao gerar a mensagem de login");
+    }
   };
 
   const cardCls = "bg-slate-900/40 border border-white/5 rounded-[2rem] p-6 space-y-4";
@@ -673,9 +690,29 @@ export default function DetalheParceiroClient({
           <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Acesso ao Sistema de Parceiros</p>
           <p className="text-xs text-slate-400">Login: <span className="text-white font-mono font-bold">{parceiro.loginEmail}</span></p>
           <p className="text-[9px] text-slate-600 italic">Senha armazenada com hash — não recuperável.</p>
+          <button
+            type="button"
+            onClick={verLogin}
+            disabled={carregandoLogin}
+            className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:border-indigo-500/40 text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+          >
+            {carregandoLogin ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />} Ver login
+          </button>
+          <p className="text-[9px] text-slate-600 italic">Gera uma nova senha temporária e mostra a mensagem de acesso pronta pra copiar.</p>
           {permissao.isAdmin && <TrocarSenhaParceiro parceiroId={parceiro.id} />}
         </div>
       </div>
+
+      {modalLogin && (
+        <ModalCredenciais
+          open
+          onClose={() => setModalLogin(null)}
+          loginEmail={modalLogin.loginEmail}
+          senhaGerada={modalLogin.senhaGerada}
+          nomeParceiro={modalLogin.nomeParceiro}
+          template={template}
+        />
+      )}
 
       {comprovanteInd && (
         <ModalComprovante

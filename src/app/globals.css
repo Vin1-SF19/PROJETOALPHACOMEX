@@ -256,6 +256,22 @@ html {
   }
 }
 
+/* ── Alpha Badge Próximo Contato: atraso pisca ─────────── */
+@keyframes alphaBadgeBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+.alpha-badge-blink {
+  animation: alphaBadgeBlink 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alpha-badge-blink {
+    animation: none;
+  }
+}
+
 /* ── Alpha Pipeline Board Elevation ─────────── */
 .alpha-pipeline-card {
   transition: translate var(--alpha-transition), scale var(--alpha-transition), box-shadow var(--alpha-transition), border-color var(--alpha-transition);

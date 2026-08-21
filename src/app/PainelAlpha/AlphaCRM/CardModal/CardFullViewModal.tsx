@@ -349,6 +349,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                 card={card}
                 etapaAtual={etapaAtual}
                 accent={accent}
+                interacoes={interacoes}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
                 podeEditar={podeEditar}
                 realtimeRevision={realtimeRevision}

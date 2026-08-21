@@ -1,5 +1,45 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Roadmap Alpha — "Novo módulo" (2026-08-20, corrigido de local)
+
+**⚠️ Fica DENTRO do Roadmap Alpha (`RoadmapDashboard.tsx`), NUNCA na tela inicial do painel (`PainelAlphaClient.tsx`).** Uma implementação inicial colocou isso na tela inicial por engano — revertido integralmente após correção explícita e irritada do usuário. Não repetir esse erro de local em sessão futura.
+
+- **Trigger:** botão "Novo módulo" no header de `RoadmapDashboard.tsx`, ao lado de "Novo objetivo" (`canMutate` only). Também aceita `?novoModulo=1` na URL (`useSearchParams`, dentro de `<Suspense>` em `page.tsx`).
+- **Gate de segurança obrigatório (dois pontos, não só um):** (1) o `useEffect` que lê o param só ativa o preset se `canMutate` for `true`; (2) `<CreateObjectiveDialog>`/`<EditObjectiveDialog>` só são montados no JSX quando `canMutate` — nunca confiar só no controle de `open` para esconder um dialog de mutação sensível de um usuário sem permissão.
+- **Preset de conteúdo:** `NOVO_MODULO_CONSTRAINTS` (constante em `RoadmapDashboard.tsx`) pré-preenche o campo Restrições com a checklist real de registro de módulo — se o processo de registro de módulo mudar no futuro (`MODULOS_REGISTRY`), atualizar esse texto também.
+- **Como adicionar um preset semelhante no futuro:** mesmo padrão — botão local (ou query param) → gate de permissão → estado de preset → prop opcional no dialog de criação.
+
+## Roadmap Alpha — Sistemas Externos: registro + execução real (2026-08-20, corrigido de local)
+
+**⚠️ Fica DENTRO do Roadmap Alpha — sidebar esquerda de `RoadmapDashboard.tsx` virou `Accordion` de 2 gavetas ("Painel Alpha" / "Sistemas Externos"). NUNCA na tela inicial do painel.** Mesmo erro de local do item acima, já corrigido.
+
+- **Rota/UI:** `/PainelAlpha/Roadmap` → gaveta "Sistemas Externos" na sidebar → botão "Novo projeto" (admin only) → `NovoProjetoExternoDialog.tsx`. Cada workspace registrado mostra badge Ativo/Parado + botões Iniciar/Parar worker.
+- **Server Actions:** `src/actions/RoadmapWorkspaces.ts` — `NavegarDiretoriosRoadmapWorkspace`/`CriarRoadmapWorkspace`/`ArquivarRoadmapWorkspace`/`IniciarWorkerRoadmapWorkspace`/`PararWorkerRoadmapWorkspace` exigem `requireRoadmapAccess(true)`; `ListarRoadmapWorkspaces` aceita acesso básico mas nunca retorna `rootPath` para não-admin.
+- **Model:** `RoadmapWorkspace` (`prisma/schema.prisma`) — migration aplicada em produção, incluindo `workerPid Int?`/`workerStartedAt DateTime?` (2ª migration pontual, mesmo protocolo Vault).
+- **`moduleKey` de workspace:** bloqueia `..`/traversal e nomes reservados do Windows (`con`/`prn`/`aux`/`nul`/`com1-9`/`lpt1-9`, `WINDOWS_RESERVED_NAMES` em `RoadmapWorkspaces.ts`) — usado como segmento de path em `prompt-phases/roadmap-alpha/{moduleKey}/...`.
+- **`rootPath` de workspace:** único por workspace ativo (comparação normalizada via `path.win32`, checada em `CriarRoadmapWorkspace`) — impede dois workspaces disputando a mesma pasta física.
+- **Isolamento de fila (ponto crítico, não regredir):** `documentedObjectives()` (`src/lib/roadmap-production/worker.ts`) SEMPRE filtra por `moduleKey IN (allowedModuleKeys)`, resolvido via `resolveProductionWorkspaceScope(root)` (`workspace-scope.ts`). Qualquer refatoração futura dessa query que remova o filtro reabre a falha de um worker processar objetivo de outro projeto — não é opcional.
+- **Worker por processo:** `scripts/roadmap-production-workspace-worker.ps1` (Mutex nomeado por workspace) + `IniciarWorkerRoadmapWorkspace`/`PararWorkerRoadmapWorkspace` (spawn/kill, PID em `RoadmapWorkspace.workerPid`). `killProcessTree()` usa `taskkill /T /F` — nunca trocar de volta para `process.kill()` simples, deixa processo filho órfão no Windows.
+- **Reserva atômica ao iniciar:** `IniciarWorkerRoadmapWorkspace` usa `updateMany({ where: { id, workerPid: valorAntigo } })` antes do `spawn` para fechar race condition de double-click — manter esse padrão em qualquer ação futura que inicie processo de longa duração a partir de uma Server Action.
+- **Segurança do navegador de diretórios — decisão definitiva do usuário, não reabrir:** sem allowlist de diretórios-pai. A única proteção é `requireRoadmapAccess(true)` (admin).
+- **Supervisores são `powershell.exe`, não `node.exe`:** ao depurar processos do Roadmap, buscar por ambos — `scripts/roadmap-production-worker.ps1`/`roadmap-alpha-worker.ps1` (supervisores originais, Mutex fixo) e `roadmap-production-workspace-worker.ps1` (por workspace, Mutex parametrizado).
+
+## Roadmap Alpha — Produção: novo status/comando de aprovação (2026-08-19)
+
+- **Novo status de execução:** `"AWAITING_APPROVAL"` (`productionExecutionStatusSchema`, `src/lib/roadmap-production/contracts.ts`) — toda execução nasce nele; `selectNextProductionExecution`/`nextReadyPhase` (`worker.ts`) ignoram qualquer status fora de `["PENDING","RUNNING"]`, então basta manter essa allowlist para preservar o gate — **nunca adicionar `"AWAITING_APPROVAL"` a essas duas listas**, ou o gate quebra silenciosamente.
+- **Novo comando de controle:** `"APPROVE"` (`productionControlCommandSchema.type`), processado em `applyProductionControls` (`worker.ts`) — só aceita a transição partindo de `"AWAITING_APPROVAL"`.
+- **Server Action:** `AprovarExecucaoRoadmapProduction` (`src/actions/RoadmapProduction.ts`) — mesmo padrão de auth dos demais controles (`requireRoadmapProductionAccess(true)`), enfileira o comando via `enqueueProductionControl("APPROVE", executionId)`.
+- **UI:** botão "Aprovar e iniciar" em `RoadmapProductionPanel.tsx`, ao lado dos botões de Pausar/Retomar/Excluir, visível só quando `canManage && execution.status === "AWAITING_APPROVAL"`.
+- **Checklist para qualquer novo status de execução no futuro:** (1) adicionar em `productionExecutionStatusSchema`; (2) decidir se ele deve ou não entrar nas allowlists de seleção do worker; (3) mapear label/cor em `STATUS_LABEL`/`statusClass` (`RoadmapProductionPanel.tsx`); (4) se o novo status precisa de ação humana, seguir o padrão comando→action→botão já estabelecido aqui.
+
+## Roadmap Alpha — Produção: terceiro provider de desenvolvimento (2026-08-19)
+
+- **Schema:** `developmentProviderSchema` (`src/lib/roadmap-production/contracts.ts`) é `z.enum(["claude","codex","ollama"])` — reutilizado por `roadmapObjectiveCreateSchema`/`roadmapObjectiveEditSchema` (`src/lib/roadmap-alpha/contracts.ts`), então adicionar um provider aqui propaga automaticamente para a validação de criar/editar objetivo, sem precisar tocar em `roadmap-alpha/contracts.ts`.
+- **UI de escolha:** grid de botões em `CreateObjectiveDialog`/`EditObjectiveDialog` (`RoadmapDashboard.tsx`) — ao adicionar um 4º provider no futuro, ajustar `sm:grid-cols-3` para o novo total e adicionar a entrada no array local de opções (`{id, label, description}`), em ambos os dialogs.
+- **Fallback:** `developmentProviderOrder()` (`worker.ts`) monta `[preferido, ...resto]` automaticamente a partir de um array fixo `["claude","codex","ollama"]` — um provider novo já entra na ordem de fallback sem mudança de código nessa função, só precisa aparecer no array fixo.
+- **Labels de exibição:** duplicados propositalmente em 3 lugares (client components não podem importar de `worker.ts`, que é server-only) — `RoadmapDashboard.tsx`, `RoadmapProductionPanel.tsx` (`DEVELOPMENT_PROVIDER_LABEL`, label curto) e `completion-report.ts` (`DEVELOPMENT_PROVIDER_REPORT_LABEL`, inclui texto de fallback). Ao adicionar um provider novo, atualizar os 3.
+- **Não confundir com o provider de infraestrutura global:** `SettingsDialog` (mesma tela, botão "Configurar IA") continua **intencionalmente** sem Qwen — `SalvarConfiguracaoRoadmapProduction` rejeita `provider === "ollama"` de propósito. São dois conceitos diferentes: infra global (qual CLI o worker usa por padrão) vs. preferência por objetivo (qual cérebro executa aquele objetivo específico).
+
 ## Agenda Alpha — contrato de data civil local (2026-07-31)
 
 - O parâmetro `data=YYYY-MM-DD` da rota `/PainelAlpha/CalendarioAlpha` representa uma **data civil em `America/Sao_Paulo`**, não um instante UTC nem a data local do processo SSR.
@@ -83,6 +123,19 @@ Ao criar um novo módulo, verificar e registrar:
 1. Scout mapeia a estrutura real do componente de detalhe daquele registro (onde inserir o botão sem quebrar layout).
 2. Adicionar `<NotesContextButton>` no lugar certo, com `moduleKey`/`entityType`/`entityId`/`displayName`/`internalPath` corretos.
 3. **Obrigatório:** adicionar um caso em `entidadeReferenciadaExiste()` (`src/actions/NotasContexto.ts`) validando que o registro existe — sem isso, `VincularContextoNota` rejeita por padrão (fail-safe).
+
+---
+
+## Parceiros — botão "Ver login" no detalhe do parceiro (2026-08-20)
+
+**Contexto:** não existia lugar nenhum para reexibir a mensagem de login (a mesma que se copia e manda ao parceiro no cadastro) depois do cadastro inicial. Usuário pediu botão "Ver login" dentro do detalhe de cada parceiro, livre para qualquer um com acesso ao módulo — **sem** gate de admin (diferente de `TrocarSenhaParceiro`, que continua admin-only).
+
+- **Restrição técnica que molda o design:** a senha original nunca é recuperável — só `senhaHash` (bcrypt) é persistido. "Ver login" **sempre reseta a senha** para uma nova gerada na hora — não existe forma de reexibir a senha antiga. Isso está documentado nos comentários da action e na UI.
+- **Server Action:** `gerarMensagemLoginParceiro(parceiroId)` (`src/actions/parceiros.ts`) — só exige `getCtx()` não-nulo (sessão autenticada), sem checar `isAdmin`/`podeEditar`. Gera senha via `gerarSenhaSegura()` (já existente no arquivo), grava `senhaHash`+`senhaTemporaria:true`, retorna `{loginEmail, senhaGerada, nomeParceiro}` em texto puro (só nessa resposta, nunca persistido).
+- **UI:** botão em `DetalheParceiroClient.tsx` (seção "Acesso ao Sistema de Parceiros"), reabre o **mesmo** `ModalCredenciais` já usado no cadastro (`NovoParceiro.tsx`) — zero componente duplicado.
+- **Template:** reaproveita `getTemplateParadaoParceiro()` (`src/actions/onboarding.ts`), buscado em paralelo em `Parceiros/[id]/page.tsx` e passado como prop `template`, mesmo padrão do cadastro.
+- **Efeito colateral consciente (não é bug):** cada clique em "Ver login" invalida a senha vigente do parceiro, mesmo que ele já estivesse logado com ela. Decisão explícita do usuário ao pedir "sem regra de admin".
+- **Padrão para replicar em outro módulo com credenciais recicláveis:** reaproveitar o mesmo modal de exibição de credenciais do cadastro + uma action de reset "geral" (sem admin-gate) que retorna a senha nova em texto puro só na resposta, nunca persistida.
 
 ---
 
@@ -1537,3 +1590,133 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 **Documentação:** `docs/components/crm-space-background.md`, `docs/components/crm-pipeline-border.md`, `docs/components/pipeline.md`, `src/app/PainelAlpha/AlphaCRM/README.md`, `CHANGELOG.md`.
 
 **Última atualização:** 2026-08-15 por Scribe
+
+### Alpha CRM — Pipeline Financeiro (RM-2026-DE0F7B, 2026-08-20)
+
+**Rota de operação:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` — kanban com 5 colunas (Contrato → Formalização → Pagamento → Nota Fiscal → Concluídos), drag-and-drop via `@dnd-kit/core`.
+
+**Rota de configuração:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` — botão "Aplicar pipeline financeiro" (`ConfigurarEtapasFinanceiroButton.tsx`).
+
+**Permissões:** `auth()` + `exigirAcessoConfigPipeline` (configuração) / `exigirAcessoBpmPipeline` (operação).
+
+**Fonte de verdade:** `src/lib/bpm/pipeline-financeiro.ts` — `FINANCIAL_STAGES` (5 etapas), `FINANCIAL_FIELDS` (40+ campos), `validateFinancialTransition`, `calcularRetencoesFinanceiras`.
+
+**Server Actions:** `ConfigurarPipelineFinanceiro` (`src/actions/bpm/PipelineFinanceiro.ts`) — idempotente, transacional, renomeia etapas, desativa excedentes, cria campos, upsert transições, grava auditoria. `MoverCardBpm` (`src/actions/bpm/Cards.ts`) — movimentação com `validateFinancialTransition`.
+
+**Modelo de dados:** `BpmPipeline`/`BpmEtapa`/`BpmCard`/`BpmCampo`/`BpmEtapaTransicaoPermitida` (já existentes). `BpmCard.etapaId` (FK → `BpmEtapa`) é o campo de referência de etapa. Sem migration SQL nova.
+
+**Testes:** `tests/bpm/pipeline-financeiro.test.ts` — 5 testes.
+
+**Editado quando:** nova etapa financeira for adicionada, campos obrigatórios mudarem, ou validação de transição for alterada.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+---
+
+### Alpha SEO — registro, navegação e autorização em duas camadas
+
+**Arquivos:** `src/lib/modulos-registry.ts`, `src/app/PainelAlpha/AlphaSEO/layout.tsx`, `src/app/PainelAlpha/AlphaSEO/[projectId]/layout.tsx`, `src/components/AlphaSEO/AlphaSeoShell.tsx`, `src/lib/alpha-seo/project-access.ts`.
+
+**Propósito:** expor o módulo no Painel Alpha e impedir que permissão global de módulo seja confundida com acesso a qualquer projeto. O registry usa `id/permission: "alphaSeo"` e `href: "/PainelAlpha/AlphaSEO"`; o layout raiz exige sessão/permissão e o layout do projeto exige owner/member ativo.
+
+**Editado quando:** a rota, o ícone/categoria ou a permissão do módulo mudar; ou quando um novo papel/capacidade por projeto for introduzido.
+
+**Como adicionar:** toda página sob `[projectId]` deve herdar o layout protegido e toda Action/Handler/tool que recebe `projectId` deve chamar o guard compartilhado, por exemplo `await requireAlphaSeoProjectAccess({ projectId, action: "seo:execute", minimumRole: "EDITOR" })`; não autorizar somente pela presença do ID.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — fachadas de Actions e serviços de domínio
+
+**Arquivos:** `src/actions/AlphaSeo*.ts`, `src/lib/alpha-seo/`, `src/lib/alpha-seo/contracts.ts`, `src/lib/alpha-seo/operation-policy.ts`.
+
+**Propósito:** manter as Server Actions finas (auth, Zod, erro sanitizado e revalidação) e concentrar regra de negócio, providers, idempotência e persistência nos serviços. As 16 fachadas existentes cobrem toda a superfície funcional do módulo.
+
+**Editado quando:** uma capacidade funcional ganhar entrada pela UI, SAM ou MCP; a nova operação deve compartilhar o mesmo serviço autoritativo em vez de duplicar lógica na borda.
+
+**Como adicionar:** siga o fluxo `UI/Action -> validação e requireAlphaSeoProjectAccess -> serviço em src/lib/alpha-seo/<domínio> -> Prisma/provider`; para operação paga, inclua estimativa/aprovação, chave idempotente e registro auditável antes da chamada externa.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — Route Handlers, jobs e Vercel Cron
+
+**Arquivos:** `src/app/api/alpha-seo/`, `src/lib/alpha-seo/jobs/`, `src/lib/alpha-seo/worker.ts`, `vercel.json`.
+
+**Propósito:** operar MCP/OAuth/API keys, OAuth Google, streaming do SAM e execução assíncrona persistente. `schedules` e `worker` executam a cada cinco minutos; `oauth-cleanup` executa às 03:17 UTC e remove em lotes limitados somente artefatos OAuth expirados/consumidos.
+
+**Editado quando:** surgir novo tipo de job, callback OAuth ou manutenção periódica. Rotas de cron continuam protegidas por `CRON_SECRET`; jobs usam lease/fencing e devem ser retomáveis.
+
+**Como adicionar:** registre a Route Handler sob `/api/alpha-seo`, valide auth/host/input na borda e, para cron, adicione uma entrada explícita em `vercel.json`, por exemplo `{ "path": "/api/alpha-seo/cron/<job>", "schedule": "<cron>" }`, com processamento bounded e idempotente.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — Prisma/Turso e gate Vault
+
+**Arquivos:** `prisma/schema.prisma`, `docs/alpha-seo/alpha-seo-migration-candidate.sql`, `docs/alpha-seo/vault-report.md`.
+
+**Propósito:** persistir projetos, membership, pesquisa, rankings, auditoria, OAuth, memória, SAM, MCP, jobs, custos e exports em 44 modelos `AlphaSeo*`.
+
+**Editado quando:** qualquer tabela, coluna, índice, chave, constraint, seed/backfill ou mutação em massa Alpha SEO for proposta.
+
+**Como adicionar:** interrompa antes da escrita, acione Vault, gere/valide backup completo com menos de 48 horas, apresente impacto/rollback e obtenha autorização explícita para o artefato exato. O lote já aplicado teve SHA-256 `acbec05894d0588ea949b4a7a8bd5d0e9fdfa6ed7462c8f201f48792c2810bef` e autorizou somente 44 tabelas + 110 índices; ele não autoriza mudanças futuras.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — providers e configuração server-side
+
+**Arquivos:** `.env.example`, `src/lib/alpha-seo/config/status.ts`, `src/lib/alpha-seo/doctor.ts`, `src/lib/alpha-seo/dataforseo/`, `src/lib/alpha-seo/google/`, `src/lib/alpha-seo/ai-visibility/`, `src/lib/alpha-seo/sam/`.
+
+**Propósito:** conectar DataForSEO, OpenRouter e Google GSC/GA4 sem expor credenciais ao client. O doctor reporta somente presença/saúde e códigos estáveis, nunca valores.
+
+**Editado quando:** um provider, modelo ou callback mudar. As variáveis obrigatórias/alternativas devem ser documentadas apenas por nome em `.env.example`; nunca usar prefixo `NEXT_PUBLIC_` para segredos.
+
+**Como adicionar:** leia a configuração exclusivamente no servidor, exponha à UI apenas status sanitizado (`configured`/`provider-missing`) e adicione teste de redaction. Os nomes atuais incluem `DATAFORSEO_API_KEY` ou login/senha, `OPENROUTER_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `ALPHA_SEO_GOOGLE_TOKEN_ENCRYPTION_KEY`, sem valores versionados.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — contrato de paridade OpenSEO
+
+**Arquivos:** `docs/alpha-seo/source-manifest.json`, `docs/alpha-seo/parity-matrix.md`, `src/lib/alpha-seo/inventory.ts`, `src/lib/alpha-seo/mcp/registry.ts`, `src/lib/alpha-seo/skills/`, `src/lib/alpha-seo/audit/issues.ts`.
+
+**Propósito:** impedir perda silenciosa de funções durante manutenção: 93/93 exports rastreados, 46/46 tools MCP nomeadas, 9 skills integrais e 27 issue IDs.
+
+**Editado quando:** a fonte congelada ou qualquer registry real mudar. Números históricos divergentes são informativos e não autorizam inventar tools/skills/issues.
+
+**Como adicionar:** atualize primeiro o registry real e seus testes; depois regenere o manifesto sanitizado com `npm run alpha-seo:inventory -- --json` e confirme ausência de drift com `npm run alpha-seo:inventory -- --check --json`. Não inclua caminhos absolutos, `.env` ou payloads/segredos no manifesto.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — fronteira paga, aprovações e grants Google compartilhados
+
+**Arquivos:** `src/lib/alpha-seo/operation-policy.ts`, `src/lib/alpha-seo/dataforseo/operations.ts`, `src/lib/alpha-seo/google/oauth.ts`, `src/actions/AlphaSeoGsc.ts`, `src/actions/AlphaSeoGa4.ts`.
+
+**Propósito:** garantir que custo e identidade externa sejam governados no servidor. Requests acima do threshold exigem aprovação persistida vinculada a projeto, usuário, operação e hash; runs concluídos são idempotentes. Um grant Google só é revogado após claim atômico que confirme ausência de consumidores do produto.
+
+**Editado quando:** uma nova operação paga for adicionada, thresholds mudarem ou outra conexão passar a reutilizar grants Google.
+
+**Como adicionar:** encaminhe a chamada DataForSEO por `executeAlphaSeoDataForSeo(...)` com `access`, `operation`, payload/unidades e parser; não chame o provider diretamente. Ao desconectar Google, remova primeiro a conexão e use `revokeGoogleGrantIfUnused(grantId, userId, product)`; nunca marque `revokedAt` incondicionalmente.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — cancelamento, disposição de jobs e mutações de auditoria
+
+**Arquivos:** `src/app/api/alpha-seo/sam/stream/route.ts`, `src/lib/alpha-seo/sam/`, `src/lib/alpha-seo/jobs/processor-result.ts`, `src/lib/alpha-seo/jobs/queue.ts`, `src/lib/alpha-seo/worker.ts`, `src/lib/alpha-seo/audit/contracts.ts`, `src/lib/alpha-seo/audit/service.ts`, `src/components/AlphaSEO/audit/AuditResultsWorkspace.tsx`.
+
+**Propósito:** impedir que cancelamento, lock ocupado ou conflito de estado seja interpretado como sucesso. SAM propaga abort; worker distingue `complete`/`defer`/`invalid`; auditoria separa cancelamento ativo de exclusão terminal com predicados atômicos e ressincronização visual.
+
+**Editado quando:** um novo processor retornar `skipped`/`deferred`, uma operação streaming for criada ou o lifecycle de auditoria ganhar estado novo.
+
+**Como adicionar:** processors devem retornar disposição explícita, por exemplo `{ skipped: true, retryable: true, delayMs }` para defer ou `{ skipped: true, terminal: true }` para conclusão terminal. Mutações de auditoria devem enviar `mode: "CANCEL" | "DELETE"`; em conflito, releia `currentStatus` e exija nova confirmação, sem retry automático da escrita.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+### Alpha SEO — paginação, exportação integral, stale guards e erros de Action
+
+**Arquivos:** `src/lib/alpha-seo/action-error.ts`, `src/components/AlphaSEO/shared/PaginationControls.tsx`, `src/components/AlphaSEO/shared/CompleteExportButtons.tsx`, `src/components/AlphaSEO/research/DomainResearchWorkspace.tsx`, `src/components/AlphaSEO/research/BacklinksWorkspace.tsx`, `src/components/AlphaSEO/audit/AuditResultsWorkspace.tsx`, `src/components/AlphaSEO/gsc/GscOverview.tsx`, `src/components/AlphaSEO/visibility/AiHistoryPanel.tsx`.
+
+**Propósito:** evitar slices fixos, exports incompletos, overwrite por resposta antiga e vazamento de erro interno. Tabelas grandes paginam; export completo carrega todas as páginas dentro do limite seguro; respostas assíncronas antigas são descartadas por versão.
+
+**Editado quando:** um dataset paginado, exportável ou atualizado de forma assíncrona for criado.
+
+**Como adicionar:** mantenha `page/limit/totalCount/hasMore`, use `CompleteExportButtons` com loader que materializa páginas bounded e compare a versão da request antes de aplicar estado. Actions devem retornar `safeAlphaSeoActionError(error)`, não `error.message` arbitrário.
+
+**Última atualização:** 2026-08-20 por Scribe

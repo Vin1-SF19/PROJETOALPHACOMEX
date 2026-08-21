@@ -22,6 +22,23 @@
 
 <!-- Adicionar aqui conforme o projeto cresce -->
 
+### AlphaSeoShell + workspaces Alpha SEO
+**Arquivo:** `src/components/AlphaSEO/AlphaSeoShell.tsx` e subpastas `audit/`, `dashboard/`, `gsc/`, `projects/`, `rank/`, `research/`, `sam/`, `saved/`, `settings/`, `shared/`, `visibility/`
+**Tipo:** composição de Server e Client Components
+**Props:** shell recebe contexto de navegação/projeto; clientes de domínio recebem IDs e snapshots serializáveis específicos da página.
+**Uso:** montado pelos layouts e páginas em `src/app/PainelAlpha/AlphaSEO/` e `src/app/PainelAlpha/AlphaSEO/[projectId]/`.
+**Notas:** `AlphaSeoShell` preserva a navegação e identidade visual do Painel Alpha. Os workspaces conectam as funções reais: `DashboardOverview`/`OnboardingPanel`; `KeywordResearchResults`, `DomainResearchWorkspace` e `BacklinksWorkspace`; `SavedKeywordsTable`; `RankControls`/`SerpLocationPicker`; `AuditDetailClient`/`LighthouseIssuesClient`; `GscOverview`; `AiHistoryPanel`; `SamWorkspace`/`SamSessionRail`; `ProjectsClient`/`InviteAcceptClient`; e `SettingsPage` com `GoogleIntegrations`, `McpManager`, `MembersManager` e `MemoryWorkspace`. Componentes compartilhados (`PageHeader`, `FeatureRoute`, `FeatureConsole`, `ExportButtons`, `DetailViews`) evitam duplicar estados, ações e exportação. Autorização nunca depende desses componentes: layouts, Actions e Route Handlers aplicam os gates server-side. Estados de loading respeitam `prefers-reduced-motion`.
+
+**Última atualização:** 2026-08-20 por Scribe
+
+#### Adendo final — detalhe, paginação e exportação Alpha SEO
+
+`AuditDetailClient` foi removido e não deve ser recriado. O detalhe canônico usa `AuditResultsWorkspace` (`src/components/AlphaSEO/audit/AuditResultsWorkspace.tsx`) montado por `AuditDetail` em `shared/DetailViews.tsx`; ele pagina issues/pages, exporta o conjunto completo dentro do limite seguro, acompanha `currentStatus` e separa `CANCEL` de `DELETE` sem retry automático em conflito.
+
+Os componentes compartilhados finais para datasets são `PaginationControls.tsx` e `CompleteExportButtons.tsx`. `DomainResearchWorkspace`, `DomainResearchTables`, `BacklinksWorkspace`, `GscOverview` e `AiHistoryPanel` aplicam paginação/histórico/export e guards de versão contra resposta stale. Novos workspaces devem reutilizar esses contratos em vez de slices fixos ou exportar somente a página visível.
+
+**Última atualização final:** 2026-08-20 por Scribe
+
 ### FlowButton
 **Arquivo:** `src/components/ui/flow-button.tsx`
 **Tipo:** Client Component
@@ -447,3 +464,8 @@
 **Uso:** `<CrmPipelineBorder highlightColor="#6366f1">{card}</CrmPipelineBorder>` — envolver KanbanCard (board) e cards de pipeline do Dashboard
 **Notas:** Borda com gradiente radial animado — rotação cíclica TOP→LEFT→BOTTOM→RIGHT em repouso (pausa no hover/focus), highlight `#6366f1` no hover, transição 300ms ease-out, `useReducedMotion()` → borda estática. Inspirado em Aceternity `HoverBorderGradient` mas com cor/timing/raio próprios do CRM + `focus-visible` + inner `bg-[#0f1629]`. Funciona com `overflow-hidden`. Ver `docs/components/crm-pipeline-border.md`.
 **Última atualização:** 2026-08-15 por Scribe (RM-2026-C4A90D)
+# PainelContatos (Alpha CRM)
+
+- **Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelContatos.tsx`
+- **Uso:** seção do card aberto para registrar e listar contatos (ligação, e-mail, reunião e WhatsApp), reutilizando `BpmInteracaoCard` sem schema paralelo.
+- **Integração:** renderizado por `PainelRegistrar`; atualiza a lista local do `CardFullViewModal` após a Server Action autenticada.

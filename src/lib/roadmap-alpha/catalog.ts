@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import db from "@/lib/prisma";
 import { MODULOS_REGISTRY, type ModuloRegistryItem } from "@/lib/modulos-registry";
 
 export interface RoadmapModuleSnapshot {
@@ -80,4 +81,49 @@ export function auditRoadmapModuleCatalog(
 
 export function getRoadmapModuleKeys(): ReadonlySet<string> {
   return new Set(getRoadmapModuleCatalog().map((module) => module.id));
+}
+
+/** Snapshot de RoadmapWorkspace ativos no mesmo formato de módulo do Roadmap. */
+export async function getRoadmapWorkspaceModules(): Promise<
+  RoadmapModuleSnapshot[]
+> {
+  const workspaces = await db.roadmapWorkspace.findMany({
+    where: { archivedAt: null },
+    select: { moduleKey: true, label: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return workspaces.map((workspace) => ({
+    id: workspace.moduleKey,
+    label: workspace.label,
+    href: `/PainelAlpha/Roadmap`,
+    category: "externo",
+    permission: null,
+  }));
+}
+
+/** Catálogo combinado: MODULOS_REGISTRY (estático) + RoadmapWorkspace ativos (dinâmico). */
+export async function getRoadmapModuleCatalogWithWorkspaces(): Promise<
+  RoadmapModuleSnapshot[]
+> {
+  const [internal, external] = await Promise.all([
+    getRoadmapModuleCatalog(),
+    getRoadmapWorkspaceModules(),
+  ]);
+  return [...internal, ...external];
+}
+
+/**
+ * Validação de moduleKey a ser usada em Server Actions, DEPOIS do parse Zod
+ * (que não valida mais isso — ver contracts.ts). Aceita tanto módulos
+ * internos (MODULOS_REGISTRY) quanto workspaces externos ativos.
+ */
+export async function isValidRoadmapModuleKey(
+  moduleKey: string,
+): Promise<boolean> {
+  if (getRoadmapModuleKeys().has(moduleKey)) return true;
+  const workspace = await db.roadmapWorkspace.findFirst({
+    where: { moduleKey, archivedAt: null },
+    select: { id: true },
+  });
+  return Boolean(workspace);
 }

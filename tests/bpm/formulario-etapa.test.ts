@@ -28,8 +28,8 @@ describe("CRM - formulário unificado por etapa", () => {
   it("coloca os controles nativos de cada etapa no formulário central", () => {
     expect(formulario).toContain("etapaEhFechado(card.etapa.nome)");
     expect(formulario).toContain("<PainelStatusPosFechamento");
-    expect(formulario).toContain("etapaExigeProximoContato(card.etapa.nome)");
     expect(formulario).toContain("<PainelProximoContato");
+    expect(formulario).not.toContain("etapaExigeProximoContato(card.etapa.nome)");
     expect(formulario).toContain("etapaEhEmTratativa(card.etapa.nome)");
     expect(formulario).toContain("<PainelChecklistFollowUp");
     expect(historico).not.toContain("<PainelStatusPosFechamento");

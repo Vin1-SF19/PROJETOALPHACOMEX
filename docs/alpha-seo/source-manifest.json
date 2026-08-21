@@ -1,0 +1,1273 @@
+{
+  "manifestVersion": 2,
+  "capturedOn": "2026-08-20",
+  "source": {
+    "label": "local-source/open-seo-main",
+    "basename": "open-seo-main",
+    "absolutePathRedacted": true,
+    "hashAlgorithm": "sha256",
+    "hash": "7d3953715995bfb80915a367e44072efd68f9fe56aa917985812935317fc7c8e",
+    "hashedFiles": 782
+  },
+  "counts": {
+    "routes": 47,
+    "serverFunctionFiles": 23,
+    "serverFunctionExports": 93,
+    "mcpRegisteredTools": 46,
+    "skills": 9,
+    "auditIssueIds": 27,
+    "tests": 133,
+    "functionalSchemas": 32,
+    "jobsAndCron": 7,
+    "exportsAndSettings": 15
+  },
+  "routes": [
+    {
+      "file": "src/routes/_app/route.tsx",
+      "name": "/_app"
+    },
+    {
+      "file": "src/routes/_app/index.tsx",
+      "name": "/_app/"
+    },
+    {
+      "file": "src/routes/_app/ai.tsx",
+      "name": "/_app/ai"
+    },
+    {
+      "file": "src/routes/_app/billing.tsx",
+      "name": "/_app/billing"
+    },
+    {
+      "file": "src/routes/_app/help/dataforseo-api-key.tsx",
+      "name": "/_app/help/dataforseo-api-key"
+    },
+    {
+      "file": "src/routes/_app/help/openrouter-api-key.tsx",
+      "name": "/_app/help/openrouter-api-key"
+    },
+    {
+      "file": "src/routes/_app/projects.tsx",
+      "name": "/_app/projects"
+    },
+    {
+      "file": "src/routes/_app/settings.tsx",
+      "name": "/_app/settings"
+    },
+    {
+      "file": "src/routes/_app/support.tsx",
+      "name": "/_app/support"
+    },
+    {
+      "file": "src/routes/_auth.tsx",
+      "name": "/_auth"
+    },
+    {
+      "file": "src/routes/_auth.sign-in.tsx",
+      "name": "/_auth/sign-in"
+    },
+    {
+      "file": "src/routes/_auth.sign-up.tsx",
+      "name": "/_auth/sign-up"
+    },
+    {
+      "file": "src/routes/_authenticated.tsx",
+      "name": "/_authenticated"
+    },
+    {
+      "file": "src/routes/_authenticated.oauth-consent.tsx",
+      "name": "/_authenticated/oauth-consent"
+    },
+    {
+      "file": "src/routes/_authenticated.onboarding.index.tsx",
+      "name": "/_authenticated/onboarding/"
+    },
+    {
+      "file": "src/routes/_authenticated.onboarding.chat.tsx",
+      "name": "/_authenticated/onboarding/chat"
+    },
+    {
+      "file": "src/routes/_authenticated.subscribe.tsx",
+      "name": "/_authenticated/subscribe"
+    },
+    {
+      "file": "src/routes/_project/route.tsx",
+      "name": "/_project"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/route.tsx",
+      "name": "/_project/p/$projectId"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/index.tsx",
+      "name": "/_project/p/$projectId/"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/audit.tsx",
+      "name": "/_project/p/$projectId/audit"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/audit/issues/$resultId.tsx",
+      "name": "/_project/p/$projectId/audit/issues/$resultId"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/backlinks.tsx",
+      "name": "/_project/p/$projectId/backlinks"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/brand-lookup.tsx",
+      "name": "/_project/p/$projectId/brand-lookup"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/domain.tsx",
+      "name": "/_project/p/$projectId/domain"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/keywords.tsx",
+      "name": "/_project/p/$projectId/keywords"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/prompt-explorer.tsx",
+      "name": "/_project/p/$projectId/prompt-explorer"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/rank-tracking.tsx",
+      "name": "/_project/p/$projectId/rank-tracking"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/rank-tracking/index.tsx",
+      "name": "/_project/p/$projectId/rank-tracking/"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/rank-tracking/$configId.tsx",
+      "name": "/_project/p/$projectId/rank-tracking/$configId"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/sam.tsx",
+      "name": "/_project/p/$projectId/sam"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/saved.tsx",
+      "name": "/_project/p/$projectId/saved"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/search-performance.tsx",
+      "name": "/_project/p/$projectId/search-performance"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/settings.tsx",
+      "name": "/_project/p/$projectId/settings"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/settings/index.tsx",
+      "name": "/_project/p/$projectId/settings/"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/settings/context.tsx",
+      "name": "/_project/p/$projectId/settings/context"
+    },
+    {
+      "file": "src/routes/_project/p/$projectId/settings/integrations.tsx",
+      "name": "/_project/p/$projectId/settings/integrations"
+    },
+    {
+      "file": "src/routes/[.well-known]/openai-apps-challenge.ts",
+      "name": "/.well-known/openai-apps-challenge"
+    },
+    {
+      "file": "src/routes/api/auth/$.ts",
+      "name": "/api/auth/$"
+    },
+    {
+      "file": "src/routes/api/autumn/$.ts",
+      "name": "/api/autumn/$"
+    },
+    {
+      "file": "src/routes/api/ga4/oauth/callback.ts",
+      "name": "/api/ga4/oauth/callback"
+    },
+    {
+      "file": "src/routes/api/gsc/oauth/callback.ts",
+      "name": "/api/gsc/oauth/callback"
+    },
+    {
+      "file": "src/routes/api/health.ts",
+      "name": "/api/health"
+    },
+    {
+      "file": "src/routes/forgot-password.tsx",
+      "name": "/forgot-password"
+    },
+    {
+      "file": "src/routes/reset-password.tsx",
+      "name": "/reset-password"
+    },
+    {
+      "file": "src/routes/verify-email.tsx",
+      "name": "/verify-email"
+    },
+    {
+      "file": "src/routes/__root.tsx",
+      "name": "<root-route>"
+    }
+  ],
+  "serverFunctions": [
+    {
+      "file": "src/serverFunctions/ahrefs.ts",
+      "exports": [
+        "getAhrefsDomainRatings"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/ai-search.ts",
+      "exports": [
+        "explorePrompt",
+        "lookupBrand"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/audit.ts",
+      "exports": [
+        "deleteAudit",
+        "getAuditHistory",
+        "getAuditResults",
+        "getAuditStatus",
+        "getCrawlProgress",
+        "startAudit"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/backlinks.ts",
+      "exports": [
+        "getBacklinksOverview",
+        "getBacklinksReferringDomains",
+        "getBacklinksRows",
+        "getBacklinksTopPages"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/billing.ts",
+      "exports": [
+        "getBillingUsageEvents"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/config.ts",
+      "exports": [
+        "getSeoApiKeyStatus"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/dashboard.ts",
+      "exports": [
+        "dismissDashboardGa4Card",
+        "dismissDashboardMcpCard",
+        "getDashboardActivation",
+        "getDashboardOverview",
+        "markDashboardCompetitorClicked",
+        "refreshDashboardBacklinkSnapshot"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/domain.ts",
+      "exports": [
+        "getDomainKeywordSuggestions",
+        "getDomainKeywordsPage",
+        "getDomainOverview",
+        "getDomainPagesPage"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/ga4.ts",
+      "exports": [
+        "disconnectGa4",
+        "getGa4Connection",
+        "getGa4DashboardReport",
+        "listGa4Properties",
+        "setGa4Property",
+        "startSelfHostedGa4Link"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/gsc.ts",
+      "exports": [
+        "disconnectGsc",
+        "getGscConnection",
+        "getGscGrantStatus",
+        "listGscSites",
+        "setGscSite",
+        "startSelfHostedGscLink"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/keywords.ts",
+      "exports": [
+        "deleteSavedKeywordTag",
+        "exportSavedKeywords",
+        "getSavedKeywords",
+        "getSerpAnalysis",
+        "refreshSavedKeywordMetrics",
+        "removeSavedKeywords",
+        "researchKeywords",
+        "saveKeywords",
+        "updateSavedKeywordTag",
+        "updateSavedKeywordTags"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/lighthouse.ts",
+      "exports": [
+        "exportAuditLighthouseIssues",
+        "getAuditLighthouseIssues"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/middleware.ts",
+      "exports": [
+        "globalServerFunctionMiddleware",
+        "requireAuthenticatedContext",
+        "requireProjectContext"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/onboarding.ts",
+      "exports": [
+        "dismissGscNudge",
+        "getOnboardingAnswers",
+        "saveOnboardingAnswers"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/onboardingChat.ts",
+      "exports": [
+        "getOnboardingChatState",
+        "saveOnboardingSite"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/projectContext.ts",
+      "exports": [
+        "getProjectContext",
+        "updateProjectContext"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/projects.ts",
+      "exports": [
+        "archiveProject",
+        "createProject",
+        "getArchivedProjects",
+        "getProjectAccess",
+        "getProjects",
+        "restoreProject",
+        "setProjectDomain",
+        "setProjectMarket",
+        "updateProject"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/rank-tracking.ts",
+      "exports": [
+        "addTrackingKeywords",
+        "createRankTrackingConfig",
+        "estimateRankCheckCost",
+        "getLatestRankResults",
+        "getLatestRankRun",
+        "getRankConfigTrend",
+        "getRankKeywordHistory",
+        "getRankPositionMatrix",
+        "getRankTrackingConfigSummaries",
+        "getRankTrackingConfigs",
+        "refreshTrackingKeywordMetrics",
+        "removeTrackingKeywords",
+        "triggerRankCheck",
+        "updateRankTrackingConfig"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/sam.ts",
+      "exports": [
+        "archiveSamSession",
+        "createSamSession",
+        "listSamSessions"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/samAccess.ts",
+      "exports": [
+        "getSamAccessSetupStatus"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/searchPerformance.ts",
+      "exports": [
+        "exportSearchPerformanceTable",
+        "getSearchPerformanceReport",
+        "getSearchPerformanceTable"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/serp-locations.ts",
+      "exports": [
+        "prewarmSerpLocations",
+        "searchSerpLocations"
+      ]
+    },
+    {
+      "file": "src/serverFunctions/workspace.ts",
+      "exports": [
+        "getWorkspaceMergeStatus",
+        "mergeLegacyWorkspaces"
+      ]
+    }
+  ],
+  "mcp": {
+    "registeredTools": [
+      {
+        "symbol": "whoamiTool",
+        "name": "whoami",
+        "file": "src/server/mcp/tools/whoami.ts"
+      },
+      {
+        "symbol": "listProjectsTool",
+        "name": "list_projects",
+        "file": "src/server/mcp/tools/list-projects.ts"
+      },
+      {
+        "symbol": "createProjectTool",
+        "name": "create_project",
+        "file": "src/server/mcp/tools/create-project.ts"
+      },
+      {
+        "symbol": "getProjectContextTool",
+        "name": "get_project_context",
+        "file": "src/server/mcp/tools/project-context.ts"
+      },
+      {
+        "symbol": "updateProjectContextTool",
+        "name": "update_project_context",
+        "file": "src/server/mcp/tools/project-context.ts"
+      },
+      {
+        "symbol": "listSavedKeywordsTool",
+        "name": "list_saved_keywords",
+        "file": "src/server/mcp/tools/list-saved-keywords.ts"
+      },
+      {
+        "symbol": "researchKeywordsTool",
+        "name": "research_keywords",
+        "file": "src/server/mcp/tools/research-keywords.ts"
+      },
+      {
+        "symbol": "saveKeywordsTool",
+        "name": "save_keywords",
+        "file": "src/server/mcp/tools/save-keywords.ts"
+      },
+      {
+        "symbol": "getDomainOverviewTool",
+        "name": "get_domain_overview",
+        "file": "src/server/mcp/tools/get-domain-overview.ts"
+      },
+      {
+        "symbol": "getDomainKeywordSuggestionsTool",
+        "name": "get_domain_keyword_suggestions",
+        "file": "src/server/mcp/tools/get-domain-keyword-suggestions.ts"
+      },
+      {
+        "symbol": "getBacklinksOverviewTool",
+        "name": "get_backlinks_overview",
+        "file": "src/server/mcp/tools/get-backlinks-overview.ts"
+      },
+      {
+        "symbol": "getBacklinksProfileTool",
+        "name": "get_backlinks_profile",
+        "file": "src/server/mcp/tools/get-backlinks-profile.ts"
+      },
+      {
+        "symbol": "getSerpResultsTool",
+        "name": "get_serp_results",
+        "file": "src/server/mcp/tools/get-serp-results.ts"
+      },
+      {
+        "symbol": "createRankTrackerTool",
+        "name": "create_rank_tracker",
+        "file": "src/server/mcp/tools/create-rank-tracker.ts"
+      },
+      {
+        "symbol": "getRankTrackerTool",
+        "name": "get_rank_tracker",
+        "file": "src/server/mcp/tools/get-rank-tracker.ts"
+      },
+      {
+        "symbol": "addRankTrackingKeywordsTool",
+        "name": "add_rank_tracking_keywords",
+        "file": "src/server/mcp/tools/add-rank-tracking-keywords.ts"
+      },
+      {
+        "symbol": "removeRankTrackingKeywordsTool",
+        "name": "remove_rank_tracking_keywords",
+        "file": "src/server/mcp/tools/remove-rank-tracking-keywords.ts"
+      },
+      {
+        "symbol": "estimateRankTrackerCostTool",
+        "name": "estimate_rank_tracker_cost",
+        "file": "src/server/mcp/tools/estimate-rank-tracker-cost.ts"
+      },
+      {
+        "symbol": "runRankTrackerTool",
+        "name": "run_rank_tracker",
+        "file": "src/server/mcp/tools/run-rank-tracker.ts"
+      },
+      {
+        "symbol": "getRankedKeywordsTool",
+        "name": "get_ranked_keywords",
+        "file": "src/server/mcp/tools/dataforseo-research-tools.ts"
+      },
+      {
+        "symbol": "findSerpCompetitorsTool",
+        "name": "find_serp_competitors",
+        "file": "src/server/mcp/tools/dataforseo-research-tools.ts"
+      },
+      {
+        "symbol": "searchLocalBusinessesTool",
+        "name": "search_local_businesses",
+        "file": "src/server/mcp/tools/dataforseo-research-tools.ts"
+      },
+      {
+        "symbol": "getLocalSerpResultsTool",
+        "name": "get_local_serp_results",
+        "file": "src/server/mcp/tools/dataforseo-research-tools.ts"
+      },
+      {
+        "symbol": "getGoogleBusinessQuestionsTool",
+        "name": "get_google_business_questions",
+        "file": "src/server/mcp/tools/dataforseo-research-tools.ts"
+      },
+      {
+        "symbol": "getBusinessProfileTool",
+        "name": "get_business_profile",
+        "file": "src/server/mcp/tools/local-seo-tools.ts"
+      },
+      {
+        "symbol": "getBusinessReviewsTool",
+        "name": "get_business_reviews",
+        "file": "src/server/mcp/tools/local-seo-tools.ts"
+      },
+      {
+        "symbol": "getBusinessUpdatesTool",
+        "name": "get_business_updates",
+        "file": "src/server/mcp/tools/local-seo-tools.ts"
+      },
+      {
+        "symbol": "listBusinessCategoriesTool",
+        "name": "list_business_categories",
+        "file": "src/server/mcp/tools/local-seo-tools.ts"
+      },
+      {
+        "symbol": "getLocalRankGridTool",
+        "name": "get_local_rank_grid",
+        "file": "src/server/mcp/tools/local-seo-tools.ts"
+      },
+      {
+        "symbol": "getKeywordMetricsTool",
+        "name": "get_keyword_metrics",
+        "file": "src/server/mcp/tools/dataforseo-research-tools.ts"
+      },
+      {
+        "symbol": "getSearchConsolePerformanceTool",
+        "name": "get_search_console_performance",
+        "file": "src/server/mcp/tools/search-console-tools.ts"
+      },
+      {
+        "symbol": "inspectUrlsTool",
+        "name": "inspect_urls",
+        "file": "src/server/mcp/tools/search-console-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsOrganicLandingPagesTool",
+        "name": "get_google_analytics_organic_landing_pages",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsPagePerformanceTool",
+        "name": "get_google_analytics_page_performance",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsKeyEventsTool",
+        "name": "get_google_analytics_key_events",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getSearchOpportunitiesTool",
+        "name": "get_search_opportunities",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsOrganicOverviewTool",
+        "name": "get_google_analytics_organic_overview",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsTrafficAcquisitionTool",
+        "name": "get_google_analytics_traffic_acquisition",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsMeasurementHealthTool",
+        "name": "get_google_analytics_measurement_health",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsEcommercePerformanceTool",
+        "name": "get_google_analytics_ecommerce_performance",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsSiteSearchTool",
+        "name": "get_google_analytics_site_search",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "getGoogleAnalyticsAudienceBreakdownTool",
+        "name": "get_google_analytics_audience_breakdown",
+        "file": "src/server/mcp/tools/google-analytics-tools.ts"
+      },
+      {
+        "symbol": "runSiteAuditTool",
+        "name": "run_site_audit",
+        "file": "src/server/mcp/tools/site-audit-tools.ts"
+      },
+      {
+        "symbol": "getAuditStatusTool",
+        "name": "get_audit_status",
+        "file": "src/server/mcp/tools/site-audit-tools.ts"
+      },
+      {
+        "symbol": "getAuditIssuesTool",
+        "name": "get_audit_issues",
+        "file": "src/server/mcp/tools/site-audit-tools.ts"
+      },
+      {
+        "symbol": "getAuditPagesTool",
+        "name": "get_audit_pages",
+        "file": "src/server/mcp/tools/site-audit-tools.ts"
+      }
+    ],
+    "reconciliation": {
+      "source": 46,
+      "ported": 46,
+      "missing": [],
+      "unexpected": [],
+      "parity": "46/46",
+      "status": "source-authoritative-pass",
+      "historicalClaim": 48,
+      "historicalUnnamedGap": 2,
+      "historicalGapBlocking": false,
+      "note": "All 46 named registrations from the executable source registry are present. The historical unnamed 48−46 gap is informational only."
+    }
+  },
+  "skills": [
+    {
+      "file": "plugins/openseo/skills/competitive-landscape/SKILL.md",
+      "name": "competitive-landscape"
+    },
+    {
+      "file": "plugins/openseo/skills/competitor-analysis/SKILL.md",
+      "name": "competitor-analysis"
+    },
+    {
+      "file": "plugins/openseo/skills/keyword-clustering/SKILL.md",
+      "name": "keyword-clustering"
+    },
+    {
+      "file": "plugins/openseo/skills/keyword-research/SKILL.md",
+      "name": "keyword-research"
+    },
+    {
+      "file": "plugins/openseo/skills/link-prospecting/SKILL.md",
+      "name": "link-prospecting"
+    },
+    {
+      "file": "plugins/openseo/skills/local-seo/SKILL.md",
+      "name": "local-seo"
+    },
+    {
+      "file": "plugins/openseo/skills/seo-audit/SKILL.md",
+      "name": "seo-audit"
+    },
+    {
+      "file": "plugins/openseo/skills/seo-coach/SKILL.md",
+      "name": "seo-coach"
+    },
+    {
+      "file": "plugins/openseo/skills/seo-project-setup/SKILL.md",
+      "name": "seo-project-setup"
+    }
+  ],
+  "skillReconciliation": {
+    "scoutClaim": 8,
+    "actual": 9,
+    "status": "source-registry-authoritative"
+  },
+  "auditIssueIds": [
+    "blocked-page",
+    "broken-internal-link",
+    "broken-page",
+    "canonical-conflict",
+    "canonicalized-page",
+    "deep-page",
+    "duplicate-content",
+    "duplicate-meta-description",
+    "duplicate-title",
+    "heading-order-skip",
+    "images-missing-alt",
+    "meta-description-too-long",
+    "meta-description-too-short",
+    "missing-h1",
+    "missing-meta-description",
+    "missing-title",
+    "multiple-h1",
+    "no-outgoing-links",
+    "noindex-page",
+    "orphan-page",
+    "redirect-chain",
+    "redirect-loop",
+    "server-error",
+    "slow-response",
+    "thin-content",
+    "title-too-long",
+    "title-too-short"
+  ],
+  "auditIssueReconciliation": {
+    "scoutClaim": 26,
+    "actual": 27,
+    "status": "source-registry-authoritative"
+  },
+  "jobsAndCron": [
+    {
+      "name": "purgeExpiredData",
+      "file": "src/server.ts"
+    },
+    {
+      "name": "rank-check-workflow:RankCheckWorkflow",
+      "file": "wrangler.jsonc"
+    },
+    {
+      "name": "reconcileStaleAudits",
+      "file": "src/server.ts"
+    },
+    {
+      "name": "runScheduledRankChecks",
+      "file": "src/server.ts"
+    },
+    {
+      "name": "scheduled-handler:*/5 * * * *",
+      "schedule": "*/5 * * * *",
+      "file": "src/server.ts"
+    },
+    {
+      "name": "scheduled-handler:17 3 * * *",
+      "schedule": "17 3 * * *",
+      "file": "src/server.ts"
+    },
+    {
+      "name": "site-audit-workflow:SiteAuditWorkflow",
+      "file": "wrangler.jsonc"
+    }
+  ],
+  "functionalSchemas": [
+    {
+      "file": "src/db/app.schema.ts",
+      "exports": [
+        "backlinkSnapshots",
+        "keywordMetrics",
+        "organizationActivationState",
+        "projectActivationState",
+        "projects",
+        "rankCheckRuns",
+        "rankSnapshots",
+        "rankTrackingConfigs",
+        "rankTrackingKeywords",
+        "savedKeywordTagAssignments",
+        "savedKeywordTags",
+        "savedKeywords",
+        "userOnboardingAnswers"
+      ]
+    },
+    {
+      "file": "src/db/audit.schema.ts",
+      "exports": [
+        "auditIssues",
+        "auditLighthouseResults",
+        "auditPages",
+        "audits"
+      ]
+    },
+    {
+      "file": "src/db/better-auth-schema.ts",
+      "exports": [
+        "account",
+        "accountRelations",
+        "apikey",
+        "invitation",
+        "invitationRelations",
+        "member",
+        "memberRelations",
+        "organization",
+        "organizationRelations",
+        "session",
+        "sessionRelations",
+        "user",
+        "userRelations",
+        "verification"
+      ]
+    },
+    {
+      "file": "src/db/billing.schema.ts",
+      "exports": [
+        "billingCustomerStatus"
+      ]
+    },
+    {
+      "file": "src/db/d1/schema.ts",
+      "exports": []
+    },
+    {
+      "file": "src/db/ga4.schema.ts",
+      "exports": [
+        "ga4Connections"
+      ]
+    },
+    {
+      "file": "src/db/gsc.schema.ts",
+      "exports": [
+        "gscConnections"
+      ]
+    },
+    {
+      "file": "src/db/pg/app.schema.ts",
+      "exports": [
+        "backlinkSnapshots",
+        "keywordMetrics",
+        "organizationActivationState",
+        "projectActivationState",
+        "projects",
+        "rankCheckRuns",
+        "rankSnapshots",
+        "rankTrackingConfigs",
+        "rankTrackingKeywords",
+        "savedKeywordTagAssignments",
+        "savedKeywordTags",
+        "savedKeywords",
+        "userOnboardingAnswers"
+      ]
+    },
+    {
+      "file": "src/db/pg/audit.schema.ts",
+      "exports": [
+        "auditIssues",
+        "auditLighthouseResults",
+        "auditPages",
+        "audits"
+      ]
+    },
+    {
+      "file": "src/db/pg/better-auth-schema.ts",
+      "exports": [
+        "account",
+        "accountRelations",
+        "apikey",
+        "invitation",
+        "invitationRelations",
+        "member",
+        "memberRelations",
+        "organization",
+        "organizationRelations",
+        "session",
+        "sessionRelations",
+        "user",
+        "userRelations",
+        "verification"
+      ]
+    },
+    {
+      "file": "src/db/pg/billing.schema.ts",
+      "exports": [
+        "billingCustomerStatus"
+      ]
+    },
+    {
+      "file": "src/db/pg/ga4.schema.ts",
+      "exports": [
+        "ga4Connections"
+      ]
+    },
+    {
+      "file": "src/db/pg/gsc.schema.ts",
+      "exports": [
+        "gscConnections"
+      ]
+    },
+    {
+      "file": "src/db/pg/project-context.schema.ts",
+      "exports": [
+        "projectCompetitors",
+        "projectContextSections",
+        "projectKeyPages",
+        "projectResearchLog"
+      ]
+    },
+    {
+      "file": "src/db/pg/sam.schema.ts",
+      "exports": [
+        "samSessions"
+      ]
+    },
+    {
+      "file": "src/db/pg/schema.ts",
+      "exports": []
+    },
+    {
+      "file": "src/db/pg/telemetry.schema.ts",
+      "exports": [
+        "telemetryState"
+      ]
+    },
+    {
+      "file": "src/db/project-context.schema.ts",
+      "exports": [
+        "projectCompetitors",
+        "projectContextSections",
+        "projectKeyPages",
+        "projectResearchLog"
+      ]
+    },
+    {
+      "file": "src/db/sam.schema.ts",
+      "exports": [
+        "samSessions"
+      ]
+    },
+    {
+      "file": "src/db/schema.ts",
+      "exports": []
+    },
+    {
+      "file": "src/db/telemetry.schema.ts",
+      "exports": [
+        "telemetryState"
+      ]
+    },
+    {
+      "file": "src/types/schemas/ai-search.ts",
+      "exports": [
+        "brandLookupInputSchema",
+        "brandLookupResultSchema",
+        "brandLookupSearchSchema",
+        "promptExplorerInputSchema",
+        "promptExplorerModelResultSchema",
+        "promptExplorerModelSchema",
+        "promptExplorerResultSchema",
+        "promptExplorerSearchSchema",
+        "webSearchCountryCodeSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/audit.ts",
+      "exports": [
+        "auditSearchSchema",
+        "deleteAuditSchema",
+        "getAuditHistorySchema",
+        "getAuditResultsSchema",
+        "getAuditStatusSchema",
+        "getCrawlProgressSchema",
+        "startAuditSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/backlinks.ts",
+      "exports": [
+        "backlinksLookupSchema",
+        "backlinksOverviewInputSchema",
+        "backlinksRowsFiltersSchema",
+        "backlinksRowsModeSchema",
+        "backlinksRowsPageRequestSchema",
+        "backlinksRowsSortFieldSchema",
+        "backlinksScopeParamSchema",
+        "backlinksScopeWithLegacySchema",
+        "backlinksSearchSchema",
+        "backlinksSortOrderSchema",
+        "backlinksTabSchema",
+        "referringDomainsFiltersSchema",
+        "referringDomainsPageRequestSchema",
+        "referringDomainsSortFieldSchema",
+        "topPagesFiltersSchema",
+        "topPagesPageRequestSchema",
+        "topPagesSortFieldSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/dashboard.ts",
+      "exports": [
+        "dashboardHeroStepSchema",
+        "dashboardProjectInputSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/domain.ts",
+      "exports": [
+        "booleanSearchParamSchema",
+        "domainKeywordSuggestionsSchema",
+        "domainKeywordsPageRequestSchema",
+        "domainOverviewSchema",
+        "domainPagesPageRequestSchema",
+        "domainSearchSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/keywords.ts",
+      "exports": [
+        "deleteSavedKeywordTagSchema",
+        "exportSavedKeywordsSchema",
+        "getSavedKeywordsSchema",
+        "keywordsSearchSchema",
+        "refreshSavedKeywordMetricsSchema",
+        "removeSavedKeywordsSchema",
+        "researchKeywordsSchema",
+        "saveKeywordsSchema",
+        "savedKeywordMetricSchema",
+        "serpAnalysisSchema",
+        "updateSavedKeywordTagSchema",
+        "updateSavedKeywordTagsSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/lighthouse.ts",
+      "exports": [
+        "lighthouseAuditExportSchema",
+        "lighthouseAuditIssueSchema",
+        "lighthouseIssuesSearchSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/projectContext.ts",
+      "exports": [
+        "getProjectContextSchema",
+        "updateProjectContextSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/projects.ts",
+      "exports": [
+        "archiveProjectSchema",
+        "createProjectSchema",
+        "restoreProjectSchema",
+        "setProjectDomainSchema",
+        "setProjectMarketSchema",
+        "updateProjectSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/rank-tracking.ts",
+      "exports": [
+        "addKeywordsSchema",
+        "comparePeriodSchema",
+        "createConfigSchema",
+        "estimateCostSchema",
+        "getConfigTrendSchema",
+        "getConfigsSchema",
+        "getKeywordHistorySchema",
+        "getLatestResultsSchema",
+        "getLatestRunSchema",
+        "getPositionMatrixSchema",
+        "refreshMetricsSchema",
+        "removeKeywordsSchema",
+        "triggerCheckSchema",
+        "updateConfigSchema"
+      ]
+    },
+    {
+      "file": "src/types/schemas/search-performance.ts",
+      "exports": [
+        "searchPerformanceInputSchema",
+        "searchPerformanceTableExportInputSchema",
+        "searchPerformanceTableInputSchema"
+      ]
+    }
+  ],
+  "tests": [
+    "src/client/components/table/url.test.ts",
+    "src/client/features/backlinks/BacklinksPageStates.test.ts",
+    "src/client/features/backlinks/backlinksPageUtils.test.ts",
+    "src/client/features/backlinks/export.test.ts",
+    "src/client/features/billing/BillingFeatureBreakdown.test.ts",
+    "src/client/features/billing/HostedBillingContentUtils.test.ts",
+    "src/client/features/billing/plan-detection.test.ts",
+    "src/client/features/billing/route-state.test.ts",
+    "src/client/features/domain/domainRouteState.test.ts",
+    "src/client/features/keywords/hooks/useKeywordFiltering.test.ts",
+    "src/client/features/keywords/hooks/useKeywordResearchData.test.ts",
+    "src/client/features/keywords/hooks/useLocalKeywordFilters.test.ts",
+    "src/client/features/rank-tracking/RankTrackingFilters.test.ts",
+    "src/client/features/rank-tracking/rankTrackingScorecards.test.ts",
+    "src/client/features/rank-tracking/tableSelection.test.ts",
+    "src/client/features/search-tabs/useSearchTabs.test.ts",
+    "src/client/lib/clipboard.test.ts",
+    "src/client/lib/csv.test.ts",
+    "src/client/lib/error-messages.test.ts",
+    "src/client/lib/posthog-sanitize.test.ts",
+    "src/db/pg/retry.test.ts",
+    "src/db/schema-parity.test.ts",
+    "src/lib/auth-redirect.test.ts",
+    "src/lib/auth-turnstile.test.ts",
+    "src/lib/selfhost-preflight.test.ts",
+    "src/middleware/ensure-user/accessTokenErrors.test.ts",
+    "src/server/auth/workspace-merge.test.ts",
+    "src/server/billing/customer-status-model.test.ts",
+    "src/server/billing/loops-contact-properties.test.ts",
+    "src/server/billing/subscription.test.ts",
+    "src/server/billing/svix.test.ts",
+    "src/server/features/ai-search/safeUrl.test.ts",
+    "src/server/features/ai-search/services/brandLookup.test.ts",
+    "src/server/features/ai-search/services/brandLookupShaping.test.ts",
+    "src/server/features/ai-search/services/citedSources.test.ts",
+    "src/server/features/ai-search/services/promptExplorer.test.ts",
+    "src/server/features/ai-search/services/shareOfVoice.test.ts",
+    "src/server/features/audit/services/AuditService.limitTier.test.ts",
+    "src/server/features/audit/services/audit-capacity.test.ts",
+    "src/server/features/backlinks/services/BacklinksService.billing.test.ts",
+    "src/server/features/backlinks/services/backlinksApiFilters.test.ts",
+    "src/server/features/domain/services/domainKeywordFilters.test.ts",
+    "src/server/features/domain/services/pagination.test.ts",
+    "src/server/features/ga4/repositories/Ga4ConnectionRepository.test.ts",
+    "src/server/features/ga4/services/Ga4MeasurementHealthService.test.ts",
+    "src/server/features/ga4/services/Ga4OrganicOverviewService.test.ts",
+    "src/server/features/ga4/services/Ga4ReportEnhancements.test.ts",
+    "src/server/features/ga4/services/Ga4ReportingService.comparison.test.ts",
+    "src/server/features/ga4/services/Ga4ReportingService.test.ts",
+    "src/server/features/ga4/services/Ga4Service.test.ts",
+    "src/server/features/ga4/services/SearchOpportunityService.test.ts",
+    "src/server/features/google/selfHostedOAuth.test.ts",
+    "src/server/features/gsc/searchAnalytics.test.ts",
+    "src/server/features/gsc/searchPerformanceReport.test.ts",
+    "src/server/features/gsc/services/GscService.test.ts",
+    "src/server/features/keywords/services/research/research-data.test.ts",
+    "src/server/features/keywords/services/research/saved-keywords.test.ts",
+    "src/server/features/lighthouse/services/lighthouse-export.test.ts",
+    "src/server/features/project-context/repositories/ProjectContextRepository.query.test.ts",
+    "src/server/features/project-context/services/ProjectContextService.test.ts",
+    "src/server/features/projects/services/projects.test.ts",
+    "src/server/features/rank-tracking/repositories/RankTrackingRepository.query.test.ts",
+    "src/server/features/rank-tracking/repositories/snapshotQueries.test.ts",
+    "src/server/features/rank-tracking/services/RankTrackingService.management.test.ts",
+    "src/server/features/rank-tracking/services/RankTrackingService.test.ts",
+    "src/server/features/rank-tracking/services/rankCheckRunGuards.test.ts",
+    "src/server/features/rank-tracking/services/rankTrackingResults.test.ts",
+    "src/server/features/rank-tracking/services/scheduledRankChecks.test.ts",
+    "src/server/features/sam/samChatTools.test.ts",
+    "src/server/features/sam/samSkills.test.ts",
+    "src/server/lib/audit/crawl-window.test.ts",
+    "src/server/lib/audit/issues/page-reporters.test.ts",
+    "src/server/lib/audit/lighthouse.test.ts",
+    "src/server/lib/audit/page-analyzer.test.ts",
+    "src/server/lib/audit/url-policy.test.ts",
+    "src/server/lib/audit/url-utils.test.ts",
+    "src/server/lib/dataforseo/backlinks.test.ts",
+    "src/server/lib/dataforseo/business.test.ts",
+    "src/server/lib/dataforseo/client.test.ts",
+    "src/server/lib/dataforseo/core.test.ts",
+    "src/server/lib/dataforseo/endpoints.test.ts",
+    "src/server/lib/dataforseo/envelope.test.ts",
+    "src/server/lib/dataforseo/keyword-metrics.test.ts",
+    "src/server/lib/dataforseo/lighthouse.test.ts",
+    "src/server/lib/dataforseo/researchScopeFilters.test.ts",
+    "src/server/lib/dataforseo/serp.test.ts",
+    "src/server/lib/dataforseoBillingClassification.test.ts",
+    "src/server/lib/dataforseoLighthousePayload.test.ts",
+    "src/server/lib/domainUtils.test.ts",
+    "src/server/lib/errors.test.ts",
+    "src/server/lib/ga4Client.test.ts",
+    "src/server/lib/gscClient.test.ts",
+    "src/server/lib/lighthouseStoredPayload.test.ts",
+    "src/server/lib/scrape.test.ts",
+    "src/server/lib/self-host-telemetry.test.ts",
+    "src/server/mcp/api-key-auth.test.ts",
+    "src/server/mcp/context.test.ts",
+    "src/server/mcp/formatters.test.ts",
+    "src/server/mcp/instrumentation.test.ts",
+    "src/server/mcp/oauth-provider.test.ts",
+    "src/server/mcp/oauth-refresh.e2e.test.ts",
+    "src/server/mcp/oauth-registration.test.ts",
+    "src/server/mcp/project-auth.test.ts",
+    "src/server/mcp/public-origin.test.ts",
+    "src/server/mcp/table.test.ts",
+    "src/server/mcp/tools/create-project.test.ts",
+    "src/server/mcp/tools/dataforseo-research-tools.google-ads.test.ts",
+    "src/server/mcp/tools/dataforseo-research-tools.market.test.ts",
+    "src/server/mcp/tools/dataforseo-research-tools.test.ts",
+    "src/server/mcp/tools/google-analytics-tools.test.ts",
+    "src/server/mcp/tools/local-seo-tools.test.ts",
+    "src/server/mcp/tools/output-schema-validation.test.ts",
+    "src/server/mcp/tools/project-context.test.ts",
+    "src/server/mcp/tools/rank-tracking-management-tools.test.ts",
+    "src/server/mcp/tools/saved-keywords-tools.test.ts",
+    "src/server/mcp/tools/search-console-tools.test.ts",
+    "src/server/mcp/tools/tool-text-output.test.ts",
+    "src/server/mcp/transport-v2.test.ts",
+    "src/server/mcp/transport.test.ts",
+    "src/server/workflows/RankCheckWorkflow.test.ts",
+    "src/server/workflows/siteAuditWorkflowPhases.test.ts",
+    "src/shared/error-codes.test.ts",
+    "src/shared/gdpr-erasure.test.ts",
+    "src/shared/json.test.ts",
+    "src/shared/keyword-locations.test.ts",
+    "src/shared/keyword-locations.vendor-defaults.test.ts",
+    "src/shared/rank-tracking.test.ts",
+    "src/shared/researchScope.test.ts",
+    "src/shared/saved-keyword-tags.test.ts",
+    "src/shared/selfhost-checks.test.ts",
+    "src/shared/targetDetection.test.ts",
+    "src/types/schemas/projects.test.ts",
+    "src/types/schemas/search-params.test.ts"
+  ],
+  "exportsAndSettings": [
+    "src/client/components/table/ExportToSheetsButton.tsx",
+    "src/client/components/table/ExportToSheetsModal.tsx",
+    "src/client/features/ai-search/components/brandLookupExport.ts",
+    "src/client/features/audit/results/export.ts",
+    "src/client/features/backlinks/export.test.ts",
+    "src/client/features/backlinks/export.ts",
+    "src/client/features/projects/ProjectGeneralSettings.tsx",
+    "src/client/features/saved-keywords/useSavedKeywordsExport.ts",
+    "src/client/features/settings/ApiKeySettings.tsx",
+    "src/client/lib/exportToSheets.ts",
+    "src/routes/_app/settings.tsx",
+    "src/routes/_project/p/$projectId/settings.tsx",
+    "src/routes/_project/p/$projectId/settings/context.tsx",
+    "src/routes/_project/p/$projectId/settings/index.tsx",
+    "src/routes/_project/p/$projectId/settings/integrations.tsx"
+  ],
+  "exclusions": [
+    {
+      "category": "independent-auth-and-workspaces",
+      "disposition": "infra-substituted",
+      "reason": "NextAuth v5 and project-scoped Alpha authorization replace Better Auth organization hosting."
+    },
+    {
+      "category": "hosted-billing-and-checkout",
+      "disposition": "infra-substituted",
+      "reason": "Internal cost estimation and approval replace hosted checkout and plan gates."
+    },
+    {
+      "category": "cloudflare-deployment",
+      "disposition": "infra-substituted",
+      "reason": "Painel Alpha runtime, jobs, cache and locks replace Cloudflare-specific hosting."
+    },
+    {
+      "category": "marketing-pricing-support-release-pages",
+      "disposition": "explicitly-non-seo",
+      "reason": "Product marketing and release surfaces are not internal SEO capabilities."
+    }
+  ]
+}

@@ -1,0 +1,4569 @@
+// CANDIDATO ISOLADO — NÃO APLICAR / NÃO USAR COMO DATASOURCE DE RUNTIME.
+// Snapshot-base: prisma/schema.prisma SHA-256
+// 402cf0930bb4299871dc2f0d343e380e92c26f5303b5c52839b54dbf19ae8da0
+// Capturado em 2026-08-20. O schema real usa SQLite/Turso e usuarios.id Int.
+// Qualquer promoção exige Vault + backup verificado <=48h + consentimento explícito.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.alpha-seo-draft-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("ALPHA_SEO_DRAFT_DATABASE_URL")
+}
+
+model usuarios {
+  id                 Int                @id @default(autoincrement())
+  nome               String
+  usuario            String             @unique
+  email              String             @unique
+  senha              String
+  role               String             @default("User")
+  permissoes         String?
+  chamados_criados   chamados[]         @relation("Solicitante")
+  mensagens          MensagensChamado[]
+  Auditoria          Auditoria[]
+  imagemUrl          String?
+  esconderBloqueados Boolean            @default(false)
+  ultimo_aviso       String?
+
+  atalhos          String? @default("radar,chamados")
+  tema_interface   String? @default("blue")
+  densidade_painel String? @default("default")
+  bibble_ativo     Boolean @default(true)
+
+  // Onboarding: vídeo obrigatório de introdução ao IAlpha (some após marcar visto)
+  onboarding_ialpha_visto    Boolean @default(false)
+  // Onboarding: tour guiado do módulo Alpha Blueprint (some após marcar visto, botão "? Ajuda" reabre)
+  onboarding_blueprint_visto Boolean @default(false)
+
+  cargo            String?
+  data_contratacao String?
+  status           String  @default("ATIVO")
+
+  cpf                  String?
+  data_nascimento      String?
+  telefone             String?
+  telefone_corporativo String?
+  contato_emerg_1_nome String?
+  contato_emerg_1_tel  String?
+  contato_emerg_2_nome String?
+  contato_emerg_2_tel  String?
+  observacoes_internas String?
+
+  meta_visivel_painel Boolean @default(true)
+
+  contratosColaborador ContratoColaborador[]
+  checklistDocumental  ChecklistDocumental?
+
+  reset_token   String?
+  reset_expires DateTime?
+
+  // Token (PAT) individual do usuário no Onyx. Opcional: quando preenchido, as
+  // chamadas ao Onyx usam este token (identidade real do usuário); quando NULL,
+  // cai no PAT de serviço (ONYX_API_KEY). NUNCA expor ao cliente nem logar.
+  token_onyx String?
+
+  mensagensEnviadas  mensagens[] @relation("Enviadas")
+  mensagensRecebidas mensagens[] @relation("Recebidas")
+
+  tarefas Tarefa[]
+
+  conversasP1 conversas[] @relation("ConversaP1")
+  conversasP2 conversas[] @relation("ConversaP2")
+
+  presets          Preset[]         @relation("PresetTousuarios")
+  progressosVideos ProgressoVideo[]
+  resultadosProvas ResultadoProva[]
+
+  holeritesColaborador Holerite[]                 @relation("HoleriteColaborador")
+  holeriteUploads      Holerite[]                 @relation("HoleriteUploader")
+  popAcessos           PopAcesso[]                @relation("PopAcessoUsuario")
+  permissaoOverrides   UsuarioPermissaoOverride[]
+  contratosComerciais  ContratoComercial[]        @relation("ContratosComerciais")
+  holeriteAlertas      HoleriteAlertaHistorico[]
+
+  senhaTemporaria  Boolean   @default(false)
+  primeiroAcessoEm DateTime?
+
+  bibbleSessions BibbleSession[]
+  bibbleProjects BibbleProject[]
+
+  onyxAgents         OnyxAgentOwner[]
+  onyxAgentesFixados OnyxAgenteFixado[]
+
+  historicoAlteracoesCliente HistoricoAlteracaoCliente[]
+  clienteServicoHistoricos   ClienteServicoHistorico[]   @relation("ClienteServicoHistoricoUsuario")
+
+  parceirosCriados        Parceiro[]
+  indicacoesCriadas       Indicacao[]       @relation("IndicacaoAutor")
+  parceiroAcessos         ParceiroAcesso[]
+  convitesParceiroCriados ConviteParceiro[] @relation("ConvitesCriados")
+
+  apresentacoesCriadas     Apresentacao[]
+  apresentacaoColaboracoes ApresentacaoColaborador[]
+  apresentacaoComentarios  ApresentacaoComentario[]
+
+  videosIntrodutorioAtivados VideoIntrodutorioConfig[]
+
+  googleCalendarConexao GoogleCalendarConexao?
+
+  colegasQueEuVejo                      GoogleCalendarColegaVisivel[]               @relation("ColegaViewer")
+  colegasQueMeVeem                      GoogleCalendarColegaVisivel[]               @relation("ColegaDono")
+  permissaoColegasCalendario            GoogleCalendarPermissaoColegas?             @relation("PermissaoColegasCalendario")
+  solicitacoesCompartilhamentoEnviadas  GoogleCalendarSolicitacaoCompartilhamento[] @relation("SolicitacaoCompartilhamentoOrigem")
+  solicitacoesCompartilhamentoRecebidas GoogleCalendarSolicitacaoCompartilhamento[] @relation("SolicitacaoCompartilhamentoAlvo")
+
+  confirmacoesLeituraDocumento ConfirmacaoLeituraDocumento[]
+
+  blueprintProjetosSolicitados     BlueprintProject[] @relation("BlueprintRequester")
+  blueprintProjetosPropriedade     BlueprintProject[] @relation("BlueprintOwner")
+  blueprintProjetosDesenvolvimento BlueprintProject[] @relation("BlueprintDeveloper")
+  blueprintProjetosCriados         BlueprintProject[] @relation("BlueprintCreatedBy")
+  blueprintMembros                 BlueprintMember[]
+
+  notasPropriedade        Note[]              @relation("NoteOwner")
+  notasCriadas            Note[]              @relation("NoteCreatedBy")
+  notasAtualizadas        Note[]              @relation("NoteUpdatedBy")
+  notaPermissoesCriadas   NotePermission[]    @relation("NotePermissionCreatedBy")
+  notaEquipesPropriedade  NoteTeam[]          @relation("NoteTeamOwner")
+  notaEquipesMembro       NoteTeamMember[]    @relation("NoteTeamMemberUser")
+  notaEquipeSharesCriados NoteTeamShare[]     @relation("NoteTeamShareCreatedBy")
+  notaTagsProprias        Tag[]               @relation("TagOwner")
+  notaVersoesAlteradas    NoteVersion[]       @relation("NoteVersionChangedBy")
+  notaComentarios         NoteComment[]       @relation("NoteCommentAuthor")
+  notaAnexosEnviados      NoteAttachment[]    @relation("NoteAttachmentUploadedBy")
+  notaLembretes           NoteReminder[]      @relation("NoteReminderUser")
+  notaAbasAbertas         UserOpenNoteTab[]   @relation("UserOpenNoteTabUser")
+  notaWorkspace           UserNotesWorkspace? @relation("UserNotesWorkspaceUser")
+
+  bpmCardsResponsavel          BpmCard[]                    @relation("BpmCardResponsavel")
+  bpmCardMembros               BpmCardMembro[]
+  bpmTarefas                   BpmTarefa[]
+  bpmCardHistorico             BpmCardHistorico[]
+  bpmPipelineConfigAuditoria   BpmPipelineConfigAuditoria[]
+  bpmCardAnexosEnviados        BpmCardAnexo[]
+  bpmInteracoesRegistradas     BpmInteracaoCard[]
+  bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
+
+  justificativasMetaEnviadas JustificativaMeta[]
+  roadmapObjectives          RoadmapObjective[]
+  roadmapWorkspacesCriados   RoadmapWorkspace[]
+
+  alphaSeoProjetosPropriedade          AlphaSeoProject[]               @relation("AlphaSeoProjectOwner")
+  alphaSeoMembresias                   AlphaSeoProjectMember[]
+  alphaSeoConvitesCriados              AlphaSeoProjectInvitation[]     @relation("AlphaSeoInvitationInviter")
+  alphaSeoConvitesAceitos              AlphaSeoProjectInvitation[]     @relation("AlphaSeoInvitationAcceptedBy")
+  alphaSeoOnboarding                   AlphaSeoUserOnboarding?
+  alphaSeoAtivacao                     AlphaSeoUserActivation?
+  alphaSeoPesquisasSolicitadas         AlphaSeoKeywordResearchRun[]    @relation("AlphaSeoKeywordResearchRequestedBy")
+  alphaSeoRankRunsSolicitados          AlphaSeoRankRun[]               @relation("AlphaSeoRankRunRequestedBy")
+  alphaSeoAuditoriasIniciadas          AlphaSeoSiteAudit[]             @relation("AlphaSeoSiteAuditStartedBy")
+  alphaSeoGoogleOAuthNonces            AlphaSeoGoogleOAuthNonce[]
+  alphaSeoGoogleOAuthGrants            AlphaSeoGoogleOAuthGrant[]
+  alphaSeoGscConexoes                  AlphaSeoGscConnection[]         @relation("AlphaSeoGscConnectedBy")
+  alphaSeoGa4Conexoes                  AlphaSeoGa4Connection[]         @relation("AlphaSeoGa4ConnectedBy")
+  alphaSeoContextSectionsAtualizadas   AlphaSeoProjectContextSection[] @relation("AlphaSeoContextSectionUpdatedBy")
+  alphaSeoCompetidoresAtualizados      AlphaSeoProjectCompetitor[]     @relation("AlphaSeoCompetitorUpdatedBy")
+  alphaSeoKeyPagesAtualizadas          AlphaSeoProjectKeyPage[]        @relation("AlphaSeoKeyPageUpdatedBy")
+  alphaSeoResearchLogCriado            AlphaSeoProjectResearchLog[]    @relation("AlphaSeoResearchLogCreatedBy")
+  alphaSeoSamSessions                  AlphaSeoSamSession[]
+  alphaSeoApiKeysCriadas               AlphaSeoApiKey[]                @relation("AlphaSeoApiKeyCreatedBy")
+  alphaSeoMcpClientsCriados            AlphaSeoMcpOAuthClient[]        @relation("AlphaSeoMcpClientCreatedBy")
+  alphaSeoMcpGrants                    AlphaSeoMcpOAuthGrant[]
+  alphaSeoCustosAprovados              AlphaSeoCostApproval[]
+  alphaSeoExportsCriados               AlphaSeoExport[]
+  alphaSeoAiRunsSolicitados            AlphaSeoAiVisibilityRun[]       @relation("AlphaSeoAiRunRequestedBy")
+  alphaSeoOperacoesExternasSolicitadas AlphaSeoExternalOperationRun[]  @relation("AlphaSeoExternalOperationRequestedBy")
+  alphaSeoEventosAuditoria             AlphaSeoAuditEvent[]
+}
+
+/// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;
+/// os snapshots preservam o rótulo e a categoria vistos na criação.
+model RoadmapObjective {
+  id                     String  @id @default(cuid())
+  code                   String  @unique
+  moduleKey              String
+  moduleLabelSnapshot    String
+  moduleCategorySnapshot String
+  title                  String
+  description            String
+  desiredOutcome         String?
+  constraints            String?
+  acceptanceCriteriaJson String
+  globalPriority         Int     @unique
+  status                 String  @default("ACTIVE")
+  documentationStatus    String  @default("PENDING")
+  sourceVersion          Int     @default(1)
+
+  createdById Int
+  createdBy   usuarios @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  documentationJobs RoadmapDocumentationJob[]
+  promptArtifacts   RoadmapPromptArtifact[]
+
+  @@index([archivedAt, globalPriority, createdAt, id])
+  @@index([moduleKey, archivedAt, globalPriority, createdAt, id])
+  @@index([documentationStatus, globalPriority, createdAt, id])
+}
+
+/// Job idempotente de documentação. Lease, heartbeat e claimToken fornecem
+/// exclusão distribuída e fencing para o worker contínuo.
+model RoadmapDocumentationJob {
+  id               String           @id @default(cuid())
+  objectiveId      String
+  objective        RoadmapObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  sourceVersion    Int
+  idempotencyKey   String           @unique
+  status           String           @default("PENDING")
+  prioritySnapshot Int
+  availableAt      DateTime         @default(now())
+  attemptCount     Int              @default(0)
+  maxAttempts      Int              @default(5)
+
+  claimedBy      String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  heartbeatAt    DateTime?
+  claimToken     Int       @default(0)
+
+  lastErrorCode    String?
+  lastErrorMessage String?
+  completedAt      DateTime?
+  deadLetteredAt   DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  attempts  RoadmapDocumentationAttempt[]
+  artifacts RoadmapPromptArtifact[]
+
+  @@unique([objectiveId, sourceVersion])
+  @@index([status, availableAt, prioritySnapshot, createdAt, id])
+  @@index([status, claimExpiresAt])
+  @@index([objectiveId, status])
+}
+
+/// Tentativa sanitizada de chamada ao provedor. Tokens, URLs autenticadas e
+/// respostas brutas nunca são armazenados.
+model RoadmapDocumentationAttempt {
+  id             String                  @id @default(cuid())
+  jobId          String
+  job            RoadmapDocumentationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attemptNumber  Int
+  provider       String
+  model          String
+  status         String
+  startedAt      DateTime                @default(now())
+  finishedAt     DateTime?
+  durationMs     Int?
+  httpStatus     Int?
+  errorCode      String?
+  errorMessage   String?
+  responseSha256 String?
+  createdAt      DateTime                @default(now())
+
+  artifacts RoadmapPromptArtifact[]
+
+  @@unique([jobId, attemptNumber])
+  @@index([jobId, status])
+}
+
+/// Conteúdo Markdown canônico; o filesystem em prompt-phases é uma projeção
+/// reconciliável e nunca a fonte primária.
+model RoadmapPromptArtifact {
+  id                   String                       @id @default(cuid())
+  objectiveId          String
+  objective            RoadmapObjective             @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  jobId                String
+  job                  RoadmapDocumentationJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attemptId            String?
+  attempt              RoadmapDocumentationAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  documentationVersion Int
+  phaseNumber          Int
+  slug                 String
+  title                String
+  kind                 String
+  agent                String
+  dependsOnJson        String
+  contentMarkdown      String
+  relativePath         String?
+  sha256               String
+  status               String                       @default("DRAFT")
+  publishedAt          DateTime?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  @@unique([objectiveId, documentationVersion, phaseNumber])
+  @@index([jobId, phaseNumber])
+  @@index([attemptId])
+  @@index([objectiveId, status])
+}
+
+/// Projeto externo registrado para desenvolvimento autônomo via Roadmap Alpha.
+/// rootPath é escolhido pelo usuário por navegador de diretório server-side
+/// (nunca digitado livremente) e revalidado a cada leitura — nunca confiar em
+/// path armazenado sem checar de novo que ainda existe e é um diretório real.
+model RoadmapWorkspace {
+  id              String    @id @default(cuid())
+  moduleKey       String    @unique
+  label           String
+  rootPath        String
+  status          String    @default("ATIVO")
+  createdById     Int
+  createdBy       usuarios  @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  archivedAt      DateTime?
+  workerPid       Int?
+  workerStartedAt DateTime?
+
+  @@index([status, createdAt, id])
+}
+
+model OnboardingTemplate {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  setor     String?
+  mensagem  String
+  ativo     Boolean  @default(true)
+  padrao    Boolean  @default(false)
+  tipo      String   @default("USUARIO") // USUARIO | PARCEIRO | CLIENTE
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("onboarding_template")
+}
+
+model OnboardingLog {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int
+  criadoPorId Int
+  templateId  Int?
+  tipoEnvio   String
+  telefone    String?
+  email       String?
+  enviadoEm   DateTime @default(now())
+
+  @@index([usuarioId])
+  @@map("onboarding_log")
+}
+
+model chamados {
+  id            Int                @id @default(autoincrement())
+  titulo        String
+  descricao     String
+  categoria     String
+  status        String             @default("ABERTO")
+  prioridade    String             @default("MEDIA")
+  solucao       String?
+  causa         String?
+  mensagemFinal String?
+  templateId    Int?
+  closedAt      DateTime?
+  usuarioId     Int
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  solicitante   usuarios           @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
+  mensagens     MensagensChamado[]
+
+  @@index([usuarioId])
+  @@index([status])
+}
+
+model ProtocoloTemplate {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  categoria String
+  template  String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("protocolo_template")
+}
+
+model WhatsAppLog {
+  id           Int      @id @default(autoincrement())
+  chamadoId    Int
+  usuarioId    Int
+  telefone     String
+  mensagem     String
+  enviadoPorId Int
+  createdAt    DateTime @default(now())
+
+  @@index([chamadoId])
+  @@map("whatsapp_log")
+}
+
+model consultas_radar {
+  id                Int             @id @default(autoincrement())
+  cnpj              String          @unique
+  razao_social      String?
+  nome_fantasia     String?
+  situacao_radar    String?
+  submodalidade     String?
+  data_situacao     DateTime?
+  municipio         String?
+  uf                String?
+  regime_tributario String?
+  capital_social    String?
+  data_constituicao DateTime?
+  contribuinte      String?
+  data_consulta     DateTime        @default(now())
+  fonte             String
+  json_completo     String
+  arquivo_id        Int?
+  data_opcao        DateTime?
+  optante_simples   Boolean?
+  arquivo           arquivos_radar? @relation(fields: [arquivo_id], references: [id], onDelete: Cascade)
+
+  @@index([cnpj])
+}
+
+model arquivos_radar {
+  id              Int               @id @default(autoincrement())
+  nome_arquivo    String            @unique
+  data_upload     DateTime          @default(now())
+  total_registros Int
+  registros       consultas_radar[]
+}
+
+model reservas {
+  id      Int      @id @default(autoincrement())
+  sala    String
+  usuario String
+  data    DateTime
+  inicio  DateTime
+
+  motivo      String?
+  tipo        String?
+  paoDeQueijo Boolean @default(true)
+
+  fim    DateTime?
+  status String    @default("Agendado")
+}
+
+model documentos {
+  id            Int      @id @default(autoincrement())
+  titulo        String
+  PastaArquivos String?
+  url           String
+  setor         String
+  tipo          String
+  data_criacao  DateTime @default(now())
+  status        String?  @default("ATIVO")
+  criado_por    String?  @default("SISTEMA")
+  protecao      String?  @default("ATIVO")
+  ordem_manual  Int?     @default(0)
+
+  confirmacoes ConfirmacaoLeituraDocumento[]
+}
+
+/// Confirmação de leitura de um documento do POP por um usuário — 1 linha por
+/// par (documento, usuário). Alimenta o botão "Confirmar Leitura" no POP e o
+/// indicador de documentos lidos no card de cada colaborador em Gestão de
+/// Equipe. Criada via script pontual (Vault aprovou 🟢, CREATE TABLE puro),
+/// não via `prisma db push` (não alcança o Turso remoto neste projeto).
+model ConfirmacaoLeituraDocumento {
+  id           Int      @id @default(autoincrement())
+  documentoId  Int
+  usuarioId    Int
+  confirmadoEm DateTime @default(now())
+
+  documento documentos @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  usuario   usuarios   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([documentoId, usuarioId])
+  @@index([usuarioId])
+  @@index([documentoId])
+}
+
+// `model clientes`, `socios`, `log_cs`, `logFeedback` removidos em 2026-08-14
+// (Fase 3.6 do Cliente Master) — substituídos por `Cliente`+`ClienteServico`
+// (empresa + serviço contratado, separados) e `Pessoa`+`PessoaClienteVinculo`
+// (sócios, celular como chave, global). `logAlteracao` (699 linhas, nunca escrita
+// por nenhuma action, só lida na exportação Excel) preservada como histórico morto
+// na tabela física do Turso, sem equivalente novo no schema — decisão do usuário
+// 2026-08-14.
+
+/// Reconstrução do log de auditoria do CS&NPS (2026-07-13, ver decisions.md).
+/// Substitui `logAlteracao` (desativado, sem gravação nova) por granularidade
+/// por campo: cada campo alterado em 1 "Salvar" vira 1 linha, agrupadas por
+/// `loteId`. Reversão é por linha/campo específico, nunca o cliente inteiro.
+// Fase 3.6 do Cliente Master (2026-08-14): passou a pendurar em `Cliente` (dados
+// cadastrais: razaoSocial/nomeFantasia/uf/municipio/regimeTributario/dataConstituicao/
+// cnpj), não mais em `clientes` (legado). Histórico de campos de NEGÓCIO (status,
+// analistaResponsavel, dataContratacao, etc) vive em `ClienteServicoHistorico`,
+// pendurado em `clienteServicoId` — são dois históricos por natureza (decisão do
+// usuário 2026-08-14).
+model HistoricoAlteracaoCliente {
+  id                 String    @id @default(cuid())
+  loteId             String // agrupa todas as linhas de 1 mesma ação de "Salvar"
+  clienteId          Int
+  cliente            Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  campo              String // nome do campo alterado (ex: "razaoSocial", "nomeFantasia")
+  valorAnterior      String?
+  valorNovo          String?
+  userId             Int?
+  usuario            usuarios? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  nomeUsuarioNaEpoca String // snapshot do nome no momento da ação
+  acao               String    @default("EDICAO") // "EDICAO" | "REVERSAO"
+  criadoEm           DateTime  @default(now())
+
+  @@index([clienteId, criadoEm])
+  @@index([loteId])
+  @@map("historico_alteracao_cliente")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLIENTE MASTER (2026-08-12, ver .bibble/memory/plano-cliente-master.md)
+// Fase 2 — schema novo em paralelo aos models antigos (clientes/socios etc.),
+// sem remover nada ainda. Cliente = empresa (1 linha por CNPJ). ClienteServico
+// = o que hoje vive dentro de `clientes` (status/analista/dataExito/valor).
+// Pessoa = pessoa física global (celular como chave), N:N com Cliente E Parceiro.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Cliente {
+  id                Int     @id @default(autoincrement())
+  cnpj              String? @unique // nullable — empresa "em constituição" sem CNPJ ainda (ver decisions.md pergunta 11)
+  razaoSocial       String
+  nomeFantasia      String?
+  dataConstituicao  String?
+  uf                String?
+  municipio         String?
+  regimeTributario  String?
+  capitalSocial     String?
+  situacaoCadastral String?
+  status            String  @default("ATIVO") // ATIVO | ARQUIVADO — status da EMPRESA, não de um serviço
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  servicos             ClienteServico[]
+  pessoas              PessoaClienteVinculo[]
+  indicacao            Indicacao?
+  bpmCards             BpmCard[]
+  extratos             Extratos?
+  consultaPreAnalise   ConsultaPreAnalise?
+  operacionalClientes  OperacionalClientes[]
+  contratosComerciais  ContratoComercial[]
+  historicoAlteracoes  HistoricoAlteracaoCliente[]
+  commissionEvents     CommissionEvent[]
+  businessProcesses    BusinessProcess[]
+  eligibilityOverrides EligibilityOverride[]
+
+  @@index([razaoSocial])
+  @@index([status])
+}
+
+model ClienteServico {
+  id        Int     @id @default(autoincrement())
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  servico             String
+  status              String  @default("Em Andamento")
+  analistaResponsavel String?
+  dataContratacao     String?
+  dataExito           String?
+  formaPagamento      String?
+  valorContrato       Float?
+  closerNome          String?
+  ultimoCs            Int?    @default(0)
+  nps                 Int?
+  feedbackGoogle      Boolean @default(false)
+  nomeGoogle          String?
+  embasamento         String?
+  origemLead          String?
+  canalAquisicao      String?
+  canalOutro          String?
+
+  logCs                ClienteServicoLogCs[]
+  logFeedback          ClienteServicoLogFeedback[]
+  historicoAlteracoes  ClienteServicoHistorico[]
+  commissionEvents     CommissionEvent[]
+  businessProcesses    BusinessProcess[]
+  eligibilityOverrides EligibilityOverride[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clienteId, servico])
+  @@index([status])
+}
+
+model ClienteServicoLogCs {
+  id               String         @id @default(cuid())
+  dataRegistro     DateTime       @default(now())
+  colaborador      String
+  sentimento       String
+  observacao       String?
+  clienteServicoId Int
+  clienteServico   ClienteServico @relation(fields: [clienteServicoId], references: [id], onDelete: Cascade)
+
+  @@index([clienteServicoId])
+}
+
+model ClienteServicoLogFeedback {
+  id               String         @id @default(cuid())
+  dataRegistro     DateTime       @default(now())
+  colaborador      String
+  sentimento       String
+  observacao       String?
+  clienteServicoId Int
+  clienteServico   ClienteServico @relation(fields: [clienteServicoId], references: [id], onDelete: Cascade)
+
+  @@index([clienteServicoId])
+}
+
+/// Sucessora de HistoricoAlteracaoCliente, penduradas em ClienteServico (decisão da
+/// pergunta 2 do plano — Opção B). Mesma granularidade por campo + agrupamento por loteId.
+model ClienteServicoHistorico {
+  id                 String         @id @default(cuid())
+  loteId             String
+  clienteServicoId   Int
+  clienteServico     ClienteServico @relation(fields: [clienteServicoId], references: [id], onDelete: Cascade)
+  campo              String
+  valorAnterior      String?
+  valorNovo          String?
+  userId             Int?
+  usuario            usuarios?      @relation("ClienteServicoHistoricoUsuario", fields: [userId], references: [id], onDelete: SetNull)
+  nomeUsuarioNaEpoca String
+  acao               String         @default("EDICAO")
+  criadoEm           DateTime       @default(now())
+
+  @@index([clienteServicoId, criadoEm])
+  @@index([loteId])
+}
+
+/// Pessoa física global — celular como chave, N:N com Cliente (empresa) e com
+/// Parceiro. Substitui `socios` (1:N preso a 1 cliente) e `ParceiroResponsavel`/
+/// `ParceiroRepresentante` (decisão do usuário, 2026-08-08, pergunta 10).
+model Pessoa {
+  id             Int     @id @default(autoincrement())
+  celular        String  @unique
+  nome           String
+  cpf            String?
+  dataNascimento String?
+  email          String?
+  telefoneExtra  String?
+  observacao     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vinculos         PessoaClienteVinculo[]
+  vinculosParceiro PessoaParceiroVinculo[]
+
+  @@index([nome])
+}
+
+model PessoaClienteVinculo {
+  id        Int     @id @default(autoincrement())
+  pessoaId  Int
+  pessoa    Pessoa  @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  vinculo   String?
+  cargo     String?
+  principal Boolean  @default(false)
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  @@unique([pessoaId, clienteId])
+  @@index([clienteId])
+  @@index([pessoaId])
+}
+
+/// Substitui ParceiroResponsavel/ParceiroRepresentante (decisão 2026-08-08). `papel`
+/// distingue os 2 tipos herdados ("RESPONSAVEL_LEGAL" | "REPRESENTANTE").
+model PessoaParceiroVinculo {
+  id         Int      @id @default(autoincrement())
+  pessoaId   Int
+  pessoa     Pessoa   @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  parceiroId Int
+  parceiro   Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+
+  papel         String // "RESPONSAVEL_LEGAL" | "REPRESENTANTE"
+  tipoDocumento String? // "PF" | "PJ"
+  documento     String?
+  cargo         String?
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+
+  @@unique([pessoaId, parceiroId, papel])
+  @@index([parceiroId])
+  @@index([pessoaId])
+}
+
+model ordemPastas {
+  id        Int     @id @default(autoincrement())
+  setor     String  @unique
+  ordem     String
+  createdAt String?
+  updatedAt String?
+}
+
+model MensagensChamado {
+  id        Int      @id @default(autoincrement())
+  texto     String?
+  createdAt DateTime @default(now())
+
+  chamado   chamados @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  chamadoId Int
+
+  lida_admin   Boolean @default(false)
+  lida_usuario Boolean @default(false)
+
+  arquivoUrl  String?
+  arquivoTipo String?
+
+  autor   usuarios @relation(fields: [autorId], references: [id])
+  autorId Int
+}
+
+model Auditoria {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  acao      String
+  detalhes  String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  usuario usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model avisos_globais {
+  id        Int      @id @default(autoincrement())
+  mensagem  String
+  ativo     Boolean  @default(true)
+  tipo      String   @default("warning")
+  criado_em DateTime @default(now())
+}
+
+model colaboradores_core {
+  id               Int     @id @default(autoincrement())
+  nome             String
+  setor            String
+  cargo            String
+  data_contratacao String?
+  status           String? @default("ATIVO")
+  criado_em        String?
+}
+
+model sistemas_core {
+  id        Int     @id @default(autoincrement())
+  nome      String
+  link      String
+  icone     String? @default("google")
+  criado_em String?
+
+  recursos vault_recursos[]
+}
+
+model vault_recursos {
+  id             Int     @id @default(autoincrement())
+  colaborador_id String
+  sistema_id     Int
+  login          String
+  senha          String
+  criado_em      String?
+
+  sistema sistemas_core @relation(fields: [sistema_id], references: [id])
+}
+
+model radar_fiscal {
+  id                 Int     @id @default(autoincrement())
+  cnpj               String  @unique
+  razao_social       String?
+  nome_fantasia      String?
+  qualificacao       String?
+  situacao_cadastral String?
+  municipio          String?
+  uf                 String?
+  data_abertura      String?
+  capital_social     String?
+
+  regime_receita        String?
+  regime_ea             String?
+  data_opcao_simples    String?
+  data_exclusao_simples String?
+  divida_tributaria     Float?  @default(0)
+
+  historico_regime String?
+  cnaes            String?
+  qsa              String?
+
+  data_consulta String?
+  perse_anexo   String?
+  perse         String?
+  perse_motivo  String?
+  fonte         String? @default("API")
+}
+
+model historico_planilha_fiscal {
+  id      Int      @id @default(autoincrement())
+  nome    String
+  arquivo Bytes
+  data    DateTime @default(now())
+}
+
+model mensagens {
+  id             Int      @id @default(autoincrement())
+  texto          String
+  remetenteId    Int
+  destinatarioId Int
+  lida           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  remetente    usuarios @relation("Enviadas", fields: [remetenteId], references: [id])
+  destinatario usuarios @relation("Recebidas", fields: [destinatarioId], references: [id])
+}
+
+model conversas {
+  id        Int      @id @default(autoincrement())
+  p1Id      Int
+  p2Id      Int
+  ultimaMsg String?
+  updatedAt DateTime @default(now())
+
+  user1 usuarios @relation("ConversaP1", fields: [p1Id], references: [id])
+  user2 usuarios @relation("ConversaP2", fields: [p2Id], references: [id])
+
+  @@unique([p1Id, p2Id])
+}
+
+// Fase 3.3 do Cliente Master (2026-08-13) — campos cadastrais de empresa
+// (cnpj/razaoSocial/nomeFantasia/dataConstituicao/municipio/uf/regimeTributario)
+// removidos, substituídos por `clienteId @unique → Cliente`. Extratos não cria
+// Cliente novo — só vincula empresa já cadastrada (mesma regra dos demais
+// módulos satélite; BPM é a única porta de entrada de Cliente novo).
+model Extratos {
+  id        Int     @id @default(autoincrement())
+  clienteId Int     @unique
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  criadoPorNome String?
+  periodos      PeriodosAnalise[]
+
+  analistaResponsavel String?
+  dataExito           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([criadoPorNome])
+  @@map("Extratos")
+}
+
+model BancosVinculados {
+  id        Int     @id @default(autoincrement())
+  bancoId   String
+  nomeBanco String
+  logo      String
+  descricao String?
+  anotacao  String?
+  status    String  @default("Ativo / Sincronizado")
+
+  periodoId Int
+  periodo   PeriodosAnalise @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transacoes Transacao[]
+
+  @@map("BancosVinculados")
+}
+
+model PeriodosAnalise {
+  id  Int    @id @default(autoincrement())
+  mes String
+  ano String
+
+  extratoId Int
+  empresa   Extratos @relation(fields: [extratoId], references: [id], onDelete: Cascade)
+
+  bancos BancosVinculados[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("PeriodosAnalise")
+}
+
+model Transacao {
+  id                String    @id @default(cuid())
+  data              DateTime?
+  dataOriginalTexto String?
+  descricao         String
+  valor             Float
+  bancoId           String
+  mesReferencia     String
+  origemArquivo     String?
+  createdAt         DateTime  @default(now())
+
+  BancosVinculadosId Int
+  BancosVinculados   BancosVinculados @relation(fields: [BancosVinculadosId], references: [id], onDelete: Cascade)
+
+  @@index([BancosVinculadosId, data])
+}
+
+model Tarefa {
+  id         String  @id @default(cuid())
+  texto      String
+  descricao  String?
+  fixa       Boolean @default(false)
+  feita      Boolean @default(false)
+  prioridade String
+
+  diaSemana     Int?
+  intervaloDias Int?
+  dataInicio    DateTime? @default(now())
+  horario       String?
+
+  userId   Int
+  usuarios usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  concluidaEm DateTime?
+
+  id_produto String? @unique
+
+  @@index([userId])
+}
+
+model DiretrizSala {
+  id        Int      @id @default(autoincrement())
+  sala      String   @unique
+  descricao String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model Categoria {
+  id           String           @id @default(uuid())
+  nome         String           @unique
+  cor          String?          @default("#6366f1")
+  icone        String?          @default("Package")
+  produtos     ProdutoEstoque[]
+  listaCompras ListaCompra[]
+  createdAt    DateTime         @default(now())
+}
+
+model ProdutoEstoque {
+  id            String    @id @default(uuid())
+  imagem        String?
+  nome          String
+  quantidade    Int       @default(0)
+  estoqueMinimo Int       @default(1)
+  unidade       String
+  precoMedio    Float?    @default(0)
+  ultimaCompra  DateTime?
+
+  categoriaId String
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ListaCompra {
+  id              String   @id @default(uuid())
+  produtoId       String   @unique
+  nome            String
+  quantidadeAtual Int
+  minimoEsperado  Int
+  unidade         String
+  status          String   @default("CARRINHO")
+  createdAt       DateTime @default(now())
+
+  categoriaId String?
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+}
+
+// Fase 3.4 do Cliente Master (2026-08-13) — mantém snapshot cadastral próprio
+// (decisão da pergunta 3 do plano: auditoria histórica da consulta à Receita
+// Federal no momento em que foi feita, não deve depender de Cliente para
+// exibir seu próprio histórico). Ganha `clienteId` nullable como FK adicional,
+// sem perder nenhum campo. `clienteId` é nullable porque pode consultar CNPJ
+// que ainda não é Cliente cadastrado.
+model ConsultaPreAnalise {
+  id           String  @id @default(cuid())
+  cnpj         String  @unique
+  razaoSocial  String
+  nomeFantasia String?
+  situacao     String?
+  uf           String?
+  municipio    String?
+
+  regimeEA      String?
+  qualificacao  String?
+  submodalidade String?
+  capitalSocial Float?
+
+  dadosBrutos Json
+
+  nomeResponsavel String?
+  telefoneContato String?
+  observacoes     String?
+
+  clienteId Int?     @unique
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cnpj])
+  @@index([razaoSocial])
+}
+
+model videos {
+  id        String  @id @default(cuid())
+  titulo    String
+  descricao String?
+  url       String
+  thumbUrl  String?
+  tamanho   String?
+  duracao   Float?
+  setor     String
+  ordem     Int?    @default(0)
+
+  modulo ModuloVideo[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  presets    Preset[]         @relation("PresetVideos")
+  progressos ProgressoVideo[]
+
+  configsIntrodutorio VideoIntrodutorioConfig[]
+
+  @@map("videos")
+}
+
+model VideoIntrodutorioConfig {
+  id           String    @id @default(cuid())
+  modulo       String    @unique
+  videoId      String?
+  video        videos?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  ativadoEm    DateTime?
+  ativadoPorId Int?
+  ativadoPor   usuarios? @relation(fields: [ativadoPorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("video_introdutorio_config")
+}
+
+model modulos {
+  id          String  @id @default(cuid())
+  nome        String  @unique
+  descricao   String?
+  aprendizado String?
+  imagemUrl   String?
+  setor       String
+
+  bloqueado        Boolean @default(false)
+  requerModuloId   String?
+  percentualMinimo Int
+
+  videos ModuloVideo[]
+  cursos CursoModulo[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("modulos")
+}
+
+model ModuloVideo {
+  moduloId String
+  videoId  String
+  ordem    Int    @default(0)
+
+  modulo modulos @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  video  videos  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@id([moduloId, videoId])
+  @@map("_ModuloVideos")
+}
+
+model Curso {
+  id        String        @id @default(cuid())
+  nome      String        @unique
+  descricao String?
+  capa      String?
+  ordem     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  setores   CursoSetor[]
+  modulos   CursoModulo[]
+
+  @@index([ordem])
+}
+
+model CursoSetor {
+  id      String @id @default(cuid())
+  cursoId String
+  setor   String
+  curso   Curso  @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@unique([cursoId, setor])
+  @@index([setor])
+}
+
+model CursoModulo {
+  id       String  @id @default(cuid())
+  cursoId  String
+  moduloId String
+  ordem    Int     @default(0)
+  curso    Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  modulo   modulos @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+
+  @@unique([cursoId, moduloId])
+  @@index([cursoId])
+  @@index([moduloId])
+}
+
+model ProgressoAula {
+  id        String   @id @default(cuid())
+  userId    String
+  aulaId    String
+  concluido Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, aulaId])
+}
+
+model Preset {
+  id        String   @id @default(uuid())
+  nome      String
+  createdAt DateTime @default(now())
+
+  videos         videos[]         @relation("PresetVideos")
+  usuarios       usuarios[]       @relation("PresetTousuarios")
+  perguntas      Pergunta[]
+  tags           TagQuestao[]     @relation("PresetTags")
+  ResultadoProva ResultadoProva[]
+
+  @@map("presets")
+}
+
+model TagQuestao {
+  id        String     @id @default(uuid())
+  nome      String     @unique
+  perguntas Pergunta[]
+  presets   Preset[]   @relation("PresetTags")
+
+  @@map("tags_questoes")
+}
+
+model Pergunta {
+  id              String     @id @default(uuid())
+  enunciado       String
+  tipo            String     @default("OBJETIVA")
+  opcoes          String
+  respostaCorreta String
+  tagId           String
+  tag             TagQuestao @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  presetId String?
+  preset   Preset? @relation(fields: [presetId], references: [id])
+
+  @@map("perguntas")
+}
+
+enum TipoPergunta {
+  OBJETIVA
+  DESCRITIVA
+}
+
+model ProgressoVideo {
+  id        String   @id @default(cuid())
+  userId    Int
+  videoId   String
+  concluido Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  user  usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video videos   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+}
+
+model ResultadoProva {
+  id         String   @id @default(cuid())
+  userId     Int
+  presetId   String
+  nota       Float
+  tentativas Int      @default(1)
+  aprovado   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user   usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preset Preset   @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@map("ResultadoProva")
+}
+
+model ComercialPerformance {
+  id             Int      @id @default(autoincrement())
+  dataRegistro   DateTime
+  colaboradoraId String
+  canal          String
+  servico        String
+
+  leadsRecebidos Int @default(0)
+
+  leadsDesqualificados Int @default(0)
+
+  reunioesAgendadas    Int @default(0)
+  reunioesRealizadas   Int @default(0)
+  noShow               Int @default(0)
+  contratosHabilitacao Int @default(0)
+  contratosRevisao     Int @default(0)
+  HotLeadsHabilitacao  Int @default(0)
+  HotLeadsRevisao      Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dataRegistro, colaboradoraId, canal, servico], name: "performance_pk")
+  @@map("comercial_performance")
+}
+
+model ClienteOperacional {
+  id           String                @id @default(cuid())
+  nome         String
+  email        String                @unique
+  senha        String
+  imagemUrl    String?
+  empresas     OperacionalClientes[]
+  documentos   DocumentoUnidade[]
+  notificacoes NotificacaoCliente[]
+}
+
+model NotificacaoCliente {
+  id        String             @id @default(cuid())
+  clienteId String
+  cliente   ClienteOperacional @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipo      String
+  titulo    String
+  mensagem  String?
+  empresaId String
+  itemId    String?
+  lida      Boolean            @default(false)
+  criadaEm  DateTime           @default(now())
+
+  @@index([clienteId, lida])
+  @@index([clienteId, criadaEm])
+}
+
+model OperacionalClientes {
+  id           String  @id @default(cuid())
+  status       String  @default("ATIVO")
+  embasamento  String
+  progresso    Int     @default(0)
+  mesProtocolo String?
+  linkGrupo    String?
+
+  tipo TipoEmbasamento?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Fase 3.5 do Cliente Master (2026-08-13): campo antigo `clienteId/cliente` (conta de
+  // login do portal) renomeado para `clienteOperacionalId/clienteOperacional` para abrir
+  // espaço ao novo `clienteId/cliente` abaixo, que aponta para o Cliente master (empresa).
+  clienteOperacionalId String
+  clienteOperacional   ClienteOperacional @relation(fields: [clienteOperacionalId], references: [id])
+
+  // Cliente master (empresa) — obrigatório, sem criação automática (vincularEmpresaAoCliente
+  // busca por CNPJ e bloqueia se não encontrar). razaoSocial/nomeFantasia/cnpj/situacaoRadar/
+  // submodalidade/municipio/uf/regimeTributario/capitalSocial/dataConstituicao/contribuinte/
+  // dataSituacao deixaram de existir aqui — vêm sempre via include: { cliente }.
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  pastaChecklistId String?
+  pastaChecklist   PastaChecklist?    @relation(fields: [pastaChecklistId], references: [id])
+  documentos       DocumentoUnidade[]
+  checklists       Checklist[]
+
+  @@index([pastaChecklistId])
+  @@index([clienteId])
+  @@map("operacional_clientes")
+}
+
+model PastaChecklist {
+  id        String                @id @default(cuid())
+  nome      String                @unique
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  empresas  OperacionalClientes[]
+}
+
+model DocumentoUnidade {
+  id              String  @id @default(cuid())
+  codigoDocumento String
+  nomeArquivo     String
+  urlBlob         String
+  status          String  @default("PENDENTE")
+  observacao      String?
+
+  empresaId String
+  empresa   OperacionalClientes @relation(fields: [empresaId], references: [id])
+
+  clienteId String
+  cliente   ClienteOperacional @relation(fields: [clienteId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([empresaId, codigoDocumento])
+}
+
+// ─── Checklist RADAR ──────────────────────────────────────────────────────────
+
+enum TipoEmbasamento {
+  RECEITA_BRUTA_DAS
+  RECEITA_BRUTA_CPRB
+  INICIO_RETOMADA
+  DISPONIBILIDADE_FINANCEIRA
+}
+
+enum StatusItemChecklist {
+  PENDENTE
+  OK
+  IRREGULAR
+  PARCIALMENTE_IRREGULAR
+  REVISAR
+  DESNECESSARIO
+  EM_ANALISE
+  AGUARDANDO_DOCUMENTOS
+  PRIORIDADE
+}
+
+model Checklist {
+  id           String              @id @default(cuid())
+  empresaId    String
+  empresa      OperacionalClientes @relation(fields: [empresaId], references: [id])
+  tipo         TipoEmbasamento
+  itens        ItemChecklist[]
+  criadoEm     DateTime            @default(now())
+  atualizadoEm DateTime            @updatedAt
+
+  @@unique([empresaId, tipo])
+}
+
+model ModeloItemChecklist {
+  id          String           @id @default(cuid())
+  tipo        TipoEmbasamento?
+  codigo      String
+  nome        String
+  descricao   String?
+  secao       String
+  obrigatorio Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([tipo, secao])
+}
+
+model ItemChecklist {
+  id           String               @id @default(cuid())
+  checklistId  String
+  checklist    Checklist            @relation(fields: [checklistId], references: [id])
+  modeloItemId String?
+  codigo       String
+  secao        String
+  descricao    String
+  complemento  String?
+  status       StatusItemChecklist  @default(PENDENTE)
+  observacao   String?
+  obrigatorio  Boolean              @default(true)
+  documentos   DocumentoChecklist[]
+  atualizadoEm DateTime             @updatedAt
+
+  @@index([modeloItemId])
+}
+
+model DocumentoChecklist {
+  id                 String        @id @default(cuid())
+  itemId             String
+  item               ItemChecklist @relation(fields: [itemId], references: [id])
+  nome               String
+  url                String
+  uploadedByCliente  Boolean       @default(false)
+  observacao         String?
+  deletadoEm         DateTime?
+  deletadoPorCliente Boolean       @default(false)
+  criadoEm           DateTime      @default(now())
+
+  @@index([itemId, deletadoEm])
+}
+
+// ─── Alpha CRM ────────────────────────────────────────────────────────────────
+
+// ─── Alpha Metas ──────────────────────────────────────────────────────────────
+
+model ContratoComercial {
+  id String @id @default(cuid())
+
+  // Fase 3.6 do Cliente Master (2026-08-14): cnpj/razaoSocial/nomeFantasia/
+  // dataConstituicao/regimeTributario/uf deixaram de existir aqui — vêm sempre
+  // via include: { cliente }. Diferente de Extratos/Operacional (busca-e-bloqueia),
+  // aqui `clienteId` é resolvido OU CRIADO por criarContrato: o BPM ainda não é a
+  // porta de entrada real de Cliente novo (time comercial usa CRM externo hoje,
+  // enquanto o BPM não está em uso operacional) — bloquear quebraria o fluxo
+  // comercial diário. Ajuste futuro (fora desta fase) quando o BPM assumir esse
+  // papel de verdade: trocar para busca-e-bloqueia, igual às demais fases satélite.
+  clienteId Int
+  cliente   Cliente @relation(fields: [clienteId], references: [id])
+
+  valorContrato         Float
+  formaPagamento        String
+  servico               String
+  canalAquisicao        String
+  canalOutro            String? // texto livre quando canal = "Outro"
+  indicadoPorParceiroId Int? // parceiro indicador quando canal = "Indicação Parceiro"
+
+  closerNome String
+
+  status String @default("ENVIADO")
+
+  pagamentoConfirmado   Boolean   @default(false)
+  pagamentoConfirmadoEm DateTime?
+
+  contratoAssinado Boolean @default(false)
+  contratoUrl      String?
+
+  contaComVenda Boolean @default(true)
+
+  arquivado   Boolean   @default(false)
+  arquivadoEm DateTime?
+
+  socios Json?
+
+  mes Int
+  ano Int
+
+  usuarioId   Int
+  usuario     usuarios             @relation("ContratosComerciais", fields: [usuarioId], references: [id], onDelete: Cascade)
+  observacoes ObservacaoContrato[]
+
+  commissionEvents     CommissionEvent[]
+  businessProcesses    BusinessProcess[]
+  eligibilityOverrides EligibilityOverride[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([usuarioId])
+  @@index([mes, ano])
+  @@index([status])
+  @@index([clienteId])
+  @@map("contratos_comerciais")
+}
+
+model ObservacaoContrato {
+  id         String            @id @default(cuid())
+  contratoId String
+  contrato   ContratoComercial @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  texto      String
+  tipo       String            @default("NA")
+  criadoEm   DateTime          @default(now())
+
+  @@index([contratoId])
+  @@map("observacoes_contratos")
+}
+
+model ServicosComerciais {
+  id    Int     @id @default(autoincrement())
+  nome  String  @unique
+  ativo Boolean @default(true)
+
+  @@map("servicos_comerciais")
+}
+
+model MetaUsuario {
+  id             Int      @id @default(autoincrement())
+  colaboradoraId String
+  metaMensal     Int      @default(0)
+  mes            Int
+  ano            Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([colaboradoraId, mes, ano])
+  @@map("meta_usuario")
+}
+
+model MetaEquipe {
+  id         Int      @id @default(autoincrement())
+  metaMensal Int      @default(0)
+  mes        Int
+  ano        Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([mes, ano])
+  @@map("meta_equipe")
+}
+
+model JustificativaMeta {
+  id           String   @id @default(cuid())
+  mes          Int
+  ano          Int
+  arquivoUrl   String
+  nomeArquivo  String
+  tipoArquivo  String
+  tamanhoBytes Int
+  enviadoPorId Int
+  enviadoPor   usuarios @relation(fields: [enviadoPorId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([mes, ano, createdAt])
+  @@map("justificativa_meta")
+}
+
+// ─── Alpha POP — Acessos Granulares por Setor ─────────────────────────────────
+
+model PopAcesso {
+  id            Int      @id @default(autoincrement())
+  usuarioId     Int
+  setor         String
+  podeVer       Boolean  @default(true)
+  podeUpload    Boolean  @default(false)
+  podeGerenciar Boolean  @default(false)
+  concedidoPor  Int
+  concedidoEm   DateTime @default(now())
+
+  usuario usuarios @relation("PopAcessoUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, setor])
+  @@index([usuarioId])
+  @@index([setor])
+  @@map("popAcesso")
+}
+
+// ─── Permissões por Setor ─────────────────────────────────────────────────────
+
+model SetorPermissao {
+  id        Int      @id @default(autoincrement())
+  setor     String
+  modulo    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([setor, modulo])
+  @@index([setor])
+}
+
+model UsuarioPermissaoOverride {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  modulo    String
+  acao      String // "ADD" | "REMOVE"
+  motivo    String?
+  criadoPor Int
+  createdAt DateTime @default(now())
+
+  usuario usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, modulo])
+  @@index([usuarioId])
+}
+
+// ─── Alpha Holerites ──────────────────────────────────────────────────────────
+
+model Holerite {
+  id            Int    @id @default(autoincrement())
+  colaboradorId Int
+  mes           Int
+  ano           Int
+  competencia   String
+
+  arquivoUrl     String
+  arquivoNome    String
+  arquivoTamanho Int
+
+  assinado   Boolean   @default(false)
+  assinadoEm DateTime?
+
+  status         String    @default("PENDENTE")
+  validadoPor    Int?
+  validadoEm     DateTime?
+  motivoRejeicao String?
+
+  uploadedAt   DateTime @default(now())
+  uploadedById Int
+  observacao   String?
+
+  colaborador usuarios @relation("HoleriteColaborador", fields: [colaboradorId], references: [id])
+  uploadedBy  usuarios @relation("HoleriteUploader", fields: [uploadedById], references: [id])
+
+  @@unique([colaboradorId, mes, ano])
+  @@index([colaboradorId])
+  @@index([ano, mes])
+  @@index([status])
+  @@map("holerite")
+}
+
+model HoleriteAlertaHistorico {
+  id           Int      @id @default(autoincrement())
+  tipo         String // "INICIAL" | "FINAL"
+  disparadoPor Int
+  disparadoEm  DateTime @default(now())
+
+  usuario usuarios @relation(fields: [disparadoPor], references: [id])
+
+  @@index([disparadoPor])
+  @@index([disparadoEm])
+  @@map("holerite_alerta_historico")
+}
+
+// ─── Setores e Cargos Dinâmicos ───────────────────────────────────────────────
+
+model Setor {
+  id        Int      @id @default(autoincrement())
+  nome      String   @unique
+  isBase    Boolean  @default(false)
+  protegido Boolean  @default(false)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  bpmPipelines BpmPipelineSetor[]
+
+  @@map("setor")
+}
+
+// ─── RH / Colaboradores ───────────────────────────────────────────────────────
+
+model CargoColaborador {
+  id        Int      @id @default(autoincrement())
+  nome      String   @unique
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Gestão de Comissões e Prêmios (2026-07-28) — colunas estendidas, não tabela paralela
+  setorId                   Int?
+  vinculoPadrao             String? // "CLT" | "PJ"
+  naturezaRecebimento       String? // "COMISSAO" | "PREMIO" | "AMBOS"
+  permiteMultiplosOcupantes Boolean @default(true)
+
+  @@map("cargo_colaborador")
+}
+
+model ModalidadeContrato {
+  id        Int      @id @default(autoincrement())
+  nome      String   @unique
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("modalidade_contrato")
+}
+
+model ContratoColaborador {
+  id        String   @id @default(cuid())
+  usuarioId Int
+  usuario   usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  tipo            String
+  modalidade      String
+  dataInicio      DateTime
+  dataFim         DateTime?
+  renovacaoNumero Int       @default(0)
+  status          String    @default("EXPERIENCIA")
+  contratoUrl     String?
+  observacoes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([usuarioId])
+  @@index([status])
+  @@map("contrato_colaborador")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Gestão de Comissões e Prêmios (módulo novo, 2026-07-28)
+// Schema aplicado no Turso via script pontual (Vault, Fase 02 da fila prompt-phases).
+// Dinheiro sempre em centavos (Int). FK de usuário sempre Int (usuarios.id).
+// ═══════════════════════════════════════════════════════════════════════════
+
+model CommissionEvent {
+  id        String @id @default(cuid())
+  eventType String // CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL
+
+  // Fase 3.7 do Cliente Master (2026-08-14): campo antigo "clienteId" continha na verdade
+  // ClienteServico.id (correlação por serviço contratado, não por empresa) — renomeado para
+  // clienteServicoId com FK real, preservando o valor e o comportamento de correlação
+  // existentes. clienteId agora aponta de fato para Cliente (derivado via ClienteServico.clienteId),
+  // adicional e nullable (evento manual nunca preenche nenhum dos dois).
+  clienteServicoId Int?
+  clienteServico   ClienteServico? @relation(fields: [clienteServicoId], references: [id])
+  clienteId        Int?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id])
+
+  contratoComercialId String?
+  contratoComercial   ContratoComercial? @relation(fields: [contratoComercialId], references: [id])
+  businessProcessId   String?
+  businessProcess     BusinessProcess?   @relation(fields: [businessProcessId], references: [id])
+
+  cnpj         String // snapshot intencional (auditoria financeira) — nunca substituído por FK, ver plano-cliente-master.md
+  razaoSocial  String // snapshot intencional
+  nomeFantasia String? // snapshot intencional
+  servico      String // snapshot intencional
+  eventDate    DateTime
+
+  grossContractAmountCents Int
+  partnerSpreadCents       Int     @default(0)
+  thirdPartyCostsCents     Int     @default(0)
+  discountAmountCents      Int     @default(0)
+  netContractAmountCents   Int
+  commissionableBaseCents  Int?
+  formaPagamento           String?
+
+  // Closer/analista responsável — FK real (preferível, permite navegar até o usuário) quando
+  // resolvido via ContratoComercial.usuarioId/BusinessProcess.analistaResponsavelId; nome
+  // manual (string, sem FK) quando só existe como texto livre ou foi preenchido à mão porque
+  // nenhuma fonte tinha o dado. Nunca inventar um FK a partir de string sem garantia de match.
+  closerUsuarioId               Int?
+  closerNomeManual              String?
+  analistaResponsavelUsuarioId  Int?
+  analistaResponsavelNomeManual String?
+
+  status String @default("PENDING_REVIEW") // PENDING_REVIEW|OK|BLOCKED|INTEGRATION_ERROR
+
+  sourceSystem    String
+  sourceEntity    String
+  sourceId        String
+  sourceUpdatedAt DateTime?
+  lastSyncAt      DateTime?
+  syncStatus      String    @default("SYNCED")
+
+  entries      CommissionEntry[]
+  divergencias CommissionDivergence[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceSystem, sourceEntity, sourceId, eventType])
+  @@index([cnpj])
+  @@index([eventType])
+  @@index([status])
+  @@index([clienteServicoId])
+  @@index([clienteId])
+  @@index([contratoComercialId])
+}
+
+model BusinessProcess {
+  id String @id @default(cuid())
+
+  // Fase 3.7 do Cliente Master (2026-08-14): mesma dupla clienteServicoId/clienteId de
+  // CommissionEvent, aplicada por consistência mesmo sem dado real hoje (model sempre
+  // esteve vazio em produção — nenhum código o escreve ainda).
+  clienteServicoId Int?
+  clienteServico   ClienteServico? @relation(fields: [clienteServicoId], references: [id])
+  clienteId        Int?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id])
+
+  contratoComercialId String?
+  contratoComercial   ContratoComercial? @relation(fields: [contratoComercialId], references: [id])
+
+  analistaResponsavelId     Int
+  analistaAuxiliarId        Int?
+  auditorId                 Int?
+  diretorId                 Int?
+  dataInicio                DateTime
+  dataProtocolo             DateTime?
+  dataExito                 DateTime?
+  tentativas                Int       @default(1)
+  deferidoPrimeiraTentativa Boolean   @default(false)
+  status                    String    @default("EM_ANDAMENTO")
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  eventos CommissionEvent[]
+
+  @@index([clienteServicoId])
+  @@index([clienteId])
+  @@index([contratoComercialId])
+}
+
+model SyncRun {
+  id             String    @id @default(cuid())
+  sourceSystem   String
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  status         String    @default("RUNNING") // RUNNING|SUCCESS|FAILED|PARTIAL
+  triggeredBy    String // "manual" | "scheduled"
+  triggeredById  Int?
+  totalProcessed Int       @default(0)
+  totalErrors    Int       @default(0)
+
+  erros SyncError[]
+}
+
+model SyncError {
+  id           String   @id @default(cuid())
+  syncRunId    String
+  syncRun      SyncRun  @relation(fields: [syncRunId], references: [id], onDelete: Cascade)
+  sourceEntity String
+  sourceId     String
+  mensagem     String
+  detalhesJson String?
+  createdAt    DateTime @default(now())
+
+  @@index([syncRunId])
+}
+
+model CommissionRule {
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  active           Boolean  @default(true)
+  priority         Int      @default(0)
+  eventType        String
+  benefitType      String // COMMISSION|BONUS|DSR
+  cargoId          Int?
+  setorId          Int?
+  collaboratorId   Int?
+  servico          String?
+  approvalRequired Boolean  @default(false)
+  createdById      Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  versoes CommissionRuleVersion[]
+}
+
+model CommissionRuleVersion {
+  id                  String         @id @default(cuid())
+  ruleId              String
+  rule                CommissionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  version             Int
+  status              String         @default("DRAFT") // DRAFT|PUBLISHED|INACTIVE
+  validFrom           DateTime
+  validTo             DateTime?
+  conditionsJson      String
+  calculationJson     String
+  paymentScheduleJson String
+  publishedById       Int?
+  publishedAt         DateTime?
+  createdAt           DateTime       @default(now())
+
+  @@unique([ruleId, version])
+}
+
+model EligibilityOverride {
+  id             String @id @default(cuid())
+  collaboratorId Int?
+  cargoId        Int?
+
+  // Fase 3.7 do Cliente Master (2026-08-14): mesma dupla clienteServicoId/clienteId, aplicada
+  // por consistência mesmo sem dado real hoje (campo nunca exposto pela UI de exceções).
+  clienteServicoId Int?
+  clienteServico   ClienteServico? @relation(fields: [clienteServicoId], references: [id])
+  clienteId        Int?
+  cliente          Cliente?        @relation(fields: [clienteId], references: [id])
+
+  contratoComercialId String?
+  contratoComercial   ContratoComercial? @relation(fields: [contratoComercialId], references: [id])
+
+  servico              String? // filtro de elegibilidade, não snapshot histórico
+  eventType            String?
+  dataInicial          DateTime?
+  dataFinal            DateTime?
+  tipo                 String // BLOQUEIO|SUBSTITUICAO|PERCENTUAL_ESPECIFICO|VALOR_ESPECIFICO|EXCLUSAO
+  percentualEspecifico Float?
+  valorEspecificoCents Int?
+  justificativa        String
+  prioridade           Int       @default(0)
+  approvalRequired     Boolean   @default(false)
+  aprovadoById         Int?
+  aprovadoEm           DateTime?
+  createdById          Int
+  createdAt            DateTime  @default(now())
+
+  @@index([clienteServicoId])
+  @@index([clienteId])
+  @@index([contratoComercialId])
+}
+
+model CommissionEntry {
+  id             String          @id @default(cuid())
+  eventId        String
+  event          CommissionEvent @relation(fields: [eventId], references: [id])
+  collaboratorId Int
+  cargoId        Int
+  vinculo        String // "CLT" | "PJ" resolvido na data do evento
+  ruleVersionId  String?
+
+  totalCents Int    @default(0)
+  status     String @default("Pendente") // Pendente|AguardandoAprovacao|Programado|Pago|ParcialmentePago|Vencido|Bloqueado|EmDivergencia|Cancelado|Estornado
+
+  contractualDueDate       DateTime?
+  operationalSuggestedDate DateTime?
+  scheduledPaymentDate     DateTime?
+  actualPaymentDate        DateTime?
+
+  componentes EntryComponent[]
+  ajustes     ManualAdjustment[]
+  alocacoes   PaymentAllocation[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([eventId, collaboratorId])
+  @@index([collaboratorId])
+  @@index([status])
+}
+
+model EntryComponent {
+  id                 String          @id @default(cuid())
+  entryId            String
+  entry              CommissionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  tipo               String // COMISSAO|PREMIO|DSR|AJUSTE
+  valorCents         Int
+  percentual         Float?
+  memoriaCalculoJson String
+  createdAt          DateTime        @default(now())
+}
+
+model ManualAdjustment {
+  id                 String          @id @default(cuid())
+  entryId            String
+  entry              CommissionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  valorOriginalCents Int
+  valorAjustadoCents Int
+  justificativa      String
+  aprovadoById       Int?
+  aprovadoEm         DateTime?
+  createdById        Int
+  createdAt          DateTime        @default(now())
+}
+
+model Payment {
+  id                   String   @id @default(cuid())
+  data                 DateTime
+  valorCents           Int
+  meio                 String
+  referencia           String?
+  observacao           String?
+  comprovanteUrl       String?
+  usuarioResponsavelId Int
+  tipo                 String   @default("PAGAMENTO") // PAGAMENTO|ESTORNO
+  estornoDeId          String?
+  createdAt            DateTime @default(now())
+
+  alocacoes PaymentAllocation[]
+}
+
+model PaymentAllocation {
+  id         String          @id @default(cuid())
+  paymentId  String
+  payment    Payment         @relation(fields: [paymentId], references: [id])
+  entryId    String
+  entry      CommissionEntry @relation(fields: [entryId], references: [id])
+  valorCents Int
+
+  @@index([entryId])
+}
+
+model TariffVersion {
+  id                       String    @id @default(cuid())
+  servico                  String
+  valorCents               Int
+  dataInicial              DateTime
+  dataFinal                DateTime?
+  formasPagamentoJson      String
+  descontoPadraoPercentual Float?
+  condicoesJson            String?
+  createdAt                DateTime  @default(now())
+}
+
+model CommissionDivergence {
+  id            String           @id @default(cuid())
+  eventId       String?
+  event         CommissionEvent? @relation(fields: [eventId], references: [id])
+  entryId       String?
+  tipo          String // as 14 checagens da seção 28 do prompt original
+  severidade    String // PENDING_REVIEW|BLOCKED|INTEGRATION_ERROR
+  detalhes      String
+  resolvidoEm   DateTime?
+  resolvidoById Int?
+  createdAt     DateTime         @default(now())
+}
+
+model ExportDocument {
+  id                String   @id @default(cuid())
+  tipo              String // comissoes|premios|comissao_dsr|todos
+  colaboradorId     Int?
+  periodoInicio     DateTime
+  periodoFim        DateTime
+  formato           String // PDF|XLSX|AMBOS
+  codigoVerificacao String   @unique
+  hash              String
+  geradoPorId       Int
+  createdAt         DateTime @default(now())
+
+  itens ExportDocumentItem[]
+}
+
+model ExportDocumentItem {
+  id         String         @id @default(cuid())
+  documentId String
+  document   ExportDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  entryId    String?
+  linhaJson  String
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  data      DateTime
+  nome      String
+  escopo    String // NACIONAL|ESTADUAL|MUNICIPAL
+  uf        String?
+  municipio String?
+
+  @@index([data])
+}
+
+model CommissionAuditLog {
+  id            String   @id @default(cuid())
+  userId        Int
+  acao          String
+  entityType    String
+  entityId      String
+  beforeJson    String?
+  afterJson     String?
+  reason        String?
+  ipAddress     String?
+  userAgent     String?
+  correlationId String
+  createdAt     DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([correlationId])
+}
+
+/**
+ * RBAC granular por ação dentro do módulo de Comissões — substitui a checagem hardcoded
+ * `ROLES_TEMPORARIAMENTE_PERMITIDOS` presente em 12 Server Actions. Categoria (não ação
+ * individual — 33 funções reais agrupadas em 6 categorias funcionais, decisão do usuário):
+ * VISUALIZAR (listar/ver detalhes), SINCRONIZAR, PAGAR (registrar/programar/estornar/lote),
+ * APROVAR (eventos/divergências/ajustes), CONFIGURAR (cargos/tarifários/regras/feriados/
+ * exceções), EXPORTAR. Admin/CEO sempre têm acesso total, independente desta tabela
+ * (bypass já existente em todo o módulo, mantido).
+ */
+model CommissionPermission {
+  id        String   @id @default(cuid())
+  userId    Int
+  categoria String // VISUALIZAR|SINCRONIZAR|PAGAR|APROVAR|CONFIGURAR|EXPORTAR
+  permitido Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoria])
+  @@index([userId])
+}
+
+model ChecklistDocumental {
+  id        String   @id @default(cuid())
+  usuarioId Int      @unique
+  usuario   usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  carteiraTrabalho      Boolean @default(false)
+  pis                   Boolean @default(false)
+  identidade            Boolean @default(false)
+  cpfDoc                Boolean @default(false)
+  cnh                   Boolean @default(false)
+  tituloEleitor         Boolean @default(false)
+  reservista            Boolean @default(false)
+  comprovanteResidencia Boolean @default(false)
+  certidao              Boolean @default(false)
+  foto3x4               Boolean @default(false)
+  exameAdmissional      Boolean @default(false)
+  escolaridade          Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("checklist_documental")
+}
+
+// ─── Bibble Chat ──────────────────────────────────────────────────────────────
+
+model BibbleProject {
+  id           String          @id @default(cuid())
+  userId       Int
+  title        String
+  systemPrompt String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  sessions     BibbleSession[]
+  user         usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("bibble_project")
+}
+
+model BibbleSession {
+  id            String          @id @default(cuid())
+  userId        Int
+  title         String          @default("Nova conversa")
+  projectId     String?
+  // Sessão Onyx vinculada (quando a conversa é com um agente Onyx). É a fonte de
+  // verdade do histórico dessa conversa — texto + imagens vêm do Onyx via
+  // GET /chat/get-chat-session/{id}. NULL = conversa Bibble/Ollama (histórico local).
+  onyxSessionId String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  messages      BibbleMessage[]
+  user          usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       BibbleProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("bibble_session")
+}
+
+model BibbleMessage {
+  id        String        @id @default(cuid())
+  sessionId String
+  role      String
+  content   String
+  tokens    Int?
+  createdAt DateTime      @default(now())
+  session   BibbleSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("bibble_message")
+}
+
+// ─── Onyx ─────────────────────────────────────────────────────────────────────
+// Vincula cada agente criado no Onyx (conta de serviço única) ao usuário do
+// PainelAlpha que o criou. Permite filtrar/gerenciar agentes por dono sem
+// precisar criar usuários no Onyx.
+model OnyxAgentOwner {
+  id          Int      @id @default(autoincrement())
+  onyxAgentId Int      @unique
+  userId      Int
+  agentName   String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isPublic])
+  @@map("onyx_agent_owner")
+}
+
+// Agentes fixados pelo usuário no chat IAlpha (máx. 3). Segue o usuário entre dispositivos.
+model OnyxAgenteFixado {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  onyxAgentId Int
+  agentName   String?
+  ordem       Int      @default(0)
+  createdAt   DateTime @default(now())
+  user        usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, onyxAgentId])
+  @@index([userId])
+  @@map("onyx_agente_fixado")
+}
+
+// ─── Parceiros ────────────────────────────────────────────────────────────────
+
+model Parceiro {
+  id                 Int                     @id @default(autoincrement())
+  tipo               String // "PF" | "PJ"
+  tipoParceiro       String                  @default("PADRAO") // "PADRAO" | "SEM_COMISSAO" | "ESPECIAL"
+  documento          String                  @unique
+  nome               String
+  nomeFantasia       String?
+  dataNascimento     String? // só preenchido quando tipo=PF
+  sobre              String? // "fale mais sobre você/sua empresa" — herdado do pré-cadastro (convite)
+  email              String
+  nomeBanco          String?
+  agencia            String?
+  conta              String?
+  chavePix           String?
+  tipoChavePix       String?
+  pixConfirmado      Boolean                 @default(false)
+  pixConfirmadoEm    DateTime?
+  nivel              String                  @default("GOLD")
+  nivelAtualizadoEm  DateTime? // base da janela de 60 dias (promoção/rebaixamento)
+  comissaoPercentual Float? // override manual opcional (lógica futura)
+  dadosConsulta      String?
+  telefone           String?
+  telefone2          String?
+  loginEmail         String
+  senhaHash          String
+  // ─── Onboarding / termo de adesão (portal AlphaParceiros) ──────────────────
+  senhaTemporaria    Boolean                 @default(true)
+  onboardingCompleto Boolean                 @default(false)
+  termoAceito        Boolean                 @default(false)
+  termoAceitoEm      DateTime?
+  termoVersao        String?
+  // ─── Ativação de acesso (admin pode desativar sem excluir o cadastro) ──────
+  ativo              Boolean                 @default(true)
+  desativadoEm       DateTime?
+  desativadoPorId    Int?
+  criadoPorId        Int
+  criadoPor          usuarios                @relation(fields: [criadoPorId], references: [id])
+  endereco           ParceiroEndereco?
+  representantes     ParceiroRepresentante[]
+  indicacoes         Indicacao[]
+  convitesGerados    ConviteParceiro[]       @relation("ConvitesPorParceiro")
+  pessoasVinculadas  PessoaParceiroVinculo[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([documento])
+  @@index([criadoPorId])
+  @@map("parceiros")
+}
+
+// Indicação: vincula um Parceiro a uma empresa do CS&NPS (model `clientes`).
+// Fonte de verdade tanto do fluxo "Nova Indicação" quanto do canal de aquisição no Metas.
+model Indicacao {
+  id                    Int       @id @default(autoincrement())
+  parceiroId            Int
+  parceiro              Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  clienteId             Int       @unique // uma empresa é indicada por no máximo 1 parceiro
+  cliente               Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  dataIndicacao         DateTime  @default(now())
+  status                String    @default("ATIVA") // "ATIVA" | "DESVINCULADA"
+  criadoPorId           Int
+  criadoPor             usuarios  @relation("IndicacaoAutor", fields: [criadoPorId], references: [id])
+  // Comprovante de comissão (enviado no PainelAlpha, visto no portal do parceiro)
+  comprovanteUrl        String?
+  comprovanteNome       String?
+  comprovanteTipo       String? // mime type
+  comprovanteEnviadoEm  DateTime?
+  comprovanteEnviadoPor String?
+  createdAt             DateTime  @default(now())
+
+  @@index([parceiroId])
+  @@index([clienteId])
+  @@map("indicacoes")
+}
+
+// Permissões do módulo de Parceiros (geridas pelo Admin via engrenagem).
+// Admin/CEO sempre têm acesso total e NÃO dependem desta tabela.
+model ParceiroAcesso {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  user        usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podeEditar  Boolean  @default(false)
+  podeExcluir Boolean  @default(false)
+  /// Pode aprovar/rejeitar pré-cadastros de parceiro (wizard de convite) mesmo
+  /// não sendo Admin/CEO — 3º toggle da tela "Controle de Acesso"
+  /// (ModalEngrenagem.tsx), ao lado de Editar/Excluir.
+  podeAprovar Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("parceiro_acesso")
+}
+
+model ParceiroEndereco {
+  id          Int      @id @default(autoincrement())
+  parceiroId  Int      @unique
+  parceiro    Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  cep         String
+  logradouro  String
+  numero      String?
+  complemento String?
+  bairro      String
+  cidade      String
+  uf          String
+
+  @@map("parceiro_endereco")
+}
+
+// Representantes cadastrados pelo parceiro no portal AlphaParceiros (manual, N por parceiro).
+// Mantido no schema por decisão explícita (2026-08-12, Fase 3.1b do Cliente Master) mesmo
+// sem escrita nova — mesmo padrão já aplicado a `PessoaEmpresaVinculo` em 2026-08-08. O
+// fluxo ativo de representante de parceiro passa a ser `Pessoa`/`PessoaParceiroVinculo`
+// (papel="REPRESENTANTE"). `ParceiroResponsavel` (irmão órfão, 0 uso confirmado no código)
+// foi removido nesta mesma fase.
+model ParceiroRepresentante {
+  id             Int      @id @default(autoincrement())
+  parceiroId     Int
+  parceiro       Parceiro @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  tipo           String
+  documento      String
+  nome           String
+  dataNascimento String?
+  cargo          String?
+  email          String?
+  telefone       String?
+  createdAt      DateTime @default(now())
+
+  @@index([parceiroId])
+  @@map("parceiro_representante")
+}
+
+// Termo de adesão editável pelo Admin (sem mexer no código). O parceiro lê a
+// versão ATIVA no onboarding do portal. Mantém histórico de versões.
+model ParceiroTermo {
+  id          Int      @id @default(autoincrement())
+  versao      String // ex: "v1-2026"
+  conteudo    String // texto do termo (markdown/plano)
+  ativo       Boolean  @default(true)
+  criadoPorId Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("parceiro_termo")
+}
+
+// ─── Convite de parceiro (link temporário) ────────────────────────────────────
+// Gera um link público com token; o convidado preenche o form → vira PreCadastro.
+model ConviteParceiro {
+  id                  Int                   @id @default(autoincrement())
+  token               String                @unique // token do link (randomUUID)
+  status              String                @default("PENDENTE") // PENDENTE | USADO | REVOGADO | EXPIRADO
+  expiraEm            DateTime // validade do link
+  usoUnico            Boolean               @default(true)
+  // PIN de 4 dígitos — protege a consulta automática de CPF (custo por chamada
+  // na InfoSimples). Nullable: convites gerados antes desta feature não têm PIN
+  // e por isso NÃO liberam a busca automática (ver rota /api/convite/consulta-cpf).
+  pin                 String?
+  // Rate-limit de tentativas de PIN — compartilhado entre StepPin (entrada no
+  // wizard) e a consulta automática de CPF. 5 tentativas erradas suspende por 1min.
+  tentativasPin       Int                   @default(0)
+  suspensoAte         DateTime?
+  // Quem gerou: um usuário do Painel OU um parceiro existente (indicação).
+  criadoPorUserId     Int?
+  criadoPorParceiroId Int?
+  criadoPorUser       usuarios?             @relation("ConvitesCriados", fields: [criadoPorUserId], references: [id], onDelete: SetNull)
+  criadoPorParceiro   Parceiro?             @relation("ConvitesPorParceiro", fields: [criadoPorParceiroId], references: [id], onDelete: SetNull)
+  preCadastros        PreCadastroParceiro[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([token])
+  @@index([status])
+  @@map("convite_parceiro")
+}
+
+// Respostas do formulário público (espelho do Google Forms). Fica como
+// pré-cadastro até um admin aprovar e converter em Parceiro de verdade.
+model PreCadastroParceiro {
+  id                  Int              @id @default(autoincrement())
+  conviteId           Int?
+  convite             ConviteParceiro? @relation(fields: [conviteId], references: [id], onDelete: SetNull)
+  // Campos do formulário
+  email               String
+  nomeCompleto        String
+  cpf                 String?
+  dataNascimento      String? // usada na consulta automática de CPF (InfoSimples)
+  dadosConsultaCpf    String? // JSON bruto da resposta InfoSimples (CPF)
+  uf                  String
+  municipio           String?
+  telefone            String
+  whatsapp            String?
+  // Endereço estruturado (wizard multi-tela com busca de CEP)
+  cep                 String?
+  logradouro          String?
+  numero              String?
+  complemento         String?
+  bairro              String?
+  cidade              String?
+  areasAtuacao        String? // CSV das áreas selecionadas
+  nomeEmpresa         String? // campo legado — mantido por compatibilidade
+  razaoSocial         String? // preenchido pela consulta automática de CNPJ
+  nomeFantasia        String? // preenchido pela consulta automática de CNPJ
+  cnpj                String?
+  dadosConsultaCnpj   String? // JSON bruto da resposta ReceitaFederal (CNPJ)
+  sobre               String? // "fale mais sobre você/empresa"
+  tipoRecebimento     String? // "PF" | "PJ" — escolha explícita feita no wizard (Step Tipo). Null = pré-cadastros antigos, cai no fallback por CNPJ.
+  souRepresentante    Boolean          @default(true) // se PJ: true = o próprio preenchedor (nomeCompleto/cpf/dataNascimento) é o representante; false = usa representantesExtra
+  representantesExtra String? // JSON stringificado de { nome, cpf, dataNascimento, cargo }[] — só quando souRepresentante=false
+  // Aceite do termo (versão capturada no momento do aceite)
+  termoVersao         String
+  termoAceito         Boolean          @default(true)
+  termoAceitoEm       DateTime         @default(now())
+  // Fluxo de aprovação
+  status              String           @default("PENDENTE") // PENDENTE | APROVADO | REJEITADO
+  parceiroId          Int? // preenchido quando aprovado (vira Parceiro)
+  aprovadoPorId       Int?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([status])
+  @@index([conviteId])
+  @@map("pre_cadastro_parceiro")
+}
+
+// Config singleton do módulo Parceiros (1 linha). Controla flags globais.
+model ParceiroConfig {
+  id                        Int      @id @default(1)
+  permitirParceiroConvidar  Boolean  @default(false)
+  validadeConvitePadraoDias Int      @default(7)
+  updatedAt                 DateTime @updatedAt
+
+  @@map("parceiro_config")
+}
+
+// ─── Alpha Presentation Studio ────────────────────────────────────────────────
+// Editor de apresentações HTML interativas. Conteúdo de cada slide é guardado
+// como JSON (Slide.dadosJson) — não relacional — decisão registrada em
+// decisions.md (2026-07-09, "arquitetura de dados do slide").
+
+model Apresentacao {
+  id            String                    @id @default(cuid())
+  titulo        String
+  clienteNome   String?
+  autorId       Int
+  autor         usuarios                  @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  status        String                    @default("DRAFT") // DRAFT | PUBLICADA | ARQUIVADA
+  temaId        String?
+  tema          ApresentacaoTema?         @relation(fields: [temaId], references: [id])
+  thumbnailUrl  String?
+  slugPublico   String?                   @unique
+  senhaAcesso   String?
+  expiraEm      DateTime?
+  slides        Slide[]
+  assets        ApresentacaoAsset[]
+  versoes       ApresentacaoVersao[]
+  colaboradores ApresentacaoColaborador[]
+  comentarios   ApresentacaoComentario[]
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@index([autorId])
+  @@index([status])
+}
+
+model Slide {
+  id               String                   @id @default(cuid())
+  apresentacaoId   String
+  apresentacao     Apresentacao             @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  ordem            Int
+  nome             String?
+  transicaoEntrada String?
+  duracaoAutoplay  Int?
+  dadosJson        Json
+  comentarios      ApresentacaoComentario[]
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([apresentacaoId, ordem])
+}
+
+model ApresentacaoTema {
+  id              String         @id @default(cuid())
+  nome            String
+  corPrimaria     String
+  corSecundaria   String
+  corAccent       String
+  radius          String?
+  fontePrimaria   String?
+  fonteSecundaria String?
+  tokensJson      Json
+  isTemplate      Boolean        @default(false)
+  criadoPorId     Int?
+  apresentacoes   Apresentacao[]
+  createdAt       DateTime       @default(now())
+}
+
+model ApresentacaoAsset {
+  id             String       @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  tipo           String // IMAGEM | VIDEO | MODELO_3D | AUDIO | FONTE
+  url            String
+  nomeOriginal   String
+  tamanhoBytes   Int
+  createdAt      DateTime     @default(now())
+
+  @@index([apresentacaoId])
+}
+
+model ApresentacaoVersao {
+  id             String       @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  dadosJson      Json
+  criadoPorId    Int
+  label          String?
+  createdAt      DateTime     @default(now())
+
+  @@index([apresentacaoId, createdAt])
+}
+
+model ApresentacaoColaborador {
+  id             String       @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  userId         Int
+  user           usuarios     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  papel          String       @default("EDITOR") // EDITOR | VISUALIZADOR | COMENTARISTA
+
+  @@unique([apresentacaoId, userId])
+}
+
+model ApresentacaoComentario {
+  id             String       @id @default(cuid())
+  apresentacaoId String
+  apresentacao   Apresentacao @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+  slideId        String?
+  slide          Slide?       @relation(fields: [slideId], references: [id], onDelete: SetNull)
+  autorId        Int
+  autor          usuarios     @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  texto          String
+  resolvido      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+// ─── Calendário Alpha (Google Calendar via Domain-Wide Delegation) — MVP, sem webhook/vínculos internos ───
+// Ver docs/stories/story-calendario-alpha.md. Arquitetura 2026-07-17: Service Account com impersonation
+// (subject = usuarios.email, que é o mesmo e-mail do Google Workspace) — NÃO há OAuth por usuário nem
+// token individual a persistir/criptografar. O acesso real é concedido em bloco pelo Super Admin do
+// Workspace no Admin Console; `status` aqui é só a ativação/preferência do usuário dentro do Painel.
+
+model GoogleCalendarConexao {
+  id     String   @id @default(cuid())
+  userId Int      @unique
+  user   usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status String @default("ATIVA") // ATIVA | DESATIVADA — não revoga o acesso do Service Account, só a exibição/uso no Painel
+
+  ativadoEm    DateTime  @default(now())
+  desativadoEm DateTime?
+
+  ultimaSincronizacaoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  calendarios GoogleCalendarSelecionado[]
+
+  @@index([status])
+}
+
+model GoogleCalendarSelecionado {
+  id        String                @id @default(cuid())
+  conexaoId String
+  conexao   GoogleCalendarConexao @relation(fields: [conexaoId], references: [id], onDelete: Cascade)
+
+  googleCalendarId String
+  nome             String
+  corHex           String?
+  timezone         String
+  papelAcesso      String // owner | writer | reader | freeBusyReader
+
+  visivel  Boolean @default(true)
+  gravavel Boolean @default(false)
+
+  syncToken             String?
+  ultimaSincronizacaoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventos           GoogleCalendarEventoCache[]
+  pushChannels      GoogleCalendarPushChannel[]
+  pendingOperations GoogleCalendarPendingOperation[]
+  syncLease         GoogleCalendarSyncLease?
+
+  @@unique([conexaoId, googleCalendarId])
+}
+
+/// Cache local mínimo por evento sincronizado — só o necessário para renderizar as visões e
+/// suportar sync incremental por syncToken (idempotência via googleEventId). Google Calendar
+/// continua sendo a fonte de verdade; descrição, participantes e link do Meet NÃO são
+/// persistidos aqui e são buscados sob demanda ao abrir o detalhe do evento.
+model GoogleCalendarEventoCache {
+  id           String                    @id @default(cuid())
+  calendarioId String
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  googleEventId String
+  status        String // confirmed | tentative | cancelled
+  titulo        String?
+  inicioEm      DateTime?
+  fimEm         DateTime?
+  diaInteiro    Boolean   @default(false)
+  etag          String
+  linkMeet      String?
+
+  atualizadoGoogleEm DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([calendarioId, googleEventId])
+  @@index([calendarioId, inicioEm])
+}
+
+/// Canal push registrado no Google Calendar. O token persistido é somente o hash usado para
+/// autenticar notificações; o valor secreto nunca é armazenado em texto puro.
+model GoogleCalendarPushChannel {
+  id           String                    @id @default(cuid())
+  calendarioId String
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  googleChannelId  String  @unique
+  googleResourceId String?
+  resourceUri      String?
+  channelTokenHash String
+
+  status     String   @default("CREATING") // CREATING | ACTIVE | STOPPING | STOPPED | EXPIRED | ERROR
+  expiresAt  DateTime
+  renewAfter DateTime
+
+  activatedAt DateTime?
+  stoppedAt   DateTime?
+
+  lastMessageNumber  String?
+  lastNotificationAt DateTime?
+  lastErrorCode      String?
+  lastErrorAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pendingOperations GoogleCalendarPendingOperation[]
+
+  @@index([status, renewAfter])
+  @@index([calendarioId, status, expiresAt])
+}
+
+/// Fila persistente at-least-once para sincronização e manutenção de canais. O idempotencyKey
+/// impede enfileiramento duplicado e claimToken oferece fencing durante reclaims.
+model GoogleCalendarPendingOperation {
+  id           String                    @id @default(cuid())
+  calendarioId String
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  pushChannelId String?
+  pushChannel   GoogleCalendarPushChannel? @relation(fields: [pushChannelId], references: [id], onDelete: SetNull)
+
+  operationType  String // SYNC_CALENDAR | RENEW_CHANNEL | STOP_CHANNEL | RECONCILE_CHANNEL
+  source         String // WEBHOOK | MANUAL | SCHEDULED | ADMIN
+  idempotencyKey String  @unique
+  payloadJson    String?
+
+  status       String   @default("PENDING") // PENDING | PROCESSING | RETRY | SUCCEEDED | DEAD_LETTER | CANCELLED
+  priority     Int      @default(100)
+  attemptCount Int      @default(0)
+  maxAttempts  Int      @default(8)
+  availableAt  DateTime @default(now())
+
+  claimedBy      String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  claimToken     Int       @default(0)
+
+  lastErrorCode    String?
+  lastErrorMessage String?
+  completedAt      DateTime?
+  deadLetteredAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, availableAt, priority, createdAt])
+  @@index([status, claimExpiresAt])
+  @@index([calendarioId, operationType, status])
+  @@index([pushChannelId])
+}
+
+/// Lease distribuído por calendário. O fencingToken cresce a cada aquisição para impedir que
+/// workers antigos confirmem trabalho depois de perder o lease.
+model GoogleCalendarSyncLease {
+  id           String                    @id @default(cuid())
+  calendarioId String                    @unique
+  calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+
+  ownerId        String
+  fencingToken   Int      @default(1)
+  leaseExpiresAt DateTime
+  heartbeatAt    DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leaseExpiresAt])
+}
+
+/// Controle de idempotência dos alertas de compromisso próximo (10min/5min antes), disparados
+/// pelo cron `/api/calendario-alpha/jobs/alertas-compromissos` a cada 5min. Uma linha por
+/// (evento, destinatário, janela) — o mesmo evento pode gerar 1 linha para o dono do compromisso
+/// e outras para cada colega que visualiza aquela agenda (GoogleCalendarColegaVisivel.visivel).
+/// googleEventId (não um FK direto pro cache) porque o alerta de um destinatário-colega não tem
+/// necessariamente uma linha própria em GoogleCalendarEventoCache — todos leem o cache do DONO.
+model GoogleCalendarAlertaCompromisso {
+  id             String @id @default(cuid())
+  calendarioId   String // GoogleCalendarSelecionado.id do calendário DONO do compromisso (fonte do cache)
+  googleEventId  String
+  destinatarioId Int // usuários.id de quem recebe o alerta (dono OU colega visualizador)
+  janela         String // "10min" | "5min"
+
+  notificadoEm DateTime @default(now())
+
+  @@unique([calendarioId, googleEventId, destinatarioId, janela])
+  @@index([notificadoEm])
+}
+
+/// Compartilhamento de agenda entre colegas. Desde 2026-08-17, uma linha aqui só é criada
+/// depois de aprovação explícita do dono via GoogleCalendarSolicitacaoCompartilhamento — decisão
+/// revertida pelo usuário (a versão anterior deste comentário dizia "não é um convite que o dono
+/// aprova"; agora é exatamente isso, inclusive para Admin/CEO, sem bypass). `papel` substitui a
+/// antiga visão única — VISUALIZADOR só lê a agenda do colega, EDITOR também pode criar/editar/
+/// excluir eventos nela (checagem de ownership nas Server Actions de evento, não só aqui). `cor`
+/// continua atribuída automaticamente na criação (mantém a lógica antiga), agora no momento em
+/// que a solicitação é aprovada, não mais no clique de "adicionar".
+model GoogleCalendarColegaVisivel {
+  id       String  @id @default(cuid())
+  userId   Int // quem está vendo (o "viewer")
+  colegaId Int // o colega cuja agenda aparece na visão do viewer (o "dono")
+  papel    String  @default("VISUALIZADOR") // VISUALIZADOR | EDITOR
+  cor      String // hex atribuído para diferenciar este colega na grade do viewer
+  visivel  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  viewer usuarios @relation("ColegaViewer", fields: [userId], references: [id], onDelete: Cascade)
+  colega usuarios @relation("ColegaDono", fields: [colegaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, colegaId])
+  @@index([colegaId])
+}
+
+/// Solicitação de compartilhamento de agenda — fluxo de convite/aprovação (substituiu o acesso
+/// direto antigo, decisão de 2026-08-17). `solicitanteId` pede para ver/editar a agenda de
+/// `alvoId`; só o `alvoId` pode aprovar/recusar. Ao aprovar, a Server Action cria a linha
+/// correspondente em GoogleCalendarColegaVisivel com o `papel` pedido — esta tabela nunca vira
+/// a fonte de verdade de acesso, só o histórico/estado do pedido (mesmo espírito de
+/// ConviteParceiro→PreCadastroParceiro→aprovação→entidade real, adaptado para 2 usuários já
+/// autenticados, sem token público).
+model GoogleCalendarSolicitacaoCompartilhamento {
+  id            String    @id @default(cuid())
+  solicitanteId Int
+  alvoId        Int
+  papelPedido   String // VISUALIZADOR | EDITOR
+  status        String    @default("PENDENTE") // PENDENTE | ACEITO | RECUSADO
+  respondidoEm  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  solicitante usuarios @relation("SolicitacaoCompartilhamentoOrigem", fields: [solicitanteId], references: [id], onDelete: Cascade)
+  alvo        usuarios @relation("SolicitacaoCompartilhamentoAlvo", fields: [alvoId], references: [id], onDelete: Cascade)
+
+  @@index([alvoId, status])
+  @@index([solicitanteId, status])
+}
+
+/// Permissão administrativa para usar o compartilhamento de agenda entre colegas (Calendário
+/// Alpha). Presença de uma linha = usuário permitido a adicionar/ser adicionado por colegas.
+/// Admin/CEO sempre tem acesso pleno independente desta tabela (ver `isAdminRole`).
+model GoogleCalendarPermissaoColegas {
+  userId       Int      @id
+  user         usuarios @relation("PermissaoColegasCalendario", fields: [userId], references: [id], onDelete: Cascade)
+  concedidoPor Int
+  createdAt    DateTime @default(now())
+}
+
+// ─── Alpha Blueprint (central de especificação de sistemas) ──────────────────
+// Aprovado por Vault em 2026-07-27 (🟢 — 9 CREATE TABLE novas, sem alteração
+// em tabela existente). Ver blueprint completo do Scout / aprovação do Vault
+// no journal desta sessão.
+
+model BlueprintProject {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  title     String
+  slug      String?
+  summary   String?
+  problem   String?
+  objective String?
+
+  status              String  @default("IDEA")
+  priority            String  @default("NORMAL")
+  progress            Int     @default(0)
+  progressDetailsJson String?
+
+  setor       String?
+  requesterId Int
+  ownerId     Int?
+  developerId Int?
+
+  dueDate     DateTime?
+  coverUrl    String?
+  icon        String?
+  tagsJson    String?
+  premioCents Int?
+
+  createdById Int
+  updatedById Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  archivedAt  DateTime?
+
+  documents    BlueprintDocument[]
+  boards       BlueprintBoard[]
+  files        BlueprintFile[]
+  requirements BlueprintRequirement[]
+  questions    BlueprintQuestion[]
+  comments     BlueprintComment[]
+  members      BlueprintMember[]
+  activities   BlueprintActivity[]
+
+  requester usuarios  @relation("BlueprintRequester", fields: [requesterId], references: [id])
+  owner     usuarios? @relation("BlueprintOwner", fields: [ownerId], references: [id])
+  developer usuarios? @relation("BlueprintDeveloper", fields: [developerId], references: [id])
+  createdBy usuarios  @relation("BlueprintCreatedBy", fields: [createdById], references: [id])
+
+  @@index([status])
+  @@index([priority])
+  @@index([setor])
+  @@index([requesterId])
+  @@index([ownerId])
+  @@index([updatedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Sistema de Notas — camada global (Fase 01, prompt-phases/SistemaDeNotas)
+// ─────────────────────────────────────────────────────────────────────────
+
+model Note {
+  id             String    @id @default(cuid())
+  title          String
+  contentJson    Json
+  plainText      String
+  ownerId        Int
+  visibility     String // PRIVADA | COMPARTILHADA | EQUIPE | INSTITUCIONAL
+  status         String    @default("ATIVA") // RASCUNHO | ATIVA | ARQUIVADA | LIXEIRA
+  color          String?
+  icon           String?
+  isFavorite     Boolean   @default(false)
+  isPinned       Boolean   @default(false)
+  currentVersion Int       @default(1)
+  createdById    Int
+  updatedById    Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  archivedAt     DateTime?
+  deletedAt      DateTime?
+
+  owner     usuarios  @relation("NoteOwner", fields: [ownerId], references: [id])
+  createdBy usuarios  @relation("NoteCreatedBy", fields: [createdById], references: [id])
+  updatedBy usuarios? @relation("NoteUpdatedBy", fields: [updatedById], references: [id])
+
+  contexts    NoteContext[]
+  permissions NotePermission[]
+  teamShares  NoteTeamShare[]
+  tags        NoteTag[]
+  versions    NoteVersion[]
+  comments    NoteComment[]
+  attachments NoteAttachment[]
+  reminders   NoteReminder[]
+  openTabs    UserOpenNoteTab[]
+
+  @@index([ownerId, status])
+  @@index([status, deletedAt])
+  @@index([visibility])
+  @@index([updatedAt])
+  @@index([isPinned])
+}
+
+model NoteContext {
+  id           String   @id @default(cuid())
+  noteId       String
+  moduleKey    String
+  entityType   String
+  entityId     String
+  displayName  String
+  internalPath String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([moduleKey, entityType, entityId])
+  @@index([noteId])
+}
+
+model NotePermission {
+  id          String   @id @default(cuid())
+  noteId      String
+  subjectType String // USUARIO | SETOR | ROLE
+  subjectId   String
+  role        String // LEITOR | COMENTARISTA | EDITOR | ADMIN
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  createdBy usuarios @relation("NotePermissionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([noteId, subjectType, subjectId])
+  @@index([subjectType, subjectId])
+}
+
+model NoteTeam {
+  id        String   @id @default(cuid())
+  name      String
+  nameKey   String
+  ownerId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   usuarios         @relation("NoteTeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members NoteTeamMember[]
+  shares  NoteTeamShare[]
+
+  @@unique([ownerId, nameKey])
+  @@index([ownerId])
+}
+
+model NoteTeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    Int
+  role      String   @default("LEITOR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team NoteTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user usuarios @relation("NoteTeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+model NoteTeamShare {
+  id          String   @id @default(cuid())
+  noteId      String
+  teamId      String
+  createdById Int
+  createdAt   DateTime @default(now())
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  team      NoteTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy usuarios @relation("NoteTeamShareCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([noteId, teamId])
+  @@index([teamId])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String
+  ownerId   Int?
+  setorNome String?
+  createdAt DateTime @default(now())
+
+  owner usuarios? @relation("TagOwner", fields: [ownerId], references: [id])
+  notes NoteTag[]
+
+  @@unique([name, ownerId, setorNome])
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId])
+}
+
+model NoteVersion {
+  id            String   @id @default(cuid())
+  noteId        String
+  version       Int
+  title         String
+  contentJson   Json
+  plainText     String
+  changedById   Int
+  changeSummary String?
+  createdAt     DateTime @default(now())
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  changedBy usuarios @relation("NoteVersionChangedBy", fields: [changedById], references: [id])
+
+  @@unique([noteId, version])
+  @@index([noteId, createdAt])
+}
+
+model NoteComment {
+  id         String    @id @default(cuid())
+  noteId     String
+  parentId   String?
+  authorId   Int
+  content    String
+  isResolved Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  note   Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author usuarios @relation("NoteCommentAuthor", fields: [authorId], references: [id])
+
+  @@index([noteId, deletedAt])
+}
+
+model NoteAttachment {
+  id           String    @id @default(cuid())
+  noteId       String
+  fileName     String
+  mimeType     String
+  size         Int
+  storageKey   String
+  uploadedById Int
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  note       Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  uploadedBy usuarios @relation("NoteAttachmentUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([noteId, deletedAt])
+}
+
+model NoteReminder {
+  id          String    @id @default(cuid())
+  noteId      String
+  userId      Int
+  remindAt    DateTime
+  status      String    @default("PENDENTE") // PENDENTE | CONCLUIDO | ADIADO
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  note Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user usuarios @relation("NoteReminderUser", fields: [userId], references: [id])
+
+  @@index([userId, remindAt, status])
+}
+
+model UserOpenNoteTab {
+  id        String   @id @default(cuid())
+  userId    Int
+  noteId    String
+  position  Int
+  isActive  Boolean  @default(false)
+  isPinned  Boolean  @default(false)
+  openedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  note Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user usuarios @relation("UserOpenNoteTabUser", fields: [userId], references: [id])
+
+  @@unique([userId, noteId])
+  @@index([userId, position])
+}
+
+model UserNotesWorkspace {
+  userId           Int      @id
+  isTaskbarVisible Boolean  @default(true)
+  viewerMode       String   @default("RECOLHIDO") // RECOLHIDO | COMPACTO | EXPANDIDO | TELA_AMPLA
+  viewerHeight     Int      @default(320)
+  activeNoteId     String?
+  updatedAt        DateTime @updatedAt
+
+  user usuarios @relation("UserNotesWorkspaceUser", fields: [userId], references: [id])
+}
+
+model BlueprintMember {
+  id              String   @id @default(cuid())
+  projectId       String
+  userId          Int
+  role            String
+  permissionsJson String?
+  addedById       Int
+  createdAt       DateTime @default(now())
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  usuario usuarios         @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model BlueprintDocument {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  contentJson String
+  contentText String?
+  order       Int      @default(0)
+  createdById Int
+  updatedById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model BlueprintBoard {
+  id           String   @id @default(cuid())
+  projectId    String
+  title        String
+  viewportJson String?
+  elementsJson String
+  version      Int      @default(1)
+  createdById  Int
+  updatedById  Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model BlueprintFile {
+  id           String    @id @default(cuid())
+  projectId    String
+  name         String
+  originalName String
+  description  String?
+  category     String?
+  mimeType     String
+  size         Int
+  url          String
+  thumbnailUrl String?
+  metadataJson String?
+  uploadedById Int
+  createdAt    DateTime  @default(now())
+  archivedAt   DateTime?
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([mimeType])
+}
+
+model BlueprintRequirement {
+  id                 String   @id @default(cuid())
+  projectId          String
+  code               String
+  title              String
+  description        String?
+  type               String
+  status             String   @default("RASCUNHO")
+  priority           String   @default("NORMAL")
+  acceptanceCriteria String?
+  sourceType         String?
+  sourceId           String?
+  assigneeId         Int?
+  dependenciesJson   String?
+  createdById        Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, code])
+  @@index([projectId])
+  @@index([status])
+}
+
+model BlueprintQuestion {
+  id           String    @id @default(cuid())
+  projectId    String
+  question     String
+  answer       String?
+  status       String    @default("ABERTA")
+  priority     String    @default("NORMAL")
+  authorId     Int
+  assignedToId Int?
+  sourceType   String?
+  sourceId     String?
+  answeredById Int?
+  answeredAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([assignedToId])
+  @@index([status])
+}
+
+model BlueprintComment {
+  id           String    @id @default(cuid())
+  projectId    String
+  parentId     String?
+  targetType   String
+  targetId     String?
+  content      String
+  authorId     Int
+  resolved     Boolean   @default(false)
+  resolvedById Int?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([targetType, targetId])
+}
+
+model BlueprintActivity {
+  id                String   @id @default(cuid())
+  projectId         String
+  userId            Int
+  action            String
+  entityType        String
+  entityId          String?
+  previousValueJson String?
+  newValueJson      String?
+  metadataJson      String?
+  createdAt         DateTime @default(now())
+
+  project BlueprintProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+// ─── Alpha BPM (2026-08-03) ───────────────────────────────────────────────────
+// Sistema de BPM/gestão de processos. Empresa = `clientes`, Pessoa = `socios`,
+// Setor = `Setor` (já existentes, reaproveitados — D-049). Card é a unidade central:
+// 1 card = 1 execução de processo/demanda, sempre vinculado a uma empresa (D-021).
+// Etapas/campos/SLA são metadados configuráveis via UI por pipeline (D-013), não enum fixo.
+
+model BpmPipeline {
+  id        String   @id @default(cuid())
+  nome      String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  setores            BpmPipelineSetor[]
+  etapas             BpmEtapa[]
+  campos             BpmCampo[]
+  cards              BpmCard[]
+  configAuditoria    BpmPipelineConfigAuditoria[]
+  checklistPerguntas BpmChecklistFollowUpPergunta[]
+
+  @@index([ativo])
+}
+
+model BpmPipelineSetor {
+  id         String @id @default(cuid())
+  pipelineId String
+  setorId    Int
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  setor    Setor       @relation(fields: [setorId], references: [id])
+
+  @@unique([pipelineId, setorId])
+  @@index([setorId])
+}
+
+model BpmEtapa {
+  id         String  @id @default(cuid())
+  pipelineId String
+  nome       String
+  ordem      Int     @default(0)
+  slaDias    Int?
+  script     String? // roteiro de texto exibido na aba "Script" da coluna Presente — só leitura por enquanto
+  ativo      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  campos   BpmCampo[]
+  cards    BpmCard[]
+
+  transicoesOrigem   BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
+  transicoesDestino  BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
+  camposObrigatorios BpmCampoObrigatorioEtapa[]
+
+  @@index([pipelineId])
+  @@index([pipelineId, ordem])
+}
+
+model BpmCampo {
+  id          String  @id @default(cuid())
+  pipelineId  String
+  etapaId     String?
+  nome        String
+  tipo        String // "texto" | "numero" | "data" | "selecao" | "booleano" (validado via Zod na action)
+  opcoesJson  String? // opções quando tipo = "selecao"
+  obrigatorio Boolean @default(false)
+  ordem       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pipeline            BpmPipeline                @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapa               BpmEtapa?                  @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  valores             BpmCardCampoValor[]
+  obrigatorioEmEtapas BpmCampoObrigatorioEtapa[]
+
+  @@index([pipelineId])
+  @@index([etapaId])
+}
+
+model BpmCard {
+  id            String  @id @default(cuid())
+  empresaId     Int
+  pipelineId    String
+  etapaId       String
+  responsavelId Int
+  servico       String?
+  status        String  @default("ATIVO") // "ATIVO" | "CONCLUIDO" | "CANCELADO"
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  concluidoEm DateTime?
+
+  // Pipeline "Revisão de Radar" — automações e regras por etapa (2026-08-10, ver
+  // .bibble/memory/plano-novos-leads-bpm.md). Todas nullable — nenhum card legado precisa
+  // ser retroativamente preenchido; automações tratam ausência como "ainda não se aplica".
+  primeiraVisualizacaoEm        DateTime? // primeiro acesso ao card, por qualquer usuário — indicador "nunca acessado" some após preenchido
+  proximoContatoEm              DateTime? // interrompe a automação de 8 dias (cobrança de follow-up); também validado como obrigatório na ENTRADA de "Em Tratativa"/"Sem Viabilidade"
+  // Standby - Follow Up: estado independente de proximoContatoEm.
+  // `ultimo` limita a automação a uma tarefa por ciclo de 7 dias; `interrompido`
+  // é NoLoss: pedido do lead para não receber mais follow-up e nunca é retomado automaticamente.
+  standbyFollowUpUltimoEm       DateTime?
+  standbyFollowUpInterrompidoEm DateTime?
+  dataReuniao                   DateTime? // data+hora combinadas da reunião (Coluna "Agendar Reunião"), timezone America/Sao_Paulo — mesmo contrato da Agenda Alpha
+  googleEventId                 String? // id do evento no Google Calendar, criado via botão "Agendar pelo Google Meet" — permite reagendar/atualizar o mesmo evento depois
+  googleCalendarId              String? // GoogleCalendarSelecionado.googleCalendarId usado ao criar a reunião — necessário para reagendar via atualizarEventoParcialNoCalendario (achado na Fase D)
+  googleMeetLink                String? // cache do hangoutLink retornado pela API, evita nova chamada só para exibir o link
+  statusPosFechamento           String? // "AGUARDANDO_CONTRATO"|"CONTRATO_A_ENVIAR"|"CONTRATO_ENVIADO"|"PAGAMENTO_CONFIRMADO"|"CONTRATO_ASSINADO" — só relevante na etapa "Fechado"
+  transcricaoReuniao            String? // texto livre — fallback manual da transcrição enquanto a integração automática com a Google Meet API não é decidida/implementada (Fase H, bloqueada)
+
+  empresa     Cliente     @relation(fields: [empresaId], references: [id])
+  pipeline    BpmPipeline @relation(fields: [pipelineId], references: [id])
+  etapa       BpmEtapa    @relation(fields: [etapaId], references: [id])
+  responsavel usuarios    @relation("BpmCardResponsavel", fields: [responsavelId], references: [id])
+
+  campoValores       BpmCardCampoValor[]
+  membros            BpmCardMembro[]
+  tarefas            BpmTarefa[]
+  historico          BpmCardHistorico[]
+  anexos             BpmCardAnexo[]
+  interacoes         BpmInteracaoCard[]
+  checklistsFollowUp BpmChecklistFollowUp[]
+
+  vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
+  vinculosDestino BpmCardVinculo[] @relation("CardDestino")
+
+  @@index([empresaId])
+  @@index([pipelineId])
+  @@index([etapaId])
+  @@index([responsavelId])
+  @@index([status])
+}
+
+model BpmCardCampoValor {
+  id      String  @id @default(cuid())
+  cardId  String
+  campoId String
+  valor   String?
+
+  card  BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  campo BpmCampo @relation(fields: [campoId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, campoId])
+  @@index([campoId])
+}
+
+model BpmCardMembro {
+  id        String   @id @default(cuid())
+  cardId    String
+  userId    Int
+  role      String // "RESPONSAVEL" | "ADMINISTRADOR" | "PARTICIPANTE"
+  createdAt DateTime @default(now())
+
+  card    BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  usuario usuarios @relation(fields: [userId], references: [id])
+
+  @@unique([cardId, userId])
+  @@index([userId])
+}
+
+model BpmCardVinculo {
+  id            String   @id @default(cuid())
+  cardOrigemId  String
+  cardDestinoId String
+  createdAt     DateTime @default(now())
+
+  cardOrigem  BpmCard @relation("CardOrigem", fields: [cardOrigemId], references: [id], onDelete: Cascade)
+  cardDestino BpmCard @relation("CardDestino", fields: [cardDestinoId], references: [id], onDelete: Cascade)
+
+  @@unique([cardOrigemId, cardDestinoId])
+  @@index([cardDestinoId])
+}
+
+model BpmTarefa {
+  id                String    @id @default(cuid())
+  cardId            String
+  titulo            String
+  descricao         String?
+  responsavelId     Int?
+  prazo             DateTime?
+  tipo              String    @default("TAREFA") // CHECKLIST | LIGACAO | WHATSAPP | EMAIL | TAREFA | LEMBRETE_RAPIDO
+  alertaEm          DateTime?
+  alertaDisparadoEm DateTime?
+  prioridade        String    @default("NORMAL") // "BAIXA" | "NORMAL" | "ALTA"
+  status            String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
+  checklistJson     String?
+  presetId          String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  concluidaEm DateTime?
+
+  card        BpmCard          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  responsavel usuarios?        @relation(fields: [responsavelId], references: [id])
+  preset      BpmTarefaPreset? @relation(fields: [presetId], references: [id])
+
+  @@index([cardId])
+  @@index([responsavelId])
+  @@index([status])
+  @@index([status, alertaEm])
+}
+
+model BpmTarefaPreset {
+  id           String  @id @default(cuid())
+  pipelineId   String?
+  nome         String
+  descricao    String?
+  tipoGeracao  String  @default("UNICA") // "UNICA" | "MULTIPLA" | "FLUXO" (configurável via UI — D-026)
+  templateJson String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tarefas BpmTarefa[]
+
+  @@index([pipelineId])
+}
+
+model BpmCardHistorico {
+  id                String   @id @default(cuid())
+  cardId            String
+  acao              String
+  valorAnteriorJson String?
+  valorNovoJson     String?
+  usuarioId         Int?
+  automacaoOrigem   String?
+  createdAt         DateTime @default(now())
+
+  card    BpmCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  usuario usuarios? @relation(fields: [usuarioId], references: [id])
+
+  @@index([cardId])
+  @@index([createdAt])
+}
+
+model BpmPipelineConfigAuditoria {
+  id                String   @id @default(cuid())
+  pipelineId        String
+  adminId           Int
+  campoAlterado     String
+  valorAnteriorJson String?
+  valorNovoJson     String?
+  createdAt         DateTime @default(now())
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  admin    usuarios    @relation(fields: [adminId], references: [id])
+
+  @@index([pipelineId])
+  @@index([createdAt])
+}
+
+model BpmCardAnexo {
+  id           String   @id @default(cuid())
+  cardId       String
+  url          String
+  nome         String
+  tipo         String?
+  tamanho      Int?
+  enviadoPorId Int
+  createdAt    DateTime @default(now())
+
+  card       BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  enviadoPor usuarios @relation(fields: [enviadoPorId], references: [id])
+
+  @@unique([cardId, url]) // recibo de upload é idempotente mesmo sob requisições concorrentes
+  @@index([cardId])
+}
+
+model BpmInteracaoCard {
+  id              String    @id @default(cuid())
+  cardId          String
+  tipo            String    @default("LIGACAO") // string livre p/ extensão futura sem migration (hoje só "LIGACAO")
+  agendadoEm      DateTime?
+  agendaLink      String?
+  observacoes     String?
+  resumo          String?
+  registradoPorId Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  card          BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  registradoPor usuarios @relation(fields: [registradoPorId], references: [id])
+
+  @@index([cardId])
+  @@index([createdAt])
+}
+
+// Pipeline "Revisão de Radar" — máquina de estado de transições permitidas entre etapas
+// (2026-08-10, ver .bibble/memory/plano-novos-leads-bpm.md). Etapa SEM nenhuma linha aqui
+// como origem continua permitindo qualquer destino — fallback preserva o comportamento
+// atual dos pipelines "Financeiro"/"Radar", que nunca pediram essa restrição.
+model BpmEtapaTransicaoPermitida {
+  id             String   @id @default(cuid())
+  etapaOrigemId  String
+  etapaDestinoId String
+  etapaOrigem    BpmEtapa @relation("TransicaoOrigem", fields: [etapaOrigemId], references: [id], onDelete: Cascade)
+  etapaDestino   BpmEtapa @relation("TransicaoDestino", fields: [etapaDestinoId], references: [id], onDelete: Cascade)
+
+  @@unique([etapaOrigemId, etapaDestinoId])
+  @@index([etapaOrigemId])
+}
+
+// Permite que um BpmCampo de nível pipeline (etapaId: null) seja obrigatório só em etapas
+// específicas, sem duplicar o campo por etapa (ex: "Valor acordado no contrato" é o mesmo
+// campo em Reunião Agendada/Em Tratativa/Fechado, mas só passa a ser obrigatório nelas).
+model BpmCampoObrigatorioEtapa {
+  id      String   @id @default(cuid())
+  campoId String
+  etapaId String
+  campo   BpmCampo @relation(fields: [campoId], references: [id], onDelete: Cascade)
+  etapa   BpmEtapa @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+
+  @@unique([campoId, etapaId])
+  @@index([etapaId])
+}
+
+// Checklist de follow-up obrigatório da etapa "Em Tratativa" — a lógica de UI que trava o
+// fechamento do card até o checklist estar completo é implementada em fase separada (Fase G),
+// e depende do catálogo de perguntas ainda não definido pelo usuário; o schema nasce pronto
+// para receber esse catálogo quando existir.
+model BpmChecklistFollowUp {
+  id            String   @id @default(cuid())
+  cardId        String
+  card          BpmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  perguntasJson String // snapshot das perguntas NO MOMENTO do follow-up — perguntas podem mudar no catálogo depois sem afetar registros passados
+  respostasJson String
+  completo      Boolean  @default(false)
+  criadoPorId   Int
+  criadoEm      DateTime @default(now())
+
+  usuario usuarios @relation(fields: [criadoPorId], references: [id])
+
+  @@index([cardId])
+}
+
+model BpmChecklistFollowUpPergunta {
+  id          String  @id @default(cuid())
+  pipelineId  String
+  pergunta    String
+  tipo        String // "texto" | "selecao" | "booleano" — mesmo catálogo de BpmCampo
+  opcoesJson  String?
+  obrigatoria Boolean @default(true)
+  ordem       Int     @default(0)
+  ativo       Boolean @default(true)
+
+  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+}
+
+// `model PessoaEmpresaVinculo` removido em 2026-08-14 (Fase 3.6 do Cliente Master) —
+// dependia de `socios`/`clientes` (ambos removidos), tabela física vazia (0 linhas)
+// desde antes desta fase, nunca chegou a ser usada de fato.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Alpha SEO — CANDIDATO ISOLADO, AINDA NÃO PROMOVIDO AO SCHEMA DE RUNTIME
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Projeto SEO é a fronteira multi-tenant do módulo. `ownerId` é a fonte
+/// canônica de ownership; a linha OWNER em members é uma projeção operacional
+/// que deve ser mantida na mesma transação pela camada de serviço.
+model AlphaSeoProject {
+  id               String    @id @default(cuid())
+  ownerId          Int
+  name             String
+  domain           String?
+  normalizedDomain String?
+  locationCode     Int       @default(2840)
+  locationName     String?
+  languageCode     String    @default("pt")
+  market           String    @default("BR")
+  status           String    @default("ACTIVE") // ACTIVE | ARCHIVED
+  archivedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  owner                usuarios                        @relation("AlphaSeoProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members              AlphaSeoProjectMember[]
+  invitations          AlphaSeoProjectInvitation[]
+  onboardingSelections AlphaSeoUserOnboarding[]
+  activation           AlphaSeoProjectActivation?
+  keywordResearchRuns  AlphaSeoKeywordResearchRun[]
+  savedKeywords        AlphaSeoSavedKeyword[]
+  savedKeywordTags     AlphaSeoSavedKeywordTag[]
+  keywordMetrics       AlphaSeoKeywordMetric[]
+  rankConfigs          AlphaSeoRankConfig[]
+  audits               AlphaSeoSiteAudit[]
+  googleOAuthNonces    AlphaSeoGoogleOAuthNonce[]
+  gscConnection        AlphaSeoGscConnection?
+  ga4Connection        AlphaSeoGa4Connection?
+  contextSections      AlphaSeoProjectContextSection[]
+  competitors          AlphaSeoProjectCompetitor[]
+  keyPages             AlphaSeoProjectKeyPage[]
+  researchLog          AlphaSeoProjectResearchLog[]
+  samSessions          AlphaSeoSamSession[]
+  backlinkSnapshots    AlphaSeoBacklinkSnapshot[]
+  apiKeys              AlphaSeoApiKey[]
+  mcpGrants            AlphaSeoMcpOAuthGrant[]
+  jobs                 AlphaSeoJob[]
+  costApprovals        AlphaSeoCostApproval[]
+  exports              AlphaSeoExport[]
+  aiVisibilityRuns     AlphaSeoAiVisibilityRun[]
+  externalOperations   AlphaSeoExternalOperationRun[]
+  providerCache        AlphaSeoProviderCache[]
+  auditEvents          AlphaSeoAuditEvent[]
+
+  @@index([ownerId, status, updatedAt])
+  @@index([status, archivedAt, updatedAt])
+  @@index([normalizedDomain])
+}
+
+model AlphaSeoProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    Int
+  role      String // OWNER | EDITOR | VIEWER
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    usuarios        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, userId])
+  @@index([userId, active, updatedAt])
+  @@index([projectId, role, active])
+}
+
+model AlphaSeoProjectInvitation {
+  id              String    @id @default(cuid())
+  projectId       String
+  email           String
+  normalizedEmail String
+  role            String // EDITOR | VIEWER
+  status          String    @default("PENDING") // PENDING | ACCEPTED | REVOKED | EXPIRED
+  tokenHash       String    @unique
+  inviterId       Int
+  acceptedById    Int?
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  project    AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter    usuarios        @relation("AlphaSeoInvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+  acceptedBy usuarios?       @relation("AlphaSeoInvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, expiresAt])
+  @@index([normalizedEmail, status, expiresAt])
+}
+
+model AlphaSeoUserOnboarding {
+  userId              Int       @id
+  activeProjectId     String?
+  interestedFeatures  Json
+  workFor             String?
+  clientWebsiteCount  String?
+  foundVia            String?
+  mcpSetupIntent      String?
+  completedAt         DateTime?
+  gscNudgeDismissedAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user          usuarios         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeProject AlphaSeoProject? @relation(fields: [activeProjectId], references: [id], onDelete: SetNull)
+
+  @@index([activeProjectId])
+}
+
+model AlphaSeoUserActivation {
+  userId               Int       @id
+  firstMcpAuthorizedAt DateTime?
+  firstMcpToolCallAt   DateTime?
+  updatedAt            DateTime  @updatedAt
+
+  user usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AlphaSeoProjectActivation {
+  projectId               String    @id
+  competitorStepClickedAt DateTime?
+  mcpCardDismissedAt      DateTime?
+  ga4CardDismissedAt      DateTime?
+  updatedAt               DateTime  @updatedAt
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+/// Histórico reproduzível de pesquisa. Seeds/request/result são snapshots
+/// tipados na camada Zod; não duplicam SavedKeyword nem KeywordMetric.
+model AlphaSeoKeywordResearchRun {
+  id                 String    @id @default(cuid())
+  projectId          String
+  requestedById      Int
+  mode               String // AUTO | RELATED | SUGGESTIONS | IDEAS
+  locationCode       Int
+  languageCode       String
+  includeClickstream Boolean   @default(false)
+  seeds              Json
+  request            Json
+  requestHash        String
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING")
+  result             Json?
+  partialResult      Json?
+  errorCode          String?
+  estimatedUnits     Int       @default(0)
+  estimatedMicrosUsd Int       @default(0)
+  actualUnits        Int?
+  actualMicrosUsd    Int?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  project     AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy usuarios        @relation("AlphaSeoKeywordResearchRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([projectId, requestHash, createdAt])
+  @@index([status, createdAt])
+}
+
+model AlphaSeoSavedKeyword {
+  id           String   @id @default(cuid())
+  projectId    String
+  keyword      String
+  normalized   String
+  locationCode Int      @default(2840)
+  languageCode String   @default("pt")
+  createdAt    DateTime @default(now())
+
+  project        AlphaSeoProject                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tagAssignments AlphaSeoSavedKeywordTagAssignment[]
+
+  @@unique([projectId, normalized, locationCode, languageCode])
+  @@index([projectId, createdAt])
+}
+
+model AlphaSeoSavedKeywordTag {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String
+  normalizedName String
+  color          String?
+  createdAt      DateTime @default(now())
+
+  project     AlphaSeoProject                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignments AlphaSeoSavedKeywordTagAssignment[]
+
+  @@unique([projectId, normalizedName])
+  @@index([projectId, name])
+}
+
+model AlphaSeoSavedKeywordTagAssignment {
+  savedKeywordId String
+  tagId          String
+  createdAt      DateTime @default(now())
+
+  savedKeyword AlphaSeoSavedKeyword    @relation(fields: [savedKeywordId], references: [id], onDelete: Cascade)
+  tag          AlphaSeoSavedKeywordTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([savedKeywordId, tagId])
+  @@index([tagId])
+}
+
+model AlphaSeoKeywordMetric {
+  id                String   @id @default(cuid())
+  projectId         String
+  keyword           String
+  normalizedKeyword String
+  locationCode      Int
+  languageCode      String
+  searchVolume      Int?
+  cpcMicros         Int?
+  competition       Float?
+  keywordDifficulty Int?
+  intent            String?
+  monthlySearches   Json?
+  fetchedAt         DateTime @default(now())
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, normalizedKeyword, locationCode, languageCode])
+  @@index([projectId, normalizedKeyword, locationCode, languageCode, fetchedAt])
+}
+
+model AlphaSeoRankConfig {
+  id               String    @id @default(cuid())
+  projectId        String
+  domain           String
+  normalizedDomain String
+  locationCode     Int       @default(2840)
+  locationName     String?
+  languageCode     String    @default("pt")
+  devices          String    @default("BOTH") // BOTH | DESKTOP | MOBILE
+  serpDepth        Int
+  scheduleInterval String    @default("WEEKLY") // MANUAL | DAILY | WEEKLY | MONTHLY
+  scheduleAnchorAt DateTime?
+  isActive         Boolean   @default(true)
+  lastCheckedAt    DateTime?
+  nextCheckAt      DateTime?
+  lastSkipReason   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  project  AlphaSeoProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keywords AlphaSeoRankKeyword[]
+  runs     AlphaSeoRankRun[]
+
+  @@index([projectId, isActive, createdAt])
+  @@index([isActive, nextCheckAt])
+  @@index([projectId, normalizedDomain, locationCode, locationName])
+}
+
+model AlphaSeoRankKeyword {
+  id                String    @id @default(cuid())
+  configId          String
+  keyword           String
+  normalizedKeyword String
+  searchVolume      Int?
+  keywordDifficulty Int?
+  cpcMicros         Int?
+  metricsFetchedAt  DateTime?
+  createdAt         DateTime  @default(now())
+
+  config AlphaSeoRankConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@unique([configId, normalizedKeyword])
+  @@index([configId, createdAt])
+}
+
+model AlphaSeoRankRun {
+  id                 String    @id @default(cuid())
+  configId           String
+  requestedById      Int?
+  trigger            String // MANUAL | SCHEDULED
+  scheduledFor       DateTime?
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+  keywordsTotal      Int       @default(0)
+  keywordsChecked    Int       @default(0)
+  isSubsetRun        Boolean   @default(false)
+  estimatedUnits     Int       @default(0)
+  estimatedMicrosUsd Int       @default(0)
+  actualUnits        Int?
+  actualMicrosUsd    Int?
+  errorCode          String?
+  errorMessage       String?
+  leaseOwner         String?
+  leaseToken         Int       @default(0)
+  leaseExpiresAt     DateTime?
+  heartbeatAt        DateTime?
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+
+  config      AlphaSeoRankConfig     @relation(fields: [configId], references: [id], onDelete: Cascade)
+  requestedBy usuarios?              @relation("AlphaSeoRankRunRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  snapshots   AlphaSeoRankSnapshot[]
+
+  @@index([configId, startedAt])
+  @@index([status, leaseExpiresAt])
+  @@index([scheduledFor, status])
+}
+
+/// Sem FK para RankKeyword de propósito: remover uma keyword do tracking não
+/// pode apagar seu histórico de posição.
+model AlphaSeoRankSnapshot {
+  id                String   @id @default(cuid())
+  runId             String
+  trackingKeywordId String
+  keyword           String
+  device            String // DESKTOP | MOBILE
+  position          Int?
+  rankedUrl         String?
+  serpFeatures      Json?
+  checkedAt         DateTime @default(now())
+
+  run AlphaSeoRankRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, trackingKeywordId, device])
+  @@index([trackingKeywordId, device, checkedAt])
+}
+
+model AlphaSeoSiteAudit {
+  id                  String    @id @default(cuid())
+  projectId           String
+  startedById         Int
+  startUrl            String
+  idempotencyKey      String    @unique
+  status              String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+  workflowInstanceId  String?
+  config              Json
+  pagesCrawled        Int       @default(0)
+  pagesTotal          Int       @default(0)
+  lighthouseTotal     Int       @default(0)
+  lighthouseCompleted Int       @default(0)
+  lighthouseFailed    Int       @default(0)
+  currentPhase        String    @default("DISCOVERY")
+  errorCode           String?
+  errorDetail         String?
+  failedPhase         String?
+  leaseOwner          String?
+  leaseToken          Int       @default(0)
+  leaseExpiresAt      DateTime?
+  heartbeatAt         DateTime?
+  startedAt           DateTime  @default(now())
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+
+  project    AlphaSeoProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  startedBy  usuarios                  @relation("AlphaSeoSiteAuditStartedBy", fields: [startedById], references: [id], onDelete: Restrict)
+  pages      AlphaSeoAuditPage[]
+  issues     AlphaSeoAuditIssue[]
+  lighthouse AlphaSeoAuditLighthouse[]
+
+  @@index([projectId, createdAt])
+  @@index([startedById, createdAt])
+  @@index([status, heartbeatAt])
+}
+
+model AlphaSeoAuditPage {
+  id                 String  @id @default(cuid())
+  auditId            String
+  url                String
+  statusCode         Int?
+  redirectUrl        String?
+  title              String?
+  metaDescription    String?
+  canonicalUrl       String?
+  robotsMeta         String?
+  ogTitle            String?
+  ogDescription      String?
+  ogImage            String?
+  h1Count            Int     @default(0)
+  h2Count            Int     @default(0)
+  h3Count            Int     @default(0)
+  h4Count            Int     @default(0)
+  h5Count            Int     @default(0)
+  h6Count            Int     @default(0)
+  headingOrder       Json?
+  wordCount          Int     @default(0)
+  imagesTotal        Int     @default(0)
+  imagesMissingAlt   Int     @default(0)
+  images             Json?
+  internalLinkCount  Int     @default(0)
+  externalLinkCount  Int     @default(0)
+  hasStructuredData  Boolean @default(false)
+  hreflangTags       Json?
+  isIndexable        Boolean @default(true)
+  xRobotsTag         String?
+  headerCanonicalUrl String?
+  crawlDepth         Int?
+  inSitemap          Boolean @default(false)
+  contentHash        String?
+  fetchClass         String  @default("OK") // OK | BLOCKED | ERROR
+  responseTimeMs     Int?
+
+  audit      AlphaSeoSiteAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  issues     AlphaSeoAuditIssue[]
+  lighthouse AlphaSeoAuditLighthouse[]
+
+  @@unique([auditId, url])
+  @@index([auditId, statusCode])
+}
+
+model AlphaSeoAuditIssue {
+  id        String  @id @default(cuid())
+  auditId   String
+  pageId    String?
+  pageUrl   String
+  issueType String
+  severity  String  @default("INFO") // CRITICAL | WARNING | INFO
+  details   Json?
+
+  audit AlphaSeoSiteAudit  @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  page  AlphaSeoAuditPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([auditId, issueType])
+  @@index([pageId])
+  @@index([auditId, severity])
+}
+
+model AlphaSeoAuditLighthouse {
+  id                 String  @id @default(cuid())
+  auditId            String
+  pageId             String
+  strategy           String // MOBILE | DESKTOP
+  performanceScore   Int?
+  accessibilityScore Int?
+  bestPracticesScore Int?
+  seoScore           Int?
+  lcpMs              Float?
+  cls                Float?
+  inpMs              Float?
+  ttfbMs             Float?
+  errorMessage       String?
+  storageKey         String?
+  payloadSizeBytes   Int?
+
+  audit AlphaSeoSiteAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  page  AlphaSeoAuditPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, strategy])
+  @@index([auditId])
+}
+
+/// State + PKCE do Google. O verifier precisa ser recuperado no callback, por
+/// isso é ciphertext autenticado e versionado — nunca hash-only nem plaintext.
+model AlphaSeoGoogleOAuthNonce {
+  id                     String    @id @default(cuid())
+  userId                 Int
+  projectId              String
+  product                String // GSC | GA4
+  stateHash              String    @unique
+  codeVerifierCiphertext String
+  tokenKeyVersion        Int       @default(1)
+  redirectUriHash        String
+  expiresAt              DateTime
+  consumedAt             DateTime?
+  createdAt              DateTime  @default(now())
+
+  user    usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, product, expiresAt])
+  @@index([projectId, product, expiresAt])
+}
+
+/// Grant por conta Google/usuário. Tokens são sempre ciphertext autenticado;
+/// as conexões de GSC e GA4 abaixo só selecionam a property do projeto.
+model AlphaSeoGoogleOAuthGrant {
+  id                     String    @id @default(cuid())
+  userId                 Int
+  product                String // GSC | GA4
+  accountId              String
+  accountEmail           String?
+  accessTokenCiphertext  String
+  refreshTokenCiphertext String?
+  idTokenCiphertext      String?
+  scopes                 Json
+  tokenKeyVersion        Int       @default(1)
+  accessTokenExpiresAt   DateTime?
+  refreshTokenExpiresAt  DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user           usuarios                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gscConnections AlphaSeoGscConnection[]
+  ga4Connections AlphaSeoGa4Connection[]
+
+  @@unique([userId, product, accountId])
+  @@index([product, accessTokenExpiresAt])
+  @@index([userId, revokedAt])
+}
+
+model AlphaSeoGscConnection {
+  id                    String   @id @default(cuid())
+  projectId             String   @unique
+  grantId               String
+  connectedById         Int
+  siteUrl               String
+  connectedAccountEmail String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  project     AlphaSeoProject          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  grant       AlphaSeoGoogleOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  connectedBy usuarios                 @relation("AlphaSeoGscConnectedBy", fields: [connectedById], references: [id], onDelete: Restrict)
+
+  @@index([grantId])
+  @@index([connectedById, grantId])
+}
+
+model AlphaSeoGa4Connection {
+  id                    String   @id @default(cuid())
+  projectId             String   @unique
+  grantId               String
+  connectedById         Int
+  propertyId            String
+  propertyDisplayName   String
+  propertyTimeZone      String
+  propertyCurrencyCode  String
+  connectedAccountEmail String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  project     AlphaSeoProject          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  grant       AlphaSeoGoogleOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  connectedBy usuarios                 @relation("AlphaSeoGa4ConnectedBy", fields: [connectedById], references: [id], onDelete: Restrict)
+
+  @@index([grantId])
+  @@index([connectedById, grantId])
+}
+
+model AlphaSeoProjectContextSection {
+  projectId       String
+  key             String
+  title           String?
+  content         String
+  updatedByKind   String // USER | SAM | MCP
+  updatedByUserId Int?
+  updatedAt       DateTime @updatedAt
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedByUser usuarios?       @relation("AlphaSeoContextSectionUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@id([projectId, key])
+  @@index([updatedByUserId, updatedAt])
+}
+
+model AlphaSeoProjectCompetitor {
+  id               String   @id @default(cuid())
+  projectId        String
+  domain           String
+  normalizedDomain String
+  name             String?
+  notes            String?
+  updatedByKind    String // USER | SAM | MCP
+  updatedByUserId  Int?
+  updatedAt        DateTime @updatedAt
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedByUser usuarios?       @relation("AlphaSeoCompetitorUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, normalizedDomain])
+  @@index([updatedByUserId, updatedAt])
+}
+
+model AlphaSeoProjectKeyPage {
+  id              String   @id @default(cuid())
+  projectId       String
+  url             String
+  normalizedUrl   String
+  role            String // HUB | SPOKE | MONEY | OTHER
+  topic           String?
+  notes           String?
+  updatedByKind   String // USER | SAM | MCP
+  updatedByUserId Int?
+  updatedAt       DateTime @updatedAt
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedByUser usuarios?       @relation("AlphaSeoKeyPageUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, normalizedUrl])
+  @@index([updatedByUserId, updatedAt])
+}
+
+model AlphaSeoProjectResearchLog {
+  id              String   @id @default(cuid())
+  projectId       String
+  entryDate       String
+  summary         String
+  createdByKind   String // USER | SAM | MCP
+  createdByUserId Int?
+  createdAt       DateTime @default(now())
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser usuarios?       @relation("AlphaSeoResearchLogCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, entryDate, createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model AlphaSeoSamSession {
+  id          String    @id @default(cuid())
+  projectId   String
+  userId      Int
+  title       String    @default("Nova conversa")
+  status      String    @default("ACTIVE") // ACTIVE | CANCELLED | ARCHIVED
+  cancelledAt DateTime?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project  AlphaSeoProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     usuarios             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AlphaSeoSamMessage[]
+
+  @@index([projectId, updatedAt])
+  @@index([userId, status, updatedAt])
+}
+
+model AlphaSeoSamMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String // USER | ASSISTANT | TOOL | SYSTEM
+  content   String
+  toolCall  Json?
+  createdAt DateTime @default(now())
+
+  session AlphaSeoSamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model AlphaSeoBacklinkSnapshot {
+  id                   String   @id @default(cuid())
+  projectId            String
+  domain               String
+  rank                 Int?
+  backlinks            Int?
+  referringDomains     Int?
+  brokenBacklinks      Int?
+  newBacklinks         Int?
+  lostBacklinks        Int?
+  newReferringDomains  Int?
+  lostReferringDomains Int?
+  capturedAt           DateTime @default(now())
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, capturedAt])
+}
+
+/// API key do MCP/automação. Somente hash e prefixo são persistidos.
+model AlphaSeoApiKey {
+  id                String    @id @default(cuid())
+  projectId         String
+  createdById       Int
+  label             String
+  keyHash           String    @unique
+  prefix            String
+  scopes            Json
+  enabled           Boolean   @default(true)
+  rateLimitWindowMs Int       @default(60000)
+  rateLimitMax      Int       @default(120)
+  requestCount      Int       @default(0)
+  lastRequestAt     DateTime?
+  lastUsedAt        DateTime?
+  expiresAt         DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  project   AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy usuarios        @relation("AlphaSeoApiKeyCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, revokedAt])
+  @@index([prefix])
+}
+
+/// Registro dinâmico de OAuth client. Segredos confidenciais ficam hash-only;
+/// redirect URIs e metadados públicos são arrays/objetos Json validados.
+model AlphaSeoMcpOAuthClient {
+  id                      String    @id @default(cuid())
+  clientId                String    @unique
+  clientSecretHash        String?
+  clientName              String
+  redirectUris            Json
+  grantTypes              Json
+  responseTypes           Json
+  tokenEndpointAuthMethod String
+  scopes                  Json
+  createdById             Int?
+  revokedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  createdBy usuarios?               @relation("AlphaSeoMcpClientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  grants    AlphaSeoMcpOAuthGrant[]
+
+  @@index([createdById, revokedAt])
+}
+
+model AlphaSeoMcpOAuthGrant {
+  id            String    @id @default(cuid())
+  oauthClientId String
+  userId        Int
+  projectId     String
+  scopes        Json
+  resource      String?
+  status        String    @default("ACTIVE") // ACTIVE | REVOKED | EXPIRED
+  consentedAt   DateTime  @default(now())
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client             AlphaSeoMcpOAuthClient         @relation(fields: [oauthClientId], references: [id], onDelete: Cascade)
+  user               usuarios                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project            AlphaSeoProject                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorizationCodes AlphaSeoMcpAuthorizationCode[]
+  accessTokens       AlphaSeoMcpAccessToken[]
+  refreshTokens      AlphaSeoMcpRefreshToken[]
+
+  @@index([oauthClientId, userId, projectId, status])
+  @@index([userId, status, expiresAt])
+  @@index([projectId, status])
+}
+
+model AlphaSeoMcpAuthorizationCode {
+  id                  String    @id @default(cuid())
+  grantId             String
+  codeHash            String    @unique
+  redirectUriHash     String
+  codeChallenge       String
+  codeChallengeMethod String    @default("S256")
+  nonceHash           String?
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  grant AlphaSeoMcpOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId, expiresAt, consumedAt])
+}
+
+model AlphaSeoMcpAccessToken {
+  id         String    @id @default(cuid())
+  grantId    String
+  tokenHash  String    @unique
+  scopes     Json
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  grant AlphaSeoMcpOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId, expiresAt, revokedAt])
+}
+
+model AlphaSeoMcpRefreshToken {
+  id            String    @id @default(cuid())
+  grantId       String
+  tokenHash     String    @unique
+  tokenFamilyId String
+  parentTokenId String?
+  scopes        Json
+  expiresAt     DateTime
+  usedAt        DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  grant       AlphaSeoMcpOAuthGrant     @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  parentToken AlphaSeoMcpRefreshToken?  @relation("AlphaSeoMcpRefreshRotation", fields: [parentTokenId], references: [id], onDelete: SetNull)
+  rotations   AlphaSeoMcpRefreshToken[] @relation("AlphaSeoMcpRefreshRotation")
+
+  @@index([grantId, expiresAt, revokedAt])
+  @@index([tokenFamilyId, createdAt])
+  @@index([parentTokenId])
+}
+
+model AlphaSeoJob {
+  id               String    @id @default(cuid())
+  projectId        String?
+  type             String
+  status           String    @default("PENDING") // PENDING | PROCESSING | RETRY | SUCCEEDED | DEAD_LETTER | CANCELLED
+  idempotencyKey   String    @unique
+  payload          Json
+  result           Json?
+  priority         Int       @default(100)
+  attemptCount     Int       @default(0)
+  maxAttempts      Int       @default(5)
+  availableAt      DateTime  @default(now())
+  claimedBy        String?
+  claimedAt        DateTime?
+  claimExpiresAt   DateTime?
+  claimToken       Int       @default(0)
+  heartbeatAt      DateTime?
+  lastErrorCode    String?
+  lastErrorMessage String?
+  completedAt      DateTime?
+  deadLetteredAt   DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  project AlphaSeoProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt, priority, createdAt])
+  @@index([status, claimExpiresAt])
+  @@index([projectId, type, status])
+}
+
+model AlphaSeoCostApproval {
+  id                 String   @id @default(cuid())
+  projectId          String
+  userId             Int
+  operation          String
+  requestHash        String
+  estimatedUnits     Int      @default(0)
+  estimatedMicrosUsd Int      @default(0)
+  approvedAt         DateTime @default(now())
+  expiresAt          DateTime
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    usuarios        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, userId, operation, requestHash])
+  @@index([expiresAt])
+}
+
+model AlphaSeoExport {
+  id          String    @id @default(cuid())
+  projectId   String
+  createdById Int
+  kind        String
+  format      String // CSV | GOOGLE_SHEETS
+  filters     Json
+  columns     Json
+  status      String    @default("PENDING")
+  storageRef  String?
+  errorCode   String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  project   AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy usuarios        @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model AlphaSeoAiVisibilityRun {
+  id                 String    @id @default(cuid())
+  projectId          String
+  requestedById      Int
+  kind               String // BRAND_LOOKUP | PROMPT_EXPLORER
+  query              String
+  requestHash        String
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING")
+  estimatedMicrosUsd Int       @default(0)
+  actualMicrosUsd    Int?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  project         AlphaSeoProject                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy     usuarios                             @relation("AlphaSeoAiRunRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  providerResults AlphaSeoAiVisibilityProviderResult[]
+
+  @@index([projectId, kind, createdAt])
+  @@index([projectId, requestHash, createdAt])
+}
+
+model AlphaSeoAiVisibilityProviderResult {
+  id              String   @id @default(cuid())
+  runId           String
+  provider        String // CHATGPT | CLAUDE | GEMINI | PERPLEXITY
+  status          String
+  result          Json?
+  errorCode       String?
+  durationMs      Int?
+  actualMicrosUsd Int?
+  createdAt       DateTime @default(now())
+
+  run AlphaSeoAiVisibilityRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, provider])
+  @@index([provider, createdAt])
+}
+
+/// Histórico comum para Domain Overview, Backlinks detalhado, SERP, GSC e os
+/// relatórios GA4. O payload externo é um snapshot canônico da execução e não
+/// duplica entidades relacionais do projeto.
+model AlphaSeoExternalOperationRun {
+  id                 String    @id @default(cuid())
+  projectId          String
+  requestedById      Int
+  provider           String
+  operation          String
+  target             String?
+  request            Json
+  requestHash        String
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING")
+  result             Json?
+  partialResult      Json?
+  estimatedUnits     Int       @default(0)
+  estimatedMicrosUsd Int       @default(0)
+  actualUnits        Int?
+  actualMicrosUsd    Int?
+  errorCode          String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  project     AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy usuarios        @relation("AlphaSeoExternalOperationRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, operation, createdAt])
+  @@index([projectId, requestHash, createdAt])
+  @@index([provider, status, createdAt])
+}
+
+model AlphaSeoProviderCache {
+  id           String   @id @default(cuid())
+  projectId    String
+  provider     String
+  operation    String
+  cacheKeyHash String
+  payload      Json
+  sourceRunId  String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, provider, operation, cacheKeyHash])
+  @@index([expiresAt])
+}
+
+model AlphaSeoAuditEvent {
+  id         String   @id @default(cuid())
+  projectId  String?
+  userId     Int?
+  action     String
+  entityType String
+  entityId   String?
+  requestId  String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  project AlphaSeoProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    usuarios?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([requestId])
+}

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
@@ -103,9 +104,9 @@ model usuarios {
 
   googleCalendarConexao GoogleCalendarConexao?
 
-  colegasQueEuVejo           GoogleCalendarColegaVisivel[]   @relation("ColegaViewer")
-  colegasQueMeVeem           GoogleCalendarColegaVisivel[]   @relation("ColegaDono")
-  permissaoColegasCalendario GoogleCalendarPermissaoColegas? @relation("PermissaoColegasCalendario")
+  colegasQueEuVejo                      GoogleCalendarColegaVisivel[]               @relation("ColegaViewer")
+  colegasQueMeVeem                      GoogleCalendarColegaVisivel[]               @relation("ColegaDono")
+  permissaoColegasCalendario            GoogleCalendarPermissaoColegas?             @relation("PermissaoColegasCalendario")
   solicitacoesCompartilhamentoEnviadas  GoogleCalendarSolicitacaoCompartilhamento[] @relation("SolicitacaoCompartilhamentoOrigem")
   solicitacoesCompartilhamentoRecebidas GoogleCalendarSolicitacaoCompartilhamento[] @relation("SolicitacaoCompartilhamentoAlvo")
 
@@ -143,6 +144,34 @@ model usuarios {
 
   justificativasMetaEnviadas JustificativaMeta[]
   roadmapObjectives          RoadmapObjective[]
+  roadmapWorkspacesCriados   RoadmapWorkspace[]
+
+  alphaSeoProjetosPropriedade          AlphaSeoProject[]               @relation("AlphaSeoProjectOwner")
+  alphaSeoMembresias                   AlphaSeoProjectMember[]
+  alphaSeoConvitesCriados              AlphaSeoProjectInvitation[]     @relation("AlphaSeoInvitationInviter")
+  alphaSeoConvitesAceitos              AlphaSeoProjectInvitation[]     @relation("AlphaSeoInvitationAcceptedBy")
+  alphaSeoOnboarding                   AlphaSeoUserOnboarding?
+  alphaSeoAtivacao                     AlphaSeoUserActivation?
+  alphaSeoPesquisasSolicitadas         AlphaSeoKeywordResearchRun[]    @relation("AlphaSeoKeywordResearchRequestedBy")
+  alphaSeoRankRunsSolicitados          AlphaSeoRankRun[]               @relation("AlphaSeoRankRunRequestedBy")
+  alphaSeoAuditoriasIniciadas          AlphaSeoSiteAudit[]             @relation("AlphaSeoSiteAuditStartedBy")
+  alphaSeoGoogleOAuthNonces            AlphaSeoGoogleOAuthNonce[]
+  alphaSeoGoogleOAuthGrants            AlphaSeoGoogleOAuthGrant[]
+  alphaSeoGscConexoes                  AlphaSeoGscConnection[]         @relation("AlphaSeoGscConnectedBy")
+  alphaSeoGa4Conexoes                  AlphaSeoGa4Connection[]         @relation("AlphaSeoGa4ConnectedBy")
+  alphaSeoContextSectionsAtualizadas   AlphaSeoProjectContextSection[] @relation("AlphaSeoContextSectionUpdatedBy")
+  alphaSeoCompetidoresAtualizados      AlphaSeoProjectCompetitor[]     @relation("AlphaSeoCompetitorUpdatedBy")
+  alphaSeoKeyPagesAtualizadas          AlphaSeoProjectKeyPage[]        @relation("AlphaSeoKeyPageUpdatedBy")
+  alphaSeoResearchLogCriado            AlphaSeoProjectResearchLog[]    @relation("AlphaSeoResearchLogCreatedBy")
+  alphaSeoSamSessions                  AlphaSeoSamSession[]
+  alphaSeoApiKeysCriadas               AlphaSeoApiKey[]                @relation("AlphaSeoApiKeyCreatedBy")
+  alphaSeoMcpClientsCriados            AlphaSeoMcpOAuthClient[]        @relation("AlphaSeoMcpClientCreatedBy")
+  alphaSeoMcpGrants                    AlphaSeoMcpOAuthGrant[]
+  alphaSeoCustosAprovados              AlphaSeoCostApproval[]
+  alphaSeoExportsCriados               AlphaSeoExport[]
+  alphaSeoAiRunsSolicitados            AlphaSeoAiVisibilityRun[]       @relation("AlphaSeoAiRunRequestedBy")
+  alphaSeoOperacoesExternasSolicitadas AlphaSeoExternalOperationRun[]  @relation("AlphaSeoExternalOperationRequestedBy")
+  alphaSeoEventosAuditoria             AlphaSeoAuditEvent[]
 }
 
 /// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;
@@ -269,6 +298,27 @@ model RoadmapPromptArtifact {
   @@index([jobId, phaseNumber])
   @@index([attemptId])
   @@index([objectiveId, status])
+}
+
+/// Projeto externo registrado para desenvolvimento autônomo via Roadmap Alpha.
+/// rootPath é escolhido pelo usuário por navegador de diretório server-side
+/// (nunca digitado livremente) e revalidado a cada leitura — nunca confiar em
+/// path armazenado sem checar de novo que ainda existe e é um diretório real.
+model RoadmapWorkspace {
+  id              String    @id @default(cuid())
+  moduleKey       String    @unique
+  label           String
+  rootPath        String
+  status          String    @default("ATIVO")
+  createdById     Int
+  createdBy       usuarios  @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  archivedAt      DateTime?
+  workerPid       Int?
+  workerStartedAt DateTime?
+
+  @@index([status, createdAt, id])
 }
 
 model OnboardingTemplate {
@@ -490,15 +540,15 @@ model Cliente {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  servicos            ClienteServico[]
-  pessoas             PessoaClienteVinculo[]
-  indicacao           Indicacao?
-  bpmCards            BpmCard[]
-  extratos            Extratos?
-  consultaPreAnalise  ConsultaPreAnalise?
-  operacionalClientes OperacionalClientes[]
-  contratosComerciais ContratoComercial[]
-  historicoAlteracoes HistoricoAlteracaoCliente[]
+  servicos             ClienteServico[]
+  pessoas              PessoaClienteVinculo[]
+  indicacao            Indicacao?
+  bpmCards             BpmCard[]
+  extratos             Extratos?
+  consultaPreAnalise   ConsultaPreAnalise?
+  operacionalClientes  OperacionalClientes[]
+  contratosComerciais  ContratoComercial[]
+  historicoAlteracoes  HistoricoAlteracaoCliente[]
   commissionEvents     CommissionEvent[]
   businessProcesses    BusinessProcess[]
   eligibilityOverrides EligibilityOverride[]
@@ -529,9 +579,9 @@ model ClienteServico {
   canalAquisicao      String?
   canalOutro          String?
 
-  logCs               ClienteServicoLogCs[]
-  logFeedback         ClienteServicoLogFeedback[]
-  historicoAlteracoes ClienteServicoHistorico[]
+  logCs                ClienteServicoLogCs[]
+  logFeedback          ClienteServicoLogFeedback[]
+  historicoAlteracoes  ClienteServicoHistorico[]
   commissionEvents     CommissionEvent[]
   businessProcesses    BusinessProcess[]
   eligibilityOverrides EligibilityOverride[]
@@ -1646,8 +1696,8 @@ model ContratoColaborador {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model CommissionEvent {
-  id                  String  @id @default(cuid())
-  eventType           String // CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL
+  id        String @id @default(cuid())
+  eventType String // CONTRACTING|PROCESS_STARTED|PROCESS_SUCCESS|FIRST_ATTEMPT_SUCCESS|AUXILIARY_PARTICIPATION|MANUAL_EVENT|CANCELLATION|REVERSAL
 
   // Fase 3.7 do Cliente Master (2026-08-14): campo antigo "clienteId" continha na verdade
   // ClienteServico.id (correlação por serviço contratado, não por empresa) — renomeado para
@@ -2653,11 +2703,11 @@ model GoogleCalendarSyncLease {
 /// googleEventId (não um FK direto pro cache) porque o alerta de um destinatário-colega não tem
 /// necessariamente uma linha própria em GoogleCalendarEventoCache — todos leem o cache do DONO.
 model GoogleCalendarAlertaCompromisso {
-  id            String @id @default(cuid())
-  calendarioId  String // GoogleCalendarSelecionado.id do calendário DONO do compromisso (fonte do cache)
-  googleEventId String
-  destinatarioId Int   // usuários.id de quem recebe o alerta (dono OU colega visualizador)
-  janela        String // "10min" | "5min"
+  id             String @id @default(cuid())
+  calendarioId   String // GoogleCalendarSelecionado.id do calendário DONO do compromisso (fonte do cache)
+  googleEventId  String
+  destinatarioId Int // usuários.id de quem recebe o alerta (dono OU colega visualizador)
+  janela         String // "10min" | "5min"
 
   notificadoEm DateTime @default(now())
 
@@ -2699,11 +2749,11 @@ model GoogleCalendarColegaVisivel {
 /// ConviteParceiro→PreCadastroParceiro→aprovação→entidade real, adaptado para 2 usuários já
 /// autenticados, sem token público).
 model GoogleCalendarSolicitacaoCompartilhamento {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   solicitanteId Int
   alvoId        Int
   papelPedido   String // VISUALIZADOR | EDITOR
-  status        String   @default("PENDENTE") // PENDENTE | ACEITO | RECUSADO
+  status        String    @default("PENDENTE") // PENDENTE | ACEITO | RECUSADO
   respondidoEm  DateTime?
 
   createdAt DateTime @default(now())
@@ -3538,3 +3588,976 @@ model BpmChecklistFollowUpPergunta {
 // `model PessoaEmpresaVinculo` removido em 2026-08-14 (Fase 3.6 do Cliente Master) —
 // dependia de `socios`/`clientes` (ambos removidos), tabela física vazia (0 linhas)
 // desde antes desta fase, nunca chegou a ser usada de fato.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Alpha SEO — schema integrado ao runtime após gate Vault aplicado e validado
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Projeto SEO é a fronteira multi-tenant do módulo. `ownerId` é a fonte
+/// canônica de ownership; a linha OWNER em members é uma projeção operacional
+/// que deve ser mantida na mesma transação pela camada de serviço.
+model AlphaSeoProject {
+  id               String    @id @default(cuid())
+  ownerId          Int
+  name             String
+  domain           String?
+  normalizedDomain String?
+  locationCode     Int       @default(2840)
+  locationName     String?
+  languageCode     String    @default("pt")
+  market           String    @default("BR")
+  status           String    @default("ACTIVE") // ACTIVE | ARCHIVED
+  archivedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  owner                usuarios                        @relation("AlphaSeoProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members              AlphaSeoProjectMember[]
+  invitations          AlphaSeoProjectInvitation[]
+  onboardingSelections AlphaSeoUserOnboarding[]
+  activation           AlphaSeoProjectActivation?
+  keywordResearchRuns  AlphaSeoKeywordResearchRun[]
+  savedKeywords        AlphaSeoSavedKeyword[]
+  savedKeywordTags     AlphaSeoSavedKeywordTag[]
+  keywordMetrics       AlphaSeoKeywordMetric[]
+  rankConfigs          AlphaSeoRankConfig[]
+  audits               AlphaSeoSiteAudit[]
+  googleOAuthNonces    AlphaSeoGoogleOAuthNonce[]
+  gscConnection        AlphaSeoGscConnection?
+  ga4Connection        AlphaSeoGa4Connection?
+  contextSections      AlphaSeoProjectContextSection[]
+  competitors          AlphaSeoProjectCompetitor[]
+  keyPages             AlphaSeoProjectKeyPage[]
+  researchLog          AlphaSeoProjectResearchLog[]
+  samSessions          AlphaSeoSamSession[]
+  backlinkSnapshots    AlphaSeoBacklinkSnapshot[]
+  apiKeys              AlphaSeoApiKey[]
+  mcpGrants            AlphaSeoMcpOAuthGrant[]
+  jobs                 AlphaSeoJob[]
+  costApprovals        AlphaSeoCostApproval[]
+  exports              AlphaSeoExport[]
+  aiVisibilityRuns     AlphaSeoAiVisibilityRun[]
+  externalOperations   AlphaSeoExternalOperationRun[]
+  providerCache        AlphaSeoProviderCache[]
+  auditEvents          AlphaSeoAuditEvent[]
+
+  @@index([ownerId, status, updatedAt])
+  @@index([status, archivedAt, updatedAt])
+  @@index([normalizedDomain])
+}
+
+model AlphaSeoProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    Int
+  role      String // OWNER | EDITOR | VIEWER
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    usuarios        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, userId])
+  @@index([userId, active, updatedAt])
+  @@index([projectId, role, active])
+}
+
+model AlphaSeoProjectInvitation {
+  id              String    @id @default(cuid())
+  projectId       String
+  email           String
+  normalizedEmail String
+  role            String // EDITOR | VIEWER
+  status          String    @default("PENDING") // PENDING | ACCEPTED | REVOKED | EXPIRED
+  tokenHash       String    @unique
+  inviterId       Int
+  acceptedById    Int?
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  project    AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter    usuarios        @relation("AlphaSeoInvitationInviter", fields: [inviterId], references: [id], onDelete: Restrict)
+  acceptedBy usuarios?       @relation("AlphaSeoInvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, expiresAt])
+  @@index([normalizedEmail, status, expiresAt])
+}
+
+model AlphaSeoUserOnboarding {
+  userId              Int       @id
+  activeProjectId     String?
+  interestedFeatures  Json
+  workFor             String?
+  clientWebsiteCount  String?
+  foundVia            String?
+  mcpSetupIntent      String?
+  completedAt         DateTime?
+  gscNudgeDismissedAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user          usuarios         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeProject AlphaSeoProject? @relation(fields: [activeProjectId], references: [id], onDelete: SetNull)
+
+  @@index([activeProjectId])
+}
+
+model AlphaSeoUserActivation {
+  userId               Int       @id
+  firstMcpAuthorizedAt DateTime?
+  firstMcpToolCallAt   DateTime?
+  updatedAt            DateTime  @updatedAt
+
+  user usuarios @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AlphaSeoProjectActivation {
+  projectId               String    @id
+  competitorStepClickedAt DateTime?
+  mcpCardDismissedAt      DateTime?
+  ga4CardDismissedAt      DateTime?
+  updatedAt               DateTime  @updatedAt
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+/// Histórico reproduzível de pesquisa. Seeds/request/result são snapshots
+/// tipados na camada Zod; não duplicam SavedKeyword nem KeywordMetric.
+model AlphaSeoKeywordResearchRun {
+  id                 String    @id @default(cuid())
+  projectId          String
+  requestedById      Int
+  mode               String // AUTO | RELATED | SUGGESTIONS | IDEAS
+  locationCode       Int
+  languageCode       String
+  includeClickstream Boolean   @default(false)
+  seeds              Json
+  request            Json
+  requestHash        String
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING")
+  result             Json?
+  partialResult      Json?
+  errorCode          String?
+  estimatedUnits     Int       @default(0)
+  estimatedMicrosUsd Int       @default(0)
+  actualUnits        Int?
+  actualMicrosUsd    Int?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  project     AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy usuarios        @relation("AlphaSeoKeywordResearchRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([projectId, requestHash, createdAt])
+  @@index([status, createdAt])
+}
+
+model AlphaSeoSavedKeyword {
+  id           String   @id @default(cuid())
+  projectId    String
+  keyword      String
+  normalized   String
+  locationCode Int      @default(2840)
+  languageCode String   @default("pt")
+  createdAt    DateTime @default(now())
+
+  project        AlphaSeoProject                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tagAssignments AlphaSeoSavedKeywordTagAssignment[]
+
+  @@unique([projectId, normalized, locationCode, languageCode])
+  @@index([projectId, createdAt])
+}
+
+model AlphaSeoSavedKeywordTag {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String
+  normalizedName String
+  color          String?
+  createdAt      DateTime @default(now())
+
+  project     AlphaSeoProject                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignments AlphaSeoSavedKeywordTagAssignment[]
+
+  @@unique([projectId, normalizedName])
+  @@index([projectId, name])
+}
+
+model AlphaSeoSavedKeywordTagAssignment {
+  savedKeywordId String
+  tagId          String
+  createdAt      DateTime @default(now())
+
+  savedKeyword AlphaSeoSavedKeyword    @relation(fields: [savedKeywordId], references: [id], onDelete: Cascade)
+  tag          AlphaSeoSavedKeywordTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([savedKeywordId, tagId])
+  @@index([tagId])
+}
+
+model AlphaSeoKeywordMetric {
+  id                String   @id @default(cuid())
+  projectId         String
+  keyword           String
+  normalizedKeyword String
+  locationCode      Int
+  languageCode      String
+  searchVolume      Int?
+  cpcMicros         Int?
+  competition       Float?
+  keywordDifficulty Int?
+  intent            String?
+  monthlySearches   Json?
+  fetchedAt         DateTime @default(now())
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, normalizedKeyword, locationCode, languageCode])
+  @@index([projectId, normalizedKeyword, locationCode, languageCode, fetchedAt])
+}
+
+model AlphaSeoRankConfig {
+  id               String    @id @default(cuid())
+  projectId        String
+  domain           String
+  normalizedDomain String
+  locationCode     Int       @default(2840)
+  locationName     String?
+  languageCode     String    @default("pt")
+  devices          String    @default("BOTH") // BOTH | DESKTOP | MOBILE
+  serpDepth        Int
+  scheduleInterval String    @default("WEEKLY") // MANUAL | DAILY | WEEKLY | MONTHLY
+  scheduleAnchorAt DateTime?
+  isActive         Boolean   @default(true)
+  lastCheckedAt    DateTime?
+  nextCheckAt      DateTime?
+  lastSkipReason   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  project  AlphaSeoProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keywords AlphaSeoRankKeyword[]
+  runs     AlphaSeoRankRun[]
+
+  @@index([projectId, isActive, createdAt])
+  @@index([isActive, nextCheckAt])
+  @@index([projectId, normalizedDomain, locationCode, locationName])
+}
+
+model AlphaSeoRankKeyword {
+  id                String    @id @default(cuid())
+  configId          String
+  keyword           String
+  normalizedKeyword String
+  searchVolume      Int?
+  keywordDifficulty Int?
+  cpcMicros         Int?
+  metricsFetchedAt  DateTime?
+  createdAt         DateTime  @default(now())
+
+  config AlphaSeoRankConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@unique([configId, normalizedKeyword])
+  @@index([configId, createdAt])
+}
+
+model AlphaSeoRankRun {
+  id                 String    @id @default(cuid())
+  configId           String
+  requestedById      Int?
+  trigger            String // MANUAL | SCHEDULED
+  scheduledFor       DateTime?
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+  keywordsTotal      Int       @default(0)
+  keywordsChecked    Int       @default(0)
+  isSubsetRun        Boolean   @default(false)
+  estimatedUnits     Int       @default(0)
+  estimatedMicrosUsd Int       @default(0)
+  actualUnits        Int?
+  actualMicrosUsd    Int?
+  errorCode          String?
+  errorMessage       String?
+  leaseOwner         String?
+  leaseToken         Int       @default(0)
+  leaseExpiresAt     DateTime?
+  heartbeatAt        DateTime?
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+
+  config      AlphaSeoRankConfig     @relation(fields: [configId], references: [id], onDelete: Cascade)
+  requestedBy usuarios?              @relation("AlphaSeoRankRunRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  snapshots   AlphaSeoRankSnapshot[]
+
+  @@index([configId, startedAt])
+  @@index([status, leaseExpiresAt])
+  @@index([scheduledFor, status])
+}
+
+/// Sem FK para RankKeyword de propósito: remover uma keyword do tracking não
+/// pode apagar seu histórico de posição.
+model AlphaSeoRankSnapshot {
+  id                String   @id @default(cuid())
+  runId             String
+  trackingKeywordId String
+  keyword           String
+  device            String // DESKTOP | MOBILE
+  position          Int?
+  rankedUrl         String?
+  serpFeatures      Json?
+  checkedAt         DateTime @default(now())
+
+  run AlphaSeoRankRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, trackingKeywordId, device])
+  @@index([trackingKeywordId, device, checkedAt])
+}
+
+model AlphaSeoSiteAudit {
+  id                  String    @id @default(cuid())
+  projectId           String
+  startedById         Int
+  startUrl            String
+  idempotencyKey      String    @unique
+  status              String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+  workflowInstanceId  String?
+  config              Json
+  pagesCrawled        Int       @default(0)
+  pagesTotal          Int       @default(0)
+  lighthouseTotal     Int       @default(0)
+  lighthouseCompleted Int       @default(0)
+  lighthouseFailed    Int       @default(0)
+  currentPhase        String    @default("DISCOVERY")
+  errorCode           String?
+  errorDetail         String?
+  failedPhase         String?
+  leaseOwner          String?
+  leaseToken          Int       @default(0)
+  leaseExpiresAt      DateTime?
+  heartbeatAt         DateTime?
+  startedAt           DateTime  @default(now())
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+
+  project    AlphaSeoProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  startedBy  usuarios                  @relation("AlphaSeoSiteAuditStartedBy", fields: [startedById], references: [id], onDelete: Restrict)
+  pages      AlphaSeoAuditPage[]
+  issues     AlphaSeoAuditIssue[]
+  lighthouse AlphaSeoAuditLighthouse[]
+
+  @@index([projectId, createdAt])
+  @@index([startedById, createdAt])
+  @@index([status, heartbeatAt])
+}
+
+model AlphaSeoAuditPage {
+  id                 String  @id @default(cuid())
+  auditId            String
+  url                String
+  statusCode         Int?
+  redirectUrl        String?
+  title              String?
+  metaDescription    String?
+  canonicalUrl       String?
+  robotsMeta         String?
+  ogTitle            String?
+  ogDescription      String?
+  ogImage            String?
+  h1Count            Int     @default(0)
+  h2Count            Int     @default(0)
+  h3Count            Int     @default(0)
+  h4Count            Int     @default(0)
+  h5Count            Int     @default(0)
+  h6Count            Int     @default(0)
+  headingOrder       Json?
+  wordCount          Int     @default(0)
+  imagesTotal        Int     @default(0)
+  imagesMissingAlt   Int     @default(0)
+  images             Json?
+  internalLinkCount  Int     @default(0)
+  externalLinkCount  Int     @default(0)
+  hasStructuredData  Boolean @default(false)
+  hreflangTags       Json?
+  isIndexable        Boolean @default(true)
+  xRobotsTag         String?
+  headerCanonicalUrl String?
+  crawlDepth         Int?
+  inSitemap          Boolean @default(false)
+  contentHash        String?
+  fetchClass         String  @default("OK") // OK | BLOCKED | ERROR
+  responseTimeMs     Int?
+
+  audit      AlphaSeoSiteAudit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  issues     AlphaSeoAuditIssue[]
+  lighthouse AlphaSeoAuditLighthouse[]
+
+  @@unique([auditId, url])
+  @@index([auditId, statusCode])
+}
+
+model AlphaSeoAuditIssue {
+  id        String  @id @default(cuid())
+  auditId   String
+  pageId    String?
+  pageUrl   String
+  issueType String
+  severity  String  @default("INFO") // CRITICAL | WARNING | INFO
+  details   Json?
+
+  audit AlphaSeoSiteAudit  @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  page  AlphaSeoAuditPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([auditId, issueType])
+  @@index([pageId])
+  @@index([auditId, severity])
+}
+
+model AlphaSeoAuditLighthouse {
+  id                 String  @id @default(cuid())
+  auditId            String
+  pageId             String
+  strategy           String // MOBILE | DESKTOP
+  performanceScore   Int?
+  accessibilityScore Int?
+  bestPracticesScore Int?
+  seoScore           Int?
+  lcpMs              Float?
+  cls                Float?
+  inpMs              Float?
+  ttfbMs             Float?
+  errorMessage       String?
+  storageKey         String?
+  payloadSizeBytes   Int?
+
+  audit AlphaSeoSiteAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  page  AlphaSeoAuditPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, strategy])
+  @@index([auditId])
+}
+
+/// State + PKCE do Google. O verifier precisa ser recuperado no callback, por
+/// isso é ciphertext autenticado e versionado — nunca hash-only nem plaintext.
+model AlphaSeoGoogleOAuthNonce {
+  id                     String    @id @default(cuid())
+  userId                 Int
+  projectId              String
+  product                String // GSC | GA4
+  stateHash              String    @unique
+  codeVerifierCiphertext String
+  tokenKeyVersion        Int       @default(1)
+  redirectUriHash        String
+  expiresAt              DateTime
+  consumedAt             DateTime?
+  createdAt              DateTime  @default(now())
+
+  user    usuarios        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, product, expiresAt])
+  @@index([projectId, product, expiresAt])
+}
+
+/// Grant por conta Google/usuário. Tokens são sempre ciphertext autenticado;
+/// as conexões de GSC e GA4 abaixo só selecionam a property do projeto.
+model AlphaSeoGoogleOAuthGrant {
+  id                     String    @id @default(cuid())
+  userId                 Int
+  product                String // GSC | GA4
+  accountId              String
+  accountEmail           String?
+  accessTokenCiphertext  String
+  refreshTokenCiphertext String?
+  idTokenCiphertext      String?
+  scopes                 Json
+  tokenKeyVersion        Int       @default(1)
+  accessTokenExpiresAt   DateTime?
+  refreshTokenExpiresAt  DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user           usuarios                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gscConnections AlphaSeoGscConnection[]
+  ga4Connections AlphaSeoGa4Connection[]
+
+  @@unique([userId, product, accountId])
+  @@index([product, accessTokenExpiresAt])
+  @@index([userId, revokedAt])
+}
+
+model AlphaSeoGscConnection {
+  id                    String   @id @default(cuid())
+  projectId             String   @unique
+  grantId               String
+  connectedById         Int
+  siteUrl               String
+  connectedAccountEmail String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  project     AlphaSeoProject          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  grant       AlphaSeoGoogleOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  connectedBy usuarios                 @relation("AlphaSeoGscConnectedBy", fields: [connectedById], references: [id], onDelete: Restrict)
+
+  @@index([grantId])
+  @@index([connectedById, grantId])
+}
+
+model AlphaSeoGa4Connection {
+  id                    String   @id @default(cuid())
+  projectId             String   @unique
+  grantId               String
+  connectedById         Int
+  propertyId            String
+  propertyDisplayName   String
+  propertyTimeZone      String
+  propertyCurrencyCode  String
+  connectedAccountEmail String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  project     AlphaSeoProject          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  grant       AlphaSeoGoogleOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Restrict)
+  connectedBy usuarios                 @relation("AlphaSeoGa4ConnectedBy", fields: [connectedById], references: [id], onDelete: Restrict)
+
+  @@index([grantId])
+  @@index([connectedById, grantId])
+}
+
+model AlphaSeoProjectContextSection {
+  projectId       String
+  key             String
+  title           String?
+  content         String
+  updatedByKind   String // USER | SAM | MCP
+  updatedByUserId Int?
+  updatedAt       DateTime @updatedAt
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedByUser usuarios?       @relation("AlphaSeoContextSectionUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@id([projectId, key])
+  @@index([updatedByUserId, updatedAt])
+}
+
+model AlphaSeoProjectCompetitor {
+  id               String   @id @default(cuid())
+  projectId        String
+  domain           String
+  normalizedDomain String
+  name             String?
+  notes            String?
+  updatedByKind    String // USER | SAM | MCP
+  updatedByUserId  Int?
+  updatedAt        DateTime @updatedAt
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedByUser usuarios?       @relation("AlphaSeoCompetitorUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, normalizedDomain])
+  @@index([updatedByUserId, updatedAt])
+}
+
+model AlphaSeoProjectKeyPage {
+  id              String   @id @default(cuid())
+  projectId       String
+  url             String
+  normalizedUrl   String
+  role            String // HUB | SPOKE | MONEY | OTHER
+  topic           String?
+  notes           String?
+  updatedByKind   String // USER | SAM | MCP
+  updatedByUserId Int?
+  updatedAt       DateTime @updatedAt
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedByUser usuarios?       @relation("AlphaSeoKeyPageUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, normalizedUrl])
+  @@index([updatedByUserId, updatedAt])
+}
+
+model AlphaSeoProjectResearchLog {
+  id              String   @id @default(cuid())
+  projectId       String
+  entryDate       String
+  summary         String
+  createdByKind   String // USER | SAM | MCP
+  createdByUserId Int?
+  createdAt       DateTime @default(now())
+
+  project       AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser usuarios?       @relation("AlphaSeoResearchLogCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, entryDate, createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model AlphaSeoSamSession {
+  id          String    @id @default(cuid())
+  projectId   String
+  userId      Int
+  title       String    @default("Nova conversa")
+  status      String    @default("ACTIVE") // ACTIVE | CANCELLED | ARCHIVED
+  cancelledAt DateTime?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project  AlphaSeoProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     usuarios             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AlphaSeoSamMessage[]
+
+  @@index([projectId, updatedAt])
+  @@index([userId, status, updatedAt])
+}
+
+model AlphaSeoSamMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String // USER | ASSISTANT | TOOL | SYSTEM
+  content   String
+  toolCall  Json?
+  createdAt DateTime @default(now())
+
+  session AlphaSeoSamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model AlphaSeoBacklinkSnapshot {
+  id                   String   @id @default(cuid())
+  projectId            String
+  domain               String
+  rank                 Int?
+  backlinks            Int?
+  referringDomains     Int?
+  brokenBacklinks      Int?
+  newBacklinks         Int?
+  lostBacklinks        Int?
+  newReferringDomains  Int?
+  lostReferringDomains Int?
+  capturedAt           DateTime @default(now())
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, capturedAt])
+}
+
+/// API key do MCP/automação. Somente hash e prefixo são persistidos.
+model AlphaSeoApiKey {
+  id                String    @id @default(cuid())
+  projectId         String
+  createdById       Int
+  label             String
+  keyHash           String    @unique
+  prefix            String
+  scopes            Json
+  enabled           Boolean   @default(true)
+  rateLimitWindowMs Int       @default(60000)
+  rateLimitMax      Int       @default(120)
+  requestCount      Int       @default(0)
+  lastRequestAt     DateTime?
+  lastUsedAt        DateTime?
+  expiresAt         DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  project   AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy usuarios        @relation("AlphaSeoApiKeyCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, revokedAt])
+  @@index([prefix])
+}
+
+/// Registro dinâmico de OAuth client. Segredos confidenciais ficam hash-only;
+/// redirect URIs e metadados públicos são arrays/objetos Json validados.
+model AlphaSeoMcpOAuthClient {
+  id                      String    @id @default(cuid())
+  clientId                String    @unique
+  clientSecretHash        String?
+  clientName              String
+  redirectUris            Json
+  grantTypes              Json
+  responseTypes           Json
+  tokenEndpointAuthMethod String
+  scopes                  Json
+  createdById             Int?
+  revokedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  createdBy usuarios?               @relation("AlphaSeoMcpClientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  grants    AlphaSeoMcpOAuthGrant[]
+
+  @@index([createdById, revokedAt])
+}
+
+model AlphaSeoMcpOAuthGrant {
+  id            String    @id @default(cuid())
+  oauthClientId String
+  userId        Int
+  projectId     String
+  scopes        Json
+  resource      String?
+  status        String    @default("ACTIVE") // ACTIVE | REVOKED | EXPIRED
+  consentedAt   DateTime  @default(now())
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client             AlphaSeoMcpOAuthClient         @relation(fields: [oauthClientId], references: [id], onDelete: Cascade)
+  user               usuarios                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project            AlphaSeoProject                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorizationCodes AlphaSeoMcpAuthorizationCode[]
+  accessTokens       AlphaSeoMcpAccessToken[]
+  refreshTokens      AlphaSeoMcpRefreshToken[]
+
+  @@index([oauthClientId, userId, projectId, status])
+  @@index([userId, status, expiresAt])
+  @@index([projectId, status])
+}
+
+model AlphaSeoMcpAuthorizationCode {
+  id                  String    @id @default(cuid())
+  grantId             String
+  codeHash            String    @unique
+  redirectUriHash     String
+  codeChallenge       String
+  codeChallengeMethod String    @default("S256")
+  nonceHash           String?
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  grant AlphaSeoMcpOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId, expiresAt, consumedAt])
+}
+
+model AlphaSeoMcpAccessToken {
+  id         String    @id @default(cuid())
+  grantId    String
+  tokenHash  String    @unique
+  scopes     Json
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  grant AlphaSeoMcpOAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId, expiresAt, revokedAt])
+}
+
+model AlphaSeoMcpRefreshToken {
+  id            String    @id @default(cuid())
+  grantId       String
+  tokenHash     String    @unique
+  tokenFamilyId String
+  parentTokenId String?
+  scopes        Json
+  expiresAt     DateTime
+  usedAt        DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  grant       AlphaSeoMcpOAuthGrant     @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  parentToken AlphaSeoMcpRefreshToken?  @relation("AlphaSeoMcpRefreshRotation", fields: [parentTokenId], references: [id], onDelete: SetNull)
+  rotations   AlphaSeoMcpRefreshToken[] @relation("AlphaSeoMcpRefreshRotation")
+
+  @@index([grantId, expiresAt, revokedAt])
+  @@index([tokenFamilyId, createdAt])
+  @@index([parentTokenId])
+}
+
+model AlphaSeoJob {
+  id               String    @id @default(cuid())
+  projectId        String?
+  type             String
+  status           String    @default("PENDING") // PENDING | PROCESSING | RETRY | SUCCEEDED | DEAD_LETTER | CANCELLED
+  idempotencyKey   String    @unique
+  payload          Json
+  result           Json?
+  priority         Int       @default(100)
+  attemptCount     Int       @default(0)
+  maxAttempts      Int       @default(5)
+  availableAt      DateTime  @default(now())
+  claimedBy        String?
+  claimedAt        DateTime?
+  claimExpiresAt   DateTime?
+  claimToken       Int       @default(0)
+  heartbeatAt      DateTime?
+  lastErrorCode    String?
+  lastErrorMessage String?
+  completedAt      DateTime?
+  deadLetteredAt   DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  project AlphaSeoProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt, priority, createdAt])
+  @@index([status, claimExpiresAt])
+  @@index([projectId, type, status])
+}
+
+model AlphaSeoCostApproval {
+  id                 String   @id @default(cuid())
+  projectId          String
+  userId             Int
+  operation          String
+  requestHash        String
+  estimatedUnits     Int      @default(0)
+  estimatedMicrosUsd Int      @default(0)
+  approvedAt         DateTime @default(now())
+  expiresAt          DateTime
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    usuarios        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, userId, operation, requestHash])
+  @@index([expiresAt])
+}
+
+model AlphaSeoExport {
+  id          String    @id @default(cuid())
+  projectId   String
+  createdById Int
+  kind        String
+  format      String // CSV | GOOGLE_SHEETS
+  filters     Json
+  columns     Json
+  status      String    @default("PENDING")
+  storageRef  String?
+  errorCode   String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  project   AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy usuarios        @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model AlphaSeoAiVisibilityRun {
+  id                 String    @id @default(cuid())
+  projectId          String
+  requestedById      Int
+  kind               String // BRAND_LOOKUP | PROMPT_EXPLORER
+  query              String
+  requestHash        String
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING")
+  estimatedMicrosUsd Int       @default(0)
+  actualMicrosUsd    Int?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  project         AlphaSeoProject                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy     usuarios                             @relation("AlphaSeoAiRunRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  providerResults AlphaSeoAiVisibilityProviderResult[]
+
+  @@index([projectId, kind, createdAt])
+  @@index([projectId, requestHash, createdAt])
+}
+
+model AlphaSeoAiVisibilityProviderResult {
+  id              String   @id @default(cuid())
+  runId           String
+  provider        String // CHATGPT | CLAUDE | GEMINI | PERPLEXITY
+  status          String
+  result          Json?
+  errorCode       String?
+  durationMs      Int?
+  actualMicrosUsd Int?
+  createdAt       DateTime @default(now())
+
+  run AlphaSeoAiVisibilityRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, provider])
+  @@index([provider, createdAt])
+}
+
+/// Histórico comum para Domain Overview, Backlinks detalhado, SERP, GSC e os
+/// relatórios GA4. O payload externo é um snapshot canônico da execução e não
+/// duplica entidades relacionais do projeto.
+model AlphaSeoExternalOperationRun {
+  id                 String    @id @default(cuid())
+  projectId          String
+  requestedById      Int
+  provider           String
+  operation          String
+  target             String?
+  request            Json
+  requestHash        String
+  idempotencyKey     String    @unique
+  status             String    @default("PENDING")
+  result             Json?
+  partialResult      Json?
+  estimatedUnits     Int       @default(0)
+  estimatedMicrosUsd Int       @default(0)
+  actualUnits        Int?
+  actualMicrosUsd    Int?
+  errorCode          String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  project     AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy usuarios        @relation("AlphaSeoExternalOperationRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([projectId, operation, createdAt])
+  @@index([projectId, requestHash, createdAt])
+  @@index([provider, status, createdAt])
+}
+
+model AlphaSeoProviderCache {
+  id           String   @id @default(cuid())
+  projectId    String
+  provider     String
+  operation    String
+  cacheKeyHash String
+  payload      Json
+  sourceRunId  String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project AlphaSeoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, provider, operation, cacheKeyHash])
+  @@index([expiresAt])
+}
+
+model AlphaSeoAuditEvent {
+  id         String   @id @default(cuid())
+  projectId  String?
+  userId     Int?
+  action     String
+  entityType String
+  entityId   String?
+  requestId  String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  project AlphaSeoProject? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    usuarios?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([requestId])
+}

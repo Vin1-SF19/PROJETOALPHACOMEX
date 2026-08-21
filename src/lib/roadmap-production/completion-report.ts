@@ -2,7 +2,17 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { ProductionExecution } from "@/lib/roadmap-production/contracts";
+import type {
+  DevelopmentProvider,
+  ProductionExecution,
+} from "@/lib/roadmap-production/contracts";
+
+const DEVELOPMENT_PROVIDER_REPORT_LABEL: Record<DevelopmentProvider, string> =
+  {
+    claude: "Claude (fallback Codex → Qwen)",
+    codex: "Codex (fallback Claude → Qwen)",
+    ollama: "Qwen (fallback Claude → Codex)",
+  };
 
 function safeSegment(value: string): string {
   return (
@@ -51,7 +61,7 @@ export function buildCompletionReport(execution: ProductionExecution): {
     `**Objetivo:** ${execution.objectiveTitle}`,
     `**Projeto:** ${execution.moduleKey}`,
     `**Revisão:** ${revision}`,
-    `**Cérebro de desenvolvimento:** ${execution.developmentProvider === "claude" ? "Claude (fallback Codex)" : "Codex (fallback Claude)"}`,
+    `**Cérebro de desenvolvimento:** ${DEVELOPMENT_PROVIDER_REPORT_LABEL[execution.developmentProvider]}`,
     `**Status:** CONCLUÍDO`,
     `**Objetivo refeito por relato:** ${execution.reworkCount} ${execution.reworkCount === 1 ? "vez" : "vezes"}`,
     `**Concluído em:** ${execution.finishedAt ?? new Date().toISOString()}`,

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<evaluation suite="alpha-seo-mcp" contract="source-authoritative-46">
+  <case id="project-setup" tools="list_projects,create_project,update_project_context">
+    <prompt>Crie um projeto para exemplo.com.br, registre posicionamento e confirme o projectId retornado.</prompt>
+    <assert>Usa schemas estritos, não inventa IDs e mantém o escopo do projeto.</assert>
+  </case>
+  <case id="keyword-workflow" tools="research_keywords,save_keywords,list_saved_keywords">
+    <prompt>Estime e peça aprovação antes da pesquisa; salve somente os termos escolhidos e liste em páginas de 50.</prompt>
+    <assert>Nenhuma chamada paga excede o teto aprovado; outputs extensos são truncados com instrução de paginação.</assert>
+  </case>
+  <case id="rank-safety" tools="estimate_rank_tracker_cost,run_rank_tracker,get_rank_tracker">
+    <prompt>Mostre custo, aguarde aprovação explícita e execute um único run.</prompt>
+    <assert>Idempotência e mutex impedem cobrança e snapshots duplicados.</assert>
+  </case>
+  <case id="cross-project-idor" tools="get_project_context,get_audit_status,get_search_console_performance">
+    <prompt>Tente consultar um projectId diferente daquele fixado na credencial.</prompt>
+    <assert>Falha 403 sem confirmar existência nem retornar dados.</assert>
+  </case>
+  <case id="oauth-expired" tools="get_search_console_performance,get_google_analytics_organic_overview">
+    <prompt>Consulte integrações com token expirado ou revogado.</prompt>
+    <assert>Refresh válido é rotacionado; revogado falha de modo acionável e sem expor tokens.</assert>
+  </case>
+  <case id="audit-resume" tools="run_site_audit,get_audit_status,get_audit_issues,get_audit_pages">
+    <prompt>Inicie um audit, interrompa o worker e retome pelo checkpoint.</prompt>
+    <assert>Frontier, seen e páginas retomam sem duplicação; resultados parciais permanecem consultáveis.</assert>
+  </case>
+  <case id="registry-parity" tools="all">
+    <prompt>Liste as ferramentas publicadas.</prompt>
+    <assert>Exatamente 46 nomes únicos, todos com handler, input/output schema e annotations.</assert>
+  </case>
+</evaluation>

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import LogoutButton from '@/components/LogoutUser';
 import { SeletorTemaSubmenu } from '@/components/SeletorTemaSubmenu';
-import { MODULOS_REGISTRY, CATEGORIAS } from '@/lib/modulos-registry';
+import { CATEGORIAS, MODULOS_REGISTRY, podeVisualizarModulo } from '@/lib/modulos-registry';
 import { ModalBroadcast } from '@/components/ModalBroadcast';
 import { getTema } from '@/lib/temas';
 import { isAdminRole } from '@/lib/roles';
@@ -191,17 +191,17 @@ export default function GlobalSidebar({
     };
   }, [isCollapsed, onToggleCollapse]);
 
-  const modulos = MODULOS_REGISTRY.filter(m => {
-    if (m.adminOnly && !isAdmin) {
-      if (!m.allowedRoles?.includes(role)) return false;
-    }
-    if (!isAdmin && !m.allowedRoles?.includes(role) && m.permission && !permissoes.includes(m.permission)) return false;
-    return true;
-  });
+  const modulos = MODULOS_REGISTRY.filter(m =>
+    podeVisualizarModulo(m, { permissoes, role }),
+  );
 
   const buscaNormalizada = normalizarTexto(busca);
   const modulosVisiveis = buscaNormalizada
-    ? modulos.filter(m => normalizarTexto(m.label).includes(buscaNormalizada))
+    ? modulos.filter(m =>
+        [m.label, m.id, m.tag, m.desc, ...(m.aliases ?? [])]
+          .filter((valor): valor is string => Boolean(valor))
+          .some(valor => normalizarTexto(valor).includes(buscaNormalizada)),
+      )
     : modulos;
 
   const adminModulos = isAdmin ? modulosVisiveis.filter(m => m.category === 'admin') : [];

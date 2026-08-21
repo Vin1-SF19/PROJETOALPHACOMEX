@@ -54,14 +54,29 @@ async function readOwner(lockPath: string): Promise<LockOwner | null> {
 }
 
 /**
- * Exclusive, non-blocking lease shared by the UI process and local workers.
- * The file is created atomically and is only reclaimed when its owner PID no
- * longer exists, preventing two objectives from being developed concurrently.
+ * Diretório fixo do lock, sempre a raiz real do PainelAlpha — NUNCA o `root`
+ * recebido. Isto é intencional: o lock é GLOBAL ao sistema inteiro (um único
+ * modelo de IA trabalhando por vez, custe de qual projeto for), não por
+ * workspace. Todo processo worker (interno ou de projeto externo) roda a
+ * partir desta mesma pasta (`Set-Location` nos scripts .ps1), então este
+ * caminho é sempre alcançável por qualquer um deles.
+ */
+const GLOBAL_LOCK_ROOT = process.cwd();
+
+/**
+ * Exclusive, non-blocking lease compartilhado por TODOS os workers do
+ * sistema (PainelAlpha e qualquer projeto externo) — nunca por `root`
+ * individual. Garante que só uma fase de desenvolvimento (uma chamada ao
+ * modelo) roda por vez no sistema inteiro, mesmo que existam vários
+ * workers ativos simultaneamente em projetos diferentes; evita sobrecarga
+ * dos provedores de IA. O parâmetro `root` é aceito só por compatibilidade
+ * de assinatura com quem chama — NUNCA usado para localizar o lock.
  */
 export async function acquireProductionExecutionLease(
   root = process.cwd(),
 ): Promise<ProductionExecutionLease | null> {
-  const stateDirectory = productionStateDirectory(root);
+  void root;
+  const stateDirectory = productionStateDirectory(GLOBAL_LOCK_ROOT);
   const lockPath = path.resolve(stateDirectory, LOCK_FILE);
   if (path.dirname(lockPath) !== path.resolve(stateDirectory)) {
     throw new Error("INVALID_PRODUCTION_LOCK_PATH");

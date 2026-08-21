@@ -1,0 +1,2 @@
+"use client";
+export default function ErrorView({reset}:{error:Error;reset:()=>void}){return <div className="grid min-h-screen place-items-center bg-[#020617] p-6 text-center text-white"><div><h2 className="text-xl font-black">Alpha SEO encontrou um erro</h2><p className="mt-2 text-sm text-slate-400">Nenhuma cobrança foi repetida automaticamente.</p><button onClick={reset} className="mt-5 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold">Tentar novamente</button></div></div>}

@@ -11,6 +11,18 @@
     {
       "path": "/api/calendario-alpha/jobs/alertas-compromissos",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/alpha-seo/cron/schedules",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/alpha-seo/cron/worker",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/alpha-seo/cron/oauth-cleanup",
+      "schedule": "17 3 * * *"
     }
   ]
 }

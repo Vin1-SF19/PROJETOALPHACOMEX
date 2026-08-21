@@ -35,6 +35,7 @@ import { toast } from "sonner";
 
 import {
   AlternarAcessoRoadmapProduction,
+  AprovarExecucaoRoadmapProduction,
   ControlarExecucaoRoadmapProduction,
   ListarAcessosRoadmapProduction,
   MelhorarFeedbackRoadmapProduction,
@@ -99,7 +100,7 @@ interface ExecutionView {
   objectiveCode: string;
   objectiveTitle: string;
   moduleKey: string;
-  developmentProvider: "claude" | "codex";
+  developmentProvider: "claude" | "codex" | "ollama";
   sourceVersion: number;
   globalPriority: number;
   status: string;
@@ -143,6 +144,7 @@ interface AccessView {
 }
 
 const STATUS_LABEL: Record<string, string> = {
+  AWAITING_APPROVAL: "Aguardando aprovação",
   PENDING: "Na fila",
   RUNNING: "Executando",
   PAUSED: "Pausado",
@@ -151,11 +153,18 @@ const STATUS_LABEL: Record<string, string> = {
   BLOCKED: "Bloqueado",
 };
 
+const DEVELOPMENT_PROVIDER_LABEL: Record<
+  "claude" | "codex" | "ollama",
+  string
+> = { claude: "Claude", codex: "Codex", ollama: "Qwen" };
+
 function statusClass(status: string): string {
   if (status === "SUCCEEDED")
     return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
   if (status === "RUNNING")
     return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
+  if (status === "AWAITING_APPROVAL")
+    return "border-violet-400/20 bg-violet-400/10 text-violet-300";
   if (status === "PAUSED")
     return "border-slate-400/20 bg-slate-400/10 text-slate-300";
   if (status === "FAILED" || status === "BLOCKED")
@@ -455,9 +464,8 @@ export function RoadmapProductionPanel({
                         {executionStatusLabel(execution)}
                       </span>
                       <span className="ml-1 mt-2 inline-flex rounded-full border border-violet-400/20 bg-violet-400/[.07] px-2 py-1 text-[10px] text-violet-300">
-                        {execution.developmentProvider === "claude"
-                          ? "Claude → Codex"
-                          : "Codex → Claude"}
+                        {DEVELOPMENT_PROVIDER_LABEL[execution.developmentProvider]}{" "}
+                        · cérebro de desenvolvimento
                       </span>
                       {execution.reworkCount > 0 && (
                         <span className="ml-1 mt-2 inline-flex rounded-full border border-amber-400/20 bg-amber-400/[.07] px-2 py-1 text-[10px] text-amber-300">
@@ -499,6 +507,26 @@ export function RoadmapProductionPanel({
                           className="rounded p-1 text-amber-300 hover:bg-amber-400/10"
                         >
                           <RefreshCw size={13} />
+                        </button>
+                      )}
+                    {canManage &&
+                      execution.status === "AWAITING_APPROVAL" && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const result = await AprovarExecucaoRoadmapProduction(
+                              execution.id,
+                            );
+                            if (result.success)
+                              toast.success(
+                                "Objetivo aprovado; liberado para produção",
+                              );
+                            else toast.error(result.error);
+                            await refresh(false);
+                          }}
+                          className="mr-1 inline-flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-400/[.06] px-2 py-1 text-[10px] font-medium text-emerald-300 hover:bg-emerald-400/10"
+                        >
+                          <CheckCircle2 size={11} /> Aprovar e iniciar
                         </button>
                       )}
                     {canManage && execution.status === "PAUSED" && (

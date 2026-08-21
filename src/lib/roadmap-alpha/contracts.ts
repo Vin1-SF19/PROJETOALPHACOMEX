@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { getRoadmapModuleKeys } from "@/lib/roadmap-alpha/catalog";
 import { developmentProviderSchema } from "@/lib/roadmap-production/contracts";
 
 export const ROADMAP_CONTRACT_VERSION = 1 as const;
@@ -28,7 +27,6 @@ export const ROADMAP_PHASE_AGENTS = [
   "dev",
 ] as const;
 
-const roadmapModuleKeys = getRoadmapModuleKeys();
 const roadmapSlugSchema = z
   .string()
   .trim()
@@ -39,15 +37,17 @@ const roadmapSlugSchema = z
     "Slug deve conter somente letras minúsculas, números e hífens",
   );
 
+/**
+ * `moduleKey` NÃO é validado contra MODULOS_REGISTRY aqui — esse array é
+ * estático e conhecido só no import do módulo, mas moduleKey também pode vir
+ * de um RoadmapWorkspace (tabela dinâmica). A validação real acontece de
+ * forma assíncrona nas Server Actions (ver isValidRoadmapModuleKey em
+ * catalog.ts), DEPOIS deste parse — nunca confiar só na forma da string.
+ */
 export const roadmapObjectiveInputSchema = z
   .object({
     contractVersion: z.literal(ROADMAP_CONTRACT_VERSION),
-    moduleKey: z
-      .string()
-      .trim()
-      .min(1)
-      .max(80)
-      .refine((key) => roadmapModuleKeys.has(key), "Módulo desconhecido"),
+    moduleKey: z.string().trim().min(1).max(80),
     title: z.string().trim().min(3).max(180),
     description: z.string().trim().min(10).max(10_000),
     desiredOutcome: z.string().trim().max(4_000).optional(),

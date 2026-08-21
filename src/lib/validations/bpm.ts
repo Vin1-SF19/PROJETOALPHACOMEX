@@ -173,7 +173,7 @@ export const criarVinculoCardSchema = z.object({
 
 export const criarInteracaoCardSchema = z.object({
   cardId: z.string().cuid(),
-  tipo: z.enum(["LIGACAO", "ANOTACAO"]).default("LIGACAO"),
+  tipo: z.enum(["LIGACAO", "ANOTACAO", "EMAIL", "REUNIAO", "WHATSAPP"]).default("LIGACAO"),
   agendadoEm: z.coerce.date().optional(),
   agendaLink: z.string().trim().url().max(500).optional(),
   observacoes: z.string().trim().max(MAX_DESCRICAO).optional(),
