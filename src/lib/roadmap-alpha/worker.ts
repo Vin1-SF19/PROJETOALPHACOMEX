@@ -3,10 +3,19 @@ import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
 import { purgeExpiredDeletedRoadmapObjectives } from "@/lib/roadmap-alpha/objectives";
 import { generateRoadmapManifest } from "@/lib/roadmap-alpha/qwen-generator";
+import { scanProjectContext } from "@/lib/roadmap-alpha/project-scanner";
 import {
   markdownSha256,
   publishRoadmapProjection,
 } from "@/lib/roadmap-alpha/projection";
+
+async function resolveObjectiveRoot(moduleKey: string): Promise<string> {
+  const workspace = await db.roadmapWorkspace.findFirst({
+    where: { moduleKey, archivedAt: null },
+    select: { rootPath: true },
+  });
+  return workspace?.rootPath ?? process.cwd();
+}
 
 const LEASE_MS = 4 * 60_000;
 const HEARTBEAT_MS = 30_000;
@@ -118,6 +127,8 @@ export async function processNextRoadmapJob(
     const acceptanceCriteria = JSON.parse(
       job.objective.acceptanceCriteriaJson,
     ) as string[];
+    const root = await resolveObjectiveRoot(job.objective.moduleKey);
+    const projectContext = await scanProjectContext(root);
     const generated = await generateRoadmapManifest({
       code: job.objective.code,
       moduleKey: job.objective.moduleKey,
@@ -127,6 +138,7 @@ export async function processNextRoadmapJob(
       desiredOutcome: job.objective.desiredOutcome,
       constraints: job.objective.constraints,
       acceptanceCriteria,
+      projectContext,
     });
 
     const current = await db.roadmapDocumentationJob.findUnique({
@@ -144,12 +156,15 @@ export async function processNextRoadmapJob(
       throw new Error("STALE_WORKER_RESULT");
     }
 
-    const projection = await publishRoadmapProjection({
-      moduleKey: current.objective.moduleKey,
-      objectiveCode: current.objective.code,
-      version: current.sourceVersion,
-      manifest: generated.manifest,
-    });
+    const projection = await publishRoadmapProjection(
+      {
+        moduleKey: current.objective.moduleKey,
+        objectiveCode: current.objective.code,
+        version: current.sourceVersion,
+        manifest: generated.manifest,
+      },
+      root,
+    );
     const relativeDirectory = projection.relativeDirectory;
 
     await db.$transaction(async (tx) => {

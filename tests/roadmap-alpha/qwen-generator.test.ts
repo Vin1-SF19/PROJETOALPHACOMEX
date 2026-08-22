@@ -15,6 +15,7 @@ const input = {
   description:
     "Documentar uma melhoria completa no cadastro de empresas do CRM.",
   acceptanceCriteria: ["O fluxo deve ser validado por testes automatizados."],
+  projectContext: "## Estrutura de arquivos (1 arquivos)\npackage.json",
 };
 const manifest = {
   contractVersion: 1,

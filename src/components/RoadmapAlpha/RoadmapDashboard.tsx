@@ -515,7 +515,14 @@ export function RoadmapDashboard({
                 Sistemas Externos
               </AccordionTrigger>
               <AccordionContent className="px-3 pb-3">
-                <SistemasExternosSection isAdmin={canMutate} />
+                <SistemasExternosSection
+                  isAdmin={canMutate}
+                  selectedModuleKey={moduleFilter}
+                  onSelectModule={(moduleKey) => {
+                    setModuleFilter(moduleKey);
+                    setMobilePane("objectives");
+                  }}
+                />
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -537,6 +544,24 @@ export function RoadmapDashboard({
                 className="border-white/10 bg-slate-950/60 pl-9"
               />
             </div>
+            {moduleFilter && (
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-cyan-400/20 bg-cyan-400/[.06] px-2.5 py-1.5 text-[11px] text-cyan-200">
+                <span className="truncate">
+                  Filtrando:{" "}
+                  <span className="font-medium">
+                    {modules.find((module) => module.id === moduleFilter)
+                      ?.label ?? moduleFilter}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setModuleFilter(null)}
+                  className="shrink-0 text-cyan-300/70 hover:text-cyan-200"
+                >
+                  Limpar
+                </button>
+              </div>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
             {filtered.length === 0 && (
@@ -980,7 +1005,9 @@ function CreateObjectiveDialog({
   onCreated: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [moduleKey, setModuleKey] = useState(modules[0]?.id ?? "");
+  const [moduleKey, setModuleKey] = useState(
+    novoModuloPreset ? "roadmap" : (modules[0]?.id ?? ""),
+  );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [desiredOutcome, setDesiredOutcome] = useState("");
@@ -1044,20 +1071,22 @@ function CreateObjectiveDialog({
           </div>
         )}
         <form onSubmit={submit} className="space-y-4">
-          <label className="block text-xs text-slate-400">
-            Projeto
-            <select
-              value={moduleKey}
-              onChange={(event) => setModuleKey(event.target.value)}
-              className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-slate-100"
-            >
-              {modules.map((module) => (
-                <option key={module.id} value={module.id}>
-                  {module.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!novoModuloPreset && (
+            <label className="block text-xs text-slate-400">
+              Projeto
+              <select
+                value={moduleKey}
+                onChange={(event) => setModuleKey(event.target.value)}
+                className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-slate-100"
+              >
+                {modules.map((module) => (
+                  <option key={module.id} value={module.id}>
+                    {module.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="block text-xs text-slate-400">
             <span className="flex items-center justify-between gap-2">
               Título{" "}

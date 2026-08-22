@@ -32,7 +32,17 @@ interface WorkspaceView {
   workerRunning: boolean;
 }
 
-export function SistemasExternosSection({ isAdmin }: { isAdmin: boolean }) {
+interface SistemasExternosSectionProps {
+  isAdmin: boolean;
+  selectedModuleKey: string | null;
+  onSelectModule: (moduleKey: string, label: string) => void;
+}
+
+export function SistemasExternosSection({
+  isAdmin,
+  selectedModuleKey,
+  onSelectModule,
+}: SistemasExternosSectionProps) {
   const [workspaces, setWorkspaces] = useState<WorkspaceView[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -93,7 +103,8 @@ export function SistemasExternosSection({ isAdmin }: { isAdmin: boolean }) {
           {workspaces.map((workspace) => (
             <article
               key={workspace.id}
-              className="group rounded-xl border border-white/10 bg-white/[.025] p-3 transition hover:border-white/20"
+              onClick={() => onSelectModule(workspace.moduleKey, workspace.label)}
+              className={`group cursor-pointer rounded-xl border p-3 transition ${selectedModuleKey === workspace.moduleKey ? "border-cyan-400/30 bg-cyan-400/[.07]" : "border-white/10 bg-white/[.025] hover:border-white/20"}`}
             >
               <div className="flex items-start gap-2.5">
                 <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">
@@ -126,7 +137,8 @@ export function SistemasExternosSection({ isAdmin }: { isAdmin: boolean }) {
                           ? "Parar worker deste projeto"
                           : "Iniciar worker deste projeto"
                       }
-                      onClick={async () => {
+                      onClick={async (event) => {
+                        event.stopPropagation();
                         const action = workspace.workerRunning
                           ? PararWorkerRoadmapWorkspace
                           : IniciarWorkerRoadmapWorkspace;
@@ -153,7 +165,8 @@ export function SistemasExternosSection({ isAdmin }: { isAdmin: boolean }) {
                     <button
                       type="button"
                       title="Arquivar projeto"
-                      onClick={async () => {
+                      onClick={async (event) => {
+                        event.stopPropagation();
                         if (
                           !window.confirm(
                             `Arquivar "${workspace.label}"? O registro fica preservado, mas ele sai da lista ativa.${workspace.workerRunning ? " O worker em execução será encerrado." : ""}`,

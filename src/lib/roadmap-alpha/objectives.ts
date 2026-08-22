@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 
 import db from "@/lib/prisma";
-import { getRoadmapModuleCatalog } from "@/lib/roadmap-alpha/catalog";
+import { getRoadmapModuleCatalogWithWorkspaces } from "@/lib/roadmap-alpha/catalog";
 import type { RoadmapObjectiveContent, RoadmapObjectiveInput } from "@/lib/roadmap-alpha/contracts";
 
 const PRIORITY_SHIFT = 1_000_000;
@@ -39,7 +39,8 @@ async function shiftPrioritiesDown(tx: Prisma.TransactionClient, from: number, t
 }
 
 export async function createRoadmapObjective(input: RoadmapObjectiveInput, createdById: number) {
-  const moduleSnapshot = getRoadmapModuleCatalog().find((item) => item.id === input.moduleKey);
+  const catalog = await getRoadmapModuleCatalogWithWorkspaces();
+  const moduleSnapshot = catalog.find((item) => item.id === input.moduleKey);
   if (!moduleSnapshot) throw new Error("UNKNOWN_MODULE");
 
   return db.$transaction(async (tx) => {
@@ -179,7 +180,8 @@ export async function retryRoadmapObjective(objectiveId: string) {
 }
 
 export async function updateRoadmapObjective(objectiveId: string, input: RoadmapObjectiveContent) {
-  const moduleSnapshot = getRoadmapModuleCatalog().find((item) => item.id === input.moduleKey);
+  const catalog = await getRoadmapModuleCatalogWithWorkspaces();
+  const moduleSnapshot = catalog.find((item) => item.id === input.moduleKey);
   if (!moduleSnapshot) throw new Error("UNKNOWN_MODULE");
   const acceptanceCriteriaJson = JSON.stringify(input.acceptanceCriteria);
 
