@@ -284,7 +284,17 @@ export async function runProductionAgent(
   root = process.cwd(),
   dependencies: { fetchImpl?: typeof fetch } = {},
 ): Promise<ProductionAgentResult> {
-  const agentContext = await loadBibbleAgentContext(input.agentId, root);
+  /**
+   * Deliberadamente SEM `root` — a squad Bibble (persona/regras dos agentes)
+   * só existe no PainelAlpha, nunca no `root` do workspace ALVO sendo
+   * processado (workspace externo = outro projeto, sem .claude/skills/
+   * bibble-squad/ nem .bibble/). O supervisor .ps1 sempre roda este processo
+   * a partir do PainelAlpha (Set-Location antes do spawn) e passa o root do
+   * alvo só via env var, nunca como cwd real — então process.cwd() (default
+   * de loadBibbleAgentContext) é sempre o caminho correto para ler a squad,
+   * independente de qual workspace está sendo processado.
+   */
+  const agentContext = await loadBibbleAgentContext(input.agentId);
   const system = [
     `Você é o agente ${input.agentId} do Bibble Squad, executando uma fase local do Roadmap Alpha.`,
     "Siga rigorosamente a persona e as regras de projeto fornecidas abaixo.",

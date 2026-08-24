@@ -2858,3 +2858,34 @@ Depois do fix do "Aprovar e iniciar" (entrada anterior), usuário reportou que o
 
 ### Refletido também em
 - `integration-points.md`: nova seção "Roadmap Alpha — Produção: auditoria completa da fila + visibilidade de bloqueio + auto-approve + tela por objetivo (2026-08-24, parte 2 da mesma sessão)", incluindo o achado de que o diretório real de estado NUNCA é `.roadmap-production/` na raiz do projeto — sempre `%LOCALAPPDATA%\PainelAlpha\RoadmapProduction\workspaces\{hash}\`.
+
+---
+
+## [2026-08-24] — Roadmap Alpha: worker de workspace externo nunca funcionava — 2 bugs de infraestrutura
+
+**Tags:** #bugfix #critical #integration
+**Agentes envolvidos:** Scout, Echo, Nova, Forge, Anubis, Lens
+**Arquivos tocados:** `src/lib/roadmap-alpha/process-check.ts` (novo), `src/actions/RoadmapAlpha.ts`, `src/actions/RoadmapWorkspaces.ts`, `src/components/RoadmapAlpha/RoadmapDashboard.tsx`, `src/components/RoadmapAlpha/RoadmapProductionPanel.tsx`, `src/components/RoadmapAlpha/RoadmapImplementationRoom.tsx`, `scripts/roadmap-production-worker.ps1`, `scripts/roadmap-production-workspace-worker.ps1`, `src/lib/roadmap-production/providers.ts`
+
+### Contexto
+Usuário reportou um objetivo documentado (autor role TI, deveria auto-aprovar) que nunca virava execução, e que o badge "Bloqueado — precisa de você" (implementado antes nesta mesma sessão) não tinha nenhuma pergunta visível nem lugar para responder.
+
+### O que foi feito
+- Diagnóstico: o objetivo pertencia a um `RoadmapWorkspace` externo (`site-alpha-comex`, fora do PainelAlpha) com worker morto, sem nenhum alerta na tela principal — a informação já existia (`SistemasExternosSection.tsx`), mas escondida numa gaveta colapsada da sidebar.
+- Implementado: badge âmbar "Worker do projeto parado" no card do objetivo (via novo campo `workspaceWorkerOffline`); abertura automática da Sala de Implementação quando o usuário chega numa execução `BLOCKED`/`WAITING_FOR_ADMIN`; mensagem explicativa para `BLOCKED` sem pergunta formal (esgotamento de retry não gera intervention, só `WAITING_FOR_ADMIN`/circuit breaker gera).
+- Ao TESTAR a correção rodando o worker manualmente, encontrados 2 bugs de infraestrutura reais e antigos, não relacionados à UI:
+  - **Bug A:** os 2 scripts supervisores PowerShell (`roadmap-production-worker.ps1` e `roadmap-production-workspace-worker.ps1`) tinham `$ErrorActionPreference='Stop'` global, que fazia QUALQUER stderr do processo `tsx` filho (mesmo um `console.warn` inofensivo) virar exceção terminante e matar o supervisor inteiro ANTES do `Start-Sleep`/restart — o mecanismo de auto-restart estava completamente inoperante desde sempre, para os dois workers (interno e externo). Corrigido com `try/catch` ao redor do pipeline do processo filho.
+  - **Bug B:** `runProductionAgent` (`providers.ts:287`) passava o `root` do workspace ALVO para `loadBibbleAgentContext`, que lê a persona/regras da squad Bibble — arquivos que só existem no PainelAlpha, nunca no projeto externo. Todo workspace externo sempre falhava com `BIBBLE_AGENT_CONTEXT_MISSING`, nunca processando nenhuma fase, desde que a feature existe. Corrigido removendo o argumento `root` — usa o default `process.cwd()`, sempre o PainelAlpha (o supervisor `.ps1` sempre faz `Set-Location` pra lá antes de rodar).
+
+### Decisões tomadas
+- Bug B corrigido de forma que também é uma melhoria de segurança (confirmado por Anubis): antes, um workspace externo comprometido poderia teoricamente plantar um `SKILL.md` malicioso no próprio repositório do projeto alvo e ele seria carregado como persona real do agente. Agora a fonte é sempre um caminho fixo, nunca variável por workspace.
+- `src/lib/roadmap-alpha/bibble-protocol.ts:43` tem o mesmo padrão superficial (root do workspace passado pra função de squad) mas é intencional e já correto (fallback gracioso documentado) — não foi tocado.
+
+### Problemas encontrados / resolvidos
+- Ambos os bugs foram confirmados por teste real (rodando os scripts `.ps1` manualmente e lendo `worker.log` de verdade), não só leitura de código — depois da correção, log mostrou `supervisor=restart` seguido de novo `supervisor=start`, confirmando que o supervisor sobrevive agora.
+
+### Pendências
+Nenhuma nova. As pendências da parte 2 (task `SEARCH_FAILED`, heurística de texto do aviso de retry) continuam de pé.
+
+### Refletido também em
+- `integration-points.md`: nova seção "Roadmap Alpha — Produção: worker de workspace externo nunca funcionava de verdade — 2 bugs de infraestrutura (2026-08-24, parte 3 da mesma sessão)", marcada como regra permanente para qualquer sessão futura que mexer em `scripts/roadmap-production*.ps1` ou `lib/roadmap-production/{agents,providers}.ts`.

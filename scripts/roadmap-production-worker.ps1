@@ -27,8 +27,19 @@ try {
   $env:ROADMAP_PRODUCTION_SUPERVISOR_PID = [string]$PID
   while ($true) {
     Add-Content -LiteralPath $logPath -Encoding utf8 -Value ('{0} supervisor=start' -f (Get-Date -Format o))
-    & $tsxPath $workerScript worker 2>&1 | ForEach-Object {
-      Add-Content -LiteralPath $logPath -Encoding utf8 -Value ([string]$_)
+    # $ErrorActionPreference='Stop' (topo do script) faz QUALQUER linha de
+    # stderr do processo filho (mesmo um console.warn inofensivo do worker,
+    # ex.: "Comando ignorado: executionId nao encontrado") virar excecao
+    # terminante no pipeline `2>&1 | ForEach-Object`, matando o supervisor
+    # inteiro antes de chegar no Start-Sleep/restart abaixo — o try/catch
+    # aqui garante que isso NUNCA propague pra fora do loop: a excecao e
+    # logada como qualquer outra linha e o supervisor sempre reinicia.
+    try {
+      & $tsxPath $workerScript worker 2>&1 | ForEach-Object {
+        Add-Content -LiteralPath $logPath -Encoding utf8 -Value ([string]$_)
+      }
+    } catch {
+      Add-Content -LiteralPath $logPath -Encoding utf8 -Value ('{0} supervisor=caught-exception message={1}' -f (Get-Date -Format o), $_.Exception.Message)
     }
     Add-Content -LiteralPath $logPath -Encoding utf8 -Value ('{0} supervisor=restart exitCode={1}' -f (Get-Date -Format o), $LASTEXITCODE)
     Start-Sleep -Seconds 10
