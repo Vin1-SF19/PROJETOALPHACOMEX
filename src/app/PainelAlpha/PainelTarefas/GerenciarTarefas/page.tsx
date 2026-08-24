@@ -856,8 +856,8 @@ export default function AdminTarefas() {
                             </div>
 
                             <div className={`space-y-4 p-6 rounded-[2.5rem] border transition-colors ${editandoId ? 'bg-amber-500/5 border-amber-500/10' : 'bg-indigo-500/5 border-indigo-500/10'}`}>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                    {[{ l: "Única", v: 0 }, { l: "Rotina", v: 7 }, { l: "10D", v: 10 }, { l: "15D", v: 15 }, { l: "30D", v: 30 }].map((opt) => (
+                                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                                    {[{ l: "Única", v: 0 }, { l: "Rotina", v: 7 }, { l: "10D", v: 10 }, { l: "15D", v: 15 }, { l: "30D", v: 30 }, { l: "45D", v: 45 }].map((opt) => (
                                         <button key={opt.v} type="button" onClick={() => setNovaTarefa({ ...novaTarefa, fixa: opt.v > 0, intervaloDias: (opt.v > 0 && opt.v !== 7) ? opt.v : null, diasSemana: opt.v === 7 ? [new Date().getDay()] : [], dataInicio: new Date() })} className={`py-3 rounded-xl text-[8px] font-black uppercase border transition-all ${((opt.v === 0 && !novaTarefa.fixa) || (opt.v === 7 && novaTarefa.fixa && !novaTarefa.intervaloDias) || (opt.v === novaTarefa.intervaloDias)) ? (editandoId ? 'bg-amber-600 border-amber-400 text-white shadow-lg' : 'bg-indigo-600 border-indigo-400 text-white shadow-lg') : 'bg-black/20 border-white/5 text-slate-500 hover:border-white/20'}`}>{opt.l}</button>
                                     ))}
                                 </div>

@@ -15,6 +15,14 @@ import {
   policyLevelForCategory,
 } from "@/lib/roadmap-production/policy";
 
+function forbiddenCategoryForPolicyCode(
+  code: string,
+): "DATABASE" | "DESTRUCTIVE" | "GIT_REMOTE" {
+  if (code === "POLICY_DATABASE_VAULT_REQUIRED") return "DATABASE";
+  if (code === "POLICY_DEVOPS_REQUIRED") return "GIT_REMOTE";
+  return "DESTRUCTIVE";
+}
+
 const needsInputPayloadSchema = z
   .object({
     requestId: z.string().uuid(),
@@ -29,13 +37,24 @@ const needsInputPayloadSchema = z
 
 const SECRET_PATTERNS = [
   /\b(?:authorization|x-api-key|api[_ -]?key|token|secret|password|senha)\s*[:=]\s*[^\s,;]+/gi,
-  /https?:\/\/[^\s/@]+:[^\s/@]+@[^\s]+/gi,
+  /\bbearer\s+[A-Za-z0-9._~+\/-]{8,}/gi,
+  /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@[^\s]+/gi,
   /\b(?:sk|ghp|github_pat|glpat)-[A-Za-z0-9_-]{12,}\b/g,
 ];
+
+const NAMED_SECRET_PATTERN =
+  /(["']?)((?:[A-Z_][A-Z0-9_]{0,100})?(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|AUTH_KEY|CREDENTIALS?|PRIVATE_KEY)[A-Z0-9_]*)\1\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;&]+)/gi;
+const QUERY_SECRET_PATTERN =
+  /([?&](?:access[_-]?token|auth[_-]?token|token|api[_-]?key|password|passwd|secret|credential)s?=)[^&#\s]+/gi;
 
 export function sanitizeProductionText(value: string, limit = 4_000): string {
   let sanitized = value.normalize("NFKC");
   for (const pattern of SECRET_PATTERNS) sanitized = sanitized.replace(pattern, "[REDACTED]");
+  sanitized = sanitized.replace(
+    NAMED_SECRET_PATTERN,
+    (_match, quote: string, name: string) => `${quote}${name}${quote}=[REDACTED]`,
+  );
+  sanitized = sanitized.replace(QUERY_SECRET_PATTERN, "$1[REDACTED]");
   sanitized = sanitized.replace(/(?:^|[\\/])\.env(?:\.[\w.-]+)?\b/gi, " [PROTECTED_FILE]");
   return sanitized.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, limit);
 }
@@ -59,15 +78,21 @@ export function parseNeedsInputResult(
   const safeIntendedAction = sanitizeProductionText(value.intendedAction, 1_000);
   const policy = classifyProductionAction({ action: safeIntendedAction });
   const categoryLevel = policyLevelForCategory(value.category);
+  const effectiveCategory =
+    policy.level === "FORBIDDEN"
+      ? forbiddenCategoryForPolicyCode(policy.code)
+      : value.category;
   const normalizedAction = normalizeProductionAction(safeIntendedAction);
   const effectiveRisk =
-    categoryLevel === "FORBIDDEN" ? `${value.risk}\n${policy.guidance}` : value.risk;
+    categoryLevel === "FORBIDDEN" || policy.level === "FORBIDDEN"
+      ? `${value.risk}\n${policy.guidance}`
+      : value.risk;
   return {
     id: randomUUID(),
     requestId: value.requestId,
     executionId,
     phaseNumber: value.phaseNumber,
-    category: value.category,
+    category: effectiveCategory,
     question: sanitizeProductionText(value.question, 2_000),
     intendedAction: safeIntendedAction,
     normalizedAction,
@@ -211,11 +236,23 @@ export function validateInteractionCommand(
     if (!intervention) throw new Error("INTERVENTION_NOT_FOUND");
     if (intervention.phaseNumber !== command.phaseNumber) throw new Error("INTERVENTION_PHASE_MISMATCH");
     if (intervention.status !== "PENDING") throw new Error("INTERVENTION_ALREADY_RESOLVED");
-    if (command.type === "AUTHORIZE" && policyLevelForCategory(intervention.category) === "FORBIDDEN") {
+    const actionPolicy = classifyProductionAction({
+      action: intervention.normalizedAction,
+    });
+    if (
+      command.type === "AUTHORIZE" &&
+      (policyLevelForCategory(intervention.category) === "FORBIDDEN" ||
+        actionPolicy.level === "FORBIDDEN")
+    ) {
       throw new Error("INTERVENTION_AUTHORIZATION_FORBIDDEN");
     }
   }
-  if (command.type === "MESSAGE" && phase && !["RUNNING", "NEEDS_INPUT", "PENDING", "BLOCKED"].includes(phase.status)) {
+  if (
+    command.type === "MESSAGE" &&
+    phase &&
+    !["RUNNING", "NEEDS_INPUT", "PENDING", "BLOCKED"].includes(phase.status) &&
+    command.acceptedPhaseStatus !== "RUNNING"
+  ) {
     throw new Error("PHASE_IS_READ_ONLY");
   }
   if (command.type === "SWITCH_AGENT" && command.agentId) {
@@ -223,5 +260,23 @@ export function validateInteractionCommand(
     if (!["nova", "echo"].includes(command.agentId) && phase?.kind === "EXECUTION") {
       throw new Error("AGENT_INCOMPATIBLE");
     }
+  }
+}
+
+export function assertNoQueuedInterventionResponse(
+  queuedCommands: ReadonlyArray<ProductionControlCommand>,
+  command: ProductionControlCommand,
+): void {
+  if (
+    command.requestId &&
+    queuedCommands.some(
+      (queued) =>
+        queued.executionId === command.executionId &&
+        queued.phaseNumber === command.phaseNumber &&
+        queued.requestId === command.requestId &&
+        ["RESPOND", "AUTHORIZE", "DENY"].includes(queued.type),
+    )
+  ) {
+    throw new Error("INTERVENTION_COMMAND_ALREADY_QUEUED");
   }
 }

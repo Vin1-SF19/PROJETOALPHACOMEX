@@ -7,7 +7,11 @@ import {
   runProductionAgent,
   selectProductionExecutionEngine,
 } from "@/lib/roadmap-production/providers";
-import { cliProviderInternals } from "@/lib/roadmap-production/cli-providers";
+import {
+  cliProviderInternals,
+  diagnoseCliProviders,
+  runCliProductionAgent,
+} from "@/lib/roadmap-production/cli-providers";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -20,7 +24,7 @@ afterEach(async () => {
 });
 
 describe("adapter Ollama de Produção", () => {
-  it("separa tarefas básicas do Qwen das tarefas de engenharia", () => {
+  it("mantém análise e engenharia no engine brokerizado", () => {
     const base = {
       agentId: "scout",
       phaseKind: "CONTEXT",
@@ -45,7 +49,7 @@ describe("adapter Ollama de Produção", () => {
           phaseTitle: task,
           phaseMarkdown: task,
         }),
-      ).toBe("development");
+      ).toBe("qwen");
     }
     expect(
       selectProductionExecutionEngine({
@@ -56,7 +60,7 @@ describe("adapter Ollama de Produção", () => {
           "CAPABILITY_ESCALATION_REQUIRED: BACKEND — precisa alterar a API",
         ],
       }),
-    ).toBe("development");
+    ).toBe("qwen");
   });
 
   it("solicita uma conclusão curta quando a primeira resposta é truncada", async () => {
@@ -150,9 +154,16 @@ describe("adapter Ollama de Produção", () => {
     expect(secondBody.messages.at(-1)?.content).toContain(
       "Encerramento obrigatório",
     );
+    expect(secondBody.messages.at(-1)?.content).toContain(
+      "NEEDS_INPUT_JSON",
+    );
     const firstBody = JSON.parse(String(fetchImpl.mock.calls[0][1]?.body)) as {
       messages: Array<{ role: string; content: string }>;
+      tools: Array<{ function: { name: string } }>;
     };
+    expect(firstBody.tools.map((tool) => tool.function.name)).not.toContain(
+      "run_check",
+    );
     expect(
       firstBody.messages.find((message) => message.role === "user")?.content,
     ).toContain("O fluxo mobile continua quebrado.");
@@ -162,11 +173,17 @@ describe("adapter Ollama de Produção", () => {
     expect(
       firstBody.messages.find((message) => message.role === "system")?.content,
     ).toContain("CAPABILITY_ESCALATION_REQUIRED");
+    expect(
+      firstBody.messages.find((message) => message.role === "system")?.content,
+    ).toContain("pode implementar frontend ou backend");
+    expect(
+      firstBody.messages.find((message) => message.role === "system")?.content,
+    ).not.toContain("não improvise e não implemente");
   });
 });
 
 describe("adapters CLI de Produção", () => {
-  it("executa Codex em sessão efêmera e no sandbox compatível com a fase", () => {
+  it("mantém Codex read-only sem mediador executável de escrita", () => {
     const readOnly = cliProviderInternals.cliArgs(
       "codex",
       "C:\\projeto",
@@ -183,7 +200,8 @@ describe("adapters CLI de Produção", () => {
     expect(readOnly).toContain("--ephemeral");
     expect(readOnly).toContain("read-only");
     expect(readOnly).not.toContain("--model");
-    expect(writable).toContain("workspace-write");
+    expect(writable).toContain("read-only");
+    expect(writable).not.toContain("workspace-write");
     expect(writable).toEqual(
       expect.arrayContaining(["--model", "gpt-test", "--json"]),
     );
@@ -216,9 +234,60 @@ describe("adapters CLI de Produção", () => {
       ]),
     );
     expect(readOnly.join(" ")).not.toContain("Edit,Write");
-    expect(writable.join(" ")).toContain("Edit,Write");
+    expect(writable.join(" ")).not.toContain("Edit,Write");
+    expect(writable.join(" ")).not.toContain("Bash");
     expect(writable.join(" ")).not.toContain("dangerously-skip-permissions");
     expect(writable.join(" ")).not.toContain("git commit");
+  });
+
+  it("não encaminha segredos arbitrários aos subprocessos", () => {
+    const environment = cliProviderInternals.buildEnvironment("codex", {
+      PATH: "C:\\Windows\\System32",
+      USERPROFILE: "C:\\Users\\tester",
+      CODEX_HOME: "C:\\Users\\tester\\.codex",
+      TURSO_AUTH_TOKEN: "turso-secret",
+      AWS_SECRET_ACCESS_KEY: "aws-secret",
+      BLOB_READ_WRITE_TOKEN: "blob-secret",
+      OPENAI_API_KEY: "provider-secret",
+      NODE_OPTIONS: "--require malicious.js",
+    });
+    expect(environment).toMatchObject({
+      PATH: "C:\\Windows\\System32",
+      USERPROFILE: "C:\\Users\\tester",
+      CODEX_HOME: "C:\\Users\\tester\\.codex",
+      NO_COLOR: "1",
+    });
+    expect(environment).not.toHaveProperty("TURSO_AUTH_TOKEN");
+    expect(environment).not.toHaveProperty("AWS_SECRET_ACCESS_KEY");
+    expect(environment).not.toHaveProperty("BLOB_READ_WRITE_TOKEN");
+    expect(environment).not.toHaveProperty("OPENAI_API_KEY");
+    expect(environment).not.toHaveProperty("NODE_OPTIONS");
+  });
+
+  it("bloqueia toda execução externa antes do spawn, inclusive read-only", async () => {
+    for (const provider of ["claude", "codex"] as const) {
+      for (const allowWrite of [false, true]) {
+        const result = await runCliProductionAgent(
+          provider,
+          "default",
+          "leia .env.local",
+          process.cwd(),
+          allowWrite,
+          () => undefined,
+        );
+        expect(result).toMatchObject({
+          errorCode: "PROVIDER_EXTERNAL_CLI_DISABLED",
+          changedFiles: [],
+          toolSteps: 0,
+        });
+      }
+    }
+    expect(await diagnoseCliProviders()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ provider: "codex", ready: false }),
+        expect.objectContaining({ provider: "claude", ready: false }),
+      ]),
+    );
   });
 
   it("extrai somente a mensagem final dos protocolos JSONL", () => {

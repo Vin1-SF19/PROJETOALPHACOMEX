@@ -46,6 +46,8 @@ import {
 import {
   AprovarExecucaoRoadmapProduction,
   ListarExecucoesAguardandoAprovacao,
+  ListarExecucoesPorObjetivo,
+  ListarExecucoesPrecisandoAtencao,
 } from "@/actions/RoadmapProduction";
 import {
   Accordion,
@@ -248,8 +250,17 @@ export function RoadmapDashboard({
   const [productionModuleKey, setProductionModuleKey] = useState<string | null>(
     null,
   );
+  const [focusExecutionId, setFocusExecutionId] = useState<string | null>(
+    null,
+  );
   const [awaitingApproval, setAwaitingApproval] = useState<
     Map<string, string>
+  >(new Map());
+  const [needingAttention, setNeedingAttention] = useState<
+    Map<string, { executionId: string; status: "BLOCKED" | "WAITING_FOR_ADMIN" }>
+  >(new Map());
+  const [objectiveExecutions, setObjectiveExecutions] = useState<
+    Map<string, { executionId: string; status: string }>
   >(new Map());
 
   const refreshAwaitingApproval = useCallback(async () => {
@@ -263,16 +274,56 @@ export function RoadmapDashboard({
     }
   }, []);
 
+  const refreshNeedingAttention = useCallback(async () => {
+    const result = await ListarExecucoesPrecisandoAtencao();
+    if (result.success) {
+      setNeedingAttention(
+        new Map(
+          result.data.map((item) => [
+            item.objectiveId,
+            { executionId: item.executionId, status: item.status },
+          ]),
+        ),
+      );
+    }
+  }, []);
+
+  const refreshObjectiveExecutions = useCallback(async () => {
+    const result = await ListarExecucoesPorObjetivo();
+    if (result.success) {
+      setObjectiveExecutions(
+        new Map(
+          result.data.map((item) => [
+            item.objectiveId,
+            { executionId: item.executionId, status: item.status },
+          ]),
+        ),
+      );
+    }
+  }, []);
+
   useEffect(() => {
     if (!canMutate) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshAwaitingApproval();
+    void refreshNeedingAttention();
+    const interval = window.setInterval(() => {
+      void refreshAwaitingApproval();
+      void refreshNeedingAttention();
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [canMutate, refreshAwaitingApproval, refreshNeedingAttention]);
+
+  useEffect(() => {
+    if (!canAccessProduction) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refreshObjectiveExecutions();
     const interval = window.setInterval(
-      () => void refreshAwaitingApproval(),
+      () => void refreshObjectiveExecutions(),
       30_000,
     );
     return () => window.clearInterval(interval);
-  }, [canMutate, refreshAwaitingApproval]);
+  }, [canAccessProduction, refreshObjectiveExecutions]);
 
   const refreshObjectives = useCallback(async () => {
     if (refreshInFlight.current || document.visibilityState === "hidden")
@@ -373,7 +424,11 @@ export function RoadmapDashboard({
           modules.find((module) => module.id === productionModuleKey)?.label ??
           null
         }
-        onBack={() => setView("roadmap")}
+        focusExecutionId={focusExecutionId}
+        onBack={() => {
+          setView("roadmap");
+          setFocusExecutionId(null);
+        }}
       />
     );
   }
@@ -393,23 +448,6 @@ export function RoadmapDashboard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canAccessProduction && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                const scopeModuleKey = moduleFilter ?? selected?.moduleKey;
-                if (!scopeModuleKey) {
-                  toast.error("Selecione um projeto antes de abrir Produção");
-                  return;
-                }
-                setProductionModuleKey(scopeModuleKey);
-                setView("production");
-              }}
-              className="border-violet-400/20 bg-violet-400/[.06] text-violet-200 hover:bg-violet-400/10"
-            >
-              <Workflow size={16} /> Produção
-            </Button>
-          )}
           <span className="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs text-slate-400 sm:inline-flex">
             <span
               className={`size-1.5 rounded-full ${hasActiveDocumentation ? "animate-pulse bg-cyan-400" : "bg-emerald-400"}`}
@@ -698,6 +736,32 @@ export function RoadmapDashboard({
                             </button>
                           </div>
                         )}
+                        {canMutate && needingAttention.has(objective.id) && (
+                          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-rose-400/20 bg-rose-400/[.06] p-1.5">
+                            <span className="flex-1 px-1 text-[10px] text-rose-200/90">
+                              {needingAttention.get(objective.id)?.status ===
+                              "WAITING_FOR_ADMIN"
+                                ? "Aguardando administrador — precisa de você"
+                                : "Bloqueado — precisa de você"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const attention = needingAttention.get(
+                                  objective.id,
+                                );
+                                if (!attention) return;
+                                setProductionModuleKey(objective.moduleKey);
+                                setFocusExecutionId(attention.executionId);
+                                setView("production");
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-400/20 bg-rose-400/[.06] px-2 py-1 text-[10px] font-medium text-rose-300 hover:bg-rose-400/10"
+                            >
+                              <Workflow size={11} /> Abrir
+                            </button>
+                          </div>
+                        )}
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-1">
                             <span
@@ -722,6 +786,27 @@ export function RoadmapDashboard({
                                 ]
                               }
                             </span>
+                            {canAccessProduction &&
+                              objectiveExecutions.has(objective.id) && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    const execution = objectiveExecutions.get(
+                                      objective.id,
+                                    );
+                                    if (!execution) return;
+                                    setProductionModuleKey(
+                                      objective.moduleKey,
+                                    );
+                                    setFocusExecutionId(execution.executionId);
+                                    setView("production");
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/[.06] px-2 py-1 text-[10px] text-cyan-300 hover:bg-cyan-400/10"
+                                >
+                                  <Workflow size={10} /> Produção
+                                </button>
+                              )}
                           </div>
                           {canMutate && (
                             <div className="flex opacity-70 transition group-hover:opacity-100">

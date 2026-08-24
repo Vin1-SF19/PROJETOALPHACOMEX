@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev --turbopack",
     "build": "prisma generate && npm run build:player && next build",
     "build:player": "node scripts/build-apresentacoes-player.mjs",
     "fonts:alpha-motion": "node scripts/download-alpha-motion-fonts.mjs",

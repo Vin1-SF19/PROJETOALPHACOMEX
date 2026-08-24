@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { isSensitiveRoadmapPath } from "@/lib/roadmap-production/protected-path";
+
 export type ProductionPolicyLevel = "SAFE" | "SENSITIVE" | "FORBIDDEN";
 
 export interface ProductionPolicyDecision {
@@ -19,11 +21,10 @@ const SAFE_COMMANDS = new Set([
 
 const SAFE_TOOLS = new Set([
   "list_files",
-  "search_files",
+  "search_code",
   "read_file",
   "create_file",
   "replace_in_file",
-  "run_quality_gate",
 ]);
 
 const PROTECTED_SEGMENTS = new Set([
@@ -55,7 +56,35 @@ function isSafeWorkspacePath(root: string, candidate?: string): boolean {
   if (segments.some((segment) => PROTECTED_SEGMENTS.has(segment.toLowerCase()))) {
     return false;
   }
-  return !relative.split(/[\\/]+/).includes("..");
+  return (
+    !relative.split(/[\\/]+/).includes("..") &&
+    !isSensitiveRoadmapPath(relative)
+  );
+}
+
+function containsShellComposition(value: string): boolean {
+  return /[\r\n;&|<>`]/.test(value) || /\$\(/.test(value);
+}
+
+function isSafeTargetedNpmTest(command: string): boolean {
+  const prefix = "npm test -- ";
+  if (!command.startsWith(prefix)) return false;
+  const targets = command.slice(prefix.length).split(" ");
+  if (!targets.length || targets.length > 20 || targets.some((item) => !item)) {
+    return false;
+  }
+  return targets.every((target) => {
+    if (!/^[a-z0-9_./\\-]+$/i.test(target) || target.startsWith("-")) {
+      return false;
+    }
+    const normalized = target.replaceAll("\\", "/");
+    const segments = normalized.split("/");
+    return (
+      normalized.startsWith("tests/") &&
+      !path.posix.isAbsolute(normalized) &&
+      !segments.includes("..")
+    );
+  });
 }
 
 export function classifyProductionAction(input: {
@@ -68,6 +97,16 @@ export function classifyProductionAction(input: {
   const lower = normalizedAction.toLocaleLowerCase("pt-BR");
   const root = input.root ?? process.cwd();
 
+  if (containsShellComposition(input.action)) {
+    return {
+      level: "FORBIDDEN",
+      code: "POLICY_COMPOSED_COMMAND_FORBIDDEN",
+      normalizedAction,
+      guidance:
+        "Composição, redirecionamento e subshell não são aceitos em comandos da allowlist.",
+    };
+  }
+
   if (!isSafeWorkspacePath(root, input.path)) {
     return {
       level: "FORBIDDEN",
@@ -77,7 +116,7 @@ export function classifyProductionAction(input: {
     };
   }
   if (
-    /(?:prisma[\\/]schema\.prisma|\bmigra(?:tion|te|ção)|\b(?:alter|drop|truncate)\s+(?:table|index)|\bseed\b|\bbackfill\b|\bdelete\s+from\b|\bdeleteMany\b|\bupdateMany\b)/i.test(
+    /(?:prisma[\\/]schema\.prisma|\bprisma(?:\.cmd|\.exe)?\b|\bsqlite3(?:\.exe)?\b|\bmigra(?:tion|te|ção)|\b(?:alter|drop|truncate)\s+(?:table|index)|\bseed\b|\bbackfill\b|\bdelete\s+from\b|\bdeleteMany\b|\bupdateMany\b)/i.test(
       normalizedAction,
     )
   ) {
@@ -90,7 +129,7 @@ export function classifyProductionAction(input: {
     };
   }
   if (
-    /\b(git\s+(?:commit|push|reset|checkout|switch|merge|rebase|tag)|gh\s+pr|pull request|release)\b/i.test(
+    /\bgit(?:\.exe)?\b(?:(?![;&|]).){0,240}\b(?:commit|push|reset|checkout|switch|merge|rebase|tag|clean)\b|\bgh(?:\.exe)?\s+(?:pr|release)\b|\bpull request\b|\brelease\b/i.test(
       normalizedAction,
     )
   ) {
@@ -101,7 +140,7 @@ export function classifyProductionAction(input: {
       guidance: "Commit, push, PR, release e tag permanecem exclusivos do DevOps.",
     };
   }
-  if (/\b(rm|rmdir|del|remove-item)\b.*(?:-r|-recurse|\/s)|\breset\s+--hard\b/i.test(lower)) {
+  if (/\b(?:rm|rmdir|del|erase|remove-item|clear-content)\b|\breset\s+--hard\b/i.test(lower)) {
     return {
       level: "FORBIDDEN",
       code: "POLICY_DESTRUCTIVE_COMMAND",
@@ -110,7 +149,7 @@ export function classifyProductionAction(input: {
     };
   }
   if (
-    /\b(npm|pnpm|yarn|bun)\s+(?:install|add|update)|\b(?:curl|wget|invoke-webrequest)\b|https?:\/\/|\b(?:sudo|runas|elevad[oa])\b|\b(?:token|credential|credencial|api key|secret)\b/i.test(
+    /\b(npm|pnpm|yarn|bun)\s+(?:install|add|update)|\b(?:curl|wget|invoke-webrequest|fetch)\b|https?:\/\/|\b(?:sudo|runas|elevad[oa])\b|\b(?:token|credential|credentials|credencial|credenciais|api key|secret|senha|password)\b/i.test(
       normalizedAction,
     )
   ) {
@@ -121,7 +160,7 @@ export function classifyProductionAction(input: {
       guidance: "A ação exige autorização explícita, de uso único e vinculada a esta fase.",
     };
   }
-  const commandIsSafe = SAFE_COMMANDS.has(lower) || /^npm test --\s+\S+/.test(lower);
+  const commandIsSafe = SAFE_COMMANDS.has(lower) || isSafeTargetedNpmTest(lower);
   const toolIsSafe = input.tool ? SAFE_TOOLS.has(input.tool) : false;
   if (commandIsSafe || toolIsSafe) {
     return {
@@ -132,10 +171,10 @@ export function classifyProductionAction(input: {
     };
   }
   return {
-    level: "SENSITIVE",
-    code: "POLICY_UNKNOWN_ACTION_REQUIRES_REVIEW",
+    level: "FORBIDDEN",
+    code: "POLICY_UNKNOWN_EXECUTABLE_FORBIDDEN",
     normalizedAction,
-    guidance: "Ação não reconhecida não é promovida a segura por texto do prompt.",
+    guidance: "Ação não reconhecida pela allowlist executável permanece bloqueada.",
   };
 }
 

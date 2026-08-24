@@ -13,6 +13,25 @@ beforeEach(async () => {
   await fs.mkdir(path.join(project, "prisma"));
   await fs.writeFile(path.join(project, "src", "example.ts"), "export const value = 1;\n", "utf8");
   await fs.writeFile(path.join(project, ".env.local"), "TOKEN=secret\n", "utf8");
+  for (const sensitive of [
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
+    "secrets-prod.json",
+    "credentials.json",
+    "service-account-dev.json",
+    "private.pem",
+    "signing.key",
+    "bundle.p12",
+    "identity.pfx",
+  ]) {
+    await fs.writeFile(path.join(project, sensitive), "SENSITIVE_CANARY", "utf8");
+  }
+  await fs.writeFile(
+    path.join(project, "package.json"),
+    JSON.stringify({ scripts: { compromised: "node write-canary.js" } }),
+    "utf8",
+  );
   await fs.writeFile(path.join(project, "prisma", "schema.prisma"), "datasource db {}\n", "utf8");
   context = { root: project, agentId: "nova", allowWrite: true };
 });
@@ -40,7 +59,79 @@ describe("tools confinadas da Produção", () => {
   });
 
   it("não oferece execução arbitrária", async () => {
-    expect((await call("run_check", { check: "shell", paths: [] })).errorCode).toBe("CHECK_NOT_ALLOWED");
+    expect((await call("run_check", { check: "tests", paths: ["tests"] })).errorCode).toBe("TOOL_NOT_ALLOWED");
     expect((await call("unknown", {})).errorCode).toBe("UNKNOWN_TOOL");
+    expect((await call("search_files", { pattern: "value" })).errorCode).toBe("UNKNOWN_TOOL");
+  });
+
+  it("não executa gates mesmo após o agente editar configuração", async () => {
+    const before = await fs.readFile(path.join(project, "package.json"), "utf8");
+    expect(
+      (
+        await call("replace_in_file", {
+          path: "package.json",
+          oldText: "write-canary.js",
+          newText: "malicious-canary.js",
+        })
+      ).success,
+    ).toBe(true);
+    expect(
+      (await call("run_check", { check: "typecheck" })).errorCode,
+    ).toBe("TOOL_NOT_ALLOWED");
+    expect(await fs.readFile(path.join(project, "package.json"), "utf8")).not.toBe(before);
+    await expect(fs.access(path.join(project, "executed-canary"))).rejects.toThrow();
+  });
+
+  it("oculta credenciais por basename e extensão em read, list e search", async () => {
+    for (const sensitive of [
+      ".npmrc",
+      ".pypirc",
+      ".netrc",
+      "secrets-prod.json",
+      "credentials.json",
+      "service-account-dev.json",
+      "private.pem",
+      "signing.key",
+      "bundle.p12",
+      "identity.pfx",
+    ]) {
+      expect((await call("read_file", { path: sensitive })).errorCode).toBe(
+        "PROTECTED_PATH",
+      );
+      expect(
+        (
+          await call("replace_in_file", {
+            path: sensitive,
+            oldText: "SENSITIVE",
+            newText: "LEAKED",
+          })
+        ).errorCode,
+      ).toBe("PROTECTED_PATH");
+    }
+    const listed = await executeProductionTool(
+      { name: "list_files", arguments: { directory: "." } },
+      context,
+    );
+    expect(listed).not.toContain("secrets-prod.json");
+    expect(listed).not.toContain("private.pem");
+    const searched = await executeProductionTool(
+      {
+        name: "search_code",
+        arguments: { pattern: "SENSITIVE_CANARY", path: "." },
+      },
+      context,
+    );
+    expect(searched).not.toContain("SENSITIVE_CANARY");
+  });
+
+  it("executa somente o nome de busca alinhado à policy", async () => {
+    const result = await executeProductionTool(
+      {
+        name: "search_code",
+        arguments: { pattern: "value = 1", path: "src" },
+      },
+      context,
+    );
+    expect(result).toContain("example.ts");
   });
 });

@@ -3,6 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { buildRoadmapSubprocessEnv } from "@/lib/roadmap-production/subprocess-env";
+import { classifyProductionAction } from "@/lib/roadmap-production/policy";
+import { isSensitiveRoadmapPath } from "@/lib/roadmap-production/protected-path";
+
 const execFileAsync = promisify(execFile);
 const MAX_TOOL_OUTPUT = 30_000;
 const MAX_READ_CHARS = 60_000;
@@ -17,6 +21,13 @@ const WRITABLE_EXTENSIONS = new Set([
   ".html", ".yml", ".yaml", ".sql", ".prisma", ".txt", ".svg",
 ]);
 const MEMORY_AGENTS = new Set(["scribe", "kowalski"]);
+const PRODUCTION_TOOL_NAMES = new Set([
+  "list_files",
+  "read_file",
+  "search_code",
+  "replace_in_file",
+  "create_file",
+]);
 
 export interface ProductionToolContext {
   root: string;
@@ -71,21 +82,6 @@ export const PRODUCTION_TOOL_DEFINITIONS = [
       parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "run_check",
-      description: "Executa somente um gate allowlisted: git_status, git_diff, eslint, typecheck, roadmap_tests ou tests.",
-      parameters: {
-        type: "object",
-        properties: {
-          check: { type: "string", enum: ["git_status", "git_diff", "eslint", "typecheck", "roadmap_tests", "tests"] },
-          paths: { type: "array", items: { type: "string" }, maxItems: 20 },
-        },
-        required: ["check"],
-      },
-    },
-  },
 ] as const;
 
 function safeRelativePath(value: unknown): string {
@@ -99,8 +95,7 @@ function safeRelativePath(value: unknown): string {
 function hasProtectedSegment(relative: string): boolean {
   const segments = relative.toLocaleLowerCase("en-US").split("/");
   if (segments.some((segment) => PROTECTED_SEGMENTS.has(segment))) return true;
-  const base = segments.at(-1) ?? "";
-  return base === ".env" || base.startsWith(".env.") || base.endsWith(".db") || base.endsWith(".sqlite") || base.endsWith(".sqlite3");
+  return isSensitiveRoadmapPath(relative);
 }
 
 function resolveInsideProject(root: string, relative: string): string {
@@ -190,9 +185,14 @@ async function searchCode(context: ProductionToolContext, args: Record<string, u
   const maxResults = Math.max(1, Math.min(Number(args.maxResults ?? 100), 300));
   const rgArgs = ["--line-number", "--color", "never", "--max-count", String(maxResults),
     "--glob", "!.git/**", "--glob", "!.next/**", "--glob", "!node_modules/**",
-    "--glob", "!.roadmap-production/**", "--glob", "!database-backups/**", pattern, relative];
+    "--glob", "!.roadmap-production/**", "--glob", "!database-backups/**",
+    "--iglob", "!**/.env*", "--iglob", "!**/.npmrc", "--iglob", "!**/.pypirc", "--iglob", "!**/.netrc",
+    "--iglob", "!**/secret*.json", "--iglob", "!**/credential*.json", "--iglob", "!**/service-account*.json",
+    "--iglob", "!**/*.pem", "--iglob", "!**/*.key", "--iglob", "!**/*.p12", "--iglob", "!**/*.pfx",
+    "--iglob", "!**/*.jks", "--iglob", "!**/*.keystore", "--iglob", "!**/id_rsa", "--iglob", "!**/id_dsa",
+    "--iglob", "!**/id_ecdsa", "--iglob", "!**/id_ed25519", pattern, relative];
   try {
-    const result = await execFileAsync("rg", rgArgs, { cwd: context.root, timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true });
+    const result = await execFileAsync("rg", rgArgs, { cwd: context.root, timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true, env: buildRoadmapSubprocessEnv("gate") });
     return truncate(result.stdout || "Nenhuma ocorrência.");
   } catch (error) {
     const failure = error as { code?: number; stdout?: string };
@@ -200,7 +200,7 @@ async function searchCode(context: ProductionToolContext, args: Record<string, u
     try {
       const literalArgs = [...rgArgs];
       literalArgs.splice(literalArgs.length - 2, 0, "--fixed-strings");
-      const literal = await execFileAsync("rg", literalArgs, { cwd: context.root, timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true });
+      const literal = await execFileAsync("rg", literalArgs, { cwd: context.root, timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true, env: buildRoadmapSubprocessEnv("gate") });
       return truncate(literal.stdout || "Nenhuma ocorrência.");
     } catch (literalError) {
       if ((literalError as { code?: number }).code === 1) return "Nenhuma ocorrência.";
@@ -239,53 +239,21 @@ async function createFile(context: ProductionToolContext, args: Record<string, u
   return JSON.stringify({ success: true, path: relative });
 }
 
-function validateCheckPaths(values: unknown): string[] {
-  if (!Array.isArray(values)) return [];
-  return values.slice(0, 20).map(safeRelativePath).filter((relative) => {
-    assertReadable(relative);
-    return true;
-  });
-}
-
-async function runCheck(context: ProductionToolContext, args: Record<string, unknown>): Promise<string> {
-  const check = String(args.check ?? "");
-  const paths = validateCheckPaths(args.paths);
-  let executable: string;
-  let commandArgs: string[];
-  if (check === "git_status") {
-    executable = "git"; commandArgs = ["status", "--short"];
-  } else if (check === "git_diff") {
-    executable = "git"; commandArgs = ["diff", "--", ...(paths.length ? paths : ["."])];
-  } else if (check === "eslint") {
-    executable = "npx.cmd"; commandArgs = ["eslint", ...(paths.length ? paths : ["src"] )];
-  } else if (check === "typecheck") {
-    executable = "npm.cmd"; commandArgs = ["run", "typecheck"];
-  } else if (check === "roadmap_tests") {
-    executable = "npx.cmd"; commandArgs = ["vitest", "run", "tests/roadmap-alpha"];
-  } else if (check === "tests") {
-    if (!paths.length || paths.some((relative) => !relative.startsWith("tests/"))) throw new Error("TEST_PATH_REQUIRED");
-    executable = "npx.cmd"; commandArgs = ["vitest", "run", ...paths];
-  } else {
-    throw new Error("CHECK_NOT_ALLOWED");
-  }
-  await context.onActivity?.(`Executando gate ${check}`);
-  try {
-    const result = await execFileAsync(executable, commandArgs, { cwd: context.root, timeout: 10 * 60_000, maxBuffer: 4_000_000, windowsHide: true });
-    return truncate(JSON.stringify({ check, exitCode: 0, output: `${result.stdout}${result.stderr}` }));
-  } catch (error) {
-    const failure = error as { code?: number; stdout?: string; stderr?: string };
-    return truncate(JSON.stringify({ check, exitCode: typeof failure.code === "number" ? failure.code : 1, output: `${failure.stdout ?? ""}${failure.stderr ?? ""}` }));
-  }
-}
-
 export async function executeProductionTool(call: ProductionToolCall, context: ProductionToolContext): Promise<string> {
   try {
+    if (call.name === "run_check") throw new Error("TOOL_NOT_ALLOWED");
+    if (!PRODUCTION_TOOL_NAMES.has(call.name)) throw new Error("UNKNOWN_TOOL");
+    const policy = classifyProductionAction({
+      action: call.name,
+      tool: call.name,
+      root: context.root,
+    });
+    if (policy.level !== "SAFE") throw new Error(policy.code);
     if (call.name === "list_files") return await listFiles(context, call.arguments);
     if (call.name === "read_file") return await readFile(context, call.arguments);
     if (call.name === "search_code") return await searchCode(context, call.arguments);
     if (call.name === "replace_in_file") return await replaceInFile(context, call.arguments);
     if (call.name === "create_file") return await createFile(context, call.arguments);
-    if (call.name === "run_check") return await runCheck(context, call.arguments);
     throw new Error("UNKNOWN_TOOL");
   } catch (error) {
     const code = error instanceof Error && /^[A-Z0-9_]+$/.test(error.message) ? error.message : "TOOL_FAILED";

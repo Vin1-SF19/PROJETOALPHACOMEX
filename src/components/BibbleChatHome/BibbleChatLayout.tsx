@@ -34,7 +34,7 @@ let msgCounter = 0;
 const newId = () => `msg-${++msgCounter}-${Date.now()}`;
 
 // Modelo do Bibble é fixo — sem seletor na UI (ver .env.local BIBBLE_MODEL).
-const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "qwen3:14b";
+const DEFAULT_MODEL = process.env.NEXT_PUBLIC_BIBBLE_MODEL || "qwen3.8:latest";
 const DEFAULT_CONTEXT_WINDOW = 32_768;
 
 export type StreamStatus = "idle" | "thinking" | "pesquisando" | "gerando_imagem";

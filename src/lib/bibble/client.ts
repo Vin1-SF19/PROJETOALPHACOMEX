@@ -2,7 +2,7 @@ export const BIBBLE_OLLAMA_URL =
   process.env.BIBBLE_OLLAMA_URL ?? "http://192.168.35.113:11434";
 
 export const BIBBLE_MODEL =
-  process.env.BIBBLE_MODEL ?? "gemma4:e4b";
+  process.env.BIBBLE_MODEL ?? "qwen3.8:latest";
 
 export type Provider = "ollama" | "openai" | "anthropic" | "google";
 
@@ -14,6 +14,7 @@ export interface ModelEntry {
 
 export const PROVIDER_MODELS: Record<Provider, ModelEntry[]> = {
   ollama: [
+    { id: "qwen3.8:latest",  label: "Qwen 3.8 · Latest", provider: "ollama" },
     { id: "gemma4:e4b",      label: "Gemma 4 · E4B",     provider: "ollama" },
     { id: "qwen3:14b",       label: "Qwen 3 · 14B",      provider: "ollama" },
     { id: "qwen3.6:35b",     label: "Qwen 3.6 · 35B",    provider: "ollama" },
@@ -66,8 +67,8 @@ export function modelSupportsVision(modelId: string): boolean {
   if (id.startsWith("claude-")) return true;
   // Gemini é multimodal
   if (id.startsWith("gemini-")) return true;
-  // Ollama: só alguns modelos têm visão (qwen3.6/3.5, gemma3, llava, qwen-vl, minicpm-v…)
-  if (id.startsWith("qwen3.6") || id.startsWith("qwen3.5") ||
+  // Ollama: só alguns modelos têm visão (qwen3.8/3.6/3.5, gemma3, llava, qwen-vl, minicpm-v…)
+  if (id.startsWith("qwen3.8") || id.startsWith("qwen3.6") || id.startsWith("qwen3.5") ||
       id.includes("gemma3") || id.includes("llava") || id.includes("vision") ||
       id.includes("minicpm") || id.includes("-vl") || id.startsWith("llama3.2")) return true;
   return false;

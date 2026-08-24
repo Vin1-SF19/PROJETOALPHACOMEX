@@ -118,6 +118,7 @@ export const productionControlCommandSchema = z
     requestId: z.string().uuid().nullable().default(null),
     content: z.string().trim().min(1).max(4_000).nullable().default(null),
     agentId: z.string().trim().min(1).max(80).nullable().default(null),
+    acceptedPhaseStatus: productionPhaseStatusSchema.nullable().default(null),
     author: z.string().trim().min(1).max(120).default("Administrador"),
     createdAt: z.string().datetime(),
   })
@@ -133,7 +134,7 @@ export const productionControlCommandSchema = z
       });
     }
     if (["APPROVE", "PAUSE", "RESUME", "RETRY", "EXCLUDE"].includes(command.type) &&
-      (command.phaseNumber !== null || command.feedback !== null || command.requestId !== null || command.content !== null || command.agentId !== null)) {
+      (command.phaseNumber !== null || command.feedback !== null || command.requestId !== null || command.content !== null || command.agentId !== null || command.acceptedPhaseStatus !== null)) {
       context.addIssue({
         code: "custom",
         message: "CONTROL_DOES_NOT_ACCEPT_FEEDBACK",
@@ -145,6 +146,9 @@ export const productionControlCommandSchema = z
     }
     if (command.type === "MESSAGE" && (command.phaseNumber === null || !command.content)) {
       context.addIssue({ code: "custom", message: "MESSAGE_COMMAND_INVALID" });
+    }
+    if (command.type !== "MESSAGE" && command.acceptedPhaseStatus !== null) {
+      context.addIssue({ code: "custom", message: "ACCEPTED_PHASE_STATUS_NOT_ALLOWED" });
     }
     if (command.type === "SWITCH_AGENT" && (command.phaseNumber === null || !command.agentId)) {
       context.addIssue({ code: "custom", message: "SWITCH_AGENT_COMMAND_INVALID" });

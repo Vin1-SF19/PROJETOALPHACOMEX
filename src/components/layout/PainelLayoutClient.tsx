@@ -101,11 +101,15 @@ export default function PainelLayoutClient({
   useCalendarioAlphaNotifications(temAcessoCalendarioAlpha ? userId : 0);
 
   // ── Embedded detection (running inside an iframe) ─────────────────────────
-  // Lazy initializer: detecta no primeiro render client-side, evita flash de sidebar dupla
-  const [isEmbedded] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try { return window !== window.top; } catch { return true; }
-  });
+  // O primeiro render precisa ser idêntico no servidor e no navegador. Detectar `window`
+  // no initializer fazia o SSR montar o shell completo e o iframe hidratar só `children`.
+  const [isEmbedded, setIsEmbedded] = useState(false);
+  useEffect(() => {
+    let embedded = false;
+    try { embedded = window !== window.top; } catch { embedded = true; }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- detecção client-only após hidratação
+    setIsEmbedded(embedded);
+  }, []);
   const [tvMode, setTvMode] = useState(false);
 
   // Recebe postMessage dos iframes filhos (ex: Modo TV do Painel de Metas)

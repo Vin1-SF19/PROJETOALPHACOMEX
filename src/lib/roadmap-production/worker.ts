@@ -11,6 +11,7 @@ import type {
   ProductionActivity,
   ProductionConfig,
   ProductionExecution,
+  ProductionMessage,
   ProductionState,
 } from "@/lib/roadmap-production/contracts";
 
@@ -35,13 +36,14 @@ type ProductionExecutionCompat = Omit<
 type ProductionStateCompat = Omit<ProductionState, "executions"> & {
   executions: ProductionExecutionCompat[];
 };
+import { isAdminRole } from "@/lib/roles";
+
 import { writeCompletionReport } from "@/lib/roadmap-production/completion-report";
 import { acquireProductionExecutionLease } from "@/lib/roadmap-production/execution-lock";
 import {
   requiresCapabilityEscalation,
   requiresDeliveryAdjustment,
   runProductionAgent,
-  selectProductionExecutionEngine,
   type ProductionAgentInput,
   type ProductionAgentResult,
 } from "@/lib/roadmap-production/providers";
@@ -84,8 +86,10 @@ const PROVIDER_FALLBACK_ERROR_CODES = new Set([
   "CLI_NOT_FOUND",
   "CLI_TIMEOUT",
   "PROVIDER_AUTH_FAILED",
+  "PROVIDER_EXTERNAL_CLI_DISABLED",
   "PROVIDER_QUOTA_EXHAUSTED",
   "PROVIDER_RATE_LIMITED",
+  "PROVIDER_WRITE_SANDBOX_UNAVAILABLE",
 ]);
 
 // Descrição legível de cada código de erro conhecido do pipeline — usada nas mensagens de
@@ -104,9 +108,13 @@ const ERROR_CODE_DESCRIPTIONS: Record<string, string> = {
   PROHIBITED_GIT_MUTATION: "o agente tentou alterar o HEAD do repositório, operação proibida",
   PRODUCTION_PROVIDER_FAILED: "nenhum provedor de IA configurado conseguiu executar a fase",
   PROVIDER_AUTH_FAILED: "falha de autenticação com o provedor de IA",
+  PROVIDER_EXTERNAL_CLI_DISABLED:
+    "o provider CLI externo está desabilitado até existir workspace brokerizado",
   PROVIDER_HTTP_ERROR: "erro de comunicação HTTP com o provedor de IA",
   PROVIDER_QUOTA_EXHAUSTED: "o provedor atingiu o limite de créditos ou uso",
   PROVIDER_RATE_LIMITED: "o provedor aplicou um limite temporário de requisições",
+  PROVIDER_WRITE_SANDBOX_UNAVAILABLE:
+    "o provider externo não possui mediador executável seguro para escrita",
   TRUNCATED_MODEL_RESPONSE: "o modelo retornou respostas truncadas repetidamente",
 };
 
@@ -120,64 +128,20 @@ export function shouldFallbackDevelopmentProvider(errorCode?: string): boolean {
   return Boolean(errorCode && PROVIDER_FALLBACK_ERROR_CODES.has(errorCode));
 }
 
-const DEVELOPMENT_PROVIDER_LABEL: Record<DevelopmentProvider, string> = {
-  claude: "Claude",
-  codex: "Codex",
-  ollama: "Qwen",
-};
-
 export function developmentProviderOrder(
   preferred: DevelopmentProvider,
-): [DevelopmentProvider, DevelopmentProvider] {
-  const rest: DevelopmentProvider[] = (
-    ["claude", "codex", "ollama"] as const
-  ).filter((provider) => provider !== preferred);
-  return [preferred, rest[0]];
+): DevelopmentProvider[] {
+  void preferred;
+  return ["ollama"];
 }
 
-async function runDevelopmentAgentWithFallback(
-  config: ProductionConfig,
-  preferred: DevelopmentProvider,
-  input: ProductionAgentInput,
-  onActivity: (message: string) => Promise<void> | void,
-  root = process.cwd(),
-  providersOverride?: DevelopmentProvider[],
-): Promise<ProductionAgentResult> {
-  const providers = providersOverride ?? developmentProviderOrder(preferred);
-  for (let index = 0; index < providers.length; index += 1) {
-    const provider = providers[index];
-    const model =
-      provider === "ollama"
-        ? (process.env.ROADMAP_QWEN_MODEL?.trim() ?? "")
-        : config.provider === provider
-          ? config.model
-          : "default";
-    if (provider === "ollama" && !model.startsWith("qwen3.8")) {
-      await onActivity("Qwen sem configuração válida; pulando esta tentativa.");
-      if (index === providers.length - 1) break;
-      continue;
-    }
-    const result = await runProductionAgent(
-      { ...config, provider, model },
-      input,
-      onActivity,
-      root,
-    );
-    const canFallback =
-      index < providers.length - 1 &&
-      shouldFallbackDevelopmentProvider(result.errorCode);
-    if (!canFallback) return result;
-    const fallback = providers[index + 1];
-    await onActivity(
-      `${DEVELOPMENT_PROVIDER_LABEL[provider]} indisponível: ${describeProductionErrorCode(result.errorCode)}; alternando automaticamente para ${DEVELOPMENT_PROVIDER_LABEL[fallback]}.`,
-    );
-  }
-  return {
-    success: false,
-    summary: "Nenhum cérebro de desenvolvimento está disponível.",
-    errorCode: "PRODUCTION_PROVIDER_FAILED",
-    toolSteps: 0,
-  };
+export function nextBrokeredCapabilityAgent(
+  currentAgent: string,
+  summary: string,
+): "nova" | "echo" | null {
+  if (!requiresCapabilityEscalation([summary])) return null;
+  const promotedAgent = resolveCapabilityEscalationAgent(summary) ?? "echo";
+  return promotedAgent === currentAgent ? null : promotedAgent;
 }
 
 async function runProductionAgentWithCapabilityRouting(
@@ -187,45 +151,27 @@ async function runProductionAgentWithCapabilityRouting(
   onActivity: (message: string) => Promise<void> | void,
   root = process.cwd(),
 ): Promise<ProductionAgentResult> {
-  const engine =
-    preferred === "ollama"
-      ? "qwen"
-      : selectProductionExecutionEngine({
-          agentId: input.agentId,
-          phaseKind: input.phaseKind,
-          phaseTitle: input.phaseTitle,
-          phaseMarkdown: input.phaseMarkdown,
-          allowWrite: input.allowWrite,
-          previousSummaries: input.previousSummaries,
-        });
-  if (engine === "development") {
-    await onActivity("Roteamento de capacidade: Claude/Codex.");
-    return runDevelopmentAgentWithFallback(
-      config,
-      preferred,
-      input,
-      onActivity,
-      root,
-    );
-  }
-
   const qwenModel = process.env.ROADMAP_QWEN_MODEL?.trim();
   if (!qwenModel?.startsWith("qwen3.8")) {
-    await onActivity(
-      "Qwen 3.8 sem configuração válida; encaminhando para Claude/Codex.",
-    );
-    return runDevelopmentAgentWithFallback(
-      config,
-      preferred,
-      input,
-      onActivity,
-      root,
-    );
+    await onActivity("Qwen 3.8 brokerizado sem configuração válida.");
+    return {
+      success: false,
+      summary: "O único provider brokerizado não está configurado.",
+      errorCode: "INVALID_PROVIDER_CONFIG",
+      toolSteps: 0,
+    };
   }
-  await onActivity("Roteamento de capacidade: Qwen 3.8 para tarefa básica.");
+  void preferred;
+  const previousEscalation = resolveCapabilityEscalationAgent(
+    input.previousSummaries.join("\n"),
+  );
+  let routedAgent = previousEscalation ?? input.agentId;
+  await onActivity(
+    `Roteamento seguro: Qwen 3.8 brokerizado como ${routedAgent}.`,
+  );
   let qwenResult: ProductionAgentResult;
-  let qwenInput = input;
-  let escalatedByQwen = false;
+  let qwenInput =
+    routedAgent === input.agentId ? input : { ...input, agentId: routedAgent };
   let attempt = 1;
   for (;;) {
     qwenResult = await runProductionAgent(
@@ -234,10 +180,37 @@ async function runProductionAgentWithCapabilityRouting(
       onActivity,
       root,
     );
-    if (qwenResult.success) return qwenResult;
+    const routedResult =
+      routedAgent === input.agentId
+        ? qwenResult
+        : { ...qwenResult, resolvedAgent: routedAgent };
+    if (qwenResult.success || qwenResult.errorCode === "NEEDS_INPUT") {
+      return routedResult;
+    }
 
-    escalatedByQwen = requiresCapabilityEscalation([qwenResult.summary]);
-    if (escalatedByQwen || attempt >= QWEN_SELF_RETRY_LIMIT) break;
+    if (requiresCapabilityEscalation([qwenResult.summary])) {
+      if (attempt >= QWEN_SELF_RETRY_LIMIT) return routedResult;
+      const promotedAgent = nextBrokeredCapabilityAgent(
+        routedAgent,
+        qwenResult.summary,
+      );
+      if (!promotedAgent) return routedResult;
+      await onActivity(
+        `Capacidade reencaminhada para ${promotedAgent} no mesmo Qwen brokerizado.`,
+      );
+      routedAgent = promotedAgent;
+      qwenInput = {
+        ...input,
+        agentId: promotedAgent,
+        previousSummaries: [
+          ...qwenInput.previousSummaries,
+          `Diagnóstico antes da troca de persona:\n${qwenResult.summary}`,
+        ],
+      };
+      attempt += 1;
+      continue;
+    }
+    if (attempt >= QWEN_SELF_RETRY_LIMIT) return routedResult;
 
     await onActivity(
       `Qwen não concluiu na tentativa ${attempt}/${QWEN_SELF_RETRY_LIMIT} (${describeProductionErrorCode(qwenResult.errorCode)}); tentando novamente sozinha antes de escalar.`,
@@ -251,35 +224,6 @@ async function runProductionAgentWithCapabilityRouting(
     };
     attempt += 1;
   }
-
-  await onActivity(
-    escalatedByQwen
-      ? "Qwen identificou necessidade de engenharia; encaminhando o diagnóstico para Claude/Codex."
-      : `Qwen não concluiu a tarefa básica após ${attempt}/${QWEN_SELF_RETRY_LIMIT} tentativas (${describeProductionErrorCode(qwenResult.errorCode)}); encaminhando para Claude/Codex.`,
-  );
-  const escalationOrder =
-    preferred === "ollama"
-      ? (["claude", "codex"] as DevelopmentProvider[])
-      : undefined;
-  const promotedAgent = resolveCapabilityEscalationAgent(qwenResult.summary);
-  const promotedInput = promotedAgent ? { ...input, agentId: promotedAgent } : input;
-  const escalatedResult = await runDevelopmentAgentWithFallback(
-    config,
-    preferred,
-    {
-      ...promotedInput,
-      previousSummaries: [
-        ...qwenInput.previousSummaries,
-        `Diagnóstico do Qwen antes do escalonamento:\n${qwenResult.summary}`,
-      ],
-    },
-    onActivity,
-    root,
-    escalationOrder,
-  );
-  return promotedAgent
-    ? { ...escalatedResult, resolvedAgent: promotedAgent }
-    : escalatedResult;
 }
 
 function now(): string {
@@ -350,6 +294,37 @@ function retryDate(at: string): string {
   return new Date(new Date(at).getTime() + AUTO_RETRY_DELAY_MS).toISOString();
 }
 
+const AUTO_RETRY_WARNING_THRESHOLD = Math.floor(AUTO_RETRY_LIMIT / 2);
+
+/**
+ * Até virar BLOCKED, uma fase pode se autocorrigir silenciosamente até
+ * AUTO_RETRY_LIMIT vezes — na prática já se observou attemptCount na casa das
+ * dezenas antes de aparecer qualquer sinal para o administrador. Ao cruzar a
+ * metade do limite pela primeira vez, empurra um aviso visível no chat da
+ * execução (não só no log interno da fase) para dar chance de intervenção
+ * antes do circuito estourar. Comparação exata (===) garante disparo único —
+ * chamar depois de CADA incremento de autoRetryCount, nos 3 pontos do arquivo
+ * que o incrementam.
+ */
+function appendRetryThresholdWarning(
+  execution: ProductionExecutionCompat,
+  phase: ProductionPhaseCompat,
+  at: string,
+): void {
+  if (phase.autoRetryCount !== AUTO_RETRY_WARNING_THRESHOLD) return;
+  const warning: ProductionMessage = {
+    id: randomUUID(),
+    executionId: execution.id,
+    phaseNumber: phase.phaseNumber,
+    role: "SYSTEM",
+    kind: "STATUS",
+    content: `Esta fase já tentou se autocorrigir ${AUTO_RETRY_WARNING_THRESHOLD} de ${AUTO_RETRY_LIMIT} vezes sem sucesso. Considere revisar o objetivo ou intervir manualmente antes do limite ser atingido.`,
+    requestId: null,
+    createdAt: at,
+  };
+  execution.messages = [...(execution.messages ?? []), warning].slice(-500);
+}
+
 function isReady(
   phase: ProductionPhaseCompat,
   referenceTime: number,
@@ -396,6 +371,7 @@ async function documentedObjectives(allowedModuleKeys: ReadonlySet<string>) {
       moduleKey: true,
       sourceVersion: true,
       globalPriority: true,
+      createdBy: { select: { role: true } },
       promptArtifacts: {
         where: { status: "PUBLISHED" },
         orderBy: { phaseNumber: "asc" },
@@ -471,7 +447,16 @@ export async function syncProductionExecutions(
     }
     if (objective.promptArtifacts.length === 0) continue;
     const createdAt = now();
-    state.executions.push({
+    /**
+     * Objetivo criado por autor com role administrativa (Admin/CEO/TI —
+     * mesmo bypass já estabelecido em todo o projeto via isAdminRole) nasce
+     * direto em PENDING, pulando AWAITING_APPROVAL por completo — decisão
+     * explícita do usuário. A primeira fase recebe uma activity registrando
+     * o motivo, para manter rastreabilidade de por que essa execução nunca
+     * passou por aprovação manual.
+     */
+    const autoApproved = isAdminRole(objective.createdBy.role);
+    const newExecution = {
       id,
       objectiveId: objective.id,
       objectiveCode: objective.code,
@@ -480,7 +465,9 @@ export async function syncProductionExecutions(
       developmentProvider,
       sourceVersion: objective.sourceVersion,
       globalPriority: objective.globalPriority,
-      status: "AWAITING_APPROVAL",
+      status: autoApproved
+        ? ("PENDING" as const)
+        : ("AWAITING_APPROVAL" as const),
       createdAt,
       startedAt: null,
       finishedAt: null,
@@ -521,7 +508,20 @@ export async function syncProductionExecutions(
         },
         activities: [],
       })),
-    });
+    } satisfies ProductionExecutionCompat;
+    if (autoApproved) {
+      for (const phase of newExecution.phases) {
+        appendActivity(phase, {
+          at: createdAt,
+          agentId: phase.resolvedAgent,
+          type: "STATUS",
+          message:
+            "Aprovação automática — autor tem acesso administrativo (Admin/CEO/TI), objetivo liberado direto para produção.",
+        });
+        break;
+      }
+    }
+    state.executions.push(newExecution);
     changed = true;
   }
   for (const execution of state.executions) {
@@ -1022,6 +1022,7 @@ export function scheduleAutomaticRecovery(
     if (!implementation) return null;
     failed.status = "PENDING";
     failed.autoRetryCount += 1;
+    appendRetryThresholdWarning(execution, failed, at);
     failed.retryAt = null;
     implementation.status = "PENDING";
     implementation.finishedAt = null;
@@ -1060,6 +1061,7 @@ export function scheduleAutomaticRecovery(
   ) {
     failed.status = "PENDING";
     failed.autoRetryCount += 1;
+    appendRetryThresholdWarning(execution, failed, at);
     failed.retryAt = retryDate(at);
     appendActivity(failed, {
       at,
@@ -1429,6 +1431,7 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
         currentPhase.resolvedAgent = retryAgent;
         currentPhase.status = "PENDING";
         currentPhase.autoRetryCount += 1;
+        appendRetryThresholdWarning(current, currentPhase, now());
         currentPhase.retryAt = retryDate(now());
         currentPhase.errorCode = "DELIVERY_AUTO_ADJUSTMENT";
         appendActivity(currentPhase, {

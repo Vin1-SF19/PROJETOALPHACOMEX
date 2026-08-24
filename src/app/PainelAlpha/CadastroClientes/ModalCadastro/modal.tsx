@@ -116,6 +116,10 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
             return toast.error("Preencha o CNPJ e o Analista!");
         }
 
+        if (servicosSelecionados.length === 0) {
+            return toast.error("Selecione o Serviço!");
+        }
+
         const sociosParaEnviar = socios.filter(s => s.nome && s.nome.trim() !== "");
 
         const temSocioSemVinculo = sociosParaEnviar.some(s => !s.vinculo || s.vinculo.trim() === "");
@@ -131,7 +135,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
         const payload = {
             cnpj,
             ...dadosEmpresa,
-            servicos: servicosSelecionados,
+            servico: servicosSelecionados[0],
             analistaResponsavel: analistaSelecionado,
             embasamento: embasamentoDesbloqueado ? embasamentoSelecionado || null : null,
             origemLead: origemLeadSelecionada || null,

@@ -20,9 +20,15 @@ import {
   productionProviderSchema,
   type ProductionControlCommand,
 } from "@/lib/roadmap-production/contracts";
-import { validateInteractionCommand } from "@/lib/roadmap-production/interactions";
+import {
+  assertNoQueuedInterventionResponse,
+  validateInteractionCommand,
+} from "@/lib/roadmap-production/interactions";
 import { diagnoseProductionProviders } from "@/lib/roadmap-production/providers";
-import { ROADMAP_PRODUCTION_RUNTIME_DISABLED } from "@/lib/roadmap-production/runtime";
+import {
+  isRoadmapProductionRuntimeEnabled,
+  ROADMAP_PRODUCTION_RUNTIME_DISABLED,
+} from "@/lib/roadmap-production/runtime";
 import {
   enqueueProductionControl,
   readProductionConfig,
@@ -30,7 +36,10 @@ import {
   readProductionState,
   writeProductionConfig,
 } from "@/lib/roadmap-production/storage";
-import { refreshProductionExecutions } from "@/lib/roadmap-production/worker";
+import {
+  processNextProductionPhase,
+  refreshProductionExecutions,
+} from "@/lib/roadmap-production/worker";
 import { isAdminRole } from "@/lib/roles";
 
 const ROUTE = "/PainelAlpha/Roadmap";
@@ -142,6 +151,29 @@ async function resolveExecutionRoot(executionId: string): Promise<string> {
   return objective ? resolveModuleRoot(objective.moduleKey) : process.cwd();
 }
 
+/**
+ * Melhor esforço: um comando enfileirado (APPROVE/RESUME/RETRY) só é
+ * efetivamente aplicado quando algo chama processNextProductionPhase — hoje
+ * isso normalmente é o worker de processo separado (scripts/roadmap-production
+ * .mjs worker), rodando em loop próprio. Sem esse "kick", o comando fica
+ * represado até o próximo ciclo do worker externo, que pode não estar rodando.
+ * Dispara UMA passagem do processamento sem bloquear a resposta da Server
+ * Action ao usuário — processar uma fase de verdade pode envolver chamar CLI
+ * de agente e demorar bastante. Seguro chamar de múltiplos lugares ao mesmo
+ * tempo: o lease global (acquireProductionExecutionLease) é não-bloqueante,
+ * então se o worker de fundo já estiver processando, este kick só recebe
+ * lease nulo e não faz nada. Só dispara quando o runtime local está habilitado
+ * neste processo — em ambientes sem runtime (ex.: nuvem), não há
+ * processNextProductionPhase local capaz de fazer algo, então não adianta
+ * tentar.
+ */
+function kickProductionWorker(root: string): void {
+  if (!isRoadmapProductionRuntimeEnabled()) return;
+  processNextProductionPhase(root).catch((error) => {
+    console.error("[roadmap-production] kick pós-comando falhou:", error);
+  });
+}
+
 async function authorName(userId: number): Promise<string> {
   const user = await db.usuarios.findUnique({
     where: { id: userId },
@@ -159,29 +191,30 @@ async function enqueueValidatedInteraction(
     listBibbleAgents(process.cwd()),
     readProductionControls(root),
   ]);
-  if (
-    command.requestId &&
-    queuedControls.some(
-      (item) =>
-        item.command.executionId === command.executionId &&
-        item.command.phaseNumber === command.phaseNumber &&
-        item.command.requestId === command.requestId &&
-        ["RESPOND", "AUTHORIZE", "DENY"].includes(item.command.type),
-    )
-  ) {
-    throw new Error("INTERVENTION_COMMAND_ALREADY_QUEUED");
-  }
+  const phase = state.executions
+    .find((execution) => execution.id === command.executionId)
+    ?.phases.find((item) => item.phaseNumber === command.phaseNumber);
+  const validatedCommand = productionControlCommandSchema.parse({
+    ...command,
+    acceptedPhaseStatus:
+      command.type === "MESSAGE" ? (phase?.status ?? null) : null,
+  });
+  assertNoQueuedInterventionResponse(
+    queuedControls.map((item) => item.command),
+    validatedCommand,
+  );
   validateInteractionCommand(
     state,
-    command,
+    validatedCommand,
     new Set(agents.filter((agent) => agent.available).map((agent) => agent.id)),
   );
-  return enqueueProductionControl(command.type, command.executionId, root, {
-    phaseNumber: command.phaseNumber ?? undefined,
-    requestId: command.requestId ?? undefined,
-    content: command.content ?? undefined,
-    agentId: command.agentId ?? undefined,
-    author: command.author,
+  return enqueueProductionControl(validatedCommand.type, validatedCommand.executionId, root, {
+    phaseNumber: validatedCommand.phaseNumber ?? undefined,
+    requestId: validatedCommand.requestId ?? undefined,
+    content: validatedCommand.content ?? undefined,
+    agentId: validatedCommand.agentId ?? undefined,
+    author: validatedCommand.author,
+    acceptedPhaseStatus: validatedCommand.acceptedPhaseStatus,
   });
 }
 
@@ -323,8 +356,10 @@ export async function RepetirExecucaoRoadmapProduction(executionId: unknown) {
   try {
     await requireRoadmapProductionAccess(true);
     const id = executionIdSchema.parse(executionId);
-    await enqueueProductionControl("RETRY", id, await resolveExecutionRoot(id));
+    const root = await resolveExecutionRoot(id);
+    await enqueueProductionControl("RETRY", id, root);
     revalidatePath(ROUTE);
+    kickProductionWorker(root);
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: publicError(error) };
@@ -339,8 +374,10 @@ export async function ControlarExecucaoRoadmapProduction(
     await requireRoadmapProductionAccess(true);
     const id = executionIdSchema.parse(executionId);
     const type = z.enum(["PAUSE", "RESUME", "EXCLUDE"]).parse(control);
-    await enqueueProductionControl(type, id, await resolveExecutionRoot(id));
+    const root = await resolveExecutionRoot(id);
+    await enqueueProductionControl(type, id, root);
     revalidatePath(ROUTE);
+    if (type === "RESUME") kickProductionWorker(root);
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: publicError(error) };
@@ -358,8 +395,10 @@ export async function AprovarExecucaoRoadmapProduction(executionId: unknown) {
   try {
     await requireRoadmapAccess(true);
     const id = executionIdSchema.parse(executionId);
-    await enqueueProductionControl("APPROVE", id, await resolveExecutionRoot(id));
+    const root = await resolveExecutionRoot(id);
+    await enqueueProductionControl("APPROVE", id, root);
     revalidatePath(ROUTE);
+    kickProductionWorker(root);
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: publicError(error) };
@@ -398,6 +437,117 @@ export async function ListarExecucoesAguardandoAprovacao() {
     return {
       success: true as const,
       data,
+    };
+  } catch (error) {
+    return { success: false as const, error: publicError(error), data: [] };
+  }
+}
+
+/**
+ * Mesmo padrão de ListarExecucoesAguardandoAprovacao (auth, varredura de
+ * workspaces, formato de retorno) — deliberadamente não usa
+ * requireRoadmapProductionAccess pelo mesmo motivo: precisa funcionar mesmo
+ * sem runtime de execução local habilitado. BLOCKED/WAITING_FOR_ADMIN são os
+ * dois status que significam "esta execução parou e precisa de decisão
+ * humana" (a diferença entre eles é interna — DENY/timeout de intervenção vs
+ * limite de correções automáticas atingido — mas do ponto de vista do
+ * usuário no dashboard principal, ambos pedem a mesma ação: abrir e olhar).
+ */
+export async function ListarExecucoesPrecisandoAtencao() {
+  try {
+    await requireRoadmapAccess(true);
+    const workspaces = await db.roadmapWorkspace.findMany({
+      where: { archivedAt: null },
+      select: { rootPath: true },
+    });
+    const roots = Array.from(
+      new Set([process.cwd(), ...workspaces.map((workspace) => workspace.rootPath)]),
+    );
+    const data: Array<{
+      objectiveId: string;
+      executionId: string;
+      status: "BLOCKED" | "WAITING_FOR_ADMIN";
+    }> = [];
+    for (const root of roots) {
+      const state = await refreshProductionExecutions(root);
+      data.push(
+        ...state.executions
+          .filter(
+            (
+              execution,
+            ): execution is typeof execution & {
+              status: "BLOCKED" | "WAITING_FOR_ADMIN";
+            } =>
+              execution.status === "BLOCKED" ||
+              execution.status === "WAITING_FOR_ADMIN",
+          )
+          .map((execution) => ({
+            objectiveId: execution.objectiveId,
+            executionId: execution.id,
+            status: execution.status,
+          })),
+      );
+    }
+    return {
+      success: true as const,
+      data,
+    };
+  } catch (error) {
+    return { success: false as const, error: publicError(error), data: [] };
+  }
+}
+
+/**
+ * Mesma varredura de workspaces das duas funções irmãs acima, mas
+ * DELIBERADAMENTE sem exigir mutação (requireRoadmapAccess() em vez de
+ * requireRoadmapAccess(true)) — decisão explícita do usuário: o botão
+ * "Produção" no card do objetivo (RoadmapDashboard.tsx) precisa manter a
+ * mesma paridade de acesso do botão antigo do header que ele substitui, e
+ * aquele era visível para qualquer usuário com permissão de LEITURA de
+ * Produção, não só quem pode mutar (Admin/CEO/TI). Cobre TODOS os status
+ * (não só AWAITING_APPROVAL ou BLOCKED/WAITING_FOR_ADMIN), para a tela
+ * principal saber se o objetivo já tem execução e para onde navegar,
+ * independente de estado. Um objectiveId pode ter mais de uma execução
+ * (revisões sucessivas do mesmo objetivo, ex.: ":v2" e ":v3") — mantém só a
+ * mais recente por `createdAt`, já que a UI só precisa de "qual execution
+ * abrir agora".
+ */
+export async function ListarExecucoesPorObjetivo() {
+  try {
+    await requireRoadmapAccess();
+    const workspaces = await db.roadmapWorkspace.findMany({
+      where: { archivedAt: null },
+      select: { rootPath: true },
+    });
+    const roots = Array.from(
+      new Set([process.cwd(), ...workspaces.map((workspace) => workspace.rootPath)]),
+    );
+    const latestByObjective = new Map<
+      string,
+      { objectiveId: string; executionId: string; status: string; createdAt: string }
+    >();
+    for (const root of roots) {
+      const state = await refreshProductionExecutions(root);
+      for (const execution of state.executions) {
+        const current = latestByObjective.get(execution.objectiveId);
+        if (current && current.createdAt >= execution.createdAt) continue;
+        latestByObjective.set(execution.objectiveId, {
+          objectiveId: execution.objectiveId,
+          executionId: execution.id,
+          status: execution.status,
+          createdAt: execution.createdAt,
+        });
+      }
+    }
+    return {
+      success: true as const,
+      data: Array.from(latestByObjective.values()).map(
+        ({ objectiveId, executionId, status }) => ({
+          objectiveId,
+          executionId,
+          status,
+        }),
+      ),
     };
   } catch (error) {
     return { success: false as const, error: publicError(error), data: [] };

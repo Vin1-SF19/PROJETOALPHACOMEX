@@ -182,13 +182,25 @@ try {
       author,
       createdAt: new Date().toISOString(),
     });
-    const [state, agents] = await Promise.all([
+    const [state, agents, queuedControls] = await Promise.all([
       storage.readProductionState(workerRoot),
       agentsModule.listBibbleAgents(process.cwd()),
+      storage.readProductionControls(workerRoot),
     ]);
+    const phase = state.executions
+      .find((execution) => execution.id === executionId)
+      ?.phases.find((item) => item.phaseNumber === phaseNumber);
+    const validated = contracts.productionControlCommandSchema.parse({
+      ...preview,
+      acceptedPhaseStatus: type === "MESSAGE" ? (phase?.status ?? null) : null,
+    });
+    interactions.assertNoQueuedInterventionResponse(
+      queuedControls.map((item) => item.command),
+      validated,
+    );
     interactions.validateInteractionCommand(
       state,
-      preview,
+      validated,
       new Set(agents.filter((agent) => agent.available).map((agent) => agent.id)),
     );
     const queued = await storage.enqueueProductionControl(type, executionId, workerRoot, {
@@ -197,6 +209,7 @@ try {
       content,
       agentId,
       author,
+      acceptedPhaseStatus: validated.acceptedPhaseStatus,
     });
     emit({ ok: true, code: 0, command, executionId, commandId: queued.id, queued: true });
   } else if (command === "worker") {

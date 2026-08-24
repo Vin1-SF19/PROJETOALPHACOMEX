@@ -21,5 +21,7 @@ describe("catálogo dos agentes Bibble", () => {
     expect(resolvePhaseAgent("dev", "Implementar painel", "Criar um route handler auxiliar")).toBe("nova");
     expect(resolvePhaseAgent("dev", "Implementar", "CAPABILITY_ESCALATION_REQUIRED: BACKEND — criar rota")).toBe("echo");
     expect(resolvePhaseAgent("dev", "Implementar", "CAPABILITY_ESCALATION_REQUIRED: FRONTEND — criar tela")).toBe("nova");
+    expect(resolvePhaseAgent("dev", "Implementar", "CAPABILITY_ESCALATION_REQUIRED: SECURITY — revisar autorização")).toBe("echo");
+    expect(resolvePhaseAgent("dev", "Implementar", "CAPABILITY_ESCALATION_REQUIRED: DATABASE — mapear schema sem alterar")).toBe("echo");
   });
 });

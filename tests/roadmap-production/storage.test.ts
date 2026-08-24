@@ -5,8 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   enqueueProductionControl,
+  productionStateDirectory,
   readObjectiveDevelopmentPreferences,
   readProductionConfig,
+  readProductionControls,
   readProductionState,
   writeProductionConfig,
   writeObjectiveDevelopmentProvider,
@@ -16,6 +18,7 @@ import {
   applyProductionControls,
   developmentProviderOrder,
   isImplementationPhase,
+  nextBrokeredCapabilityAgent,
   phaseRequiresWrite,
   recoverCorrectableFailures,
   resolveDeliveryAdjustmentAgent,
@@ -31,14 +34,99 @@ async function root() {
   return value;
 }
 afterEach(async () => {
+  const staleRoots = roots.splice(0);
   await Promise.all(
-    roots
-      .splice(0)
-      .map((value) => fs.rm(value, { recursive: true, force: true })),
+    staleRoots.flatMap((value) => [
+      fs.rm(value, { recursive: true, force: true }),
+      fs.rm(productionStateDirectory(value), { recursive: true, force: true }),
+    ]),
   );
 });
 
 describe("estado local de Produção", () => {
+  it("mantém o control plane fora do workspace do agente", async () => {
+    const project = await root();
+    const stateDirectory = productionStateDirectory(project);
+    expect(path.relative(project, stateDirectory).startsWith("..")).toBe(true);
+    expect(stateDirectory).not.toContain(
+      `${path.sep}.roadmap-production`,
+    );
+  });
+
+  it("importa o estado legado validado uma única vez e não executa controls legados", async () => {
+    const project = await root();
+    const legacyDirectory = path.join(project, ".roadmap-production");
+    await fs.mkdir(path.join(legacyDirectory, "commands"), { recursive: true });
+    await fs.writeFile(
+      path.join(legacyDirectory, "state.json"),
+      JSON.stringify({
+        version: 1,
+        updatedAt: "2026-08-24T12:00:00.000Z",
+        ignoredExecutionIds: ["legacy:v1"],
+        executions: [],
+      }),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(legacyDirectory, "commands", "legacy.json"),
+      JSON.stringify({
+        id: "8ffca73d-9224-4a67-a2af-ad99658ee20f",
+        type: "EXCLUDE",
+        executionId: "legacy:v1",
+        phaseNumber: null,
+        feedback: null,
+        improvedWithAi: false,
+        requestId: null,
+        content: null,
+        agentId: null,
+        acceptedPhaseStatus: null,
+        author: "workspace agent",
+        createdAt: "2026-08-24T12:00:00.000Z",
+      }),
+      "utf8",
+    );
+
+    expect((await readProductionState(project)).ignoredExecutionIds).toEqual([
+      "legacy:v1",
+    ]);
+    expect(await readProductionControls(project)).toEqual([]);
+    await fs.writeFile(
+      path.join(legacyDirectory, "state.json"),
+      JSON.stringify({
+        version: 1,
+        updatedAt: "2026-08-24T12:01:00.000Z",
+        ignoredExecutionIds: ["tampered:v2"],
+        executions: [],
+      }),
+      "utf8",
+    );
+    expect((await readProductionState(project)).ignoredExecutionIds).toEqual([
+      "legacy:v1",
+    ]);
+  });
+
+  it("falha fechado e não volta ao legado após encontrar JSON corrompido", async () => {
+    const project = await root();
+    const legacyDirectory = path.join(project, ".roadmap-production");
+    await fs.mkdir(legacyDirectory, { recursive: true });
+    await fs.writeFile(path.join(legacyDirectory, "state.json"), "{invalid", "utf8");
+    await expect(readProductionState(project)).rejects.toThrow(
+      "INVALID_LEGACY_STATE_JSON",
+    );
+    await fs.writeFile(
+      path.join(legacyDirectory, "state.json"),
+      JSON.stringify({
+        version: 1,
+        updatedAt: "2026-08-24T12:00:00.000Z",
+        ignoredExecutionIds: [],
+        executions: [],
+      }),
+      "utf8",
+    );
+    await expect(readProductionState(project)).rejects.toThrow(
+      "INVALID_LEGACY_STATE_JSON",
+    );
+  });
   it("promove uma fase read-only quando o diagnóstico encontra lacuna de entrega", () => {
     expect(
       resolveDeliveryAdjustmentAgent(
@@ -57,8 +145,8 @@ describe("estado local de Produção", () => {
   });
 
   it("prioriza Claude e troca somente em falhas de disponibilidade", () => {
-    expect(developmentProviderOrder("claude")).toEqual(["claude", "codex"]);
-    expect(developmentProviderOrder("codex")).toEqual(["codex", "claude"]);
+    expect(developmentProviderOrder("claude")).toEqual(["ollama"]);
+    expect(developmentProviderOrder("codex")).toEqual(["ollama"]);
     expect(shouldFallbackDevelopmentProvider("PROVIDER_QUOTA_EXHAUSTED")).toBe(
       true,
     );
@@ -68,6 +156,18 @@ describe("estado local de Produção", () => {
     expect(shouldFallbackDevelopmentProvider("AGENT_REPORTED_FAILURE")).toBe(
       false,
     );
+    expect(
+      nextBrokeredCapabilityAgent(
+        "scout",
+        "CAPABILITY_ESCALATION_REQUIRED: BACKEND — criar rota",
+      ),
+    ).toBe("echo");
+    expect(
+      nextBrokeredCapabilityAgent(
+        "echo",
+        "CAPABILITY_ESCALATION_REQUIRED: FRONTEND — criar painel",
+      ),
+    ).toBe("nova");
   });
   it("não exige escrita de fases analíticas classificadas como execução", () => {
     expect(
@@ -143,6 +243,91 @@ describe("estado local de Produção", () => {
     const state = await readProductionState(project);
     await writeProductionState(state, project);
     expect((await readProductionState(project)).executions).toEqual([]);
+  });
+
+  it("redige segredos em summaries, errors, activities e messages no boundary", async () => {
+    const project = await root();
+    const timestamp = "2026-08-24T12:00:00.000Z";
+    await writeProductionState(
+      {
+        version: 1,
+        updatedAt: timestamp,
+        ignoredExecutionIds: [],
+        executions: [
+          {
+            id: "secure:v1",
+            objectiveId: "secure",
+            objectiveCode: "RM-SEC",
+            objectiveTitle: "Segurança",
+            moduleKey: "roadmap",
+            developmentProvider: "codex",
+            sourceVersion: 1,
+            globalPriority: 1,
+            status: "FAILED",
+            createdAt: timestamp,
+            startedAt: timestamp,
+            finishedAt: timestamp,
+            completionReportPath: null,
+            completionReportMarkdown:
+              "relatório https://example.test/cb?access_token=report-secret",
+            reworkCount: 0,
+            manualFeedback: [],
+            messages: [
+              {
+                id: "23b1ea41-610e-4daf-8b89-5980c48869cc",
+                executionId: "secure:v1",
+                phaseNumber: 1,
+                role: "SYSTEM",
+                kind: "STATUS",
+                content: "TURSO_AUTH_TOKEN=turso-secret",
+                requestId: null,
+                createdAt: timestamp,
+              },
+            ],
+            interventions: [],
+            phases: [
+              {
+                phaseNumber: 1,
+                title: "Executar",
+                kind: "EXECUTION",
+                requestedAgent: "echo",
+                resolvedAgent: "echo",
+                status: "FAILED",
+                attemptCount: 1,
+                autoRetryCount: 0,
+                retryAt: null,
+                startedAt: timestamp,
+                finishedAt: timestamp,
+                summary: "AWS_SECRET_ACCESS_KEY=aws-secret",
+                errorCode: "TOKEN=error-secret",
+                changedFiles: [],
+                reworkCount: 0,
+                manualFeedback: [],
+                activities: [
+                  {
+                    at: timestamp,
+                    agentId: "echo",
+                    type: "ERROR",
+                    message: "falhou?api_key=activity-secret",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      project,
+    );
+    const raw = await fs.readFile(
+      path.join(productionStateDirectory(project), "state.json"),
+      "utf8",
+    );
+    expect(raw).not.toContain("turso-secret");
+    expect(raw).not.toContain("aws-secret");
+    expect(raw).not.toContain("error-secret");
+    expect(raw).not.toContain("activity-secret");
+    expect(raw).not.toContain("report-secret");
+    expect(raw).toContain("[REDACTED]");
   });
 
   it("pausa, retoma e exclui por comandos locais sem recriar a execução", async () => {

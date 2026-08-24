@@ -9,6 +9,29 @@ import XLSX from 'xlsx-js-style';
 
 type Canal = 'TRAFEGO_PAGO' | 'CALLIX' | 'INDICACAO' | 'EVENTOS' | 'CHINA';
 type Servico = 'REVISAO' | 'HABILITACAO';
+type CorCanal = 'blue' | 'orange' | 'emerald' | 'pink' | 'red';
+
+const CANAIS_CONFIG: Record<Canal, { titulo: string; cor: CorCanal }> = {
+    TRAFEGO_PAGO: { titulo: 'TRÁFEGO PAGO', cor: 'blue' },
+    CALLIX: { titulo: 'CALLIX', cor: 'orange' },
+    INDICACAO: { titulo: 'INDICAÇÃO', cor: 'emerald' },
+    EVENTOS: { titulo: 'EVENTOS', cor: 'pink' },
+    CHINA: { titulo: 'CHINA', cor: 'red' },
+};
+const CANAIS: readonly Canal[] = ['TRAFEGO_PAGO', 'CALLIX', 'INDICACAO', 'EVENTOS', 'CHINA'];
+
+function isCanal(value: string | null): value is Canal {
+    switch (value) {
+        case 'TRAFEGO_PAGO':
+        case 'CALLIX':
+        case 'INDICACAO':
+        case 'EVENTOS':
+        case 'CHINA':
+            return true;
+        default:
+            return false;
+    }
+}
 
 export default function Lancamentos({ dadosAcumulados }: any) {
     const { data: session } = useSession();
@@ -17,8 +40,8 @@ export default function Lancamentos({ dadosAcumulados }: any) {
     const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
     const [servico, setServico] = useState<Servico>('REVISAO');
     const searchParams = useSearchParams();
-    const [canal, setCanal] = useState<Canal>((searchParams.get('canal') as Canal) || 'TRAFEGO_PAGO');
-    const canalAtual = searchParams.get('canal') || 'TRAFEGO_PAGO';
+    const canalParam = searchParams.get('canal');
+    const canalAtual: Canal | null = isCanal(canalParam) ? canalParam : null;
     const [loading, setLoading] = useState(true);
     const [metricas, setMetricas] = useState({
         leads_recebidos: 0,
@@ -79,19 +102,20 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
                 const dataObjeto = new Date(dataUrl + 'T12:00:00');
 
-                const diario = await getPerformanceDiaria(usuarioNome, dataObjeto, canalAtual);
-                setMetricas(diario || {
-                    leads_recebidos: 0,
-                    leads_desqualificados: 0,
-                    reunioes_agendadas: 0,
-                    reunioes_realizadas: 0,
-                    no_show: 0,
-                    contratos_Habilit: 0,
-                    contratos_Revisao: 0,
-                    HotLeadsHabilitacao: 0,
-                    HotLeadsRevisao: 0
-
-                });
+                if (canalAtual) {
+                    const diario = await getPerformanceDiaria(usuarioNome, dataObjeto, canalAtual);
+                    setMetricas(diario || {
+                        leads_recebidos: 0,
+                        leads_desqualificados: 0,
+                        reunioes_agendadas: 0,
+                        reunioes_realizadas: 0,
+                        no_show: 0,
+                        contratos_Habilit: 0,
+                        contratos_Revisao: 0,
+                        HotLeadsHabilitacao: 0,
+                        HotLeadsRevisao: 0
+                    });
+                }
 
                 const acumulado = await getPerformanceAcumulada(
                     usuarioNome,
@@ -107,13 +131,6 @@ export default function Lancamentos({ dadosAcumulados }: any) {
         carregarNovoCanal();
     }, [canalAtual, dataUrl, mesAtualUrl, usuarioNome]);
 
-
-    useEffect(() => {
-        const canalNaUrl = searchParams.get('canal') as Canal;
-        if (canalNaUrl) {
-            setCanal(canalNaUrl);
-        }
-    }, [searchParams]);
 
     const handleMesChange = (novoMes: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -133,6 +150,8 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
 
     const handleSave = async () => {
+        if (!canalAtual || status === 'saving') return;
+
         setStatus('saving');
         try {
             const payload = {
@@ -165,8 +184,10 @@ export default function Lancamentos({ dadosAcumulados }: any) {
     };
 
     const handleCanalChange = (novoCanal: Canal) => {
-        setCanal(novoCanal);
-        router.push(`?canal=${novoCanal}`);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('canal', novoCanal);
+        setStatus('idle');
+        router.push(`?${params.toString()}`, { scroll: false });
     };
 
     const handleInputChange = (field: string, value: string) => {
@@ -288,7 +309,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
         return (
             <div className="flex items-center justify-center p-20">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-3 font-black text-xs uppercase tracking-widest text-slate-400">Carregando {canalAtual}...</span>
+                <span className="ml-3 font-black text-xs uppercase tracking-widest text-slate-400">Carregando {canalAtual ? CANAIS_CONFIG[canalAtual].titulo : 'canais'}...</span>
             </div>
         );
     }
@@ -339,26 +360,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 pb-10 border-b border-slate-100 dark:border-slate-800 items-end">
-
-                        {/* Bloco do Canal de Entrada */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">
-                                Canal de Entrada
-                            </label>
-                            <select
-                                value={canal}
-                                onChange={(e) => handleCanalChange(e.target.value as Canal)}
-                                className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl outline-none focus:border-blue-500 font-bold transition-all"
-                            >
-                                <option value="TRAFEGO_PAGO">Tráfego Pago</option>
-                                <option value="CALLIX">Callix</option>
-                                <option value="INDICACAO">Indicação</option>
-                                <option value="EVENTOS">EVENTOS</option>
-                                <option value="CHINA">CHINA</option>
-                            </select>
-                        </div>
-
+                    <div className="mb-10 border-b border-slate-100 pb-10 dark:border-slate-800">
                         {/* Bloco do Histórico de Mês (Estilizado para combinar) */}
                         <div className="space-y-1">
                             <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">
@@ -428,19 +430,22 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
                     <button
                         onClick={handleSave}
-                        disabled={status === 'saving'}
+                        disabled={status === 'saving' || !canalAtual}
                         className={`w-full mt-10 py-5 rounded-2xl font-black text-lg transition-all ${status === 'success'
                             ? 'bg-green-500 text-white'
-                            : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 hover:bg-blue-700 hover:-translate-y-1'
+                            : !canalAtual
+                                ? 'cursor-not-allowed bg-slate-300 text-slate-500 shadow-none dark:bg-slate-800 dark:text-slate-500'
+                                : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 hover:bg-blue-700 hover:-translate-y-1'
                             }`}
                     >
                         {status === 'saving' ? (
                             'PROCESSANDO...'
                         ) : status === 'success' ? (
                             'DADOS SINCRONIZADOS!'
+                        ) : !canalAtual ? (
+                            'SALVAR NO SISTEMA — SELECIONE UM CANAL'
                         ) : (
-
-                            `SALVAR NO SISTEMA (${canalAtual?.toUpperCase() || 'GERAL'})`
+                            `SALVAR NO SISTEMA (${CANAIS_CONFIG[canalAtual].titulo})`
                         )}
                     </button>
 
@@ -449,15 +454,18 @@ export default function Lancamentos({ dadosAcumulados }: any) {
             </div>
 
             <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-24">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Resumo Mensal / Canal</h3>
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Selecione o Canal de Entrada</h3>
 
-                {(Object.keys(resumoLateral.canais) as Canal[]).map((key) => {
+                {CANAIS.map((key) => {
                     const dadosCanal = resumoLateral.canais[key];
+                    const config = CANAIS_CONFIG[key];
                     return (
                         <CardCanalSimples
                             key={key}
-                            titulo={key.replace('_', ' ')}
-                            cor={key === 'TRAFEGO_PAGO' ? 'blue' : key === 'CALLIX' ? 'orange' : key === 'INDICACAO' ? 'emerald' : key === 'EVENTOS' ? 'pink' : 'red'}
+                            titulo={config.titulo}
+                            cor={config.cor}
+                            selecionado={canalAtual === key}
+                            onSelecionar={() => handleCanalChange(key)}
                             leads={dadosCanal.leads}
                             desq={dadosCanal.leadsDesqualificados}
                             agendadas={dadosCanal.agendadas}
@@ -474,19 +482,54 @@ export default function Lancamentos({ dadosAcumulados }: any) {
         </div>
     )
 
-    function CardCanalSimples({ titulo, leads, desq, agendadas, Realizadas, NoShow, vendasRevisao, VendasHabilit, HotLeadsHabilitacao, HotLeadsRevisao, cor }: any) {
-        const colorClasses: any = {
+    interface CardCanalSimplesProps {
+        titulo: string;
+        leads: number;
+        desq: number;
+        agendadas: number;
+        Realizadas: number;
+        NoShow: number;
+        vendasRevisao: number;
+        VendasHabilit: number;
+        HotLeadsHabilitacao: number;
+        HotLeadsRevisao: number;
+        cor: CorCanal;
+        selecionado: boolean;
+        onSelecionar: () => void;
+    }
+
+    function CardCanalSimples({ titulo, leads, desq, agendadas, Realizadas, NoShow, vendasRevisao, VendasHabilit, HotLeadsHabilitacao, HotLeadsRevisao, cor, selecionado, onSelecionar }: CardCanalSimplesProps) {
+        const colorClasses: Record<CorCanal, string> = {
             blue: 'text-blue-600 border-blue-100 bg-blue-50/30',
             orange: 'text-orange-600 border-orange-100 bg-orange-50/30',
             emerald: 'text-emerald-600 border-emerald-100 bg-emerald-50/30',
             pink: 'text-pink-500 border-rose-700 bg-pink-50/10 dark:border-pink-900/50',
-            amber: 'text-amber-600 border-amber-100 bg-amber-50/30',
             red: 'text-red-600 border-red-100 bg-red-50/30',
+        };
+        const selectedClasses: Record<CorCanal, string> = {
+            blue: 'border-blue-500 ring-blue-400/70 shadow-blue-500/30 dark:border-blue-400',
+            orange: 'border-orange-500 ring-orange-400/70 shadow-orange-500/30 dark:border-orange-400',
+            emerald: 'border-emerald-500 ring-emerald-400/70 shadow-emerald-500/30 dark:border-emerald-400',
+            pink: 'border-pink-500 ring-pink-400/70 shadow-pink-500/30 dark:border-pink-400',
+            red: 'border-red-500 ring-red-400/70 shadow-red-500/30 dark:border-red-400',
         };
 
         return (
-            <div className={`p-4 rounded-3xl border ${colorClasses[cor]} dark:bg-slate-900/40 dark:border-slate-800 transition-all hover:scale-[1.02]`}>
-                <p className="text-[10px] font-black uppercase mb-3 italic tracking-widest">{titulo}</p>
+            <button
+                type="button"
+                onClick={onSelecionar}
+                aria-pressed={selecionado}
+                aria-label={`Selecionar canal ${titulo}`}
+                className={`w-full cursor-pointer rounded-3xl border-2 p-4 text-left transition-all hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-900/40 dark:focus-visible:ring-offset-slate-950 ${colorClasses[cor]} ${selecionado ? `ring-2 shadow-xl ${selectedClasses[cor]}` : 'dark:border-slate-800'}`}
+            >
+                <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase italic tracking-widest">{titulo}</p>
+                    {selecionado && (
+                        <span className="rounded-full bg-current/10 px-2 py-1 text-[8px] font-black uppercase tracking-wider">
+                            Selecionado
+                        </span>
+                    )}
+                </div>
                 <div className="grid grid-cols-3 gap-y-3 gap-x-1 text-center">
                     <div><p className="text-[7px] font-bold text-slate-400 uppercase leading-none mb-1">Leads</p><p className="text-xs font-black dark:text-white">{leads}</p></div>
                     <div>
@@ -504,7 +547,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
                     <div><p className="text-[7px] font-bold text-slate-400 uppercase leading-none mb-1">Hot Habilit.</p><p className="text-xs font-black dark:text-white">{HotLeadsHabilitacao}</p></div>
                     <div><p className="text-[7px] font-bold text-slate-400 uppercase leading-none mb-1">Hot Revisão</p><p className="text-xs font-black dark:text-white">{HotLeadsRevisao}</p></div>
                 </div>
-            </div>
+            </button>
         );
     }
 

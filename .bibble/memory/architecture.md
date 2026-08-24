@@ -1,5 +1,11 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## ⚠️ Bibble (assistente) roda 100% via Ollama local — não Anthropic/OpenAI (confirmado 2026-08-24)
+
+O CLAUDE.md raiz descreve Anthropic como "futuro padrão para AI" para o Bibble, mas **o código real sempre usou Ollama** como provider padrão (`src/lib/bibble/client.ts`, `BIBBLE_MODEL`, hoje `qwen3.8:latest`), servido por um Ollama remoto em `192.168.35.113` com GPU dedicada e VRAM alta (confirmado pelo usuário). Anthropic/OpenAI/Google existem no código (`PROVIDER_MODELS`, `getProviderConfig`) como providers alternativos que o usuário pode selecionar manualmente no chat, nunca como padrão ativo. **Qualquer sessão futura que for ajustar limites de token/contexto/custo do Bibble deve tratar o Ollama local como o path real e testado** — ver detalhe completo da correção de tetos de contexto/output em `integration-points.md` ("Bibble — hardening do pipeline de anexos/PDF", 2026-08-24).
+
+---
+
 ## ⚠️ Acoplamento crítico: Parceiros ↔ Metas ↔ CS&NPS via `clientes`
 
 `clientes` (módulo CS&NPS) é o **hub central** referenciado por FK de múltiplos módulos que, à primeira vista, parecem independentes:

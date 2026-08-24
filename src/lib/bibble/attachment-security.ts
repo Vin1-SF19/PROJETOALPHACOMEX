@@ -8,7 +8,13 @@ export {
 } from "./attachments";
 
 export const BIBBLE_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
-export const BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET = 30_000;
+// Teto de extração aplicado no MOMENTO DO UPLOAD, antes do orçamento por
+// arquivo do chat (context-budget.ts). Servidor Ollama roda em GPU com VRAM
+// alta — subido de 30k para acompanhar a mesma margem de anexo do chat
+// (BIBBLE_ATTACHMENT_CONTEXT_WINDOW), senão o upload cortava o PDF antes do
+// chat ter chance de usar o orçamento maior.
+export const BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET =
+  Number(process.env.BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET) || 120_000;
 export const BIBBLE_UPLOAD_TEXT_MAX_CHARS = BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET * 4;
 export const BIBBLE_CHAT_MESSAGE_MAX_CHARS = 100_000;
 export const BIBBLE_HISTORY_ENVELOPE_OVERHEAD_CHARS = 32_768;

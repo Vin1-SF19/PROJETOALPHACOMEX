@@ -1,5 +1,53 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Bibble — hardening do pipeline de anexos/PDF (tokens, orçamento por arquivo, protocolo financeiro) (2026-08-24)
+
+**⚠️ Achado arquitetural corrigido nesta sessão — o Bibble roda 100% via Ollama local, não Anthropic/OpenAI.** O CLAUDE.md raiz descreve Anthropic como "futuro padrão para AI", mas o código real (`src/lib/bibble/client.ts`) sempre usou `BIBBLE_MODEL` apontando para um modelo Ollama (`gemma4:e4b` → agora `qwen3.8:latest`), servido por um Ollama remoto em `192.168.35.113` (GPU dedicada, VRAM alta, confirmado pelo usuário). Anthropic/OpenAI/Google existem no código como providers alternativos selecionáveis pelo usuário no seletor de modelo, nunca como padrão. Qualquer sessão futura que for mexer em limites de token/contexto do Bibble deve tratar Ollama como o path real, não os providers remotos.
+
+**Gatilho da sessão:** usuário relatou que o Bibble não conseguiu produzir uma conciliação bancária a partir de 3 PDFs de extrato Mercado Pago + lista de valores já justificados — resposta cortada/incompleta. Diagnóstico revelou 4 causas reais no pipeline (`src/app/api/bibble/chat/route.ts`), corrigidas nesta sessão:
+
+1. **Anexo desligava todas as tools e virava geração única** (`toolsForTurn = hasAttachments ? [] : toolsToUse`) — mantido por design (protege contra misturar conteúdo não confiável do arquivo com ações no sistema), mas a geração única agora pode se **auto-continuar**.
+2. **Teto de output travado em 4096 tokens mesmo com anexo** — `calculateRequestBudget` nunca olhava `hasPdf` na hora de decidir `outputTokenLimit`.
+3. **3 PDFs competiam pelo mesmo orçamento sequencial** — o primeiro arquivo processado podia esgotar o orçamento e deixar os seguintes sem nenhum texto útil (causa mais provável da falha relatada, com 3 extratos).
+4. **System prompt sem nenhum protocolo para tarefa financeira/contábil estruturada**.
+
+### O que mudou (arquivos e comportamento)
+
+- **`src/lib/bibble/context-budget.ts`**
+  - `ATTACHMENT_CONTEXT_WINDOW_TOKENS` (131072, env `BIBBLE_ATTACHMENT_CONTEXT_WINDOW`) e `ATTACHMENT_OUTPUT_TOKEN_LIMIT` (16384, env `BIBBLE_ATTACHMENT_OUTPUT_TOKENS`) — novo piso/teto usado **somente quando `hasPdf === true`**. `resolveEffectiveContextWindow` agora usa `Math.max(providerDefault, ATTACHMENT_CONTEXT_WINDOW_TOKENS)` como baseline com anexo; `calculateRequestBudget` usa `PROVIDER_ATTACHMENT_OUTPUT_LIMITS` (novo `Record<Provider, number>`) em vez do `DEFAULT_OUTPUT_TOKEN_LIMIT` genérico quando há anexo.
+  - Nova função `allocatePerFileBudget(fileSizesChars, totalTokenBudget, minTokensPerFile=512)` — divide o orçamento de conteúdo entre N arquivos anexados, cada um com fatia GARANTIDA proporcional ao tamanho, nunca menos que o piso. **Qualquer código futuro que processe múltiplos arquivos no mesmo turno deve usar esta função em vez de um orçamento compartilhado sequencial** — o padrão sequencial antigo é a causa raiz confirmada da falha original.
+
+- **`src/app/api/bibble/chat/route.ts`**
+  - `extractFilesContent` agora recebe orçamento por arquivo (via `allocatePerFileBudget`, usando `file.size` como proxy de tamanho) em vez de `remainingTokens` compartilhado.
+  - Loop de continuação automática no fluxo sem-tools (`for (;;)` dentro de `runStream`): quando `finishReason` indica truncamento (`isOutputTruncated`), o servidor reinjeta o texto já gerado como turno `assistant` + pede explicitamente para continuar, até `MAX_CONTINUACOES_TRUNCAMENTO = 2` vezes. Guard de tempo (`TEMPO_LIMITE_CONTINUACAO_MS = (maxDuration - 20) * 1000`) impede continuar se já não sobra tempo suficiente antes do `maxDuration = 120` da rota — sem isso a rota abortaria uma geração cara no meio.
+  - `activeModel` agora usa a constante `BIBBLE_MODEL` de `client.ts` em vez de um literal `"qwen3:14b"` duplicado que existia solto na rota (fonte única).
+  - **`hasPdf` agora exige evidência real de conteúdo** (`file.url` OU `file.extractedContent` presentes), não só `file.type`/`file.name` declarados pelo cliente. Achado do Anubis: sem essa exigência, qualquer usuário autenticado conseguia declarar um arquivo PDF fake sem conteúdo real só para forçar a janela de contexto/output ampliada (mais cara em GPU) no Ollama compartilhado — nenhum rate-limit por usuário existe nesta rota hoje.
+
+- **`src/lib/bibble/attachment-security.ts`**
+  - `BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET` subiu de 30.000 para 120.000 tokens (env `BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET`) — este é o teto aplicado no **momento do upload** (`upload-to-blob/route.ts`), ANTES do orçamento por arquivo do chat. Sem subir os dois juntos, o upload cortava o PDF antes do chat ter chance de usar a margem maior — **checklist para qualquer teto de token futuro no pipeline do Bibble: sempre verificar se existe um teto anterior no caminho (upload → chat → provider) que precisa subir junto**. Confirmado matematicamente que os tetos agregados derivados (`BIBBLE_HISTORY_MESSAGE_MAX_CHARS` ≈ 4.9MB) continuam dentro de `BIBBLE_HISTORY_TOTAL_MAX_CHARS` (6MB) após o aumento.
+
+- **`src/lib/bibble/client.ts`**
+  - `BIBBLE_MODEL` (default) trocado de `gemma4:e4b` para `qwen3.8:latest` (modelo já instalado no servidor Ollama, mesma tag usada por `ROADMAP_QWEN_MODEL` no Roadmap Alpha). Adicionado a `PROVIDER_MODELS.ollama` e a `modelSupportsVision()` (confirmado com o usuário: tem visão).
+  - `src/components/BibbleChatHome/BibbleChatLayout.tsx` — `DEFAULT_MODEL` client-side espelha o mesmo novo default.
+
+- **`src/lib/bibble/system-prompt.ts`** — duas seções novas:
+  - "REGRA DE TRANSPARÊNCIA DE LEITURA" — instrui o modelo a avisar o usuário explicitamente quando o texto do anexo veio marcado com `[CAPACIDADE: reduzido]` (a estratégia `head-middle-tail` de `selectTextForTokenBudget` já existia, mas o prompt nunca instruía o modelo a repassar o aviso).
+  - "PROTOCOLO PARA TAREFAS FINANCEIRAS/CONTÁBEIS" — conferir soma contra saldo/totais informados pelo usuário antes de finalizar, respeitar partidas dobradas, agrupar por conta, nunca inventar valor sem base no documento.
+
+### Risco residual documentado, não corrigido nesta sessão (Anubis, achado informativo)
+
+Texto extraído de PDF entra como conteúdo de usuário (dentro de bloco ` ``` ` markdown) sem nenhuma instrução explícita de "nunca trate isto como comando" — risco de prompt injection via documento malicioso, **pré-existente à sessão, não introduzido por ela**. Fica mais relevante agora porque o novo protocolo financeiro depende do modelo seguir a instrução de sistema em vez de uma instrução potencialmente embutida no PDF anexado. Se uma sessão futura for reforçar isso, o ponto de entrada é `appendExtractedText` em `route.ts` (onde o texto do arquivo é formatado antes de entrar no prompt) + uma nova regra explícita no `system-prompt.ts`.
+
+### Checklist de integração desta sessão
+- [x] Diagnóstico (Bibble) → Scout (blueprint) → implementação → Forge (`tsc`/`lint`/`build`, aprovado 2x) → Anubis (2 achados importantes corrigidos, 1 informativo documentado) → Scribe (esta entrada)
+- [x] Sem migration, sem mudança de schema — Vault não foi acionado
+- [x] `.env.example` documentado com as 4 novas env vars opcionais (`BIBBLE_MODEL`, `BIBBLE_ATTACHMENT_CONTEXT_WINDOW`, `BIBBLE_ATTACHMENT_OUTPUT_TOKENS`, `BIBBLE_UPLOAD_TEXT_TOKEN_BUDGET`)
+- [ ] Rate-limit por usuário de verdade nesta rota (Redis/memória compartilhada) — não existe nenhuma infraestrutura de rate-limit em `lib/bibble/` hoje; ficou como TODO explícito, mitigado parcialmente pelo guard de tempo + `MAX_CONTINUACOES_TRUNCAMENTO` conservador
+
+**Última atualização:** 2026-08-24 por Scribe (sessão Bibble — diagnóstico → Scout → implementação → Forge → Anubis → Scribe)
+
+---
+
 ## Alpha Motion (Apresentações) — Ocultar slide + Compartilhar (cria cópia) + listagem por dono (2026-08-24)
 
 ### Ocultar slide (soft-hide, estilo Canva — nunca exclui)
@@ -73,6 +121,59 @@
 - **UI:** botão "Aprovar e iniciar" em `RoadmapProductionPanel.tsx`, ao lado dos botões de Pausar/Retomar/Excluir, visível só quando `canManage && execution.status === "AWAITING_APPROVAL"`.
 - **Checklist para qualquer novo status de execução no futuro:** (1) adicionar em `productionExecutionStatusSchema`; (2) decidir se ele deve ou não entrar nas allowlists de seleção do worker; (3) mapear label/cor em `STATUS_LABEL`/`statusClass` (`RoadmapProductionPanel.tsx`); (4) se o novo status precisa de ação humana, seguir o padrão comando→action→botão já estabelecido aqui.
 
+## Roadmap Alpha — Produção: enfileirar comando NUNCA processa sozinho — bug do "Aprovar e iniciar" que não iniciava (2026-08-24)
+
+**Causa raiz confirmada pelo Scout:** `enqueueProductionControl(...)` (chamado por `AprovarExecucaoRoadmapProduction`/`ControlarExecucaoRoadmapProduction`/`RepetirExecucaoRoadmapProduction`, `src/actions/RoadmapProduction.ts`) só ESCREVE o comando num arquivo de fila — nunca processa nada sozinho. Quem de fato aplica o comando (`applyProductionControls`, `worker.ts`) só é chamado de dentro de `processNextProductionPhaseUnlocked`, que por sua vez só roda a partir do **worker de processo separado** (`scripts/roadmap-production.mjs worker`, loop de 5s, ou o supervisor `.ps1`). O refresh que a tela chama a cada poll (`ObterRoadmapProduction` → `refreshProductionExecutions` → `syncProductionExecutions`) **nunca** chama `applyProductionControls` — só resincroniza estado já existente. Se o worker de processo separado não estiver rodando (ou já estiver ocupado com outro workspace), qualquer comando enfileirado fica represado indefinidamente e a UI nunca reflete a mudança — o botão "Aprovar e iniciar" parecia simplesmente não fazer nada.
+
+**⚠️ Regra permanente para qualquer comando novo de controle adicionado no futuro:** enfileirar (`enqueueProductionControl`) NUNCA é suficiente sozinho — sempre depende de algo chamar `processNextProductionPhase` depois. Se o comando novo precisa de efeito imediato na UI (não só na próxima passada do worker de fundo, que pode não estar rodando), seguir o padrão do kick abaixo. Comandos que não devem "iniciar" nada (como `PAUSE`/`EXCLUDE`) não precisam de kick.
+
+**Correção — helper `kickProductionWorker` (`src/actions/RoadmapProduction.ts`):** função privada (não exportada) `kickProductionWorker(root: string): void`, chamada **fire-and-forget** (sem `await` bloqueando a resposta da Server Action — processar uma fase de verdade pode envolver chamar CLI de agente e demorar) logo após `enqueueProductionControl(...)` em `AprovarExecucaoRoadmapProduction`, `RepetirExecucaoRoadmapProduction` e em `ControlarExecucaoRoadmapProduction` (somente no ramo `RESUME`). Reaproveita `processNextProductionPhase` (já existente e exportada em `worker.ts`, a MESMA função que o worker externo chama em loop) — como ela resolve um lease global não-bloqueante (`acquireProductionExecutionLease`), é seguro chamar de múltiplos lugares ao mesmo tempo: se o worker de fundo já detém o lease, o kick recebe `lease === null` e retorna sem side effect, sem duplicar trabalho. Só dispara quando `isRoadmapProductionRuntimeEnabled()` é `true` **neste processo** (env `ROADMAP_PRODUCTION_ENABLED=true`) — em ambiente sem runtime local (ex.: nuvem), o kick não tenta nada, preservando o comportamento já documentado de que aprovar deve funcionar mesmo sem o runtime de execução habilitado.
+
+**Não alterado:** `selectNextProductionExecution`/`nextReadyPhase` (seleção de fila em `worker.ts`) já estavam corretos — não faziam parte do bug. Sem migration, sem mudança de schema.
+
+**Checklist de integração desta sessão:**
+- [x] Scout (blueprint) → Echo (implementação) → Forge (`tsc`/`lint`/`build` limpos) → Probe (wiring confirmado em 2 callers de UI: `RoadmapProductionPanel.tsx` e o card de aprovação em `RoadmapDashboard.tsx`) → Anubis (0 críticos/importantes — `root` sempre derivado do banco, guard de runtime é server-side puro) → Lens (aprovado, duplicação do padrão enqueue+kick nas 3 Server Actions julgada aceitável, não vale extrair) → Sage (sem teste novo necessário — guard de ambiente já 100% coberto por `tests/roadmap-production/runtime.test.ts`, lease não-bloqueante já coberto por `execution-lock.test.ts`)
+
+**Última atualização:** 2026-08-24 por Scribe (sessão Bibble — Scout→Echo→Forge→Probe→Anubis→Lens→Sage→Scribe)
+
+## Roadmap Alpha — Produção: auditoria completa da fila + visibilidade de bloqueio + auto-approve + tela por objetivo (2026-08-24, parte 2 da mesma sessão)
+
+**Gatilho:** depois do fix acima, usuário reportou que o sistema "parece travado, nunca demorou tanto" e pediu auditoria completa do sistema de fila/auto-desenvolvimento.
+
+### Achado 1 — "lock travado" era lixo de uma migração de diretório já concluída, não um bug
+
+`storage.ts` migrou o diretório de estado de `{raiz do projeto}/.roadmap-production/` (legado) para `%LOCALAPPDATA%\PainelAlpha\RoadmapProduction\workspaces\{sha256(canonicalRoot(root))}\` (`directory()`/`stateHomeDirectory()`, ambas em `storage.ts`) — migração já concluída em sessão anterior (marcador `.legacy-migration-v1.json`, `status: "SUCCEEDED"`). O lock que parecia órfão (`execution.lock` com PID morto, horas de idade) estava no diretório LEGADO, que nenhum código atual lê ou escreve — a pasta foi apagada (`.gitignore` já cobria `/.roadmap-production/`, confirmado seguro antes de remover). **Se uma sessão futura for depurar "lock travado"/"estado desatualizado" do Roadmap Produção, o diretório real é sempre `%LOCALAPPDATA%\PainelAlpha\RoadmapProduction\workspaces\{hash}\` — nunca confiar em `.roadmap-production/` na raiz do projeto, mesmo que o arquivo exista e pareça atual.**
+
+### Achado 2 — comportamento correto, mas invisível: BLOCKED nunca aparecia fora do painel de Produção
+
+Execuções `BLOCKED`/`WAITING_FOR_ADMIN` (esperando decisão humana) nunca tinham nenhum sinal na tela principal do Roadmap — só apareciam se o usuário entrasse manualmente no painel de Produção e expandisse a execução certa. Combinado com `AUTO_RETRY_LIMIT = 30` (worker.ts, correções automáticas silenciosas antes de virar BLOCKED — `attemptCount` real já chegou a 63 numa sessão anterior), o sistema passa horas "girando em vazio" sem nenhum aviso progressivo, o que se sente como travamento.
+
+### Correções implementadas
+
+**1. Badge de bloqueio no dashboard** — nova Server Action `ListarExecucoesPrecisandoAtencao()` (`src/actions/RoadmapProduction.ts`, mesmo padrão de auth/varredura de `ListarExecucoesAguardandoAprovacao`, exige mutação via `requireRoadmapAccess(true)`) retorna `{objectiveId, executionId, status: "BLOCKED"|"WAITING_FOR_ADMIN"}[]`. Badge vermelho no card do objetivo (`RoadmapDashboard.tsx`, estado `needingAttention`, gateado por `canMutate`) com botão que abre a execução focada.
+
+**2. Aviso progressivo do circuito de retry** — novo helper `appendRetryThresholdWarning(execution, phase, at)` (`worker.ts`) dispara UMA mensagem em `execution.messages` (role `SYSTEM`, kind `STATUS`) quando `autoRetryCount` cruza EXATAMENTE `Math.floor(AUTO_RETRY_LIMIT/2)` = 15 pela primeira vez (comparação `===`, garante disparo único). Chamado nos 3 pontos do arquivo que incrementam `autoRetryCount` (dois em `scheduleAutomaticRecovery`, um no bloco de delivery-adjustment de `processNextProductionPhaseUnlocked`). Destaque visual em `RoadmapImplementationRoom.tsx` (`isRetryThresholdWarning`, âmbar + `AlertTriangle`) via **heurística de texto** (`content.startsWith("Esta fase já tentou se autocorrigir")`) — frágil a mudança de texto futura no worker sem sincronizar aqui; documentado no próprio código como caminho de melhoria (trocar por um `kind` dedicado no `productionMessageSchema` de `contracts.ts` se algum dia justificar o esforço de migrar um schema Zod usado em 3+ arquivos).
+
+**3. Auto-approve para autor Admin/CEO/TI** — `documentedObjectives()` (`worker.ts`) inclui `createdBy: { select: { role: true } }` no select Prisma. `syncProductionExecutions()`: `const autoApproved = isAdminRole(objective.createdBy.role)` (reaproveita `@/lib/roles`, já testado em `tests/auth/ti-admin-access.test.ts`) decide `status: autoApproved ? "PENDING" : "AWAITING_APPROVAL"` **apenas na criação** da execução — o bloco `if (existing) { ...; continue; }` sai antes de qualquer objetivo já documentado ser reavaliado, então mudar a role do autor DEPOIS não destrava retroativamente uma execução já em `AWAITING_APPROVAL` (verificado por leitura de código, Probe e Anubis). Activity registrada na primeira fase quando auto-aprovado, para rastreabilidade de "por que este nunca passou por aprovação manual".
+
+**4. Tela de Produção por objetivo (substitui a fila global)** — `RoadmapProductionPanel.tsx` ganhou prop `focusExecutionId?: string | null`; filtra `executions` para 1 item, reaproveitando o `expandedExecutionId` já existente (sem estado novo de UI — o painel já sabia focar 1 execução, só faltava um jeito de chegar direto nela de fora). **Botão "Produção" do HEADER de `RoadmapDashboard.tsx` foi REMOVIDO** (decisão explícita do usuário — Produção só se acessa a partir do card de um objetivo específico, nunca mais uma fila com todos os objetivos de um módulo). Botão "Produção" novo por card, visível quando `canAccessProduction && objectiveExecutions.has(objective.id)` (estado `objectiveExecutions`, carregado por nova Server Action `ListarExecucoesPorObjetivo()`).
+
+**⚠️ Ponto de atenção para replicar este padrão em outra tela:** `ListarExecucoesPorObjetivo()` foi implementada inicialmente com `requireRoadmapAccess(true)` (mesmo padrão das duas funções irmãs, exige mutação), mas teve que ser REBAIXADA para `requireRoadmapAccess()` (só leitura) depois de confirmação explícita do usuário — o botão novo precisava manter a MESMA paridade de acesso do botão antigo do header que estava sendo removido (visível para qualquer `canAccessProduction`, não só Admin/CEO/TI). **Ao remover um controle de UI e substituir por um equivalente, sempre checar se o nível de acesso do substituto bate com o do original antes de assumir o padrão "igual às funções vizinhas" — nem toda Server Action nova do mesmo arquivo deve ter o mesmo gate de auth.** Dedupe por `objectiveId` pegando a execução mais recente por `createdAt` (um objectiveId pode ter múltiplas execuções de revisões sucessivas, ex.: `:v2` e `:v3`).
+
+### Achado separado, NÃO resolvido nesta sessão
+
+Durante a checagem final de regressão (suíte completa `tests/roadmap-production/`), Forge encontrou 1 teste falhando em `tools.test.ts` ("executa somente o nome de busca alinhado à policy", `SEARCH_FAILED`). Confirmado via `git stash`/`git stash pop` que é regressão de uma sessão ANTERIOR a esta (não introduzida pelas 5 entregas acima), relacionada a `buildRoadmapSubprocessEnv` (`src/lib/roadmap-production/subprocess-env.ts`, sandbox de env vars aplicado à chamada do `rg`/ripgrep dentro da tool `search_code` em `tools.ts`) — `PATH` já está na allowlist do sandbox, então a causa exata não é óbvia sem investigação dedicada. Task separada criada para o usuário decidir se quer investigar agora ou depois — **não corrigido às cegas de propósito**, pois mexer no sandbox sem entender a decisão de design original arrisca desfazer uma proteção de segurança intencional (o sandbox existe para não vazar env vars sensíveis para o subprocesso do agente de IA).
+
+### Teste novo
+
+`tests/roadmap-production/worker.test.ts` (3 testes) — cobre o threshold de aviso de retry via `scheduleAutomaticRecovery` (já exportada). Auto-approve por role **não** tem teste direto: `syncProductionExecutions` depende de Prisma real e nenhum teste em `tests/roadmap-production/` mocka banco hoje — introduzir isso seria custo desproporcional para uma composição de 2 peças já cobertas separadamente (`isAdminRole` 100% testada; enum de `status` validado pelo schema Zod).
+
+### Checklist de integração desta sessão
+- [x] Scout (auditoria + blueprint) → Echo (backend, 3 Server Actions novas/ajustadas) → Nova (frontend, pausou 2x pedindo decisão do usuário sobre nível de acesso) → Forge (3 erros de tipo TS corrigidos em `worker.ts`: `satisfies ProductionExecutionCompat`, `as const` em ternário de status, tipagem explícita de `ProductionMessage` — todos por widening de literal, não bugs de lógica) → Probe (wiring completo confirmado) → Anubis (0 achados — auto-approve validado sem vetor de escalação retroativa) → Lens (aprovado) → Sage (3 testes novos) → Forge (2 correções de tipo no teste novo) → Lens (aprovado)
+- [x] Sem migration, sem mudança de schema Prisma além do `select` já existente em `documentedObjectives()`
+
+**Última atualização:** 2026-08-24 por Scribe (sessão Bibble — Scout→Echo→Nova→Forge→Probe→Anubis→Lens→Sage→Forge→Lens→Scribe)
+
 ## Roadmap Alpha — Produção: terceiro provider de desenvolvimento (2026-08-19)
 
 - **Schema:** `developmentProviderSchema` (`src/lib/roadmap-production/contracts.ts`) é `z.enum(["claude","codex","ollama"])` — reutilizado por `roadmapObjectiveCreateSchema`/`roadmapObjectiveEditSchema` (`src/lib/roadmap-alpha/contracts.ts`), então adicionar um provider aqui propaga automaticamente para a validação de criar/editar objetivo, sem precisar tocar em `roadmap-alpha/contracts.ts`.
@@ -113,6 +214,19 @@ Antes de finalizar qualquer migration que renomeie, recrie, ou mude índice/cons
 
 > Mantido por: Scribe (cartógrafo) e Probe (integration tester)
 > Todo novo módulo DEVE registrar seus integration points aqui.
+
+---
+
+## CS&NPS — cadastro manual reabilitado (bug corrigido); pendência real de CRM identificada (2026-08-24)
+
+**Contexto do pedido:** usuário reportou que o cadastro de cliente estava "desabilitado por causa do CRM ainda não estar pronto". Investigação do Scout descartou essa hipótese — não existe (e nunca existiu) bloqueio intencional de cadastro ligado ao CRM neste módulo. O que causava a falha era um bug real de payload (ver `known-errors.md`, entrada "CS&NPS — Invalid input: expected string, received undefined"), já corrigido.
+
+**Pendência real e legítima para quando o Alpha CRM (BPM) for lançado**, encontrada durante a investigação (não é a causa do bug, é uma dívida arquitetural separada e já documentada no código):
+- `modalDados.tsx:830-832` — campo CNPJ do cliente já existente é somente-leitura, com comentário explícito: *"mudar o CNPJ significaria trocar de Cliente master inteiro. Corrige no Alpha CRM (BPM)"* (decisão da Fase 3.6 do Cliente Master, 2026-08-14).
+- Ou seja: o cadastro de cliente NOVO (o que foi corrigido agora) sempre funcionou de forma independente do CRM — mas a EDIÇÃO de CNPJ de um cliente já existente foi deliberadamente deixada para ser resolvida pelo Alpha CRM, que ainda não foi lançado.
+- **Ação sugerida:** quando o Alpha CRM for lançado, criar um objetivo no Roadmap Alpha (`/PainelAlpha/Roadmap`, gaveta "Painel Alpha") para decidir e implementar o fluxo de "trocar CNPJ de um Cliente master" — hoje não existe nenhum caminho para isso em lugar nenhum do sistema.
+
+**Última atualização:** 2026-08-24 por Scribe (sessão Bibble — Scout→Echo→Forge→Probe→Scribe)
 
 ---
 

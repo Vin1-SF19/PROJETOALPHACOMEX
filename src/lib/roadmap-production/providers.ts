@@ -98,6 +98,9 @@ export interface ProductionAgentResult {
 
 export type ProductionExecutionEngine = "qwen" | "development";
 
+const NEEDS_INPUT_RESPONSE_CONTRACT =
+  "Se precisar de decisão ou autorização, responda RESULT: NEEDS_INPUT e finalize com NEEDS_INPUT_JSON: seguido de JSON estrito contendo requestId UUID, phaseNumber, category (PERMISSION|DECISION|CREDENTIAL|EXTERNAL_ACTION|DATABASE|DESTRUCTIVE|GIT_REMOTE), question, intendedAction, risk e options; nunca inclua credenciais.";
+
 export function requiresCapabilityEscalation(summaries: string[]): boolean {
   return summaries.some((summary) =>
     /\bCAPABILITY_ESCALATION_REQUIRED\s*:/i.test(summary),
@@ -112,26 +115,8 @@ export function selectProductionExecutionEngine(input: {
   allowWrite: boolean;
   previousSummaries?: string[];
 }): ProductionExecutionEngine {
-  if (requiresCapabilityEscalation(input.previousSummaries ?? [])) {
-    return "development";
-  }
-  const normalized =
-    `${input.phaseTitle}\n${input.phaseMarkdown}`.toLocaleLowerCase("pt-BR");
-  const requiresEngineering =
-    /\b(frontend|front-end|backend|back-end|banco de dados|database|sql|prisma|turso|libsql|schema|migration|migrate|api|server action|servidor|autentica|autoriza|permiss|seguran[cç]a|webhook|integra[cç][aã]o|componente|react|next\.js|typescript|javascript|css|tailwind|rota|endpoint)\b/i.test(
-      normalized,
-    );
-  if (requiresEngineering) return "development";
-  if (input.phaseKind === "EXECUTION" && input.allowWrite) {
-    return "development";
-  }
-  const basicTask =
-    ["CONTEXT", "CLOSURE"].includes(input.phaseKind) ||
-    ["context", "scout", "sage", "scribe", "lens"].includes(input.agentId) ||
-    /\b(diagn[oó]stico|diagnosticar|an[aá]lise|analisar|levantamento|mapear|documentar|relat[oó]rio|resumir|pesquisar|investigar|checklist)\b/i.test(
-      normalized,
-    );
-  return basicTask ? "qwen" : "development";
+  void input;
+  return "qwen";
 }
 
 export function requiresDeliveryAdjustment(summaries: string[]): boolean {
@@ -310,17 +295,17 @@ export async function runProductionAgent(
     "Seja econômico: investigue somente o necessário e conclua em até 10 rodadas de tools.",
     "Não faça commit, push, reset, checkout, migration, alteração de schema ou operação destrutiva.",
     "Pedidos de PR, commit ou screenshot anexado são opcionais e não bloqueiam a implementação local; registre-os como pendência manual.",
-    "Quando faltar uma decisão ou autorização humana, encerre a chamada sem manter processo aberto. Responda exatamente RESULT: NEEDS_INPUT e, na última linha, NEEDS_INPUT_JSON: seguido de JSON estrito com requestId UUID, phaseNumber, category (PERMISSION|DECISION|CREDENTIAL|EXTERNAL_ACTION|DATABASE|DESTRUCTIVE|GIT_REMOTE), question, intendedAction, risk e options. Nunca inclua valor de credencial.",
+    NEEDS_INPUT_RESPONSE_CONTRACT,
     deliveryAdaptationInstructions(input.phaseKind),
     config.provider === "ollama"
-      ? "Limite de capacidade do Qwen: execute diagnósticos, análises, levantamentos e documentação simples. Se descobrir necessidade de frontend, backend, banco de dados, autenticação, integração complexa ou alteração de código, não improvise e não implemente. Responda RESULT: BLOCKED e inclua exatamente CAPABILITY_ESCALATION_REQUIRED: <FRONTEND|BACKEND|DATABASE|SECURITY|INTEGRATION> — <motivo verificável>. O worker encaminhará o contexto para Claude/Codex."
+      ? "Ollama/Qwen é o runtime seguro brokerizado desta fase e pode implementar frontend ou backend usando somente as tools fornecidas. Preserve os bloqueios de banco, paths protegidos, Git mutável e operações destrutivas. Se a persona atual não for adequada, responda RESULT: BLOCKED e inclua exatamente CAPABILITY_ESCALATION_REQUIRED: <FRONTEND|BACKEND|DATABASE|SECURITY|INTEGRATION> — <motivo verificável>; o worker repetirá a mesma fase como Nova ou Echo no mesmo provider brokerizado."
       : "Você recebeu esta fase porque ela exige capacidade de engenharia ou porque o Qwen solicitou escalonamento. Considere o diagnóstico anterior e execute a implementação necessária dentro das regras de segurança.",
     input.allowWrite
       ? config.provider === "ollama"
         ? "Você pode editar somente pelos tools create_file/replace_in_file."
         : "Você pode editar arquivos dentro do projeto usando somente as ferramentas autorizadas pela CLI."
       : "Esta é uma fase somente leitura: não tente criar ou alterar arquivos.",
-    "Ao concluir, responda com RESULT: PASS, RESULT: FAIL/BLOCKED ou RESULT: NEEDS_INPUT, resumo, arquivos afetados e gates executados.",
+    "Ao concluir, responda com RESULT: PASS, RESULT: FAIL/BLOCKED ou RESULT: NEEDS_INPUT, resumo e arquivos afetados. As validações executáveis cabem ao supervisor confiável.",
     agentContext,
   ].join("\n\n");
   const user = JSON.stringify({
@@ -397,15 +382,15 @@ export async function runProductionAgent(
         messages.push({
           role: "user",
           content: input.allowWrite
-            ? "Limite de investigação alcançado. Pare de buscar: aplique agora a menor alteração segura com os caminhos já descobertos, rode um gate direcionado e conclua. Se não for seguro, responda RESULT: BLOCKED."
-            : "Limite de investigação alcançado. Pare de buscar e conclua agora com RESULT: PASS ou RESULT: BLOCKED e o resumo verificável.",
+            ? `Limite de investigação alcançado. Pare de buscar: aplique agora a menor alteração segura com os caminhos já descobertos e conclua. Se não for seguro, responda RESULT: BLOCKED. ${NEEDS_INPUT_RESPONSE_CONTRACT}`
+            : `Limite de investigação alcançado. Pare de buscar e conclua agora com RESULT: PASS ou RESULT: BLOCKED e o resumo verificável. ${NEEDS_INPUT_RESPONSE_CONTRACT}`,
         });
       }
       if (forceConclusion) {
         messages.push({
           role: "user",
           content:
-            "Encerramento obrigatório: não há mais ferramentas disponíveis. Responda agora com RESULT: PASS, RESULT: FAIL ou RESULT: BLOCKED, seguido de resumo, arquivos afetados e gates.",
+            `Encerramento obrigatório: não há mais ferramentas disponíveis. Responda agora com RESULT: PASS, RESULT: FAIL ou RESULT: BLOCKED, seguido de resumo e arquivos afetados. ${NEEDS_INPUT_RESPONSE_CONTRACT}`,
         });
       }
       await onActivity(`Consultando ${config.model} · passo ${step + 1}`);
@@ -457,7 +442,7 @@ export async function runProductionAgent(
         messages.push({
           role: "user",
           content:
-            "Conclua agora, sem novas investigações, em até 800 tokens. Informe RESULT: PASS, FAIL ou BLOCKED, resumo, arquivos afetados e gates.",
+            `Conclua agora, sem novas investigações, em até 800 tokens. Informe RESULT: PASS, FAIL ou BLOCKED, resumo e arquivos afetados. ${NEEDS_INPUT_RESPONSE_CONTRACT}`,
         });
         continue;
       }
@@ -471,7 +456,7 @@ export async function runProductionAgent(
           messages.push({
             role: "user",
             content:
-              "Responda agora em uma única linha: RESULT: PASS, RESULT: FAIL ou RESULT: BLOCKED.",
+              `Responda agora objetivamente com RESULT: PASS, RESULT: FAIL ou RESULT: BLOCKED. ${NEEDS_INPUT_RESPONSE_CONTRACT}`,
           });
           continue;
         }

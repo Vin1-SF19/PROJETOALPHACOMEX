@@ -1,5 +1,39 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+---
+
+## [2026-08-24] — CS&NPS: cadastro de cliente "reabilitado" (bug real, não bloqueio de CRM)
+
+**Tags:** #bugfix #critical #integration
+**Agentes envolvidos:** Bibble, Scout, Echo, Forge, Probe, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx`, `.bibble/memory/known-errors.md`, `.bibble/memory/integration-points.md`
+
+### Contexto
+Usuário pediu, com urgência, para "reabilitar" o cadastro de cliente no módulo CS&NPS — a premissa era de que o cadastro tinha sido desabilitado de propósito porque a ideia era o Alpha CRM assumir esse papel, mas o CRM ainda não foi lançado e o time de CS precisa continuar cadastrando.
+
+### O que foi feito
+- Scout investigou o módulo inteiro (botão, modal, Server Action, schema Zod, schema Prisma, FKs físicas no Turso) e **descartou a premissa do usuário**: não existia nenhuma trava, flag ou redirecionamento ligado a CRM no fluxo de cadastro novo.
+- Usuário confirmou o sintoma real: erro "Invalid input: expected string, received undefined" ao clicar em "Salvar Cliente".
+- Causa raiz encontrada: `modal.tsx` (`handleFinalizar`) montava o payload com a chave `servicos: servicosSelecionados` (array), mas `cadastrarClienteSchema` exige `servico: string` (singular) — a chave nunca batia, Zod rejeitava sempre, 100% dos cadastros novos falhavam.
+- Fix: `servico: servicosSelecionados[0]` + toast de validação se nenhum serviço for selecionado antes de enviar.
+- Forge rodou `tsc`/`lint`/`build` reais; confirmou (via `git stash`/`stash pop`) que os erros/warnings encontrados já existiam antes da mudança, nenhuma regressão nova.
+- Probe confirmou integração ponta a ponta: única chamada a `CadastrarCliente()` em todo o projeto já usa o payload corrigido; sincronização automática Metas→CS&NPS (`criarRegistroClienteAPartirDeContrato`) usa interface própria e não foi afetada.
+
+### Decisões tomadas
+- Não investigar/tocar em nenhum outro ponto do módulo (2000+ linhas, `modalDados.tsx`) — escopo estritamente o bug do cadastro novo, conforme pedido.
+- Não corrigir agora o erro de lint pré-existente (`react-hooks/static-components`, `ModalDuplicata` declarado dentro do render em `modal.tsx`) — fora do escopo do pedido, registrado como task separada em background.
+
+### Problemas encontrados / resolvidos
+- "Invalid input: expected string, received undefined" no cadastro CS&NPS: resolvido (ver `known-errors.md`, causa raiz = chave de payload `servicos` vs `servico`).
+
+### Pendências
+- Task em background (não executada) para corrigir `ModalDuplicata` em `modal.tsx` (erro de lint pré-existente, não relacionado ao bug corrigido).
+- **Pendência real de CRM identificada** (diferente da premissa original do usuário): edição de CNPJ de um cliente CS&NPS já existente está deliberadamente bloqueada até o Alpha CRM (BPM) ser lançado (`modalDados.tsx:830-832`, decisão da Fase 3.6 do Cliente Master, 2026-08-14). Sugestão registrada em `integration-points.md`: criar objetivo no Roadmap Alpha quando o CRM for lançado.
+
+### Refletido também em
+- `known-errors.md`: nova entrada "CS&NPS — Invalid input: expected string, received undefined ao clicar em Salvar Cliente"
+- `integration-points.md`: nova entrada "CS&NPS — cadastro manual reabilitado; pendência real de CRM identificada"
+
 > Mantido por: Kowalski (cronista)
 > Registrar ao FINAL de toda sessão com trabalho real.
 
@@ -2754,3 +2788,73 @@ Usuário pediu 3 mudanças no módulo Alpha Motion (Apresentações): (1) ícone
 ### Refletido também em
 - `codebase-map.md`: nova seção "Alpha Motion (Apresentações) — Ocultar slide + Compartilhar + listagem por dono (2026-08-24)"
 - `integration-points.md`: nova seção completa com os 3 comportamentos, checklist para futuros pontos de leitura pública, e o padrão reutilizável "Compartilhar = cria cópia" documentado para outros módulos que um dia precisarem de algo parecido
+
+---
+
+## [2026-08-24] — Roadmap Alpha: botão "Aprovar e iniciar" não iniciava nada
+
+**Tags:** #bugfix #integration #critical
+**Agentes envolvidos:** Scout, Echo, Forge, Probe, Anubis, Lens, Sage, Scribe
+**Arquivos tocados:** `src/actions/RoadmapProduction.ts`
+
+### Contexto
+Usuário reportou que, após documentar um objetivo/módulo no Roadmap Alpha e clicar em "Aprovar e iniciar", nada acontecia — esperava que o item fosse para a fila de desenvolvimento (ou entrasse na fila se já houvesse algo rodando).
+
+### O que foi feito
+- Scout mapeou a causa raiz: `enqueueProductionControl(...)` só grava o comando num arquivo de fila — nunca processa. Quem processa (`applyProductionControls`, `worker.ts`) só roda a partir de `processNextProductionPhaseUnlocked`, chamado exclusivamente pelo worker de PROCESSO SEPARADO (`scripts/roadmap-production.mjs worker`, loop de 5s). O refresh que a UI chama a cada poll nunca aplica os comandos pendentes.
+- Echo implementou `kickProductionWorker(root)` — helper privado, fire-and-forget, chamado logo após `enqueueProductionControl(...)` em `AprovarExecucaoRoadmapProduction`, `RepetirExecucaoRoadmapProduction` e `ControlarExecucaoRoadmapProduction` (só no ramo RESUME). Reaproveita `processNextProductionPhase` já existente, sem criar lógica nova de processamento.
+- Forge rodou `tsc --noEmit`, `eslint` e `npm run build` (background, ~15-20min) — todos limpos, sem erros novos.
+- Probe confirmou wiring nos 2 callers de UI (`RoadmapProductionPanel.tsx` e o card em `RoadmapDashboard.tsx`).
+- Anubis: 0 achados (root sempre vem do banco, guard de runtime é server-side puro, auth checks intactos).
+- Lens: aprovado sem ressalvas — duplicação do padrão enqueue+kick nas 3 actions julgada aceitável (auth/schema diferentes entre elas).
+- Sage: sem teste novo necessário — o guard de ambiente (`isRoadmapProductionRuntimeEnabled`) já tem 100% de cobertura em `tests/roadmap-production/runtime.test.ts`, e o lease não-bloqueante já é coberto por `execution-lock.test.ts`.
+
+### Decisões tomadas
+- Kick é fire-and-forget (não bloqueia a resposta da Server Action): processar uma fase de verdade pode chamar CLI de agente e demorar — a UX de aprovar precisa responder rápido.
+- Kick só dispara se `isRoadmapProductionRuntimeEnabled()` for `true` neste processo: preserva o comportamento já documentado no código de que aprovar deve funcionar mesmo sem runtime local (ex: ambiente de nuvem).
+- `PAUSE`/`EXCLUDE` não recebem kick, de propósito — não devem "iniciar" nada.
+- Não extrair um helper único para o padrão `resolveRoot → enqueue → revalidate → kick` repetido nas 3 actions — cada uma tem auth/schema ligeiramente diferentes, extração reduziria legibilidade mais do que economizaria linhas.
+
+### Problemas encontrados / resolvidos
+- Causa raiz era puramente arquitetural (dependência de um worker de processo externo que pode não estar rodando), não um bug de lógica de fila — `selectNextProductionExecution`/`nextReadyPhase` já estavam corretos e não foram tocados.
+
+### Pendências
+Nenhuma.
+
+### Refletido também em
+- `integration-points.md`: nova seção "Roadmap Alpha — Produção: enfileirar comando NUNCA processa sozinho — bug do 'Aprovar e iniciar' que não iniciava (2026-08-24)", com regra permanente para qualquer comando de controle novo que precisar de efeito imediato na UI.
+
+---
+
+## [2026-08-24] — Roadmap Alpha: auditoria da fila + visibilidade de bloqueio + auto-approve + tela por objetivo
+
+**Tags:** #feature #bugfix #decision #integration
+**Agentes envolvidos:** Scout, Echo, Nova, Forge, Probe, Anubis, Lens, Sage
+**Arquivos tocados:** `src/actions/RoadmapProduction.ts`, `src/lib/roadmap-production/worker.ts`, `src/components/RoadmapAlpha/RoadmapDashboard.tsx`, `src/components/RoadmapAlpha/RoadmapProductionPanel.tsx`, `src/components/RoadmapAlpha/RoadmapImplementationRoom.tsx`, `tests/roadmap-production/worker.test.ts` (novo)
+
+### Contexto
+Depois do fix do "Aprovar e iniciar" (entrada anterior), usuário reportou que o sistema "parece travado, nunca demorou tanto" e pediu auditoria completa do sistema de fila/auto-desenvolvimento do Roadmap Alpha — que é para ser autônomo após aprovação.
+
+### O que foi feito
+- Scout investigou o "travamento": não era bug — era um lock LEGADO (`.roadmap-production/execution.lock` na raiz do projeto) sobrando de ANTES de uma migração de diretório de estado para `%LOCALAPPDATA%\PainelAlpha\RoadmapProduction\workspaces\{hash}\`, já concluída em sessão anterior. Pasta legada apagada (estava em `.gitignore`).
+- Achado real: 2 execuções em `BLOCKED` há horas, worker de fundo vivo mas sem processar nada (comportamento correto — `BLOCKED` não entra na fila) e **sem nenhum sinal visível na tela principal**. `AUTO_RETRY_LIMIT = 30` tentativas silenciosas antes de virar `BLOCKED`, sem aviso progressivo (`attemptCount` real já bateu 63 numa sessão passada).
+- Implementadas 5 entregas: (1) badge vermelho "Bloqueado — precisa de você" no card do objetivo, via nova Server Action `ListarExecucoesPrecisandoAtencao()`; (2) helper `appendRetryThresholdWarning` — aviso único no chat da execução ao cruzar `autoRetryCount === 15` (metade do limite), com destaque visual âmbar em `RoadmapImplementationRoom.tsx`; (3) auto-approve: objetivo criado por autor Admin/CEO/TI nasce direto em `PENDING`, pulando `AWAITING_APPROVAL`; (4) tela de Produção por objetivo — `RoadmapProductionPanel` ganhou `focusExecutionId`, botão do header removido, botão novo por card via `ListarExecucoesPorObjetivo()`.
+- Forge encontrou e Echo corrigiu 3 erros de widening de tipo literal em `worker.ts` (`satisfies ProductionExecutionCompat`, `as const`, tipagem explícita de `ProductionMessage`).
+- Sage escreveu 3 testes novos (`worker.test.ts`) para o threshold de retry via `scheduleAutomaticRecovery`.
+
+### Decisões tomadas
+- Botão "Produção" do header foi REMOVIDO por completo (não virou índice/atalho) — confirmado explicitamente pelo usuário: Produção só se acessa a partir do card do objetivo específico.
+- `ListarExecucoesPorObjetivo()` foi implementada com `requireRoadmapAccess(true)` (mutação) e REBAIXADA para `requireRoadmapAccess()` (leitura) depois de confirmação do usuário — o botão novo precisa manter a mesma paridade de acesso do botão antigo do header (visível para qualquer `canAccessProduction`, não só Admin/CEO/TI). Nem toda Server Action nova do mesmo arquivo deve copiar o gate de auth das vizinhas.
+- Auto-approve por role só roda na CRIAÇÃO da execução — nunca reavalia uma execução já existente, então trocar a role do autor depois não destrava retroativamente nada em `AWAITING_APPROVAL`. Confirmado por leitura de código (Probe, Anubis), decisão de design, não limitação.
+- Sage decidiu não testar diretamente o auto-approve por role: `syncProductionExecutions` depende de Prisma real e nenhum teste em `tests/roadmap-production/` mocka banco hoje — introduzir isso teria custo desproporcional para uma composição de 2 peças já cobertas (`isAdminRole` 100% testada em outro arquivo; enum de status validado pelo Zod).
+
+### Problemas encontrados / resolvidos
+- Heurística de texto em `RoadmapImplementationRoom.tsx` (`isRetryThresholdWarning`) é frágil a mudança futura do texto da mensagem em `worker.ts` — aceito como débito consciente para o escopo desta sessão, documentado no próprio código.
+- Achado separado NÃO resolvido: `tests/roadmap-production/tools.test.ts` tem 1 teste falhando (`SEARCH_FAILED`) — confirmado via `git stash`/`pop` que é regressão de sessão ANTERIOR (sandbox de env vars `buildRoadmapSubprocessEnv` aplicado à chamada do ripgrep), não desta sessão. Task separada criada para o usuário decidir — não corrigido às cegas para não desfazer uma proteção de segurança intencional sem entender a decisão original.
+
+### Pendências
+- Task pendente (spawnada): investigar e corrigir `SEARCH_FAILED` em `tools.test.ts`/`subprocess-env.ts`.
+- Se um dia justificar o esforço: trocar a heurística de texto do aviso de retry por um `kind: "WARNING"` dedicado no schema Zod de `ProductionMessage` (`contracts.ts`), usado em 3+ arquivos hoje.
+
+### Refletido também em
+- `integration-points.md`: nova seção "Roadmap Alpha — Produção: auditoria completa da fila + visibilidade de bloqueio + auto-approve + tela por objetivo (2026-08-24, parte 2 da mesma sessão)", incluindo o achado de que o diretório real de estado NUNCA é `.roadmap-production/` na raiz do projeto — sempre `%LOCALAPPDATA%\PainelAlpha\RoadmapProduction\workspaces\{hash}\`.

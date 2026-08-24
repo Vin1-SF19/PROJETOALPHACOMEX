@@ -199,11 +199,22 @@ export function RoadmapProductionPanel({
   moduleKey,
   moduleLabel,
   onBack,
+  focusExecutionId = null,
 }: {
   canManage: boolean;
   moduleKey: string;
   moduleLabel: string | null;
   onBack: () => void;
+  /**
+   * Quando presente, o painel mostra SOMENTE a execução com este id — tela
+   * dedicada de Produção por objetivo, acionada a partir do card do
+   * objetivo na tela principal (nunca mais a fila global de um módulo
+   * inteiro). `null`/ausente preserva o comportamento antigo de fallback
+   * (mostra todas as execuções do módulo) — hoje sem nenhum caller usando
+   * esse fallback, já que o botão do header foi removido, mas mantido para
+   * não quebrar a prop como obrigatória sem necessidade.
+   */
+  focusExecutionId?: string | null;
 }) {
   const [data, setData] = useState<ProductionData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -254,10 +265,11 @@ export function RoadmapProductionPanel({
     return () => window.clearInterval(interval);
   }, [refresh]);
 
-  const executions = useMemo(
-    () => data?.state.executions ?? [],
-    [data?.state.executions],
-  );
+  const executions = useMemo(() => {
+    const all = data?.state.executions ?? [];
+    if (!focusExecutionId) return all;
+    return all.filter((execution) => execution.id === focusExecutionId);
+  }, [data?.state.executions, focusExecutionId]);
   const activePhase = useMemo(
     () =>
       executions
@@ -357,9 +369,15 @@ export function RoadmapProductionPanel({
             <Cpu size={20} />
           </span>
           <div>
-            <h1 className="font-semibold">Produção local</h1>
+            <h1 className="font-semibold">
+              {focusExecutionId && executions[0]
+                ? executions[0].objectiveTitle
+                : "Produção local"}
+            </h1>
             <p className="text-xs text-slate-400">
-              {moduleLabel ?? moduleKey} · objetivos deste projeto
+              {focusExecutionId && executions[0]
+                ? `${executions[0].objectiveCode} · ${moduleLabel ?? moduleKey}`
+                : `${moduleLabel ?? moduleKey} · objetivos deste projeto`}
             </p>
           </div>
         </div>
@@ -435,12 +453,14 @@ export function RoadmapProductionPanel({
       <div className="grid min-h-0 flex-1 lg:grid-cols-[460px_minmax(0,1fr)]">
         <aside className="min-h-0 overflow-y-auto border-r border-white/10 p-3">
           <p className="mb-3 px-1 text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">
-            Prompts por prioridade global
+            {focusExecutionId ? "Fases deste objetivo" : "Prompts por prioridade global"}
           </p>
           <div className="space-y-3">
             {!executions.length && (
               <p className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                Nenhum prompt de {moduleLabel ?? moduleKey} aguardando produção.
+                {focusExecutionId
+                  ? "Esta execução não foi encontrada — ela pode ter sido excluída da fila local."
+                  : `Nenhum prompt de ${moduleLabel ?? moduleKey} aguardando produção.`}
               </p>
             )}
             {executions.map((execution) => (

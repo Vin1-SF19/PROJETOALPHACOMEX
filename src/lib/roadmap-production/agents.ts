@@ -68,9 +68,9 @@ const FRONTEND_CAPABILITY = /\b(?:ui|ux|css|tailwind|layout|painel|interface|com
 const BACKEND_CAPABILITY = /\b(?:api|apis|server actions?|backend|back-end|route handlers?|rotas?|serviços?|worker|fila|integra(?:ção|ções)|servidor)\b/i;
 
 export function resolveCapabilityEscalationAgent(value: string): "nova" | "echo" | null {
-  const marker = value.match(/\bCAPABILITY_ESCALATION_REQUIRED\s*:\s*(FRONTEND|BACKEND)\b/i)?.[1]?.toUpperCase();
+  const marker = value.match(/\bCAPABILITY_ESCALATION_REQUIRED\s*:\s*(FRONTEND|BACKEND|DATABASE|SECURITY|INTEGRATION)\b/i)?.[1]?.toUpperCase();
   if (marker === "FRONTEND") return "nova";
-  if (marker === "BACKEND") return "echo";
+  if (marker) return "echo";
   return null;
 }
 

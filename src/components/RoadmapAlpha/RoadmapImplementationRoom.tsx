@@ -4,24 +4,10 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { AlertTriangle, Bot, CheckCircle2, CirclePause, CirclePlay, FileCode2, Loader2, MessageSquareText, Send, ShieldAlert, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  EnviarMensagemRoadmapProduction,
-  ResponderIntervencaoRoadmapProduction,
-  TrocarAgenteFaseRoadmapProduction,
-} from "@/actions/RoadmapProduction";
+import { EnviarMensagemRoadmapProduction, ResponderIntervencaoRoadmapProduction, TrocarAgenteFaseRoadmapProduction } from "@/actions/RoadmapProduction";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import type {
-  ProductionActivity,
-  ProductionIntervention,
-  ProductionMessage,
-} from "@/lib/roadmap-production/contracts";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { ProductionActivity, ProductionIntervention, ProductionMessage } from "@/lib/roadmap-production/contracts";
 
 interface Phase {
   phaseNumber: number;
@@ -45,11 +31,7 @@ export interface RoadmapImplementationRoomExecution {
   interventions: ProductionIntervention[];
 }
 
-interface AgentOption {
-  id: string;
-  name: string;
-  available: boolean;
-}
+interface AgentOption { id: string; name: string; available: boolean; }
 
 interface RoadmapImplementationRoomProps {
   execution: RoadmapImplementationRoomExecution | null;
@@ -97,6 +79,7 @@ export function RoadmapImplementationRoom({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [agentDrafts, setAgentDrafts] = useState<Record<string, string>>({});
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ error: boolean; text: string } | null>(null);
   const [, startTransition] = useTransition();
 
   const phases = useMemo(() => execution?.phases ?? [], [execution?.phases]);
@@ -126,15 +109,28 @@ export function RoadmapImplementationRoom({
   function runAction(key: string, action: () => Promise<{ success: boolean; error?: string }>) {
     if (pendingKey) return;
     setPendingKey(key);
+    setActionFeedback(null);
     startTransition(async () => {
-      const result = await action();
-      setPendingKey(null);
-      if (!result.success) {
-        toast.error(result.error ?? "Não foi possível concluir a ação");
-        return;
-      }
-      toast.success("Solicitação registrada");
-      await onChanged();
+      try {
+        const result = await action();
+        if (!result.success) {
+          const message = result.error ?? "Não foi possível concluir a ação.";
+          setActionFeedback({ error: true, text: message });
+          toast.error(message);
+          return;
+        }
+        setActionFeedback({ error: false, text: "Solicitação registrada." });
+        toast.success("Solicitação registrada");
+        try {
+          await onChanged();
+        } catch {
+          const message = "A solicitação foi registrada, mas o painel não conseguiu atualizar. Aguarde o próximo ciclo.";
+          setActionFeedback({ error: true, text: message }); toast.error(message);
+        }
+      } catch {
+        const message = "A comunicação com a Produção falhou. Tente novamente.";
+        setActionFeedback({ error: true, text: message }); toast.error(message);
+      } finally { setPendingKey(null); }
     });
   }
 
@@ -156,8 +152,12 @@ export function RoadmapImplementationRoom({
   async function control(control: "PAUSE" | "RESUME") {
     if (pendingKey) return;
     setPendingKey(`control:${control}`);
-    await onControl(control);
-    setPendingKey(null);
+    try {
+      await onControl(control);
+    } catch {
+      const message = "Não foi possível alterar o estado da execução. Tente novamente.";
+      setActionFeedback({ error: true, text: message }); toast.error(message);
+    } finally { setPendingKey(null); }
   }
 
   return (
@@ -210,6 +210,7 @@ export function RoadmapImplementationRoom({
           <p className="sr-only" aria-live="polite">
             {pendingInterventions.length ? `${pendingInterventions.length} solicitação pendente.` : "Nenhuma solicitação pendente."}
           </p>
+          {actionFeedback && <p role={actionFeedback.error ? "alert" : "status"} className={`mb-4 rounded-xl border p-3 text-xs ${actionFeedback.error ? "border-rose-400/20 bg-rose-400/[.06] text-rose-200" : "border-emerald-400/20 bg-emerald-400/[.06] text-emerald-200"}`}>{actionFeedback.text}</p>}
 
           {pendingInterventions.map((item) => {
             const forbidden = FORBIDDEN_CATEGORIES.has(item.category);
@@ -289,9 +290,57 @@ function PhaseFilter({ active, label, onClick }: { active: boolean; label: strin
   return <button type="button" aria-pressed={active} onClick={onClick} className={`shrink-0 rounded-full border px-3 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 ${active ? "border-violet-400/30 bg-violet-400/10 text-violet-200" : "border-white/10 text-slate-500 hover:text-slate-200"}`}>{label}</button>;
 }
 
+/**
+ * Heurística de texto (sem campo dedicado no schema ainda) para destacar o
+ * aviso de circuito de retry que worker.ts emite ao cruzar metade de
+ * AUTO_RETRY_LIMIT — mensagem SYSTEM/STATUS começando com este prefixo fixo.
+ * Se um `kind` mais específico (ex.: "WARNING") for adicionado a
+ * productionMessageSchema no futuro, trocar esta checagem por ele.
+ */
+function isRetryThresholdWarning(message: ProductionMessage): boolean {
+  return (
+    message.role === "SYSTEM" &&
+    message.kind === "STATUS" &&
+    message.content.startsWith("Esta fase já tentou se autocorrigir")
+  );
+}
+
 function MessageCard({ message }: { message: ProductionMessage }) {
-  const Icon = message.role === "AGENT" ? Bot : message.role === "ADMIN" ? UserRound : CheckCircle2;
-  return <article className={`rounded-2xl border p-3 ${message.role === "ADMIN" ? "border-violet-400/20 bg-violet-400/[.06]" : "border-white/10 bg-white/[.025]"}`}><div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500"><Icon className="size-3.5" />{message.role} · fase {message.phaseNumber}<time className="ml-auto normal-case tracking-normal">{formatDate(message.createdAt)}</time></div><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-200">{message.content}</p></article>;
+  const isWarning = isRetryThresholdWarning(message);
+  const Icon = isWarning
+    ? AlertTriangle
+    : message.role === "AGENT"
+      ? Bot
+      : message.role === "ADMIN"
+        ? UserRound
+        : CheckCircle2;
+  return (
+    <article
+      className={`rounded-2xl border p-3 ${
+        isWarning
+          ? "border-amber-400/30 bg-amber-400/[.08]"
+          : message.role === "ADMIN"
+            ? "border-violet-400/20 bg-violet-400/[.06]"
+            : "border-white/10 bg-white/[.025]"
+      }`}
+    >
+      <div
+        className={`flex items-center gap-2 text-[10px] uppercase tracking-wider ${isWarning ? "text-amber-300" : "text-slate-500"}`}
+      >
+        <Icon className="size-3.5" />
+        {isWarning ? "Alerta de retry" : message.role} · fase{" "}
+        {message.phaseNumber}
+        <time className="ml-auto normal-case tracking-normal">
+          {formatDate(message.createdAt)}
+        </time>
+      </div>
+      <p
+        className={`mt-2 whitespace-pre-wrap break-words text-sm leading-6 ${isWarning ? "text-amber-100" : "text-slate-200"}`}
+      >
+        {message.content}
+      </p>
+    </article>
+  );
 }
 
 function ActivityCard({ activity, phaseNumber }: { activity: ProductionActivity; phaseNumber: number }) {

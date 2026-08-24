@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "../../../../../auth";
-import { modelSupportsVision, getModelLabel } from "@/lib/bibble/client";
+import { modelSupportsVision, getModelLabel, BIBBLE_MODEL } from "@/lib/bibble/client";
 import { BIBBLE_SYSTEM_PROMPT } from "@/lib/bibble/system-prompt";
 import { BIBBLE_TOOLS, type OllamaTool } from "@/lib/bibble/tools";
 import { executarTool, type UserCtx } from "@/lib/bibble/tool-executor";
@@ -19,6 +19,7 @@ import {
 import { extractTextFromUrl } from "@/lib/bibble/tika";
 import { callCompletion, consumeCompletionStream, encodeSSE, isOutputTruncated, type ChatMessage, type ContentPart } from "@/lib/bibble/completion";
 import {
+  allocatePerFileBudget,
   calculateRequestBudget,
   estimateTokens,
   selectRecentHistory,
@@ -47,6 +48,11 @@ function fmtBytes(b: number) {
 const MAX_TOOL_CALLS_POR_TURNO = 6;
 const MAX_TOOL_CALLS_POR_REQUISICAO = 12;
 const MAX_MUTACOES_CALENDARIO_POR_REQUISICAO = 3;
+// Quantas vezes o fluxo sem-tools pode pedir "continue de onde parou" quando
+// a resposta é cortada por limite de saída (ex.: relatório/conciliação longa).
+// Mantido conservador: cada continuação é uma geração inteira nova no Ollama
+// compartilhado (custo de GPU), e não há rate-limit por usuário nesta rota.
+const MAX_CONTINUACOES_TRUNCAMENTO = 2;
 const MUTACOES_CALENDARIO = new Set([
   "criar_evento_calendario",
   "editar_evento_calendario",
@@ -71,23 +77,33 @@ async function extractFilesContent(
 
   const parts: string[] = ["---", "### Arquivos Anexados pelo Usuário\n"];
   const metrics: ExtractionMetric[] = [];
-  let remainingTokens = Math.max(0, contentTokenBudget - estimateTokens(parts.join("\n\n")));
+  const headerTokens = estimateTokens(parts.join("\n\n"));
+
+  // Cada arquivo de conteúdo (não imagem/vídeo) recebe uma fatia GARANTIDA do
+  // orçamento, proporcional ao tamanho em bytes — antes, o 1º arquivo processado
+  // podia consumir o orçamento inteiro e deixar os seguintes sem texto útil
+  // (crítico com múltiplos extratos: um mês podia sobrar sem nenhum lançamento).
+  const contentFiles = files.filter(f => !f.type.startsWith("image/") && !f.type.startsWith("video/"));
+  const perFileBudget = allocatePerFileBudget(
+    contentFiles.map(f => f.size),
+    Math.max(0, contentTokenBudget - headerTokens),
+  );
+  const budgetByFile = new Map(contentFiles.map((f, i) => [f, perFileBudget[i]]));
 
   const appendExtractedText = (
     heading: string,
     raw: string,
     source: string,
+    fileBudget: number,
   ) => {
     const headingTokens = estimateTokens(heading) + 2;
     const selection = selectTextForTokenBudget(
       raw,
-      Math.max(0, remainingTokens - headingTokens),
+      Math.max(0, fileBudget - headingTokens),
       "conteúdo do arquivo",
     );
     const part = `${heading}\n\`\`\`\n${selection.text}\n\`\`\``;
-    const partTokens = estimateTokens(part);
     parts.push(part);
-    remainingTokens = Math.max(0, remainingTokens - partTokens);
     metrics.push({
       source,
       extractedChars: selection.originalChars,
@@ -113,12 +129,15 @@ async function extractFilesContent(
       continue;
     }
 
+    const fileBudget = budgetByFile.get(file) ?? 0;
+
     // Conteúdo já extraído no upload (blobs privados não podem ser re-fetchados)
     if (file.extractedContent?.trim()) {
       appendExtractedText(
         `#### 📄 ${file.name}`,
         file.extractedContent,
         file.extractionSource ?? "upload",
+        fileBudget,
       );
       continue;
     }
@@ -142,7 +161,7 @@ async function extractFilesContent(
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.text();
-        appendExtractedText(`#### 📄 ${file.name} (${file.type})`, raw, "url-text");
+        appendExtractedText(`#### 📄 ${file.name} (${file.type})`, raw, "url-text", fileBudget);
       } catch {
         parts.push(`- ⚠️ **${file.name}** — falha ao ler o conteúdo.`);
         metrics.push({ source: "url-text", extractedChars: 0, includedChars: 0, strategy: "no-useful-text" });
@@ -154,7 +173,7 @@ async function extractFilesContent(
     try {
       const { text, source } = await extractTextFromUrl(file.url, file.type, file.name, 20000);
       if (text) {
-        appendExtractedText(`#### 📄 ${file.name} [via ${source}]`, text, source);
+        appendExtractedText(`#### 📄 ${file.name} [via ${source}]`, text, source, fileBudget);
       } else {
         parts.push(`- ⚠️ **${file.name}** — não foi possível obter texto útil pela cadeia Tika, pdf-parse e OCR configurado.`);
         metrics.push({ source, extractedChars: 0, includedChars: 0, strategy: "no-useful-text" });
@@ -255,6 +274,11 @@ async function runStream(
   const send = (event: SSEEvent) => {
     try { controller.enqueue(encodeSSE(event, enc)); } catch { /* stream closed */ }
   };
+  const inicioRequisicao = Date.now();
+  // Margem de segurança antes do maxDuration da rota (120s): uma continuação
+  // extra só é pedida se sobrar tempo suficiente para completá-la, senão o
+  // Next.js aborta a requisição no meio de uma geração já paga em GPU-time.
+  const TEMPO_LIMITE_CONTINUACAO_MS = (maxDuration - 20) * 1000;
 
   try {
     send({ type: "status", state: "thinking" });
@@ -406,20 +430,12 @@ async function runStream(
         }
       }
 
-      // Sem ferramentas (fluxo de documento), a resposta é gerada uma única
-      // vez diretamente em streaming. Com ferramentas, esta é a geração final.
-      const streamRes = await callCompletion(
-        msgs,
-        [],
-        model,
-        providerCtrl.signal,
-        true,
-        temperature,
-        contextWindow,
-        maxOutputTokens,
-      );
-
-      let respostaFinalProtegida = "";
+      // Sem ferramentas (fluxo de documento), a resposta é gerada em streaming.
+      // Com ferramentas, esta é a geração final. Quando o modelo é cortado por
+      // limite de saída (finishReason "length"/"max_tokens"), continuamos
+      // automaticamente pedindo a sequência do texto em vez de desistir — uma
+      // conciliação bancária ou relatório longo legitimamente pode passar do
+      // teto de um único turno.
       const protegerRespostaCancelamento =
         userCtx.solicitouCancelamentoCalendario === true;
       // Quando o usuário pediu para abrir um chamado, uma alegação falsa de
@@ -429,14 +445,60 @@ async function runStream(
         userCtx.solicitouAbrirChamado === true && !chamadoAbertoComSucesso;
       const bufferizarResposta = protegerRespostaCancelamento || protegerRespostaChamado;
 
-      const streamResult = await consumeCompletionStream(streamRes, (delta) => {
-        if (bufferizarResposta) {
-          respostaFinalProtegida += delta;
-        } else {
-          send({ type: "text", text: delta });
+      let respostaFinalProtegida = "";
+      let respostaAcumulada = "";
+      let finishReason: string | null = null;
+      let continuacoesUsadas = 0;
+
+      for (;;) {
+        const streamRes = await callCompletion(
+          msgs,
+          [],
+          model,
+          providerCtrl.signal,
+          true,
+          temperature,
+          contextWindow,
+          maxOutputTokens,
+        );
+
+        const streamResult = await consumeCompletionStream(streamRes, (delta) => {
+          respostaAcumulada += delta;
+          if (bufferizarResposta) {
+            respostaFinalProtegida += delta;
+          } else {
+            send({ type: "text", text: delta });
+          }
+        });
+        finishReason = streamResult.finishReason;
+
+        const cortadoPorLimite = isOutputTruncated(finishReason);
+        const tempoEsgotando = Date.now() - inicioRequisicao >= TEMPO_LIMITE_CONTINUACAO_MS;
+        if (
+          !cortadoPorLimite
+          || bufferizarResposta
+          || continuacoesUsadas >= MAX_CONTINUACOES_TRUNCAMENTO
+          || tempoEsgotando
+        ) {
+          break;
         }
-      });
-      const finishReason = streamResult.finishReason;
+
+        // Pede a continuação: injeta o texto já gerado como turno do
+        // assistant e soma um pedido explícito de continuar exatamente de
+        // onde parou, sem repetir o que já foi enviado.
+        continuacoesUsadas += 1;
+        msgs.push({ role: "assistant", content: respostaAcumulada });
+        msgs.push({
+          role: "user",
+          content: "Continue exatamente de onde parou, sem repetir o que já foi escrito e sem reintroduzir o assunto.",
+        });
+        console.info("[BIBBLE COMPLETION] continuation", {
+          stage: "final-stream",
+          attempt: continuacoesUsadas,
+          outputTokenLimit: maxOutputTokens ?? null,
+        });
+        send({ type: "status", state: "thinking" });
+      }
 
       if (bufferizarResposta && respostaFinalProtegida) {
         let respostaSegura = respostaFinalProtegida;
@@ -470,7 +532,7 @@ async function runStream(
       if (truncated) {
         send({
           type: "error",
-          message: "A resposta atingiu o limite de saída do modelo e não foi concluída. Seus anexos e texto foram mantidos para tentar novamente.",
+          message: "A resposta atingiu o limite de saída do modelo mesmo após tentativas de continuação automática e não foi concluída. Seus anexos e texto foram mantidos para tentar novamente.",
         });
       }
 
@@ -478,6 +540,7 @@ async function runStream(
         stage: "final-stream",
         finishReason: finishReason ?? "provider-eof",
         truncated,
+        continuacoesUsadas,
         outputTokenLimit: maxOutputTokens ?? null,
       });
 
@@ -557,8 +620,13 @@ export async function POST(req: NextRequest) {
   const { message = "", history = [], context, model: modelOverride, sessionId, files, temperature, computerAccess, globalSystemPrompt, contextWindow } = input;
   const inputFiles = files ?? [];
   const hasAttachments = inputFiles.length > 0;
+  // Exige evidência real de conteúdo (URL do Blob validada ou texto já
+  // extraído) — sem isso, qualquer usuário conseguiria declarar type/name de
+  // PDF sem anexar nada real só para forçar a janela de contexto/output
+  // ampliada (mais cara em GPU) no servidor Ollama compartilhado.
   const hasPdf = inputFiles.some(file =>
-    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
+    (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))
+    && (Boolean(file.url) || Boolean(file.extractedContent?.trim())),
   );
   const ultimaMensagemBibble = history.at(-1);
   const bibblePediuConfirmacaoDeCancelamento =
@@ -609,7 +677,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const activeModel = modelOverride?.trim() || (process.env.BIBBLE_MODEL ?? "qwen3:14b");
+  const activeModel = modelOverride?.trim() || BIBBLE_MODEL;
 
   // ── Preparar mensagem e anexos ──
   let userContent = message.trim();

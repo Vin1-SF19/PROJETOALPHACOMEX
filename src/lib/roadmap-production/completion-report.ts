@@ -6,11 +6,12 @@ import type {
   DevelopmentProvider,
   ProductionExecutionInput,
 } from "@/lib/roadmap-production/contracts";
+import { sanitizeProductionText } from "@/lib/roadmap-production/interactions";
 
 const DEVELOPMENT_PROVIDER_REPORT_LABEL: Record<DevelopmentProvider, string> =
   {
-    claude: "Claude (fallback Codex)",
-    codex: "Codex (fallback Claude)",
+    claude: "Claude (fallback Qwen brokerizado)",
+    codex: "Codex (fallback Qwen brokerizado)",
     ollama: "Qwen (fallback Claude → Codex)",
   };
 
@@ -56,7 +57,7 @@ export function buildCompletionReport(execution: ProductionExecutionInput): {
     ].join("\n"),
   );
 
-  const markdown = [
+  const markdown = sanitizeProductionText([
     `# Relatório de conclusão — ${execution.objectiveCode}`,
     "",
     `**Objetivo:** ${execution.objectiveTitle}`,
@@ -120,7 +121,7 @@ export function buildCompletionReport(execution: ProductionExecutionInput): {
     "---",
     "Relatório final gerado automaticamente pelo Roadmap Alpha. Aprovação e commit permanecem manuais.",
     "",
-  ].join("\n");
+  ].join("\n"), 200_000);
   return { relativePath, markdown };
 }
 

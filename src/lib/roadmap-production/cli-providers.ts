@@ -7,6 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import type { ProductionProvider } from "@/lib/roadmap-production/contracts";
+import { buildRoadmapSubprocessEnv } from "@/lib/roadmap-production/subprocess-env";
 
 const execFileAsync = promisify(execFile);
 const CLI_TIMEOUT_MS = 30 * 60_000;
@@ -95,6 +96,7 @@ async function pathExecutables(command: string): Promise<string[]> {
     const result = await execFileAsync("where.exe", [command], {
       timeout: 5_000,
       windowsHide: true,
+      env: buildRoadmapSubprocessEnv("gate"),
     });
     return String(result.stdout)
       .split(/\r?\n/)
@@ -188,6 +190,7 @@ async function resolveCli(provider: CliProvider): Promise<ResolvedCli | null> {
       const result = await execFileAsync(executable, ["--version"], {
         timeout: 10_000,
         windowsHide: true,
+        env: buildRoadmapSubprocessEnv(provider),
       });
       const version = `${result.stdout}${result.stderr}`.trim().slice(0, 120);
       if (
@@ -213,6 +216,7 @@ async function isAuthenticated(
     const result = await execFileAsync(executable, args, {
       timeout: 15_000,
       windowsHide: true,
+      env: buildRoadmapSubprocessEnv(provider),
     });
     const output = `${result.stdout}${result.stderr}`.trim();
     if (provider === "codex") return /logged in/i.test(output);
@@ -223,36 +227,14 @@ async function isAuthenticated(
 }
 
 export async function diagnoseCliProviders(): Promise<CliDiagnostic[]> {
-  return await Promise.all(
-    (["codex", "claude"] as const).map(async (provider) => {
-      const resolved = await resolveCli(provider);
-      if (!resolved) {
-        return {
-          provider,
-          available: false,
-          ready: false,
-          detail:
-            provider === "codex"
-              ? "CLI não executável; verifique a instalação do Codex"
-              : "CLI não executável; o launcher global pode estar quebrado",
-          models: [],
-        };
-      }
-      const authenticated = await isAuthenticated(
-        provider,
-        resolved.executable,
-      );
-      return {
-        provider,
-        available: true,
-        ready: authenticated,
-        detail: authenticated
-          ? `Conectado · ${resolved.version}`
-          : "CLI detectada; faça login antes de usar",
-        models: authenticated ? ["default"] : [],
-      };
-    }),
-  );
+  return (["codex", "claude"] as const).map((provider) => ({
+    provider,
+    available: false,
+    ready: false,
+    detail:
+      "Desabilitado no Roadmap: provider externo sem workspace brokerizado.",
+    models: [],
+  }));
 }
 
 async function fileDigest(filePath: string): Promise<string> {
@@ -271,6 +253,7 @@ async function workspaceSnapshot(root: string): Promise<WorkspaceSnapshot> {
       cwd: root,
       timeout: 10_000,
       windowsHide: true,
+      env: buildRoadmapSubprocessEnv("gate"),
     }),
     execFileAsync(
       "git",
@@ -281,6 +264,7 @@ async function workspaceSnapshot(root: string): Promise<WorkspaceSnapshot> {
         windowsHide: true,
         maxBuffer: 8 * 1024 * 1024,
         encoding: "buffer",
+        env: buildRoadmapSubprocessEnv("gate"),
       },
     ),
   ]);
@@ -369,7 +353,7 @@ async function runProcess(
       cwd: root,
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, NO_COLOR: "1" },
+      env: buildRoadmapSubprocessEnv(provider),
     });
     let stdout = "";
     let stderr = "";
@@ -461,14 +445,15 @@ function cliArgs(
   provider: CliProvider,
   root: string,
   model: string,
-  allowWrite: boolean,
+  _allowWrite: boolean,
 ): string[] {
+  void _allowWrite;
   if (provider === "codex") {
     return [
       "exec",
       "--ephemeral",
       "--sandbox",
-      allowWrite ? "workspace-write" : "read-only",
+      "read-only",
       "--cd",
       root,
       "--color",
@@ -478,12 +463,8 @@ function cliArgs(
       "-",
     ];
   }
-  const tools = allowWrite
-    ? "Read,Glob,Grep,Edit,Write,Bash"
-    : "Read,Glob,Grep";
-  const allowedTools = allowWrite
-    ? "Read,Glob,Grep,Edit,Write,Bash(git status *),Bash(git diff *),Bash(npm run typecheck *),Bash(npx tsc *),Bash(npx vitest *),Bash(npx eslint *)"
-    : "Read,Glob,Grep";
+  const tools = "Read,Glob,Grep";
+  const allowedTools = "Read,Glob,Grep";
   return [
     "-p",
     "--safe-mode",
@@ -513,6 +494,15 @@ export async function runCliProductionAgent(
   allowWrite: boolean,
   onActivity: (message: string) => Promise<void> | void,
 ): Promise<CliAgentExecution> {
+  if (!externalCliExecutionEnabled()) {
+    return {
+      content:
+        `${provider === "codex" ? "Codex CLI" : "Claude Code"} está desabilitado no Roadmap até existir workspace brokerizado sem segredos.`,
+      toolSteps: 0,
+      changedFiles: [],
+      errorCode: "PROVIDER_EXTERNAL_CLI_DISABLED",
+    };
+  }
   const resolved = await resolveCli(provider);
   if (!resolved)
     return {
@@ -600,7 +590,12 @@ export async function runCliProductionAgent(
   };
 }
 
+function externalCliExecutionEnabled(): boolean {
+  return false;
+}
+
 export const cliProviderInternals = {
+  buildEnvironment: buildRoadmapSubprocessEnv,
   cliArgs,
   extractFinal,
   structuredProviderError,

@@ -7,8 +7,19 @@ export const LEGACY_CONTEXT_WINDOW_TOKENS = 4_096;
 export const DEFAULT_OUTPUT_TOKEN_LIMIT = 4_096;
 export const MIN_OUTPUT_TOKEN_LIMIT = 1_024;
 
+// Servidor Ollama (192.168.35.113) roda em GPU com VRAM alta — a janela de
+// contexto e o teto de saída padrão do Ollama podiam ser aumentados com
+// segurança. Anexo (PDF/documento) é o caso que mais precisa de margem: várias
+// páginas de extrato + resposta longa estruturada (lançamentos, tabelas) não
+// cabiam nos 32k/4k anteriores. Configurável via env para ajuste sem deploy
+// caso o hardware do servidor mude.
+export const ATTACHMENT_CONTEXT_WINDOW_TOKENS =
+  Number(process.env.BIBBLE_ATTACHMENT_CONTEXT_WINDOW) || 131_072;
+export const ATTACHMENT_OUTPUT_TOKEN_LIMIT =
+  Number(process.env.BIBBLE_ATTACHMENT_OUTPUT_TOKENS) || 16_384;
+
 const MAX_CONFIGURABLE_CONTEXT_WINDOW = 262_144;
-const MIN_PDF_CONTEXT_WINDOW = DEFAULT_CONTEXT_WINDOW_TOKENS;
+const MIN_PDF_CONTEXT_WINDOW = ATTACHMENT_CONTEXT_WINDOW_TOKENS;
 const MESSAGE_OVERHEAD_TOKENS = 8;
 
 const PROVIDER_CONTEXT_WINDOWS: Record<Provider, number> = {
@@ -18,11 +29,24 @@ const PROVIDER_CONTEXT_WINDOWS: Record<Provider, number> = {
   google: 1_048_576,
 };
 
+// Teto de saída "normal" (sem anexo) por provider — mantido conservador para
+// não pagar latência desnecessária em conversas curtas.
 const PROVIDER_OUTPUT_LIMITS: Record<Provider, number> = {
   ollama: DEFAULT_OUTPUT_TOKEN_LIMIT,
   openai: 16_384,
   anthropic: 8_192,
   google: 8_192,
+};
+
+// Teto de saída quando HÁ anexo — resposta pode ser longa (relatório,
+// lançamentos contábeis, tabelas). Ollama sobe para o valor configurável
+// acima; providers remotos sobem para o próprio limite real deles (não mais
+// capados artificialmente pelo DEFAULT_OUTPUT_TOKEN_LIMIT genérico).
+const PROVIDER_ATTACHMENT_OUTPUT_LIMITS: Record<Provider, number> = {
+  ollama: ATTACHMENT_OUTPUT_TOKEN_LIMIT,
+  openai: 32_768,
+  anthropic: 8_192,
+  google: 65_536,
 };
 
 export type TextSelectionStrategy = "full" | "head-middle-tail" | "capacity-notice";
@@ -60,14 +84,19 @@ export function resolveEffectiveContextWindow(input: {
 }): { provider: Provider; effectiveContextWindow: number; legacyContextAdjusted: boolean } {
   const provider = getProvider(input.model);
   const providerDefault = PROVIDER_CONTEXT_WINDOWS[provider];
+  // Com anexo, o piso passa a ser a janela dedicada a documentos — bem maior
+  // que o default de conversa — para não cortar o próprio conteúdo do PDF.
+  const baselineForRequest = input.hasPdf
+    ? Math.max(providerDefault, ATTACHMENT_CONTEXT_WINDOW_TOKENS)
+    : providerDefault;
   const requested = Number.isFinite(input.requestedContextWindow)
     ? Math.floor(input.requestedContextWindow as number)
     : undefined;
   const legacyOrInsufficientForPdf = input.hasPdf
     && (requested === undefined || requested <= LEGACY_CONTEXT_WINDOW_TOKENS || requested < MIN_PDF_CONTEXT_WINDOW);
 
-  let effective = requested && requested > 0 ? requested : providerDefault;
-  if (legacyOrInsufficientForPdf) effective = providerDefault;
+  let effective = requested && requested > 0 ? requested : baselineForRequest;
+  if (legacyOrInsufficientForPdf) effective = baselineForRequest;
 
   // Ollama pode ser configurado acima do default; providers remotos são
   // limitados à capacidade conhecida do endpoint OpenAI-compat utilizado.
@@ -93,11 +122,14 @@ export function calculateRequestBudget(input: {
   imageCount?: number;
 }): RequestBudget {
   const resolved = resolveEffectiveContextWindow(input);
-  const providerOutputLimit = PROVIDER_OUTPUT_LIMITS[resolved.provider];
+  const providerOutputLimit = input.hasPdf
+    ? PROVIDER_ATTACHMENT_OUTPUT_LIMITS[resolved.provider]
+    : PROVIDER_OUTPUT_LIMITS[resolved.provider];
+  const outputCeiling = input.hasPdf ? providerOutputLimit : DEFAULT_OUTPUT_TOKEN_LIMIT;
   const outputTokenLimit = Math.max(
     MIN_OUTPUT_TOKEN_LIMIT,
     Math.min(
-      DEFAULT_OUTPUT_TOKEN_LIMIT,
+      outputCeiling,
       providerOutputLimit,
       Math.floor(resolved.effectiveContextWindow / 4),
     ),
@@ -185,6 +217,42 @@ export function selectTextForTokenBudget(
     estimatedTokens: estimateTokens(bounded),
     reduced: true,
   };
+}
+
+/**
+ * Divide o orçamento de conteúdo entre N arquivos anexados, cada um com uma
+ * fatia GARANTIDA, em vez de consumo sequencial (onde o 1º arquivo processado
+ * podia esgotar o orçamento e cortar o conteúdo dos seguintes por completo).
+ * Arquivos maiores recebem fatia proporcionalmente maior, mas nenhum fica
+ * com menos que `minTokensPerFile` enquanto o total permitir.
+ */
+export function allocatePerFileBudget(
+  fileSizesChars: number[],
+  totalTokenBudget: number,
+  minTokensPerFile = 512,
+): number[] {
+  const n = fileSizesChars.length;
+  if (n === 0) return [];
+  const totalBudget = Math.max(0, Math.floor(totalTokenBudget));
+
+  const guaranteedTotal = minTokensPerFile * n;
+  if (totalBudget <= guaranteedTotal) {
+    // Não há espaço nem para o piso de todos — distribui igualmente.
+    const equal = Math.floor(totalBudget / n);
+    return new Array(n).fill(equal);
+  }
+
+  const totalChars = fileSizesChars.reduce((sum, c) => sum + Math.max(0, c), 0);
+  const remaining = totalBudget - guaranteedTotal;
+  if (totalChars === 0) {
+    const equal = Math.floor(totalBudget / n);
+    return new Array(n).fill(equal);
+  }
+
+  return fileSizesChars.map(chars => {
+    const proportional = Math.floor((Math.max(0, chars) / totalChars) * remaining);
+    return minTokensPerFile + proportional;
+  });
 }
 
 export function selectRecentHistory(
