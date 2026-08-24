@@ -265,6 +265,7 @@ export function RoadmapDashboard({
   >(new Map());
 
   const refreshAwaitingApproval = useCallback(async () => {
+    if (!canMutate || !canAccessProduction) return;
     const result = await ListarExecucoesAguardandoAprovacao();
     if (result.success) {
       setAwaitingApproval(
@@ -273,9 +274,10 @@ export function RoadmapDashboard({
         ),
       );
     }
-  }, []);
+  }, [canAccessProduction, canMutate]);
 
   const refreshNeedingAttention = useCallback(async () => {
+    if (!canMutate || !canAccessProduction) return;
     const result = await ListarExecucoesPrecisandoAtencao();
     if (result.success) {
       setNeedingAttention(
@@ -287,7 +289,7 @@ export function RoadmapDashboard({
         ),
       );
     }
-  }, []);
+  }, [canAccessProduction, canMutate]);
 
   const refreshObjectiveExecutions = useCallback(async () => {
     const result = await ListarExecucoesPorObjetivo();
@@ -304,7 +306,7 @@ export function RoadmapDashboard({
   }, []);
 
   useEffect(() => {
-    if (!canMutate) return;
+    if (!canMutate || !canAccessProduction) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshAwaitingApproval();
     void refreshNeedingAttention();
@@ -313,7 +315,12 @@ export function RoadmapDashboard({
       void refreshNeedingAttention();
     }, 30_000);
     return () => window.clearInterval(interval);
-  }, [canMutate, refreshAwaitingApproval, refreshNeedingAttention]);
+  }, [
+    canAccessProduction,
+    canMutate,
+    refreshAwaitingApproval,
+    refreshNeedingAttention,
+  ]);
 
   useEffect(() => {
     if (!canAccessProduction) return;

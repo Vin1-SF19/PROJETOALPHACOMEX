@@ -406,15 +406,16 @@ export async function AprovarExecucaoRoadmapProduction(executionId: unknown) {
 }
 
 /**
- * Deliberadamente NÃO usa requireRoadmapProductionAccess — essa função exige
- * assertRoadmapProductionRuntimeEnabled(), que bloqueia em ambientes (ex.:
- * nuvem) onde a execução local não roda. Aprovar/rejeitar são decisões de
- * gestão, não dependem do worker de execução estar disponível — só exigem
- * a mesma permissão de mutação já usada por AprovarExecucaoRoadmapProduction.
+ * Não exige requireRoadmapProductionAccess porque a autorização é a mesma
+ * usada por AprovarExecucaoRoadmapProduction. Em runtime sem execução local,
+ * retorna uma lista vazia antes de tocar banco ou filesystem.
  */
 export async function ListarExecucoesAguardandoAprovacao() {
   try {
     await requireRoadmapAccess(true);
+    if (!isRoadmapProductionRuntimeEnabled()) {
+      return { success: true as const, data: [] };
+    }
     const workspaces = await db.roadmapWorkspace.findMany({
       where: { archivedAt: null },
       select: { rootPath: true },
@@ -444,18 +445,16 @@ export async function ListarExecucoesAguardandoAprovacao() {
 }
 
 /**
- * Mesmo padrão de ListarExecucoesAguardandoAprovacao (auth, varredura de
- * workspaces, formato de retorno) — deliberadamente não usa
- * requireRoadmapProductionAccess pelo mesmo motivo: precisa funcionar mesmo
- * sem runtime de execução local habilitado. BLOCKED/WAITING_FOR_ADMIN são os
- * dois status que significam "esta execução parou e precisa de decisão
- * humana" (a diferença entre eles é interna — DENY/timeout de intervenção vs
- * limite de correções automáticas atingido — mas do ponto de vista do
- * usuário no dashboard principal, ambos pedem a mesma ação: abrir e olhar).
+ * Mesmo padrão de ListarExecucoesAguardandoAprovacao: a varredura só acontece
+ * com runtime local habilitado. BLOCKED/WAITING_FOR_ADMIN são os dois status
+ * que significam "esta execução parou e precisa de decisão humana".
  */
 export async function ListarExecucoesPrecisandoAtencao() {
   try {
     await requireRoadmapAccess(true);
+    if (!isRoadmapProductionRuntimeEnabled()) {
+      return { success: true as const, data: [] };
+    }
     const workspaces = await db.roadmapWorkspace.findMany({
       where: { archivedAt: null },
       select: { rootPath: true },
@@ -498,8 +497,8 @@ export async function ListarExecucoesPrecisandoAtencao() {
 }
 
 /**
- * Mesma varredura de workspaces das duas funções irmãs acima, mas
- * DELIBERADAMENTE sem exigir mutação (requireRoadmapAccess() em vez de
+ * Mesma varredura de workspaces das duas funções irmãs acima, mas sem exigir
+ * mutação (requireRoadmapAccess() em vez de
  * requireRoadmapAccess(true)) — decisão explícita do usuário: o botão
  * "Produção" no card do objetivo (RoadmapDashboard.tsx) precisa manter a
  * mesma paridade de acesso do botão antigo do header que ele substitui, e
@@ -514,7 +513,13 @@ export async function ListarExecucoesPrecisandoAtencao() {
  */
 export async function ListarExecucoesPorObjetivo() {
   try {
-    await requireRoadmapAccess();
+    const access = await requireRoadmapAccess();
+    if (!access.canAccessProduction) {
+      return { success: false as const, error: "Não autorizado", data: [] };
+    }
+    if (!isRoadmapProductionRuntimeEnabled()) {
+      return { success: true as const, data: [] };
+    }
     const workspaces = await db.roadmapWorkspace.findMany({
       where: { archivedAt: null },
       select: { rootPath: true },

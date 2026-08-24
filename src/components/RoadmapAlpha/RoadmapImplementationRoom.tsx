@@ -323,6 +323,7 @@ function isRetryThresholdWarning(message: ProductionMessage): boolean {
   return (
     message.role === "SYSTEM" &&
     message.kind === "STATUS" &&
+    typeof message.content === "string" &&
     message.content.startsWith("Esta fase já tentou se autocorrigir")
   );
 }

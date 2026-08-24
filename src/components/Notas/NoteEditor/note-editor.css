@@ -58,3 +58,38 @@
 .ProseMirror.resize-cursor {
   cursor: col-resize;
 }
+
+/* Checklist (TaskList/TaskItem) — o plugin .prose aplica display: list-item padrão ao <li>,
+   então sem isso o <label> (checkbox) e a <div> (texto) do TaskItem ficam empilhados em vez
+   de lado a lado, e o clique no texto some (herda pointer-events do label). */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  margin-top: 0.25rem;
+  user-select: none;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div > p {
+  margin: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
