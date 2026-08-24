@@ -2889,3 +2889,31 @@ Nenhuma nova. As pendências da parte 2 (task `SEARCH_FAILED`, heurística de te
 
 ### Refletido também em
 - `integration-points.md`: nova seção "Roadmap Alpha — Produção: worker de workspace externo nunca funcionava de verdade — 2 bugs de infraestrutura (2026-08-24, parte 3 da mesma sessão)", marcada como regra permanente para qualquer sessão futura que mexer em `scripts/roadmap-production*.ps1` ou `lib/roadmap-production/{agents,providers}.ts`.
+
+---
+
+## [2026-08-24 17:06] — Site Alpha Comex: revisão de textos do RADAR concluída
+
+**Tags:** #feature #integration #decision
+**Agentes envolvidos:** Roadmap Alpha, Nova, Forge, Probe
+**Arquivos tocados:** 9 arquivos de copy no workspace externo `Site Alpha Comex`
+
+### Contexto
+Missão `RM-2026-E9AEEF` do Roadmap Alpha solicitou a alteração dos textos do site institucional da Alpha.
+
+### O que foi feito
+- Reposicionado o conteúdo para **Revisão de Estimativa do RADAR** em nove arquivos de copy.
+- Preservadas sem alteração as seções TTD, AFRMM e Recuperação.
+- Lint e typecheck aprovados; Probe verificou as rotas locais afetadas.
+
+### Decisões tomadas
+- Manter TTD, AFRMM e Recuperação intactas para limitar a mudança ao novo posicionamento solicitado.
+
+### Problemas encontrados / resolvidos
+- O build local do adaptador Vercel compilou, mas foi bloqueado por `EPERM` ao criar symlink no Windows.
+
+### Pendências
+- Validar o empacotamento Vercel em ambiente que permita criação de symlinks.
+
+### Refletido também em
+- Nenhum arquivo curado aplicável.

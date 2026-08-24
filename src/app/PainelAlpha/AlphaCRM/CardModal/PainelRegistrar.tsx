@@ -6,17 +6,26 @@ import { CalendarClock, ChevronDown, MessageSquareText, ScrollText } from "lucid
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CriarInteracaoCardBpm, type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
-import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
-import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
-import { etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
-import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
-import { PainelCamposEtapaAtual } from "./PainelCamposEtapaAtual";
-import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
-import { PainelProximoContato } from "./PainelProximoContato";
-import { PainelContatos } from "./PainelContatos";
+import { CardOpenFormSlot } from "./CardOpenFormSlot";
 import PainelReuniao from "./PainelReuniao";
 import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
+import { PainelProximoContato } from "./PainelProximoContato";
+import { PainelContatos } from "./PainelContatos";
+import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
 import { PainelStandbyFollowUp } from "./PainelStandbyFollowUp";
+import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento"; // refactored
+import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
+import { etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
+
+
+
+
+
+
+
+
+
+
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -83,7 +92,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
         </TabsList>
 
         <TabsContent id={`formulario-etapa-${card.id}`} value="formulario-etapa" className="m-0 mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5" tabIndex={-1}>
-          <PainelCamposEtapaAtual
+          <CardOpenFormSlot
             card={card}
             accent={accent}
             podeEditar={podeEditar}
@@ -91,7 +100,10 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             onAtualizado={onAtualizado}
           />
 
-          {etapaEhAgendarReuniao(card.etapa.nome) && (
+          {/* condicionais removidas — agora em CardOpenFormSlot */}
+          {/* REMOVIDO: bloco de painéis duplicados */}
+          {false && (
+            // dead code removed
             <PainelReuniao
               card={card}
               accent={accent}
@@ -99,7 +111,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             />
           )}
 
-          {etapaEhFechado(card.etapa.nome) && (
+          {false && etapaEhFechado(card.etapa.nome) && (
             <PainelStatusPosFechamento
               cardId={card.id}
               statusPersistido={card.statusPosFechamento}
@@ -125,7 +137,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             onInteracaoCriada={onInteracaoCriada}
           />
 
-          {etapaEhEmTratativa(card.etapa.nome) && (
+          {false && etapaEhEmTratativa(card.etapa.nome) && (
             <PainelChecklistFollowUp
               cardId={card.id}
               accent={accent}
@@ -136,7 +148,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             />
           )}
 
-          {etapaEhStandbyFollowUp(card.etapa.nome) && (
+          {false && etapaEhStandbyFollowUp(card.etapa.nome) && (
             <PainelStandbyFollowUp
               cardId={card.id}
               accent={accent}
