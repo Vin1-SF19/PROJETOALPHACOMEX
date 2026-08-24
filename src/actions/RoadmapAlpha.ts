@@ -10,6 +10,7 @@ import {
   roadmapObjectiveCreateSchema,
   roadmapObjectiveEditSchema,
 } from "@/lib/roadmap-alpha/contracts";
+import { processIsAlive } from "@/lib/roadmap-alpha/process-check";
 import {
   improveRoadmapField,
   roadmapImproveFieldSchema,
@@ -55,7 +56,7 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
     const access = await requireRoadmapAccess();
     await purgeExpiredDeletedRoadmapObjectives();
     const where = { ...(moduleKey ? { moduleKey } : {}) };
-    const [objectives, developmentPreferences] = await Promise.all([
+    const [objectives, developmentPreferences, workspaces] = await Promise.all([
       db.roadmapObjective.findMany({
         where,
         orderBy: [
@@ -79,7 +80,23 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
         },
       }),
       readObjectiveDevelopmentPreferences(),
+      db.roadmapWorkspace.findMany({
+        where: { archivedAt: null },
+        select: { moduleKey: true, workerPid: true },
+      }),
     ]);
+    /**
+     * Só workspaces EXTERNOS têm registro em RoadmapWorkspace — módulos
+     * internos do PainelAlpha (ex.: moduleKey "roadmap", "crm") nunca
+     * aparecem aqui, então nunca entram neste Map e o objetivo deles
+     * sempre resolve workspaceWorkerOffline: false abaixo.
+     */
+    const workspaceWorkerRunning = new Map(
+      workspaces.map((workspace) => [
+        workspace.moduleKey,
+        Boolean(workspace.workerPid && processIsAlive(workspace.workerPid)),
+      ]),
+    );
     return {
       success: true as const,
       canMutate: access.canMutate,
@@ -111,6 +128,10 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
             updatedAt: artifact.updatedAt.toISOString(),
             publishedAt: artifact.publishedAt?.toISOString() ?? null,
           })),
+        workspaceWorkerOffline:
+          objective.documentationStatus === "DOCUMENTED" &&
+          workspaceWorkerRunning.has(objective.moduleKey) &&
+          !workspaceWorkerRunning.get(objective.moduleKey),
       })),
     };
   } catch (error) {

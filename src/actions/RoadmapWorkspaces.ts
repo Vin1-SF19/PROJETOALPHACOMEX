@@ -7,20 +7,11 @@ import { z } from "zod";
 
 import db from "@/lib/prisma";
 import { requireRoadmapAccess } from "@/lib/roadmap-alpha/authorization";
+import { processIsAlive } from "@/lib/roadmap-alpha/process-check";
 import {
   assertWorkspaceRootPathUsable,
   listWorkspaceDirectories,
 } from "@/lib/roadmap-alpha/workspace-browser";
-
-function processIsAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
 
 /**
  * Mata a árvore inteira do processo (supervisor PowerShell + worker tsx

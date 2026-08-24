@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { criarFiltroAcessoNota, criarFiltroExclusaoLixeira } from "@/lib/notas/acesso";
 import { atualizarPreviewNaLista } from "@/lib/notas/preview";
@@ -45,6 +47,31 @@ describe("Bloco de notas ALpha — seleção da lixeira", () => {
   it("rejeita lotes acima do limite", () => {
     const noteIds = Array.from({ length: 101 }, (_, index) => `n${index}`);
     expect(excluirNotasDefinitivamenteSchema.safeParse({ noteIds }).success).toBe(false);
+  });
+});
+
+describe("Bloco de notas ALpha — restauração da lixeira", () => {
+  it("liga o botão individual do card à action protegida de restauração", () => {
+    const hook = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/useLixeiraNotas.ts"),
+      "utf8",
+    );
+    const lista = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/ListaNotas.tsx"),
+      "utf8",
+    );
+    const central = readFileSync(
+      resolve(process.cwd(), "src/components/Notas/Central/CentralDeNotas.tsx"),
+      "utf8",
+    );
+    const action = readFileSync(resolve(process.cwd(), "src/actions/Notas.ts"), "utf8");
+
+    expect(hook).toContain("await RestaurarNota(noteId)");
+    expect(lista).toContain("Restaurar nota");
+    expect(lista).toContain("onRestaurarNota(nota.id)");
+    expect(central).toContain("lixeira.restaurar(noteId)");
+    expect(action).toContain("await podeRestaurarNota(usuario, noteId)");
+    expect(action).toContain('status: "ATIVA", archivedAt: null, deletedAt: null');
   });
 });
 

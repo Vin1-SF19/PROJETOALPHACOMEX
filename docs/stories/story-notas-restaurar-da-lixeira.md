@@ -1,6 +1,6 @@
 # Story — Restaurar nota da lixeira
 
-**Status:** In Progress  
+**Status:** InReview
 **Módulo:** Bloco de notas ALpha  
 **Origem:** solicitação direta do usuário em 2026-08-24
 
@@ -19,11 +19,11 @@ Como usuário do Bloco de notas ALpha, quero restaurar uma nota que movi para a 
 ## Tarefas
 
 - [x] Mapear a ação existente, as permissões, o hook e os componentes da Lixeira.
-- [ ] Conectar a ação `RestaurarNota` ao hook client-side da Lixeira.
-- [ ] Adicionar ação individual de restauração aos cards sem criar botões aninhados.
-- [ ] Atualizar o wiring da Central e cobrir a integração com teste automatizado.
-- [ ] Executar typecheck, lint, testes e build; registrar falhas preexistentes separadamente.
-- [ ] Atualizar checklist, status e File List.
+- [x] Conectar a ação `RestaurarNota` ao hook client-side da Lixeira.
+- [x] Adicionar ação individual de restauração aos cards sem criar botões aninhados.
+- [x] Atualizar o wiring da Central e cobrir a integração com teste automatizado.
+- [x] Executar typecheck, lint, testes e build; registrar falhas preexistentes separadamente.
+- [x] Atualizar checklist, status e File List.
 
 ## Blueprint de integração (Scout)
 
@@ -71,7 +71,42 @@ Como usuário do Bloco de notas ALpha, quero restaurar uma nota que movi para a 
 ## File List
 
 - `docs/stories/story-notas-restaurar-da-lixeira.md`
+- `src/components/Notas/Central/CentralDeNotas.tsx`
+- `src/components/Notas/Central/ListaNotas.tsx`
+- `src/components/Notas/Central/useLixeiraNotas.ts`
+- `tests/notas/acesso-e-lixeira.test.ts`
 
 ## Resultado dos gates
 
 - Pendente.
+
+## Change Log
+
+| Data | Versão | Alteração | Agente |
+|---|---:|---|---|
+| 2026-08-24 | 0.1.0 | Desenvolvimento iniciado — Status: Ready → InProgress | @dev |
+| 2026-08-24 | 0.2.0 | Restauração individual implementada e validada — Status: InProgress → InReview | @dev |
+
+## Dev Agent Record
+
+### Agent Model Used
+
+- Codex (GPT-5)
+
+### Debug Log References
+
+- `npx tsc --noEmit`: sem erro nos arquivos desta story; permanecem erros preexistentes em `ExclusaoFiscal`, `HabilitacaoRadarClient` e `tests/google-calendar/sync-queue.test.ts`.
+- ESLint direcionado aos quatro arquivos alterados: aprovado sem erros ou avisos.
+- `npm run lint`: varredura global interrompida após aproximadamente quatro minutos sem saída ou conclusão.
+- Teste direcionado de Notas: 8/8 passando.
+- `npm test`: 1.710/1.718 passando; oito falhas fora do módulo de Notas em Alpha SEO, Apresentações, Bibble, BPM e Google Calendar.
+- `npm run build`: aprovado; rota `/PainelAlpha/Notas` incluída no build de produção.
+- CodeRabbit: indisponível porque não há distribuição WSL instalada neste ambiente.
+
+### Completion Notes List
+
+- O botão `Restaurar` aparece individualmente em cada card da Lixeira e possui rótulo acessível, foco visível, loading e bloqueio durante processamento.
+- O card foi estruturado com controles irmãos para evitar elementos `button` aninhados.
+- O hook reutiliza a action server-side existente, exibe feedback, volta à primeira página e sincroniza a Central após sucesso.
+- Nenhuma dependência, configuração, rota, schema ou migration foi adicionada.
+- DoD aplicável concluído; pendências globais registradas são preexistentes e não pertencem a esta story.

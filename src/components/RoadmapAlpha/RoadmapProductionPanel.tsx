@@ -230,6 +230,7 @@ export function RoadmapProductionPanel({
   );
   const [roomExecutionId, setRoomExecutionId] = useState<string | null>(null);
   const polling = useRef(false);
+  const autoOpenedRoomFor = useRef<string | null>(null);
 
   const refresh = useCallback(
     async (includeCatalog = false) => {
@@ -270,6 +271,30 @@ export function RoadmapProductionPanel({
     if (!focusExecutionId) return all;
     return all.filter((execution) => execution.id === focusExecutionId);
   }, [data?.state.executions, focusExecutionId]);
+
+  /**
+   * Abre a Sala de Implementação automaticamente quando o usuário chega
+   * focado numa execução BLOCKED/WAITING_FOR_ADMIN (veio do badge "precisa
+   * de você") — sem isso, a pergunta pendente fica um clique escondida atrás
+   * de "Acompanhar implementação". Guard por useRef garante que só abre UMA
+   * vez por execução: dispara na primeira vez que ela aparece com esse
+   * status, não a cada re-render do polling de 2s — senão a Sala reabriria
+   * sozinha mesmo depois do usuário fechá-la manualmente.
+   */
+  useEffect(() => {
+    if (!focusExecutionId) return;
+    const focused = executions.find(
+      (execution) => execution.id === focusExecutionId,
+    );
+    if (!focused) return;
+    if (
+      (focused.status === "BLOCKED" || focused.status === "WAITING_FOR_ADMIN") &&
+      autoOpenedRoomFor.current !== focusExecutionId
+    ) {
+      autoOpenedRoomFor.current = focusExecutionId;
+      setRoomExecutionId(focusExecutionId);
+    }
+  }, [executions, focusExecutionId]);
   const activePhase = useMemo(
     () =>
       executions

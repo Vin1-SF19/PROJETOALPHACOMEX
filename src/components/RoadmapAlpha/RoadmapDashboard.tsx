@@ -111,6 +111,7 @@ interface RoadmapObjectiveView {
     lastErrorCode: string | null;
   }>;
   promptArtifacts: RoadmapArtifact[];
+  workspaceWorkerOffline: boolean;
 }
 
 interface Props {
@@ -760,6 +761,28 @@ export function RoadmapDashboard({
                             >
                               <Workflow size={11} /> Abrir
                             </button>
+                          </div>
+                        )}
+                        {objective.workspaceWorkerOffline && (
+                          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[.06] p-1.5">
+                            <span className="flex-1 px-1 text-[10px] text-amber-200/90">
+                              Worker do projeto parado — não vai iniciar
+                              sozinho. Reinicie em &quot;Sistemas
+                              Externos&quot;, na barra lateral.
+                            </span>
+                            {canMutate && (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setModuleFilter(objective.moduleKey);
+                                  setMobilePane("modules");
+                                }}
+                                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400/20 bg-amber-400/[.06] px-2 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-400/10"
+                              >
+                                Ver projeto
+                              </button>
+                            )}
                           </div>
                         )}
                         <div className="mt-3 flex items-center justify-between gap-2">

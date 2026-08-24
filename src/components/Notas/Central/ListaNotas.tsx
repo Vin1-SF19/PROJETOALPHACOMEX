@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, Pin, Star, Paperclip, MessageSquare, FileText, CheckSquare2, Square, Settings, Users } from "lucide-react";
+import { ChevronLeft, Pin, Star, Paperclip, MessageSquare, FileText, CheckSquare2, Square, Settings, Users, RotateCcw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarraAcoesLixeira } from "./BarraAcoesLixeira";
@@ -36,9 +36,11 @@ interface ListaNotasProps {
   modoSelecao: boolean;
   notasSelecionadas: ReadonlySet<string>;
   processandoLixeira: boolean;
+  restaurandoNotaId: string | null;
   onAtivarSelecao: () => void;
   onCancelarSelecao: () => void;
   onToggleSelecionada: (noteId: string) => void;
+  onRestaurarNota: (noteId: string) => void;
   onExcluirSelecionadas: () => void;
   onEsvaziarLixeira: () => void;
   isEquipe: boolean;
@@ -82,9 +84,11 @@ export function ListaNotas({
   modoSelecao,
   notasSelecionadas,
   processandoLixeira,
+  restaurandoNotaId,
   onAtivarSelecao,
   onCancelarSelecao,
   onToggleSelecionada,
+  onRestaurarNota,
   onExcluirSelecionadas,
   onEsvaziarLixeira,
   isEquipe,
@@ -184,9 +188,8 @@ export function ListaNotas({
                 const selecionada = nota.id === notaSelecionadaId;
                 const marcadaParaExcluir = notasSelecionadas.has(nota.id);
                 return (
-                  <motion.button
+                  <motion.div
                     key={nota.id}
-                    type="button"
                     layout
                     initial={{ opacity: 0, y: 10, scale: 0.94 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -194,10 +197,8 @@ export function ListaNotas({
                     transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.3) }}
                     whileHover={{ y: -6, scale: 1.015 }}
                     whileTap={{ scale: 0.99 }}
-                    onClick={() => (modoSelecao ? onToggleSelecionada(nota.id) : onSelecionar(nota.id))}
-                    aria-pressed={modoSelecao ? marcadaParaExcluir : selecionada}
                     className={cn(
-                      "group relative flex h-40 flex-col overflow-hidden rounded-2xl border p-3 text-left backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-300",
+                      "group relative h-40 overflow-hidden rounded-2xl border text-left backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-300",
                       "shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_45px_-12px_rgba(0,0,0,0.65)]",
                       selecionada || marcadaParaExcluir
                         ? "border-transparent"
@@ -217,14 +218,6 @@ export function ListaNotas({
                         : undefined
                     }
                   >
-                    {modoSelecao && (
-                      <span
-                        className="absolute right-2 top-2 z-10 rounded-md bg-slate-950/80 p-1 text-slate-300"
-                        aria-hidden="true"
-                      >
-                        {marcadaParaExcluir ? <CheckSquare2 size={15} className="text-rose-300" /> : <Square size={15} />}
-                      </span>
-                    )}
                     {nota.color && (
                       <span
                         className="absolute left-0 top-0 h-full w-1"
@@ -233,56 +226,90 @@ export function ListaNotas({
                       />
                     )}
 
-                    <div className="mb-1 flex items-center gap-1.5">
-                      {nota.isPinned && <Pin size={11} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Fixada" />}
-                      {nota.isFavorite && <Star size={11} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Favorita" />}
-                      <span className="truncate text-sm font-semibold text-slate-100">{nota.title || "Sem título"}</span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => (modoSelecao ? onToggleSelecionada(nota.id) : onSelecionar(nota.id))}
+                      aria-pressed={modoSelecao ? marcadaParaExcluir : selecionada}
+                      className="flex h-full w-full flex-col p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/60"
+                    >
+                      {modoSelecao && (
+                        <span
+                          className="absolute right-2 top-2 z-10 rounded-md bg-slate-950/80 p-1 text-slate-300"
+                          aria-hidden="true"
+                        >
+                          {marcadaParaExcluir ? <CheckSquare2 size={15} className="text-rose-300" /> : <Square size={15} />}
+                        </span>
+                      )}
 
-                    {nota.plainText?.trim() ? (
-                      <p className="line-clamp-3 flex-1 text-xs leading-relaxed text-slate-500">
-                        {nota.plainText.trim()}
-                      </p>
-                    ) : (
-                      <p className="flex flex-1 items-center gap-1.5 text-xs italic text-slate-700">
-                        <FileText size={12} /> Nota vazia
-                      </p>
-                    )}
-
-                    {nota.tags.length > 0 && (
-                      <div className="mb-1.5 mt-1 flex flex-wrap gap-1">
-                        {nota.tags.slice(0, 3).map(({ tag }) => (
-                          <span
-                            key={tag.id}
-                            className="truncate rounded-full border px-1.5 py-0.5 text-[9px]"
-                            style={{ borderColor: `${tag.color}55`, color: tag.color }}
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
+                      <div className={cn("mb-1 flex items-center gap-1.5", isLixeira && !modoSelecao && "pr-24")}>
+                        {nota.isPinned && <Pin size={11} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Fixada" />}
+                        {nota.isFavorite && <Star size={11} className="shrink-0" style={{ color: `rgba(${accent},1)` }} aria-label="Favorita" />}
+                        <span className="truncate text-sm font-semibold text-slate-100">{nota.title || "Sem título"}</span>
                       </div>
-                    )}
 
-                    <div className="mt-auto flex items-center gap-2 border-t border-white/5 pt-1.5 text-[10px] text-slate-600">
-                      <span className="truncate">{nota.owner.nome}</span>
-                      <span className="shrink-0">·</span>
-                      <span className="shrink-0">{formatarData(nota.updatedAt)}</span>
-                      {nota._count.attachments > 0 && (
-                        <span className="ml-auto flex shrink-0 items-center gap-0.5">
-                          <Paperclip size={9} /> {nota._count.attachments}
-                        </span>
+                      {nota.plainText?.trim() ? (
+                        <p className="line-clamp-3 flex-1 text-xs leading-relaxed text-slate-500">
+                          {nota.plainText.trim()}
+                        </p>
+                      ) : (
+                        <p className="flex flex-1 items-center gap-1.5 text-xs italic text-slate-700">
+                          <FileText size={12} /> Nota vazia
+                        </p>
                       )}
-                      {nota._count.comments > 0 && (
-                        <span className="flex shrink-0 items-center gap-0.5">
-                          <MessageSquare size={9} /> {nota._count.comments}
-                        </span>
-                      )}
-                    </div>
 
-                    {nota.contexts.length > 0 && (
-                      <span className="mt-1 truncate text-[9px] text-indigo-400/80">{nota.contexts[0].displayName}</span>
+                      {nota.tags.length > 0 && (
+                        <div className="mb-1.5 mt-1 flex flex-wrap gap-1">
+                          {nota.tags.slice(0, 3).map(({ tag }) => (
+                            <span
+                              key={tag.id}
+                              className="truncate rounded-full border px-1.5 py-0.5 text-[9px]"
+                              style={{ borderColor: `${tag.color}55`, color: tag.color }}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-auto flex items-center gap-2 border-t border-white/5 pt-1.5 text-[10px] text-slate-600">
+                        <span className="truncate">{nota.owner.nome}</span>
+                        <span className="shrink-0">·</span>
+                        <span className="shrink-0">{formatarData(nota.updatedAt)}</span>
+                        {nota._count.attachments > 0 && (
+                          <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                            <Paperclip size={9} /> {nota._count.attachments}
+                          </span>
+                        )}
+                        {nota._count.comments > 0 && (
+                          <span className="flex shrink-0 items-center gap-0.5">
+                            <MessageSquare size={9} /> {nota._count.comments}
+                          </span>
+                        )}
+                      </div>
+
+                      {nota.contexts.length > 0 && (
+                        <span className="mt-1 truncate text-[9px] text-indigo-400/80">{nota.contexts[0].displayName}</span>
+                      )}
+                    </button>
+
+                    {isLixeira && !modoSelecao && (
+                      <button
+                        type="button"
+                        onClick={() => onRestaurarNota(nota.id)}
+                        disabled={processandoLixeira}
+                        aria-label={`Restaurar nota ${nota.title || "Sem título"}`}
+                        title="Restaurar nota"
+                        className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold text-emerald-300 transition hover:border-emerald-300/50 hover:bg-emerald-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {restaurandoNotaId === nota.id ? (
+                          <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                        ) : (
+                          <RotateCcw size={12} aria-hidden="true" />
+                        )}
+                        Restaurar
+                      </button>
                     )}
-                  </motion.button>
+                  </motion.div>
                 );
               })}
             </AnimatePresence>

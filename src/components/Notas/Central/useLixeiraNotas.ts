@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { EsvaziarLixeira, ExcluirNotasDefinitivamente } from "@/actions/Notas";
+import { EsvaziarLixeira, ExcluirNotasDefinitivamente, RestaurarNota } from "@/actions/Notas";
 import { limparRascunhoLocalDaNota } from "@/lib/notas-tabs";
 import { useNotasNotificacoes } from "@/store/useNotasNotificacoes";
 import { useNotasWorkspace } from "@/store/useNotasWorkspace";
@@ -25,6 +25,7 @@ export function useLixeiraNotas({
   const [modoSelecao, setModoSelecao] = useState(false);
   const [notasSelecionadas, setNotasSelecionadas] = useState<Set<string>>(new Set());
   const [processando, setProcessando] = useState(false);
+  const [restaurandoId, setRestaurandoId] = useState<string | null>(null);
   const removerAbaPorNota = useNotasWorkspace((state) => state.removerAbaPorNota);
   const removerNotificacoesDaNota = useNotasNotificacoes((state) => state.removerNotificacoesDaNota);
 
@@ -54,6 +55,32 @@ export function useLixeiraNotas({
       else proximas.add(noteId);
       return proximas;
     });
+  }
+
+  async function restaurar(noteId: string) {
+    if (processando) return;
+
+    setProcessando(true);
+    setRestaurandoId(noteId);
+    try {
+      const res = await RestaurarNota(noteId);
+      if (!res.success) {
+        toast.error(res.error ?? "Não foi possível restaurar a nota");
+        return;
+      }
+
+      notificarWorkspaceNotasAtualizado();
+      cancelarSelecao();
+      onLimparNotaAberta();
+      onVoltarPrimeiraPagina();
+      onRecarregar();
+      toast.success("Nota restaurada");
+    } catch {
+      toast.error("Não foi possível restaurar a nota");
+    } finally {
+      setRestaurandoId(null);
+      setProcessando(false);
+    }
   }
 
   async function excluirSelecionadas() {
@@ -98,9 +125,11 @@ export function useLixeiraNotas({
     modoSelecao,
     notasSelecionadas,
     processando,
+    restaurandoId,
     ativarSelecao,
     cancelarSelecao,
     toggleSelecionada,
+    restaurar,
     excluirSelecionadas,
     esvaziar,
   };

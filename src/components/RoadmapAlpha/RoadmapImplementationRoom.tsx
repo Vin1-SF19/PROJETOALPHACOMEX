@@ -212,6 +212,28 @@ export function RoadmapImplementationRoom({
           </p>
           {actionFeedback && <p role={actionFeedback.error ? "alert" : "status"} className={`mb-4 rounded-xl border p-3 text-xs ${actionFeedback.error ? "border-rose-400/20 bg-rose-400/[.06] text-rose-200" : "border-emerald-400/20 bg-emerald-400/[.06] text-emerald-200"}`}>{actionFeedback.text}</p>}
 
+          {execution?.status === "BLOCKED" && pendingInterventions.length === 0 && (() => {
+            const failedPhase = [...phases].reverse().find((phase) => phase.status === "BLOCKED" || phase.errorCode);
+            return (
+              <section className="mb-4 rounded-2xl border border-rose-400/25 bg-rose-400/[.06] p-4" aria-label="Bloqueio sem pergunta pendente">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-rose-300" />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-semibold text-white">Este bloqueio não tem uma pergunta específica pendente</h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">A última tentativa falhou e o limite de correções automáticas foi atingido. Use &quot;Tentar novamente&quot; no painel principal ou relate o problema com uma orientação nova.</p>
+                    {failedPhase && (
+                      <dl className="mt-3 space-y-1.5 text-xs leading-5">
+                        <div><dt className="inline font-semibold text-slate-300">Fase: </dt><dd className="inline text-slate-400">{phaseLabel(failedPhase)}</dd></div>
+                        {failedPhase.errorCode && <div><dt className="inline font-semibold text-slate-300">Erro: </dt><dd className="inline text-slate-400">{failedPhase.errorCode}</dd></div>}
+                        {failedPhase.summary && <div><dt className="font-semibold text-slate-300">Resumo</dt><dd className="mt-0.5 whitespace-pre-wrap break-words text-slate-400">{failedPhase.summary}</dd></div>}
+                      </dl>
+                    )}
+                  </div>
+                </div>
+              </section>
+            );
+          })()}
+
           {pendingInterventions.map((item) => {
             const forbidden = FORBIDDEN_CATEGORIES.has(item.category);
             const content = drafts[item.requestId] ?? "";

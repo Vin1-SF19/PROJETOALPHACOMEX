@@ -441,9 +441,11 @@ export function CentralDeNotas({ temaName = "blue" }: CentralDeNotasProps) {
                 modoSelecao={lixeira.modoSelecao}
                 notasSelecionadas={lixeira.notasSelecionadas}
                 processandoLixeira={lixeira.processando}
+                restaurandoNotaId={lixeira.restaurandoId}
                 onAtivarSelecao={lixeira.ativarSelecao}
                 onCancelarSelecao={lixeira.cancelarSelecao}
                 onToggleSelecionada={lixeira.toggleSelecionada}
+                onRestaurarNota={(noteId) => void lixeira.restaurar(noteId)}
                 onExcluirSelecionadas={() => void lixeira.excluirSelecionadas()}
                 onEsvaziarLixeira={() => void lixeira.esvaziar()}
                 isEquipe={secaoAtiva === "EQUIPE"}
