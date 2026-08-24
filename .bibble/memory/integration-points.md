@@ -1,5 +1,46 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Alpha Motion (Apresentações) — Ocultar slide + Compartilhar (cria cópia) + listagem por dono (2026-08-24)
+
+### Ocultar slide (soft-hide, estilo Canva — nunca exclui)
+
+- **Schema:** `Slide.oculto Boolean @default(false)` (`prisma/schema.prisma`) — migration aditiva aplicada em produção no Turso pelo Vault (backup pontual gerado e validado 76/76 linhas de `Slide`, `ALTER TABLE Slide ADD COLUMN oculto` confirmado via `PRAGMA table_info`).
+- **Toggle:** `AlternarVisibilidadeSlide(slideId)` (`src/actions/slides.ts`) — ownership via `checarOwnershipApresentacao`, mesmo padrão de `ExcluirSlide`/`DuplicarSlide`. Sem trava de "não pode ocultar o último slide" (diferente de `ExcluirSlide`) — ocultar não é destrutivo, então não precisa da mesma proteção.
+- **UI:** ícone `Eye`/`EyeOff` (lucide-react) em cada `ItemSlide` da sidebar (`src/components/Apresentacoes/Editor/SidebarEsquerda/SidebarSlides.tsx`), update otimista com rollback via `atualizarVisibilidadeSlide` (novo método em `useEditorStore.ts`, campo `oculto?` em `SlideResumo`).
+- **Onde o filtro `where: { oculto: false }` É aplicado (3 pontos, todos leitura pública/exportação):**
+  1. Link público — `src/app/apresentacao/[slug]/page.tsx`
+  2. Export HTML autocontido — `src/app/api/apresentacoes/[id]/exportar-html/route.ts`
+  3. Modo apresentação — `src/app/PainelAlpha/Apresentacoes/[id]/apresentar/page.tsx`
+- **Onde o filtro NÃO é aplicado (intencional):**
+  - Editor (`src/app/PainelAlpha/Apresentacoes/[id]/editor/page.tsx`) e `ListarSlides`/`ObterSlide`/`DuplicarSlide` (`slides.ts`) — o dono precisa continuar vendo e reativando slides ocultos.
+  - `ExcluirAssetApresentacao` (`src/actions/apresentacao-assets.ts:30`) — varre TODOS os slides (ocultos ou não) para checar se um asset ainda está em uso antes de excluir. Filtrar por `oculto: false` ali seria um bug: permitiria excluir um asset referenciado por um slide oculto, quebrando-o silenciosamente quando o dono reexibir.
+- **Checklist para um 4º ponto de leitura pública futuro (se um dia existir):** sempre adicionar `where: { oculto: false }` dentro do `select.slides` da query Prisma — nunca filtrar depois em memória (mais fácil esquecer). Pontos de leitura que servem o EDITOR/DONO nunca devem filtrar.
+- **Resiliência a lista de slides vazia (todos ocultos):** modo apresentação tem guard explícito (`if (apresentacao.slides.length === 0) notFound()`, `apresentar/page.tsx:52` — comentário ali ficou desatualizado, dizia "não deve acontecer" mas agora é um caso real possível, puramente cosmético). Link público e export HTML não têm guard próprio, mas `PlayerStandalone.tsx:175` (`if (!slideAtual) return <div>...</div>`) já absorve o array vazio sem crash — resiliência pré-existente, não algo que esta feature precisou adicionar.
+
+### Compartilhar apresentação — PADRÃO REUTILIZÁVEL: cria cópia, não link/acesso
+
+**Diferença de conceito importante:** "Compartilhar" aqui NUNCA é um link ou uma permissão de acesso compartilhado (isso já existe via `ApresentacaoColaborador`, papel EDITOR/VISUALIZADOR/COMENTARISTA). É uma ação que **cria uma cópia completa e independente** da apresentação, atribuída como propriedade a cada destinatário escolhido. Após compartilhar, os dois usuários têm apresentações totalmente desacopladas — editar uma não afeta a outra.
+
+- **Server Action:** `CompartilharApresentacao({ apresentacaoId, destinatarioIds: number[] })` (`src/actions/apresentacoes.ts`) — Zod (`compartilharApresentacaoSchema`), 1 cópia por destinatário via `db.$transaction` (array de `create`s, atômico — todas ou nenhuma).
+- **Ownership mais restritivo que o padrão do arquivo:** exige `original.autorId === userId` estritamente — nem Admin/CEO nem colaborador podem compartilhar, só o criador literal. Decisão explícita do usuário, diferente de `podeEditarApresentacao`/`isAdmin` usado no resto de `apresentacoes.ts`.
+- **`destinatarioIds` validado contra usuários reais** (`db.usuarios.findMany({ where: { id: { in: destinatarioIds } } })`) antes de criar qualquer cópia — nunca cria `Apresentacao` órfã com `autorId` inválido.
+- **Nomenclatura da cópia:** sempre `"{título original} - copia de {nome de quem compartilhou}"` — o remetente, nunca o destinatário. `autorId` da cópia = destinatário.
+- **Todos os slides da cópia nascem com `oculto: false`**, independente do estado no original — decisão explícita do usuário (a cópia é sempre "página em branco" visualmente completa para quem recebe).
+- **UI:** `ModalCompartilharApresentacao.tsx` (`src/components/Apresentacoes/Dashboard/`, novo) — busca + lista de usuários via `getUsers()` (`src/actions/get-user.ts`, já existente) + `Checkbox` multi-seleção. Segue a mesma estrutura visual de `ModalNovaApresentacao.tsx` (`Dialog`/`DialogHeader`/`DialogFooter`, paleta `slate-900`/`indigo-600`).
+- **Botão "Compartilhar"** no dropdown de `CardApresentacao.tsx` só aparece quando `apresentacao.autor.id === usuarioAtualId` — prop `usuarioAtualId` propagada em cadeia: `src/app/PainelAlpha/Apresentacoes/page.tsx` → `ApresentacoesDashboard` → `CardApresentacao` → `ModalCompartilharApresentacao`.
+- **Dívida pré-existente reaproveitada, não introduzida por esta feature:** `getUsers()` não tem `auth()` — mesma exposição já documentada em `BuscarTodosUsuarios` (`RecursosHumanos.ts`). Se um dia for endurecido, corrigir os dois juntos.
+- **Como replicar este padrão em outro módulo:** (1) Server Action que exige `autorId === userId` (ou o ownership que fizer sentido) estritamente; (2) valida destinatários reais antes de criar; (3) `$transaction` com 1 `create` por destinatário; (4) título/nome da cópia menciona quem compartilhou, não quem recebe; (5) reaproveitar `getUsers()` para o seletor, a menos que o módulo precise de filtro diferente de usuários elegíveis.
+
+### Listagem inicial restrita ao dono (mudança de comportamento deliberada)
+
+- **`ListarApresentacoes`** (`src/actions/apresentacoes.ts`) mudou de `{ autorId OU colaborador, Admin vê tudo }` para **somente `{ autorId: userId }`** — inclusive Admin/CEO agora só vê as próprias criações na tela inicial do Alpha Motion. Decisão confirmada explicitamente pelo usuário via pergunta direta (não assumida).
+- **Efeito colateral intencional:** colaboradores convidados via `ApresentacaoColaborador` não aparecem mais na listagem de quem foi convidado — a colaboração ainda funciona para quem já está DENTRO do editor (ownership check permanece o mesmo em `slides.ts`/outras actions), só a listagem inicial que não lista mais. "Compartilhar" (cópia) é o caminho oficial agora para dar acesso a outra pessoa a partir da tela inicial.
+- **Se uma sessão futura precisar reverter ou ajustar isso:** o `acesso` object em `ListarApresentacoes` é o único ponto a tocar — não precisa mexer em `podeEditarApresentacao`/`checarOwnershipApresentacao`, que continuam com a lógica original (autor OU colaborador OU admin) para todas as outras operações.
+
+**Última atualização:** 2026-08-24 por Scribe (sessão Bibble — pipeline completo Scout→Vault→Forge→Probe→Anubis→Lens→Sage→Scribe)
+
+---
+
 ## Roadmap Alpha — "Novo módulo" (2026-08-20, corrigido de local)
 
 **⚠️ Fica DENTRO do Roadmap Alpha (`RoadmapDashboard.tsx`), NUNCA na tela inicial do painel (`PainelAlphaClient.tsx`).** Uma implementação inicial colocou isso na tela inicial por engano — revertido integralmente após correção explícita e irritada do usuário. Não repetir esse erro de local em sessão futura.

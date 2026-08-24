@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MonitorPlay, MoreVertical, Pencil, Copy, Trash2, User } from "lucide-react";
+import { MonitorPlay, MoreVertical, Pencil, Copy, Trash2, User, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DuplicarApresentacao, ExcluirApresentacao } from "@/actions/apresentacoes";
+import { ModalCompartilharApresentacao } from "./ModalCompartilharApresentacao";
 
 export interface ApresentacaoCard {
   id: string;
@@ -47,12 +48,15 @@ interface CardApresentacaoProps {
   apresentacao: ApresentacaoCard;
   accent: string;
   onAlterado: () => void;
+  usuarioAtualId: number;
 }
 
-export function CardApresentacao({ apresentacao, accent, onAlterado }: CardApresentacaoProps) {
+export function CardApresentacao({ apresentacao, accent, onAlterado, usuarioAtualId }: CardApresentacaoProps) {
   const router = useRouter();
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [compartilharAberto, setCompartilharAberto] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const ehCriador = apresentacao.autor.id === usuarioAtualId;
 
   const badge = STATUS_BADGE[apresentacao.status] ?? STATUS_BADGE.DRAFT;
 
@@ -151,6 +155,11 @@ export function CardApresentacao({ apresentacao, accent, onAlterado }: CardApres
               <DropdownMenuItem onClick={handleDuplicar}>
                 <Copy aria-hidden="true" /> Duplicar
               </DropdownMenuItem>
+              {ehCriador && (
+                <DropdownMenuItem onClick={() => setCompartilharAberto(true)}>
+                  <Share2 aria-hidden="true" /> Compartilhar
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem variant="destructive" onClick={() => setConfirmarExclusao(true)}>
                 <Trash2 aria-hidden="true" /> Excluir
               </DropdownMenuItem>
@@ -190,6 +199,16 @@ export function CardApresentacao({ apresentacao, accent, onAlterado }: CardApres
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {ehCriador && (
+        <ModalCompartilharApresentacao
+          open={compartilharAberto}
+          onOpenChange={setCompartilharAberto}
+          apresentacaoId={apresentacao.id}
+          apresentacaoTitulo={apresentacao.titulo}
+          usuarioAtualId={usuarioAtualId}
+        />
+      )}
     </div>
   );
 }

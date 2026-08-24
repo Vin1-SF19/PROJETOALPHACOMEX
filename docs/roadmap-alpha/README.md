@@ -83,7 +83,23 @@ Produção sempre herda o projeto do objetivo selecionado no Roadmap. A seção 
 
 Cada card de objetivo possui um único **Relatar erro**. O administrador descreve o problema da implementação completa, pode usar **Melhorar com IA** para tornar o feedback mais claro e confirma em **Refazer com este feedback**. O worker registra o relato, invalida temporariamente o relatório anterior e reenfileira todas as fases do objetivo. Todos os agentes recebem o feedback como requisito obrigatório dentro do escopo original. Na nova conclusão, `99-relatorio-conclusao.md` lista cada relato, se houve melhoria com IA, quando a correção foi concluída e quantas vezes o objetivo completo precisou ser refeito.
 
-Reprovações de verificação entram no ciclo de autocorreção: o relatório do Probe volta para a última fase de implementação, o agente `dev` corrige os itens apontados e a verificação é executada novamente. Bloqueios de implementação e falhas transitórias do provider também são reenfileirados automaticamente após cinco segundos. A UI mostra **Correção automática** e o contador; após 12 tentativas da mesma fase, o worker preserva o bloqueio para intervenção administrativa, evitando um loop local sem controle. Erros de autorização, configuração inválida, objetivo substituído ou proteção de segurança nunca são repetidos automaticamente.
+Reprovações de verificação entram no ciclo de autocorreção: o relatório do Probe volta para a última fase de implementação, o agente `dev` corrige os itens apontados e a verificação é executada novamente. Bloqueios de implementação e falhas transitórias do provider também são reenfileirados automaticamente após cinco segundos. Se a mesma impressão digital de falha ocorrer três vezes consecutivas, o circuit breaker muda a fase para `NEEDS_INPUT` e a execução para `WAITING_FOR_ADMIN`; não existe quarta chamada com a mesma causa sem mudança de agente, contexto, política ou resposta administrativa. O limite absoluto de 30 continua apenas como última barreira para falhas diferentes.
+
+## Sala de Implementação e intervenções
+
+Um agente que precisa de decisão ou permissão encerra a chamada com `RESULT: NEEDS_INPUT` e `NEEDS_INPUT_JSON`. O worker persiste a pergunta, fecha o processo do provedor e aguarda uma resposta local. Responder ou autorizar recoloca somente a fase solicitante em `PENDING`; negar encerra a fase com `ADMIN_DENIED`, sem autocorreção. Autorizações são de uso único e expiram ao terminar a tentativa seguinte. Banco, ações destrutivas e Git remoto nunca são liberados pela Sala: banco segue Vault/backup/confirmação explícita e push/PR/release seguem DevOps.
+
+Os comandos CLI usam o mesmo estado e as mesmas validações da interface. Para workspace externo, defina `ROADMAP_PRODUCTION_ROOT` antes de executar:
+
+```powershell
+npx tsx scripts/roadmap-production.mjs interventions --execution="<id>"
+npx tsx scripts/roadmap-production.mjs history --execution="<id>"
+npx tsx scripts/roadmap-production.mjs respond --execution="<id>" --phase=2 --request="<uuid>" --content="Minha resposta"
+npx tsx scripts/roadmap-production.mjs authorize --execution="<id>" --phase=2 --request="<uuid>"
+npx tsx scripts/roadmap-production.mjs deny --execution="<id>" --phase=2 --request="<uuid>"
+npx tsx scripts/roadmap-production.mjs message --execution="<id>" --phase=2 --content="Orientação adicional"
+npx tsx scripts/roadmap-production.mjs switch-agent --execution="<id>" --phase=2 --agent="echo"
+```
 
 Se o manifesto atribuir por engano uma fase com título explícito de implementação ao Scout, Forge ou Probe, o worker mantém o agente solicitado no histórico, mas roteia a execução para Nova (frontend/UI) ou Echo (backend). Essa reconciliação também corrige execuções locais que já estavam bloqueadas antes da atualização.
 

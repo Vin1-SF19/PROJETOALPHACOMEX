@@ -2452,6 +2452,7 @@ model Slide {
   transicaoEntrada String?
   duracaoAutoplay  Int?
   dadosJson        Json
+  oculto           Boolean                  @default(false)
   comentarios      ApresentacaoComentario[]
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt

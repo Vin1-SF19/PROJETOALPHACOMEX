@@ -12,6 +12,7 @@ import {
   type ProductionControlCommand,
   type DevelopmentProvider,
   type ProductionState,
+  type ProductionStateInput,
 } from "@/lib/roadmap-production/contracts";
 
 const STATE_DIRECTORY = ".roadmap-production";
@@ -152,7 +153,7 @@ export async function readProductionState(
 }
 
 export async function writeProductionState(
-  state: ProductionState,
+  state: ProductionStateInput,
   root = process.cwd(),
 ): Promise<void> {
   const parsed = productionStateSchema.parse({
@@ -174,6 +175,10 @@ export async function enqueueProductionControl(
     phaseNumber?: number;
     feedback?: string;
     improvedWithAi?: boolean;
+    requestId?: string;
+    content?: string;
+    agentId?: string;
+    author?: string;
   } = {},
 ): Promise<ProductionControlCommand> {
   const command = productionControlCommandSchema.parse({
@@ -183,6 +188,10 @@ export async function enqueueProductionControl(
     phaseNumber: details.phaseNumber ?? null,
     feedback: details.feedback ?? null,
     improvedWithAi: details.improvedWithAi ?? false,
+    requestId: details.requestId ?? null,
+    content: details.content ?? null,
+    agentId: details.agentId ?? null,
+    author: details.author ?? "Administrador",
     createdAt: new Date().toISOString(),
   });
   await writeJson(

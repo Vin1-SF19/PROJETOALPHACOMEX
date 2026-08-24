@@ -14,6 +14,7 @@ export interface SlideResumo {
   componentes: ComponenteSlide[];
   canvas: CanvasConfig;
   animacaoConfig?: SlideAnimationConfig;
+  oculto?: boolean;
 }
 
 export interface EstadoEditavelSlide {
@@ -49,6 +50,7 @@ interface EditorStore {
 
   inicializar: (apresentacaoId: string, slides: SlideResumo[]) => void;
   setSlides: (slides: SlideResumo[]) => void;
+  atualizarVisibilidadeSlide: (slideId: string, oculto: boolean) => void;
   carregarSlide: (slideId: string, componentes: ComponenteSlide[], canvas?: CanvasConfig, animacaoConfig?: SlideAnimationConfig, transicaoEntrada?: string | null) => void;
   setSlideAtivo: (slideId: string) => void;
   adicionarComponente: (c: ComponenteSlide) => void;
@@ -252,6 +254,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
           ? { ...slide, componentes: state.componentes, canvas: state.canvas, animacaoConfig: state.animacaoConfig, transicaoEntrada: state.transicaoEntrada }
           : slide,
       ),
+    })),
+  atualizarVisibilidadeSlide: (slideId, oculto) =>
+    set((state) => ({
+      slides: state.slides.map((slide) => (slide.id === slideId ? { ...slide, oculto } : slide)),
     })),
   carregarSlide: (slideId, componentes, canvas = CANVAS_PADRAO, animacaoConfig, transicaoEntrada = null) => {
     profundidadeTransacaoHistorico = 0;

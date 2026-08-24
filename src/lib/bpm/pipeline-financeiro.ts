@@ -1,18 +1,20 @@
 export const FINANCIAL_PIPELINE_NAME = "Financeiro";
-export const FINANCIAL_PIPELINE_SCHEMA_VERSION = "2026.08.20.1";
+export const FINANCIAL_PIPELINE_SCHEMA_VERSION = "2026.08.22.1";
 
 export const FINANCIAL_STAGES = [
-  { key: "contrato", label: "Contrato", order: 1 },
-  { key: "formalizacao", label: "Formalização", order: 2 },
-  { key: "pagamento", label: "Pagamento", order: 3 },
-  { key: "nota_fiscal", label: "Nota Fiscal", order: 4 },
-  { key: "concluidos", label: "Concluídos", order: 5 },
+  { key: "solicitacao_contrato", label: "Solicitação de Contrato", order: 1 },
+  { key: "elaboracao_contrato", label: "Elaboração do Contrato", order: 2 },
+  { key: "formalizacao", label: "Formalização", order: 3 },
+  { key: "pagamento", label: "Pagamento", order: 4 },
+  { key: "nota_fiscal", label: "Nota Fiscal", order: 5 },
+  { key: "concluidos", label: "Concluídos", order: 6 },
 ] as const;
 
 export type FinancialStageKey = (typeof FINANCIAL_STAGES)[number]["key"];
 
 const FINANCIAL_STAGE_LABELS_BY_KEY: Readonly<Record<FinancialStageKey, readonly string[]>> = {
-  contrato: ["Contrato", "Solicitação de Contrato", "Elaboração do Contrato"],
+  solicitacao_contrato: ["Solicitação de Contrato"],
+  elaboracao_contrato: ["Contrato", "Elaboração do Contrato"],
   formalizacao: ["Formalização", "Formalização da Contratação"],
   pagamento: ["Pagamento", "Confirmação do Pagamento"],
   nota_fiscal: ["Nota Fiscal", "Emissão da Nota Fiscal"],
@@ -41,31 +43,31 @@ export interface FinancialFieldDefinition {
 const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"] as const;
 
 export const FINANCIAL_FIELDS: readonly FinancialFieldDefinition[] = [
-  { key: "cnpj", label: "CNPJ", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "razao_social", label: "Razão Social", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "rua", label: "Rua", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "numero", label: "Número", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "complemento", label: "Complemento", stage: "contrato", type: "texto", category: "OBRIGATORIO_CONDICIONAL" },
-  { key: "bairro", label: "Bairro", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "cep", label: "CEP", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "municipio", label: "Município", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "estado", label: "Estado", stage: "contrato", type: "selecao", options: UFS, category: "OBRIGATORIO" },
-  { key: "email", label: "E-mail", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "regime_cliente", label: "Regime tributário do cliente", stage: "contrato", type: "selecao", options: ["Simples Nacional", "Lucro Presumido", "Lucro Real", "Imune/Isento"], category: "OBRIGATORIO" },
-  { key: "servico", label: "Serviço contratado", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "valor_bruto", label: "Valor bruto do contrato", stage: "contrato", type: "numero", category: "OBRIGATORIO" },
-  { key: "forma_pagamento", label: "Forma de pagamento", stage: "contrato", type: "selecao", options: ["PIX", "Boleto", "Transferência", "Cartão", "Outro"], category: "OBRIGATORIO" },
-  { key: "condicao_negociada", label: "Condição negociada", stage: "contrato", type: "texto_longo", category: "OBRIGATORIO" },
-  { key: "vendedor", label: "Vendedor responsável", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "origem", label: "Origem do cliente", stage: "contrato", type: "selecao", options: ["Prospecção", "Indicação", "Parceiro", "Orgânico", "Outro"], category: "OBRIGATORIO" },
-  { key: "parceiro", label: "Parceiro responsável", stage: "contrato", type: "texto", category: "OBRIGATORIO_CONDICIONAL" },
-  { key: "contato", label: "Contato/Nome do responsável", stage: "contrato", type: "texto", category: "OBRIGATORIO" },
-  { key: "observacoes", label: "Observações comerciais", stage: "contrato", type: "texto_longo", category: "OBRIGATORIO_CONDICIONAL" },
-  { key: "contrato_elaborado", label: "Contrato elaborado", stage: "contrato", type: "booleano", category: "OBRIGATORIO" },
-  { key: "data_elaboracao", label: "Data de elaboração", stage: "contrato", type: "data", category: "OBRIGATORIO_CONDICIONAL" },
-  { key: "contrato_enviado", label: "Contrato enviado para assinatura", stage: "contrato", type: "booleano", category: "OBRIGATORIO" },
-  { key: "data_envio", label: "Data do envio", stage: "contrato", type: "data", category: "AUTOMATICO_CALCULADO" },
-  { key: "link_contrato", label: "Link/arquivo do contrato", stage: "contrato", type: "texto", category: "OBRIGATORIO_CONDICIONAL" },
+  { key: "cnpj", label: "CNPJ", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "razao_social", label: "Razão Social", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "rua", label: "Rua", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "numero", label: "Número", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "complemento", label: "Complemento", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO_CONDICIONAL" },
+  { key: "bairro", label: "Bairro", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "cep", label: "CEP", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "municipio", label: "Município", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "estado", label: "Estado", stage: "solicitacao_contrato", type: "selecao", options: UFS, category: "OBRIGATORIO" },
+  { key: "email", label: "E-mail", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "regime_cliente", label: "Regime tributário do cliente", stage: "solicitacao_contrato", type: "selecao", options: ["Simples Nacional", "Lucro Presumido", "Lucro Real", "Imune/Isento"], category: "OBRIGATORIO" },
+  { key: "servico", label: "Serviço contratado", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "valor_bruto", label: "Valor bruto do contrato", stage: "solicitacao_contrato", type: "numero", category: "OBRIGATORIO" },
+  { key: "forma_pagamento", label: "Forma de pagamento", stage: "solicitacao_contrato", type: "selecao", options: ["PIX", "Boleto", "Transferência", "Cartão", "Outro"], category: "OBRIGATORIO" },
+  { key: "condicao_negociada", label: "Condição negociada", stage: "solicitacao_contrato", type: "texto_longo", category: "OBRIGATORIO" },
+  { key: "vendedor", label: "Vendedor responsável", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "origem", label: "Origem do cliente", stage: "solicitacao_contrato", type: "selecao", options: ["Prospecção", "Indicação", "Parceiro", "Orgânico", "Outro"], category: "OBRIGATORIO" },
+  { key: "parceiro", label: "Parceiro responsável", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO_CONDICIONAL" },
+  { key: "contato", label: "Contato/Nome do responsável", stage: "solicitacao_contrato", type: "texto", category: "OBRIGATORIO" },
+  { key: "observacoes", label: "Observações comerciais", stage: "solicitacao_contrato", type: "texto_longo", category: "OBRIGATORIO_CONDICIONAL" },
+  { key: "contrato_elaborado", label: "Contrato elaborado", stage: "elaboracao_contrato", type: "booleano", category: "OBRIGATORIO" },
+  { key: "data_elaboracao", label: "Data de elaboração", stage: "elaboracao_contrato", type: "data", category: "OBRIGATORIO_CONDICIONAL" },
+  { key: "contrato_enviado", label: "Contrato enviado para assinatura", stage: "elaboracao_contrato", type: "booleano", category: "OBRIGATORIO" },
+  { key: "data_envio", label: "Data do envio", stage: "elaboracao_contrato", type: "data", category: "AUTOMATICO_CALCULADO" },
+  { key: "link_contrato", label: "Link/arquivo do contrato", stage: "elaboracao_contrato", type: "texto", category: "OBRIGATORIO_CONDICIONAL" },
   { key: "status_assinatura", label: "Status do contrato/assinatura", stage: "formalizacao", type: "selecao", options: ["Aguardando assinatura", "Assinado"], category: "OBRIGATORIO" },
   { key: "data_assinatura", label: "Data da assinatura", stage: "formalizacao", type: "data", category: "AUTOMATICO_CALCULADO" },
   { key: "contrato_assinado", label: "Contrato assinado/anexo", stage: "formalizacao", type: "texto", category: "OBRIGATORIO_CONDICIONAL" },
@@ -127,14 +129,15 @@ export function validateFinancialTransition(input: FinancialTransitionInput): Fi
   if (index === 0) {
     require("CNPJ", "Razão Social", "Rua", "Número", "Bairro", "CEP", "Município", "Estado", "E-mail", "Regime tributário do cliente", "Serviço contratado", "Forma de pagamento", "Condição negociada", "Vendedor responsável", "Origem do cliente", "Contato/Nome do responsável"); requirePositive("Valor bruto do contrato");
     if (normalizar(v["Origem do cliente"]).toLowerCase() === "parceiro") require("Parceiro responsável"); if (normalizar(v.CNPJ) && !cnpjValido(normalizar(v.CNPJ))) missing.push("CNPJ (formato inválido)"); if (normalizar(v.CEP).replace(/\D/g, "").length !== 8) missing.push("CEP (formato inválido)"); if (normalizar(v["E-mail"]) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizar(v["E-mail"]))) missing.push("E-mail (formato inválido)");
-    if (!sim(v["Contrato elaborado"])) missing.push("Contrato elaborado = Sim"); if (!sim(v["Contrato enviado para assinatura"])) missing.push("Contrato enviado para assinatura = Sim"); require("Data de elaboração", "Link/arquivo do contrato"); automaticValues["Data do envio"] = normalizar(v["Data do envio"]) || today;
   } else if (index === 1) {
+    if (!sim(v["Contrato elaborado"])) missing.push("Contrato elaborado = Sim"); if (!sim(v["Contrato enviado para assinatura"])) missing.push("Contrato enviado para assinatura = Sim"); require("Data de elaboração", "Link/arquivo do contrato"); automaticValues["Data do envio"] = normalizar(v["Data do envio"]) || today;
+  } else if (index === 2) {
     if (normalizar(v["Status do contrato/assinatura"]).toLowerCase() !== "assinado") missing.push("Status do contrato/assinatura = Assinado"); if (!normalizar(v["Contrato assinado/anexo"]) && !input.attachmentNames?.some((name) => /contrato/i.test(name))) missing.push("Contrato assinado/anexo"); require("Regime tributário do prestador", "Regime tributário do cliente", "Forma de pagamento", "Vencimento", "Link/dados para pagamento", "IRRF aplicável", "CSRF aplicável"); requirePositive("Valor bruto do contrato");
     if (sim(v["IRRF aplicável"]) && !(numero(v["Alíquota IRRF"]) >= 0 && numero(v["Alíquota IRRF"]) <= 100)) missing.push("Alíquota IRRF"); if (sim(v["CSRF aplicável"]) && !(numero(v["Alíquota CSRF"]) >= 0 && numero(v["Alíquota CSRF"]) <= 100)) missing.push("Alíquota CSRF");
     const calc = calcularRetencoesFinanceiras(numero(v["Valor bruto do contrato"]), sim(v["IRRF aplicável"]) ? numero(v["Alíquota IRRF"]) : 0, sim(v["CSRF aplicável"]) ? numero(v["Alíquota CSRF"]) : 0); if (!(calc.valorLiquido > 0)) missing.push("Valor líquido para pagamento"); Object.assign(automaticValues, { "Data da assinatura": normalizar(v["Data da assinatura"]) || today, "Valor IRRF": String(calc.valorIrrf), "Valor CSRF": String(calc.valorCsrf), "Total de retenções": String(calc.totalRetencoes), "Valor líquido para pagamento": String(calc.valorLiquido), "Valor esperado": String(calc.valorLiquido), "Memória de cálculo": calc.memoriaCalculo });
-  } else if (index === 2) {
-    if (!sim(v["Pagamento confirmado"])) missing.push("Pagamento confirmado = Sim"); requirePositive("Valor esperado"); requirePositive("Valor recebido"); require("Forma de pagamento utilizada"); automaticValues["Data do pagamento"] = normalizar(v["Data do pagamento"]) || today;
   } else if (index === 3) {
+    if (!sim(v["Pagamento confirmado"])) missing.push("Pagamento confirmado = Sim"); requirePositive("Valor esperado"); requirePositive("Valor recebido"); require("Forma de pagamento utilizada"); automaticValues["Data do pagamento"] = normalizar(v["Data do pagamento"]) || today;
+  } else if (index === 4) {
     if (!sim(v["NF emitida"])) missing.push("NF emitida = Sim"); require("Número da NF", "Data de emissão"); requirePositive("Valor da NF"); if (!normalizar(v["Arquivo/link da NF"]) && !input.attachmentNames?.some((name) => /nota|nf/i.test(name))) missing.push("Arquivo/link da NF"); if (normalizar(v["Status do contrato/assinatura"]).toLowerCase() !== "assinado") missing.push("Contrato assinado"); if (!sim(v["Pagamento confirmado"])) missing.push("Pagamento confirmado");
   }
   const pendingFields = [...new Set(missing)]; return { applicable: true, blocked: pendingFields.length > 0, message: pendingFields.length > 0 ? "Dados pendentes para avançar de etapa." : undefined, pendingFields, automaticValues };

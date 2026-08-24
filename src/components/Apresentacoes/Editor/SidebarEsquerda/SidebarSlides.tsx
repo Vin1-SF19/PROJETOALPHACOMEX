@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Copy, Trash2, Pencil, Upload, ChevronDown, GripVertical } from "lucide-react";
+import { Plus, Copy, Trash2, Pencil, Upload, ChevronDown, GripVertical, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import {
   AtualizarSlide,
@@ -22,6 +22,7 @@ import {
   ObterSlide,
   ListarSlides,
   ReordenarSlides,
+  AlternarVisibilidadeSlide,
 } from "@/actions/slides";
 import { serializarPersistenciaSlide, useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
@@ -35,19 +36,21 @@ interface DadosSlidePersistidos {
   animacaoConfig?: SlideAnimationConfig;
 }
 
-function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplicar, onExcluir, onRenomear }: {
+function ItemSlide({ id, ordem, nome, ativo, oculto, podeExcluir, onSelecionar, onDuplicar, onExcluir, onRenomear, onAlternarVisibilidade }: {
   id: string;
   ordem: number;
   nome: string | null;
   ativo: boolean;
+  oculto: boolean;
   podeExcluir: boolean;
   onSelecionar: () => void;
   onDuplicar: () => void;
   onExcluir: () => void;
   onRenomear: (novoNome: string) => void;
+  onAlternarVisibilidade: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : oculto ? 0.5 : 1 };
   const rotulo = nome || `Slide ${ordem + 1}`;
   const [editando, setEditando] = useState(false);
   const [valorEdicao, setValorEdicao] = useState(rotulo);
@@ -100,8 +103,18 @@ function ItemSlide({ id, ordem, nome, ativo, podeExcluir, onSelecionar, onDuplic
           className="min-w-0 flex-1 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-white outline-none ring-1 ring-indigo-500"
         />
       ) : (
-        <span className="flex-1 truncate">{rotulo}</span>
+        <span className={`flex-1 truncate ${oculto ? "italic text-slate-500" : ""}`}>{rotulo}</span>
       )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onAlternarVisibilidade(); }}
+        aria-label={oculto ? "Reexibir slide" : "Ocultar slide"}
+        title={oculto ? "Slide oculto — clique para reexibir" : "Ocultar slide (não aparece no link, export ou apresentação)"}
+        className={`cursor-pointer rounded p-1 hover:text-white hover:bg-white/10 ${
+          oculto ? "text-amber-400 opacity-100" : "text-slate-500 opacity-0 group-hover:opacity-100"
+        }`}
+      >
+        {oculto ? <EyeOff size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
+      </button>
       <button
         onClick={iniciarEdicao}
         aria-label="Renomear slide"
@@ -135,6 +148,7 @@ export function SidebarSlides() {
   const slideAtivoId = useEditorStore((s) => s.slideAtivoId);
   const setSlides = useEditorStore((s) => s.setSlides);
   const carregarSlide = useEditorStore((s) => s.carregarSlide);
+  const atualizarVisibilidadeSlide = useEditorStore((s) => s.atualizarVisibilidadeSlide);
   const [processando, setProcessando] = useState(false);
   const [arquivoPptxSelecionado, setArquivoPptxSelecionado] = useState<File | null>(null);
   const [modalPreImportarAberto, setModalPreImportarAberto] = useState(false);
@@ -263,6 +277,7 @@ export function SidebarSlides() {
         transicaoEntrada: s.transicaoEntrada ?? null,
         componentes: (s.dadosJson as { componentes: ComponenteSlide[] } | null)?.componentes ?? [],
         canvas: obterCanvasSeguro((s.dadosJson as DadosSlidePersistidos | null)?.canvas),
+        oculto: s.oculto,
       })));
     }
   }
@@ -342,6 +357,17 @@ export function SidebarSlides() {
     }
   }
 
+  async function handleAlternarVisibilidade(slideId: string, ocultoAtual: boolean) {
+    if (processando) return;
+    // Otimista — o toggle é uma ação leve e frequente, sem indicador de loading próprio.
+    atualizarVisibilidadeSlide(slideId, !ocultoAtual);
+    const res = await AlternarVisibilidadeSlide(slideId);
+    if (!res.success) {
+      atualizarVisibilidadeSlide(slideId, ocultoAtual);
+      toast.error(typeof res.error === "string" ? res.error : "Erro ao alterar visibilidade do slide.");
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id || !apresentacaoId) return;
@@ -416,11 +442,13 @@ export function SidebarSlides() {
                     ordem={s.ordem}
                     nome={s.nome}
                     ativo={s.id === slideAtivoId}
+                    oculto={Boolean(s.oculto)}
                     podeExcluir={slides.length > 1}
                     onSelecionar={() => handleSelecionar(s.id)}
                     onDuplicar={() => handleDuplicar(s.id)}
                     onExcluir={() => handleExcluir(s.id)}
                     onRenomear={(novoNome) => handleRenomear(s.id, novoNome)}
+                    onAlternarVisibilidade={() => handleAlternarVisibilidade(s.id, Boolean(s.oculto))}
                   />
                 ))}
               </div>

@@ -37,6 +37,7 @@ export default async function ModoApresentacaoPage({
       },
       colaboradores: { where: { userId }, select: { id: true } },
       slides: {
+        where: { oculto: false },
         orderBy: { ordem: "asc" },
         select: { id: true, ordem: true, dadosJson: true, transicaoEntrada: true },
       },

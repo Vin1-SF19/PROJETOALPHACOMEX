@@ -4,13 +4,13 @@ import path from "node:path";
 
 import type {
   DevelopmentProvider,
-  ProductionExecution,
+  ProductionExecutionInput,
 } from "@/lib/roadmap-production/contracts";
 
 const DEVELOPMENT_PROVIDER_REPORT_LABEL: Record<DevelopmentProvider, string> =
   {
-    claude: "Claude (fallback Codex → Qwen)",
-    codex: "Codex (fallback Claude → Qwen)",
+    claude: "Claude (fallback Codex)",
+    codex: "Codex (fallback Claude)",
     ollama: "Qwen (fallback Claude → Codex)",
   };
 
@@ -23,19 +23,20 @@ function safeSegment(value: string): string {
   );
 }
 
-export function buildCompletionReport(execution: ProductionExecution): {
+export function buildCompletionReport(execution: ProductionExecutionInput): {
   relativePath: string;
   markdown: string;
 } {
   const revision = `r${String(execution.sourceVersion).padStart(4, "0")}`;
   const relativePath = `prompt-phases/roadmap-alpha/${safeSegment(execution.moduleKey)}/${safeSegment(execution.objectiveCode)}/${revision}/99-relatorio-conclusao.md`;
   const changedFiles = Array.from(
-    new Set(execution.phases.flatMap((phase) => phase.changedFiles)),
+    new Set(execution.phases.flatMap((phase) => phase.changedFiles ?? [])),
   ).sort();
   const closure = [...execution.phases]
     .reverse()
     .find((phase) => phase.kind === "CLOSURE" && phase.summary)?.summary;
-  const reportedErrors = execution.manualFeedback;
+  const reportedErrors = execution.manualFeedback ?? [];
+  const interventions = execution.interventions ?? [];
   const phaseRows = execution.phases.map(
     (phase) =>
       `| ${phase.phaseNumber} | ${phase.title.replaceAll("|", "\\|")} | @${phase.resolvedAgent} | ${phase.status} | ${phase.attemptCount} |`,
@@ -47,8 +48,8 @@ export function buildCompletionReport(execution: ProductionExecution): {
       `- Agente: \`@${phase.resolvedAgent}\``,
       `- Tipo: \`${phase.kind}\``,
       `- Tentativas: ${phase.attemptCount}`,
-      phase.changedFiles.length
-        ? `- Arquivos: ${phase.changedFiles.map((file) => `\`${file}\``).join(", ")}`
+      (phase.changedFiles ?? []).length
+        ? `- Arquivos: ${(phase.changedFiles ?? []).map((file) => `\`${file}\``).join(", ")}`
         : "- Arquivos: nenhum",
       "",
       phase.summary ?? "Fase concluída sem resumo textual.",
@@ -61,7 +62,7 @@ export function buildCompletionReport(execution: ProductionExecution): {
     `**Objetivo:** ${execution.objectiveTitle}`,
     `**Projeto:** ${execution.moduleKey}`,
     `**Revisão:** ${revision}`,
-    `**Cérebro de desenvolvimento:** ${DEVELOPMENT_PROVIDER_REPORT_LABEL[execution.developmentProvider]}`,
+    `**Cérebro de desenvolvimento:** ${DEVELOPMENT_PROVIDER_REPORT_LABEL[execution.developmentProvider ?? "claude"]}`,
     `**Status:** CONCLUÍDO`,
     `**Objetivo refeito por relato:** ${execution.reworkCount} ${execution.reworkCount === 1 ? "vez" : "vezes"}`,
     `**Concluído em:** ${execution.finishedAt ?? new Date().toISOString()}`,
@@ -97,6 +98,17 @@ export function buildCompletionReport(execution: ProductionExecution): {
           .join("\n\n")
       : "Nenhum retrabalho manual foi solicitado nesta execução.",
     "",
+    "## Decisões e intervenções administrativas",
+    "",
+    interventions.length
+      ? interventions
+          .map(
+            (intervention) =>
+              `- Fase ${intervention.phaseNumber} · ${intervention.category} · ${intervention.status}: ${intervention.question}${intervention.resolution ? ` — ${intervention.resolution.author}: ${intervention.resolution.content}` : ""}`,
+          )
+          .join("\n")
+      : "Nenhuma intervenção administrativa foi necessária.",
+    "",
     "## Como foi feito",
     "",
     "| Fase | Atividade | Agente | Resultado | Tentativas |",
@@ -113,7 +125,7 @@ export function buildCompletionReport(execution: ProductionExecution): {
 }
 
 export async function writeCompletionReport(
-  execution: ProductionExecution,
+  execution: ProductionExecutionInput,
   root = process.cwd(),
 ): Promise<{ relativePath: string; markdown: string }> {
   const report = buildCompletionReport(execution);

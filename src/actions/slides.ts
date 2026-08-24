@@ -45,6 +45,7 @@ export async function ListarSlides(apresentacaoId: string) {
         transicaoEntrada: true,
         duracaoAutoplay: true,
         dadosJson: true,
+        oculto: true,
       },
       orderBy: { ordem: "asc" },
     });
@@ -71,6 +72,7 @@ export async function ObterSlide(slideId: string) {
         transicaoEntrada: true,
         duracaoAutoplay: true,
         dadosJson: true,
+        oculto: true,
         apresentacaoId: true,
       },
     });
@@ -330,7 +332,7 @@ export async function DuplicarSlide(slideId: string) {
           duracaoAutoplay: original.duracaoAutoplay,
           dadosJson: dadosDaCopia as object,
         },
-        select: { id: true, ordem: true, nome: true, dadosJson: true },
+        select: { id: true, ordem: true, nome: true, dadosJson: true, oculto: true },
       });
     });
 
@@ -339,5 +341,36 @@ export async function DuplicarSlide(slideId: string) {
   } catch (error) {
     console.error("[DuplicarSlide]", error);
     return { success: false, error: "Erro ao duplicar slide" };
+  }
+}
+
+/** Alterna o campo `oculto` do slide (soft-hide, estilo Canva) — nunca exclui dado nenhum.
+ * Slides ocultos continuam no editor, mas são filtrados do link público, export HTML e modo apresentação. */
+export async function AlternarVisibilidadeSlide(slideId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+
+    const userId = Number(session.user.id);
+    const slide = await db.slide.findUnique({
+      where: { id: slideId },
+      select: { apresentacaoId: true, oculto: true },
+    });
+    if (!slide) return { success: false, error: "Slide não encontrado" };
+
+    const autorizado = await checarOwnershipApresentacao(slide.apresentacaoId, userId, session.user.role);
+    if (!autorizado) return { success: false, error: "Sem permissão" };
+
+    const atualizado = await db.slide.update({
+      where: { id: slideId },
+      data: { oculto: !slide.oculto },
+      select: { id: true, oculto: true },
+    });
+
+    revalidatePath(`/PainelAlpha/Apresentacoes/${slide.apresentacaoId}/editor`);
+    return { success: true, data: atualizado };
+  } catch (error) {
+    console.error("[AlternarVisibilidadeSlide]", error);
+    return { success: false, error: "Erro ao alterar visibilidade do slide" };
   }
 }

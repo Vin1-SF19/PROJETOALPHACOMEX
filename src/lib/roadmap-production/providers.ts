@@ -15,6 +15,8 @@ import {
   diagnoseCliProviders,
   runCliProductionAgent,
 } from "@/lib/roadmap-production/cli-providers";
+import { parseNeedsInputResult } from "@/lib/roadmap-production/interactions";
+import type { ProductionIntervention } from "@/lib/roadmap-production/contracts";
 
 const completionSchema = z
   .object({
@@ -69,6 +71,7 @@ export interface ProviderDiagnostic {
 }
 
 export interface ProductionAgentInput {
+  executionId?: string;
   agentId: string;
   objectiveCode: string;
   objectiveTitle: string;
@@ -89,6 +92,8 @@ export interface ProductionAgentResult {
   summary: string;
   errorCode?: string;
   toolSteps: number;
+  intervention?: ProductionIntervention;
+  resolvedAgent?: string;
 }
 
 export type ProductionExecutionEngine = "qwen" | "development";
@@ -242,9 +247,28 @@ function describeCaughtError(error: unknown): { errorCode: string; summary: stri
 function phaseResult(
   content: string,
   toolSteps: number,
+  executionId: string,
 ): ProductionAgentResult {
   const summary =
     content.trim().slice(0, 8_000) || "Fase concluída sem resumo textual.";
+  if (/RESULT\s*:\s*NEEDS_INPUT\b/i.test(content)) {
+    const intervention = parseNeedsInputResult(content, executionId);
+    if (!intervention) {
+      return {
+        success: false,
+        summary,
+        errorCode: "INVALID_NEEDS_INPUT",
+        toolSteps,
+      };
+    }
+    return {
+      success: false,
+      summary,
+      errorCode: "NEEDS_INPUT",
+      toolSteps,
+      intervention,
+    };
+  }
   const failure = /RESULT(?:ADO)?\s*:\s*(FAIL|FAILED|BLOCKED|REPROVADO)/i.test(
     content,
   );
@@ -286,6 +310,7 @@ export async function runProductionAgent(
     "Seja econômico: investigue somente o necessário e conclua em até 10 rodadas de tools.",
     "Não faça commit, push, reset, checkout, migration, alteração de schema ou operação destrutiva.",
     "Pedidos de PR, commit ou screenshot anexado são opcionais e não bloqueiam a implementação local; registre-os como pendência manual.",
+    "Quando faltar uma decisão ou autorização humana, encerre a chamada sem manter processo aberto. Responda exatamente RESULT: NEEDS_INPUT e, na última linha, NEEDS_INPUT_JSON: seguido de JSON estrito com requestId UUID, phaseNumber, category (PERMISSION|DECISION|CREDENTIAL|EXTERNAL_ACTION|DATABASE|DESTRUCTIVE|GIT_REMOTE), question, intendedAction, risk e options. Nunca inclua valor de credencial.",
     deliveryAdaptationInstructions(input.phaseKind),
     config.provider === "ollama"
       ? "Limite de capacidade do Qwen: execute diagnósticos, análises, levantamentos e documentação simples. Se descobrir necessidade de frontend, backend, banco de dados, autenticação, integração complexa ou alteração de código, não improvise e não implemente. Responda RESULT: BLOCKED e inclua exatamente CAPABILITY_ESCALATION_REQUIRED: <FRONTEND|BACKEND|DATABASE|SECURITY|INTEGRATION> — <motivo verificável>. O worker encaminhará o contexto para Claude/Codex."
@@ -295,7 +320,7 @@ export async function runProductionAgent(
         ? "Você pode editar somente pelos tools create_file/replace_in_file."
         : "Você pode editar arquivos dentro do projeto usando somente as ferramentas autorizadas pela CLI."
       : "Esta é uma fase somente leitura: não tente criar ou alterar arquivos.",
-    "Ao concluir, responda com RESULT: PASS ou RESULT: FAIL/BLOCKED, resumo, arquivos afetados e gates executados.",
+    "Ao concluir, responda com RESULT: PASS, RESULT: FAIL/BLOCKED ou RESULT: NEEDS_INPUT, resumo, arquivos afetados e gates executados.",
     agentContext,
   ].join("\n\n");
   const user = JSON.stringify({
@@ -335,7 +360,7 @@ export async function runProductionAgent(
           errorCode: execution.errorCode,
           toolSteps: execution.toolSteps,
         };
-      const result = phaseResult(execution.content, execution.toolSteps);
+      const result = phaseResult(execution.content, execution.toolSteps, input.executionId ?? input.objectiveCode);
       if (
         result.success &&
         input.requireChanges &&
@@ -437,7 +462,7 @@ export async function runProductionAgent(
         continue;
       }
       if (!assistant.tool_calls?.length) {
-        const result = phaseResult(assistant.content ?? "", step);
+        const result = phaseResult(assistant.content ?? "", step, input.executionId ?? input.objectiveCode);
         if (
           result.errorCode === "AGENT_RESULT_MISSING" &&
           step + 1 < config.maxToolSteps

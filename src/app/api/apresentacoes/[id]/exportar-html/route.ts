@@ -40,6 +40,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       titulo: true,
       tema: { select: { corPrimaria: true, corSecundaria: true, corAccent: true } },
       slides: {
+        where: { oculto: false },
         orderBy: { ordem: "asc" },
         select: { id: true, ordem: true, transicaoEntrada: true, dadosJson: true },
       },

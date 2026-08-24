@@ -70,6 +70,7 @@ export async function createRoadmapObjective(input: RoadmapObjectiveInput, creat
         sourceVersion: objective.sourceVersion,
         idempotencyKey: `${objective.id}:v${objective.sourceVersion}`,
         prioritySnapshot: priority,
+        maxAttempts: 30,
       },
     });
 
@@ -173,6 +174,7 @@ export async function retryRoadmapObjective(objectiveId: string) {
         sourceVersion: nextVersion,
         idempotencyKey: `${objectiveId}:v${nextVersion}`,
         prioritySnapshot: objective.globalPriority,
+        maxAttempts: 30,
       },
     });
     return { objective: updated, job };
@@ -227,6 +229,7 @@ export async function updateRoadmapObjective(objectiveId: string, input: Roadmap
         sourceVersion: nextVersion,
         idempotencyKey: `${objectiveId}:v${nextVersion}`,
         prioritySnapshot: current.globalPriority,
+        maxAttempts: 30,
       },
     });
     return { objective, regenerated: true };

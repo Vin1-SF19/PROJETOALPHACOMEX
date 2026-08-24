@@ -132,10 +132,17 @@ export async function CriarObjetivoRoadmap(payload: unknown) {
       throw new Error("MODULE_KEY_INVALID");
     const { developmentProvider, ...objectiveInput } = input;
     const result = await createRoadmapObjective(objectiveInput, access.userId);
-    await writeObjectiveDevelopmentProvider(
-      result.objective.id,
-      developmentProvider,
-    );
+    try {
+      await writeObjectiveDevelopmentProvider(
+        result.objective.id,
+        developmentProvider,
+      );
+    } catch (providerError) {
+      console.error(
+        `[roadmap] Falha ao salvar preferência de desenvolvimento do objetivo ${result.objective.id}:`,
+        providerError,
+      );
+    }
     revalidatePath(ROUTE);
     return { success: true as const, objectiveId: result.objective.id };
   } catch (error) {
@@ -174,10 +181,17 @@ export async function AtualizarObjetivoRoadmap(payload: unknown) {
       parsed.objectiveId,
       objectiveContent,
     );
-    await writeObjectiveDevelopmentProvider(
-      parsed.objectiveId,
-      developmentProvider,
-    );
+    try {
+      await writeObjectiveDevelopmentProvider(
+        parsed.objectiveId,
+        developmentProvider,
+      );
+    } catch (providerError) {
+      console.error(
+        `[roadmap] Falha ao salvar preferência de desenvolvimento do objetivo ${parsed.objectiveId}:`,
+        providerError,
+      );
+    }
     revalidatePath(ROUTE);
     return {
       success: true as const,

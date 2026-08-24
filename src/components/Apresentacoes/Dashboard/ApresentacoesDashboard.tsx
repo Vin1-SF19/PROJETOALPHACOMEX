@@ -14,9 +14,10 @@ const PAGE_SIZE = 24;
 
 interface ApresentacoesDashboardProps {
   temaName?: string;
+  usuarioAtualId: number;
 }
 
-export function ApresentacoesDashboard({ temaName = "blue" }: ApresentacoesDashboardProps) {
+export function ApresentacoesDashboard({ temaName = "blue", usuarioAtualId }: ApresentacoesDashboardProps) {
   const tema = getTema(temaName);
   const accent = tema.accent;
 
@@ -167,7 +168,12 @@ export function ApresentacoesDashboard({ temaName = "blue" }: ApresentacoesDashb
             >
               {apresentacoes.map((ap) => (
                 <motion.div key={ap.id} variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
-                  <CardApresentacao apresentacao={ap} accent={accent} onAlterado={carregarDados} />
+                  <CardApresentacao
+                    apresentacao={ap}
+                    accent={accent}
+                    onAlterado={carregarDados}
+                    usuarioAtualId={usuarioAtualId}
+                  />
                 </motion.div>
               ))}
             </motion.div>

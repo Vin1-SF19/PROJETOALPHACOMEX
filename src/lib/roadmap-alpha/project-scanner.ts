@@ -23,6 +23,8 @@ const BINARY_EXTENSIONS = new Set([
 ]);
 
 const MAX_CONTEXT_CHARS = 100_000;
+const MAX_TREE_CHARS = 20_000;
+const MAX_TREE_ENTRIES = 3_000;
 
 interface ScannedFile {
   relativePath: string;
@@ -69,10 +71,22 @@ export async function scanProjectContext(root: string): Promise<string> {
     return "[Não foi possível ler o diretório do projeto para gerar contexto.]";
   }
 
-  const tree = files
+  const sortedPaths = files
     .map((file) => file.relativePath)
-    .sort((a, b) => a.localeCompare(b))
-    .join("\n");
+    .sort((a, b) => a.localeCompare(b));
+  const treeTruncatedByCount = sortedPaths.length > MAX_TREE_ENTRIES;
+  const treeEntries = treeTruncatedByCount
+    ? sortedPaths.slice(0, MAX_TREE_ENTRIES)
+    : sortedPaths;
+  let tree = treeEntries.join("\n");
+  let treeTruncated = treeTruncatedByCount;
+  if (tree.length > MAX_TREE_CHARS) {
+    tree = tree.slice(0, MAX_TREE_CHARS);
+    treeTruncated = true;
+  }
+  if (treeTruncated) {
+    tree += `\n[Árvore truncada — projeto tem ${files.length} arquivos, exibindo os primeiros que couberam no limite]`;
+  }
 
   const sortedByDepthThenPath = [...files].sort((a, b) => {
     const depthDiff =

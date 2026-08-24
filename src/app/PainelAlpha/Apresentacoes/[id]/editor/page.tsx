@@ -40,7 +40,7 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
       colaboradores: { where: { userId }, select: { id: true } },
       slides: {
         orderBy: { ordem: "asc" },
-        select: { id: true, ordem: true, nome: true, dadosJson: true, transicaoEntrada: true },
+        select: { id: true, ordem: true, nome: true, dadosJson: true, transicaoEntrada: true, oculto: true },
       },
       assets: {
         orderBy: { createdAt: "desc" },
@@ -92,6 +92,7 @@ export default async function ApresentacaoEditorPage({ params }: { params: Promi
         componentes: (s.dadosJson as DadosSlidePersistidos | null)?.componentes ?? [],
         canvas: obterCanvasSeguro((s.dadosJson as DadosSlidePersistidos | null)?.canvas),
         animacaoConfig: (s.dadosJson as DadosSlidePersistidos | null)?.animacaoConfig,
+        oculto: s.oculto,
       }))}
       slideAtivoIdInicial={primeiroSlide.id}
       componentesIniciais={componentesIniciais}

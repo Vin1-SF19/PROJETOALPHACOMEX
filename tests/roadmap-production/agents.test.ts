@@ -16,5 +16,10 @@ describe("catálogo dos agentes Bibble", () => {
     expect(resolvePhaseAgent("dev", "API", "Criar server action backend")).toBe("echo");
     expect(resolvePhaseAgent("probe", "Validar", "Executar testes")).toBe("probe");
     expect(resolvePhaseAgent("forge", "Implementar background espacial", "Criar componente visual no layout do CRM")).toBe("nova");
+    expect(resolvePhaseAgent("dev", "Implementar requisitos", "Criar o fluxo solicitado")).toBe("echo");
+    expect(resolvePhaseAgent("dev", "Implementar API", "Também atualizar um componente React")).toBe("echo");
+    expect(resolvePhaseAgent("dev", "Implementar painel", "Criar um route handler auxiliar")).toBe("nova");
+    expect(resolvePhaseAgent("dev", "Implementar", "CAPABILITY_ESCALATION_REQUIRED: BACKEND — criar rota")).toBe("echo");
+    expect(resolvePhaseAgent("dev", "Implementar", "CAPABILITY_ESCALATION_REQUIRED: FRONTEND — criar tela")).toBe("nova");
   });
 });

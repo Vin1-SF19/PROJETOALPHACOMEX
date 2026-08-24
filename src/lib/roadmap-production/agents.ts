@@ -64,15 +64,31 @@ export async function listBibbleAgents(root = process.cwd()): Promise<BibbleAgen
   }));
 }
 
+const FRONTEND_CAPABILITY = /\b(?:ui|ux|css|tailwind|layout|painel|interface|componentes?|frontend|front-end|react|visual|hover|skeleton|anima(?:ção|ções|r))\b/i;
+const BACKEND_CAPABILITY = /\b(?:api|apis|server actions?|backend|back-end|route handlers?|rotas?|serviços?|worker|fila|integra(?:ção|ções)|servidor)\b/i;
+
+export function resolveCapabilityEscalationAgent(value: string): "nova" | "echo" | null {
+  const marker = value.match(/\bCAPABILITY_ESCALATION_REQUIRED\s*:\s*(FRONTEND|BACKEND)\b/i)?.[1]?.toUpperCase();
+  if (marker === "FRONTEND") return "nova";
+  if (marker === "BACKEND") return "echo";
+  return null;
+}
+
+function classifyCapability(value: string): "nova" | "echo" | null {
+  if (BACKEND_CAPABILITY.test(value)) return "echo";
+  if (FRONTEND_CAPABILITY.test(value)) return "nova";
+  return null;
+}
+
 export function resolvePhaseAgent(requestedAgent: string, title: string, markdown: string): string {
+  const escalation = resolveCapabilityEscalationAgent(`${title}\n${markdown}`);
+  if (escalation) return escalation;
   if (requestedAgent === "context") return "scout";
-  const normalized = `${title} ${markdown}`.toLocaleLowerCase("pt-BR");
-  const implementationIntent = /\b(implementar|criar|adicionar|corrigir|desenvolver|integrar)\b/.test(title.toLocaleLowerCase("pt-BR"));
+  if (["nova", "echo"].includes(requestedAgent)) return requestedAgent;
+  const implementationIntent = /\b(implementar|criar|adicionar|corrigir|desenvolver|integrar)\b/i.test(title);
   const misroutedReadOnlyAgent = ["forge", "probe", "scout"].includes(requestedAgent) && implementationIntent;
   if (requestedAgent !== "dev" && !misroutedReadOnlyAgent) return requestedAgent;
-  if (/(ui|ux|css|tailwind|layout|componente|frontend|visual|hover|skeleton|anima)/.test(normalized)) return "nova";
-  if (/(api|server action|backend|rota|serviço|worker|fila|integração)/.test(normalized)) return "echo";
-  return "echo";
+  return classifyCapability(title) ?? classifyCapability(markdown) ?? "echo";
 }
 
 export async function loadBibbleAgentContext(agentId: string, root = process.cwd()): Promise<string> {

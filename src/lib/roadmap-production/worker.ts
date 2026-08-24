@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import db from "@/lib/prisma";
-import { resolvePhaseAgent } from "@/lib/roadmap-production/agents";
+import {
+  listBibbleAgents,
+  resolveCapabilityEscalationAgent,
+  resolvePhaseAgent,
+} from "@/lib/roadmap-production/agents";
 import type {
   DevelopmentProvider,
   ProductionActivity,
@@ -9,6 +13,28 @@ import type {
   ProductionExecution,
   ProductionState,
 } from "@/lib/roadmap-production/contracts";
+
+type ProductionPhaseCompat = Omit<
+  ProductionExecution["phases"][number],
+  "agentOverride" | "circuit"
+> &
+  Partial<
+    Pick<
+      ProductionExecution["phases"][number],
+      "agentOverride" | "circuit"
+    >
+  >;
+type ProductionExecutionCompat = Omit<
+  ProductionExecution,
+  "messages" | "interventions" | "phases"
+> & {
+  messages?: ProductionExecution["messages"];
+  interventions?: ProductionExecution["interventions"];
+  phases: ProductionPhaseCompat[];
+};
+type ProductionStateCompat = Omit<ProductionState, "executions"> & {
+  executions: ProductionExecutionCompat[];
+};
 import { writeCompletionReport } from "@/lib/roadmap-production/completion-report";
 import { acquireProductionExecutionLease } from "@/lib/roadmap-production/execution-lock";
 import {
@@ -28,6 +54,13 @@ import {
   writeProductionState,
 } from "@/lib/roadmap-production/storage";
 import { resolveProductionWorkspaceScope } from "@/lib/roadmap-production/workspace-scope";
+import {
+  createCircuitIntervention,
+  registerProductionFailure,
+  resetProductionCircuit,
+  sanitizeProductionText,
+  validateInteractionCommand,
+} from "@/lib/roadmap-production/interactions";
 
 const AUTO_RETRY_DELAY_MS = 5_000;
 // Margem alta de propósito: fases recuperáveis (implementação, closure gravável, erro
@@ -95,11 +128,11 @@ const DEVELOPMENT_PROVIDER_LABEL: Record<DevelopmentProvider, string> = {
 
 export function developmentProviderOrder(
   preferred: DevelopmentProvider,
-): [DevelopmentProvider, DevelopmentProvider, DevelopmentProvider] {
+): [DevelopmentProvider, DevelopmentProvider] {
   const rest: DevelopmentProvider[] = (
     ["claude", "codex", "ollama"] as const
   ).filter((provider) => provider !== preferred);
-  return [preferred, rest[0], rest[1]];
+  return [preferred, rest[0]];
 }
 
 async function runDevelopmentAgentWithFallback(
@@ -228,11 +261,13 @@ async function runProductionAgentWithCapabilityRouting(
     preferred === "ollama"
       ? (["claude", "codex"] as DevelopmentProvider[])
       : undefined;
-  return runDevelopmentAgentWithFallback(
+  const promotedAgent = resolveCapabilityEscalationAgent(qwenResult.summary);
+  const promotedInput = promotedAgent ? { ...input, agentId: promotedAgent } : input;
+  const escalatedResult = await runDevelopmentAgentWithFallback(
     config,
     preferred,
     {
-      ...input,
+      ...promotedInput,
       previousSummaries: [
         ...qwenInput.previousSummaries,
         `Diagnóstico do Qwen antes do escalonamento:\n${qwenResult.summary}`,
@@ -242,6 +277,9 @@ async function runProductionAgentWithCapabilityRouting(
     root,
     escalationOrder,
   );
+  return promotedAgent
+    ? { ...escalatedResult, resolvedAgent: promotedAgent }
+    : escalatedResult;
 }
 
 function now(): string {
@@ -313,7 +351,7 @@ function retryDate(at: string): string {
 }
 
 function isReady(
-  phase: ProductionExecution["phases"][number],
+  phase: ProductionPhaseCompat,
   referenceTime: number,
 ): boolean {
   return (
@@ -323,9 +361,9 @@ function isReady(
 }
 
 function nextReadyPhase(
-  execution: ProductionExecution,
+  execution: ProductionExecutionCompat,
   referenceTime: number,
-): ProductionExecution["phases"][number] | undefined {
+): ProductionPhaseCompat | undefined {
   const nextPending = execution.phases.find(
     (phase) => phase.status === "PENDING",
   );
@@ -335,7 +373,7 @@ function nextReadyPhase(
 }
 
 function appendActivity(
-  executionPhase: ProductionExecution["phases"][number],
+  executionPhase: Pick<ProductionPhaseCompat, "activities">,
   activity: ProductionActivity,
 ): void {
   executionPhase.activities = [...executionPhase.activities, activity].slice(
@@ -412,8 +450,14 @@ export async function syncProductionExecutions(
           artifact.title,
           artifact.contentMarkdown,
         );
-        if (existingPhase.resolvedAgent !== desiredAgent) {
+        if (!existingPhase.agentOverride && existingPhase.resolvedAgent !== desiredAgent) {
           existingPhase.resolvedAgent = desiredAgent;
+          resetProductionCircuit(
+            existing,
+            existingPhase.phaseNumber,
+            "agente corrigido automaticamente",
+            now(),
+          );
           appendActivity(existingPhase, {
             at: now(),
             agentId: desiredAgent,
@@ -444,6 +488,8 @@ export async function syncProductionExecutions(
       completionReportMarkdown: null,
       reworkCount: 0,
       manualFeedback: [],
+      messages: [],
+      interventions: [],
       phases: objective.promptArtifacts.map((phase) => ({
         phaseNumber: phase.phaseNumber,
         title: phase.title,
@@ -454,6 +500,7 @@ export async function syncProductionExecutions(
           phase.title,
           phase.contentMarkdown,
         ),
+        agentOverride: false,
         status: "PENDING",
         attemptCount: 0,
         autoRetryCount: 0,
@@ -465,6 +512,13 @@ export async function syncProductionExecutions(
         changedFiles: [],
         reworkCount: 0,
         manualFeedback: [],
+        circuit: {
+          fingerprint: null,
+          consecutiveCount: 0,
+          firstOccurredAt: null,
+          lastOccurredAt: null,
+          resetReason: null,
+        },
         activities: [],
       })),
     });
@@ -473,7 +527,7 @@ export async function syncProductionExecutions(
   for (const execution of state.executions) {
     if (execution.status !== "SUCCEEDED" || execution.completionReportMarkdown)
       continue;
-    const report = await writeCompletionReport(execution);
+    const report = await writeCompletionReport(execution, root);
     execution.completionReportPath = report.relativePath;
     execution.completionReportMarkdown = report.markdown;
     changed = true;
@@ -500,11 +554,13 @@ export async function syncProductionExecutions(
   return state;
 }
 
-export async function refreshProductionExecutions(): Promise<ProductionState> {
+export async function refreshProductionExecutions(
+  root = process.cwd(),
+): Promise<ProductionState> {
   const lease = await acquireProductionExecutionLease();
-  if (!lease) return readProductionState();
+  if (!lease) return readProductionState(root);
   try {
-    return await syncProductionExecutions();
+    return await syncProductionExecutions(root);
   } finally {
     await lease.release();
   }
@@ -516,11 +572,38 @@ export async function applyProductionControls(
   const controls = await readProductionControls(root);
   if (!controls.length) return 0;
   const state = await readProductionState(root);
+  const installedAgents = new Set(
+    (await listBibbleAgents(process.cwd()))
+      .filter((agent) => agent.available)
+      .map((agent) => agent.id),
+  );
   for (const { command } of controls) {
     const index = state.executions.findIndex(
       (execution) => execution.id === command.executionId,
     );
     const execution = index >= 0 ? state.executions[index] : null;
+    if (["RESPOND", "AUTHORIZE", "DENY", "MESSAGE", "SWITCH_AGENT"].includes(command.type)) {
+      try {
+        validateInteractionCommand(state, command, installedAgents);
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "INTERACTION_REJECTED";
+        const phase = execution?.phases.find((item) => item.phaseNumber === command.phaseNumber);
+        if (execution && phase) {
+          execution.messages.push({
+            id: randomUUID(),
+            executionId: execution.id,
+            phaseNumber: phase.phaseNumber,
+            role: "SYSTEM",
+            kind: "STATUS",
+            content: `Comando administrativo rejeitado: ${code}`,
+            requestId: command.requestId,
+            createdAt: command.createdAt,
+          });
+          execution.messages = execution.messages.slice(-500);
+        }
+        continue;
+      }
+    }
     if (command.type === "EXCLUDE") {
       if (execution) state.executions.splice(index, 1);
       if (!state.ignoredExecutionIds.includes(command.executionId))
@@ -606,6 +689,139 @@ export async function applyProductionControls(
       execution.finishedAt = null;
       execution.completionReportPath = null;
       execution.completionReportMarkdown = null;
+    } else if (
+      ["RESPOND", "AUTHORIZE", "DENY"].includes(command.type) &&
+      execution &&
+      command.phaseNumber !== null &&
+      command.requestId
+    ) {
+      const phase = execution.phases.find(
+        (item) => item.phaseNumber === command.phaseNumber,
+      );
+      const intervention = execution.interventions.find(
+        (item) => item.requestId === command.requestId,
+      );
+      if (!phase || !intervention) continue;
+      const decision =
+        command.type === "RESPOND"
+          ? "ANSWER"
+          : command.type === "AUTHORIZE"
+            ? "AUTHORIZE"
+            : "DENY";
+      const content = sanitizeProductionText(
+        command.content ??
+          (decision === "AUTHORIZE"
+            ? "Ação autorizada uma única vez para esta fase."
+            : "Ação negada pelo administrador."),
+      );
+      intervention.status =
+        decision === "ANSWER"
+          ? "ANSWERED"
+          : decision === "AUTHORIZE"
+            ? "AUTHORIZED"
+            : "DENIED";
+      intervention.resolvedAt = command.createdAt;
+      intervention.resolution = {
+        author: command.author,
+        decision,
+        content,
+        createdAt: command.createdAt,
+        authorizationAttempt:
+          decision === "AUTHORIZE" ? phase.attemptCount + 1 : null,
+        authorizationConsumedAt: null,
+      };
+      execution.messages.push({
+        id: randomUUID(),
+        executionId: execution.id,
+        phaseNumber: phase.phaseNumber,
+        role: "ADMIN",
+        kind: decision === "ANSWER" ? "ANSWER" : "DECISION",
+        content,
+        requestId: intervention.requestId,
+        createdAt: command.createdAt,
+      });
+      execution.messages = execution.messages.slice(-500);
+      if (decision === "DENY") {
+        phase.status = "BLOCKED";
+        phase.errorCode = "ADMIN_DENIED";
+        phase.finishedAt = command.createdAt;
+        execution.status = "BLOCKED";
+        execution.finishedAt = command.createdAt;
+      } else {
+        phase.status = "PENDING";
+        phase.errorCode = null;
+        phase.finishedAt = null;
+        phase.retryAt = null;
+        execution.status = "PENDING";
+        execution.finishedAt = null;
+        resetProductionCircuit(
+          execution,
+          phase.phaseNumber,
+          "resposta administrativa recebida",
+          command.createdAt,
+        );
+      }
+    } else if (
+      command.type === "MESSAGE" &&
+      execution &&
+      command.phaseNumber !== null &&
+      command.content
+    ) {
+      execution.messages.push({
+        id: randomUUID(),
+        executionId: execution.id,
+        phaseNumber: command.phaseNumber,
+        role: "ADMIN",
+        kind: "MESSAGE",
+        content: sanitizeProductionText(command.content),
+        requestId: null,
+        createdAt: command.createdAt,
+      });
+      execution.messages = execution.messages.slice(-500);
+    } else if (
+      command.type === "SWITCH_AGENT" &&
+      execution &&
+      command.phaseNumber !== null &&
+      command.agentId
+    ) {
+      const phase = execution.phases.find(
+        (item) => item.phaseNumber === command.phaseNumber,
+      );
+      if (!phase) continue;
+      const previousAgent = phase.resolvedAgent;
+      phase.resolvedAgent = command.agentId;
+      phase.agentOverride = true;
+      resetProductionCircuit(
+        execution,
+        phase.phaseNumber,
+        `troca manual de ${previousAgent} para ${command.agentId}`,
+        command.createdAt,
+      );
+      execution.messages.push({
+        id: randomUUID(),
+        executionId: execution.id,
+        phaseNumber: phase.phaseNumber,
+        role: "SYSTEM",
+        kind: "STATUS",
+        content: `Agente trocado por ${command.author}: ${previousAgent} → ${command.agentId}.`,
+        requestId: null,
+        createdAt: command.createdAt,
+      });
+      execution.messages = execution.messages.slice(-500);
+    } else if (execution) {
+      for (const phase of execution.phases) {
+        appendActivity(phase, {
+          at: now(),
+          agentId: phase.resolvedAgent,
+          type: "STATUS",
+          message: `Comando ${command.type} ignorado: execução está em status ${execution.status}, condição do comando não foi satisfeita.`,
+        });
+        break;
+      }
+    } else {
+      console.warn(
+        `[roadmap-production] Comando ${command.type} ignorado: executionId ${command.executionId} não encontrado no estado atual.`,
+      );
     }
   }
   await writeProductionState(state, root);
@@ -616,8 +832,8 @@ export async function applyProductionControls(
 }
 
 export function selectNextProductionExecution(
-  state: ProductionState,
-): ProductionExecution | undefined {
+  state: ProductionStateCompat,
+): ProductionExecutionCompat | undefined {
   const referenceTime = Date.now();
   const activeExecution = state.executions.find(
     (execution) =>
@@ -724,6 +940,7 @@ export async function recoverInterruptedProduction(
 async function retryProductionExecutionUnlocked(
   id: string,
   adoptedChanges: string[] = [],
+  root = process.cwd(),
 ): Promise<void> {
   await mutateExecution(id, (execution) => {
     const failed = execution.phases.find(
@@ -755,17 +972,18 @@ async function retryProductionExecutionUnlocked(
     });
     execution.status = "PENDING";
     execution.finishedAt = null;
-  });
+  }, root);
 }
 
 export async function retryProductionExecution(
   id: string,
   adoptedChanges: string[] = [],
+  root = process.cwd(),
 ): Promise<void> {
   const lease = await acquireProductionExecutionLease();
   if (!lease) throw new Error("PRODUCTION_EXECUTION_BUSY");
   try {
-    await retryProductionExecutionUnlocked(id, adoptedChanges);
+    await retryProductionExecutionUnlocked(id, adoptedChanges, root);
   } finally {
     await lease.release();
   }
@@ -778,7 +996,7 @@ interface FailedAgentResult {
 }
 
 export function scheduleAutomaticRecovery(
-  execution: ProductionExecution,
+  execution: ProductionExecutionCompat,
   failedPhaseNumber: number,
   result: FailedAgentResult,
   at = now(),
@@ -788,6 +1006,7 @@ export function scheduleAutomaticRecovery(
   );
   if (!failed || failed.autoRetryCount >= AUTO_RETRY_LIMIT) return null;
   const errorCode = result.errorCode ?? "AGENT_FAILED";
+  if (errorCode === "ADMIN_DENIED") return null;
 
   if (
     failed.kind === "VERIFICATION" &&
@@ -857,7 +1076,7 @@ export function scheduleAutomaticRecovery(
 }
 
 export function recoverCorrectableFailures(
-  state: ProductionState,
+  state: ProductionStateCompat,
   at = now(),
 ): number {
   let recovered = 0;
@@ -907,7 +1126,7 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
         ? feedback
         : { ...feedback, resolvedAt: execution.finishedAt },
     );
-    const report = await writeCompletionReport(execution);
+    const report = await writeCompletionReport(execution, root);
     execution.completionReportPath = report.relativePath;
     execution.completionReportMarkdown = report.markdown;
     await writeProductionState(state, root);
@@ -1023,6 +1242,7 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
     (feedback) => !feedback.resolvedAt,
   );
   const agentInput: ProductionAgentInput = {
+    executionId: execution.id,
     agentId: phase.resolvedAgent,
     objectiveCode: execution.objectiveCode,
     objectiveTitle: execution.objectiveTitle,
@@ -1031,7 +1251,27 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
     phaseTitle: phase.title,
     phaseKind: phase.kind,
     phaseMarkdown: artifact.contentMarkdown,
-    manualFeedback: pendingManualFeedback.map((feedback) => feedback.content),
+    manualFeedback: [
+      ...pendingManualFeedback.map((feedback) => feedback.content),
+      ...(execution.messages ?? [])
+        .filter((message) => message.phaseNumber === phase.phaseNumber)
+        .filter((message) => {
+          if (!message.requestId) return true;
+          const related = (execution.interventions ?? []).find(
+            (item) => item.requestId === message.requestId,
+          );
+          if (related?.status !== "AUTHORIZED") return true;
+          return (
+            related.resolution?.authorizationAttempt === phase.attemptCount &&
+            related.resolution.authorizationConsumedAt === null
+          );
+        })
+        .slice(-20)
+        .map(
+          (message) =>
+            `[${message.role}/${message.kind}] ${message.content}`,
+        ),
+    ],
     previousSummaries: [
       ...successfulSummaries,
       ...(phase.attemptCount > 1 && phase.summary
@@ -1068,6 +1308,65 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
       (item) => item.phaseNumber === phase.phaseNumber,
     );
     if (!currentPhase) return;
+    for (const intervention of current.interventions) {
+      if (
+        intervention.phaseNumber === currentPhase.phaseNumber &&
+        intervention.status === "AUTHORIZED" &&
+        intervention.resolution?.authorizationAttempt ===
+          currentPhase.attemptCount &&
+        intervention.resolution.authorizationConsumedAt === null
+      ) {
+        intervention.resolution.authorizationConsumedAt = now();
+      }
+    }
+    if (result.resolvedAgent && result.resolvedAgent !== currentPhase.resolvedAgent) {
+      const previousAgent = currentPhase.resolvedAgent;
+      currentPhase.resolvedAgent = result.resolvedAgent;
+      currentPhase.agentOverride = false;
+      resetProductionCircuit(
+        current,
+        currentPhase.phaseNumber,
+        `escalonamento automático de ${previousAgent} para ${result.resolvedAgent}`,
+        now(),
+      );
+    }
+    if (result.errorCode === "NEEDS_INPUT" && result.intervention) {
+      const intervention = result.intervention;
+      if (intervention.phaseNumber !== currentPhase.phaseNumber) {
+        currentPhase.status = "FAILED";
+        currentPhase.finishedAt = now();
+        currentPhase.summary = result.summary;
+        currentPhase.errorCode = "INTERVENTION_PHASE_MISMATCH";
+        current.status = "FAILED";
+        current.finishedAt = now();
+        return;
+      }
+      const duplicate = current.interventions.some(
+        (item) => item.requestId === intervention.requestId,
+      );
+      if (!duplicate) {
+        current.interventions.push(intervention);
+        current.interventions = current.interventions.slice(-100);
+        current.messages.push({
+          id: randomUUID(),
+          executionId: current.id,
+          phaseNumber: currentPhase.phaseNumber,
+          role: "AGENT",
+          kind: "QUESTION",
+          content: intervention.question,
+          requestId: intervention.requestId,
+          createdAt: intervention.createdAt,
+        });
+        current.messages = current.messages.slice(-500);
+      }
+      currentPhase.status = "NEEDS_INPUT";
+      currentPhase.finishedAt = now();
+      currentPhase.summary = result.summary;
+      currentPhase.errorCode = "NEEDS_INPUT";
+      current.status = "WAITING_FOR_ADMIN";
+      current.finishedAt = null;
+      return;
+    }
     currentPhase.status = result.success
       ? "SUCCEEDED"
       : result.errorCode === "AGENT_BLOCKED"
@@ -1085,6 +1384,40 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
         : `Fase interrompida: ${describeProductionErrorCode(result.errorCode)}`,
     });
     if (!result.success) {
+      const circuit = registerProductionFailure(
+        current,
+        currentPhase.phaseNumber,
+        result.errorCode,
+        result.summary,
+        now(),
+      );
+      if (circuit.opened) {
+        const intervention = createCircuitIntervention(
+          current,
+          currentPhase.phaseNumber,
+          result.summary,
+          circuit.count,
+          now(),
+        );
+        current.interventions.push(intervention);
+        current.interventions = current.interventions.slice(-100);
+        current.messages.push({
+          id: randomUUID(),
+          executionId: current.id,
+          phaseNumber: currentPhase.phaseNumber,
+          role: "SYSTEM",
+          kind: "QUESTION",
+          content: intervention.question,
+          requestId: intervention.requestId,
+          createdAt: intervention.createdAt,
+        });
+        current.messages = current.messages.slice(-500);
+        currentPhase.status = "NEEDS_INPUT";
+        currentPhase.errorCode = "CIRCUIT_OPEN";
+        current.status = "WAITING_FOR_ADMIN";
+        current.finishedAt = null;
+        return;
+      }
       let recovery: "IMPLEMENTATION_FEEDBACK" | "SAME_PHASE" | null;
       const retryAgent = resolveDeliveryAdjustmentAgent(
         currentPhase,
@@ -1130,6 +1463,12 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
         });
       }
     } else if (current.phases.every((item) => item.status === "SUCCEEDED")) {
+      resetProductionCircuit(
+        current,
+        currentPhase.phaseNumber,
+        "fase concluída com sucesso",
+        now(),
+      );
       current.status = "SUCCEEDED";
       current.finishedAt = now();
       current.manualFeedback = current.manualFeedback.map((feedback) =>
@@ -1142,7 +1481,7 @@ async function processNextProductionPhaseUnlocked(root = process.cwd()) {
     }
   }, root);
   if (updated.status === "SUCCEEDED" && !updated.completionReportMarkdown) {
-    const report = await writeCompletionReport(updated);
+    const report = await writeCompletionReport(updated, root);
     updated = await mutateExecution(
       updated.id,
       (current) => {

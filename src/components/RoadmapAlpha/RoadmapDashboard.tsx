@@ -44,6 +44,10 @@ import {
   ReenfileirarObjetivoRoadmap,
 } from "@/actions/RoadmapAlpha";
 import {
+  AprovarExecucaoRoadmapProduction,
+  ListarExecucoesAguardandoAprovacao,
+} from "@/actions/RoadmapProduction";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -60,6 +64,10 @@ import {
 import { Input } from "@/components/ui/input";
 import type { RoadmapModuleSnapshot } from "@/lib/roadmap-alpha/catalog";
 import type { RoadmapImproveField } from "@/lib/roadmap-alpha/improve-with-ai";
+import {
+  NOVO_MODULO_CONSTRAINTS,
+  isNovoModuloObjective,
+} from "@/lib/roadmap-alpha/new-module-preset";
 import { RoadmapProductionPanel } from "@/components/RoadmapAlpha/RoadmapProductionPanel";
 import { SistemasExternosSection } from "@/components/RoadmapAlpha/SistemasExternosSection";
 
@@ -240,6 +248,31 @@ export function RoadmapDashboard({
   const [productionModuleKey, setProductionModuleKey] = useState<string | null>(
     null,
   );
+  const [awaitingApproval, setAwaitingApproval] = useState<
+    Map<string, string>
+  >(new Map());
+
+  const refreshAwaitingApproval = useCallback(async () => {
+    const result = await ListarExecucoesAguardandoAprovacao();
+    if (result.success) {
+      setAwaitingApproval(
+        new Map(
+          result.data.map((item) => [item.objectiveId, item.executionId]),
+        ),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!canMutate) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refreshAwaitingApproval();
+    const interval = window.setInterval(
+      () => void refreshAwaitingApproval(),
+      30_000,
+    );
+    return () => window.clearInterval(interval);
+  }, [canMutate, refreshAwaitingApproval]);
 
   const refreshObjectives = useCallback(async () => {
     if (refreshInFlight.current || document.visibilityState === "hidden")
@@ -608,6 +641,63 @@ export function RoadmapDashboard({
                         <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
                           {objective.description}
                         </p>
+                        {canMutate && awaitingApproval.has(objective.id) && (
+                          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-violet-400/20 bg-violet-400/[.06] p-1.5">
+                            <span className="flex-1 px-1 text-[10px] text-violet-200/90">
+                              Aguardando aprovação para produção
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async (event) => {
+                                event.stopPropagation();
+                                const executionId = awaitingApproval.get(
+                                  objective.id,
+                                );
+                                if (!executionId) return;
+                                const result =
+                                  await AprovarExecucaoRoadmapProduction(
+                                    executionId,
+                                  );
+                                if (!result.success) {
+                                  toast.error(result.error);
+                                  return;
+                                }
+                                toast.success(
+                                  "Objetivo aprovado; liberado para produção",
+                                );
+                                await refreshAwaitingApproval();
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-400/[.06] px-2 py-1 text-[10px] font-medium text-emerald-300 hover:bg-emerald-400/10"
+                            >
+                              <CheckCircle2 size={11} /> Aprovar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async (event) => {
+                                event.stopPropagation();
+                                if (
+                                  !window.confirm(
+                                    `Rejeitar e arquivar "${objective.title}"? O objetivo sai da lista ativa e vai para Arquivados.`,
+                                  )
+                                )
+                                  return;
+                                const result = await ArquivarObjetivoRoadmap(
+                                  objective.id,
+                                );
+                                if (!result.success) {
+                                  toast.error(result.error);
+                                  return;
+                                }
+                                toast.success("Objetivo rejeitado e arquivado");
+                                await refreshAwaitingApproval();
+                                await refreshObjectives();
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-400/20 bg-rose-400/[.06] px-2 py-1 text-[10px] font-medium text-rose-300 hover:bg-rose-400/10"
+                            >
+                              <Archive size={11} /> Rejeitar
+                            </button>
+                          </div>
+                        )}
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-1">
                             <span
@@ -980,15 +1070,6 @@ function ImproveWithAIButton({
   );
 }
 
-const NOVO_MODULO_CONSTRAINTS =
-  "Este objetivo cria um MÓDULO NOVO do PainelAlpha (não é ajuste em módulo existente). " +
-  "Antes de qualquer implementação, a squad deve seguir a checklist obrigatória de registro de módulo: " +
-  "(1) adicionar 1 entrada em MODULOS_REGISTRY (src/lib/modulos-registry.ts) — id, label, href, iconName, category, permission; " +
-  "(2) confirmar que o ícone escolhido existe em ICON_MAP (src/components/layout/GlobalSidebar.tsx), importando se necessário; " +
-  "(3) só depois criar a rota em src/app/PainelAlpha/[NomeDoModulo]/page.tsx, actions e componentes. " +
-  "MODULOS_REGISTRY é a fonte única — não usar os 3 arrays manuais antigos (obsoletos). " +
-  "A fase de documentação (Qwen) deve detalhar o propósito do módulo, dados que ele vai manipular e quem deve ter acesso, antes de qualquer fase de execução escrever código.";
-
 function CreateObjectiveDialog({
   open,
   onOpenChange,
@@ -1291,6 +1372,7 @@ function EditObjectiveDialog({
   const [developmentProvider, setDevelopmentProvider] = useState<
     "claude" | "codex" | "ollama"
   >(objective.developmentProvider);
+  const isNovoModulo = isNovoModuloObjective(objective.constraints);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -1337,20 +1419,28 @@ function EditObjectiveDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
-          <label className="block text-xs text-slate-400">
-            Projeto
-            <select
-              value={moduleKey}
-              onChange={(event) => setModuleKey(event.target.value)}
-              className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-slate-100"
-            >
-              {modules.map((module) => (
-                <option key={module.id} value={module.id}>
-                  {module.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {isNovoModulo && (
+            <div className="rounded-xl border border-violet-400/20 bg-violet-400/[.06] px-3 py-2 text-[11px] leading-5 text-violet-200/90">
+              Este objetivo cria um módulo novo do PainelAlpha — não é possível
+              associá-lo a um projeto/módulo já existente.
+            </div>
+          )}
+          {!isNovoModulo && (
+            <label className="block text-xs text-slate-400">
+              Projeto
+              <select
+                value={moduleKey}
+                onChange={(event) => setModuleKey(event.target.value)}
+                className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-slate-100"
+              >
+                {modules.map((module) => (
+                  <option key={module.id} value={module.id}>
+                    {module.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="block text-xs text-slate-400">
             <span className="flex items-center justify-between gap-2">
               Título{" "}

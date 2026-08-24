@@ -2715,3 +2715,42 @@ Sessão imediatamente anterior removeu por completo o teto de correções autom�
 
 ### Pendências para próxima sessão
 - Nenhuma. Forge aprovado (tsc/lint limpos nos 3 arquivos; falhas de teste pré-existentes confirmadas via stash).
+
+---
+
+## [2026-08-24] — Alpha Motion: ocultar slide (soft-hide) + compartilhar apresentação via cópia + listagem por dono
+
+**Tags:** #feature #prisma #security #integration
+**Agentes envolvidos:** Bibble, Scout, Vault, Forge, Probe, Anubis, Lens, Sage, Scribe, Kowalski
+**Arquivos tocados:** `prisma/schema.prisma`, `src/actions/slides.ts`, `src/actions/apresentacoes.ts`, `src/app/apresentacao/[slug]/page.tsx`, `src/app/api/apresentacoes/[id]/exportar-html/route.ts`, `src/app/PainelAlpha/Apresentacoes/[id]/apresentar/page.tsx`, `src/app/PainelAlpha/Apresentacoes/[id]/editor/page.tsx`, `src/app/PainelAlpha/Apresentacoes/page.tsx`, `src/components/Apresentacoes/Editor/store/useEditorStore.ts`, `src/components/Apresentacoes/Editor/SidebarEsquerda/SidebarSlides.tsx`, `src/components/Apresentacoes/Dashboard/CardApresentacao.tsx`, `src/components/Apresentacoes/Dashboard/ModalCompartilharApresentacao.tsx` (novo), `src/components/Apresentacoes/Dashboard/ApresentacoesDashboard.tsx`
+
+### Contexto
+Usuário pediu 3 mudanças no módulo Alpha Motion (Apresentações): (1) ícone de olho por slide pra ocultar sem excluir, estilo Canva — some do link público/export/apresentação mas continua editável; (2) botão "Compartilhar" só pro criador, abre modal com todos os usuários, cria uma CÓPIA pra cada destinatário escolhido; (3) tela inicial passa a mostrar só as criações do próprio usuário logado.
+
+### O que foi feito
+- `Slide.oculto Boolean @default(false)` novo no schema — migration aditiva aplicada em produção no Turso.
+- `AlternarVisibilidadeSlide` (slides.ts) — toggle com ownership, ícone `Eye`/`EyeOff` na sidebar do editor com update otimista.
+- Filtro `where: { oculto: false }` adicionado nos 3 pontos de leitura pública: link público, export HTML, modo apresentação. Editor e `ListarSlides` não filtram (dono precisa continuar editando slide oculto).
+- `CompartilharApresentacao` (apresentacoes.ts) — nova action, cria 1 cópia por destinatário via `$transaction`, título `"{titulo} - copia de {nome do remetente}"`, `oculto: false` forçado em todos os slides da cópia. Só o `autorId` original pode chamar (nem Admin nem colaborador).
+- `ModalCompartilharApresentacao.tsx` (novo) — busca + lista de usuários via `getUsers()` já existente, `Checkbox` multi-seleção, mesmo padrão visual de `ModalNovaApresentacao.tsx`.
+- Botão "Compartilhar" no dropdown do card, condicionado a `apresentacao.autor.id === usuarioAtualId` (prop nova propagada em 4 níveis).
+- `ListarApresentacoes` restrita a `{ autorId: userId }` — removido o bypass de Admin/CEO e o `OR` de colaborador que existiam antes.
+
+### Decisões tomadas
+- Listagem inicial só por `autorId`, sem exceção nem para Admin: confirmado com o usuário via pergunta direta (AskUserQuestion) antes de implementar — não foi assumido.
+- Cópia compartilhada sempre nasce com todos os slides visíveis (`oculto: false`), mesmo que o original tivesse slides ocultos: também confirmado via pergunta direta.
+- `CompartilharApresentacao` exige `autorId === userId` estrito (mais restritivo que `podeEditarApresentacao`/`isAdmin` usado no resto do arquivo) — reflete literalmente o pedido "só aparece para o criador".
+- `ExcluirAssetApresentacao` (apresentacao-assets.ts) foi auditado e confirmado como correto por NÃO ter o filtro de oculto — precisa varrer todos os slides pra checar uso de asset, senão permitiria excluir asset referenciado por slide oculto.
+
+### Problemas encontrados / resolvidos
+- Dois processos `next build` ficaram travados de tentativas anteriores em background nesta sessão (lock stale em `.next/lock`, sem escrever no arquivo de output redirecionado) — identificados via `ps aux`, mortos com `kill -9`, lock removido manualmente antes do build final rodar limpo.
+- Comentário em `apresentar/page.tsx:52` ficou semanticamente desatualizado ("não deve acontecer — toda apresentação sempre tem >= 1 slide") — agora é um caso real possível (usuário oculta todos os slides). O guard (`notFound()`) continua correto, só o texto do comentário não reflete mais a causa. Não corrigido nesta sessão (achado do Sage, puramente cosmético).
+
+### Pendências
+- Ajustar o comentário cosmético de `apresentar/page.tsx:52` numa próxima sessão que tocar esse arquivo.
+- Verificação de UI em browser real não foi possível (sem credenciais de login disponíveis nesta sessão, mesma limitação já registrada para Comissões/Blueprint/Notas) — recomenda-se teste manual humano do fluxo completo antes de considerar 100% validado.
+- 3 sugestões não-bloqueantes do Lens ficaram em aberto: guard de `processando` ausente em `handleAlternarVisibilidade` (risco baixo de race em duplo-clique rápido), pequena duplicação entre `CompartilharApresentacao`/`DuplicarApresentacao` (extração de helper opcional), filtro `status !== "INATIVO"` no modal pode não cobrir todos os status equivalentes de usuário inativo.
+
+### Refletido também em
+- `codebase-map.md`: nova seção "Alpha Motion (Apresentações) — Ocultar slide + Compartilhar + listagem por dono (2026-08-24)"
+- `integration-points.md`: nova seção completa com os 3 comportamentos, checklist para futuros pontos de leitura pública, e o padrão reutilizável "Compartilhar = cria cópia" documentado para outros módulos que um dia precisarem de algo parecido

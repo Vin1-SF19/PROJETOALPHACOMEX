@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -8,15 +9,24 @@ import {
   toggleAcessoModulo,
 } from "@/actions/PermissoesSetor";
 import db from "@/lib/prisma";
-import { requireRoadmapProductionAccess } from "@/lib/roadmap-alpha/authorization";
+import {
+  requireRoadmapAccess,
+  requireRoadmapProductionAccess,
+} from "@/lib/roadmap-alpha/authorization";
 import { improveRoadmapField } from "@/lib/roadmap-alpha/improve-with-ai";
 import { listBibbleAgents } from "@/lib/roadmap-production/agents";
-import { productionProviderSchema } from "@/lib/roadmap-production/contracts";
+import {
+  productionControlCommandSchema,
+  productionProviderSchema,
+  type ProductionControlCommand,
+} from "@/lib/roadmap-production/contracts";
+import { validateInteractionCommand } from "@/lib/roadmap-production/interactions";
 import { diagnoseProductionProviders } from "@/lib/roadmap-production/providers";
 import { ROADMAP_PRODUCTION_RUNTIME_DISABLED } from "@/lib/roadmap-production/runtime";
 import {
   enqueueProductionControl,
   readProductionConfig,
+  readProductionControls,
   readProductionState,
   writeProductionConfig,
 } from "@/lib/roadmap-production/storage";
@@ -42,6 +52,35 @@ const implementationFeedbackSchema = z
   })
   .strict();
 const userIdSchema = z.number().int().positive();
+const phaseNumberSchema = z.number().int().min(0).max(99);
+const messageSchema = z
+  .object({
+    executionId: executionIdSchema,
+    phaseNumber: phaseNumberSchema,
+    content: z.string().trim().min(1).max(4_000),
+  })
+  .strict();
+const interventionResponseSchema = z
+  .object({
+    executionId: executionIdSchema,
+    phaseNumber: phaseNumberSchema,
+    requestId: z.string().uuid(),
+    decision: z.enum(["ANSWER", "AUTHORIZE", "DENY"]),
+    content: z.string().trim().min(1).max(4_000).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.decision === "ANSWER" && !value.content) {
+      context.addIssue({ code: "custom", message: "ANSWER_REQUIRES_CONTENT" });
+    }
+  });
+const switchAgentSchema = z
+  .object({
+    executionId: executionIdSchema,
+    phaseNumber: phaseNumberSchema,
+    agentId: z.string().trim().min(1).max(80),
+  })
+  .strict();
 
 function publicError(error: unknown): string {
   if (
@@ -59,7 +98,92 @@ function publicError(error: unknown): string {
   return "Não foi possível concluir a operação";
 }
 
+function publicInteractionError(error: unknown): {
+  error: string;
+  code: string;
+} {
+  const code =
+    error instanceof Error && /^[A-Z0-9_]+$/.test(error.message)
+      ? error.message
+      : "INTERACTION_REJECTED";
+  const messages: Record<string, string> = {
+    PRODUCTION_EXECUTION_NOT_FOUND: "Execução não encontrada",
+    INTERACTION_PHASE_NOT_FOUND: "Fase não encontrada",
+    INTERVENTION_NOT_FOUND: "Solicitação não encontrada",
+    INTERVENTION_PHASE_MISMATCH: "A solicitação pertence a outra fase",
+    INTERVENTION_ALREADY_RESOLVED: "Esta solicitação já foi respondida",
+    INTERVENTION_COMMAND_ALREADY_QUEUED:
+      "Uma resposta para esta solicitação já está na fila",
+    INTERVENTION_AUTHORIZATION_FORBIDDEN:
+      "Esta ação exige o protocolo especializado e não pode ser autorizada pela Sala",
+    PHASE_IS_READ_ONLY: "A fase concluída é somente leitura",
+    AGENT_NOT_INSTALLED: "Agente não instalado",
+    AGENT_INCOMPATIBLE: "Agente incompatível com a fase",
+  };
+  return { error: messages[code] ?? publicError(error), code };
+}
+
 const moduleKeySchema = z.string().trim().min(1).max(120);
+
+async function resolveModuleRoot(moduleKey: string): Promise<string> {
+  const workspace = await db.roadmapWorkspace.findFirst({
+    where: { moduleKey, archivedAt: null },
+    select: { rootPath: true },
+  });
+  return workspace?.rootPath ?? process.cwd();
+}
+
+async function resolveExecutionRoot(executionId: string): Promise<string> {
+  const objectiveId = executionId.replace(/:v\d+$/, "");
+  const objective = await db.roadmapObjective.findUnique({
+    where: { id: objectiveId },
+    select: { moduleKey: true },
+  });
+  return objective ? resolveModuleRoot(objective.moduleKey) : process.cwd();
+}
+
+async function authorName(userId: number): Promise<string> {
+  const user = await db.usuarios.findUnique({
+    where: { id: userId },
+    select: { nome: true },
+  });
+  return user?.nome?.trim() || `Administrador #${userId}`;
+}
+
+async function enqueueValidatedInteraction(
+  command: ProductionControlCommand,
+  root: string,
+): Promise<{ id: string }> {
+  const [state, agents, queuedControls] = await Promise.all([
+    readProductionState(root),
+    listBibbleAgents(process.cwd()),
+    readProductionControls(root),
+  ]);
+  if (
+    command.requestId &&
+    queuedControls.some(
+      (item) =>
+        item.command.executionId === command.executionId &&
+        item.command.phaseNumber === command.phaseNumber &&
+        item.command.requestId === command.requestId &&
+        ["RESPOND", "AUTHORIZE", "DENY"].includes(item.command.type),
+    )
+  ) {
+    throw new Error("INTERVENTION_COMMAND_ALREADY_QUEUED");
+  }
+  validateInteractionCommand(
+    state,
+    command,
+    new Set(agents.filter((agent) => agent.available).map((agent) => agent.id)),
+  );
+  return enqueueProductionControl(command.type, command.executionId, root, {
+    phaseNumber: command.phaseNumber ?? undefined,
+    requestId: command.requestId ?? undefined,
+    content: command.content ?? undefined,
+    agentId: command.agentId ?? undefined,
+    author: command.author,
+  });
+}
 
 export async function ObterRoadmapProduction(
   includeCatalog: boolean,
@@ -68,9 +192,10 @@ export async function ObterRoadmapProduction(
   try {
     const access = await requireRoadmapProductionAccess();
     const scopedModuleKey = moduleKeySchema.parse(moduleKey);
+    const root = await resolveModuleRoot(scopedModuleKey);
     const [config, fullState, agents, providers] = await Promise.all([
-      readProductionConfig(),
-      refreshProductionExecutions(),
+      readProductionConfig(root),
+      refreshProductionExecutions(root),
       includeCatalog ? listBibbleAgents() : Promise.resolve([]),
       includeCatalog ? diagnoseProductionProviders() : Promise.resolve([]),
     ]);
@@ -197,10 +322,8 @@ export async function AlternarAcessoRoadmapProduction(usuarioId: unknown) {
 export async function RepetirExecucaoRoadmapProduction(executionId: unknown) {
   try {
     await requireRoadmapProductionAccess(true);
-    await enqueueProductionControl(
-      "RETRY",
-      executionIdSchema.parse(executionId),
-    );
+    const id = executionIdSchema.parse(executionId);
+    await enqueueProductionControl("RETRY", id, await resolveExecutionRoot(id));
     revalidatePath(ROUTE);
     return { success: true as const };
   } catch (error) {
@@ -216,7 +339,7 @@ export async function ControlarExecucaoRoadmapProduction(
     await requireRoadmapProductionAccess(true);
     const id = executionIdSchema.parse(executionId);
     const type = z.enum(["PAUSE", "RESUME", "EXCLUDE"]).parse(control);
-    await enqueueProductionControl(type, id);
+    await enqueueProductionControl(type, id, await resolveExecutionRoot(id));
     revalidatePath(ROUTE);
     return { success: true as const };
   } catch (error) {
@@ -224,15 +347,60 @@ export async function ControlarExecucaoRoadmapProduction(
   }
 }
 
+/**
+ * Deliberadamente usa requireRoadmapAccess (não requireRoadmapProductionAccess)
+ * — aprovar é uma decisão de gestão, não depende do runtime de execução local
+ * estar habilitado (que é o que assertRoadmapProductionRuntimeEnabled exige,
+ * e é justamente o que falta em ambientes como nuvem). O card de objetivo na
+ * lista principal precisa poder aprovar mesmo sem acesso à tela de Produção.
+ */
 export async function AprovarExecucaoRoadmapProduction(executionId: unknown) {
   try {
-    await requireRoadmapProductionAccess(true);
+    await requireRoadmapAccess(true);
     const id = executionIdSchema.parse(executionId);
-    await enqueueProductionControl("APPROVE", id);
+    await enqueueProductionControl("APPROVE", id, await resolveExecutionRoot(id));
     revalidatePath(ROUTE);
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: publicError(error) };
+  }
+}
+
+/**
+ * Deliberadamente NÃO usa requireRoadmapProductionAccess — essa função exige
+ * assertRoadmapProductionRuntimeEnabled(), que bloqueia em ambientes (ex.:
+ * nuvem) onde a execução local não roda. Aprovar/rejeitar são decisões de
+ * gestão, não dependem do worker de execução estar disponível — só exigem
+ * a mesma permissão de mutação já usada por AprovarExecucaoRoadmapProduction.
+ */
+export async function ListarExecucoesAguardandoAprovacao() {
+  try {
+    await requireRoadmapAccess(true);
+    const workspaces = await db.roadmapWorkspace.findMany({
+      where: { archivedAt: null },
+      select: { rootPath: true },
+    });
+    const roots = Array.from(
+      new Set([process.cwd(), ...workspaces.map((workspace) => workspace.rootPath)]),
+    );
+    const data: Array<{ objectiveId: string; executionId: string }> = [];
+    for (const root of roots) {
+      const state = await refreshProductionExecutions(root);
+      data.push(
+        ...state.executions
+          .filter((execution) => execution.status === "AWAITING_APPROVAL")
+          .map((execution) => ({
+            objectiveId: execution.objectiveId,
+            executionId: execution.id,
+          })),
+      );
+    }
+    return {
+      success: true as const,
+      data,
+    };
+  } catch (error) {
+    return { success: false as const, error: publicError(error), data: [] };
   }
 }
 
@@ -242,7 +410,8 @@ export async function MelhorarFeedbackRoadmapProduction(payload: unknown) {
     const input = implementationFeedbackSchema
       .omit({ improvedWithAi: true })
       .parse(payload);
-    const state = await readProductionState();
+    const root = await resolveExecutionRoot(input.executionId);
+    const state = await readProductionState(root);
     const execution = state.executions.find(
       (item) => item.id === input.executionId,
     );
@@ -272,7 +441,8 @@ export async function RelatarErroRoadmapProduction(payload: unknown) {
   try {
     await requireRoadmapProductionAccess(true);
     const input = implementationFeedbackSchema.parse(payload);
-    const state = await readProductionState();
+    const root = await resolveExecutionRoot(input.executionId);
+    const state = await readProductionState(root);
     const execution = state.executions.find(
       (item) => item.id === input.executionId,
     );
@@ -280,7 +450,7 @@ export async function RelatarErroRoadmapProduction(payload: unknown) {
     await enqueueProductionControl(
       "REPORT_ERROR",
       execution.id,
-      process.cwd(),
+      root,
       {
         feedback: input.feedback,
         improvedWithAi: input.improvedWithAi,
@@ -292,5 +462,81 @@ export async function RelatarErroRoadmapProduction(payload: unknown) {
     if (error instanceof z.ZodError)
       return { success: false as const, error: "Revise o relato do erro" };
     return { success: false as const, error: publicError(error) };
+  }
+}
+
+export async function EnviarMensagemRoadmapProduction(payload: unknown) {
+  try {
+    const access = await requireRoadmapProductionAccess(true);
+    const input = messageSchema.parse(payload);
+    const root = await resolveExecutionRoot(input.executionId);
+    const author = await authorName(access.userId);
+    const command = productionControlCommandSchema.parse({
+      id: randomUUID(),
+      type: "MESSAGE",
+      executionId: input.executionId,
+      phaseNumber: input.phaseNumber,
+      content: input.content,
+      author,
+      createdAt: new Date().toISOString(),
+    });
+    const queued = await enqueueValidatedInteraction(command, root);
+    revalidatePath(ROUTE);
+    return { success: true as const, commandId: queued.id };
+  } catch (error) {
+    return { success: false as const, ...publicInteractionError(error) };
+  }
+}
+
+export async function ResponderIntervencaoRoadmapProduction(payload: unknown) {
+  try {
+    const access = await requireRoadmapProductionAccess(true);
+    const input = interventionResponseSchema.parse(payload);
+    const root = await resolveExecutionRoot(input.executionId);
+    const author = await authorName(access.userId);
+    const type =
+      input.decision === "ANSWER"
+        ? "RESPOND"
+        : input.decision === "AUTHORIZE"
+          ? "AUTHORIZE"
+          : "DENY";
+    const command = productionControlCommandSchema.parse({
+      id: randomUUID(),
+      type,
+      executionId: input.executionId,
+      phaseNumber: input.phaseNumber,
+      requestId: input.requestId,
+      content: input.content ?? null,
+      author,
+      createdAt: new Date().toISOString(),
+    });
+    const queued = await enqueueValidatedInteraction(command, root);
+    revalidatePath(ROUTE);
+    return { success: true as const, commandId: queued.id };
+  } catch (error) {
+    return { success: false as const, ...publicInteractionError(error) };
+  }
+}
+
+export async function TrocarAgenteFaseRoadmapProduction(payload: unknown) {
+  try {
+    const access = await requireRoadmapProductionAccess(true);
+    const input = switchAgentSchema.parse(payload);
+    const root = await resolveExecutionRoot(input.executionId);
+    const author = await authorName(access.userId);
+    const command = productionControlCommandSchema.parse({
+      id: randomUUID(),
+      type: "SWITCH_AGENT",
+      executionId: input.executionId,
+      phaseNumber: input.phaseNumber,
+      agentId: input.agentId,
+      author,
+      createdAt: new Date().toISOString(),
+    });
+    const queued = await enqueueValidatedInteraction(command, root);
+    revalidatePath(ROUTE);
+    return { success: true as const, commandId: queued.id };
+  } catch (error) {
+    return { success: false as const, ...publicInteractionError(error) };
   }
 }

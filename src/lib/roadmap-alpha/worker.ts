@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import db from "@/lib/prisma";
+import { loadBibbleOrchestrationContext } from "@/lib/roadmap-alpha/bibble-protocol";
+import { isNovoModuloObjective } from "@/lib/roadmap-alpha/new-module-preset";
 import { purgeExpiredDeletedRoadmapObjectives } from "@/lib/roadmap-alpha/objectives";
 import { generateRoadmapManifest } from "@/lib/roadmap-alpha/qwen-generator";
 import { scanProjectContext } from "@/lib/roadmap-alpha/project-scanner";
@@ -17,13 +19,37 @@ async function resolveObjectiveRoot(moduleKey: string): Promise<string> {
   return workspace?.rootPath ?? process.cwd();
 }
 
-const LEASE_MS = 4 * 60_000;
+const LEASE_MS = 12 * 60_000;
 const HEARTBEAT_MS = 30_000;
 
 function sanitizedErrorCode(error: unknown): string {
   if (error instanceof Error && /^[A-Z_]+$/.test(error.message))
     return error.message.slice(0, 80);
   return "DOCUMENTATION_FAILED";
+}
+
+/**
+ * Objetivo com documentationStatus="DOCUMENTING" só é legítimo enquanto
+ * existir um RoadmapDocumentationJob dele ainda PROCESSING com lease válido.
+ * Se o worker morreu/reiniciou sem terminar, o job já tem recuperação de
+ * lease expirado em claimNextJob — mas isso só acontece quando outro ciclo
+ * CHEGA a esse job específico, o que pode demorar numa fila grande. Reverte
+ * proativamente para RETRY_WAIT nesse meio-tempo, evitando badge congelado.
+ */
+async function reconcileStaleDocumentingObjectives(now: Date): Promise<void> {
+  await db.roadmapObjective.updateMany({
+    where: {
+      documentationStatus: "DOCUMENTING",
+      archivedAt: null,
+      documentationJobs: {
+        none: {
+          status: "PROCESSING",
+          claimExpiresAt: { gte: now },
+        },
+      },
+    },
+    data: { documentationStatus: "RETRY_WAIT" },
+  });
 }
 
 async function claimNextJob(workerId: string) {
@@ -93,6 +119,7 @@ export async function processNextRoadmapJob(
   workerId = `roadmap-${randomUUID()}`,
 ) {
   await purgeExpiredDeletedRoadmapObjectives();
+  await reconcileStaleDocumentingObjectives(new Date());
   const job = await claimNextJob(workerId);
   if (!job) return { processed: false as const };
   const attempt = await db.roadmapDocumentationAttempt.create({
@@ -129,6 +156,13 @@ export async function processNextRoadmapJob(
     ) as string[];
     const root = await resolveObjectiveRoot(job.objective.moduleKey);
     const projectContext = await scanProjectContext(root);
+    const isNewModule = isNovoModuloObjective(job.objective.constraints);
+    const { protocol: bibbleProtocol, agentCatalog } =
+      await loadBibbleOrchestrationContext(root);
+    const previousAttemptError =
+      job.attemptCount > 1 && job.lastErrorCode
+        ? { code: job.lastErrorCode, attemptNumber: job.attemptCount }
+        : null;
     const generated = await generateRoadmapManifest({
       code: job.objective.code,
       moduleKey: job.objective.moduleKey,
@@ -139,6 +173,10 @@ export async function processNextRoadmapJob(
       constraints: job.objective.constraints,
       acceptanceCriteria,
       projectContext,
+      isNewModule,
+      bibbleProtocol,
+      agentCatalog,
+      previousAttemptError,
     });
 
     const current = await db.roadmapDocumentationJob.findUnique({

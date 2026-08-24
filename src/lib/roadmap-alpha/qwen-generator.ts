@@ -36,6 +36,10 @@ export interface RoadmapGenerationInput {
   constraints?: string | null;
   acceptanceCriteria: string[];
   projectContext: string;
+  isNewModule: boolean;
+  bibbleProtocol: string | null;
+  agentCatalog: string;
+  previousAttemptError?: { code: string; attemptNumber: number } | null;
 }
 
 export interface RoadmapGenerationResult {
@@ -127,7 +131,7 @@ export async function generateRoadmapManifest(
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
-    dependencies.timeoutMs ?? 180_000,
+    dependencies.timeoutMs ?? 600_000,
   );
 
   const system = [
@@ -141,6 +145,25 @@ export async function generateRoadmapManifest(
     "Quando uma auditoria apontar lacuna de entrega, a fase EXECUTION seguinte será promovida automaticamente para dev/Nova/Echo; arquivo solto não conta como entrega utilizável quando o usuário precisa consumi-lo pelo sistema.",
     "A fase de verificação deve testar o consumo ponta a ponta do resultado. Não aprove apenas porque um arquivo foi criado.",
     "Cada markdown deve ser autossuficiente, específico, verificável e ter entre 100 e 50000 caracteres.",
+    ...(input.isNewModule
+      ? [
+          "Este objetivo cria um MÓDULO COMPLETAMENTE NOVO dentro do projeto — o contexto de arquivos fornecido é APENAS referência de padrões de código, convenções e arquitetura a seguir (como outros módulos são estruturados), NUNCA o alvo da mudança. NÃO modifique, integre com, ou assuma que este objetivo se conecta a nenhum módulo específico já existente (ex: Chamados, CRM, Metas) a menos que o título ou descrição do objetivo mencione isso explicitamente. Trate a criação como isolada e nova.",
+        ]
+      : []),
+    ...(input.bibbleProtocol
+      ? [
+          "Você monta este plano de fases COMO O BIBBLE, o orquestrador-chefe desta squad — siga rigorosamente o protocolo dele abaixo, em especial a ORDEM OBRIGATÓRIA de agentes e o Protocolo de Execução Serial: Scout (reconhecimento) sempre primeiro; especialistas de implementação depois (nova para frontend, echo para backend, iris para design quando aplicável); Vault OBRIGATORIAMENTE antes de qualquer fase que altere schema ou faça mutação em massa no banco; Forge SEMPRE antes de Lens, nunca depois; Probe depois da implementação para verificar integração; Anubis quando houver auth, API ou IA envolvida; Sage para testes; Scribe e Kowalski como fases finais de documentação/arquivamento quando o escopo justificar. Nem todo objetivo precisa de todas as fases — inclua só as aplicáveis ao escopo real do objetivo — mas a ORDEM RELATIVA entre as fases incluídas é obrigatória e não pode ser violada.",
+          `--- Protocolo real do Bibble (bibble/SKILL.md) ---\n${input.bibbleProtocol}`,
+        ]
+      : []),
+    ...(input.agentCatalog
+      ? [`--- Catálogo real de agentes disponíveis ---\n${input.agentCatalog}`]
+      : []),
+    ...(input.previousAttemptError
+      ? [
+          `Esta é a tentativa ${input.previousAttemptError.attemptNumber} — a tentativa anterior falhou com o erro "${input.previousAttemptError.code}". Ajuste sua resposta para não repetir o mesmo problema: se o erro foi sobre formato de resposta inválido, garanta JSON válido e estritamente aderente ao contrato solicitado; se foi sobre resposta truncada, seja mais conciso e direto nos markdowns das fases sem perder informação essencial; se foi qualquer outro erro de validação de contrato (numeração de fases, dependências, fase 0 fora do formato exigido), releia o contrato com atenção redobrada antes de responder.`,
+        ]
+      : []),
   ].join(" ");
   const user = JSON.stringify({
     task: "Documentar o objetivo em prompt-phases",
@@ -178,7 +201,16 @@ export async function generateRoadmapManifest(
         "dev",
       ],
     },
-    objective: input,
+    objective: {
+      code: input.code,
+      moduleKey: input.moduleKey,
+      moduleLabel: input.moduleLabel,
+      title: input.title,
+      description: input.description,
+      desiredOutcome: input.desiredOutcome,
+      constraints: input.constraints,
+      acceptanceCriteria: input.acceptanceCriteria,
+    },
   });
 
   try {
@@ -203,14 +235,27 @@ export async function generateRoadmapManifest(
         }),
       },
     );
-    if (!response.ok)
+    if (!response.ok) {
+      console.error(
+        "[roadmap-alpha] Provider retornou status HTTP de erro:",
+        response.status,
+        response.statusText,
+      );
       throw new Error(
         response.status === 401 || response.status === 403
           ? "PROVIDER_AUTH_FAILED"
           : "PROVIDER_HTTP_ERROR",
       );
-    const body = completionSchema.safeParse(await response.json());
-    if (!body.success) throw new Error("INVALID_PROVIDER_RESPONSE");
+    }
+    const rawBody: unknown = await response.json();
+    const body = completionSchema.safeParse(rawBody);
+    if (!body.success) {
+      console.error(
+        "[roadmap-alpha] Resposta do provider não bateu com o schema esperado:",
+        JSON.stringify({ issues: body.error.issues, rawBody }).slice(0, 2000),
+      );
+      throw new Error("INVALID_PROVIDER_RESPONSE");
+    }
     const choice = body.data.choices[0];
     if (
       choice.finish_reason === "length" ||
@@ -236,6 +281,7 @@ export async function generateRoadmapManifest(
   } catch (error) {
     if (controller.signal.aborted) throw new Error("PROVIDER_TIMEOUT");
     if (error instanceof Error && /^[A-Z_]+$/.test(error.message)) throw error;
+    console.error("[roadmap-alpha] Falha não mapeada ao chamar o provider:", error);
     throw new Error("PROVIDER_FAILURE");
   } finally {
     clearTimeout(timeout);

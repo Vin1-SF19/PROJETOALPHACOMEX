@@ -1,4 +1,5 @@
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { config } from "dotenv";
 
 config({ path: ".env", quiet: true });
@@ -27,6 +28,12 @@ function emit(value) {
   console.info(JSON.stringify(value));
 }
 
+function argument(name) {
+  return process.argv
+    .find((value) => value.startsWith(`--${name}=`))
+    ?.slice(name.length + 3);
+}
+
 try {
   if (command === "doctor") {
     const [
@@ -39,9 +46,9 @@ try {
       import("../src/lib/roadmap-production/storage.ts"),
     ]);
     const [agents, providers, productionConfig] = await Promise.all([
-      listBibbleAgents(),
+      listBibbleAgents(process.cwd()),
       diagnoseProductionProviders(),
-      readProductionConfig(),
+      readProductionConfig(workerRoot),
     ]);
     const selected = providers.find(
       (provider) => provider.id === productionConfig.provider,
@@ -78,10 +85,10 @@ try {
       import("../src/lib/roadmap-production/storage.ts"),
       import("../src/lib/roadmap-production/worker.ts"),
     ]);
-    await refreshProductionExecutions();
+    await refreshProductionExecutions(workerRoot);
     const [productionConfig, state] = await Promise.all([
-      readProductionConfig(),
-      readProductionState(),
+      readProductionConfig(workerRoot),
+      readProductionState(workerRoot),
     ]);
     emit({ ok: true, code: 0, command, config: productionConfig, state });
   } else if (command === "retry") {
@@ -94,7 +101,7 @@ try {
       .map((argument) => argument.slice("--adopt-change=".length));
     const { retryProductionExecution } =
       await import("../src/lib/roadmap-production/worker.ts");
-    await retryProductionExecution(executionId, adoptedChanges);
+    await retryProductionExecution(executionId, adoptedChanges, workerRoot);
     emit({ ok: true, code: 0, command, executionId, adoptedChanges });
     const { default: db } = await import("../src/lib/prisma.ts");
     await db.$disconnect();
@@ -111,7 +118,7 @@ try {
       throw new Error("CONTROL_ACTION_REQUIRED");
     const { enqueueProductionControl } =
       await import("../src/lib/roadmap-production/storage.ts");
-    const queued = await enqueueProductionControl(action, executionId);
+    const queued = await enqueueProductionControl(action, executionId, workerRoot);
     emit({
       ok: true,
       code: 0,
@@ -120,6 +127,78 @@ try {
       action: queued.type,
       queued: true,
     });
+  } else if (["interventions", "history"].includes(command)) {
+    const executionId = argument("execution");
+    if (!executionId) throw new Error("EXECUTION_ID_REQUIRED");
+    const { readProductionState } =
+      await import("../src/lib/roadmap-production/storage.ts");
+    const state = await readProductionState(workerRoot);
+    const execution = state.executions.find((item) => item.id === executionId);
+    if (!execution) throw new Error("PRODUCTION_EXECUTION_NOT_FOUND");
+    emit({
+      ok: true,
+      code: 0,
+      command,
+      executionId,
+      data:
+        command === "interventions"
+          ? execution.interventions.filter((item) => item.status === "PENDING")
+          : {
+              messages: execution.messages,
+              interventions: execution.interventions,
+              phases: execution.phases,
+            },
+    });
+  } else if (["respond", "authorize", "deny", "message", "switch-agent"].includes(command)) {
+    const executionId = argument("execution");
+    const phaseNumber = Number(argument("phase"));
+    if (!executionId) throw new Error("EXECUTION_ID_REQUIRED");
+    if (!Number.isInteger(phaseNumber) || phaseNumber < 0) throw new Error("PHASE_NUMBER_REQUIRED");
+    const requestId = argument("request");
+    const content = argument("content");
+    const agentId = argument("agent");
+    const author = argument("author") ?? "Administrador via CLI";
+    const type = {
+      respond: "RESPOND",
+      authorize: "AUTHORIZE",
+      deny: "DENY",
+      message: "MESSAGE",
+      "switch-agent": "SWITCH_AGENT",
+    }[command];
+    const [contracts, storage, interactions, agentsModule] = await Promise.all([
+      import("../src/lib/roadmap-production/contracts.ts"),
+      import("../src/lib/roadmap-production/storage.ts"),
+      import("../src/lib/roadmap-production/interactions.ts"),
+      import("../src/lib/roadmap-production/agents.ts"),
+    ]);
+    const preview = contracts.productionControlCommandSchema.parse({
+      id: randomUUID(),
+      type,
+      executionId,
+      phaseNumber,
+      requestId: requestId ?? null,
+      content: content ?? null,
+      agentId: agentId ?? null,
+      author,
+      createdAt: new Date().toISOString(),
+    });
+    const [state, agents] = await Promise.all([
+      storage.readProductionState(workerRoot),
+      agentsModule.listBibbleAgents(process.cwd()),
+    ]);
+    interactions.validateInteractionCommand(
+      state,
+      preview,
+      new Set(agents.filter((agent) => agent.available).map((agent) => agent.id)),
+    );
+    const queued = await storage.enqueueProductionControl(type, executionId, workerRoot, {
+      phaseNumber,
+      requestId,
+      content,
+      agentId,
+      author,
+    });
+    emit({ ok: true, code: 0, command, executionId, commandId: queued.id, queued: true });
   } else if (command === "worker") {
     const { processNextProductionPhase, recoverInterruptedProduction } =
       await import("../src/lib/roadmap-production/worker.ts");

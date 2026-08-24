@@ -24,6 +24,7 @@ export default async function ApresentacaoPublicaPage({ params }: { params: Prom
       expiraEm: true,
       tema: { select: { corPrimaria: true, corSecundaria: true, corAccent: true } },
       slides: {
+        where: { oculto: false },
         orderBy: { ordem: "asc" },
         select: { id: true, ordem: true, transicaoEntrada: true, dadosJson: true },
       },

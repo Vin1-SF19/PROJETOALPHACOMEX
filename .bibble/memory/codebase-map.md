@@ -2,7 +2,19 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-19 (Roadmap Alpha — Qwen como cérebro de desenvolvimento + gate de aprovação obrigatória)
+> Última atualização: 2026-08-24 (Alpha Motion — ocultar slide + compartilhar apresentação via cópia)
+
+---
+
+## Alpha Motion (Apresentações) — Ocultar slide + Compartilhar + listagem por dono (2026-08-24)
+
+Ver `.bibble/memory/integration-points.md` para o detalhe completo dos 3 itens. Resumo estrutural:
+
+- **`Slide.oculto Boolean @default(false)`** (`prisma/schema.prisma`) — coluna nova, migration aditiva aplicada em produção (Vault). Soft-hide estilo Canva: nunca exclui, só filtra de leituras públicas.
+- **`AlternarVisibilidadeSlide`** (`src/actions/slides.ts`) e **`CompartilharApresentacao`** (`src/actions/apresentacoes.ts`) são as duas Server Actions novas.
+- **`CompartilharApresentacao` é o primeiro precedente real no projeto de "compartilhar = cria cópia independente"** (distinto de link público `slugPublico` e de colaboração `ApresentacaoColaborador`) — candidato a padrão de referência se outro módulo (Blueprint, Notas, etc.) um dia precisar de algo parecido.
+- **`ListarApresentacoes` não usa mais bypass de Admin** — primeira vez no módulo que Admin/CEO fica sujeito ao mesmo filtro de um usuário comum numa listagem (decisão explícita do usuário, não uma omissão).
+- Pipeline de qualidade completo rodou nesta sessão: Scout → Vault (backup+migration) → Forge (tsc/lint/build) → Probe (integração) → Anubis (segurança, 0 críticos) → Lens (qualidade, aprovado) → Sage (edge cases por análise de código, sem regressão).
 
 ---
 

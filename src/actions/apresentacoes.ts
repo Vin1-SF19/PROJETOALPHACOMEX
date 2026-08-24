@@ -38,6 +38,11 @@ const gerarLinkPublicoSchema = z.object({
   renovar: z.boolean().optional().default(false),
 });
 
+const compartilharApresentacaoSchema = z.object({
+  apresentacaoId: z.string().min(1),
+  destinatarioIds: z.array(z.number().int().positive()).min(1, "Selecione ao menos um usuário"),
+});
+
 export async function ListarApresentacoes(params?: { page?: number; pageSize?: number; busca?: string }) {
   try {
     const session = await auth();
@@ -48,14 +53,9 @@ export async function ListarApresentacoes(params?: { page?: number; pageSize?: n
     const pageSize = params?.pageSize && params.pageSize > 0 ? Math.min(Math.max(params.pageSize, 1), 100) : 20;
     const busca = params?.busca?.trim();
 
-    const acesso = isAdmin(session.user.role)
-      ? {}
-      : {
-          OR: [
-            { autorId: userId },
-            { colaboradores: { some: { userId } } },
-          ],
-        };
+    // Tela inicial mostra somente as criações do próprio usuário — inclusive Admin/CEO.
+    // Compartilhar (CompartilharApresentacao) é o caminho oficial para dar acesso a outra pessoa.
+    const acesso = { autorId: userId };
 
     const where = busca
       ? {
@@ -309,5 +309,78 @@ export async function GerarLinkPublicoApresentacao(dados: unknown) {
   } catch (error) {
     console.error("[GerarLinkPublicoApresentacao]", error);
     return { success: false as const, error: "Erro ao gerar link da apresentação" };
+  }
+}
+
+/**
+ * Compartilha a apresentação com um ou mais usuários do sistema — cria uma CÓPIA completa
+ * (não um link/acesso compartilhado) para cada destinatário, nomeada "{título} - copia de {quem compartilhou}".
+ * Só o CRIADOR original pode compartilhar (nunca Admin/colaborador) — regra explícita do usuário.
+ * A cópia nasce sempre com todos os slides visíveis, independente do que o criador tinha oculto.
+ */
+export async function CompartilharApresentacao(dados: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+
+    const parsed = compartilharApresentacaoSchema.safeParse(dados);
+    if (!parsed.success) {
+      return { success: false as const, error: parsed.error.flatten().fieldErrors };
+    }
+    const { apresentacaoId, destinatarioIds } = parsed.data;
+    const userId = Number(session.user.id);
+
+    const original = await db.apresentacao.findUnique({
+      where: { id: apresentacaoId },
+      include: { slides: true },
+    });
+    if (!original) return { success: false as const, error: "Apresentação não encontrada" };
+    if (original.autorId !== userId) {
+      return { success: false as const, error: "Somente o criador pode compartilhar esta apresentação" };
+    }
+
+    const remetente = await db.usuarios.findUnique({ where: { id: userId }, select: { nome: true } });
+    if (!remetente) return { success: false as const, error: "Usuário remetente não encontrado" };
+
+    const destinatarios = await db.usuarios.findMany({
+      where: { id: { in: destinatarioIds } },
+      select: { id: true },
+    });
+    if (destinatarios.length === 0) {
+      return { success: false as const, error: "Nenhum destinatário válido encontrado" };
+    }
+
+    const tituloCopia = `${original.titulo} - copia de ${remetente.nome}`;
+
+    const copias = await db.$transaction(
+      destinatarios.map((destinatario) =>
+        db.apresentacao.create({
+          data: {
+            titulo: tituloCopia,
+            clienteNome: original.clienteNome,
+            autorId: destinatario.id,
+            status: "DRAFT",
+            temaId: original.temaId,
+            slides: {
+              create: original.slides.map((s) => ({
+                ordem: s.ordem,
+                nome: s.nome,
+                transicaoEntrada: s.transicaoEntrada,
+                duracaoAutoplay: s.duracaoAutoplay,
+                dadosJson: s.dadosJson as object,
+                oculto: false,
+              })),
+            },
+          },
+          select: { id: true, autorId: true },
+        }),
+      ),
+    );
+
+    revalidatePath("/PainelAlpha/Apresentacoes");
+    return { success: true as const, data: { copias: copias.length } };
+  } catch (error) {
+    console.error("[CompartilharApresentacao]", error);
+    return { success: false as const, error: "Erro ao compartilhar apresentação" };
   }
 }

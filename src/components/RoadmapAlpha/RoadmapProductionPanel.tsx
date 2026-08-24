@@ -20,6 +20,7 @@ import {
   Cpu,
   FileText,
   Loader2,
+  MessagesSquare,
   PauseCircle,
   PlayCircle,
   RefreshCw,
@@ -45,6 +46,7 @@ import {
   SalvarConfiguracaoRoadmapProduction,
 } from "@/actions/RoadmapProduction";
 import { Button } from "@/components/ui/button";
+import { RoadmapImplementationRoom } from "@/components/RoadmapAlpha/RoadmapImplementationRoom";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +54,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type {
+  ProductionIntervention,
+  ProductionMessage,
+} from "@/lib/roadmap-production/contracts";
 
 interface ProviderView {
   id: "ollama" | "codex" | "claude";
@@ -110,6 +116,8 @@ interface ExecutionView {
   completionReportPath: string | null;
   completionReportMarkdown: string | null;
   reworkCount: number;
+  messages: ProductionMessage[];
+  interventions: ProductionIntervention[];
   manualFeedback: Array<{
     id: string;
     reportedAt: string;
@@ -151,6 +159,8 @@ const STATUS_LABEL: Record<string, string> = {
   SUCCEEDED: "Concluído",
   FAILED: "Falhou",
   BLOCKED: "Bloqueado",
+  NEEDS_INPUT: "Aguardando resposta",
+  WAITING_FOR_ADMIN: "Aguardando administrador",
 };
 
 const DEVELOPMENT_PROVIDER_LABEL: Record<
@@ -165,6 +175,8 @@ function statusClass(status: string): string {
     return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
   if (status === "AWAITING_APPROVAL")
     return "border-violet-400/20 bg-violet-400/10 text-violet-300";
+  if (status === "WAITING_FOR_ADMIN" || status === "NEEDS_INPUT")
+    return "border-amber-400/30 bg-amber-400/10 text-amber-200";
   if (status === "PAUSED")
     return "border-slate-400/20 bg-slate-400/10 text-slate-300";
   if (status === "FAILED" || status === "BLOCKED")
@@ -205,6 +217,7 @@ export function RoadmapProductionPanel({
   const [feedbackTarget, setFeedbackTarget] = useState<ExecutionView | null>(
     null,
   );
+  const [roomExecutionId, setRoomExecutionId] = useState<string | null>(null);
   const polling = useRef(false);
 
   const refresh = useCallback(
@@ -254,6 +267,8 @@ export function RoadmapProductionPanel({
         .find(({ phase }) => phase.status === "RUNNING") ?? null,
     [executions],
   );
+  const roomExecution =
+    executions.find((execution) => execution.id === roomExecutionId) ?? null;
   const promptItems = useMemo(
     () =>
       executions.flatMap((execution) => [
@@ -568,6 +583,29 @@ export function RoadmapProductionPanel({
                     )}
                   </div>
                 </div>
+                <div className="border-b border-white/10 p-2">
+                  <button
+                    type="button"
+                    onClick={() => setRoomExecutionId(execution.id)}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/20 bg-violet-400/[.06] px-3 py-2 text-xs font-medium text-violet-200 hover:bg-violet-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
+                  >
+                    <MessagesSquare size={14} /> Acompanhar implementação
+                    {execution.interventions.filter(
+                      (item) => item.status === "PENDING",
+                    ).length > 0 && (
+                      <span
+                        className="grid min-w-5 place-items-center rounded-full bg-amber-300 px-1 text-[10px] font-bold text-slate-950"
+                        aria-label={`${execution.interventions.filter((item) => item.status === "PENDING").length} intervenções pendentes`}
+                      >
+                        {
+                          execution.interventions.filter(
+                            (item) => item.status === "PENDING",
+                          ).length
+                        }
+                      </span>
+                    )}
+                  </button>
+                </div>
                 {resolvedExpandedExecutionId === execution.id && (
                   <div
                     id={`production-prompts-${execution.id}`}
@@ -748,6 +786,19 @@ export function RoadmapProductionPanel({
           }}
         />
       )}
+      <RoadmapImplementationRoom
+        open={Boolean(roomExecutionId && roomExecution)}
+        onOpenChange={(open) => !open && setRoomExecutionId(null)}
+        execution={roomExecution}
+        agents={data?.agents ?? []}
+        canManage={canManage}
+        onControl={async (control) => {
+          if (!roomExecution) return;
+          await controlExecution(roomExecution, control);
+          await refresh(false);
+        }}
+        onChanged={() => refresh(false)}
+      />
     </main>
   );
 }

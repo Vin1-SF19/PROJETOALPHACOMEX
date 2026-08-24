@@ -25,5 +25,5 @@ export default async function ApresentacoesPage() {
     : null;
   const temaName = rec?.tema_interface ?? "blue";
 
-  return <ApresentacoesDashboard temaName={temaName} />;
+  return <ApresentacoesDashboard temaName={temaName} usuarioAtualId={userId} />;
 }

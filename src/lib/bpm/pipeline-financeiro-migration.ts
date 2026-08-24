@@ -15,7 +15,7 @@ export interface SchemaFinanceiroResult {
 }
 
 /**
- * Garante que um pipeline "Financeiro" tenha o schema de 5 etapas aplicado.
+ * Garante que um pipeline "Financeiro" tenha o schema de 6 etapas aplicado.
  * Idempotente: se o schema já está configurado, não faz nada.
  * Não exige permissão de admin — é uma operação de integridade de dados.
  */
