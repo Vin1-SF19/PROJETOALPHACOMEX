@@ -466,6 +466,14 @@ Os componentes compartilhados finais para datasets são `PaginationControls.tsx`
 **Notas:** Background "espaço profundo" do módulo CRM — 60 partículas desktop / 25 mobile, 3 nébulas temáticas (Checklist azul-ciano, CS&NPS verde-âmbar, Extratos violeta), ícones sutis `CheckSquare`/`TrendingUp`/`Banknote` a 3% de opacidade. `pointer-events-none` + `aria-hidden`, `useReducedMotion()` respeitado. Localização no folder do módulo (não em `components/ui/`) — mesmo padrão de `ChecklistBackground.tsx` e `CsNpsBackground.tsx`. Ver `docs/components/crm-space-background.md`.
 **Última atualização:** 2026-08-15 por Scribe (RM-2026-C4A90D)
 
+### PainelProximaEtapa (Alpha CRM — card aberto, coluna direita)
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`
+**Tipo:** Client Component
+**Props:** `card: CardDetalhe`, `etapas: EtapaOpcao[]`, `podeMoverEtapa: boolean`, `accent: string`, `onMovido: () => void`
+**Uso:** renderizado por `CardAbertoLayout.tsx` na coluna direita do card aberto do CRM.
+**Notas:** Exibe exclusivamente a lista de botões de etapas futuras (`etapas.map`) + nota de permissão. A validação funcional de data/hora permanece via `bloqueadaPorDataHora` (desabilita botão "Reunião Agendada" + `title` tooltip) e no backend (`obterErroDataReuniaoParaMovimento` em `Cards.ts`). A transição para Standby é canal independente (botão de etapa → `MoverCardBpm`), nunca bloqueada por ausência de data/hora.
+**2026-07-XX — Removido texto de validação e elementos associados do lado direito do card (RM-2026-FCE09D).**
+
 ### CrmPipelineBorder (Alpha CRM)
 **Arquivo:** `src/components/ui/crm-pipeline-border.tsx`
 **Tipo:** Client Component

@@ -17,7 +17,7 @@ import {
   isAdminRole,
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
-import { executarAutomacaoFechamentoComercial } from "@/lib/bpm/automacoes";
+import { executarAutomacaoFechamentoComercial, executarAutomacaoTarefaNotaFiscal } from "@/lib/bpm/automacoes";
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
@@ -47,6 +47,7 @@ import {
   obterErroProximoContatoParaMovimento,
   pipelineEhRevisaoRadar,
 } from "@/lib/bpm/proximo-contato";
+import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
 import {
   etapaEhEmTratativa,
   obterErroChecklistParaSaidaEmTratativa,
@@ -270,6 +271,10 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
     await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
     const diretoria = await checarAcessoDiretoriaBpm(userId);
+    const pipelineInfo = await db.bpmPipeline.findUnique({
+      where: { id: pipelineId },
+      select: { nome: true },
+    });
 
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
@@ -344,22 +349,63 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
       );
     }
 
+    const cardsReais = cards.map((card) => {
+      const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
+      return {
+        ...card,
+        origem: "real" as const,
+        nolossLeadId: null as string | null,
+        ligacoesHoje: ehNovoLead ? (ligacoesPorCard.get(card.id) ?? 0) : 0,
+        metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
+        diasUteisDecorridos: ehNovoLead
+          ? contarDiasUteisDecorridos(card.createdAt, agora)
+          : 0,
+        diaCiclo: ehNovoLead
+          ? calcularDiaCicloNovosLeads(card.createdAt, agora)
+          : 1,
+      };
+    });
+
+    // Leads do NoLoss viram cards VIRTUAIS na coluna "Novos leads" do pipeline
+    // "Revisão de Radar" — nunca em outro pipeline, nunca fora dessa etapa.
+    // Visíveis a qualquer usuário com acesso ao pipeline (sem filtro de membro).
+    const cardsVirtuais = (etapaNovosLeads && pipelineEhRevisaoRadar(pipelineInfo?.nome))
+      ? (await buscarNolossLeadsPendentes()).map((lead) => ({
+          id: lead.id,
+          etapaId: etapaNovosLeads.id,
+          servico: null,
+          status: "ATIVO",
+          createdAt: lead.receivedAt,
+          primeiraVisualizacaoEm: null,
+          proximoContatoEm: null,
+          statusPosFechamento: null,
+          // Sentinela: id=0 nunca existe em Cliente/usuarios (autoincrement começa
+          // em 1) — qualquer consumidor futuro de CardBpm DEVE checar
+          // origem==="noloss" antes de usar empresa.id/responsavel.id para lookup
+          // real (ex: CardFullViewModal). A UI atual já bloqueia abrir esse modal
+          // para cards virtuais — não remova essa checagem sem manter esta garantia.
+          empresa: {
+            id: 0,
+            razaoSocial: lead.nome || lead.email || "Lead sem nome",
+            nomeFantasia: null,
+          },
+          responsavel: { id: 0, nome: "Sem responsável" },
+          membros: [],
+          _count: { tarefas: 0, anexos: 0 },
+          tarefas: [],
+          campoValores: [],
+          origem: "noloss" as const,
+          nolossLeadId: lead.id,
+          ligacoesHoje: 0,
+          metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
+          diasUteisDecorridos: 0,
+          diaCiclo: 1,
+        }))
+      : [];
+
     return {
       success: true,
-      data: cards.map((card) => {
-        const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
-        return {
-          ...card,
-          ligacoesHoje: ehNovoLead ? (ligacoesPorCard.get(card.id) ?? 0) : 0,
-          metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
-          diasUteisDecorridos: ehNovoLead
-            ? contarDiasUteisDecorridos(card.createdAt, agora)
-            : 0,
-          diaCiclo: ehNovoLead
-            ? calcularDiaCicloNovosLeads(card.createdAt, agora)
-            : 1,
-        };
-      }),
+      data: [...cardsReais, ...cardsVirtuais],
     };
   } catch (error) {
     console.error("[ListarCardsPipelineBpm]", error);
@@ -1421,6 +1467,7 @@ async function executarMovimentoComRequisitos(
   });
 
   await executarAutomacaoFechamentoComercial(cardId, userId);
+  await executarAutomacaoTarefaNotaFiscal(cardId, userId);
   await notificarPipelineBpm({ pipelineId: resultadoMovimento.pipelineId, cardId, tipo: "CARD_MOVIDO" });
   revalidatePath(`${ROTA_BASE}/pipeline/${resultadoMovimento.pipelineId}`);
   revalidatePath(ROTA_BASE);

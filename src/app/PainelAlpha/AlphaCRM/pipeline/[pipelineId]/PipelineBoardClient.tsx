@@ -24,6 +24,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, PhoneCall, Plus, RefreshCw, StickyNote } from "lucide-react";
 import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
+import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
 import {
   BPM_PIPELINE_EVENT,
   canalPipelineBpm,
@@ -32,6 +33,7 @@ import {
 import { pusherClient } from "@/lib/pusher";
 import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
+import AtribuirResponsavelPromocaoModal from "./AtribuirResponsavelPromocaoModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
 import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
@@ -69,6 +71,9 @@ interface CardBpm {
   etapaId: string;
   servico: string | null;
   status: string;
+  origem: "real" | "noloss";
+  nolossLeadId: string | null;
+  createdAt: Date | string;
   primeiraVisualizacaoEm?: Date | string | null;
   proximoContatoEm?: Date | string | null;
   statusPosFechamento?: string | null;
@@ -164,8 +169,9 @@ function KanbanCard({
   });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, animationDelay: `${index * 40}ms` };
 
+  const ehLeadVirtual = card.origem === "noloss";
   const naoAcessado = !card.primeiraVisualizacaoEm;
-  const alertaBoasVindas = etapaEhBoasVindas(etapaNome) && naoAcessado;
+  const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome) && naoAcessado;
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
   const resumoAlinhamento = card.campoValores?.find((campo) => campoEhResumoAlinhamento(campo.campo.nome))?.valor;
   const alertaAlinhamento = etapaEhAlinhamentoEstrategico(etapaNome) && !resumoAlinhamento?.trim();
@@ -188,12 +194,14 @@ function KanbanCard({
       style={style}
       {...attributes}
       {...listeners}
-      onClick={() => onAbrir(card.id)}
-      aria-label={statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
+      onClick={() => { if (!ehLeadVirtual) onAbrir(card.id); }}
+      aria-label={ehLeadVirtual ? `${nomeEmpresa}. Lead do site, ainda sem card` : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
         "cursor-grab active:cursor-grabbing select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
         (alertaBoasVindas || alertaAlinhamento) && "animate-pulse",
-        alertaBoasVindas || alertaAlinhamento
+        ehLeadVirtual
+          ? "border-dashed border-sky-400/40 hover:border-sky-400/60"
+          : alertaBoasVindas || alertaAlinhamento
           ? "animate-pulse"
           : naoAcessado
             ? "border-cyan-400/50 hover:border-cyan-400/70"
@@ -225,18 +233,22 @@ function KanbanCard({
                   />
                 )}
                 <Building2 size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAbrir(card.id);
-                  }}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  className="line-clamp-2 text-left decoration-white/40 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  aria-label={`Abrir card de ${nomeEmpresa}`}
-                >
-                  {nomeEmpresa}
-                </button>
+                {ehLeadVirtual ? (
+                  <span className="line-clamp-2 text-left text-white">{nomeEmpresa}</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onAbrir(card.id);
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    className="line-clamp-2 text-left decoration-white/40 underline-offset-2 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    aria-label={`Abrir card de ${nomeEmpresa}`}
+                  >
+                    {nomeEmpresa}
+                  </button>
+                )}
               </div>
               {card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
             </div>
@@ -252,7 +264,21 @@ function KanbanCard({
           </div>
         )}
 
-        {(canalOrigem || statusConfig || card.proximoContatoEm !== undefined) && (
+        {ehLeadVirtual && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className="rounded-lg border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-sky-300"
+              title="Lead recebido pelo formulário do site — ainda não é uma empresa/card real"
+            >
+              Lead do site
+            </span>
+            <span className="text-[10px] text-slate-500">
+              Recebido em {formatarPrazoNoCard(card.createdAt)}
+            </span>
+          </div>
+        )}
+
+        {!ehLeadVirtual && (canalOrigem || statusConfig || card.proximoContatoEm !== undefined) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {canalOrigem && (
               <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
@@ -270,7 +296,7 @@ function KanbanCard({
           </div>
         )}
 
-        {novosLeads && (
+        {novosLeads && !ehLeadVirtual && (
           <div className="grid grid-cols-2 gap-1.5 border-t border-white/[0.06] pt-2.5">
             <div
               className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[9px] font-bold ${
@@ -308,32 +334,34 @@ function KanbanCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5">
-          <div className="flex min-h-6 items-center gap-2 text-[10px] font-medium text-slate-400">
-            {card._count.tarefas > 0 && (
-              <span className="inline-flex items-center gap-1" title={`${card._count.tarefas} tarefa(s)`}>
-                <ClipboardList size={12} aria-hidden="true" />
-                <span className="tabular-nums">{card._count.tarefas}</span>
-                <span className="sr-only">tarefa(s)</span>
-              </span>
-            )}
-            {card._count.anexos > 0 && (
-              <span className="inline-flex items-center gap-1" title={`${card._count.anexos} anexo(s)`}>
-                <Paperclip size={12} aria-hidden="true" />
-                <span className="tabular-nums">{card._count.anexos}</span>
-                <span className="sr-only">anexo(s)</span>
-              </span>
-            )}
-            {card._count.tarefas === 0 && card._count.anexos === 0 && (
-              <span className="text-slate-500">Sem pendências</span>
-            )}
+        {!ehLeadVirtual && (
+          <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5">
+            <div className="flex min-h-6 items-center gap-2 text-[10px] font-medium text-slate-400">
+              {card._count.tarefas > 0 && (
+                <span className="inline-flex items-center gap-1" title={`${card._count.tarefas} tarefa(s)`}>
+                  <ClipboardList size={12} aria-hidden="true" />
+                  <span className="tabular-nums">{card._count.tarefas}</span>
+                  <span className="sr-only">tarefa(s)</span>
+                </span>
+              )}
+              {card._count.anexos > 0 && (
+                <span className="inline-flex items-center gap-1" title={`${card._count.anexos} anexo(s)`}>
+                  <Paperclip size={12} aria-hidden="true" />
+                  <span className="tabular-nums">{card._count.anexos}</span>
+                  <span className="sr-only">anexo(s)</span>
+                </span>
+              )}
+              {card._count.tarefas === 0 && card._count.anexos === 0 && (
+                <span className="text-slate-500">Sem pendências</span>
+              )}
+            </div>
+            <GrupoAvataresMembrosCard
+              membros={membrosVisiveis}
+              limite={3}
+              className="[&_[data-slot=avatar]]:shadow-sm [&_[data-slot=avatar]]:shadow-black/30"
+            />
           </div>
-          <GrupoAvataresMembrosCard
-            membros={membrosVisiveis}
-            limite={3}
-            className="[&_[data-slot=avatar]]:shadow-sm [&_[data-slot=avatar]]:shadow-black/30"
-          />
-        </div>
+        )}
         </div>
       </GradientBlobCard>
     </div>
@@ -449,6 +477,13 @@ interface OpcoesRecarregarCards {
   preservarErro?: boolean;
 }
 
+interface PromocaoLeadPendente {
+  nolossLeadId: string;
+  nomeLead: string;
+  etapaDestinoId: string;
+  etapaDestinoNome: string;
+}
+
 export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, currentUserId, currentUserRole }: Props) {
   const accent = visual.accent;
   const router = useRouter();
@@ -457,6 +492,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [novoCardAberto, setNovoCardAberto] = useState(false);
+  const [promocaoLeadPendente, setPromocaoLeadPendente] = useState<PromocaoLeadPendente | null>(null);
   const [movimentoPendente, setMovimentoPendente] = useState(false);
   const [atualizandoManual, setAtualizandoManual] = useState(false);
   const [realtimeRevision, setRealtimeRevision] = useState(0);
@@ -639,6 +675,20 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
       return;
     }
 
+    if (activeCard.origem === "noloss" && activeCard.nolossLeadId) {
+      // Lead virtual: nunca move sozinho — reverte visualmente e abre o modal
+      // de "quem assume esse lead?" antes de qualquer efeito real no banco.
+      const etapaDestinoNome = etapasOrdenadas.find((etapa) => etapa.id === etapaDestinoId)?.nome ?? "";
+      await restaurarArrasto(snapshot);
+      setPromocaoLeadPendente({
+        nolossLeadId: activeCard.nolossLeadId,
+        nomeLead: activeCard.empresa.nomeFantasia || activeCard.empresa.razaoSocial,
+        etapaDestinoId,
+        etapaDestinoNome,
+      });
+      return;
+    }
+
     if (pipelineEhRevisaoRadar(pipeline.nome)) {
       const erroProximoContato = obterErroProximoContatoParaMovimento(activeCard.proximoContatoEm);
       if (erroProximoContato) {
@@ -805,6 +855,31 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
             router.refresh();
           }}
           onAbrirCard={abrirCard}
+        />
+      )}
+
+      {promocaoLeadPendente && (
+        <AtribuirResponsavelPromocaoModal
+          pipelineId={pipeline.id}
+          nomeLead={promocaoLeadPendente.nomeLead}
+          etapaDestinoNome={promocaoLeadPendente.etapaDestinoNome}
+          currentUserId={currentUserId}
+          accent={accent}
+          onCancelar={() => setPromocaoLeadPendente(null)}
+          onConfirmar={async (responsavelId) => {
+            const res = await PromoverNolossLead({
+              nolossLeadId: promocaoLeadPendente.nolossLeadId,
+              etapaDestinoId: promocaoLeadPendente.etapaDestinoId,
+              responsavelId,
+            });
+            if (res.success) {
+              setPromocaoLeadPendente(null);
+              await recarregarCards();
+              router.refresh();
+              return { success: true as const };
+            }
+            return { success: false as const, error: typeof res.error === "string" ? res.error : "Erro ao promover lead" };
+          }}
         />
       )}
     </div>

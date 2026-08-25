@@ -166,6 +166,12 @@ export const salvarRequisitosEMoverCardSchema = moverCardSchema.extend({
   ),
 });
 
+export const promoverNolossLeadSchema = z.object({
+  nolossLeadId: z.string().cuid(),
+  etapaDestinoId: z.string().cuid(),
+  responsavelId: z.number().int().positive(),
+});
+
 export const criarVinculoCardSchema = z.object({
   cardOrigemId: z.string().cuid(),
   cardDestinoId: z.string().cuid(),

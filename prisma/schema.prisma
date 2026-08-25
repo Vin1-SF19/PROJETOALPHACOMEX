@@ -141,6 +141,7 @@ model usuarios {
   bpmCardAnexosEnviados        BpmCardAnexo[]
   bpmInteracoesRegistradas     BpmInteracaoCard[]
   bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
+  nolossLeadsPromovidos        NolossLead[]
 
   justificativasMetaEnviadas JustificativaMeta[]
   roadmapObjectives          RoadmapObjective[]
@@ -552,6 +553,7 @@ model Cliente {
   commissionEvents     CommissionEvent[]
   businessProcesses    BusinessProcess[]
   eligibilityOverrides EligibilityOverride[]
+  nolossLeadsPromovidos NolossLead[]
 
   @@index([razaoSocial])
   @@index([status])
@@ -3364,6 +3366,8 @@ model BpmCard {
   vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
   vinculosDestino BpmCardVinculo[] @relation("CardDestino")
 
+  nolossLeadOrigem NolossLead[]
+
   @@index([empresaId])
   @@index([pipelineId])
   @@index([etapaId])
@@ -3538,6 +3542,35 @@ model BpmEtapaTransicaoPermitida {
 
   @@unique([etapaOrigemId, etapaDestinoId])
   @@index([etapaOrigemId])
+}
+
+// Lead recebido do NoLoss (formulário do site → audience "Leads" → webhook da campanha)
+// como staging antes de virar Cliente/BpmCard reais. Exibido como card VIRTUAL na 1ª
+// coluna ("Novos leads") do pipeline "Revisão de Radar" enquanto status = "pending".
+// Promovido (cria Cliente + BpmCard em transação) só quando um usuário arrasta o card
+// para outra etapa — nunca automaticamente.
+model NolossLead {
+  id                 String    @id @default(cuid())
+  nolossContactId    String    @unique
+  nolossSubmissionId String?
+  nome               String?
+  email              String?
+  telefone           String?
+  utmSource          String?
+  utmMedium          String?
+  utmCampaign        String?
+  status             String    @default("pending") // pending | promoted | dismissed
+  promotedClienteId  Int?
+  promotedCardId     String?
+  promotedAt         DateTime?
+  promotedByUserId   Int?
+  receivedAt         DateTime  @default(now())
+
+  promotedCliente Cliente?  @relation(fields: [promotedClienteId], references: [id])
+  promotedCard    BpmCard?  @relation(fields: [promotedCardId], references: [id])
+  promotedByUser  usuarios? @relation(fields: [promotedByUserId], references: [id])
+
+  @@index([status])
 }
 
 // Permite que um BpmCampo de nível pipeline (etapaId: null) seja obrigatório só em etapas

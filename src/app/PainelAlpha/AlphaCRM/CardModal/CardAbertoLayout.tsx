@@ -7,10 +7,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { isAdminRole } from "@/lib/roles";
-import type { EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoServico from "./PainelHistoricoServico";
-import PainelRegistrar from "./PainelRegistrar";
 import PainelProximaEtapa from "./PainelProximaEtapa";
 import {
   DadosEmpresaDrawer,
@@ -27,25 +25,7 @@ type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][num
 
 const SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"];
 
-// ─── Registro pipeline → layout ───────────────────────────────────────────────
-// Para adicionar um novo pipeline com layout customizado:
-//   1. Crie um componente de layout (ex: PipelineXCardLayout.tsx)
-//   2. Adicione uma entrada neste registro
-// Por padrão, todos os pipelines usam o layout padrão (CardOpenDefaultLayout).
-type PipelineLayoutComponent = (props: CardOpenShellProps) => ReactNode;
-
-const PIPELINE_LAYOUT_REGISTRY: Record<string, PipelineLayoutComponent> = {
-  // Exemplo de extensão:
-  // "pipeline-x": PipelineXCardLayout,
-};
-
-function resolvePipelineLayout(pipelineId: string): PipelineLayoutComponent {
-  return PIPELINE_LAYOUT_REGISTRY[pipelineId] ?? CardOpenDefaultLayout;
-}
-
-// ─── Props do Shell ───────────────────────────────────────────────────────────
-
-export interface CardOpenShellProps {
+export interface CardAbertoLayoutProps {
   card: CardDetalhe;
   etapas: EtapaOpcao[];
   interacoes: Interacao[];
@@ -57,13 +37,26 @@ export interface CardOpenShellProps {
   onAtualizado: () => void;
   onAbrirCard: (cardId: string) => void;
   onInteracaoCriada: (interacao: Interacao) => void;
-  onEstadoFollowUpChange: (estado: EstadoFollowUpModal) => void;
-  estadoFollowUpAtual: EstadoFollowUpModal;
+  onEstadoFollowUpChange: (estado: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO") => void;
+  estadoFollowUpAtual: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
+  /** Slot: formulário da etapa ativa (renderizado pelo CardOpenFormSlot ou equivalente) */
+  children: ReactNode;
 }
 
-// ─── Layout Padrão (usado por todos os pipelines sem override) ───────────────
-
-function CardOpenDefaultLayout({
+/**
+ * Layout padrão do card aberto — idêntico em todas as etapas do pipeline.
+ *
+ * Estrutura:
+ * - Handle visual do bottom-sheet
+ * - Header (empresa, CNPJ, serviço, tabs de serviço, ações)
+ * - Grid de 3 painéis:
+ *   - Esquerda: PainelHistorico (ou DadosEmpresaDrawer)
+ *   - Centro: children (formulário da etapa ativa)
+ *   - Direita: PainelProximaEtapa
+ *
+ * Apenas a seção central (children) varia entre etapas.
+ */
+export function CardAbertoLayout({
   card,
   etapas,
   interacoes,
@@ -77,7 +70,8 @@ function CardOpenDefaultLayout({
   onInteracaoCriada,
   onEstadoFollowUpChange,
   estadoFollowUpAtual,
-}: CardOpenShellProps) {
+  children,
+}: CardAbertoLayoutProps) {
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
   const [perfilEmpresaAberto, setPerfilEmpresaAberto] = useState(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(card.id);
@@ -99,17 +93,6 @@ function CardOpenDefaultLayout({
           (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
         )
       : etapas;
-
-  const focarPainelReuniao = () => {
-    const painel = document.getElementById(`formulario-etapa-${card.id}`);
-    painel?.scrollIntoView({ behavior: "smooth", block: "center" });
-    painel?.focus({ preventScroll: true });
-  };
-
-  const recarregar = async () => {
-    const res = await ObterCardBpm(card.id);
-    if (res.success && res.data) onAtualizado();
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -183,11 +166,8 @@ function CardOpenDefaultLayout({
               membros={card.membros}
               podeGerenciar={podeGerenciarMembros}
               accent={accent}
-              onMembrosAtualizados={(membros) => {
-                // Atualização local via callback do pai
-                onAtualizado();
-              }}
-              onAtualizado={() => { void recarregar(); onAtualizado(); }}
+              onMembrosAtualizados={() => { onAtualizado(); }}
+              onAtualizado={() => { onAtualizado(); }}
             />
             <TelefonesCardButton
               cardId={card.id}
@@ -250,7 +230,7 @@ function CardOpenDefaultLayout({
                 accent={accent}
                 currentUserId={currentUserId}
                 currentUserRole={currentUserRole}
-                onAtualizado={() => { void recarregar(); onAtualizado(); }}
+                onAtualizado={() => { onAtualizado(); }}
                 etapas={etapas}
                 podeTrabalharTarefas={podeTrabalharTarefas}
                 anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
@@ -268,23 +248,18 @@ function CardOpenDefaultLayout({
             ))}
           </Tabs>
         )}
-        <PainelRegistrar
-          card={card}
-          etapaAtual={etapaAtual}
-          accent={accent}
-          interacoes={interacoes}
-          onInteracaoCriada={onInteracaoCriada}
-          podeEditar={podeEditar}
-          realtimeRevision={realtimeRevision}
-          onAtualizado={() => { void recarregar(); onAtualizado(); }}
-        />
+
+        {/* Centro: slot do formulário da etapa ativa */}
+        <div className="min-h-0 lg:h-full lg:overflow-hidden">{children}</div>
+
+        {/* Direita: próxima etapa */}
         <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
           <PainelProximaEtapa
             card={card}
             etapas={etapasParaMover}
             podeMoverEtapa={podeMoverEtapa}
             accent={accent}
-            onMovido={() => { void recarregar(); onAtualizado(); }}
+            onMovido={() => { onAtualizado(); }}
           />
         </div>
       </div>
@@ -298,11 +273,4 @@ function CardOpenDefaultLayout({
       />
     </div>
   );
-}
-
-// ─── Shell principal ──────────────────────────────────────────────────────────
-
-export function CardOpenShell(props: CardOpenShellProps) {
-  const LayoutComponent = resolvePipelineLayout(props.card.pipeline.id);
-  return <LayoutComponent {...props} />;
 }

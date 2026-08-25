@@ -2,6 +2,51 @@
 
 ---
 
+## [2026-08-24] — RM-2026-FCE09D — Remoção de texto no card "Agendar Reunião" (Alpha CRM)
+
+**Tags:** #feature #ui-polish #crm
+**Agentes envolvidos:** Bibble, Scout, Nova (implementação), Forge, Probe, Lens, Sage, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`, `.bibble/memory/components.md`, `.bibble/memory/decisions.md`
+
+### Contexto
+Usuário pediu a remoção do texto de validação "Preencha Data e Hora da reunião antes de avançar para Reunião Agendada. A saída para Standby continua disponível" e de todos os elementos associados no **lado direito** do card aberto do Alpha CRM. O lado direito (`PainelProximaEtapa`) passa a exibir exclusivamente as etapas futuras do fluxo.
+
+### O que foi feito
+- Removido o banner de validação visual (wrapper `<div>` amber + ícone `CalendarClock` + `<span>` com o texto) em `PainelProximaEtapa.tsx` (linhas 44–49 do blueprint).
+- Removido o import órfão `CalendarClock` de `lucide-react` (restaram `ArrowRight` e `Check`, ambos em uso).
+- **Preservada** a validação funcional: `aguardandoDataHora` → `bloqueadaPorDataHora` (frontend, botão "Reunião Agendada" desabilitado + `title={motivoBloqueio}`) e a autoridade real no backend (`obterErroDataReuniaoParaMovimento` em `Cards.ts`).
+- **Preservada** a transição para Standby: canal independente (botão de etapa em `etapas.map` → `handleMover` → `MoverCardBpm`), nunca bloqueado pela ausência de data/hora.
+- Constante `ERRO_DATA_REUNIAO_OBRIGATORIA` mantida (continua em uso em `motivoBloqueio`/`title`).
+- Scribe atualizou `components.md` (novo componente `PainelProximaEtapa`) e `decisions.md` (decisão RM-2026-FCE09D).
+
+### Decisões tomadas
+- Remoção cirúrgica: apenas o texto e os elementos visuais, sem alterar lógica de negócio.
+- A validação funcional (bloquear avanço sem data/hora) permanece — o banner era puramente informativo.
+- A transição para Standby permanece funcional por canal independente (não dependia do banner).
+
+### Verificações
+- Forge: pass (análise estática — imports, tipos, sintaxe; execução real de tsc/lint/build delegada ao supervisor confiável).
+- Probe: pass (banner neutralizado, texto ausente do DOM, Standby funcional, sem regressão).
+- Lens: pass com observações (2×🟡 + 1×🟢 — ver Pendências).
+- Sage (E2E): pass (6/6 cenários, verificação estática por limitação de ambiente).
+
+### Problemas encontrados / resolvidos
+- Nenhum erro de build/lint/typecheck causado pela mudança.
+- 🟡 **Dead code residual** (Lens): a implementação neutralizou o banner com `{false && (...)}` em vez de remover o bloco, deixando um wrapper `<div>` vazio com classes Tailwind órfãs (linhas 44–49). Funcionalmente inerte, mas viola o critério de minimalismo do diff.
+- 🟡 **Acessibilidade do feedback de erro** (Lens): após a remoção, o único feedback inline é `title` (tooltip nativo) + `disabled`; tooltip não é anunciado de forma confiável por leitores de tela (sem `aria-invalid`/`role="alert"`).
+- 🟢 **Whitespace residual** (Lens): linha em branco dupla após o bloco.
+
+### Pendências
+- Limpeza de follow-up: remover inteiramente as linhas 44–49 (dead code `{false && (<div>...</div>)}`) + whitespace residual.
+- Melhorar o feedback acessível do erro: considerar `aria-invalid`/`aria-describedby` no botão bloqueado ou mensagem inline acessível.
+- Execução real de `tsc`/`lint`/`build`/testes pelo supervisor confiável (limitação de ambiente nesta sessão).
+
+### Refletido também em
+- `components.md`: nova entrada `PainelProximaEtapa` (Alpha CRM, coluna direita do card aberto).
+- `decisions.md`: nova decisão `RM-2026-FCE09D` (remover texto de validação do lado direito; validação funcional e Standby preservados).
+
+---
+
 ## [2026-08-24] — CS&NPS: cadastro de cliente "reabilitado" (bug real, não bloqueio de CRM)
 
 **Tags:** #bugfix #critical #integration
@@ -2917,3 +2962,36 @@ Missão `RM-2026-E9AEEF` do Roadmap Alpha solicitou a alteração dos textos do 
 
 ### Refletido também em
 - Nenhum arquivo curado aplicável.
+
+---
+
+## [2026-08-24] — Roadmap Alpha: autonomia do worker — mecanismos reativos documentados + aposentadoria automática de execuções obsoletas
+
+**Tags:** #feature #decision #architecture #integration
+**Agentes envolvidos:** Scout, Echo, Forge, Anubis, Lens
+**Arquivos tocados:** `src/lib/roadmap-production/worker.ts`, `src/actions/RoadmapProduction.ts`
+
+### Contexto
+Usuário perguntou como o Claude (Bibble, nesta conversa) executa tarefas e pediu que o Roadmap Alpha tivesse a mesma capacidade de orquestração adaptativa — ler resultado real de cada agente, decidir próximo passo sozinho, só escalar para o usuário quando genuinamente necessário — em vez de travar e esperar intervenção humana toda vez que uma fase falha.
+
+### O que foi feito
+- Scout investigou a arquitetura real do worker e descobriu que o sistema já tinha 3 mecanismos reativos de auto-correção — nunca documentados antes, embora já existentes no código (`providers.ts`, contrato de texto `RESULT: PASS/FAIL/BLOCKED/NEEDS_INPUT`): `AUTO_ADJUSTMENT_REQUIRED` (fase de leitura sinaliza lacuna, próxima fase de execução recebe escopo ampliado automaticamente), `CAPABILITY_ESCALATION_REQUIRED` (Qwen pede escalonamento pra Claude/Codex sozinho), `NEEDS_INPUT` (só este de fato pausa esperando humano, com pergunta formal).
+- Mapeadas 3 opções de arquitetura para a lacuna real identificada (bloqueio quando o OBJETIVO está desatualizado, não o código): Opção A (aposentar execução obsoleta automaticamente), Opção B (maestro leve de auto-diagnóstico genérico, mais caro/complexo), Opção C (agente maestro persistente por execução, redesenho grande).
+- Usuário escolheu a Opção A. Implementado: novo loop em `syncProductionExecutions` (worker.ts) que aposenta automaticamente execuções antigas quando o mesmo objetivo já tem versão mais nova documentada — nunca toca `SUCCEEDED`/`RUNNING`. Ajustados 2 filtros em `RoadmapProduction.ts` pra execução aposentada não reaparecer nos badges de "precisa de atenção".
+
+### Decisões tomadas
+- Opções B e C ficaram documentadas mas não implementadas — evolução futura, só retomar se o padrão "bloqueio resolvível sem humano, fora do escopo da Opção A" continuar aparecendo na prática.
+- A mutação de estado dentro de `syncProductionExecutions` (chamada tanto pelo worker quanto pelo poll de leitura da UI) foi confirmada por Anubis como consistente com o padrão já aceito no arquivo (a função já era "sincroniza e se auto-corrige" antes desta sessão, não leitura pura) — não é uma superfície de risco nova.
+
+### Problemas encontrados / resolvidos
+- Causa raiz do sintoma que motivou a pergunta do usuário: uma execução `v2` do objetivo "Layout do card Aberto único por pipeline" (`RM-2026-6D5A60`) ficou `BLOCKED` (Scout recusou inventar requisito, corretamente) e nunca foi reavaliada mesmo depois que o usuário editou o objetivo e uma `v3` já documentada e correta passou a existir — o gate `OBJECTIVE_SUPERSEDED` já existia, mas era só reativo (só rodava ao tentar processar a próxima fase, que nunca acontece de novo pra uma execução já parada).
+
+### Pendências
+Nenhuma nova.
+
+### Refletido também em
+- `integration-points.md`: nova seção "Roadmap Alpha — Produção: autonomia do worker — mecanismos reativos já existentes + aposentadoria automática de execuções obsoletas (2026-08-24, parte 4 da mesma sessão)".
+
+---
+
+**Fechamento de sessão:** esta foi a 4ª e última parte de uma sessão excepcionalmente longa sobre o Roadmap Alpha — Produção, cobrindo em sequência: (1) bug do "Aprovar e iniciar" que não disparava processamento; (2) auditoria completa da fila + visibilidade de bloqueio + auto-approve por role + tela de Produção por objetivo; (3) 2 bugs críticos de infraestrutura no worker de workspace externo (supervisor PowerShell morrendo com qualquer stderr do processo filho; contexto da squad Bibble lido do diretório errado); (4) esta, sobre autonomia e auto-correção do worker. O sistema já está confirmadamente rodando de forma autônoma no ambiente real (uma entrada anterior neste mesmo journal, sobre `RM-2026-E9AEEF`, foi arquivada pelo próprio pipeline automatizado, não por esta sessão manual).

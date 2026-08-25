@@ -532,6 +532,51 @@ export async function syncProductionExecutions(
     execution.completionReportMarkdown = report.markdown;
     changed = true;
   }
+  /**
+   * Aposentadoria PROATIVA de execuções obsoletas — extensão do gate
+   * reativo de OBJECTIVE_SUPERSEDED (linha ~1168 mais abaixo, dentro de
+   * processNextProductionPhaseUnlocked), que só roda quando o worker tenta
+   * processar a PRÓXIMA fase de uma execução específica. Uma execução já
+   * parada (BLOCKED/AWAITING_APPROVAL/PENDING/PAUSED/WAITING_FOR_ADMIN/
+   * FAILED) nunca volta a ser processada, então nunca chegaria nesse gate —
+   * ficaria presa com o errorCode antigo para sempre mesmo depois que uma
+   * versão mais nova do MESMO objetivo já foi documentada e já tem sua
+   * própria execução ativa. Este loop cobre exatamente essa lacuna, a cada
+   * sincronização (poll da UI ou ciclo do worker).
+   */
+  const currentSourceVersionByObjective = new Map(
+    objectives.map((objective) => [objective.id, objective.sourceVersion]),
+  );
+  for (const execution of state.executions) {
+    if (execution.status === "SUCCEEDED" || execution.status === "RUNNING")
+      continue;
+    const alreadySuperseded = execution.phases.some(
+      (phase) => phase.errorCode === "OBJECTIVE_SUPERSEDED",
+    );
+    if (alreadySuperseded) continue;
+    const currentVersion = currentSourceVersionByObjective.get(
+      execution.objectiveId,
+    );
+    if (currentVersion === undefined || execution.sourceVersion >= currentVersion)
+      continue;
+    const currentPhase = [...execution.phases]
+      .reverse()
+      .find((phase) => phase.status !== "SUCCEEDED");
+    if (!currentPhase) continue;
+    currentPhase.status = "BLOCKED";
+    currentPhase.errorCode = "OBJECTIVE_SUPERSEDED";
+    currentPhase.finishedAt = now();
+    execution.status = "BLOCKED";
+    execution.finishedAt = now();
+    appendActivity(currentPhase, {
+      at: now(),
+      agentId: currentPhase.resolvedAgent,
+      type: "STATUS",
+      message:
+        "Objetivo foi revisado (nova versão já documentada) — esta execução da versão anterior foi aposentada automaticamente.",
+    });
+    changed = true;
+  }
   const completedObjectiveIds = state.executions
     .filter((execution) => execution.status === "SUCCEEDED")
     .map((execution) => execution.objectiveId);

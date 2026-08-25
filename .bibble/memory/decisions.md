@@ -1,5 +1,15 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-07-XX — RM-2026-FCE09D — Remoção do texto de validação no card Agendar Reunião
+
+**Contexto:** O card aberto do CRM, etapa "Agendar Reunião", exibia no lado direito um banner âmbar com o texto "Preencha Data e Hora da reunião antes de avançar para Reunião Agendada. A saída para Standby continua disponível." — ruído visual redundante, pois a validação funcional já é comunicada via `title` tooltip no botão desabilitado e rejeitada no backend.
+
+**Decisão:** Remover o banner visual (wrapper `<div>` âmbar + ícone `CalendarClock` + `<span>` com o texto) e o import órfão `CalendarClock`. A validação funcional permanece intacta: frontend (`bloqueadaPorDataHora` desabilita o botão "Reunião Agendada" + `title={motivoBloqueio}`) e backend (`obterErroDataReuniaoParaMovimento` em `Cards.ts` rejeita o movimento). A transição para Standby permanece por canal independente (botão de etapa → `MoverCardBpm`), nunca bloqueada por ausência de data/hora.
+
+**Arquivo modificado:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx` (banner neutralizado, import `CalendarClock` removido).
+
+**Adicionado em:** 2026-07-XX por Scribe.
+
 ### 2026-08-20 — Alpha SEO: paridade OpenSEO por contratos congelados, adaptada à arquitetura do Painel Alpha
 
 **Contexto:** o pedido exigia trazer todas as funções do checkout `open-seo-main`, mas manter stack, autenticação, banco e UI coerentes com o Painel Alpha. A fonte possuía infraestrutura própria (Cloudflare/D1/Drizzle, Better Auth organizations e billing hosted) que não deveria ser transplantada literalmente.

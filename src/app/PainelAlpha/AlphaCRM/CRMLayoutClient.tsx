@@ -18,6 +18,7 @@ import {
 
 const NAV = [
   { href: "/PainelAlpha/AlphaCRM", label: "Dashboard", icon: LayoutDashboard, exact: true, adminOnly: false },
+  { href: "/PainelAlpha/AlphaCRM/pipelines", label: "Pipelines", icon: KanbanSquare, exact: true, adminOnly: false },
   { href: "/PainelAlpha/AlphaCRM/tarefas", label: "Tarefas", icon: ListChecks, exact: false, adminOnly: false },
   { href: "/PainelAlpha/AlphaCRM/admin", label: "Configurações", icon: Settings2, exact: false, adminOnly: true },
 ];

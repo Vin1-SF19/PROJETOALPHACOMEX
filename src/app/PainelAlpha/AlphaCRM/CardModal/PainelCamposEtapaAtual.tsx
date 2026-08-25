@@ -18,6 +18,7 @@ import {
   TEMPLATE_RESUMO_ALINHAMENTO,
 } from "@/lib/bpm/alinhamento-estrategico";
 import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
+import { CalculoTributario } from "./CalculoTributario";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
@@ -236,6 +237,20 @@ export function PainelCamposEtapaAtual({
               </div>
             );
           })}
+          {card.etapa.nome === "Formalização" && (() => {
+            const v = (nome: string) => { const c = camposEtapaBase.find((x) => x.nome === nome); return c ? (valoresCamposAtuais[c.id] ?? "") : ""; };
+            const num = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+            return (
+              <CalculoTributario
+                valorBruto={num(v("Valor bruto do contrato"))}
+                aliquotaIrrf={num(v("Alíquota IRRF"))}
+                aliquotaCsrf={num(v("Alíquota CSRF"))}
+                regimePrestador={v("Regime tributário do prestador") || undefined}
+                regimeTomador={v("Regime tributário do cliente") || undefined}
+                servico={v("Serviço contratado") || undefined}
+              />
+            );
+          })()}
           {salvandoCamposAtuais && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando alterações...</p>}
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}
         </div>

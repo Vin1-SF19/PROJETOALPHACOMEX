@@ -207,6 +207,49 @@ Descobertos ao **testar** a correção acima no ambiente real — não eram teó
 
 **Última atualização:** 2026-08-24 por Scribe (sessão Bibble — Scout→Echo→Nova→Forge→Anubis→Lens→Scribe)
 
+## Roadmap Alpha — Produção: autonomia do worker — mecanismos reativos já existentes + aposentadoria automática de execuções obsoletas (2026-08-24, parte 4 da mesma sessão)
+
+**Gatilho:** usuário perguntou "como você Claude executa tarefas? Eu quero que o Roadmap seja capaz de fazer essas execuções, assim como você" — comparando a squad Bibble desta conversa (Bibble orienta agentes, lê resultado real de cada um, decide próximo passo adaptativamente, só pergunta ao usuário quando genuinamente precisa) com o worker do Roadmap, que segue um roteiro de fases fixo, gerado uma única vez pelo Qwen na documentação, sem essa camada de "maestro".
+
+### ⚠️ Descoberta: o sistema JÁ tem 3 mecanismos reativos de auto-correção — nunca documentados antes
+
+Todos vivem em `src/lib/roadmap-production/providers.ts`, no contrato de texto que cada agente usa para terminar a resposta de uma fase (`RESULT: PASS`, `RESULT: FAIL`, `RESULT: BLOCKED` ou `RESULT: NEEDS_INPUT`, parseado por regex em `providers.ts:264-266`):
+
+1. **`AUTO_ADJUSTMENT_REQUIRED`** (`providers.ts:132,141`) — uma fase de leitura (CONTEXT) que descobre uma lacuna sinaliza isso sem travar (`RESULT: PASS` + `AUTO_ADJUSTMENT_REQUIRED: <lacuna>`); a próxima fase de execução recebe esse sinal automaticamente e amplia seu próprio escopo para cobrir a lacuna antes da entrega principal — sem intervenção humana.
+2. **`CAPABILITY_ESCALATION_REQUIRED`** — quando o Qwen reconhece que não tem capacidade para uma fase, ele mesmo pede escalonamento; o worker promove automaticamente para Claude/Codex (`resolveCapabilityEscalationAgent`, `worker.ts`), sem parar para o usuário.
+3. **`NEEDS_INPUT`** — reservado para quando é **genuinamente** uma decisão/autorização humana (credencial, ação destrutiva, permissão) — cria uma `ProductionIntervention` formal com pergunta, é o único dos 3 que de fato pausa esperando você.
+
+**Regra permanente:** antes de qualquer mudança futura no contrato de fases, verificar se o caso já é coberto por um desses 3 mecanismos antes de propor algo novo — o sistema é mais adaptativo do que parece à primeira vista.
+
+### O que faltava — 4ª categoria de bloqueio, sem caminho automático
+
+Nenhum dos 3 mecanismos acima cobre o caso: "o próprio **objetivo** (não o código, não a capacidade do agente) está desatualizado ou incompleto no momento em que o roteiro de fases foi gerado". Esse caso vira `RESULT: BLOCKED` puro (sem `AUTO_ADJUSTMENT_REQUIRED` nem `NEEDS_INPUT`) — e como o `RETRY` já existente só reseta a fase para `PENDING` e roda de novo **com o mesmo prompt fixo antigo**, retry nunca ajudava nesse caso específico.
+
+**Exemplo real desta sessão:** objetivo "Layout do card Aberto único por pipeline" (`RM-2026-6D5A60`) teve uma execução `v2` com Scout bloqueado (`AGENT_BLOCKED`) por falta do requisito completo — o objetivo só tinha o título na hora em que aquele roteiro foi gerado. O usuário editou o objetivo depois (adicionando descrição/critérios completos), criando automaticamente a `v3`, já documentada e correta — mas a `v2` morta continuava aparecendo como `BLOCKED` na tela, coexistindo e confundindo ao lado da `v3` `AWAITING_APPROVAL`.
+
+### 3 opções de arquitetura mapeadas pelo Scout (só a A foi implementada)
+
+- **Opção A (implementada):** detectar objetivo desatualizado e aposentar a execução antiga automaticamente.
+- **Opção B (não implementada, evolução futura):** "maestro leve" por fase — antes de qualquer `BLOCKED` terminal sem `AUTO_ADJUSTMENT_REQUIRED`/`NEEDS_INPUT`, disparar uma chamada extra e barata a um agente diagnosticador (pode ser o próprio Qwen) com o motivo do bloqueio + o objetivo atual do banco (não o prompt congelado), perguntando se é resolvível sem humano. Mais genérico que a Opção A (cobriria outros padrões de bloqueio "resolvível", não só objetivo desatualizado), mas mais complexo e arriscado (novo contrato, novo ponto de decisão, risco do diagnosticador "inventar" correção errada). Retomar se o padrão "bloqueio resolvível sem humano, mas fora do escopo da Opção A" continuar aparecendo na prática.
+- **Opção C (não implementada, redesenho grande):** agente maestro persistente por execução (não por fase), com memória e controle ativo do fluxo — mais fiel à analogia literal do usuário, mas exigiria repensar como o roteiro de fases é armazenado/modificado em runtime (hoje é gerado uma vez e imutável). Só considerar se A e B se mostrarem insuficientes.
+
+### Implementação da Opção A
+
+**`src/lib/roadmap-production/worker.ts`, dentro de `syncProductionExecutions`** — novo loop logo após o loop existente de geração de relatório de conclusão (para `SUCCEEDED`). Constrói `Map<objectiveId, sourceVersion atual>` a partir de `objectives` (já carregado no início da função). Para cada execução em `state.executions`:
+- Pula `SUCCEEDED` e `RUNNING` — **nunca tocados** (histórico legítimo já entregue / trabalho em andamento, respectivamente).
+- Pula execuções já aposentadas (alguma fase já com `errorCode === "OBJECTIVE_SUPERSEDED"`) — evita `appendActivity` duplicada a cada poll de 2s.
+- Aposenta (mesmo padrão exato do gate **reativo** `OBJECTIVE_SUPERSEDED` já existente, `worker.ts:~1168`, dentro de `processNextProductionPhaseUnlocked`) as execuções cuja `sourceVersion` é menor que a versão atual documentada do mesmo `objectiveId`: marca a última fase não-`SUCCEEDED` com `status: "BLOCKED"` + `errorCode: "OBJECTIVE_SUPERSEDED"`, `execution.status = "BLOCKED"`, com `appendActivity` explicando o motivo.
+
+**`src/actions/RoadmapProduction.ts`** — `ListarExecucoesAguardandoAprovacao` e `ListarExecucoesPrecisandoAtencao` agora excluem execuções com qualquer fase `errorCode === "OBJECTIVE_SUPERSEDED"` — sem isso, a execução recém-aposentada (que também vira `status: "BLOCKED"`) reapareceria erroneamente no badge "precisa de você", reintroduzindo o mesmo problema que a correção resolve. `ListarExecucoesPorObjetivo` não precisou de mudança — já pegava só a execução mais recente por `createdAt` por `objectiveId`.
+
+**Por que este loop é o lugar certo (e não uma mutação perigosa em rota de leitura):** `syncProductionExecutions` já é, por design pré-existente, uma função de "sincronizar e se auto-corrigir a cada chamada" — não uma leitura pura. Ela já muta estado como efeito colateral em 3 lugares antes desta sessão (gera relatório de conclusão, corrige roteamento de agente, cria novas execuções). O novo loop segue exatamente essa convenção já aceita, chamada tanto pelo worker de fundo quanto pelo poll de leitura da UI (`refreshProductionExecutions` → `ObterRoadmapProduction`) — confirmado por Anubis como consistente, não uma superfície de risco nova.
+
+### Checklist de integração desta parte
+- [x] Scout (mapeou 3 mecanismos reativos pré-existentes + 3 opções de arquitetura) → Echo (implementou Opção A) → Forge (`tsc`/`lint`/build limpos; 71/72 testes `roadmap-production`, a 1 falha é `SEARCH_FAILED` pré-existente de sessão anterior, não relacionada) → Anubis (0 achados) → Lens (aprovado)
+- [x] Sem migration, sem mudança de schema Prisma
+
+**Última atualização:** 2026-08-24 por Scribe (sessão Bibble — Scout→Echo→Forge→Anubis→Lens→Scribe)
+
 ## Roadmap Alpha — Produção: terceiro provider de desenvolvimento (2026-08-19)
 
 - **Schema:** `developmentProviderSchema` (`src/lib/roadmap-production/contracts.ts`) é `z.enum(["claude","codex","ollama"])` — reutilizado por `roadmapObjectiveCreateSchema`/`roadmapObjectiveEditSchema` (`src/lib/roadmap-alpha/contracts.ts`), então adicionar um provider aqui propaga automaticamente para a validação de criar/editar objetivo, sem precisar tocar em `roadmap-alpha/contracts.ts`.

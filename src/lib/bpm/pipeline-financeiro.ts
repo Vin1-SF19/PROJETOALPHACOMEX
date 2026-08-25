@@ -106,11 +106,25 @@ export function hasConfiguredFinancialPipeline(etapas: readonly FinancialPipelin
 export function campoFinanceiroSomenteLeitura(nome: string) { return FINANCIAL_FIELDS.some((campo) => campo.label === nome && campo.category === "AUTOMATICO_CALCULADO") }
 export function etapaFinanceiraValida(nome: string) { return FINANCIAL_STAGES.some((etapa) => etapa.label === nome) }
 
-export interface FinancialTaxCalculation { valorIrrf: number; valorCsrf: number; totalRetencoes: number; valorLiquido: number; memoriaCalculo: string }
+export interface FinancialTaxCalculation { valorIrrf: number; valorCsrf: number; totalRetencoes: number; valorLiquido: number; memoriaCalculo: string; regraAplicada: string }
+export interface ContextoCalculoTributario { regimePrestador?: string; regimeTomador?: string; servico?: string; now?: Date }
 function arredondarMoeda(valor: number) { return Math.round((valor + Number.EPSILON) * 100) / 100 }
-export function calcularRetencoesFinanceiras(valorBruto: number, aliquotaIrrf: number, aliquotaCsrf: number): FinancialTaxCalculation {
+export function descreverRegraTributaria(aliquotaIrrf: number, aliquotaCsrf: number, contexto?: ContextoCalculoTributario): string {
+  const partes: string[] = [];
+  if (aliquotaIrrf > 0) partes.push(`IRRF ${aliquotaIrrf}%`);
+  if (aliquotaCsrf > 0) partes.push(`CSRF ${aliquotaCsrf}%`);
+  const retencao = partes.length > 0 ? `Retenções: ${partes.join(" + ")}` : "Sem retenções (alíquotas zero)";
+  const regimes: string[] = [];
+  if (contexto?.regimePrestador) regimes.push(`prestador ${contexto.regimePrestador}`);
+  if (contexto?.regimeTomador) regimes.push(`tomador ${contexto.regimeTomador}`);
+  const contextoTexto = regimes.length > 0 ? ` — ${regimes.join(", ")}` : "";
+  const servicoTexto = contexto?.servico ? ` sobre serviço "${contexto.servico}"` : "";
+  return `${retencao}${servicoTexto}${contextoTexto}`;
+}
+export function calcularRetencoesFinanceiras(valorBruto: number, aliquotaIrrf: number, aliquotaCsrf: number, contexto?: ContextoCalculoTributario): FinancialTaxCalculation {
   const valorIrrf = arredondarMoeda(valorBruto * aliquotaIrrf / 100); const valorCsrf = arredondarMoeda(valorBruto * aliquotaCsrf / 100); const totalRetencoes = arredondarMoeda(valorIrrf + valorCsrf); const valorLiquido = arredondarMoeda(valorBruto - totalRetencoes);
-  return { valorIrrf, valorCsrf, totalRetencoes, valorLiquido, memoriaCalculo: JSON.stringify({ schemaVersion: FINANCIAL_PIPELINE_SCHEMA_VERSION, formula: "liquido = bruto - ((bruto × irrf%) + (bruto × csrf%))", entradas: { valorBruto, aliquotaIrrf, aliquotaCsrf }, resultados: { valorIrrf, valorCsrf, totalRetencoes, valorLiquido } }) };
+  const regraAplicada = descreverRegraTributaria(aliquotaIrrf, aliquotaCsrf, contexto);
+  return { valorIrrf, valorCsrf, totalRetencoes, valorLiquido, regraAplicada, memoriaCalculo: JSON.stringify({ schemaVersion: FINANCIAL_PIPELINE_SCHEMA_VERSION, formula: "liquido = bruto - ((bruto × irrf%) + (bruto × csrf%))", entradas: { valorBruto, aliquotaIrrf, aliquotaCsrf, regimePrestador: contexto?.regimePrestador ?? null, regimeTomador: contexto?.regimeTomador ?? null, servico: contexto?.servico ?? null }, resultados: { valorIrrf, valorCsrf, totalRetencoes, valorLiquido }, regra: regraAplicada, timestamp: (contexto?.now ?? new Date()).toISOString() }) };
 }
 function normalizar(valor: string | null | undefined) { return valor?.trim() ?? "" }
 function numero(valor: string | null | undefined) { const text = normalizar(valor); const parsed = Number(text.replace(/\./g, "").replace(",", ".")); return Number.isFinite(parsed) ? parsed : 0 }
@@ -134,11 +148,19 @@ export function validateFinancialTransition(input: FinancialTransitionInput): Fi
   } else if (index === 2) {
     if (normalizar(v["Status do contrato/assinatura"]).toLowerCase() !== "assinado") missing.push("Status do contrato/assinatura = Assinado"); if (!normalizar(v["Contrato assinado/anexo"]) && !input.attachmentNames?.some((name) => /contrato/i.test(name))) missing.push("Contrato assinado/anexo"); require("Regime tributário do prestador", "Regime tributário do cliente", "Forma de pagamento", "Vencimento", "Link/dados para pagamento", "IRRF aplicável", "CSRF aplicável"); requirePositive("Valor bruto do contrato");
     if (sim(v["IRRF aplicável"]) && !(numero(v["Alíquota IRRF"]) >= 0 && numero(v["Alíquota IRRF"]) <= 100)) missing.push("Alíquota IRRF"); if (sim(v["CSRF aplicável"]) && !(numero(v["Alíquota CSRF"]) >= 0 && numero(v["Alíquota CSRF"]) <= 100)) missing.push("Alíquota CSRF");
-    const calc = calcularRetencoesFinanceiras(numero(v["Valor bruto do contrato"]), sim(v["IRRF aplicável"]) ? numero(v["Alíquota IRRF"]) : 0, sim(v["CSRF aplicável"]) ? numero(v["Alíquota CSRF"]) : 0); if (!(calc.valorLiquido > 0)) missing.push("Valor líquido para pagamento"); Object.assign(automaticValues, { "Data da assinatura": normalizar(v["Data da assinatura"]) || today, "Valor IRRF": String(calc.valorIrrf), "Valor CSRF": String(calc.valorCsrf), "Total de retenções": String(calc.totalRetencoes), "Valor líquido para pagamento": String(calc.valorLiquido), "Valor esperado": String(calc.valorLiquido), "Memória de cálculo": calc.memoriaCalculo });
+    const calc = calcularRetencoesFinanceiras(numero(v["Valor bruto do contrato"]), sim(v["IRRF aplicável"]) ? numero(v["Alíquota IRRF"]) : 0, sim(v["CSRF aplicável"]) ? numero(v["Alíquota CSRF"]) : 0, { regimePrestador: normalizar(v["Regime tributário do prestador"]) || undefined, regimeTomador: normalizar(v["Regime tributário do cliente"]) || undefined, servico: normalizar(v["Serviço contratado"]) || undefined, now: input.now }); if (!(calc.valorLiquido > 0)) missing.push("Valor líquido para pagamento"); Object.assign(automaticValues, { "Data da assinatura": normalizar(v["Data da assinatura"]) || today, "Valor IRRF": String(calc.valorIrrf), "Valor CSRF": String(calc.valorCsrf), "Total de retenções": String(calc.totalRetencoes), "Valor líquido para pagamento": String(calc.valorLiquido), "Valor esperado": String(calc.valorLiquido), "Memória de cálculo": calc.memoriaCalculo });
   } else if (index === 3) {
     if (!sim(v["Pagamento confirmado"])) missing.push("Pagamento confirmado = Sim"); requirePositive("Valor esperado"); requirePositive("Valor recebido"); require("Forma de pagamento utilizada"); automaticValues["Data do pagamento"] = normalizar(v["Data do pagamento"]) || today;
   } else if (index === 4) {
     if (!sim(v["NF emitida"])) missing.push("NF emitida = Sim"); require("Número da NF", "Data de emissão"); requirePositive("Valor da NF"); if (!normalizar(v["Arquivo/link da NF"]) && !input.attachmentNames?.some((name) => /nota|nf/i.test(name))) missing.push("Arquivo/link da NF"); if (normalizar(v["Status do contrato/assinatura"]).toLowerCase() !== "assinado") missing.push("Contrato assinado"); if (!sim(v["Pagamento confirmado"])) missing.push("Pagamento confirmado");
   }
   const pendingFields = [...new Set(missing)]; return { applicable: true, blocked: pendingFields.length > 0, message: pendingFields.length > 0 ? "Dados pendentes para avançar de etapa." : undefined, pendingFields, automaticValues };
+}
+
+export interface StatusGeralFinanceiro { contratoConcluido: boolean; pagamentoConcluido: boolean; status: string; liberarAvanco: boolean }
+export function resolverStatusGeralFinanceiro(contratoConcluido: boolean, pagamentoConcluido: boolean): StatusGeralFinanceiro {
+  if (!contratoConcluido && !pagamentoConcluido) return { contratoConcluido, pagamentoConcluido, status: "Aguardando assinatura e pagamento", liberarAvanco: false };
+  if (contratoConcluido && !pagamentoConcluido) return { contratoConcluido, pagamentoConcluido, status: "Aguardando pagamento", liberarAvanco: false };
+  if (!contratoConcluido && pagamentoConcluido) return { contratoConcluido, pagamentoConcluido, status: "Aguardando assinatura", liberarAvanco: false };
+  return { contratoConcluido, pagamentoConcluido, status: "Formalização concluída", liberarAvanco: true };
 }

@@ -428,7 +428,13 @@ export async function ListarExecucoesAguardandoAprovacao() {
       const state = await refreshProductionExecutions(root);
       data.push(
         ...state.executions
-          .filter((execution) => execution.status === "AWAITING_APPROVAL")
+          .filter(
+            (execution) =>
+              execution.status === "AWAITING_APPROVAL" &&
+              !execution.phases.some(
+                (phase) => phase.errorCode === "OBJECTIVE_SUPERSEDED",
+              ),
+          )
           .map((execution) => ({
             objectiveId: execution.objectiveId,
             executionId: execution.id,
@@ -477,8 +483,11 @@ export async function ListarExecucoesPrecisandoAtencao() {
             ): execution is typeof execution & {
               status: "BLOCKED" | "WAITING_FOR_ADMIN";
             } =>
-              execution.status === "BLOCKED" ||
-              execution.status === "WAITING_FOR_ADMIN",
+              (execution.status === "BLOCKED" ||
+                execution.status === "WAITING_FOR_ADMIN") &&
+              !execution.phases.some(
+                (phase) => phase.errorCode === "OBJECTIVE_SUPERSEDED",
+              ),
           )
           .map((execution) => ({
             objectiveId: execution.objectiveId,

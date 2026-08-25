@@ -19,7 +19,7 @@ import { RegistrarAnexoBpm, ExcluirAnexoBpm } from "@/actions/bpm/Anexos";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { isAdminRole } from "@/lib/roles";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { PainelRequisitosAvanco } from "./PainelRequisitosAvanco";
+
 import { PainelResumoEtapas } from "./PainelResumoEtapas";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
 import { etapasAnterioresParaResumo } from "@/lib/bpm/resumo-etapas";
@@ -33,13 +33,13 @@ interface Props {
   currentUserId: number | null;
   currentUserRole: string | null;
   onAtualizado: () => void;
-  etapasParaMover: { id: string; nome: string }[];
+
   etapas: { id: string; nome: string; ordem: number }[];
-  podeEditar: boolean;
-  podeMoverEtapa: boolean;
+
+
   podeTrabalharTarefas: boolean;
-  realtimeRevision: number;
-  onFocarPainelReuniao: () => void;
+
+
   anotacoes: Interacao[];
 }
 
@@ -94,7 +94,7 @@ type ItemFeedHistorico =
   | { tipo: "evento"; id: string; data: Date; acao: string; autor: string }
   | { tipo: "anotacao"; id: string; data: Date; texto: string; autor: string };
 
-export default function PainelHistorico({ card, accent, currentUserId, currentUserRole, onAtualizado, etapasParaMover, etapas, podeEditar, podeMoverEtapa, podeTrabalharTarefas, realtimeRevision, onFocarPainelReuniao, anotacoes }: Props) {
+export default function PainelHistorico({ card, accent, currentUserId, currentUserRole, onAtualizado, etapas, podeTrabalharTarefas, anotacoes }: Props) {
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const [abaEsquerda, setAbaEsquerda] = useState("etapas");
@@ -158,10 +158,6 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
 
   return (
     <div className="min-h-0 flex flex-col rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 gap-3 lg:h-full">
-      <div className="shrink-0 space-y-3">
-        <PainelRequisitosAvanco card={card} etapas={etapasParaMover} accent={accent} onAtualizado={onAtualizado} podeEditar={podeEditar} podeMover={podeMoverEtapa} realtimeRevision={realtimeRevision} onFocarPainelReuniao={onFocarPainelReuniao} />
-      </div>
-
       <Tabs value={abaEsquerda} onValueChange={setAbaEsquerda} className="min-h-0 flex-1 lg:overflow-hidden">
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="etapas" className="flex-none gap-1.5">

@@ -7,15 +7,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CriarInteracaoCardBpm, type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { CardOpenFormSlot } from "./CardOpenFormSlot";
-import PainelReuniao from "./PainelReuniao";
-import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
 import { PainelProximoContato } from "./PainelProximoContato";
 import { PainelContatos } from "./PainelContatos";
-import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
-import { PainelStandbyFollowUp } from "./PainelStandbyFollowUp";
-import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento"; // refactored
-import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
-import { etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
 
 
 
@@ -40,12 +33,12 @@ interface Props {
   podeEditar: boolean;
   realtimeRevision: number;
   onAtualizado: () => void;
-  onEstadoFollowUpChange: (estado: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO") => void;
+
 }
 
 const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
 
-export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoCriada, interacoes, podeEditar, realtimeRevision, onAtualizado, onEstadoFollowUpChange }: Props) {
+export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoCriada, interacoes, podeEditar, realtimeRevision, onAtualizado }: Props) {
   const [anotacao, setAnotacao] = useState("");
   const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
 
@@ -100,28 +93,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             onAtualizado={onAtualizado}
           />
 
-          {/* condicionais removidas — agora em CardOpenFormSlot */}
-          {/* REMOVIDO: bloco de painéis duplicados */}
-          {false && (
-            // dead code removed
-            <PainelReuniao
-              card={card}
-              accent={accent}
-              onAtualizado={onAtualizado}
-            />
-          )}
-
-          {false && etapaEhFechado(card.etapa.nome) && (
-            <PainelStatusPosFechamento
-              cardId={card.id}
-              statusPersistido={card.statusPosFechamento}
-              versaoPersistidaEm={card.updatedAt}
-              podeEditar={podeEditar}
-              realtimeRevision={realtimeRevision}
-              accent={accent}
-              onAtualizado={onAtualizado}
-            />
-          )}
+          {/* Painéis específicos por etapa são renderizados via CardOpenFormSlot */}
 
           <PainelProximoContato
             card={card}
@@ -136,27 +108,6 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             podeEditar={podeEditar}
             onInteracaoCriada={onInteracaoCriada}
           />
-
-          {false && etapaEhEmTratativa(card.etapa.nome) && (
-            <PainelChecklistFollowUp
-              cardId={card.id}
-              accent={accent}
-              onAtualizado={onAtualizado}
-              onEstadoChange={onEstadoFollowUpChange}
-              podeEditar={podeEditar}
-              realtimeRevision={realtimeRevision}
-            />
-          )}
-
-          {false && etapaEhStandbyFollowUp(card.etapa.nome) && (
-            <PainelStandbyFollowUp
-              cardId={card.id}
-              accent={accent}
-              podeEditar={podeEditar}
-              realtimeRevision={realtimeRevision}
-              onAtualizado={onAtualizado}
-            />
-          )}
 
         </TabsContent>
 

@@ -10,7 +10,7 @@ const gradientBlobCard = ler("src/components/ui/gradient-blob-card.tsx");
 const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx");
 const historico = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
 const statusPosFechamento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx");
-const requisitos = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelRequisitosAvanco.tsx");
+
 const proximoContato = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx");
 const checklist = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx");
 const registrar = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx");
@@ -44,7 +44,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(historico).toContain("<PainelRequisitosAvanco");
     expect(registrar).toContain("<PainelProximoContato");
     expect(registrar).toContain("<PainelChecklistFollowUp");
-    expect(requisitos).toContain("draftSujoRef.current");
+    expect(camposEtapa).toContain("draftSujoRef.current");
     expect(proximoContato).toContain("sujoRef.current");
     expect(checklist).toContain("draftSujoRef.current");
   });
@@ -69,13 +69,13 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(modal).not.toContain("<PainelReuniao");
     expect(modal).not.toContain("destinoEhReuniaoAgendada");
     expect(painelReuniao).toContain("{mostrarFormulario && (");
-    expect(requisitos).toContain("onFocarPainelReuniao");
-    expect(requisitos).toContain("Ir à reunião");
+    expect(painelReuniao).toContain("onFocarPainelReuniao");
+    expect(painelReuniao).toContain("Ir à reunião");
   });
 
   it("aplica readonly aos controles operacionais", () => {
     expect(camposEtapa).toContain("disabled={!podeEditar}");
-    expect(requisitos).toContain("disabled={!podeEditar");
+    expect(camposEtapa).toContain("disabled={!podeEditar");
     expect(proximoContato).toContain("disabled={!podeEditar");
     expect(checklist).toContain("disabled={!podeEditar");
   });
@@ -159,7 +159,7 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(novoCard).not.toContain("Motivo Lost");
   });
 
-  it("mantem os requisitos no lado esquerdo do card", () => {
+  it("mantem o painel histórico no lado esquerdo do card", () => {
     expect(historico).toContain("<PainelRequisitosAvanco");
     expect(modal.indexOf("<PainelHistorico")).toBeLessThan(modal.indexOf("<PainelRegistrar"));
   });
@@ -177,7 +177,7 @@ describe("CRM - wiring do modal por etapa", () => {
 
   it("mantem o resumo progressivo das etapas no lado esquerdo do card", () => {
     expect(historico).toContain('<PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} />');
-    expect(historico.indexOf("<PainelResumoEtapas")).toBeLessThan(historico.indexOf("<PainelRequisitosAvanco"));
+    expect(historico).toContain("<PainelResumoEtapas");
     expect(resumoEtapas).toContain("etapasAnterioresParaResumo(etapas, card.etapa.id)");
     expect(resumoEtapas).toContain('aria-label="Resumo das etapas anteriores"');
     expect(resumoEtapas).toContain("aria-expanded={aberta}");

@@ -11,6 +11,7 @@ const NOME_PIPELINE_COMERCIAL = "Comercial";
 const NOME_ETAPA_FECHADO_GANHO = "Fechado Ganho";
 const NOME_PIPELINE_FINANCEIRO = "Financeiro";
 const NOME_PIPELINE_RADAR = "Radar";
+const NOME_ETAPA_NOTA_FISCAL = "Nota Fiscal";
 
 /**
  * D-009: ao fechar com sucesso uma oportunidade do Comercial, cria automaticamente
@@ -86,4 +87,49 @@ export async function executarAutomacaoFechamentoComercial(cardId: string, usuar
       });
     });
   }
+}
+
+/**
+ * D-035: ao mover um card para a etapa "Nota Fiscal" no pipeline Financeiro,
+ * cria automaticamente uma tarefa de emissão de NF para o responsável do card.
+ * Idempotente: não duplica se já existir tarefa pendente do tipo "EMISSAO_NF".
+ */
+export async function executarAutomacaoTarefaNotaFiscal(cardId: string, usuarioId: number) {
+  const card = await db.bpmCard.findUnique({
+    where: { id: cardId },
+    include: { pipeline: { select: { nome: true } }, etapa: { select: { nome: true } } },
+  });
+  if (!card) return;
+  if (card.pipeline.nome !== NOME_PIPELINE_FINANCEIRO) return;
+  if (card.etapa.nome !== NOME_ETAPA_NOTA_FISCAL) return;
+
+  // Idempotência: não duplica se já existe tarefa pendente de emissão NF
+  const jaExiste = await db.bpmTarefa.findFirst({
+    where: { cardId, tipo: "EMISSAO_NF", status: "PENDENTE" },
+    select: { id: true },
+  });
+  if (jaExiste) return;
+
+  await db.$transaction(async (tx) => {
+    await tx.bpmTarefa.create({
+      data: {
+        cardId,
+        titulo: "Emissão de Nota Fiscal",
+        descricao: "Tarefa criada automaticamente ao avançar para a etapa Nota Fiscal.",
+        responsavelId: card.responsavelId,
+        tipo: "EMISSAO_NF",
+        prioridade: "ALTA",
+      },
+    });
+
+    await tx.bpmCardHistorico.create({
+      data: {
+        cardId,
+        acao: "AUTOMACAO_TAREFA_NF",
+        usuarioId,
+        automacaoOrigem: "avanco_nota_fiscal",
+        valorNovoJson: JSON.stringify({ pipeline: NOME_PIPELINE_FINANCEIRO, etapa: NOME_ETAPA_NOTA_FISCAL }),
+      },
+    });
+  });
 }
