@@ -358,6 +358,34 @@ Nenhum dos 3 mecanismos acima cobre o caso: "o próprio **objetivo** (não o có
 
 **Última atualização:** 2026-08-24 por Scribe (sessão Bibble — Scout→Echo→Forge→Anubis→Lens→Scribe)
 
+## Roadmap Alpha — Produção: herança de progresso entre versões de execução (2026-08-25)
+
+**Gatilho:** usuário reportou que quando um objetivo **em desenvolvimento** era revisado (nova `sourceVersion` documentada), "sai da fila de em desenvolvimento e volta para pendente e outro assume, o que não pode acontecer pq se não fica toda hora recomeçando e nunca nada termina". Diferente da Opção A (seção acima, mesmo sintoma-raiz): a Opção A resolve a execução **antiga** ficar presa como `BLOCKED` para sempre — este problema é o **desperdício de trabalho já concluído** quando a execução **nova** nasce: até esta correção, toda fase renascia em `PENDING`, mesmo que a versão anterior já tivesse aquela mesma fase `SUCCEEDED` com conteúdo idêntico. Quanto mais vezes um objetivo era revisado no meio do caminho, mais vezes o trabalho já feito era jogado fora — nunca chegando ao fim.
+
+### Mecanismo: comparação de `sha256` por fase, com efeito cascata
+
+**`src/lib/roadmap-production/worker.ts`:**
+
+- `documentedObjectives()` agora seleciona `sha256: true` também em `promptArtifacts` — campo já existia em `RoadmapPromptArtifact` (`prisma/schema.prisma`), só não estava sendo lido; zero migration.
+- Novo helper privado `buildFreshPhase(artifact)` — constrói o shape de uma fase nova em `PENDING` (extraído para eliminar duplicação entre os dois pontos do arquivo que criavam fases do zero: dentro de `inheritPhaseProgress` e no `.map()` original usado quando não há execução anterior).
+- Nova função pura exportada `inheritPhaseProgress(previousPhases, previousArtifactsByPhase, newArtifacts, previousSourceVersion, at)` — para cada fase nova, em ordem crescente de `phaseNumber`, decide se herda o resultado (`status: "SUCCEEDED"`, `summary`, `changedFiles`, `attemptCount`) da fase correspondente da execução anterior do **mesmo objetivo**. Só herda se, simultaneamente: (a) existe fase correspondente na versão anterior pelo mesmo `phaseNumber`; (b) o `sha256` do artefato bate exatamente entre a versão antiga e a nova — conteúdo da fase idêntico, byte a byte; (c) a fase anterior tinha `status === "SUCCEEDED"`; (d) **nenhuma fase de número menor já quebrou a cadeia de herança** (variável local `chainBroken`, setada assim que qualquer condição acima falha para um `phaseNumber` menor).
+- Campos que **sempre resetam**, mesmo quando a fase é herdada: `activities`, `autoRetryCount`, `retryAt`, `errorCode`, `startedAt`, `finishedAt` — nenhum desses faz sentido copiado de uma execução diferente. Cada fase herdada ganha uma `appendActivity` nova citando a versão de origem ("Progresso herdado da versão anterior (vN) — conteúdo desta fase não mudou.").
+- No bloco de criação de execução nova dentro de `syncProductionExecutions` (`if (!existing) { ... }`): antes de montar `newExecution`, busca a execução mais recente do **mesmo `objectiveId`** já presente em `state.executions` (`filter` + `sort` por `sourceVersion desc`, pega a primeira). Se existir, busca via `db.roadmapPromptArtifact.findMany({ where: { objectiveId, documentationVersion: previousExecution.sourceVersion, status: "PUBLISHED" }, select: { phaseNumber, sha256 } })` os artefatos daquela versão anterior específica, monta um `Map<phaseNumber, sha256>` e chama `inheritPhaseProgress`. Sem execução anterior (primeira vez que o objetivo gera execução), o comportamento é exatamente o de antes: `objective.promptArtifacts.map((phase) => buildFreshPhase(phase))`.
+
+### Por que o efeito cascata é obrigatório (não opcional)
+
+Cada fase real, ao rodar, recebe `previousSummaries` (contexto já existente no arquivo) — os resumos de **todas** as fases anteriores bem-sucedidas daquela execução. Se a fase 1 mudou de conteúdo entre versões (foi refeita), o resumo dela agora é diferente do resumo antigo. Uma fase 2 cujo **próprio** conteúdo não mudou não pode herdar o resultado antigo mesmo assim, porque aquele resultado antigo foi produzido com um contexto (resumo da fase 1) que já não reflete a realidade atual. `chainBroken` propaga essa invalidação: a primeira fase que não herda "contamina" todas as seguintes, forçando-as a refazer também.
+
+### Validação com dados reais
+
+146 artefatos `PUBLISHED` no banco de produção no momento da implementação, **0 com `sha256` vazio** — confirma que a comparação funciona com o dado real, não é hipotética. 7 testes novos (`tests/roadmap-production/inherit-phase-progress.test.ts`): herança bem-sucedida, não-herança por `sha256` diferente, não-herança por status anterior ≠ `SUCCEEDED`, efeito cascata, fase sem correspondente na versão anterior, execução sem histórico algum, confirmação de que campos de execução (`activities`/`autoRetryCount`/etc.) sempre resetam mesmo quando herdado.
+
+### Checklist de integração desta parte
+- [x] Scout (mapeou estrutura de `ProductionPhase`, fonte do `sha256`, ponto exato de criação de execução, riscos de efeito cascata) → Echo (implementou) → Forge (`tsc`/lint/build limpos; suíte `roadmap-production` 78/79 — a 1 falha é `SEARCH_FAILED` pré-existente, não relacionada) → Anubis (0 achados) → Lens (1 sugestão 🟢 aplicada: extração de `buildFreshPhase` para eliminar duplicação com o `.map()` original) → Probe (aprovado, incluindo verificação de `sha256` real em produção)
+- [x] Sem migration, sem mudança de schema Prisma
+
+**Última atualização:** 2026-08-25 por Scribe (sessão Bibble — Scout→Echo→Forge→Anubis→Lens→Probe→Scribe)
+
 ## Roadmap Alpha — Produção: terceiro provider de desenvolvimento (2026-08-19)
 
 - **Schema:** `developmentProviderSchema` (`src/lib/roadmap-production/contracts.ts`) é `z.enum(["claude","codex","ollama"])` — reutilizado por `roadmapObjectiveCreateSchema`/`roadmapObjectiveEditSchema` (`src/lib/roadmap-alpha/contracts.ts`), então adicionar um provider aqui propaga automaticamente para a validação de criar/editar objetivo, sem precisar tocar em `roadmap-alpha/contracts.ts`.

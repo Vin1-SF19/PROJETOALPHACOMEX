@@ -10,6 +10,8 @@ import {
   logRegistroSchema,
   alteracoesClienteSchema,
   alteracoesServicoSchema,
+  gerarTelefonePendente,
+  paraExibicaoTelefone,
 } from "@/lib/validations/cs-nps";
 
 async function getColaboradorNome(): Promise<string> {
@@ -247,16 +249,18 @@ export async function CadastrarCliente(dados: unknown, socios: unknown[]) {
       });
 
       for (const socio of sociosValidados.data) {
-        // Sócio sem telefone não vira Pessoa/vínculo agora — `Pessoa.celular` é
-        // `@unique`, então múltiplos sócios sem telefone colidiriam entre si.
-        // Fica como pendência: complete o telefone depois na edição do cliente.
-        if (!socio.telefone) continue;
+        // Sócio sem telefone recebe um placeholder único (`gerarTelefonePendente`)
+        // no lugar do celular — `Pessoa.celular` é `@unique`, então string vazia
+        // colidiria entre sócios sem telefone de clientes diferentes. O placeholder
+        // nunca é exposto pro usuário (ver `paraExibicaoTelefone`) e é sempre único,
+        // então o upsert abaixo sempre cria uma Pessoa nova nesse caso (nunca reaproveita).
+        const celular = socio.telefone || gerarTelefonePendente();
 
         const pessoa = await tx.pessoa.upsert({
-          where: { celular: socio.telefone },
+          where: { celular },
           update: { nome: socio.nome },
           create: {
-            celular: socio.telefone,
+            celular,
             nome: socio.nome,
             dataNascimento: socio.dataNascimento || null,
           },
@@ -426,7 +430,7 @@ export async function buscarClientes() {
         socios: pessoas.map((v) => ({
           id: v.pessoa.id,
           nome: v.pessoa.nome,
-          telefone: v.pessoa.celular,
+          telefone: paraExibicaoTelefone(v.pessoa.celular),
           obs: v.pessoa.observacao,
           dataNascimento: v.pessoa.dataNascimento,
           vinculo: v.vinculo,
@@ -790,9 +794,8 @@ export async function reverterCampoHistorico(historicoId: string, tipo: "cliente
 /**
  * Adiciona um sócio ao `Cliente` — resolve/cria `Pessoa` por celular
  * (reaproveita se já existe, mesmo padrão de `sincronizarRepresentantesParceiro`
- * em `parceiros.ts`) + `PessoaClienteVinculo`. Fase 3.6 do Cliente Master:
- * `socios` (por-serviço, legado) virou `Pessoa`+`PessoaClienteVinculo`
- * (global, por-empresa) — celular obrigatório a partir de agora.
+ * em `parceiros.ts`) + `PessoaClienteVinculo`. Sócio sem telefone recebe um
+ * placeholder único (`gerarTelefonePendente`) — ver comentário em `cs-nps.ts`.
  */
 export async function adicionarSocio(clienteId: number, dadosSocio: unknown) {
   try {
@@ -802,14 +805,13 @@ export async function adicionarSocio(clienteId: number, dadosSocio: unknown) {
     const parsed = socioSchema.safeParse(dadosSocio);
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     const d = parsed.data;
-    if (!d.telefone) return { success: false, error: "Telefone é obrigatório para vincular o sócio" };
-    const telefone = d.telefone;
+    const celular = d.telefone || gerarTelefonePendente();
 
     const vinculo = await db.$transaction(async (tx) => {
       const pessoa = await tx.pessoa.upsert({
-        where: { celular: telefone },
+        where: { celular },
         update: { nome: d.nome },
-        create: { celular: telefone, nome: d.nome, dataNascimento: d.dataNascimento || null },
+        create: { celular, nome: d.nome, dataNascimento: d.dataNascimento || null },
       });
       return tx.pessoaClienteVinculo.upsert({
         where: { pessoaId_clienteId: { pessoaId: pessoa.id, clienteId } },
@@ -825,7 +827,7 @@ export async function adicionarSocio(clienteId: number, dadosSocio: unknown) {
       data: {
         id: vinculo.pessoa.id,
         nome: vinculo.pessoa.nome,
-        telefone: vinculo.pessoa.celular,
+        telefone: paraExibicaoTelefone(vinculo.pessoa.celular),
         obs: vinculo.pessoa.observacao,
         dataNascimento: vinculo.pessoa.dataNascimento,
         vinculo: vinculo.vinculo,
@@ -900,12 +902,16 @@ export async function atualizarSocio(pessoaId: number, clienteId: number, dados:
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
+    // Telefone vazio (ou apagado na edição) recebe um novo placeholder — nunca
+    // grava celular="" (colidiria com outro sócio sem telefone via @unique).
+    const celular = dados.telefone.trim() || gerarTelefonePendente();
+
     await db.$transaction(async (tx) => {
       await tx.pessoa.update({
         where: { id: pessoaId },
         data: {
           nome: dados.nome,
-          celular: dados.telefone,
+          celular,
           dataNascimento: dados.dataNascimento,
           observacao: dados.obs,
         },

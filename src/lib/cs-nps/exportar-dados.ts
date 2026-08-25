@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 
 import db from "@/lib/prisma";
 
@@ -430,7 +431,7 @@ export async function gerarExportacaoCompletaCsNps(): Promise<{ buffer: Buffer; 
     r.cliente.pessoas.map((v) => ({
       id: v.pessoa.id,
       nome: v.pessoa.nome,
-      telefone: v.pessoa.celular,
+      telefone: paraExibicaoTelefone(v.pessoa.celular),
       obs: v.pessoa.observacao,
       dataNascimento: v.pessoa.dataNascimento,
       vinculo: v.vinculo,

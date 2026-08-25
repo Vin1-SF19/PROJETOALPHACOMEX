@@ -24,10 +24,24 @@ export const cadastrarClienteSchema = z.object({
 export type CadastrarClienteInput = z.infer<typeof cadastrarClienteSchema>;
 
 // Telefone é opcional (2026-08-25): nem sempre está disponível no momento do
-// cadastro. `Pessoa.celular` continua `@unique` no schema — sócio sem telefone
-// NÃO vira `Pessoa`/vínculo (evita colisão entre sócios de clientes diferentes
-// resolvendo pro mesmo valor vazio), fica como pendência local até ser
-// completado depois. Quando preenchido, mantém a validação de formato mínimo.
+// cadastro. `Pessoa.celular` continua `@unique` no schema (sem migration — decisão
+// do usuário) — sócio sem telefone recebe um valor técnico único via
+// `gerarTelefonePendente()` só para satisfazer essa constraint sem colidir com
+// outro sócio sem telefone de um cliente diferente. Esse valor NUNCA pode ser
+// exposto cru pro usuário: todo ponto que devolve `pessoa.celular` para a UI,
+// exportação ou qualquer outro consumidor deve passar por `paraExibicaoTelefone`
+// antes (vira string vazia, como se o telefone realmente não existisse).
+const TELEFONE_PENDENTE_PREFIXO = "SEM-TELEFONE-";
+
+export function gerarTelefonePendente(): string {
+  return `${TELEFONE_PENDENTE_PREFIXO}${crypto.randomUUID()}`;
+}
+
+export function paraExibicaoTelefone(celular: string | null | undefined): string {
+  if (!celular || celular.startsWith(TELEFONE_PENDENTE_PREFIXO)) return "";
+  return celular;
+}
+
 export const socioSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome"),
   telefone: z.string().trim().optional().refine((v) => !v || v.length >= 8, { message: "Telefone inválido" }),

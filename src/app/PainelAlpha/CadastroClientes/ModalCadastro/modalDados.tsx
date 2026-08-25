@@ -722,7 +722,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         // (Pessoa/PessoaClienteVinculo, Fase 3.6 do Cliente Master), não ao serviço.
         for (const s of listaSocios) {
             if (s._pendente === "criar") {
-                if (!s.telefone) { falhas.push(`sócio "${s.nome}" (telefone obrigatório)`); continue; }
                 const res = await adicionarSocio(cliente!.clienteId, {
                     nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });
@@ -733,7 +732,6 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                     falhas.push(`sócio "${s.nome}"`);
                 }
             } else if (s._pendente === "editar") {
-                if (!s.telefone) { falhas.push(`sócio "${s.nome}" (telefone obrigatório)`); continue; }
                 const res = await atualizarSocio(s.id, cliente!.clienteId, {
                     nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });

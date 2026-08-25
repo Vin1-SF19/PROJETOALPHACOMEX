@@ -12,6 +12,7 @@ import {
   parseParceiroNaoCadastrado,
   type ParceiroPendenteCadastro,
 } from "@/lib/comercial/parceiro-nao-cadastrado";
+import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 
 const EnderecoSchema = z.object({
   cep: z.string().min(8),
@@ -156,7 +157,7 @@ async function listarRepresentantesParceiro(tx: PrismaTx, parceiroId: number) {
     dataNascimento: null as string | null,
     cargo: v.cargo,
     email: v.pessoa.email,
-    telefone: v.pessoa.celular,
+    telefone: paraExibicaoTelefone(v.pessoa.celular),
   }));
 }
 

@@ -365,6 +365,45 @@ export interface InheritablePhaseArtifact {
   sha256: string;
 }
 
+function buildFreshPhase(
+  artifact: Pick<
+    InheritablePhaseArtifact,
+    "phaseNumber" | "title" | "kind" | "agent" | "contentMarkdown"
+  >,
+): ProductionExecution["phases"][number] {
+  return {
+    phaseNumber: artifact.phaseNumber,
+    title: artifact.title,
+    kind: artifact.kind,
+    requestedAgent: artifact.agent,
+    resolvedAgent: resolvePhaseAgent(
+      artifact.agent,
+      artifact.title,
+      artifact.contentMarkdown,
+    ),
+    agentOverride: false,
+    status: "PENDING",
+    attemptCount: 0,
+    autoRetryCount: 0,
+    retryAt: null,
+    startedAt: null,
+    finishedAt: null,
+    summary: null,
+    errorCode: null,
+    changedFiles: [],
+    reworkCount: 0,
+    manualFeedback: [],
+    circuit: {
+      fingerprint: null,
+      consecutiveCount: 0,
+      firstOccurredAt: null,
+      lastOccurredAt: null,
+      resetReason: null,
+    },
+    activities: [],
+  };
+}
+
 /**
  * Quando um objetivo é revisado (nova sourceVersion documentada), a execução
  * nova nascia sempre do zero — todas as fases em PENDING, mesmo que a versão
@@ -398,37 +437,7 @@ export function inheritPhaseProgress(
       previousSha256 !== undefined &&
       previousSha256 === artifact.sha256;
     if (!canInherit) chainBroken = true;
-    const fresh: ProductionExecution["phases"][number] = {
-      phaseNumber: artifact.phaseNumber,
-      title: artifact.title,
-      kind: artifact.kind,
-      requestedAgent: artifact.agent,
-      resolvedAgent: resolvePhaseAgent(
-        artifact.agent,
-        artifact.title,
-        artifact.contentMarkdown,
-      ),
-      agentOverride: false,
-      status: "PENDING",
-      attemptCount: 0,
-      autoRetryCount: 0,
-      retryAt: null,
-      startedAt: null,
-      finishedAt: null,
-      summary: null,
-      errorCode: null,
-      changedFiles: [],
-      reworkCount: 0,
-      manualFeedback: [],
-      circuit: {
-        fingerprint: null,
-        consecutiveCount: 0,
-        firstOccurredAt: null,
-        lastOccurredAt: null,
-        resetReason: null,
-      },
-      activities: [],
-    };
+    const fresh = buildFreshPhase(artifact);
     if (!canInherit || !previous) return fresh;
     const inherited: ProductionExecution["phases"][number] = {
       ...fresh,
@@ -600,37 +609,7 @@ export async function syncProductionExecutions(
             previousExecution.sourceVersion,
             createdAt,
           )
-        : objective.promptArtifacts.map((phase) => ({
-            phaseNumber: phase.phaseNumber,
-            title: phase.title,
-            kind: phase.kind,
-            requestedAgent: phase.agent,
-            resolvedAgent: resolvePhaseAgent(
-              phase.agent,
-              phase.title,
-              phase.contentMarkdown,
-            ),
-            agentOverride: false,
-            status: "PENDING",
-            attemptCount: 0,
-            autoRetryCount: 0,
-            retryAt: null,
-            startedAt: null,
-            finishedAt: null,
-            summary: null,
-            errorCode: null,
-            changedFiles: [],
-            reworkCount: 0,
-            manualFeedback: [],
-            circuit: {
-              fingerprint: null,
-              consecutiveCount: 0,
-              firstOccurredAt: null,
-              lastOccurredAt: null,
-              resetReason: null,
-            },
-            activities: [],
-          })),
+        : objective.promptArtifacts.map((phase) => buildFreshPhase(phase)),
     } satisfies ProductionExecutionCompat;
     if (autoApproved) {
       for (const phase of newExecution.phases) {

@@ -137,12 +137,12 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
             ...dadosEmpresa,
             servico: servicosSelecionados[0],
             analistaResponsavel: analistaSelecionado,
-            embasamento: embasamentoDesbloqueado ? embasamentoSelecionado || null : null,
-            origemLead: origemLeadSelecionada || null,
+            embasamento: embasamentoDesbloqueado ? embasamentoSelecionado || undefined : undefined,
+            origemLead: origemLeadSelecionada || undefined,
             dataContratacao,
-            formaPagamento: formaPagamentoFinal || null,
-            valorContrato: valorContrato ? Number(valorContrato) : null,
-            closerNome: closerSelecionado || null,
+            formaPagamento: formaPagamentoFinal || undefined,
+            valorContrato: valorContrato ? Number(valorContrato) : undefined,
+            closerNome: closerSelecionado || undefined,
         };
 
         const res = await CadastrarCliente(payload, sociosParaEnviar);
@@ -150,7 +150,7 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
         if (res.success) {
             toast.success("Cadastrado!");
             if (res.sociosSemTelefone?.length) {
-                toast.warning(`Sócio(s) sem telefone ainda não vinculados: ${res.sociosSemTelefone.join(", ")}. Complete o telefone depois na edição do cliente.`);
+                toast.warning(`Sócio(s) salvo(s) sem telefone: ${res.sociosSemTelefone.join(", ")}. Complete o telefone depois na edição do cliente.`);
             }
             onClose();
             window.location.reload();

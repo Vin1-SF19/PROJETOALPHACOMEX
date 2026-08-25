@@ -8,6 +8,7 @@ import {
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
 import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
+import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import { normalizarDadosEmpresaBpm, type ClienteEmpresaFonte } from "@/lib/bpm/dados-empresa";
 
 const SELECT_SERVICO_CLIENTE = {
@@ -213,7 +214,7 @@ export async function ObterDadosEmpresaCardBpm(cardId: string) {
     const pessoasFonte = pessoasVinculadas.map((v) => ({
       id: v.pessoa.id,
       nome: v.pessoa.nome,
-      telefone: v.pessoa.celular,
+      telefone: paraExibicaoTelefone(v.pessoa.celular),
       obs: v.pessoa.observacao,
       dataNascimento: v.pessoa.dataNascimento,
       vinculo: v.vinculo,

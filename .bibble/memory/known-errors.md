@@ -5,6 +5,24 @@
 
 ---
 
+### CS&NPS — "Invalid input: expected string, received null" ao clicar em "Salvar Cliente" (cadastro novo) — bug pré-existente, mascarado pelo bloqueio de telefone do sócio
+**Sintoma:** No modal de cadastro de cliente novo, ao clicar em "Salvar Cliente", erro de validação `Invalid input: expected string, received null`. Só passou a aparecer depois de o telefone do sócio virar opcional (2026-08-25) — antes, o cadastro sempre travava mais cedo nesse campo e nunca chegava a bater nesse segundo bug.
+**Causa raiz:** `handleFinalizar` em `modal.tsx` monta o payload usando `campo || null` para `embasamento`, `origemLead`, `formaPagamento`, `valorContrato`, `closerNome` quando vazios — mas `cadastrarClienteSchema` (`src/lib/validations/cs-nps.ts`) define esses campos como `z.string().optional()`/`z.coerce.number().optional()`, que aceitam `undefined`, **não `null`**. Zod trata os dois como tipos diferentes por padrão.
+**Fix:** trocar `|| null` por `|| undefined` nesses 5 campos em `modal.tsx:140-145`. O backend (`CadastrarCliente`/`resolverClienteCsNps` em `Clientes.ts`) já normaliza para `null` na hora de gravar no Prisma (`d.embasamento || null`, etc.), então o comportamento final no banco não muda — só o contrato de validação do payload.
+**Lição geral:** Zod `.optional()` sozinho NUNCA aceita `null` — só `undefined`. Campo que pode legitimamente vir `null` (nullable no banco/UI) precisa de `.nullable()` explícito no schema, OU o caller deve normalizar `null → undefined` antes de enviar. Ao montar payload de Server Action a partir de state React, preferir `valor || undefined` em vez de `valor || null`, a menos que o schema do lado do servidor use `.nullable()`.
+**Adicionado em:** 2026-08-25 (Bibble/Echo/Forge)
+
+---
+
+### Deploy falha com "Cannot find module '@/auth'" — alias `@/*` não cobre a raiz do projeto
+**Sintoma:** Build/deploy quebra com `Cannot find module '@/auth' or its corresponding type declarations` num arquivo novo (nesta ocorrência, `src/app/api/painel-alpha/clientes/[id]/timeline/route.ts`). É um erro de RESOLUÇÃO DE MÓDULO do bundler (webpack/turbopack), não um erro de tipo — por isso derruba o build mesmo com `typescript.ignoreBuildErrors: true` no `next.config.ts` (esse flag só ignora erros de type-check, não erros de resolução de import).
+**Causa raiz:** `auth.ts` vive na RAIZ do projeto (`./auth.ts`), mas o alias `@/*` no `tsconfig.json` mapeia só para `./src/*`. O CLAUDE.md documenta `import { auth } from '@/auth'` como padrão — **essa documentação está desatualizada/errada**. Confirmado por grep em todo `src/app/api/`: 100% das rotas existentes usam import RELATIVO até a raiz (ex.: `import { auth } from "../../../../../auth"`, profundidade variando com a quantidade de pastas do arquivo).
+**Fix:** trocar `import { auth } from '@/auth'` por caminho relativo (`../` × número de pastas entre `src/app/api/` e a raiz, inclusive). Nunca usar `@/auth` em código novo.
+**Lição geral:** ao criar uma rota nova em `src/app/api/`, checar como uma rota IRMÃ próxima importa `auth` antes de escrever o import — não confiar cegamente no exemplo do CLAUDE.md para esse caso específico.
+**Adicionado em:** 2026-08-25 (Bibble/Echo/Forge)
+
+---
+
 ### CS&NPS — "Invalid input: expected string, received undefined" ao clicar em "Salvar Cliente" (cadastro novo sempre falhava)
 **Sintoma:** No módulo CS&NPS (`/PainelAlpha/CadastroClientes`), preencher o modal "Cadastro de Cliente" (CNPJ, serviço, analista, sócios) e clicar em "Salvar Cliente" sempre retornava erro de validação — 100% dos cadastros novos falhavam, não era um caso isolado.
 **Causa raiz:** Bug de contrato de payload entre frontend e Server Action, NÃO relacionado a CRM/feature flag/bloqueio intencional (hipótese inicial descartada após investigação — banco, schema Prisma e FKs de `Cliente`/`ClienteServico`/`Pessoa`/`PessoaClienteVinculo` confirmados 100% saudáveis via `PRAGMA foreign_key_check` e teste de transação real contra o Turso). `handleFinalizar` em `modal.tsx` montava o payload com a chave `servicos: servicosSelecionados` (array), mas `cadastrarClienteSchema` (`src/lib/validations/cs-nps.ts`) exige `servico: z.string().trim().min(1)` (singular, string) — a chave nunca batia, `dados.servico` chegava `undefined` no `safeParse`, e o Zod rejeitava com essa mensagem genérica.

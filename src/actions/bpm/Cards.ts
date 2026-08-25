@@ -48,6 +48,7 @@ import {
   pipelineEhRevisaoRadar,
 } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
+import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
 import {
   etapaEhEmTratativa,
   obterErroChecklistParaSaidaEmTratativa,
@@ -550,7 +551,7 @@ export async function ListarTelefonesCardBpm(cardId: string) {
     });
 
     const data = vinculos.flatMap(({ pessoa }) => {
-      const telefone = pessoa.celular?.trim();
+      const telefone = paraExibicaoTelefone(pessoa.celular).trim();
       return telefone ? [{ id: pessoa.id, nome: pessoa.nome, telefone }] : [];
     });
 

@@ -2,6 +2,32 @@
 
 ---
 
+## [2026-08-25] — Fix de deploy: `@/auth` não resolvido + bugs de schema no módulo Timeline
+
+**Tags:** #bugfix #deploy #timeline
+**Agentes envolvidos:** Bibble, Echo, Forge
+**Arquivos tocados:** `src/app/api/painel-alpha/clientes/[id]/timeline/route.ts`, `src/lib/timeline/extractors/crm.ts`, `src/lib/timeline/extractors/comissoes.ts`, `src/lib/timeline/extractors/metad.ts`, `.bibble/memory/known-errors.md`
+
+### Contexto
+Usuário reportou erro de deploy mostrando `import { auth } from '@/auth';` na rota nova `src/app/api/painel-alpha/clientes/[id]/timeline/route.ts` (feature "timeline do cliente", untracked/em progresso de outra sessão, não relacionada ao bugfix de telefone do sócio feito antes nesta mesma sessão).
+
+### O que foi feito
+- **Causa raiz do erro de deploy:** `@/*` no `tsconfig.json` mapeia só para `./src/*`, mas `auth.ts` vive na raiz do projeto — `@/auth` nunca resolveu. Confirmado por grep que 100% das rotas existentes usam import relativo (`../../../.../auth`); o próprio CLAUDE.md documenta `@/auth` incorretamente. Corrigido o import para relativo. Detalhe completo em `known-errors.md`.
+- Ao rodar `tsc --noEmit` de novo, apareceram mais 3 arquivos quebrados na mesma feature (`extractors/crm.ts`, `comissoes.ts`, `metad.ts`) — escritos contra um schema `BpmCard` desatualizado:
+  - `crm.ts`: `where: { clienteId }` (campo não existe em `BpmCard`, é `empresaId`) + `select: { titulo: true }` (campo não existe; usado `servico` como título do evento em seu lugar — mesma convenção dos outros extractors).
+  - `comissoes.ts`/`metad.ts`: `where: { clienteId }` usando shorthand de uma variável que não existe — o parâmetro da função se chama `clientId`, não `clienteId` (typo de digitação, não erro de schema).
+- Confirmado que `next.config.ts` tem `typescript.ignoreBuildErrors: true` — por isso só o erro de RESOLUÇÃO DE MÓDULO (`@/auth`) derrubava o deploy; os erros de tipo do `timeline/` não travariam o build mas quebrariam em runtime (`ReferenceError` real no caso do `clienteId` inexistente).
+- `tsc --noEmit` limpo para todos os arquivos tocados nesta sessão. `npm run build` completo não pôde ser executado até o fim — lock do `.next` ocupado por outro processo `next dev`/`build` já rodando na máquina do usuário (não encerrado, por não ter autorização para matar processos).
+
+### Pendências
+- Recomendado ao usuário: tentar o deploy de novo agora; se quiser validação local completa (`npm run build`), fechar o processo `next dev` ativo primeiro.
+- Restante da feature "timeline do cliente" (não auditado além dos 4 arquivos com erro de compilação) pertence a outra sessão/trabalho em progresso — não foi revisado por completo (só o que bloqueava a compilação).
+
+### Refletido também em
+- `known-errors.md`: nova entrada sobre `@/auth` não resolvido pelo alias `@/*`.
+
+---
+
 ## [2026-08-25] — Telefone do Sócio opcional no cadastro de cliente (CS & NPS)
 
 **Tags:** #bugfix #cs-nps #validacao
@@ -3163,3 +3189,37 @@ Usuário pediu que leads captados pelo formulário do site (Alpha NoLoss, audien
 ---
 
 **Nota de sessão:** a pedido do usuário, foi criado um `NolossLead` de teste diretamente no Turso (via script pontual, removido após uso) para visualização imediata do card virtual no board antes do fechamento da sessão — não é dado de produção real, é um registro de teste com `nolossContactId` prefixado `teste-manual-`.
+
+---
+
+## [2026-08-25 11:09] — Roadmap Alpha: herança de progresso entre versões de execução (5ª parte da mesma linha de trabalho)
+
+**Tags:** #bugfix #decision #roadmap-alpha
+
+**Agentes envolvidos:** Bibble, Scout, Echo, Forge, Anubis, Lens, Probe, Scribe, Kowalski
+
+**Arquivos tocados:** `src/lib/roadmap-production/worker.ts`, `tests/roadmap-production/inherit-phase-progress.test.ts`, `.bibble/memory/integration-points.md`
+
+### Contexto
+Continuação direta da sessão anterior de 4 partes sobre o Roadmap Alpha — Produção (não é sessão nova isolada). Usuário reportou: quando uma execução em desenvolvimento batia num bloqueio e o objetivo era revisado, a fila "sai de em desenvolvimento e volta para pendente e outro assume, o que não pode acontecer pq se não fica toda hora recomeçando e nunca nada termina". Antes de chegar na causa raiz, o usuário também colou um texto `NEEDS_INPUT` (agente perguntando se deveria criar modelo `Contratacao` no pipeline financeiro) — Bibble investigou sem achar o `requestId` em nenhum workspace, e deu recomendação técnica direta (não criar o modelo — confirmado lendo `pipeline-financeiro.ts` real: campos dinâmicos já cobrem os critérios de aceite).
+
+### O que foi feito
+- Bibble rastreou a causa raiz do "recomeça do zero": cada revisão de objetivo (nova `sourceVersion`) gerava execução nova com TODAS as fases resetadas em `PENDING`, mesmo que a versão anterior já tivesse fases `SUCCEEDED` com conteúdo idêntico — confirmado com evidência real do `state.json` (objetivo `RM-2026-6D5A60`, fase 0 concluída na v2, perdida ao nascer a v5).
+- Scout blueprintou a solução: comparação de `sha256` (já armazenado em `RoadmapPromptArtifact`, só não selecionado na query) entre a fase da versão antiga e da nova, com efeito cascata.
+- Echo implementou `inheritPhaseProgress` (função pura) em `worker.ts` — herda `status`/`summary`/`changedFiles`/`attemptCount` de fases cujo `sha256` bate e cuja versão anterior tinha `SUCCEEDED`, respeitando cascata (`chainBroken`).
+- Forge aprovou (`tsc`/lint/build limpos; suíte `roadmap-production` 78/79, única falha é `SEARCH_FAILED` pré-existente e já documentada). Durante essa etapa, o `npm run build` completo falhou por um erro **não relacionado**, de outra tarefa do Roadmap rodando em paralelo (`timeline/route.ts`, import quebrado de `@/auth`) — antes de Bibble editar qualquer coisa, a própria tarefa paralela se autocorrigiu (erros `tsc` caíram de 18 para 5 sozinhos).
+- Anubis (0 achados), Lens (1 sugestão 🟢 aplicada: extraiu `buildFreshPhase` para eliminar duplicação entre `inheritPhaseProgress` e o `.map()` original), Probe (aprovado — validou `sha256` real em produção: 146 artefatos `PUBLISHED`, 0 vazios).
+
+### Decisões tomadas
+- Herdar progresso (não travar revisão enquanto roda) — usuário escolheu entre as duas opções via `AskUserQuestion`. Motivo: preserva a possibilidade de corrigir/enriquecer um objetivo a qualquer momento sem custo de perder trabalho já validado.
+- Regra de efeito cascata é obrigatória, não opcional: uma fase só herda se **todas** as fases anteriores também herdaram, porque o contexto real que cada fase recebe (`previousSummaries`) inclui os resumos das fases anteriores — se uma mudou, o contexto de qualquer fase seguinte já não reflete a realidade, mesmo que o conteúdo dela mesma não tenha mudado.
+
+### Problemas encontrados / resolvidos
+- Import quebrado (`@/auth` sem resolver, deveria ser caminho relativo já que `auth.ts` fica na raiz, fora de `src/`) em arquivo de outra tarefa do Roadmap rodando em paralelo — **não foi Bibble quem corrigiu**; a própria tarefa autônoma se autocorrigiu durante a investigação. Achado curioso: evidência real de duas sessões do Roadmap Alpha rodando de forma verdadeiramente autônoma e concorrente no mesmo projeto, cada uma se autocorrigindo independentemente sem coordenação explícita.
+- Intervenção `NEEDS_INPUT` sobre o modelo `Contratacao` que o usuário colou não foi localizada em nenhum workspace conhecido (PainelAlpha nem site-alpha-comex) — hipótese não resolvida: texto pode ter vindo de terminal/log direto em vez da UI, ou de execução já sobrescrita entre o momento em que o usuário viu e a consulta de Bibble. Não bloqueou a recomendação técnica dada (Opção A, não criar o modelo).
+
+### Pendências
+- Nenhuma nova. (`SEARCH_FAILED` em `tools.test.ts` continua como task separada já aberta em sessão anterior, não relacionada a esta parte.)
+
+### Refletido também em
+- `integration-points.md`: nova seção "Roadmap Alpha — Produção: herança de progresso entre versões de execução (2026-08-25)".
