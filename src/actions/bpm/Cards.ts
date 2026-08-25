@@ -219,7 +219,7 @@ export async function BuscarEmpresasBpm(termo: string) {
         OR: [
           { razaoSocial: { contains: termoSeguro } },
           { nomeFantasia: { contains: termoSeguro } },
-          { cnpj: { contains: termoSeguro } },
+          { cnpj: { contains: termoSeguro.replace(/\D/g, "") || termoSeguro } },
         ],
       },
       select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
@@ -293,7 +293,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         primeiraVisualizacaoEm: true,
         proximoContatoEm: true,
         statusPosFechamento: true,
-        empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true } },
+        empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
         responsavel: { select: { id: true, nome: true } },
         membros: {
           select: {
@@ -387,6 +387,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           empresa: {
             id: 0,
             razaoSocial: lead.nome || lead.email || "Lead sem nome",
+            cnpj: null,
             nomeFantasia: null,
           },
           responsavel: { id: 0, nome: "Sem responsável" },
@@ -571,7 +572,7 @@ export async function CriarCardBpm(dados: unknown) {
 
     const parsed = criarCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico } = parsed.data;
+    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
     if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
@@ -638,7 +639,8 @@ export async function CriarCardBpm(dados: unknown) {
           pipelineId,
           etapaId,
           responsavelId,
-          servico,
+          // Fase 3 (RM-2026-54DC86): `servico` derivado do nome do pipeline de destino.
+          servico: (await tx.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { nome: true } }))?.nome ?? null,
         },
       });
 

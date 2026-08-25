@@ -1,5 +1,15 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Padrão: "card virtual" em Kanban BPM — staging antes de materializar registro real (2026-08-24)
+
+Padrão introduzido pela feature NoLoss leads (ver `integration-points.md` para o caso concreto), reaproveitável para qualquer fluxo futuro de "dado externo chega antes de virar entidade real do sistema":
+
+1. **Tabela de staging separada** (não a entidade final) com `status` (`pending`/`promoted`/`dismissed` ou equivalente) e colunas `promoted*` opcionais apontando para o que foi criado quando promovido.
+2. **Ingestão** (webhook/import/etc.) só grava na tabela de staging — nunca cria a entidade real (`Cliente`/`BpmCard` no caso do NoLoss) no momento da ingestão.
+3. **Leitura da UI faz merge**: a Server Action que lista os itens reais (`ListarCardsPipelineBpm`) busca também os itens de staging pendentes e os concatena no **mesmo formato de objeto** da entidade real, com um campo discriminador (`origem: "real"|"virtual"`) e um ID de referência ao staging (`nolossLeadId`). Campos que a entidade real tem mas o staging não tem recebem valores neutros sensatos (arrays vazios, contadores zero, objetos-sentinela com `id:0`).
+4. **Sentinela `id:0` é seguro SOMENTE se a UI nunca deixar o item de staging acionar um fluxo que dependa do ID ser real** (abrir modal de detalhe, navegar para página de detalhe etc.) — essa garantia vive do lado do componente, não do dado. Todo consumidor futuro do mesmo tipo de objeto precisa checar o campo `origem` antes de usar esses IDs para lookup.
+5. **Promoção** é uma ação explícita do usuário (nunca automática) que roda em transação: valida os dados de destino (etapa/categoria/etc. pertence ao escopo esperado — nunca confia em ID cru do client), usa **CAS** (`updateMany({where:{status:"pending"}})`) para blindar contra dois usuários promovendo o mesmo item ao mesmo tempo, cria a entidade real, e atualiza o staging para `promoted` com referência ao que foi criado.
+
 ## ⚠️ Bibble (assistente) roda 100% via Ollama local — não Anthropic/OpenAI (confirmado 2026-08-24)
 
 O CLAUDE.md raiz descreve Anthropic como "futuro padrão para AI" para o Bibble, mas **o código real sempre usou Ollama** como provider padrão (`src/lib/bibble/client.ts`, `BIBBLE_MODEL`, hoje `qwen3.8:latest`), servido por um Ollama remoto em `192.168.35.113` com GPU dedicada e VRAM alta (confirmado pelo usuário). Anthropic/OpenAI/Google existem no código (`PROVIDER_MODELS`, `getProviderConfig`) como providers alternativos que o usuário pode selecionar manualmente no chat, nunca como padrão ativo. **Qualquer sessão futura que for ajustar limites de token/contexto/custo do Bibble deve tratar o Ollama local como o path real e testado** — ver detalhe completo da correção de tetos de contexto/output em `integration-points.md` ("Bibble — hardening do pipeline de anexos/PDF", 2026-08-24).

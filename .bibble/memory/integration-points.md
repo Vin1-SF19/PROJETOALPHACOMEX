@@ -1,5 +1,113 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## AlphaCRM/BPM — Form de adição de card: serviço derivado do pipeline (RM-2026-54DC86, 2026-08-26)
+
+**Objetivo:** documentar o ponto de integração entre o form de criação de card e o pipeline de destino, após a remoção do campo "serviço" do form.
+
+### Ponto de integração: form de card ↔ pipeline (serviço derivado)
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx`
+**Propósito:** Único form de criação de card para todos os pipelines do Alpha CRM
+**Editado quando:** Novos campos forem adicionados ao form de criação de card, ou o fluxo de criação mudar
+
+**Como funciona (após RM-2026-54DC86):**
+- O form **NÃO tem campo "serviço"** — o serviço é derivado automaticamente do `nome` do pipeline de destino
+- `CriarCardBpm` (`src/actions/bpm/Cards.ts`) resolve: `servico: (await tx.bpmPipeline.findUnique({where:{id: pipelineId}, select:{nome:true}}))?.nome ?? null`
+- O `pipelineId` vem da rota (`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]`) — nunca do payload do cliente
+- `criarCardSchema` (`src/lib/validations/bpm.ts`) **não aceita** `servico` no payload de criação
+
+**Checkpoint de verificação:**
+- [ ] Form NÃO deve ter campo "serviço" (input, state, payload)
+- [ ] `criarCardSchema` NÃO deve ter `servico` como campo
+- [ ] `CriarCardBpm` DEVE derivar `servico` de `bpmPipeline.nome`
+- [ ] `atualizarCardSchema` (edição) PODE manter `servico` — edição é caso distinto
+
+**Dependência:** form depende de `pipelineId` (da rota) para resolver o serviço. Se o pipeline não existir, `servico` cai em `null` (coluna nullable, sem crash).
+
+**CNPJ como campo-chave para pesquisa de empresa:**
+- Modo busca: `BuscarEmpresasBpm` normaliza o termo (remove não-dígitos) antes da query `contains` na coluna `cnpj`
+- Modo cadastro: `novaEmpresa.cnpj` → `formatarCnpjInput()` (exibição) → `.replace(/\D/g,"")` (submit) → `cliente.cnpj` (banco)
+- **Nunca** armazenar CNPJ formatado no banco — sempre dígitos puros
+
+**Última atualização:** 2026-08-26 por Scribe
+
+---
+
+## AlphaCRM/BPM — NoLoss leads como cards virtuais na coluna "Novos leads" do pipeline "Revisão de Radar" (2026-08-24)
+
+**Objetivo:** um lead que preenche o formulário do site e cai no Alpha NoLoss (audience "Leads") aparece como **card virtual** na coluna "Novos leads" do pipeline "Revisão de Radar" — sem criar `Cliente`/`BpmCard` reais ainda. Só quando um usuário **arrasta esse card virtual para outra coluna** é que o sistema pede um responsável e materializa `Cliente` + `BpmCard` reais numa transação. Ver padrão geral "card virtual" em `architecture.md`.
+
+### Schema — `NolossLead` (staging, migration aplicada em produção)
+
+```prisma
+model NolossLead {
+  id                 String    @id @default(cuid())
+  nolossContactId    String    @unique
+  nolossSubmissionId String?
+  nome               String?
+  email              String?
+  telefone           String?
+  utmSource          String?
+  utmMedium          String?
+  utmCampaign        String?
+  status             String    @default("pending") // pending | promoted | dismissed
+  promotedClienteId  Int?
+  promotedCardId     String?
+  promotedAt         DateTime?
+  promotedByUserId   Int?
+  receivedAt         DateTime  @default(now())
+
+  promotedCliente Cliente?  @relation(fields: [promotedClienteId], references: [id])
+  promotedCard    BpmCard?  @relation(fields: [promotedCardId], references: [id])
+  promotedByUser  usuarios? @relation(fields: [promotedByUserId], references: [id])
+
+  @@index([status])
+}
+```
+
+Relações inversas: `usuarios.nolossLeadsPromovidos`, `Cliente.nolossLeadsPromovidos`, `BpmCard.nolossLeadOrigem`. **Migration aplicada em produção** no Turso `basetestes-alphacomex` via script Node pontual com `@libsql/client` (`prisma db push`/`migrate` não alcançam o Turso neste projeto — ver `decisions.md`, 2026-07-06), aprovada pelo Vault (`CREATE TABLE` puro, sem risco, 🟢 em todos os statements). Backup pré-mudança gerado e validado antes de aplicar: 72,17MB, 181.875 linhas, 242 tabelas (`database-backups/pre-change/painelalpha_turso_pre_change_noloss-lead_2026-08-24T23-59-15-164Z.sql`).
+
+### Arquivos criados
+
+- **`src/lib/bpm/noloss-leads.ts`** — helper `buscarNolossLeadsPendentes()`, fonte única da query de `NolossLead` com `status:"pending"`, reaproveitado por `Cards.ts` e `NolossLeads.ts` (evita duplicar a query).
+- **`src/app/api/bpm/noloss-leads/ingest/route.ts`** — Route Handler **público, sem sessão de usuário** (é o NoLoss batendo, não um humano logado). Auth por segredo compartilhado no header `x-noloss-webhook-secret`, comparado contra `process.env.NOLOSS_WEBHOOK_SECRET` — **mesmo padrão já existente** em `src/app/api/onyx/agent-tools/[tool]/route.ts` (função `checkSecret`, comparação por tamanho+igualdade, "sem segredo configurado = bloqueado"). Faz `upsert` em `NolossLead` por `nolossContactId`, **idempotente a retry do NoLoss**: se o lead já existe, sempre `update` (nunca `create`, que fixaria `status:"pending"` de novo) e o payload de `update` nunca inclui `status` — um reenvio nunca reverte um lead já `promoted`/`dismissed` de volta para `pending`, só atualiza nome/email/telefone.
+  - **⚠️ Limitação real do NoLoss, não resolvida nesta sessão:** o node "Webhook" das campanhas do NoLoss só suporta placeholders simples sobre campos **nativos** do contato (`{{contact.email}}` etc.) — **sem acesso a custom fields**, onde ficam `utm_source`/`utm_medium`/`utm_campaign` capturados no form. Essas 3 colunas existem no schema mas **nunca são preenchidas** nesta v1. Corrigir exigiria o endpoint de ingest fazer uma segunda chamada de volta pro NoLoss buscando os custom fields — mas o NoLoss **não tem API autenticável por token** hoje (só sessão de admin). Fica como melhoria futura explícita, não bloqueando o MVP.
+- **`src/actions/bpm/NolossLeads.ts`** — `PromoverNolossLead({nolossLeadId, etapaDestinoId, responsavelId})`. **Decisão confirmada do usuário: Server Action, não Route Handler HTTP** — mantém consistência com o resto do Kanban (`MoverCardBpm`/`CriarCardBpm` já são Server Actions). Fluxo: valida `etapaDestinoId` pertence de fato ao pipeline "Revisão de Radar" resolvido no servidor (nunca confia no ID cru do client — isolamento de tenant/pipeline), valida `responsavelId` via `usuarioElegivelResponsavelBpm` (mesma função de `CriarCardBpm`), depois dentro de `db.$transaction`: **CAS** via `tx.nolossLead.updateMany({where:{id,status:"pending"}}, data:{status:"promoted"})` — se `count !== 1`, alguém já promoveu esse lead (double-click ou dois usuários arrastando ao mesmo tempo), aborta sem criar nada; senão cria `Cliente` (`razaoSocial: nome ?? email ?? "Lead sem nome"`, `cnpj: null` — `Cliente.cnpj` é nullable) + `BpmCard` reais, e atualiza o `NolossLead` com `promotedClienteId`/`promotedCardId`/`promotedAt`/`promotedByUserId`. Dispara `notificarPipelineBpm` (Pusher, tipo `"CARD_CRIADO"`) após a transação para o board atualizar em tempo real para todos os usuários.
+  - **Removida durante a sessão (achado do Lens):** `ListarNolossLeadsPendentes` foi implementada inicialmente como uma 2ª Server Action de leitura, mas **removida** por não ter nenhum consumidor real no sistema — o merge de leads virtuais no board acontece direto dentro de `ListarCardsPipelineBpm` via `buscarNolossLeadsPendentes()`. **Se uma tela futura precisar só da lista de leads pendentes sem carregar o board inteiro**, recriar essa Server Action nesse momento (é trivial, a lógica já existe no helper).
+- **`AtribuirResponsavelPromocaoModal.tsx`** (`src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/`) — modal "quem assume esse lead?", réplica **exata** do padrão de seletor de responsável já usado em `NovoCardModal.tsx` (mesmo `useEffect` chamando `ListarUsuariosResponsavelBpm` ao montar, mesmo `<select>`, mesma estrutura visual `Dialog`/paleta `slate-900`). **Decisão de qualidade do Lens:** a duplicação de ~15 linhas entre os dois modais é aceitável (propósitos diferentes — um cria card, outro promove lead — e o projeto já tem a regra de não abstrair prematuramente com só 2 ocorrências). Só extrair um hook compartilhado (`useResponsaveisBpm(pipelineId)`) se um 3º modal precisar do mesmo seletor.
+- **Testes** (`tests/bpm/`): `noloss-leads-schema.test.ts` (6), `promover-noloss-lead.test.ts` (11), `noloss-leads-ingest-route.test.ts` (10) — 27/27 passando. Cobrem schema Zod, happy path, CAS de concorrência (`updateMany` retornando `count:0`), tenant isolation (`etapaDestinoId` de outro pipeline rejeitado), idempotência do webhook (reenvio nunca reverte `status` promovido), e fallback de `razaoSocial` (nome → email → "Lead sem nome").
+
+### Arquivos editados
+
+- **`src/lib/validations/bpm.ts`** — novo `promoverNolossLeadSchema` (`nolossLeadId`/`etapaDestinoId`: cuid, `responsavelId`: int positivo).
+- **`src/actions/bpm/Cards.ts`, `ListarCardsPipelineBpm`** — depois de montar os `BpmCard` reais, se o pipeline for "Revisão de Radar" (via `pipelineEhRevisaoRadar`) **e** a etapa "Novos leads" existir, concatena os `NolossLead` `status:"pending"` como cards virtuais no **mesmo formato** de `CardBpm`, com 2 campos novos: `origem: "real"|"noloss"` e `nolossLeadId: string|null`. Campos que um `BpmCard` real tem mas o lead virtual não tem recebem valores "neutros" sensatos: `empresa:{id:0, razaoSocial: lead.nome||lead.email||"Lead sem nome", nomeFantasia:null}`, `responsavel:{id:0, nome:"Sem responsável"}`, `membros:[]`, `_count:{tarefas:0,anexos:0}`, `tarefas:[]`, `campoValores:[]`.
+  - **⚠️ Sentinela `id:0` — regra permanente para qualquer código futuro que toque `CardBpm`:** `id:0` nunca existe em `Cliente`/`usuarios` de verdade (autoincrement começa em 1), mas essa garantia hoje vive **inteiramente do lado da UI** (`PipelineBoardClient.tsx` bloqueia abrir `CardFullViewModal` para cards virtuais — nunca chega em `CardAbertoLayout.tsx`/`CardOpenShell.tsx`, que usam `card.empresa.id` para lookup real). **Qualquer consumidor futuro de `CardBpm`/`ListarCardsPipelineBpm` DEVE checar `origem==="noloss"` antes de usar `empresa.id`/`responsavel.id` para uma query real** — comentário explícito deixado no código em `Cards.ts` nesse ponto exato.
+  - **Decisão de visibilidade confirmada pelo usuário:** leads virtuais visíveis a **qualquer usuário com acesso ao pipeline** — sem o filtro de `membros`/admin que os `BpmCard` reais têm nessa mesma função (`...(admin ? {} : { membros: { some: { userId } } })`). Faz sentido porque o lead ainda não tem responsável definido, não há "membro" pra filtrar por.
+- **`PipelineBoardClient.tsx`** — tipo `CardBpm` ganhou `origem`, `nolossLeadId`, `createdAt`. `KanbanCard`: card virtual (`origem==="noloss"`) nunca abre `CardFullViewModal` (nem pelo clique no card nem pelo botão do nome), borda tracejada azul (`border-dashed border-sky-400/40`) para diferenciação visual imediata, badge "Lead do site" com tooltip explicativo + data de recebimento, esconde membros/contadores de tarefas-anexos/bloco de ligações-do-dia (sempre zero nos virtuais, seria só ruído visual). `onDragEnd`: quando o card arrastado é virtual e o destino é uma etapa diferente da atual, **reverte o movimento otimista imediatamente** (`restaurarArrasto`, nunca move o virtual sozinho no banco) e abre `AtribuirResponsavelPromocaoModal` em vez de chamar `MoverCardBpm`; ao confirmar o responsável no modal, chama `PromoverNolossLead` e recarrega os cards — o card real recém-criado substitui automaticamente o virtual no board (o lead saiu de `status:"pending"`, não é mais retornado pelo merge).
+- **`.env.example`** — `NOLOSS_WEBHOOK_SECRET` documentada.
+
+### Segurança (Anubis) — 0 críticos, 2 importantes documentados como TODO explícito (decisão do usuário: não corrigir agora)
+
+1. **Sem rate-limit no endpoint de ingest** — com o secret válido, um flood criaria `NolossLead` ilimitados, cada um visível **imediatamente a todo mundo com acesso ao pipeline** (a decisão de visibilidade ampla amplifica o impacto de um flood além de só "banco crescendo"). Sem secret válido, o atacante recebe 401 antes de qualquer escrita. **Correção futura recomendada:** portar o padrão de rate-limit em memória já usado em `preflight-xlsx.ts` do CS&NPS (5/min por IP).
+2. **Sem limite de tamanho nos campos do payload nem no body JSON como um todo** — `email`/`firstName`/`lastName`/`phone` são `z.string()` sem `.max()`; um payload gigante seria persistido inteiro e renderizado na UI de todo mundo com acesso ao pipeline. **Correção futura recomendada:** `z.string().max(200)` nos 4 campos + checagem de `content-length` antes do `.json()`.
+3. **Informativo, não é um TODO:** comparação de secret não é timing-safe (`length===length && ===`), mas é o **mesmo padrão já aceito** em `onyx/agent-tools` — mantido por consistência; timing attack via rede real é impraticável (ruído de rede >> diferença mensurável).
+
+### Achado colateral, virou task separada (não desta feature)
+
+Durante `tsc --noEmit`, Forge encontrou erros de TypeScript **pré-existentes** (confirmado via `git status`/`git diff` como já modificados **antes** desta sessão) de uma refatoração incompleta do CardModal do CRM: `PainelHistorico.tsx` (JSX desbalanceado após remover `<PainelRequisitosAvanco>`), `CardOpenShell.tsx` (props inexistentes passadas para `PainelHistorico`), `AlphaCRM/pipelines/page.tsx` (import quebrado de `../../../../auth`), `HabilitacaoRadarClient.tsx` (`res.data` possivelmente `undefined`). Spawnada como task separada para o usuário decidir quando resolver — **não corrigido às cegas nesta sessão**, pois não fazia parte do escopo e mexer sem entender a decisão de design da refatoração em andamento seria arriscado.
+
+### Checklist de integração desta sessão
+
+- [x] Scout (blueprint) → Vault (migration aprovada 🟢, backup validado, aplicada) → Echo (backend) → Nova (frontend) → Forge (tsc/lint/build aprovados nos arquivos da feature) → Probe (integração confirmada, único board do sistema, middleware não intercepta `/api/*`) → Anubis (0 críticos, 2 importantes documentados) → Lens (aprovado com ressalvas já corrigidas: função órfã removida, sentinela `id:0` documentado) → Sage (27 testes, 100% passando) → Scribe (esta entrada)
+- [x] Migration aplicada em produção com backup + aprovação Vault
+- [x] `.env.example` documentado com `NOLOSS_WEBHOOK_SECRET`
+- [ ] Rate-limit e limite de tamanho de payload no endpoint de ingest — TODO explícito, não bloqueante, ver seção Segurança acima
+- [ ] Configurar o node `webhook-1` da campanha real do NoLoss (`rc-e6732936-04bd-488c-9be4-de0db87215c5`) com a URL de produção + header secreto — ação **fora do código**, pendente de deploy
+
+**Última atualização:** 2026-08-24 por Scribe (sessão Bibble — Scout→Vault→Echo→Nova→Forge→Probe→Anubis→Lens→Sage→Scribe)
+
+---
+
 ## Bibble — hardening do pipeline de anexos/PDF (tokens, orçamento por arquivo, protocolo financeiro) (2026-08-24)
 
 **⚠️ Achado arquitetural corrigido nesta sessão — o Bibble roda 100% via Ollama local, não Anthropic/OpenAI.** O CLAUDE.md raiz descreve Anthropic como "futuro padrão para AI", mas o código real (`src/lib/bibble/client.ts`) sempre usou `BIBBLE_MODEL` apontando para um modelo Ollama (`gemma4:e4b` → agora `qwen3.8:latest`), servido por um Ollama remoto em `192.168.35.113` (GPU dedicada, VRAM alta, confirmado pelo usuário). Anthropic/OpenAI/Google existem no código como providers alternativos selecionáveis pelo usuário no seletor de modelo, nunca como padrão. Qualquer sessão futura que for mexer em limites de token/contexto do Bibble deve tratar Ollama como o path real, não os providers remotos.

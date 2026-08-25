@@ -356,6 +356,97 @@ function appendActivity(
   );
 }
 
+export interface InheritablePhaseArtifact {
+  phaseNumber: number;
+  title: string;
+  kind: string;
+  agent: string;
+  contentMarkdown: string;
+  sha256: string;
+}
+
+/**
+ * Quando um objetivo é revisado (nova sourceVersion documentada), a execução
+ * nova nascia sempre do zero — todas as fases em PENDING, mesmo que a versão
+ * anterior já tivesse fases SUCCEEDED cujo conteúdo não mudou. Isso fazia
+ * objetivos revisados no meio do caminho recomeçarem do zero a cada revisão,
+ * nunca terminando. Esta função decide, fase a fase (em ordem crescente de
+ * phaseNumber), se o resultado da versão anterior pode ser herdado: só herda
+ * se o sha256 do artefato bate (conteúdo idêntico) E a fase anterior tinha
+ * SUCCEEDED E nenhuma fase de número menor já quebrou a cadeia — efeito
+ * cascata necessário porque o contexto que cada fase recebe (previousSummaries)
+ * inclui os resumos das fases anteriores, que podem ter mudado.
+ */
+export function inheritPhaseProgress(
+  previousPhases: readonly ProductionPhaseCompat[],
+  previousArtifactsByPhase: ReadonlyMap<number, string>,
+  newArtifacts: readonly InheritablePhaseArtifact[],
+  previousSourceVersion: number,
+  at: string,
+): ProductionExecution["phases"] {
+  let chainBroken = false;
+  return newArtifacts.map((artifact) => {
+    const previous = previousPhases.find(
+      (phase) => phase.phaseNumber === artifact.phaseNumber,
+    );
+    const previousSha256 = previousArtifactsByPhase.get(artifact.phaseNumber);
+    const canInherit =
+      !chainBroken &&
+      Boolean(previous) &&
+      previous!.status === "SUCCEEDED" &&
+      previous!.errorCode === null &&
+      previousSha256 !== undefined &&
+      previousSha256 === artifact.sha256;
+    if (!canInherit) chainBroken = true;
+    const fresh: ProductionExecution["phases"][number] = {
+      phaseNumber: artifact.phaseNumber,
+      title: artifact.title,
+      kind: artifact.kind,
+      requestedAgent: artifact.agent,
+      resolvedAgent: resolvePhaseAgent(
+        artifact.agent,
+        artifact.title,
+        artifact.contentMarkdown,
+      ),
+      agentOverride: false,
+      status: "PENDING",
+      attemptCount: 0,
+      autoRetryCount: 0,
+      retryAt: null,
+      startedAt: null,
+      finishedAt: null,
+      summary: null,
+      errorCode: null,
+      changedFiles: [],
+      reworkCount: 0,
+      manualFeedback: [],
+      circuit: {
+        fingerprint: null,
+        consecutiveCount: 0,
+        firstOccurredAt: null,
+        lastOccurredAt: null,
+        resetReason: null,
+      },
+      activities: [],
+    };
+    if (!canInherit || !previous) return fresh;
+    const inherited: ProductionExecution["phases"][number] = {
+      ...fresh,
+      status: "SUCCEEDED",
+      summary: previous.summary,
+      changedFiles: previous.changedFiles,
+      attemptCount: previous.attemptCount,
+    };
+    appendActivity(inherited, {
+      at,
+      agentId: inherited.resolvedAgent,
+      type: "STATUS",
+      message: `Progresso herdado da versão anterior (v${previousSourceVersion}) — conteúdo desta fase não mudou.`,
+    });
+    return inherited;
+  });
+}
+
 async function documentedObjectives(allowedModuleKeys: ReadonlySet<string>) {
   return db.roadmapObjective.findMany({
     where: {
@@ -381,6 +472,7 @@ async function documentedObjectives(allowedModuleKeys: ReadonlySet<string>) {
           kind: true,
           agent: true,
           contentMarkdown: true,
+          sha256: true,
         },
       },
     },
@@ -456,6 +548,29 @@ export async function syncProductionExecutions(
      * passou por aprovação manual.
      */
     const autoApproved = isAdminRole(objective.createdBy.role);
+    /**
+     * Execução mais recente do MESMO objetivo já presente no estado (versão
+     * anterior, qualquer status) — fonte de herança de progresso via
+     * inheritPhaseProgress. Se não existir, é a primeira execução deste
+     * objetivo e as fases nascem do zero como sempre.
+     */
+    const previousExecution = state.executions
+      .filter((execution) => execution.objectiveId === objective.id)
+      .sort((a, b) => b.sourceVersion - a.sourceVersion)[0];
+    const previousArtifactsByPhase = previousExecution
+      ? new Map(
+          (
+            await db.roadmapPromptArtifact.findMany({
+              where: {
+                objectiveId: objective.id,
+                documentationVersion: previousExecution.sourceVersion,
+                status: "PUBLISHED",
+              },
+              select: { phaseNumber: true, sha256: true },
+            })
+          ).map((artifact) => [artifact.phaseNumber, artifact.sha256]),
+        )
+      : new Map<number, string>();
     const newExecution = {
       id,
       objectiveId: objective.id,
@@ -477,37 +592,45 @@ export async function syncProductionExecutions(
       manualFeedback: [],
       messages: [],
       interventions: [],
-      phases: objective.promptArtifacts.map((phase) => ({
-        phaseNumber: phase.phaseNumber,
-        title: phase.title,
-        kind: phase.kind,
-        requestedAgent: phase.agent,
-        resolvedAgent: resolvePhaseAgent(
-          phase.agent,
-          phase.title,
-          phase.contentMarkdown,
-        ),
-        agentOverride: false,
-        status: "PENDING",
-        attemptCount: 0,
-        autoRetryCount: 0,
-        retryAt: null,
-        startedAt: null,
-        finishedAt: null,
-        summary: null,
-        errorCode: null,
-        changedFiles: [],
-        reworkCount: 0,
-        manualFeedback: [],
-        circuit: {
-          fingerprint: null,
-          consecutiveCount: 0,
-          firstOccurredAt: null,
-          lastOccurredAt: null,
-          resetReason: null,
-        },
-        activities: [],
-      })),
+      phases: previousExecution
+        ? inheritPhaseProgress(
+            previousExecution.phases,
+            previousArtifactsByPhase,
+            objective.promptArtifacts,
+            previousExecution.sourceVersion,
+            createdAt,
+          )
+        : objective.promptArtifacts.map((phase) => ({
+            phaseNumber: phase.phaseNumber,
+            title: phase.title,
+            kind: phase.kind,
+            requestedAgent: phase.agent,
+            resolvedAgent: resolvePhaseAgent(
+              phase.agent,
+              phase.title,
+              phase.contentMarkdown,
+            ),
+            agentOverride: false,
+            status: "PENDING",
+            attemptCount: 0,
+            autoRetryCount: 0,
+            retryAt: null,
+            startedAt: null,
+            finishedAt: null,
+            summary: null,
+            errorCode: null,
+            changedFiles: [],
+            reworkCount: 0,
+            manualFeedback: [],
+            circuit: {
+              fingerprint: null,
+              consecutiveCount: 0,
+              firstOccurredAt: null,
+              lastOccurredAt: null,
+              resetReason: null,
+            },
+            activities: [],
+          })),
     } satisfies ProductionExecutionCompat;
     if (autoApproved) {
       for (const phase of newExecution.phases) {

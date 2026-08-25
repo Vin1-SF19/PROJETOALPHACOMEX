@@ -8,7 +8,8 @@ import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CriarInteracaoCardBpm, type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { CardOpenFormSlot } from "./CardOpenFormSlot";
 import { PainelProximoContato } from "./PainelProximoContato";
-import { PainelContatos } from "./PainelContatos";
+
+
 
 
 
@@ -100,13 +101,6 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
             onAtualizado={onAtualizado}
             podeEditar={podeEditar}
             realtimeRevision={realtimeRevision}
-          />
-
-          <PainelContatos
-            cardId={card.id}
-            interacoes={interacoes}
-            podeEditar={podeEditar}
-            onInteracaoCriada={onInteracaoCriada}
           />
 
         </TabsContent>

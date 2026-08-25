@@ -1,5 +1,74 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-25 — Telefone do Sócio volta a ser opcional no cadastro de cliente (CS & NPS)
+
+**Contexto:** A Fase 3.6 do Cliente Master (2026-08-14) tornou `telefone` obrigatório em `socioSchema` (`src/lib/validations/cs-nps.ts`) porque `Pessoa.celular` é `@unique` no schema e serve de chave de deduplicação global do sócio. Na prática isso bloqueava a criação do CLIENTE inteiro (`CadastrarCliente`) sempre que qualquer sócio preenchido não tivesse telefone à mão — usuário reportou que "impede a criação do cliente".
+
+**Decisão:** `telefone` volta a ser opcional no formulário/validação, mas **sem migration de banco** (opção escolhida explicitamente pelo usuário entre duas alternativas apresentadas: migration tornando `Pessoa.celular` nullable vs. fix só em aplicação). Sócio sem telefone é aceito e salvo nos dados do cliente, mas **não vira `Pessoa`/`PessoaClienteVinculo`** — evita colisão no `@unique` entre sócios de clientes diferentes que ficassem com celular vazio. Fica como pendência local, replicando o padrão que já existia em `modalDados.tsx` (edição de cliente existente) para o mesmo caso. O cadastro retorna `sociosSemTelefone` com os nomes pendentes; a UI mostra um toast de aviso (não bloqueante) informando quais sócios precisam ter o telefone completado depois.
+
+**Consequência aceita:** sócio sem telefone cadastrado na criação do cliente não aparece na lista de sócios vinculados (Quadro de Sócios) até o telefone ser preenchido — mesma limitação que já existia silenciosamente na tela de edição.
+
+**Arquivos alterados:**
+- `src/lib/validations/cs-nps.ts` — `socioSchema.telefone` de obrigatório (`min(8)`) para opcional (com validação de formato só quando preenchido)
+- `src/actions/Clientes.ts` — `CadastrarCliente` pula upsert de `Pessoa`/vínculo para sócio sem telefone e retorna `sociosSemTelefone`; `adicionarSocio` ganhou guarda explícita (telefone continua obrigatório para ESSA action específica, cujo único propósito é criar o vínculo de Pessoa)
+- `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx` — `handleFinalizar` exibe toast de aviso quando `res.sociosSemTelefone` vier preenchido
+
+**Adicionado em:** 2026-08-25 por Bibble.
+
+### 2026-08-26 — RM-2026-05E75A — Bloco de contatos removido do card aberto (PainelAlpha/AlphaCRM)
+
+**Contexto:** O card aberto do Alpha CRM (`PainelRegistrar.tsx`, aba "Formulário da Etapa") exibia um bloco "Contatos" com campos Data, Tipo (Ligação/E-mail/Reunião/WhatsApp), Notas e botão "Registrar contato" (`PainelContatos.tsx`, 114 linhas). O bloco era ruído visual e não utilizado no fluxo de trabalho real do operador.
+
+**Decisão:** Remover o bloco de contatos da UI do card aberto. A Server Action `CriarInteracaoCardBpm` e `ListarInteracoesCardBpm` permanecem intactas — ainda em uso pela anotação (`tipo: "ANOTACAO"`) e pelo histórico (`PainelHistorico.tsx`). O bloco "Próximo Contato" (`PainelProximoContato.tsx`) é distinto e permanece.
+
+**Arquivos alterados:**
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx` — import e JSX de `PainelContatos` removidos
+
+**Arquivo órfão (pendência manual):** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelContatos.tsx` — remover via `rm`.
+
+**Adicionado em:** 2026-08-26 por Scribe.
+
+### 2026-08-26 — RM-2026-54DC86 — Campo "serviço" removido do form de adição de card; serviço derivado do pipeline
+
+**Contexto:** O form de criação de card (`NovoCardModal.tsx`) tinha um campo "serviço" (input livre) que era redundante: o pipeline de destino já define o serviço. O operador precisava digitar manualmente um valor que o sistema já conhecia, gerando confusão e inconsistência de dados (cards no mesmo pipeline com valores de "serviço" diferentes).
+
+**Decisão:** Remover o campo "serviço" do form, do payload e do schema Zod de criação. O serviço do card é agora **derivado automaticamente do `nome` do pipeline de destino** (`bpmPipeline.nome`) dentro da transação de `CriarCardBpm`.
+
+**Justificativa:**
+1. **Redundância:** o pipeline já define o serviço — pedir ao operador era pedir o mesmo dado duas vezes.
+2. **Confusão do operador:** o campo era opcional e livre, gerando valores inconsistentes ("Radar", "radar", "Radar — análise", etc.) para o mesmo pipeline.
+3. **Inconsistência de dados:** cards no mesmo pipeline tinham valores de `servico` diferentes, dificultando relatórios e filtros.
+
+**Impacto:**
+- `bpmCard.servico` continua nullable (`String?`) — cards já criados com valor antigo continuam exibindo.
+- `atualizarCardSchema` (edição de card existente) **mantém** `servico` — edição é caso distinto de criação.
+- O form é único e compartilhado — a mudança afeta todos os pipelines simultaneamente (comportamento desejado).
+
+**Arquivos alterados:**
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx` — removido state, input e payload de `servico`
+- `src/lib/validations/bpm.ts` — `criarCardSchema` sem `servico`
+- `src/actions/bpm/Cards.ts` — `CriarCardBpm` deriva `servico` de `bpmPipeline.nome`; `BuscarEmpresasBpm` normaliza CNPJ na busca
+
+**Adicionado em:** 2026-08-26 por Scribe.
+
+### 2026-08-25 — RM-2026-3E14F1 — Remoção visual do bloco "REQUISITOS PARA AVANÇAR" do card CRM
+
+**Contexto:** O card aberto do Alpha CRM exibia no topo da coluna esquerda o bloco "Requisitos para avançar" (`PainelRequisitosAvanco.tsx`, 284 linhas) — um formulário com seletor de etapa de destino + campos obrigatórios de transição. O bloco era visualmente redundante: a validação funcional já é comunicada via `title` tooltip no botão desabilitado em `PainelProximaEtapa` e rejeitada no backend (`SalvarRequisitosEMoverCardBpm`).
+
+**Decisão:** Remover o bloco visual da UI do card aberto. A validação de transição server-side permanece **intacta** — `SalvarRequisitosEMoverCardBpm`, `MoverCardBpm`, `@/lib/bpm/card-modal-ui.ts` e `@/lib/bpm/requisitos-etapa-server.ts` não foram alterados. O usuário ainda pode mover o card via `PainelProximaEtapa` (coluna direita) → `MoverCardBpm`.
+
+**Justificativa:** Redução de sobrecarga visual e redundância de informação. O bloco ocupava espaço significativo na coluna esquerda sem adicionar valor funcional além do que `PainelProximaEtapa` já oferece.
+
+**Arquivos alterados:**
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx` — import e renderização removidos
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` — props órfãs limpas
+
+**Arquivo órfão (pendência manual):** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRequisitosAvanco.tsx` — remover via `rm`.
+
+**Pendências de qualidade:** 2 asserções de teste quebradas em `tests/bpm/card-modal-integration.test.ts` + 2 lint warnings em `CardAbertoLayout.tsx`.
+
+**Adicionado em:** 2026-08-25 por Scribe.
+
 ### 2026-07-XX — RM-2026-FCE09D — Remoção do texto de validação no card Agendar Reunião
 
 **Contexto:** O card aberto do CRM, etapa "Agendar Reunião", exibia no lado direito um banner âmbar com o texto "Preencha Data e Hora da reunião antes de avançar para Reunião Agendada. A saída para Standby continua disponível." — ruído visual redundante, pois a validação funcional já é comunicada via `title` tooltip no botão desabilitado e rejeitada no backend.

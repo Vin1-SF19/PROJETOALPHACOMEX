@@ -149,6 +149,9 @@ export default function ModalCadastroCliente({ isOpen, onClose }: { isOpen: bool
 
         if (res.success) {
             toast.success("Cadastrado!");
+            if (res.sociosSemTelefone?.length) {
+                toast.warning(`Sócio(s) sem telefone ainda não vinculados: ${res.sociosSemTelefone.join(", ")}. Complete o telefone depois na edição do cliente.`);
+            }
             onClose();
             window.location.reload();
         } else {

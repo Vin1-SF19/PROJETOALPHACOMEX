@@ -2,6 +2,131 @@
 
 ---
 
+## [2026-08-25] — Telefone do Sócio opcional no cadastro de cliente (CS & NPS)
+
+**Tags:** #bugfix #cs-nps #validacao
+**Agentes envolvidos:** Bibble, Scout (reconhecimento), Echo (implementação), Forge, Scribe
+**Arquivos tocados:** `src/lib/validations/cs-nps.ts`, `src/actions/Clientes.ts`, `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx`, `.bibble/memory/decisions.md`
+
+### Contexto
+Usuário reportou que o campo "Telefone do Sócio" era obrigatório ao criar cliente novo no CS & NPS, impedindo a criação do cliente quando o telefone não estava disponível. Investigação encontrou que isso era proposital (Fase 3.6 do Cliente Master, 2026-08-14): `Pessoa.celular` é `@unique` no schema e é usado como chave de deduplicação do sócio entre clientes/parceiros — telefone vazio para dois sócios de empresas diferentes colidiria nessa constraint.
+
+### O que foi feito
+- Apresentadas 2 opções ao usuário via pergunta direta: migration tornando `Pessoa.celular` nullable (fix "correto" mas mexe em schema/Vault) vs. fix só em aplicação (sócio sem telefone não vira `Pessoa`, fica pendente). **Usuário escolheu a segunda opção.**
+- `socioSchema.telefone`: de obrigatório para opcional (Zod), com validação de formato mínimo só quando preenchido.
+- `CadastrarCliente` (`Clientes.ts`): sócio sem telefone não gera `Pessoa.upsert`/vínculo — evita colisão do `@unique`. Retorna `sociosSemTelefone` com os nomes pendentes.
+- `adicionarSocio`: ganhou guarda explícita — telefone continua obrigatório especificamente nessa action (seu único propósito é criar o vínculo de Pessoa).
+- `modal.tsx` (`handleFinalizar`): toast de aviso não bloqueante quando `sociosSemTelefone` vier preenchido, orientando a completar depois na edição do cliente.
+- Forge: `tsc --noEmit` e `eslint` limpos para os 3 arquivos alterados (corrigido 1 erro de narrowing de `string | undefined` dentro de closure de `$transaction` em `adicionarSocio`). Erros pré-existentes de outras frentes (`timeline/`, rotas `painel-alpha`) não relacionados, não tocados.
+
+### Decisões tomadas
+- Reversão parcial e deliberada de uma decisão anterior documentada (Fase 3.6) — registrada em `decisions.md` com contexto completo para não repetir o debate.
+- Padrão de "sócio sem telefone = pendência local, não persiste como Pessoa" já existia implicitamente em `modalDados.tsx` (edição); esta mudança só estende o mesmo padrão para a tela de CRIAÇÃO do cliente, que antes bloqueava tudo via Zod.
+
+### Pendências
+- Teste manual via browser não executado nesta sessão (sem acesso fácil a login/dados reais no momento) — recomendado validar o fluxo completo (criar cliente sem telefone de sócio → aparece toast de aviso → cliente é criado → sócio pendente reaparece corretamente ao editar depois).
+
+### Refletido também em
+- `decisions.md`: nova entrada "Telefone do Sócio volta a ser opcional no cadastro de cliente (CS & NPS)".
+
+---
+
+## [2026-08-26] — RM-2026-05E75A — Remoção do bloco de contatos do card aberto (Alpha CRM)
+
+**Tags:** #feature #ui-polish #crm
+**Agentes envolvidos:** Bibble, Scout, Nova (implementação), Forge, Probe, Lens, Sage, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx`, `.bibble/memory/decisions.md`
+
+### Contexto
+Usuário pediu a remoção do bloco "Contatos" (Data, Tipo, Notas, botão "Registrar contato") do card aberto do Alpha CRM. O bloco (`PainelContatos.tsx`, 114 linhas) era ruído visual e não utilizado no fluxo de trabalho real do operador.
+
+### O que foi feito
+- Removido o import e a renderização de `PainelContatos` em `PainelRegistrar.tsx`.
+- **Preservada** a Server Action `CriarInteracaoCardBpm` e `ListarInteracoesCardBpm` — ainda em uso pela anotação (`tipo: "ANOTACAO"`) e pelo histórico (`PainelHistorico.tsx`).
+- **Preservado** o bloco "Próximo Contato" (`PainelProximoContato.tsx`) — bloco distinto, não afetado.
+- Scribe atualizou `decisions.md`.
+
+### Decisões tomadas
+- Remoção cirúrgica: apenas o bloco visual, sem alterar lógica de negócio.
+- A anotação e o histórico permanecem funcionais via `CriarInteracaoCardBpm`/`ListarInteracoesCardBpm`.
+- O bloco "Próximo Contato" é independente e permanece.
+
+### Pendências
+- **Arquivo órfão:** `PainelContatos.tsx` (114 linhas) — remover via `rm` manual.
+- Execução real de `tsc`/`lint`/`build`/testes pelo supervisor confiável.
+
+### Refletido também em
+- `decisions.md`: nova decisão `RM-2026-05E75A`.
+
+---
+
+## [2026-08-26] — RM-2026-54DC86 — Correção do form de adição de card no pipeline Radar (Alpha CRM)
+
+**Tags:** #bugfix #crm #form
+**Agentes envolvidos:** Bibble, Scout, Nova, Echo, Forge, Probe, Sage, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx`, `src/actions/bpm/Cards.ts`, `src/lib/validations/bpm.ts`, `.bibble/memory/codebase-map.md`, `.bibble/memory/integration-points.md`, `.bibble/memory/decisions.md`
+
+### Contexto
+Usuário reportou dois problemas no form de adição de card no pipeline Radar: (1) CNPJ mapeado para campo incorreto, impedindo pesquisa da empresa; (2) campo "serviço" redundante no form (serviço é determinado pelo pipeline).
+
+### O que foi feito
+- Removido o campo "serviço" do form (`NovoCardModal.tsx`): state, input e payload.
+- Corrigida a busca de empresa por CNPJ em `BuscarEmpresasBpm` (`Cards.ts`): normalização de dígitos antes da query `contains`.
+- Removido `servico` do `criarCardSchema` (`bpm.ts`); `CriarCardBpm` agora deriva `servico` de `bpmPipeline.nome`.
+- Scribe atualizou `codebase-map.md`, `integration-points.md` e `decisions.md`.
+
+### Decisões tomadas
+- CNPJ: normalização no backend (remover não-dígitos antes de `contains`) em vez de exigir `equals` — mantém flexibilidade para busca parcial.
+- "Serviço" removido do form e do schema de criação; derivado do nome do pipeline no backend — elimina redundância e inconsistência.
+- `atualizarCardSchema` (edição) mantém `servico` — caso distinto de criação.
+
+### Pendências
+- R1 (média): validação de dígitos verificadores de CNPJ não implementada (frontend nem backend).
+- R2 (baixa): pipeline inativo não bloqueia criação de card.
+- R3 (baixa): dois cards para a mesma empresa (modo busca) — comportamento não definido.
+- R4 (baixa): foco não retorna ao campo de erro após submissão (acessibilidade).
+- Execução real de `tsc`/`lint`/`build`/testes pelo supervisor confiável.
+
+### Refletido também em
+- `codebase-map.md`: nova seção "Alpha CRM — Correção do form de adição de card".
+- `integration-points.md`: nova seção "Form de adição de card: serviço derivado do pipeline".
+- `decisions.md`: nova decisão "Campo 'serviço' removido do form de adição de card; serviço derivado do pipeline".
+
+---
+
+## [2026-08-25] — RM-2026-3E14F1 — Remoção visual do bloco "REQUISITOS PARA AVANÇAR" do card aberto (Alpha CRM)
+
+**Tags:** #feature #ui-polish #crm
+**Agentes envolvidos:** Bibble, Scout, Nova (implementação), Forge, Probe, Lens, Scribe, Kowalski
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`, `.bibble/memory/codebase-map.md`, `.bibble/memory/decisions.md`
+
+### Contexto
+Usuário pediu a remoção do bloco "REQUISITOS PARA AVANÇAR" do card aberto do Alpha CRM. O bloco (`PainelRequisitosAvanco.tsx`, 284 linhas) exibia um formulário com seletor de etapa de destino + campos obrigatórios de transição no topo da coluna esquerda. Era visualmente redundante: a validação funcional já é comunicada via `title` tooltip no botão desabilitado em `PainelProximaEtapa` e rejeitada no backend (`SalvarRequisitosEMoverCardBpm`).
+
+### O que foi feito
+- Removido o import e a renderização de `PainelRequisitosAvanco` em `PainelHistorico.tsx`.
+- Limpas as props órfãs (`etapasParaMover`, `podeMoverEtapa`) em `CardAbertoLayout.tsx`.
+- **Preservada** a validação funcional: `SalvarRequisitosEMoverCardBpm`, `MoverCardBpm`, `@/lib/bpm/card-modal-ui.ts`, `@/lib/bpm/requisitos-etapa-server.ts` — nenhum alterado.
+- **Preservada** a transição de etapa: `PainelProximaEtapa` (coluna direita) continua funcional via `MoverCardBpm`.
+- Scribe atualizou `codebase-map.md` e `decisions.md`.
+
+### Decisões tomadas
+- Remoção cirúrgica: apenas o bloco visual, sem alterar lógica de negócio.
+- A validação funcional (requisitos de transição) permanece — o bloco era puramente informativo/redundante.
+- A transição de etapa permanece funcional por canal independente (`PainelProximaEtapa`).
+
+### Pendências
+- **Arquivo órfão:** `PainelRequisitosAvanco.tsx` (284 linhas) — remover via `rm` manual.
+- **2 asserções de teste quebradas** em `tests/bpm/card-modal-integration.test.ts` (referenciam `<PainelRequisitosAvanco>`).
+- **2 lint warnings** (`no-unused-vars`) em `CardAbertoLayout.tsx` (`realtimeRevision`, `podeEditar`).
+- **1 drift pré-existente** em teste (`PainelResumoEtapas` sem `ocultarTitulo`).
+
+### Refletido também em
+- `codebase-map.md`: nova seção "Alpha CRM — Remoção visual do bloco REQUISITOS PARA AVANÇAR".
+- `decisions.md`: nova decisão `RM-2026-3E14F1`.
+
+---
+
 ## [2026-08-24] — RM-2026-FCE09D — Remoção de texto no card "Agendar Reunião" (Alpha CRM)
 
 **Tags:** #feature #ui-polish #crm
@@ -2995,3 +3120,46 @@ Nenhuma nova.
 ---
 
 **Fechamento de sessão:** esta foi a 4ª e última parte de uma sessão excepcionalmente longa sobre o Roadmap Alpha — Produção, cobrindo em sequência: (1) bug do "Aprovar e iniciar" que não disparava processamento; (2) auditoria completa da fila + visibilidade de bloqueio + auto-approve por role + tela de Produção por objetivo; (3) 2 bugs críticos de infraestrutura no worker de workspace externo (supervisor PowerShell morrendo com qualquer stderr do processo filho; contexto da squad Bibble lido do diretório errado); (4) esta, sobre autonomia e auto-correção do worker. O sistema já está confirmadamente rodando de forma autônoma no ambiente real (uma entrada anterior neste mesmo journal, sobre `RM-2026-E9AEEF`, foi arquivada pelo próprio pipeline automatizado, não por esta sessão manual).
+
+---
+
+## [2026-08-24] — AlphaCRM/BPM: NoLoss leads como cards virtuais no pipeline "Revisão de Radar"
+
+**Tags:** #feature #integration #security #architecture #decision
+**Agentes envolvidos:** Scout, Vault, Echo, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `src/lib/bpm/noloss-leads.ts`, `src/app/api/bpm/noloss-leads/ingest/route.ts`, `src/actions/bpm/NolossLeads.ts`, `src/lib/validations/bpm.ts`, `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/AtribuirResponsavelPromocaoModal.tsx`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `.env.example`, 3 arquivos novos em `tests/bpm/`
+
+### Contexto
+Usuário pediu que leads captados pelo formulário do site (Alpha NoLoss, audience "Leads") aparecessem como cards na coluna "Novos leads" do pipeline "Revisão de Radar", sem criar `Cliente`/`BpmCard` reais até alguém de fato assumir o lead arrastando o card para outra etapa.
+
+### O que foi feito
+- Pipeline serial completo da squad, do zero: Scout mapeou o schema real (`BpmCard.responsavelId` obrigatório, `Cliente.cnpj` nullable) e achou o precedente exato de "secret header estático" já em produção (`onyx/agent-tools`) e o padrão de "criar Cliente+BpmCard em transação" já existente em `CriarCardBpm`.
+- Vault aprovou e aplicou em produção a tabela `NolossLead` (staging) no Turso real, com backup fresco gerado e validado antes (72,17MB/181.875 linhas/242 tabelas).
+- Echo implementou: endpoint público `POST /api/bpm/noloss-leads/ingest` (secret header, upsert idempotente), Server Action `PromoverNolossLead` (CAS transacional contra double-click/corrida, cria Cliente+BpmCard reais), e o merge de leads pendentes como cards virtuais dentro de `ListarCardsPipelineBpm`.
+- Nova implementou o visual do card virtual no Kanban (borda tracejada, badge "Lead do site") e o modal `AtribuirResponsavelPromocaoModal` que intercepta o drag-and-drop de um card virtual antes de promovê-lo.
+- Forge, Probe, Anubis, Lens e Sage rodaram a fila completa de qualidade — 27 testes novos, todos passando; 0 achados críticos de segurança.
+
+### Decisões tomadas
+- Leads virtuais visíveis a **qualquer usuário com acesso ao pipeline** (não só admin/membros) — confirmado explicitamente pelo usuário, diferente do filtro que os `BpmCard` reais têm.
+- Promoção do lead é **Server Action**, não Route Handler HTTP — consistência com o resto do Kanban.
+- `ListarNolossLeadsPendentes` (Server Action de leitura sem consumidor) foi **removida** por recomendação do Lens — o merge real já cobre a necessidade via `buscarNolossLeadsPendentes`.
+- 2 achados de segurança do Anubis (sem rate-limit e sem limite de tamanho de payload no endpoint de ingest) foram **conscientemente adiados** pelo usuário — documentados como TODO explícito em `integration-points.md`, não bloqueiam a entrega porque a rota já exige secret válido para qualquer escrita.
+
+### Problemas encontrados / resolvidos
+- Sentinela `empresa.id:0`/`responsavel.id:0` nos cards virtuais depende inteiramente da UI nunca deixar um card virtual abrir `CardFullViewModal` — Lens pediu comentário explícito no código (`Cards.ts`) para não virar bug silencioso se um consumidor futuro reaproveitar `CardBpm` sem essa checagem.
+- Achado colateral não relacionado a esta feature: Forge encontrou erros de TypeScript pré-existentes de uma refatoração incompleta do CardModal do CRM (`PainelHistorico.tsx`, `CardOpenShell.tsx`, `AlphaCRM/pipelines/page.tsx`, `HabilitacaoRadarClient.tsx`), confirmados via `git diff` como anteriores a esta sessão — não corrigidos, virou task separada sugerida ao usuário (`task_8d9dc8e3`).
+- Lint do projeto inteiro revelou 16.240 problemas pré-existentes (10.803 erros, 5.437 warnings) não relacionados a esta feature — dívida técnica antiga, registrada só para visibilidade, sem ação nesta sessão.
+
+### Pendências
+- Rate-limit e limite de tamanho de payload no endpoint de ingest (TODO explícito do usuário).
+- Configurar o node `webhook-1` da campanha real do NoLoss com a URL de produção + secret — ação fora do código, pendente de deploy.
+- Se uma tela futura precisar listar só os leads pendentes sem carregar o board inteiro, recriar `ListarNolossLeadsPendentes` (lógica já existe em `buscarNolossLeadsPendentes`).
+- Task separada aberta para corrigir a refatoração incompleta do CardModal do CRM (achado colateral, não desta feature).
+
+### Refletido também em
+- `integration-points.md`: nova seção "AlphaCRM/BPM — NoLoss leads como cards virtuais na coluna 'Novos leads' do pipeline 'Revisão de Radar' (2026-08-24)".
+- `architecture.md`: novo padrão arquitetural documentado — "card virtual em Kanban BPM — staging antes de materializar registro real", reaproveitável para futuros fluxos de dado externo → entidade real.
+
+---
+
+**Nota de sessão:** a pedido do usuário, foi criado um `NolossLead` de teste diretamente no Turso (via script pontual, removido após uso) para visualização imediata do card virtual no board antes do fechamento da sessão — não é dado de produção real, é um registro de teste com `nolossContactId` prefixado `teste-manual-`.

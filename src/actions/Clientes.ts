@@ -247,6 +247,11 @@ export async function CadastrarCliente(dados: unknown, socios: unknown[]) {
       });
 
       for (const socio of sociosValidados.data) {
+        // Sócio sem telefone não vira Pessoa/vínculo agora — `Pessoa.celular` é
+        // `@unique`, então múltiplos sócios sem telefone colidiriam entre si.
+        // Fica como pendência: complete o telefone depois na edição do cliente.
+        if (!socio.telefone) continue;
+
         const pessoa = await tx.pessoa.upsert({
           where: { celular: socio.telefone },
           update: { nome: socio.nome },
@@ -271,7 +276,12 @@ export async function CadastrarCliente(dados: unknown, socios: unknown[]) {
     });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
-    return { success: true, clienteServicoId: clienteServico.id };
+    const sociosSemTelefone = sociosValidados.data.filter((s) => !s.telefone).map((s) => s.nome);
+    return {
+      success: true,
+      clienteServicoId: clienteServico.id,
+      sociosSemTelefone: sociosSemTelefone.length ? sociosSemTelefone : undefined,
+    };
   } catch (error) {
     const err = error as { code?: string; message?: string };
     console.error("ERRO CADASTRO:", err.message);
@@ -792,12 +802,14 @@ export async function adicionarSocio(clienteId: number, dadosSocio: unknown) {
     const parsed = socioSchema.safeParse(dadosSocio);
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
     const d = parsed.data;
+    if (!d.telefone) return { success: false, error: "Telefone é obrigatório para vincular o sócio" };
+    const telefone = d.telefone;
 
     const vinculo = await db.$transaction(async (tx) => {
       const pessoa = await tx.pessoa.upsert({
-        where: { celular: d.telefone },
+        where: { celular: telefone },
         update: { nome: d.nome },
-        create: { celular: d.telefone, nome: d.nome, dataNascimento: d.dataNascimento || null },
+        create: { celular: telefone, nome: d.nome, dataNascimento: d.dataNascimento || null },
       });
       return tx.pessoaClienteVinculo.upsert({
         where: { pessoaId_clienteId: { pessoaId: pessoa.id, clienteId } },

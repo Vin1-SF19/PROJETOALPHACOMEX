@@ -23,11 +23,14 @@ export const cadastrarClienteSchema = z.object({
 });
 export type CadastrarClienteInput = z.infer<typeof cadastrarClienteSchema>;
 
-// Telefone obrigatório a partir desta fase (decisão do plano Cliente Master, pergunta 8) —
-// sócios legados sem telefone ficam retidos como pendência de saneamento, não migram.
+// Telefone é opcional (2026-08-25): nem sempre está disponível no momento do
+// cadastro. `Pessoa.celular` continua `@unique` no schema — sócio sem telefone
+// NÃO vira `Pessoa`/vínculo (evita colisão entre sócios de clientes diferentes
+// resolvendo pro mesmo valor vazio), fica como pendência local até ser
+// completado depois. Quando preenchido, mantém a validação de formato mínimo.
 export const socioSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome"),
-  telefone: z.string().trim().min(8, "Telefone é obrigatório"),
+  telefone: z.string().trim().optional().refine((v) => !v || v.length >= 8, { message: "Telefone inválido" }),
   dataNascimento: z.string().max(40).optional(),
   vinculo: z.string().trim().min(1, "Selecione o vínculo"),
   obs: z.string().max(500).optional(),

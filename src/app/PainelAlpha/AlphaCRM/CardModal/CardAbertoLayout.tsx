@@ -18,6 +18,7 @@ import {
 import { TelefonesCardButton } from "./TelefonesCardButton";
 import { EmpresaPerfilModal } from "./EmpresaPerfilModal";
 import { SeletorMembrosCard } from "./SeletorMembrosCard";
+import { CardSaveProvider } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -95,6 +96,7 @@ export function CardAbertoLayout({
       : etapas;
 
   return (
+    <CardSaveProvider>
     <div className="flex flex-col h-full">
       {/* Handle visual do bottom-sheet */}
       <div className="flex justify-center pt-3 pb-1 shrink-0">
@@ -272,5 +274,6 @@ export function CardAbertoLayout({
         onAbrirCard={onAbrirCard}
       />
     </div>
+    </CardSaveProvider>
   );
 }

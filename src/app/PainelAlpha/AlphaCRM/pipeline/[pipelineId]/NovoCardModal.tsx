@@ -73,7 +73,6 @@ export default function NovoCardModal({
   const [empresaSelecionada, setEmpresaSelecionada] = useState<EmpresaOpcao | null>(null);
   const [usuarios, setUsuarios] = useState<UsuarioOpcao[]>([]);
   const [responsavelId, setResponsavelId] = useState<number | null>(currentUserId);
-  const [servico, setServico] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [modoCadastro, setModoCadastro] = useState(false);
@@ -180,7 +179,6 @@ export default function NovoCardModal({
         pipelineId,
         etapaId,
         responsavelId,
-        servico: servico.trim() || undefined,
       });
       if (!resultado.success) setErro(resultado.error);
     } catch {
@@ -271,9 +269,7 @@ export default function NovoCardModal({
             </select>
           </FieldRow>
 
-          <FieldRow label="Serviço" htmlFor="novo-card-servico">
-            <input id="novo-card-servico" className={inputCls} placeholder="Descrição do serviço" value={servico} onChange={(e) => setServico(e.target.value)} />
-          </FieldRow>
+
         </div>
 
         <div className="flex gap-2 p-5 border-t border-white/5">

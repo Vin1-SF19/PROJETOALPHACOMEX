@@ -48,6 +48,7 @@ import {
   restaurarSnapshotBoard,
 } from "@/lib/bpm/drag-drop-board";
 import { cn } from "@/lib/utils";
+import { formatCNPJ } from "@/lib/format-cnpj";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
 
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
@@ -77,7 +78,7 @@ interface CardBpm {
   primeiraVisualizacaoEm?: Date | string | null;
   proximoContatoEm?: Date | string | null;
   statusPosFechamento?: string | null;
-  empresa: { id: number; razaoSocial: string; nomeFantasia: string | null };
+  empresa: { id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string | null };
   responsavel: { id: number; nome: string };
   membros: MembroCard[];
   _count: { tarefas: number; anexos: number };
@@ -176,7 +177,10 @@ function KanbanCard({
   const resumoAlinhamento = card.campoValores?.find((campo) => campoEhResumoAlinhamento(campo.campo.nome))?.valor;
   const alertaAlinhamento = etapaEhAlinhamentoEstrategico(etapaNome) && !resumoAlinhamento?.trim();
   const statusConfig = obterStatusPosFechamentoVisivel({ etapaNome, status: card.statusPosFechamento });
-  const nomeEmpresa = card.empresa.nomeFantasia || card.empresa.razaoSocial;
+  const razaoSocial = card.empresa.razaoSocial;
+  const nomeFantasia = card.empresa.nomeFantasia;
+  const cnpjFormatado = formatCNPJ(card.empresa.cnpj);
+  const nomeEmpresa = razaoSocial || nomeFantasia || "";
   const inicialEmpresa = nomeEmpresa.trim().charAt(0).toUpperCase() || "?";
   const proximaTarefaComPrazo = card.tarefas.find((tarefa) => tarefa.prazo);
   const anotacaoRapidaPendente = card.tarefas.find((tarefa) => tarefa.tipo === "LEMBRETE_RAPIDO");
@@ -250,6 +254,12 @@ function KanbanCard({
                   </button>
                 )}
               </div>
+              {!ehLeadVirtual && (nomeFantasia || cnpjFormatado) && (
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {nomeFantasia && <span className="line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{nomeFantasia}</span>}
+                  {cnpjFormatado && <span className="font-mono text-[10px] leading-tight text-slate-500">{cnpjFormatado}</span>}
+                </div>
+              )}
               {card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
             </div>
           </div>

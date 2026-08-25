@@ -19,6 +19,7 @@ import {
 } from "@/lib/bpm/alinhamento-estrategico";
 import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
 import { CalculoTributario } from "./CalculoTributario";
+import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type CamposEtapaCard = CardDetalhe["camposEtapa"];
@@ -58,6 +59,7 @@ export function PainelCamposEtapaAtual({
   const [conflitoCamposAtuais, setConflitoCamposAtuais] = useState(false);
   const camposAtuaisSujosRef = useRef(false);
   const [salvandoCamposAtuais, setSalvandoCamposAtuais] = useState(false);
+  const { registerSave } = useCardSave();
 
   const configuracaoLostUi = prepararCamposMotivoLostUi(
     card.etapa.nome,
@@ -129,25 +131,29 @@ export function PainelCamposEtapaAtual({
     }
     const camposValores = montarPayloadCamposDestino(camposAtuaisVisiveis, valoresCamposAtuais);
     setSalvandoCamposAtuais(true);
-    const resultado = await AtualizarCardBpm({
+    const promise = AtualizarCardBpm({
       cardId: card.id,
       camposValores,
       versaoEsperadaEm: versaoBaseCampos,
+    }).then(async (resultado) => {
+      if (!resultado.success) {
+        toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa");
+        return;
+      }
+      toast.success("Campos da etapa atualizados");
+      setBaseCamposAtuais((atual) => ({ ...atual, ...camposValores }));
+      snapshotAtivoRef.current = {
+        valores: { ...snapshotAtivoRef.current.valores, ...camposValores },
+        versao: versaoBaseCampos,
+      };
+      camposAtuaisSujosRef.current = false;
+      setConflitoCamposAtuais(false);
+      onAtualizado();
+    }).finally(() => {
+      setSalvandoCamposAtuais(false);
     });
-    setSalvandoCamposAtuais(false);
-    if (!resultado.success) {
-      toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa");
-      return;
-    }
-    toast.success("Campos da etapa atualizados");
-    setBaseCamposAtuais((atual) => ({ ...atual, ...camposValores }));
-    snapshotAtivoRef.current = {
-      valores: { ...snapshotAtivoRef.current.valores, ...camposValores },
-      versao: versaoBaseCampos,
-    };
-    camposAtuaisSujosRef.current = false;
-    setConflitoCamposAtuais(false);
-    onAtualizado();
+    registerSave(promise);
+    await promise;
   }
 
   const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";

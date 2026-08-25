@@ -3,6 +3,7 @@
 import { toast } from "sonner";
 import { ArrowRight, Check } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm } from "@/actions/bpm/Cards";
+import { useCardSave } from "./CardSaveContext";
 import {
   ERRO_DATA_REUNIAO_OBRIGATORIA,
   etapaEhAgendarReuniao,
@@ -23,12 +24,14 @@ interface Props {
 }
 
 export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accent, onMovido }: Props) {
+  const { flushSaves } = useCardSave();
   const aguardandoDataHora = etapaEhAgendarReuniao(card.etapa.nome) && !card.dataReuniao;
   const aguardandoTranscricao = etapaEhReuniaoAgendada(card.etapa.nome)
     && !card.transcricaoReuniao?.trim();
 
   async function handleMover(etapaDestinoId: string) {
     if (etapaDestinoId === card.etapa.id) return;
+    await flushSaves();
     const res = await MoverCardBpm({ cardId: card.id, etapaDestinoId });
     if (res.success) { toast.success("Card movido"); onMovido(); }
     else toast.error(typeof res.error === "string" ? res.error : "Não foi possível mover o card");

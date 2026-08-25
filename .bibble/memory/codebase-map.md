@@ -2,7 +2,75 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-24 (Alpha Motion — ocultar slide + compartilhar apresentação via cópia)
+> Última atualização: 2026-08-26 (Alpha CRM — correção do form de adição de card: remoção do campo "serviço", serviço derivado do pipeline)
+
+---
+
+## Alpha CRM — Correção do form de adição de card (RM-2026-54DC86, 2026-08-26)
+
+**Objetivo:** remover o campo "serviço" do form de criação de card (redundante — o pipeline já define o serviço) e corrigir a busca de empresa por CNPJ (normalização).
+
+### Componente de form
+
+- **Caminho:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx` (285 linhas)
+- **Único ponto de entrada** para criação de card em qualquer pipeline (Radar, Revisão de Radar, Financeiro, etc.)
+- **Rota de acesso:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → board Kanban → botão "Novo Card" numa coluna
+
+### Campos do form (após correção)
+
+| Campo | Binding | Observação |
+|-------|---------|------------|
+| **Empresa (busca)** | `buscaEmpresa` → `BuscarEmpresasBpm` | Busca textual em `razaoSocial`/`nomeFantasia`/`cnpj`; CNPJ normalizado (dígitos puros) antes da query |
+| **Empresa (cadastro) — CNPJ** | `novaEmpresa.cnpj` | `aria-label="CNPJ"`, formatado por `formatarCnpjInput()`, enviado como dígitos puros |
+| **Empresa (cadastro) — Razão social** | `novaEmpresa.razaoSocial` | Obrigatório no modo cadastro |
+| **Empresa (cadastro) — Nome fantasia** | `novaEmpresa.nomeFantasia` | Opcional |
+| **Empresa (cadastro) — Município / UF** | `novaEmpresa.municipio` / `novaEmpresa.uf` | Opcionais |
+| **Responsável** | `responsavelId` | Obrigatório, seletor via `ListarUsuariosResponsavelBpm` |
+| ~~**Serviço**~~ | **REMOVIDO** | Campo removido do form, do payload e do schema Zod. Serviço agora derivado do pipeline. |
+
+### Fluxo de dados (form → banco)
+
+```
+NovoCardModal.tsx (Client Component)
+  │
+  ├─ [Modo Busca] buscaEmpresa → BuscarEmpresasBpm (CNPJ normalizado)
+  ├─ [Modo Cadastro] novaEmpresa.cnpj → GET /api/ReceitaFederal (preenche campos)
+  │
+  └─ handleSalvar() → payload: { empresaId | novaEmpresa, pipelineId, etapaId, responsavelId }
+       │
+       ▼  onCriado(payload) = CriarCardBpm
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ CriarCardBpm (Server Action — src/actions/bpm/Cards.ts ~L568)  │
+  │  1. auth() + exigirAcessoBpmPipeline                           │
+  │  2. criarCardSchema.safeParse (Zod — sem `servico`)            │
+  │  3. destinoEhEtapaCanonicaNovosLeads                           │
+  │  4. Se novaEmpresa: valida CNPJ único                          │
+  │  5. db.$transaction:                                           │
+  │     a. Revalida acesso + destino + responsável                │
+  │     b. Se novaEmpresa: tx.cliente.create({cnpj, ...})         │
+  │     c. tx.bpmCard.create({                                     │
+  │          empresaId, pipelineId, etapaId, responsavelId,        │
+  │          servico: bpmPipeline.nome  ◄── DERIVADO DO PIPELINE   │
+  │        })                                                      │
+  │     d. tx.bpmCardMembro.create (RESPONSAVEL)                  │
+  │     e. tx.bpmCardHistorico.create (CARD_CRIADO)               │
+  │  6. revalidatePath + notificarPipelineBpm (realtime)          │
+  └─────────────────────────────────────────────────────────────────┘
+```
+
+### Arquivos alterados nesta correção
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NovoCardModal.tsx` | Removido: state `servico`, input `#novo-card-servico`, `servico` do payload |
+| `src/lib/validations/bpm.ts` | `criarCardSchema`: removido `servico` do schema Zod (comentário RM-2026-54DC86) |
+| `src/actions/bpm/Cards.ts` | `CriarCardBpm`: `servico` derivado de `bpmPipeline.nome`; `BuscarEmpresasBpm`: CNPJ normalizado na busca |
+
+### Notas
+
+- `bpmCard.servico` é **nullable** (`String?`) — cards já criados com valor continuam exibindo no board.
+- `atualizarCardSchema` (edição de card existente) **mantém** `servico` — edição é caso distinto de criação.
+- O form é **único e compartilhado** — a correção afeta todos os pipelines simultaneamente.
 
 ---
 
@@ -195,6 +263,36 @@ Implementação documentada, com encerramento bloqueado pelos gates em 2026-08-1
 - `CHANGELOG.md`
 
 **Última atualização:** 2026-08-17 por Scribe
+
+---
+
+### Alpha CRM — Remoção visual do bloco "REQUISITOS PARA AVANÇAR" do card aberto (RM-2026-3E14F1, 2026-08-25)
+
+Objetivo concluído. O bloco visual "Requisitos para avançar" (`PainelRequisitosAvanco.tsx`) foi removido da UI do card aberto do Alpha CRM. A validação de transição server-side permanece intacta.
+
+**Estrutura atual do card aberto (`CardAbertoLayout.tsx`):**
+- **Coluna esquerda:** `PainelHistorico.tsx` — tabs (Etapas/Tarefas/Anexos/Histórico) + `PainelResumoEtapas` + `PainelTarefasPorTipo`. **Sem** o bloco de requisitos de transição (removido).
+- **Coluna centro:** `children` (formulário da etapa ativa via `CardOpenFormSlot`/`PainelCamposEtapaAtual`).
+- **Coluna direita:** `PainelProximaEtapa.tsx` — navegação entre etapas + `MoverCardBpm`.
+
+**Arquivos alterados:**
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx` — import e renderização de `PainelRequisitosAvanco` removidos
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` — props órfãs (`etapasParaMover`, `podeMoverEtapa`) limpas
+
+**Arquivo órfão (pendência de limpeza manual):**
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRequisitosAvanco.tsx` — 284 linhas, não importado por nenhum arquivo, não entra no bundle. Remover via `rm` manual.
+
+**Validação de transição (INALTERADA):**
+- `@/actions/bpm/Cards.ts` → `ObterRequisitosTransicaoBpm`, `SalvarRequisitosEMoverCardBpm`, `MoverCardBpm`
+- `@/lib/bpm/card-modal-ui.ts` → `separarCamposRequisitos`, `montarPayloadCamposDestino`, `prepararCamposMotivoLostUi`
+- `@/lib/bpm/requisitos-etapa-server.ts` → `carregarCamposAplicaveisCardEtapa`
+
+**Pendências de qualidade (não bloqueiam a funcionalidade):**
+- 2 asserções em `tests/bpm/card-modal-integration.test.ts` referenciam `<PainelRequisitosAvanco>` (FALHA em `npm test`)
+- 2 lint warnings (`no-unused-vars`) em `CardAbertoLayout.tsx` (`realtimeRevision`, `podeEditar`)
+- 1 drift pré-existente em teste (`PainelResumoEtapas` sem `ocultarTitulo`)
+
+**Última atualização:** 2026-08-25 por Scribe
 
 ---
 

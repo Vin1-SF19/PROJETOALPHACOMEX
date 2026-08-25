@@ -94,7 +94,7 @@ export const criarCardSchema = z.object({
   pipelineId: z.string().cuid(),
   etapaId: z.string().cuid(),
   responsavelId: z.number().int().positive(),
-  servico: z.string().trim().max(120).optional(),
+  // Fase 3 (RM-2026-54DC86): `servico` removido do payload — derivado do nome do pipeline em CriarCardBpm.
 }).refine((d) => d.empresaId !== undefined || d.novaEmpresa !== undefined, {
   message: "Empresa é obrigatória",
   path: ["empresaId"],
