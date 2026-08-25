@@ -77,7 +77,9 @@ describe("generateRoadmapManifest", () => {
     });
     const request = JSON.parse(String(receivedInit?.body)) as {
       messages: Array<{ role: string; content: string }>;
+      options: { num_predict: number };
     };
+    expect(request.options).toEqual({ num_predict: 8_192 });
     expect(request.messages[0].content).toContain("AUTO_ADJUSTMENT_REQUIRED");
     expect(result.manifest.phases[0].markdown).toContain(
       "Auditoria obrigatória da forma de entrega",

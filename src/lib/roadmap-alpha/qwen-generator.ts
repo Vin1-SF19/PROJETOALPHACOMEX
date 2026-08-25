@@ -227,6 +227,33 @@ export async function generateRoadmapManifest(
           model: runtime.config.model,
           stream: false,
           temperature: 0.2,
+          /**
+           * `max_tokens` no nível raiz (formato OpenAI-compatible) NÃO é
+           * suficiente para o Ollama — testado em produção e confirmado que
+           * não tem efeito algum: o real limitador é `options.num_ctx`
+           * (janela de contexto TOTAL, entrada+saída) e `options.num_predict`
+           * (teto de saída), formato nativo do Ollama. Sem isso, o servidor
+           * usa o default (`DEFAULT_CONTEXT_WINDOW_TOKENS = 32_768` em
+           * lib/bibble/context-budget.ts) — o prompt de sistema desta função
+           * (protocolo Bibble inteiro + catálogo de agentes + contexto do
+           * projeto) já consome boa parte disso, sobrando pouco espaço para
+           * o manifesto de saída (até 24 fases, cada markdown até 50_000
+           * chars — schema em contracts.ts). Objetivos grandes truncavam de
+           * forma 100% consistente (TRUNCATED_MODEL_RESPONSE em toda
+           * tentativa, mesma duração ~170s sempre).
+           *
+           * Manter num_ctx no DEFAULT (32_768) — testado em produção com
+           * num_ctx:65_536 e a geração ficou presa >13min sem responder
+           * (heartbeat do job parou de atualizar, processo do worker travou),
+           * bem além dos 600s de timeout configurado; revertido. Dobrar o
+           * contexto sobrecarregou o servidor Ollama real além do que ele
+           * processa em tempo hábil para este modelo — mesmo padrão maior
+           * (131_072) em lib/bibble/completion.ts é usado só para anexos e
+           * não necessariamente reflete a capacidade real sob esta carga.
+           * Só `num_predict` explícito muda aqui: reserva um teto de saída
+           * generoso DENTRO do contexto padrão, sem aumentar o total.
+           */
+          options: { num_predict: 8_192 },
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: system },

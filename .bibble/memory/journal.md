@@ -3295,3 +3295,40 @@ Quarta tarefa distinta do dia sobre o Roadmap Alpha (depois da auditoria de 24 s
 ### Refletido também em
 - `integration-points.md`: nova seção "Roadmap Alpha — identidade de 'objetivo de módulo novo' é campo estrutural, nunca inferida de texto livre" — padrão arquitetural geral.
 - `known-errors.md`: nova seção com sintoma, causa e fix específicos, incluindo o achado colateral sobre `moduleKey="roadmap"`.
+
+---
+
+## [2026-08-25 16:46] — TRUNCATED_MODEL_RESPONSE (não resolvido) + correção definitiva do erro #310 (a de mais cedo estava incompleta)
+
+**Tags:** #bugfix #critical #nextjs
+
+**Agentes envolvidos:** Bibble, Scout, Forge, Sage, Anubis, Lens
+
+**Arquivos tocados:** `src/lib/roadmap-alpha/qwen-generator.ts`, `tests/roadmap-alpha/qwen-generator.test.ts`, `src/components/RoadmapAlpha/RoadmapDashboard.tsx`
+
+### Contexto
+Quinta e última parte do dia sobre o Roadmap Alpha (depois da auditoria de 24 seções, herança de progresso, correção incompleta do #310, e o campo `isNewModule`). Usuário reportou `TRUNCATED_MODEL_RESPONSE` na documentação de `RM-2026-7282A4` ("CRM dos Parceiros"); enquanto isso era investigado, o usuário também reportou que o erro React #310 (já "corrigido" mais cedo hoje) voltou a derrubar o Roadmap em produção.
+
+### O que foi feito
+- Investigado `TRUNCATED_MODEL_RESPONSE`: 8 tentativas idênticas confirmaram causa sistemática. Tentativa 1 de correção (`max_tokens: 32_768`, formato OpenAI) não teve efeito real — mesmo erro, mesma duração.
+- Tentativa 2: trocado para formato nativo Ollama (`options.num_ctx: 65_536, num_predict: 16_384`, precedente já usado em `lib/bibble/completion.ts`). Após reiniciar o worker e reenfileirar, a tentativa ficou `RUNNING` por 13+ minutos — muito além do timeout de 600s configurado — com `heartbeatAt` do job parado, sinal de travamento real do processo (não só demora). Usuário autorizou matar o processo.
+- Tentativa 3: reduzido para só `num_predict: 8_192` (contexto no default), por precaução. Mesmo travamento reproduzido de novo (heartbeat parado, processo vivo, nunca chega a timeout) — confirma que a causa do travamento é **independente** de `num_ctx`/`num_predict`, não é sobre tokens. Registrado como não resolvido.
+- Usuário pediu para matar o processo e arquivar o objetivo — feito via `archiveRoadmapObjective` (função oficial). Antes disso, no mesmo fio de trabalho, o objetivo também foi restaurado da lixeira (estava `DELETED`) e teve `moduleKey` corrigido de `chamados` (engano de seleção) para `crm` (correto pelo conteúdo real).
+- Em paralelo, reproduzido ao vivo o retorno do erro #310 (mesmo padrão: hard-reload quebra, navegação client-side nunca quebra) — confirmado via `dpl` (deployment hash) diferente que o deploy da correção anterior já estava ativo. Descoberta: `useSearchParams()` sozinho, mesmo sem `<Suspense>` ao redor, já é suficiente para causar o erro em produção numa página `force-dynamic` — a correção de mais cedo (só remover o Suspense) era incompleta.
+- Corrigido definitivamente: `useSearchParams()` removido por completo de `RoadmapDashboard.tsx`, substituído por `window.location.search` lido dentro do `useEffect` já existente (único uso era ler `?novoModulo=1`).
+
+### Decisões tomadas
+- Arquivar `RM-2026-7282A4` em vez de continuar investigando o travamento agora — decisão do usuário, prioriza destravar o sistema sobre resolver a causa raiz imediatamente.
+- Reverter para `num_predict` sozinho (sem elevar `num_ctx`) depois do primeiro travamento — precaução para não sobrecarregar ainda mais o servidor Ollama real enquanto a causa não é conhecida; mesmo assim travou de novo, confirmando que a precaução não era a causa.
+
+### Problemas encontrados / resolvidos
+- **Resolvido:** erro #310 (causa real e completa desta vez: `useSearchParams()`, não só `<Suspense>`).
+- **Não resolvido:** travamento do worker de documentação — heartbeat para, processo não morre, timeout de 600s nunca dispara. Causa raiz desconhecida (hipótese não confirmada: bloqueio síncrono do event loop). Registrado em `known-errors.md` para retomada futura.
+- Lição registrada: uma correção que passa por todo o pipeline de qualidade (Forge/Anubis/Lens) e vai para produção ainda pode estar incompleta se a investigação inicial não isolou 100% a causa — sempre re-verificar com o mesmo rigor se o sintoma reaparecer, mesmo que "já devia estar corrigido".
+
+### Pendências
+- Causa raiz do travamento do worker de documentação (ver `known-errors.md` para hipóteses e próximos passos sugeridos).
+- Commit/push das mudanças locais: `qwen-generator.ts` + teste (correção de tokens, não resolve o bug mas não é prejudicial) e `RoadmapDashboard.tsx` (correção definitiva do #310) — nenhum dos dois foi commitado ainda nesta parte da sessão; aguardando decisão do usuário.
+
+### Refletido também em
+- `known-errors.md`: entrada do erro #310 **corrigida** (causa completa, não só Suspense) + nova entrada "NÃO RESOLVIDO" sobre o travamento do worker de documentação.

@@ -8,7 +8,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -214,7 +214,6 @@ export function RoadmapDashboard({
   canAccessProduction,
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [objectives, setObjectives] = useState(initialObjectives);
   const [lastLiveUpdate, setLastLiveUpdate] = useState(() => new Date());
@@ -232,7 +231,16 @@ export function RoadmapDashboard({
   const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get("novoModulo") !== "1") return;
+    /**
+     * Lido de window.location.search (não useSearchParams()) de propósito —
+     * useSearchParams() causava React error #310 em produção durante a
+     * hidratação, mesmo sem <Suspense> ao redor (Next.js App Router trata
+     * esse hook de forma especial independente do boundary). Como este é o
+     * único uso no componente e só precisa rodar no cliente, ler direto do
+     * DOM evita a dependência do hook por completo.
+     */
+    if (new URLSearchParams(window.location.search).get("novoModulo") !== "1")
+      return;
     const timer = window.setTimeout(() => {
       if (canMutate) {
         setCreateNovoModuloPreset(true);
@@ -241,7 +249,7 @@ export function RoadmapDashboard({
       router.replace("/PainelAlpha/Roadmap");
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [searchParams, router, canMutate]);
+  }, [router, canMutate]);
   const [mobilePane, setMobilePane] = useState<
     "modules" | "objectives" | "docs"
   >("objectives");
