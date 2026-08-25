@@ -3228,3 +3228,37 @@ Continuação direta da sessão anterior de 4 partes sobre o Roadmap Alpha — P
 
 ### Refletido também em
 - `integration-points.md`: nova seção "Roadmap Alpha — Produção: herança de progresso entre versões de execução (2026-08-25)".
+
+---
+
+## [2026-08-25 13:43] — React error #310 em produção: Suspense desnecessário derrubava a tela do Roadmap
+
+**Tags:** #bugfix #critical #nextjs
+
+**Agentes envolvidos:** Bibble, Scout, Forge, Anubis, Lens, Scribe, Kowalski
+
+**Arquivos tocados:** `src/app/PainelAlpha/Roadmap/page.tsx`
+
+### Contexto
+Terceira tarefa distinta do dia sobre o Roadmap Alpha (depois da auditoria técnica de 24 seções e da implementação de herança de progresso entre versões de execução, ambas mais cedo hoje) — mesmo sistema, ângulo de trabalho diferente. Usuário reportou "Application error: a client-side exception has occurred" ao abrir `painel.alpha-comex.com/PainelAlpha/Roadmap` em produção.
+
+### O que foi feito
+- Bibble investigou extensivamente por leitura de código primeiro (componentes inteiros do Roadmap, Server Actions, hooks) sem confirmar a causa raiz definitiva só por leitura estática.
+- Com autorização explícita do usuário, o usuário logou no navegador da sessão do Bibble (Browser pane) — Bibble só observou console/network durante todo o processo, nunca tocou em credenciais.
+- Reproduziu o erro real ao vivo (React error #310) e, por teste comparativo (hard-reload sempre crasha vs. navegação client-side nunca crasha, mesmo após 6s de espera), isolou a causa para um problema de hidratação, não de dados incorretos.
+- Scout confirmou via grep que `page.tsx` era o único uso de `<Suspense>` em todo o projeto e a única combinação `Suspense` + `useSearchParams()` — caso isolado, sem precedente a seguir.
+- Bibble implementou a correção diretamente (mudança trivial de 1 arquivo).
+
+### Decisões tomadas
+- Remover o `<Suspense>` por completo em vez de trocar o fallback ou isolar `useSearchParams()` num componente filho: a página já era `export const dynamic = "force-dynamic"` (nunca prerenderizada estaticamente), então o Suspense boundary não protegia nenhum prerendering real — era supérfluo, não apenas "menos necessário". Opção mais simples e sem trade-off real.
+
+### Problemas encontrados / resolvidos
+- Causa raiz: mismatch de contagem de hooks entre o fallback `null` (0 hooks) e `RoadmapDashboard` (dezenas de hooks) durante a hidratação em produção — gatilho clássico do React error #310. Detalhe completo registrado em `known-errors.md`.
+- Forge: `tsc`/lint 0 erros no arquivo editado. Build completo do projeto falhou, mas por outra tarefa não relacionada rodando em paralelo (`gerador-documentos`, import `@/auth` quebrado) — mesmo padrão de tarefas autônomas paralelas já visto 2x nesta sessão, fora de escopo.
+- Anubis confirmou que o gate de auth (`redirect()` em `ListarRoadmapAlpha()` falho) continua intacto, acontecendo antes do JSX independente do Suspense.
+
+### Pendências
+- A correção só terá efeito real em produção depois que o usuário fizer deploy (commit + push) — Bibble não commitou nem fez push nesta sessão, fora do escopo sem autorização explícita para essa ação específica.
+
+### Refletido também em
+- `known-errors.md`: nova seção "React error #310 ('more hooks than previous render') em produção — `<Suspense>` desnecessário numa página `force-dynamic`", incluindo o padrão geral reconhecível para páginas futuras.
