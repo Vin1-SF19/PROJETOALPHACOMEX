@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { ListarRoadmapAlpha } from "@/actions/RoadmapAlpha";
@@ -15,13 +14,11 @@ export default async function RoadmapAlphaPage() {
   if (!result.success) redirect("/PainelAlpha");
 
   return (
-    <Suspense fallback={null}>
-      <RoadmapDashboard
-        initialObjectives={result.data}
-        modules={modules}
-        canMutate={result.canMutate}
-        canAccessProduction={result.canAccessProduction}
-      />
-    </Suspense>
+    <RoadmapDashboard
+      initialObjectives={result.data}
+      modules={modules}
+      canMutate={result.canMutate}
+      canAccessProduction={result.canAccessProduction}
+    />
   );
 }

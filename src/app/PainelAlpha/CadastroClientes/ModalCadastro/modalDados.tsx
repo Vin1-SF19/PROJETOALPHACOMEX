@@ -723,7 +723,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
         for (const s of listaSocios) {
             if (s._pendente === "criar") {
                 const res = await adicionarSocio(cliente!.clienteId, {
-                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
+                    nome: s.nome, telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });
                 if (res.success && res.data) {
                     const novoId = res.data.id;
@@ -733,7 +733,7 @@ export default function ModalGestaoCliente({ isOpen, onClose, cliente: clienteGr
                 }
             } else if (s._pendente === "editar") {
                 const res = await atualizarSocio(s.id, cliente!.clienteId, {
-                    nome: s.nome, telefone: s.telefone, dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
+                    nome: s.nome, telefone: s.telefone || "", dataNascimento: s.dataNascimento || "", vinculo: s.vinculo || "", obs: s.obs || "",
                 });
                 if (res.success) {
                     setListaSocios((prev) => prev.map((x) => x.id === s.id ? { ...x, _pendente: undefined } : x));

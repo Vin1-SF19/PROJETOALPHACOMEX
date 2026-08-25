@@ -28,32 +28,37 @@ Usuário reportou erro de deploy mostrando `import { auth } from '@/auth';` na r
 
 ---
 
-## [2026-08-25] — Telefone do Sócio opcional no cadastro de cliente (CS & NPS)
+## [2026-08-25] — Telefone do Sócio opcional no cadastro de cliente (CS & NPS) — 2 iterações até o placeholder final
 
-**Tags:** #bugfix #cs-nps #validacao
-**Agentes envolvidos:** Bibble, Scout (reconhecimento), Echo (implementação), Forge, Scribe
-**Arquivos tocados:** `src/lib/validations/cs-nps.ts`, `src/actions/Clientes.ts`, `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx`, `.bibble/memory/decisions.md`
+**Tags:** #bugfix #cs-nps #validacao #vault
+**Agentes envolvidos:** Bibble, Scout (reconhecimento), Echo (implementação), Vault (protocolo de migration), Forge, Scribe
+**Arquivos tocados:** `src/lib/validations/cs-nps.ts`, `src/actions/Clientes.ts`, `src/actions/bpm/Empresas.ts`, `src/actions/bpm/Cards.ts`, `src/lib/cs-nps/exportar-dados.ts`, `src/actions/parceiros.ts`, `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx`, `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx`, `tests/cs-nps/socio-telefone-opcional.test.ts`, `.bibble/memory/decisions.md`, `.bibble/memory/known-errors.md`
 
 ### Contexto
 Usuário reportou que o campo "Telefone do Sócio" era obrigatório ao criar cliente novo no CS & NPS, impedindo a criação do cliente quando o telefone não estava disponível. Investigação encontrou que isso era proposital (Fase 3.6 do Cliente Master, 2026-08-14): `Pessoa.celular` é `@unique` no schema e é usado como chave de deduplicação do sócio entre clientes/parceiros — telefone vazio para dois sócios de empresas diferentes colidiria nessa constraint.
 
-### O que foi feito
-- Apresentadas 2 opções ao usuário via pergunta direta: migration tornando `Pessoa.celular` nullable (fix "correto" mas mexe em schema/Vault) vs. fix só em aplicação (sócio sem telefone não vira `Pessoa`, fica pendente). **Usuário escolheu a segunda opção.**
-- `socioSchema.telefone`: de obrigatório para opcional (Zod), com validação de formato mínimo só quando preenchido.
-- `CadastrarCliente` (`Clientes.ts`): sócio sem telefone não gera `Pessoa.upsert`/vínculo — evita colisão do `@unique`. Retorna `sociosSemTelefone` com os nomes pendentes.
-- `adicionarSocio`: ganhou guarda explícita — telefone continua obrigatório especificamente nessa action (seu único propósito é criar o vínculo de Pessoa).
-- `modal.tsx` (`handleFinalizar`): toast de aviso não bloqueante quando `sociosSemTelefone` vier preenchido, orientando a completar depois na edição do cliente.
-- Forge: `tsc --noEmit` e `eslint` limpos para os 3 arquivos alterados (corrigido 1 erro de narrowing de `string | undefined` dentro de closure de `$transaction` em `adicionarSocio`). Erros pré-existentes de outras frentes (`timeline/`, rotas `painel-alpha`) não relacionados, não tocados.
+### Iteração 1 (revertida) — sócio sem telefone não persiste
+`socioSchema.telefone` virou opcional; sócio sem telefone não gerava `Pessoa`/vínculo, ficava só como pendência local não salva. Forge aprovado, `sociosSemTelefone` retornado com aviso em toast. **Usuário testou e reportou que o sócio "não permanecia"** (sumia ao reabrir o cliente) — comportamento correto pelo desenho, mas não o esperado na prática.
+
+### Iteração 2 (final) — placeholder técnico, Vault envolvido
+Reapresentadas 2 opções: migration tornando `Pessoa.celular` nullable vs. placeholder técnico único sem migration. Usuário escolheu inicialmente a migration — **Vault rodou o protocolo completo**: ambiente confirmado como produção real (`libsql://basetestes-alphacomex.aws-us-east-1.turso.io`, apesar do nome "basetestes"), investigação de leitura no Turso (426 linhas em `Pessoa`, 423 em `PessoaClienteVinculo`, zero duplicidade/vazio hoje, FKs mapeadas), backup completo gerado e verificado (`database-backups/pre-change/painelalpha_turso_pre_change_pessoa-celular-nullable_2026-08-25T14-37-16-286Z.sql`, 79,8 MB, 243 tabelas, 41.651 linhas — contagem de `Pessoa`/`PessoaClienteVinculo` no dump conferida contra o banco real), plano de recriação de tabela (SQLite não suporta `ALTER COLUMN`) apresentado com o risco real já documentado em `known-errors.md` (FK física presa em tabela renomeada, incidente de 21/08). **Antes da execução, usuário mudou de decisão e pediu o placeholder.** Migration NÃO aplicada — backup fica preservado (política do projeto não remove backups de `pre-change/` automaticamente).
+
+Implementado: `gerarTelefonePendente()` gera `SEM-TELEFONE-{uuid}` como `Pessoa.celular` quando o sócio não tem telefone — sempre único, nunca colide. `paraExibicaoTelefone()` normaliza esse valor de volta para string vazia em TODO ponto que expõe `pessoa.celular` para fora do backend — descoberto que são 6 pontos diferentes no sistema (não só CS&NPS): `Clientes.ts` (4 funções), `bpm/Empresas.ts`, `bpm/Cards.ts` (`ListarTelefonesCardBpm`), `cs-nps/exportar-dados.ts` (Excel), `parceiros.ts` (mesma tabela `Pessoa`, normalizado por segurança). Com a normalização centralizada no backend, a UI (`modalDados.tsx`) não precisou aprender nada sobre o placeholder — só as 2 checagens client-side que bloqueavam o envio foram removidas.
+
+Forge: `tsc --noEmit` e `eslint` limpos em todos os arquivos tocados (1 erro de narrowing corrigido em `modalDados.tsx` — `s.telefone` podia ser `null`/`undefined`, normalizado com `|| ""`). Contagem de erros pré-existentes em `modalDados.tsx` conferida idêntica antes/depois (28 problems, todos não relacionados). `npm run build` completo (produção) rodado até o fim depois — exit code 0, zero erros/warnings no log inteiro, todas as rotas geradas normalmente inclusive `/PainelAlpha/CadastroClientes`. Teste automatizado existente (`tests/cs-nps/clientes-logs.test.ts`, 9 casos) continua passando.
+
+Sage: novo arquivo `tests/cs-nps/socio-telefone-opcional.test.ts` (7 casos) cobrindo `gerarTelefonePendente`/`paraExibicaoTelefone` (prefixo, unicidade, normalização de null/undefined/placeholder/telefone real) e `adicionarSocio` (placeholder nunca vaza no retorno, telefone real é preservado, dois sócios sem telefone em chamadas separadas nunca colidem). Suíte `tests/cs-nps/` completa: 42/42 passando.
 
 ### Decisões tomadas
-- Reversão parcial e deliberada de uma decisão anterior documentada (Fase 3.6) — registrada em `decisions.md` com contexto completo para não repetir o debate.
-- Padrão de "sócio sem telefone = pendência local, não persiste como Pessoa" já existia implicitamente em `modalDados.tsx` (edição); esta mudança só estende o mesmo padrão para a tela de CRIAÇÃO do cliente, que antes bloqueava tudo via Zod.
+- Reversão parcial e deliberada de uma decisão anterior documentada (Fase 3.6) — registrada em `decisions.md` com o histórico completo das 2 iterações para não repetir o debate.
+- Migration real ficou pronta (backup + plano) mas não foi executada — se o usuário reconsiderar no futuro, o backup já existe e não precisa ser regerado se ainda estiver dentro de 48h.
+- Durante a sessão, identificados 3 commits automáticos ("Bug cs&nps", autoria do próprio usuário) criados por um hook/script externo enquanto a sessão avançava — usuário confirmou que é esperado (automação própria dele, não relacionada ao Bibble).
 
 ### Pendências
-- Teste manual via browser não executado nesta sessão (sem acesso fácil a login/dados reais no momento) — recomendado validar o fluxo completo (criar cliente sem telefone de sócio → aparece toast de aviso → cliente é criado → sócio pendente reaparece corretamente ao editar depois).
+- Teste manual via browser não executado nesta sessão (validado via tsc/eslint/build/testes automatizados) — recomendado validar visualmente: criar cliente com sócio sem telefone → toast de aviso → sócio aparece no Quadro de Sócios → editar depois e completar o telefone real.
 
 ### Refletido também em
-- `decisions.md`: nova entrada "Telefone do Sócio volta a ser opcional no cadastro de cliente (CS & NPS)".
+- `decisions.md`: entrada "Telefone do Sócio volta a ser opcional no cadastro de cliente (CS & NPS) — placeholder técnico, sem migration" (reescrita para refletir a decisão final).
 
 ---
 

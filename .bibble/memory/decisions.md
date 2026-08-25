@@ -1,19 +1,25 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
-### 2026-08-25 — Telefone do Sócio volta a ser opcional no cadastro de cliente (CS & NPS)
+### 2026-08-25 — Telefone do Sócio volta a ser opcional no cadastro de cliente (CS & NPS) — placeholder técnico, sem migration
 
 **Contexto:** A Fase 3.6 do Cliente Master (2026-08-14) tornou `telefone` obrigatório em `socioSchema` (`src/lib/validations/cs-nps.ts`) porque `Pessoa.celular` é `@unique` no schema e serve de chave de deduplicação global do sócio. Na prática isso bloqueava a criação do CLIENTE inteiro (`CadastrarCliente`) sempre que qualquer sócio preenchido não tivesse telefone à mão — usuário reportou que "impede a criação do cliente".
 
-**Decisão:** `telefone` volta a ser opcional no formulário/validação, mas **sem migration de banco** (opção escolhida explicitamente pelo usuário entre duas alternativas apresentadas: migration tornando `Pessoa.celular` nullable vs. fix só em aplicação). Sócio sem telefone é aceito e salvo nos dados do cliente, mas **não vira `Pessoa`/`PessoaClienteVinculo`** — evita colisão no `@unique` entre sócios de clientes diferentes que ficassem com celular vazio. Fica como pendência local, replicando o padrão que já existia em `modalDados.tsx` (edição de cliente existente) para o mesmo caso. O cadastro retorna `sociosSemTelefone` com os nomes pendentes; a UI mostra um toast de aviso (não bloqueante) informando quais sócios precisam ter o telefone completado depois.
+**Primeira tentativa (revertida no mesmo dia):** telefone opcional, mas sócio sem telefone NÃO virava `Pessoa`/vínculo — ficava como pendência puramente local, nunca persistido. Usuário testou e reportou "o sócio não permaneceu" (sumia ao reabrir o cliente) — comportamento tecnicamente correto pelo desenho, mas não era o que o usuário queria na prática.
 
-**Consequência aceita:** sócio sem telefone cadastrado na criação do cliente não aparece na lista de sócios vinculados (Quadro de Sócios) até o telefone ser preenchido — mesma limitação que já existia silenciosamente na tela de edição.
+**Decisão final:** apresentadas 2 opções (migration tornando `Pessoa.celular` nullable vs. placeholder técnico sem migration). Vault chegou a rodar o protocolo completo para a migration (backup gerado e verificado em `database-backups/pre-change/painelalpha_turso_pre_change_pessoa-celular-nullable_2026-08-25T14-37-16-286Z.sql`, plano de recriação de tabela apresentado) — **usuário decidiu pelo placeholder** antes da execução, então a migration NÃO foi aplicada (backup fica preservado, não atrapalha, política do projeto não remove backups de `pre-change/` automaticamente).
+
+Sócio sem telefone agora É persistido de verdade: `gerarTelefonePendente()` (`src/lib/validations/cs-nps.ts`) gera um valor único (`SEM-TELEFONE-{uuid}`) usado como `Pessoa.celular` só para satisfazer o `@unique` sem colidir entre sócios de clientes diferentes — nunca colide entre si por ser um UUID novo a cada chamada. Esse valor **nunca é exposto ao usuário**: todo ponto que devolve `pessoa.celular`/`socio.telefone` para UI, exportação Excel ou qualquer consumidor externo passa por `paraExibicaoTelefone()` (mesmo arquivo), que converte o placeholder de volta para string vazia antes de sair do backend — a UI nunca precisou aprender a reconhecer o placeholder.
+
+**Escopo real do impacto** (maior do que pareceu inicialmente — `Pessoa.celular` é lido em 6 pontos diferentes do sistema, não só no CS&NPS): `Clientes.ts` (`CadastrarCliente`, `adicionarSocio`, `atualizarSocio`, `buscarClientes`), `bpm/Empresas.ts`, `bpm/Cards.ts` (`ListarTelefonesCardBpm` — sócio com placeholder some da lista de telefones disponíveis pro card, correto, pois não filtra mais por string vazia e sim pelo resultado já normalizado), `cs-nps/exportar-dados.ts` (export Excel), `parceiros.ts` (`listarRepresentantesParceiro` — mesma tabela `Pessoa`, normalizado por segurança mesmo não sendo o fluxo pedido).
 
 **Arquivos alterados:**
-- `src/lib/validations/cs-nps.ts` — `socioSchema.telefone` de obrigatório (`min(8)`) para opcional (com validação de formato só quando preenchido)
-- `src/actions/Clientes.ts` — `CadastrarCliente` pula upsert de `Pessoa`/vínculo para sócio sem telefone e retorna `sociosSemTelefone`; `adicionarSocio` ganhou guarda explícita (telefone continua obrigatório para ESSA action específica, cujo único propósito é criar o vínculo de Pessoa)
-- `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx` — `handleFinalizar` exibe toast de aviso quando `res.sociosSemTelefone` vier preenchido
+- `src/lib/validations/cs-nps.ts` — `gerarTelefonePendente()`/`paraExibicaoTelefone()` novos; `socioSchema.telefone` opcional
+- `src/actions/Clientes.ts` — `CadastrarCliente`, `adicionarSocio`, `atualizarSocio` geram placeholder quando telefone vazio; `buscarClientes` normaliza na leitura
+- `src/actions/bpm/Empresas.ts`, `src/actions/bpm/Cards.ts`, `src/lib/cs-nps/exportar-dados.ts`, `src/actions/parceiros.ts` — normalizam `pessoa.celular` na leitura
+- `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modal.tsx` — toast de aviso ajustado ("salvo sem telefone", não mais "ainda não vinculado")
+- `src/app/PainelAlpha/CadastroClientes/ModalCadastro/modalDados.tsx` — removidas as 2 checagens client-side que bloqueavam salvar sócio sem telefone (comportamento agora tratado no backend)
 
-**Adicionado em:** 2026-08-25 por Bibble.
+**Adicionado em:** 2026-08-25 por Bibble/Vault/Echo.
 
 ### 2026-08-26 — RM-2026-05E75A — Bloco de contatos removido do card aberto (PainelAlpha/AlphaCRM)
 
