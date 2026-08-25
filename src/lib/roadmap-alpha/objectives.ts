@@ -60,6 +60,7 @@ export async function createRoadmapObjective(input: RoadmapObjectiveInput, creat
         constraints: input.constraints,
         acceptanceCriteriaJson: JSON.stringify(input.acceptanceCriteria),
         globalPriority: priority,
+        isNewModule: input.isNewModule,
         createdById,
       },
     });
@@ -190,6 +191,17 @@ export async function updateRoadmapObjective(objectiveId: string, input: Roadmap
   return db.$transaction(async (tx) => {
     const current = await tx.roadmapObjective.findUnique({ where: { id: objectiveId } });
     if (!current || current.archivedAt) throw new Error("OBJECTIVE_NOT_FOUND");
+    /**
+     * Objetivo de módulo novo nunca pode ser "movido" para outro módulo na
+     * edição — moduleKey dele é sempre o placeholder do módulo Roadmap Alpha
+     * em si (histórico da criação, ver CreateObjectiveDialog), não um módulo
+     * de destino real. Trocar isso corromperia o objetivo (o worker de
+     * documentação passaria a tratá-lo como ajuste de módulo existente em
+     * vez de criação de módulo novo, ver worker.ts).
+     */
+    if (current.isNewModule && input.moduleKey !== current.moduleKey) {
+      throw new Error("CANNOT_CHANGE_MODULE_OF_NEW_MODULE_OBJECTIVE");
+    }
     const materialChanged = current.moduleKey !== input.moduleKey
       || current.title !== input.title
       || current.description !== input.description

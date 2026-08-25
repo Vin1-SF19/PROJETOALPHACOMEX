@@ -57,6 +57,15 @@ export const roadmapObjectiveInputSchema = z
       .min(1)
       .max(50),
     globalPriority: z.number().int().min(1).max(9_999),
+    /**
+     * Marca objetivos que criam um MÓDULO NOVO do PainelAlpha (não um ajuste
+     * em módulo existente) — sinal estrutural persistido, nunca inferido do
+     * texto de `constraints` (esse texto é editável livremente pelo usuário,
+     * então não pode ser a fonte de verdade de algo que precisa sobreviver à
+     * edição). Setado explicitamente na criação via CreateObjectiveDialog
+     * (`novoModuloPreset`); imutável depois — não pode ser alterado na edição.
+     */
+    isNewModule: z.boolean().default(false),
   })
   .strict();
 

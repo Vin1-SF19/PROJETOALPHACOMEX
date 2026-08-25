@@ -66,10 +66,7 @@ import {
 import { Input } from "@/components/ui/input";
 import type { RoadmapModuleSnapshot } from "@/lib/roadmap-alpha/catalog";
 import type { RoadmapImproveField } from "@/lib/roadmap-alpha/improve-with-ai";
-import {
-  NOVO_MODULO_CONSTRAINTS,
-  isNovoModuloObjective,
-} from "@/lib/roadmap-alpha/new-module-preset";
+import { NOVO_MODULO_CONSTRAINTS } from "@/lib/roadmap-alpha/new-module-preset";
 import { RoadmapProductionPanel } from "@/components/RoadmapAlpha/RoadmapProductionPanel";
 import { SistemasExternosSection } from "@/components/RoadmapAlpha/SistemasExternosSection";
 
@@ -98,6 +95,7 @@ interface RoadmapObjectiveView {
   status: string;
   documentationStatus: string;
   sourceVersion: number;
+  isNewModule: boolean;
   developmentProvider: "claude" | "codex" | "ollama";
   acceptanceCriteria: string[];
   createdAt: string;
@@ -1232,6 +1230,7 @@ function CreateObjectiveDialog({
           .filter(Boolean),
         globalPriority: priority,
         developmentProvider,
+        isNewModule: novoModuloPreset,
       });
       if (!result.success) {
         toast.error(result.error);
@@ -1487,7 +1486,7 @@ function EditObjectiveDialog({
   const [developmentProvider, setDevelopmentProvider] = useState<
     "claude" | "codex" | "ollama"
   >(objective.developmentProvider);
-  const isNovoModulo = isNovoModuloObjective(objective.constraints);
+  const isNovoModulo = objective.isNewModule;
 
   function submit(event: React.FormEvent) {
     event.preventDefault();

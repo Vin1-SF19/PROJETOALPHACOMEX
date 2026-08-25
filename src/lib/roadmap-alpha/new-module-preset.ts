@@ -1,3 +1,10 @@
+/**
+ * Conteúdo padrão sugerido no campo "Restrições" ao criar um objetivo de
+ * módulo novo (CreateObjectiveDialog) — só um valor inicial editável, nunca
+ * mais usado para IDENTIFICAR se um objetivo é módulo novo (isso é o campo
+ * estrutural RoadmapObjective.isNewModule, persistido explicitamente na
+ * criação e nunca inferido de texto livre).
+ */
 export const NOVO_MODULO_CONSTRAINTS =
   "Este objetivo cria um MÓDULO NOVO do PainelAlpha (não é ajuste em módulo existente). " +
   "Antes de qualquer implementação, a squad deve seguir a checklist obrigatória de registro de módulo: " +
@@ -6,7 +13,3 @@ export const NOVO_MODULO_CONSTRAINTS =
   "(3) só depois criar a rota em src/app/PainelAlpha/[NomeDoModulo]/page.tsx, actions e componentes. " +
   "MODULOS_REGISTRY é a fonte única — não usar os 3 arrays manuais antigos (obsoletos). " +
   "A fase de documentação (Qwen) deve detalhar o propósito do módulo, dados que ele vai manipular e quem deve ter acesso, antes de qualquer fase de execução escrever código.";
-
-export function isNovoModuloObjective(constraints: string | null | undefined): boolean {
-  return constraints?.includes(NOVO_MODULO_CONSTRAINTS) ?? false;
-}

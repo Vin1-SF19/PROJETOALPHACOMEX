@@ -48,6 +48,11 @@ function publicError(error: unknown): string {
     return "Objetivo não encontrado";
   if (error instanceof Error && error.message === "MODULE_KEY_INVALID")
     return "Projeto desconhecido — selecione um projeto ou sistema externo válido";
+  if (
+    error instanceof Error &&
+    error.message === "CANNOT_CHANGE_MODULE_OF_NEW_MODULE_OBJECTIVE"
+  )
+    return "Este objetivo cria um módulo novo — não é possível associá-lo a um projeto existente";
   return "Não foi possível concluir a operação";
 }
 

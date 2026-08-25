@@ -3262,3 +3262,36 @@ Terceira tarefa distinta do dia sobre o Roadmap Alpha (depois da auditoria técn
 
 ### Refletido também em
 - `known-errors.md`: nova seção "React error #310 ('more hooks than previous render') em produção — `<Suspense>` desnecessário numa página `force-dynamic`", incluindo o padrão geral reconhecível para páginas futuras.
+
+---
+
+## [2026-08-25 15:17] — Campo isNewModule: identidade estrutural em vez de heurística de texto
+
+**Tags:** #bugfix #decision #integration
+
+**Agentes envolvidos:** Bibble, Scout, Vault, Forge, Anubis, Lens, Probe, Scribe, Kowalski
+
+**Arquivos tocados:** `prisma/schema.prisma`, `src/lib/roadmap-alpha/contracts.ts`, `src/lib/roadmap-alpha/objectives.ts`, `src/lib/roadmap-alpha/new-module-preset.ts`, `src/lib/roadmap-alpha/worker.ts`, `src/components/RoadmapAlpha/RoadmapDashboard.tsx`, `src/actions/RoadmapAlpha.ts`
+
+### Contexto
+Quarta tarefa distinta do dia sobre o Roadmap Alpha (depois da auditoria de 24 seções, da herança de progresso entre versões, e da correção do erro React #310) — mesmo sistema, quarto ângulo de trabalho diferente na mesma sessão longa. Usuário reportou que editar um objetivo criado via "Novo módulo" mostrava o campo "Projeto" com valor enganoso, em vez de ficar oculto.
+
+### O que foi feito
+- Causa raiz identificada: `isNovoModuloObjective(constraints)` determinava o tipo do objetivo checando se um texto mágico fixo sobrevivia intacto num campo de texto livre editável — quebrava assim que o usuário editava as restrições (uso normal, até incentivado pela própria UI).
+- Scout mapeou 2 consumidores da checagem antiga (não só a UI — também `worker.ts`, que decide o comportamento do Qwen ao documentar o objetivo).
+- **Primeira operação real de banco de produção autorizada formalmente nesta sessão** (Vault acionado): backup fresco gerado e validado (77,39 MB, 243 tabelas, contagem de linhas confirmada), migration `ADD COLUMN isNewModule` aplicada via script pontual `@libsql/client` no Turso `basetestes-alphacomex` (padrão já documentado — `prisma migrate` não alcança esse banco), backfill de exatamente 1 linha (RM-2026-999766), tudo verificado pós-execução.
+- Bibble implementou: schema Zod, `createRoadmapObjective` persistindo o campo, `updateRoadmapObjective` bloqueando troca de módulo quando `isNewModule === true`, `EditObjectiveDialog`/`CreateObjectiveDialog` atualizados, `worker.ts` migrado, função legada removida sem deixar órfãos.
+
+### Decisões tomadas
+- Campo estrutural persistido (`RoadmapObjective.isNewModule`), nunca inferido de conteúdo de texto — decisão registrada como padrão arquitetural geral em `integration-points.md`, para não repetir o mesmo antipadrão em outro lugar do sistema.
+- Campo imutável na edição por construção: o backend nunca escreve `isNewModule` a partir do input do usuário (só lê do banco) — fecha o vetor de um payload forjado tentar contornar a regra, mesmo que o schema Zod aceite o campo por herança.
+
+### Problemas encontrados / resolvidos
+- Hipótese inicial de Bibble estava **errada** e foi corrigida antes de implementar: supôs que `moduleKey="roadmap"` fosse um placeholder inválido que faria `updateRoadmapObjective` sempre falhar com `UNKNOWN_MODULE`. Ao ler `modulos-registry.ts` com atenção durante a implementação, descobriu que `"roadmap"` é o id real do próprio módulo Roadmap Alpha — valor válido no catálogo. O bug real era só a UI mostrar o campo indevidamente, não uma falha de validação no backend. Lição: verificar suposições sobre "valor inválido"/"placeholder" lendo o registro real antes de implementar a correção, mesmo quando a hipótese parece razoável e bem fundamentada no blueprint.
+
+### Pendências
+- Nenhuma nova — migration já em produção, código já commitável (pendente de push, não incluso automaticamente nesta sessão).
+
+### Refletido também em
+- `integration-points.md`: nova seção "Roadmap Alpha — identidade de 'objetivo de módulo novo' é campo estrutural, nunca inferida de texto livre" — padrão arquitetural geral.
+- `known-errors.md`: nova seção com sintoma, causa e fix específicos, incluindo o achado colateral sobre `moduleKey="roadmap"`.

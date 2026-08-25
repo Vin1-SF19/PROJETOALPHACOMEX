@@ -2113,3 +2113,15 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 **Evidência/estado operacional:** Forge 161/161, Probe com casos de render/busca e Lens PASS. O módulo consta no `HEAD`/`origin/main` `c2979beb6`, mas deploy não foi verificado; a correção final de precedência e seu teste reforçado ainda estão no working tree e dependem de DevOps autorizado para publicação.
 
 **Última atualização:** 2026-08-21 por Scribe
+
+## Roadmap Alpha — identidade de "objetivo de módulo novo" é campo estrutural, nunca inferida de texto livre (2026-08-25)
+
+**Padrão arquitetural a seguir em todo o projeto:** nunca inferir a identidade/tipo de um registro a partir do CONTEÚDO de um campo de texto livre editável pelo usuário — sempre que um registro precisa de um "tipo" ou "categoria" que outras partes do sistema dependem para tomar decisões (UI, workers, validação), esse tipo precisa ser um campo persistido explícito no schema, setado uma vez no momento da criação, nunca recalculado a partir de heurística de texto.
+
+**Caso real que motivou a regra:** `RoadmapObjective` tinha uma função `isNovoModuloObjective(constraints)` que determinava se um objetivo era "cria um módulo novo do PainelAlpha" checando se o campo `constraints` (texto livre) CONTINHA um texto mágico fixo. Isso quebrava assim que o usuário editava as restrições — uso legítimo e até incentivado pela própria UI ("Ajuste se necessário, mas não remova os passos de integração"). O sinal era consumido em 2 lugares distintos e desconectados: `EditObjectiveDialog` (decide se mostra o campo "Projeto") e `worker.ts` (decide o comportamento do Qwen ao documentar) — os dois quebravam juntos, silenciosamente, assim que o texto era editado.
+
+**Fix aplicado:** campo estrutural `RoadmapObjective.isNewModule Boolean @default(false)` (migration real em produção, ver `known-errors.md` para o passo a passo técnico). Setado explicitamente em `createRoadmapObjective` no momento da criação (vindo de `novoModuloPreset` da UI), nunca inferido depois. `updateRoadmapObjective` bloqueia estruturalmente qualquer tentativa de mudar `moduleKey` quando `current.isNewModule === true` — e o campo nunca é escrito a partir do input do usuário na edição (só lido do banco), fechando o vetor de um payload forjado tentar contornar a regra.
+
+**Onde verificar antes de reintroduzir esse antipadrão:** se um objetivo/registro futuro precisar de um "modo especial" que muda o comportamento de mais de um consumidor (UI + worker/backend), procure primeiro se já existe um campo estrutural — não crie uma segunda heurística baseada em conteúdo de texto/nome/formato. `grep` por `.includes(` sobre campos de texto livre é um bom jeito de achar candidatos a esse antipadrão já existentes no código.
+
+**Última atualização:** 2026-08-25 por Scribe

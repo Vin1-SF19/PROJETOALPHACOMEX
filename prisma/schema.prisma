@@ -192,6 +192,7 @@ model RoadmapObjective {
   status                 String  @default("ACTIVE")
   documentationStatus    String  @default("PENDING")
   sourceVersion          Int     @default(1)
+  isNewModule            Boolean @default(false)
 
   createdById Int
   createdBy   usuarios @relation(fields: [createdById], references: [id], onDelete: Restrict)

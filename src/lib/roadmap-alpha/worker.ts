@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import db from "@/lib/prisma";
 import { loadBibbleOrchestrationContext } from "@/lib/roadmap-alpha/bibble-protocol";
-import { isNovoModuloObjective } from "@/lib/roadmap-alpha/new-module-preset";
 import { purgeExpiredDeletedRoadmapObjectives } from "@/lib/roadmap-alpha/objectives";
 import { generateRoadmapManifest } from "@/lib/roadmap-alpha/qwen-generator";
 import { scanProjectContext } from "@/lib/roadmap-alpha/project-scanner";
@@ -156,7 +155,7 @@ export async function processNextRoadmapJob(
     ) as string[];
     const root = await resolveObjectiveRoot(job.objective.moduleKey);
     const projectContext = await scanProjectContext(root);
-    const isNewModule = isNovoModuloObjective(job.objective.constraints);
+    const isNewModule = job.objective.isNewModule;
     const { protocol: bibbleProtocol, agentCatalog } =
       await loadBibbleOrchestrationContext(root);
     const previousAttemptError =
