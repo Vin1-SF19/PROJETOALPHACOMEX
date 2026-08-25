@@ -4,7 +4,7 @@ import type { TimelineEvent } from '../types';
 export async function extractComissoesEvents(clientId: number): Promise<TimelineEvent[]> {
   try {
     const events = await db.commissionEvent.findMany({
-      where: { clienteId },
+      where: { clienteId: clientId },
       select: {
         id: true,
         eventType: true,

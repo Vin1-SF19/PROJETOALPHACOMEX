@@ -4,7 +4,7 @@ import type { TimelineEvent } from '../types';
 export async function extractMetasEvents(clientId: number): Promise<TimelineEvent[]> {
   try {
     const contratos = await db.contratoComercial.findMany({
-      where: { clienteId },
+      where: { clienteId: clientId },
       select: {
         id: true,
         servico: true,

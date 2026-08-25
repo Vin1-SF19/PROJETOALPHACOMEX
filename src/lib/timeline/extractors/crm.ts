@@ -7,10 +7,9 @@ const MODULE_LABEL = 'Alpha CRM';
 export async function extractCrmEvents(clienteId: number): Promise<TimelineEvent[]> {
   try {
     const cards = await db.bpmCard.findMany({
-      where: { clienteId },
+      where: { empresaId: clienteId },
       select: {
         id: true,
-        titulo: true,
         status: true,
         servico: true,
         createdAt: true,
@@ -34,7 +33,7 @@ export async function extractCrmEvents(clienteId: number): Promise<TimelineEvent
         timestamp: card.createdAt.toISOString(),
         module: MODULE,
         moduleLabel: MODULE_LABEL,
-        title: `Card criado — ${card.titulo}`,
+        title: `Card criado — ${card.servico ?? 'Sem serviço'}`,
         description: `Pipeline: ${card.pipeline?.nome ?? 'N/D'} | Etapa: ${card.etapa?.nome ?? 'N/D'} | Status: ${card.status}`,
         actor: card.responsavel?.nome,
         metadata: { servico: card.servico ?? undefined, pipeline: card.pipeline?.nome, etapa: card.etapa?.nome, status: card.status },
@@ -47,7 +46,7 @@ export async function extractCrmEvents(clienteId: number): Promise<TimelineEvent
           timestamp: h.createdAt.toISOString(),
           module: MODULE,
           moduleLabel: MODULE_LABEL,
-          title: `${h.acao} — ${card.titulo}`,
+          title: `${h.acao} — ${card.servico ?? 'Sem serviço'}`,
           description: `Ação: ${h.acao}`,
           actor: h.usuario?.nome,
           metadata: { cardId: card.id, acao: h.acao },
