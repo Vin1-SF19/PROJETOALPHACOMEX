@@ -1,5 +1,25 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — Relatório de conclusão do Kowalski (modal read-only por objetivo)
+
+**Contexto:** usuário pediu que o relatório final de cada objetivo do Roadmap (hoje só narrado em `.bibble/memory/journal.md`) ficasse visível como artefato de produto na própria UI — um botão dentro do "Detalhes" (Sheet, `RoadmapImplementationRoom.tsx`) da fase do Kowalski, que abre um modal somente-leitura com o Markdown completo + botão de copiar. Só vale para objetivos futuros (não retroativo aos 2 já concluídos nesta sessão).
+
+**Modelo de dados:** 2 campos aditivos em `RoadmapObjective` (`completionReportMarkdown String?`, `completionReportGeneratedAt DateTime?`) — decisão de manter simples (1 relatório vigente por objetivo, sobrescrito se reexecutado), sem model dedicado de histórico. Migration aplicada via protocolo Vault completo.
+
+**Por que não reaproveitar `resultSummary`:** o campo já existente em `RoadmapProductionRun` é por-fase (não por-objetivo) e limitado a 4000 caracteres pela tool MCP `roadmap_marcar_fase_concluida` — insuficiente para um relatório completo e seria abuso semântico do campo.
+
+**Backend novo:** rota `POST /api/roadmap/production/objectives/[objectiveId]/completion-report`, método `setCompletionReport` no client MCP, tool `roadmap_registrar_relatorio_conclusao` (sem limite de 4000, teto de sanidade 200k chars), Server Action `ObterRelatorioConclusaoRoadmap`.
+
+**Frontend novo:** `RoadmapCompletionReportDialog.tsx` — mesmo padrão visual de `AccessDialog` (Dialog shadcn) e mesmo padrão de renderização Markdown já usado em `RoadmapDashboard.tsx` para `artifact.contentMarkdown` (`ReactMarkdown` + `remarkGfm` + classes `prose prose-invert`). Botão "Ver relatório de conclusão" em `RoadmapImplementationRoom.tsx`, visível só quando `objective.completionReportAvailable === true` (sinalizador leve — a query da fila só traz `completionReportGeneratedAt`, não o Markdown inteiro, para não pesar a listagem).
+
+**Achado de qualidade corrigido:** `setState` síncrono dentro do corpo do `useEffect` de fetch violava a regra `react-hooks/set-state-in-effect` do eslint — corrigido envolvendo em `window.setTimeout(..., 0)`, mesmo padrão já usado em `RoadmapImplementationRoom.tsx` para o mesmo tipo de fetch-on-open.
+
+**Como o comportamento é ativado daqui pra frente:** não há template de código para a Fase 11 (o `.md` de cada objetivo é gerado dinamicamente pelo Qwen, específico por objetivo) — a chamada da tool nova é uma instrução que Claude (eu) segue por conta própria ao executar a Fase 11 de objetivos futuros, registrada em memória de sessão (não em arquivo de código).
+
+**Validação:** `tsc`/`eslint` limpos (zero erros relacionados a Roadmap; erros pré-existentes de `google-calendar`/`CalendarioAlpha` são de processo concorrente, confirmados via `git status` como não tocados por mim), `npm run build` completo exit 0 com a rota nova e `/PainelAlpha/Parceiros/Relacionamento` presentes no manifest. Verificação visual via browser não foi possível — sistema sob contenção pesada de memória (dev server principal consumindo 5+GB) impediu subir um segundo servidor de preview; documentado em known-errors.md, não fabricado como testado.
+
+**Adicionado em:** 2026-08-26 por Bibble/Vault (execução direta, migration aplicada com confirmação explícita do usuário).
+
 ### 2026-08-26 — RM-2026-2C7A4B — Kanban de Relacionamento de Parceiros (8º estágio, máquina de estados, próxima ação real)
 
 **Contexto:** objetivo "Implementar pipeline de relacionamento de parceiros no Painel Alpha reutilizando e adaptando o BPM/CRM existente" — segundo objetivo executado via chat/MCP nesta sessão. A Fase 0 (auditoria) confirmou que 7 dos 8 estados pedidos já existiam em `Parceiro.estagioDesenvolvimento`, mas revelou 3 lacunas reais: (1) "Em Reativação" não existia como estado, `ReativarParceiro` pulava direto para o destino final; (2) `RECORRENTE` não tinha nenhuma automação/action que o produzisse; (3) "próxima ação" para `Parceiro` era hardcode `null`, sem campo nem UI; (4) não havia Kanban visual para o estágio (só badge de texto na tela 360º).

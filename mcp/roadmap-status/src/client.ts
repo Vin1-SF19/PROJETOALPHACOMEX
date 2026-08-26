@@ -86,6 +86,13 @@ export class RoadmapApiClient {
       body: JSON.stringify({ phaseNumber, assignee }),
     });
   }
+
+  setCompletionReport(objectiveId: string, reportMarkdown: string) {
+    return this.request(`/objectives/${encodeURIComponent(objectiveId)}/completion-report`, {
+      method: "POST",
+      body: JSON.stringify({ reportMarkdown }),
+    });
+  }
 }
 
 export const roadmapApiClient = new RoadmapApiClient(BASE_URL, TOKEN);

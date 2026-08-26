@@ -5,6 +5,14 @@
 
 ---
 
+### Sistema sob contenção pesada de memória (dev server ativo, 5+GB) impede iniciar um segundo dev server para verificação visual
+**Sintoma:** com um `next dev` já rodando e consumindo 5-6GB de memória (mesmo cenário de lentidão extrema de `tsc`/`build` já catalogado abaixo), tentar `preview_start` de um segundo servidor de dev (para verificação visual via browser) retorna `serverId` válido mas a porta nunca fica acessível — `navigate` falha consistentemente com "denied or failed", `preview_logs`/`preview_stop` reportam `serverId not found` logo em seguida (o processo morre ou nunca sobe de verdade).
+**Causa raiz:** memória física insuficiente para rodar 2 processos Next.js dev simultâneos neste sistema — o segundo processo falha ao inicializar (provavelmente OOM silencioso ou timeout de compilação inicial do Turbopack).
+**Fix:** não insistir em abrir um segundo dev server para verificação visual quando o sistema já está sob a contenção documentada (dev server principal consumindo 5+GB). Nessas condições, considerar a validação de código (`tsc`/`eslint`/`npm run build` de produção, todos passando) suficiente e reportar ao usuário que a verificação visual ficou pendente por causa da carga do sistema — não fabricar nem assumir que a UI renderiza corretamente sem prova real.
+**Adicionado em:** 2026-08-26 (Bibble, feature de relatório de conclusão do Kowalski)
+
+---
+
 ### `npm run build | tail -N` em background: pipe pode "morrer" silenciosamente (0 bytes no log) enquanto o processo real continua vivo por 50+ minutos
 **Sintoma:** `npm run build 2>&1 | tail -150` rodado em background retornou 0 bytes de output por mais de 50 minutos, sem nenhum processo `next build` aparente em `Get-CimInstance Win32_Process` numa checagem pontual — parecia que o processo tinha morrido sem deixar rastro. Relançar um segundo `npm run build` nesse meio tempo falhou com `Unable to acquire lock at .next/lock, is another instance of next build running?` — provando que o PRIMEIRO processo (`next build`, PID diferente do `npm run build` que o gerou) estava vivo o tempo todo, só invisível para o monitoramento porque (a) a checagem de processos por `CommandLine like '*next*build*'` não pegou o processo filho real do Turbopack em algum momento, e (b) o pipe `| tail` para um arquivo de log em background pode não fazer flush/aparecer até o comando inteiro terminar, mesmo com dados sendo gerados.
 **Causa raiz:** este projeto tem uma etapa extra antes do `next build` de verdade — `npm run build` = `prisma generate && npm run build:player && next build` (o `build:player` empacota um bundle JS/CSS de ~5MB via `scripts/build-apresentacoes-player.mjs`). Isso soma tempo real ao processo total, e o processo `next build` real (filho) pode não aparecer imediatamente nas primeiras checagens de processo — foi preciso olhar `Get-CimInstance Win32_Process` repetidamente até achar o PID certo com CPU/memória crescente.

@@ -44,6 +44,7 @@ interface RunView {
     title: string;
     moduleKey: string;
     moduleLabelSnapshot: string;
+    completionReportAvailable: boolean;
   };
   artifact: { phaseNumber: number; title: string; kind: string; relativePath: string | null } | null;
 }

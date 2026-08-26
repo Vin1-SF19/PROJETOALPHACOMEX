@@ -73,6 +73,7 @@ async function authorName(userId: number): Promise<string> {
 function serializeQueueRun(
   run: Awaited<ReturnType<typeof listRoadmapProductionQueue>>[number],
 ) {
+  const { completionReportGeneratedAt, ...objectiveRest } = run.objective;
   return {
     id: run.id,
     status: run.status,
@@ -82,7 +83,7 @@ function serializeQueueRun(
     resultSummary: run.resultSummary,
     errorCode: run.errorCode,
     updatedAt: run.updatedAt.toISOString(),
-    objective: run.objective,
+    objective: { ...objectiveRest, completionReportAvailable: completionReportGeneratedAt !== null },
     artifact: run.artifact,
   };
 }
@@ -123,6 +124,36 @@ export async function ObterFaseRoadmapProduction(runId: unknown) {
     const id = runIdSchema.parse(runId);
     const run = await getRoadmapProductionRunDetail(id);
     return { success: true as const, run };
+  } catch (error) {
+    return { success: false as const, error: publicError(error) };
+  }
+}
+
+/** Relatório de conclusão completo (Markdown) — modal read-only na UI de Produção. */
+export async function ObterRelatorioConclusaoRoadmap(objectiveId: unknown) {
+  try {
+    await requireRoadmapProductionAccess();
+    const id = z.string().min(1).max(240).parse(objectiveId);
+    const objective = await db.roadmapObjective.findUnique({
+      where: { id },
+      select: {
+        code: true,
+        title: true,
+        completionReportMarkdown: true,
+        completionReportGeneratedAt: true,
+      },
+    });
+    if (!objective) return { success: false as const, error: "Objetivo não encontrado" };
+    if (!objective.completionReportMarkdown) {
+      return { success: false as const, error: "Relatório de conclusão ainda não disponível" };
+    }
+    return {
+      success: true as const,
+      code: objective.code,
+      title: objective.title,
+      reportMarkdown: objective.completionReportMarkdown,
+      generatedAt: objective.completionReportGeneratedAt?.toISOString() ?? null,
+    };
   } catch (error) {
     return { success: false as const, error: publicError(error) };
   }

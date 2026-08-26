@@ -39,7 +39,16 @@ export async function listRoadmapProductionQueue(filter: {
     },
     include: {
       objective: {
-        select: { id: true, code: true, title: true, moduleKey: true, moduleLabelSnapshot: true },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          moduleKey: true,
+          moduleLabelSnapshot: true,
+          // Só a data (não o Markdown inteiro, que pode ser grande) — suficiente para a UI
+          // decidir se mostra o botão "Ver relatório de conclusão".
+          completionReportGeneratedAt: true,
+        },
       },
       artifact: {
         select: { phaseNumber: true, title: true, kind: true, relativePath: true },
@@ -244,5 +253,29 @@ export async function createRoadmapProductionRun(
       assignee,
       createdById,
     },
+  });
+}
+
+/**
+ * Grava o relatório de conclusão completo (Markdown) de um objetivo — chamado na fase de
+ * arquivamento (Kowalski), sem o limite de 4000 caracteres de RoadmapProductionRun.resultSummary.
+ * Sobrescreve um relatório anterior se o objetivo for reexecutado/reaberto (1 relatório vigente
+ * por objetivo, sem histórico de versões).
+ */
+export async function setRoadmapObjectiveCompletionReport(
+  objectiveId: string,
+  reportMarkdown: string,
+) {
+  const objective = await db.roadmapObjective.findUnique({
+    where: { id: objectiveId },
+    select: { id: true },
+  });
+  if (!objective) {
+    throw new RoadmapProductionOperationError(404, "OBJECTIVE_NOT_FOUND", "Objetivo não encontrado.");
+  }
+  return db.roadmapObjective.update({
+    where: { id: objectiveId },
+    data: { completionReportMarkdown: reportMarkdown, completionReportGeneratedAt: new Date() },
+    select: { id: true, completionReportGeneratedAt: true },
   });
 }

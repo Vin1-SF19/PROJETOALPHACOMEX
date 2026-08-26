@@ -98,4 +98,16 @@ export const roadmapTools = [
     execute: (args: { objectiveId: string; phaseNumber: number; assignee: string }) =>
       roadmapApiClient.createRun(args.objectiveId, args.phaseNumber, args.assignee),
   },
+  {
+    name: "roadmap_registrar_relatorio_conclusao",
+    title: "Registrar relatório de conclusão do objetivo",
+    description:
+      "Grava o relatório Markdown completo de conclusão de um objetivo (chamado na fase de arquivamento/Kowalski, sem o limite de 4000 caracteres do resultSummary de fase). Sobrescreve o relatório anterior se o objetivo for reexecutado.",
+    inputSchema: {
+      objectiveId: z.string().min(1),
+      reportMarkdown: z.string().min(1).max(200_000),
+    },
+    execute: (args: { objectiveId: string; reportMarkdown: string }) =>
+      roadmapApiClient.setCompletionReport(args.objectiveId, args.reportMarkdown),
+  },
 ] as const;

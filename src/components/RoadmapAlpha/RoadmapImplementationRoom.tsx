@@ -5,6 +5,7 @@ import {
   Bot,
   CheckCircle2,
   CirclePlay,
+  FileText,
   HelpCircle,
   Loader2,
   MessageSquareText,
@@ -26,6 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { RoadmapCompletionReportDialog } from "@/components/RoadmapAlpha/RoadmapCompletionReportDialog";
 
 export interface RoadmapProductionEventView {
   id: string;
@@ -42,7 +44,7 @@ export interface RoadmapImplementationRoomRun {
   id: string;
   status: string;
   assignee: string;
-  objective: { code: string; title: string };
+  objective: { id: string; code: string; title: string; completionReportAvailable?: boolean };
   artifact: { phaseNumber: number; title: string } | null;
 }
 
@@ -95,6 +97,7 @@ export function RoadmapImplementationRoom({
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState("");
   const [pending, startTransition] = useTransition();
+  const [reportOpen, setReportOpen] = useState(false);
 
   const loadEvents = useMemo(
     () => async (runId: string) => {
@@ -177,11 +180,21 @@ export function RoadmapImplementationRoom({
                   {run.artifact.title}
                 </span>
               )}
+              {run.objective.completionReportAvailable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto border-white/10 text-slate-300 hover:bg-white/10"
+                  onClick={() => setReportOpen(true)}
+                >
+                  <FileText className="size-4" /> Ver relatório de conclusão
+                </Button>
+              )}
               {canManage && run.status === "AWAITING_APPROVAL" && (
                 <Button
                   size="sm"
                   disabled={pending}
-                  className="ml-auto bg-emerald-500 hover:bg-emerald-400"
+                  className={`bg-emerald-500 hover:bg-emerald-400 ${run.objective.completionReportAvailable ? "" : "ml-auto"}`}
                   onClick={() => void approve()}
                 >
                   <CirclePlay className="size-4" /> Aprovar
@@ -190,6 +203,12 @@ export function RoadmapImplementationRoom({
             </div>
           )}
         </SheetHeader>
+
+        <RoadmapCompletionReportDialog
+          objectiveId={run?.objective.id ?? null}
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+        />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           {loading && (
