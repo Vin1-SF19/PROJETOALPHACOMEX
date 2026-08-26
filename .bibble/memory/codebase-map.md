@@ -2,7 +2,20 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-26 (Parceiros — Kanban de Relacionamento/Desenvolvimento)
+> Última atualização: 2026-08-26 (Parceiros — Card de Aquisição alinhado ao padrão do CRM)
+
+---
+
+## Parceiros — Card de Aquisição alinhado ao padrão visual do CRM (2026-08-26, RM-2026-3F263C)
+
+- **Arquivo tocado:** `src/components/Parceiros/Aquisicao/AquisicaoParceirosClient.tsx` (único arquivo — sem novo componente, sem novo arquivo).
+- **Card do Kanban de Aquisição** (dentro de `KanbanColuna`) passou a reaproveitar `GradientBlobCard` (`src/components/ui/gradient-blob-card.tsx`) como shell — mesmo componente já usado pelo `KanbanCard` do Alpha CRM (`PipelineBoardClient.tsx`). Antes era um `<button>` com `style` inline duplicando visual parecido.
+- **Estrutura do card** (ordem): avatar/inicial do lead + nome + segmento/UF → divisor `border-t border-white/[0.06]` → potencial (estrelas, `PotencialBadge`) + badge de urgência da próxima ação (`BadgeProximaAcao`) → responsável (se houver).
+- **Badge de urgência novo:** `calcularUrgenciaProximaAcao`/`BADGE_URGENCIA_CLASSNAME`/`BadgeProximaAcao` — cópia adaptada do algoritmo já em produção no CRM (`calcularUrgenciaProximoContato`, `PipelineBoardClient.tsx`), 3 estados por cor (ATRASADO vermelho, HOJE âmbar, FUTURO verde), comparação de data fixada em `America/Sao_Paulo`.
+- **Deliberadamente NÃO trazido do CRM** (fora do escopo confirmado pelo usuário): drag-and-drop (`@dnd-kit` — o Kanban de Aquisição continua usando o padrão clique→dialog→seletor, que é o mesmo padrão real que o próprio Kanban do CRM usa por trás da aparência, apesar de ter `@dnd-kit` instalado), contagem de tarefas/anexos, bloco de métricas "novos leads" — nenhum tem equivalente no domínio de Aquisição.
+- **Dependência de design system:** `GradientBlobCard` já documentado como shell padrão de card de Kanban do painel — este é o segundo Kanban a usá-lo (CRM e agora Aquisição de Parceiros), reforçando-o como o token de card de Kanban do projeto.
+
+**Última atualização:** 2026-08-26 por Scribe
 
 ---
 
