@@ -105,4 +105,27 @@ describe("Fase 08 — regressão: criarIndicacao permite múltiplas indicações
     expect(criarCardBpmMock).not.toHaveBeenCalled();
     expect(prismaMock.indicacao.create).not.toHaveBeenCalled();
   });
+
+  it("rejeita cadastrar empresa nova quando o CNPJ já existe (checagem antes de acionar o BPM)", async () => {
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 999 });
+    const r = await criarIndicacao({
+      parceiroId: 16,
+      novaEmpresa: { cnpj: "12.345.678/0001-90", razaoSocial: "Empresa Duplicada Ltda" },
+      servicoIndicado: "TTD 409",
+    });
+    expect(r.success).toBe(false);
+    expect(prismaMock.cliente.findUnique).toHaveBeenCalledWith({ where: { cnpj: "12345678000190" }, select: { id: true } });
+    expect(criarCardBpmMock).not.toHaveBeenCalled();
+    expect(prismaMock.indicacao.create).not.toHaveBeenCalled();
+  });
+
+  it("propaga o erro do BPM sem criar a Indicacao quando CriarCardBpm falha", async () => {
+    prismaMock.indicacao.findFirst.mockResolvedValue(null);
+    criarCardBpmMock.mockResolvedValue({ success: false, error: "Responsável inválido para este pipeline." });
+    const r = await criarIndicacao({ parceiroId: 17, clienteId: 504, servicoIndicado: "TTD 409" });
+    expect(r.success).toBe(false);
+    expect(r).toMatchObject({ error: "Responsável inválido para este pipeline." });
+    expect(prismaMock.indicacao.create).not.toHaveBeenCalled();
+    expect(direcionarAutomaticoMock).not.toHaveBeenCalled();
+  });
 });

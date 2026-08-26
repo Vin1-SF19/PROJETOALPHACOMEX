@@ -1,5 +1,26 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — RM-2026-97934A — Formulário de indicação de cliente com serviço + posicionamento automático no pipeline
+
+**Contexto:** módulo Parceiros → `ModalNovaIndicacao.tsx`. Objetivo pedia vincular parceiro a "empresa indicada" e "produto/serviço", com "posicionamento automático no pipeline". A Fase 0 (auditoria) achou 3 lacunas reais: (1) modal só permitia vincular empresa já existente no CS&NPS; (2) não existia campo de serviço na indicação; (3) `DirecionarIndicacaoParaCloser` (cria o `BpmCard`) existia mas era código morto de UI — nenhum botão o invocava.
+
+**Decisões de escopo confirmadas com o usuário (AskUserQuestion):**
+1. Permitir cadastro de empresa nova inline no modal (reaproveitando `CriarCardBpm({ novaEmpresa })`, que já suportava esse caminho mas nenhuma UI usava).
+2. Reaproveitar o catálogo de serviços do Alpha Metas (`SERVICOS_COMERCIAIS_PADRAO` de `src/lib/comercial/servicos.ts` + `getServicosComerciais()` de `src/actions/ContratoComercial.ts`, mesmo merge de `ModalGerenciamentoLeads.tsx`) em vez de criar uma lista nova — texto livre, nunca foi enum real no projeto (mesmo padrão de `BpmCard.servico`/`ContratoComercial.servico`).
+3. Automatizar 100% a criação do card BPM — sem campo de responsável no formulário. Como `BpmCard.responsavelId` é obrigatório e não havia conceito de "responsável padrão", criada `resolverResponsavelAutomaticoBpm(pipelineId, preferidoUserId?)` em `src/lib/bpm/ownership.ts`: prioriza o criador da indicação se elegível, senão o primeiro usuário ativo elegível do pipeline (determinístico por `id asc`).
+
+**Mudança de schema (Vault, aditiva):** `Indicacao.servicoIndicado String?` — nenhuma outra alteração de schema necessária (`BpmCard.servico` já existia).
+
+**Fusão de fluxo:** `criarIndicacao` (antes só criava o vínculo) e `DirecionarIndicacaoParaCloser` (antes manual, sem UI) foram fundidos — `criarIndicacao` agora cria a `Indicacao` E já cria o `BpmCard` na mesma operação lógica, responsável auto-resolvido. `DirecionarIndicacaoParaCloser` foi mantida intacta (não deletada) por precaução, mas confirmado que não tem nenhum caller — puro código morto preservado.
+
+**`CriarCardBpm` ganhou parâmetro `servico` opcional:** antes sempre derivava `servico` do nome do pipeline; agora aceita um valor explícito do caller (usado pela indicação), com fallback ao nome do pipeline nos demais fluxos do BPM — não quebra nenhum caller existente.
+
+**Descoberta de infraestrutura:** durante o fechamento desta fase, constatado que o commit desta feature (9 arquivos: schema, migration, 5 arquivos de código, 2 de teste) já havia sido feito e enviado ao remoto pela sessão concorrente que também mexia no mesmo working directory (commit `9c17df86b "Melhorias roadmap"`, misturado com mudanças de `CalendarioAlpha`) — confirmado via `git diff HEAD` = 0 linhas de diferença (sem corrupção) e `git log origin/main..HEAD` = 0 (já sincronizado). Ver `feedback_commit_concorrente_working_dir.md`.
+
+**Validação:** `tsc`/`eslint` limpos no escopo; `npm run build` de produção OK (EXIT 0); testes unitários (8/8) cobrindo caminho feliz, empresa nova, CNPJ duplicado, indicação já ativa, sem responsável elegível, e falha do BPM sem estado parcial. Verificação visual via browser autenticado não foi possível (sem credenciais de teste) — compensado por testes com mocks fiéis + confirmação de schema aplicado em produção.
+
+---
+
 ### 2026-08-26 — RM-2026-3F263C — Card de Aquisição de Parceiros alinhado ao padrão visual do CRM
 
 **Contexto:** objetivo "Alterar layout do card do formulário de aquisição de parceiros" — terceiro objetivo executado via chat/MCP nesta sessão, o primeiro puramente visual (sem schema/backend). A Fase 0 (auditoria) comparou o card do Kanban de Aquisição de Parceiros com o card do Kanban do Alpha CRM e confirmou divergência estrutural real: o card de Aquisição reimplementava visual parecido com `style` inline em vez de reaproveitar `GradientBlobCard` (já existente e documentado, usado pelo CRM).

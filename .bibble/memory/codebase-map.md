@@ -2,7 +2,21 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-26 (Parceiros — Card de Aquisição alinhado ao padrão do CRM)
+> Última atualização: 2026-08-26 (Parceiros — Indicação com serviço + posicionamento automático no pipeline)
+
+---
+
+## Parceiros — Indicação com serviço + posicionamento automático no pipeline (2026-08-26, RM-2026-97934A)
+
+- **`src/actions/parceiros.ts` → `criarIndicacao`:** assinatura mudou de `(parceiroId, clienteId)` para `(input: { parceiroId, clienteId? | novaEmpresa?, servicoIndicado })`. Agora cria a `Indicacao` E já direciona ao closer automaticamente na mesma operação (antes eram 2 passos: `criarIndicacao` + `DirecionarIndicacaoParaCloser` manual, que nunca tinha botão de UI). Usa dynamic import de `./parceiros-indicacoes`, `@/lib/bpm/ownership` e `./bpm/Cards` para evitar ciclo de import.
+- **`src/lib/bpm/ownership.ts` → `resolverResponsavelAutomaticoBpm(pipelineId, preferidoUserId?)`:** novo helper para atribuir responsável de um `BpmCard` sem exigir escolha manual. Preferência: `preferidoUserId` se elegível (via `usuarioElegivelResponsavelBpm`); fallback: primeiro usuário ativo elegível do pipeline, determinístico por `id asc`. Retorna `null` se ninguém for elegível — chamador deve tratar como erro de configuração (não criar card sem responsável).
+- **`src/actions/bpm/Cards.ts` → `CriarCardBpm`:** aceita `servico?: string` no payload (via `criarCardSchema` em `src/lib/validations/bpm.ts`). Quando informado, usa esse valor; senão mantém o fallback histórico (nome do pipeline de destino). Não quebra nenhum caller existente do BPM.
+- **`src/actions/parceiros-indicacoes.ts`:** `obterEtapaNovosLeadsPipelineIndicacoes` agora exportada (antes privada). Nova `direcionarIndicacaoParaCloserAutomatico` — só grava o histórico do parceiro (`ParceiroHistorico`), já que o `BpmCard`/`Indicacao.bpmCardId` são resolvidos por `criarIndicacao`. `DirecionarIndicacaoParaCloser` (fluxo manual original) mantida intacta mas confirmada como código morto (zero callers).
+- **`Indicacao.servicoIndicado` (String?, aditivo):** produto/serviço indicado, texto livre — reaproveita o catálogo `SERVICOS_COMERCIAIS_PADRAO` (`src/lib/comercial/servicos.ts`) + `getServicosComerciais()` (`src/actions/ContratoComercial.ts`), mesmo merge usado em `ModalGerenciamentoLeads.tsx` (Alpha Metas). Nunca foi/é enum real no projeto — mesmo padrão de `BpmCard.servico`/`ContratoComercial.servico`.
+- **`src/components/Parceiros/ModalNovaIndicacao.tsx`:** ganhou toggle "empresa existente / cadastrar nova" (CNPJ/razão social/nome fantasia/UF/município, reaproveitando o schema `novaEmpresaCardSchema` do BPM) e campo "3. Serviço indicado" (select). Interface pública do componente (`open`/`onClose`/`onDone`/`accent`) preservada — já integrado em `ParceirosClient.tsx:600`, botão de entrada em `ParceirosClient.tsx:482`.
+- **Padrão de auto-atribuição de responsável:** primeiro uso deste padrão no projeto (nenhum outro fluxo do BPM tinha atribuição automática antes — sempre exigia escolha manual). Se outro módulo precisar de "criar card sem pedir responsável", reaproveitar `resolverResponsavelAutomaticoBpm` em vez de reimplementar.
+
+**Última atualização:** 2026-08-26 por Scribe
 
 ---
 
