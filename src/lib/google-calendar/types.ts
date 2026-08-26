@@ -31,6 +31,14 @@ export interface GoogleEventoDataDTO {
   timezone?: string;
 }
 
+export type GoogleEventType =
+  | "default"
+  | "focusTime"
+  | "outOfOffice"
+  | "workingLocation"
+  | "birthday"
+  | "fromGmail";
+
 export interface GoogleEventoDTO {
   googleEventId: string;
   status: "confirmed" | "tentative" | "cancelled";
@@ -48,6 +56,9 @@ export interface GoogleEventoDTO {
   etag: string;
   atualizadoEm: string;
   visibilidade: "default" | "public" | "private" | "confidential";
+  eventType: GoogleEventType;
+  /** Propriedades de status serializadas para o cache; o Google segue sendo a fonte de verdade. */
+  statusPropertiesJson: string | null;
 }
 
 export interface ResultadoPaginaEventos {
@@ -79,4 +90,5 @@ export interface CriarOuAtualizarEventoInput {
   fim: Date;
   participantes: string[];
   criarMeet: boolean;
+  eventType?: Extract<GoogleEventType, "default" | "focusTime" | "outOfOffice" | "workingLocation">;
 }

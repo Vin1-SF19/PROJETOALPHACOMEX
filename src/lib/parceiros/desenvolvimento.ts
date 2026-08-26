@@ -26,9 +26,51 @@ export const ESTAGIOS_DESENVOLVIMENTO = [
   "ATIVO",
   "RECORRENTE",
   "INATIVO",
+  "EM_REATIVACAO",
 ] as const;
 
 export type EstagioDesenvolvimento = (typeof ESTAGIOS_DESENVOLVIMENTO)[number];
+
+// Sequência linear "produtiva" do Kanban (RM-2026-2C7A4B) — usada só para decidir se um
+// avanço manual de 1 posição é permitido. INATIVO/EM_REATIVACAO ficam FORA da sequência
+// (mesmo espírito de SAIDAS_LATERAIS no Kanban de Aquisição): saem/entram por regra própria,
+// não por posição numérica.
+const SEQUENCIA_ESTAGIOS_PRODUTIVOS: EstagioDesenvolvimento[] = [
+  "NOVO",
+  "EM_ATIVACAO",
+  "ATIVADO_SEM_INDICACAO",
+  "PRIMEIRA_INDICACAO",
+  "ATIVO",
+  "RECORRENTE",
+];
+
+/**
+ * Valida se um movimento manual no Kanban de Desenvolvimento é permitido — adaptado de
+ * `podeMoverPara` (Kanban de Aquisição, `parceiros-aquisicao.ts`). Regras:
+ * - Dentro da sequência produtiva: avança 1 posição, ou corrige livremente para trás.
+ * - INATIVO → EM_REATIVACAO: única saída manual permitida a partir de INATIVO.
+ * - EM_REATIVACAO → qualquer estágio produtivo: reingresso manual livre (mesmo espírito de
+ *   "retomar de uma saída lateral" no Kanban de Aquisição).
+ * - Nenhum estágio produtivo pode ir direto para INATIVO manualmente (isso é sempre automático,
+ *   via `executarJobDesenvolvimentoParceiros` — não é decisão de clique humano).
+ */
+export function podeMoverEstagioParceiro(atual: EstagioDesenvolvimento, destino: EstagioDesenvolvimento): boolean {
+  if (atual === destino) return false;
+  if (destino === "INATIVO") return false; // só automático (job de inatividade)
+
+  if (atual === "INATIVO") return destino === "EM_REATIVACAO";
+
+  if (atual === "EM_REATIVACAO") {
+    return (SEQUENCIA_ESTAGIOS_PRODUTIVOS as readonly string[]).includes(destino);
+  }
+
+  if (destino === "EM_REATIVACAO") return false; // só alcançável a partir de INATIVO
+
+  const idxAtual = SEQUENCIA_ESTAGIOS_PRODUTIVOS.indexOf(atual);
+  const idxDestino = SEQUENCIA_ESTAGIOS_PRODUTIVOS.indexOf(destino);
+  if (idxAtual === -1 || idxDestino === -1) return false;
+  return idxDestino === idxAtual + 1 || idxDestino < idxAtual;
+}
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -61,15 +103,18 @@ export async function transicionarEstagioDesenvolvimento(
   return { alterado: true as const, estagioAnterior: atual.estagioDesenvolvimento as EstagioDesenvolvimento };
 }
 
-// Estágios "pré-produtivos" (ou reincidência pós-inatividade) elegíveis a avançar
+// Estágios "pré-produtivos" (ou reincidência pós-reativação) elegíveis a avançar
 // automaticamente quando uma indicação é criada. `ATIVO`/`RECORRENTE` nunca são tocados por
 // esta automação — uma vez lá, só ação manual ou o job de inatividade os move.
+// RM-2026-2C7A4B: `INATIVO` saiu desta lista — a partir de agora, um parceiro inativo só volta
+// a produzir via reativação explícita (`ReativarParceiro`, que move para `EM_REATIVACAO`
+// primeiro); uma indicação chegando durante `EM_REATIVACAO` é o que resolve o destino final.
 const ESTAGIOS_ELEGIVEIS_AVANCO_POR_INDICACAO: EstagioDesenvolvimento[] = [
   "NOVO",
   "EM_ATIVACAO",
   "ATIVADO_SEM_INDICACAO",
   "PRIMEIRA_INDICACAO",
-  "INATIVO",
+  "EM_REATIVACAO",
 ];
 
 /**

@@ -2,6 +2,45 @@
 
 ---
 
+## [2026-08-26] — RM-2026-2C7A4B — Kanban de Relacionamento de Parceiros (objetivo COMPLETO, 12/12 fases)
+
+**Tags:** #roadmap #mcp #parceiros #migration #vault #kanban #maquina-de-estados #concluido
+**Agentes envolvidos:** Bibble (execução direta via chat + MCP), agente Explore (auditoria da Fase 0)
+**Arquivos tocados:** `prisma/schema.prisma`, `prisma/migrations/20260826184500_add_parceiro_proxima_acao/`, `src/lib/parceiros/desenvolvimento.ts`, `src/actions/parceiros-desenvolvimento.ts`, `src/actions/parceiros-dashboard.ts`, `src/app/PainelAlpha/Parceiros/page.tsx`, `src/app/PainelAlpha/Parceiros/[id]/page.tsx`, `src/app/PainelAlpha/Parceiros/Relacionamento/page.tsx` (novo), `src/components/Parceiros/ParceirosClient.tsx`, `src/components/Parceiros/DetalheParceiroClient.tsx`, `src/components/Parceiros/Relacionamento360Section.tsx`, `src/components/Parceiros/Relacionamento/KanbanRelacionamentoParceiros.tsx` (novo), `tests/parceiros/{desenvolvimento.test.ts, desenvolvimento-actions.test.ts, dashboard-followup-alertas.test.ts}` (corrigidos), `tests/parceiros/relacionamento-kanban.test.ts` (novo), `.bibble/memory/{decisions.md, known-errors.md, journal.md, codebase-map.md}`
+
+### Contexto
+Usuário pediu, seguindo a lógica correta de ordem da fila (menor `globalPriority`, não `createdAt` — lição aprendida e registrada em memória durante esta mesma sessão), o próximo objetivo: "Implementar pipeline de relacionamento de parceiros no Painel Alpha reutilizando e adaptando o BPM/CRM existente".
+
+### O que foi feito
+
+**Fase 0 (auditoria):** agente Explore confirmou que 7 dos 8 estados pedidos já existiam (`Parceiro.estagioDesenvolvimento`). Lacunas reais: "Em Reativação" inexistente (reativação pulava direto pro destino final), `RECORRENTE` sem nenhum caller que o produzisse, "próxima ação" hardcode `null` (sem campo nem UI para `Parceiro`, diferente de `ParceiroLead`), sem Kanban visual (só badge de texto na 360º).
+
+**Confirmação de escopo (3 perguntas):** usuário confirmou os 3 itens: 8º estado real, Kanban visual novo, campo de próxima ação real.
+
+**Fases 1-2 (blueprint + Vault):** desenhada a máquina de estados nova (`podeMoverEstagioParceiro`, adaptada do Kanban de Aquisição já em produção) e a migration aditiva (`proximaAcaoEm`/`proximaAcaoDescricao` em `Parceiro`). Protocolo Vault completo — backup fresco, confirmação explícita do usuário ("Sim") — migration aplicada com sucesso.
+
+**Fase 3 (implementação):** `desenvolvimento.ts` ganhou `EM_REATIVACAO` e `podeMoverEstagioParceiro`; `ReativarParceiro` ajustado para não decidir mais o destino final no mesmo clique; `MoverEstagioParceiro`/`RegistrarProximaAcaoParceiro`/`ListarParceirosParaKanban` novos; `KanbanRelacionamentoParceiros.tsx` (novo componente) + rota `/PainelAlpha/Parceiros/Relacionamento`, mesmo padrão do Kanban de Aquisição (clique→dialog→seletor, confirmado não ser drag-and-drop real); filtro por estágio em `ParceirosClient.tsx`; UI de próxima ação na tela 360º.
+
+**Testes pré-existentes quebrados e corrigidos** (esperado — a mudança de comportamento era intencional, não regressão): 3 arquivos de teste documentavam o comportamento antigo de `ReativarParceiro` (destino calculado no clique) e de `INATIVO` reagindo a indicações — reescritos para refletir o novo comportamento (sempre `EM_REATIVACAO` primeiro).
+
+**Fases 4-11 (mesmo ritmo do objetivo anterior):** Fase 4 `AUTO_ADJUSTMENT_REQUIRED` (spec pedia Pusher/drag-and-drop/histórico dedicado, fora do padrão real do módulo); Fase 5 revalidação formal; Fase 6 smoke test E2E real contra produção; Fase 7 auditoria de segurança (nenhuma vulnerabilidade); Fase 8 revisão de código — achado real corrigido (prop `permissao` não usada, dialog de edição visível para qualquer usuário); Fase 9 — 17 testes novos cobrindo exaustivamente a máquina de estados; Fase 10 mapa do codebase; Fase 11 esta consolidação.
+
+### Bugs/lentidão de processo (não do código)
+Builds desta execução sofreram lentidão severa (um único `tsc` chegou a ~3h) por contenção de recursos — um dev server ativo no mesmo sistema consumindo 5+GB de memória. Investigado a fundo (verificação repetida de processos por CPU/memória crescente) antes de concluir que não era travamento real. Um pipe `| tail` em background também "perdeu" output por ~1h sem o processo real ter morrido, gerando um falso alarme de "build morto" que quase causou um segundo build concorrente colidindo por lock — evitado a tempo. Ambas as lições documentadas em `known-errors.md`.
+
+### Validação final
+`tsc --noEmit` limpo (só os 4 erros pré-existentes catalogados), `eslint` limpo em todos os arquivos tocados, `tests/parceiros` 116/116 passando, `npm run build` completo com sucesso — `/PainelAlpha/Parceiros/Relacionamento` presente no manifest final. Objetivo promovido automaticamente para `COMPLETED` ao fechar a Fase 11.
+
+### Pendências
+- `git push` continua bloqueado para mim — todo o código desta execução está commitado apenas localmente, aguardando o usuário publicar.
+
+### Refletido também em
+- `decisions.md`: nova decisão "RM-2026-2C7A4B — Kanban de Relacionamento de Parceiros".
+- `known-errors.md`: 2 novos erros catalogados (pipe de captura de build, lentidão por contenção de dev server).
+- `codebase-map.md`: nova entrada sobre o Kanban de Relacionamento e a máquina de estados nova.
+
+---
+
 ## [2026-08-26] — RM-2026-8B7DC7 — Tarefas de Parceiros (objetivo COMPLETO, 12/12 fases)
 
 **Tags:** #roadmap #mcp #parceiros #migration #vault #tarefas #concluido

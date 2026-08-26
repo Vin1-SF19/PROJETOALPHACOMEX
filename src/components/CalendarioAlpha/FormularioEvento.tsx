@@ -97,6 +97,11 @@ export function FormularioEvento({
     participantesIniciais.join(", "),
   );
   const [criarMeet, setCriarMeet] = useState(false);
+  const [eventType, setEventType] = useState<"default" | "focusTime" | "outOfOffice" | "workingLocation">(
+    detalhesEvento?.eventType === "focusTime" || detalhesEvento?.eventType === "outOfOffice" || detalhesEvento?.eventType === "workingLocation"
+      ? detalhesEvento.eventType
+      : "default",
+  );
   const [conflito, setConflito] = useState(false);
 
   function handleSubmit(evento: FormEvent<HTMLFormElement>) {
@@ -116,7 +121,8 @@ export function FormularioEvento({
         inicio: new Date(inicio),
         fim: new Date(fim),
         participantes: listaParticipantes,
-        criarMeet,
+        criarMeet: eventType === "default" && criarMeet,
+        eventType,
       };
 
       if (emEdicao && eventoParaEditar) {
@@ -230,6 +236,24 @@ export function FormularioEvento({
           )}
         </div>
 
+        {!emEdicao && (
+          <div className="space-y-1.5">
+            <Label htmlFor="ca-tipo">Tipo</Label>
+            <Select value={eventType} onValueChange={(value) => setEventType(value as typeof eventType)}>
+              <SelectTrigger id="ca-tipo" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Evento</SelectItem>
+                <SelectItem value="focusTime">Horário de foco</SelectItem>
+                <SelectItem value="outOfOffice">Ausente</SelectItem>
+                <SelectItem value="workingLocation">Local de trabalho</SelectItem>
+              </SelectContent>
+            </Select>
+            {eventType !== "default" && (
+              <p className="text-xs text-slate-400">Este tipo segue as regras e o status definidos pelo Google Calendar.</p>
+            )}
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label htmlFor="ca-titulo">Título</Label>
           <Input id="ca-titulo" value={titulo} onChange={(evento) => setTitulo(evento.target.value)} maxLength={300} required />
@@ -273,7 +297,7 @@ export function FormularioEvento({
           <Label htmlFor="ca-participantes">Participantes (e-mails separados por vírgula)</Label>
           <Input id="ca-participantes" value={participantes} onChange={(evento) => setParticipantes(evento.target.value)} placeholder="nome@empresa.com" />
         </div>
-        {detalhesEvento?.linkMeet ? (
+        {eventType !== "default" ? null : detalhesEvento?.linkMeet ? (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
             Este evento já possui Google Meet. O link será preservado.
           </div>

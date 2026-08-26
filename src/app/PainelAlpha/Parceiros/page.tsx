@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ParceirosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ busca?: string; nivel?: string }>;
+  searchParams: Promise<{ busca?: string; nivel?: string; estagio?: string }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/");
@@ -23,9 +23,9 @@ export default async function ParceirosPage({
     : null;
   const temaName = rec?.tema_interface ?? "blue";
 
-  const { busca, nivel } = await searchParams;
+  const { busca, nivel, estagio } = await searchParams;
   const [{ parceiros }, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, videoIntrodutorio, parceirosPendentesCadastro] = await Promise.all([
-    listarParceiros(busca, nivel),
+    listarParceiros(busca, nivel, estagio ? { estagioDesenvolvimento: estagio } : undefined),
     getPermissaoParceiros(),
     getTemplateParadaoConvite(),
     getTemplateParadaoParceiro(),
@@ -41,6 +41,7 @@ export default async function ParceirosPage({
       temaName={temaName}
       busca={busca}
       nivel={nivel}
+      estagio={estagio}
       permissao={permissao}
       templateConvite={templateConvite}
       templateParceiro={templateParceiro}

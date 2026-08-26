@@ -1,5 +1,25 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — RM-2026-2C7A4B — Kanban de Relacionamento de Parceiros (8º estágio, máquina de estados, próxima ação real)
+
+**Contexto:** objetivo "Implementar pipeline de relacionamento de parceiros no Painel Alpha reutilizando e adaptando o BPM/CRM existente" — segundo objetivo executado via chat/MCP nesta sessão. A Fase 0 (auditoria) confirmou que 7 dos 8 estados pedidos já existiam em `Parceiro.estagioDesenvolvimento`, mas revelou 3 lacunas reais: (1) "Em Reativação" não existia como estado, `ReativarParceiro` pulava direto para o destino final; (2) `RECORRENTE` não tinha nenhuma automação/action que o produzisse; (3) "próxima ação" para `Parceiro` era hardcode `null`, sem campo nem UI; (4) não havia Kanban visual para o estágio (só badge de texto na tela 360º).
+
+**Escopo confirmado com o usuário** (3 perguntas diretas): criar "Em Reativação" como 8º estado real; criar Kanban visual novo; implementar campo real de próxima ação.
+
+**Decisão técnica — máquina de estados:** `podeMoverEstagioParceiro`, adaptada do padrão já validado em produção no Kanban de Aquisição (`podeMoverPara`, `parceiros-aquisicao.ts`). Sequência produtiva linear (`NOVO→...→RECORRENTE`) só avança 1 posição ou corrige pra trás; `INATIVO`/`EM_REATIVACAO` tratados como estados especiais fora da sequência (mesmo espírito das "saídas laterais" do Kanban de Aquisição) — `INATIVO` só alcançável automaticamente (job de inatividade), `EM_REATIVACAO` só a partir de `INATIVO` via ação manual explícita.
+
+**Decisão técnica — Kanban visual:** mesmo padrão do Kanban de Aquisição (clique no card → dialog → seletor de estágio destino), confirmado NÃO ser drag-and-drop real apesar da aparência visual. Reaproveitar o padrão em vez de introduzir `@dnd-kit` ou Pusher tempo real, que não existem em nenhum Kanban do módulo hoje.
+
+**Migration:** aditiva (`Parceiro.proximaAcaoEm`/`proximaAcaoDescricao`, mesmo padrão de `ParceiroLead`), aplicada via protocolo Vault completo — backup fresco, confirmação explícita do usuário.
+
+**Achado de revisão corrigido:** `KanbanRelacionamentoParceiros.tsx` recebia `permissao` sem usar — dialog de edição aparecia para qualquer usuário mesmo sem `podeEditar` (backend já protegia corretamente, mas UX inconsistente). Corrigido para esconder as seções de edição, mesmo padrão do Kanban de Aquisição.
+
+**Validação:** `tsc`/`eslint`/`build` limpos, 116/116 testes passando (17 novos cobrindo exaustivamente a máquina de estados e as 2 actions novas), smoke test E2E contra produção.
+
+**Nota de processo:** builds desta fase sofreram lentidão severa (até ~3h num único `tsc`) por contenção de recursos com um dev server ativo consumindo 5+GB de memória no mesmo sistema — investigado, confirmado não ser problema do código, documentado em `known-errors.md`.
+
+**Adicionado em:** 2026-08-26 por Bibble (execução via Roadmap Production, Fases 0-11 de 12 concluídas — objetivo completo).
+
 ### 2026-08-26 — RM-2026-8B7DC7 — Tarefas de Parceiros (manual + automática por alerta), Fases 0-3 do novo motor de produção
 
 **Contexto:** objetivo "Criar PAINEL GERENCIAL E ALERTAS e TAREFA de Canais e Parcerias" — primeira execução real via chat/MCP depois da troca do motor de produção. A Fase 0 (auditoria) revelou que o "Painel Gerencial e Alertas" descrito no objetivo **já existia**, entregue 1-2 dias antes (`/PainelAlpha/Parceiros/Dashboard`). O único item genuíno em aberto era a integração de "TAREFA" — sinalizado como `AUTO_ADJUSTMENT_REQUIRED` na Fase 0, com escopo reduzido confirmado pelo usuário via pergunta direta.

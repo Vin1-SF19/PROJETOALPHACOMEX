@@ -34,6 +34,7 @@ export interface EventoExibicao {
   diaInteiro: boolean;
   etag: string;
   linkMeet: string | null;
+  eventType: string;
   calendarioId: string;
   calendarioGoogleId: string;
   calendarioNome: string;
@@ -41,4 +42,13 @@ export interface EventoExibicao {
   calendarioGravavel: boolean;
   /** Presente quando o evento pertence à agenda de um colega (não do próprio usuário logado). */
   colegaId?: number;
+}
+
+export interface TarefaAgendaExibicao {
+  id: string;
+  taskListGoogleId: string;
+  listaTitulo: string;
+  titulo: string;
+  status: "needsAction" | "completed";
+  vencimentoEm: string | null;
 }

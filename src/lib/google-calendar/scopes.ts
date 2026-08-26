@@ -12,6 +12,8 @@ export const ESCOPO_EVENTS_OWNED =
 export const ESCOPO_EVENTS_READONLY =
   "https://www.googleapis.com/auth/calendar.events.readonly";
 export const ESCOPO_FREEBUSY = "https://www.googleapis.com/auth/calendar.freebusy";
+/** Google Tasks é uma API independente do Google Calendar. */
+export const ESCOPO_GOOGLE_TASKS = "https://www.googleapis.com/auth/tasks";
 
 /**
  * Escopos usados pela Service Account (Domain-Wide Delegation) ao impersonar cada usuário.
@@ -25,4 +27,5 @@ export const ESCOPOS_CALENDARIO_ALPHA = [
   ESCOPO_EVENTS_OWNED,
   ESCOPO_EVENTS_READONLY,
   ESCOPO_FREEBUSY,
+  ESCOPO_GOOGLE_TASKS,
 ] as const;

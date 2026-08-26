@@ -51,6 +51,9 @@ describe("AtualizarPotencialRecorrenciaParceiro", () => {
   });
 });
 
+// RM-2026-2C7A4B: ReativarParceiro deixou de calcular o destino final no mesmo clique — agora
+// sempre move para o estado transitório EM_REATIVACAO (8º estágio). O destino real é resolvido
+// depois, por uma indicação real (sincronizarEstagioAposIndicacao) ou movimento manual no Kanban.
 describe("ReativarParceiro", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,32 +62,17 @@ describe("ReativarParceiro", () => {
   });
 
   it("rejeita reativar um parceiro que não está INATIVO", async () => {
-    prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "ATIVO", onboardingCompleto: true });
+    prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "ATIVO" });
     const r = await ReativarParceiro(1);
     expect(r.success).toBe(false);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  it("reativa para ATIVO quando já possui indicações reais", async () => {
-    prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "INATIVO", onboardingCompleto: true });
-    prismaMock.indicacao.count.mockResolvedValue(3);
+  it("move parceiro INATIVO para EM_REATIVACAO (não decide mais o destino final no mesmo clique)", async () => {
+    prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "INATIVO" });
     const r = await ReativarParceiro(1);
     expect(r.success).toBe(true);
-    if (r.success) expect(r.estagio).toBe("ATIVO");
-  });
-
-  it("reativa para ATIVADO_SEM_INDICACAO quando onboarding já concluído mas nunca indicou", async () => {
-    prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "INATIVO", onboardingCompleto: true });
-    prismaMock.indicacao.count.mockResolvedValue(0);
-    const r = await ReativarParceiro(1);
-    expect(r.success).toBe(true);
-    if (r.success) expect(r.estagio).toBe("ATIVADO_SEM_INDICACAO");
-  });
-
-  it("reativa para EM_ATIVACAO quando onboarding nunca foi concluído", async () => {
-    prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "INATIVO", onboardingCompleto: false });
-    prismaMock.indicacao.count.mockResolvedValue(0);
-    const r = await ReativarParceiro(1);
-    expect(r.success).toBe(true);
-    if (r.success) expect(r.estagio).toBe("EM_ATIVACAO");
+    if (r.success) expect(r.estagio).toBe("EM_REATIVACAO");
+    expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 });

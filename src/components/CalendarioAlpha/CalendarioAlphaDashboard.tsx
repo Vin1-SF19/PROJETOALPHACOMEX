@@ -18,6 +18,8 @@ import { StatusSincronizacao } from "./StatusSincronizacao";
 import { TutorialAgendaModal } from "./TutorialAgendaModal";
 import { dataAnterior, proximaData, type VisaoCalendario } from "./lib/datas";
 import type { CalendarioSelecionadoView, EventoExibicao } from "./lib/tipos";
+import type { TarefaAgendaExibicao } from "./lib/tipos";
+import { TarefasAgendaPanel } from "./TarefasAgendaPanel";
 import { TUTORIAL_AGENDA } from "./lib/tutorial-agenda";
 import { useAgendaAlphaController } from "./lib/useAgendaAlphaController";
 
@@ -27,6 +29,7 @@ interface CalendarioAlphaDashboardProps {
   conexaoId: string | null;
   calendarios: CalendarioSelecionadoView[];
   eventos: EventoExibicao[];
+  tarefas: TarefaAgendaExibicao[];
   isAdmin: boolean;
   visao: VisaoCalendario;
   dataReferenciaISO: string;
@@ -44,6 +47,7 @@ export function CalendarioAlphaDashboard({
   conexaoId,
   calendarios,
   eventos,
+  tarefas,
   isAdmin,
   visao,
   dataReferenciaISO,
@@ -171,6 +175,8 @@ export function CalendarioAlphaDashboard({
         onAbrirConfiguracoes={agenda.abrirConfiguracoes}
         onAbrirTutorial={() => setTutorialAberto(true)}
       />
+
+      <TarefasAgendaPanel tema={tema} tarefas={tarefas} onAtualizar={agenda.atualizarAgenda} />
 
       <div className="flex min-h-0 flex-1 gap-3">
         <AgendaSidebar

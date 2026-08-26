@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Handshake, Plus, Settings, Trash2, X, Loader2, AlertTriangle, FileText, Link2, UserPlus,
-  MoreHorizontal, Search, Crown, Gem, Square, Users, Bell, CircleHelp,
+  MoreHorizontal, Search, Crown, Gem, Square, Users, Bell, CircleHelp, GitBranch,
 } from "lucide-react";
 import { toast } from "sonner";
 import ParceiroCard, { type CardParceiro } from "./ParceiroCard";
@@ -104,6 +104,7 @@ type Props = {
   temaName: string;
   busca?: string;
   nivel?: string;
+  estagio?: string;
   permissao: Permissao;
   templateConvite: TemplateOnboarding | null;
   templateParceiro: TemplateOnboarding | null;
@@ -113,7 +114,7 @@ type Props = {
 };
 
 export default function ParceirosClient({
-  userId, parceiros, temaName, busca, nivel, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, parceirosPendentesCadastro, videoIntrodutorioConfig,
+  userId, parceiros, temaName, busca, nivel, estagio, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, parceirosPendentesCadastro, videoIntrodutorioConfig,
 }: Props) {
   const tema = getTema(temaName);
   const accent = tema.accent;
@@ -154,10 +155,11 @@ export default function ParceirosClient({
   // antes de considerar o filtro "aplicado", eliminando a corrida.
   const [buscaInput, setBuscaInput] = useState(busca ?? "");
   const [, startTransition] = useTransition();
-  const aplicarFiltro = useCallback((novaBusca: string, novoNivel: string) => {
+  const aplicarFiltro = useCallback((novaBusca: string, novoNivel: string, novoEstagio: string) => {
     const params = new URLSearchParams();
     if (novaBusca.trim()) params.set("busca", novaBusca.trim());
     if (novoNivel) params.set("nivel", novoNivel);
+    if (novoEstagio) params.set("estagio", novoEstagio);
     const qs = params.toString();
     startTransition(() => {
       router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -166,7 +168,7 @@ export default function ParceirosClient({
 
   useEffect(() => {
     const t = setTimeout(() => {
-      if (buscaInput !== (busca ?? "")) aplicarFiltro(buscaInput, nivel ?? "");
+      if (buscaInput !== (busca ?? "")) aplicarFiltro(buscaInput, nivel ?? "", estagio ?? "");
     }, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -466,6 +468,15 @@ export default function ParceirosClient({
                 </Link>
               )}
 
+              {/* Relacionamento — Kanban do ciclo de vida pós-cadastro (RM-2026-2C7A4B) */}
+              {(permissao.isAdmin || permissao.podeEditar) && (
+                <Link href="/PainelAlpha/Parceiros/Relacionamento"
+                  className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-200 hover:brightness-110"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                  <GitBranch size={15} /> Relacionamento
+                </Link>
+              )}
+
               {/* Nova Indicação — ação relevante, fica visível */}
               {permissao.podeEditar && (
                 <button data-guia-parceiros="nova-indicacao" onClick={() => setNovaIndicacaoOpen(true)}
@@ -526,7 +537,7 @@ export default function ParceirosClient({
                 className="w-full h-11 bg-black/40 border border-white/10 rounded-2xl pl-10 pr-4 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-white/25 transition-colors"
               />
             </div>
-            <Select value={nivel ?? "TODOS"} onValueChange={(v) => aplicarFiltro(buscaInput, v === "TODOS" ? "" : v)}>
+            <Select value={nivel ?? "TODOS"} onValueChange={(v) => aplicarFiltro(buscaInput, v === "TODOS" ? "" : v, estagio ?? "")}>
               <SelectTrigger className="h-11 min-w-[170px] bg-black/40 border-white/10 rounded-2xl px-4 text-xs text-slate-300 uppercase font-black hover:bg-black/50 focus:ring-0 focus:border-white/25 [&>svg]:text-slate-500">
                 <SelectValue placeholder="Todos os Níveis" />
               </SelectTrigger>
@@ -535,6 +546,22 @@ export default function ParceirosClient({
                 <SelectItem value="GOLD" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">★ GOLD</SelectItem>
                 <SelectItem value="PLATINUM" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">◆ PLATINUM</SelectItem>
                 <SelectItem value="BLACK" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">■ BLACK</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={estagio ?? "TODOS"} onValueChange={(v) => aplicarFiltro(buscaInput, nivel ?? "", v === "TODOS" ? "" : v)}>
+              <SelectTrigger className="h-11 min-w-[170px] bg-black/40 border-white/10 rounded-2xl px-4 text-xs text-slate-300 uppercase font-black hover:bg-black/50 focus:ring-0 focus:border-white/25 [&>svg]:text-slate-500">
+                <SelectValue placeholder="Todos os Estágios" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0a1020] border-white/10 text-slate-200">
+                <SelectItem value="TODOS" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Todos os Estágios</SelectItem>
+                <SelectItem value="NOVO" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Novo Parceiro</SelectItem>
+                <SelectItem value="EM_ATIVACAO" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Em Ativação</SelectItem>
+                <SelectItem value="ATIVADO_SEM_INDICACAO" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Ativado sem Indicação</SelectItem>
+                <SelectItem value="PRIMEIRA_INDICACAO" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Primeira Indicação</SelectItem>
+                <SelectItem value="ATIVO" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Parceiro Ativo</SelectItem>
+                <SelectItem value="RECORRENTE" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Parceiro Recorrente</SelectItem>
+                <SelectItem value="INATIVO" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Inativo</SelectItem>
+                <SelectItem value="EM_REATIVACAO" className="text-xs uppercase font-bold focus:bg-white/10 focus:text-white">Em Reativação</SelectItem>
               </SelectContent>
             </Select>
           </div>

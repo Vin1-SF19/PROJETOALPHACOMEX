@@ -100,8 +100,11 @@ export function lerAgendaAlphaRuntimeConfig(
     "AGENDA_ALPHA_PUSH_ENABLED",
     errors,
   );
+  // O painel já possui uma URL pública canônica. A variável específica continua
+  // prevalecendo quando existir, mas não deve ser necessário duplicar a URL só
+  // para a Agenda Alpha.
   const webhookBaseUrl = parsePublicHttpsBaseUrl(
-    env.AGENDA_ALPHA_WEBHOOK_BASE_URL,
+    env.AGENDA_ALPHA_WEBHOOK_BASE_URL ?? env.PAINELALPHA_PUBLIC_URL,
     pushEnabled,
     errors,
   );

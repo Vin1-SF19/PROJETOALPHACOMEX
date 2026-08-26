@@ -2,7 +2,20 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-26 (Parceiros — Tarefas manuais e automáticas por alerta)
+> Última atualização: 2026-08-26 (Parceiros — Kanban de Relacionamento/Desenvolvimento)
+
+---
+
+## Parceiros — Kanban de Relacionamento (Desenvolvimento) (2026-08-26, RM-2026-2C7A4B)
+
+- **8º estágio:** `EM_REATIVACAO` adicionado a `ESTAGIOS_DESENVOLVIMENTO` (`src/lib/parceiros/desenvolvimento.ts`) — estado transitório de reingresso. `ReativarParceiro` (`parceiros-desenvolvimento.ts`) deixou de decidir o destino final no mesmo clique: agora move `INATIVO→EM_REATIVACAO`, e o destino real é resolvido por uma indicação real (`sincronizarEstagioAposIndicacao`) ou movimento manual no Kanban.
+- **Máquina de estados nova:** `podeMoverEstagioParceiro(atual, destino)` (função pura, `desenvolvimento.ts`) — adaptada de `podeMoverPara` do Kanban de Aquisição. Sequência produtiva linear (`NOVO→EM_ATIVACAO→ATIVADO_SEM_INDICACAO→PRIMEIRA_INDICACAO→ATIVO→RECORRENTE`) só avança 1 posição por vez ou corrige livremente pra trás; `INATIVO`/`EM_REATIVACAO` são estados especiais fora da sequência (mesmo espírito das "saídas laterais" do Kanban de Aquisição). Validada tanto no backend (`MoverEstagioParceiro`) quanto coberta por 8 testes exaustivos.
+- **Campo novo:** `Parceiro.proximaAcaoEm`/`proximaAcaoDescricao` (migration `20260826184500_add_parceiro_proxima_acao`) — mesmo padrão já usado em `ParceiroLead` (Aquisição). `ListarFilaFollowUpParceiros` (`parceiros-dashboard.ts`) passou a usar o valor real, removendo um hardcode `null` documentado desde a entrega original do Dashboard.
+- **Backend novo:** `MoverEstagioParceiro`, `RegistrarProximaAcaoParceiro`, `ListarParceirosParaKanban` (`src/actions/parceiros-desenvolvimento.ts`).
+- **Frontend novo:** `KanbanRelacionamentoParceiros.tsx` (`src/components/Parceiros/Relacionamento/`) + rota `/PainelAlpha/Parceiros/Relacionamento` — mesmo padrão visual/técnico do Kanban de Aquisição (clique no card → dialog → seletor de destino; NÃO drag-and-drop, apesar da aparência). `Relacionamento360Section.tsx` ganhou UI de registro de próxima ação. `ParceirosClient.tsx` ganhou filtro por estágio (backend já suportava via `FiltrosParceirosExtra`) + link para o Kanban.
+- **Achado de revisão corrigido:** o Kanban recebia `permissao` sem usar — dialog de edição aparecia para qualquer usuário, mesmo sem `podeEditar` (backend já protegia, mas UX inconsistente com o Kanban de Aquisição). Corrigido envolvendo as seções de edição em `{podeEditar && (...)}`.
+
+**Última atualização:** 2026-08-26 por Scribe
 
 ---
 

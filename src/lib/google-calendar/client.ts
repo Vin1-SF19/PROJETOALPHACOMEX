@@ -220,6 +220,16 @@ function mapEventoParaDTO(evento: calendar_v3.Schema$Event): GoogleEventoDTO {
     etag: evento.etag ?? "",
     atualizadoEm: evento.updated ?? new Date().toISOString(),
     visibilidade: (evento.visibility as GoogleEventoDTO["visibilidade"]) ?? "default",
+    eventType: (evento.eventType as GoogleEventoDTO["eventType"]) ?? "default",
+    statusPropertiesJson: (() => {
+      const statusProperties = {
+        focusTimeProperties: evento.focusTimeProperties,
+        outOfOfficeProperties: evento.outOfOfficeProperties,
+        workingLocationProperties: evento.workingLocationProperties,
+      };
+      if (!Object.values(statusProperties).some(Boolean)) return null;
+      return JSON.stringify(statusProperties) ?? null;
+    })(),
   };
 }
 
@@ -333,6 +343,14 @@ function paraSchemaEvento(input: CriarOuAtualizarEventoInput): calendar_v3.Schem
     ? { date: input.fim.toISOString().slice(0, 10) }
     : { dateTime: input.fim.toISOString(), timeZone: input.timezone };
 
+  const eventType = input.eventType ?? "default";
+  const statusProperties = eventType === "focusTime"
+    ? { focusTimeProperties: { autoDeclineMode: "declineNone" as const } }
+    : eventType === "outOfOffice"
+      ? { outOfOfficeProperties: { autoDeclineMode: "declineNone" as const } }
+      : eventType === "workingLocation"
+        ? { workingLocationProperties: { type: "homeOffice" as const } }
+        : {};
   return {
     summary: input.titulo,
     description: input.descricaoGoogle,
@@ -348,6 +366,8 @@ function paraSchemaEvento(input: CriarOuAtualizarEventoInput): calendar_v3.Schem
           },
         }
       : undefined,
+    eventType,
+    ...statusProperties,
   };
 }
 

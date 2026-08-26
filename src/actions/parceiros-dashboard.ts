@@ -205,18 +205,15 @@ export async function ListarFilaFollowUpParceiros(filtros?: { responsavelId?: nu
       responsavelId: filtros?.responsavelId,
       potencialRecorrencia: filtros?.potencialMin !== undefined ? { gte: filtros.potencialMin } : undefined,
     },
-    select: { id: true, nome: true, potencialRecorrencia: true, estagioDesenvolvimento: true },
+    select: { id: true, nome: true, potencialRecorrencia: true, estagioDesenvolvimento: true, proximaAcaoEm: true },
   });
 
   const itens: ItemFilaFollowUp[] = [];
   for (const p of parceiros) {
     const ind = await calcularIndicadoresParceiro(p.id);
-    // `proximaAcaoEm` do Parceiro não existe como campo próprio nesta primeira entrega (vive no
-    // conceito de BpmTarefa/próxima ação da Aquisição) — para Desenvolvimento, ainda não há UI de
-    // registro dedicada (fica para a Fase 07, junto da tela 360º); aqui a fila já funciona com
-    // `proximaAcaoEm: null` (todo parceiro ativo sem próxima ação registrada, que é o estado real
-    // hoje) até essa UI existir — o alerta "sem próxima ação" reflete isso corretamente.
-    const proximaAcaoEm: Date | null = null;
+    // RM-2026-2C7A4B: `proximaAcaoEm` agora é um campo real de `Parceiro` (mesmo padrão de
+    // `ParceiroLead`), registrado via `RegistrarProximaAcaoParceiro` — deixou de ser hardcode.
+    const proximaAcaoEm = p.proximaAcaoEm;
     itens.push({
       parceiroId: p.id,
       nome: p.nome,

@@ -91,11 +91,23 @@ describe("Desenvolvimento do Parceiro — sincronizarEstagioAposIndicacao", () =
     expect(r.alterado).toBe(false);
   });
 
-  it("reativa (INATIVO) quando volta a indicar", async () => {
+  // RM-2026-2C7A4B: INATIVO deixou de reagir automaticamente a uma indicação — precisa passar
+  // por EM_REATIVACAO primeiro (via ReativarParceiro, ação manual). Só então uma indicação real
+  // resolve o destino final automaticamente.
+  it("NÃO reativa automaticamente um parceiro INATIVO só por receber uma indicação (precisa de EM_REATIVACAO primeiro)", async () => {
     prismaMock.indicacao.count.mockResolvedValue(5);
     prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "INATIVO" });
     const r = await sincronizarEstagioAposIndicacao(1);
+    expect(r.alterado).toBe(false);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("resolve o destino automaticamente quando uma indicação chega durante EM_REATIVACAO", async () => {
+    prismaMock.indicacao.count.mockResolvedValue(5);
+    prismaMock.parceiro.findUnique.mockResolvedValue({ estagioDesenvolvimento: "EM_REATIVACAO" });
+    const r = await sincronizarEstagioAposIndicacao(1);
     expect(r.alterado).toBe(true);
+    expect(prismaMock.$transaction).toHaveBeenCalled();
   });
 });
 

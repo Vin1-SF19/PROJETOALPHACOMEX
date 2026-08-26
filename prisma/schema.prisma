@@ -217,6 +217,12 @@ model RoadmapObjective {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  // Relatório de conclusão (Fase 11 — Kowalski/arquivamento). Markdown completo, sem o limite de
+  // 4000 caracteres de RoadmapProductionRun.resultSummary — gravado via tool MCP dedicada
+  // (roadmap_registrar_relatorio_conclusao), exibido em modal read-only na UI de Produção.
+  completionReportMarkdown    String?
+  completionReportGeneratedAt DateTime?
+
   documentationJobs RoadmapDocumentationJob[]
   promptArtifacts   RoadmapPromptArtifact[]
   productionRuns    RoadmapProductionRun[]
@@ -2341,8 +2347,12 @@ model Parceiro {
   loginEmail                          String
   senhaHash                           String
   // ─── CRM de Canais e Parcerias — Desenvolvimento do Parceiro (ciclo de vida pós-cadastro) ──
-  estagioDesenvolvimento              String                  @default("NOVO") // NOVO|EM_ATIVACAO|ATIVADO_SEM_INDICACAO|PRIMEIRA_INDICACAO|ATIVO|RECORRENTE|INATIVO
+  estagioDesenvolvimento              String                  @default("NOVO") // NOVO|EM_ATIVACAO|ATIVADO_SEM_INDICACAO|PRIMEIRA_INDICACAO|ATIVO|RECORRENTE|INATIVO|EM_REATIVACAO
   estagioDesenvolvimentoAtualizadoEm  DateTime?
+  // RM-2026-2C7A4B — próxima ação de relacionamento (Kanban de Desenvolvimento), mesmo padrão
+  // já usado em ParceiroLead.proximaAcaoEm/proximaAcaoDescricao (Aquisição).
+  proximaAcaoEm                       DateTime?
+  proximaAcaoDescricao                String?
   // Score MANUAL de 0 a 5 (0=sem potencial, 5=estratégico) — preenchido na qualificação, nunca
   // calculado automaticamente. Distinto de `nivel` (calculado por contratação) e de
   // `comissaoPercentual` (regra financeira) — nunca misturar os três.
@@ -2837,6 +2847,7 @@ model GoogleCalendarConexao {
   updatedAt DateTime @updatedAt
 
   calendarios GoogleCalendarSelecionado[]
+  taskLists   GoogleCalendarTaskListCache[]
 
   @@index([status])
 }
@@ -2886,6 +2897,8 @@ model GoogleCalendarEventoCache {
   diaInteiro    Boolean   @default(false)
   etag          String
   linkMeet      String?
+  eventType     String    @default("default") // default | focusTime | outOfOffice | workingLocation | birthday | fromGmail
+  statusPropertiesJson String?
 
   atualizadoGoogleEm DateTime
 
@@ -2894,6 +2907,54 @@ model GoogleCalendarEventoCache {
 
   @@unique([calendarioId, googleEventId])
   @@index([calendarioId, inicioEm])
+  @@index([calendarioId, eventType, inicioEm])
+}
+
+/// Cache das listas Google Tasks da conexão. A Google Tasks API é uma integração
+/// distinta do Calendar; o cache permite manter a Agenda Alpha cache-first.
+model GoogleCalendarTaskListCache {
+  id        String                  @id @default(cuid())
+  conexaoId String
+  conexao   GoogleCalendarConexao   @relation(fields: [conexaoId], references: [id], onDelete: Cascade)
+
+  googleTaskListId String
+  titulo           String
+  ultimaSincronizacaoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tarefas GoogleCalendarTaskCache[]
+
+  @@unique([conexaoId, googleTaskListId])
+  @@index([conexaoId, ultimaSincronizacaoEm])
+}
+
+/// Cache local de tarefas Google. A API Google Tasks não possui syncToken nem
+/// webhook; atualizações externas entram por sincronização explícita/agendada.
+model GoogleCalendarTaskCache {
+  id          String                       @id @default(cuid())
+  taskListId  String
+  taskList    GoogleCalendarTaskListCache  @relation(fields: [taskListId], references: [id], onDelete: Cascade)
+
+  googleTaskId       String
+  titulo             String
+  notas              String?
+  status             String // needsAction | completed
+  vencimentoEm       DateTime?
+  concluidaEm        DateTime?
+  excluida           Boolean @default(false)
+  oculta             Boolean @default(false)
+  parentGoogleTaskId String?
+  posicao            String?
+  atualizadoGoogleEm DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([taskListId, googleTaskId])
+  @@index([taskListId, status, vencimentoEm])
+  @@index([taskListId, atualizadoGoogleEm])
 }
 
 /// Canal push registrado no Google Calendar. O token persistido é somente o hash usado para

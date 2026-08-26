@@ -38,6 +38,8 @@ export function dadosCacheDeEvento(evento: GoogleEventoDTO) {
     diaInteiro: evento.diaInteiro,
     etag: evento.etag,
     linkMeet: evento.linkMeet,
+    eventType: evento.eventType,
+    statusPropertiesJson: evento.statusPropertiesJson,
     atualizadoGoogleEm: new Date(evento.atualizadoEm),
   };
 }

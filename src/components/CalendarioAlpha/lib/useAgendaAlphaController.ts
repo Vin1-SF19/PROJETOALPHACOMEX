@@ -26,6 +26,7 @@ import {
   sincronizarAgendaAlpha,
   type ResumoSincronizacaoAgenda,
 } from "@/actions/google-calendar-sync";
+import { sincronizarTarefasAgendaAlpha } from "@/actions/google-calendar-tarefas";
 import {
   assinarInvalidacaoCalendarioAlpha,
   notificarCalendarioAlphaAlterado,
@@ -228,11 +229,15 @@ export function useAgendaAlphaController({
     setSincronizando(true);
     try {
       const resultado = await sincronizarAgendaAlpha();
+      const resultadoTarefas = await sincronizarTarefasAgendaAlpha();
       await compartilhadas.carregar();
       if (!resultado.success) {
         setErroSincronizacao(resultado.error);
         toast.error(resultado.error);
         return;
+      }
+      if (!resultadoTarefas.success) {
+        setErroSincronizacao(resultadoTarefas.error);
       }
       setResumoSincronizacao(resultado.data);
       setUltimaSincronizacaoEm(resultado.data.ultimaSincronizacaoEm);

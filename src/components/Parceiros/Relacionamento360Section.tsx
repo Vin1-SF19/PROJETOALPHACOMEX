@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Star, TrendingUp, Users2, Percent, DollarSign, Target, History, GitBranch } from "lucide-react";
-import { AtualizarPotencialRecorrenciaParceiro, type ObterIndicadoresDesenvolvimentoParceiro, type ListarHistoricoParceiro } from "@/actions/parceiros-desenvolvimento";
+import { AtualizarPotencialRecorrenciaParceiro, RegistrarProximaAcaoParceiro, type ObterIndicadoresDesenvolvimentoParceiro, type ListarHistoricoParceiro } from "@/actions/parceiros-desenvolvimento";
 import type { ListarIndicacoesDoParceiro } from "@/actions/parceiros-indicacoes";
 
 type Indicadores = Awaited<ReturnType<typeof ObterIndicadoresDesenvolvimentoParceiro>>;
@@ -19,6 +19,7 @@ const ESTAGIO_LABEL: Record<string, string> = {
   ATIVO: "Parceiro Ativo",
   RECORRENTE: "Parceiro Recorrente",
   INATIVO: "Inativo",
+  EM_REATIVACAO: "Em Reativação",
 };
 
 const ESTAGIO_COR: Record<string, string> = {
@@ -29,6 +30,7 @@ const ESTAGIO_COR: Record<string, string> = {
   ATIVO: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10",
   RECORRENTE: "text-fuchsia-300 border-fuchsia-500/40 bg-fuchsia-500/10",
   INATIVO: "text-red-300 border-red-500/40 bg-red-500/10",
+  EM_REATIVACAO: "text-amber-300 border-amber-500/40 bg-amber-500/10",
 };
 
 function fmtBRL(v: number) {
@@ -42,6 +44,8 @@ export default function Relacionamento360Section({
   responsavelNome,
   segmento,
   origem,
+  proximaAcaoEmInicial,
+  proximaAcaoDescricaoInicial,
   indicadores,
   historico,
   indicacoesFunil,
@@ -55,6 +59,8 @@ export default function Relacionamento360Section({
   responsavelNome: string | null;
   segmento: string | null;
   origem: string | null;
+  proximaAcaoEmInicial?: Date | null;
+  proximaAcaoDescricaoInicial?: string | null;
   indicadores: Indicadores;
   historico: Historico;
   indicacoesFunil: Indicacoes;
@@ -65,6 +71,11 @@ export default function Relacionamento360Section({
   const router = useRouter();
   const [potencial, setPotencial] = useState(potencialRecorrenciaInicial ?? 0);
   const [salvandoPotencial, setSalvandoPotencial] = useState(false);
+  const [proximaAcaoEm, setProximaAcaoEm] = useState(proximaAcaoEmInicial ?? null);
+  const [proximaAcaoDescricao, setProximaAcaoDescricao] = useState(proximaAcaoDescricaoInicial ?? null);
+  const [novaData, setNovaData] = useState("");
+  const [novaDesc, setNovaDesc] = useState("");
+  const [salvandoProximaAcao, setSalvandoProximaAcao] = useState(false);
 
   async function salvarPotencial(novoValor: number) {
     setSalvandoPotencial(true);
@@ -74,6 +85,19 @@ export default function Relacionamento360Section({
     if (!r.success) { toast.error(r.error); return; }
     toast.success("Potencial de recorrência atualizado");
     router.refresh();
+  }
+
+  async function salvarProximaAcao() {
+    if (!novaData || !novaDesc.trim()) { toast.error("Preencha data e descrição"); return; }
+    setSalvandoProximaAcao(true);
+    const r = await RegistrarProximaAcaoParceiro({ parceiroId, proximaAcaoEm: novaData, proximaAcaoDescricao: novaDesc.trim() });
+    setSalvandoProximaAcao(false);
+    if (!r.success) { toast.error(r.error); return; }
+    setProximaAcaoEm(new Date(novaData));
+    setProximaAcaoDescricao(novaDesc.trim());
+    setNovaData("");
+    setNovaDesc("");
+    toast.success("Próxima ação registrada");
   }
 
   const ind = indicadores.success ? indicadores.indicadores : null;
@@ -109,6 +133,41 @@ export default function Relacionamento360Section({
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <p className="text-[9px] text-slate-600 uppercase tracking-widest font-bold mb-1.5">Próxima ação</p>
+          {proximaAcaoEm && proximaAcaoDescricao && (
+            <p className="text-[11px] text-slate-300 mb-1.5">
+              {new Date(proximaAcaoEm).toLocaleDateString("pt-BR")} — {proximaAcaoDescricao}
+            </p>
+          )}
+          {podeEditar && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={novaData}
+                onChange={(e) => setNovaData(e.target.value)}
+                className="h-9 rounded-lg px-2.5 text-[11px] outline-none text-slate-200"
+                style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` }}
+              />
+              <input
+                value={novaDesc}
+                onChange={(e) => setNovaDesc(e.target.value)}
+                placeholder="Ex: Ligação, WhatsApp..."
+                className="flex-1 h-9 rounded-lg px-2.5 text-[11px] outline-none text-slate-200"
+                style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` }}
+              />
+              <button
+                onClick={() => void salvarProximaAcao()}
+                disabled={salvandoProximaAcao}
+                className="h-9 px-3 rounded-lg text-[10px] font-bold text-black shrink-0 disabled:opacity-50"
+                style={{ background: `rgba(${accent},1)` }}
+              >
+                Registrar
+              </button>
+            </div>
+          )}
         </div>
 
         {ind && (

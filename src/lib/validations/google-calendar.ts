@@ -33,6 +33,7 @@ const camposEventoBase = {
   fim: z.coerce.date(),
   participantes: z.array(emailParticipanteSchema).max(MAX_PARTICIPANTES).default([]),
   criarMeet: z.boolean().default(false),
+  eventType: z.enum(["default", "focusTime", "outOfOffice", "workingLocation"]).default("default"),
 };
 
 function refinarIntervalo<T extends { inicio: Date; fim: Date }>(schema: z.ZodType<T>) {

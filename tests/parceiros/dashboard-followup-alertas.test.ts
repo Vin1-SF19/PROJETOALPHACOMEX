@@ -68,8 +68,8 @@ describe("ListarFilaFollowUpParceiros", () => {
 
   it("ordena por prioridade decrescente (quem mais precisa de atenção primeiro)", async () => {
     prismaMock.parceiro.findMany.mockResolvedValue([
-      { id: 1, nome: "Baixa Prioridade", potencialRecorrencia: 0, estagioDesenvolvimento: "EM_ATIVACAO" },
-      { id: 2, nome: "Alta Prioridade", potencialRecorrencia: 5, estagioDesenvolvimento: "ATIVO" },
+      { id: 1, nome: "Baixa Prioridade", potencialRecorrencia: 0, estagioDesenvolvimento: "EM_ATIVACAO", proximaAcaoEm: null },
+      { id: 2, nome: "Alta Prioridade", potencialRecorrencia: 5, estagioDesenvolvimento: "ATIVO", proximaAcaoEm: null },
     ]);
     calcularIndicadoresMock.mockImplementation(async (id: number) => ({
       ...INDICADORES_VAZIOS,
@@ -85,10 +85,26 @@ describe("ListarFilaFollowUpParceiros", () => {
   });
 
   it("exclui parceiros INATIVOS da fila comercial (vão para alerta separado)", async () => {
+    prismaMock.parceiro.findMany.mockResolvedValue([]);
     await ListarFilaFollowUpParceiros();
     expect(prismaMock.parceiro.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ estagioDesenvolvimento: { not: "INATIVO" } }) }),
     );
+  });
+
+  // RM-2026-2C7A4B: proximaAcaoEm agora é lido do campo real de Parceiro (antes hardcode null).
+  it("usa proximaAcaoEm real do parceiro (deixou de ser hardcode null)", async () => {
+    const dataFutura = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    prismaMock.parceiro.findMany.mockResolvedValue([
+      { id: 1, nome: "Fulano", potencialRecorrencia: 3, estagioDesenvolvimento: "ATIVO", proximaAcaoEm: dataFutura },
+    ]);
+    calcularIndicadoresMock.mockResolvedValue(INDICADORES_VAZIOS);
+    const r = await ListarFilaFollowUpParceiros();
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.itens[0].proximaAcaoEm).toEqual(dataFutura);
+      expect(r.itens[0].followUpVencido).toBe(false);
+    }
   });
 });
 

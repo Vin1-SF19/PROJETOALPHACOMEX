@@ -96,6 +96,8 @@ export default function DetalheParceiroClient({
     potencialRecorrencia: number | null;
     segmento: string | null;
     origem: string | null;
+    proximaAcaoEm?: Date | null;
+    proximaAcaoDescricao?: string | null;
     responsavelNome: string | null;
     indicadores: Awaited<ReturnType<typeof ObterIndicadoresDesenvolvimentoParceiro>>;
     historico: Awaited<ReturnType<typeof ListarHistoricoParceiro>>["historico"];
@@ -303,6 +305,8 @@ export default function DetalheParceiroClient({
             responsavelNome={relacionamento360.responsavelNome}
             segmento={relacionamento360.segmento}
             origem={relacionamento360.origem}
+            proximaAcaoEmInicial={relacionamento360.proximaAcaoEm}
+            proximaAcaoDescricaoInicial={relacionamento360.proximaAcaoDescricao}
             indicadores={relacionamento360.indicadores}
             historico={relacionamento360.historico}
             indicacoesFunil={relacionamento360.indicacoesFunil}
