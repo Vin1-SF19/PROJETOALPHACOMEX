@@ -351,7 +351,20 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
   }
 }
 
-export async function listarParceiros(busca?: string, nivel?: string) {
+export interface FiltrosParceirosExtra {
+  estagioDesenvolvimento?: string;
+  potencialMin?: number;
+  segmento?: string;
+  origem?: string;
+  responsavelId?: number;
+}
+
+/**
+ * Fase 07 (CRM de Canais e Parcerias) — `filtrosExtra` é opcional e aditivo: nenhum call site
+ * existente precisou mudar. Reaproveita o padrão de filtros já usado em `ListarLeadsAquisicaoParceiros`/
+ * `ListarFilaFollowUpParceiros`.
+ */
+export async function listarParceiros(busca?: string, nivel?: string, filtrosExtra?: FiltrosParceirosExtra) {
   const session = await auth();
   if (!session?.user) return { parceiros: [] };
 
@@ -366,7 +379,14 @@ export async function listarParceiros(busca?: string, nivel?: string) {
   const documentoBusca = busca?.replace(/\D/g, "");
 
   const parceiros = await db.parceiro.findMany({
-    where: { ...(nivel && { nivel }) },
+    where: {
+      ...(nivel && { nivel }),
+      ...(filtrosExtra?.estagioDesenvolvimento && { estagioDesenvolvimento: filtrosExtra.estagioDesenvolvimento }),
+      ...(filtrosExtra?.potencialMin !== undefined && { potencialRecorrencia: { gte: filtrosExtra.potencialMin } }),
+      ...(filtrosExtra?.segmento && { segmento: { contains: filtrosExtra.segmento } }),
+      ...(filtrosExtra?.origem && { origem: { contains: filtrosExtra.origem } }),
+      ...(filtrosExtra?.responsavelId !== undefined && { responsavelId: filtrosExtra.responsavelId }),
+    },
     include: {
       endereco: true,
       indicacoes: {

@@ -10,11 +10,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { editarParceiro, desvincularIndicacao, gerarMensagemLoginParceiro } from "@/actions/parceiros";
+import type { ObterIndicadoresDesenvolvimentoParceiro, ListarHistoricoParceiro } from "@/actions/parceiros-desenvolvimento";
+import type { ListarIndicacoesDoParceiro } from "@/actions/parceiros-indicacoes";
 import { getTema } from "@/lib/temas";
 import { TRIBUTOS } from "@/lib/tributos";
 import TrocarSenhaParceiro from "./TrocarSenhaParceiro";
 import ModalComprovante from "./ModalComprovante";
 import ModalCredenciais from "./ModalCredenciais";
+import Relacionamento360Section from "./Relacionamento360Section";
 import {
   criarFormularioResponsaveis,
   criarResponsavelVazio,
@@ -80,12 +83,22 @@ function fmtBRL(valor: number): string {
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
 
 export default function DetalheParceiroClient({
-  parceiro, permissao, temaName = "blue", template,
+  parceiro, permissao, temaName = "blue", template, relacionamento360,
 }: {
   parceiro: DetalheParceiro;
   permissao: { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
   temaName?: string;
   template?: TemplateOnboarding | null;
+  relacionamento360?: {
+    estagioDesenvolvimento: string;
+    potencialRecorrencia: number | null;
+    segmento: string | null;
+    origem: string | null;
+    responsavelNome: string | null;
+    indicadores: Awaited<ReturnType<typeof ObterIndicadoresDesenvolvimentoParceiro>>;
+    historico: Awaited<ReturnType<typeof ListarHistoricoParceiro>>["historico"];
+    indicacoesFunil: Awaited<ReturnType<typeof ListarIndicacoesDoParceiro>>["indicacoes"];
+  };
 }) {
   const router = useRouter();
   const tema = getTema(temaName);
@@ -277,6 +290,24 @@ export default function DetalheParceiroClient({
             </div>
           )}
         </div>
+
+        {/* Relacionamento, indicadores, funil comercial e histórico (Fase 07 — tela 360º) */}
+        {relacionamento360 && (
+          <Relacionamento360Section
+            parceiroId={parceiro.id}
+            estagioDesenvolvimento={relacionamento360.estagioDesenvolvimento}
+            potencialRecorrenciaInicial={relacionamento360.potencialRecorrencia}
+            responsavelNome={relacionamento360.responsavelNome}
+            segmento={relacionamento360.segmento}
+            origem={relacionamento360.origem}
+            indicadores={relacionamento360.indicadores}
+            historico={relacionamento360.historico}
+            indicacoesFunil={relacionamento360.indicacoesFunil}
+            podeEditar={permissao.podeEditar}
+            accent={tema.accent}
+            cardCls={cardCls}
+          />
+        )}
 
         {/* Indicações */}
         {parceiro.indicacoes.length > 0 && (

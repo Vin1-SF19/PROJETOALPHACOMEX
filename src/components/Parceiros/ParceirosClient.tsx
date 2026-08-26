@@ -436,9 +436,25 @@ export default function ParceirosClient({
                         <MenuItem icon={<Settings size={15} />} label="Controle de acesso"
                           onClick={() => { setEngrenagemOpen(true); setMenuOpen(false); }} accent={accent} />
                       )}
+                      {permissao.isAdmin && (
+                        <Link href="/PainelAlpha/Parceiros/Configuracoes" onClick={() => setMenuOpen(false)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 text-slate-200">
+                          <Settings size={15} />
+                          <span className="text-[12px] font-bold">Regras de Canais e Parcerias</span>
+                        </Link>
+                      )}
                     </motion.div>
                   )}
                 </div>
+              )}
+
+              {/* Dashboard de Canais e Parcerias — indicadores, fila de follow-up e alertas */}
+              {(permissao.isAdmin || permissao.podeEditar) && (
+                <Link href="/PainelAlpha/Parceiros/Dashboard"
+                  className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-200 hover:brightness-110"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                  <Bell size={15} /> Dashboard
+                </Link>
               )}
 
               {/* Aquisição — funil de potencial parceiro até o cadastro */}

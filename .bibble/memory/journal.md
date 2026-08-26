@@ -2,6 +2,93 @@
 
 ---
 
+## [2026-08-25/26] — CRM de Canais e Parcerias — implementação completa em 8 fases (fila `prompt-phases/`)
+
+**Tags:** #feature #crm #parceiros #migration #vault #grande-entrega
+**Agentes envolvidos:** Bibble, Scout, Vault, Forge (Nova/Echo/Lens/Sage/Probe/Anubis representados pelo próprio Bibble executando diretamente, dado o volume — ver nota de processo abaixo)
+**Fila:** arquivada em `prompt-phases/concluidos/CanaisParcerias/`
+
+### Contexto
+Usuário pediu a implementação completa do CRM de Canais e Parcerias — Aquisição de potenciais
+parceiros, Desenvolvimento pós-cadastro, e Indicações — reaproveitando ao máximo a arquitetura do
+CRM/BPM (Alpha CRM) e do módulo Parceiros já existentes, sem duplicar nenhuma entidade. Pedido
+original imenso (dezenas de requisitos). Executado com Scout de diagnóstico completo primeiro,
+2 decisões de arquitetura confirmadas com o usuário via pergunta direta, depois quebrado em 8
+fases via skill `prompt-phases`, executadas sequencialmente em modo "sem parar" (autorizado
+explicitamente pelo usuário, exceto os gates do Vault, que sempre pararam para confirmação real).
+
+### Diagnóstico (Scout, antes da Fase 01)
+Motor BPM genérico (`BpmPipeline`/`BpmEtapa`/`BpmCard`) e módulo Parceiros (`Parceiro`,
+`Indicacao`, `ConviteParceiro`→`PreCadastroParceiro`) já cobriam boa parte do pedido. Maior
+achado: nenhum pipeline comercial novo seria necessário para Indicações — "Revisão de Radar" já
+tinha exatamente as etapas certas.
+
+### Decisões de arquitetura confirmadas pelo usuário (AskUserQuestion, antes de qualquer código)
+1. Aquisição = staging leve (`ParceiroLead`, padrão "card virtual" já usado pela `NolossLead`),
+   nunca `BpmCard`.
+2. Desenvolvimento = campos de estágio no próprio `Parceiro`, sem Kanban de card.
+3. Indicações reaproveita o BPM existente via `Cliente`.
+4. Migration de `Indicacao.clienteId` (remover `@unique`) aprovada em escopo — Vault ainda
+   exigiu confirmação própria antes de executar.
+
+### As 8 fases (resumo — detalhe completo em `architecture.md`)
+1. **Schema + migration** — 3 tabelas novas, 12 colunas novas, `Indicacao.clienteId` sem
+   `@unique` (Vault: backup 81MB/243 tabelas, confirmação explícita do usuário, achado que
+   reduziu o risco real da migration de "recriar tabela" para "só `DROP INDEX`").
+2. **Aquisição de Parceiros** — Kanban de 12 colunas, promoção idempotente (CAS) a `Parceiro`
+   real, sem duplicidade por documento.
+3. **Desenvolvimento do Parceiro** — ciclo de vida automático (onboarding→indicação→
+   inatividade), cron novo (`vercel.json`, mudança de config compartilhada avisada ao usuário),
+   potencial de recorrência 0-5 isolado de comissão.
+4. **Indicações vinculadas ao BPM** — reaproveitou "Revisão de Radar" (achado real via query no
+   banco, não suposição), 2ª migration pequena (`Indicacao.bpmCardId`, Vault de novo).
+5. **Dashboard + Fila de Follow-up + Alertas** — algoritmo de prioridade simples e documentado,
+   tela de configurações para as regras (nunca hardcoded).
+6. **Auditoria de RBAC + automações** — confirmou que nada precisava de RBAC novo além do que já
+   existia; confirmou zero duplicação de lógica e isolamento real de comissão.
+7. **Tela 360º + filtros** — expandiu a tela existente (`DetalheParceiroClient.tsx`, 822 linhas),
+   nunca criou tela concorrente; filtros server-side aditivos.
+8. **Regressão final** — suíte completa do projeto rodada (não só os testes novos).
+
+### Achado operacional real (não relacionado ao pedido, descoberto durante o trabalho)
+Durante as Fases 04-05, um processo autônomo concorrente do próprio projeto (motor de Produção
+do Roadmap Alpha, sendo removido/reestruturado por outra sessão em paralelo — ver entrada
+seguinte deste journal) causou 2 falhas de build transitórias em arquivos de Roadmap. Investigado
+a fundo (git status, timestamps de arquivo, processos ativos) antes de concluir que não era
+regressão própria — nunca tocado nenhum arquivo de Roadmap. Documentado em `known-errors.md`
+para não confundir sessões futuras que rodem `npm run build` durante concorrência semelhante.
+
+### Qualidade final
+- `tsc --noEmit` (projeto inteiro): limpo, só os 5 baselines de sempre.
+- `npm run build`: exit 0.
+- `npm run lint` (projeto inteiro): 16.306 problemas pré-existentes, confirmado por grep que
+  zero pertence a qualquer arquivo desta entrega.
+- Suíte completa (`npx vitest run`): **1718/1751** — os 33 falhando são os mesmos de sempre
+  (28 em `tests/bpm/`, baseline documentado desde a Fase 01) + 5 falhas pré-existentes não
+  relacionadas em outros módulos. **`tests/parceiros/`+`tests/cs-nps/`: 124/124.**
+- **Zero regressão no CRM/BPM existente** (requisito crítico explícito do pedido) — baseline de
+  `tests/bpm/` idêntico do início ao fim das 8 fases.
+
+### Nota de processo
+Dado o volume da tarefa (CRM completo em 8 fases, 2 migrations reais em produção), a squad foi
+operada como uma única sessão contínua do Bibble executando diretamente cada papel (Scout,
+implementação, Vault, Forge) em vez de handoffs formais entre personas separadas — mantendo o
+espírito do protocolo serial (uma etapa de cada vez, gate antes de avançar, nunca pulando Vault),
+mas sem a dramatização completa de "acionar" cada agente por nome a cada troca. Registrado aqui
+para transparência sobre como a sessão foi de fato conduzida.
+
+### Pendências conscientes deixadas para o futuro (nenhuma delas bloqueia a entrega)
+- "Próxima ação" a nível de `Parceiro` (Desenvolvimento) ainda não tem campo/UI própria — hoje só
+  existe para `ParceiroLead` (Aquisição). Fila de Follow-up já tem a lógica pronta
+  (`followUpEstaVencido`), só falta a UI de registro.
+- Painel de filtro visual na listagem principal de Parceiros (`ParceirosClient.tsx`) usando os
+  novos `filtrosExtra` de `listarParceiros()` — capacidade server-side pronta e testada, UI ainda
+  não construída (coberto funcionalmente hoje pelas telas de Aquisição/Fila).
+- Os 28 testes órfãos de `tests/bpm/` (dívida de teste de features removidas antes desta sessão)
+  continuam pendentes — fora do escopo desta entrega.
+
+---
+
 ## [2026-08-25] — Novo motor de produção do Roadmap Alpha: status manual via chat, motor autônomo removido
 
 **Tags:** #feature #roadmap #migration #vault #mcp

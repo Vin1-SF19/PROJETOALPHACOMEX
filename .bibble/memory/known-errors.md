@@ -49,7 +49,13 @@ alheio.
 **Causa raiz:** dívida de teste acumulada de remoções de UI já documentadas em `decisions.md` (ex: `PainelRequisitosAvanco.tsx` removido em RM-2026-3E14F1, `PainelContatos.tsx` removido em RM-2026-05E75A) — os testes fazem asserção estática de que certos componentes/strings aparecem no código-fonte (`readFileSync` + `toContain`), e ficaram órfãos quando os componentes foram removidos da UI por decisão deliberada, sem que os testes fossem atualizados junto. `tests/bpm/standby-follow-up.test.ts:139` é um exemplo confirmado (`expect(registrar).toContain("<PainelStandbyFollowUp")`).
 **Confirmado NÃO ser regressão de nenhuma sessão específica:** verificado via `git stash` isolando qualquer mudança em andamento — as mesmas 28 falhas, nos mesmos 11 arquivos, com a mesma asserção, reproduzem no baseline limpo (2026-08-25, sessão CRM de Canais e Parcerias, Fase 01).
 **Ação para sessões futuras:** ao rodar a suíte `tests/bpm/` como gate de regressão de qualquer feature nova, o baseline de comparação é **287/315 passando**, não 315/315. Uma queda abaixo de 287 é regressão real; 287 mantido não é. Corrigir os 28 testes órfãos é trabalho de limpeza válido, mas está fora do escopo de qualquer feature que não seja especificamente sobre esses componentes — não tente "consertar" silenciosamente como efeito colateral de outra tarefa.
-**Adicionado em:** 2026-08-25 (Bibble/Vault, Fase 01 do CRM de Canais e Parcerias)
+**Baseline da suíte COMPLETA do projeto (`npx vitest run`, sem filtro), confirmado em 2026-08-26 na Fase 08 (fechamento da fila CRM de Canais e Parcerias):** **1718 passando / 1751 totais** (242 arquivos, 226 passando/16 falhando). Os 33 testes falhando se decompõem em: os mesmos 28 de `tests/bpm/` acima **+ 5 falhas pré-existentes e não relacionadas** em outros módulos, também confirmadas sem nenhuma ligação com Parceiros/Canais (nenhum arquivo desses módulos foi tocado nesta fila):
+- `tests/alpha-seo/inventory.test.ts` (1) e `tests/alpha-seo/schema-draft.test.ts` (1)
+- `tests/apresentacoes/pptx-parser.test.ts` (1)
+- `tests/bibble/context-budget.test.ts` (1)
+- `tests/google-calendar/cli.test.ts` (1, timeout de 5000ms — pode ser flaky, não investigado a fundo por estar fora do escopo desta fila)
+Ao rodar a suíte COMPLETA como gate final de qualquer feature futura, o baseline de comparação é **1718/1751**, não 1751/1751. `tests/parceiros/`+`tests/cs-nps/` devem continuar 100% (124/124 confirmado nesta mesma sessão) — qualquer falha nesses dois diretórios É regressão real.
+**Adicionado em:** 2026-08-25/26 (Bibble/Vault/Sage, Fases 01 e 08 do CRM de Canais e Parcerias)
 
 ---
 

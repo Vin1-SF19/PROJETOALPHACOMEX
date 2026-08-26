@@ -86,3 +86,26 @@ export async function ObterIndicadoresDesenvolvimentoParceiro(parceiroIdInput: n
   const indicadores = await calcularIndicadoresParceiro(parceiroId);
   return { success: true as const, indicadores };
 }
+
+/** Timeline de relacionamento — Fase 07 (tela 360º). */
+export async function ListarHistoricoParceiro(parceiroIdInput: number) {
+  const ctx = await getCtx();
+  if (!ctx) return { success: false as const, error: "Sem permissão", historico: [] };
+
+  const parceiroId = z.number().int().positive().parse(parceiroIdInput);
+  const historico = await db.parceiroHistorico.findMany({
+    where: { parceiroId },
+    select: {
+      id: true,
+      acao: true,
+      valorAnteriorJson: true,
+      valorNovoJson: true,
+      automacaoOrigem: true,
+      createdAt: true,
+      usuario: { select: { nome: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+  return { success: true as const, historico };
+}
