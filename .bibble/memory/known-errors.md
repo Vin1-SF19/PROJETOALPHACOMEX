@@ -5,6 +5,14 @@
 
 ---
 
+### `CardFullViewModal.tsx` — eslint `react-hooks/refs` ("Cannot access refs during render") pré-existente, não relacionado a mudanças no CardModal
+**Sintoma:** `npx eslint src/app/PainelAlpha/AlphaCRM/CardModal/` reporta 1 `error` (não warning) em `CardFullViewModal.tsx:197:44`, na linha `onAtualizado={() => { void recarregar(); onAtualizado(); }}` — a regra nova `react-hooks/refs` do eslint-plugin-react-hooks acusa que `recarregar` (função que provavelmente lê `acessoRevogadoRef.current` internamente) está sendo referenciada dentro de um closure passado como prop durante o render.
+**Confirmado NÃO ser regressão:** `git status`/`git diff HEAD` confirmam que `CardFullViewModal.tsx` não foi tocado na sessão em que este erro foi descoberto (2026-08-26, execução do objetivo RM-2026-6D5A60 — só `CardOpenFormSlot.tsx`/`CardOpenShell.tsx`/`PainelContatos.tsx` foram editados/removidos). O arquivo também tem ~15 warnings pré-existentes de `no-unused-vars` (props/estado declarados mas nunca usados: `realtimeRevision`, `onClose`, `dadosEmpresaDrawer`, `podeMoverEtapa`, etc.) — sinal de que ninguém rodou `eslint` escopado nesse diretório específico antes (só o lint completo do projeto, que aparentemente não pegou por alguma diferença de config/cache — investigar se necessário no futuro).
+**Ação:** não corrigido nesta sessão — fora do escopo da tarefa em andamento (limpeza de `CardOpenFormSlot`/remoção de código morto), e mexer na leitura de refs de `CardFullViewModal.tsx` é risco desnecessário sem uma tarefa dedicada a esse arquivo. Registrar aqui para não ser confundido com regressão em sessões futuras que tocarem este diretório.
+**Adicionado em:** 2026-08-26 (Bibble, execução do objetivo RM-2026-6D5A60, Fase 3/Forge)
+
+---
+
 ### `npm run build` falha em arquivos de `Roadmap*`/`roadmap-alpha`/`roadmap-production` sem eu ter tocado nesses arquivos — processo autônomo concorrente, não é regressão
 **Sintoma:** `npm run build` (Turbopack) falha com erro de módulo em arquivos como
 `src/actions/RoadmapProduction.ts`, `src/lib/roadmap-alpha/*`, `RoadmapDashboard.tsx`,

@@ -1,7 +1,6 @@
 "use client";
 
 import { ObterCardBpm } from "@/actions/bpm/Cards";
-import { type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
 import { etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
@@ -9,22 +8,18 @@ import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 import { PainelCamposEtapaAtual } from "./PainelCamposEtapaAtual";
 import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
 import { PainelProximoContato } from "./PainelProximoContato";
-import { PainelContatos } from "./PainelContatos";
 import PainelReuniao from "./PainelReuniao";
 import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
 import { PainelStandbyFollowUp } from "./PainelStandbyFollowUp";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
-type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
 export interface CardOpenFormSlotProps {
   card: CardDetalhe;
   accent: string;
-  interacoes?: Interacao[];
   podeEditar: boolean;
   realtimeRevision: number;
   onAtualizado: () => void;
-  onInteracaoCriada?: (interacao: Interacao) => void;
   onEstadoFollowUpChange?: (
     estado: "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO",
   ) => void;
@@ -40,11 +35,9 @@ export interface CardOpenFormSlotProps {
 export function CardOpenFormSlot({
   card,
   accent,
-  interacoes = [],
   podeEditar,
   realtimeRevision,
   onAtualizado,
-  onInteracaoCriada = () => {},
   onEstadoFollowUpChange = () => {},
 }: CardOpenFormSlotProps) {
   return (
@@ -82,13 +75,6 @@ export function CardOpenFormSlot({
         onAtualizado={onAtualizado}
         podeEditar={podeEditar}
         realtimeRevision={realtimeRevision}
-      />
-
-      <PainelContatos
-        cardId={card.id}
-        interacoes={interacoes}
-        podeEditar={podeEditar}
-        onInteracaoCriada={onInteracaoCriada}
       />
 
       {etapaEhEmTratativa(card.etapa.nome) && (

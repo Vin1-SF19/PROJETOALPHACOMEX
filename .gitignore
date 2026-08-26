@@ -67,3 +67,6 @@ next-env.d.ts
 
 # Configuração, telemetria e logs locais da execução em Produção do Roadmap
 /.roadmap-production/
+
+# Registro local de MCP servers (contém tokens/credenciais em claro)
+/.mcp.json
