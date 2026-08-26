@@ -83,8 +83,8 @@ function KanbanColuna({
   tracejada?: boolean;
 }) {
   return (
-    <div className="shrink-0 w-[280px] flex flex-col rounded-2xl overflow-hidden" style={{ background: "rgba(8,11,20,0.55)", border: `1px solid rgba(${cor},0.22)`, boxShadow: `0 0 0 1px rgba(0,0,0,0.2), 0 12px 30px -18px rgba(${cor},0.35)` }}>
-      <div className="flex items-center justify-between px-3.5 py-3 border-b" style={{ borderColor: `rgba(${cor},0.18)`, background: `rgba(${cor},0.06)` }}>
+    <div className="shrink-0 w-[280px] h-full flex flex-col rounded-2xl overflow-hidden" style={{ background: "rgba(8,11,20,0.55)", border: `1px solid rgba(${cor},0.22)`, boxShadow: `0 0 0 1px rgba(0,0,0,0.2), 0 12px 30px -18px rgba(${cor},0.35)` }}>
+      <div className="shrink-0 flex items-center justify-between px-3.5 py-3 border-b" style={{ borderColor: `rgba(${cor},0.18)`, background: `rgba(${cor},0.06)` }}>
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: `rgb(${cor})`, boxShadow: `0 0 8px rgba(${cor},0.7)` }} />
           <span className="text-[11px] font-black uppercase tracking-widest text-slate-200 truncate">{label}</span>
@@ -94,11 +94,13 @@ function KanbanColuna({
         </span>
       </div>
       <div
-        className={`flex-1 p-2.5 space-y-2 min-h-[140px] rounded-b-2xl ${tracejada ? "border-dashed" : ""}`}
+        className={`flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 rounded-b-2xl ${tracejada ? "border-dashed" : ""}`}
         style={tracejada ? { border: `1px dashed rgba(${cor},0.12)`, borderTop: "none" } : undefined}
       >
         {itens.length === 0 ? (
-          <p className="text-[10px] text-slate-600 text-center py-6">Vazio</p>
+          <div className="h-full flex items-center justify-center">
+            <p className="text-[10px] text-slate-600">Vazio</p>
+          </div>
         ) : (
           itens.map((lead) => (
             <button
@@ -166,7 +168,7 @@ export default function AquisicaoParceirosClient({
   }, [leads]);
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden" style={{ background: "#05070d" }}>
+    <main className="relative h-screen w-full flex flex-col overflow-hidden" style={{ background: "#05070d" }}>
       {/* Fundo vivo — mesmo padrão do restante do módulo Parceiros (shader + glows + partículas) */}
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
         {!reduceMotion && (
@@ -198,7 +200,7 @@ export default function AquisicaoParceirosClient({
         ))}
       </div>
 
-      <header className="relative z-10 px-6 py-5 flex items-center justify-between border-b" style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(5,7,13,0.4)", backdropFilter: "blur(8px)" }}>
+      <header className="relative z-10 shrink-0 px-6 py-5 flex items-center justify-between border-b" style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(5,7,13,0.4)", backdropFilter: "blur(8px)" }}>
         <div className="flex items-center gap-3">
           <Link href="/PainelAlpha/Parceiros" className="h-9 w-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-white transition-colors" style={{ background: "rgba(255,255,255,0.05)" }}>
             <ArrowLeft size={16} />
@@ -219,7 +221,7 @@ export default function AquisicaoParceirosClient({
         )}
       </header>
 
-      <div className="relative z-10 p-6 flex gap-4 overflow-x-auto">
+      <div className="relative z-10 flex-1 min-h-0 p-6 flex gap-4 overflow-x-auto overflow-y-hidden">
         {colunasFunil.map((col) => (
           <KanbanColuna key={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} />
         ))}
