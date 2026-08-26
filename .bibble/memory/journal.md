@@ -2,6 +2,46 @@
 
 ---
 
+## [2026-08-26] — RM-2026-04C4B0 — Bug real de campos globais corrigido; promoção automática de status implementada e validada em produção
+
+**Tags:** #bugfix #crm #roadmap #mcp #status-automatico
+**Agentes envolvidos:** Bibble (execução direta via chat + MCP, sem pipeline formal da squad)
+**Arquivos tocados:** `src/lib/bpm/requisitos-etapa-server.ts` (fix), `tests/bpm/requisitos-etapa-server.test.ts` (testes atualizados/novos), `src/lib/roadmap-production-api/operations.ts` (feature nova: promoção automática de status), `.bibble/memory/{decisions.md, known-errors.md, journal.md}`
+
+### Contexto
+Continuação da sessão que trocou o motor de produção do Roadmap. Usuário pediu uma regra de comportamento nova: quando um objetivo termina todas as fases, promover automaticamente para `COMPLETED`; enquanto em andamento, deve aparecer no filtro "Em desenvolvimento" (`IN_DEVELOPMENT`) da tela. Depois pediu para concluir o objetivo que estava usando como teste dessa feature (RM-2026-04C4B0 — "Campos já preenchidos nos cards"), que até então só tinha sido tocado superficialmente para validação.
+
+### O que foi feito
+
+**1. Promoção automática de status (`src/lib/roadmap-production-api/operations.ts`):**
+- `updateRoadmapProductionRunStatus` ganhou 2 gatilhos dentro da mesma transação: ao entrar `IN_PROGRESS`, promove `RoadmapObjective.status` de `ACTIVE` para `IN_DEVELOPMENT` (só na 1ª fase real); ao entrar `SUCCEEDED` na fase de maior `phaseNumber` publicado da versão, promove para `COMPLETED`.
+- Corrigido retroativamente o objetivo já concluído na sessão anterior (RM-2026-6D5A60) para `COMPLETED`, já que as 9 fases tinham terminado antes da feature existir.
+- **Bloqueio real encontrado:** `git push` é exclusivo do agente `@devops` por regra do framework AIOX (`Constitution Article II`) — não consegui publicar o código sozinho. Usuário fez o push manualmente. Validado ao vivo, pós-deploy, criando uma run real e confirmando a transição `ACTIVE→IN_DEVELOPMENT` funcionando via MCP contra produção.
+
+**2. Execução completa do objetivo RM-2026-04C4B0 (10 fases, 0-9), 2ª execução real via o novo motor:**
+- **Fase 0/1 (auditoria + Scout):** a documentação (Qwen) tinha hipóteses genéricas sobre a causa do bug ("campos perdem valor entre etapas" = estado resetado no frontend). Investigação real revelou causa raiz mais precisa e diferente: campos configurados como "Todas as etapas" no admin do pipeline (`BpmCampo.etapaId = null`) nunca apareciam em NENHUMA etapa, por um bug de filtro Prisma — confirmado com evidência real do banco (6 campos com valores de usuários reais, 100% invisíveis).
+- **Achado de processo importante:** um teste unitário pré-existente documentava esse comportamento como se fosse esperado ("retorna somente campos diretos e globais explicitamente associados"). Antes de aceitar isso como design intencional, confirmei contra a UI real do admin (`AdminPipelineClient.tsx:240-244`) — o `<select>` de criação de campo tem `<option value="">Todas as etapas</option>` como padrão. A UI promete um comportamento que o backend nunca cumpriu — bug real, não decisão de produto. O teste foi corrigido junto com o fix, não aceito como âncora.
+- **Fase 2 (fix):** 7 linhas em `src/lib/bpm/requisitos-etapa-server.ts` — `where: { pipelineId, etapaId }` → `where: { pipelineId, OR: [{ etapaId }, { etapaId: null }] }` em 2 funções (`carregarCamposAplicaveisEtapa`, `carregarCamposObrigatoriosEtapa`).
+- **Fase 3 (Echo/persistência):** auditoria confirmou que o salvamento (`AtualizarCardBpm`) já era correto (upsert granular por campoId, nunca replace) — nenhuma mudança adicional necessária, só a leitura tinha o bug.
+- **Fases 4-9:** build de produção completo (~15min, sucesso), integração ponta a ponta mapeada em 8 pontos de consumo (incluindo `automacao-novos-leads.ts`, corrigida de graça pelo mesmo fix), 2 testes de edge case novos, revisão 🟢 aprovada, memória atualizada, sessão arquivada.
+- Validação de zero regressão feita via `git stash` comparativo em múltiplos pontos: `tests/bpm/requisitos-etapa-server.test.ts` (6/6), `tests/bpm/` completo (280/305 baseline → 281/306 com fix, mesmas 25 falhas pré-existentes), e 4 arquivos de teste de transição de etapa (fechado/lost/sem-viabilidade/edicao-campos — mesmas 5 falhas antes/depois).
+
+### Decisões tomadas
+- Promoção automática de status registrada como comportamento permanente do motor (não uma escolha pontual).
+- Bug de campos globais tratado como bug real (não decisão de design) com base em evidência da UI, não do teste existente — registrado como lição geral para sessões futuras (nunca aceitar teste como prova de intenção sem checar a UI real).
+- Correção backend-only, escopo mínimo — nenhuma mudança de schema/frontend/rota.
+
+### Pendências
+- Objetivo RM-2026-04C4B0 concluído (`COMPLETED` deve refletir automaticamente ao fechar a Fase 9).
+- Teste manual visual não executado (sem credenciais de login) — recomendado: abrir card do pipeline "Comercial" com CNPJ/Nome do responsável já preenchidos e confirmar visualmente em qualquer etapa.
+- `git push` continua bloqueado para mim — qualquer mudança de código desta sessão em diante precisa do usuário rodar `git push` manualmente (ou de um agente `@devops` dedicado).
+
+### Refletido também em
+- `decisions.md`: nova decisão "RM-2026-04C4B0 — Bug real de campos globais invisíveis corrigido".
+- `known-errors.md`: nova entrada sobre `etapaId=null`/filtro Prisma incompleto, com lição geral sobre FK nullable.
+
+---
+
 ## [2026-08-26] — RM-2026-6D5A60 — Primeira execução real via novo motor de produção do Roadmap (MCP), 9 fases concluídas
 
 **Tags:** #feature #roadmap #crm #mcp #cleanup

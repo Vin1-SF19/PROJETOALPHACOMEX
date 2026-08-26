@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { carregarCamposAplicaveisCardEtapa } from "@/lib/bpm/requisitos-etapa-server";
+import {
+  carregarCamposAplicaveisCardEtapa,
+  carregarCamposObrigatoriosEtapa,
+} from "@/lib/bpm/requisitos-etapa-server";
 
 describe("campos aplicáveis por etapa", () => {
   it("retorna somente campos diretos e globais explicitamente associados", async () => {
@@ -52,7 +55,7 @@ describe("campos aplicáveis por etapa", () => {
     );
 
     expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { pipelineId: "pipeline-1", etapaId: "etapa-2" },
+      where: { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-2" }, { etapaId: null }] },
     }));
     expect(campos.map((campo) => campo.id)).toEqual([
       "campo-global-associado",
@@ -62,6 +65,48 @@ describe("campos aplicáveis por etapa", () => {
     expect(campos[1]).toMatchObject({
       obrigatorio: false,
       valor: "valor existente",
+    });
+  });
+
+  it("inclui campo com etapaId null (\"Todas as etapas\" no admin) mesmo sem vínculo em BpmCampoObrigatorioEtapa — RM-2026-04C4B0", async () => {
+    const client = {
+      bpmCampo: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "campo-global-direto",
+            pipelineId: "pipeline-1",
+            etapaId: null,
+            nome: "CNPJ",
+            tipo: "texto",
+            opcoesJson: null,
+            obrigatorio: false,
+            ordem: 1,
+          },
+        ]),
+      },
+      bpmCampoObrigatorioEtapa: { findMany: vi.fn().mockResolvedValue([]) },
+      bpmCardCampoValor: {
+        findMany: vi.fn().mockResolvedValue([
+          { campoId: "campo-global-direto", valor: "12.345.678/0001-90" },
+        ]),
+      },
+    };
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-1",
+      "pipeline-1",
+      "etapa-qualquer",
+      client as never,
+    );
+
+    expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-qualquer" }, { etapaId: null }] },
+    }));
+    expect(campos).toHaveLength(1);
+    expect(campos[0]).toMatchObject({
+      id: "campo-global-direto",
+      obrigatorio: false,
+      valor: "12.345.678/0001-90",
     });
   });
 
@@ -158,5 +203,64 @@ describe("campos aplicáveis por etapa", () => {
       expect.objectContaining({ id: "campo-repetido", obrigatorio: true, valor: null }),
       expect.objectContaining({ id: "campo-alpha", obrigatorio: false, valor: null }),
     ]));
+  });
+
+  it("campo global sem valor salvo aparece com valor null, não é omitido", async () => {
+    const client = {
+      bpmCampo: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "campo-global-vazio",
+            pipelineId: "pipeline-1",
+            etapaId: null,
+            nome: "Radar pretendido",
+            tipo: "texto",
+            opcoesJson: null,
+            obrigatorio: false,
+            ordem: 1,
+          },
+        ]),
+      },
+      bpmCampoObrigatorioEtapa: { findMany: vi.fn().mockResolvedValue([]) },
+      bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-1",
+      "pipeline-1",
+      "etapa-qualquer",
+      client as never,
+    );
+
+    expect(campos).toHaveLength(1);
+    expect(campos[0]).toMatchObject({ id: "campo-global-vazio", valor: null });
+  });
+});
+
+describe("campos obrigatórios por etapa (validação de transição)", () => {
+  it("RM-2026-04C4B0: inclui campo global (etapaId null) marcado como obrigatório, sem depender de BpmCampoObrigatorioEtapa", async () => {
+    const client = {
+      bpmCampo: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "campo-global-obrigatorio", nome: "CNPJ" },
+        ]),
+      },
+      bpmCampoObrigatorioEtapa: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    const campos = await carregarCamposObrigatoriosEtapa(
+      "pipeline-1",
+      "etapa-2",
+      client as never,
+    );
+
+    expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        pipelineId: "pipeline-1",
+        OR: [{ etapaId: "etapa-2" }, { etapaId: null }],
+        obrigatorio: true,
+      },
+    }));
+    expect(campos).toEqual([{ id: "campo-global-obrigatorio", nome: "CNPJ" }]);
   });
 });

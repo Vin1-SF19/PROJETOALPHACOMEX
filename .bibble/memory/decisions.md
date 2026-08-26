@@ -1,5 +1,17 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — RM-2026-04C4B0 — Bug real de campos globais invisíveis corrigido (2ª execução completa via novo motor de produção)
+
+**Contexto:** objetivo "Campos já preenchidos nos cards" — reclamação do usuário de que campos perdiam valor ao navegar entre etapas do card no Alpha CRM. A documentação (Qwen) do objetivo assumiu hipóteses genéricas (estado de formulário resetado no frontend, persistência fazendo replace). Investigação real (Fase 0/1) confirmou causa raiz diferente e mais precisa: campos configurados como "Todas as etapas" no admin do pipeline (`BpmCampo.etapaId = null`) nunca apareciam em etapa nenhuma, por um bug de filtro Prisma (`where: { etapaId }` não inclui `null`), não por perda de estado. Confirmado com evidência real do banco de produção: 6 campos com valores já preenchidos por usuários (CNPJ, Nome do responsável, etc.) ficavam invisíveis.
+
+**Validação importante:** um teste unitário pré-existente (`tests/bpm/requisitos-etapa-server.test.ts`) documentava o comportamento buggy como se fosse esperado. Antes de aceitar isso como "design intencional", confirmei contra a UI real do admin (`AdminPipelineClient.tsx`) — o `<select>` de criação de campo tem `<option value="">Todas as etapas</option>` como opção padrão, e a listagem também rotula campos sem etapa como "Todas as etapas". A UI promete um comportamento que o backend nunca entregou — confirmando bug real, não decisão de design. O teste foi atualizado para refletir o comportamento correto.
+
+**Fix:** `src/lib/bpm/requisitos-etapa-server.ts` — `carregarCamposAplicaveisEtapa` e `carregarCamposObrigatoriosEtapa` passaram a usar `where: { pipelineId, OR: [{ etapaId }, { etapaId: null }] }` em vez de `where: { pipelineId, etapaId }`. 7 linhas de produção, backend-only, sem mudança de schema/rota/frontend.
+
+**Execução:** segunda execução completa (9 fases, 0-9) via o novo motor de produção do Roadmap (chat + MCP), na mesma sessão que validou a promoção automática de status (`ACTIVE→IN_DEVELOPMENT→COMPLETED`). Validado sem regressão em toda a cadeia: `tsc`, `eslint`, `npm run build` completo, e comparação via `git stash` em 5 arquivos de teste de transição de etapa (mesmas falhas pré-existentes antes/depois).
+
+**Adicionado em:** 2026-08-26 por Bibble (execução via Roadmap Production).
+
 ### 2026-08-26 — RM-2026-6D5A60 — Card aberto do Alpha CRM: autoajuste de "criar layout por pipeline" para "remover código morto", 3 arquivos órfãos apagados
 
 **Contexto:** objetivo do Roadmap "Layout do card Aberto único por pipeline" foi a primeira execução real do novo motor de produção via chat (ver decisão 2026-08-25 sobre o motor). O prompt documentado (Fase 2/Nova) assumia genericamente que seria necessário criar N componentes de layout, um por pipeline — mas as Fases 0 (Scout/auditoria) e 1 (Scout/blueprint) confirmaram por leitura de código que **o layout já é único de fato** (`CardAbertoLayout.tsx`, usado por todos os pipelines via `resolveCardAbertoLayout()` em `pipelines/index.ts`, registry hoje vazio). Não havia duplicação de layout a resolver.

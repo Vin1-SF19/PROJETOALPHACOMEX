@@ -41,8 +41,11 @@ export async function carregarCamposAplicaveisEtapa(
   } as const;
 
   const [diretos, associados] = await Promise.all([
+    // etapaId: null é "todas as etapas" (rótulo exibido no admin de pipeline,
+    // AdminPipelineClient.tsx) — precisa entrar aqui junto com os campos da
+    // etapa específica, não só os de etapaId igual.
     client.bpmCampo.findMany({
-      where: { pipelineId, etapaId },
+      where: { pipelineId, OR: [{ etapaId }, { etapaId: null }] },
       select: selectCampo,
     }),
     client.bpmCampoObrigatorioEtapa.findMany({
@@ -98,7 +101,7 @@ export async function carregarCamposObrigatoriosEtapa(
 ): Promise<CampoObrigatorioBpm[]> {
   const [diretos, porEtapa] = await Promise.all([
     client.bpmCampo.findMany({
-      where: { pipelineId, etapaId, obrigatorio: true },
+      where: { pipelineId, OR: [{ etapaId }, { etapaId: null }], obrigatorio: true },
       select: { id: true, nome: true },
     }),
     client.bpmCampoObrigatorioEtapa.findMany({
