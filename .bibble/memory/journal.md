@@ -2,6 +2,65 @@
 
 ---
 
+## [2026-08-26] — RM-2026-8B7DC7 — Tarefas de Parceiros (objetivo COMPLETO, 12/12 fases)
+
+**Tags:** #roadmap #mcp #parceiros #migration #vault #tarefas #concluido
+**Agentes envolvidos:** Bibble (execução direta via chat + MCP), agente Explore (auditoria da Fase 0)
+**Arquivos tocados:** `prisma/schema.prisma`, `prisma/migrations/20260826173000_add_parceiro_tarefa/`, `src/actions/parceiros-tarefas.ts` (novo), `src/actions/parceiros-dashboard.ts`, `src/actions/convites-parceiro.ts`, `src/app/PainelAlpha/Parceiros/Dashboard/page.tsx`, `src/app/PainelAlpha/Parceiros/[id]/page.tsx`, `src/components/Parceiros/Configuracoes/ConfiguracoesParceirosClient.tsx`, `src/components/Parceiros/Dashboard/DashboardParceirosClient.tsx`, `src/components/Parceiros/DetalheParceiroClient.tsx`, `src/components/Parceiros/ParceiroTarefasSection.tsx` (novo), `tests/parceiros/regras-admin-e-isolamento.test.ts`, `tests/parceiros/tarefas.test.ts` (novo), `tests/parceiros/dashboard-followup-alertas.test.ts` (estendido), `.bibble/memory/{decisions.md, known-errors.md, journal.md, codebase-map.md}`
+
+### Contexto
+Usuário pediu para executar o objetivo RM-2026-8B7DC7 do Roadmap — primeira execução real via chat/MCP do novo motor de produção (trocado em etapa anterior desta mesma sessão). Título do objetivo: "Criar PAINEL GERENCIAL E ALERTAS e TAREFA de Canais e Parcerias".
+
+### O que foi feito
+
+**Fase 0 (auditoria):** agente Explore mapeou o módulo Parceiros e revelou que o "Painel Gerencial e Alertas" pedido **já existia**, entregue 1-2 dias antes (`/PainelAlpha/Parceiros/Dashboard`, funil + fila de follow-up + alertas configuráveis). Sinalizado `AUTO_ADJUSTMENT_REQUIRED` — único item genuíno em aberto era a integração de "TAREFA".
+
+**Confirmação de escopo:** perguntado ao usuário como a tarefa deveria funcionar — resposta: manual (vinculada a Parceiro/Indicação) **e** automática (gerada quando um alerta dispara).
+
+**Fase 1 (blueprint) e Fase 2 (design):** desenhado o schema (`ParceiroTarefa`, não reaproveitando `BpmTarefa` por estar amarrado a `cardId`), confirmado que o layout visual do Dashboard já atende à spec original — só a aba Alertas/Fila precisavam de extensão pontual.
+
+**Fase 3 (schema + backend + frontend), com protocolo Vault completo:**
+- Backup fresco gerado e validado antes de tocar produção; relatório de risco/rollback apresentado; usuário confirmou explicitamente ("Sim cara, prossiga").
+- Migration aditiva aplicada (`ParceiroTarefa` + `ParceiroConfig.gerarTarefaAutomaticaAlertas`).
+- **Bug de processo encontrado durante a aplicação:** script de migration ad-hoc removia comentários de forma que engolia o `CREATE TABLE` inteiro no split por `;` — nada foi persistido na 1ª tentativa. Detectado ANTES de seguir adiante (verificação direta contra `sqlite_master`, disciplina já estabelecida nesta sessão), corrigido e reaplicado com sucesso.
+- Backend: `parceiros-tarefas.ts` (CRUD de tarefa), geração automática idempotente em `parceiros-dashboard.ts`.
+- Frontend: botão/badge de tarefa na aba Alertas do Dashboard, coluna de contagem na Fila, toggle em Configurações, nova seção "Tarefas" na tela 360º (`ParceiroTarefasSection.tsx`).
+
+### Bugs corrigidos durante a validação
+1. `startTransition` em `DashboardParceirosClient.tsx` recebendo callback que retornava não-`void` (toast.error/success) — TypeScript pegou, corrigido.
+2. `tests/parceiros/regras-admin-e-isolamento.test.ts` quebrou por faltar o novo campo obrigatório em `AtualizarRegrasParceiros` — corrigido (2 ocorrências).
+
+### Validação
+`tsc --noEmit` limpo (mesmos 4 erros pré-existentes catalogados), `eslint` limpo nos 10 arquivos tocados, `tests/parceiros` 82/82 passando, `npm run build` completo com sucesso — todas as rotas de Parceiros presentes no manifest final.
+
+### Decisões tomadas
+- `ParceiroTarefa` como model novo e independente de `BpmTarefa` — registrado em `decisions.md`.
+- Automação por alerta é opt-in (`gerarTarefaAutomaticaAlertas`, default `false`) — nunca liga sozinha.
+
+### Fases 4-11 (continuação, mesma sessão, execução automática autorizada pelo usuário)
+
+- **Fase 4 (Frontend):** `AUTO_ADJUSTMENT_REQUIRED` confirmado — spec original pedia página/componentes novos que duplicariam a Fase 3. Sem código novo.
+- **Fase 5 (Verificação de Build):** revalidação formal — `tsc`/`eslint`/`build` já limpos desde a Fase 3, confirmado `git status` sem mudança de código no intervalo.
+- **Fase 6 (Integração E2E):** smoke test real contra o banco de produção (script pontual, removido após uso) — criar/listar/concluir tarefa e idempotência da automação, todos os 6 pontos confirmados, zero resíduo deixado no banco.
+- **Fase 7 (Segurança):** auditoria de auth/RBAC/input/IDOR — nenhuma vulnerabilidade nova. 1 achado documentado (não corrigido, aceito por desenho): `gerarTarefasAutomaticasDeAlertas` é disparada por uma função de leitura (`ListarAlertasParceiros`) sem exigir `podeEditar` — comentário de segurança adicionado no código explicando a decisão e o gatilho para reavaliar no futuro.
+- **Fase 8 (Revisão de código):** 🟢 aprovado — 2 pequenos ajustes de clareza/consistência de estilo (non-null assertion redundante removida; padronização de `return toast.error(...)`).
+- **Fase 9 (Testes/Edge Cases):** 17 testes automatizados novos (`tests/parceiros/tarefas.test.ts` + extensão de `dashboard-followup-alertas.test.ts`) cobrindo RBAC granular e a idempotência da automação (o requisito mais sensível a bug de duplicação). Suíte final: 99/99 passando.
+- **Fase 10 (Mapa do Codebase):** entrada nova em `codebase-map.md` documentando o model, os arquivos e a decisão de não reaproveitar `BpmTarefa`.
+- **Fase 11 (Arquivamento):** esta consolidação final.
+
+### Validação final consolidada
+`tsc --noEmit` limpo, `eslint` limpo em todos os arquivos tocados, `tests/parceiros` 99/99 passando, `npm run build` completo com sucesso, smoke test E2E contra produção confirmado. Objetivo promovido automaticamente para `COMPLETED` ao fechar a Fase 11 (última fase publicada da versão), via a lógica de promoção automática implementada em etapa anterior desta mesma sessão.
+
+### Pendências
+- `git push` continua bloqueado para mim — usuário precisa publicar manualmente quando decidir. Todo o código desta execução (schema, migration, actions, componentes, testes) está commitado apenas localmente.
+
+### Refletido também em
+- `decisions.md`: nova decisão "RM-2026-8B7DC7 — Tarefas de Parceiros".
+- `known-errors.md`: novo erro catalogado sobre o bug de parsing de comentários no script de migration ad-hoc.
+- `codebase-map.md`: nova entrada sobre `ParceiroTarefa` e a integração de Tarefas no módulo Parceiros.
+
+---
+
 ## [2026-08-26] — Lock global de sequenciamento no worker de documentação do Roadmap
 
 **Tags:** #bugfix #roadmap #concorrencia #migration #vault

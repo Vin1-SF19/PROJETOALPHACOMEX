@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Save } from "lucide-react";
 import { AtualizarRegrasParceiros, obterConfigParceiros } from "@/actions/convites-parceiro";
+import { Switch } from "@/components/ui/switch";
 
 type Config = Awaited<ReturnType<typeof obterConfigParceiros>>;
 
@@ -23,6 +24,7 @@ export default function ConfiguracoesParceirosClient({ configInicial }: { config
   const [diasInatividade, setDiasInatividade] = useState<string>(configInicial.diasInatividade.toString());
   const [cadenciaPotencial4, setCadenciaPotencial4] = useState<string>(configInicial.cadenciaPotencial4Dias?.toString() ?? "");
   const [cadenciaPotencial5, setCadenciaPotencial5] = useState<string>(configInicial.cadenciaPotencial5Dias?.toString() ?? "");
+  const [gerarTarefaAutomaticaAlertas, setGerarTarefaAutomaticaAlertas] = useState<boolean>(configInicial.gerarTarefaAutomaticaAlertas);
   const [salvando, setSalvando] = useState(false);
 
   const inputCls = "w-full h-10 rounded-xl px-3 text-[12px] outline-none text-slate-200";
@@ -35,6 +37,7 @@ export default function ConfiguracoesParceirosClient({ configInicial }: { config
       diasInatividade: Number(diasInatividade),
       cadenciaPotencial4Dias: cadenciaPotencial4.trim() ? Number(cadenciaPotencial4) : null,
       cadenciaPotencial5Dias: cadenciaPotencial5.trim() ? Number(cadenciaPotencial5) : null,
+      gerarTarefaAutomaticaAlertas,
     });
     setSalvando(false);
     if (!r.success) return toast.error(r.error);
@@ -66,6 +69,14 @@ export default function ConfiguracoesParceirosClient({ configInicial }: { config
         <Campo label="Cadência recomendada — Potencial 5" ajuda="Frequência sugerida de follow-up (dias) para parceiros estratégicos.">
           <input type="number" min={1} value={cadenciaPotencial5} onChange={(e) => setCadenciaPotencial5(e.target.value)} className={inputCls} style={inputStyle} placeholder="Não definida" />
         </Campo>
+
+        <div className="flex items-center justify-between gap-4 rounded-xl px-3 py-3" style={inputStyle}>
+          <div className="space-y-1">
+            <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Gerar tarefa automática a partir de alertas</label>
+            <p className="text-[10px] text-slate-500">Quando um alerta surgir no Dashboard, cria automaticamente uma tarefa vinculada ao parceiro.</p>
+          </div>
+          <Switch checked={gerarTarefaAutomaticaAlertas} onCheckedChange={setGerarTarefaAutomaticaAlertas} />
+        </div>
 
         <button onClick={() => void salvar()} disabled={salvando} className="h-11 px-5 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest text-white disabled:opacity-50" style={{ background: "rgb(37,99,235)" }}>
           <Save size={15} /> {salvando ? "Salvando..." : "Salvar configurações"}

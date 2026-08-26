@@ -54,6 +54,8 @@ export async function obterConfigParceiros() {
       diasInatividade: true,
       cadenciaPotencial4Dias: true,
       cadenciaPotencial5Dias: true,
+      // RM-2026-8B7DC7 — Painel Gerencial e Tarefas.
+      gerarTarefaAutomaticaAlertas: true,
     },
   });
   return cfg;
@@ -77,6 +79,7 @@ const RegrasParceirosSchema = z.object({
   diasInatividade: z.number().int().positive(),
   cadenciaPotencial4Dias: z.number().int().positive().nullable(),
   cadenciaPotencial5Dias: z.number().int().positive().nullable(),
+  gerarTarefaAutomaticaAlertas: z.boolean(),
 });
 
 /**

@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserPlus, Flame, Repeat, UserX, AlertTriangle,
-  TrendingUp, DollarSign, Percent, Target, Bell,
+  TrendingUp, DollarSign, Percent, Target, Bell, ListTodo, CheckCircle2,
 } from "lucide-react";
 import { getTema } from "@/lib/temas";
 import type { ObterDashboardCanaisParcerias, ListarFilaFollowUpParceiros, ListarAlertasParceiros } from "@/actions/parceiros-dashboard";
+import { CriarTarefaParceiro } from "@/actions/parceiros-tarefas";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
@@ -54,19 +56,44 @@ export default function DashboardParceirosClient({
   dashboardInicial,
   filaInicial,
   alertasIniciais,
+  tarefasPendentesPorParceiro,
+  alertasComTarefaAutomatica,
 }: {
   temaName: string;
   permissao: Permissao;
   dashboardInicial: DashboardData | null;
   filaInicial: ItemFila[];
   alertasIniciais: Alerta[];
+  tarefasPendentesPorParceiro: Record<number, number>;
+  alertasComTarefaAutomatica: string[];
 }) {
   const tema = getTema(temaName);
   const accent = tema.accent;
-  const [isPending] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const [dashboard] = useState(dashboardInicial);
   const [fila] = useState(filaInicial);
   const [alertas] = useState(alertasIniciais);
+  const [tarefaAutomaticaChaves, setTarefaAutomaticaChaves] = useState(new Set(alertasComTarefaAutomatica));
+  const [criandoTarefaKey, setCriandoTarefaKey] = useState<string | null>(null);
+
+  function criarTarefaDoAlerta(a: Alerta) {
+    const parceiroId = a.parceiroId;
+    if (!parceiroId) return;
+    const key = `${parceiroId}:${a.tipo}`;
+    setCriandoTarefaKey(key);
+    startTransition(async () => {
+      const r = await CriarTarefaParceiro({
+        parceiroId,
+        titulo: `${ALERTA_LABEL[a.tipo]} — ${a.nome}`,
+        descricao: a.detalhe,
+        prioridade: "ALTA",
+      });
+      setCriandoTarefaKey(null);
+      if (!r.success) { toast.error(r.error); return; }
+      setTarefaAutomaticaChaves((prev) => new Set(prev).add(key));
+      toast.success("Tarefa criada");
+    });
+  }
 
   const ind = dashboard?.success ? dashboard.indicadores : null;
   const evolucao = dashboard?.success ? dashboard.evolucao : null;
@@ -141,12 +168,15 @@ export default function DashboardParceirosClient({
                     <th className="px-4 py-3">Dias sem indicação</th>
                     <th className="px-4 py-3">Próxima ação</th>
                     <th className="px-4 py-3">Prioridade</th>
+                    <th className="px-4 py-3">Tarefas</th>
                   </tr>
                 </thead>
                 <tbody>
                   {fila.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">Nenhum parceiro na fila.</td></tr>
-                  ) : fila.map((item) => (
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Nenhum parceiro na fila.</td></tr>
+                  ) : fila.map((item) => {
+                    const qtdTarefas = tarefasPendentesPorParceiro[item.parceiroId] ?? 0;
+                    return (
                     <tr key={item.parceiroId} className="border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
                       <td className="px-4 py-3 text-slate-200 font-bold">{item.nome}</td>
                       <td className="px-4 py-3 text-slate-400">{item.potencialRecorrencia ?? "—"}</td>
@@ -166,8 +196,17 @@ export default function DashboardParceirosClient({
                           {item.prioridade}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="px-2 py-1 rounded-lg text-[10px] font-black"
+                          style={qtdTarefas > 0 ? { background: `rgba(${accent},0.15)`, color: `rgb(${accent})` } : { background: "rgba(255,255,255,0.05)", color: "rgb(100,116,139)" }}
+                        >
+                          {qtdTarefas} pendente{qtdTarefas === 1 ? "" : "s"}
+                        </span>
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -176,15 +215,35 @@ export default function DashboardParceirosClient({
           <TabsContent value="alertas" className="space-y-2">
             {alertas.length === 0 ? (
               <p className="text-slate-500 text-sm flex items-center gap-2"><Bell size={14} /> Nenhum alerta no momento.</p>
-            ) : alertas.map((a, i) => (
+            ) : alertas.map((a, i) => {
+              const key = a.parceiroId ? `${a.parceiroId}:${a.tipo}` : null;
+              const temTarefa = key ? tarefaAutomaticaChaves.has(key) : false;
+              return (
               <div key={i} className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
                 <AlertTriangle size={15} className="text-red-400 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="text-[12px] font-bold text-slate-200">{ALERTA_LABEL[a.tipo]} — {a.nome}</p>
                   <p className="text-[10px] text-slate-500">{a.detalhe}</p>
                 </div>
+                {a.parceiroId && (
+                  temTarefa ? (
+                    <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black shrink-0" style={{ background: "rgba(255,255,255,0.08)", color: "rgb(148,163,184)" }}>
+                      <CheckCircle2 size={11} /> Tarefa criada
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => criarTarefaDoAlerta(a)}
+                      disabled={isPending && criandoTarefaKey === key}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black shrink-0 disabled:opacity-50"
+                      style={{ background: `rgba(${accent},0.15)`, color: `rgb(${accent})` }}
+                    >
+                      <ListTodo size={12} /> {isPending && criandoTarefaKey === key ? "Criando..." : "Criar tarefa"}
+                    </button>
+                  )
+                )}
               </div>
-            ))}
+              );
+            })}
           </TabsContent>
         </Tabs>
       </div>

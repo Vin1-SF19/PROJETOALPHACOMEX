@@ -1,5 +1,21 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — RM-2026-8B7DC7 — Tarefas de Parceiros (manual + automática por alerta), Fases 0-3 do novo motor de produção
+
+**Contexto:** objetivo "Criar PAINEL GERENCIAL E ALERTAS e TAREFA de Canais e Parcerias" — primeira execução real via chat/MCP depois da troca do motor de produção. A Fase 0 (auditoria) revelou que o "Painel Gerencial e Alertas" descrito no objetivo **já existia**, entregue 1-2 dias antes (`/PainelAlpha/Parceiros/Dashboard`). O único item genuíno em aberto era a integração de "TAREFA" — sinalizado como `AUTO_ADJUSTMENT_REQUIRED` na Fase 0, com escopo reduzido confirmado pelo usuário via pergunta direta.
+
+**Decisão de escopo (usuário):** tarefa manual vinculada a Parceiro/Indicação **e** geração automática quando um alerta do Dashboard dispara (não só uma das duas opções).
+
+**Decisão técnica — não reaproveitar `BpmTarefa`:** o model existente de tarefas do CRM está fisicamente amarrado a `cardId` (BpmCard) como FK obrigatória. Forçar isso para Parceiros exigiria criar um "card fantasma" por parceiro, rejeitado por ser um hack. Criado `ParceiroTarefa` como model espelho (mesma paleta de prioridade/status de `BpmTarefa`, para consistência visual entre módulos), com FK direta para `Parceiro`.
+
+**Migration** (`20260826173000_add_parceiro_tarefa`, 100% aditiva) aplicada em produção via protocolo Vault completo — backup fresco gerado e validado, confirmação explícita do usuário. Durante a aplicação, um bug de processo foi encontrado e corrigido: o script de aplicação ad-hoc removia comentários de forma que engolia o `CREATE TABLE` inteiro no split por `;` — nada foi persistido na 1ª tentativa (confirmado antes de seguir, via `sqlite_master` direto), corrigido e reaplicado com sucesso. Detalhe técnico completo em `known-errors.md`.
+
+**Geração automática idempotente:** `gerarTarefasAutomaticasDeAlertas` (`parceiros-dashboard.ts`) cria `ParceiroTarefa` a partir de `ListarAlertasParceiros`, só quando `ParceiroConfig.gerarTarefaAutomaticaAlertas=true`, usando a chave lógica `parceiroId+alertaOrigemTipo+status=PENDENTE` para nunca duplicar a cada refresh do dashboard.
+
+**Validação:** `tsc --noEmit` limpo (mesmos 4 erros pré-existentes, nenhum novo), `eslint` limpo, `tests/parceiros` 82/82 passando (incluindo correção de um teste pré-existente que quebrou por causa do novo campo obrigatório em `AtualizarRegrasParceiros`), `npm run build` completo com sucesso.
+
+**Adicionado em:** 2026-08-26 por Bibble (execução via Roadmap Production, Fases 0-3 de 12 concluídas).
+
 ### 2026-08-26 — Lock global de sequenciamento no worker de documentação do Roadmap (RoadmapDocumentationWorkerLock)
 
 **Contexto:** usuário reportou que o worker de documentação (Qwen, `src/lib/roadmap-alpha/worker.ts`) estava processando vários objetivos ao mesmo tempo, quando a regra é estritamente 1 por vez. Investigação (agente Explore) confirmou causa raiz: `RoadmapDocumentationJob.claimToken` só protege contra o MESMO job ser reivindicado duas vezes — nada impedia dois processos worker diferentes de reivindicarem jobs DIFERENTES simultaneamente, cada um chamando o Ollama ao mesmo tempo. Ver detalhe técnico em `known-errors.md`.

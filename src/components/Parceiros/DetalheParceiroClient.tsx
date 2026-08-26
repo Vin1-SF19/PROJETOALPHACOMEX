@@ -18,6 +18,8 @@ import TrocarSenhaParceiro from "./TrocarSenhaParceiro";
 import ModalComprovante from "./ModalComprovante";
 import ModalCredenciais from "./ModalCredenciais";
 import Relacionamento360Section from "./Relacionamento360Section";
+import ParceiroTarefasSection from "./ParceiroTarefasSection";
+import type { ListarTarefasParceiro } from "@/actions/parceiros-tarefas";
 import {
   criarFormularioResponsaveis,
   criarResponsavelVazio,
@@ -83,7 +85,7 @@ function fmtBRL(valor: number): string {
 type TemplateOnboarding = { id: number; nome: string; mensagem: string };
 
 export default function DetalheParceiroClient({
-  parceiro, permissao, temaName = "blue", template, relacionamento360,
+  parceiro, permissao, temaName = "blue", template, relacionamento360, tarefasIniciais = [],
 }: {
   parceiro: DetalheParceiro;
   permissao: { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean };
@@ -99,6 +101,7 @@ export default function DetalheParceiroClient({
     historico: Awaited<ReturnType<typeof ListarHistoricoParceiro>>["historico"];
     indicacoesFunil: Awaited<ReturnType<typeof ListarIndicacoesDoParceiro>>["indicacoes"];
   };
+  tarefasIniciais?: Awaited<ReturnType<typeof ListarTarefasParceiro>>["tarefas"];
 }) {
   const router = useRouter();
   const tema = getTema(temaName);
@@ -308,6 +311,16 @@ export default function DetalheParceiroClient({
             cardCls={cardCls}
           />
         )}
+
+        {/* Tarefas — RM-2026-8B7DC7 */}
+        <ParceiroTarefasSection
+          parceiroId={parceiro.id}
+          tarefasIniciais={tarefasIniciais}
+          podeEditar={permissao.podeEditar}
+          podeExcluir={permissao.podeExcluir}
+          accent={tema.accent}
+          cardCls={cardCls}
+        />
 
         {/* Indicações */}
         {parceiro.indicacoes.length > 0 && (

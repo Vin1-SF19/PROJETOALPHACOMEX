@@ -34,14 +34,14 @@ describe("Fase 06 — RBAC: alterar configurações exige Admin, não apenas pod
 
   it("rejeita editor comum (role não-admin, mesmo com ParceiroAcesso.podeEditar=true)", async () => {
     authMock.mockResolvedValue({ user: { id: "2", role: "User" } });
-    const r = await AtualizarRegrasParceiros({ diasAlertaSemIndicacao: 30, diasInatividade: 60, cadenciaPotencial4Dias: null, cadenciaPotencial5Dias: null });
+    const r = await AtualizarRegrasParceiros({ diasAlertaSemIndicacao: 30, diasInatividade: 60, cadenciaPotencial4Dias: null, cadenciaPotencial5Dias: null, gerarTarefaAutomaticaAlertas: false });
     expect(r.success).toBe(false);
     expect(prismaMock.parceiroConfig.upsert).not.toHaveBeenCalled();
   });
 
   it("aceita Admin", async () => {
     authMock.mockResolvedValue({ user: { id: "1", role: "Admin" } });
-    const r = await AtualizarRegrasParceiros({ diasAlertaSemIndicacao: 30, diasInatividade: 60, cadenciaPotencial4Dias: null, cadenciaPotencial5Dias: null });
+    const r = await AtualizarRegrasParceiros({ diasAlertaSemIndicacao: 30, diasInatividade: 60, cadenciaPotencial4Dias: null, cadenciaPotencial5Dias: null, gerarTarefaAutomaticaAlertas: false });
     expect(r.success).toBe(true);
     expect(prismaMock.parceiroConfig.upsert).toHaveBeenCalled();
   });

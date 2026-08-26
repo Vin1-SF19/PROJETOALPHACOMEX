@@ -20,7 +20,62 @@ async function lerConfigRegras() {
     where: { id: 1 },
     create: { id: 1 },
     update: {},
-    select: { diasAlertaSemIndicacao: true, diasInatividade: true },
+    select: { diasAlertaSemIndicacao: true, diasInatividade: true, gerarTarefaAutomaticaAlertas: true },
+  });
+}
+
+const ALERTA_TAREFA_TITULO: Record<AlertaParceiro["tipo"], string> = {
+  SEM_PROXIMA_ACAO: "Definir próxima ação",
+  FOLLOWUP_VENCIDO: "Follow-up vencido — retomar contato",
+  PARCEIRO_INATIVO: "Reativar parceiro inativo",
+  CADASTRO_PENDENTE: "Aprovar pré-cadastro pendente",
+  SEM_INDICACAO: "Sem indicação no prazo — contatar parceiro",
+};
+
+/**
+ * Gera `ParceiroTarefa` automáticas a partir dos alertas ativos, quando ligado em
+ * `ParceiroConfig.gerarTarefaAutomaticaAlertas`. Idempotente: só cria se ainda não existir
+ * uma tarefa automática PENDENTE do mesmo tipo para o mesmo parceiro — evita duplicar a
+ * cada refresh do dashboard. Alertas sem `parceiroId` (ex: CADASTRO_PENDENTE) são ignorados,
+ * pois não há parceiro para vincular a tarefa.
+ *
+ * Nota de segurança (auditada — aceita por desenho): chamada a partir de `ListarAlertasParceiros`,
+ * que só exige `ctx` (sessão válida + acesso ao módulo), não `podeEditar`. Ou seja, qualquer
+ * usuário com acesso de LEITURA ao Dashboard pode, como efeito colateral de abrir a aba
+ * Alertas, disparar esta escrita no banco. Isso é intencional: (1) o toggle que liga a
+ * automação (`gerarTarefaAutomaticaAlertas`) é Admin-only via `AtualizarRegrasParceiros`,
+ * então a superfície só existe se um Admin optou por ativá-la; (2) o efeito é sempre a
+ * criação de uma tarefa refletindo um alerta que já é público a qualquer leitor do módulo,
+ * nunca uma ação destrutiva ou exposição de dado novo. Se essa automação ganhar efeitos mais
+ * sensíveis no futuro (ex: notificar externamente, cobrar), mover a checagem para dentro
+ * deste helper (`ctx.isAdmin || ctx.podeEditar`) antes de expandir o escopo.
+ */
+async function gerarTarefasAutomaticasDeAlertas(alertas: AlertaParceiro[]) {
+  const candidatos = alertas.filter((a): a is AlertaParceiro & { parceiroId: number } => a.parceiroId !== undefined);
+  if (candidatos.length === 0) return;
+
+  const existentes = await db.parceiroTarefa.findMany({
+    where: {
+      status: "PENDENTE",
+      origemAutomatica: true,
+      parceiroId: { in: candidatos.map((a) => a.parceiroId) },
+    },
+    select: { parceiroId: true, alertaOrigemTipo: true },
+  });
+  const jaExiste = new Set(existentes.map((t) => `${t.parceiroId}:${t.alertaOrigemTipo}`));
+
+  const novas = candidatos.filter((a) => !jaExiste.has(`${a.parceiroId}:${a.tipo}`));
+  if (novas.length === 0) return;
+
+  await db.parceiroTarefa.createMany({
+    data: novas.map((a) => ({
+      parceiroId: a.parceiroId,
+      titulo: ALERTA_TAREFA_TITULO[a.tipo],
+      descricao: a.detalhe,
+      prioridade: "ALTA" as const,
+      origemAutomatica: true,
+      alertaOrigemTipo: a.tipo,
+    })),
   });
 }
 
@@ -228,6 +283,10 @@ export async function ListarAlertasParceiros() {
   });
   for (const p of preCadastrosPendentes) {
     alertas.push({ tipo: "CADASTRO_PENDENTE", preCadastroId: p.id, nome: p.nomeCompleto, detalhe: "Pré-cadastro aguardando aprovação" });
+  }
+
+  if (cfg.gerarTarefaAutomaticaAlertas) {
+    await gerarTarefasAutomaticasDeAlertas(alertas);
   }
 
   return { success: true as const, alertas };

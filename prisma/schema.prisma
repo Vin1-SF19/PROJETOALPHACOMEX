@@ -99,6 +99,7 @@ model usuarios {
   parceirosResponsavel            Parceiro[]              @relation("ParceiroResponsavel")
   parceirosPotencialAtualizadoPor Parceiro[]              @relation("ParceiroPotencialAtualizadoPor")
   parceiroHistoricos              ParceiroHistorico[]     @relation("ParceiroHistoricoUsuario")
+  parceiroTarefasResponsavel      ParceiroTarefa[]        @relation("ParceiroTarefaResponsavel")
   parceiroLeadsResponsavel        ParceiroLead[]          @relation("ParceiroLeadResponsavel")
   parceiroLeadsPromovidosPor      ParceiroLead[]          @relation("ParceiroLeadPromovidoPor")
   parceiroLeadHistoricos          ParceiroLeadHistorico[] @relation("ParceiroLeadHistoricoUsuario")
@@ -2371,6 +2372,7 @@ model Parceiro {
   convitesGerados                     ConviteParceiro[]       @relation("ConvitesPorParceiro")
   pessoasVinculadas                   PessoaParceiroVinculo[]
   historico                           ParceiroHistorico[]
+  tarefas                             ParceiroTarefa[]
   leadsOrigem                         ParceiroLead[]          @relation("ParceiroLeadPromovido")
   createdAt                           DateTime                @default(now())
   updatedAt                           DateTime                @updatedAt
@@ -2400,6 +2402,36 @@ model ParceiroHistorico {
   @@index([parceiroId])
   @@index([createdAt])
   @@map("parceiro_historico")
+}
+
+// Tarefa vinculada a um Parceiro (Desenvolvimento) — RM-2026-8B7DC7. Não reaproveita `BpmTarefa`
+// porque esta está fisicamente amarrada a `cardId` (BpmCard/CRM) como FK obrigatória; forçar isso
+// aqui exigiria um card fantasma por parceiro, rejeitado. Mesma paleta de prioridade/status de
+// `BpmTarefa` para consistência visual entre módulos. `origemAutomatica`/`alertaOrigemTipo`
+// marcam tarefas geradas por `ListarAlertasParceiros` (idempotente por parceiroId+tipo+PENDENTE),
+// distinguindo-as das criadas manualmente na tela 360º/Dashboard.
+model ParceiroTarefa {
+  id                String    @id @default(cuid())
+  parceiroId        Int
+  parceiro          Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  titulo            String
+  descricao         String?
+  responsavelId     Int?
+  responsavel       usuarios? @relation("ParceiroTarefaResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  prazo             DateTime?
+  prioridade        String    @default("NORMAL") // "BAIXA" | "NORMAL" | "ALTA"
+  status            String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
+  origemAutomatica  Boolean   @default(false)
+  alertaOrigemTipo  String? // AlertaParceiro.tipo, só quando origemAutomatica=true
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  concluidaEm DateTime?
+
+  @@index([parceiroId])
+  @@index([status])
+  @@index([responsavelId])
+  @@map("parceiro_tarefa")
 }
 
 // Staging de Aquisição de Parceiros ("card virtual") — mesmo padrão em produção de `NolossLead`:
@@ -2663,6 +2695,9 @@ model ParceiroConfig {
   diasInatividade           Int      @default(60)
   cadenciaPotencial4Dias    Int?
   cadenciaPotencial5Dias    Int?
+  // RM-2026-8B7DC7 — liga/desliga a criação automática de ParceiroTarefa a partir dos alertas
+  // de ListarAlertasParceiros. Desligado por padrão (opt-in explícito do Admin).
+  gerarTarefaAutomaticaAlertas Boolean @default(false)
   updatedAt                 DateTime @updatedAt
 
   @@map("parceiro_config")

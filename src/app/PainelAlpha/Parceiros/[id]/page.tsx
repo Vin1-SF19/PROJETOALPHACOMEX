@@ -5,6 +5,7 @@ import { buscarParceiro, getPermissaoParceiros } from "@/actions/parceiros";
 import { getTemplateParadaoParceiro } from "@/actions/onboarding";
 import { ObterIndicadoresDesenvolvimentoParceiro, ListarHistoricoParceiro } from "@/actions/parceiros-desenvolvimento";
 import { ListarIndicacoesDoParceiro } from "@/actions/parceiros-indicacoes";
+import { ListarTarefasParceiro } from "@/actions/parceiros-tarefas";
 import DetalheParceiroClient, { type DetalheParceiro } from "@/components/Parceiros/DetalheParceiroClient";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function DetalheParceiroPage({ params }: { params: Promise<
   const parceiroId = Number(id);
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
 
-  const [parceiroRaw, permissao, rec, template, relacionamento, indicadores, historico, indicacoesFunil] = await Promise.all([
+  const [parceiroRaw, permissao, rec, template, relacionamento, indicadores, historico, indicacoesFunil, tarefas] = await Promise.all([
     buscarParceiro(parceiroId),
     getPermissaoParceiros(),
     userId ? db.usuarios.findUnique({ where: { id: userId }, select: { tema_interface: true } }) : null,
@@ -37,6 +38,7 @@ export default async function DetalheParceiroPage({ params }: { params: Promise<
     ObterIndicadoresDesenvolvimentoParceiro(parceiroId),
     ListarHistoricoParceiro(parceiroId),
     ListarIndicacoesDoParceiro(parceiroId),
+    ListarTarefasParceiro(parceiroId),
   ]);
   if (!parceiroRaw) notFound();
 
@@ -59,6 +61,7 @@ export default async function DetalheParceiroPage({ params }: { params: Promise<
         historico: historico.success ? historico.historico : [],
         indicacoesFunil: indicacoesFunil.success ? indicacoesFunil.indicacoes : [],
       }}
+      tarefasIniciais={tarefas.success ? tarefas.tarefas : []}
     />
   );
 }

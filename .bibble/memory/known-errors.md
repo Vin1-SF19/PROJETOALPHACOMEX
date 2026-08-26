@@ -5,6 +5,15 @@
 
 ---
 
+### Script de migration ad-hoc: split de statements por `.split(";\n")` engole `CREATE TABLE` quando o arquivo .sql começa com linhas de comentário `-- ...`
+**Sintoma:** ao aplicar `prisma/migrations/20260826173000_add_parceiro_tarefa/migration.sql` statement-por-statement via `@libsql/client`, o primeiro `CREATE INDEX` falhou com `SQLITE_UNKNOWN: no such table: main.parceiro_tarefa` — mesmo o `CREATE TABLE` sendo o statement anterior no arquivo e reportando sucesso aparente. Investigação (`PRAGMA foreign_key_check`/`sqlite_master` direto no Turso) confirmou: a tabela realmente NUNCA foi criada — nada persistiu, nem erro nem sucesso silencioso do lado do servidor.
+**Causa raiz:** era um bug no script local de aplicação, não no Turso. O parser `sql.split(";\n").filter(s => !s.startsWith("--"))` juntou os 2 comentários de cabeçalho do arquivo (`-- RM-...` / `-- Migration 100%...`) com o `CREATE TABLE` inteiro em um único "statement 0" (porque o split só corta DEPOIS do primeiro `;`, e o `CREATE TABLE` multi-linha não tem `;` até o fim dele) — e o filtro `startsWith("--")` descartou esse statement inteiro por começar com comentário, incluindo o `CREATE TABLE` que vinha junto. Os demais `CREATE INDEX`/`ALTER TABLE`, sem comentário próprio, passaram batido — por isso o erro só apareceu no índice, não no `CREATE TABLE`.
+**Fix:** sempre que aplicar SQL de migration via script ad-hoc, remover linhas de comentário (`.split("\n").filter(line => !line.trim().startsWith("--")).join("\n")`) ANTES de dividir por `;` — nunca filtrar por `startsWith("--")` depois de já ter agrupado por `;\n`, porque um statement multi-linha pode carregar um comentário de cabeçalho junto e ser descartado inteiro.
+**Lição geral:** depois de qualquer statement de migration reportar "OK" via script solto, SEMPRE confirmar contra `sqlite_master`/`PRAGMA table_info` antes de seguir para o próximo — "não deu erro" não é prova de que persistiu (já visto antes com o Hrana batch; agora confirmado que um bug de parsing local pode produzir o mesmo sintoma por um motivo totalmente diferente).
+**Adicionado em:** 2026-08-26 (Bibble, migration `parceiro_tarefa`, RM-2026-8B7DC7)
+
+---
+
 ### Roadmap — worker de documentação (Qwen) processava vários objetivos ao mesmo tempo, deveria ser 1 por vez (2026-08-26, CORRIGIDO)
 **Sintoma:** Usuário reportou que o worker de documentação estava "documentando vários ao mesmo tempo, sendo que é para documentar 1 por 1". Múltiplos objetivos entravam em `DOCUMENTING` simultaneamente.
 **Causa raiz:** `RoadmapDocumentationJob.claimToken` (fencing otimista) só protege contra o MESMO job ser reivindicado duas vezes — não impede que dois processos worker DIFERENTES reivindiquem jobs DIFERENTES ao mesmo tempo, cada um chamando o Ollama/Qwen em paralelo sem nenhuma serialização entre si. Não havia nenhum lock global de sequenciamento na fila.

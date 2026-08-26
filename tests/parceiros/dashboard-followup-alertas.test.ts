@@ -8,6 +8,7 @@ const prismaMock = vi.hoisted(() => ({
   parceiroHistorico: { count: vi.fn() },
   parceiroConfig: { upsert: vi.fn() },
   preCadastroParceiro: { findMany: vi.fn() },
+  parceiroTarefa: { findMany: vi.fn(), createMany: vi.fn() },
 }));
 
 const getCtxMock = vi.hoisted(() => vi.fn());
@@ -125,5 +126,47 @@ describe("ListarAlertasParceiros", () => {
     const r = await ListarAlertasParceiros();
     expect(r.success).toBe(true);
     if (r.success) expect(r.alertas.some((a) => a.tipo === "CADASTRO_PENDENTE" && a.preCadastroId === 9)).toBe(true);
+  });
+
+  describe("geração automática de ParceiroTarefa (RM-2026-8B7DC7)", () => {
+    it("NÃO gera tarefa quando gerarTarefaAutomaticaAlertas está desligado (default)", async () => {
+      prismaMock.parceiroConfig.upsert.mockResolvedValue({ diasAlertaSemIndicacao: null, diasInatividade: 45, gerarTarefaAutomaticaAlertas: false });
+      prismaMock.parceiro.findMany.mockResolvedValueOnce([{ id: 1, nome: "Fulano" }]); // inativos
+      await ListarAlertasParceiros();
+      expect(prismaMock.parceiroTarefa.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.parceiroTarefa.createMany).not.toHaveBeenCalled();
+    });
+
+    it("gera tarefa automática quando ligado e ainda não existe uma PENDENTE do mesmo tipo", async () => {
+      prismaMock.parceiroConfig.upsert.mockResolvedValue({ diasAlertaSemIndicacao: null, diasInatividade: 45, gerarTarefaAutomaticaAlertas: true });
+      prismaMock.parceiro.findMany.mockResolvedValueOnce([{ id: 1, nome: "Fulano" }]); // inativos
+      prismaMock.parceiroTarefa.findMany.mockResolvedValue([]); // nenhuma tarefa automática existente ainda
+      const r = await ListarAlertasParceiros();
+      expect(r.success).toBe(true);
+      expect(prismaMock.parceiroTarefa.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({ parceiroId: 1, origemAutomatica: true, alertaOrigemTipo: "PARCEIRO_INATIVO" }),
+          ]),
+        }),
+      );
+    });
+
+    it("é idempotente — NÃO duplica quando já existe tarefa automática PENDENTE do mesmo tipo/parceiro", async () => {
+      prismaMock.parceiroConfig.upsert.mockResolvedValue({ diasAlertaSemIndicacao: null, diasInatividade: 45, gerarTarefaAutomaticaAlertas: true });
+      prismaMock.parceiro.findMany.mockResolvedValueOnce([{ id: 1, nome: "Fulano" }]); // inativos
+      prismaMock.parceiroTarefa.findMany.mockResolvedValue([{ parceiroId: 1, alertaOrigemTipo: "PARCEIRO_INATIVO" }]);
+      await ListarAlertasParceiros();
+      expect(prismaMock.parceiroTarefa.createMany).not.toHaveBeenCalled();
+    });
+
+    it("ignora alertas sem parceiroId (ex: CADASTRO_PENDENTE) — não há parceiro para vincular", async () => {
+      prismaMock.parceiroConfig.upsert.mockResolvedValue({ diasAlertaSemIndicacao: null, diasInatividade: 60, gerarTarefaAutomaticaAlertas: true });
+      prismaMock.parceiro.findMany.mockResolvedValueOnce([]); // inativos
+      prismaMock.preCadastroParceiro.findMany.mockResolvedValue([{ id: 9, nomeCompleto: "Ciclano", createdAt: new Date() }]);
+      prismaMock.parceiroTarefa.findMany.mockResolvedValue([]);
+      await ListarAlertasParceiros();
+      expect(prismaMock.parceiroTarefa.createMany).not.toHaveBeenCalled();
+    });
   });
 });

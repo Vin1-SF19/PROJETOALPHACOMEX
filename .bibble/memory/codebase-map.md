@@ -2,7 +2,19 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-26 (Roadmap Alpha — MCP Codex project-scoped)
+> Última atualização: 2026-08-26 (Parceiros — Tarefas manuais e automáticas por alerta)
+
+---
+
+## Parceiros — Tarefas manuais e automáticas por alerta (2026-08-26, RM-2026-8B7DC7)
+
+- **Model novo:** `ParceiroTarefa` (`prisma/schema.prisma`, migration `20260826173000_add_parceiro_tarefa`) — tarefa vinculada a `Parceiro` (FK cascade), com `titulo`/`descricao`/`responsavelId`/`prazo`/`prioridade` (BAIXA|NORMAL|ALTA)/`status` (PENDENTE|CONCLUIDA)/`origemAutomatica`/`alertaOrigemTipo`. Espelha `BpmTarefa` (CRM) na paleta visual, mas é um model independente — `BpmTarefa` está amarrada a `cardId` (BpmCard) como FK obrigatória, incompatível com o domínio de Parceiro.
+- **Campo novo:** `ParceiroConfig.gerarTarefaAutomaticaAlertas` (Boolean, default `false`) — liga/desliga a geração automática, Admin-only via `AtualizarRegrasParceiros`.
+- **Backend:** `src/actions/parceiros-tarefas.ts` (novo) — `CriarTarefaParceiro`/`ListarTarefasParceiro`/`ConcluirTarefaParceiro`/`ExcluirTarefaParceiro`, RBAC igual ao resto do módulo (`getCtx()` de `parceiros.ts`). Geração automática idempotente em `gerarTarefasAutomaticasDeAlertas` (`src/actions/parceiros-dashboard.ts`), chamada ao final de `ListarAlertasParceiros` — chave lógica `parceiroId+alertaOrigemTipo+status=PENDENTE` evita duplicar tarefa a cada refresh do dashboard.
+- **Frontend:** `DashboardParceirosClient.tsx` (aba Alertas: botão "Criar tarefa"/badge "Tarefa criada"; aba Fila: coluna de contagem de tarefas pendentes), `ConfiguracoesParceirosClient.tsx` (toggle da automação), `ParceiroTarefasSection.tsx` (novo componente — lista de tarefas na tela 360º do parceiro, criar/concluir/excluir inline).
+- **Achado de processo relevante:** o "Painel Gerencial e Alertas" pedido no objetivo original já existia (entregue 1-2 dias antes) — a Fase 0 (auditoria) evitou reconstrução redundante, e o trabalho real ficou concentrado só na integração de Tarefas.
+
+**Última atualização:** 2026-08-26 por Scribe
 
 ---
 
