@@ -2125,3 +2125,15 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 **Onde verificar antes de reintroduzir esse antipadrão:** se um objetivo/registro futuro precisar de um "modo especial" que muda o comportamento de mais de um consumidor (UI + worker/backend), procure primeiro se já existe um campo estrutural — não crie uma segunda heurística baseada em conteúdo de texto/nome/formato. `grep` por `.includes(` sobre campos de texto livre é um bom jeito de achar candidatos a esse antipadrão já existentes no código.
 
 **Última atualização:** 2026-08-25 por Scribe
+
+### Roadmap Alpha — conexão MCP do Codex
+
+**Arquivos:** `.codex/config.toml`, `mcp/roadmap-status` e `.mcp.json` (somente referência; configuração Claude preservada).
+
+**Propósito:** conectar o Codex ao status do Roadmap pelo servidor project-scoped `roadmap_status_codex`, reutilizando a implementação MCP já existente e mantendo o Claude conectado de forma independente.
+
+**Editado quando:** mudar o comando/entrada do servidor MCP, os nomes das variáveis de ambiente ou o contrato de autenticação do Roadmap.
+
+**Como adicionar/manter:** configure `roadmap_status_codex` em `.codex/config.toml`; forneça os valores por variáveis de ambiente User do Windows, sem versionar segredos, usando uma `RoadmapApiKey` dedicada ao Codex; depois recarregue o Codex para herdar o novo ambiente. Não altere `.mcp.json` nem compartilhe a chave do Claude. Esta integração não requer menu, rota, permissão ou atalho novos.
+
+**Última atualização:** 2026-08-26 por Scribe

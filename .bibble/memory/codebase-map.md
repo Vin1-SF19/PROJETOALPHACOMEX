@@ -2,7 +2,20 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-26 (Alpha CRM — correção do form de adição de card: remoção do campo "serviço", serviço derivado do pipeline)
+> Última atualização: 2026-08-26 (Roadmap Alpha — MCP Codex project-scoped)
+
+---
+
+## Roadmap Alpha — MCP Codex project-scoped (2026-08-26)
+
+- **Configuração:** `.codex/config.toml`, exclusiva deste projeto, registra o servidor `roadmap_status_codex`.
+- **Implementação reutilizada:** `mcp/roadmap-status`; não foi criado um segundo servidor de domínio.
+- **Credenciais:** nomes de variáveis são lidos do ambiente **User** do Windows, sem segredos versionados. O Codex usa uma `RoadmapApiKey` dedicada.
+- **Coexistência:** o MCP do Claude permanece em `.mcp.json`, sem alteração; ambos acessam o mesmo domínio do Roadmap por configurações independentes.
+- **Ativação:** depois de definir as variáveis User, é necessário recarregar/reiniciar o Codex para o processo herdar o ambiente.
+- **Wiring de produto:** integração de agente, sem novo menu, rota, permissão ou atalho no Painel Alpha.
+
+**Última atualização:** 2026-08-26 por Scribe
 
 ---
 

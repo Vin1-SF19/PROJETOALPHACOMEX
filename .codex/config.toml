@@ -1,5 +1,5 @@
 [mcp_servers.roadmap_status_codex]
 enabled = true
 command = "node"
-args = ['C:\Users\TI\Desktop\PainelAlpha\mcp\roadmap-status\dist\index.js']
+args = ["mcp/roadmap-status/dist/index.js"]
 env_vars = ["ROADMAP_MCP_BASE_URL", "ROADMAP_MCP_TOKEN"]

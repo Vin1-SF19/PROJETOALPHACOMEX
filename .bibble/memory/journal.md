@@ -3570,3 +3570,37 @@ Quinta e última parte do dia sobre o Roadmap Alpha (depois da auditoria de 24 s
 
 ### Refletido também em
 - `known-errors.md`: entrada do erro #310 **corrigida** (causa completa, não só Suspense) + nova entrada "NÃO RESOLVIDO" sobre o travamento do worker de documentação.
+
+---
+
+## [2026-08-26 14:09] — MCP do Roadmap conectado ao Codex sem alterar a integração do Claude
+
+**Tags:** #integration #security #roadmap #Codex-api
+
+**Agentes envolvidos:** Bibble, Codex, Kowalski
+
+**Arquivos tocados:** configuração MCP project-scoped do Codex, variável de ambiente do usuário
+
+### Contexto
+O módulo Roadmap já possuía um MCP funcional para o Claude; a pendência era conectar também o Codex ao mesmo domínio, mantendo as duas integrações independentes e sem modificar a configuração existente do Claude.
+
+### O que foi feito
+- Configurado um MCP do Roadmap exclusivo para o Codex, com identidade e chave de API dedicadas, declaração TOML no escopo do projeto e segredo mantido em variável de ambiente do usuário.
+- Validado o handshake do servidor: 9 tools foram descobertas e a fila respondeu em modo somente leitura.
+- Verificada a preservação do MCP do Claude por comparação de hash antes/depois, sem alteração no artefato existente.
+- Executados testes e build pertinentes; eventuais falhas de baseline externas ao trabalho foram separadas da validação desta integração.
+
+### Decisões tomadas
+- Usar credencial dedicada por cliente MCP: isola revogação, auditoria e rotação entre Codex e Claude.
+- Manter o TOML no escopo do projeto e o segredo fora do repositório: limita a configuração ao PainelAlpha sem expor credenciais em arquivos versionáveis.
+- Restringir a validação inicial da fila a operações somente leitura: comprova conectividade sem provocar mutações no Roadmap.
+
+### Problemas encontrados / resolvidos
+- Risco de sobrescrever ou degradar o MCP do Claude: eliminado ao adicionar a configuração do Codex separadamente e confirmar a integridade do artefato do Claude por hash.
+- Segredos potencialmente registráveis em configuração ou memória: evitado; nenhum token, URL autenticada, prefixo de chave ou outro segredo foi persistido neste registro.
+
+### Pendências
+- Recarregar o Codex para que a nova configuração MCP e a variável de ambiente sejam incorporadas ao processo; após o reload, confirmar a disponibilidade das 9 tools na sessão nova.
+
+### Refletido também em
+- Nenhum arquivo curado adicional: a consolidação ficou restrita ao journal por escopo desta tarefa.
