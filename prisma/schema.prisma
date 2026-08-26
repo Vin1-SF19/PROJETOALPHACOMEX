@@ -262,6 +262,24 @@ model RoadmapDocumentationJob {
   @@index([objectiveId, status])
 }
 
+/// Lock global singleton (id fixo "singleton") que garante processamento
+/// estritamente sequencial da fila de documentação — no máximo 1 objetivo em
+/// DOCUMENTING por vez, mesmo que múltiplos processos worker (ou o mesmo
+/// worker chamado fora do supervisor .ps1, de outra máquina, etc.) tentem
+/// reivindicar jobs ao mesmo tempo. RoadmapDocumentationJob.claimToken já
+/// protege contra double-claim do MESMO job; este lock protege contra dois
+/// jobs DIFERENTES sendo processados ao mesmo tempo. Mesmo padrão de fencing
+/// otimista (claimToken incremental) já usado em RoadmapDocumentationJob.
+model RoadmapDocumentationWorkerLock {
+  id             String    @id @default("singleton")
+  claimedBy      String?
+  claimedAt      DateTime?
+  claimExpiresAt DateTime?
+  heartbeatAt    DateTime?
+  claimToken     Int       @default(0)
+  updatedAt      DateTime  @updatedAt
+}
+
 /// Tentativa sanitizada de chamada ao provedor. Tokens, URLs autenticadas e
 /// respostas brutas nunca são armazenados.
 model RoadmapDocumentationAttempt {

@@ -5,6 +5,15 @@
 
 ---
 
+### Roadmap — worker de documentação (Qwen) processava vários objetivos ao mesmo tempo, deveria ser 1 por vez (2026-08-26, CORRIGIDO)
+**Sintoma:** Usuário reportou que o worker de documentação estava "documentando vários ao mesmo tempo, sendo que é para documentar 1 por 1". Múltiplos objetivos entravam em `DOCUMENTING` simultaneamente.
+**Causa raiz:** `RoadmapDocumentationJob.claimToken` (fencing otimista) só protege contra o MESMO job ser reivindicado duas vezes — não impede que dois processos worker DIFERENTES reivindiquem jobs DIFERENTES ao mesmo tempo, cada um chamando o Ollama/Qwen em paralelo sem nenhuma serialização entre si. Não havia nenhum lock global de sequenciamento na fila.
+**Fix:** nova tabela `RoadmapDocumentationWorkerLock` (lock global singleton, `id` fixo `"singleton"`, mesmo padrão de fencing otimista com `claimToken` incremental + lease de 12min via `claimExpiresAt`/heartbeat de 30s). `src/lib/roadmap-alpha/worker.ts`: `processNextRoadmapJob` agora chama `acquireWorkerLock(workerId)` ANTES de `claimNextJob` — se não conseguir o lock, retorna `{ processed: false }` sem reivindicar nada. Lock é liberado no `finally` (`releaseWorkerLock`) e renovado junto do heartbeat do job (`heartbeatWorkerLock`). Migration 100% aditiva (`CREATE TABLE`), aplicada em produção via protocolo Vault completo (backup + confirmação explícita).
+**Lição geral:** um `claimToken` por-linha (job individual) NÃO substitui um lock de fila — eles resolvem problemas diferentes. Fencing por-item impede double-claim do MESMO recurso; um lock global/singleton é o que impede concorrência entre RECURSOS DIFERENTES quando a regra de negócio exige processamento estritamente sequencial da fila inteira.
+**Adicionado em:** 2026-08-26 (Bibble, execução direta a pedido do usuário)
+
+---
+
 ### Alpha CRM — Campo BPM com etapaId=null ("Todas as etapas" no admin) nunca aparece em nenhuma etapa — RM-2026-04C4B0 (2026-08-26, CORRIGIDO)
 **Sintoma:** Usuário reportou que "campos já preenchidos perdem valor entre etapas" no card do Alpha CRM. Investigação confirmou: campos configurados no admin do pipeline (`AdminPipelineClient.tsx`) com a opção **"Todas as etapas"** (que grava `BpmCampo.etapaId = null`) nunca aparecem em NENHUMA etapa — mesmo com valor real já salvo em `BpmCardCampoValor`. Confirmado em produção: 6 campos (CNPJ, Nome do responsável, Radar pretendido, Confirmar serviço, Valor acordado no contrato, Forma de pagamento) tinham valores reais preenchidos por usuários, mas ficavam 100% invisíveis.
 **Causa raiz:** `carregarCamposAplicaveisEtapa`/`carregarCamposObrigatoriosEtapa` (`src/lib/bpm/requisitos-etapa-server.ts`) filtravam `bpmCampo.findMany({ where: { pipelineId, etapaId } })` por igualdade exata — um campo com `etapaId: null` no banco nunca bate com `etapaId: "<id-da-etapa-atual>"` no Prisma (Prisma não trata `{ etapaId: "x" }` como "inclui nulls"). O mecanismo que faria um campo global aparecer numa etapa específica (`BpmCampoObrigatorioEtapa`) existe no schema e é lido pela query, mas **nunca é escrito por nenhuma Server Action/UI** — infraestrutura morta, nunca conectada.

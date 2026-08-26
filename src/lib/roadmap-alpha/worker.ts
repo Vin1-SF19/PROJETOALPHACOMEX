@@ -51,6 +51,58 @@ async function reconcileStaleDocumentingObjectives(now: Date): Promise<void> {
   });
 }
 
+const LOCK_ID = "singleton";
+
+/**
+ * Adquire o lock global de sequenciamento (RoadmapDocumentationWorkerLock,
+ * linha única "singleton"). Só o dono do lock pode reivindicar um job da
+ * fila — garante no máximo 1 objetivo em DOCUMENTING por vez, mesmo com
+ * múltiplos processos worker concorrentes (ver known-errors.md). Mesmo
+ * padrão de fencing otimista (claimToken incremental) já usado nos jobs
+ * individuais. Cria a linha singleton sob demanda se ainda não existir
+ * (primeira execução após a migration).
+ */
+async function acquireWorkerLock(workerId: string): Promise<boolean> {
+  const now = new Date();
+  return db.$transaction(async (tx) => {
+    const lock = await tx.roadmapDocumentationWorkerLock.upsert({
+      where: { id: LOCK_ID },
+      update: {},
+      create: { id: LOCK_ID },
+    });
+    const free = !lock.claimedBy || !lock.claimExpiresAt || lock.claimExpiresAt < now;
+    if (!free) return false;
+    const claimed = await tx.roadmapDocumentationWorkerLock.updateMany({
+      where: { id: LOCK_ID, claimToken: lock.claimToken },
+      data: {
+        claimedBy: workerId,
+        claimedAt: now,
+        heartbeatAt: now,
+        claimExpiresAt: new Date(now.getTime() + LEASE_MS),
+        claimToken: { increment: 1 },
+      },
+    });
+    return claimed.count === 1;
+  });
+}
+
+async function releaseWorkerLock(workerId: string): Promise<void> {
+  await db.roadmapDocumentationWorkerLock.updateMany({
+    where: { id: LOCK_ID, claimedBy: workerId },
+    data: { claimedBy: null, claimedAt: null, claimExpiresAt: null, heartbeatAt: null },
+  });
+}
+
+async function heartbeatWorkerLock(workerId: string): Promise<void> {
+  const now = new Date();
+  await db.roadmapDocumentationWorkerLock
+    .updateMany({
+      where: { id: LOCK_ID, claimedBy: workerId },
+      data: { heartbeatAt: now, claimExpiresAt: new Date(now.getTime() + LEASE_MS) },
+    })
+    .catch(() => undefined);
+}
+
 async function claimNextJob(workerId: string) {
   const now = new Date();
   return db.$transaction(async (tx) => {
@@ -119,8 +171,20 @@ export async function processNextRoadmapJob(
 ) {
   await purgeExpiredDeletedRoadmapObjectives();
   await reconcileStaleDocumentingObjectives(new Date());
-  const job = await claimNextJob(workerId);
-  if (!job) return { processed: false as const };
+
+  // Lock global: só o processo que detém o lock pode reivindicar um job.
+  // Garante no máximo 1 objetivo em DOCUMENTING por vez em todo o sistema,
+  // independente de quantos processos worker estejam de pé.
+  const gotLock = await acquireWorkerLock(workerId);
+  if (!gotLock) return { processed: false as const };
+
+  let job: Awaited<ReturnType<typeof claimNextJob>> = null;
+  try {
+    job = await claimNextJob(workerId);
+    if (!job) return { processed: false as const };
+  } finally {
+    if (!job) await releaseWorkerLock(workerId);
+  }
   const attempt = await db.roadmapDocumentationAttempt.create({
     data: {
       jobId: job.id,
@@ -147,6 +211,7 @@ export async function processNextRoadmapJob(
         },
       })
       .catch(() => undefined);
+    void heartbeatWorkerLock(workerId);
   }, HEARTBEAT_MS);
 
   try {
@@ -345,5 +410,6 @@ export async function processNextRoadmapJob(
     };
   } finally {
     clearInterval(heartbeat);
+    await releaseWorkerLock(workerId);
   }
 }

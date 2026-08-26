@@ -2,6 +2,37 @@
 
 ---
 
+## [2026-08-26] — Lock global de sequenciamento no worker de documentação do Roadmap
+
+**Tags:** #bugfix #roadmap #concorrencia #migration #vault
+**Agentes envolvidos:** Bibble (execução direta, sem pipeline formal da squad), agente Explore (diagnóstico de causa raiz)
+**Arquivos tocados:** `prisma/schema.prisma` (model novo), `prisma/migrations/20260826170000_add_roadmap_documentation_worker_lock/migration.sql`, `src/lib/roadmap-alpha/worker.ts`, `docs/roadmap-alpha/migration-preflight-2026-08-26-documentation-worker-lock.md`, `.bibble/memory/{decisions.md, known-errors.md, journal.md}`
+
+### Contexto
+Usuário reportou, na mesma sessão que já tinha trocado o motor de PRODUÇÃO do Roadmap, que o motor de DOCUMENTAÇÃO (Qwen, `src/lib/roadmap-alpha/worker.ts` — componente diferente, não tocado nas mudanças anteriores) estava documentando vários objetivos ao mesmo tempo, quando deveria processar estritamente 1 por vez. Mencionou de passagem que estava mexendo no MCP do Codex em paralelo — confirmado via pergunta direta ao usuário que era só um comentário à parte, sem relação com o bug.
+
+### Diagnóstico
+Agente Explore investigou `claimNextJob`/`processNextRoadmapJob` e confirmou: `RoadmapDocumentationJob.claimToken` (fencing otimista) só impede o MESMO job ser reivindicado duas vezes — não existia nenhum lock de fila impedindo dois processos worker diferentes de reivindicarem jobs DIFERENTES ao mesmo tempo, cada um chamando o Ollama/Qwen em paralelo.
+
+### O que foi feito
+- Nova tabela `RoadmapDocumentationWorkerLock` (lock global singleton, `id="singleton"`, mesmo padrão de fencing otimista `claimToken` já usado no resto do sistema).
+- Migration 100% aditiva aplicada em produção via protocolo Vault completo: backup fresco gerado e validado (75.755.741 bytes, SHA-256 registrado no preflight), relatório de risco/rollback apresentado, confirmação explícita do usuário via AskUserQuestion antes de aplicar. Pós-migration: 250→251 tabelas, `foreign_key_check` zero violações, `quick_check: ok`.
+- `src/lib/roadmap-alpha/worker.ts`: `acquireWorkerLock`/`releaseWorkerLock`/`heartbeatWorkerLock` novas; `processNextRoadmapJob` adquire o lock antes de `claimNextJob` e libera no `finally`; heartbeat do lock roda junto do heartbeat do job (30s), lease de 12min (mesmo `LEASE_MS`) — worker morto libera o lock sozinho por expiração.
+- Validação: `npx tsc --noEmit` limpo (mesmos 4 erros pré-existentes catalogados, nenhum novo), `npx eslint src/lib/roadmap-alpha/worker.ts` limpo (exit 0), `npm run build` completo (Turbopack, produção) — `exit code 0`, todas as rotas do manifest presentes incluindo `/PainelAlpha/Roadmap`.
+
+### Decisões tomadas
+- Lock em banco (Turso), não mutex em memória do processo — o worker roda tanto dentro do Next.js quanto em processos externos (`.ps1`), então o lock precisa ser visível entre processos/máquinas.
+- Reaproveitar o padrão de fencing otimista já validado em produção (`RoadmapDocumentationJob.claimToken`) em vez de inventar mecanismo novo.
+
+### Pendências
+- `git push` continua bloqueado para mim (regra `@devops` exclusivo do projeto) — usuário precisa publicar `worker.ts`/`schema.prisma`/migration manualmente. Schema já está aplicado em produção (script pontual), mas o Git local ainda não foi sincronizado com o remoto nesta mudança específica.
+
+### Refletido também em
+- `decisions.md`: nova decisão "Lock global de sequenciamento no worker de documentação do Roadmap".
+- `known-errors.md`: novo erro catalogado "worker de documentação processava vários objetivos ao mesmo tempo".
+
+---
+
 ## [2026-08-26] — RM-2026-04C4B0 — Bug real de campos globais corrigido; promoção automática de status implementada e validada em produção
 
 **Tags:** #bugfix #crm #roadmap #mcp #status-automatico

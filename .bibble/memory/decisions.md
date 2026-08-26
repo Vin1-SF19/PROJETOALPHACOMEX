@@ -1,5 +1,21 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — Lock global de sequenciamento no worker de documentação do Roadmap (RoadmapDocumentationWorkerLock)
+
+**Contexto:** usuário reportou que o worker de documentação (Qwen, `src/lib/roadmap-alpha/worker.ts`) estava processando vários objetivos ao mesmo tempo, quando a regra é estritamente 1 por vez. Investigação (agente Explore) confirmou causa raiz: `RoadmapDocumentationJob.claimToken` só protege contra o MESMO job ser reivindicado duas vezes — nada impedia dois processos worker diferentes de reivindicarem jobs DIFERENTES simultaneamente, cada um chamando o Ollama ao mesmo tempo. Ver detalhe técnico em `known-errors.md`.
+
+**Decisão:** implementar lock global singleton (`RoadmapDocumentationWorkerLock`, 1 linha fixa `id="singleton"`) em vez de, por exemplo, um mutex em memória do processo Node — porque o worker roda tanto dentro do processo Next.js quanto em processos externos (supervisor `.ps1`), então o lock precisa ser visível entre processos/máquinas, e o banco (Turso) já é o ponto de coordenação compartilhado natural. Mesmo padrão de fencing otimista já usado em `RoadmapDocumentationJob` (`claimToken` incremental) e em `RoadmapProductionEvent`/jobs anteriores desta sessão — reaproveitar o padrão em vez de inventar um novo mecanismo.
+
+**Migration:** 100% aditiva (`CREATE TABLE`, sem tocar tabela existente), aplicada em produção via protocolo Vault completo — backup fresco gerado (`painelalpha_turso_pre_change_roadmap-documentation-worker-lock_2026-08-26T16-48-01-862Z.sql`, SHA-256 `289f91f8...`), preflight documentado em `docs/roadmap-alpha/migration-preflight-2026-08-26-documentation-worker-lock.md`, confirmação explícita do usuário via AskUserQuestion antes de aplicar. Pós-migration: 250→251 tabelas, `foreign_key_check` zero violações, `quick_check: ok`.
+
+**Implementação:** `acquireWorkerLock`/`releaseWorkerLock`/`heartbeatWorkerLock` em `src/lib/roadmap-alpha/worker.ts`, chamadas em `processNextRoadmapJob` antes de `claimNextJob` (adquire lock → só então reivindica job → libera no `finally`; heartbeat do lock roda junto do heartbeat do job, mesmo intervalo de 30s; lease de 12min igual ao `LEASE_MS` do job, então um worker morto libera o lock automaticamente por expiração, sem intervenção manual).
+
+**Validação:** `npx tsc --noEmit` limpo (mesmos 4 erros pré-existentes de sempre, nenhum novo), `npx eslint src/lib/roadmap-alpha/worker.ts` limpo (exit 0), `npm run build` completo rodado como validação final. Sem testes unitários pré-existentes cobrindo `processNextRoadmapJob`/`claimNextJob` (grep vazio em `tests/`).
+
+**Pendente:** código de `worker.ts` e `schema.prisma`/migration ainda precisam de `git push` do usuário — bloqueado para o agente pela regra `@devops` exclusivo do projeto (o schema já está aplicado em produção via script pontual, mas o repositório Git local ainda não foi sincronizado com o remoto nesta mudança específica).
+
+**Adicionado em:** 2026-08-26 por Bibble (execução direta, sem pipeline formal da squad — decisão do usuário mantida desde a troca do motor de produção).
+
 ### 2026-08-26 — RM-2026-04C4B0 — Bug real de campos globais invisíveis corrigido (2ª execução completa via novo motor de produção)
 
 **Contexto:** objetivo "Campos já preenchidos nos cards" — reclamação do usuário de que campos perdiam valor ao navegar entre etapas do card no Alpha CRM. A documentação (Qwen) do objetivo assumiu hipóteses genéricas (estado de formulário resetado no frontend, persistência fazendo replace). Investigação real (Fase 0/1) confirmou causa raiz diferente e mais precisa: campos configurados como "Todas as etapas" no admin do pipeline (`BpmCampo.etapaId = null`) nunca apareciam em etapa nenhuma, por um bug de filtro Prisma (`where: { etapaId }` não inclui `null`), não por perda de estado. Confirmado com evidência real do banco de produção: 6 campos com valores já preenchidos por usuários (CNPJ, Nome do responsável, etc.) ficavam invisíveis.
