@@ -266,33 +266,42 @@ Implementação documentada, com encerramento bloqueado pelos gates em 2026-08-1
 
 ---
 
-### Alpha CRM — Remoção visual do bloco "REQUISITOS PARA AVANÇAR" do card aberto (RM-2026-3E14F1, 2026-08-25)
+### Alpha CRM — Card aberto: cadeia real de layout consolidada + 3 arquivos órfãos removidos (RM-2026-6D5A60, 2026-08-26)
 
-Objetivo concluído. O bloco visual "Requisitos para avançar" (`PainelRequisitosAvanco.tsx`) foi removido da UI do card aberto do Alpha CRM. A validação de transição server-side permanece intacta.
+Objetivo "Layout do card Aberto único por pipeline" executado via Roadmap Production (novo motor de status manual, ver seção própria em `architecture.md`). Auditoria (Fase 0/Scout) confirmou: **o layout já é único de fato para todos os pipelines** — não havia duplicação de layout a resolver, o problema real era débito técnico de refatorações anteriores incompletas.
 
-**Estrutura atual do card aberto (`CardAbertoLayout.tsx`):**
-- **Coluna esquerda:** `PainelHistorico.tsx` — tabs (Etapas/Tarefas/Anexos/Histórico) + `PainelResumoEtapas` + `PainelTarefasPorTipo`. **Sem** o bloco de requisitos de transição (removido).
-- **Coluna centro:** `children` (formulário da etapa ativa via `CardOpenFormSlot`/`PainelCamposEtapaAtual`).
-- **Coluna direita:** `PainelProximaEtapa.tsx` — navegação entre etapas + `MoverCardBpm`.
+**Cadeia real e completa do card aberto (confirmada por leitura de código, corrige menções anteriores desatualizadas):**
+```
+CardFullViewModal.tsx (3 consumidores: DashboardClient, PipelineBoardClient em
+  /PainelAlpha/AlphaCRM/pipeline/[pipelineId], TarefasCentralClient)
+  → resolveCardAbertoLayout(pipeline.nome)  [pipelines/index.ts — registry por
+    nome normalizado, hoje vazio, fallback sempre CardAbertoLayout]
+  → CardAbertoLayout.tsx (layout único: header, tabs de serviço, grid 3 colunas)
+      - Esquerda: PainelHistorico.tsx / PainelHistoricoServico.tsx (aba serviço)
+      - Centro (children/slot): PainelRegistrar.tsx (Tabs "Formulário da
+        Etapa"/"Script") → CardOpenFormSlot.tsx (seleção por etapaEh*())
+      - Direita: PainelProximaEtapa.tsx
+```
 
-**Arquivos alterados:**
-- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx` — import e renderização de `PainelRequisitosAvanco` removidos
-- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` — props órfãs (`etapasParaMover`, `podeMoverEtapa`) limpas
+**`CardOpenFormSlot.tsx`** é o ÚNICO ponto real de seleção de formulário por etapa — IS a fonte de verdade, não `PainelRegistrar.tsx` (que só monta as Tabs e a Anotação). Painéis condicionais: `PainelReuniao` (etapaEhAgendarReuniao), `PainelStatusPosFechamento` (etapaEhFechado), `PainelChecklistFollowUp` (etapaEhEmTratativa), `PainelStandbyFollowUp` (etapaEhStandbyFollowUp). Sempre renderizados: `PainelCamposEtapaAtual`, `PainelProximoContato`.
 
-**Arquivo órfão (pendência de limpeza manual):**
-- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRequisitosAvanco.tsx` — 284 linhas, não importado por nenhum arquivo, não entra no bundle. Remover via `rm` manual.
+**3 arquivos órfãos removidos nesta sessão** (zero consumidores confirmados via grep em todo `src/`, todas as remoções validadas por `tsc --noEmit`/`eslint`/`npm run build`/`tests/bpm` sem regressão):
+- `CardOpenShell.tsx` (308 linhas) — 2ª implementação completa e duplicada do mesmo layout, com registry paralelo INCOMPATÍVEL (chaveado por `pipeline.id`, o real é por `pipeline.nome`). Nunca deve ser recriado — se um dia for necessário customizar o layout por pipeline, popular `pipelines/index.ts` (o registry real).
+- `PainelContatos.tsx` (113 linhas) — já havia sido removido de `PainelRegistrar.tsx` em `RM-2026-05E75A` (2026-08-25/26), mas tinha voltado sem intenção via `CardOpenFormSlot.tsx` (import solto, provavelmente de uma sessão que não conhecia a decisão anterior). Usuário reconfirmou a remoção nesta sessão.
+- `PainelRequisitosAvanco.tsx` (284 linhas) — pendência registrada desde `RM-2026-3E14F1` (2026-08-25), nunca executada até esta sessão. Bloco de UI já removido de `PainelHistorico.tsx` há tempo; o arquivo físico só agora foi apagado.
 
-**Validação de transição (INALTERADA):**
+**`CardOpenFormSlot.tsx` também foi limpo:** removidas props `interacoes`/`onInteracaoCriada` (só existiam para alimentar o `PainelContatos` removido) e o import não usado de `Interacao`/`ListarInteracoesCardBpm`.
+
+**Lição para sessões futuras:** este diretório (`CardModal/`) acumulou 3 arquivos órfãos ao longo de múltiplas sessões porque a remoção de UI (import + JSX) e a remoção do arquivo físico (`rm`) foram tratadas como passos separados, e o segundo passo ("pendência de limpeza manual") nunca foi retomado. Ao remover um bloco de UI, preferir remover o arquivo físico na mesma sessão sempre que confirmado órfão (grep de zero consumidores), em vez de deixar como pendência textual na memória.
+
+**Validação de transição de etapa (INALTERADA por esta sessão, já era assim):**
 - `@/actions/bpm/Cards.ts` → `ObterRequisitosTransicaoBpm`, `SalvarRequisitosEMoverCardBpm`, `MoverCardBpm`
 - `@/lib/bpm/card-modal-ui.ts` → `separarCamposRequisitos`, `montarPayloadCamposDestino`, `prepararCamposMotivoLostUi`
 - `@/lib/bpm/requisitos-etapa-server.ts` → `carregarCamposAplicaveisCardEtapa`
 
-**Pendências de qualidade (não bloqueiam a funcionalidade):**
-- 2 asserções em `tests/bpm/card-modal-integration.test.ts` referenciam `<PainelRequisitosAvanco>` (FALHA em `npm test`)
-- 2 lint warnings (`no-unused-vars`) em `CardAbertoLayout.tsx` (`realtimeRevision`, `podeEditar`)
-- 1 drift pré-existente em teste (`PainelResumoEtapas` sem `ocultarTitulo`)
+**Débito técnico pré-existente confirmado (não corrigido, fora de escopo, ver `known-errors.md`):** `CardFullViewModal.tsx` tem 1 eslint `error` real (`react-hooks/refs`) + ~15 warnings de `no-unused-vars`; `tests/bpm/card-modal-integration.test.ts` tem 9/21 testes falhando (asserções estáticas desatualizadas). Ambos confirmados pré-existentes via `git diff`/`git stash` comparativo, não introduzidos por esta sessão.
 
-**Última atualização:** 2026-08-25 por Scribe
+**Última atualização:** 2026-08-26 por Scribe (execução via Roadmap Production)
 
 ---
 

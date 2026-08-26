@@ -1,5 +1,20 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — RM-2026-6D5A60 — Card aberto do Alpha CRM: autoajuste de "criar layout por pipeline" para "remover código morto", 3 arquivos órfãos apagados
+
+**Contexto:** objetivo do Roadmap "Layout do card Aberto único por pipeline" foi a primeira execução real do novo motor de produção via chat (ver decisão 2026-08-25 sobre o motor). O prompt documentado (Fase 2/Nova) assumia genericamente que seria necessário criar N componentes de layout, um por pipeline — mas as Fases 0 (Scout/auditoria) e 1 (Scout/blueprint) confirmaram por leitura de código que **o layout já é único de fato** (`CardAbertoLayout.tsx`, usado por todos os pipelines via `resolveCardAbertoLayout()` em `pipelines/index.ts`, registry hoje vazio). Não havia duplicação de layout a resolver.
+
+**Autoajuste aplicado** (conforme o próprio protocolo do prompt — "DELIVERY_READY confirma que a infraestrutura existente pode ser reutilizada", não criar componentes onde já existe um único suficiente): em vez de criar componentes novos, a implementação real foi remover 3 arquivos órfãos de refatorações anteriores incompletas, todos com zero consumidores confirmados via grep em `src/`:
+- `CardOpenShell.tsx` (308 linhas) — layout duplicado com registry paralelo incompatível (por `pipeline.id`, o real é por `pipeline.nome`).
+- `PainelContatos.tsx` (113 linhas) — já removido antes (`RM-2026-05E75A`, 2026-08-25/26) mas reintroduzido sem intenção via `CardOpenFormSlot.tsx`. **Usuário reconfirmou explicitamente a remoção** antes da ação (via pergunta direta, não decisão unilateral).
+- `PainelRequisitosAvanco.tsx` (284 linhas) — pendência de limpeza registrada desde `RM-2026-3E14F1` (2026-08-25), nunca executada; usuário aprovou remover junto ao ser perguntado durante a Fase 7 (Scribe).
+
+`CardOpenFormSlot.tsx` editado: removidos import/uso de `PainelContatos` e as props `interacoes`/`onInteracaoCriada` (ficaram sem uso).
+
+**Validação:** `tsc --noEmit`, `eslint`, `npm run build` (produção completa) e `tests/bpm` (287/315, baseline idêntico confirmado via `git stash` comparativo, zero regressão) — todos limpos em relação à mudança. Achados de débito técnico pré-existente em `CardFullViewModal.tsx` (1 eslint error + warnings) e `tests/bpm/card-modal-integration.test.ts` (9 falhas) documentados em `known-errors.md`, confirmados não relacionados a esta sessão.
+
+**Adicionado em:** 2026-08-26 por Bibble (execução via Roadmap Production, sem pipeline formal da squad — decisão do usuário).
+
 ### 2026-08-25 — Novo motor de produção do Roadmap Alpha: status manual via chat, motor autônomo antigo removido por completo
 
 **Contexto:** o motor de produção do Roadmap (implementação de fases documentadas) era um agente de IA autônomo (tool-calling loop contra Ollama/Qwen, até 24 passos por fase, lendo/escrevendo arquivos de código sozinho) rodando dentro do próprio processo Next.js (Server Action `kickProductionWorker`) e também em workers PowerShell externos (`spawn` direto de Server Actions, Mutex global, PID em `RoadmapWorkspace.workerPid`). Suporte a Claude Code/Codex CLI existia no código mas estava hard-desligado (`externalCliExecutionEnabled()` sempre `false`) — na prática só Ollama/Qwen rodava, mesmo quando o usuário selecionava "Claude"/"Codex" na UI. Retry automático até 30x e troca automática de agente eram a origem das falhas reportadas pelo usuário ("muitas falhas").

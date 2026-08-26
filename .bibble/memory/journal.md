@@ -2,6 +2,46 @@
 
 ---
 
+## [2026-08-26] — RM-2026-6D5A60 — Primeira execução real via novo motor de produção do Roadmap (MCP), 9 fases concluídas
+
+**Tags:** #feature #roadmap #crm #mcp #cleanup
+**Agentes envolvidos:** Bibble (execução direta via chat, seguindo o protocolo da squad manualmente — Scout/Nova/Forge/Probe/Lens/Sage/Scribe/Kowalski — mas sem sub-agentes formais)
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/CardModal/{CardOpenFormSlot.tsx (editado), CardOpenShell.tsx (removido), PainelContatos.tsx (removido), PainelRequisitosAvanco.tsx (removido)}`, `.bibble/memory/{codebase-map.md, decisions.md, known-errors.md, journal.md}`, `.mcp.json` (novo, ignorado pelo git), `.gitignore`
+
+### Contexto
+Continuação direta da sessão de troca do motor de produção do Roadmap (ver entrada anterior, 2026-08-25). Após validar o MCP local (`roadmap-status`) conectado e funcionando ponta a ponta (rota HTTP em produção respondendo, primeira `RoadmapApiKey` gerada), o usuário pediu para executar o primeiro objetivo real da fila até a conclusão: **RM-2026-6D5A60 — "Layout do card Aberto único por pipeline"** (Alpha CRM), 9 fases documentadas (0-8, protocolo completo da squad Bibble).
+
+### O que foi feito
+Execução sequencial das 9 fases, cada uma criada/iniciada/concluída via as tools do MCP (`roadmap_criar_run`, `roadmap_marcar_fase_iniciada`, `roadmap_marcar_fase_concluida`), refletindo em tempo real no `RoadmapProductionRun`/`RoadmapProductionEvent` do banco:
+
+- **Fase 0 (Context/auditoria):** delegada a um agente Explore — mapeou pipelines (100% dinâmicos via `BpmPipeline`, sem enum), componentes de card aberto, sinalizou `DELIVERY_READY`.
+- **Fase 1 (Scout/blueprint):** investigação própria (leitura direta de `CardAbertoLayout.tsx`, `CardFullViewModal.tsx`, `pipelines/index.ts`, `PainelRegistrar.tsx`, `CardOpenFormSlot.tsx`, `CardOpenShell.tsx`) — **corrigiu um erro do relatório da Fase 0**: `CardOpenFormSlot.tsx` não é órfão, está ativo; `CardOpenShell.tsx` sim é órfão confirmado. Blueprint concluiu que não havia duplicação de layout a resolver — a ação real necessária era limpeza de código morto.
+- **Fase 2 (Nova/implementação):** autoajuste explícito do escopo genérico do prompt ("criar N componentes por pipeline") para a ação real identificada nas fases anteriores. Antes de agir, **usuário consultado e confirmou explicitamente** a remoção de `PainelContatos.tsx` (reafirmando decisão anterior `RM-2026-05E75A` que havia sido revertida sem intenção). Removidos `CardOpenShell.tsx` (308 linhas) e `PainelContatos.tsx` (113 linhas); `CardOpenFormSlot.tsx` limpo de props/imports não usados.
+- **Fase 3 (Forge):** `tsc --noEmit`, `npm run build` (produção completa, Turbopack, ~20min), `eslint` — todos executados de verdade. Achado um eslint `error` real pré-existente em `CardFullViewModal.tsx` (`react-hooks/refs`), confirmado via `git status`/`diff` como não relacionado a esta sessão — documentado em `known-errors.md`, não bloqueou.
+- **Fase 4 (Probe):** grep completo confirmou zero referências órfãs; confirmado que `CardModal/` não é módulo próprio (não precisa do checklist de integração de módulo novo).
+- **Fase 5 (Lens):** revisão 🟢 aprovada — diff 100% subtrativo (435 linhas removidas, 0 adicionadas), sem `any`, sem mudança de auth/schema.
+- **Fase 6 (Sage):** comparação via `git stash` confirmou que as 9 falhas de `tests/bpm/card-modal-integration.test.ts` e as 28 falhas totais de `tests/bpm/` são idênticas com e sem a mudança — zero regressão.
+- **Fase 7 (Scribe):** memória atualizada (`codebase-map.md` reescrito com a cadeia real do card aberto, corrigindo documentação desatualizada; `decisions.md` nova entrada). **Escopo expandido com aprovação do usuário:** encontrado um 3º arquivo órfão no mesmo diretório, `PainelRequisitosAvanco.tsx` (284 linhas, pendência de limpeza registrada desde `RM-2026-3E14F1`/2026-08-25 e nunca executada) — removido também.
+- **Fase 8 (Kowalski):** esta entrada.
+
+### Decisões tomadas
+- Autoajuste de "criar componentes de layout por pipeline" para "remover código morto" — registrado em `decisions.md`, seguindo o próprio protocolo do prompt documentado (sinal `DELIVERY_READY` de fases anteriores autoriza reusar infraestrutura existente em vez de inventar).
+- 3 arquivos órfãos removidos no total (2 do escopo original do objetivo + 1 pendência antiga de outra sessão, removido com aprovação explícita ao ser descoberto).
+- Execução via MCP validada como funcional de ponta a ponta pela primeira vez: chat → MCP local → rota HTTP em produção → Prisma → Turso → refletido no painel.
+
+### Pendências
+- `CardFullViewModal.tsx`: 1 eslint error (`react-hooks/refs`) + ~15 warnings pré-existentes, não corrigidos (fora de escopo desta sessão).
+- `tests/bpm/card-modal-integration.test.ts`: 9/21 falhas pré-existentes (parte da dívida geral de 28/315 já documentada).
+- Teste manual visual no navegador não executado (sem credenciais de login disponíveis) — recomendado: abrir um card no Alpha CRM e confirmar visualmente a remoção do bloco "Contatos".
+- Objetivo RM-2026-6D5A60 permanece com `status: ACTIVE` no Prisma (`RoadmapObjective.status`) — não foi promovido a `COMPLETED` nesta sessão; decisão de marcar como concluído fica para o usuário confirmar após revisão.
+
+### Refletido também em
+- `codebase-map.md`: seção "Alpha CRM — Card aberto: cadeia real de layout consolidada + 3 arquivos órfãos removidos".
+- `decisions.md`: nova decisão "RM-2026-6D5A60 — autoajuste + 3 arquivos órfãos apagados".
+- `known-errors.md`: nova entrada sobre `react-hooks/refs` pré-existente em `CardFullViewModal.tsx`.
+
+---
+
 ## [2026-08-25/26] — CRM de Canais e Parcerias — implementação completa em 8 fases (fila `prompt-phases/`)
 
 **Tags:** #feature #crm #parceiros #migration #vault #grande-entrega

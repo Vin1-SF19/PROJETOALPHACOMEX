@@ -128,6 +128,37 @@ export async function updateRoadmapProductionRunStatus(
         authorUserId: author.authorUserId,
       },
     });
+
+    // Primeira fase a começar de fato move o objetivo para o filtro "Em
+    // desenvolvimento" — nunca sobrescreve ARCHIVED/DELETED, só o estado
+    // inicial ACTIVE (objetivo documentado ainda não tocado).
+    if (toStatus === "IN_PROGRESS") {
+      await tx.roadmapObjective.updateMany({
+        where: { id: run.objectiveId, status: "ACTIVE" },
+        data: { status: "IN_DEVELOPMENT" },
+      });
+    }
+
+    // Última fase (maior phaseNumber publicado da mesma versão) concluída
+    // com sucesso promove o objetivo inteiro para "Concluídos".
+    if (toStatus === "SUCCEEDED") {
+      const lastArtifact = await tx.roadmapPromptArtifact.findFirst({
+        where: {
+          objectiveId: run.objectiveId,
+          documentationVersion: run.sourceVersion,
+          status: "PUBLISHED",
+        },
+        orderBy: { phaseNumber: "desc" },
+        select: { phaseNumber: true },
+      });
+      if (lastArtifact && run.phaseNumber === lastArtifact.phaseNumber) {
+        await tx.roadmapObjective.updateMany({
+          where: { id: run.objectiveId, status: { in: ["ACTIVE", "IN_DEVELOPMENT"] } },
+          data: { status: "COMPLETED" },
+        });
+      }
+    }
+
     return saved;
   });
   return updated;
