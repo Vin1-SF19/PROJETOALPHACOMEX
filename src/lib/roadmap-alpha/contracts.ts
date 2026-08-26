@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { developmentProviderSchema } from "@/lib/roadmap-production/contracts";
+// Quem executa as fases do objetivo (novo motor de status manual, via chat).
+// "ollama"/"qwen" não é mais uma opção — não há motor de IA autônomo rodando
+// dentro do painel. Espelha RoadmapObjective.developmentAssignee.
+export const developmentProviderSchema = z.enum(["claude", "codex"]);
+export type DevelopmentProvider = z.infer<typeof developmentProviderSchema>;
 
 export const ROADMAP_CONTRACT_VERSION = 1 as const;
 export const ROADMAP_PHASE_KINDS = [

@@ -314,11 +314,11 @@ export async function criarParceiro(input: z.input<typeof ParceiroSchema>): Prom
       try {
         const cliente = await db.cliente.findUnique({
           where: { id: contratoOrigem.clienteId },
-          select: { id: true, indicacao: { select: { parceiroId: true } } },
+          select: { id: true, indicacoes: { where: { status: "ATIVA" }, select: { parceiroId: true } } },
         });
         if (!cliente) {
           avisoIndicacao = "Parceiro cadastrado, mas a empresa do contrato fechado não foi encontrada no CRM — vincule a indicação manualmente depois.";
-        } else if (cliente.indicacao) {
+        } else if (cliente.indicacoes.length > 0) {
           avisoIndicacao = "Parceiro cadastrado, mas o cliente desta venda já possui outro parceiro indicador — revise a indicação manualmente em CS & NPS.";
         } else {
           await db.indicacao.create({
@@ -539,7 +539,7 @@ export async function buscarParceiro(id: number) {
 
 // ─── Permissões do módulo (Admin/CEO sempre full; outros via ParceiroAcesso) ──
 
-interface ParceiroCtx {
+export interface ParceiroCtx {
   userId: number;
   role: string;
   isAdmin: boolean;
@@ -548,7 +548,8 @@ interface ParceiroCtx {
   podeAprovar: boolean;
 }
 
-async function getCtx(): Promise<ParceiroCtx | null> {
+/** Exportado para reuso em outras Server Actions do módulo Parceiros (ex: `parceiros-aquisicao.ts`) — evita duplicar a lógica de permissão. */
+export async function getCtx(): Promise<ParceiroCtx | null> {
   const session = await auth();
   if (!session?.user) return null;
   const userId = Number((session.user as { id?: string | number }).id ?? 0);
@@ -737,19 +738,20 @@ export async function criarIndicacao(parceiroId: number, clienteId: number) {
   const ctx = await getCtx();
   if (!ctx || (!ctx.isAdmin && !ctx.podeEditar)) return { success: false, error: "Sem permissão" };
   try {
-    const existe = await db.indicacao.findUnique({ where: { clienteId } });
-    if (existe && existe.status === "ATIVA") {
+    // Migration 2026-08-26: `clienteId` deixou de ser `@unique` em `Indicacao` — uma empresa
+    // pode ser indicada mais de uma vez ao longo do tempo. A regra de negócio preservada é
+    // "só 1 indicação ATIVA por vez por empresa" (nunca duas simultâneas); cada nova indicação
+    // é sempre um registro novo (histórico imutável), nunca reaproveita/reescreve um registro
+    // antigo `DESVINCULADA`.
+    const ativa = await db.indicacao.findFirst({ where: { clienteId, status: "ATIVA" } });
+    if (ativa) {
       return { success: false, error: "Esta empresa já está vinculada a um parceiro" };
     }
-    if (existe) {
-      await db.indicacao.update({
-        where: { clienteId },
-        data: { parceiroId, status: "ATIVA", dataIndicacao: new Date(), criadoPorId: ctx.userId },
-      });
-    } else {
-      await db.indicacao.create({ data: { parceiroId, clienteId, criadoPorId: ctx.userId } });
-    }
+    await db.indicacao.create({ data: { parceiroId, clienteId, criadoPorId: ctx.userId } });
     await recalcularNivel(parceiroId);
+    // CRM de Canais e Parcerias (Fase 03) — automação "indicação criada → atualiza estágio".
+    const { sincronizarEstagioAposIndicacao } = await import("@/lib/parceiros/desenvolvimento");
+    await sincronizarEstagioAposIndicacao(parceiroId, { usuarioId: ctx.userId });
     revalidatePath("/PainelAlpha/Parceiros");
     return { success: true };
   } catch {
@@ -797,7 +799,7 @@ export async function listarClientesParaIndicacao(busca?: string) {
       // SERVIÇO contratado (ClienteServico), não da empresa (Cliente.status é só
       // ATIVO/ARQUIVADO) — pega o serviço mais recentemente atualizado como "status atual".
       servicos: { select: { status: true }, orderBy: { updatedAt: "desc" }, take: 1 },
-      indicacao: { select: { parceiroId: true, status: true } },
+      indicacoes: { where: { status: "ATIVA" }, select: { parceiroId: true, status: true } },
     },
     take: 30,
     orderBy: { razaoSocial: "asc" },
@@ -808,7 +810,10 @@ export async function listarClientesParaIndicacao(busca?: string) {
     nomeFantasia: c.nomeFantasia,
     cnpj: c.cnpj,
     status: c.servicos[0]?.status ?? "Sem serviço",
-    indicacao: c.indicacao,
+    // Só pode existir 1 indicação ATIVA por empresa a cada momento (regra preservada em
+    // `criarIndicacao`) — array filtrado por status vira singular aqui para não quebrar os
+    // consumidores existentes (`ModalNovaIndicacao.tsx` espera `indicacao: {...} | null`).
+    indicacao: c.indicacoes[0] ?? null,
   }));
 }
 

@@ -1,5 +1,264 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Roadmap Alpha — novo motor de produção: status manual via chat, sem agente autônomo no painel (2026-08-25)
+
+O módulo Roadmap tem 2 fluxos independentes: **documentação** (`RoadmapAlpha.ts` + `roadmap-alpha/*`, gera Markdown via Qwen — não tocado nesta sessão) e **produção** (implementação de fato — reescrito do zero nesta sessão). O motor antigo (agent loop autônomo contra Ollama/Qwen + workers PowerShell externos, `src/lib/roadmap-production/*`) foi **removido por completo**. Agora quem implementa é Claude (via chat/Claude Code) ou Codex, reportando progresso por uma rota HTTP autenticada — o painel só reflete status, nunca executa código sozinho.
+
+```prisma
+model RoadmapProductionRun {
+  id, objectiveId → RoadmapObjective, sourceVersion, phaseNumber, artifactId? → RoadmapPromptArtifact
+  status String @default("PENDING") // PENDING|AWAITING_APPROVAL|IN_PROGRESS|NEEDS_INPUT|BLOCKED|SUCCEEDED|FAILED|CANCELLED
+  assignee String @default("claude") // "claude"|"codex"|"manual"
+  approvedById?, approvedAt?, startedAt?, finishedAt?, resultSummary?, errorCode?, changedFilesJson?
+  createdById, createdAt, updatedAt
+  @@unique([objectiveId, sourceVersion, phaseNumber])
+}
+model RoadmapProductionEvent {
+  id, runId → RoadmapProductionRun, kind // STATUS_CHANGE|MESSAGE|QUESTION|ANSWER|NOTE
+  fromStatus?, toStatus?, content?, authorKind // "user"|"assistant"|"system"
+  authorLabel, authorUserId?, createdAt
+}
+model RoadmapApiKey {
+  id, label, keyHash @unique, prefix, scopesJson, enabled
+  createdById, expiresAt?, revokedAt?, rateLimitWindowMs, rateLimitMax, requestCount, lastRequestAt?, lastUsedAt?
+}
+```
+`RoadmapObjective` ganhou `developmentAssignee String @default("claude")` (`ADD COLUMN` aditivo) — substitui a preferência antiga em JSON; domínio é só `"claude"|"codex"` (Qwen/Ollama não é mais opção, não há motor local).
+
+**Camada de API** (`src/lib/roadmap-production-api/`): `auth.ts` reaproveita o padrão de `alpha-seo/mcp/auth.ts` (Bearer token com hash SHA-256, prefixo `roadmap_key_`, rate limit por compare-and-swap, ou sessão Next-Auth como fallback); `status-machine.ts` é a única fonte de verdade de transições válidas de status (usada tanto pela rota HTTP quanto pela Server Action da UI); `operations.ts` centraliza toda a lógica de negócio via Prisma. Rota `src/app/api/roadmap/production/*`: `GET queue`, `GET/POST runs/:id`, `POST runs/:id/status`, `GET/POST runs/:id/events`, `POST runs/:id/approve`, `POST objectives/:id/runs`.
+
+**MCP local** (`mcp/roadmap-status/`) — processo Node standalone (fora de `src/`, roda via `claude mcp add` ou `.mcp.json`, NÃO dentro do processo Next.js), 9 tools (`roadmap_listar_fila`, `roadmap_marcar_fase_iniciada/concluida/falhou`, `roadmap_perguntar`, `roadmap_registrar_nota`, `roadmap_ver_historico`, `roadmap_criar_run`, `roadmap_ver_fase`), autenticado via `ROADMAP_MCP_TOKEN`/`ROADMAP_MCP_BASE_URL` (`.env` local, nunca commitado). Chama a rota HTTP acima — nunca conecta direto no Turso.
+
+**Lição de migration no Turso remoto** (ver `known-errors.md`): `client.transaction("write")` em lote falha ao criar múltiplas tabelas com FK cruzada no mesmo batch não commitado — usar `client.execute()` sequencial, uma statement por vez, verificando cada uma.
+
+## CRM de Canais e Parcerias — Fase 01: schema + migration (2026-08-25/26)
+
+Fundação de dados para o novo CRM de Canais e Parcerias (fila `prompt-phases/` em execução,
+ver `_status.md`). Reaproveita 100% o cadastro de `Parceiro`/`Indicacao` já existente — nenhuma
+entidade duplicada.
+
+**3 models novos** (`prisma/schema.prisma`):
+```prisma
+model ParceiroLead {
+  id String @id @default(cuid())
+  status String @default("NOVO_LEAD") // NOVO_LEAD|EM_PROSPECCAO|CONTATO_REALIZADO|EM_QUALIFICACAO|
+    // REUNIAO_AGENDADA|REUNIAO_REALIZADA|NEGOCIACAO_FOLLOWUP|AGUARDANDO_CADASTRO|PRE_CADASTRO|
+    // CADASTRADO|STANDBY|SEM_PERFIL|PERDIDO
+  // ... nome/documento/email/telefone/segmento/origem/cidade/uf, responsavelId, potencialRecorrencia,
+  // proximaAcaoEm/proximaAcaoDescricao, motivoSaidaLateral, promovidoParceiroId/promovidoEm/promovidoPorUserId
+  historico ParceiroLeadHistorico[]
+}
+model ParceiroLeadHistorico { id, leadId → ParceiroLead, acao, valorAnteriorJson?, valorNovoJson?, usuarioId?, automacaoOrigem?, createdAt }
+model ParceiroHistorico { id, parceiroId → Parceiro, acao, valorAnteriorJson?, valorNovoJson?, usuarioId?, automacaoOrigem?, createdAt }
+```
+`ParceiroLead` é staging tipo "card virtual" — mesmo padrão já em produção da `NolossLead`
+(ver seção logo abaixo nesta memória). **Nunca vira `BpmCard`** — decisão de arquitetura
+confirmada com o usuário: `BpmCard.empresaId` é obrigatório e aponta para `Cliente`, entidade que
+não serve para "potencial parceiro" antes do cadastro. A promoção para `Parceiro` real usa
+`criarParceiro()` já existente (`src/actions/parceiros.ts`), preservando idempotência.
+
+**`Parceiro` ganhou 8 colunas** (ciclo de vida de Desenvolvimento pós-cadastro, sem Kanban de
+card por parceiro — decisão do usuário): `estagioDesenvolvimento String @default("NOVO")`
+(NOVO|EM_ATIVACAO|ATIVADO_SEM_INDICACAO|PRIMEIRA_INDICACAO|ATIVO|RECORRENTE|INATIVO),
+`estagioDesenvolvimentoAtualizadoEm`, `potencialRecorrencia Int?` (0-5, score MANUAL, distinto de
+`nivel` — calculado por contratação — e de `comissaoPercentual` — regra financeira; nunca
+misturar os três), `potencialRecorrenciaAtualizadoEm/AtualizadoPorId`, `segmento`, `origem`,
+`responsavelId` (relacionamento comercial, distinto de `criadoPorId` que é só "quem cadastrou").
+
+**`ParceiroConfig` ganhou 4 colunas** de regras configuráveis (nunca hardcoded):
+`diasAlertaSemIndicacao Int?` (null = desligado), `diasInatividade Int @default(60)`,
+`cadenciaPotencial4Dias`/`cadenciaPotencial5Dias`. **`diasInatividade` é uma regra de
+RELACIONAMENTO, distinta e independente da janela de 60 dias de `recalcularNivel()`** (regra
+FINANCEIRA de rebaixamento de nível por contratação) — nunca reaproveitar uma pela outra.
+
+**Migration estrutural real, aplicada em produção via Vault:** `Indicacao.clienteId` deixou de
+ser `@unique` — uma empresa pode ser indicada mais de uma vez ao longo do tempo (antes: 1
+indicação por empresa para sempre). `Cliente.indicacao Indicacao?` virou
+`Cliente.indicacoes Indicacao[]`. A regra de negócio preservada é "só 1 indicação **ATIVA** por
+empresa por vez" (não uma liberação irrestrita) — enforçada em `criarIndicacao()`
+(`src/actions/parceiros.ts`), que agora sempre cria um registro novo em vez de reescrever um
+antigo `DESVINCULADA` (histórico completo preservado). **Achado que reduziu o risco da
+migration:** a constraint `@unique` não era inline na tabela — era um índice único SEPARADO
+(`indicacoes_clienteId_key_v2`), e já existia um índice não-único redundante na mesma coluna. A
+migration real foi só `DROP INDEX`, não a recriação de tabela originalmente prevista (SQLite não
+suporta `ALTER COLUMN`/`DROP CONSTRAINT` inline, mas neste caso específico não havia constraint
+inline a remover).
+
+**6 pontos de código ajustados** para a nova cardinalidade (grep completo, todos os
+consumidores confirmados): `src/actions/parceiros.ts` (`criarParceiro` indicação retroativa,
+`criarIndicacao`, `listarClientesParaIndicacao`), `src/actions/ContratoComercial.ts`
+(`confirmarFechamento`), `src/actions/Clientes.ts` (`SELECT_CLIENTE_CS_NPS`/`buscarClientes` —
+filtra por `status: "ATIVA"` e converte array→singular no retorno para não quebrar consumidores
+como `modalDados.tsx`), `src/lib/cs-nps/exportar-dados.ts` (export Excel, dedup agora por
+`Indicacao.id` em vez de `Cliente.id`). `ModalNovaIndicacao.tsx` não precisou de nenhuma mudança
+— contrato externo preservado propositalmente.
+
+**Backup pré-migration:** `database-backups/pre-change/painelalpha_turso_pre_change_canais-parcerias-fase01_2026-08-25T19-49-57-015Z.sql`
+(243 tabelas, 42.129 linhas, 81,2 MB, SHA-256 `c9e862a3...9d3ce2c`).
+
+**Qualidade:** `tsc --noEmit`/`eslint`/`npm run build` limpos (zero erro novo — só os 6 baselines
+pré-existentes de sempre, em módulos não relacionados). `tests/parceiros/`+`tests/cs-nps/`:
+55/55 passando (1 teste ajustado para a nova shape de query, `responsavel.test.ts`).
+`tests/bpm/`: confirmado 287/315 pré-existente também no baseline limpo (zero regressão
+introduzida) — ver `known-errors.md` para o detalhe completo dos 28 testes órfãos já quebrados
+antes desta fase.
+
+## CRM de Canais e Parcerias — Fase 02: Aquisição de Parceiros (2026-08-26)
+
+Funil "potencial parceiro → cadastrado" implementado como staging tipo "card virtual"
+(`ParceiroLead`, schema da Fase 01) — **nunca cria `BpmCard`**.
+
+**Backend:** `src/actions/parceiros-aquisicao.ts` — `CriarLeadAquisicaoParceiro`,
+`MoverLeadAquisicaoParceiro`, `RegistrarSaidaLateralLeadAquisicao`,
+`AtualizarPotencialLeadAquisicao`, `RegistrarProximaAcaoLeadAquisicao`,
+`ListarLeadsAquisicaoParceiros`, `ListarResponsaveisParceiros`, `PromoverLeadParaParceiro`.
+Reaproveita `getCtx`/`criarParceiro` de `src/actions/parceiros.ts` (ambos exportados nesta fase
+especificamente para esse reuso — antes eram privados do módulo).
+
+**Máquina de transição** (`podeMoverPara()`, função pura testável): 9 etapas ativas fixas em
+ordem (`NOVO_LEAD`→...→`PRE_CADASTRO`), avanço de 1 posição ou correção para qualquer etapa
+anterior; saída lateral (`STANDBY`/`SEM_PERFIL`/`PERDIDO`) permitida de qualquer etapa ativa com
+`motivoSaidaLateral` obrigatório; reingresso de uma saída lateral para qualquer etapa ativa;
+`CADASTRADO` é destino proibido em `MoverLeadAquisicaoParceiro` — só alcançável via
+`PromoverLeadParaParceiro`.
+
+**Promoção idempotente** (`PromoverLeadParaParceiro`): CAS via `updateMany({where:{id,status:statusAntes}})`
+antes de qualquer efeito colateral (mesmo padrão do card virtual `NolossLead`) — reivindica o
+lead comparando o status lido, não um valor fixo. Se `documento`/`email` ausentes ou já existe
+`Parceiro` com o mesmo documento, reverte o lead para `statusAntes` (a etapa real onde estava,
+não um valor hardcoded) e retorna erro amigável. Sucesso propaga `potencialRecorrencia` (se já
+qualificado no lead) + `segmento`/`origem`/`responsavelId` para o `Parceiro` recém-criado — nunca
+se perde na promoção. Grava `ParceiroLeadHistorico` e `ParceiroHistorico` na mesma transação.
+
+**Frontend:** `/PainelAlpha/Parceiros/Aquisicao` (`page.tsx` fino + `AquisicaoParceirosClient.tsx`)
+— Kanban de 12 colunas (9 etapas + 3 saídas laterais) com scroll horizontal, sem drag-and-drop
+nesta primeira entrega (movimentação via dialog de detalhe do lead — potencial de polish visual
+futuro se o usuário pedir paridade com o dnd-kit do Alpha CRM). Acesso via botão "Aquisição" no
+header de `ParceirosClient.tsx` (`src/components/Parceiros/ParceirosClient.tsx`) — **sem** nova
+entrada em `MODULOS_REGISTRY` (é sub-rota do módulo `parceiros` já registrado, mesma permissão).
+
+**Testes:** `tests/parceiros/aquisicao.test.ts` (16 casos — máquina de transição, saída lateral,
+range de potencial, idempotência de promoção, prevenção de duplicidade, propagação de potencial).
+
+**Qualidade:** `tsc`/`eslint`/`npm run build` limpos (mesmos 5-6 baselines pré-existentes, zero
+erro novo). `tests/parceiros/`+`tests/cs-nps/` 55/55 + `aquisicao.test.ts` 16/16.
+
+---
+
+## CRM de Canais e Parcerias — Fase 03: Desenvolvimento do Parceiro (2026-08-26)
+
+Ciclo de vida pós-cadastro como campos/estados diretamente em `Parceiro` (schema já criado na
+Fase 01) — sem Kanban de card por parceiro, conforme decisão de arquitetura do usuário.
+
+**Lógica central:** `src/lib/parceiros/desenvolvimento.ts` — `transicionarEstagioDesenvolvimento()`
+(idempotente, sempre grava `ParceiroHistorico`), `sincronizarEstagioAposIndicacao()` (1ª indicação
+→ `PRIMEIRA_INDICACAO`, 2ª em diante → `ATIVO` — **decisão de produto documentada no código**, o
+pedido original não especificava o gatilho exato; nunca toca `ATIVO`/`RECORRENTE` já atingidos,
+evitando rebaixar automação em cima de ajuste manual), `executarJobDesenvolvimentoParceiros()`
+(2 varreduras: onboarding concluído→`ATIVADO_SEM_INDICACAO`; inatividade→`INATIVO`, usando
+`ParceiroConfig.diasInatividade` configurável, NUNCA a janela de 60 dias de `recalcularNivel()`
+— regra financeira distinta), `calcularIndicadoresParceiro()` (1ª/última indicação, dias sem
+indicação, contagens, conversão, receita — **tudo derivado de `Indicacao`/`ClienteServico`/
+`BpmCard` reais, nunca um contador solto**).
+
+**⚠️ Achado arquitetural importante:** `Parceiro.onboardingCompleto` é escrito pelo portal
+EXTERNO `PainelAlphaParceiros` (`C:\Users\TI\Desktop\PainelAlphaParceiros\alphaparceiros`),
+processo/deploy separado que só compartilha o mesmo banco Turso — não existe hook in-process
+possível quando esse campo muda. Por isso a transição "onboarding concluído → Ativado sem
+Indicação" é um job de **reconciliação periódica** (cron diário), não um trigger síncrono.
+
+**Automação síncrona real:** `criarIndicacao()` (`src/actions/parceiros.ts`) chama
+`sincronizarEstagioAposIndicacao()` via dynamic `import()` (mesmo padrão anti-ciclo já usado por
+`ContratoComercial.ts`→`recalcularNivel`) logo após criar a `Indicacao` — não transacional com o
+`create` (mesmo padrão non-atômico já existente para `recalcularNivel` nessa mesma função, best
+effort documentado, não uma regressão nova).
+
+**Cron novo:** `src/app/api/parceiros/jobs/desenvolvimento/route.ts` (mesmo padrão de
+autorização/lock de `automacao-novos-leads`, via `autorizarCron`/`CRON_SECRET`) — registrado em
+`vercel.json` (`0 13 * * *`, diário). **Mudança de configuração compartilhada de produção —
+usuário avisado explicitamente no momento da adição.**
+
+**Circular import evitado propositalmente:** `desenvolvimento.ts` lê `ParceiroConfig` direto via
+`db.parceiroConfig.upsert()` em vez de importar `obterConfigParceiros()` de
+`convites-parceiro.ts` — essa função já importa `criarParceiro` de `parceiros.ts`, que agora
+importa `desenvolvimento.ts`; importar de volta criaria um ciclo de 3 módulos.
+`obterConfigParceiros()` (`convites-parceiro.ts`) teve seu `select` ampliado com os 4 campos
+novos de config (mudança aditiva, únicos consumidores eram internos + `ModalEngrenagem.tsx`).
+
+**Server Actions:** `src/actions/parceiros-desenvolvimento.ts` —
+`AtualizarPotencialRecorrenciaParceiro` (0-5, isolado de `comissaoPercentual`),
+`ReativarParceiro` (só a partir de `INATIVO`; decide o destino real a partir do histórico —
+`ATIVO` se já indicou, `ATIVADO_SEM_INDICACAO` se onboarding completo sem indicação,
+`EM_ATIVACAO` caso contrário — nunca reativa "no escuro"), `ObterIndicadoresDesenvolvimentoParceiro`.
+
+**Testes:** `tests/parceiros/desenvolvimento.test.ts` (12 casos, lógica central) +
+`tests/parceiros/desenvolvimento-actions.test.ts` (7 casos, Server Actions/permissão/reativação).
+
+**Qualidade:** `tsc`/`eslint`/`npm run build` limpos (mesmos baselines pré-existentes). 19 testes
+novos, nenhum existente quebrado.
+
+**Pendência consciente:** UI para exibir os indicadores/potencial/estágio no card e na tela do
+parceiro fica para a Fase 07 (tela 360º) — Fase 03 entregou só o motor de dados/automação.
+
+---
+
+## CRM de Canais e Parcerias — Fase 04: Indicações vinculadas ao BPM (2026-08-26)
+
+**Decisão de arquitetura confirmada por investigação real do banco (não suposição):** o pipeline
+comercial **"Revisão de Radar"** já tem exatamente as etapas do fluxo de indicação pedido —
+`Novos leads(0) → Agendar reunião(1) → Reunião Agendada(2) → Em tratativa(3) → Fechado(4)` +
+saídas laterais `Lost(5)`/`Sem viabilidade(6)`/`Standby - Follow Up(7)` → `Monitoramento(8)`. É o
+MESMO pipeline que a feature NoLoss Leads já usa como entrada. Reaproveitado 100% —
+**nenhum pipeline "Indicações de Parceiros" paralelo foi criado.**
+
+**Migration aplicada (Vault, backup dedicado + confirmação explícita do usuário):**
+`Indicacao.bpmCardId String? @unique` (FK→`BpmCard`, `ON DELETE SET NULL`) +
+`BpmCard.indicacaoOrigem Indicacao?` (relação inversa, **sem nenhuma coluna nova em `BpmCard`**
+— só o campo FK vive em `Indicacao`). Backup:
+`database-backups/pre-change/painelalpha_turso_pre_change_canais-parcerias-fase04_2026-08-25T20-43-03-577Z.sql`
+(249 tabelas, 42.137 linhas, 77,48 MB). Estado real pré-migration: 21 `indicacoes`, 5 `BpmCard`.
+
+**Server Actions:** `src/actions/parceiros-indicacoes.ts`:
+- `DirecionarIndicacaoParaCloser(indicacaoId, responsavelId)` — a transição real "Indicação
+  Registrada → Direcionada ao Closer": resolve dinamicamente o pipeline por `nome: "Revisão de
+  Radar"` + a etapa `ordem: 0` (nunca hardcoded IDs, que variam por ambiente), reaproveita
+  `CriarCardBpm()` já existente (`src/actions/bpm/Cards.ts` — inclusive respeitando a mesma
+  validação `destinoEhEtapaCanonicaNovosLeads`), e só então vincula `Indicacao.bpmCardId`. A
+  constraint `@unique` em `bpmCardId` funciona como CAS implícito contra vínculo duplo
+  concorrente. Rejeita se a indicação já tiver `bpmCardId` (idempotência).
+- `ListarIndicacoesDoParceiro(parceiroId)` — consolida cada `Indicacao` do parceiro com o status
+  da oportunidade (`BpmCard`, quando já direcionada) e o serviço/contrato mais recente da empresa
+  indicada (via `ClienteServico`) — para a tela 360º (Fase 07).
+
+`RegistrarIndicacaoParceiro` **não foi criado como Action nova** — `criarIndicacao()`
+(`src/actions/parceiros.ts`, já existente e ajustado na Fase 01) já cobre esse papel; criar uma
+segunda Action redundante violaria o princípio de não duplicar.
+
+`ObterFunilIndicacoesParceiro` (agregado GLOBAL do funil de indicações) foi **deliberadamente
+adiado para a Fase 05** (Dashboard) — é escopo de dashboard, não de gestão individual de
+indicação; `calcularIndicadoresParceiro()` (Fase 03) já cobre os indicadores POR parceiro.
+
+**Testes:** `tests/parceiros/indicacoes-bpm.test.ts` (8 casos — direcionamento feliz/erro/
+idempotência/pipeline ausente, consolidação de indicação com/sem oportunidade vinculada).
+
+**Qualidade:** `tsc` (log completo lido, não só grep) e `eslint` limpos nos arquivos desta fase
+(mesmos baselines pré-existentes de sempre). `npm run build` **não pôde ser confirmado limpo
+nesta janela** — um processo autônomo concorrente (Roadmap Production) estava ativamente
+reescrevendo `RoadmapProduction.ts`/`roadmap-alpha/*` no mesmo working directory durante a
+tentativa (2 builds seguidos falharam com erros DIFERENTES, ambos 100% confinados a arquivos de
+Roadmap — nunca em Parceiros/Indicações). Ver `known-errors.md` para a investigação completa
+(git status + timestamps de arquivo + processos ativos confirmam a causa). Suíte completa
+`tests/parceiros/`+`tests/cs-nps/`: 98/98.
+
+---
+
+## CRM de Canais e Parcerias — fases seguintes
+
+Ver `prompt-phases/_status.md` para o estado vivo da fila: 05 Dashboard/Follow-up/Alertas,
+06 Permissões/Automações, 07 Tela 360º, 08 Testes/Regressão final.
+
+---
+
 ## Padrão: "card virtual" em Kanban BPM — staging antes de materializar registro real (2026-08-24)
 
 Padrão introduzido pela feature NoLoss leads (ver `integration-points.md` para o caso concreto), reaproveitável para qualquer fluxo futuro de "dado externo chega antes de virar entidade real do sistema":

@@ -1,49 +1,23 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowLeft,
-  Bot,
-  Bug,
   CheckCircle2,
-  ChevronDown,
+  Clock,
   Cpu,
-  FileText,
   Loader2,
-  MessagesSquare,
-  PauseCircle,
-  PlayCircle,
-  RefreshCw,
-  Send,
-  Settings2,
+  MessageSquareText,
   ShieldCheck,
-  Sparkles,
-  Trash2,
-  Users,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   AlternarAcessoRoadmapProduction,
-  AprovarExecucaoRoadmapProduction,
-  ControlarExecucaoRoadmapProduction,
+  AprovarFaseRoadmapProduction,
   ListarAcessosRoadmapProduction,
-  MelhorarFeedbackRoadmapProduction,
   ObterRoadmapProduction,
-  RelatarErroRoadmapProduction,
-  RepetirExecucaoRoadmapProduction,
-  SalvarConfiguracaoRoadmapProduction,
 } from "@/actions/RoadmapProduction";
 import { Button } from "@/components/ui/button";
 import { RoadmapImplementationRoom } from "@/components/RoadmapAlpha/RoadmapImplementationRoom";
@@ -54,92 +28,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type {
-  ProductionIntervention,
-  ProductionMessage,
-} from "@/lib/roadmap-production/contracts";
 
-interface ProviderView {
-  id: "ollama" | "codex" | "claude";
-  label: string;
-  available: boolean;
-  ready: boolean;
-  detail: string;
-  models: string[];
-}
-interface AgentView {
+interface RunView {
   id: string;
-  name: string;
-  title: string;
-  icon: string;
-  description: string;
-  skillPath: string;
-  available: boolean;
-}
-interface ActivityView {
-  at: string;
-  agentId: string;
-  type: "STATUS" | "TOOL" | "RESULT" | "ERROR";
-  message: string;
-}
-interface PhaseView {
-  phaseNumber: number;
-  title: string;
-  kind: string;
-  requestedAgent: string;
-  resolvedAgent: string;
   status: string;
-  attemptCount: number;
+  assignee: string;
   startedAt: string | null;
   finishedAt: string | null;
-  autoRetryCount: number;
-  retryAt: string | null;
-  summary: string | null;
+  resultSummary: string | null;
   errorCode: string | null;
-  changedFiles: string[];
-  activities: ActivityView[];
-  promptMarkdown: string;
-  promptPath: string | null;
-}
-interface ExecutionView {
-  id: string;
-  objectiveCode: string;
-  objectiveTitle: string;
-  moduleKey: string;
-  developmentProvider: "claude" | "codex" | "ollama";
-  sourceVersion: number;
-  globalPriority: number;
-  status: string;
-  createdAt: string;
-  startedAt: string | null;
-  finishedAt: string | null;
-  completionReportPath: string | null;
-  completionReportMarkdown: string | null;
-  reworkCount: number;
-  messages: ProductionMessage[];
-  interventions: ProductionIntervention[];
-  manualFeedback: Array<{
+  updatedAt: string;
+  objective: {
     id: string;
-    reportedAt: string;
-    content: string;
-    improvedWithAi: boolean;
-    resolvedAt: string | null;
-  }>;
-  phases: PhaseView[];
-}
-interface ProductionData {
-  config: {
-    version: 1;
-    provider: "ollama" | "codex" | "claude";
-    model: string;
-    autoRun: boolean;
-    maxToolSteps: number;
-    updatedAt: string;
+    code: string;
+    title: string;
+    moduleKey: string;
+    moduleLabelSnapshot: string;
   };
-  state: { updatedAt: string; executions: ExecutionView[] };
-  agents: AgentView[];
-  providers: ProviderView[];
+  artifact: { phaseNumber: number; title: string; kind: string; relativePath: string | null } | null;
 }
+
 interface AccessView {
   id: number;
   nome: string;
@@ -152,46 +60,36 @@ interface AccessView {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  AWAITING_APPROVAL: "Aguardando aprovação",
   PENDING: "Na fila",
-  RUNNING: "Executando",
-  PAUSED: "Pausado",
-  SUCCEEDED: "Concluído",
-  FAILED: "Falhou",
-  BLOCKED: "Bloqueado",
+  AWAITING_APPROVAL: "Aguardando aprovação",
+  IN_PROGRESS: "Em progresso",
   NEEDS_INPUT: "Aguardando resposta",
-  WAITING_FOR_ADMIN: "Aguardando administrador",
+  BLOCKED: "Bloqueada",
+  SUCCEEDED: "Concluída",
+  FAILED: "Falhou",
+  CANCELLED: "Cancelada",
 };
 
-const DEVELOPMENT_PROVIDER_LABEL: Record<
-  "claude" | "codex" | "ollama",
-  string
-> = { claude: "Claude", codex: "Codex", ollama: "Qwen" };
+const ASSIGNEE_LABEL: Record<string, string> = {
+  claude: "Claude",
+  codex: "Codex",
+  manual: "Manual",
+};
 
 function statusClass(status: string): string {
   if (status === "SUCCEEDED")
     return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
-  if (status === "RUNNING")
+  if (status === "IN_PROGRESS")
     return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
   if (status === "AWAITING_APPROVAL")
     return "border-violet-400/20 bg-violet-400/10 text-violet-300";
-  if (status === "WAITING_FOR_ADMIN" || status === "NEEDS_INPUT")
+  if (status === "NEEDS_INPUT")
     return "border-amber-400/30 bg-amber-400/10 text-amber-200";
-  if (status === "PAUSED")
-    return "border-slate-400/20 bg-slate-400/10 text-slate-300";
   if (status === "FAILED" || status === "BLOCKED")
     return "border-rose-400/20 bg-rose-400/10 text-rose-300";
+  if (status === "CANCELLED")
+    return "border-slate-400/20 bg-slate-400/10 text-slate-400";
   return "border-amber-400/20 bg-amber-400/10 text-amber-300";
-}
-
-function executionStatusLabel(execution: ExecutionView): string {
-  if (
-    execution.phases.some(
-      (phase) => phase.status === "PENDING" && phase.retryAt,
-    )
-  )
-    return "Correção automática";
-  return STATUS_LABEL[execution.status] ?? execution.status;
 }
 
 export function RoadmapProductionPanel({
@@ -199,179 +97,59 @@ export function RoadmapProductionPanel({
   moduleKey,
   moduleLabel,
   onBack,
-  focusExecutionId = null,
 }: {
   canManage: boolean;
   moduleKey: string;
   moduleLabel: string | null;
   onBack: () => void;
-  /**
-   * Quando presente, o painel mostra SOMENTE a execução com este id — tela
-   * dedicada de Produção por objetivo, acionada a partir do card do
-   * objetivo na tela principal (nunca mais a fila global de um módulo
-   * inteiro). `null`/ausente preserva o comportamento antigo de fallback
-   * (mostra todas as execuções do módulo) — hoje sem nenhum caller usando
-   * esse fallback, já que o botão do header foi removido, mas mantido para
-   * não quebrar a prop como obrigatória sem necessidade.
-   */
-  focusExecutionId?: string | null;
 }) {
-  const [data, setData] = useState<ProductionData | null>(null);
+  const [queue, setQueue] = useState<RunView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [agentsOpen, setAgentsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
-  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
-  const [expandedExecutionId, setExpandedExecutionId] = useState<
-    string | null | undefined
-  >(undefined);
-  const [feedbackTarget, setFeedbackTarget] = useState<ExecutionView | null>(
-    null,
-  );
-  const [roomExecutionId, setRoomExecutionId] = useState<string | null>(null);
-  const polling = useRef(false);
-  const autoOpenedRoomFor = useRef<string | null>(null);
+  const [roomRunId, setRoomRunId] = useState<string | null>(null);
 
-  const refresh = useCallback(
-    async (includeCatalog = false) => {
-      if (polling.current || document.visibilityState === "hidden") return;
-      polling.current = true;
-      try {
-        const result = await ObterRoadmapProduction(includeCatalog, moduleKey);
-        if (!result.success) {
-          setError(result.error);
-          return;
-        }
-        setData((current) => ({
-          config: result.config,
-          state: result.state,
-          agents: result.agents.length
-            ? result.agents
-            : (current?.agents ?? []),
-          providers: result.providers.length
-            ? result.providers
-            : (current?.providers ?? []),
-        }));
-        setError(null);
-      } finally {
-        polling.current = false;
-      }
-    },
-    [moduleKey],
-  );
+  const refresh = useCallback(async () => {
+    const result = await ObterRoadmapProduction(moduleKey);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setQueue(result.queue);
+    setError(null);
+  }, [moduleKey]);
 
   useEffect(() => {
-    void refresh(true);
-    const interval = window.setInterval(() => void refresh(false), 2_000);
-    return () => window.clearInterval(interval);
+    const timer = window.setTimeout(() => void refresh(), 0);
+    const interval = window.setInterval(() => void refresh(), 5_000);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+    };
   }, [refresh]);
 
-  const executions = useMemo(() => {
-    const all = data?.state.executions ?? [];
-    if (!focusExecutionId) return all;
-    return all.filter((execution) => execution.id === focusExecutionId);
-  }, [data?.state.executions, focusExecutionId]);
+  const runs = useMemo(() => queue ?? [], [queue]);
+  const inProgress = runs.filter((run) => run.status === "IN_PROGRESS").length;
+  const succeeded = runs.filter((run) => run.status === "SUCCEEDED").length;
+  const needsAttention = runs.filter((run) =>
+    ["NEEDS_INPUT", "BLOCKED"].includes(run.status),
+  ).length;
 
-  /**
-   * Abre a Sala de Implementação automaticamente quando o usuário chega
-   * focado numa execução BLOCKED/WAITING_FOR_ADMIN (veio do badge "precisa
-   * de você") — sem isso, a pergunta pendente fica um clique escondida atrás
-   * de "Acompanhar implementação". Guard por useRef garante que só abre UMA
-   * vez por execução: dispara na primeira vez que ela aparece com esse
-   * status, não a cada re-render do polling de 2s — senão a Sala reabriria
-   * sozinha mesmo depois do usuário fechá-la manualmente.
-   */
-  useEffect(() => {
-    if (!focusExecutionId) return;
-    const focused = executions.find(
-      (execution) => execution.id === focusExecutionId,
-    );
-    if (!focused) return;
-    if (
-      (focused.status === "BLOCKED" || focused.status === "WAITING_FOR_ADMIN") &&
-      autoOpenedRoomFor.current !== focusExecutionId
-    ) {
-      autoOpenedRoomFor.current = focusExecutionId;
-      setRoomExecutionId(focusExecutionId);
-    }
-  }, [executions, focusExecutionId]);
-  const activePhase = useMemo(
-    () =>
-      executions
-        .flatMap((execution) =>
-          execution.phases.map((phase) => ({ execution, phase })),
-        )
-        .find(({ phase }) => phase.status === "RUNNING") ?? null,
-    [executions],
+  const roomRun = useMemo(
+    () => runs.find((run) => run.id === roomRunId) ?? null,
+    [runs, roomRunId],
   );
-  const roomExecution =
-    executions.find((execution) => execution.id === roomExecutionId) ?? null;
-  const promptItems = useMemo(
-    () =>
-      executions.flatMap((execution) => [
-        ...execution.phases.map((phase) => ({
-          id: `${execution.id}:${phase.phaseNumber}`,
-          execution,
-          phase,
-          isReport: false as const,
-          markdown: phase.promptMarkdown,
-          path: phase.promptPath,
-        })),
-        ...(execution.completionReportMarkdown
-          ? [
-              {
-                id: `${execution.id}:report`,
-                execution,
-                phase: null,
-                isReport: true as const,
-                markdown: execution.completionReportMarkdown,
-                path: execution.completionReportPath,
-              },
-            ]
-          : []),
-      ]),
-    [executions],
-  );
-  const selectedItem =
-    promptItems.find((item) => item.id === selectedPrompt) ??
-    promptItems.find((item) => item.phase?.status === "RUNNING") ??
-    promptItems[0] ??
-    null;
-  const resolvedExpandedExecutionId =
-    expandedExecutionId === undefined
-      ? (activePhase?.execution.id ?? executions[0]?.id ?? null)
-      : expandedExecutionId;
 
-  async function controlExecution(
-    execution: ExecutionView,
-    control: "PAUSE" | "RESUME" | "EXCLUDE",
-  ) {
-    if (
-      control === "EXCLUDE" &&
-      !window.confirm(
-        `Excluir ${execution.objectiveCode} r${String(execution.sourceVersion).padStart(4, "0")} da fila local?`,
-      )
-    )
-      return;
-    const result = await ControlarExecucaoRoadmapProduction(
-      execution.id,
-      control,
-    );
+  async function approve(run: RunView) {
+    const result = await AprovarFaseRoadmapProduction(run.id);
     if (!result.success) {
       toast.error(result.error);
       return;
     }
-    toast.success(
-      control === "PAUSE"
-        ? "Pausa solicitada"
-        : control === "RESUME"
-          ? "Execução retomada"
-          : "Exclusão solicitada",
-    );
-    window.setTimeout(() => void refresh(false), 1_000);
+    toast.success("Fase aprovada");
+    await refresh();
   }
 
-  if (error && !data)
+  if (error && !queue)
     return (
       <div className="grid min-h-[680px] place-items-center rounded-2xl border border-rose-400/20 bg-[#07101f] text-rose-300">
         {error}
@@ -394,31 +172,13 @@ export function RoadmapProductionPanel({
             <Cpu size={20} />
           </span>
           <div>
-            <h1 className="font-semibold">
-              {focusExecutionId && executions[0]
-                ? executions[0].objectiveTitle
-                : "Produção local"}
-            </h1>
+            <h1 className="font-semibold">Produção</h1>
             <p className="text-xs text-slate-400">
-              {focusExecutionId && executions[0]
-                ? `${executions[0].objectiveCode} · ${moduleLabel ?? moduleKey}`
-                : `${moduleLabel ?? moduleKey} · objetivos deste projeto`}
+              {moduleLabel ?? moduleKey} · quadro de status das fases
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={`hidden rounded-full border px-3 py-1 text-xs sm:inline-flex ${data?.config.autoRun ? "border-emerald-400/20 text-emerald-300" : "border-amber-400/20 text-amber-300"}`}
-          >
-            {data?.config.autoRun ? "Automação ativa" : "Automação pausada"}
-          </span>
-          <Button
-            variant="outline"
-            className="border-white/10"
-            onClick={() => setAgentsOpen(true)}
-          >
-            <Users size={16} /> Agentes
-          </Button>
           {canManage && (
             <Button
               variant="outline"
@@ -428,537 +188,115 @@ export function RoadmapProductionPanel({
               <ShieldCheck size={16} /> Acessos
             </Button>
           )}
-          {canManage && (
-            <Button
-              className="bg-violet-500 hover:bg-violet-400"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Settings2 size={16} /> Configurar IA
-            </Button>
-          )}
         </div>
       </header>
 
-      <section className="grid gap-3 border-b border-white/10 p-4 md:grid-cols-4">
-        <Metric
-          icon={Bot}
-          label="Provedor"
-          value={
-            data
-              ? (data.providers.find(
-                  (provider) => provider.id === data.config.provider,
-                )?.label ?? data.config.provider)
-              : "Carregando"
-          }
-        />
-        <Metric
-          icon={Users}
-          label="Agentes disponíveis"
-          value={String(
-            data?.agents.filter((agent) => agent.available).length ?? 0,
-          )}
-        />
+      <section className="grid gap-3 border-b border-white/10 p-4 md:grid-cols-3">
         <Metric
           icon={Activity}
-          label="Atividade atual"
-          value={
-            activePhase
-              ? `${activePhase.phase.resolvedAgent} · fase ${activePhase.phase.phaseNumber}`
-              : "Aguardando"
-          }
-          active={Boolean(activePhase)}
+          label="Em progresso"
+          value={String(inProgress)}
+          active={inProgress > 0}
+        />
+        <Metric
+          icon={Clock}
+          label="Precisando de atenção"
+          value={String(needsAttention)}
+          active={needsAttention > 0}
         />
         <Metric
           icon={CheckCircle2}
-          label="Execuções concluídas"
-          value={`${executions.filter((item) => item.status === "SUCCEEDED").length} / ${executions.length}`}
+          label="Concluídas"
+          value={`${succeeded} / ${runs.length}`}
         />
       </section>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[460px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-r border-white/10 p-3">
-          <p className="mb-3 px-1 text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">
-            {focusExecutionId ? "Fases deste objetivo" : "Prompts por prioridade global"}
-          </p>
-          <div className="space-y-3">
-            {!executions.length && (
-              <p className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-                {focusExecutionId
-                  ? "Esta execução não foi encontrada — ela pode ter sido excluída da fila local."
-                  : `Nenhum prompt de ${moduleLabel ?? moduleKey} aguardando produção.`}
-              </p>
-            )}
-            {executions.map((execution) => (
-              <article
-                key={execution.id}
-                className="overflow-hidden rounded-xl border border-white/10 bg-white/[.025]"
-              >
-                <div className="flex items-start gap-2 border-b border-white/10 p-3">
-                  <button
-                    type="button"
-                    aria-expanded={resolvedExpandedExecutionId === execution.id}
-                    aria-controls={`production-prompts-${execution.id}`}
-                    onClick={() =>
-                      setExpandedExecutionId(
-                        resolvedExpandedExecutionId === execution.id
-                          ? null
-                          : execution.id,
-                      )
-                    }
-                    className="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40"
-                  >
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-950 font-bold text-violet-300">
-                      {execution.globalPriority}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[10px] uppercase tracking-wider text-slate-500">
-                        {execution.objectiveCode} · r
-                        {String(execution.sourceVersion).padStart(4, "0")}
-                      </span>
-                      <span className="mt-1 line-clamp-1 block text-sm font-medium">
-                        {execution.objectiveTitle}
-                      </span>
-                      <span
-                        className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] ${statusClass(execution.status)}`}
-                      >
-                        {executionStatusLabel(execution)}
-                      </span>
-                      <span className="ml-1 mt-2 inline-flex rounded-full border border-violet-400/20 bg-violet-400/[.07] px-2 py-1 text-[10px] text-violet-300">
-                        {DEVELOPMENT_PROVIDER_LABEL[execution.developmentProvider]}{" "}
-                        · cérebro de desenvolvimento
-                      </span>
-                      {execution.reworkCount > 0 && (
-                        <span className="ml-1 mt-2 inline-flex rounded-full border border-amber-400/20 bg-amber-400/[.07] px-2 py-1 text-[10px] text-amber-300">
-                          Objetivo refeito {execution.reworkCount}{" "}
-                          {execution.reworkCount === 1 ? "vez" : "vezes"}
-                        </span>
-                      )}
-                    </span>
-                    <ChevronDown
-                      size={16}
-                      className={`mt-2 shrink-0 text-slate-500 transition-transform ${resolvedExpandedExecutionId === execution.id ? "rotate-180 text-cyan-300" : ""}`}
-                    />
-                  </button>
-                  <div className="flex items-center gap-1">
-                    {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => setFeedbackTarget(execution)}
-                        className="mr-1 inline-flex items-center gap-1 rounded-md border border-rose-400/20 bg-rose-400/[.06] px-2 py-1 text-[10px] font-medium text-rose-300 hover:bg-rose-400/10"
-                      >
-                        <Bug size={11} /> Relatar erro
-                      </button>
-                    )}
-                    {canManage &&
-                      ["FAILED", "BLOCKED"].includes(execution.status) && (
-                        <button
-                          type="button"
-                          title="Tentar novamente"
-                          onClick={async () => {
-                            const result =
-                              await RepetirExecucaoRoadmapProduction(
-                                execution.id,
-                              );
-                            if (result.success)
-                              toast.success("Execução reenfileirada");
-                            else toast.error(result.error);
-                            await refresh(false);
-                          }}
-                          className="rounded p-1 text-amber-300 hover:bg-amber-400/10"
-                        >
-                          <RefreshCw size={13} />
-                        </button>
-                      )}
-                    {canManage &&
-                      execution.status === "AWAITING_APPROVAL" && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const result = await AprovarExecucaoRoadmapProduction(
-                              execution.id,
-                            );
-                            if (result.success)
-                              toast.success(
-                                "Objetivo aprovado; liberado para produção",
-                              );
-                            else toast.error(result.error);
-                            await refresh(false);
-                          }}
-                          className="mr-1 inline-flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-400/[.06] px-2 py-1 text-[10px] font-medium text-emerald-300 hover:bg-emerald-400/10"
-                        >
-                          <CheckCircle2 size={11} /> Aprovar e iniciar
-                        </button>
-                      )}
-                    {canManage && execution.status === "PAUSED" && (
-                      <button
-                        type="button"
-                        title="Retomar"
-                        onClick={() =>
-                          void controlExecution(execution, "RESUME")
-                        }
-                        className="rounded p-1 text-emerald-300 hover:bg-emerald-400/10"
-                      >
-                        <PlayCircle size={14} />
-                      </button>
-                    )}
-                    {canManage &&
-                      ["PENDING", "RUNNING"].includes(execution.status) && (
-                        <button
-                          type="button"
-                          title="Pausar"
-                          onClick={() =>
-                            void controlExecution(execution, "PAUSE")
-                          }
-                          className="rounded p-1 text-slate-300 hover:bg-white/10"
-                        >
-                          <PauseCircle size={14} />
-                        </button>
-                      )}
-                    {canManage && (
-                      <button
-                        type="button"
-                        title="Excluir da fila local"
-                        onClick={() =>
-                          void controlExecution(execution, "EXCLUDE")
-                        }
-                        className="rounded p-1 text-rose-300 hover:bg-rose-400/10"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="border-b border-white/10 p-2">
-                  <button
-                    type="button"
-                    onClick={() => setRoomExecutionId(execution.id)}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/20 bg-violet-400/[.06] px-3 py-2 text-xs font-medium text-violet-200 hover:bg-violet-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                  >
-                    <MessagesSquare size={14} /> Acompanhar implementação
-                    {execution.interventions.filter(
-                      (item) => item.status === "PENDING",
-                    ).length > 0 && (
-                      <span
-                        className="grid min-w-5 place-items-center rounded-full bg-amber-300 px-1 text-[10px] font-bold text-slate-950"
-                        aria-label={`${execution.interventions.filter((item) => item.status === "PENDING").length} intervenções pendentes`}
-                      >
-                        {
-                          execution.interventions.filter(
-                            (item) => item.status === "PENDING",
-                          ).length
-                        }
-                      </span>
-                    )}
-                  </button>
-                </div>
-                {resolvedExpandedExecutionId === execution.id && (
-                  <div
-                    id={`production-prompts-${execution.id}`}
-                    className="animate-in slide-in-from-top-1 p-2 duration-200"
-                  >
-                    {execution.phases.map((phase) => {
-                      const itemId = `${execution.id}:${phase.phaseNumber}`;
-                      const latest = phase.activities.at(-1)?.message;
-                      return (
-                        <div
-                          key={itemId}
-                          className={`mb-1 rounded-lg border transition ${selectedItem?.id === itemId ? "border-cyan-400/30 bg-cyan-400/[.08]" : "border-transparent hover:bg-white/5"}`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setSelectedPrompt(itemId)}
-                            className="flex w-full items-start gap-3 px-3 py-2 text-left"
-                          >
-                            <span
-                              className={`mt-1 size-2 shrink-0 rounded-full ${phase.status === "RUNNING" ? "animate-pulse bg-cyan-400" : phase.status === "SUCCEEDED" ? "bg-emerald-400" : phase.status === "BLOCKED" || phase.status === "FAILED" ? "bg-rose-400" : "bg-slate-600"}`}
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-[10px] text-slate-500">
-                                Prompt{" "}
-                                {String(phase.phaseNumber).padStart(2, "0")} · @
-                                {phase.resolvedAgent}
-                              </span>
-                              <span className="mt-0.5 block text-xs text-slate-200">
-                                {phase.title}
-                              </span>
-                              {phase.status === "RUNNING" && (
-                                <span className="mt-1 line-clamp-1 block text-[10px] text-cyan-300">
-                                  Em desenvolvimento · {latest ?? "Iniciando"}
-                                </span>
-                              )}
-                            </span>
-                            <span
-                              className={`rounded-full border px-2 py-1 text-[9px] ${statusClass(phase.status)}`}
-                            >
-                              {STATUS_LABEL[phase.status] ?? phase.status}
-                            </span>
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {execution.completionReportMarkdown && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedPrompt(`${execution.id}:report`)
-                        }
-                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left ${selectedItem?.id === `${execution.id}:report` ? "border-emerald-400/30 bg-emerald-400/[.08]" : "border-transparent hover:bg-white/5"}`}
-                      >
-                        <FileText size={14} className="text-emerald-300" />
-                        <span className="text-xs text-emerald-200">
-                          Relatório final de conclusão
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </article>
-            ))}
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {queue === null && !error && (
+          <div className="flex items-center justify-center gap-2 py-12 text-xs text-slate-500">
+            <Loader2 className="animate-spin" size={14} /> Carregando…
           </div>
-        </aside>
-
-        <section className="flex min-h-0 flex-col bg-[#081321]">
-          {!selectedItem ? (
-            <div className="grid h-full place-items-center text-slate-500">
-              Selecione um prompt.
-            </div>
-          ) : (
-            <>
-              <header className="border-b border-white/10 px-6 py-4">
-                <p className="text-xs text-violet-300">
-                  {selectedItem.execution.objectiveCode} ·{" "}
-                  {selectedItem.execution.moduleKey}
-                </p>
-                <h2 className="mt-1 text-xl font-semibold">
-                  {selectedItem.isReport
-                    ? "Relatório final de conclusão"
-                    : selectedItem.phase?.title}
-                </h2>
-                <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-500">
-                  {!selectedItem.isReport && selectedItem.phase && (
-                    <>
-                      <span className="rounded bg-white/5 px-2 py-1">
-                        @{selectedItem.phase.resolvedAgent}
+        )}
+        {queue !== null && runs.length === 0 && (
+          <p className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">
+            Nenhuma fase de produção registrada para {moduleLabel ?? moduleKey}{" "}
+            ainda. Fases são criadas a partir de objetivos documentados
+            (Claude/Codex, via chat).
+          </p>
+        )}
+        <div className="space-y-2">
+          {runs.map((run) => (
+            <article
+              key={run.id}
+              className="overflow-hidden rounded-xl border border-white/10 bg-white/[.025]"
+            >
+              <div className="flex items-start gap-3 p-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-950 font-bold text-violet-300">
+                  {run.artifact ? String(run.artifact.phaseNumber).padStart(2, "0") : "—"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[10px] uppercase tracking-wider text-slate-500">
+                    {run.objective.code}
+                  </span>
+                  <span className="mt-1 line-clamp-1 block text-sm font-medium">
+                    {run.artifact?.title ?? run.objective.title}
+                  </span>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <span
+                      className={`inline-flex rounded-full border px-2 py-1 text-[10px] ${statusClass(run.status)}`}
+                    >
+                      {STATUS_LABEL[run.status] ?? run.status}
+                    </span>
+                    <span className="inline-flex rounded-full border border-violet-400/20 bg-violet-400/[.07] px-2 py-1 text-[10px] text-violet-300">
+                      {ASSIGNEE_LABEL[run.assignee] ?? run.assignee}
+                    </span>
+                    {run.errorCode && (
+                      <span className="inline-flex rounded-full border border-rose-400/20 bg-rose-400/[.07] px-2 py-1 text-[10px] text-rose-300">
+                        {run.errorCode}
                       </span>
-                      <span
-                        className={`rounded border px-2 py-1 ${statusClass(selectedItem.phase.status)}`}
-                      >
-                        {STATUS_LABEL[selectedItem.phase.status] ??
-                          selectedItem.phase.status}
-                      </span>
-                    </>
-                  )}
-                  {selectedItem.path && (
-                    <code className="break-all rounded bg-white/5 px-2 py-1">
-                      {selectedItem.path}
-                    </code>
+                    )}
+                  </div>
+                  {run.resultSummary && (
+                    <p className="mt-2 line-clamp-2 text-xs text-slate-400">
+                      {run.resultSummary}
+                    </p>
                   )}
                 </div>
-                {selectedItem.phase?.activities.at(-1) && (
-                  <p className="mt-3 rounded-lg bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
-                    {selectedItem.phase.activities.at(-1)?.message}
-                  </p>
-                )}
-              </header>
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-7">
-                {selectedItem.execution.manualFeedback.length > 0 && (
-                  <section className="mx-auto mb-6 max-w-5xl rounded-xl border border-amber-400/20 bg-amber-400/[.05] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">
-                      Feedback do administrador
-                    </p>
-                    <div className="mt-3 space-y-3">
-                      {selectedItem.execution.manualFeedback.map((feedback) => (
-                        <div
-                          key={feedback.id}
-                          className="rounded-lg bg-slate-950/50 p-3 text-xs leading-5 text-slate-300"
-                        >
-                          <p className="whitespace-pre-wrap">
-                            {feedback.content}
-                          </p>
-                          <p className="mt-2 text-[10px] text-slate-500">
-                            {new Date(feedback.reportedAt).toLocaleString(
-                              "pt-BR",
-                            )}{" "}
-                            ·{" "}
-                            {feedback.improvedWithAi
-                              ? "melhorado com IA"
-                              : "texto original"}{" "}
-                            ·{" "}
-                            {feedback.resolvedAt
-                              ? "correção concluída"
-                              : "aguardando correção"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-                <article className="prose prose-invert prose-slate mx-auto max-w-5xl prose-a:text-cyan-400 prose-pre:border prose-pre:border-white/10 prose-pre:bg-slate-950">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>
-                    {selectedItem.markdown || "Prompt ainda não disponível."}
-                  </ReactMarkdown>
-                </article>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {canManage && run.status === "AWAITING_APPROVAL" && (
+                    <button
+                      type="button"
+                      onClick={() => void approve(run)}
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-400/[.06] px-2 py-1 text-[10px] font-medium text-emerald-300 hover:bg-emerald-400/10"
+                    >
+                      <CheckCircle2 size={11} /> Aprovar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setRoomRunId(run.id)}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[10px] text-slate-300 hover:bg-white/10"
+                  >
+                    <MessageSquareText size={11} /> Detalhes
+                  </button>
+                </div>
               </div>
-            </>
-          )}
-        </section>
+            </article>
+          ))}
+        </div>
       </div>
 
-      <AgentDrawer
-        open={agentsOpen}
-        onClose={() => setAgentsOpen(false)}
-        agents={data?.agents ?? []}
-        active={activePhase}
-      />
-      {canManage && data && settingsOpen && (
-        <SettingsDialog
-          open
-          onOpenChange={setSettingsOpen}
-          data={data}
-          onSaved={() => refresh(true)}
-        />
-      )}
       {canManage && accessOpen && (
         <AccessDialog open onOpenChange={setAccessOpen} />
       )}
-      {canManage && feedbackTarget && (
-        <FeedbackDialog
-          target={feedbackTarget}
-          onClose={() => setFeedbackTarget(null)}
-          onSubmitted={async () => {
-            setFeedbackTarget(null);
-            await refresh(false);
-          }}
-        />
-      )}
       <RoadmapImplementationRoom
-        open={Boolean(roomExecutionId && roomExecution)}
-        onOpenChange={(open) => !open && setRoomExecutionId(null)}
-        execution={roomExecution}
-        agents={data?.agents ?? []}
+        open={Boolean(roomRunId && roomRun)}
+        onOpenChange={(open) => !open && setRoomRunId(null)}
+        run={roomRun}
         canManage={canManage}
-        onControl={async (control) => {
-          if (!roomExecution) return;
-          await controlExecution(roomExecution, control);
-          await refresh(false);
-        }}
-        onChanged={() => refresh(false)}
+        onChanged={() => refresh()}
       />
     </main>
-  );
-}
-
-function FeedbackDialog({
-  target,
-  onClose,
-  onSubmitted,
-}: {
-  target: ExecutionView;
-  onClose: () => void;
-  onSubmitted: () => Promise<void> | void;
-}) {
-  const [feedback, setFeedback] = useState("");
-  const [improvedWithAi, setImprovedWithAi] = useState(false);
-  const [improving, startImproving] = useTransition();
-  const [submitting, startSubmitting] = useTransition();
-  const valid = feedback.trim().length >= 5;
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="border-white/10 bg-[#0b1524] text-slate-100 sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Relatar erro na implementação</DialogTitle>
-          <DialogDescription>
-            Objetivo {target.objectiveCode} · {target.objectiveTitle}. Descreva
-            o que ficou ruim na implementação completa e o resultado esperado.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <textarea
-            autoFocus
-            value={feedback}
-            onChange={(event) => setFeedback(event.target.value)}
-            maxLength={4_000}
-            rows={9}
-            placeholder="Ex.: O card ainda quebra no celular. Ele deve manter os botões visíveis em 320 px e permitir rolagem apenas no conteúdo."
-            className="w-full resize-y rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-rose-400/30"
-          />
-          <div className="flex items-center justify-between gap-3 text-[10px] text-slate-500">
-            <span>{feedback.length} / 4000</span>
-            {improvedWithAi && (
-              <span className="inline-flex items-center gap-1 text-violet-300">
-                <Sparkles size={11} /> Texto melhorado pelo Qwen 3.8
-              </span>
-            )}
-          </div>
-          <div className="rounded-xl border border-amber-400/15 bg-amber-400/[.05] p-3 text-xs leading-5 text-amber-100/80">
-            Este prompt e todas as fases posteriores serão reenfileirados. O
-            agente receberá seu relato como requisito obrigatório, e o novo
-            relatório final registrará o retrabalho.
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="ghost" onClick={onClose} disabled={submitting}>
-              Cancelar
-            </Button>
-            <Button
-              variant="outline"
-              className="border-violet-400/20 text-violet-300"
-              disabled={!valid || improving || submitting}
-              onClick={() =>
-                startImproving(async () => {
-                  const result = await MelhorarFeedbackRoadmapProduction({
-                    executionId: target.id,
-                    feedback,
-                  });
-                  if (!result.success) {
-                    toast.error(result.error);
-                    return;
-                  }
-                  setFeedback(result.improved);
-                  setImprovedWithAi(true);
-                  toast.success("Relato melhorado pelo Qwen 3.8");
-                })
-              }
-            >
-              {improving ? (
-                <Loader2 className="animate-spin" size={14} />
-              ) : (
-                <Sparkles size={14} />
-              )}
-              Melhorar com IA
-            </Button>
-            <Button
-              className="bg-rose-500 hover:bg-rose-400"
-              disabled={!valid || improving || submitting}
-              onClick={() =>
-                startSubmitting(async () => {
-                  const result = await RelatarErroRoadmapProduction({
-                    executionId: target.id,
-                    feedback,
-                    improvedWithAi,
-                  });
-                  if (!result.success) {
-                    toast.error(result.error);
-                    return;
-                  }
-                  toast.success(
-                    "Erro registrado; prompt reenfileirado para correção",
-                  );
-                  await onSubmitted();
-                })
-              }
-            >
-              {submitting ? (
-                <Loader2 className="animate-spin" size={14} />
-              ) : (
-                <Send size={14} />
-              )}
-              Refazer com este feedback
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -968,7 +306,7 @@ function Metric({
   value,
   active = false,
 }: {
-  icon: typeof Bot;
+  icon: typeof Activity;
   label: string;
   value: string;
   active?: boolean;
@@ -984,219 +322,6 @@ function Metric({
       </div>
       <p className="mt-2 truncate text-sm font-medium">{value}</p>
     </div>
-  );
-}
-
-function AgentDrawer({
-  open,
-  onClose,
-  agents,
-  active,
-}: {
-  open: boolean;
-  onClose: () => void;
-  agents: AgentView[];
-  active: { execution: ExecutionView; phase: PhaseView } | null;
-}) {
-  if (!open) return null;
-  return (
-    <div
-      className="absolute inset-0 z-50 flex justify-end bg-black/55"
-      onClick={onClose}
-    >
-      <aside
-        className="h-full w-full max-w-md overflow-y-auto border-l border-white/10 bg-[#0a1423] p-4 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold">Agentes Bibble</h2>
-            <p className="text-xs text-slate-500">
-              Skills instalados no projeto local
-            </p>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X size={18} />
-          </Button>
-        </div>
-        {active && (
-          <div className="mb-4 rounded-xl border border-cyan-400/25 bg-cyan-400/[.07] p-3">
-            <p className="text-[10px] uppercase tracking-wider text-cyan-300">
-              Trabalhando agora
-            </p>
-            <p className="mt-1 font-medium">{active.phase.resolvedAgent}</p>
-            <p className="mt-1 text-xs text-slate-400">
-              {active.execution.objectiveCode} · {active.phase.title}
-            </p>
-            <p className="mt-2 text-xs text-slate-300">
-              {active.phase.activities.at(-1)?.message ?? "Iniciando fase"}
-            </p>
-          </div>
-        )}
-        <div className="space-y-2">
-          {agents.map((agent) => {
-            const isActive = active?.phase.resolvedAgent === agent.id;
-            return (
-              <div
-                key={agent.id}
-                className={`rounded-xl border p-3 ${isActive ? "border-cyan-400/30 bg-cyan-400/[.06]" : "border-white/10 bg-white/[.02]"}`}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-xl">{agent.icon}</span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{agent.name}</p>
-                      {isActive && (
-                        <span className="size-2 animate-pulse rounded-full bg-cyan-400" />
-                      )}
-                    </div>
-                    <p className="text-xs text-violet-300">{agent.title}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                      {agent.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-function SettingsDialog({
-  open,
-  onOpenChange,
-  data,
-  onSaved,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  data: ProductionData;
-  onSaved: () => Promise<void> | void;
-}) {
-  const [provider, setProvider] = useState<"codex" | "claude">(
-    data.config.provider === "codex" ? "codex" : "claude",
-  );
-  const [model, setModel] = useState(
-    data.config.provider === "codex" || data.config.provider === "claude"
-      ? data.config.model
-      : "default",
-  );
-  const [autoRun, setAutoRun] = useState(data.config.autoRun);
-  const [maxToolSteps, setMaxToolSteps] = useState(data.config.maxToolSteps);
-  const [pending, startTransition] = useTransition();
-  const developmentProviders = data.providers.filter(
-    (item): item is ProviderView & { id: "codex" | "claude" } =>
-      item.id !== "ollama",
-  );
-  const selectedProvider = data.providers.find((item) => item.id === provider);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/10 bg-[#0b1524] text-slate-100">
-        <DialogHeader>
-          <DialogTitle>Configurar motor de IA</DialogTitle>
-          <DialogDescription>
-            Qwen 3.8 permanece exclusivo para documentação e melhoria dos
-            prompts. Claude e Codex executam o desenvolvimento com os agentes
-            Bibble, sem commit automático.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {developmentProviders.map((item) => (
-              <button
-                key={item.id}
-                disabled={!item.ready}
-                onClick={() => {
-                  setProvider(item.id);
-                  setModel(item.models[0] ?? "");
-                }}
-                className={`rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-45 ${provider === item.id ? "border-violet-400/40 bg-violet-400/10" : "border-white/10"}`}
-              >
-                <p className="text-sm font-medium">{item.label}</p>
-                <p className="mt-1 text-[10px] text-slate-500">{item.detail}</p>
-              </button>
-            ))}
-          </div>
-          <p className="rounded-lg border border-cyan-400/15 bg-cyan-400/[.05] px-3 py-2 text-[11px] text-cyan-200/80">
-            Ordem padrão: Claude primeiro, Codex como fallback automático. A
-            escolha feita em cada objetivo prevalece sobre esta preferência.
-          </p>
-          <label className="block text-xs text-slate-400">
-            Modelo
-            <select
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm"
-            >
-              {selectedProvider?.models.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center justify-between rounded-xl border border-white/10 p-3">
-            <span>
-              <span className="block text-sm">Execução automática</span>
-              <span className="text-xs text-slate-500">
-                O worker recebe as próximas fases da fila.
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={autoRun}
-              onChange={(event) => setAutoRun(event.target.checked)}
-              className="size-5 accent-violet-500"
-            />
-          </label>
-          <label className="block text-xs text-slate-400">
-            Limite de tools por fase: {maxToolSteps}
-            <input
-              type="range"
-              min={4}
-              max={40}
-              value={maxToolSteps}
-              onChange={(event) => setMaxToolSteps(Number(event.target.value))}
-              className="mt-2 w-full accent-violet-500"
-            />
-          </label>
-          <div className="flex justify-end">
-            <Button
-              disabled={pending || !selectedProvider?.ready || !model}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await SalvarConfiguracaoRoadmapProduction({
-                    provider,
-                    model,
-                    autoRun,
-                    maxToolSteps,
-                  });
-                  if (!result.success) {
-                    toast.error(result.error);
-                    return;
-                  }
-                  toast.success(
-                    autoRun ? "Automação configurada" : "Automação pausada",
-                  );
-                  onOpenChange(false);
-                  await onSaved();
-                })
-              }
-            >
-              {pending ? (
-                <Loader2 className="animate-spin" size={15} />
-              ) : autoRun ? (
-                <PlayCircle size={15} />
-              ) : (
-                <PauseCircle size={15} />
-              )}{" "}
-              Salvar
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

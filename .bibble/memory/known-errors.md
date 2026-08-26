@@ -5,6 +5,54 @@
 
 ---
 
+### `npm run build` falha em arquivos de `Roadmap*`/`roadmap-alpha`/`roadmap-production` sem eu ter tocado nesses arquivos — processo autônomo concorrente, não é regressão
+**Sintoma:** `npm run build` (Turbopack) falha com erro de módulo em arquivos como
+`src/actions/RoadmapProduction.ts`, `src/lib/roadmap-alpha/*`, `RoadmapDashboard.tsx`,
+`RoadmapImplementationRoom.tsx` etc. — mesmo numa sessão que não editou nenhum arquivo desse
+módulo. Rodar o build de novo minutos depois produz um erro DIFERENTE, ainda confinado aos
+mesmos arquivos de Roadmap.
+**Causa raiz confirmada (2026-08-25, sessão CRM Canais e Parcerias):** o Painel Alpha tem um
+sistema próprio de desenvolvimento autônomo (Roadmap Production, ver `codebase-map.md` — workers
+`.ps1`/`.mjs` que rodam como processos separados, escrevendo código de verdade neste MESMO
+working directory). Confirmado via `git status` (arquivos de `roadmap-production`/`roadmap-alpha`
+modificados/deletados que a sessão atual não tocou) + timestamp de arquivo (`RoadmapProduction.ts`
+modificado há SEGUNDOS antes do build) + `Get-Process` (múltiplos processos `node`/`powershell`
+iniciados nos minutos imediatamente anteriores). O build captura um snapshot do meio de um
+refactor de outro processo, não um erro real e estável.
+**O que fazer:** NUNCA tentar "consertar" arquivos de Roadmap por causa disso — não é seu escopo
+e o outro processo pode estar no meio de uma mudança legítima. Para validar SEU PRÓPRIO trabalho
+com confiança quando isso acontecer: (1) `npx eslint <seus arquivos específicos>` — não depende
+de resolução cruzada de módulos de outras partes do projeto; (2) `npx tsc --noEmit` completo,
+mas ler o log INTEIRO (não só grep pelo nome do seu módulo) — se os únicos erros forem os
+baselines já catalogados (`ReceitaFederal`/`ExclusaoFiscal`/`HabilitacaoRadarClient`/
+`google-calendar sync-queue`) e nada de Roadmap aparecer no `tsc`, seu código está correto
+independente do que `next build` reportar naquele instante; (3) rodar a suíte de testes
+Vitest relevante (isolada via mocks, não afetada pelo estado de compilação de outros módulos).
+Se precisar mesmo de um `npm run build` limpo como evidência final, esperar alguns minutos e
+rodar de novo — mas não bloquear a entrega do seu próprio trabalho por um erro comprovadamente
+alheio.
+**Adicionado em:** 2026-08-25 (Bibble/Vault/Forge, Fase 04 do CRM de Canais e Parcerias)
+
+---
+
+### Migration no Turso remoto: `client.transaction("write")` em lote falha com "no such table" ao criar tabelas com FK cruzada no mesmo batch
+**Sintoma:** Ao aplicar uma migration multi-`CREATE TABLE` via `@libsql/client` usando `client.transaction("write")` + `tx.execute()` para cada statement + `tx.commit()`, o Turso remoto (protocolo Hrana HTTP) retorna `LibsqlBatchError: SQLITE_UNKNOWN: no such table: main.<TabelaCriadaAntesNoMesmoBatch>` — mesmo a tabela referenciada sendo a PRIMEIRA statement do batch. O erro acontece mesmo quando o mesmo SQL, testado antes contra um SQLite local via `client.executeMultiple(sql)`, passa sem nenhum problema (é o que gerou falsa confiança antes de tentar em produção).
+**Causa raiz:** o protocolo Hrana do Turso remoto, no modo `transaction()`, não resolve de forma confiável referências de FK a uma tabela criada mais cedo no MESMO batch não commitado — diferente do modo local (`executeMultiple`), que resolve tudo na mesma conexão SQLite direta. Ao dar erro, o rollback do lado do cliente não necessariamente reflete o que o servidor remoto realmente persistiu: numa ocorrência real (2026-08-25, migration `20260825180000_add_roadmap_production_status`), 2 das 3 tabelas do lote ficaram criadas (vazias, sem violação de FK) mesmo com o batch inteiro reportando erro e "rollback" — só a 1ª tabela (que não tinha nenhuma FK pendente ainda) não foi criada, criando um estado parcial que exigiu diagnóstico manual antes de continuar.
+**Fix:** para migrations no Turso remoto que criam múltiplas tabelas com FK entre si, usar `client.execute(sql)` **simples, um statement por vez, sem `transaction()`/batch**, verificando cada `CREATE TABLE`/`CREATE INDEX` individualmente (`SELECT name FROM sqlite_master WHERE name=...`) antes de seguir para o próximo. Mais lento, mas cada passo é atômico e confirmável — sem risco de estado parcial invisível.
+**Lição geral:** SEMPRE, depois de qualquer tentativa de migration remota que reportar erro (mesmo com "rollback"), rodar `SELECT name, type FROM sqlite_master WHERE name LIKE '%NomeDaFeature%'` no banco real antes de tentar de novo — nunca assumir que erro reportado = nada foi persistido no Turso remoto. `PRAGMA foreign_key_check` sozinho não pega esse cenário (tabelas parcialmente criadas mas vazias não geram violação de FK).
+**Adicionado em:** 2026-08-25 (Bibble/Vault, migration do novo motor de status do Roadmap Production)
+
+---
+
+### `tests/bpm/` tem 28 testes falhando PRÉ-EXISTENTES (11 arquivos) — baseline real é 287/315, não 315/315
+**Sintoma:** `npx vitest run tests/bpm` retorna "11 failed | 39 passed (50 arquivos), 28 failed | 287 passed (315 testes)" mesmo sem nenhuma mudança em código de BPM/Alpha CRM.
+**Causa raiz:** dívida de teste acumulada de remoções de UI já documentadas em `decisions.md` (ex: `PainelRequisitosAvanco.tsx` removido em RM-2026-3E14F1, `PainelContatos.tsx` removido em RM-2026-05E75A) — os testes fazem asserção estática de que certos componentes/strings aparecem no código-fonte (`readFileSync` + `toContain`), e ficaram órfãos quando os componentes foram removidos da UI por decisão deliberada, sem que os testes fossem atualizados junto. `tests/bpm/standby-follow-up.test.ts:139` é um exemplo confirmado (`expect(registrar).toContain("<PainelStandbyFollowUp")`).
+**Confirmado NÃO ser regressão de nenhuma sessão específica:** verificado via `git stash` isolando qualquer mudança em andamento — as mesmas 28 falhas, nos mesmos 11 arquivos, com a mesma asserção, reproduzem no baseline limpo (2026-08-25, sessão CRM de Canais e Parcerias, Fase 01).
+**Ação para sessões futuras:** ao rodar a suíte `tests/bpm/` como gate de regressão de qualquer feature nova, o baseline de comparação é **287/315 passando**, não 315/315. Uma queda abaixo de 287 é regressão real; 287 mantido não é. Corrigir os 28 testes órfãos é trabalho de limpeza válido, mas está fora do escopo de qualquer feature que não seja especificamente sobre esses componentes — não tente "consertar" silenciosamente como efeito colateral de outra tarefa.
+**Adicionado em:** 2026-08-25 (Bibble/Vault, Fase 01 do CRM de Canais e Parcerias)
+
+---
+
 ### CS&NPS — "Invalid input: expected string, received null" ao clicar em "Salvar Cliente" (cadastro novo) — bug pré-existente, mascarado pelo bloqueio de telefone do sócio
 **Sintoma:** No modal de cadastro de cliente novo, ao clicar em "Salvar Cliente", erro de validação `Invalid input: expected string, received null`. Só passou a aparecer depois de o telefone do sócio virar opcional (2026-08-25) — antes, o cadastro sempre travava mais cedo nesse campo e nunca chegava a bater nesse segundo bug.
 **Causa raiz:** `handleFinalizar` em `modal.tsx` monta o payload usando `campo || null` para `embasamento`, `origemLead`, `formaPagamento`, `valorContrato`, `closerNome` quando vazios — mas `cadastrarClienteSchema` (`src/lib/validations/cs-nps.ts`) define esses campos como `z.string().optional()`/`z.coerce.number().optional()`, que aceitam `undefined`, **não `null`**. Zod trata os dois como tipos diferentes por padrão.

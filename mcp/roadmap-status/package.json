@@ -1,0 +1,20 @@
+{
+  "name": "roadmap-status-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP local fino: expoe o quadro de status de producao do Roadmap Alpha (PainelAlpha) via chamadas HTTP autenticadas por Bearer token contra /api/roadmap/production/*.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.2"
+  }
+}

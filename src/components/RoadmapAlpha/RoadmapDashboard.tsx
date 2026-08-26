@@ -44,7 +44,7 @@ import {
   ReenfileirarObjetivoRoadmap,
 } from "@/actions/RoadmapAlpha";
 import {
-  AprovarExecucaoRoadmapProduction,
+  AprovarFaseRoadmapProduction,
   ListarExecucoesAguardandoAprovacao,
   ListarExecucoesPorObjetivo,
   ListarExecucoesPrecisandoAtencao,
@@ -96,7 +96,7 @@ interface RoadmapObjectiveView {
   documentationStatus: string;
   sourceVersion: number;
   isNewModule: boolean;
-  developmentProvider: "claude" | "codex" | "ollama";
+  developmentProvider: "claude" | "codex";
   acceptanceCriteria: string[];
   createdAt: string;
   archivedAt: string | null;
@@ -109,7 +109,6 @@ interface RoadmapObjectiveView {
     lastErrorCode: string | null;
   }>;
   promptArtifacts: RoadmapArtifact[];
-  workspaceWorkerOffline: boolean;
 }
 
 interface Props {
@@ -194,10 +193,10 @@ const LIFECYCLE_META: Record<
   },
 };
 
-const DEVELOPMENT_PROVIDER_LABEL: Record<
-  "claude" | "codex" | "ollama",
-  string
-> = { claude: "Claude", codex: "Codex", ollama: "Qwen" };
+const DEVELOPMENT_PROVIDER_LABEL: Record<"claude" | "codex", string> = {
+  claude: "Claude",
+  codex: "Codex",
+};
 
 function lifecycleOf(objective: RoadmapObjectiveView): LifecycleFilter {
   if (objective.status === "DELETED") return "deleted";
@@ -257,14 +256,11 @@ export function RoadmapDashboard({
   const [productionModuleKey, setProductionModuleKey] = useState<string | null>(
     null,
   );
-  const [focusExecutionId, setFocusExecutionId] = useState<string | null>(
-    null,
-  );
   const [awaitingApproval, setAwaitingApproval] = useState<
     Map<string, string>
   >(new Map());
   const [needingAttention, setNeedingAttention] = useState<
-    Map<string, { executionId: string; status: "BLOCKED" | "WAITING_FOR_ADMIN" }>
+    Map<string, { executionId: string; status: "BLOCKED" | "NEEDS_INPUT" }>
   >(new Map());
   const [objectiveExecutions, setObjectiveExecutions] = useState<
     Map<string, { executionId: string; status: string }>
@@ -438,10 +434,8 @@ export function RoadmapDashboard({
           modules.find((module) => module.id === productionModuleKey)?.label ??
           null
         }
-        focusExecutionId={focusExecutionId}
         onBack={() => {
           setView("roadmap");
-          setFocusExecutionId(null);
         }}
       />
     );
@@ -707,7 +701,7 @@ export function RoadmapDashboard({
                                 );
                                 if (!executionId) return;
                                 const result =
-                                  await AprovarExecucaoRoadmapProduction(
+                                  await AprovarFaseRoadmapProduction(
                                     executionId,
                                   );
                                 if (!result.success) {
@@ -754,8 +748,8 @@ export function RoadmapDashboard({
                           <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-rose-400/20 bg-rose-400/[.06] p-1.5">
                             <span className="flex-1 px-1 text-[10px] text-rose-200/90">
                               {needingAttention.get(objective.id)?.status ===
-                              "WAITING_FOR_ADMIN"
-                                ? "Aguardando administrador — precisa de você"
+                              "NEEDS_INPUT"
+                                ? "Aguardando resposta — precisa de você"
                                 : "Bloqueado — precisa de você"}
                             </span>
                             <button
@@ -767,35 +761,12 @@ export function RoadmapDashboard({
                                 );
                                 if (!attention) return;
                                 setProductionModuleKey(objective.moduleKey);
-                                setFocusExecutionId(attention.executionId);
                                 setView("production");
                               }}
                               className="inline-flex items-center gap-1 rounded-md border border-rose-400/20 bg-rose-400/[.06] px-2 py-1 text-[10px] font-medium text-rose-300 hover:bg-rose-400/10"
                             >
                               <Workflow size={11} /> Abrir
                             </button>
-                          </div>
-                        )}
-                        {objective.workspaceWorkerOffline && (
-                          <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[.06] p-1.5">
-                            <span className="flex-1 px-1 text-[10px] text-amber-200/90">
-                              Worker do projeto parado — não vai iniciar
-                              sozinho. Reinicie em &quot;Sistemas
-                              Externos&quot;, na barra lateral.
-                            </span>
-                            {canMutate && (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setModuleFilter(objective.moduleKey);
-                                  setMobilePane("modules");
-                                }}
-                                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400/20 bg-amber-400/[.06] px-2 py-1 text-[10px] font-medium text-amber-300 hover:bg-amber-400/10"
-                              >
-                                Ver projeto
-                              </button>
-                            )}
                           </div>
                         )}
                         <div className="mt-3 flex items-center justify-between gap-2">
@@ -828,14 +799,9 @@ export function RoadmapDashboard({
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    const execution = objectiveExecutions.get(
-                                      objective.id,
-                                    );
-                                    if (!execution) return;
                                     setProductionModuleKey(
                                       objective.moduleKey,
                                     );
-                                    setFocusExecutionId(execution.executionId);
                                     setView("production");
                                   }}
                                   className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/[.06] px-2 py-1 text-[10px] text-cyan-300 hover:bg-cyan-400/10"
@@ -1219,7 +1185,7 @@ function CreateObjectiveDialog({
   const [criteria, setCriteria] = useState("");
   const [priority, setPriority] = useState(nextPriority);
   const [developmentProvider, setDevelopmentProvider] = useState<
-    "claude" | "codex" | "ollama"
+    "claude" | "codex"
   >("claude");
 
   function submit(event: React.FormEvent) {
@@ -1403,37 +1369,33 @@ function CreateObjectiveDialog({
               desenvolvimento
             </legend>
             <p className="text-[11px] text-slate-500">
-              Qwen 3.8 sempre documenta o objetivo. O cérebro escolhido aqui
-              executa os prompts de desenvolvimento com os agentes Bibble; se
-              ficar indisponível, os outros dois assumem automaticamente, na
-              ordem de prioridade escolhida.
+              Qwen documenta o objetivo. Quem implementa as fases, via chat, é
+              escolhido aqui.
             </p>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               {(
                 [
                   {
-                    id: "claude",
+                    id: "claude" as const,
                     label: "Claude",
-                    description: "Prioridade 1 · fallback Codex → Qwen",
+                    description: "Implementa via Claude Code, no chat",
+                    disabled: false,
                   },
                   {
-                    id: "codex",
+                    id: "codex" as const,
                     label: "Codex",
-                    description: "Prioridade 1 · fallback Claude → Qwen",
+                    description: "Ainda não configurado",
+                    disabled: true,
                   },
-                  {
-                    id: "ollama",
-                    label: "Qwen",
-                    description: "Prioridade 1 · fallback Claude → Codex",
-                  },
-                ] as const
+                ]
               ).map((brain) => (
                 <button
                   key={brain.id}
                   type="button"
+                  disabled={brain.disabled}
                   aria-pressed={developmentProvider === brain.id}
                   onClick={() => setDevelopmentProvider(brain.id)}
-                  className={`rounded-xl border p-3 text-left transition ${developmentProvider === brain.id ? "border-violet-400/40 bg-violet-400/10" : "border-white/10 bg-slate-950 hover:border-white/20"}`}
+                  className={`rounded-xl border p-3 text-left transition ${brain.disabled ? "cursor-not-allowed border-white/5 bg-slate-950/50 opacity-40" : developmentProvider === brain.id ? "border-violet-400/40 bg-violet-400/10" : "border-white/10 bg-slate-950 hover:border-white/20"}`}
                 >
                   <span className="block text-sm font-medium text-slate-100">
                     {brain.label}
@@ -1492,7 +1454,7 @@ function EditObjectiveDialog({
     objective.acceptanceCriteria.join("\n"),
   );
   const [developmentProvider, setDevelopmentProvider] = useState<
-    "claude" | "codex" | "ollama"
+    "claude" | "codex"
   >(objective.developmentProvider);
   const isNovoModulo = objective.isNewModule;
 
@@ -1666,35 +1628,32 @@ function EditObjectiveDialog({
             </legend>
             <p className="text-[11px] text-slate-500">
               A troca não regenera os prompts. Uma fase já em execução termina;
-              próximas tentativas e fases usam a nova preferência, com fallback
-              automático para as outras duas IAs, na ordem de prioridade.
+              próximas fases usam a nova preferência.
             </p>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               {(
                 [
                   {
-                    id: "claude",
+                    id: "claude" as const,
                     label: "Claude",
-                    description: "Preferencial · fallback Codex → Qwen",
+                    description: "Implementa via Claude Code, no chat",
+                    disabled: false,
                   },
                   {
-                    id: "codex",
+                    id: "codex" as const,
                     label: "Codex",
-                    description: "Preferencial · fallback Claude → Qwen",
+                    description: "Ainda não configurado",
+                    disabled: true,
                   },
-                  {
-                    id: "ollama",
-                    label: "Qwen",
-                    description: "Preferencial · fallback Claude → Codex",
-                  },
-                ] as const
+                ]
               ).map((brain) => (
                 <button
                   key={brain.id}
                   type="button"
+                  disabled={brain.disabled}
                   aria-pressed={developmentProvider === brain.id}
                   onClick={() => setDevelopmentProvider(brain.id)}
-                  className={`rounded-xl border p-3 text-left transition ${developmentProvider === brain.id ? "border-violet-400/40 bg-violet-400/10" : "border-white/10 bg-slate-950 hover:border-white/20"}`}
+                  className={`rounded-xl border p-3 text-left transition ${brain.disabled ? "cursor-not-allowed border-white/5 bg-slate-950/50 opacity-40" : developmentProvider === brain.id ? "border-violet-400/40 bg-violet-400/10" : "border-white/10 bg-slate-950 hover:border-white/20"}`}
                 >
                   <span className="block text-sm font-medium text-slate-100">
                     {brain.label}

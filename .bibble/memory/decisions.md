@@ -1,5 +1,27 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-25 — Novo motor de produção do Roadmap Alpha: status manual via chat, motor autônomo antigo removido por completo
+
+**Contexto:** o motor de produção do Roadmap (implementação de fases documentadas) era um agente de IA autônomo (tool-calling loop contra Ollama/Qwen, até 24 passos por fase, lendo/escrevendo arquivos de código sozinho) rodando dentro do próprio processo Next.js (Server Action `kickProductionWorker`) e também em workers PowerShell externos (`spawn` direto de Server Actions, Mutex global, PID em `RoadmapWorkspace.workerPid`). Suporte a Claude Code/Codex CLI existia no código mas estava hard-desligado (`externalCliExecutionEnabled()` sempre `false`) — na prática só Ollama/Qwen rodava, mesmo quando o usuário selecionava "Claude"/"Codex" na UI. Retry automático até 30x e troca automática de agente eram a origem das falhas reportadas pelo usuário ("muitas falhas").
+
+**Decisão do usuário:** quem implementa as fases agora é Claude (via chat/Claude Code) e futuramente Codex — não mais um agente autônomo dentro do painel. O painel de Produção virou um quadro de status: Claude atualiza fase iniciada/em progresso/concluída a partir do chat, via um MCP server local fino que chama uma rota HTTP autenticada no próprio painel (não conecta direto no Turso). O fluxo de **documentação** (`RoadmapAlpha.ts`, `roadmap-alpha/*`, geração de Markdown via Qwen) foi mantido intocado.
+
+**Modelo de dados novo** (2 migrations aditivas aplicadas em produção nesta sessão, ambas com protocolo Vault completo — backup reutilizado de `2026-08-25T17:59`, confirmação explícita do usuário):
+- `RoadmapProductionRun` — uma linha por fase-execução (`objectiveId`+`sourceVersion`+`phaseNumber` único), status (`PENDING|AWAITING_APPROVAL|IN_PROGRESS|NEEDS_INPUT|BLOCKED|SUCCEEDED|FAILED|CANCELLED`), `assignee` (`claude|codex|manual`).
+- `RoadmapProductionEvent` — log append-only por run (status change, mensagem, pergunta, nota).
+- `RoadmapApiKey` — credencial de API dedicada ao MCP (mesmo padrão de `AlphaSeoApiKey`: hash SHA-256, prefixo `roadmap_key_`, rate limit por compare-and-swap).
+- `RoadmapObjective.developmentAssignee` (coluna nova, `ADD COLUMN` aditivo) — substitui a preferência antiga (`objective-development-providers.json`) por objetivo; domínio agora é só `claude|codex` (Qwen/Ollama removido do domínio, não é mais opção).
+
+**Nota operacional registrada em `known-errors.md`:** aplicar migration multi-tabela via `client.transaction("write")` em lote no Turso remoto falhou (Hrana não resolve FK a tabela criada no mesmo batch não commitado) — corrigido aplicando `client.execute()` sequencial, uma statement por vez, com verificação individual. Nenhum dado perdido, mas exigiu diagnóstico manual do estado parcial antes de prosseguir.
+
+**O que foi removido por completo:** todo `src/lib/roadmap-production/` (worker.ts, providers.ts, cli-providers.ts, tools.ts, agents.ts, storage.ts, execution-lock.ts, interactions.ts, contracts.ts, policy.ts, protected-path.ts, completion-report.ts, subprocess-env.ts, workspace-scope.ts, runtime.ts), os 3 scripts `.ps1`/`.mjs` do motor de produção, `IniciarWorkerRoadmapWorkspace`/`PararWorkerRoadmapWorkspace` (spawn de PowerShell) em `RoadmapWorkspaces.ts`, `src/lib/roadmap-alpha/process-check.ts` (órfão após a remoção). `listBibbleAgents` (catálogo de agentes da squad, usado pela documentação) foi movido para `src/lib/roadmap-alpha/bibble-agents.ts` antes da remoção — a documentação (Qwen) continua usando esse catálogo normalmente.
+
+**O que foi criado:** `src/lib/roadmap-production-api/` (auth.ts, status-machine.ts, operations.ts, response.ts, identity-label.ts), rota HTTP `src/app/api/roadmap/production/*` (queue, runs/:id, runs/:id/status, runs/:id/events, runs/:id/approve, objectives/:id/runs), `mcp/roadmap-status/` (MCP server Node standalone, 9 tools, `README.md` com instruções de registro no Claude Code). `src/actions/RoadmapProduction.ts` reescrito do zero como fachada Prisma direta. UI (`RoadmapProductionPanel.tsx`, `RoadmapImplementationRoom.tsx`) reescrita como quadro de status simples, sem configuração de motor de IA. Formulário de criar/editar objetivo (`RoadmapDashboard.tsx`) mantém o seletor "quem implementa" (Claude/Codex), com Codex desabilitado/acinzentado (ainda não configurado, decisão explícita do usuário).
+
+**Validação:** `npx tsc --noEmit` limpo (só os 4 erros pré-existentes não relacionados, mesmos de antes da sessão), `npm run lint` limpo (0 erros/warnings nos arquivos tocados), `npm run build` completo com sucesso (exit 0, todas as rotas novas presentes no manifest final).
+
+**Adicionado em:** 2026-08-25 por Bibble/Vault (execução direta, sem pipeline formal da squad — decisão explícita do usuário).
+
 ### 2026-08-25 — Telefone do Sócio volta a ser opcional no cadastro de cliente (CS & NPS) — placeholder técnico, sem migration
 
 **Contexto:** A Fase 3.6 do Cliente Master (2026-08-14) tornou `telefone` obrigatório em `socioSchema` (`src/lib/validations/cs-nps.ts`) porque `Pessoa.celular` é `@unique` no schema e serve de chave de deduplicação global do sócio. Na prática isso bloqueava a criação do CLIENTE inteiro (`CadastrarCliente`) sempre que qualquer sócio preenchido não tivesse telefone à mão — usuário reportou que "impede a criação do cliente".

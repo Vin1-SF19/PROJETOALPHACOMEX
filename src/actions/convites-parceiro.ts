@@ -46,7 +46,15 @@ export async function obterConfigParceiros() {
     where: { id: 1 },
     create: { id: 1 },
     update: {},
-    select: { permitirParceiroConvidar: true, validadeConvitePadraoDias: true },
+    select: {
+      permitirParceiroConvidar: true,
+      validadeConvitePadraoDias: true,
+      // CRM de Canais e Parcerias (Fase 01) — regras de relacionamento configuráveis.
+      diasAlertaSemIndicacao: true,
+      diasInatividade: true,
+      cadenciaPotencial4Dias: true,
+      cadenciaPotencial5Dias: true,
+    },
   });
   return cfg;
 }
@@ -59,6 +67,35 @@ export async function togglePermitirParceiroConvidar(ativo: boolean) {
     where: { id: 1 },
     create: { id: 1, permitirParceiroConvidar: ativo },
     update: { permitirParceiroConvidar: ativo },
+  });
+  revalidatePath("/PainelAlpha/Parceiros");
+  return { success: true as const };
+}
+
+const RegrasParceirosSchema = z.object({
+  diasAlertaSemIndicacao: z.number().int().positive().nullable(),
+  diasInatividade: z.number().int().positive(),
+  cadenciaPotencial4Dias: z.number().int().positive().nullable(),
+  cadenciaPotencial5Dias: z.number().int().positive().nullable(),
+});
+
+/**
+ * CRM de Canais e Parcerias (Fase 05) — atualiza as regras de relacionamento configuráveis
+ * (alertas, inatividade, cadência de follow-up por potencial). Admin only — mesmo padrão de
+ * `togglePermitirParceiroConvidar`. Nunca confundir com regras de comissão (`comissaoPercentual`
+ * em `Parceiro`), que são um sistema totalmente separado.
+ */
+export async function AtualizarRegrasParceiros(input: z.input<typeof RegrasParceirosSchema>) {
+  const ctx = await getCtx();
+  if (!ctx?.isAdmin) return { success: false as const, error: "Apenas administradores" };
+
+  const parsed = RegrasParceirosSchema.safeParse(input);
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+
+  await db.parceiroConfig.upsert({
+    where: { id: 1 },
+    create: { id: 1, ...parsed.data },
+    update: parsed.data,
   });
   revalidatePath("/PainelAlpha/Parceiros");
   return { success: true as const };

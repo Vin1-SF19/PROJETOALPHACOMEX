@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { listBibbleAgents } from "@/lib/roadmap-production/agents";
+import { listBibbleAgents } from "@/lib/roadmap-alpha/bibble-agents";
 
 const BIBBLE_SKILL_RELATIVE_PATH = ".claude/skills/bibble-squad/bibble/SKILL.md";
 

@@ -186,7 +186,7 @@ describe("responsável físico de parceiro PJ (Pessoa/PessoaParceiroVinculo)", (
       }),
     });
     prismaMock.contratoComercial.updateMany.mockResolvedValue({ count: 1 });
-    prismaMock.cliente.findUnique.mockResolvedValue({ id: 55, indicacao: null });
+    prismaMock.cliente.findUnique.mockResolvedValue({ id: 55, indicacoes: [] });
     prismaMock.indicacao.create.mockResolvedValue({ id: 77 });
 
     const resultado = await criarParceiro({
@@ -201,7 +201,7 @@ describe("responsável físico de parceiro PJ (Pessoa/PessoaParceiroVinculo)", (
     expect(resultado.success).toBe(true);
     expect(prismaMock.cliente.findUnique).toHaveBeenCalledWith({
       where: { id: 55 },
-      select: { id: true, indicacao: { select: { parceiroId: true } } },
+      select: { id: true, indicacoes: { where: { status: "ATIVA" }, select: { parceiroId: true } } },
     });
     expect(prismaMock.indicacao.create).toHaveBeenCalledWith({
       data: { parceiroId: 10, clienteId: 55, criadoPorId: 7 },

@@ -10,7 +10,6 @@ import {
   roadmapObjectiveCreateSchema,
   roadmapObjectiveEditSchema,
 } from "@/lib/roadmap-alpha/contracts";
-import { processIsAlive } from "@/lib/roadmap-alpha/process-check";
 import {
   improveRoadmapField,
   roadmapImproveFieldSchema,
@@ -24,10 +23,6 @@ import {
   retryRoadmapObjective,
   updateRoadmapObjective,
 } from "@/lib/roadmap-alpha/objectives";
-import {
-  readObjectiveDevelopmentPreferences,
-  writeObjectiveDevelopmentProvider,
-} from "@/lib/roadmap-production/storage";
 
 const ROUTE = "/PainelAlpha/Roadmap";
 const idSchema = z.string().cuid();
@@ -61,47 +56,28 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
     const access = await requireRoadmapAccess();
     await purgeExpiredDeletedRoadmapObjectives();
     const where = { ...(moduleKey ? { moduleKey } : {}) };
-    const [objectives, developmentPreferences, workspaces] = await Promise.all([
-      db.roadmapObjective.findMany({
-        where,
-        orderBy: [
-          { globalPriority: "asc" },
-          { createdAt: "asc" },
-          { id: "asc" },
-        ],
-        include: {
-          createdBy: { select: { id: true, nome: true } },
-          documentationJobs: {
-            orderBy: { sourceVersion: "desc" },
-            take: 1,
-            select: {
-              status: true,
-              attemptCount: true,
-              maxAttempts: true,
-              lastErrorCode: true,
-            },
+    const objectives = await db.roadmapObjective.findMany({
+      where,
+      orderBy: [
+        { globalPriority: "asc" },
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
+      include: {
+        createdBy: { select: { id: true, nome: true } },
+        documentationJobs: {
+          orderBy: { sourceVersion: "desc" },
+          take: 1,
+          select: {
+            status: true,
+            attemptCount: true,
+            maxAttempts: true,
+            lastErrorCode: true,
           },
-          promptArtifacts: { orderBy: { phaseNumber: "asc" } },
         },
-      }),
-      readObjectiveDevelopmentPreferences(),
-      db.roadmapWorkspace.findMany({
-        where: { archivedAt: null },
-        select: { moduleKey: true, workerPid: true },
-      }),
-    ]);
-    /**
-     * Só workspaces EXTERNOS têm registro em RoadmapWorkspace — módulos
-     * internos do PainelAlpha (ex.: moduleKey "roadmap", "crm") nunca
-     * aparecem aqui, então nunca entram neste Map e o objetivo deles
-     * sempre resolve workspaceWorkerOffline: false abaixo.
-     */
-    const workspaceWorkerRunning = new Map(
-      workspaces.map((workspace) => [
-        workspace.moduleKey,
-        Boolean(workspace.workerPid && processIsAlive(workspace.workerPid)),
-      ]),
-    );
+        promptArtifacts: { orderBy: { phaseNumber: "asc" } },
+      },
+    });
     return {
       success: true as const,
       canMutate: access.canMutate,
@@ -111,8 +87,7 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
         acceptanceCriteria: JSON.parse(
           objective.acceptanceCriteriaJson,
         ) as string[],
-        developmentProvider:
-          developmentPreferences.objectives[objective.id] ?? "claude",
+        developmentProvider: objective.developmentAssignee as "claude" | "codex",
         createdAt: objective.createdAt.toISOString(),
         updatedAt: objective.updatedAt.toISOString(),
         archivedAt: objective.archivedAt?.toISOString() ?? null,
@@ -133,10 +108,6 @@ export async function ListarRoadmapAlpha(moduleKey?: string) {
             updatedAt: artifact.updatedAt.toISOString(),
             publishedAt: artifact.publishedAt?.toISOString() ?? null,
           })),
-        workspaceWorkerOffline:
-          objective.documentationStatus === "DOCUMENTED" &&
-          workspaceWorkerRunning.has(objective.moduleKey) &&
-          !workspaceWorkerRunning.get(objective.moduleKey),
       })),
     };
   } catch (error) {
@@ -158,17 +129,10 @@ export async function CriarObjetivoRoadmap(payload: unknown) {
       throw new Error("MODULE_KEY_INVALID");
     const { developmentProvider, ...objectiveInput } = input;
     const result = await createRoadmapObjective(objectiveInput, access.userId);
-    try {
-      await writeObjectiveDevelopmentProvider(
-        result.objective.id,
-        developmentProvider,
-      );
-    } catch (providerError) {
-      console.error(
-        `[roadmap] Falha ao salvar preferência de desenvolvimento do objetivo ${result.objective.id}:`,
-        providerError,
-      );
-    }
+    await db.roadmapObjective.update({
+      where: { id: result.objective.id },
+      data: { developmentAssignee: developmentProvider },
+    });
     revalidatePath(ROUTE);
     return { success: true as const, objectiveId: result.objective.id };
   } catch (error) {
@@ -200,24 +164,19 @@ export async function AtualizarObjetivoRoadmap(payload: unknown) {
     if (!(await isValidRoadmapModuleKey(parsed.content.moduleKey)))
       throw new Error("MODULE_KEY_INVALID");
     const { developmentProvider, ...objectiveContent } = parsed.content;
-    const preferences = await readObjectiveDevelopmentPreferences();
-    const previousDevelopmentProvider =
-      preferences.objectives[parsed.objectiveId] ?? "claude";
+    const previousObjective = await db.roadmapObjective.findUnique({
+      where: { id: parsed.objectiveId },
+      select: { developmentAssignee: true },
+    });
+    const previousDevelopmentProvider = previousObjective?.developmentAssignee ?? "claude";
     const result = await updateRoadmapObjective(
       parsed.objectiveId,
       objectiveContent,
     );
-    try {
-      await writeObjectiveDevelopmentProvider(
-        parsed.objectiveId,
-        developmentProvider,
-      );
-    } catch (providerError) {
-      console.error(
-        `[roadmap] Falha ao salvar preferência de desenvolvimento do objetivo ${parsed.objectiveId}:`,
-        providerError,
-      );
-    }
+    await db.roadmapObjective.update({
+      where: { id: parsed.objectiveId },
+      data: { developmentAssignee: developmentProvider },
+    });
     revalidatePath(ROUTE);
     return {
       success: true as const,

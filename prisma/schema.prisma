@@ -96,6 +96,13 @@ model usuarios {
   parceiroAcessos         ParceiroAcesso[]
   convitesParceiroCriados ConviteParceiro[] @relation("ConvitesCriados")
 
+  parceirosResponsavel            Parceiro[]              @relation("ParceiroResponsavel")
+  parceirosPotencialAtualizadoPor Parceiro[]              @relation("ParceiroPotencialAtualizadoPor")
+  parceiroHistoricos              ParceiroHistorico[]     @relation("ParceiroHistoricoUsuario")
+  parceiroLeadsResponsavel        ParceiroLead[]          @relation("ParceiroLeadResponsavel")
+  parceiroLeadsPromovidosPor      ParceiroLead[]          @relation("ParceiroLeadPromovidoPor")
+  parceiroLeadHistoricos          ParceiroLeadHistorico[] @relation("ParceiroLeadHistoricoUsuario")
+
   apresentacoesCriadas     Apresentacao[]
   apresentacaoColaboracoes ApresentacaoColaborador[]
   apresentacaoComentarios  ApresentacaoComentario[]
@@ -143,9 +150,13 @@ model usuarios {
   bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
   nolossLeadsPromovidos        NolossLead[]
 
-  justificativasMetaEnviadas JustificativaMeta[]
-  roadmapObjectives          RoadmapObjective[]
-  roadmapWorkspacesCriados   RoadmapWorkspace[]
+  justificativasMetaEnviadas     JustificativaMeta[]
+  roadmapObjectives              RoadmapObjective[]
+  roadmapWorkspacesCriados       RoadmapWorkspace[]
+  roadmapProductionRunsAprovadas RoadmapProductionRun[]   @relation("RoadmapProductionRunApprovedBy")
+  roadmapProductionRunsCriadas   RoadmapProductionRun[]   @relation("RoadmapProductionRunCreatedBy")
+  roadmapProductionEventos       RoadmapProductionEvent[] @relation("RoadmapProductionEventAuthor")
+  roadmapApiKeysCriadas          RoadmapApiKey[]          @relation("RoadmapApiKeyCreatedBy")
 
   alphaSeoProjetosPropriedade          AlphaSeoProject[]               @relation("AlphaSeoProjectOwner")
   alphaSeoMembresias                   AlphaSeoProjectMember[]
@@ -193,6 +204,10 @@ model RoadmapObjective {
   documentationStatus    String  @default("PENDING")
   sourceVersion          Int     @default(1)
   isNewModule            Boolean @default(false)
+  developmentAssignee    String  @default("claude")
+  // "claude" | "codex" — quem executa as fases deste objetivo (novo motor de
+  // status manual). Qwen/Ollama não é mais uma opção: não há motor de IA
+  // autônomo rodando dentro do painel.
 
   createdById Int
   createdBy   usuarios @relation(fields: [createdById], references: [id], onDelete: Restrict)
@@ -203,6 +218,7 @@ model RoadmapObjective {
 
   documentationJobs RoadmapDocumentationJob[]
   promptArtifacts   RoadmapPromptArtifact[]
+  productionRuns    RoadmapProductionRun[]
 
   @@index([archivedAt, globalPriority, createdAt, id])
   @@index([moduleKey, archivedAt, globalPriority, createdAt, id])
@@ -296,6 +312,8 @@ model RoadmapPromptArtifact {
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
 
+  productionRuns RoadmapProductionRun[]
+
   @@unique([objectiveId, documentationVersion, phaseNumber])
   @@index([jobId, phaseNumber])
   @@index([attemptId])
@@ -321,6 +339,102 @@ model RoadmapWorkspace {
   workerStartedAt DateTime?
 
   @@index([status, createdAt, id])
+}
+
+/// Estado de execução de UMA fase (objectiveId+sourceVersion+phaseNumber) no
+/// paradigma de status manual: quem implementa é um humano/agente externo
+/// (Claude ou Codex, via chat) reportando progresso pela rota HTTP
+/// /api/roadmap/production — substitui por completo o antigo motor autônomo
+/// (agent loop + estado em JSON). "Execução" (antigo executionId derivado)
+/// agora é implícita: o conjunto de runs de um objectiveId+sourceVersion.
+model RoadmapProductionRun {
+  id            String                 @id @default(cuid())
+  objectiveId   String
+  objective     RoadmapObjective       @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  sourceVersion Int
+  phaseNumber   Int
+  artifactId    String?
+  artifact      RoadmapPromptArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+
+  status   String @default("PENDING")
+  // PENDING | AWAITING_APPROVAL | IN_PROGRESS | NEEDS_INPUT | BLOCKED | SUCCEEDED | FAILED | CANCELLED
+  assignee String @default("claude")
+  // "claude" | "codex" | "manual"
+
+  approvedById Int?
+  approvedBy   usuarios? @relation("RoadmapProductionRunApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  resultSummary    String?
+  errorCode        String?
+  changedFilesJson String?
+
+  createdById Int
+  createdBy   usuarios @relation("RoadmapProductionRunCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  events RoadmapProductionEvent[]
+
+  @@unique([objectiveId, sourceVersion, phaseNumber])
+  @@index([status, updatedAt, id])
+  @@index([objectiveId, status])
+}
+
+/// Log append-only de tudo que acontece numa RoadmapProductionRun: mudanças
+/// de status, mensagens/perguntas/notas registradas via chat. Nunca editado.
+model RoadmapProductionEvent {
+  id    String               @id @default(cuid())
+  runId String
+  run   RoadmapProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  kind       String
+  // STATUS_CHANGE | MESSAGE | QUESTION | ANSWER | NOTE
+  fromStatus String?
+  toStatus   String?
+  content    String?
+
+  authorKind   String
+  // "user" | "assistant" | "system"
+  authorLabel  String
+  authorUserId Int?
+  authorUser   usuarios? @relation("RoadmapProductionEventAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([runId, createdAt, id])
+}
+
+/// Credencial de API dedicada ao uso do MCP local (Claude Code/Codex) contra
+/// /api/roadmap/production/*. Mesmo padrão de AlphaSeoApiKey: token nunca
+/// armazenado em claro, só keyHash (SHA-256); prefixo identificável exibido
+/// ao usuário para reconhecer a key sem expor o segredo.
+model RoadmapApiKey {
+  id         String  @id @default(cuid())
+  label      String
+  keyHash    String  @unique
+  prefix     String
+  scopesJson String
+  // JSON array: ["roadmap:read","roadmap:write"]
+  enabled    Boolean @default(true)
+
+  createdById Int
+  createdBy   usuarios @relation("RoadmapApiKeyCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  expiresAt DateTime?
+  revokedAt DateTime?
+
+  rateLimitWindowMs Int       @default(60000)
+  rateLimitMax      Int       @default(120)
+  requestCount      Int       @default(0)
+  lastRequestAt     DateTime?
+  lastUsedAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([enabled, revokedAt])
 }
 
 model OnboardingTemplate {
@@ -542,18 +656,18 @@ model Cliente {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  servicos             ClienteServico[]
-  pessoas              PessoaClienteVinculo[]
-  indicacao            Indicacao?
-  bpmCards             BpmCard[]
-  extratos             Extratos?
-  consultaPreAnalise   ConsultaPreAnalise?
-  operacionalClientes  OperacionalClientes[]
-  contratosComerciais  ContratoComercial[]
-  historicoAlteracoes  HistoricoAlteracaoCliente[]
-  commissionEvents     CommissionEvent[]
-  businessProcesses    BusinessProcess[]
-  eligibilityOverrides EligibilityOverride[]
+  servicos              ClienteServico[]
+  pessoas               PessoaClienteVinculo[]
+  indicacoes            Indicacao[]
+  bpmCards              BpmCard[]
+  extratos              Extratos?
+  consultaPreAnalise    ConsultaPreAnalise?
+  operacionalClientes   OperacionalClientes[]
+  contratosComerciais   ContratoComercial[]
+  historicoAlteracoes   HistoricoAlteracaoCliente[]
+  commissionEvents      CommissionEvent[]
+  businessProcesses     BusinessProcess[]
+  eligibilityOverrides  EligibilityOverride[]
   nolossLeadsPromovidos NolossLead[]
 
   @@index([razaoSocial])
@@ -2183,53 +2297,155 @@ model OnyxAgenteFixado {
 // ─── Parceiros ────────────────────────────────────────────────────────────────
 
 model Parceiro {
-  id                 Int                     @id @default(autoincrement())
-  tipo               String // "PF" | "PJ"
-  tipoParceiro       String                  @default("PADRAO") // "PADRAO" | "SEM_COMISSAO" | "ESPECIAL"
-  documento          String                  @unique
-  nome               String
-  nomeFantasia       String?
-  dataNascimento     String? // só preenchido quando tipo=PF
-  sobre              String? // "fale mais sobre você/sua empresa" — herdado do pré-cadastro (convite)
-  email              String
-  nomeBanco          String?
-  agencia            String?
-  conta              String?
-  chavePix           String?
-  tipoChavePix       String?
-  pixConfirmado      Boolean                 @default(false)
-  pixConfirmadoEm    DateTime?
-  nivel              String                  @default("GOLD")
-  nivelAtualizadoEm  DateTime? // base da janela de 60 dias (promoção/rebaixamento)
-  comissaoPercentual Float? // override manual opcional (lógica futura)
-  dadosConsulta      String?
-  telefone           String?
-  telefone2          String?
-  loginEmail         String
-  senhaHash          String
+  id                                  Int                     @id @default(autoincrement())
+  tipo                                String // "PF" | "PJ"
+  tipoParceiro                        String                  @default("PADRAO") // "PADRAO" | "SEM_COMISSAO" | "ESPECIAL"
+  documento                           String                  @unique
+  nome                                String
+  nomeFantasia                        String?
+  dataNascimento                      String? // só preenchido quando tipo=PF
+  sobre                               String? // "fale mais sobre você/sua empresa" — herdado do pré-cadastro (convite)
+  email                               String
+  nomeBanco                           String?
+  agencia                             String?
+  conta                               String?
+  chavePix                            String?
+  tipoChavePix                        String?
+  pixConfirmado                       Boolean                 @default(false)
+  pixConfirmadoEm                     DateTime?
+  nivel                               String                  @default("GOLD")
+  nivelAtualizadoEm                   DateTime? // base da janela de 60 dias (promoção/rebaixamento) — regra FINANCEIRA, nunca reaproveitar para inatividade de relacionamento
+  comissaoPercentual                  Float? // override manual opcional (lógica futura)
+  dadosConsulta                       String?
+  telefone                            String?
+  telefone2                           String?
+  loginEmail                          String
+  senhaHash                           String
+  // ─── CRM de Canais e Parcerias — Desenvolvimento do Parceiro (ciclo de vida pós-cadastro) ──
+  estagioDesenvolvimento              String                  @default("NOVO") // NOVO|EM_ATIVACAO|ATIVADO_SEM_INDICACAO|PRIMEIRA_INDICACAO|ATIVO|RECORRENTE|INATIVO
+  estagioDesenvolvimentoAtualizadoEm  DateTime?
+  // Score MANUAL de 0 a 5 (0=sem potencial, 5=estratégico) — preenchido na qualificação, nunca
+  // calculado automaticamente. Distinto de `nivel` (calculado por contratação) e de
+  // `comissaoPercentual` (regra financeira) — nunca misturar os três.
+  potencialRecorrencia                Int?
+  potencialRecorrenciaAtualizadoEm    DateTime?
+  potencialRecorrenciaAtualizadoPorId Int?
+  potencialRecorrenciaAtualizadoPor   usuarios?               @relation("ParceiroPotencialAtualizadoPor", fields: [potencialRecorrenciaAtualizadoPorId], references: [id], onDelete: SetNull)
+  segmento                            String?
+  origem                              String?
+  responsavelId                       Int?
+  responsavel                         usuarios?               @relation("ParceiroResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
   // ─── Onboarding / termo de adesão (portal AlphaParceiros) ──────────────────
-  senhaTemporaria    Boolean                 @default(true)
-  onboardingCompleto Boolean                 @default(false)
-  termoAceito        Boolean                 @default(false)
-  termoAceitoEm      DateTime?
-  termoVersao        String?
+  senhaTemporaria                     Boolean                 @default(true)
+  onboardingCompleto                  Boolean                 @default(false)
+  termoAceito                         Boolean                 @default(false)
+  termoAceitoEm                       DateTime?
+  termoVersao                         String?
   // ─── Ativação de acesso (admin pode desativar sem excluir o cadastro) ──────
-  ativo              Boolean                 @default(true)
-  desativadoEm       DateTime?
-  desativadoPorId    Int?
-  criadoPorId        Int
-  criadoPor          usuarios                @relation(fields: [criadoPorId], references: [id])
-  endereco           ParceiroEndereco?
-  representantes     ParceiroRepresentante[]
-  indicacoes         Indicacao[]
-  convitesGerados    ConviteParceiro[]       @relation("ConvitesPorParceiro")
-  pessoasVinculadas  PessoaParceiroVinculo[]
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
+  ativo                               Boolean                 @default(true)
+  desativadoEm                        DateTime?
+  desativadoPorId                     Int?
+  criadoPorId                         Int
+  criadoPor                           usuarios                @relation(fields: [criadoPorId], references: [id])
+  endereco                            ParceiroEndereco?
+  representantes                      ParceiroRepresentante[]
+  indicacoes                          Indicacao[]
+  convitesGerados                     ConviteParceiro[]       @relation("ConvitesPorParceiro")
+  pessoasVinculadas                   PessoaParceiroVinculo[]
+  historico                           ParceiroHistorico[]
+  leadsOrigem                         ParceiroLead[]          @relation("ParceiroLeadPromovido")
+  createdAt                           DateTime                @default(now())
+  updatedAt                           DateTime                @updatedAt
 
   @@index([documento])
   @@index([criadoPorId])
+  @@index([estagioDesenvolvimento])
+  @@index([responsavelId])
   @@map("parceiros")
+}
+
+// Histórico de relacionamento do Parceiro (Desenvolvimento) — contatos, reuniões, mudança de
+// etapa/responsável/potencial, indicações, contratos, ativação/reativação. Segue o mesmo padrão
+// FK-direta já usado por `BpmCardHistorico`/`ClienteServicoHistorico` (não polimórfico).
+model ParceiroHistorico {
+  id                String    @id @default(cuid())
+  parceiroId        Int
+  parceiro          Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  acao              String
+  valorAnteriorJson String?
+  valorNovoJson     String?
+  usuarioId         Int?
+  usuario           usuarios? @relation("ParceiroHistoricoUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
+  automacaoOrigem   String?
+  createdAt         DateTime  @default(now())
+
+  @@index([parceiroId])
+  @@index([createdAt])
+  @@map("parceiro_historico")
+}
+
+// Staging de Aquisição de Parceiros ("card virtual") — mesmo padrão em produção de `NolossLead`:
+// dado externo/lead ainda NÃO é um `Parceiro` real. Kanban visual mescla estes registros com o
+// funil de aquisição; promoção explícita (nunca automática) cria o `Parceiro` de verdade via
+// `criarParceiro()`, preservando idempotência (CAS por `status`) e checagem de duplicidade por
+// documento antes de promover.
+model ParceiroLead {
+  id        String  @id @default(cuid())
+  status    String  @default("NOVO_LEAD") // NOVO_LEAD|EM_PROSPECCAO|CONTATO_REALIZADO|EM_QUALIFICACAO|REUNIAO_AGENDADA|REUNIAO_REALIZADA|NEGOCIACAO_FOLLOWUP|AGUARDANDO_CADASTRO|PRE_CADASTRO|CADASTRADO|STANDBY|SEM_PERFIL|PERDIDO
+  tipo      String? // "PF" | "PJ", se já souber
+  documento String? // CPF/CNPJ, se já coletado — checado contra `Parceiro.documento` antes de promover
+  nome      String
+  email     String?
+  telefone  String?
+  segmento  String?
+  origem    String?
+  cidade    String?
+  uf        String?
+
+  responsavelId Int?
+  responsavel   usuarios? @relation("ParceiroLeadResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  // Mesmo conceito de `Parceiro.potencialRecorrencia` — preenchível já na qualificação e
+  // propagado ao `Parceiro` real na promoção (não se perde).
+  potencialRecorrencia Int?
+
+  proximaAcaoEm        DateTime?
+  proximaAcaoDescricao String?
+
+  motivoSaidaLateral String? // preenchido só quando status ∈ {STANDBY, SEM_PERFIL, PERDIDO}
+
+  // Preenchidos só ao promover — mesmo padrão de `NolossLead.promotedClienteId/promotedAt/promotedByUserId`
+  promovidoParceiroId Int?
+  promovidoParceiro   Parceiro? @relation("ParceiroLeadPromovido", fields: [promovidoParceiroId], references: [id], onDelete: SetNull)
+  promovidoEm         DateTime?
+  promovidoPorUserId  Int?
+  promovidoPorUser    usuarios? @relation("ParceiroLeadPromovidoPor", fields: [promovidoPorUserId], references: [id], onDelete: SetNull)
+
+  historico ParceiroLeadHistorico[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([responsavelId])
+  @@map("parceiro_lead")
+}
+
+model ParceiroLeadHistorico {
+  id                String       @id @default(cuid())
+  leadId            String
+  lead              ParceiroLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  acao              String
+  valorAnteriorJson String?
+  valorNovoJson     String?
+  usuarioId         Int?
+  usuario           usuarios?    @relation("ParceiroLeadHistoricoUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
+  automacaoOrigem   String?
+  createdAt         DateTime     @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("parceiro_lead_historico")
 }
 
 // Indicação: vincula um Parceiro a uma empresa do CS&NPS (model `clientes`).
@@ -2238,10 +2454,20 @@ model Indicacao {
   id                    Int       @id @default(autoincrement())
   parceiroId            Int
   parceiro              Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
-  clienteId             Int       @unique // uma empresa é indicada por no máximo 1 parceiro
+  // Migration 2026-08-26 (RM CRM-Canais-Parcerias): `clienteId` DEIXOU de ser `@unique` — uma
+  // empresa pode ser indicada mais de uma vez ao longo do tempo (cada indicação é um evento
+  // próprio, repetível). Antes desta migration era 1 indicação por empresa para sempre. Ver
+  // `decisions.md` para o histórico completo e os call sites que dependiam da cardinalidade 1:1.
+  clienteId             Int
   cliente               Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   dataIndicacao         DateTime  @default(now())
   status                String    @default("ATIVA") // "ATIVA" | "DESVINCULADA"
+  // CRM de Canais e Parcerias (Fase 04) — vínculo explícito à oportunidade comercial real
+  // (BpmCard) quando a indicação é "Direcionada ao Closer". Nunca inferir esse vínculo só por
+  // `Indicacao.clienteId == BpmCard.empresaId` — uma empresa pode ter múltiplos cards ao longo
+  // do tempo (inclusive de indicações diferentes, já que `clienteId` deixou de ser único).
+  bpmCardId             String?   @unique
+  bpmCard               BpmCard?  @relation(fields: [bpmCardId], references: [id], onDelete: SetNull)
   criadoPorId           Int
   criadoPor             usuarios  @relation("IndicacaoAutor", fields: [criadoPorId], references: [id])
   // Comprovante de comissão (enviado no PainelAlpha, visto no portal do parceiro)
@@ -2254,6 +2480,7 @@ model Indicacao {
 
   @@index([parceiroId])
   @@index([clienteId])
+  @@index([dataIndicacao])
   @@map("indicacoes")
 }
 
@@ -2411,6 +2638,13 @@ model ParceiroConfig {
   id                        Int      @id @default(1)
   permitirParceiroConvidar  Boolean  @default(false)
   validadeConvitePadraoDias Int      @default(7)
+  // ─── CRM de Canais e Parcerias — regras de relacionamento configuráveis (nunca hardcoded) ──
+  // null = alerta desligado. NUNCA reaproveitar a janela de 60 dias de `recalcularNivel()`
+  // (regra financeira de nível) para nenhum destes campos (regra de relacionamento).
+  diasAlertaSemIndicacao    Int?
+  diasInatividade           Int      @default(60)
+  cadenciaPotencial4Dias    Int?
+  cadenciaPotencial5Dias    Int?
   updatedAt                 DateTime @updatedAt
 
   @@map("parceiro_config")
@@ -3368,6 +3602,10 @@ model BpmCard {
   vinculosDestino BpmCardVinculo[] @relation("CardDestino")
 
   nolossLeadOrigem NolossLead[]
+
+  // CRM de Canais e Parcerias (Fase 04) — indicação de parceiro que originou este card, quando
+  // aplicável. Puramente aditivo: nenhuma coluna nova em `BpmCard` (a FK vive em `Indicacao`).
+  indicacaoOrigem Indicacao?
 
   @@index([empresaId])
   @@index([pipelineId])

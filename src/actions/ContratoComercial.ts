@@ -352,7 +352,7 @@ export async function confirmarFechamento(raw: unknown) {
                 contratoAssinado: d.contratoAssinado,
                 contratoUrl: d.contratoUrl || null,
             },
-            include: { cliente: { select: { indicacao: { select: { parceiroId: true } } } } },
+            include: { cliente: { select: { indicacoes: { where: { status: "ATIVA" }, select: { parceiroId: true } } } } },
         });
 
         // Sincroniza com o CS&NPS na confirmação de pagamento (efeito colateral
@@ -378,7 +378,7 @@ export async function confirmarFechamento(raw: unknown) {
             // normalização incorreta que descartava letras de CNPJ alfanumérico).
             if (resultadoSync.criado && atualizado.indicadoPorParceiroId) {
                 try {
-                    if (!atualizado.cliente.indicacao) {
+                    if (atualizado.cliente.indicacoes.length === 0) {
                         await db.indicacao.create({
                             data: {
                                 parceiroId: atualizado.indicadoPorParceiroId,

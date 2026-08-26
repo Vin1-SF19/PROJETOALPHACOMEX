@@ -441,6 +441,15 @@ export default function ParceirosClient({
                 </div>
               )}
 
+              {/* Aquisição — funil de potencial parceiro até o cadastro */}
+              {(permissao.isAdmin || permissao.podeEditar) && (
+                <Link href="/PainelAlpha/Parceiros/Aquisicao"
+                  className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-200 hover:brightness-110"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                  <UserPlus size={15} /> Aquisição
+                </Link>
+              )}
+
               {/* Nova Indicação — ação relevante, fica visível */}
               {permissao.podeEditar && (
                 <button data-guia-parceiros="nova-indicacao" onClick={() => setNovaIndicacaoOpen(true)}

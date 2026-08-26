@@ -46,7 +46,7 @@ const clienteServicoSelect = {
           },
         },
       },
-      indicacao: {
+      indicacoes: {
         select: {
           id: true,
           parceiroId: true,
@@ -502,8 +502,10 @@ export async function gerarExportacaoCompletaCsNps(): Promise<{ buffer: Buffer; 
       name: "Indicacoes",
       headers: ["id", "parceiroId", "clienteId", "dataIndicacao", "status", "criadoPorId", "comprovanteUrl", "comprovanteNome", "comprovanteTipo", "comprovanteEnviadoEm", "comprovanteEnviadoPor", "createdAt"],
       // Indicacao pertence ao Cliente (empresa), não ao ClienteServico — dedup por
-      // Cliente.id para não repetir 1 linha por serviço contratado daquele Cliente.
-      rows: [...new Map(registros.filter((r) => r.cliente.indicacao).map((r) => [r.cliente.id, r.cliente.indicacao!])).values()],
+      // Indicacao.id (não mais por Cliente.id, migration 2026-08-26: uma empresa pode ter
+      // múltiplas indicações ao longo do tempo) para não repetir a mesma indicação 1x por
+      // serviço contratado daquele Cliente.
+      rows: [...new Map(registros.flatMap((r) => r.cliente.indicacoes.map((ind) => [ind.id, ind] as const))).values()],
       dateColumns: { dataIndicacao: "date-time", comprovanteEnviadoEm: "date-time", createdAt: "date-time" },
     },
   ];

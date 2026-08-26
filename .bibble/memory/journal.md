@@ -2,6 +2,46 @@
 
 ---
 
+## [2026-08-25] — Novo motor de produção do Roadmap Alpha: status manual via chat, motor autônomo removido
+
+**Tags:** #feature #roadmap #migration #vault #mcp
+**Agentes envolvidos:** Bibble (execução direta, sem pipeline formal da squad — decisão explícita do usuário)
+**Arquivos tocados:** ver lista completa em `decisions.md` ("Novo motor de produção do Roadmap Alpha"); resumo: schema (`prisma/schema.prisma` + 2 migrations), `src/lib/roadmap-production-api/*` (novo), `src/app/api/roadmap/production/*` (novo), `mcp/roadmap-status/*` (novo), `src/actions/RoadmapProduction.ts` (reescrito), `src/actions/RoadmapWorkspaces.ts`/`src/actions/RoadmapAlpha.ts`/`src/lib/roadmap-alpha/authorization.ts` (ajustados), `src/components/RoadmapAlpha/RoadmapProductionPanel.tsx`/`RoadmapImplementationRoom.tsx` (reescritos), `SistemasExternosSection.tsx`/`RoadmapDashboard.tsx` (ajustados), `src/lib/roadmap-production/*` (removido, ~15 arquivos), `tests/roadmap-production/*` (removido, testes órfãos do motor antigo).
+
+### Contexto
+Usuário reportou que o motor de produção do Roadmap (implementação automática de fases) estava "falhando muito" e pediu para trocar o funcionamento: em vez de um agente de IA autônomo tentando implementar sozinho dentro do painel, quem implementa agora é o próprio Claude (nesta sessão de chat/Claude Code) e futuramente o Codex — o painel vira um quadro de status que reflete o progresso, sem executar nada sozinho. A documentação de objetivos/fases (via Qwen) deveria continuar exatamente como estava.
+
+### O que foi feito
+Sessão longa, conduzida via `EnterPlanMode` com investigação prévia por agentes Explore/Plan em paralelo antes de qualquer código. Principais etapas:
+
+1. **Mapeamento do motor antigo** — confirmado que era um agent loop de tool-calling contra Ollama/Qwen (até 24 passos/fase) rodando dentro do processo Next.js via Server Action (`kickProductionWorker`) e também em workers PowerShell externos com `spawn` direto. Suporte a Claude/Codex CLI existia mas estava hard-desligado no código.
+2. **Decisões de arquitetura confirmadas com o usuário** (via `AskUserQuestion`): MCP server dedicado (não script CLI nem atualização manual); remoção completa do motor antigo (não só desligar); execução direta sem o pipeline formal Scout→Vault→Forge→Probe→Lens; camada em 2 níveis (rota HTTP autenticada no painel + MCP fino local por cima, não conexão direta ao Turso).
+3. **Schema novo** — 3 tabelas (`RoadmapProductionRun`, `RoadmapProductionEvent`, `RoadmapApiKey`) + 1 coluna (`RoadmapObjective.developmentAssignee`), 2 migrations aditivas. Ambas passaram pelo protocolo Vault completo: banco de produção real confirmado (`libsql://basetestes-alphacomex...`, apesar do nome), backup reaproveitado de `2026-08-25T17:59` (gerado ~2h antes por outra mudança do mesmo dia, íntegro e dentro de 48h — usuário confirmou explicitamente o reuso em vez de gerar um novo), SQL validado antes contra SQLite local via `@libsql/client`.
+4. **Incidente durante a aplicação da 1ª migration:** `client.transaction("write")` em lote falhou no Turso remoto (protocolo Hrana não resolve FK a tabela criada no mesmo batch não commitado) — 2 das 3 tabelas ficaram criadas (vazias, sem violação de FK) antes do erro. Diagnosticado com `SELECT sqlite_master` antes de qualquer nova escrita (nunca assumiu que "erro reportado" = "nada persistido"), corrigido aplicando o restante via `client.execute()` sequencial. Documentado em `known-errors.md` como lição geral para migrations futuras no Turso.
+5. **Rota HTTP + MCP** — `src/lib/roadmap-production-api/` (auth Bearer reaproveitando o padrão já em produção de `alpha-seo/mcp/auth.ts`, máquina de estados de transição única e compartilhada, operações Prisma centralizadas). 6 endpoints em `src/app/api/roadmap/production/*`. MCP local em `mcp/roadmap-status/` (processo Node standalone, 9 tools, compilado e testado). Primeira `RoadmapApiKey` real gerada (script administrativo pontual, descartado após uso) e vinculada ao usuário ADM (id 1, por indicação explícita do usuário) — `.env` do MCP configurado com a URL real de produção (`https://painel.alpha-comex.com`).
+6. **Remoção do motor antigo** — todo `src/lib/roadmap-production/` (~15 arquivos), 3 scripts `.ps1`/`.mjs`, `spawn` de PowerShell em `RoadmapWorkspaces.ts`, arquivo órfão `process-check.ts`. `listBibbleAgents` (usado pela documentação) foi preservado e movido para `roadmap-alpha/bibble-agents.ts` antes da remoção, para não quebrar o fluxo de documentação.
+7. **UI simplificada** — `RoadmapProductionPanel.tsx` e `RoadmapImplementationRoom.tsx` reescritos do zero como quadro de status (sem configuração de motor de IA, sem "agentes trabalhando agora" em tempo real). `RoadmapDashboard.tsx` manteve o seletor "quem implementa" no formulário de objetivo (pedido explícito do usuário), removendo Qwen do domínio e deixando Codex visível mas desabilitado/acinzentado (ainda não configurado).
+8. **Validação real** — `npx tsc --noEmit` (várias rodadas, zero erros novos), `npx eslint` escopado (2 erros de `react-hooks/set-state-in-effect` + 1 warning encontrados e corrigidos), `npm run build` completo (Turbopack, ~15 min neste projeto grande, exit 0, todas as 6 rotas novas + `/PainelAlpha/Roadmap` presentes no manifest final).
+
+### Decisões tomadas
+- Motor antigo removido por completo, não apenas desligado (registrado em `decisions.md`).
+- `RoadmapWorkspace.workerPid`/`workerStartedAt` ficam órfãos no schema (não removidos — seria `DROP`, fora do escopo aditivo desta sessão).
+- Estado JSON do motor antigo (`.roadmap-production/state.json` por workspace) não foi migrado — paradigma incompatível (agente autônomo vs. status manual); nenhuma execução em andamento foi identificada como perdida.
+- Execução direta sem pipeline formal da squad (decisão explícita do usuário), mas protocolo Vault mantido integralmente para as 2 migrations — regra absoluta do projeto, não é uma etapa do pipeline que se possa pular.
+
+### Pendências
+- UI de gestão de `RoadmapApiKey` (criar/revogar keys pela tela do painel) não foi construída — hoje só via script administrativo pontual (já descartado). Se o usuário quiser rotacionar ou gerar novas keys sem pedir a um agente, essa tela precisa ser feita.
+- Teste manual end-to-end via browser (marcar fase iniciada pelo MCP → ver refletido na UI → aprovar → concluir) não foi executado nesta sessão — validado via tsc/lint/build reais, não via interação humana no navegador.
+- `RoadmapWorkspace.workerPid`/`workerStartedAt` seguem no schema sem uso — candidatos a limpeza futura (`DROP COLUMN`) se o usuário quiser, exigiria novo ciclo Vault.
+
+### Refletido também em
+- `decisions.md`: nova decisão "Novo motor de produção do Roadmap Alpha".
+- `known-errors.md`: nova entrada sobre `client.transaction()` em lote falhando no Turso remoto com FK cruzada no mesmo batch.
+- `architecture.md`: nova seção "Roadmap Alpha — novo motor de produção".
+- `docs/roadmap-alpha/migration-preflight-2026-08-25-production-status.md`: preflight completo da 1ª migration (3 tabelas).
+
+---
+
 ## [2026-08-25] — Fix de deploy: `@/auth` não resolvido + bugs de schema no módulo Timeline
 
 **Tags:** #bugfix #deploy #timeline

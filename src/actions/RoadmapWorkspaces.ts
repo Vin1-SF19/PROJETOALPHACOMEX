@@ -1,38 +1,15 @@
 "use server";
 
-import { spawn } from "node:child_process";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import db from "@/lib/prisma";
 import { requireRoadmapAccess } from "@/lib/roadmap-alpha/authorization";
-import { processIsAlive } from "@/lib/roadmap-alpha/process-check";
 import {
   assertWorkspaceRootPathUsable,
   listWorkspaceDirectories,
 } from "@/lib/roadmap-alpha/workspace-browser";
-
-/**
- * Mata a árvore inteira do processo (supervisor PowerShell + worker tsx
- * filho), não só o PID salvo. process.kill() sozinho não garante isso no
- * Windows — o supervisor pode morrer deixando o worker órfão, ainda
- * escrevendo no diretório do workspace sem nenhum rastro na UI.
- */
-function killProcessTree(pid: number): void {
-  try {
-    spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-      stdio: "ignore",
-    }).unref();
-  } catch {
-    // Best-effort — se taskkill falhar, ainda tentamos o kill direto abaixo.
-  }
-  try {
-    process.kill(pid);
-  } catch {
-    // Processo já pode ter encerrado.
-  }
-}
 
 const ROUTE = "/PainelAlpha/Roadmap";
 
@@ -115,8 +92,6 @@ export async function ListarRoadmapWorkspaces() {
         status: true,
         createdAt: true,
         createdBy: { select: { id: true, nome: true } },
-        workerPid: true,
-        workerStartedAt: true,
       },
     });
     return {
@@ -130,9 +105,6 @@ export async function ListarRoadmapWorkspaces() {
         status: workspace.status,
         createdAt: workspace.createdAt.toISOString(),
         createdBy: workspace.createdBy,
-        workerRunning: Boolean(
-          workspace.workerPid && processIsAlive(workspace.workerPid),
-        ),
       })),
     };
   } catch (error) {
@@ -195,126 +167,16 @@ export async function ArquivarRoadmapWorkspace(workspaceId: unknown) {
     const id = workspaceIdSchema.parse(workspaceId);
     const workspace = await db.roadmapWorkspace.findUnique({
       where: { id },
-      select: { id: true, archivedAt: true, workerPid: true },
+      select: { id: true, archivedAt: true },
     });
     if (!workspace || workspace.archivedAt)
       throw new Error("WORKSPACE_NOT_FOUND");
-    if (workspace.workerPid && processIsAlive(workspace.workerPid))
-      killProcessTree(workspace.workerPid);
     await db.roadmapWorkspace.update({
       where: { id },
-      data: {
-        archivedAt: new Date(),
-        status: "ARQUIVADO",
-        workerPid: null,
-        workerStartedAt: null,
-      },
+      data: { archivedAt: new Date(), status: "ARQUIVADO" },
     });
     revalidatePath(ROUTE);
     revalidatePath("/PainelAlpha");
-    return { success: true as const };
-  } catch (error) {
-    if (error instanceof z.ZodError)
-      return { success: false as const, error: "Identificador inválido" };
-    return { success: false as const, error: publicError(error) };
-  }
-}
-
-export async function IniciarWorkerRoadmapWorkspace(workspaceId: unknown) {
-  try {
-    await requireRoadmapAccess(true);
-    const id = workspaceIdSchema.parse(workspaceId);
-    const workspace = await db.roadmapWorkspace.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        archivedAt: true,
-        rootPath: true,
-        workerPid: true,
-      },
-    });
-    if (!workspace || workspace.archivedAt)
-      throw new Error("WORKSPACE_NOT_FOUND");
-    if (workspace.workerPid && processIsAlive(workspace.workerPid))
-      throw new Error("WORKER_ALREADY_RUNNING");
-    await assertWorkspaceRootPathUsable(workspace.rootPath);
-
-    // Reserva atômica do "slot" antes de spawnar — o where garante que só UMA
-    // requisição concorrente (ex.: double-click) consegue reservar; a outra
-    // recebe reservedCount === 0 e não chega a spawnar processo nenhum.
-    const reservation = await db.roadmapWorkspace.updateMany({
-      where: { id, workerPid: workspace.workerPid },
-      data: { workerPid: -1, workerStartedAt: new Date() },
-    });
-    if (reservation.count === 0) throw new Error("WORKER_ALREADY_RUNNING");
-
-    const projectRoot = path.resolve(process.cwd());
-    const scriptPath = path.resolve(
-      projectRoot,
-      "scripts",
-      "roadmap-production-workspace-worker.ps1",
-    );
-    let child: ReturnType<typeof spawn>;
-    try {
-      child = spawn(
-        "powershell.exe",
-        [
-          "-NoProfile",
-          "-NonInteractive",
-          "-ExecutionPolicy",
-          "Bypass",
-          "-WindowStyle",
-          "Hidden",
-          "-File",
-          scriptPath,
-          "-WorkspaceId",
-          workspace.id,
-          "-WorkerRoot",
-          workspace.rootPath,
-        ],
-        { detached: true, stdio: "ignore", cwd: projectRoot },
-      );
-      child.unref();
-      if (!child.pid) throw new Error("WORKER_SPAWN_FAILED");
-    } catch (spawnError) {
-      await db.roadmapWorkspace.update({
-        where: { id },
-        data: { workerPid: null, workerStartedAt: null },
-      });
-      throw spawnError;
-    }
-
-    await db.roadmapWorkspace.update({
-      where: { id },
-      data: { workerPid: child.pid, workerStartedAt: new Date() },
-    });
-    revalidatePath(ROUTE);
-    return { success: true as const };
-  } catch (error) {
-    if (error instanceof z.ZodError)
-      return { success: false as const, error: "Identificador inválido" };
-    if (error instanceof Error && error.message === "WORKER_ALREADY_RUNNING")
-      return { success: false as const, error: "O worker já está em execução" };
-    return { success: false as const, error: publicError(error) };
-  }
-}
-
-export async function PararWorkerRoadmapWorkspace(workspaceId: unknown) {
-  try {
-    await requireRoadmapAccess(true);
-    const id = workspaceIdSchema.parse(workspaceId);
-    const workspace = await db.roadmapWorkspace.findUnique({
-      where: { id },
-      select: { id: true, workerPid: true },
-    });
-    if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
-    if (workspace.workerPid && processIsAlive(workspace.workerPid))
-      killProcessTree(workspace.workerPid);
-    await db.roadmapWorkspace.update({
-      where: { id },
-      data: { workerPid: null, workerStartedAt: null },
-    });
-    revalidatePath(ROUTE);
     return { success: true as const };
   } catch (error) {
     if (error instanceof z.ZodError)

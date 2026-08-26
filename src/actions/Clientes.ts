@@ -394,7 +394,7 @@ const SELECT_CLIENTE_CS_NPS = {
     where: { ativo: true },
     include: { pessoa: true },
   },
-  indicacao: {
+  indicacoes: {
     where: { status: "ATIVA" as const },
     include: { parceiro: { select: { id: true, nome: true, nivel: true } } },
   },
@@ -423,7 +423,11 @@ export async function buscarClientes() {
 
     return registros.map((r) => {
       const { cliente, ...resto } = r;
-      const { historicoAlteracoes: historicoCliente, pessoas, indicacao, ...clienteDados } = cliente;
+      const { historicoAlteracoes: historicoCliente, pessoas, indicacoes, ...clienteDados } = cliente;
+      // Só pode existir 1 indicação ATIVA por empresa a cada momento (regra preservada em
+      // `criarIndicacao`, ver `parceiros.ts`) — array filtrado por status vira singular aqui
+      // para não quebrar os consumidores existentes (`modalDados.tsx` espera `indicacao: {...} | null`).
+      const indicacao = indicacoes[0] ?? null;
       return {
         ...resto,
         ...clienteDados,
