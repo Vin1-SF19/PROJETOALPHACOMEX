@@ -1,0 +1,13 @@
+[agenda-alpha] Falha local inesperada durante a sincronização {
+  calendarioId: 'cmsxa1cck0001l404vumsd185',
+  nome: 'PrismaClientKnownRequestError',
+  mensagem: '\n' +
+    'Invalid `tx.googleCalendarEventoCache.deleteMany()` invocation in\n' +
+    'C:\\Users\\TI\\Desktop\\PainelAlpha\\src\\lib\\google-calendar\\sync.ts:269:46\n' +
+    '\n' +
+    '  266 \n' +
+    '  267 for (const lote of dividirEmLotes(ativos, TAMANHO_LOTE_CACHE)) {\n' +
+    '  268   if (usandoIncremental) {\n' +
+    '→ 269     await tx.googleCalendarEventoCache.deleteMany(\n' +
+    'Transaction API error: A query cannot be executed on an expired transaction. The timeout for this transaction was 5000 ms, however 5213 ms passed since the start of the transaction. Consider increasing the interactive transaction timeout or doing less work in the transaction.'
+}

@@ -1,0 +1,4 @@
+◇ injected env (8) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injected env (64) from .env.local // tip: ⌘ suppress logs { quiet: true }
+{"usuarioId":1,"calendario":"vinicius@alpha-comex.com","ok":true,"paginas":1,"recebidos":0,"atualizados":0}
+{"usuarioId":8,"calendario":"vinicius@alpha-comex.com","ok":true,"paginas":21,"recebidos":5127,"atualizados":4379}

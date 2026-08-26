@@ -18,6 +18,8 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
+import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
+import { cn } from "@/lib/utils";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
 type Lead = Awaited<ReturnType<typeof ListarLeadsAquisicaoParceiros>>["leads"][number];
@@ -66,6 +68,43 @@ function PotencialBadge({ valor }: { valor: number | null }) {
   );
 }
 
+// Mesmo algoritmo/paleta de urgência já usado no card do Alpha CRM (PipelineBoardClient.tsx,
+// calcularUrgenciaProximoContato/BADGE_URGENCIA_CLASSNAME) — RM-2026-3F263C alinha o card de
+// Aquisição ao padrão visual do CRM.
+type UrgenciaProximaAcao = "ATRASADO" | "HOJE" | "FUTURO";
+
+function calcularUrgenciaProximaAcao(proximaAcaoEm: Date | string): UrgenciaProximaAcao {
+  const hojeChave = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const acaoChave = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(proximaAcaoEm));
+  if (acaoChave < hojeChave) return "ATRASADO";
+  if (acaoChave === hojeChave) return "HOJE";
+  return "FUTURO";
+}
+
+const BADGE_URGENCIA_CLASSNAME: Record<UrgenciaProximaAcao, string> = {
+  ATRASADO: "border-red-500/40 bg-red-500/15 text-red-200",
+  HOJE: "border-amber-500/40 bg-amber-500/15 text-amber-200",
+  FUTURO: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
+};
+
+function BadgeProximaAcao({ proximaAcaoEm }: { proximaAcaoEm: Date | string }) {
+  const urgencia = calcularUrgenciaProximaAcao(proximaAcaoEm);
+  const formatado = new Date(proximaAcaoEm).toLocaleDateString("pt-BR");
+  return (
+    <span
+      role="status"
+      className={cn(
+        "inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide",
+        BADGE_URGENCIA_CLASSNAME[urgencia],
+      )}
+      title={`Próxima ação: ${formatado}`}
+    >
+      <CalendarClock size={11} aria-hidden="true" />
+      {formatado}
+    </span>
+  );
+}
+
 /** Cada etapa vira um "cartão" visualmente independente — cor própria no header,
  * contorno e fundo levemente tingidos, mesmo padrão de separação por coluna já
  * usado no Kanban do Alpha CRM (PipelineBoardClient.tsx). */
@@ -102,31 +141,43 @@ function KanbanColuna({
             <p className="text-[10px] text-slate-600">Vazio</p>
           </div>
         ) : (
-          itens.map((lead) => (
-            <button
-              key={lead.id}
-              onClick={() => onAbrirLead(lead)}
-              className="w-full text-left rounded-xl p-3 transition-all hover:brightness-125 hover:-translate-y-0.5"
-              style={{ background: "rgba(15,23,42,0.75)", border: `1px solid rgba(${cor},0.22)` }}
-            >
-              <p className="text-[12.5px] font-bold text-slate-200 truncate">{lead.nome}</p>
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                {lead.segmento && <span className="flex items-center gap-1"><Building2 size={10} /> {lead.segmento}</span>}
-                {lead.uf && <span className="flex items-center gap-1"><MapPin size={10} /> {lead.uf}</span>}
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <PotencialBadge valor={lead.potencialRecorrencia} />
-                {lead.proximaAcaoEm && (
-                  <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <CalendarClock size={11} /> {new Date(lead.proximaAcaoEm).toLocaleDateString("pt-BR")}
-                  </span>
-                )}
-              </div>
-              {lead.responsavel && (
-                <p className="text-[10px] text-slate-600 mt-1.5 truncate">Resp.: {lead.responsavel.nome}</p>
-              )}
-            </button>
-          ))
+          itens.map((lead) => {
+            const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
+            return (
+              <button
+                key={lead.id}
+                onClick={() => onAbrirLead(lead)}
+                className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 rounded-2xl"
+                aria-label={`Abrir lead ${lead.nome}`}
+              >
+                <GradientBlobCard accent={cor} className="hover:brightness-110 transition-[filter]">
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black text-slate-200">
+                        {inicial}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-tight text-slate-100 truncate">{lead.nome}</p>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                          {lead.segmento && <span className="flex items-center gap-1"><Building2 size={10} /> {lead.segmento}</span>}
+                          {lead.uf && <span className="flex items-center gap-1"><MapPin size={10} /> {lead.uf}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-white/[0.06] pt-2">
+                      <PotencialBadge valor={lead.potencialRecorrencia} />
+                      {lead.proximaAcaoEm && <BadgeProximaAcao proximaAcaoEm={lead.proximaAcaoEm} />}
+                    </div>
+
+                    {lead.responsavel && (
+                      <p className="text-[10px] text-slate-600 truncate">Resp.: {lead.responsavel.nome}</p>
+                    )}
+                  </div>
+                </GradientBlobCard>
+              </button>
+            );
+          })
         )}
       </div>
     </div>

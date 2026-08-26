@@ -22,6 +22,10 @@ const MAX_PAGINAS_POR_SYNC = 30;
 // Dez campos persistidos por evento. Lotes de 50 mantêm folga abaixo do
 // limite conservador de 999 parâmetros do SQLite, inclusive com defaults.
 const TAMANHO_LOTE_CACHE = 50;
+// O timeout padrão de 5 segundos do Prisma é insuficiente para um cursor
+// incremental acumulado (milhares de eventos). O cache e o cursor precisam
+// continuar atômicos para evitar perda de alterações entre páginas.
+const TIMEOUT_TRANSACAO_CACHE_MS = 120_000;
 
 function dividirEmLotes<T>(itens: readonly T[], tamanho: number): T[][] {
   const lotes: T[][] = [];
@@ -295,6 +299,9 @@ export async function sincronizarCalendario(
       });
       eventosAtualizados = atualizadosNaTransacao;
       eventosRemovidos = removidosNaTransacao;
+    }, {
+      maxWait: 10_000,
+      timeout: TIMEOUT_TRANSACAO_CACHE_MS,
     });
 
     return { ok: true, contadores: obterContadores(), sincronizadoEm };
@@ -329,6 +336,12 @@ export async function sincronizarCalendario(
         contadores: obterContadores(),
       };
     }
+    const erroInesperado = erro instanceof Error ? erro : null;
+    console.error("[agenda-alpha] Falha local inesperada durante a sincronização", {
+      calendarioId: calendario.id,
+      nome: erroInesperado?.name ?? "Erro desconhecido",
+      mensagem: erroInesperado?.message ?? "Sem mensagem",
+    });
     return {
       ok: false,
       erro: "Falha inesperada ao sincronizar este calendário.",

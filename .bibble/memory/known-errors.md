@@ -5,6 +5,15 @@
 
 ---
 
+### Dev server (`next dev`) com vazamento real de memória — não é só "contenção", cresce sem parar até derrubar
+**Sintoma:** ao longo de uma sessão longa (~6h), um processo `next dev` ativo cresceu continuamente de ~5GB para 7.4GB de memória, sem nunca estabilizar ou liberar — causando lentidão progressivamente PIOR em `tsc`/`npm run build` a cada nova tentativa (um `tsc --noEmit` chegou a levar 2h15min; o padrão histórico deste projeto é ~15-20min). A suspeita inicial (várias vezes nesta sessão) foi "contenção normal de recursos" — mas o padrão real era um vazamento: a cada checagem de processo, a memória do dev server só subia, nunca descia, mesmo sem nenhuma atividade nova de HMR/navegação.
+**Como confirmar:** `Get-CimInstance Win32_Process -Filter "Name = 'node.exe'"` + `Get-Process` para ver `WorkingSet64` — se o PID do `next dev` estiver casas de GB e SUBINDO em checagens repetidas ao longo de horas (não só um pico pontual), é vazamento, não contenção pontual.
+**Fix:** com autorização do usuário, `Stop-Process -Id <PID> -Force` no processo do dev server. Resultado imediato e comprovado nesta sessão: `prisma generate` que estava travado há 15+ minutos completou em 3.92s assim que o processo foi encerrado; o `npm run build` seguinte completou no tempo normal.
+**Lição geral:** se um `tsc`/`build` está anormalmente lento (muito além do padrão histórico já catalogado) e outros processos node de longa duração estão ativos (especialmente `next dev`), verificar se a memória desses processos está CRESCENDO ao longo do tempo (não só alta) antes de assumir "só contenção, aguardar mais". Contenção pontual se estabiliza; vazamento não. Sempre pedir autorização ao usuário antes de derrubar um processo de longa duração que não foi iniciado pela sessão atual — é o ambiente de trabalho dele.
+**Adicionado em:** 2026-08-26 (Bibble, card de Aquisição de Parceiros — RM-2026-3F263C)
+
+---
+
 ### Sistema sob contenção pesada de memória (dev server ativo, 5+GB) impede iniciar um segundo dev server para verificação visual
 **Sintoma:** com um `next dev` já rodando e consumindo 5-6GB de memória (mesmo cenário de lentidão extrema de `tsc`/`build` já catalogado abaixo), tentar `preview_start` de um segundo servidor de dev (para verificação visual via browser) retorna `serverId` válido mas a porta nunca fica acessível — `navigate` falha consistentemente com "denied or failed", `preview_logs`/`preview_stop` reportam `serverId not found` logo em seguida (o processo morre ou nunca sobe de verdade).
 **Causa raiz:** memória física insuficiente para rodar 2 processos Next.js dev simultâneos neste sistema — o segundo processo falha ao inicializar (provavelmente OOM silencioso ou timeout de compilação inicial do Turbopack).
