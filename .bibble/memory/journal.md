@@ -2,6 +2,43 @@
 
 ---
 
+## [2026-08-26] — RM-2026-3F263C — Card de Aquisição alinhado ao padrão do CRM (objetivo COMPLETO, 10/10 fases)
+
+**Tags:** #roadmap #mcp #parceiros #ui #refactor #concluido #infra
+**Agentes envolvidos:** Bibble (execução direta via chat + MCP), agente Explore (comparação visual da Fase 0)
+**Arquivos tocados:** `src/components/Parceiros/Aquisicao/AquisicaoParceirosClient.tsx`, `.bibble/memory/{decisions.md, known-errors.md, journal.md, codebase-map.md}`
+
+### Contexto
+Terceiro objetivo do Roadmap executado nesta sessão, seguindo a ordem correta de fila (`globalPriority`). Título: "Alterar layout do card do formulário de aquisição de parceiros". Primeiro objetivo puramente visual desta sessão — sem schema, sem Vault necessário.
+
+### O que foi feito
+
+**Fase 0 (auditoria):** agente Explore comparou o card do Kanban de Aquisição de Parceiros com o card do Kanban do Alpha CRM e confirmou: o card de Aquisição reimplementava visual parecido com `style` inline em vez de reaproveitar `GradientBlobCard` (já existente, documentado, usado pelo CRM) — violação direta da regra do projeto de não recriar componente existente.
+
+**Fase 1-3 (blueprint + implementação, feitas juntas):** trocado o shell do card para `GradientBlobCard`; adicionado avatar/inicial do lead; badge de urgência na próxima ação (`calcularUrgenciaProximaAcao`, cópia adaptada do algoritmo já em produção no CRM); divisor visual separando blocos de informação. Único arquivo tocado, sem mudança de lógica/dados/schema.
+
+**Fases 4-9:** verificação de build (tsc/eslint/build limpos), revisão de código (🟢 aprovado, zero issues), testes/edge cases (analisados contra o código real — todos já tratados por condicionais preexistentes, nenhuma regressão), mapa do codebase atualizado, arquivamento (esta entrada).
+
+**Fase 5 (Probe) — limitação honesta:** verificação visual real via navegador não foi possível — a rota exige login autenticado e não há credenciais de usuário para o agente usar. Reportado como pendência explícita ao usuário em vez de fabricar um "testado com sucesso".
+
+### Incidente de infraestrutura resolvido nesta sessão
+Durante a Fase 2, um `next dev` de longa duração (não iniciado por esta sessão) foi identificado com vazamento real de memória — cresceu continuamente de ~5GB para 7.4GB ao longo de ~6 horas, sem nunca estabilizar. Isso causou lentidão progressivamente pior em todos os comandos `tsc`/`build` da sessão (um `tsc` chegou a **2h15min**, ante o padrão histórico de ~15-20min). Após múltiplas checagens confirmando que a memória só crescia (não apenas alta, mas subindo continuamente), Bibble avisou o usuário proativamente em vez de continuar esperando em silêncio. Usuário autorizou encerrar o processo (`Stop-Process -Force`) — resultado imediato e comprovado: `prisma generate` que estava travado há 15+ minutos completou em 3.92s logo em seguida, e o build seguinte voltou ao ritmo normal.
+
+### Decisões tomadas
+- `GradientBlobCard` confirmado como padrão de shell de card de Kanban do projeto (agora usado por 2 Kanbans: CRM e Aquisição de Parceiros).
+- Drag-and-drop e elementos específicos do domínio BPM (tarefas/anexos/métricas) deliberadamente NÃO trazidos — mudariam interação, não só layout.
+
+### Pendências
+- Verificação visual manual pelo usuário recomendada antes de considerar 100% fechado na prática (código validado, mas não visto renderizado).
+- `git push` continua bloqueado para mim — código local, aguardando publicação do usuário.
+
+### Refletido também em
+- `decisions.md`: nova decisão "RM-2026-3F263C — Card de Aquisição de Parceiros alinhado ao padrão visual do CRM".
+- `known-errors.md`: novo erro catalogado sobre o vazamento de memória do dev server (distinto de "contenção pontual", já catalogada antes).
+- `codebase-map.md`: nova entrada sobre a adoção do `GradientBlobCard` no card de Aquisição.
+
+---
+
 ## [2026-08-26] — RM-2026-2C7A4B — Kanban de Relacionamento de Parceiros (objetivo COMPLETO, 12/12 fases)
 
 **Tags:** #roadmap #mcp #parceiros #migration #vault #kanban #maquina-de-estados #concluido

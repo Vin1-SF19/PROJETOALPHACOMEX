@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Circle, Plus } from "lucide-react";
 
 import type { TemaAlpha } from "@/lib/temas";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { DetalhePopover } from "./DetalhePopover";
 import { DiaEventosPopover } from "./DiaEventosPopover";
 import { agruparPorDia, diasDoGridMes, formatarDataCivil, mesmodia } from "./lib/datas";
-import { COR_CALENDARIO_PADRAO, type EventoExibicao } from "./lib/tipos";
+import { corDoItemAgenda, type EventoExibicao } from "./lib/tipos";
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -20,6 +20,7 @@ export function VisaoMes({
   onEventoCancelado,
   onSelecionarDia,
   onNovoEventoNoDia,
+  onConcluirTarefa,
 }: {
   dataReferencia: Date;
   eventos: EventoExibicao[];
@@ -28,6 +29,7 @@ export function VisaoMes({
   onEventoCancelado: () => void;
   onSelecionarDia: (data: Date) => void;
   onNovoEventoNoDia: (data: Date) => void;
+  onConcluirTarefa: (tarefaCacheId: string) => void;
 }) {
   const dias = diasDoGridMes(dataReferencia);
   const eventosPorDia = agruparPorDia(eventos);
@@ -94,21 +96,27 @@ export function VisaoMes({
                 </span>
               </div>
               <div className="mt-1 space-y-1">
-                {eventosDoDia.slice(0, limiteEventosVisiveis).map((evento) => (
+                {eventosDoDia.slice(0, limiteEventosVisiveis).map((evento) => evento.tipo === "tarefa" ? (
+                  <button
+                    key={evento.id}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); if (evento.tarefaCacheId) onConcluirTarefa(evento.tarefaCacheId); }}
+                    className="flex w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-[10px] font-semibold text-emerald-50 hover:brightness-110"
+                    style={{ backgroundColor: `${corDoItemAgenda(evento)}cc` }}
+                    title="Concluir tarefa"
+                  >
+                    <Circle className="size-3 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{evento.titulo || "(sem título)"}</span>
+                  </button>
+                ) : (
                   <DetalhePopover key={evento.id} evento={evento} tema={tema} onEditar={onEditarEvento} onCancelado={onEventoCancelado}>
-                    <button
-                      type="button"
-                      onClick={(e) => e.stopPropagation()}
-                      className="block w-full truncate rounded-md px-1.5 py-0.5 text-left text-[10px] font-semibold text-white/90 hover:brightness-110"
-                      style={{ backgroundColor: `${evento.calendarioCorHex ?? COR_CALENDARIO_PADRAO}55` }}
-                      title={evento.titulo ?? "(sem título)"}
-                    >
+                    <button type="button" onClick={(e) => e.stopPropagation()} className="block w-full truncate rounded-md px-1.5 py-0.5 text-left text-[10px] font-semibold text-white/90 hover:brightness-110" style={{ backgroundColor: `${corDoItemAgenda(evento)}cc` }} title={evento.titulo ?? "(sem título)"}>
                       {evento.titulo || "(sem título)"}
                     </button>
                   </DetalhePopover>
                 ))}
                 {eventosDoDia.length > limiteEventosVisiveis && (
-                  <DiaEventosPopover dia={dia} eventos={eventosDoDia} onEditarEvento={onEditarEvento}>
+                  <DiaEventosPopover dia={dia} eventos={eventosDoDia} onEditarEvento={onEditarEvento} onConcluirTarefa={onConcluirTarefa}>
                     <button
                       type="button"
                       onClick={(e) => e.stopPropagation()}

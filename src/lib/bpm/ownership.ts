@@ -248,6 +248,62 @@ export async function usuarioElegivelResponsavelBpm(
   });
 }
 
+/**
+ * Escolhe automaticamente um responsável elegível para `pipelineId`, sem exigir seleção manual
+ * (RM-2026-97934A — indicação de parceiro direcionada ao closer automaticamente). Preferência:
+ * `preferidoUserId` (ex: quem criou a indicação) se elegível; senão o usuário ativo com permissão
+ * CRM há mais tempo no sistema (`orderBy id asc`, determinístico) dentre os elegíveis do pipeline.
+ * Retorna `null` se nenhum usuário elegível existir — chamador deve tratar como erro de configuração.
+ */
+export async function resolverResponsavelAutomaticoBpm(
+  pipelineId: string,
+  preferidoUserId?: number,
+  client: ClienteAcessoBpm = db,
+): Promise<number | null> {
+  if (preferidoUserId && (await usuarioElegivelResponsavelBpm(pipelineId, preferidoUserId, client))) {
+    return preferidoUserId;
+  }
+
+  const pipeline = await client.bpmPipeline.findUnique({
+    where: { id: pipelineId },
+    select: { setores: { select: { setor: { select: { nome: true } } } } },
+  });
+  if (!pipeline) return null;
+  const setoresPipeline = pipeline.setores.map(({ setor }) => setor.nome);
+
+  const [usuarios, permissoesSetorTodas] = await Promise.all([
+    client.usuarios.findMany({
+      where: { status: "ATIVO" },
+      select: { id: true, role: true, status: true, permissoes: true },
+      orderBy: { id: "asc" },
+    }),
+    client.setorPermissao.findMany({ select: { setor: true, modulo: true } }),
+  ]);
+  if (usuarios.length === 0) return null;
+
+  const overrides = await client.usuarioPermissaoOverride.findMany({
+    where: { usuarioId: { in: usuarios.map((usuario) => usuario.id) } },
+    select: { usuarioId: true, modulo: true, acao: true },
+  });
+  const overridesPorUsuario = new Map<number, OverridePermissaoBpm[]>();
+  for (const override of overrides) {
+    const atuais = overridesPorUsuario.get(override.usuarioId) ?? [];
+    atuais.push(override);
+    overridesPorUsuario.set(override.usuarioId, atuais);
+  }
+
+  const elegivel = usuarios.find((usuario) => podeSerResponsavelPipelineBpm({
+    role: usuario.role,
+    permissoes: resolverPermissoesEfetivasBpm(
+      usuario,
+      permissoesSetorTodas,
+      overridesPorUsuario.get(usuario.id) ?? [],
+    ),
+    setoresPipeline,
+  }));
+  return elegivel?.id ?? null;
+}
+
 export type BpmAcao =
   | "visualizar"
   | "editarCard"

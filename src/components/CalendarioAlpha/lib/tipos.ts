@@ -1,6 +1,14 @@
 /** Cor usada quando o Google não retorna `backgroundColor` para o calendário/evento. */
 export const COR_CALENDARIO_PADRAO = "#3b82f6";
 
+export function corDoItemAgenda(item: Pick<EventoExibicao, "tipo" | "eventType" | "calendarioCorHex">): string {
+  if (item.tipo === "tarefa") return "#22c55e";
+  if (item.eventType === "focusTime") return "#a855f7";
+  if (item.eventType === "outOfOffice") return "#f43f5e";
+  if (item.eventType === "workingLocation") return "#0ea5e9";
+  return item.calendarioCorHex ?? COR_CALENDARIO_PADRAO;
+}
+
 export interface CalendarioSelecionadoView {
   id: string;
   googleCalendarId: string;
@@ -35,6 +43,8 @@ export interface EventoExibicao {
   etag: string;
   linkMeet: string | null;
   eventType: string;
+  tipo: "evento" | "tarefa";
+  tarefaCacheId?: string;
   calendarioId: string;
   calendarioGoogleId: string;
   calendarioNome: string;
@@ -51,4 +61,9 @@ export interface TarefaAgendaExibicao {
   titulo: string;
   status: "needsAction" | "completed";
   vencimentoEm: string | null;
+}
+
+export interface ListaTarefasAgendaView {
+  googleTaskListId: string;
+  titulo: string;
 }

@@ -9,7 +9,7 @@ import {
   parsearDataCivil,
   type VisaoCalendario,
 } from "@/components/CalendarioAlpha/lib/datas";
-import type { EventoExibicao, TarefaAgendaExibicao } from "@/components/CalendarioAlpha/lib/tipos";
+import type { EventoExibicao, ListaTarefasAgendaView, TarefaAgendaExibicao } from "@/components/CalendarioAlpha/lib/tipos";
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
 
@@ -58,6 +58,7 @@ export default async function CalendarioAlphaPage({
         calendarios={[]}
         eventos={[]}
         tarefas={[]}
+        listasTarefas={[]}
         isAdmin={isAdmin}
         visao={visao}
         dataReferenciaISO={dataReferencia.toISOString()}
@@ -96,6 +97,7 @@ export default async function CalendarioAlphaPage({
       etag: evento.etag,
       linkMeet: evento.linkMeet,
       eventType: evento.eventType,
+      tipo: "evento",
       calendarioId: calendario.id,
       calendarioGoogleId: calendario.googleCalendarId,
       calendarioNome: calendario.nome,
@@ -111,6 +113,11 @@ export default async function CalendarioAlphaPage({
     take: 100,
     select: { id: true, titulo: true, status: true, vencimentoEm: true, taskList: { select: { googleTaskListId: true, titulo: true } } },
   }).then((items) => items.map((tarefa) => ({ id: tarefa.id, taskListGoogleId: tarefa.taskList.googleTaskListId, listaTitulo: tarefa.taskList.titulo, titulo: tarefa.titulo, status: tarefa.status === "completed" ? "completed" : "needsAction", vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null })));
+  const listasTarefas: ListaTarefasAgendaView[] = await db.googleCalendarTaskListCache.findMany({
+    where: { conexaoId: statusConexao.conexaoId ?? "" },
+    orderBy: { titulo: "asc" },
+    select: { googleTaskListId: true, titulo: true },
+  });
 
   return (
     <CalendarioAlphaDashboard
@@ -120,6 +127,7 @@ export default async function CalendarioAlphaPage({
       calendarios={calendarios}
       eventos={eventos}
       tarefas={tarefas}
+      listasTarefas={listasTarefas}
       isAdmin={isAdmin}
       visao={visao}
       dataReferenciaISO={dataReferencia.toISOString()}

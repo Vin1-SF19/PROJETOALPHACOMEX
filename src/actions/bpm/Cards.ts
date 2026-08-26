@@ -573,7 +573,7 @@ export async function CriarCardBpm(dados: unknown) {
 
     const parsed = criarCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId } = parsed.data;
+    const { empresaId, novaEmpresa, pipelineId, etapaId, responsavelId, servico } = parsed.data;
     await exigirAcessoBpmPipeline(pipelineId, userId);
     if (!(await usuarioElegivelResponsavelBpm(pipelineId, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
@@ -640,8 +640,9 @@ export async function CriarCardBpm(dados: unknown) {
           pipelineId,
           etapaId,
           responsavelId,
-          // Fase 3 (RM-2026-54DC86): `servico` derivado do nome do pipeline de destino.
-          servico: (await tx.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { nome: true } }))?.nome ?? null,
+          // Fase 3 (RM-2026-54DC86): fallback é o nome do pipeline de destino. RM-2026-97934A:
+          // caller pode informar o serviço de origem explicitamente (ex: indicação de parceiro).
+          servico: servico ?? (await tx.bpmPipeline.findUnique({ where: { id: pipelineId }, select: { nome: true } }))?.nome ?? null,
         },
       });
 

@@ -9,7 +9,7 @@ import type { TemaAlpha } from "@/lib/temas";
 
 import { AgendaModal3D } from "./AgendaModal3D";
 import { FormularioEvento } from "./FormularioEvento";
-import type { CalendarioSelecionadoView, ColegaAgendaView, EventoExibicao } from "./lib/tipos";
+import type { CalendarioSelecionadoView, ColegaAgendaView, EventoExibicao, ListaTarefasAgendaView } from "./lib/tipos";
 import { PainelColegas, type SolicitacaoRecebidaView } from "./PainelColegas";
 import { PainelPermissoesColegas } from "./PainelPermissoesColegas";
 import { SeletorCalendarios } from "./SeletorCalendarios";
@@ -36,6 +36,7 @@ interface AgendaOverlaysProps {
   dataEvento: Date;
   evento?: EventoExibicao;
   detalhesEvento?: GoogleEventoDTO;
+  listasTarefas: ListaTarefasAgendaView[];
   desativarAberto: boolean;
   onDesativarAbertoChange: (open: boolean) => void;
   desativando: boolean;
@@ -92,6 +93,7 @@ export function AgendaOverlays(props: AgendaOverlaysProps) {
           dataInicial={props.dataEvento}
           eventoParaEditar={props.evento}
           detalhesEvento={props.detalhesEvento}
+          listasTarefas={props.listasTarefas}
           onSalvo={props.onAtualizar}
         />
       )}

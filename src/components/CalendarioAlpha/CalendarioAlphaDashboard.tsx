@@ -17,9 +17,10 @@ import { HeaderCalendario } from "./HeaderCalendario";
 import { StatusSincronizacao } from "./StatusSincronizacao";
 import { TutorialAgendaModal } from "./TutorialAgendaModal";
 import { dataAnterior, proximaData, type VisaoCalendario } from "./lib/datas";
-import type { CalendarioSelecionadoView, EventoExibicao } from "./lib/tipos";
-import type { TarefaAgendaExibicao } from "./lib/tipos";
-import { TarefasAgendaPanel } from "./TarefasAgendaPanel";
+import { tarefasParaItensAgenda } from "./lib/itens-agenda";
+import type { CalendarioSelecionadoView, EventoExibicao, ListaTarefasAgendaView, TarefaAgendaExibicao } from "./lib/tipos";
+import { concluirTarefaAgendaAlpha } from "@/actions/google-calendar-tarefas";
+import { toast } from "sonner";
 import { TUTORIAL_AGENDA } from "./lib/tutorial-agenda";
 import { useAgendaAlphaController } from "./lib/useAgendaAlphaController";
 
@@ -30,6 +31,7 @@ interface CalendarioAlphaDashboardProps {
   calendarios: CalendarioSelecionadoView[];
   eventos: EventoExibicao[];
   tarefas: TarefaAgendaExibicao[];
+  listasTarefas: ListaTarefasAgendaView[];
   isAdmin: boolean;
   visao: VisaoCalendario;
   dataReferenciaISO: string;
@@ -48,6 +50,7 @@ export function CalendarioAlphaDashboard({
   calendarios,
   eventos,
   tarefas,
+  listasTarefas,
   isAdmin,
   visao,
   dataReferenciaISO,
@@ -67,6 +70,17 @@ export function CalendarioAlphaDashboard({
   const usuarioAtualId = Number((session?.user as { id?: string | number } | undefined)?.id ?? 0);
   const [tutorialAberto, setTutorialAberto] = useState(false);
   const [tourAberto, setTourAberto] = useState(false);
+  const tarefasNaGrade = tarefasParaItensAgenda(tarefas);
+
+  async function concluirTarefa(tarefaCacheId: string) {
+    const resultado = await concluirTarefaAgendaAlpha({ tarefaCacheId });
+    if (!resultado.success) {
+      toast.error(resultado.error);
+      return;
+    }
+    toast.success("Tarefa concluída.");
+    agenda.atualizarAgenda();
+  }
 
   useEffect(() => {
     if (!usuarioAtualId) return;
@@ -176,8 +190,6 @@ export function CalendarioAlphaDashboard({
         onAbrirTutorial={() => setTutorialAberto(true)}
       />
 
-      <TarefasAgendaPanel tema={tema} tarefas={tarefas} onAtualizar={agenda.atualizarAgenda} />
-
       <div className="flex min-h-0 flex-1 gap-3">
         <AgendaSidebar
           tema={tema}
@@ -228,7 +240,7 @@ export function CalendarioAlphaDashboard({
               tema={tema}
               visao={visao}
               dataReferencia={agenda.dataReferencia}
-              eventos={[...eventos, ...agenda.compartilhadas.eventos]}
+              eventos={[...eventos, ...tarefasNaGrade, ...agenda.compartilhadas.eventos]}
               possuiCalendarios={calendarios.length > 0}
               onEditarEvento={agenda.editarEvento}
               onEventoCancelado={agenda.notificarAlteracaoAgenda}
@@ -236,6 +248,7 @@ export function CalendarioAlphaDashboard({
               onSelecionarDia={(data) => agenda.navegarPara("dia", data)}
               onSelecionarMes={(data) => agenda.navegarPara("mes", data)}
               onAbrirConfiguracoes={agenda.abrirConfiguracoes}
+              onConcluirTarefa={concluirTarefa}
             />
           </div>
         </main>
@@ -263,6 +276,7 @@ export function CalendarioAlphaDashboard({
         dataEvento={agenda.dataParaNovoEvento}
         evento={agenda.sessaoEdicao?.evento}
         detalhesEvento={agenda.sessaoEdicao?.detalhes}
+        listasTarefas={listasTarefas}
         desativarAberto={agenda.desativarAberto}
         onDesativarAbertoChange={agenda.setDesativarAberto}
         desativando={agenda.desativando}

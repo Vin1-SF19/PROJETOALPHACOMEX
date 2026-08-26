@@ -2530,6 +2530,11 @@ model Indicacao {
   bpmCard               BpmCard?  @relation(fields: [bpmCardId], references: [id], onDelete: SetNull)
   criadoPorId           Int
   criadoPor             usuarios  @relation("IndicacaoAutor", fields: [criadoPorId], references: [id])
+  // RM-2026-97934A: produto/serviço indicado pelo parceiro, texto livre (mesmo padrão de
+  // BpmCard.servico/ContratoComercial.servico), reaproveitando o catálogo do Alpha Metas
+  // (SERVICOS_COMERCIAIS_PADRAO + tabela servicos_comerciais). Repassado ao BpmCard.servico
+  // quando a indicação é direcionada ao closer automaticamente.
+  servicoIndicado       String?
   // Comprovante de comissão (enviado no PainelAlpha, visto no portal do parceiro)
   comprovanteUrl        String?
   comprovanteNome       String?

@@ -44,10 +44,10 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `prisma/migrations/<timestamp>_agenda_alpha_tasks_status/migration.sql`
 - `src/lib/google-calendar/{client,types,cache-eventos,scopes,sync}.ts`
 - `src/actions/google-calendar-{eventos,sync,tarefas}.ts`
-- `src/components/CalendarioAlpha/{FormularioEvento,CalendarioAlphaDashboard,StatusSincronizacao}.tsx`
-- `src/components/CalendarioAlpha/lib/{tipos,useAgendaAlphaController}.ts`
+- `src/components/CalendarioAlpha/{FormularioEvento,CalendarioAlphaDashboard,StatusSincronizacao,GradeHoraria,VisaoMes,VisaoAno,DiaEventosPopover}.tsx`
+- `src/components/CalendarioAlpha/lib/{tipos,itens-agenda,useAgendaAlphaController}.ts`
 - `src/app/PainelAlpha/CalendarioAlpha/page.tsx`
-- `tests/google-calendar/*`
+- `tests/google-calendar/{itens-agenda,layout-eventos,page-cache-wiring}.test.ts`
 
 ## Notas operacionais
 

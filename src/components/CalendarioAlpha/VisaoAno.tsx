@@ -11,7 +11,7 @@ import {
   mesesDoAno,
   mesmodia,
 } from "./lib/datas";
-import { COR_CALENDARIO_PADRAO, type EventoExibicao } from "./lib/tipos";
+import { corDoItemAgenda, type EventoExibicao } from "./lib/tipos";
 
 const DIAS_SEMANA_INICIAIS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -50,7 +50,8 @@ function MiniMes({
         {dias.map((dia) => {
           const chave = formatarDataCivil(dia);
           const foraDoMes = chave.slice(0, 7) !== mesReferenciaCivil;
-          const temEventos = (eventosPorDia.get(chave)?.length ?? 0) > 0;
+          const itensDoDia = eventosPorDia.get(chave) ?? [];
+          const temEventos = itensDoDia.length > 0;
           const ehHoje = mesmodia(dia, hoje);
 
           return (
@@ -69,7 +70,7 @@ function MiniMes({
               {temEventos && !ehHoje && (
                 <span
                   className="absolute bottom-0.5 h-1 w-1 rounded-full"
-                  style={{ backgroundColor: COR_CALENDARIO_PADRAO }}
+                  style={{ backgroundColor: corDoItemAgenda(itensDoDia[0]!) }}
                 />
               )}
             </button>

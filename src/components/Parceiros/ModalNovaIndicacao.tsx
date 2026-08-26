@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { X, Search, Handshake, Building2, Loader2, Check, AlertTriangle } from "lucide-react";
+import { X, Search, Handshake, Building2, Loader2, Check, AlertTriangle, Plus } from "lucide-react";
 import {
   listarParceirosSimples, listarClientesParaIndicacao, criarIndicacao,
 } from "@/actions/parceiros";
+import { getServicosComerciais } from "@/actions/ContratoComercial";
+import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 
 type ParceiroSimples = { id: number; nome: string; nomeFantasia: string | null; documento: string; nivel: string };
 type ClienteOpt = {
   id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string | null; status: string;
   indicacao: { parceiroId: number; status: string } | null;
 };
+type NovaEmpresaForm = { cnpj: string; razaoSocial: string; nomeFantasia: string; uf: string; municipio: string };
+
+const NOVA_EMPRESA_VAZIA: NovaEmpresaForm = { cnpj: "", razaoSocial: "", nomeFantasia: "", uf: "", municipio: "" };
 
 // Valores reais observados em produção (ClienteServico.status) — sem enum formal no schema.
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
@@ -32,10 +37,17 @@ export default function ModalNovaIndicacao({
 }) {
   const [parceiros, setParceiros] = useState<ParceiroSimples[]>([]);
   const [parceiroId, setParceiroId] = useState<number | null>(null);
+
+  const [modoEmpresa, setModoEmpresa] = useState<"existente" | "nova">("existente");
   const [buscaCliente, setBuscaCliente] = useState("");
   const [clientes, setClientes] = useState<ClienteOpt[]>([]);
   const [clienteId, setClienteId] = useState<number | null>(null);
   const [loadingCli, setLoadingCli] = useState(false);
+  const [novaEmpresa, setNovaEmpresa] = useState<NovaEmpresaForm>(NOVA_EMPRESA_VAZIA);
+
+  const [servicos, setServicos] = useState<string[]>([...SERVICOS_COMERCIAIS_PADRAO]);
+  const [servicoIndicado, setServicoIndicado] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,8 +55,14 @@ export default function ModalNovaIndicacao({
     if (!open) return;
     /* eslint-disable react-hooks/set-state-in-effect -- reset ao abrir o modal */
     setParceiroId(null); setClienteId(null); setBuscaCliente(""); setError(null);
+    setModoEmpresa("existente"); setNovaEmpresa(NOVA_EMPRESA_VAZIA); setServicoIndicado("");
     /* eslint-enable react-hooks/set-state-in-effect */
     listarParceirosSimples().then(setParceiros).catch(() => setParceiros([]));
+    // Mesmo merge de ModalGerenciamentoLeads.tsx — piso fixo + serviços customizados do banco.
+    getServicosComerciais().then((res) => {
+      const fromDb = res.success ? res.servicos.map((s) => s.nome) : [];
+      setServicos([...new Set([...SERVICOS_COMERCIAIS_PADRAO, ...fromDb])]);
+    });
   }, [open]);
 
   const carregarClientes = useCallback((q: string) => {
@@ -53,17 +71,30 @@ export default function ModalNovaIndicacao({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || modoEmpresa !== "existente") return;
     const t = setTimeout(() => carregarClientes(buscaCliente), 300);
     return () => clearTimeout(t);
-  }, [open, buscaCliente, carregarClientes]);
+  }, [open, modoEmpresa, buscaCliente, carregarClientes]);
 
   if (!open) return null;
 
+  const empresaValida = modoEmpresa === "existente"
+    ? clienteId !== null
+    : novaEmpresa.cnpj.replace(/\D/g, "").length >= 11 && novaEmpresa.razaoSocial.trim().length >= 2;
+
   const vincular = async () => {
-    if (!parceiroId || !clienteId) { setError("Selecione o parceiro e a empresa."); return; }
+    if (!parceiroId || !empresaValida || !servicoIndicado) {
+      setError("Preencha o parceiro, a empresa e o serviço indicado.");
+      return;
+    }
     setSaving(true); setError(null);
-    const res = await criarIndicacao(parceiroId, clienteId);
+    const res = await criarIndicacao({
+      parceiroId,
+      ...(modoEmpresa === "existente"
+        ? { clienteId: clienteId! }
+        : { novaEmpresa: { ...novaEmpresa, nomeFantasia: novaEmpresa.nomeFantasia || undefined, uf: novaEmpresa.uf || undefined, municipio: novaEmpresa.municipio || undefined } }),
+      servicoIndicado,
+    });
     setSaving(false);
     if (!res.success) { setError(res.error ?? "Erro ao vincular"); return; }
     onDone();
@@ -100,52 +131,96 @@ export default function ModalNovaIndicacao({
             </select>
           </div>
 
-          {/* Empresa CS&NPS */}
+          {/* Empresa CS&NPS ou nova */}
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1.5">2. Empresa indicada (CS &amp; NPS)</label>
-            <div className="relative mb-2">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)} placeholder="Buscar empresa por nome ou CNPJ…"
-                className="w-full h-11 rounded-xl pl-9 pr-3 text-[12px] outline-none" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)`, color: "#e2e8f0" }} />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">2. Empresa indicada</label>
+              <button
+                type="button"
+                onClick={() => setModoEmpresa(m => m === "existente" ? "nova" : "existente")}
+                className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg"
+                style={{ color: `rgba(${accent},1)`, background: `rgba(${accent},0.1)` }}
+              >
+                {modoEmpresa === "existente" ? <><Plus size={11} /> Cadastrar nova empresa</> : "Buscar empresa existente"}
+              </button>
             </div>
-            <div className="space-y-1 max-h-[240px] overflow-y-auto">
-              {loadingCli ? (
-                <div className="flex items-center gap-2 px-3 py-4 text-slate-500 text-[12px]"><Loader2 size={14} className="animate-spin" /> Carregando…</div>
-              ) : clientes.length === 0 ? (
-                <p className="px-3 py-4 text-[12px] text-slate-500 text-center">Nenhuma empresa encontrada.</p>
-              ) : clientes.map(c => {
-                const jaVinculada = c.indicacao?.status === "ATIVA";
-                const ativo = clienteId === c.id;
-                const statusStyle = STATUS_STYLE[c.status] ?? STATUS_STYLE_DEFAULT;
-                return (
-                  <button key={c.id} type="button" disabled={jaVinculada} onClick={() => setClienteId(c.id)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{ background: ativo ? `rgba(${accent},0.18)` : "rgba(15,23,42,0.5)", border: `1px solid ${ativo ? `rgba(${accent},0.5)` : "rgba(99,102,241,0.12)"}` }}>
-                    <Building2 size={14} className="shrink-0 text-slate-400" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12.5px] font-bold text-slate-200 truncate">{c.razaoSocial}</p>
-                      <p className="text-[10px] text-slate-500 truncate">
-                        <span className="font-mono">{c.cnpj}</span>{c.nomeFantasia ? ` · ${c.nomeFantasia}` : ""}
-                      </p>
-                    </div>
-                    <span
-                      className="text-[9px] font-black uppercase px-2 py-1 rounded-lg shrink-0"
-                      style={{ background: statusStyle.bg, color: statusStyle.color }}
-                    >
-                      {c.status}
-                    </span>
-                    {jaVinculada && <span className="text-[9px] font-black uppercase text-amber-400 shrink-0">Já vinculada</span>}
-                    {ativo && <Check size={15} style={{ color: `rgba(${accent},1)` }} />}
-                  </button>
-                );
-              })}
-            </div>
+
+            {modoEmpresa === "existente" ? (
+              <>
+                <div className="relative mb-2">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)} placeholder="Buscar empresa por nome ou CNPJ…"
+                    className="w-full h-11 rounded-xl pl-9 pr-3 text-[12px] outline-none" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)`, color: "#e2e8f0" }} />
+                </div>
+                <div className="space-y-1 max-h-[240px] overflow-y-auto">
+                  {loadingCli ? (
+                    <div className="flex items-center gap-2 px-3 py-4 text-slate-500 text-[12px]"><Loader2 size={14} className="animate-spin" /> Carregando…</div>
+                  ) : clientes.length === 0 ? (
+                    <p className="px-3 py-4 text-[12px] text-slate-500 text-center">Nenhuma empresa encontrada.</p>
+                  ) : clientes.map(c => {
+                    const jaVinculada = c.indicacao?.status === "ATIVA";
+                    const ativo = clienteId === c.id;
+                    const statusStyle = STATUS_STYLE[c.status] ?? STATUS_STYLE_DEFAULT;
+                    return (
+                      <button key={c.id} type="button" disabled={jaVinculada} onClick={() => setClienteId(c.id)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: ativo ? `rgba(${accent},0.18)` : "rgba(15,23,42,0.5)", border: `1px solid ${ativo ? `rgba(${accent},0.5)` : "rgba(99,102,241,0.12)"}` }}>
+                        <Building2 size={14} className="shrink-0 text-slate-400" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12.5px] font-bold text-slate-200 truncate">{c.razaoSocial}</p>
+                          <p className="text-[10px] text-slate-500 truncate">
+                            <span className="font-mono">{c.cnpj}</span>{c.nomeFantasia ? ` · ${c.nomeFantasia}` : ""}
+                          </p>
+                        </div>
+                        <span
+                          className="text-[9px] font-black uppercase px-2 py-1 rounded-lg shrink-0"
+                          style={{ background: statusStyle.bg, color: statusStyle.color }}
+                        >
+                          {c.status}
+                        </span>
+                        {jaVinculada && <span className="text-[9px] font-black uppercase text-amber-400 shrink-0">Já vinculada</span>}
+                        {ativo && <Check size={15} style={{ color: `rgba(${accent},1)` }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <input value={novaEmpresa.cnpj} onChange={e => setNovaEmpresa(v => ({ ...v, cnpj: e.target.value }))} placeholder="CNPJ *"
+                  className="w-full h-11 rounded-xl px-3 text-[12px] outline-none" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)`, color: "#e2e8f0" }} />
+                <input value={novaEmpresa.razaoSocial} onChange={e => setNovaEmpresa(v => ({ ...v, razaoSocial: e.target.value }))} placeholder="Razão social *"
+                  className="w-full h-11 rounded-xl px-3 text-[12px] outline-none" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)`, color: "#e2e8f0" }} />
+                <input value={novaEmpresa.nomeFantasia} onChange={e => setNovaEmpresa(v => ({ ...v, nomeFantasia: e.target.value }))} placeholder="Nome fantasia"
+                  className="w-full h-11 rounded-xl px-3 text-[12px] outline-none" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)`, color: "#e2e8f0" }} />
+                <div className="flex gap-2">
+                  <input value={novaEmpresa.uf} maxLength={2} onChange={e => setNovaEmpresa(v => ({ ...v, uf: e.target.value.toUpperCase() }))} placeholder="UF"
+                    className="w-20 h-11 rounded-xl px-3 text-[12px] outline-none uppercase" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)`, color: "#e2e8f0" }} />
+                  <input value={novaEmpresa.municipio} onChange={e => setNovaEmpresa(v => ({ ...v, municipio: e.target.value }))} placeholder="Município"
+                    className="flex-1 h-11 rounded-xl px-3 text-[12px] outline-none" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)`, color: "#e2e8f0" }} />
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Serviço indicado */}
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1.5">3. Serviço indicado</label>
+            <select value={servicoIndicado} onChange={e => setServicoIndicado(e.target.value)}
+              className="w-full h-12 rounded-xl px-3 text-[13px] outline-none" style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.25)`, color: "#e2e8f0" }}>
+              <option value="">Selecione o serviço…</option>
+              {servicos.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <p className="text-[10px] text-slate-600 px-1">
+            Ao vincular, a indicação já é direcionada automaticamente ao pipeline comercial &ldquo;Revisão de Radar&rdquo; — sem necessidade de escolher responsável.
+          </p>
         </div>
 
         <div className="px-5 py-4 shrink-0 flex justify-end gap-2" style={{ borderTop: `1px solid rgba(${accent},0.15)` }}>
           <button onClick={onClose} className="px-4 py-2.5 rounded-xl text-[12px] font-bold text-slate-400 hover:text-white">Cancelar</button>
-          <button onClick={vincular} disabled={saving || !parceiroId || !clienteId}
+          <button onClick={vincular} disabled={saving || !parceiroId || !empresaValida || !servicoIndicado}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-widest text-white disabled:opacity-40"
             style={{ background: `rgba(${accent},1)` }}>
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Handshake size={14} />} Vincular indicação

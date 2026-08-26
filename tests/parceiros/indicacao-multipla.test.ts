@@ -2,17 +2,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   indicacao: { findFirst: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+  cliente: { findUnique: vi.fn() },
   parceiro: { update: vi.fn() },
   parceiroAcesso: { findUnique: vi.fn() },
+  parceiroHistorico: { create: vi.fn() },
 }));
 const authMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 const sincronizarEstagioMock = vi.hoisted(() => vi.fn());
+const obterEtapaMock = vi.hoisted(() => vi.fn());
+const direcionarAutomaticoMock = vi.hoisted(() => vi.fn());
+const resolverResponsavelMock = vi.hoisted(() => vi.fn());
+const criarCardBpmMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 vi.mock("@/lib/parceiros/desenvolvimento", () => ({ sincronizarEstagioAposIndicacao: sincronizarEstagioMock }));
+vi.mock("@/actions/parceiros-indicacoes", () => ({
+  obterEtapaNovosLeadsPipelineIndicacoes: obterEtapaMock,
+  direcionarIndicacaoParaCloserAutomatico: direcionarAutomaticoMock,
+}));
+vi.mock("@/lib/bpm/ownership", () => ({ resolverResponsavelAutomaticoBpm: resolverResponsavelMock }));
+vi.mock("@/actions/bpm/Cards", () => ({ CriarCardBpm: criarCardBpmMock }));
 
 import { criarIndicacao } from "@/actions/parceiros";
 
@@ -24,19 +36,25 @@ describe("Fase 08 — regressão: criarIndicacao permite múltiplas indicações
     prismaMock.parceiroAcesso.findUnique.mockResolvedValue(null);
     prismaMock.indicacao.findMany.mockResolvedValue([]); // recalcularNivel
     sincronizarEstagioMock.mockResolvedValue({ alterado: false });
+    obterEtapaMock.mockResolvedValue({ pipelineId: "pipeline-1", etapaId: "etapa-1" });
+    resolverResponsavelMock.mockResolvedValue(7);
+    criarCardBpmMock.mockResolvedValue({ success: true, data: { id: "card-1", empresaId: 500 } });
+    direcionarAutomaticoMock.mockResolvedValue(undefined);
   });
 
   it("cria a 1ª indicação de uma empresa que nunca foi indicada", async () => {
     prismaMock.indicacao.findFirst.mockResolvedValue(null);
     prismaMock.indicacao.create.mockResolvedValue({ id: 1 });
-    const r = await criarIndicacao(10, 500);
+    const r = await criarIndicacao({ parceiroId: 10, clienteId: 500, servicoIndicado: "TTD 409" });
     expect(r.success).toBe(true);
-    expect(prismaMock.indicacao.create).toHaveBeenCalledWith({ data: { parceiroId: 10, clienteId: 500, criadoPorId: 7 } });
+    expect(prismaMock.indicacao.create).toHaveBeenCalledWith({
+      data: { parceiroId: 10, clienteId: 500, criadoPorId: 7, servicoIndicado: "TTD 409", bpmCardId: "card-1" },
+    });
   });
 
   it("rejeita quando a empresa já tem uma indicação ATIVA no momento (regra preservada)", async () => {
     prismaMock.indicacao.findFirst.mockResolvedValue({ id: 1, status: "ATIVA" });
-    const r = await criarIndicacao(11, 500);
+    const r = await criarIndicacao({ parceiroId: 11, clienteId: 500, servicoIndicado: "TTD 409" });
     expect(r.success).toBe(false);
     expect(prismaMock.indicacao.create).not.toHaveBeenCalled();
   });
@@ -46,15 +64,45 @@ describe("Fase 08 — regressão: criarIndicacao permite múltiplas indicações
     // fluxo segue para criar uma nova linha (não reescreve a antiga).
     prismaMock.indicacao.findFirst.mockResolvedValue(null);
     prismaMock.indicacao.create.mockResolvedValue({ id: 2 });
-    const r = await criarIndicacao(12, 500); // mesmo clienteId 500 de antes, novo parceiro/indicação
+    const r = await criarIndicacao({ parceiroId: 12, clienteId: 500, servicoIndicado: "TTD 409" }); // mesmo clienteId 500 de antes, novo parceiro/indicação
     expect(r.success).toBe(true);
-    expect(prismaMock.indicacao.create).toHaveBeenCalledWith({ data: { parceiroId: 12, clienteId: 500, criadoPorId: 7 } });
+    expect(prismaMock.indicacao.create).toHaveBeenCalledWith({
+      data: { parceiroId: 12, clienteId: 500, criadoPorId: 7, servicoIndicado: "TTD 409", bpmCardId: "card-1" },
+    });
   });
 
   it("dispara a automação de estágio (Fase 03) após criar a indicação", async () => {
     prismaMock.indicacao.findFirst.mockResolvedValue(null);
     prismaMock.indicacao.create.mockResolvedValue({ id: 3 });
-    await criarIndicacao(13, 501);
+    await criarIndicacao({ parceiroId: 13, clienteId: 501, servicoIndicado: "TTD 409" });
     expect(sincronizarEstagioMock).toHaveBeenCalledWith(13, { usuarioId: 7 });
+  });
+
+  it("direciona automaticamente ao closer (cria BpmCard, sem exigir responsável no input)", async () => {
+    prismaMock.indicacao.findFirst.mockResolvedValue(null);
+    prismaMock.indicacao.create.mockResolvedValue({ id: 4 });
+    const r = await criarIndicacao({ parceiroId: 14, clienteId: 502, servicoIndicado: "Habilitação RADAR - 50K" });
+    expect(r.success).toBe(true);
+    expect(resolverResponsavelMock).toHaveBeenCalledWith("pipeline-1", 7);
+    expect(criarCardBpmMock).toHaveBeenCalledWith({
+      empresaId: 502,
+      novaEmpresa: undefined,
+      pipelineId: "pipeline-1",
+      etapaId: "etapa-1",
+      responsavelId: 7,
+      servico: "Habilitação RADAR - 50K",
+    });
+    expect(direcionarAutomaticoMock).toHaveBeenCalledWith({
+      parceiroId: 14, bpmCardId: "card-1", responsavelId: 7, usuarioId: 7,
+    });
+  });
+
+  it("rejeita quando nenhum responsável elegível é encontrado no pipeline", async () => {
+    prismaMock.indicacao.findFirst.mockResolvedValue(null);
+    resolverResponsavelMock.mockResolvedValue(null);
+    const r = await criarIndicacao({ parceiroId: 15, clienteId: 503, servicoIndicado: "TTD 409" });
+    expect(r.success).toBe(false);
+    expect(criarCardBpmMock).not.toHaveBeenCalled();
+    expect(prismaMock.indicacao.create).not.toHaveBeenCalled();
   });
 });

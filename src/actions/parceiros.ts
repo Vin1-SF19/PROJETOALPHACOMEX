@@ -754,26 +754,104 @@ export async function recalcularNiveisInativos() {
 
 // ─── Indicações (vincular parceiro ↔ empresa do CS&NPS) ──────────────────────
 
-export async function criarIndicacao(parceiroId: number, clienteId: number) {
+const NovaEmpresaIndicacaoSchema = z.object({
+  cnpj: z.string().trim().min(14, "CNPJ inválido").max(20),
+  razaoSocial: z.string().trim().min(2, "Razão social é obrigatória").max(200),
+  nomeFantasia: z.string().trim().max(200).optional(),
+  uf: z.string().trim().length(2).optional(),
+  municipio: z.string().trim().max(120).optional(),
+});
+
+const CriarIndicacaoSchema = z.object({
+  parceiroId: z.number().int().positive(),
+  clienteId: z.number().int().positive().optional(),
+  novaEmpresa: NovaEmpresaIndicacaoSchema.optional(),
+  servicoIndicado: z.string().trim().min(1).max(120),
+}).refine((d) => d.clienteId !== undefined || d.novaEmpresa !== undefined, {
+  message: "Empresa é obrigatória",
+  path: ["clienteId"],
+});
+
+/**
+ * RM-2026-97934A: cria a indicação e já direciona automaticamente ao closer (cria o BpmCard
+ * no pipeline "Revisão de Radar", responsável auto-resolvido) — fundindo o que antes eram 2
+ * passos manuais (criarIndicacao + DirecionarIndicacaoParaCloser). Aceita empresa nova (criada
+ * na mesma transação, mesmo caminho de `CriarCardBpm`) OU empresa já existente no CS&NPS.
+ */
+export async function criarIndicacao(input: z.input<typeof CriarIndicacaoSchema>) {
   const ctx = await getCtx();
   if (!ctx || (!ctx.isAdmin && !ctx.podeEditar)) return { success: false, error: "Sem permissão" };
+
+  const parsed = CriarIndicacaoSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  const { parceiroId, clienteId, novaEmpresa, servicoIndicado } = parsed.data;
+
   try {
     // Migration 2026-08-26: `clienteId` deixou de ser `@unique` em `Indicacao` — uma empresa
     // pode ser indicada mais de uma vez ao longo do tempo. A regra de negócio preservada é
     // "só 1 indicação ATIVA por vez por empresa" (nunca duas simultâneas); cada nova indicação
     // é sempre um registro novo (histórico imutável), nunca reaproveita/reescreve um registro
     // antigo `DESVINCULADA`.
-    const ativa = await db.indicacao.findFirst({ where: { clienteId, status: "ATIVA" } });
-    if (ativa) {
-      return { success: false, error: "Esta empresa já está vinculada a um parceiro" };
+    if (clienteId) {
+      const ativa = await db.indicacao.findFirst({ where: { clienteId, status: "ATIVA" } });
+      if (ativa) return { success: false, error: "Esta empresa já está vinculada a um parceiro" };
+    } else if (novaEmpresa) {
+      const cnpjNormalizado = novaEmpresa.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      const jaExiste = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
+      if (jaExiste) {
+        return { success: false, error: "Já existe uma empresa cadastrada com este CNPJ — busque e selecione-a." };
+      }
     }
-    await db.indicacao.create({ data: { parceiroId, clienteId, criadoPorId: ctx.userId } });
+
+    const {
+      obterEtapaNovosLeadsPipelineIndicacoes,
+      direcionarIndicacaoParaCloserAutomatico,
+    } = await import("./parceiros-indicacoes");
+
+    const destino = await obterEtapaNovosLeadsPipelineIndicacoes();
+    if (!destino) {
+      return { success: false, error: 'Pipeline "Revisão de Radar" não está configurado corretamente' };
+    }
+
+    const { resolverResponsavelAutomaticoBpm } = await import("@/lib/bpm/ownership");
+    const responsavelId = await resolverResponsavelAutomaticoBpm(destino.pipelineId, ctx.userId);
+    if (!responsavelId) {
+      return { success: false, error: "Nenhum responsável elegível encontrado para o pipeline comercial. Configure os setores/permissões CRM antes de indicar." };
+    }
+
+    const { CriarCardBpm } = await import("./bpm/Cards");
+    const resultadoCard = await CriarCardBpm({
+      empresaId: clienteId,
+      novaEmpresa,
+      pipelineId: destino.pipelineId,
+      etapaId: destino.etapaId,
+      responsavelId,
+      servico: servicoIndicado,
+    });
+    if (!resultadoCard.success || !resultadoCard.data) {
+      const erroCard = typeof resultadoCard.error === "string" ? resultadoCard.error : "Erro ao criar a oportunidade comercial";
+      return { success: false, error: erroCard };
+    }
+
+    const clienteIdResolvido = resultadoCard.data.empresaId;
+    await db.indicacao.create({
+      data: {
+        parceiroId,
+        clienteId: clienteIdResolvido,
+        criadoPorId: ctx.userId,
+        servicoIndicado,
+        bpmCardId: resultadoCard.data.id,
+      },
+    });
+    await direcionarIndicacaoParaCloserAutomatico({ parceiroId, bpmCardId: resultadoCard.data.id, responsavelId, usuarioId: ctx.userId });
+
     await recalcularNivel(parceiroId);
     // CRM de Canais e Parcerias (Fase 03) — automação "indicação criada → atualiza estágio".
     const { sincronizarEstagioAposIndicacao } = await import("@/lib/parceiros/desenvolvimento");
     await sincronizarEstagioAposIndicacao(parceiroId, { usuarioId: ctx.userId });
     revalidatePath("/PainelAlpha/Parceiros");
-    return { success: true };
+    revalidatePath(`/PainelAlpha/AlphaCRM/pipeline/${destino.pipelineId}`);
+    return { success: true, bpmCardId: resultadoCard.data.id };
   } catch {
     return { success: false, error: "Erro ao vincular a indicação" };
   }

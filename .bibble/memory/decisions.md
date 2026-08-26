@@ -1,5 +1,21 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-26 — RM-2026-3F263C — Card de Aquisição de Parceiros alinhado ao padrão visual do CRM
+
+**Contexto:** objetivo "Alterar layout do card do formulário de aquisição de parceiros" — terceiro objetivo executado via chat/MCP nesta sessão, o primeiro puramente visual (sem schema/backend). A Fase 0 (auditoria) comparou o card do Kanban de Aquisição de Parceiros com o card do Kanban do Alpha CRM e confirmou divergência estrutural real: o card de Aquisição reimplementava visual parecido com `style` inline em vez de reaproveitar `GradientBlobCard` (já existente e documentado, usado pelo CRM).
+
+**Decisão técnica:** adotar `GradientBlobCard` como shell do card de Aquisição (mesmo componente do CRM), adicionar avatar/inicial e badge de urgência na próxima ação (algoritmo copiado do CRM, `calcularUrgenciaProximoContato`, adaptado para `calcularUrgenciaProximaAcao`). Escopo deliberadamente NÃO incluiu drag-and-drop (`@dnd-kit`), contagem de tarefas/anexos, ou métricas de "novos leads" — nenhum tem equivalente no domínio de Aquisição, e trazê-los mudaria a interação, não só o layout.
+
+**Único arquivo tocado:** `src/components/Parceiros/Aquisicao/AquisicaoParceirosClient.tsx` — nenhuma mudança de schema, API, auth ou lógica de dados.
+
+**Incidente de infraestrutura durante a execução:** um `next dev` de longa duração (não iniciado por esta sessão) apresentou vazamento real de memória (cresceu continuamente de ~5GB para 7.4GB ao longo de ~6h), causando lentidão progressiva severa em todos os comandos `tsc`/`build` (um chegou a 2h15min, muito acima do padrão histórico de ~15-20min). Usuário autorizou encerrar o processo — resultado imediato: comandos voltaram ao ritmo normal (`prisma generate` que estava travado há 15+ min completou em 3.92s). Documentado em `known-errors.md`.
+
+**Limitação honesta registrada:** verificação visual real (navegador autenticado, comparação lado a lado com o CRM) não foi possível nesta sessão — a rota exige login e não há credenciais de usuário disponíveis para o agente. Reportado como pendência ao usuário, não fabricado como testado.
+
+**Validação:** `tsc`/`eslint`/`build` de produção completos e limpos (zero erro relacionado a Parceiros — erros existentes são de um processo concorrente em `google-calendar`/`CalendarioAlpha`, confirmado via `git status`).
+
+**Adicionado em:** 2026-08-26 por Bibble (execução direta, sem Vault necessário — mudança puramente visual, sem schema).
+
 ### 2026-08-26 — Relatório de conclusão do Kowalski (modal read-only por objetivo)
 
 **Contexto:** usuário pediu que o relatório final de cada objetivo do Roadmap (hoje só narrado em `.bibble/memory/journal.md`) ficasse visível como artefato de produto na própria UI — um botão dentro do "Detalhes" (Sheet, `RoadmapImplementationRoom.tsx`) da fase do Kowalski, que abre um modal somente-leitura com o Markdown completo + botão de copiar. Só vale para objetivos futuros (não retroativo aos 2 já concluídos nesta sessão).

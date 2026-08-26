@@ -94,7 +94,10 @@ export const criarCardSchema = z.object({
   pipelineId: z.string().cuid(),
   etapaId: z.string().cuid(),
   responsavelId: z.number().int().positive(),
-  // Fase 3 (RM-2026-54DC86): `servico` removido do payload — derivado do nome do pipeline em CriarCardBpm.
+  // Fase 3 (RM-2026-54DC86): omitido, `servico` é derivado do nome do pipeline em CriarCardBpm.
+  // RM-2026-97934A: informado explicitamente por callers que já sabem o serviço de origem
+  // (ex: Indicacao.servicoIndicado) — quando ausente, mantém o fallback do nome do pipeline.
+  servico: z.string().trim().min(1).max(120).optional(),
 }).refine((d) => d.empresaId !== undefined || d.novaEmpresa !== undefined, {
   message: "Empresa é obrigatória",
   path: ["empresaId"],

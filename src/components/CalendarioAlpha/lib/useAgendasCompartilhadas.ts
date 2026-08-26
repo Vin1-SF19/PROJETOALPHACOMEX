@@ -81,6 +81,8 @@ export function useAgendasCompartilhadas({
                 diaInteiro: evento.diaInteiro,
                 etag: evento.etag,
                 linkMeet: evento.linkMeet,
+                eventType: "default",
+                tipo: "evento" as const,
                 calendarioId: `colega-${evento.colegaId}`,
                 calendarioGoogleId: evento.colegaEmail,
                 calendarioNome: evento.colegaNome,

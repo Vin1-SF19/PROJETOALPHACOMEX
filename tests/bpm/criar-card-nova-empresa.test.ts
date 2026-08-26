@@ -102,7 +102,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
       },
     });
     expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
-      data: { empresaId: 501, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: undefined },
+      data: { empresaId: 501, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: null },
     });
   });
 
@@ -157,7 +157,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     expect(resultado.success).toBe(true);
     expect(prismaMock.cliente.create).not.toHaveBeenCalled();
     expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
-      data: { empresaId: 42, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: undefined },
+      data: { empresaId: 42, pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, responsavelId: 7, servico: null },
     });
   });
 
@@ -263,7 +263,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
         pipelineId: PIPELINE_ID,
         etapaId: ETAPA_ID,
         responsavelId: 7,
-        servico: undefined,
+        servico: null,
       },
     });
   });

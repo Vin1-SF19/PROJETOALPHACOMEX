@@ -21,6 +21,7 @@ interface ConteudoAgendaProps {
   onSelecionarDia: (data: Date) => void;
   onSelecionarMes: (data: Date) => void;
   onAbrirConfiguracoes: () => void;
+  onConcluirTarefa: (tarefaCacheId: string) => void;
 }
 
 export function ConteudoAgenda({
@@ -35,6 +36,7 @@ export function ConteudoAgenda({
   onSelecionarDia,
   onSelecionarMes,
   onAbrirConfiguracoes,
+  onConcluirTarefa,
 }: ConteudoAgendaProps) {
   if (!possuiCalendarios) {
     return (
@@ -61,6 +63,7 @@ export function ConteudoAgenda({
         onEditarEvento={onEditarEvento}
         onEventoCancelado={onEventoCancelado}
         onSelecionarHorario={onSelecionarHorario}
+        onConcluirTarefa={onConcluirTarefa}
       />
     );
   }
@@ -74,6 +77,7 @@ export function ConteudoAgenda({
         onEditarEvento={onEditarEvento}
         onEventoCancelado={onEventoCancelado}
         onSelecionarHorario={onSelecionarHorario}
+        onConcluirTarefa={onConcluirTarefa}
       />
     );
   }
@@ -88,6 +92,7 @@ export function ConteudoAgenda({
         onEventoCancelado={onEventoCancelado}
         onSelecionarDia={onSelecionarDia}
         onNovoEventoNoDia={onSelecionarHorario}
+        onConcluirTarefa={onConcluirTarefa}
       />
     );
   }

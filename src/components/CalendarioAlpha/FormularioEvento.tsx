@@ -9,6 +9,7 @@ import {
   atualizarEventoParcialNoCalendario,
   criarEventoNoCalendario,
 } from "@/actions/google-calendar-eventos";
+import { criarTarefaAgendaAlpha } from "@/actions/google-calendar-tarefas";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,7 @@ import { cn } from "@/lib/utils";
 import type { AtualizarEventoParcialInput } from "@/lib/validations/google-calendar";
 
 import { AgendaModal3D } from "./AgendaModal3D";
-import type { CalendarioSelecionadoView, EventoExibicao } from "./lib/tipos";
+import type { CalendarioSelecionadoView, EventoExibicao, ListaTarefasAgendaView } from "./lib/tipos";
 
 const TIMEZONE_PADRAO = "America/Sao_Paulo";
 
@@ -32,6 +33,7 @@ interface FormularioEventoProps {
   dataInicial: Date;
   eventoParaEditar?: EventoExibicao;
   detalhesEvento?: GoogleEventoDTO;
+  listasTarefas: ListaTarefasAgendaView[];
   onSalvo: () => void;
 }
 
@@ -72,6 +74,7 @@ export function FormularioEvento({
   dataInicial,
   eventoParaEditar,
   detalhesEvento,
+  listasTarefas,
   onSalvo,
 }: FormularioEventoProps) {
   const calendariosGravaveis = calendarios.filter((calendario) => calendario.gravavel);
@@ -97,20 +100,41 @@ export function FormularioEvento({
     participantesIniciais.join(", "),
   );
   const [criarMeet, setCriarMeet] = useState(false);
-  const [eventType, setEventType] = useState<"default" | "focusTime" | "outOfOffice" | "workingLocation">(
+  const [eventType, setEventType] = useState<"default" | "focusTime" | "outOfOffice" | "workingLocation" | "task">(
     detalhesEvento?.eventType === "focusTime" || detalhesEvento?.eventType === "outOfOffice" || detalhesEvento?.eventType === "workingLocation"
       ? detalhesEvento.eventType
       : "default",
   );
+  const [taskListId, setTaskListId] = useState(listasTarefas[0]?.googleTaskListId ?? "");
   const [conflito, setConflito] = useState(false);
 
   function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    if (!calendarId) return toast.error("Selecione uma agenda.");
+    if (eventType !== "task" && !calendarId) return toast.error("Selecione uma agenda.");
     if (!titulo.trim()) return toast.error("Título é obrigatório.");
 
     const listaParticipantes = emailsNormalizados(participantes);
     startTransition(async () => {
+      if (eventType === "task") {
+        if (!taskListId) {
+          toast.error("Sincronize as tarefas antes de criar a primeira tarefa.");
+          return;
+        }
+        const resultado = await criarTarefaAgendaAlpha({
+          taskListId,
+          titulo,
+          notas: descricao || undefined,
+          vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
+        });
+        if (!resultado.success) {
+          toast.error(resultado.error);
+          return;
+        }
+        toast.success("Tarefa criada.");
+        onSalvo();
+        onOpenChange(false);
+        return;
+      }
       const payloadBase = {
         calendarId,
         titulo,
@@ -192,7 +216,7 @@ export function FormularioEvento({
       </Button>
       <Button type="submit" form="formulario-evento-agenda" disabled={isPending} className={cn(tema.bg, "text-white")}>
         {isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-        {emEdicao ? "Salvar alterações" : "Criar evento"}
+        {emEdicao ? "Salvar alterações" : eventType === "task" ? "Criar tarefa" : "Criar evento"}
       </Button>
     </div>
   );
@@ -202,8 +226,8 @@ export function FormularioEvento({
       open={open}
       onOpenChange={onOpenChange}
       tema={tema}
-      title={emEdicao ? "Editar evento" : "Novo evento"}
-      description="Sincronizado com sua conta Google Calendar."
+      title={emEdicao ? "Editar evento" : eventType === "task" ? "Nova tarefa" : "Novo evento"}
+      description={eventType === "task" ? "Sincronizado com o Google Tasks." : "Sincronizado com sua conta Google Calendar."}
       footer={footer}
       size="md"
     >
@@ -214,28 +238,6 @@ export function FormularioEvento({
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="ca-calendario">Agenda</Label>
-          {editandoEventoDeColega ? (
-            <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
-              Agenda de {eventoParaEditar?.calendarioNome}
-            </p>
-          ) : (
-            <Select value={calendarId} onValueChange={setCalendarId} disabled={emEdicao}>
-              <SelectTrigger id="ca-calendario" className="w-full">
-                <SelectValue placeholder="Selecione uma agenda" />
-              </SelectTrigger>
-              <SelectContent>
-                {calendariosGravaveis.map((calendario) => (
-                  <SelectItem key={calendario.googleCalendarId} value={calendario.googleCalendarId}>
-                    {calendario.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
         {!emEdicao && (
           <div className="space-y-1.5">
             <Label htmlFor="ca-tipo">Tipo</Label>
@@ -243,13 +245,44 @@ export function FormularioEvento({
               <SelectTrigger id="ca-tipo" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">Evento</SelectItem>
+                <SelectItem value="task">Tarefa</SelectItem>
                 <SelectItem value="focusTime">Horário de foco</SelectItem>
                 <SelectItem value="outOfOffice">Ausente</SelectItem>
                 <SelectItem value="workingLocation">Local de trabalho</SelectItem>
               </SelectContent>
             </Select>
-            {eventType !== "default" && (
+            {eventType !== "default" && eventType !== "task" && (
               <p className="text-xs text-slate-400">Este tipo segue as regras e o status definidos pelo Google Calendar.</p>
+            )}
+          </div>
+        )}
+
+        {eventType === "task" ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="ca-lista-tarefas">Lista de tarefas</Label>
+            <Select value={taskListId} onValueChange={setTaskListId}>
+              <SelectTrigger id="ca-lista-tarefas" className="w-full"><SelectValue placeholder="Sincronize para carregar as listas" /></SelectTrigger>
+              <SelectContent>
+                {listasTarefas.map((lista) => (
+                  <SelectItem key={lista.googleTaskListId} value={lista.googleTaskListId}>{lista.titulo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label htmlFor="ca-calendario">Agenda</Label>
+            {editandoEventoDeColega ? (
+              <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">Agenda de {eventoParaEditar?.calendarioNome}</p>
+            ) : (
+              <Select value={calendarId} onValueChange={setCalendarId} disabled={emEdicao}>
+                <SelectTrigger id="ca-calendario" className="w-full"><SelectValue placeholder="Selecione uma agenda" /></SelectTrigger>
+                <SelectContent>
+                  {calendariosGravaveis.map((calendario) => (
+                    <SelectItem key={calendario.googleCalendarId} value={calendario.googleCalendarId}>{calendario.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
         )}
@@ -259,12 +292,17 @@ export function FormularioEvento({
           <Input id="ca-titulo" value={titulo} onChange={(evento) => setTitulo(evento.target.value)} maxLength={300} required />
         </div>
 
-        <div className="flex items-center gap-2">
+        {eventType !== "task" && <div className="flex items-center gap-2">
           <Checkbox id="ca-dia-inteiro" checked={diaInteiro} onCheckedChange={(valor) => setDiaInteiro(valor === true)} />
           <Label htmlFor="ca-dia-inteiro" className="cursor-pointer">Dia inteiro</Label>
-        </div>
+        </div>}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {eventType === "task" ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="ca-vencimento">Data da tarefa</Label>
+            <Input id="ca-vencimento" type="date" value={inicio.slice(0, 10)} onChange={(evento) => setInicio(`${evento.target.value}T12:00`)} required />
+          </div>
+        ) : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="ca-inicio">Início</Label>
             <Input
@@ -283,21 +321,21 @@ export function FormularioEvento({
             <Label htmlFor="ca-fim">Fim</Label>
             <Input id="ca-fim" type={diaInteiro ? "date" : "datetime-local"} value={diaInteiro ? fim.slice(0, 10) : fim} onChange={(evento) => setFim(diaInteiro ? `${evento.target.value}T00:00` : evento.target.value)} required />
           </div>
-        </div>
+        </div>}
 
-        <div className="space-y-1.5">
+        {eventType !== "task" && <div className="space-y-1.5">
           <Label htmlFor="ca-local">Localização</Label>
           <Input id="ca-local" value={localizacao} onChange={(evento) => setLocalizacao(evento.target.value)} maxLength={300} />
-        </div>
+        </div>}
         <div className="space-y-1.5">
           <Label htmlFor="ca-descricao">Descrição</Label>
           <textarea id="ca-descricao" value={descricao} onChange={(evento) => setDescricao(evento.target.value)} maxLength={8000} rows={4} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-white/20" />
         </div>
-        <div className="space-y-1.5">
+        {eventType !== "task" && <div className="space-y-1.5">
           <Label htmlFor="ca-participantes">Participantes (e-mails separados por vírgula)</Label>
           <Input id="ca-participantes" value={participantes} onChange={(evento) => setParticipantes(evento.target.value)} placeholder="nome@empresa.com" />
-        </div>
-        {eventType !== "default" ? null : detalhesEvento?.linkMeet ? (
+        </div>}
+        {eventType === "task" || eventType !== "default" ? null : detalhesEvento?.linkMeet ? (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
             Este evento já possui Google Meet. O link será preservado.
           </div>

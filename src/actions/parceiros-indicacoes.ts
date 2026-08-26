@@ -12,7 +12,7 @@ import { CriarCardBpm } from "./bpm/Cards";
 
 const PIPELINE_INDICACOES_NOME = "Revisão de Radar";
 
-async function obterEtapaNovosLeadsPipelineIndicacoes() {
+export async function obterEtapaNovosLeadsPipelineIndicacoes() {
   const pipeline = await db.bpmPipeline.findFirst({
     where: { nome: PIPELINE_INDICACOES_NOME, ativo: true },
     select: { id: true },
@@ -81,6 +81,28 @@ export async function DirecionarIndicacaoParaCloser(input: z.input<typeof Direci
   revalidatePath("/PainelAlpha/Parceiros");
   revalidatePath(`/PainelAlpha/AlphaCRM/pipeline/${destino.pipelineId}`);
   return { success: true as const, bpmCardId: resultadoCard.data.id };
+}
+
+/**
+ * RM-2026-97934A: registra o histórico do direcionamento automático ao closer. Diferente de
+ * `DirecionarIndicacaoParaCloser` (fluxo manual, mantido por compatibilidade mas sem gatilho de
+ * UI), esta função NÃO cria o BpmCard nem atualiza `Indicacao.bpmCardId` — ambos já foram
+ * resolvidos por `criarIndicacao` (parceiros.ts) na mesma operação. Só registra o evento.
+ */
+export async function direcionarIndicacaoParaCloserAutomatico(params: {
+  parceiroId: number;
+  bpmCardId: string;
+  responsavelId: number;
+  usuarioId: number;
+}) {
+  await db.parceiroHistorico.create({
+    data: {
+      parceiroId: params.parceiroId,
+      acao: "INDICACAO_DIRECIONADA_AO_CLOSER",
+      valorNovoJson: JSON.stringify({ bpmCardId: params.bpmCardId, responsavelId: params.responsavelId, automatico: true }),
+      usuarioId: params.usuarioId,
+    },
+  });
 }
 
 /** Consolida cada indicação do parceiro com o status da oportunidade/contrato vinculados — para a tela 360º (Fase 07). */

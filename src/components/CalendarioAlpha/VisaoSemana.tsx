@@ -13,6 +13,7 @@ export function VisaoSemana({
   onEditarEvento,
   onEventoCancelado,
   onSelecionarHorario,
+  onConcluirTarefa,
 }: {
   dataReferencia: Date;
   eventos: EventoExibicao[];
@@ -20,6 +21,7 @@ export function VisaoSemana({
   onEditarEvento: (evento: EventoExibicao) => void;
   onEventoCancelado: () => void;
   onSelecionarHorario: (data: Date) => void;
+  onConcluirTarefa: (tarefaCacheId: string) => void;
 }) {
   return (
     <GradeHoraria
@@ -29,6 +31,7 @@ export function VisaoSemana({
       onEditarEvento={onEditarEvento}
       onEventoCancelado={onEventoCancelado}
       onSelecionarHorario={onSelecionarHorario}
+      onConcluirTarefa={onConcluirTarefa}
     />
   );
 }

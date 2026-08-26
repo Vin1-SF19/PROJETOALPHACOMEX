@@ -1,22 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { Circle } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { formatarHora, formatarTituloDia } from "./lib/datas";
-import { COR_CALENDARIO_PADRAO, type EventoExibicao } from "./lib/tipos";
+import { corDoItemAgenda, type EventoExibicao } from "./lib/tipos";
 
 /** Lista completa dos eventos de um dia — aberta ao clicar em "+N mais" na visão de mês. */
 export function DiaEventosPopover({
   dia,
   eventos,
   onEditarEvento,
+  onConcluirTarefa,
   children,
 }: {
   dia: Date;
   eventos: EventoExibicao[];
   onEditarEvento: (evento: EventoExibicao) => void;
+  onConcluirTarefa: (tarefaCacheId: string) => void;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -34,17 +37,24 @@ export function DiaEventosPopover({
                 type="button"
                 onClick={() => {
                   setOpen(false);
-                  onEditarEvento(evento);
+                  if (evento.tipo === "tarefa") {
+                    if (evento.tarefaCacheId) onConcluirTarefa(evento.tarefaCacheId);
+                  } else {
+                    onEditarEvento(evento);
+                  }
                 }}
                 className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/5 transition-colors"
               >
                 <span
                   className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: evento.calendarioCorHex ?? COR_CALENDARIO_PADRAO }}
+                  style={{ backgroundColor: corDoItemAgenda(evento) }}
                   aria-hidden="true"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-white">{evento.titulo || "(sem título)"}</span>
+                  <span className="flex items-center gap-1 truncate text-sm font-semibold text-white">
+                    {evento.tipo === "tarefa" && <Circle className="size-3.5 shrink-0 text-emerald-300" aria-hidden="true" />}
+                    <span className="truncate">{evento.titulo || "(sem título)"}</span>
+                  </span>
                   <span className="block text-[11px] text-slate-500">
                     {evento.diaInteiro ? "Dia inteiro" : evento.inicioEm ? formatarHora(new Date(evento.inicioEm)) : "—"}
                   </span>

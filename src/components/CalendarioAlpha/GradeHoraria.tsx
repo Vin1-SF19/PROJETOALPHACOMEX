@@ -3,12 +3,14 @@
 import { useEffect, useRef } from "react";
 
 import type { TemaAlpha } from "@/lib/temas";
+import { Circle } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 import { DetalhePopover } from "./DetalhePopover";
 import { formatarDiaSemanaCurto, formatarHora, mesmodia } from "./lib/datas";
 import { calcularPosicoesEventosDoDia, eventosDiaInteiroDoDia } from "./lib/layout-eventos";
-import { COR_CALENDARIO_PADRAO, type EventoExibicao } from "./lib/tipos";
+import { corDoItemAgenda, type EventoExibicao } from "./lib/tipos";
 
 const ALTURA_HORA_PX = 64;
 const HORAS = Array.from({ length: 24 }, (_, i) => i);
@@ -21,6 +23,7 @@ export function GradeHoraria({
   onEditarEvento,
   onEventoCancelado,
   onSelecionarHorario,
+  onConcluirTarefa,
 }: {
   dias: Date[];
   eventos: EventoExibicao[];
@@ -28,6 +31,7 @@ export function GradeHoraria({
   onEditarEvento: (evento: EventoExibicao) => void;
   onEventoCancelado: () => void;
   onSelecionarHorario: (data: Date) => void;
+  onConcluirTarefa: (tarefaCacheId: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hoje = new Date();
@@ -68,13 +72,21 @@ export function GradeHoraria({
           <div className="flex items-center justify-end pr-2 text-[9px] font-bold uppercase text-slate-600">Dia todo</div>
           {dias.map((dia) => (
             <div key={dia.toISOString()} className="border-l border-white/5 p-1 space-y-1 min-h-[2rem]">
-              {eventosDiaInteiroDoDia(dia, eventos).map((evento) => (
+              {eventosDiaInteiroDoDia(dia, eventos).map((evento) => evento.tipo === "tarefa" ? (
+                <button
+                  key={evento.id}
+                  type="button"
+                  onClick={() => evento.tarefaCacheId && onConcluirTarefa(evento.tarefaCacheId)}
+                  className="flex w-full items-center gap-1.5 truncate rounded-md px-1.5 py-0.5 text-left text-[10px] font-semibold text-emerald-50 hover:brightness-110"
+                  style={{ backgroundColor: `${corDoItemAgenda(evento)}bb` }}
+                  title="Concluir tarefa"
+                >
+                  <Circle className="size-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{evento.titulo || "(sem título)"}</span>
+                </button>
+              ) : (
                 <DetalhePopover key={evento.id} evento={evento} tema={tema} onEditar={onEditarEvento} onCancelado={onEventoCancelado}>
-                  <button
-                    type="button"
-                    className="block w-full truncate rounded-md px-1.5 py-0.5 text-left text-[10px] font-semibold text-white/90 hover:brightness-110"
-                    style={{ backgroundColor: `${evento.calendarioCorHex ?? COR_CALENDARIO_PADRAO}88` }}
-                  >
+                  <button type="button" className="block w-full truncate rounded-md px-1.5 py-0.5 text-left text-[10px] font-semibold text-white/90 hover:brightness-110" style={{ backgroundColor: `${corDoItemAgenda(evento)}cc` }}>
                     {evento.titulo || "(sem título)"}
                   </button>
                 </DetalhePopover>
@@ -138,7 +150,7 @@ export function GradeHoraria({
                         height: `${alturaPercentual}%`,
                         left: `${(coluna / totalColunas) * 100}%`,
                         width: `${100 / totalColunas}%`,
-                        backgroundColor: `${evento.calendarioCorHex ?? COR_CALENDARIO_PADRAO}cc`,
+                        backgroundColor: `${corDoItemAgenda(evento)}dd`,
                       }}
                       title={evento.titulo ?? "(sem título)"}
                     >
