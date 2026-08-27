@@ -332,6 +332,39 @@ export async function carregarDetalhesEventoParaEdicao(
   }
 }
 
+/** Carrega detalhes de leitura de um convite, inclusive quando o calendário é somente leitura. */
+export async function carregarDetalhesEventoParaVisualizacao(
+  input: CarregarDetalhesEventoInput,
+): Promise<ResultadoAcao<GoogleEventoDTO>> {
+  const acesso = await verificarAcessoCalendarioAlpha();
+  if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
+
+  const validacao = detalhesEventoSchema.safeParse(input);
+  if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
+  const calendario = await carregarCalendarioComOwnership(validacao.data.calendarioId, acesso.userId);
+  if (!calendario) return { success: false, error: "Calendário não encontrado." };
+
+  const usuarioGoogle = await obterUsuarioGoogleAtivo(acesso.userId);
+  if (!usuarioGoogle.ok) return { success: false, error: erroMensagemAmigavel(usuarioGoogle.motivo) };
+
+  try {
+    const evento = await obterEventoGoogleApi({
+      emailUsuario: usuarioGoogle.emailUsuario,
+      calendarId: calendario.googleCalendarId,
+      googleEventId: validacao.data.googleEventId,
+    });
+    const dadosCache = dadosCacheDeEvento(evento);
+    await db.googleCalendarEventoCache.upsert({
+      where: { calendarioId_googleEventId: { calendarioId: calendario.id, googleEventId: validacao.data.googleEventId } },
+      create: { calendarioId: calendario.id, googleEventId: validacao.data.googleEventId, ...dadosCache },
+      update: dadosCache,
+    });
+    return { success: true, data: evento };
+  } catch {
+    return { success: false, error: "Não foi possível carregar os detalhes do convite agora." };
+  }
+}
+
 export async function consultarDisponibilidade(
   input: ConsultarFreeBusyInput,
 ): Promise<ResultadoAcao<Awaited<ReturnType<typeof consultarFreeBusy>>>> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlayCircle } from "lucide-react";
 import type { obterVideoIntrodutorioConfig } from "@/actions/video-introdutorio";
@@ -19,6 +19,8 @@ interface BotaoVideoIntrodutorioProps {
    * competem por GPU com o decode do `<video>` e causam frame congelado.
    */
   aoAlternarModal?: (aberto: boolean) => void;
+  /** Abre o modal assim que o componente monta — usado por navegação externa (ex: `?abrir=video`). */
+  abrirAutomaticamente?: boolean;
 }
 
 /**
@@ -27,12 +29,19 @@ interface BotaoVideoIntrodutorioProps {
  * - Admin: SEMPRE aparece (mesmo sem config, ou config expirada).
  * - Não-Admin: só aparece se houver config ativa e não expirada.
  */
-export function BotaoVideoIntrodutorio({ modulo, isAdmin, configInicial, aoAlternarModal }: BotaoVideoIntrodutorioProps) {
+export function BotaoVideoIntrodutorio({ modulo, isAdmin, configInicial, aoAlternarModal, abrirAutomaticamente }: BotaoVideoIntrodutorioProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const config = configInicial;
 
   const visivelParaNaoAdmin = !!config && !config.expirado;
+
+  useEffect(() => {
+    if (!abrirAutomaticamente) return;
+    setModalOpen(true);
+    aoAlternarModal?.(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirAutomaticamente]);
 
   if (!isAdmin && !visivelParaNaoAdmin) return null;
 

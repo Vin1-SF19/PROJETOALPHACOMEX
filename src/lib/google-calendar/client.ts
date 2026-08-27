@@ -197,8 +197,8 @@ function paraGoogleEventoDataDTO(data: calendar_v3.Schema$EventDateTime | undefi
 }
 
 function mapEventoParaDTO(evento: calendar_v3.Schema$Event): GoogleEventoDTO {
-  const linkMeet =
-    evento.conferenceData?.entryPoints?.find((entrada) => entrada.entryPointType === "video")?.uri ?? null;
+  const entradasConferencia = evento.conferenceData?.entryPoints ?? [];
+  const linkMeet = entradasConferencia.find((entrada) => entrada.entryPointType === "video")?.uri ?? null;
 
   return {
     googleEventId: evento.id ?? "",
@@ -213,9 +213,16 @@ function mapEventoParaDTO(evento: calendar_v3.Schema$Event): GoogleEventoDTO {
     eventoRecorrenteIdOrigem: evento.recurringEventId ?? null,
     participantes: (evento.attendees ?? []).map((participante) => ({
       email: participante.email ?? "",
+      nome: participante.displayName ?? null,
       status: (participante.responseStatus as "needsAction" | "accepted" | "declined" | "tentative") ?? "needsAction",
       organizador: participante.organizer === true,
     })),
+    conferencia: evento.conferenceData ? {
+      videoUrl: linkMeet,
+      telefones: entradasConferencia
+        .filter((entrada) => entrada.entryPointType === "phone" && entrada.uri)
+        .map((entrada) => entrada.uri!),
+    } : null,
     linkMeet,
     etag: evento.etag ?? "",
     atualizadoEm: evento.updated ?? new Date().toISOString(),

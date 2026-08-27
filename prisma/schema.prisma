@@ -41,6 +41,8 @@ model usuarios {
   data_nascimento      String?
   telefone             String?
   telefone_corporativo String?
+  callixHabilitado     Boolean @default(false)
+  callixUserId         String?
   contato_emerg_1_nome String?
   contato_emerg_1_tel  String?
   contato_emerg_2_nome String?

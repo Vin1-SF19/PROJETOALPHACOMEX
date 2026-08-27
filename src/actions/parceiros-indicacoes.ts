@@ -161,3 +161,45 @@ export async function ListarIndicacoesDoParceiro(parceiroIdInput: number) {
     })),
   };
 }
+
+/** Todas as indicações do módulo (não filtradas por parceiro) — para a tela dedicada de Indicações. */
+export async function ListarTodasIndicacoes() {
+  const ctx = await getCtx();
+  if (!ctx) return { success: false as const, error: "Sem permissão", indicacoes: [] };
+
+  const indicacoes = await db.indicacao.findMany({
+    select: {
+      id: true,
+      status: true,
+      dataIndicacao: true,
+      servicoIndicado: true,
+      parceiro: { select: { id: true, nome: true, nivel: true } },
+      cliente: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
+      bpmCard: {
+        select: {
+          id: true,
+          status: true,
+          pipeline: { select: { nome: true } },
+          etapa: { select: { nome: true } },
+        },
+      },
+    },
+    orderBy: { dataIndicacao: "desc" },
+    take: 200,
+  });
+
+  return {
+    success: true as const,
+    indicacoes: indicacoes.map((i) => ({
+      id: i.id,
+      status: i.status,
+      dataIndicacao: i.dataIndicacao,
+      servicoIndicado: i.servicoIndicado,
+      parceiro: i.parceiro,
+      empresa: i.cliente,
+      oportunidade: i.bpmCard
+        ? { id: i.bpmCard.id, status: i.bpmCard.status, pipelineNome: i.bpmCard.pipeline.nome, etapaNome: i.bpmCard.etapa.nome }
+        : null,
+    })),
+  };
+}

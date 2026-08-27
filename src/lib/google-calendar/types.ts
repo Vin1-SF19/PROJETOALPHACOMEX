@@ -19,8 +19,14 @@ export interface GoogleCalendarioDTO {
 
 export interface GoogleEventoParticipanteDTO {
   email: string;
+  nome: string | null;
   status: "needsAction" | "accepted" | "declined" | "tentative";
   organizador: boolean;
+}
+
+export interface GoogleEventoConferenciaDTO {
+  videoUrl: string | null;
+  telefones: string[];
 }
 
 export interface GoogleEventoDataDTO {
@@ -52,6 +58,7 @@ export interface GoogleEventoDTO {
   /** Preenchido quando este DTO representa uma instância de um evento recorrente. */
   eventoRecorrenteIdOrigem: string | null;
   participantes: GoogleEventoParticipanteDTO[];
+  conferencia: GoogleEventoConferenciaDTO | null;
   linkMeet: string | null;
   etag: string;
   atualizadoEm: string;

@@ -1,20 +1,12 @@
-import { auth } from "../../../../auth";
+import { auth } from "../../../../../auth";
 import { redirect } from "next/navigation";
 import db from "@/lib/prisma";
-import { listarParceiros, getPermissaoParceiros, listarParceirosPendentesCadastro } from "@/actions/parceiros";
-import { getTemplateParadaoConvite, getTemplateParadaoParceiro } from "@/actions/onboarding";
-import { contarPreCadastrosPendentes } from "@/actions/convites-parceiro";
-import { obterVideoIntrodutorioConfig } from "@/actions/video-introdutorio";
 import { ObterDashboardCanaisParcerias, ListarFilaFollowUpParceiros, ListarAlertasParceiros } from "@/actions/parceiros-dashboard";
 import DashboardParceirosClient from "@/components/Parceiros/Dashboard/DashboardParceirosClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function ParceirosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ busca?: string; nivel?: string; estagio?: string }>;
-}) {
+export default async function DashboardParceirosPage() {
   const session = await auth();
   if (!session?.user) redirect("/");
 
@@ -24,26 +16,7 @@ export default async function ParceirosPage({
     : null;
   const temaName = rec?.tema_interface ?? "blue";
 
-  const { busca, nivel, estagio } = await searchParams;
-  const [
-    { parceiros },
-    permissao,
-    templateConvite,
-    templateParceiro,
-    preCadastrosPendentesInicial,
-    videoIntrodutorio,
-    parceirosPendentesCadastro,
-    dashboard,
-    fila,
-    alertas,
-  ] = await Promise.all([
-    listarParceiros(busca, nivel, estagio ? { estagioDesenvolvimento: estagio } : undefined),
-    getPermissaoParceiros(),
-    getTemplateParadaoConvite(),
-    getTemplateParadaoParceiro(),
-    contarPreCadastrosPendentes(),
-    obterVideoIntrodutorioConfig("parceiros"),
-    listarParceirosPendentesCadastro(),
+  const [dashboard, fila, alertas] = await Promise.all([
     ObterDashboardCanaisParcerias(),
     ListarFilaFollowUpParceiros(),
     ListarAlertasParceiros(),
@@ -79,20 +52,6 @@ export default async function ParceirosPage({
       alertasIniciais={alertas.success ? alertas.alertas : []}
       tarefasPendentesPorParceiro={tarefasPendentesPorParceiro}
       alertasComTarefaAutomatica={[...tarefaAutomaticaChaves]}
-      listaProps={{
-        userId,
-        parceiros,
-        temaName,
-        busca,
-        nivel,
-        estagio,
-        permissao,
-        templateConvite,
-        templateParceiro,
-        preCadastrosPendentesInicial,
-        parceirosPendentesCadastro,
-        videoIntrodutorioConfig: videoIntrodutorio.data,
-      }}
     />
   );
 }

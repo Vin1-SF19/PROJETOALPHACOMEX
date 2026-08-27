@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const exigirAcessoBpmCardMock = vi.hoisted(() => vi.fn());
+const iniciarLigacaoCallixMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   bpmCard: { findUnique: vi.fn() },
   pessoaClienteVinculo: { findMany: vi.fn() },
+  usuarios: { findUnique: vi.fn() },
 }));
 
 vi.mock("../../auth", () => ({ auth: authMock }));
@@ -19,13 +21,21 @@ vi.mock("@/lib/bpm/ownership", () => ({
 // falha ao resolver o pacote antes de qualquer teste rodar.
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: vi.fn() }));
+vi.mock("@/lib/callix/click-to-call", () => ({
+  iniciarLigacaoCallix: iniciarLigacaoCallixMock,
+  normalizarTelefoneCallix: (telefone: string) => {
+    const normalizado = telefone.replace(/\D/g, "");
+    return normalizado.length >= 8 && normalizado.length <= 15 ? normalizado : null;
+  },
+}));
 
-import { ListarTelefonesCardBpm } from "@/actions/bpm/Cards";
+import { IniciarLigacaoTelefoneCardBpm, ListarTelefonesCardBpm } from "@/actions/bpm/Cards";
 
 describe("ListarTelefonesCardBpm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     exigirAcessoBpmCardMock.mockResolvedValue({ autorizado: true });
+    iniciarLigacaoCallixMock.mockResolvedValue({ success: true, data: { id: "call-1", message: "Chamada enviada." } });
   });
 
   it("bloqueia a consulta sem sessão autenticada", async () => {
@@ -68,5 +78,53 @@ describe("ListarTelefonesCardBpm", () => {
       success: true,
       data: [{ id: 1, nome: "Ana", telefone: "(11) 99999-0000" }],
     });
+  });
+
+  it("inicia na Callix somente um telefone vinculado ao card autorizado", async () => {
+    authMock.mockResolvedValue({ user: { id: "42", role: "User" } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ empresaId: 17 });
+    prismaMock.pessoaClienteVinculo.findMany.mockResolvedValue([
+      { pessoa: { celular: "(11) 99999-0000" } },
+    ]);
+    prismaMock.usuarios.findUnique.mockResolvedValue({
+      role: "COMERCIAL", callixHabilitado: true, callixUserId: "agente-123",
+    });
+
+    const resultado = await IniciarLigacaoTelefoneCardBpm("card-1", "(11) 99999-0000");
+
+    expect(iniciarLigacaoCallixMock).toHaveBeenCalledWith("11999990000", "agente-123");
+    expect(resultado).toEqual({ success: true, data: { id: "call-1", message: "Chamada enviada." } });
+  });
+
+  it("não permite iniciar chamada para telefone que não pertence ao card", async () => {
+    authMock.mockResolvedValue({ user: { id: "42", role: "User" } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ empresaId: 17 });
+    prismaMock.pessoaClienteVinculo.findMany.mockResolvedValue([
+      { pessoa: { celular: "(11) 99999-0000" } },
+    ]);
+
+    const resultado = await IniciarLigacaoTelefoneCardBpm("card-1", "(11) 98888-0000");
+
+    expect(resultado).toEqual({ success: false, error: "Telefone não vinculado a este card." });
+    expect(iniciarLigacaoCallixMock).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia a Callix quando o colaborador não estiver habilitado", async () => {
+    authMock.mockResolvedValue({ user: { id: "42", role: "COMERCIAL" } });
+    prismaMock.bpmCard.findUnique.mockResolvedValue({ empresaId: 17 });
+    prismaMock.pessoaClienteVinculo.findMany.mockResolvedValue([
+      { pessoa: { celular: "(11) 99999-0000" } },
+    ]);
+    prismaMock.usuarios.findUnique.mockResolvedValue({
+      role: "COMERCIAL", callixHabilitado: false, callixUserId: null,
+    });
+
+    const resultado = await IniciarLigacaoTelefoneCardBpm("card-1", "(11) 99999-0000");
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "Seu usuário não está habilitado para realizar ligações pela Callix.",
+    });
+    expect(iniciarLigacaoCallixMock).not.toHaveBeenCalled();
   });
 });

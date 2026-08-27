@@ -49,6 +49,7 @@ import {
 } from "@/lib/bpm/proximo-contato";
 import { buscarNolossLeadsPendentes } from "@/lib/bpm/noloss-leads";
 import { paraExibicaoTelefone } from "@/lib/validations/cs-nps";
+import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
 import {
   etapaEhEmTratativa,
   obterErroChecklistParaSaidaEmTratativa,
@@ -562,6 +563,53 @@ export async function ListarTelefonesCardBpm(cardId: string) {
       ? "Não autorizado"
       : "Erro ao buscar telefones";
     return { success: false, error: msg, data: [] };
+  }
+}
+
+/** Inicia uma ligação Callix apenas para um telefone que pertença ao card autorizado. */
+export async function IniciarLigacaoTelefoneCardBpm(cardId: string, telefone: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+
+    const telefoneNormalizado = normalizarTelefoneCallix(telefone);
+    if (!telefoneNormalizado) return { success: false, error: "Telefone inválido para ligação." };
+
+    const card = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: { empresaId: true },
+    });
+    if (!card) return { success: false, error: "Card não encontrado" };
+
+    const vinculos = await db.pessoaClienteVinculo.findMany({
+      where: { clienteId: card.empresaId },
+      select: { pessoa: { select: { celular: true } } },
+    });
+    const telefoneVinculado = vinculos.some(({ pessoa }) =>
+      normalizarTelefoneCallix(paraExibicaoTelefone(pessoa.celular)) === telefoneNormalizado,
+    );
+    if (!telefoneVinculado) return { success: false, error: "Telefone não vinculado a este card." };
+
+    const agenteCallix = await db.usuarios.findUnique({
+      where: { id: userId },
+      select: { role: true, callixHabilitado: true, callixUserId: true },
+    });
+    if (agenteCallix?.role !== "COMERCIAL" || !agenteCallix.callixHabilitado || !agenteCallix.callixUserId?.trim()) {
+      return { success: false, error: "Seu usuário não está habilitado para realizar ligações pela Callix." };
+    }
+
+    return iniciarLigacaoCallix(telefoneNormalizado, agenteCallix.callixUserId);
+  } catch (error) {
+    console.error("[IniciarLigacaoTelefoneCardBpm]", error);
+    return {
+      success: false,
+      error: error instanceof Error && error.message === "Não autorizado"
+        ? "Não autorizado"
+        : "Erro ao iniciar ligação",
+    };
   }
 }
 

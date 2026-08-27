@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Loader2, Phone, UserRound } from "lucide-react";
+import { Loader2, Phone, PhoneCall, UserRound } from "lucide-react";
 
-import { ListarTelefonesCardBpm } from "@/actions/bpm/Cards";
+import { IniciarLigacaoTelefoneCardBpm, ListarTelefonesCardBpm } from "@/actions/bpm/Cards";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,8 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [telefones, setTelefones] = useState<TelefoneCard[]>([]);
+  const [telefonesEmLigacao, setTelefonesEmLigacao] = useState<Set<string>>(new Set());
+  const [avisoLigacao, setAvisoLigacao] = useState<string | null>(null);
 
   async function carregarTelefones() {
     setCarregando(true);
@@ -45,6 +47,19 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
   function abrirModal() {
     setAberto(true);
     void carregarTelefones();
+  }
+
+  async function iniciarLigacao(telefone: string) {
+    if (telefonesEmLigacao.has(telefone)) return;
+    setTelefonesEmLigacao((atual) => new Set(atual).add(telefone));
+    setAvisoLigacao(null);
+    const resultado = await IniciarLigacaoTelefoneCardBpm(cardId, telefone);
+    setTelefonesEmLigacao((atual) => {
+      const proximo = new Set(atual);
+      proximo.delete(telefone);
+      return proximo;
+    });
+    setAvisoLigacao(resultado.success ? "Ligação enviada para a Callix." : resultado.error);
   }
 
   return (
@@ -92,6 +107,14 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
           </DialogHeader>
 
           <div className="min-h-36 overflow-y-auto px-4 py-4">
+            {avisoLigacao && (
+              <p
+                role="status"
+                className="mb-3 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-200"
+              >
+                {avisoLigacao}
+              </p>
+            )}
             {carregando ? (
               <div role="status" className="flex min-h-28 items-center justify-center gap-2 text-sm text-slate-400">
                 <Loader2 size={18} className="animate-spin text-emerald-300" aria-hidden="true" />
@@ -123,10 +146,23 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
                       <UserRound size={18} aria-hidden="true" />
                     </span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-slate-100">{contato.nome}</p>
                       <p className="mt-0.5 text-sm text-emerald-300">{contato.telefone}</p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => void iniciarLigacao(contato.telefone)}
+                      disabled={telefonesEmLigacao.has(contato.telefone)}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    >
+                      {telefonesEmLigacao.has(contato.telefone) ? (
+                        <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                      ) : (
+                        <PhoneCall size={14} aria-hidden="true" />
+                      )}
+                      Ligar
+                    </button>
                   </li>
                 ))}
               </ul>

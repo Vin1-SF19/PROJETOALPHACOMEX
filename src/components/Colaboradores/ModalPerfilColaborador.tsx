@@ -67,6 +67,8 @@ interface ColaboradorFull {
   data_nascimento: string | null;
   telefone: string | null;
   telefone_corporativo: string | null;
+  callixHabilitado: boolean;
+  callixUserId: string | null;
   contato_emerg_1_nome: string | null;
   contato_emerg_1_tel: string | null;
   contato_emerg_2_nome: string | null;
@@ -228,6 +230,8 @@ export default function ModalPerfilColaborador({
   const [dataNascimento, setDataNascimento] = useState('');
   const [telefone, setTelefone] = useState('');
   const [telefoneCorp, setTelefoneCorp] = useState('');
+  const [callixHabilitado, setCallixHabilitado] = useState(false);
+  const [callixUserId, setCallixUserId] = useState('');
   const [emerg1Nome, setEmerg1Nome] = useState('');
   const [emerg1Tel, setEmerg1Tel] = useState('');
   const [emerg2Nome, setEmerg2Nome] = useState('');
@@ -306,6 +310,8 @@ export default function ModalPerfilColaborador({
       setDataNascimento(u.data_nascimento ?? '');
       setTelefone(u.telefone ?? '');
       setTelefoneCorp(u.telefone_corporativo ?? '');
+      setCallixHabilitado(u.callixHabilitado);
+      setCallixUserId(u.callixUserId ?? '');
       setEmerg1Nome(u.contato_emerg_1_nome ?? '');
       setEmerg1Tel(u.contato_emerg_1_tel ?? '');
       setEmerg2Nome(u.contato_emerg_2_nome ?? '');
@@ -336,6 +342,7 @@ export default function ModalPerfilColaborador({
         nome, usuario: usuarioLogin, email, role, cargo, status,
         data_contratacao: dataContratacao, cpf, data_nascimento: dataNascimento,
         telefone, telefone_corporativo: telefoneCorp,
+        callixHabilitado, callixUserId,
         contato_emerg_1_nome: emerg1Nome, contato_emerg_1_tel: emerg1Tel,
         contato_emerg_2_nome: emerg2Nome, contato_emerg_2_tel: emerg2Tel,
         observacoes_internas: obsInternas,
@@ -365,6 +372,7 @@ export default function ModalPerfilColaborador({
         nome, usuario: usuarioLogin, email, role, cargo, status,
         data_contratacao: dataContratacao, cpf, data_nascimento: dataNascimento,
         telefone, telefone_corporativo: telefoneCorp,
+        callixHabilitado, callixUserId,
         contato_emerg_1_nome: emerg1Nome, contato_emerg_1_tel: emerg1Tel,
         contato_emerg_2_nome: emerg2Nome, contato_emerg_2_tel: emerg2Tel,
         observacoes_internas: obsInternas,
@@ -665,6 +673,31 @@ export default function ModalPerfilColaborador({
                             </Field>
                           </div>
                         </section>
+
+                        {role === 'COMERCIAL' && (
+                          <section className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] p-4">
+                            <p className="text-[8px] font-black uppercase tracking-[0.3em] text-emerald-400 mb-3">Integração Callix</p>
+                            <label className="flex items-center justify-between gap-4 cursor-pointer">
+                              <span>
+                                <span className="block text-xs font-bold text-slate-200">Utiliza Callix</span>
+                                <span className="block mt-1 text-[9px] text-slate-500">Permite iniciar ligações pelo Alpha CRM.</span>
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={callixHabilitado}
+                                onChange={(e) => setCallixHabilitado(e.target.checked)}
+                                className="h-4 w-4 accent-emerald-400"
+                              />
+                            </label>
+                            {callixHabilitado && (
+                              <div className="mt-4">
+                                <Field label="ID do agente na Callix">
+                                  <TextInput value={callixUserId} onChange={setCallixUserId} placeholder="ID informado pela Callix" />
+                                </Field>
+                              </div>
+                            )}
+                          </section>
+                        )}
 
                         <section>
                           <p className="text-[8px] font-black uppercase tracking-[0.3em] text-rose-500 mb-4">Contatos de Emergência</p>

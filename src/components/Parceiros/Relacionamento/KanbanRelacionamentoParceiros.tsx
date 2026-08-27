@@ -5,6 +5,12 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowLeft, Star, CalendarClock, Target, AlertTriangle } from "lucide-react";
+import {
+  DndContext, type DragEndEvent, DragOverlay, type DragStartEvent,
+  PointerSensor, useSensor, useSensors, closestCorners, useDroppable,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { getTema } from "@/lib/temas";
 import {
   MoverEstagioParceiro,
@@ -13,7 +19,7 @@ import {
   ListarParceirosParaKanban,
   type CardKanbanParceiro,
 } from "@/actions/parceiros-desenvolvimento";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 
@@ -277,19 +283,42 @@ function CardDetalheDialog({
     onAtualizado();
   }
 
+  const inicial = card.nome.trim().charAt(0).toUpperCase() || "?";
+
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg bg-[#0a1020] border-white/10 max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-slate-100">{card.nome}</DialogTitle>
-        </DialogHeader>
+    <Sheet open onOpenChange={(v) => !v && onClose()}>
+      <SheetContent
+        side="bottom"
+        className="h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] bg-[#020617] p-0 overflow-hidden sm:max-w-none"
+        style={{ ["--accent-rgb" as string]: accent }}
+      >
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-white/15" />
+        </div>
 
-        <div className="space-y-4">
-          <div className="text-[11px] text-slate-500 space-y-1">
-            <p>Indicações: {card.totalIndicacoes}</p>
-            <p>Dias sem indicação: {card.diasSemIndicacao ?? "Nunca indicou"}</p>
+        <div className="px-6 sm:px-8 pt-2 pb-5 shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-lg text-sm font-black text-slate-100"
+              style={{
+                background: `linear-gradient(135deg, rgba(${accent},0.35), rgba(${accent},0.08))`,
+                boxShadow: `0 8px 24px -8px rgba(${accent},0.5)`,
+              }}
+            >
+              {inicial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="text-xl font-black text-white tracking-tight truncate">{card.nome}</SheetTitle>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-500">
+                <span>Indicações: {card.totalIndicacoes}</span>
+                <span className="text-slate-700">·</span>
+                <span>Dias sem indicação: {card.diasSemIndicacao ?? "Nunca indicou"}</span>
+              </div>
+            </div>
           </div>
+        </div>
 
+        <div className="flex-1 overflow-y-auto space-y-4 px-6 sm:px-8 pb-8 max-w-2xl">
           {podeEditar && (
             <>
               {card.estagioDesenvolvimento === "INATIVO" ? (
@@ -327,7 +356,7 @@ function CardDetalheDialog({
             </>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -111,6 +111,8 @@ export async function getColaboradorCompleto(usuarioId: number) {
         data_nascimento: true,
         telefone: true,
         telefone_corporativo: true,
+        callixHabilitado: true,
+        callixUserId: true,
         contato_emerg_1_nome: true,
         contato_emerg_1_tel: true,
         contato_emerg_2_nome: true,
@@ -151,6 +153,8 @@ const UpdateDadosSchema = z.object({
   data_nascimento: z.string().optional(),
   telefone: z.string().optional(),
   telefone_corporativo: z.string().optional(),
+  callixHabilitado: z.boolean().optional(),
+  callixUserId: z.string().trim().max(100).optional(),
   contato_emerg_1_nome: z.string().optional(),
   contato_emerg_1_tel: z.string().optional(),
   contato_emerg_2_nome: z.string().optional(),
@@ -173,6 +177,19 @@ export async function updateColaboradorDados(usuarioId: number, raw: unknown) {
   // Financeiro não pode alterar role
   if (!isAdminOrCeo(currentRole) && currentRole !== "RECURSOS HUMANOS") {
     d.role = (await db.usuarios.findUnique({ where: { id: usuarioId }, select: { role: true } }))?.role ?? d.role;
+  }
+
+  const atualizacaoCallix = d.role !== "COMERCIAL"
+    ? { callixHabilitado: false, callixUserId: null }
+    : d.callixHabilitado === undefined
+      ? {}
+      : d.callixHabilitado
+        ? d.callixUserId?.trim()
+          ? { callixHabilitado: true, callixUserId: d.callixUserId.trim() }
+          : null
+        : { callixHabilitado: false, callixUserId: null };
+  if (atualizacaoCallix === null) {
+    return { success: false as const, error: "Informe o ID Callix para habilitar o colaborador." };
   }
 
   // Token Onyx só pode ser alterado por admin/CEO (é credencial de acesso).
@@ -205,6 +222,7 @@ export async function updateColaboradorDados(usuarioId: number, raw: unknown) {
         observacoes_internas: d.observacoes_internas ?? null,
         ...(d.imagemUrl ? { imagemUrl: d.imagemUrl } : {}),
         ...tokenUpdate,
+        ...atualizacaoCallix,
       },
     });
 

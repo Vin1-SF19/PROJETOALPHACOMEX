@@ -5,6 +5,12 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut } from "lucide-react";
+import {
+  DndContext, type DragEndEvent, DragOverlay, type DragStartEvent,
+  PointerSensor, useSensor, useSensors, closestCorners, useDroppable,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { getTema } from "@/lib/temas";
 import {
   CriarLeadAquisicaoParceiro,
@@ -15,7 +21,7 @@ import {
   PromoverLeadParaParceiro,
   ListarLeadsAquisicaoParceiros,
 } from "@/actions/parceiros-aquisicao";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
@@ -105,22 +111,73 @@ function BadgeProximaAcao({ proximaAcaoEm }: { proximaAcaoEm: Date | string }) {
   );
 }
 
+/** Card individual do lead — arrastável (dnd-kit `useSortable`), mesmo padrão do
+ * BlueprintProjectCard.tsx. */
+function LeadCard({ lead, cor, onAbrirLead }: { lead: Lead; cor: string; onAbrirLead: (lead: Lead) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => { if (!isDragging) onAbrirLead(lead); }}
+      className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 rounded-2xl cursor-grab active:cursor-grabbing"
+      aria-label={`Abrir lead ${lead.nome}`}
+    >
+      <GradientBlobCard accent={cor} className="hover:brightness-110 transition-[filter]">
+        <div className="space-y-2">
+          <div className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black text-slate-200">
+              {inicial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-tight text-slate-100 truncate">{lead.nome}</p>
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                {lead.segmento && <span className="flex items-center gap-1"><Building2 size={10} /> {lead.segmento}</span>}
+                {lead.uf && <span className="flex items-center gap-1"><MapPin size={10} /> {lead.uf}</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-white/[0.06] pt-2">
+            <PotencialBadge valor={lead.potencialRecorrencia} />
+            {lead.proximaAcaoEm && <BadgeProximaAcao proximaAcaoEm={lead.proximaAcaoEm} />}
+          </div>
+
+          {lead.responsavel && (
+            <p className="text-[10px] text-slate-600 truncate">Resp.: {lead.responsavel.nome}</p>
+          )}
+        </div>
+      </GradientBlobCard>
+    </button>
+  );
+}
+
 /** Cada etapa vira um "cartão" visualmente independente — cor própria no header,
  * contorno e fundo levemente tingidos, mesmo padrão de separação por coluna já
- * usado no Kanban do Alpha CRM (PipelineBoardClient.tsx). */
+ * usado no Kanban do Alpha CRM (PipelineBoardClient.tsx). Droppable via dnd-kit,
+ * mesmo padrão de BlueprintColumn.tsx. */
 function KanbanColuna({
+  status,
   label,
   cor,
   itens,
   onAbrirLead,
   tracejada = false,
 }: {
+  status: string;
   label: string;
   cor: string;
   itens: Lead[];
   onAbrirLead: (lead: Lead) => void;
   tracejada?: boolean;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+
   return (
     <div className="shrink-0 w-[280px] h-full flex flex-col rounded-2xl overflow-hidden" style={{ background: "rgba(8,11,20,0.55)", border: `1px solid rgba(${cor},0.22)`, boxShadow: `0 0 0 1px rgba(0,0,0,0.2), 0 12px 30px -18px rgba(${cor},0.35)` }}>
       <div className="shrink-0 flex items-center justify-between px-3.5 py-3 border-b" style={{ borderColor: `rgba(${cor},0.18)`, background: `rgba(${cor},0.06)` }}>
@@ -133,52 +190,19 @@ function KanbanColuna({
         </span>
       </div>
       <div
-        className={`flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 rounded-b-2xl ${tracejada ? "border-dashed" : ""}`}
+        ref={setNodeRef}
+        className={`flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 rounded-b-2xl transition-colors ${tracejada ? "border-dashed" : ""} ${isOver ? "bg-white/[0.04]" : ""}`}
         style={tracejada ? { border: `1px dashed rgba(${cor},0.12)`, borderTop: "none" } : undefined}
       >
-        {itens.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-[10px] text-slate-600">Vazio</p>
-          </div>
-        ) : (
-          itens.map((lead) => {
-            const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
-            return (
-              <button
-                key={lead.id}
-                onClick={() => onAbrirLead(lead)}
-                className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 rounded-2xl"
-                aria-label={`Abrir lead ${lead.nome}`}
-              >
-                <GradientBlobCard accent={cor} className="hover:brightness-110 transition-[filter]">
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black text-slate-200">
-                        {inicial}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold leading-tight text-slate-100 truncate">{lead.nome}</p>
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                          {lead.segmento && <span className="flex items-center gap-1"><Building2 size={10} /> {lead.segmento}</span>}
-                          {lead.uf && <span className="flex items-center gap-1"><MapPin size={10} /> {lead.uf}</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between border-t border-white/[0.06] pt-2">
-                      <PotencialBadge valor={lead.potencialRecorrencia} />
-                      {lead.proximaAcaoEm && <BadgeProximaAcao proximaAcaoEm={lead.proximaAcaoEm} />}
-                    </div>
-
-                    {lead.responsavel && (
-                      <p className="text-[10px] text-slate-600 truncate">Resp.: {lead.responsavel.nome}</p>
-                    )}
-                  </div>
-                </GradientBlobCard>
-              </button>
-            );
-          })
-        )}
+        <SortableContext items={itens.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+          {itens.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <p className="text-[10px] text-slate-600">Vazio</p>
+            </div>
+          ) : (
+            itens.map((lead) => <LeadCard key={lead.id} lead={lead} cor={cor} onAbrirLead={onAbrirLead} />)
+          )}
+        </SortableContext>
       </div>
     </div>
   );
@@ -217,6 +241,49 @@ export default function AquisicaoParceirosClient({
   const colunasSaida = useMemo(() => {
     return SAIDAS.map((col) => ({ ...col, itens: leads.filter((l) => l.status === col.status) }));
   }, [leads]);
+
+  // Drag-and-drop — mesmo padrão de BlueprintKanban.tsx: PointerSensor só (sem teclado,
+  // consistente com os outros 2 Kanbans do projeto), optimistic update local, servidor
+  // valida a transição (podeMoverPara em parceiros-aquisicao.ts) e recusa se inválida.
+  const [ativoLeadId, setAtivoLeadId] = useState<string | null>(null);
+  const [saidaLateralPendente, setSaidaLateralPendente] = useState<{ leadId: string; status: string } | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const leadAtivo = leads.find((l) => l.id === ativoLeadId) ?? null;
+  const statusSaidaLateral = new Set(SAIDAS.map((s) => s.status));
+
+  function handleDragStart(event: DragStartEvent) {
+    setAtivoLeadId(String(event.active.id));
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setAtivoLeadId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const leadId = String(active.id);
+    const leadAtual = leads.find((l) => l.id === leadId);
+    if (!leadAtual) return;
+
+    const overId = String(over.id);
+    const todosStatus = [...ETAPAS.map((e) => e.status), ...SAIDAS.map((s) => s.status)];
+    const novoStatus = todosStatus.includes(overId) ? overId : leads.find((l) => l.id === overId)?.status;
+    if (!novoStatus || novoStatus === leadAtual.status) return;
+
+    // Saídas laterais exigem motivo (RegistrarSaidaLateralLeadAquisicao) — abre modal em vez
+    // de mover direto, mesmo espírito do card noloss no Pipeline BPM (PipelineBoardClient.tsx).
+    if (statusSaidaLateral.has(novoStatus)) {
+      setSaidaLateralPendente({ leadId, status: novoStatus });
+      return;
+    }
+
+    const statusAnterior = leadAtual.status;
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: novoStatus as Lead["status"] } : l)));
+    const res = await MoverLeadAquisicaoParceiro({ leadId, statusDestino: novoStatus as Lead["status"] });
+    if (!res.success) {
+      toast.error(res.error ?? "Não foi possível mover o lead");
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: statusAnterior } : l)));
+    }
+  }
 
   return (
     <main className="relative h-screen w-full flex flex-col overflow-hidden" style={{ background: "#05070d" }}>
@@ -272,22 +339,34 @@ export default function AquisicaoParceirosClient({
         )}
       </header>
 
-      <div className="relative z-10 flex-1 min-h-0 p-6 flex gap-4 overflow-x-auto overflow-y-hidden">
-        {colunasFunil.map((col) => (
-          <KanbanColuna key={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} />
-        ))}
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={(e) => void handleDragEnd(e)}>
+        <div className="relative z-10 flex-1 min-h-0 p-6 flex gap-4 overflow-x-auto overflow-y-hidden">
+          {colunasFunil.map((col) => (
+            <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} />
+          ))}
 
-        {/* Divisor visual — separa o fluxo principal das saídas laterais */}
-        <div className="shrink-0 flex flex-col items-center justify-center px-1" aria-hidden>
-          <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
-          <span className="text-[9px] font-black uppercase tracking-widest text-slate-600 py-2 [writing-mode:vertical-rl]">Saídas</span>
-          <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
+          {/* Divisor visual — separa o fluxo principal das saídas laterais */}
+          <div className="shrink-0 flex flex-col items-center justify-center px-1" aria-hidden>
+            <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-600 py-2 [writing-mode:vertical-rl]">Saídas</span>
+            <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
+          </div>
+
+          {colunasSaida.map((col) => (
+            <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} tracejada />
+          ))}
         </div>
 
-        {colunasSaida.map((col) => (
-          <KanbanColuna key={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} tracejada />
-        ))}
-      </div>
+        <DragOverlay>
+          {leadAtivo && (
+            <div style={{ transform: "rotate(-2deg)", width: 280 }}>
+              <GradientBlobCard accent="255,255,255">
+                <p className="text-sm font-semibold text-slate-100">{leadAtivo.nome}</p>
+              </GradientBlobCard>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       {novoLeadOpen && (
         <NovoLeadDialog
@@ -314,12 +393,86 @@ export default function AquisicaoParceirosClient({
         />
       )}
 
+      {saidaLateralPendente && (
+        <SaidaLateralDragDialog
+          accent={accent}
+          statusLabel={SAIDAS.find((s) => s.status === saidaLateralPendente.status)?.label ?? saidaLateralPendente.status}
+          onCancelar={() => setSaidaLateralPendente(null)}
+          onConfirmar={async (motivo) => {
+            const { leadId, status } = saidaLateralPendente;
+            setSaidaLateralPendente(null);
+            const res = await RegistrarSaidaLateralLeadAquisicao({ leadId, status, motivo });
+            if (!res.success) { toast.error(res.error ?? "Não foi possível registrar a saída lateral"); return; }
+            toast.success("Saída lateral registrada");
+            startTransition(() => void recarregar());
+          }}
+        />
+      )}
+
       {isPending && (
         <div className="fixed bottom-4 right-4 text-[11px] text-slate-500 px-3 py-1.5 rounded-full" style={{ background: "rgba(15,23,42,0.9)" }}>
           Atualizando...
         </div>
       )}
     </main>
+  );
+}
+
+/** Arrastar um lead pra uma coluna de saída lateral (Stand-by/Sem Perfil/Perdido) exige motivo
+ * — a Server Action rejeita sem isso. Abre este modal em vez de mover direto, mesmo espírito do
+ * card noloss no Pipeline BPM (PipelineBoardClient.tsx). */
+function SaidaLateralDragDialog({
+  accent,
+  statusLabel,
+  onCancelar,
+  onConfirmar,
+}: {
+  accent: string;
+  statusLabel: string;
+  onCancelar: () => void;
+  onConfirmar: (motivo: string) => Promise<void>;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(2,6,23,0.85)", backdropFilter: "blur(6px)" }} onClick={() => !salvando && onCancelar()}>
+      <div className="w-full max-w-md rounded-3xl p-5" style={{ background: "#0a1020", border: `1px solid rgba(${accent},0.3)` }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: "rgba(239,68,68,0.12)" }}>
+            <LogOut size={17} className="text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-[14px] font-black text-white">Mover para &ldquo;{statusLabel}&rdquo;</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">Descreva o motivo da saída lateral antes de confirmar.</p>
+          </div>
+        </div>
+        <textarea
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Descreva o motivo..."
+          autoFocus
+          className="w-full min-h-20 rounded-xl px-3 py-2 text-[12px] outline-none text-slate-200 resize-none"
+          style={{ background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` }}
+        />
+        <div className="flex justify-end gap-2 mt-3">
+          <button onClick={onCancelar} disabled={salvando} className="px-4 py-2 rounded-xl text-[12px] font-bold text-slate-400 hover:text-white">Cancelar</button>
+          <button
+            onClick={async () => {
+              if (!motivo.trim()) { toast.error("Descreva o motivo"); return; }
+              setSalvando(true);
+              await onConfirmar(motivo.trim());
+              setSalvando(false);
+            }}
+            disabled={salvando}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-[12px] font-black uppercase tracking-wider text-red-300 disabled:opacity-60"
+            style={{ background: "rgba(239,68,68,0.15)" }}
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -496,19 +649,31 @@ function LeadDetalheDialog({
   const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
 
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg bg-[#0a1020] border-white/10 max-h-[85vh] overflow-y-auto p-0 gap-0">
-        <DialogHeader className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
-          <div className="flex items-start gap-3">
+    <Sheet open onOpenChange={(v) => !v && onClose()}>
+      <SheetContent
+        side="bottom"
+        className="h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] bg-[#020617] p-0 overflow-hidden sm:max-w-none"
+        style={{ ["--accent-rgb" as string]: accent }}
+      >
+        {/* Handle visual do bottom-sheet — mesmo padrão do card aberto do CRM */}
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-white/15" />
+        </div>
+
+        <div className="px-6 sm:px-8 pt-2 pb-5 shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
             <div
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm font-black text-slate-100"
-              style={{ background: `rgba(${accent},0.15)`, borderColor: `rgba(${accent},0.35)` }}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-lg text-sm font-black text-slate-100"
+              style={{
+                background: `linear-gradient(135deg, rgba(${accent},0.35), rgba(${accent},0.08))`,
+                boxShadow: `0 8px 24px -8px rgba(${accent},0.5)`,
+              }}
             >
               {inicial}
             </div>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <DialogTitle className="text-slate-100 leading-tight">{lead.nome}</DialogTitle>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10.5px] text-slate-500">
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="text-xl font-black text-white tracking-tight truncate">{lead.nome}</SheetTitle>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-500">
                 {lead.segmento && <span className="flex items-center gap-1"><Building2 size={11} /> {lead.segmento}</span>}
                 {lead.telefone && <span>{lead.telefone}</span>}
                 {lead.email && <span className="truncate">{lead.email}</span>}
@@ -522,13 +687,13 @@ function LeadDetalheDialog({
                 </span>
               )}
               {lead.motivoSaidaLateral && (
-                <p className="mt-2 text-[10.5px] text-amber-400">Motivo saída: {lead.motivoSaidaLateral}</p>
+                <p className="mt-2 text-xs text-amber-400">Motivo saída: {lead.motivoSaidaLateral}</p>
               )}
             </div>
           </div>
-        </DialogHeader>
+        </div>
 
-        <div className="space-y-4 px-5 py-4">
+        <div className="flex-1 overflow-y-auto space-y-4 px-6 sm:px-8 pb-8 max-w-2xl">
           {podeEditar && (
             <>
               <section className="space-y-2">
@@ -596,7 +761,7 @@ function LeadDetalheDialog({
             </>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -44,6 +44,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [x] Exibir tarefa agendada na grade horária em azul durante o atendimento e em verde após a conclusão.
 - [x] Persistir a resposta do próprio participante no cache e riscar visualmente convites recusados em todas as visões da agenda.
 - [x] Exibir eventos organizados por outra pessoa em modo de contorno, com cor do calendário na borda e no texto.
+- [x] Abrir convites em painel detalhado com Meet, telefones, local, descrição, organizador e respostas dos convidados.
 
 ## File List
 

@@ -105,6 +105,8 @@ export type ParceirosClientProps = {
   busca?: string;
   nivel?: string;
   estagio?: string;
+  /** Query param `?abrir=tutorial|acoes|video` — usado pelo submenu do módulo (sidebar) pra navegar até aqui já disparando o recurso correspondente. */
+  abrir?: string;
   permissao: Permissao;
   templateConvite: TemplateOnboarding | null;
   templateParceiro: TemplateOnboarding | null;
@@ -114,7 +116,7 @@ export type ParceirosClientProps = {
 };
 
 export default function ParceirosClient({
-  userId, parceiros, temaName, busca, nivel, estagio, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, parceirosPendentesCadastro, videoIntrodutorioConfig,
+  userId, parceiros, temaName, busca, nivel, estagio, abrir, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, parceirosPendentesCadastro, videoIntrodutorioConfig,
 }: ParceirosClientProps) {
   const tema = getTema(temaName);
   const accent = tema.accent;
@@ -219,6 +221,22 @@ export default function ParceirosClient({
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
+
+  // Abre um recurso direto ao chegar via `?abrir=` — usado pelo submenu do módulo (sidebar)
+  // pra navegar de qualquer tela até aqui já disparando Tutoriais/Ações/Vídeo Introdutório.
+  // Prop vinda do Server Component (não useSearchParams — evitaria exigir Suspense boundary).
+  const [abrirVideoAutomaticamente, setAbrirVideoAutomaticamente] = useState(false);
+  useEffect(() => {
+    if (!abrir) return;
+    if (abrir === "tutorial") setTutorialAberto(true);
+    if (abrir === "acoes") setMenuOpen(true);
+    if (abrir === "video") setAbrirVideoAutomaticamente(true);
+    const params = new URLSearchParams(window.location.search);
+    params.delete("abrir");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrir]);
 
   // Stats por nível (dá vida ao header)
   const stats = {
@@ -393,6 +411,7 @@ export default function ParceirosClient({
                 isAdmin={permissao.isAdmin}
                 configInicial={videoIntrodutorioConfig}
                 aoAlternarModal={setVideoIntrodutorioModalOpen}
+                abrirAutomaticamente={abrirVideoAutomaticamente}
               />
 
               <button
