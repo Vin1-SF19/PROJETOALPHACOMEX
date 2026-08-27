@@ -43,6 +43,8 @@ export default function CadastroUsuarios({
   const [state, formAction, isPending] = useActionState(registerAction, null);
   const [aba, setAba] = useState<AbaAtiva>(isAdmin ? "cadastro" : "equipe");
   const [setorSelecionado, setSetorSelecionado] = useState("");
+  const [callixHabilitado, setCallixHabilitado] = useState(false);
+  const [callixUserId, setCallixUserId] = useState("");
   const [senhaCapturada, setSenhaCapturada] = useState("");
   const [modalOnboarding, setModalOnboarding] = useState(false);
   const [usuarioOnboarding, setUsuarioOnboarding] = useState<NovoUsuario | null>(null);
@@ -236,6 +238,48 @@ export default function CadastroUsuarios({
                     {/* Preview módulos do setor */}
                     {setorSelecionado && (
                       <PreviewModulosSetor setor={setorSelecionado} />
+                    )}
+
+                    {setorSelecionado === "COMERCIAL" && (
+                      <div className="space-y-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4">
+                        <input type="hidden" name="callixHabilitado" value={callixHabilitado ? "on" : ""} />
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <Label htmlFor="callixHabilitado" className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                              Utiliza Callix
+                            </Label>
+                            <p className="mt-1 text-[9px] text-slate-500">Habilita ligações pelo ServiceHub.</p>
+                          </div>
+                          <button
+                            id="callixHabilitado"
+                            type="button"
+                            role="switch"
+                            aria-checked={callixHabilitado}
+                            onClick={() => setCallixHabilitado((atual) => !atual)}
+                            className={`relative h-7 w-12 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
+                              callixHabilitado ? "border-emerald-300/50 bg-emerald-400/30" : "border-white/10 bg-black/30"
+                            }`}
+                          >
+                            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${callixHabilitado ? "translate-x-6" : "translate-x-1"}`} />
+                          </button>
+                        </div>
+                        {callixHabilitado && (
+                          <div className="space-y-2 border-t border-emerald-400/10 pt-3">
+                            <Label htmlFor="callixUserId" className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              ID do agente na Callix
+                            </Label>
+                            <Input
+                              id="callixUserId"
+                              name="callixUserId"
+                              value={callixUserId}
+                              onChange={(event) => setCallixUserId(event.target.value)}
+                              placeholder="Ex.: 5"
+                              className="h-11 bg-black/40 border-white/5 rounded-xl text-xs font-bold focus:border-emerald-400/50"
+                              required
+                            />
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* Info sobre módulos */}

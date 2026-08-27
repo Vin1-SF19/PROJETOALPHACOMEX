@@ -17,6 +17,8 @@ export default async function registerAction(
     const email = formData.get("email") as string;
     const senha = formData.get("senha") as string;
     const role = (formData.get("role") as string) || "User";
+    const callixHabilitado = role === "COMERCIAL" && formData.get("callixHabilitado") === "on";
+    const callixUserId = (formData.get("callixUserId") as string | null)?.trim() || null;
     // Token Onyx é opcional — pode ser preenchido depois. String vazia → null.
     const tokenOnyxRaw = (formData.get("token_onyx") as string | null)?.trim();
     const tokenOnyx = tokenOnyxRaw ? tokenOnyxRaw : null;
@@ -25,6 +27,13 @@ export default async function registerAction(
       return {
         success: false,
         message: "Preencha todos os campos obrigatórios",
+      };
+    }
+
+    if (callixHabilitado && !callixUserId) {
+      return {
+        success: false,
+        message: "Informe o ID do agente na Callix para habilitar as ligações.",
       };
     }
 
@@ -56,6 +65,8 @@ export default async function registerAction(
         senha: hashSync(senha, 10),
         role,
         permissoes: permissoesString,
+        callixHabilitado,
+        callixUserId: callixHabilitado ? callixUserId : null,
         ...(tokenOnyx ? { token_onyx: tokenOnyx } : {}),
       },
       // token_onyx NUNCA retornado ao cliente.

@@ -143,6 +143,8 @@ GPT-5 Codex
 - `prisma/schema.prisma`
 - `prisma/migrations/20260827153000_add_callix_user_settings/migration.sql`
 - `src/actions/ColaboradorRH.ts`
+- `src/actions/CreateAction.ts`
+- `src/components/FormCadastro.tsx`
 - `src/components/Colaboradores/ModalPerfilColaborador.tsx`
 - `src/actions/bpm/Cards.ts`
 - `src/app/PainelAlpha/AlphaCRM/CardModal/TelefonesCardButton.tsx`
