@@ -22,6 +22,7 @@ import {
   ListarLeadsAquisicaoParceiros,
 } from "@/actions/parceiros-aquisicao";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";

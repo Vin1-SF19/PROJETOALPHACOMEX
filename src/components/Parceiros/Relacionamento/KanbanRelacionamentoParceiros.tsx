@@ -63,19 +63,58 @@ function PotencialBadge({ valor }: { valor: number | null }) {
   );
 }
 
+/** Card individual do parceiro — arrastável (dnd-kit `useSortable`), mesmo padrão do
+ * BlueprintProjectCard.tsx. */
+function ParceiroCard({ card, cor, onAbrirCard }: { card: Card; cor: string; onAbrirCard: (card: Card) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.parceiroId });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => { if (!isDragging) onAbrirCard(card); }}
+      className="w-full text-left rounded-xl p-3 transition-all hover:brightness-125 hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"
+    >
+      <p className="text-[12.5px] font-bold text-slate-200 truncate">{card.nome}</p>
+      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+        <span className="flex items-center gap-1"><Target size={10} /> {card.totalIndicacoes} indicação(ões)</span>
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <PotencialBadge valor={card.potencialRecorrencia} />
+        {card.followUpVencido ? (
+          <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold">
+            <AlertTriangle size={11} /> Vencido
+          </span>
+        ) : card.proximaAcaoEm ? (
+          <span className="flex items-center gap-1 text-[10px] text-slate-400">
+            <CalendarClock size={11} /> {new Date(card.proximaAcaoEm).toLocaleDateString("pt-BR")}
+          </span>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
 function KanbanColuna({
+  status,
   label,
   cor,
   itens,
   onAbrirCard,
   tracejada = false,
 }: {
+  status: string;
   label: string;
   cor: string;
   itens: Card[];
   onAbrirCard: (card: Card) => void;
   tracejada?: boolean;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+
   return (
     <div className="shrink-0 w-[280px] h-full flex flex-col rounded-2xl overflow-hidden" style={{ background: "rgba(8,11,20,0.55)", border: `1px solid rgba(${cor},0.22)`, boxShadow: `0 0 0 1px rgba(0,0,0,0.2), 0 12px 30px -18px rgba(${cor},0.35)` }}>
       <div className="shrink-0 flex items-center justify-between px-3.5 py-3 border-b" style={{ borderColor: `rgba(${cor},0.18)`, background: `rgba(${cor},0.06)` }}>
@@ -88,40 +127,19 @@ function KanbanColuna({
         </span>
       </div>
       <div
-        className={`flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 rounded-b-2xl ${tracejada ? "border-dashed" : ""}`}
+        ref={setNodeRef}
+        className={`flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 rounded-b-2xl transition-colors ${tracejada ? "border-dashed" : ""} ${isOver ? "bg-white/[0.04]" : ""}`}
         style={tracejada ? { border: `1px dashed rgba(${cor},0.12)`, borderTop: "none" } : undefined}
       >
-        {itens.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-[10px] text-slate-600">Vazio</p>
-          </div>
-        ) : (
-          itens.map((card) => (
-            <button
-              key={card.parceiroId}
-              onClick={() => onAbrirCard(card)}
-              className="w-full text-left rounded-xl p-3 transition-all hover:brightness-125 hover:-translate-y-0.5"
-              style={{ background: "rgba(15,23,42,0.75)", border: `1px solid rgba(${cor},0.22)` }}
-            >
-              <p className="text-[12.5px] font-bold text-slate-200 truncate">{card.nome}</p>
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                <span className="flex items-center gap-1"><Target size={10} /> {card.totalIndicacoes} indicação(ões)</span>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <PotencialBadge valor={card.potencialRecorrencia} />
-                {card.followUpVencido ? (
-                  <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold">
-                    <AlertTriangle size={11} /> Vencido
-                  </span>
-                ) : card.proximaAcaoEm ? (
-                  <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <CalendarClock size={11} /> {new Date(card.proximaAcaoEm).toLocaleDateString("pt-BR")}
-                  </span>
-                ) : null}
-              </div>
-            </button>
-          ))
-        )}
+        <SortableContext items={itens.map((c) => c.parceiroId)} strategy={verticalListSortingStrategy}>
+          {itens.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <p className="text-[10px] text-slate-600">Vazio</p>
+            </div>
+          ) : (
+            itens.map((card) => <ParceiroCard key={card.parceiroId} card={card} cor={cor} onAbrirCard={onAbrirCard} />)
+          )}
+        </SortableContext>
       </div>
     </div>
   );
@@ -156,6 +174,42 @@ export default function KanbanRelacionamentoParceiros({
   const colunasEspeciais = useMemo(() => {
     return ESTAGIOS_ESPECIAIS.map((col) => ({ ...col, itens: itens.filter((c) => c.estagioDesenvolvimento === col.estagio) }));
   }, [itens]);
+
+  // Drag-and-drop — mesmo padrão de BlueprintKanban.tsx. Servidor valida a transição
+  // (podeMoverEstagioParceiro em parceiros-desenvolvimento.ts, incluindo o bloqueio de
+  // INATIVO como destino manual) e recusa se inválida — sem duplicar a regra no client.
+  const [ativoParceiroId, setAtivoParceiroId] = useState<number | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const cardAtivo = itens.find((c) => c.parceiroId === ativoParceiroId) ?? null;
+  const todosEstagios = [...ESTAGIOS_PRODUTIVOS, ...ESTAGIOS_ESPECIAIS].map((e) => e.estagio);
+
+  function handleDragStart(event: DragStartEvent) {
+    setAtivoParceiroId(Number(event.active.id));
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setAtivoParceiroId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const parceiroId = Number(active.id);
+    const cardAtual = itens.find((c) => c.parceiroId === parceiroId);
+    if (!cardAtual) return;
+
+    const overId = String(over.id);
+    const novoEstagio = (todosEstagios as string[]).includes(overId)
+      ? (overId as Card["estagioDesenvolvimento"])
+      : itens.find((c) => c.parceiroId === Number(overId))?.estagioDesenvolvimento;
+    if (!novoEstagio || novoEstagio === cardAtual.estagioDesenvolvimento) return;
+
+    const estagioAnterior = cardAtual.estagioDesenvolvimento;
+    setItens((prev) => prev.map((c) => (c.parceiroId === parceiroId ? { ...c, estagioDesenvolvimento: novoEstagio } : c)));
+    const res = await MoverEstagioParceiro({ parceiroId, estagioDestino: novoEstagio });
+    if (!res.success) {
+      toast.error(res.error ?? "Não foi possível mover o parceiro");
+      setItens((prev) => prev.map((c) => (c.parceiroId === parceiroId ? { ...c, estagioDesenvolvimento: estagioAnterior } : c)));
+    }
+  }
 
   return (
     <main className="relative h-screen w-full flex flex-col overflow-hidden" style={{ background: "#05070d" }}>
@@ -193,21 +247,34 @@ export default function KanbanRelacionamentoParceiros({
         </div>
       </header>
 
-      <div className="relative z-10 flex-1 min-h-0 p-6 flex gap-4 overflow-x-auto overflow-y-hidden">
-        {colunasProdutivas.map((col) => (
-          <KanbanColuna key={col.estagio} label={col.label} cor={col.cor} itens={col.itens} onAbrirCard={setCardFoco} />
-        ))}
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={(e) => void handleDragEnd(e)}>
+        <div className="relative z-10 flex-1 min-h-0 p-6 flex gap-4 overflow-x-auto overflow-y-hidden">
+          {colunasProdutivas.map((col) => (
+            <KanbanColuna key={col.estagio} status={col.estagio} label={col.label} cor={col.cor} itens={col.itens} onAbrirCard={setCardFoco} />
+          ))}
 
-        <div className="shrink-0 flex flex-col items-center justify-center px-1" aria-hidden>
-          <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
-          <span className="text-[9px] font-black uppercase tracking-widest text-slate-600 py-2 [writing-mode:vertical-rl]">Especiais</span>
-          <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
+          <div className="shrink-0 flex flex-col items-center justify-center px-1" aria-hidden>
+            <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-600 py-2 [writing-mode:vertical-rl]">Especiais</span>
+            <div className="w-px flex-1" style={{ background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent)" }} />
+          </div>
+
+          {colunasEspeciais.map((col) => (
+            <KanbanColuna key={col.estagio} status={col.estagio} label={col.label} cor={col.cor} itens={col.itens} onAbrirCard={setCardFoco} tracejada />
+          ))}
         </div>
 
-        {colunasEspeciais.map((col) => (
-          <KanbanColuna key={col.estagio} label={col.label} cor={col.cor} itens={col.itens} onAbrirCard={setCardFoco} tracejada />
-        ))}
-      </div>
+        <DragOverlay>
+          {cardAtivo && (
+            <div
+              style={{ transform: "rotate(-2deg)", width: 280, background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.2)" }}
+              className="rounded-xl p-3"
+            >
+              <p className="text-[12.5px] font-bold text-slate-200">{cardAtivo.nome}</p>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       {cardFoco && (
         <CardDetalheDialog

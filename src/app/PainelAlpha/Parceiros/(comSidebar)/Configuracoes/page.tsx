@@ -1,4 +1,4 @@
-import { auth } from "../../../../../auth";
+import { auth } from "../../../../../../auth";
 import { redirect } from "next/navigation";
 import { getPermissaoParceiros } from "@/actions/parceiros";
 import { obterConfigParceiros } from "@/actions/convites-parceiro";
