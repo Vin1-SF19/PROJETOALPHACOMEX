@@ -38,7 +38,7 @@ function obterConfiguracaoCallix():
 export async function iniciarLigacaoCallix(telefone: string, userId: string): Promise<InicioLigacaoCallix> {
   const phone = normalizarTelefoneCallix(telefone);
   if (!phone) return { success: false, error: "Telefone inválido para ligação." };
-  if (!userId.trim()) return { success: false, error: "Usuário não habilitado para a Callix." };
+  if (!userId.trim()) return { success: false, error: "Usuário não habilitado para o Callix." };
 
   const configuracao = obterConfiguracaoCallix();
   if (!configuracao.success) return configuracao;

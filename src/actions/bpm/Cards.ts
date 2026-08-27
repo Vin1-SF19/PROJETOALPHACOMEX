@@ -595,10 +595,10 @@ export async function IniciarLigacaoTelefoneCardBpm(cardId: string, telefone: st
 
     const agenteCallix = await db.usuarios.findUnique({
       where: { id: userId },
-      select: { role: true, callixHabilitado: true, callixUserId: true },
+      select: { callixHabilitado: true, callixUserId: true },
     });
-    if (agenteCallix?.role !== "COMERCIAL" || !agenteCallix.callixHabilitado || !agenteCallix.callixUserId?.trim()) {
-      return { success: false, error: "Seu usuário não está habilitado para realizar ligações pela Callix." };
+    if (!agenteCallix?.callixHabilitado || !agenteCallix.callixUserId?.trim()) {
+      return { success: false, error: "Seu usuário não está habilitado para realizar ligações pelo Callix." };
     }
 
     return iniciarLigacaoCallix(telefoneNormalizado, agenteCallix.callixUserId);

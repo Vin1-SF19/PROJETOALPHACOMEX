@@ -109,22 +109,22 @@ describe("ListarTelefonesCardBpm", () => {
     expect(iniciarLigacaoCallixMock).not.toHaveBeenCalled();
   });
 
-  it("bloqueia a Callix quando o colaborador não estiver habilitado", async () => {
+  it("permite a Callix para qualquer usuário habilitado, inclusive fora do role COMERCIAL", async () => {
     authMock.mockResolvedValue({ user: { id: "42", role: "COMERCIAL" } });
     prismaMock.bpmCard.findUnique.mockResolvedValue({ empresaId: 17 });
     prismaMock.pessoaClienteVinculo.findMany.mockResolvedValue([
       { pessoa: { celular: "(11) 99999-0000" } },
     ]);
     prismaMock.usuarios.findUnique.mockResolvedValue({
-      role: "COMERCIAL", callixHabilitado: false, callixUserId: null,
+      callixHabilitado: true, callixUserId: "agente-lider",
     });
 
     const resultado = await IniciarLigacaoTelefoneCardBpm("card-1", "(11) 99999-0000");
 
     expect(resultado).toEqual({
-      success: false,
-      error: "Seu usuário não está habilitado para realizar ligações pela Callix.",
+      success: true,
+      data: { id: "call-1", message: "Chamada enviada." },
     });
-    expect(iniciarLigacaoCallixMock).not.toHaveBeenCalled();
+    expect(iniciarLigacaoCallixMock).toHaveBeenCalledWith("11999990000", "agente-lider");
   });
 });
