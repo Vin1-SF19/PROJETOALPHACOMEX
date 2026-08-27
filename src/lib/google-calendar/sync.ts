@@ -119,10 +119,32 @@ const FALHAS_GOOGLE_SEGURAS: Record<
   },
   unknown: {
     codigo: "GOOGLE_UNKNOWN",
-    erro: "Não foi possível concluir a sincronização com o provedor.",
+    erro: "O servidor público não conseguiu se comunicar com a Agenda do Google.",
     permanent: false,
   },
 };
+
+/**
+ * Registra somente metadados técnicos da chamada que falhou. Em particular, não
+ * registra cabeçalhos, payloads, tokens ou a chave da service account.
+ */
+function detalhesSegurosErroGoogle(erro: GoogleCalendarError) {
+  const causa = erro.cause;
+  const causaComMetadados = causa && typeof causa === "object"
+    ? causa as { name?: unknown; code?: unknown; message?: unknown }
+    : null;
+
+  return {
+    tipo: erro.kind,
+    statusHttp: erro.status ?? null,
+    retryable: erro.retryable,
+    causaNome: typeof causaComMetadados?.name === "string" ? causaComMetadados.name : null,
+    causaCodigo: typeof causaComMetadados?.code === "string" ? causaComMetadados.code : null,
+    causaMensagem: typeof causaComMetadados?.message === "string"
+      ? causaComMetadados.message.slice(0, 300)
+      : null,
+  };
+}
 
 export interface ContextoFencingSincronizacao {
   ownerId: string;
@@ -327,6 +349,10 @@ export async function sincronizarCalendario(
     }
     if (erro instanceof GoogleCalendarError) {
       const falha = FALHAS_GOOGLE_SEGURAS[erro.kind];
+      console.error("[agenda-alpha] Chamada ao Google Calendar falhou", {
+        calendarioId: calendario.id,
+        ...detalhesSegurosErroGoogle(erro),
+      });
       return {
         ok: false,
         erro: falha.erro,

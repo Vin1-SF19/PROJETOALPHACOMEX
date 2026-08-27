@@ -205,7 +205,13 @@ export function criarOrquestradorSincronizacao(opcoes: OpcoesOrquestrador = {}) 
           concluidoEm: new Date(concluidoEm).toISOString(),
           contadores: resultado.contadores,
         };
-      } catch {
+      } catch (erro) {
+        const erroInesperado = erro instanceof Error ? erro : null;
+        console.error("[agenda-alpha] Falha no orquestrador de sincronização", {
+          calendarioId: params.calendario.id,
+          nome: erroInesperado?.name ?? "Erro desconhecido",
+          mensagem: erroInesperado?.message ?? "Sem mensagem",
+        });
         const concluidoEm = agora();
         ultimasTentativas.set(chave, {
           executadoEm: concluidoEm,
