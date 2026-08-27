@@ -49,17 +49,27 @@ export async function iniciarLigacaoCallix(telefone: string, userId: string): Pr
     const resposta = await fetch(configuracao.endpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/vnd.api+json",
         Authorization: `Bearer ${configuracao.token}`,
       },
-      body: JSON.stringify({ user_id: userId.trim(), phone }),
+      body: JSON.stringify({
+        data: {
+          type: "click_to_call",
+          attributes: { user_id: userId.trim(), phone },
+        },
+      }),
       signal: controller.signal,
     });
     const corpo = (await resposta.json().catch(() => null)) as CallixResposta | null;
 
     if (resposta.status !== 200 || typeof corpo?.click_to_call_id !== "string") {
       console.error("[Callix click-to-call] resposta inválida", { status: resposta.status });
-      return { success: false, error: "Não foi possível iniciar a ligação na Callix." };
+      const erroPorStatus: Record<number, string> = {
+        400: "O Callix recusou a ligação. Verifique o ID do agente e o telefone de destino.",
+        401: "A autenticação com o Callix falhou. Verifique a configuração da integração.",
+        404: "O agente configurado não foi encontrado no Callix.",
+      };
+      return { success: false, error: erroPorStatus[resposta.status] ?? "Não foi possível iniciar a ligação no Callix." };
     }
 
     return {

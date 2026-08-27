@@ -35,10 +35,15 @@ describe("click-to-call Callix", () => {
     expect(fetchMock).toHaveBeenCalledWith("https://empresa.callix.com.br/api/v1/click_to_call", expect.objectContaining({
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/vnd.api+json",
         Authorization: "Bearer token-secreto",
       },
-      body: JSON.stringify({ user_id: "agente-123", phone: "11999990000" }),
+      body: JSON.stringify({
+        data: {
+          type: "click_to_call",
+          attributes: { user_id: "agente-123", phone: "11999990000" },
+        },
+      }),
       signal: expect.any(AbortSignal),
     }));
     expect(resultado).toEqual({
@@ -59,14 +64,19 @@ describe("click-to-call Callix", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it.each([400, 401, 404, 500])("retorna erro seguro para HTTP %i", async (status) => {
+  it.each([
+    [400, "O Callix recusou a ligação. Verifique o ID do agente e o telefone de destino."],
+    [401, "A autenticação com o Callix falhou. Verifique a configuração da integração."],
+    [404, "O agente configurado não foi encontrado no Callix."],
+    [500, "Não foi possível iniciar a ligação no Callix."],
+  ])("retorna erro seguro para HTTP %i", async (status, mensagem) => {
     process.env.CALLIX_BASE_URL = "https://empresa.callix.com.br";
     process.env.TOKEN_CALLIX = "token-secreto";
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("erro", { status })));
 
     await expect(iniciarLigacaoCallix("11999990000", "agente-123")).resolves.toEqual({
       success: false,
-      error: "Não foi possível iniciar a ligação na Callix.",
+      error: mensagem,
     });
   });
 
