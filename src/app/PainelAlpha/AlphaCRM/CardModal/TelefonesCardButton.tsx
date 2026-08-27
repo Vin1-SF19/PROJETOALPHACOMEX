@@ -53,7 +53,7 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
 
   async function iniciarLigacao(telefone: string) {
     if (telefonesEmLigacao.has(telefone)) return;
-    window.parent.postMessage({ type: "ALPHA_OPEN_TAB", url: SERVICE_HUB_URL, label: "ServiceHub" }, "*");
+    window.open(SERVICE_HUB_URL, "servicehub-callix", "noopener,noreferrer");
     setTelefonesEmLigacao((atual) => new Set(atual).add(telefone));
     setAvisoLigacao(null);
     const resultado = await IniciarLigacaoTelefoneCardBpm(cardId, telefone);
