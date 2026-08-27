@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin } from "lucide-react";
+import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut } from "lucide-react";
 import { getTema } from "@/lib/temas";
 import {
   CriarLeadAquisicaoParceiro,
@@ -493,26 +493,46 @@ function LeadDetalheDialog({
     onAtualizado();
   }
 
+  const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg bg-[#0a1020] border-white/10 max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-slate-100">{lead.nome}</DialogTitle>
+      <DialogContent className="max-w-lg bg-[#0a1020] border-white/10 max-h-[85vh] overflow-y-auto p-0 gap-0">
+        <DialogHeader className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-sm font-black text-slate-100"
+              style={{ background: `rgba(${accent},0.15)`, borderColor: `rgba(${accent},0.35)` }}
+            >
+              {inicial}
+            </div>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <DialogTitle className="text-slate-100 leading-tight">{lead.nome}</DialogTitle>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10.5px] text-slate-500">
+                {lead.segmento && <span className="flex items-center gap-1"><Building2 size={11} /> {lead.segmento}</span>}
+                {lead.telefone && <span>{lead.telefone}</span>}
+                {lead.email && <span className="truncate">{lead.email}</span>}
+              </div>
+              {lead.origem && (
+                <span
+                  className="inline-flex mt-2 items-center rounded-lg border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                  style={{ background: `rgba(${accent},0.1)`, borderColor: `rgba(${accent},0.3)`, color: `rgba(${accent},1)` }}
+                >
+                  {lead.origem}
+                </span>
+              )}
+              {lead.motivoSaidaLateral && (
+                <p className="mt-2 text-[10.5px] text-amber-400">Motivo saída: {lead.motivoSaidaLateral}</p>
+              )}
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="text-[11px] text-slate-500 space-y-1">
-            {lead.email && <p>E-mail: {lead.email}</p>}
-            {lead.telefone && <p>Telefone: {lead.telefone}</p>}
-            {lead.segmento && <p>Segmento: {lead.segmento}</p>}
-            {lead.origem && <p>Origem: {lead.origem}</p>}
-            {lead.motivoSaidaLateral && <p className="text-amber-400">Motivo saída: {lead.motivoSaidaLateral}</p>}
-          </div>
-
+        <div className="space-y-4 px-5 py-4">
           {podeEditar && (
             <>
               <section className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mover etapa</p>
+                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500"><ArrowLeftRight size={12} /> Mover etapa</p>
                 <div className="flex gap-2">
                   <Select value={statusDestino} onValueChange={setStatusDestino}>
                     <SelectTrigger className={inputCls} style={inputStyle}><SelectValue /></SelectTrigger>
@@ -520,48 +540,48 @@ function LeadDetalheDialog({
                       {ETAPAS.map((e) => <SelectItem key={e.status} value={e.status}>{e.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <button onClick={() => void mover()} disabled={salvando} className="h-10 px-4 rounded-xl text-[11px] font-bold text-black shrink-0" style={{ background: `rgba(${accent},1)` }}>
+                  <button onClick={() => void mover()} disabled={salvando} className="h-10 px-4 rounded-xl text-[11px] font-bold text-black shrink-0 transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>
                     Mover
                   </button>
                 </div>
               </section>
 
-              <section className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Potencial de recorrência (0-5)</p>
+              <section className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500"><Star size={12} /> Potencial de recorrência</p>
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
                     {[0, 1, 2, 3, 4, 5].map((n) => (
-                      <button key={n} onClick={() => setPotencial(n)} className="h-8 w-8 rounded-lg text-[11px] font-bold" style={{ background: potencial === n ? `rgba(${accent},0.4)` : "rgba(255,255,255,0.05)", color: potencial === n ? "#fff" : "#94a3b8" }}>
+                      <button key={n} onClick={() => setPotencial(n)} className="h-8 w-8 rounded-lg text-[11px] font-bold transition-colors" style={{ background: potencial === n ? `rgba(${accent},0.4)` : "rgba(255,255,255,0.05)", color: potencial === n ? "#fff" : "#94a3b8" }}>
                         {n}
                       </button>
                     ))}
                   </div>
-                  <button onClick={() => void salvarPotencial()} disabled={salvando} className="h-8 px-3 rounded-lg text-[10px] font-bold text-black" style={{ background: `rgba(${accent},1)` }}>Salvar</button>
+                  <button onClick={() => void salvarPotencial()} disabled={salvando} className="h-8 px-3 rounded-lg text-[10px] font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Salvar</button>
                 </div>
               </section>
 
-              <section className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Próxima ação</p>
+              <section className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500"><CalendarClock size={12} /> Próxima ação</p>
                 <div className="grid grid-cols-[130px_1fr] gap-2">
                   <input type="date" value={proximaAcaoData} onChange={(e) => setProximaAcaoData(e.target.value)} className={inputCls} style={inputStyle} />
                   <input value={proximaAcaoDesc} onChange={(e) => setProximaAcaoDesc(e.target.value)} placeholder="Ex: Ligação, WhatsApp..." className={inputCls} style={inputStyle} />
                 </div>
-                <button onClick={() => void salvarProximaAcao()} disabled={salvando} className="h-9 px-4 rounded-xl text-[11px] font-bold text-black" style={{ background: `rgba(${accent},1)` }}>Registrar</button>
+                <button onClick={() => void salvarProximaAcao()} disabled={salvando} className="h-9 px-4 rounded-xl text-[11px] font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Registrar</button>
               </section>
 
               {lead.status !== "PRE_CADASTRO" ? null : (
                 <section className="space-y-2 p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)" }}>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Promover a parceiro cadastrado</p>
+                  <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400"><Handshake size={12} /> Promover a parceiro cadastrado</p>
                   <input value={docPromocao} onChange={(e) => setDocPromocao(e.target.value)} placeholder="CPF/CNPJ *" className={inputCls} style={inputStyle} />
                   <input value={emailPromocao} onChange={(e) => setEmailPromocao(e.target.value)} placeholder="E-mail *" className={inputCls} style={inputStyle} />
-                  <button onClick={() => void promover()} disabled={salvando} className="w-full h-10 rounded-xl text-[11px] font-black uppercase tracking-widest text-white" style={{ background: "rgb(16,185,129)" }}>
+                  <button onClick={() => void promover()} disabled={salvando} className="w-full h-10 rounded-xl text-[11px] font-black uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: "rgb(16,185,129)" }}>
                     Cadastrar Parceiro
                   </button>
                 </section>
               )}
 
               <section className="space-y-2 p-3 rounded-xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-400">Saída lateral</p>
+                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-red-400"><LogOut size={12} /> Saída lateral</p>
                 <Select value={saidaSelecionada} onValueChange={setSaidaSelecionada}>
                   <SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Motivo" /></SelectTrigger>
                   <SelectContent>
@@ -569,7 +589,7 @@ function LeadDetalheDialog({
                   </SelectContent>
                 </Select>
                 <textarea value={motivoSaida} onChange={(e) => setMotivoSaida(e.target.value)} placeholder="Descreva o motivo..." className="w-full min-h-16 rounded-xl px-3 py-2 text-[12px] outline-none text-slate-200 resize-none" style={inputStyle} />
-                <button onClick={() => void registrarSaida()} disabled={salvando} className="w-full h-9 rounded-xl text-[11px] font-bold text-red-300" style={{ background: "rgba(239,68,68,0.15)" }}>
+                <button onClick={() => void registrarSaida()} disabled={salvando} className="w-full h-9 rounded-xl text-[11px] font-bold text-red-300 transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: "rgba(239,68,68,0.15)" }}>
                   Registrar saída
                 </button>
               </section>

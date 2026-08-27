@@ -60,6 +60,17 @@ export function eventoFoiRecusadoPeloUsuario(statusPropertiesJson: string | null
   }
 }
 
+/** Evento organizado por outra pessoa e colocado na agenda do usuário atual. */
+export function eventoFoiCompartilhadoComUsuario(statusPropertiesJson: string | null): boolean {
+  if (!statusPropertiesJson) return false;
+  try {
+    const propriedades = JSON.parse(statusPropertiesJson) as { compartilhadoComUsuario?: unknown };
+    return propriedades.compartilhadoComUsuario === true;
+  } catch {
+    return false;
+  }
+}
+
 export interface CalendarioSelecionadoView {
   id: string;
   googleCalendarId: string;
@@ -103,6 +114,7 @@ export interface EventoExibicao {
   calendarioCorHex: string | null;
   calendarioGravavel: boolean;
   recusadoPeloUsuario?: boolean;
+  compartilhadoComUsuario?: boolean;
   /** Presente quando o evento pertence à agenda de um colega (não do próprio usuário logado). */
   colegaId?: number;
 }

@@ -83,7 +83,7 @@ export function GradeHoraria({
                 </div>
               ) : (
                 <DetalhePopover key={evento.id} evento={evento} tema={tema} onEditar={onEditarEvento} onCancelado={onEventoCancelado}>
-                  <button type="button" className={cn("flex w-full items-center gap-1.5 truncate rounded-lg border border-white/10 px-1.5 py-1 text-left text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(15,23,42,0.18)] transition-all hover:-translate-y-px hover:brightness-110", evento.recusadoPeloUsuario && "opacity-55 grayscale line-through")} style={{ background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}f2, ${corDoItemAgenda(evento)}b8)`, borderLeftColor: "rgba(255,255,255,0.75)", borderLeftWidth: 3 }}>
+                  <button type="button" className={cn("flex w-full items-center gap-1.5 truncate rounded-lg border border-white/10 px-1.5 py-1 text-left text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(15,23,42,0.18)] transition-all hover:-translate-y-px hover:brightness-110", evento.recusadoPeloUsuario && "opacity-55 grayscale line-through", evento.compartilhadoComUsuario && "shadow-none")} style={{ background: evento.compartilhadoComUsuario ? "rgba(15,23,42,0.84)" : `linear-gradient(135deg, ${corDoItemAgenda(evento)}f2, ${corDoItemAgenda(evento)}b8)`, borderColor: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : undefined, borderLeftColor: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : "rgba(255,255,255,0.75)", borderLeftWidth: 3, color: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : undefined }}>
                     {evento.eventType === "focusTime" && <Sparkles className="size-3 shrink-0 text-white/90" aria-hidden="true" />}
                     <span className="truncate">{evento.titulo || "(sem título)"}</span>
                   </button>
@@ -166,23 +166,25 @@ export function GradeHoraria({
                     <button
                       type="button"
                       onClick={(e) => e.stopPropagation()}
-                      className={cn("group/event absolute z-20 overflow-hidden rounded-xl border border-white/15 border-l-[3px] px-2 py-1.5 text-left text-[10px] font-bold text-white shadow-[0_10px_22px_rgba(15,23,42,0.30)] transition-all duration-150 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/80 before:to-transparent before:opacity-70 hover:z-30 hover:-translate-y-px hover:brightness-110 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40", evento.recusadoPeloUsuario && "opacity-55 grayscale line-through")}
+                      className={cn("group/event absolute z-20 overflow-hidden rounded-xl border border-white/15 border-l-[3px] px-2 py-1.5 text-left text-[10px] font-bold text-white shadow-[0_10px_22px_rgba(15,23,42,0.30)] transition-all duration-150 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/80 before:to-transparent before:opacity-70 hover:z-30 hover:-translate-y-px hover:brightness-110 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40", evento.recusadoPeloUsuario && "opacity-55 grayscale line-through", evento.compartilhadoComUsuario && "shadow-none")}
                       style={{
                         top: `${topoPercentual}%`,
                         height: `${alturaPercentual}%`,
                         left: `${(coluna / totalColunas) * 100}%`,
                         width: `${100 / totalColunas}%`,
-                        background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}f5, ${corDoItemAgenda(evento)}bc)`,
-                        borderLeftColor: "rgba(255,255,255,0.8)",
-                        boxShadow: `0 10px 22px ${corDoItemAgenda(evento)}33`,
+                        background: evento.compartilhadoComUsuario ? "rgba(15,23,42,0.88)" : `linear-gradient(135deg, ${corDoItemAgenda(evento)}f5, ${corDoItemAgenda(evento)}bc)`,
+                        borderColor: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : undefined,
+                        borderLeftColor: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : "rgba(255,255,255,0.8)",
+                        boxShadow: evento.compartilhadoComUsuario ? "none" : `0 10px 22px ${corDoItemAgenda(evento)}33`,
+                        color: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : undefined,
                       }}
                       title={evento.titulo ?? "(sem título)"}
                     >
-                      <span className="flex items-center gap-1 truncate leading-tight">
+                      <span className={cn("flex items-center gap-1 truncate leading-tight", evento.compartilhadoComUsuario && "text-current")}>
                         {evento.eventType === "focusTime" && <Sparkles className="size-3 shrink-0 text-white/90" aria-hidden="true" />}
                         <span className="truncate">{evento.titulo || "(sem título)"}</span>
                       </span>
-                      {evento.inicioEm && <span className="mt-0.5 block truncate text-[9px] font-medium text-white/75">{formatarHora(new Date(evento.inicioEm))}</span>}
+                      {evento.inicioEm && <span className={cn("mt-0.5 block truncate text-[9px] font-medium text-white/75", evento.compartilhadoComUsuario && "text-current opacity-80")}>{formatarHora(new Date(evento.inicioEm))}</span>}
                     </button>
                   </DetalhePopover>
                 ))}

@@ -43,6 +43,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [x] Criar a tarefa de uma hora para técnico TI ao assumir o chamado e concluí-la ao fechar o chamado.
 - [x] Exibir tarefa agendada na grade horária em azul durante o atendimento e em verde após a conclusão.
 - [x] Persistir a resposta do próprio participante no cache e riscar visualmente convites recusados em todas as visões da agenda.
+- [x] Exibir eventos organizados por outra pessoa em modo de contorno, com cor do calendário na borda e no texto.
 
 ## File List
 

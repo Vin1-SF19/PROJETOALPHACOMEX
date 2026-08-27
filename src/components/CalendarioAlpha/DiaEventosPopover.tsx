@@ -53,16 +53,16 @@ export function DiaEventosPopover({
                 key={evento.id}
                 type="button"
                 onClick={() => { setOpen(false); onEditarEvento(evento); }}
-                className={evento.recusadoPeloUsuario ? "group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left opacity-55 grayscale line-through shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110" : "group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110"}
-                style={{ background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}e8, ${corDoItemAgenda(evento)}aa)`, borderLeftColor: "rgba(255,255,255,0.8)", borderLeftWidth: 3 }}
+                className={evento.recusadoPeloUsuario ? "group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left opacity-55 grayscale line-through shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110" : evento.compartilhadoComUsuario ? "group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border px-3 py-2.5 text-left shadow-none transition-all hover:-translate-y-px hover:brightness-110" : "group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110"}
+                style={{ background: evento.compartilhadoComUsuario ? "rgba(15,23,42,0.88)" : `linear-gradient(135deg, ${corDoItemAgenda(evento)}e8, ${corDoItemAgenda(evento)}aa)`, borderColor: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : undefined, borderLeftColor: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : "rgba(255,255,255,0.8)", borderLeftWidth: 3, color: evento.compartilhadoComUsuario ? corDoItemAgenda(evento) : undefined }}
               >
                 <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.8)]" aria-hidden="true" />
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1 truncate text-sm font-bold text-white">
+                  <span className={evento.compartilhadoComUsuario ? "flex items-center gap-1 truncate text-sm font-bold text-current" : "flex items-center gap-1 truncate text-sm font-bold text-white"}>
                     {evento.eventType === "focusTime" && <Sparkles className="size-3.5 shrink-0 text-white/90" aria-hidden="true" />}
                     <span className="truncate">{evento.titulo || "(sem título)"}</span>
                   </span>
-                  <span className="mt-0.5 block text-[11px] font-medium text-white/70">
+                  <span className={evento.compartilhadoComUsuario ? "mt-0.5 block text-[11px] font-medium text-current opacity-80" : "mt-0.5 block text-[11px] font-medium text-white/70"}>
                     {evento.diaInteiro ? "Dia inteiro" : evento.inicioEm ? formatarHora(new Date(evento.inicioEm)) : "—"}
                   </span>
                 </span>

@@ -226,11 +226,15 @@ function mapEventoParaDTO(evento: calendar_v3.Schema$Event): GoogleEventoDTO {
       // ao usuário impersonado. Ele permite reproduzir o visual de convite
       // recusado do Google Calendar sem depender de e-mail no cliente.
       const respostaDoUsuario = evento.attendees?.find((participante) => participante.self === true)?.responseStatus ?? null;
+      const compartilhadoComUsuario = Boolean(
+        evento.organizer?.email && evento.organizer.self !== true,
+      );
       const statusProperties = {
         focusTimeProperties: evento.focusTimeProperties,
         outOfOfficeProperties: evento.outOfOfficeProperties,
         workingLocationProperties: evento.workingLocationProperties,
         respostaDoUsuario,
+        compartilhadoComUsuario,
       };
       if (!Object.values(statusProperties).some(Boolean)) return null;
       return JSON.stringify(statusProperties) ?? null;
