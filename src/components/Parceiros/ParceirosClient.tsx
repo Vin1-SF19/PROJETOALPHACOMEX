@@ -98,7 +98,7 @@ const TUTORIAL_PARCEIROS: ConfigTutorialModulo = {
   ],
 };
 
-type Props = {
+export type ParceirosClientProps = {
   userId: number;
   parceiros: CardParceiro[];
   temaName: string;
@@ -115,7 +115,7 @@ type Props = {
 
 export default function ParceirosClient({
   userId, parceiros, temaName, busca, nivel, estagio, permissao, templateConvite, templateParceiro, preCadastrosPendentesInicial, parceirosPendentesCadastro, videoIntrodutorioConfig,
-}: Props) {
+}: ParceirosClientProps) {
   const tema = getTema(temaName);
   const accent = tema.accent;
   const router = useRouter();
@@ -254,7 +254,7 @@ export default function ParceirosClient({
   const selecionadosNomes = parceiros.filter(p => selecionados.has(p.id)).map(p => p.nome);
 
   return (
-    <main className="relative min-h-screen bg-[#020617] text-slate-200 p-6 lg:p-10 overflow-hidden">
+    <div className="relative min-h-screen bg-[#020617] text-slate-200 p-6 lg:p-10 overflow-hidden">
       {/* Fundo vivo — shader animado (WebGL) + glows lentos + partículas flutuantes */}
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
         {!reduceMotion && (
@@ -448,15 +448,6 @@ export default function ParceirosClient({
                     </motion.div>
                   )}
                 </div>
-              )}
-
-              {/* Dashboard de Canais e Parcerias — indicadores, fila de follow-up e alertas */}
-              {(permissao.isAdmin || permissao.podeEditar) && (
-                <Link href="/PainelAlpha/Parceiros/Dashboard"
-                  className="h-11 px-4 flex items-center gap-2 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all text-slate-200 hover:brightness-110"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                  <Bell size={15} /> Dashboard
-                </Link>
               )}
 
               {/* Aquisição — funil de potencial parceiro até o cadastro */}
@@ -678,7 +669,7 @@ export default function ParceirosClient({
         accent={accent}
         onFinalizar={finalizarTutorial}
       />
-    </main>
+    </div>
   );
 }
 

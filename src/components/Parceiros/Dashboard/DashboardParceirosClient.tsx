@@ -1,18 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Users, UserPlus, Flame, Repeat, UserX, AlertTriangle,
-  TrendingUp, DollarSign, Percent, Target, Bell, ListTodo, CheckCircle2,
+  Users, UserPlus, Flame, Repeat, UserX, AlertTriangle,
+  TrendingUp, DollarSign, Percent, Target, Bell, ListTodo, CheckCircle2, LayoutGrid,
 } from "lucide-react";
 import { getTema } from "@/lib/temas";
 import type { ObterDashboardCanaisParcerias, ListarFilaFollowUpParceiros, ListarAlertasParceiros } from "@/actions/parceiros-dashboard";
 import { CriarTarefaParceiro } from "@/actions/parceiros-tarefas";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ParceirosClient, { type ParceirosClientProps } from "@/components/Parceiros/ParceirosClient";
 
-type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
 type DashboardData = Awaited<ReturnType<typeof ObterDashboardCanaisParcerias>>;
 type ItemFila = Awaited<ReturnType<typeof ListarFilaFollowUpParceiros>>["itens"][number];
 type Alerta = Awaited<ReturnType<typeof ListarAlertasParceiros>>["alertas"][number];
@@ -58,14 +57,15 @@ export default function DashboardParceirosClient({
   alertasIniciais,
   tarefasPendentesPorParceiro,
   alertasComTarefaAutomatica,
+  listaProps,
 }: {
   temaName: string;
-  permissao: Permissao;
   dashboardInicial: DashboardData | null;
   filaInicial: ItemFila[];
   alertasIniciais: Alerta[];
   tarefasPendentesPorParceiro: Record<number, number>;
   alertasComTarefaAutomatica: string[];
+  listaProps: ParceirosClientProps;
 }) {
   const tema = getTema(temaName);
   const accent = tema.accent;
@@ -101,23 +101,25 @@ export default function DashboardParceirosClient({
   return (
     <div className="min-h-screen w-full" style={{ background: "#05070d" }}>
       <header className="px-6 py-5 flex items-center gap-3 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-        <Link href="/PainelAlpha/Parceiros" className="h-9 w-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-white transition-colors" style={{ background: "rgba(255,255,255,0.05)" }}>
-          <ArrowLeft size={16} />
-        </Link>
         <div>
-          <h1 className="text-lg font-black text-slate-100">Dashboard de Canais e Parcerias</h1>
+          <h1 className="text-lg font-black text-slate-100">Parceiros</h1>
           <p className="text-[11px] text-slate-500">Aquisição, desenvolvimento e indicações — últimos {dashboard?.success ? dashboard.periodoDias : 30} dias</p>
         </div>
         {isPending && <span className="ml-auto text-[10px] text-slate-500">Atualizando...</span>}
       </header>
 
       <div className="p-6">
-        <Tabs defaultValue="visao-geral">
+        <Tabs defaultValue="lista">
           <TabsList className="bg-white/5 mb-4">
+            <TabsTrigger value="lista"><LayoutGrid size={13} className="mr-1.5" /> Lista</TabsTrigger>
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="fila">Fila de Follow-up ({fila.length})</TabsTrigger>
             <TabsTrigger value="alertas">Alertas ({alertas.length})</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="lista" className="-m-6 mt-0">
+            <ParceirosClient {...listaProps} />
+          </TabsContent>
 
           <TabsContent value="visao-geral" className="space-y-6">
             {!ind ? (

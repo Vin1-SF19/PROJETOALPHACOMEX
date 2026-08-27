@@ -42,7 +42,6 @@ export async function CriarTarefaParceiro(input: z.input<typeof CriarTarefaSchem
   ]);
 
   revalidatePath("/PainelAlpha/Parceiros");
-  revalidatePath("/PainelAlpha/Parceiros/Dashboard");
   return { success: true as const, tarefa };
 }
 
@@ -83,7 +82,6 @@ export async function ConcluirTarefaParceiro(tarefaId: string) {
   ]);
 
   revalidatePath("/PainelAlpha/Parceiros");
-  revalidatePath("/PainelAlpha/Parceiros/Dashboard");
   return { success: true as const };
 }
 
@@ -97,6 +95,5 @@ export async function ExcluirTarefaParceiro(tarefaId: string) {
   await db.parceiroTarefa.delete({ where: { id: tarefaId } });
 
   revalidatePath("/PainelAlpha/Parceiros");
-  revalidatePath("/PainelAlpha/Parceiros/Dashboard");
   return { success: true as const };
 }
