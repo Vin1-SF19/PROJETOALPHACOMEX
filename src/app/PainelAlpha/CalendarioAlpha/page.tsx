@@ -46,7 +46,7 @@ export default async function CalendarioAlphaPage({
   const VISOES_VALIDAS: VisaoCalendario[] = ["dia", "semana", "mes", "ano"];
   const visao: VisaoCalendario = VISOES_VALIDAS.includes(visaoParam as VisaoCalendario)
     ? (visaoParam as VisaoCalendario)
-    : "mes";
+    : "semana";
   const dataReferencia = parsearDataCivil(dataParam) ?? new Date();
 
   if (!statusConexao.conectado) {
@@ -111,8 +111,28 @@ export default async function CalendarioAlphaPage({
     where: { taskList: { conexaoId: statusConexao.conexaoId ?? "" }, excluida: false, oculta: false },
     orderBy: [{ status: "asc" }, { vencimentoEm: "asc" }],
     take: 100,
-    select: { id: true, titulo: true, notas: true, status: true, vencimentoEm: true, taskList: { select: { googleTaskListId: true, titulo: true } } },
-  }).then((items) => items.map((tarefa) => ({ id: tarefa.id, taskListGoogleId: tarefa.taskList.googleTaskListId, listaTitulo: tarefa.taskList.titulo, titulo: tarefa.titulo, notas: tarefa.notas, status: tarefa.status === "completed" ? "completed" : "needsAction", vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null })));
+    select: {
+      id: true,
+      titulo: true,
+      notas: true,
+      status: true,
+      vencimentoEm: true,
+      agendamentoChamado: { select: { inicioEm: true, fimPlanejadoEm: true, fimConcluidoEm: true, status: true } },
+      taskList: { select: { googleTaskListId: true, titulo: true } },
+    },
+  }).then((items) => items.map((tarefa) => ({
+    id: tarefa.id,
+    taskListGoogleId: tarefa.taskList.googleTaskListId,
+    listaTitulo: tarefa.taskList.titulo,
+    titulo: tarefa.titulo,
+    notas: tarefa.notas,
+    status: tarefa.status === "completed" ? "completed" : "needsAction",
+    vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null,
+    inicioAgendadoEm: tarefa.agendamentoChamado?.inicioEm.toISOString() ?? null,
+    fimPlanejadoAgendadoEm: tarefa.agendamentoChamado?.fimPlanejadoEm.toISOString() ?? null,
+    fimConcluidoAgendadoEm: tarefa.agendamentoChamado?.fimConcluidoEm?.toISOString() ?? null,
+    statusAgendamento: tarefa.agendamentoChamado?.status === "CONCLUIDO" ? "CONCLUIDO" : tarefa.agendamentoChamado?.status === "EM_ATENDIMENTO" ? "EM_ATENDIMENTO" : null,
+  })));
   const listasTarefas: ListaTarefasAgendaView[] = await db.googleCalendarTaskListCache.findMany({
     where: { conexaoId: statusConexao.conexaoId ?? "" },
     orderBy: { titulo: "asc" },

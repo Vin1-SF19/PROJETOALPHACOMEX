@@ -137,7 +137,31 @@ export function GradeHoraria({
                   </div>
                 )}
 
-                {posicoes.map(({ evento, topoPercentual, alturaPercentual, coluna, totalColunas }) => (
+                {posicoes.map(({ evento, topoPercentual, alturaPercentual, coluna, totalColunas }) => evento.tipo === "tarefa" ? (
+                  <div
+                    key={evento.id}
+                    className="group/task absolute z-20 overflow-hidden rounded-xl border border-white/15 border-l-[3px] px-2 py-1.5 text-left text-[10px] font-bold text-white shadow-[0_10px_22px_rgba(15,23,42,0.30)] transition-all duration-150 hover:z-30 hover:-translate-y-px hover:brightness-110 hover:shadow-xl"
+                    style={{
+                      top: `${topoPercentual}%`,
+                      height: `${alturaPercentual}%`,
+                      left: `${(coluna / totalColunas) * 100}%`,
+                      width: `${100 / totalColunas}%`,
+                      background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}f5, ${corDoItemAgenda(evento)}bc)`,
+                      borderLeftColor: "rgba(255,255,255,0.8)",
+                      boxShadow: `0 10px 22px ${corDoItemAgenda(evento)}33`,
+                    }}
+                  >
+                    <span className="flex items-center gap-1 truncate leading-tight">
+                      {evento.status === "completed" ? (
+                        <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/20" title="Tarefa concluída"><CheckCircle2 className="size-3 text-white" aria-hidden="true" /></span>
+                      ) : (
+                        <button type="button" onClick={() => evento.tarefaCacheId && onConcluirTarefa(evento.tarefaCacheId)} className="flex size-4 shrink-0 items-center justify-center rounded-full border border-white/80 bg-slate-950/25 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label={`Concluir tarefa: ${evento.titulo || "sem título"}`} title="Concluir tarefa"><CheckCircle2 className="size-3 text-white" aria-hidden="true" /></button>
+                      )}
+                      <button type="button" onClick={() => onEditarEvento(evento)} className="min-w-0 flex-1 truncate text-left focus:outline-none" title={`Editar tarefa: ${evento.titulo || "sem título"}`}><span className="truncate">{evento.titulo || "(sem título)"}</span></button>
+                    </span>
+                    {evento.inicioEm && <span className="mt-0.5 block truncate text-[9px] font-medium text-white/75">{formatarHora(new Date(evento.inicioEm))}</span>}
+                  </div>
+                ) : (
                   <DetalhePopover key={evento.id} evento={evento} tema={tema} onEditar={onEditarEvento} onCancelado={onEventoCancelado}>
                     <button
                       type="button"

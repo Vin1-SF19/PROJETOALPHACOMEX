@@ -9,6 +9,10 @@ import {
   notificarChamadoConcluido,
   notificarNovoChamado,
 } from "@/lib/chamados/notificacoes-server";
+import {
+  concluirTarefaAgendadaDoChamado,
+  criarTarefaAgendadaParaChamado,
+} from "@/lib/chamados/tarefa-agendada";
 
 export async function updateChamadosStatus(id: number, novoStatus: string, solucao?: string) {
   const session = await auth();
@@ -24,6 +28,7 @@ export async function updateChamadosStatus(id: number, novoStatus: string, soluc
       select: {
         id: true,
         titulo: true,
+        descricao: true,
         usuarioId: true,
         solucao: true,
         updatedAt: true,
@@ -39,7 +44,34 @@ export async function updateChamadosStatus(id: number, novoStatus: string, soluc
       });
     }
 
+    try {
+      const tecnicoId = Number(session.user.id);
+      if (novoStatus === "EM_ATENDIMENTO") {
+        await criarTarefaAgendadaParaChamado({
+          chamado: chamadoAtualizado,
+          tecnicoId,
+          tecnicoRole: session.user.role,
+        });
+      }
+      if (novoStatus === "CONCLUIDO") {
+        await concluirTarefaAgendadaDoChamado({
+          chamadoId: chamadoAtualizado.id,
+          concluidoEm: chamadoAtualizado.updatedAt,
+          tecnicoId,
+          tecnicoRole: session.user.role,
+        });
+      }
+    } catch (error) {
+      // A mudança de status não pode deixar o chamado preso se o Google falhar.
+      console.error("[chamados] Falha na automação da Agenda Alpha", {
+        chamadoId: chamadoAtualizado.id,
+        status: novoStatus,
+        message: error instanceof Error ? error.message : "erro desconhecido",
+      });
+    }
+
     revalidatePath("/PainelAlpha/Chamados");
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true };
   } catch {
     return { success: false, error: "Erro ao atualizar status." };

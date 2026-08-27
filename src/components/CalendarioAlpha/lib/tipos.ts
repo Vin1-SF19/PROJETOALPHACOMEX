@@ -37,7 +37,7 @@ function hslParaHex({ h, s, l }: { h: number; s: number; l: number }): string {
 
 /** Varia a luminosidade da cor do calendário por item, sem perder a identidade escolhida pelo usuário. */
 export function corDoItemAgenda(item: Pick<EventoExibicao, "id" | "tipo" | "eventType" | "calendarioCorHex">): string {
-  const base = item.tipo === "tarefa" ? "#22c55e"
+  const base = item.tipo === "tarefa" ? item.calendarioCorHex ?? "#22c55e"
     : item.eventType === "focusTime" ? "#a855f7"
       : item.eventType === "outOfOffice" ? "#f43f5e"
         : item.eventType === "workingLocation" ? "#0ea5e9"
@@ -103,6 +103,10 @@ export interface TarefaAgendaExibicao {
   notas: string | null;
   status: "needsAction" | "completed";
   vencimentoEm: string | null;
+  inicioAgendadoEm?: string | null;
+  fimPlanejadoAgendadoEm?: string | null;
+  fimConcluidoAgendadoEm?: string | null;
+  statusAgendamento?: "EM_ATENDIMENTO" | "CONCLUIDO" | null;
 }
 
 export interface ListaTarefasAgendaView {

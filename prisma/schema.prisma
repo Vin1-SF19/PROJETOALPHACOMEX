@@ -491,22 +491,23 @@ model OnboardingLog {
 }
 
 model chamados {
-  id            Int                @id @default(autoincrement())
-  titulo        String
-  descricao     String
-  categoria     String
-  status        String             @default("ABERTO")
-  prioridade    String             @default("MEDIA")
-  solucao       String?
-  causa         String?
-  mensagemFinal String?
-  templateId    Int?
-  closedAt      DateTime?
-  usuarioId     Int
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  solicitante   usuarios           @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
-  mensagens     MensagensChamado[]
+  id             Int                         @id @default(autoincrement())
+  titulo         String
+  descricao      String
+  categoria      String
+  status         String                      @default("ABERTO")
+  prioridade     String                      @default("MEDIA")
+  solucao        String?
+  causa          String?
+  mensagemFinal  String?
+  templateId     Int?
+  closedAt       DateTime?
+  usuarioId      Int
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  solicitante    usuarios                    @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
+  mensagens      MensagensChamado[]
+  tarefaAgendada GoogleCalendarTaskSchedule?
 
   @@index([usuarioId])
   @@index([status])
@@ -2421,18 +2422,18 @@ model ParceiroHistorico {
 // marcam tarefas geradas por `ListarAlertasParceiros` (idempotente por parceiroId+tipo+PENDENTE),
 // distinguindo-as das criadas manualmente na tela 360º/Dashboard.
 model ParceiroTarefa {
-  id                String    @id @default(cuid())
-  parceiroId        Int
-  parceiro          Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
-  titulo            String
-  descricao         String?
-  responsavelId     Int?
-  responsavel       usuarios? @relation("ParceiroTarefaResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
-  prazo             DateTime?
-  prioridade        String    @default("NORMAL") // "BAIXA" | "NORMAL" | "ALTA"
-  status            String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
-  origemAutomatica  Boolean   @default(false)
-  alertaOrigemTipo  String? // AlertaParceiro.tipo, só quando origemAutomatica=true
+  id               String    @id @default(cuid())
+  parceiroId       Int
+  parceiro         Parceiro  @relation(fields: [parceiroId], references: [id], onDelete: Cascade)
+  titulo           String
+  descricao        String?
+  responsavelId    Int?
+  responsavel      usuarios? @relation("ParceiroTarefaResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  prazo            DateTime?
+  prioridade       String    @default("NORMAL") // "BAIXA" | "NORMAL" | "ALTA"
+  status           String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
+  origemAutomatica Boolean   @default(false)
+  alertaOrigemTipo String? // AlertaParceiro.tipo, só quando origemAutomatica=true
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -2700,20 +2701,20 @@ model PreCadastroParceiro {
 
 // Config singleton do módulo Parceiros (1 linha). Controla flags globais.
 model ParceiroConfig {
-  id                        Int      @id @default(1)
-  permitirParceiroConvidar  Boolean  @default(false)
-  validadeConvitePadraoDias Int      @default(7)
+  id                           Int      @id @default(1)
+  permitirParceiroConvidar     Boolean  @default(false)
+  validadeConvitePadraoDias    Int      @default(7)
   // ─── CRM de Canais e Parcerias — regras de relacionamento configuráveis (nunca hardcoded) ──
   // null = alerta desligado. NUNCA reaproveitar a janela de 60 dias de `recalcularNivel()`
   // (regra financeira de nível) para nenhum destes campos (regra de relacionamento).
-  diasAlertaSemIndicacao    Int?
-  diasInatividade           Int      @default(60)
-  cadenciaPotencial4Dias    Int?
-  cadenciaPotencial5Dias    Int?
+  diasAlertaSemIndicacao       Int?
+  diasInatividade              Int      @default(60)
+  cadenciaPotencial4Dias       Int?
+  cadenciaPotencial5Dias       Int?
   // RM-2026-8B7DC7 — liga/desliga a criação automática de ParceiroTarefa a partir dos alertas
   // de ListarAlertasParceiros. Desligado por padrão (opt-in explícito do Admin).
-  gerarTarefaAutomaticaAlertas Boolean @default(false)
-  updatedAt                 DateTime @updatedAt
+  gerarTarefaAutomaticaAlertas Boolean  @default(false)
+  updatedAt                    DateTime @updatedAt
 
   @@map("parceiro_config")
 }
@@ -2894,15 +2895,15 @@ model GoogleCalendarEventoCache {
   calendarioId String
   calendario   GoogleCalendarSelecionado @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
 
-  googleEventId String
-  status        String // confirmed | tentative | cancelled
-  titulo        String?
-  inicioEm      DateTime?
-  fimEm         DateTime?
-  diaInteiro    Boolean   @default(false)
-  etag          String
-  linkMeet      String?
-  eventType     String    @default("default") // default | focusTime | outOfOffice | workingLocation | birthday | fromGmail
+  googleEventId        String
+  status               String // confirmed | tentative | cancelled
+  titulo               String?
+  inicioEm             DateTime?
+  fimEm                DateTime?
+  diaInteiro           Boolean   @default(false)
+  etag                 String
+  linkMeet             String?
+  eventType            String    @default("default") // default | focusTime | outOfOffice | workingLocation | birthday | fromGmail
   statusPropertiesJson String?
 
   atualizadoGoogleEm DateTime
@@ -2918,12 +2919,12 @@ model GoogleCalendarEventoCache {
 /// Cache das listas Google Tasks da conexão. A Google Tasks API é uma integração
 /// distinta do Calendar; o cache permite manter a Agenda Alpha cache-first.
 model GoogleCalendarTaskListCache {
-  id        String                  @id @default(cuid())
+  id        String                @id @default(cuid())
   conexaoId String
-  conexao   GoogleCalendarConexao   @relation(fields: [conexaoId], references: [id], onDelete: Cascade)
+  conexao   GoogleCalendarConexao @relation(fields: [conexaoId], references: [id], onDelete: Cascade)
 
-  googleTaskListId String
-  titulo           String
+  googleTaskListId      String
+  titulo                String
   ultimaSincronizacaoEm DateTime?
 
   createdAt DateTime @default(now())
@@ -2938,9 +2939,9 @@ model GoogleCalendarTaskListCache {
 /// Cache local de tarefas Google. A API Google Tasks não possui syncToken nem
 /// webhook; atualizações externas entram por sincronização explícita/agendada.
 model GoogleCalendarTaskCache {
-  id          String                       @id @default(cuid())
-  taskListId  String
-  taskList    GoogleCalendarTaskListCache  @relation(fields: [taskListId], references: [id], onDelete: Cascade)
+  id         String                      @id @default(cuid())
+  taskListId String
+  taskList   GoogleCalendarTaskListCache @relation(fields: [taskListId], references: [id], onDelete: Cascade)
 
   googleTaskId       String
   titulo             String
@@ -2948,8 +2949,8 @@ model GoogleCalendarTaskCache {
   status             String // needsAction | completed
   vencimentoEm       DateTime?
   concluidaEm        DateTime?
-  excluida           Boolean @default(false)
-  oculta             Boolean @default(false)
+  excluida           Boolean   @default(false)
+  oculta             Boolean   @default(false)
   parentGoogleTaskId String?
   posicao            String?
   atualizadoGoogleEm DateTime
@@ -2957,9 +2958,32 @@ model GoogleCalendarTaskCache {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  agendamentoChamado GoogleCalendarTaskSchedule?
+
   @@unique([taskListId, googleTaskId])
   @@index([taskListId, status, vencimentoEm])
   @@index([taskListId, atualizadoGoogleEm])
+}
+
+/// Agendamento local de uma tarefa Google criada automaticamente para um chamado.
+/// A API Google Tasks persiste a data de vencimento, mas não a hora; estas colunas
+/// preservam o período exibido na Agenda Alpha e o fim real do atendimento.
+model GoogleCalendarTaskSchedule {
+  id              String    @id @default(cuid())
+  chamadoId       Int       @unique
+  tarefaCacheId   String    @unique
+  usuarioAgendaId Int
+  inicioEm        DateTime
+  fimPlanejadoEm  DateTime
+  fimConcluidoEm  DateTime?
+  status          String    @default("EM_ATENDIMENTO") // EM_ATENDIMENTO | CONCLUIDO
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  chamado     chamados                @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  tarefaCache GoogleCalendarTaskCache @relation(fields: [tarefaCacheId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioAgendaId, status, inicioEm])
 }
 
 /// Canal push registrado no Google Calendar. O token persistido é somente o hash usado para
