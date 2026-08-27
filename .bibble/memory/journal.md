@@ -2,6 +2,30 @@
 
 ---
 
+## [2026-08-26] — RM-2026-97934A — Indicação com serviço + posicionamento automático no pipeline (objetivo COMPLETO, 11/11 fases)
+
+**Tags:** #roadmap #mcp #parceiros #bpm #schema #vault #concluido #primeiro-relatorio-kowalski
+**Agentes envolvidos:** Bibble (execução direta via chat + MCP), agente Explore (investigação do catálogo de serviços do Alpha Metas)
+**Arquivos tocados:** `prisma/schema.prisma` + migration, `src/lib/bpm/ownership.ts`, `src/lib/validations/bpm.ts`, `src/actions/bpm/Cards.ts`, `src/actions/parceiros.ts`, `src/actions/parceiros-indicacoes.ts`, `src/components/Parceiros/ModalNovaIndicacao.tsx`, `tests/parceiros/indicacao-multipla.test.ts`, `tests/bpm/criar-card-nova-empresa.test.ts` (asserções ajustadas), `.bibble/memory/{decisions.md, known-errors.md, journal.md, codebase-map.md}`
+
+**Pedido:** formulário de indicação de cliente no módulo Parceiros, vinculando parceiro à empresa indicada e ao produto/serviço, com posicionamento automático no pipeline.
+
+**Fase 0 (auditoria) revelou 3 lacunas reais:** (1) modal só aceitava empresa já cadastrada no CS&NPS; (2) sem campo de serviço na indicação; (3) `DirecionarIndicacaoParaCloser` (cria o card BPM) existia mas era código morto de UI — indicações nunca chegavam ao pipeline na prática.
+
+**3 decisões de escopo confirmadas com o usuário (AskUserQuestion):** permitir empresa nova inline; reaproveitar catálogo de serviços do Alpha Metas (`SERVICOS_COMERCIAIS_PADRAO` + `getServicosComerciais()`); automatizar 100% a atribuição de responsável (sem campo no formulário) — exigiu criar o primeiro padrão de auto-atribuição de responsável do projeto (`resolverResponsavelAutomaticoBpm`).
+
+**Schema (Vault, aditivo):** `Indicacao.servicoIndicado String?`. Backup fresco gerado via script `@libsql/client` pontual (253 tabelas, 46.512 linhas) — protocolo Vault completo, aprovado explicitamente pelo usuário.
+
+**Fusão de fluxo:** `criarIndicacao` + `DirecionarIndicacaoParaCloser` (manual, sem uso) fundidos em uma única operação — a indicação já nasce direcionada ao closer, responsável auto-resolvido.
+
+**Validação:** tsc/eslint limpos no escopo; `npm run build` produção OK; 8/8 testes automatizados (incluindo CNPJ duplicado em empresa nova e propagação de erro do BPM sem estado parcial). Verificação visual interativa não realizada (sem credencial de teste) — mesma limitação já documentada em objetivos anteriores desta sessão.
+
+**Incidente de processo:** ao fechar a implementação, descobri que o commit já tinha sido feito e enviado ao remoto por outra sessão concorrente no mesmo working directory (commit `9c17df86b`, misturado com mudanças de `CalendarioAlpha`) — confirmado íntegro via `git diff HEAD` = 0. Um segundo commit (`e8e68c91d`, testes extras + memória) ficou pronto localmente mas o `git push` foi bloqueado pelo hook `enforce-git-push-authority.cjs` (push exclusivo a `@devops` no framework AIOX deste projeto) — não contornado, reportado ao usuário para push manual.
+
+**Primeiro uso real da feature de relatório de conclusão do Kowalski** (construída na sessão anterior): tool MCP `roadmap_registrar_relatorio_conclusao` ainda não disponível nesta sessão (mesma lição já catalogada — tool nova só aparece em sessão futura), relatório registrado via script Prisma/libsql pontual direto no Turso, equivalente exato ao que a tool faria.
+
+---
+
 ## [2026-08-26] — RM-2026-3F263C — Card de Aquisição alinhado ao padrão do CRM (objetivo COMPLETO, 10/10 fases)
 
 **Tags:** #roadmap #mcp #parceiros #ui #refactor #concluido #infra
