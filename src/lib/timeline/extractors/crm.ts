@@ -4,10 +4,21 @@ import type { TimelineEvent } from '../types';
 const MODULE = 'crm';
 const MODULE_LABEL = 'Alpha CRM';
 
-export async function extractCrmEvents(clienteId: number): Promise<TimelineEvent[]> {
+interface ExtractCrmEventsOptions {
+  userId: number;
+  isAdminOrDiretoria: boolean;
+}
+
+export async function extractCrmEvents(
+  clienteId: number,
+  { userId, isAdminOrDiretoria }: ExtractCrmEventsOptions,
+): Promise<TimelineEvent[]> {
   try {
     const cards = await db.bpmCard.findMany({
-      where: { empresaId: clienteId },
+      where: {
+        empresaId: clienteId,
+        ...(isAdminOrDiretoria ? {} : { membros: { some: { userId } } }),
+      },
       select: {
         id: true,
         status: true,
@@ -36,7 +47,7 @@ export async function extractCrmEvents(clienteId: number): Promise<TimelineEvent
         title: `Card criado — ${card.servico ?? 'Sem serviço'}`,
         description: `Pipeline: ${card.pipeline?.nome ?? 'N/D'} | Etapa: ${card.etapa?.nome ?? 'N/D'} | Status: ${card.status}`,
         actor: card.responsavel?.nome,
-        metadata: { servico: card.servico ?? undefined, pipeline: card.pipeline?.nome, etapa: card.etapa?.nome, status: card.status },
+        metadata: { cardId: card.id, servico: card.servico ?? undefined, pipeline: card.pipeline?.nome, etapa: card.etapa?.nome, status: card.status },
       });
 
       // Histórico de ações

@@ -98,3 +98,21 @@ export async function concluirTarefaGoogleTasks(input: { emailUsuario: string; t
     throw classificarErroGoogle(error);
   }
 }
+
+export async function atualizarTarefaGoogleTasks(input: { emailUsuario: string; taskListId: string; taskId: string; titulo: string; notas?: string; vencimentoEm?: Date }): Promise<GoogleTaskDTO> {
+  try {
+    const resposta = await clienteTasks(input.emailUsuario).tasks.patch({
+      tasklist: input.taskListId,
+      task: input.taskId,
+      requestBody: {
+        title: input.titulo,
+        // String vazia é intencional: permite limpar a descrição já existente.
+        notes: input.notas ?? "",
+        due: input.vencimentoEm?.toISOString(),
+      },
+    });
+    return mapTask(resposta.data);
+  } catch (error) {
+    throw classificarErroGoogle(error);
+  }
+}

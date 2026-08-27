@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Circle } from "lucide-react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -27,41 +27,43 @@ export function DiaEventosPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align="start" className="w-72">
-        <div className="p-3 space-y-2">
+      <PopoverContent align="start" className="w-80 border-white/10 bg-slate-950/95 p-0 shadow-2xl shadow-slate-950/60 backdrop-blur-xl">
+        <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_60%)] p-4">
           <p className="text-xs font-black uppercase tracking-wide text-slate-400 capitalize">{formatarTituloDia(dia)}</p>
-          <div className="max-h-72 space-y-1 overflow-y-auto">
-            {eventos.map((evento) => (
+          <p className="mt-1 text-sm font-bold text-white">Compromissos do dia</p>
+        </div>
+        <div className="max-h-72 space-y-2 overflow-y-auto p-3">
+            {eventos.map((evento) => evento.tipo === "tarefa" ? (
+              <div key={evento.id} className="group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-emerald-200/20 bg-emerald-500/15 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-emerald-100/30" style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3 }}>
+                <button type="button" onClick={() => { if (evento.tarefaCacheId) onConcluirTarefa(evento.tarefaCacheId); }} className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-emerald-100/80 bg-emerald-950/30 transition-colors hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-100" aria-label={`Concluir tarefa: ${evento.titulo || "sem título"}`} title="Concluir tarefa">
+                  <CheckCircle2 className="size-3.5 text-emerald-100 group-hover/item:text-emerald-600" aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => { setOpen(false); onEditarEvento(evento); }} className="min-w-0 flex-1 text-left focus:outline-none">
+                  <span className="block truncate text-sm font-bold text-white">{evento.titulo || "(sem título)"}</span>
+                  <span className="mt-0.5 block text-[11px] font-medium text-emerald-100/75">{evento.diaInteiro ? "Dia inteiro" : evento.inicioEm ? formatarHora(new Date(evento.inicioEm)) : "—"}</span>
+                  <span className="mt-1 block text-[10px] font-bold uppercase tracking-wide text-emerald-200/90">Clique para editar</span>
+                </button>
+              </div>
+            ) : (
               <button
                 key={evento.id}
                 type="button"
-                onClick={() => {
-                  setOpen(false);
-                  if (evento.tipo === "tarefa") {
-                    if (evento.tarefaCacheId) onConcluirTarefa(evento.tarefaCacheId);
-                  } else {
-                    onEditarEvento(evento);
-                  }
-                }}
-                className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/5 transition-colors"
+                onClick={() => { setOpen(false); onEditarEvento(evento); }}
+                className="group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110"
+                style={{ background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}e8, ${corDoItemAgenda(evento)}aa)`, borderLeftColor: "rgba(255,255,255,0.8)", borderLeftWidth: 3 }}
               >
-                <span
-                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: corDoItemAgenda(evento) }}
-                  aria-hidden="true"
-                />
+                <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.8)]" aria-hidden="true" />
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1 truncate text-sm font-semibold text-white">
-                    {evento.tipo === "tarefa" && <Circle className="size-3.5 shrink-0 text-emerald-300" aria-hidden="true" />}
+                  <span className="flex items-center gap-1 truncate text-sm font-bold text-white">
+                    {evento.eventType === "focusTime" && <Sparkles className="size-3.5 shrink-0 text-white/90" aria-hidden="true" />}
                     <span className="truncate">{evento.titulo || "(sem título)"}</span>
                   </span>
-                  <span className="block text-[11px] text-slate-500">
+                  <span className="mt-0.5 block text-[11px] font-medium text-white/70">
                     {evento.diaInteiro ? "Dia inteiro" : evento.inicioEm ? formatarHora(new Date(evento.inicioEm)) : "—"}
                   </span>
                 </span>
               </button>
             ))}
-          </div>
         </div>
       </PopoverContent>
     </Popover>

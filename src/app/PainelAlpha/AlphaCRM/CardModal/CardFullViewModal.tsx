@@ -54,7 +54,6 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
-  const [perfilEmpresaAberto, setPerfilEmpresaAberto] = useState(false);
   const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
   const acessoRevogadoRef = useRef(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);

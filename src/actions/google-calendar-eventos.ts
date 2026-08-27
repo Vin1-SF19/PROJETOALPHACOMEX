@@ -84,6 +84,10 @@ function paraInputEventoGoogle(dados: CriarEventoInput | AtualizarEventoInput) {
     fim: dados.fim,
     participantes: dados.participantes,
     criarMeet: dados.criarMeet,
+    recorrenciaRegras: dados.recorrenciaRegras,
+    visibilidade: dados.visibilidade,
+    transparencia: dados.transparencia,
+    lembretesMinutos: dados.lembretesMinutos,
   };
 }
 

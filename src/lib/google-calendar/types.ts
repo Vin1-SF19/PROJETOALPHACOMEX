@@ -91,4 +91,8 @@ export interface CriarOuAtualizarEventoInput {
   participantes: string[];
   criarMeet: boolean;
   eventType?: Extract<GoogleEventType, "default" | "focusTime" | "outOfOffice" | "workingLocation">;
+  recorrenciaRegras?: string[];
+  visibilidade?: "default" | "public" | "private" | "confidential";
+  transparencia?: "opaque" | "transparent";
+  lembretesMinutos?: number[];
 }

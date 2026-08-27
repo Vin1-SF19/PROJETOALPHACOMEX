@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { getTema } from "@/lib/temas";
 import { CrmSpaceBackground } from "./CRMBackground";
+import { PerfilEmpresaProvider } from "@/components/PerfilEmpresaGlobal";
 import { FlowButton } from "@/components/ui/flow-button";
 import type { Session } from "next-auth";
 import { isAdminRole } from "@/lib/roles";
@@ -128,7 +129,9 @@ export default function CRMLayout({ children, session }: { children: React.React
           </div>
         </div>
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">
+          <PerfilEmpresaProvider>{children}</PerfilEmpresaProvider>
+        </main>
       </div>
     </div>
   );

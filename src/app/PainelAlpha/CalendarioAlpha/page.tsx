@@ -111,8 +111,8 @@ export default async function CalendarioAlphaPage({
     where: { taskList: { conexaoId: statusConexao.conexaoId ?? "" }, excluida: false, oculta: false },
     orderBy: [{ status: "asc" }, { vencimentoEm: "asc" }],
     take: 100,
-    select: { id: true, titulo: true, status: true, vencimentoEm: true, taskList: { select: { googleTaskListId: true, titulo: true } } },
-  }).then((items) => items.map((tarefa) => ({ id: tarefa.id, taskListGoogleId: tarefa.taskList.googleTaskListId, listaTitulo: tarefa.taskList.titulo, titulo: tarefa.titulo, status: tarefa.status === "completed" ? "completed" : "needsAction", vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null })));
+    select: { id: true, titulo: true, notas: true, status: true, vencimentoEm: true, taskList: { select: { googleTaskListId: true, titulo: true } } },
+  }).then((items) => items.map((tarefa) => ({ id: tarefa.id, taskListGoogleId: tarefa.taskList.googleTaskListId, listaTitulo: tarefa.taskList.titulo, titulo: tarefa.titulo, notas: tarefa.notas, status: tarefa.status === "completed" ? "completed" : "needsAction", vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null })));
   const listasTarefas: ListaTarefasAgendaView[] = await db.googleCalendarTaskListCache.findMany({
     where: { conexaoId: statusConexao.conexaoId ?? "" },
     orderBy: { titulo: "asc" },

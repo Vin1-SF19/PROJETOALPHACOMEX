@@ -16,7 +16,7 @@ import {
   useDadosEmpresaDrawer,
 } from "./DadosEmpresaDrawer";
 import { TelefonesCardButton } from "./TelefonesCardButton";
-import { EmpresaPerfilModal } from "./EmpresaPerfilModal";
+import { usePerfilEmpresa } from "@/components/PerfilEmpresaGlobal";
 import { SeletorMembrosCard } from "./SeletorMembrosCard";
 import { CardSaveProvider } from "./CardSaveContext";
 
@@ -74,8 +74,8 @@ export function CardAbertoLayout({
   children,
 }: CardAbertoLayoutProps) {
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
-  const [perfilEmpresaAberto, setPerfilEmpresaAberto] = useState(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(card.id);
+  const { openPerfilEmpresa } = usePerfilEmpresa();
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo);
@@ -125,7 +125,17 @@ export function CardAbertoLayout({
                 <span className="text-slate-700">·</span>
                 <button
                   type="button"
-                  onClick={() => setPerfilEmpresaAberto(true)}
+                  onClick={() =>
+                    openPerfilEmpresa(
+                      card.empresa.id,
+                      {
+                        cnpj: card.empresa.cnpj ?? "",
+                        razaoSocial: card.empresa.razaoSocial,
+                        nomeFantasia: card.empresa.nomeFantasia ?? undefined,
+                      },
+                      onAbrirCard
+                    )
+                  }
                   className="hover:text-white transition-colors"
                   aria-label="Abrir perfil da empresa"
                 >
@@ -265,14 +275,6 @@ export function CardAbertoLayout({
           />
         </div>
       </div>
-
-      <EmpresaPerfilModal
-        empresaId={card.empresa.id}
-        aberto={perfilEmpresaAberto}
-        accent={accent}
-        onAbertoChange={setPerfilEmpresaAberto}
-        onAbrirCard={onAbrirCard}
-      />
     </div>
     </CardSaveProvider>
   );

@@ -358,6 +358,15 @@ function paraSchemaEvento(input: CriarOuAtualizarEventoInput): calendar_v3.Schem
     start: dataInicio,
     end: dataFim,
     attendees: input.participantes.map((email) => ({ email })),
+    recurrence: input.recorrenciaRegras,
+    visibility: input.visibilidade,
+    transparency: input.transparencia,
+    reminders: input.lembretesMinutos
+      ? {
+          useDefault: input.lembretesMinutos.length === 0,
+          overrides: input.lembretesMinutos.map((minutes) => ({ method: "popup" as const, minutes })),
+        }
+      : undefined,
     conferenceData: input.criarMeet
       ? {
           createRequest: {

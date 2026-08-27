@@ -4,13 +4,19 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { verificarAcessoCalendarioAlpha } from "@/lib/google-calendar/autorizacao";
-import { criarTarefaGoogleTasks, concluirTarefaGoogleTasks, listarListasGoogleTasks, listarTarefasGoogleTasks } from "@/lib/google-calendar/tasks";
+import { atualizarTarefaGoogleTasks, criarTarefaGoogleTasks, concluirTarefaGoogleTasks, listarListasGoogleTasks, listarTarefasGoogleTasks } from "@/lib/google-calendar/tasks";
 import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import db from "@/lib/prisma";
 
 type Resultado<T> = { success: true; data: T } | { success: false; error: string };
 const tarefaSchema = z.object({ taskListId: z.string().min(1).max(300), titulo: z.string().trim().min(1).max(1024), notas: z.string().trim().max(8192).optional(), vencimentoEm: z.coerce.date().optional() }).strict();
 const concluirSchema = z.object({ tarefaCacheId: z.string().min(1) }).strict();
+const atualizarSchema = z.object({
+  tarefaCacheId: z.string().min(1),
+  titulo: z.string().trim().min(1).max(1024),
+  notas: z.string().trim().max(8192).optional(),
+  vencimentoEm: z.coerce.date().optional(),
+}).strict();
 
 async function contextoAtivo(): Promise<Resultado<{ conexaoId: string; emailUsuario: string }>> {
   const acesso = await verificarAcessoCalendarioAlpha();
@@ -76,4 +82,26 @@ export async function concluirTarefaAgendaAlpha(input: z.input<typeof concluirSc
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { id: tarefa.id } };
   } catch { return { success: false, error: "Não foi possível concluir a tarefa no Google." }; }
+}
+
+export async function atualizarTarefaAgendaAlpha(input: z.input<typeof atualizarSchema>): Promise<Resultado<{ id: string }>> {
+  const parsed = atualizarSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  const contexto = await contextoAtivo();
+  if (!contexto.success) return contexto;
+  const tarefa = await db.googleCalendarTaskCache.findFirst({ where: { id: parsed.data.tarefaCacheId, taskList: { conexaoId: contexto.data.conexaoId } }, include: { taskList: { select: { googleTaskListId: true } } } });
+  if (!tarefa) return { success: false, error: "Tarefa não encontrada." };
+  try {
+    const atualizada = await atualizarTarefaGoogleTasks({
+      emailUsuario: contexto.data.emailUsuario,
+      taskListId: tarefa.taskList.googleTaskListId,
+      taskId: tarefa.googleTaskId,
+      titulo: parsed.data.titulo,
+      notas: parsed.data.notas,
+      vencimentoEm: parsed.data.vencimentoEm,
+    });
+    await db.googleCalendarTaskCache.update({ where: { id: tarefa.id }, data: atualizada });
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return { success: true, data: { id: tarefa.id } };
+  } catch { return { success: false, error: "Não foi possível atualizar a tarefa no Google." }; }
 }

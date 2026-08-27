@@ -17,6 +17,7 @@ import { Timeline } from "./Timeline";
 import { useClientTimeline } from "./useClientTimeline";
 import { fmtDate } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
+import type { TimelineEvent } from "@/lib/timeline/types";
 
 interface EmpresaInfo {
   cnpj: string;
@@ -34,6 +35,7 @@ interface PerfilEmpresaModalProps {
   empresa: EmpresaInfo;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onAbrirCard?: (cardId: string) => void;
 }
 
 function SkeletonTimeline() {
@@ -64,10 +66,19 @@ export function PerfilEmpresaModal({
   empresa,
   open,
   onOpenChange,
+  onAbrirCard,
 }: PerfilEmpresaModalProps) {
   const { events, loading, error, modules, total, refetch } = useClientTimeline(
     open ? empresaId : null
   );
+
+  const handleEventClick = (event: TimelineEvent) => {
+    const cardId = event.metadata?.cardId;
+    if (typeof cardId === "number" && onAbrirCard) {
+      onOpenChange(false);
+      onAbrirCard(String(cardId));
+    }
+  };
 
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -174,7 +185,7 @@ export function PerfilEmpresaModal({
               </Button>
             </div>
           ) : (
-            <Timeline events={events} />
+            <Timeline events={events} onEventClick={onAbrirCard ? handleEventClick : undefined} />
           )}
         </div>
 

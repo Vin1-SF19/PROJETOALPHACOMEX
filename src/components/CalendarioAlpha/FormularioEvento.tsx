@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Loader2 } from "lucide-react";
+import { Bell, Clock3, Loader2, MapPin, UsersRound, Video } from "lucide-react";
 import { toast } from "sonner";
 
 import { atualizarEventoParcialParaColega } from "@/actions/google-calendar-admin";
@@ -9,7 +9,7 @@ import {
   atualizarEventoParcialNoCalendario,
   criarEventoNoCalendario,
 } from "@/actions/google-calendar-eventos";
-import { criarTarefaAgendaAlpha } from "@/actions/google-calendar-tarefas";
+import { atualizarTarefaAgendaAlpha, criarTarefaAgendaAlpha } from "@/actions/google-calendar-tarefas";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,10 @@ import { AgendaModal3D } from "./AgendaModal3D";
 import type { CalendarioSelecionadoView, EventoExibicao, ListaTarefasAgendaView } from "./lib/tipos";
 
 const TIMEZONE_PADRAO = "America/Sao_Paulo";
+const TIPOS_EVENTO = [
+  ["default", "Evento"], ["task", "Tarefa"], ["outOfOffice", "Ausente"],
+  ["focusTime", "Hora de foco"], ["workingLocation", "Local de trabalho"],
+] as const;
 
 interface FormularioEventoProps {
   open: boolean;
@@ -80,6 +84,7 @@ export function FormularioEvento({
   const calendariosGravaveis = calendarios.filter((calendario) => calendario.gravavel);
   const editandoEventoDeColega = Boolean(eventoParaEditar?.colegaId);
   const emEdicao = Boolean(eventoParaEditar);
+  const editandoTarefa = eventoParaEditar?.tipo === "tarefa";
   const [isPending, startTransition] = useTransition();
   const inicioDetalhado = dataDoGoogle(detalhesEvento?.inicio);
   const fimDetalhado = dataDoGoogle(detalhesEvento?.fim);
@@ -91,7 +96,7 @@ export function FormularioEvento({
   const [fim, setFim] = useState(paraInputDatetimeLocal(fimPadrao));
   const [diaInteiro, setDiaInteiro] = useState(detalhesEvento?.diaInteiro ?? eventoParaEditar?.diaInteiro ?? false);
   const [localizacao, setLocalizacao] = useState(detalhesEvento?.localizacao ?? "");
-  const [descricao, setDescricao] = useState(detalhesEvento?.descricao ?? "");
+  const [descricao, setDescricao] = useState(detalhesEvento?.descricao ?? eventoParaEditar?.tarefaNotas ?? "");
   const participantesIniciais = detalhesEvento?.participantes
     .filter((participante) => !participante.organizador)
     .map((participante) => participante.email)
@@ -101,11 +106,15 @@ export function FormularioEvento({
   );
   const [criarMeet, setCriarMeet] = useState(false);
   const [eventType, setEventType] = useState<"default" | "focusTime" | "outOfOffice" | "workingLocation" | "task">(
-    detalhesEvento?.eventType === "focusTime" || detalhesEvento?.eventType === "outOfOffice" || detalhesEvento?.eventType === "workingLocation"
+    editandoTarefa ? "task" : detalhesEvento?.eventType === "focusTime" || detalhesEvento?.eventType === "outOfOffice" || detalhesEvento?.eventType === "workingLocation"
       ? detalhesEvento.eventType
       : "default",
   );
   const [taskListId, setTaskListId] = useState(listasTarefas[0]?.googleTaskListId ?? "");
+  const [repeticao, setRepeticao] = useState("nunca");
+  const [visibilidade, setVisibilidade] = useState<"default" | "private" | "public">("default");
+  const [disponibilidade, setDisponibilidade] = useState<"opaque" | "transparent">("opaque");
+  const [lembreteMinutos, setLembreteMinutos] = useState("30");
   const [conflito, setConflito] = useState(false);
 
   function handleSubmit(evento: FormEvent<HTMLFormElement>) {
@@ -114,23 +123,33 @@ export function FormularioEvento({
     if (!titulo.trim()) return toast.error("Título é obrigatório.");
 
     const listaParticipantes = emailsNormalizados(participantes);
+    const recorrenciaRegras = repeticao === "nunca" ? undefined : [
+      repeticao === "diaria" ? "RRULE:FREQ=DAILY" : repeticao === "semanal" ? "RRULE:FREQ=WEEKLY" : repeticao === "mensal" ? "RRULE:FREQ=MONTHLY" : "RRULE:FREQ=YEARLY",
+    ];
     startTransition(async () => {
       if (eventType === "task") {
-        if (!taskListId) {
+        if (!editandoTarefa && !taskListId) {
           toast.error("Sincronize as tarefas antes de criar a primeira tarefa.");
           return;
         }
-        const resultado = await criarTarefaAgendaAlpha({
-          taskListId,
-          titulo,
-          notas: descricao || undefined,
-          vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
-        });
+        const resultado = editandoTarefa && eventoParaEditar?.tarefaCacheId
+          ? await atualizarTarefaAgendaAlpha({
+            tarefaCacheId: eventoParaEditar.tarefaCacheId,
+            titulo,
+            notas: descricao || undefined,
+            vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
+          })
+          : await criarTarefaAgendaAlpha({
+            taskListId,
+            titulo,
+            notas: descricao || undefined,
+            vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
+          });
         if (!resultado.success) {
           toast.error(resultado.error);
           return;
         }
-        toast.success("Tarefa criada.");
+        toast.success(editandoTarefa ? "Tarefa atualizada." : "Tarefa criada.");
         onSalvo();
         onOpenChange(false);
         return;
@@ -147,6 +166,10 @@ export function FormularioEvento({
         participantes: listaParticipantes,
         criarMeet: eventType === "default" && criarMeet,
         eventType,
+        recorrenciaRegras,
+        visibilidade,
+        transparencia: disponibilidade,
+        lembretesMinutos: lembreteMinutos === "nenhum" ? [] : [Number(lembreteMinutos)],
       };
 
       if (emEdicao && eventoParaEditar) {
@@ -226,7 +249,7 @@ export function FormularioEvento({
       open={open}
       onOpenChange={onOpenChange}
       tema={tema}
-      title={emEdicao ? "Editar evento" : eventType === "task" ? "Nova tarefa" : "Novo evento"}
+      title={emEdicao ? editandoTarefa ? "Editar tarefa" : "Editar evento" : eventType === "task" ? "Nova tarefa" : "Novo evento"}
       description={eventType === "task" ? "Sincronizado com o Google Tasks." : "Sincronizado com sua conta Google Calendar."}
       footer={footer}
       size="md"
@@ -239,20 +262,10 @@ export function FormularioEvento({
         )}
 
         {!emEdicao && (
-          <div className="space-y-1.5">
-            <Label htmlFor="ca-tipo">Tipo</Label>
-            <Select value={eventType} onValueChange={(value) => setEventType(value as typeof eventType)}>
-              <SelectTrigger id="ca-tipo" className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Evento</SelectItem>
-                <SelectItem value="task">Tarefa</SelectItem>
-                <SelectItem value="focusTime">Horário de foco</SelectItem>
-                <SelectItem value="outOfOffice">Ausente</SelectItem>
-                <SelectItem value="workingLocation">Local de trabalho</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1.5">
+            {TIPOS_EVENTO.map(([valor, rotulo]) => <button key={valor} type="button" onClick={() => setEventType(valor)} className={cn("rounded-xl px-3 py-2 text-sm font-bold transition-colors", eventType === valor ? cn(tema.bg, "text-white shadow-lg") : "text-slate-400 hover:bg-white/10 hover:text-white")}>{rotulo}</button>)}
             {eventType !== "default" && eventType !== "task" && (
-              <p className="text-xs text-slate-400">Este tipo segue as regras e o status definidos pelo Google Calendar.</p>
+              <p className="basis-full px-2 pb-1 text-xs text-slate-400">Este tipo segue as regras e o status definidos pelo Google Calendar.</p>
             )}
           </div>
         )}
@@ -260,7 +273,7 @@ export function FormularioEvento({
         {eventType === "task" ? (
           <div className="space-y-1.5">
             <Label htmlFor="ca-lista-tarefas">Lista de tarefas</Label>
-            <Select value={taskListId} onValueChange={setTaskListId}>
+            <Select value={taskListId} onValueChange={setTaskListId} disabled={editandoTarefa}>
               <SelectTrigger id="ca-lista-tarefas" className="w-full"><SelectValue placeholder="Sincronize para carregar as listas" /></SelectTrigger>
               <SelectContent>
                 {listasTarefas.map((lista) => (
@@ -289,7 +302,7 @@ export function FormularioEvento({
 
         <div className="space-y-1.5">
           <Label htmlFor="ca-titulo">Título</Label>
-          <Input id="ca-titulo" value={titulo} onChange={(evento) => setTitulo(evento.target.value)} maxLength={300} required />
+          <Input id="ca-titulo" placeholder="Adicionar título" value={titulo} onChange={(evento) => setTitulo(evento.target.value)} maxLength={300} required className="h-12 border-x-0 border-t-0 rounded-none bg-transparent px-0 text-lg font-semibold" />
         </div>
 
         {eventType !== "task" && <div className="flex items-center gap-2">
@@ -302,7 +315,9 @@ export function FormularioEvento({
             <Label htmlFor="ca-vencimento">Data da tarefa</Label>
             <Input id="ca-vencimento" type="date" value={inicio.slice(0, 10)} onChange={(evento) => setInicio(`${evento.target.value}T12:00`)} required />
           </div>
-        ) : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        ) : <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-3">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500"><Clock3 className="size-4" /> Quando</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="ca-inicio">Início</Label>
             <Input
@@ -321,11 +336,16 @@ export function FormularioEvento({
             <Label htmlFor="ca-fim">Fim</Label>
             <Input id="ca-fim" type={diaInteiro ? "date" : "datetime-local"} value={diaInteiro ? fim.slice(0, 10) : fim} onChange={(evento) => setFim(diaInteiro ? `${evento.target.value}T00:00` : evento.target.value)} required />
           </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5"><Label htmlFor="ca-repeticao">Repetição</Label><Select value={repeticao} onValueChange={setRepeticao}><SelectTrigger id="ca-repeticao"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="nunca">Não se repete</SelectItem><SelectItem value="diaria">Todos os dias</SelectItem><SelectItem value="semanal">Toda semana</SelectItem><SelectItem value="mensal">Todo mês</SelectItem><SelectItem value="anual">Todo ano</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1.5"><Label htmlFor="ca-fuso">Fuso horário</Label><Input id="ca-fuso" value={TIMEZONE_PADRAO} readOnly className="text-slate-400" /></div>
+          </div>
         </div>}
 
         {eventType !== "task" && <div className="space-y-1.5">
           <Label htmlFor="ca-local">Localização</Label>
-          <Input id="ca-local" value={localizacao} onChange={(evento) => setLocalizacao(evento.target.value)} maxLength={300} />
+          <div className="relative"><MapPin className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" /><Input id="ca-local" value={localizacao} onChange={(evento) => setLocalizacao(evento.target.value)} maxLength={300} className="pl-9" placeholder="Adicionar local" /></div>
         </div>}
         <div className="space-y-1.5">
           <Label htmlFor="ca-descricao">Descrição</Label>
@@ -333,18 +353,23 @@ export function FormularioEvento({
         </div>
         {eventType !== "task" && <div className="space-y-1.5">
           <Label htmlFor="ca-participantes">Participantes (e-mails separados por vírgula)</Label>
-          <Input id="ca-participantes" value={participantes} onChange={(evento) => setParticipantes(evento.target.value)} placeholder="nome@empresa.com" />
+          <div className="relative"><UsersRound className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" /><Input id="ca-participantes" value={participantes} onChange={(evento) => setParticipantes(evento.target.value)} className="pl-9" placeholder="Adicionar convidados: nome@empresa.com" /></div>
         </div>}
         {eventType === "task" || eventType !== "default" ? null : detalhesEvento?.linkMeet ? (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
             Este evento já possui Google Meet. O link será preservado.
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2">
             <Checkbox id="ca-meet" checked={criarMeet} onCheckedChange={(valor) => setCriarMeet(valor === true)} />
-            <Label htmlFor="ca-meet" className="cursor-pointer">Criar Google Meet</Label>
+            <Video className="size-4 text-slate-400" /><Label htmlFor="ca-meet" className="cursor-pointer">Adicionar videoconferência do Google Meet</Label>
           </div>
         )}
+        {eventType !== "task" && <div className="grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-3 sm:grid-cols-3">
+          <div className="space-y-1.5"><Label htmlFor="ca-disponibilidade">Mostrar como</Label><Select value={disponibilidade} onValueChange={(v) => setDisponibilidade(v as typeof disponibilidade)}><SelectTrigger id="ca-disponibilidade"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="opaque">Ocupado</SelectItem><SelectItem value="transparent">Livre</SelectItem></SelectContent></Select></div>
+          <div className="space-y-1.5"><Label htmlFor="ca-visibilidade">Visibilidade</Label><Select value={visibilidade} onValueChange={(v) => setVisibilidade(v as typeof visibilidade)}><SelectTrigger id="ca-visibilidade"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="default">Padrão</SelectItem><SelectItem value="private">Privado</SelectItem><SelectItem value="public">Público</SelectItem></SelectContent></Select></div>
+          <div className="space-y-1.5"><Label htmlFor="ca-lembrete"><Bell className="mr-1 inline size-3.5" />Lembrete</Label><Select value={lembreteMinutos} onValueChange={setLembreteMinutos}><SelectTrigger id="ca-lembrete"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="nenhum">Padrão da agenda</SelectItem><SelectItem value="10">10 min antes</SelectItem><SelectItem value="30">30 min antes</SelectItem><SelectItem value="60">1 h antes</SelectItem><SelectItem value="1440">1 dia antes</SelectItem></SelectContent></Select></div>
+        </div>}
       </form>
     </AgendaModal3D>
   );

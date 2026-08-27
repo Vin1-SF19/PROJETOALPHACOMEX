@@ -15,7 +15,7 @@ interface EmpresaInfo {
 }
 
 interface PerfilEmpresaContextValue {
-  openPerfilEmpresa: (empresaId: number, empresa: EmpresaInfo) => void;
+  openPerfilEmpresa: (empresaId: number, empresa: EmpresaInfo, onAbrirCard?: (cardId: string) => void) => void;
   closePerfilEmpresa: () => void;
   isPerfilEmpresaOpen: boolean;
 }
@@ -30,12 +30,17 @@ export function PerfilEmpresaProvider({ children }: PerfilEmpresaProviderProps) 
   const [isOpen, setIsOpen] = useState(false);
   const [empresaId, setEmpresaId] = useState<number | null>(null);
   const [empresa, setEmpresa] = useState<EmpresaInfo | null>(null);
+  const [onAbrirCard, setOnAbrirCard] = useState<((cardId: string) => void) | undefined>(undefined);
 
-  const openPerfilEmpresa = useCallback((id: number, info: EmpresaInfo) => {
-    setEmpresaId(id);
-    setEmpresa(info);
-    setIsOpen(true);
-  }, []);
+  const openPerfilEmpresa = useCallback(
+    (id: number, info: EmpresaInfo, abrirCard?: (cardId: string) => void) => {
+      setEmpresaId(id);
+      setEmpresa(info);
+      setOnAbrirCard(() => abrirCard);
+      setIsOpen(true);
+    },
+    []
+  );
 
   const closePerfilEmpresa = useCallback(() => {
     setIsOpen(false);
@@ -61,6 +66,7 @@ export function PerfilEmpresaProvider({ children }: PerfilEmpresaProviderProps) 
           onOpenChange={(open) => {
             if (!open) closePerfilEmpresa();
           }}
+          onAbrirCard={onAbrirCard}
         />
       )}
     </PerfilEmpresaContext.Provider>

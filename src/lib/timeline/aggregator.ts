@@ -2,8 +2,8 @@ import type { TimelineEvent, TimelineResponse } from './types';
 import { extractCrmEvents } from './extractors/crm';
 import { extractCsNpsEvents } from './extractors/cs-nps';
 import { extractComissoesEvents } from './extractors/comissoes';
-import { extractMetasEvents } from './extractors/metad';
 import { isAdminRole } from '@/lib/roles';
+import { usuarioEhDiretoriaBpm } from '@/lib/bpm/boas-vindas';
 
 interface ModulePermission {
   module: string;
@@ -15,7 +15,6 @@ const MODULE_PERMISSIONS: ModulePermission[] = [
   { module: 'crm', permission: 'crm' },
   { module: 'cs-nps', permission: 'Cliente' },
   { module: 'comissoes', permission: 'comissoes', allowedRoles: ['Admin', 'CEO', 'TI', 'FINANCEIRO'] },
-  { module: 'metas', permission: 'metas', allowedRoles: ['Lider Comercial'] },
 ];
 
 function hasModuleAccess(
@@ -32,13 +31,15 @@ function hasModuleAccess(
 export async function aggregateClientEvents(
   clientId: number,
   permissoes: string[],
-  role?: string | null,
+  role: string | null | undefined,
+  userId: number,
 ): Promise<TimelineResponse> {
+  const isAdminOrDiretoria = isAdminRole(role) || usuarioEhDiretoriaBpm(role);
+
   const extractors: Record<string, () => Promise<TimelineEvent[]>> = {
-    crm: () => extractCrmEvents(clientId),
+    crm: () => extractCrmEvents(clientId, { userId, isAdminOrDiretoria }),
     'cs-nps': () => extractCsNpsEvents(clientId),
     comissoes: () => extractComissoesEvents(clientId),
-    metas: () => extractMetasEvents(clientId),
   };
 
   const allowedModules = MODULE_PERMISSIONS.filter((m) => hasModuleAccess(m, permissoes, role));

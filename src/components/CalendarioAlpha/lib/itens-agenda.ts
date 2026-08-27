@@ -24,6 +24,7 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
       eventType: "task",
       tipo: "tarefa" as const,
       tarefaCacheId: tarefa.id,
+      tarefaNotas: tarefa.notas,
       calendarioId: "tarefas-google",
       calendarioGoogleId: tarefa.taskListGoogleId,
       calendarioNome: tarefa.listaTitulo,

@@ -179,6 +179,15 @@ export function useAgendaAlphaController({
   }
 
   async function editarEvento(evento: EventoExibicao) {
+    if (evento.tipo === "tarefa") {
+      invalidarEdicaoPendente();
+      setAlvoEdicao(evento);
+      setSessaoEdicao({ evento, detalhes: undefined });
+      setErroEdicao(null);
+      setDataParaNovoEvento(evento.inicioEm ? new Date(evento.inicioEm) : dataReferencia);
+      setFormularioAberto(true);
+      return;
+    }
     const sequencia = sequenciaEdicao.current + 1;
     const chave = chaveEvento(evento);
     sequenciaEdicao.current = sequencia;

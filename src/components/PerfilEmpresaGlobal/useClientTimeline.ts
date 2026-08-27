@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TimelineEvent, TimelineResponse } from "@/lib/timeline/types";
 
 interface UseClientTimelineResult {
@@ -19,47 +19,40 @@ export function useClientTimeline(clientId: number | null): UseClientTimelineRes
   const [modules, setModules] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [attempt, setAttempt] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
 
-  const fetchTimeline = useCallback(async () => {
+  useEffect(() => {
     if (clientId === null) return;
 
-    abortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- inicia o fetch da timeline ao trocar de cliente/attempt
     setLoading(true);
     setError(null);
 
-    try {
-      const res = await fetch(`/api/painel-alpha/clientes/${clientId}/timeline`, {
-        signal: controller.signal,
+    fetch(`/api/painel-alpha/clientes/${clientId}/timeline`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error("Falha ao carregar timeline do cliente.");
+        return res.json() as Promise<TimelineResponse>;
+      })
+      .then((data) => {
+        setEvents(data.events);
+        setModules(data.modules);
+        setTotal(data.total);
+      })
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setError(e instanceof Error ? e.message : "Erro desconhecido ao carregar timeline.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
 
-      if (!res.ok) {
-        throw new Error("Falha ao carregar timeline do cliente.");
-      }
-
-      const data: TimelineResponse = await res.json();
-      setEvents(data.events);
-      setModules(data.modules);
-      setTotal(data.total);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setError(e instanceof Error ? e.message : "Erro desconhecido ao carregar timeline.");
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
-  }, [clientId]);
-
-  useEffect(() => {
-    fetchTimeline();
     return () => {
-      abortRef.current?.abort();
+      controller.abort();
     };
-  }, [fetchTimeline, attempt]);
+  }, [clientId, attempt]);
 
   const refetch = useCallback(() => {
     setAttempt((n) => n + 1);

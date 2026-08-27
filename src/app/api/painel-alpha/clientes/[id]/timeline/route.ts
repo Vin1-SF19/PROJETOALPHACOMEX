@@ -18,11 +18,17 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid client ID' }, { status: 400 });
   }
 
-  const permissoes: string[] = (session.user as any).permissoes ?? [];
-  const role: string | undefined = (session.user as any).role;
+  const user = session.user as typeof session.user & { permissoes?: string[]; role?: string };
+  const permissoes: string[] = user.permissoes ?? [];
+  const role: string | undefined = user.role;
+  const userId = Number(session.user.id);
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return NextResponse.json({ error: 'Invalid session user' }, { status: 401 });
+  }
 
   try {
-    const result = await aggregateClientEvents(clientId, permissoes, role);
+    const result = await aggregateClientEvents(clientId, permissoes, role, userId);
     return NextResponse.json(result);
   } catch {
     return NextResponse.json(

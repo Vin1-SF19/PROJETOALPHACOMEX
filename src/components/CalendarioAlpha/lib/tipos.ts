@@ -1,12 +1,52 @@
 /** Cor usada quando o Google não retorna `backgroundColor` para o calendário/evento. */
 export const COR_CALENDARIO_PADRAO = "#3b82f6";
 
-export function corDoItemAgenda(item: Pick<EventoExibicao, "tipo" | "eventType" | "calendarioCorHex">): string {
-  if (item.tipo === "tarefa") return "#22c55e";
-  if (item.eventType === "focusTime") return "#a855f7";
-  if (item.eventType === "outOfOffice") return "#f43f5e";
-  if (item.eventType === "workingLocation") return "#0ea5e9";
-  return item.calendarioCorHex ?? COR_CALENDARIO_PADRAO;
+function hashEstavel(valor: string): number {
+  let resultado = 0;
+  for (let indice = 0; indice < valor.length; indice += 1) {
+    resultado = ((resultado << 5) - resultado + valor.charCodeAt(indice)) | 0;
+  }
+  return Math.abs(resultado);
+}
+
+function hexParaHsl(hex: string): { h: number; s: number; l: number } | null {
+  const valor = hex.replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(valor)) return null;
+  const [r, g, b] = [0, 2, 4].map((inicio) => Number.parseInt(valor.slice(inicio, inicio + 2), 16) / 255);
+  const maximo = Math.max(r, g, b);
+  const minimo = Math.min(r, g, b);
+  const delta = maximo - minimo;
+  const l = (maximo + minimo) / 2;
+  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (delta !== 0) {
+    if (maximo === r) h = 60 * (((g - b) / delta) % 6);
+    else if (maximo === g) h = 60 * ((b - r) / delta + 2);
+    else h = 60 * ((r - g) / delta + 4);
+  }
+  return { h: (h + 360) % 360, s, l };
+}
+
+function hslParaHex({ h, s, l }: { h: number; s: number; l: number }): string {
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const segundo = chroma * (1 - Math.abs((h / 60) % 2 - 1));
+  const ajuste = l - chroma / 2;
+  const [r, g, b] = h < 60 ? [chroma, segundo, 0] : h < 120 ? [segundo, chroma, 0] : h < 180 ? [0, chroma, segundo] : h < 240 ? [0, segundo, chroma] : h < 300 ? [segundo, 0, chroma] : [chroma, 0, segundo];
+  return `#${[r, g, b].map((canal) => Math.round((canal + ajuste) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Varia a luminosidade da cor do calendário por item, sem perder a identidade escolhida pelo usuário. */
+export function corDoItemAgenda(item: Pick<EventoExibicao, "id" | "tipo" | "eventType" | "calendarioCorHex">): string {
+  const base = item.tipo === "tarefa" ? "#22c55e"
+    : item.eventType === "focusTime" ? "#a855f7"
+      : item.eventType === "outOfOffice" ? "#f43f5e"
+        : item.eventType === "workingLocation" ? "#0ea5e9"
+          : item.calendarioCorHex ?? COR_CALENDARIO_PADRAO;
+  const hsl = hexParaHsl(base);
+  if (!hsl) return COR_CALENDARIO_PADRAO;
+  const variacoes = [-0.1, -0.035, 0.045, 0.11, 0.17];
+  const ajuste = variacoes[hashEstavel(item.id) % variacoes.length] ?? 0;
+  return hslParaHex({ ...hsl, l: Math.max(0.28, Math.min(0.7, hsl.l + ajuste)) });
 }
 
 export interface CalendarioSelecionadoView {
@@ -45,6 +85,7 @@ export interface EventoExibicao {
   eventType: string;
   tipo: "evento" | "tarefa";
   tarefaCacheId?: string;
+  tarefaNotas?: string | null;
   calendarioId: string;
   calendarioGoogleId: string;
   calendarioNome: string;
@@ -59,6 +100,7 @@ export interface TarefaAgendaExibicao {
   taskListGoogleId: string;
   listaTitulo: string;
   titulo: string;
+  notas: string | null;
   status: "needsAction" | "completed";
   vencimentoEm: string | null;
 }

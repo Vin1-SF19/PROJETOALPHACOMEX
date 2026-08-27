@@ -34,6 +34,10 @@ const camposEventoBase = {
   participantes: z.array(emailParticipanteSchema).max(MAX_PARTICIPANTES).default([]),
   criarMeet: z.boolean().default(false),
   eventType: z.enum(["default", "focusTime", "outOfOffice", "workingLocation"]).default("default"),
+  recorrenciaRegras: z.array(z.string().trim().min(1).max(300)).max(10).optional(),
+  visibilidade: z.enum(["default", "public", "private", "confidential"]).default("default"),
+  transparencia: z.enum(["opaque", "transparent"]).default("opaque"),
+  lembretesMinutos: z.array(z.number().int().min(0).max(40_320)).max(5).default([]),
 };
 
 function refinarIntervalo<T extends { inicio: Date; fim: Date }>(schema: z.ZodType<T>) {
