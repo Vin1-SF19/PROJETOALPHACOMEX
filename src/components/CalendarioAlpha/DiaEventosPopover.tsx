@@ -53,7 +53,7 @@ export function DiaEventosPopover({
                 key={evento.id}
                 type="button"
                 onClick={() => { setOpen(false); onEditarEvento(evento); }}
-                className="group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110"
+                className={evento.recusadoPeloUsuario ? "group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left opacity-55 grayscale line-through shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110" : "group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/10 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/20 hover:brightness-110"}
                 style={{ background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}e8, ${corDoItemAgenda(evento)}aa)`, borderLeftColor: "rgba(255,255,255,0.8)", borderLeftWidth: 3 }}
               >
                 <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.8)]" aria-hidden="true" />

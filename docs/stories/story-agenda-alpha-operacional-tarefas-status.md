@@ -42,6 +42,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [x] Criar vínculo aditivo entre chamado e tarefa Google, com início, fim planejado e fim real locais.
 - [x] Criar a tarefa de uma hora para técnico TI ao assumir o chamado e concluí-la ao fechar o chamado.
 - [x] Exibir tarefa agendada na grade horária em azul durante o atendimento e em verde após a conclusão.
+- [x] Persistir a resposta do próprio participante no cache e riscar visualmente convites recusados em todas as visões da agenda.
 
 ## File List
 
@@ -56,6 +57,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `src/components/CalendarioAlpha/lib/{tipos,itens-agenda,useAgendaAlphaController}.ts`
 - `src/app/PainelAlpha/CalendarioAlpha/page.tsx`
 - `tests/google-calendar/{itens-agenda,layout-eventos,page-cache-wiring}.test.ts`
+- `tests/google-calendar/evento-resposta-usuario.test.ts`
 - `scripts/{turso-backup,apply-turso-migration}.mjs`
 
 ## Notas operacionais

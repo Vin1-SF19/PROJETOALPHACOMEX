@@ -9,7 +9,7 @@ import {
   parsearDataCivil,
   type VisaoCalendario,
 } from "@/components/CalendarioAlpha/lib/datas";
-import type { EventoExibicao, ListaTarefasAgendaView, TarefaAgendaExibicao } from "@/components/CalendarioAlpha/lib/tipos";
+import { eventoFoiRecusadoPeloUsuario, type EventoExibicao, type ListaTarefasAgendaView, type TarefaAgendaExibicao } from "@/components/CalendarioAlpha/lib/tipos";
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
 
@@ -103,6 +103,7 @@ export default async function CalendarioAlphaPage({
       calendarioNome: calendario.nome,
       calendarioCorHex: calendario.corHex,
       calendarioGravavel: calendario.gravavel,
+      recusadoPeloUsuario: eventoFoiRecusadoPeloUsuario(evento.statusPropertiesJson),
     }));
   });
 

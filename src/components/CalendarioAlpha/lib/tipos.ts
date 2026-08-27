@@ -49,6 +49,17 @@ export function corDoItemAgenda(item: Pick<EventoExibicao, "id" | "tipo" | "even
   return hslParaHex({ ...hsl, l: Math.max(0.28, Math.min(0.7, hsl.l + ajuste)) });
 }
 
+/** A resposta `declined` do participante atual é persistida no cache durante o sync. */
+export function eventoFoiRecusadoPeloUsuario(statusPropertiesJson: string | null): boolean {
+  if (!statusPropertiesJson) return false;
+  try {
+    const propriedades = JSON.parse(statusPropertiesJson) as { respostaDoUsuario?: unknown };
+    return propriedades.respostaDoUsuario === "declined";
+  } catch {
+    return false;
+  }
+}
+
 export interface CalendarioSelecionadoView {
   id: string;
   googleCalendarId: string;
@@ -91,6 +102,7 @@ export interface EventoExibicao {
   calendarioNome: string;
   calendarioCorHex: string | null;
   calendarioGravavel: boolean;
+  recusadoPeloUsuario?: boolean;
   /** Presente quando o evento pertence à agenda de um colega (não do próprio usuário logado). */
   colegaId?: number;
 }

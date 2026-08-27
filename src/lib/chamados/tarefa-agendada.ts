@@ -1,4 +1,4 @@
-import { concluirTarefaGoogleTasks, criarTarefaGoogleTasks, listarListasGoogleTasks } from "@/lib/google-calendar/tasks";
+import { atualizarTarefaGoogleTasks, concluirTarefaGoogleTasks, criarTarefaGoogleTasks, listarListasGoogleTasks } from "@/lib/google-calendar/tasks";
 import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import db from "@/lib/prisma";
 
@@ -13,19 +13,34 @@ function ehUsuarioTi(role: string | null | undefined): boolean {
   return role?.trim().toUpperCase() === "TI";
 }
 
-function urlDoChamado(chamadoId: number): string | null {
-  const base = process.env.PAINELALPHA_PUBLIC_URL?.trim().replace(/\/$/, "");
-  return base ? `${base}/PainelAlpha/Chamados?chamado=${chamadoId}` : null;
+function formatarHorario(data: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo",
+  }).format(data);
 }
 
 function notasDaTarefa(chamado: ChamadoParaAgenda): string {
   const descricao = chamado.descricao.trim().slice(0, 4_000);
-  const link = urlDoChamado(chamado.id);
   return [
     `Chamado #${chamado.id}`,
     descricao && `Descrição: ${descricao}`,
-    link && `Abrir chamado: ${link}`,
+    `Horário de início: ${formatarHorario(chamado.updatedAt)}`,
   ].filter(Boolean).join("\n\n");
+}
+
+function notasComConclusao(notas: string | null, concluidoEm: Date): string {
+  const semLinkLegado = (notas ?? "")
+    .replace(/^Abrir chamado:.*(?:\r?\n)?/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  const semConclusaoAnterior = semLinkLegado
+    .replace(/(?:\r?\n){1,2}Horário de conclusão:.*$/m, "")
+    .trim();
+  return [semConclusaoAnterior, `Horário de conclusão: ${formatarHorario(concluidoEm)}`]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 /**
@@ -119,10 +134,18 @@ export async function concluirTarefaAgendadaDoChamado(input: {
   const usuario = await obterUsuarioGoogleAtivo(input.tecnicoId);
   if (!usuario.ok) throw new Error("Agenda Alpha do técnico não está ativa.");
 
-  const tarefaGoogle = await concluirTarefaGoogleTasks({
+  const tarefaConcluida = await concluirTarefaGoogleTasks({
     emailUsuario: usuario.emailUsuario,
     taskListId: agendamento.tarefaCache.taskList.googleTaskListId,
     taskId: agendamento.tarefaCache.googleTaskId,
+  });
+  const tarefaGoogle = await atualizarTarefaGoogleTasks({
+    emailUsuario: usuario.emailUsuario,
+    taskListId: agendamento.tarefaCache.taskList.googleTaskListId,
+    taskId: agendamento.tarefaCache.googleTaskId,
+    titulo: tarefaConcluida.titulo,
+    notas: notasComConclusao(tarefaConcluida.notas ?? agendamento.tarefaCache.notas, input.concluidoEm),
+    vencimentoEm: tarefaConcluida.vencimentoEm ?? undefined,
   });
 
   await db.$transaction([

@@ -83,7 +83,7 @@ export function GradeHoraria({
                 </div>
               ) : (
                 <DetalhePopover key={evento.id} evento={evento} tema={tema} onEditar={onEditarEvento} onCancelado={onEventoCancelado}>
-                  <button type="button" className="flex w-full items-center gap-1.5 truncate rounded-lg border border-white/10 px-1.5 py-1 text-left text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(15,23,42,0.18)] transition-all hover:-translate-y-px hover:brightness-110" style={{ background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}f2, ${corDoItemAgenda(evento)}b8)`, borderLeftColor: "rgba(255,255,255,0.75)", borderLeftWidth: 3 }}>
+                  <button type="button" className={cn("flex w-full items-center gap-1.5 truncate rounded-lg border border-white/10 px-1.5 py-1 text-left text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(15,23,42,0.18)] transition-all hover:-translate-y-px hover:brightness-110", evento.recusadoPeloUsuario && "opacity-55 grayscale line-through")} style={{ background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}f2, ${corDoItemAgenda(evento)}b8)`, borderLeftColor: "rgba(255,255,255,0.75)", borderLeftWidth: 3 }}>
                     {evento.eventType === "focusTime" && <Sparkles className="size-3 shrink-0 text-white/90" aria-hidden="true" />}
                     <span className="truncate">{evento.titulo || "(sem título)"}</span>
                   </button>
@@ -166,7 +166,7 @@ export function GradeHoraria({
                     <button
                       type="button"
                       onClick={(e) => e.stopPropagation()}
-                      className="group/event absolute z-20 overflow-hidden rounded-xl border border-white/15 border-l-[3px] px-2 py-1.5 text-left text-[10px] font-bold text-white shadow-[0_10px_22px_rgba(15,23,42,0.30)] transition-all duration-150 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/80 before:to-transparent before:opacity-70 hover:z-30 hover:-translate-y-px hover:brightness-110 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                      className={cn("group/event absolute z-20 overflow-hidden rounded-xl border border-white/15 border-l-[3px] px-2 py-1.5 text-left text-[10px] font-bold text-white shadow-[0_10px_22px_rgba(15,23,42,0.30)] transition-all duration-150 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/80 before:to-transparent before:opacity-70 hover:z-30 hover:-translate-y-px hover:brightness-110 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40", evento.recusadoPeloUsuario && "opacity-55 grayscale line-through")}
                       style={{
                         top: `${topoPercentual}%`,
                         height: `${alturaPercentual}%`,

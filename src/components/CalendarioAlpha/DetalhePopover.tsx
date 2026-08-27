@@ -105,7 +105,7 @@ export function DetalhePopover({
                 aria-hidden="true"
               />
               <div className="min-w-0">
-                <p className="font-bold leading-snug text-white">{evento.titulo || "(sem título)"}</p>
+                <p className={evento.recusadoPeloUsuario ? "font-bold leading-snug text-white line-through opacity-60" : "font-bold leading-snug text-white"}>{evento.titulo || "(sem título)"}</p>
                 <p className="text-xs text-slate-500">{evento.calendarioNome}</p>
               </div>
             </div>
@@ -120,7 +120,7 @@ export function DetalhePopover({
               </p>
               <p>
                 <span className="text-slate-500">Status: </span>
-                {evento.status === "tentative" ? "Provisório" : evento.status === "cancelled" ? "Cancelado" : "Confirmado"}
+                {evento.recusadoPeloUsuario ? "Você recusou" : evento.status === "tentative" ? "Provisório" : evento.status === "cancelled" ? "Cancelado" : "Confirmado"}
               </p>
             </div>
             {evento.linkMeet && (
