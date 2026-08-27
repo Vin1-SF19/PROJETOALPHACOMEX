@@ -3,6 +3,14 @@ import "server-only";
 type CallixResposta = {
   click_to_call_id?: unknown;
   message?: unknown;
+  errors?: Array<{ title?: unknown }>;
+};
+
+type CallixUsuariosResposta = {
+  data?: Array<{
+    id?: unknown;
+    attributes?: { login?: unknown };
+  }>;
 };
 
 type InicioLigacaoCallix =
@@ -15,7 +23,7 @@ export function normalizarTelefoneCallix(telefone: string): string | null {
 }
 
 function obterConfiguracaoCallix():
-  | { success: true; endpoint: string; token: string }
+  | { success: true; endpoint: string; usuariosEndpoint: string; token: string }
   | { success: false; error: string } {
   const baseUrl = process.env.CALLIX_BASE_URL?.trim();
   const token = process.env.TOKEN_CALLIX?.trim();
@@ -28,10 +36,33 @@ function obterConfiguracaoCallix():
     const url = new URL(baseUrl);
     if (url.protocol !== "https:") throw new Error("URL não segura");
     url.pathname = `${url.pathname.replace(/\/$/, "")}/api/v1/click_to_call`;
-    return { success: true, endpoint: url.toString(), token };
+    const endpoint = url.toString();
+    url.pathname = `${url.pathname.replace(/\/click_to_call$/, "")}/users`;
+    return { success: true, endpoint, usuariosEndpoint: url.toString(), token };
   } catch {
     return { success: false, error: "Configuração da Callix inválida." };
   }
+}
+
+async function obterLoginDoAgenteCallix(
+  configuracao: Extract<ReturnType<typeof obterConfiguracaoCallix>, { success: true }>,
+  userId: string,
+  signal: AbortSignal,
+): Promise<string | null> {
+  const resposta = await fetch(configuracao.usuariosEndpoint, {
+    headers: {
+      Accept: "application/vnd.api+json",
+      Authorization: `Bearer ${configuracao.token}`,
+    },
+    signal,
+  });
+  const corpo = (await resposta.json().catch(() => null)) as CallixUsuariosResposta | null;
+  if (!resposta.ok || !Array.isArray(corpo?.data)) return null;
+
+  const agente = corpo.data.find((item) => String(item.id) === userId);
+  return typeof agente?.attributes?.login === "string" && agente.attributes.login.trim()
+    ? agente.attributes.login.trim()
+    : null;
 }
 
 /** Dispara uma chamada pela API da Callix sem expor o token ao navegador. */
@@ -46,6 +77,11 @@ export async function iniciarLigacaoCallix(telefone: string, userId: string): Pr
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
+    const username = await obterLoginDoAgenteCallix(configuracao, userId.trim(), controller.signal);
+    if (!username) {
+      return { success: false, error: "Não foi possível localizar o login do agente no Callix." };
+    }
+
     const resposta = await fetch(configuracao.endpoint, {
       method: "POST",
       headers: {
@@ -55,7 +91,7 @@ export async function iniciarLigacaoCallix(telefone: string, userId: string): Pr
       body: JSON.stringify({
         data: {
           type: "click_to_call",
-          attributes: { user_id: userId.trim(), phone },
+          attributes: { username, phone },
         },
       }),
       signal: controller.signal,
@@ -64,6 +100,15 @@ export async function iniciarLigacaoCallix(telefone: string, userId: string): Pr
 
     if (resposta.status !== 200 || typeof corpo?.click_to_call_id !== "string") {
       console.error("[Callix click-to-call] resposta inválida", { status: resposta.status });
+      const erroDisponibilidade = corpo?.errors?.find(
+        (erro) => erro?.title === "User not available to receive this call.",
+      );
+      if (erroDisponibilidade) {
+        return {
+          success: false,
+          error: "O agente configurado não está disponível para receber a ligação no Callix.",
+        };
+      }
       const erroPorStatus: Record<number, string> = {
         400: "O Callix recusou a ligação. Verifique o ID do agente e o telefone de destino.",
         401: "A autenticação com o Callix falhou. Verifique a configuração da integração.",

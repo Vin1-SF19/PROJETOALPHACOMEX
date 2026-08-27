@@ -4,6 +4,10 @@ vi.mock("server-only", () => ({}));
 
 import { iniciarLigacaoCallix, normalizarTelefoneCallix } from "@/lib/callix/click-to-call";
 
+const respostaUsuariosCallix = () => new Response(JSON.stringify({
+  data: [{ id: "agente-123", attributes: { login: "agente.login" } }],
+}), { status: 200 });
+
 const envOriginal = {
   baseUrl: process.env.CALLIX_BASE_URL,
   token: process.env.TOKEN_CALLIX,
@@ -24,15 +28,24 @@ describe("click-to-call Callix", () => {
   it("envia o contrato da Callix apenas com configuração server-side", async () => {
     process.env.CALLIX_BASE_URL = "https://empresa.callix.com.br/";
     process.env.TOKEN_CALLIX = "token-secreto";
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      click_to_call_id: "call-1",
-      message: "Call successfully sent",
-    }), { status: 200 }));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(respostaUsuariosCallix())
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        click_to_call_id: "call-1",
+        message: "Call successfully sent",
+      }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const resultado = await iniciarLigacaoCallix("(11) 99999-0000", "agente-123");
 
-    expect(fetchMock).toHaveBeenCalledWith("https://empresa.callix.com.br/api/v1/click_to_call", expect.objectContaining({
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "https://empresa.callix.com.br/api/v1/users", expect.objectContaining({
+      headers: {
+        Accept: "application/vnd.api+json",
+        Authorization: "Bearer token-secreto",
+      },
+      signal: expect.any(AbortSignal),
+    }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "https://empresa.callix.com.br/api/v1/click_to_call", expect.objectContaining({
       method: "POST",
       headers: {
         "Content-Type": "application/vnd.api+json",
@@ -41,7 +54,7 @@ describe("click-to-call Callix", () => {
       body: JSON.stringify({
         data: {
           type: "click_to_call",
-          attributes: { user_id: "agente-123", phone: "11999990000" },
+          attributes: { username: "agente.login", phone: "11999990000" },
         },
       }),
       signal: expect.any(AbortSignal),
@@ -72,11 +85,28 @@ describe("click-to-call Callix", () => {
   ])("retorna erro seguro para HTTP %i", async (status, mensagem) => {
     process.env.CALLIX_BASE_URL = "https://empresa.callix.com.br";
     process.env.TOKEN_CALLIX = "token-secreto";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("erro", { status })));
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(respostaUsuariosCallix())
+      .mockResolvedValueOnce(new Response("erro", { status })));
 
     await expect(iniciarLigacaoCallix("11999990000", "agente-123")).resolves.toEqual({
       success: false,
       error: mensagem,
+    });
+  });
+
+  it("informa quando o agente não está disponível no Callix", async () => {
+    process.env.CALLIX_BASE_URL = "https://empresa.callix.com.br";
+    process.env.TOKEN_CALLIX = "token-secreto";
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(respostaUsuariosCallix())
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        errors: [{ title: "User not available to receive this call." }],
+      }), { status: 400 })));
+
+    await expect(iniciarLigacaoCallix("11999990000", "agente-123")).resolves.toEqual({
+      success: false,
+      error: "O agente configurado não está disponível para receber a ligação no Callix.",
     });
   });
 
@@ -89,5 +119,18 @@ describe("click-to-call Callix", () => {
       success: false,
       error: "Não foi possível conectar à Callix.",
     });
+  });
+
+  it("não inicia a ligação quando o ID não corresponde a um login da Callix", async () => {
+    process.env.CALLIX_BASE_URL = "https://empresa.callix.com.br";
+    process.env.TOKEN_CALLIX = "token-secreto";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(iniciarLigacaoCallix("11999990000", "agente-123")).resolves.toEqual({
+      success: false,
+      error: "Não foi possível localizar o login do agente no Callix.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
