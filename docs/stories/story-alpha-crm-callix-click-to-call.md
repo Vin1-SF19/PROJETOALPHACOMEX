@@ -112,7 +112,7 @@ O token já existe em `.env.local` como `TOKEN_CALLIX`. Ele e `CALLIX_BASE_URL` 
 | 2026-08-27 | 1.0 | Story criada para integrar Click-to-Call Callix ao modal de telefones do Alpha CRM/BPM. | River |
 | 2026-08-27 | 1.1 | Requisito aprovado: `user_id` Callix passa a ser individual em `usuarios`; configuração exclusiva de `COMERCIAL`; migration já aplicada. | River |
 | 2026-08-27 | 1.2 | Correção: a UI de cadastro continua exclusiva de `COMERCIAL`, mas qualquer usuário já habilitado pode ligar pelo Callix. | River |
-| 2026-08-27 | 1.3 | Integração ajustada para resolver o login Callix pelo ID salvo; ServiceHub incorporado sob demanda para manter a sessão do agente. | Dex |
+| 2026-08-27 | 1.3 | Integração ajustada para resolver o login Callix pelo ID salvo; ServiceHub é aberto como aba persistente do Painel Alpha sob demanda. | Dex |
 
 ## Dev Agent Record
 
@@ -134,7 +134,7 @@ GPT-5 Codex
 - A action repete a autorização do card e confirma que o telefone pertence à empresa associada antes da chamada externa.
 - Cada contato tem ação acessível de ligar, com carregamento e feedback anunciado sem fechar o modal.
 - A configuração do agente Callix foi adicionada ao perfil do colaborador comercial; qualquer usuário já habilitado com ID válido pode ligar pelo Callix. A migration aditiva foi aplicada após autorização explícita.
-- O Click-to-Call resolve o login do agente a partir do ID Callix salvo e envia `username`, formato aceito pelo tenant. O ServiceHub abre somente ao iniciar uma ligação e permanece carregado após ser fechado visualmente.
+- O Click-to-Call resolve o login do agente a partir do ID Callix salvo e envia `username`, formato aceito pelo tenant. O ServiceHub abre somente ao iniciar uma ligação, como aba persistente do Painel Alpha.
 
 ### File List
 
@@ -148,8 +148,6 @@ GPT-5 Codex
 - `src/components/Colaboradores/ModalPerfilColaborador.tsx`
 - `src/actions/bpm/Cards.ts`
 - `src/app/PainelAlpha/AlphaCRM/CardModal/TelefonesCardButton.tsx`
-- `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx`
-- `src/app/PainelAlpha/AlphaCRM/ServiceHubProvider.tsx`
 - `src/lib/callix/click-to-call.ts`
 - `tests/bpm/card-telefones.test.ts`
 - `tests/lib/callix/click-to-call.test.ts`

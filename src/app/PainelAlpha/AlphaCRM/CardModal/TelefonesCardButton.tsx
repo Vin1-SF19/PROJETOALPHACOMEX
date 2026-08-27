@@ -5,7 +5,6 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Loader2, Phone, PhoneCall, UserRound } from "lucide-react";
 
 import { IniciarLigacaoTelefoneCardBpm, ListarTelefonesCardBpm } from "@/actions/bpm/Cards";
-import { useServiceHub } from "../ServiceHubProvider";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,8 @@ interface TelefonesCardButtonProps {
   empresaNome: string;
 }
 
+const SERVICE_HUB_URL = "https://alphacomex.callix.com.br/servicehub";
+
 export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButtonProps) {
   const reduzirMovimento = useReducedMotion();
   const [aberto, setAberto] = useState(false);
@@ -29,7 +30,6 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
   const [telefones, setTelefones] = useState<TelefoneCard[]>([]);
   const [telefonesEmLigacao, setTelefonesEmLigacao] = useState<Set<string>>(new Set());
   const [avisoLigacao, setAvisoLigacao] = useState<string | null>(null);
-  const { abrirServiceHub } = useServiceHub();
 
   async function carregarTelefones() {
     setCarregando(true);
@@ -53,7 +53,7 @@ export function TelefonesCardButton({ cardId, empresaNome }: TelefonesCardButton
 
   async function iniciarLigacao(telefone: string) {
     if (telefonesEmLigacao.has(telefone)) return;
-    abrirServiceHub();
+    window.parent.postMessage({ type: "ALPHA_OPEN_TAB", url: SERVICE_HUB_URL, label: "ServiceHub" }, "*");
     setTelefonesEmLigacao((atual) => new Set(atual).add(telefone));
     setAvisoLigacao(null);
     const resultado = await IniciarLigacaoTelefoneCardBpm(cardId, telefone);
