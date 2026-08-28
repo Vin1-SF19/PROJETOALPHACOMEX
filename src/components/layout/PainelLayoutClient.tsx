@@ -25,6 +25,7 @@ import { CompromissoNotificacaoToast } from '@/components/CalendarioAlpha/Compro
 import { SinoNotificacoesCompromissos } from '@/components/CalendarioAlpha/SinoNotificacoesCompromissos';
 import { isAdminRole } from '@/lib/roles';
 import type { OnboardingVideo } from '@/lib/onboarding';
+import type { LinkExternoVisivel } from '@/actions/LinksExternos';
 import { signOut } from 'next-auth/react';
 import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
 import {
@@ -58,6 +59,7 @@ interface PainelLayoutClientProps {
   temaName?: string;
   onboardingVisto?: boolean;
   onboardingVideo?: OnboardingVideo | null;
+  linksExternos?: LinkExternoVisivel[];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ export default function PainelLayoutClient({
   temaName,
   onboardingVisto = true,
   onboardingVideo = null,
+  linksExternos = [],
 }: PainelLayoutClientProps) {
   const { isCollapsed, isMobileOpen, toggleCollapse, toggleMobile, closeMobile } = useSidebarState();
   const pathname = usePathname();
@@ -291,6 +294,7 @@ export default function PainelLayoutClient({
           activeUrl={activeUrl}
           temaName={temaName}
           onWidthChange={handleSidebarWidthChange}
+          linksExternos={linksExternos}
         />
       )}
 

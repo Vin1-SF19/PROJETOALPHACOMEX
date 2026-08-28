@@ -5,6 +5,24 @@
 
 ---
 
+### ChatBot Alpha — Adminer/RedisInsight recusam conexão dentro do iframe em localhost/staging (não é bug de código)
+**Sintoma:** no módulo ChatBot Alpha, o iframe de Adminer/RedisInsight mostra "conexão recusada" quando testado fora de `https://painel.alpha-comex.com` (ex: localhost, staging) — mesmo a URL com token funcionando perfeitamente quando aberta direto numa aba do navegador.
+**Causa raiz confirmada:** o Nginx/Cloudflare na frente de `adminer.alpha-comex.com` e `redisinsight.alpha-comex.com` envia `Content-Security-Policy: frame-ancestors 'self' https://painel.alpha-comex.com` — só permite ser embutido em iframe por esse domínio exato de produção. Confirmado via `curl -D -` simulando headers de iframe (`Sec-Fetch-Dest: iframe`), reproduzindo o header CSP restritivo em ambos os serviços. Sem essa página pai específica, o navegador bloqueia o embed (alguns navegadores relatam esse bloqueio de CSP como "ERR_CONNECTION_REFUSED" em vez de uma mensagem clara de frame-ancestors).
+**NÃO é bug no código do PainelAlpha** — `sandbox`/`referrerPolicy` do iframe não têm nenhum efeito sobre isso, é decisão do servidor de destino. MailHog funciona em qualquer domínio porque não tem essa camada de proxy/CSP (sem token).
+**Fix:** testar em `https://painel.alpha-comex.com` (produção) — funciona sem nenhuma mudança de código. Para liberar outro domínio de teste, é preciso pedir para quem administra a infraestrutura do ChatbotX (Nginx/Cloudflare) adicionar esse domínio à allowlist de `frame-ancestors`.
+**Achado secundário:** a autenticação real do RedisInsight usa `Set-Cookie: chatbotx_redisinsight_token=...; SameSite=Lax; Secure` — o `?token=` na URL parece servir para o servidor SETAR esse cookie na primeira visita, a sessão real depois pode depender do cookie persistir (não testado a fundo, mas relevante se a autenticação falhar mesmo já dentro do domínio de produção).
+**Adicionado em:** 2026-08-28 (Bibble, debug pós-entrega do módulo ChatBot Alpha)
+
+---
+
+### Baseline do `npm run lint` (ESLint) da base COMPLETA — 16.287 problemas pré-existentes (10.814 erros / 5.473 warnings)
+**Contexto:** ao rodar `npm run lint` sem filtro (toda a base), o resultado confirmado em 2026-08-28 (sessão "Sidebar em gavetas") é **16.287 problemas / 10.814 erros / 5.473 warnings**, `exit code 1`. NÃO é regressão de nenhuma sessão específica — cobre módulos legados nunca tocados na sessão (`src/lib/dateUtils.ts`, `src/lib/loginAction.ts`, `src/lib/user.ts` — vários `@typescript-eslint/no-explicit-any`; `src/hooks/useSidebarState.ts` — `react-hooks/set-state-in-effect`; entre outros).
+**Tempo de execução:** o lint completo desta base é **pesado** — levou bem mais de 30 minutos numa sessão real (processo Node único, CPU crescendo linearmente, sem output incremental até o fim). Não assumir travamento só pela demora; confirmar via `Get-Process -Id <PID> | Select CPU` se o valor de CPU segue subindo entre checagens (subindo = trabalhando de verdade, não travado).
+**Ação para sessões futuras:** ao rodar lint como gate de uma mudança específica, **prefira lint escopado nos arquivos alterados** (`npx eslint <arquivo1> <arquivo2>`) para feedback rápido e objetivo — é o que realmente prova se a mudança introduziu problema novo. O lint completo da base só é útil como snapshot geral de débito técnico, não como gate bloqueante de uma feature pontual (baseline size demonstra que é dívida histórica acumulada, não algo a corrigir como efeito colateral de outra tarefa). Se rodar o completo, compare contra este baseline (16.287/10.814/5.473) — uma contagem MAIOR é regressão real, igual ou menor não é.
+**Adicionado em:** 2026-08-28 (Bibble, sidebar em gavetas — agrupamento funcional de módulos)
+
+---
+
 ### Dev server (`next dev`) com vazamento real de memória — não é só "contenção", cresce sem parar até derrubar
 **Sintoma:** ao longo de uma sessão longa (~6h), um processo `next dev` ativo cresceu continuamente de ~5GB para 7.4GB de memória, sem nunca estabilizar ou liberar — causando lentidão progressivamente PIOR em `tsc`/`npm run build` a cada nova tentativa (um `tsc --noEmit` chegou a levar 2h15min; o padrão histórico deste projeto é ~15-20min). A suspeita inicial (várias vezes nesta sessão) foi "contenção normal de recursos" — mas o padrão real era um vazamento: a cada checagem de processo, a memória do dev server só subia, nunca descia, mesmo sem nenhuma atividade nova de HMR/navegação.
 **Como confirmar:** `Get-CimInstance Win32_Process -Filter "Name = 'node.exe'"` + `Get-Process` para ver `WorkingSet64` — se o PID do `next dev` estiver casas de GB e SUBINDO em checagens repetidas ao longo de horas (não só um pico pontual), é vazamento, não contenção pontual.

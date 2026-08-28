@@ -2,7 +2,21 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-26 (Parceiros — Indicação com serviço + posicionamento automático no pipeline)
+> Última atualização: 2026-08-28 (Alpha CRM — card fechado com Razão Social/Nome Fantasia/CNPJ)
+
+---
+
+## Alpha CRM — Card fechado: Razão Social + Nome Fantasia + CNPJ sem duplicação (RM-2026-6BAAB8, 2026-08-28)
+
+**Único arquivo tocado:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` (`KanbanCard`) — mesmo componente que renderiza o card fechado em **todos** os pipelines do CRM (confirmado único consumidor via grep, sem duplicação de layout).
+
+**Estado anterior:** título usava `nomeEmpresa = razaoSocial || nomeFantasia || ""` (fallback correto), mas a linha secundária mostrava `nomeFantasia` sempre que existisse — mesmo quando `nomeFantasia` já era o próprio texto do título (empresa sem `razaoSocial`), duplicando visualmente o mesmo nome.
+
+**Correção:** nova constante `nomeFantasiaSecundario = nomeFantasia && nomeFantasia !== nomeEmpresa ? nomeFantasia : null` — a linha secundária agora só mostra Nome Fantasia quando ele é distinto do título. `cnpjFormatado` (via `formatCNPJ`, `src/lib/format-cnpj.ts`, máscara `00.000.000/0000-00`) inalterado, sempre exibido quando existir. Hierarquia tipográfica reaproveitada sem tokens novos: título `text-sm font-semibold`, Nome Fantasia `text-[11px] font-medium text-slate-400`, CNPJ `text-[10px] font-mono text-slate-500`.
+
+**Limitação conhecida e aceita:** a comparação `nomeFantasia !== nomeEmpresa` é estrita — não normaliza espaço/case. Se um dia um cadastro tiver `nomeFantasia` quase-idêntico a `razaoSocial` (diferença só de espaço/maiúscula), duplicaria visualmente. Não normalizado propositalmente (fora do escopo pedido, cenário raro em dados reais).
+
+**Última atualização:** 2026-08-28 por Scribe (execução via Roadmap Production)
 
 ---
 

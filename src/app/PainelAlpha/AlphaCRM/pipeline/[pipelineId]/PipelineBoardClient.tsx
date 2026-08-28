@@ -181,6 +181,7 @@ function KanbanCard({
   const nomeFantasia = card.empresa.nomeFantasia;
   const cnpjFormatado = formatCNPJ(card.empresa.cnpj);
   const nomeEmpresa = razaoSocial || nomeFantasia || "";
+  const nomeFantasiaSecundario = nomeFantasia && nomeFantasia !== nomeEmpresa ? nomeFantasia : null;
   const inicialEmpresa = nomeEmpresa.trim().charAt(0).toUpperCase() || "?";
   const proximaTarefaComPrazo = card.tarefas.find((tarefa) => tarefa.prazo);
   const anotacaoRapidaPendente = card.tarefas.find((tarefa) => tarefa.tipo === "LEMBRETE_RAPIDO");
@@ -254,9 +255,9 @@ function KanbanCard({
                   </button>
                 )}
               </div>
-              {!ehLeadVirtual && (nomeFantasia || cnpjFormatado) && (
+              {!ehLeadVirtual && (nomeFantasiaSecundario || cnpjFormatado) && (
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {nomeFantasia && <span className="line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{nomeFantasia}</span>}
+                  {nomeFantasiaSecundario && <span className="line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{nomeFantasiaSecundario}</span>}
                   {cnpjFormatado && <span className="font-mono text-[10px] leading-tight text-slate-500">{cnpjFormatado}</span>}
                 </div>
               )}

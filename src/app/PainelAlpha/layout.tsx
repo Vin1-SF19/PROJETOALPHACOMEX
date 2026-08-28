@@ -8,6 +8,7 @@ import { getOnboardingVideo, type OnboardingVideo } from "@/lib/onboarding";
 import db from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { statusPermiteAcessoPainel } from "@/lib/auth/acesso-painel";
+import { ListarLinksExternosVisiveis, type LinkExternoVisivel } from "@/actions/LinksExternos";
 
 export const metadata: Metadata = {
   title: "Painel Alpha",
@@ -32,8 +33,9 @@ export default async function PainelLayout({
   let temaName = "blue";
   let onboardingVisto = true;        // default true = não bloqueia se não houver usuário
   let onboardingVideo: OnboardingVideo | null = null;
+  let linksExternos: LinkExternoVisivel[] = [];
   if (userId > 0) {
-    const [perms, userRecord] = await Promise.all([
+    const [perms, userRecord, links] = await Promise.all([
       getPermissoesEfetivas(userId),
       db.usuarios.findUnique({
         where: { id: userId },
@@ -43,6 +45,7 @@ export default async function PainelLayout({
           onboarding_ialpha_visto: true,
         },
       }),
+      ListarLinksExternosVisiveis(),
     ]);
 
     if (!userRecord || !statusPermiteAcessoPainel(userRecord.status)) {
@@ -52,6 +55,7 @@ export default async function PainelLayout({
     permissoes = perms;
     temaName = userRecord?.tema_interface ?? "blue";
     onboardingVisto = userRecord?.onboarding_ialpha_visto ?? false;
+    linksExternos = links;
     // Só busca o vídeo se ainda não viu (economiza query)
     if (!onboardingVisto) onboardingVideo = await getOnboardingVideo();
   }
@@ -68,6 +72,7 @@ export default async function PainelLayout({
         temaName={temaName}
         onboardingVisto={onboardingVisto}
         onboardingVideo={onboardingVideo}
+        linksExternos={linksExternos}
       >
         {children}
       </PainelLayoutClient>

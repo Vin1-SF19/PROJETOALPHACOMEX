@@ -1,5 +1,19 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## ChatBot Alpha — módulo de acesso administrativo à infraestrutura ChatbotX (2026-08-28)
+
+Novo módulo (`category: 'admin'` em `MODULOS_REGISTRY`, id `chatBotAlpha`) — hub de atalhos para 3 ferramentas administrativas de um sistema **ChatbotX** self-hosted externo (projeto de referência consultado em `C:\Users\TI\Downloads\ChatbotX-main`, não implementado neste repositório, só consumido via URL): **Adminer** (cliente Postgres), **RedisInsight** (console Redis, env `REDIS_URL`/`REDIS_TOKEN`), **MailHog** (capturador de e-mail de teste, env `BASMAILOG_URL` — nome da env mantido apesar do nome real da ferramenta ser MailHog).
+
+**Regra de negócio:** Admin/CEO/TI veem tela de escolha entre os 3; usuário comum (com a permissão `chatBotAlpha` concedida) vai direto para o MailHog, único sem token. `src/actions/ChatBotAlpha.ts` (`ObterUrlSistemaChatBot`) é o único ponto que monta URL com token, sempre sob demanda e só após guard de admin — nunca embute segredo em prop pré-carregada. Ver `integration-points.md` para o padrão geral de "iframe com token" que este módulo estabeleceu.
+
+**Envs:** `ADMINER_URL`, `ADMINER_TOKEN`, `BASMAILOG_URL`, `REDIS_URL`, `REDIS_TOKEN` — todas em `.env.local` (não `.env` principal), confirmadas no `.gitignore`, nunca commitadas.
+
+## Sidebar reestruturada em gavetas + Links Externos (2026-08-28)
+
+**Agrupamento funcional (`src/lib/modulos-registry.ts`):** `GRUPOS_SIDEBAR` (10 grupos: gestaoTarefas, leadsMarketing, relacionamento, estudioConteudo, financeiroFiscal, pessoasRH, conhecimento, documentos, agendaEspacos, comunicacaoInterna) + campo `grupo?`/`hidden?` em `ModuloRegistryItem`. `GlobalSidebar.tsx` renderiza como accordion (fechado por padrão), reaproveitando `renderModuloItem()` para pinned/soltos/agrupados/collapsed. Fonte customizada `SF Pro Display Bold` (`next/font/local`, `public/fonts/sidebar/`) aplicada só aos labels da sidebar expandida.
+
+**Links Externos (`model LinkExterno`, migration `20260828140000_add_link_externo`):** bloco "Sistema Externo" separado dos 10 grupos estáticos — dado dinâmico do banco, CRUD via modal (`ModalLinkExterno.tsx`) gerenciado por Admin/CEO/TI, visibilidade por `visivelPara` (role/CSV, distinto do sistema de `permission` de módulos). `src/actions/LinksExternos.ts` propagado via `layout.tsx` → `PainelLayoutClient.tsx` → `GlobalSidebar.tsx` (estado local espelhado/otimista, sem `router.refresh()`). Ver `integration-points.md` para o fluxo completo de "como adicionar um link".
+
 ## Roadmap Alpha — novo motor de produção: status manual via chat, sem agente autônomo no painel (2026-08-25)
 
 O módulo Roadmap tem 2 fluxos independentes: **documentação** (`RoadmapAlpha.ts` + `roadmap-alpha/*`, gera Markdown via Qwen — não tocado nesta sessão) e **produção** (implementação de fato — reescrito do zero nesta sessão). O motor antigo (agent loop autônomo contra Ollama/Qwen + workers PowerShell externos, `src/lib/roadmap-production/*`) foi **removido por completo**. Agora quem implementa é Claude (via chat/Claude Code) ou Codex, reportando progresso por uma rota HTTP autenticada — o painel só reflete status, nunca executa código sozinho.

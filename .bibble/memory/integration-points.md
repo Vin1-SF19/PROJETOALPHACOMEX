@@ -1,5 +1,35 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Módulo com iframe de sistema externo protegido por token (2026-08-28)
+
+Padrão confirmado com o módulo `ChatBot Alpha` (`src/actions/ChatBotAlpha.ts`, `src/app/PainelAlpha/ChatBotAlpha/`, `src/components/ChatBotAlpha/`): sempre que um módulo embute um sistema externo via iframe e a URL exige token/segredo:
+
+1. **Nunca `NEXT_PUBLIC_*`** para a env var do token — só para URLs realmente públicas (ver `NEXT_PUBLIC_INSTAGRAM_STUDIO_URL` em `Marketing/page.tsx`, que não tem segredo).
+2. **A URL final com token só é montada dentro de uma Server Action**, no momento da chamada, nunca pré-carregada em lote no client. Guard de autorização (`isAdminRole` ou equivalente) roda ANTES de montar a URL.
+3. **Se a env var (URL ou token) estiver ausente, retorna erro tratado** (`"Sistema não configurado"`) — nunca deixa a URL final com `undefined` literal.
+4. **Nenhum caminho de erro exibe a URL/token** — diferente do precedente `MarketingClient.tsx` (que mostra a URL no erro porque ela é pública), um iframe com token nunca deve reutilizar esse padrão de debug.
+5. Checklist obrigatório de novo módulo (FormCadastro.tsx) confirmado OBSOLETO de novo — `ModalGerenciarSetor.tsx`/`ModalOverrideUser.tsx`/`PreviewModulosSetor.tsx` já consomem `MODULOS_REGISTRY` dinamicamente (`m.permission && !m.adminOnly`); só a entrada no registry é necessária.
+
+## Links Externos — gaveta "Sistema Externo" na sidebar (2026-08-28)
+
+Novo integration point: adicionar um link externo (sistema fora do PainelAlpha) é feito **inteiramente pela UI**, dentro da própria gaveta "Sistema Externo" na sidebar — nunca direto no banco, nunca por código.
+
+1. **Quem gerencia:** só Admin/CEO/TI (`isAdminRole`). Botão "+" no header da gaveta (ou "+ Inserir sistema externo" quando vazia) abre `src/components/layout/ModalLinkExterno.tsx`.
+2. **Visibilidade por link:** campo `LinkExterno.visivelPara` — `"TODOS"` ou CSV de roles (`ROLES_CONHECIDOS` em `src/lib/validations/link-externo.ts`). Distinto do sistema de `permission` de módulos (`ModuloRegistryItem`) — não entra no `FormCadastro.tsx`, não é um "módulo" no sentido do checklist de novo módulo.
+3. **Backend:** `src/actions/LinksExternos.ts` — `ListarLinksExternosVisiveis()` (sem guard, filtro de visibilidade sempre no server) é o que `layout.tsx` chama para popular a sidebar; `ListarLinksExternosGestao/CriarLinkExterno/AtualizarLinkExterno/ExcluirLinkExterno` exigem `isAdmin`.
+4. **Reordenação NÃO existe** — `ReordenarLinksExternos` foi implementada e depois removida (decisão do usuário, 2026-08-28) por falta de UI consumidora. Se pedirem no futuro, criar do zero com UI real (botões ↑↓ ou drag-and-drop), não reaproveitar código antigo (já foi deletado).
+5. **Renderização na sidebar é um bloco SEPARADO** dos 10 grupos funcionais estáticos (`GRUPOS_SIDEBAR`) — não é um 11º item desse array. Motivo: dado dinâmico do banco (não `MODULOS_REGISTRY`), regra especial de "sempre visível pra admin mesmo vazio", controles de CRUD inline que os outros grupos não têm.
+
+## Grupo funcional de módulo na sidebar (gaveta colapsável) — 2026-08-28
+
+Novo integration point: agrupar um módulo dentro de uma "gaveta" (accordion) da `GlobalSidebar` é **1 campo** no item do módulo, não um arquivo separado.
+
+1. **`src/lib/modulos-registry.ts`** — em `MODULOS_REGISTRY`, adicionar `grupo: '<id-do-grupo>'` ao item do módulo. O id deve bater com um `GrupoSidebarItem.id` existente em `GRUPOS_SIDEBAR` (mesmo arquivo). Sem `grupo`, o módulo renderiza solto (fora de qualquer gaveta) — comportamento correto para módulos de uso raro/isolado (ex: `metas`, `roadmap`).
+2. **Novo grupo do zero:** adicionar entrada em `GRUPOS_SIDEBAR` (`id`, `label`, `iconName` — `iconName` precisa existir em `ICON_MAP` de `GlobalSidebar.tsx`, senão cai no fallback `Layers`).
+3. **Ocultar um módulo da navegação sem remover do sistema:** `hidden: true` no item do `MODULOS_REGISTRY` — filtrado antes de qualquer outra lógica (busca, grupo, pin) em `GlobalSidebar.tsx`. Não afeta banco/permissões, só a navegação visual.
+4. **Bloco Admin (`category: 'admin'`) não usa esse sistema de grupos** — continua como seção fixa própria, sem accordion, por decisão explícita do usuário (2026-08-28).
+5. Nenhuma outra tela precisa ser tocada — `GRUPOS_SIDEBAR`/`grupo`/`hidden` são consumidos apenas por `GlobalSidebar.tsx`. `TabBar.tsx` (outro consumidor de `MODULOS_REGISTRY`) só faz `.find()` por `href`, não depende desses campos.
+
 ## AlphaCRM/BPM — Form de adição de card: serviço derivado do pipeline (RM-2026-54DC86, 2026-08-26)
 
 **Objetivo:** documentar o ponto de integração entre o form de criação de card e o pipeline de destino, após a remoção do campo "serviço" do form.

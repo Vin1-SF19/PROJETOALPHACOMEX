@@ -2,6 +2,135 @@
 
 ---
 
+## [2026-08-28] — Módulo novo: ChatBot Alpha (acesso admin à infraestrutura ChatbotX)
+
+**Tags:** #feature #integration #security #concluido
+**Agentes envolvidos:** Bibble, Scout, Echo, Nova, Forge, Anubis, Probe, Lens
+**Arquivos tocados:** `src/actions/ChatBotAlpha.ts` (novo), `src/app/PainelAlpha/ChatBotAlpha/page.tsx` (novo), `src/components/ChatBotAlpha/{ChatBotAlphaClient,SeletorSistemaChatBot,IframeChatBotAlpha}.tsx` (novos), `src/lib/modulos-registry.ts`, `src/components/layout/GlobalSidebar.tsx`, `.bibble/memory/{architecture.md, integration-points.md}`
+
+### Contexto
+Usuário adicionou 5 env vars novas em `.env.local` (ADMINER_URL/TOKEN, BASMAILOG_URL, REDIS_URL/TOKEN) e pediu um módulo "ChatBot Alpha": Admin/TI/CEO escolhem entre 3 sistemas administrativos, usuário comum vai direto pro que não precisa de token. Usuário indicou um projeto de referência em `C:\Users\TI\Downloads\ChatbotX-main` para consulta.
+
+### O que foi feito
+- Scout investigou o projeto de referência (`docker-compose.yml`) e identificou os 3 serviços reais: Adminer (Postgres), RedisInsight (Redis), **MailHog** (o "Basmailog" do usuário era esse — nome corrigido na UI, env mantida como está).
+- 2 rodadas de AskUserQuestion fecharam o design: mapeamento de token confirmado, formato `?token=` na URL, abertura via iframe embutido (não nova aba), visibilidade do módulo via permissão manual `chatBotAlpha` (não visível a todos por padrão).
+- Backend: `ObterUrlSistemaChatBot(sistema)` — única Server Action, monta URL com token só sob demanda, após guard de admin.
+- Frontend: página fina + 3 componentes client divididos por responsabilidade (orquestrador / seletor / iframe). Para usuário comum, a URL do MailHog é resolvida no próprio Server Component da página — evita `useEffect` de fetch-on-mount no caso mais comum.
+- Checklist de novo módulo cumprido: confirmado (2ª vez nesta sessão) que `FormCadastro.tsx` está obsoleto — `ModalGerenciarSetor.tsx`/`ModalOverrideUser.tsx`/`PreviewModulosSetor.tsx` já consomem `MODULOS_REGISTRY` dinamicamente.
+
+### Decisões tomadas
+- Sem `allowedRoles` fixo no registry para `chatBotAlpha` — evita duplicar o bypass automático que Admin/CEO/TI já têm via `isAdminRole`, deixando `permission` como único controle de visibilidade para usuários comuns.
+- Token na URL do iframe (visível via devtools do próprio usuário) foi avaliado e aceito pelo Anubis — exposição é ao próprio usuário autorizado, não a terceiro.
+
+### Problemas encontrados / resolvidos
+- Nenhum bug encontrado pelo Probe — 8/8 itens de integração PASS de primeira.
+- Lens identificou duplicação (~40 linhas) entre `IframeChatBotAlpha.tsx` e o precedente `MarketingClient.tsx` — não bloqueante, registrado como candidato a extração quando um 3º caso aparecer (regra das 3 repetições).
+
+### Pendências
+- Nenhuma. Verificação visual no browser não foi possível nesta sessão (mesma limitação já registrada nas entradas anteriores).
+
+### Refletido também em
+- `architecture.md`: nova seção "ChatBot Alpha — módulo de acesso administrativo à infraestrutura ChatbotX"
+- `integration-points.md`: novo ponto "Módulo com iframe de sistema externo protegido por token"
+
+---
+
+## [2026-08-28] — Sidebar: refinamentos + fonte custom + feature Links Externos
+
+**Tags:** #feature #refactor #ui #sidebar #security #prisma #decision #concluido
+**Agentes envolvidos:** Bibble, Scout, Vault, Echo, Nova, Forge, Anubis, Probe, Lens
+**Arquivos tocados:** `src/lib/modulos-registry.ts`, `src/components/layout/GlobalSidebar.tsx`, `src/components/layout/ModalLinkExterno.tsx` (novo), `src/actions/LinksExternos.ts` (novo), `src/lib/validations/link-externo.ts` (novo), `prisma/schema.prisma`, `prisma/migrations/20260828140000_add_link_externo/migration.sql` (novo), `src/app/PainelAlpha/layout.tsx`, `src/components/layout/PainelLayoutClient.tsx`, `public/fonts/sidebar/SF-Pro-Display-Bold.otf` (novo), `.bibble/memory/{architecture.md, integration-points.md, known-errors.md}`
+
+### Contexto
+Continuação da sessão de reestruturação da sidebar (ver entrada anterior). Usuário pediu ajustes finos de agrupamento, comportamento de accordion também no modo recolhido, troca de ícones por colisão visual, fonte customizada da empresa, e por fim uma feature nova completa: gaveta de links para sistemas externos ao painel.
+
+### O que foi feito
+- **Ajustes de agrupamento**: Alpha Metas → `leadsMarketing`; Tarefas Comercial corrigida para `gestaoTarefas` (tinha ficado de fora na entrega anterior); Roadmap Alpha → `gestaoTarefas`; Bloco de Notas e Chamados → nova gaveta `comunicacaoInterna` (10º grupo).
+- **Modo collapsed virou accordion real**: ícone único da gaveta com tooltip, clique expande mostrando ícones compactos dos módulos, sem alargar a sidebar (`renderModuloItem` ganhou parâmetro `compact`).
+- **Troca dos 10 ícones de gaveta** por não colidirem visualmente com ícones de módulos dentro delas: FolderKanban, Radar, Users2, Clapperboard, CircleDollarSign, Contact, LibraryBig, FolderOpen, CalendarRange, MessagesSquare.
+- **Fonte SF Pro Display Bold** aplicada via `next/font/local` (`--font-sf-pro-sidebar`), escopada só aos labels da sidebar expandida — copiada de um caminho de rede da empresa para `public/fonts/sidebar/`.
+- **Feature "Links Externos"** completa: gaveta "Sistema Externo" para URLs fora do painel, CRUD via modal (`ModalLinkExterno.tsx`) gerenciado por Admin/CEO/TI, visibilidade por link controlada por role/setor (`visivelPara`).
+
+### Decisões tomadas
+- `visivelPara` (string simples, CSV de roles ou "TODOS") é deliberadamente distinto do sistema `permission`/`allowedRoles` de módulos — link externo não é um "módulo do sistema", não entra no `FormCadastro.tsx`.
+- CRUD acontece inteiramente dentro da gaveta via modal, não em tela de admin separada (2 rodadas de refinamento com o usuário via AskUserQuestion).
+- `ReordenarLinksExternos` (Server Action + Zod) implementada e depois **removida** por decisão do usuário — Probe achou como código órfão sem UI consumidora, usuário preferiu deletar a construir UI de reordenação não solicitada.
+- Estado local espelhado/otimista no client para CRUD de listas pequenas sempre montadas — não usar `router.refresh()` (caro demais para o ganho).
+
+### Problemas encontrados / resolvidos
+- **`prisma migrate diff --from-url` não funciona direto contra Turso** (erro de schema/protocolo não reconhecido para SQLite+libsql via CLI) — migration da tabela nova (`LinkExterno`) escrita manualmente seguindo o padrão de migrations anteriores do projeto, aplicada via `scripts/apply-turso-migration.mjs` (mecanismo real já existente no projeto, não documentado antes desta sessão).
+- **Race condition real encontrada pelo Probe**: estado inicial de `links` na sidebar usava `visivelPara: 'TODOS'` hardcoded até um `useEffect` assíncrono (`ListarLinksExternosGestao`) buscar o valor real. Clicar em "editar" nessa janela e salvar sobrescrevia silenciosamente a visibilidade real do link para "TODOS" (vazamento de visibilidade não intencional). Corrigido com estado `linksGestaoCarregado` que desabilita o botão de editar até o fetch real completar.
+- **Anubis testou `protocoloPermitido()` contra 14 vetores de bypass XSS** (javascript:, data:, vbscript:, file:, variações de case/espaço/tab, protocol-relative) — todos corretamente bloqueados pelo parser nativo `new URL()`.
+
+### Pendências
+- `GlobalSidebar.tsx` chegou a 920 linhas (limite da rule é 300) — dívida pré-existente (já estava em 729 antes desta sessão), não bloqueou a entrega. Lens recomendou extrair sub-componentes (grupos funcionais + Sistema Externo + Admin) na próxima vez que o arquivo for tocado por qualquer motivo.
+- Verificação visual no browser não foi possível nesta sessão (Browser pane não exibido/permissão negada) — toda validação ficou em tsc/lint/build reais + auditoria de segurança + diff linha a linha.
+
+### Refletido também em
+- `architecture.md`: nova seção "Sidebar reestruturada em gavetas + Links Externos"
+- `integration-points.md`: novo ponto "Links Externos — gaveta Sistema Externo na sidebar" + atualização do ponto de grupos funcionais
+- `known-errors.md`: baseline do `npm run lint` completo (já registrado na entrada anterior)
+
+---
+
+## [2026-08-28] — Sidebar: agrupamento funcional de módulos em gavetas colapsáveis
+
+**Tags:** #ui #refactor #sidebar #concluido
+**Agentes envolvidos:** Bibble, Scout, Nova, Forge, Probe, Lens
+**Arquivos tocados:** `src/lib/modulos-registry.ts`, `src/components/layout/GlobalSidebar.tsx`, `.bibble/memory/{known-errors.md, integration-points.md, journal.md}`
+
+### Contexto
+Sidebar com 27+ módulos numa lista praticamente plana estava grande demais. Usuário pediu agrupamento por afinidade FUNCIONAL (módulos que trabalham juntos no dia a dia), não por categoria/setor já existente — exemplo dado: Ger. Tarefas + Tarefas Comercial + Serviços Gerais.
+
+### O que foi feito
+- Alinhamento via `AskUserQuestion`: proposta de 9 grupos funcionais aprovada, com 3 ajustes do usuário — CheckList saiu de solto/Operacional e entrou no grupo Documentos (junto com POP); Alpha Vault (módulo `Senhas`) ficou oculto da sidebar por falta de uso; bloco Admin existente permanece exatamente como está, fora do sistema de grupos novo. Gavetas fechadas por padrão; modo collapsed mantém separador visual sutil entre grupos.
+- Scout: blueprint com 2 arquivos a editar, novo array `GRUPOS_SIDEBAR`, campos `grupo?`/`hidden?` no `ModuloRegistryItem`; recomendou accordion custom em vez do componente `Accordion` shadcn genérico (densidade visual incompatível com a sidebar compacta).
+- Nova: `modulos-registry.ts` ganhou `GRUPOS_SIDEBAR` (9 grupos) + `grupo` em 24 módulos + `hidden: true` em `Senhas`. `GlobalSidebar.tsx` extraiu `renderModuloItem` (função interna reaproveitada, sem duplicar JSX), novo estado `openGroups: Set<string>`, renderização em 3 blocos (pinned → soltos → grupos accordion).
+- Forge: `tsc`/`lint` escopados nos 2 arquivos alterados limpos; `build` completo sucesso (exit 0, todas as rotas). Lint da base COMPLETA rodou ~30min e terminou com 16.287 problemas pré-existentes (10.814 erros/5.473 warnings) — confirmado 100% baseline não relacionado, documentado em `known-errors.md`.
+- Probe: 10/10 itens de checklist PASS (grupos batendo com `GRUPOS_SIDEBAR`, `metas`/`roadmap` soltos, Admin intocado, `hidden` filtrado antes de tudo, lógica de isActive/isOpen/isPinned/tooltip preservada 1:1 via diff, busca abre grupo com resultado sem sobrescrever estado manual, `TabBar.tsx` confirmado não-afetado).
+- Lens: 1 achado 🟡 (faltava `aria-controls` no botão do header do grupo, complementando o `aria-expanded` já presente) — corrigido na hora.
+
+### Decisões tomadas
+- Accordion custom (não o componente shadcn genérico): motivo de densidade visual, evita overrides de padding/fonte em cada sub-parte.
+- `grupo` como campo opcional simples no item, não um objeto de relacionamento: mantém o padrão de arrays tipados já usado no arquivo (`CATEGORIAS`).
+- `hidden: true` em vez de remover o módulo do registry: reversível, não mexe em banco/permissões.
+
+### Problemas encontrados / resolvidos
+- Lint completo da base é pesado (~30min, processo único sem output incremental) — resolvido rodando lint escopado nos arquivos alterados para feedback rápido, e confirmando depois que o lint completo terminou sem regressão nova (baseline documentado).
+- Verificação visual no browser (`preview_start`/`navigate`) foi negada nesta sessão (pane não visível) — validação ficou em tsc/lint/build reais + diff linha a linha (Probe) + revisão de qualidade (Lens), sem screenshot de confirmação.
+
+### Pendências
+- Nenhuma pendência de implementação. Verificação visual manual pelo usuário é recomendada na primeira abertura da sidebar.
+
+### Refletido também em
+- `known-errors.md`: baseline do `npm run lint` completo da base (16.287/10.814/5.473)
+- `integration-points.md`: novo integration point "Grupo funcional de módulo na sidebar (gaveta colapsável)"
+
+### Ajuste pós-entrega (mesmo dia)
+Usuário pediu 5 correções de agrupamento após a primeira entrega: `metas` (Alpha Metas) movido de solto para `leadsMarketing`; `tarefasComercial` (Tarefas Comercial) ganhou `grupo: 'gestaoTarefas'` (tinha ficado sem grupo por falha na implementação original, apesar de estar no blueprint aprovado); `roadmap` (Roadmap Alpha) movido de solto para `gestaoTarefas`; `notas` (Bloco de notas) e `chamados` (Chamados) movidos para gaveta **nova**, `comunicacaoInterna` (label "Comunicação Interna", ícone `MessageSquare` — já importado no `ICON_MAP`, sem mudança necessária em `GlobalSidebar.tsx`). `GRUPOS_SIDEBAR` agora tem 10 grupos. `tsc`/`eslint` escopados limpos após o ajuste.
+
+---
+
+## [2026-08-28] — RM-2026-6BAAB8 — Card fechado com Razão Social/Nome Fantasia/CNPJ (objetivo COMPLETO, 9/9 fases)
+
+**Tags:** #roadmap #mcp #crm #ui #concluido
+**Agentes envolvidos:** Bibble (execução via chat + MCP roadmap-status), Scout, Nova, Forge, Probe, Lens, Sage, Scribe
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `.bibble/memory/{codebase-map.md, journal.md}`
+
+**Pedido:** exibir Razão Social, Nome Fantasia e CNPJ formatado no card fechado dos pipelines do CRM.
+
+**Fase 0 (auditoria):** DELIVERY_READY — sem lacuna de entrega, dados já persistidos, componente já existente.
+
+**Scout confirmou:** `KanbanCard` já exibia Nome Fantasia + CNPJ (via `formatCNPJ` já existente), mas duplicava o Nome Fantasia quando ele virava o próprio título (empresa sem Razão Social). Gap real era pequeno — ajuste, não criação.
+
+**Implementação (Nova):** 1 constante nova (`nomeFantasiaSecundario`), só mostra Nome Fantasia na linha secundária quando distinto do título. `cnpjFormatado` inalterado. Nenhum arquivo novo, nenhum token novo.
+
+**Qualidade:** Forge (tsc/lint/build limpos), Probe (4 cenários de dados verificados), Lens (aprovado, 1 sugestão não-bloqueante de comentário), Sage (aprovado via análise de código — mudança de baixo risco, limitação aceita: comparação de string não normaliza espaço/case).
+
+**Nota de processo:** o código `RM-2026-6BAAB8` (visível na UI) não é o `objectiveId` esperado pelas tools MCP (`roadmap_criar_run`/`roadmap_ver_fase`) — essas exigem o `id` cuid interno do `RoadmapObjective`. Resolvido consultando o Turso diretamente (script Prisma pontual com adapter `@prisma/adapter-libsql/web`, igual ao `src/lib/prisma.ts`) para mapear `code` → `id`. Uma tool de lookup por `code` no MCP `roadmap-status` eliminaria esse passo manual em sessões futuras.
+
+---
+
 ## [2026-08-26] — RM-2026-97934A — Indicação com serviço + posicionamento automático no pipeline (objetivo COMPLETO, 11/11 fases)
 
 **Tags:** #roadmap #mcp #parceiros #bpm #schema #vault #concluido #primeiro-relatorio-kowalski

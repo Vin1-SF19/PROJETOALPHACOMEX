@@ -187,6 +187,7 @@ model usuarios {
   alphaSeoAiRunsSolicitados            AlphaSeoAiVisibilityRun[]       @relation("AlphaSeoAiRunRequestedBy")
   alphaSeoOperacoesExternasSolicitadas AlphaSeoExternalOperationRun[]  @relation("AlphaSeoExternalOperationRequestedBy")
   alphaSeoEventosAuditoria             AlphaSeoAuditEvent[]
+  linksExternosCriados                 LinkExterno[]
 }
 
 /// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;
@@ -1706,6 +1707,22 @@ model SetorPermissao {
 
   @@unique([setor, modulo])
   @@index([setor])
+}
+
+model LinkExterno {
+  id          String   @id @default(cuid())
+  label       String
+  url         String
+  iconName    String   @default("ExternalLink")
+  ordem       Int      @default(0)
+  visivelPara String   @default("TODOS")
+  ativo       Boolean  @default(true)
+  criadoPorId Int
+  criadoPor   usuarios @relation(fields: [criadoPorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ordem])
 }
 
 model UsuarioPermissaoOverride {
