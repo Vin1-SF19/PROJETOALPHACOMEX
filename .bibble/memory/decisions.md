@@ -1,5 +1,19 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-28 — RM-2026-999766 — Gerador de Documentos: desarquivamento manual + link de conferência autenticado (não-público)
+
+**Contexto:** usuário pediu para desenvolver um item do Roadmap Alpha que estava `ARCHIVED`. Descoberto que o sistema não tem função de "desarquivar" — `retireRoadmapObjective` é operação terminal, todas as funções de mutação de objetivo rejeitam `archivedAt != null`. Reproduzido o mesmo bug de truncamento (`TRUNCATED_MODEL_RESPONSE`) já catalogado em `known-errors.md` ao tentar reprocessar via worker automático — forte indício de que foi essa a causa do arquivamento original, não uma decisão de produto.
+
+**Decisão 1 — como desenvolver um item arquivado sem função de unarchive:** replicar manualmente a lógica de `retryRoadmapObjective` (zera `archivedAt`, `status=ACTIVE`, `documentationStatus=PENDING`, `globalPriority=1`, incrementa `sourceVersion`) direto no banco (Vault aprovou como operação segura — INSERT/UPDATE simples, sem DROP/DELETE). Job automático de documentação foi cancelado após confirmar o truncamento consistente; blueprint de integração foi feito manualmente por Bibble assumindo o papel do Scout, sem depender do worker Qwen.
+
+**Decisão 2 — link de conferência autenticado, não público (confirmada via AskUserQuestion):** o blueprint pré-existente (`docs/stories/story-gerador-documentos-fase1-blueprint.md`, seção 9 item 5) recomendava token público na URL sem login. O objetivo original do Roadmap exige explicitamente "acessível apenas por quem possui permissão, não sendo um link público" — contradição resolvida a favor do requisito original: `tokenAcesso` identifica o documento, mas a rota `conferencia/[token]` sempre exige `auth()` + ownership antes de renderizar. Documentado em `architecture.md`.
+
+**Decisão 3 — escopo da API entre módulos (confirmada via AskUserQuestion):** "outros módulos chamam a geração de documento" foi interpretado como uso interno (mesmo processo Next.js), não uma integração externa que exigiria API key dedicada (`RoadmapApiKey`/`AlphaSeoApiKey`). Só uma rota HTTP de conveniência foi criada, delegando 100% para a Server Action já autenticada — sem tabela nova, sem migration adicional.
+
+**Validação:** `tsc`/`eslint`/`npm run build` limpos, 41 testes novos (`tests/gerador-documentos/`) cobrindo render de variáveis, schemas Zod e ownership/IDOR — um bug real de fuso horário na formatação de datas foi encontrado pelos próprios testes e corrigido antes da entrega. Suíte completa do projeto sem regressão.
+
+**Adicionado em:** 2026-08-28 por Bibble/Vault/Echo/Anubis/Lens/Sage (execução direta via chat, sem pipeline formal do Roadmap — job automático de documentação não pôde ser usado).
+
 ### 2026-08-26 — RM-2026-97934A — Formulário de indicação de cliente com serviço + posicionamento automático no pipeline
 
 **Contexto:** módulo Parceiros → `ModalNovaIndicacao.tsx`. Objetivo pedia vincular parceiro a "empresa indicada" e "produto/serviço", com "posicionamento automático no pipeline". A Fase 0 (auditoria) achou 3 lacunas reais: (1) modal só permitia vincular empresa já existente no CS&NPS; (2) não existia campo de serviço na indicação; (3) `DirecionarIndicacaoParaCloser` (cria o `BpmCard`) existia mas era código morto de UI — nenhum botão o invocava.

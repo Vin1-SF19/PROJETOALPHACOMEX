@@ -292,7 +292,7 @@ model DocumentoClasulaGerada {
 | # | Caminho | O que mudar | Agente |
 |---|---------|-------------|--------|
 | 1 | `prisma/schema.prisma` | Adicionar 4 models novos (seção 3) | Echo |
-| 2 | `src/lib/modulos-registry.ts` | Adicionar item: `{ id: 'geradorDocumentos', label: 'Gerador de Documentos', href: '/PainelAlpha/GeradorDocumentos', iconName: 'FileText', category: 'operacional', permission: 'geradorDocumentos', desc: 'Criação e gestão de documentos a partir de templates com IA.', tag: 'Documentos', color: 'from-blue-600/20' }` | Nova |
+| 2 | `src/lib/modulos-registry.ts` | ✅ **Já feito** — item `geradorDocumentos` já existe no registry (`category: 'infra'`, `grupo: 'estudioConteudo'`, `href: '/PainelAlpha/GeradorDocumentos'`, `permission: 'geradorDocumentos'`). Nada a editar aqui. | — |
 | 3 | `src/lib/temas.ts` (se necessário) | Verificar se o tema padrão suporta o novo módulo (provavelmente não precisa) | Nova |
 
 ---
@@ -319,7 +319,7 @@ model DocumentoClasulaGerada {
 |-------|---------|-----------|
 | Migration de banco (4 models novos) | Alto — exige protocolo Vault | Backup pré-mudança + confirmação explícita do usuário |
 | Onyx indisponível | Médio — reescrita IA falha | Fallback: exibir mensagem "IA indisponível" + permitir edição manual |
-| Token de conferência vazado | Alto — documento exposto | Token = cuid() (24 chars, alta entropia) + expiração opcional |
+| Token de conferência vazado | Baixo — link sozinho não basta | Token = cuid() identifica o documento, mas a rota exige `auth()` + ownership; vazar o link não expõe o documento a quem não tem permissão |
 | Template com muitas cláusulas (>500) | Baixo — SQLite suporta | Limite de 200 cláusulas por template (validação Zod) |
 | Concorrência na edição de cláusula | Médio — conflito de escrita | `atualizadoEm` + optimistic locking (CAS por `updatedAt`) |
 | Onyx streaming SSE em iframe | Médio — CORS/proxy | Mesmo padrão do chat do Bibble (já funciona) |
@@ -334,7 +334,7 @@ model DocumentoClasulaGerada {
 | 2 | Storage de documentos finais (PDF/DOCX) | A) Vercel Blob<br>B) Banco (BLOB)<br>C) Não gerar arquivo (só texto) | **C — MVP: só texto** | Reduz complexidade. Exportação PDF/DOCX pode ser fase futura. |
 | 3 | Permissão: granular por ação vs. módulo-inteiro | A) `geradorDocumentos` (módulo-inteiro)<br>B) `geradorDocumentos.criar`, `.editar`, `.gerar`, `.conferir` | **A — Módulo-inteiro** | Padrão do projeto (mesmo de Comissões, Blueprint). Granularidade pode vir depois. |
 | 4 | Onyx: token do usuário vs. API key global | A) `usuarios.token_onyx` (PAT)<br>B) `ONYX_API_KEY` (env) | **A com fallback B** | Padrão do projeto. PAT do usuário é mais seguro (auditoria por usuário). |
-| 5 | Link de conferência: público vs. autenticado | A) Público (token na URL)<br>B) Autenticado (login + token) | **A — Público com token** | Token cuid() é suficientemente seguro. Login adiciona fricção. |
+| 5 | Link de conferência: público vs. autenticado | A) Público (token na URL)<br>B) Autenticado (login + token) | **B — Autenticado** *(revisado 2026-08-28, Bibble)* | O objetivo original (`RM-2026-999766`) exige explicitamente que o link "seja acessível apenas por quem possui permissão, não sendo um link público". `tokenAcesso` continua identificando o documento na URL, mas a rota `conferencia/[token]` exige `auth()` + checagem de ownership/permissão do usuário logado antes de renderizar — segue o mesmo padrão de `blueprint/ownership.ts`, não o padrão `ConviteParceiro` (que é para convite de quem ainda não tem conta). |
 | 6 | Reescrita IA: streaming vs. resposta única | A) Streaming SSE<br>B) Resposta única JSON | **A — Streaming SSE** | Padrão do projeto (chat Bibble, gerar-slide). Melhor UX para textos longos. |
 
 ---

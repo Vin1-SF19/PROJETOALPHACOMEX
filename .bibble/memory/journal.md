@@ -3892,3 +3892,44 @@ O módulo Roadmap já possuía um MCP funcional para o Claude; a pendência era 
 
 ### Refletido também em
 - Nenhum arquivo curado adicional: a consolidação ficou restrita ao journal por escopo desta tarefa.
+
+---
+
+## [2026-08-28 14:42] — Gerador de Documentos implementado a partir de item arquivado do Roadmap (RM-2026-999766)
+
+**Tags:** #feature #integration #decision #security #nextjs #prisma
+**Agentes envolvidos:** Bibble, Vault, Echo, Anubis, Lens, Sage, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `prisma/migrations/20260828171445_add_gerador_documentos/migration.sql`, `src/lib/gerador-documentos/{ownership,render,onyx,schemas}.ts`, `src/actions/gerador-documentos.ts`, `src/app/api/gerador-documentos/gerar/route.ts`, `src/app/PainelAlpha/GeradorDocumentos/**` (layout, page, `[templateId]`, `gerar`, `conferencia/[token]`), `src/components/GeradorDocumentos/**` (6 componentes), `tests/gerador-documentos/{render,schemas,ownership}.test.ts`, `docs/stories/story-gerador-documentos-fase1-blueprint.md` (revisado), `.bibble/memory/{architecture,decisions}.md`
+
+### Contexto
+Usuário pediu para desenvolver o item `RM-2026-999766` do Roadmap Alpha, que estava marcado como `ARCHIVED` — nenhum contexto adicional foi dado sobre o motivo do arquivamento.
+
+### O que foi feito
+- Localizado o objetivo no banco (`basetestes-alphacomex`, confirmado com o usuário como ambiente correto) — módulo novo "Gerador de Documentos": templates com variáveis dinâmicas e cláusulas separadas, geração sob demanda via chamada de outro módulo, tela de conferência com reescrita de cláusula por cláusula via IA padrão do painel (Onyx).
+- Desarquivado manualmente (não existe função de unarchive no sistema — replicada a lógica de `retryRoadmapObjective` direto no banco, aprovado pelo Vault como operação segura).
+- Worker automático de documentação (Qwen/Ollama) truncou 3x seguidas (`TRUNCATED_MODEL_RESPONSE`) — mesmo bug já catalogado em `known-errors.md`, cancelado o job e assumido manualmente o papel do Scout.
+- Descoberto blueprint anterior já existente (`docs/stories/story-gerador-documentos-fase1-blueprint.md`, 14/08) — reaproveitado, com uma correção de segurança (ver decisões).
+- Schema Prisma: 4 models novos, migration aplicada via Vault (backup + confirmação), aplicada manualmente statement-a-statement contra Turso (corrigido um bug de split de comentário que engolia o primeiro `CREATE TABLE`, mesmo padrão já visto em `known-errors.md`).
+- Backend completo: ownership (permissão de módulo + dono/admin), motor de render de variáveis, integração Onyx (coleta interna de stream, padrão de `extrato-agents.ts`), Server Actions completas, 1 rota HTTP de conveniência.
+- Frontend completo: lista de templates/documentos, criação de template, detalhe/edição, formulário de geração, tela de conferência com edição e reescrita por IA.
+- Pipeline completo da squad rodado nesta conversa: Vault → Echo → Forge (`tsc`/`eslint`/`build` limpos) → Probe (aprovado, com ressalva de verificação visual não testável por falta de credenciais) → Anubis (aprovado, 1 issue importante de baixo risco documentada — prompt injection de impacto limitado na reescrita) → Lens (aprovado, 2 issues menores documentadas) → Sage (41 testes novos, 1 bug real de fuso horário encontrado e corrigido) → Scribe.
+
+### Decisões tomadas
+- **Link de conferência autenticado, não público**: divergia do blueprint original (token público sem login); corrigido para exigir `auth()` + ownership, conforme o requisito literal do objetivo ("não sendo um link público").
+- **API entre módulos só uso interno**: sem API key dedicada (`RoadmapApiKey`-like) por enquanto — Server Action/rota HTTP autenticada bastam para o caso descrito.
+- **Reescrita por IA com coleta interna de stream** (não SSE direto ao cliente): mais simples de auditar/validar a resposta, mesmo padrão já comprovado em produção.
+
+### Problemas encontrados / resolvidos
+- Não existe função de desarquivar objetivo do Roadmap → replicada manualmente a lógica de `retryRoadmapObjective`.
+- Split de migration por `;\n` engolia o primeiro `CREATE TABLE` junto com o comentário do cabeçalho → corrigido removendo linhas de comentário antes do split, não por statement inteiro.
+- Bug real de fuso horário em `renderizarConteudo` (data ISO sem hora virava um dia antes ao formatar) → encontrado pelos testes, corrigido com parse manual de componentes.
+- `.env`/`.env.local` têm 2 linhas de `TURSO_DATABASE_URL` (produção comentada, testes ativa) — confirmado com o usuário antes de prosseguir com qualquer escrita.
+
+### Pendências
+- Verificação visual end-to-end no navegador autenticado não foi feita (sem credenciais de usuário de teste disponíveis).
+- Prompt injection de baixo risco na reescrita por IA documentado pelo Anubis — não bloqueante, mas vale revisar se o produto crescer para permitir compartilhamento externo sem revisão humana.
+- Concorrência em `ReordenarClasulasTemplate`/`CriarClasulaTemplate` (colisão de `ordem` em uso simultâneo) — edge case de baixo impacto, não tratado.
+
+### Refletido também em
+- `architecture.md`: entrada completa do módulo, schema, decisões técnicas, achado do bug de desarquivamento.
+- `decisions.md`: entrada dedicada às 3 decisões confirmadas com o usuário (desarquivamento manual, link não-público, escopo de API interna).

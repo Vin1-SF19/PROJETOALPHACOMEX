@@ -1,5 +1,35 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Gerador de Documentos — templates, geração e conferência com reescrita por IA (RM-2026-999766, 2026-08-28)
+
+Módulo novo (`category: 'infra'`, `grupo: 'estudioConteudo'`, id `geradorDocumentos` — já pré-registrado em `MODULOS_REGISTRY` desde 22/08, implementação real feita nesta sessão). Templates com variáveis dinâmicas `{{nome}}` e cláusulas separadas editáveis individualmente; geração sob demanda gera um `DocumentoGerado` + link de conferência; cada cláusula do documento gerado pode ser reescrita pontualmente via IA padrão do painel (Onyx), mediante instrução textual do usuário.
+
+**⚠️ Achado que mudou o rumo da sessão:** o objetivo estava `ARCHIVED` no Roadmap. Não existe função de "desarquivar" no sistema (`retireRoadmapObjective` é operação terminal — todas as funções de `objectives.ts` rejeitam objetivo com `archivedAt != null`). Foi desarquivado manualmente (reset de `archivedAt`/`status`/`globalPriority`/nova `sourceVersion`, replicando a lógica de `retryRoadmapObjective`). O worker automático de documentação (Qwen/Ollama) tentou gerar o blueprint de fases e truncou 3x seguidas (`TRUNCATED_MODEL_RESPONSE`) — bug já conhecido (ver `known-errors.md`) para objetivos com descrição muito extensa, quase certamente a causa raiz do arquivamento original. Descoberto que já existia um blueprint completo anterior em `docs/stories/story-gerador-documentos-fase1-blueprint.md` (14/08, "Fase 1 — Scout", agente Nova) — reaproveitado e corrigido (ver decisão de link não-público abaixo) em vez de refeito do zero.
+
+**4 models novos** (`prisma/schema.prisma`, migration `20260828171445_add_gerador_documentos`, 100% aditiva):
+```prisma
+model DocumentoTemplate { id, titulo, descricao?, categoria?, variaveisJson (Json), status @default("ATIVO"), criadoPorId → usuarios, clausulas[], documentos[] }
+model DocumentoClasula { id, templateId → DocumentoTemplate, ordem, titulo, conteudo, tipo @default("TEXTO"), editavel @@unique([templateId, ordem]) }
+model DocumentoGerado { id, templateId, titulo, variaveisJson, status @default("RASCUNHO"), tokenAcesso @unique, criadoPorId → usuarios, clausulas[] }
+model DocumentoClasulaGerada { id, documentoId → DocumentoGerado, ordem, titulo, conteudo, conteudoOriginal, reescritoPorIA, instrucaoIA? @@unique([documentoId, ordem]) }
+```
+
+**Decisão de segurança confirmada com o usuário (diverge do blueprint original):** link de conferência (`/PainelAlpha/GeradorDocumentos/conferencia/[token]`) é **autenticado**, não público — `tokenAcesso` identifica o documento na URL mas NUNCA autoriza sozinho; toda leitura/escrita exige `auth()` + ownership (`exigirOwnershipDocumentoPorToken`/`exigirOwnershipDocumento`, dono ou admin). O blueprint de 14/08 recomendava token público sem login (mesmo padrão de `ConviteParceiro`); revisado porque o objetivo original do Roadmap exige explicitamente "não sendo um link público".
+
+**Backend** (`src/lib/gerador-documentos/`): `ownership.ts` (`exigirAcessoModulo` — permissão `geradorDocumentos` via `getPermissoesEfetivas`/bypass admin; `exigirOwnershipTemplate`/`exigirOwnershipDocumento`/`exigirOwnershipDocumentoPorToken` — dono ou admin, nunca confia em ID isolado), `render.ts` (substituição de `{{variavel}}` por tipo — texto/número/moeda/data/booleano; parse manual de datas `YYYY-MM-DD` evita bug de off-by-one por fuso horário, achado real pelos testes), `onyx.ts` (`reescreverClasulaViaIA` — persona_id 0/Default AI, coleta interna do stream NDJSON, mesmo padrão de `extrato-agents.ts`, nunca streaming SSE direto ao cliente), `schemas.ts` (Zod completo: nomes de variável validados por regex, limite de 200 cláusulas/template, instrução de reescrita 3-2000 chars).
+
+**Server Actions** (`src/actions/gerador-documentos.ts`): CRUD de template/cláusula, `GerarDocumento` (transação atômica: cria `DocumentoGerado` + todas as `DocumentoClasulaGerada` renderizadas), `ReescreverClasulaComIA` (contexto = todas as cláusulas do documento concatenadas + texto atual + instrução → Onyx → só a cláusula em questão é atualizada), `FinalizarDocumento`.
+
+**Decisão de escopo confirmada com o usuário:** só uso interno (Server Action chamada diretamente entre módulos do mesmo processo Next.js, ou via a única rota HTTP `/api/gerador-documentos/gerar` que apenas delega para a Server Action). Nenhuma API key dedicada tipo `RoadmapApiKey`/`AlphaSeoApiKey` foi criada — adiado para se algum dia surgir necessidade real de chamada externa (fora do processo Next.js).
+
+**Frontend** (`src/components/GeradorDocumentos/`): `GeradorDocumentosClient` (lista templates/documentos, tabs), `NovoTemplateDialog` (criação com editor de variáveis + cláusulas), `TemplateDetalheClient` (CRUD de cláusulas do template), `GerarDocumentoForm` (preenche variáveis, dispara geração), `ConferenciaClient` + `ReescreverIA` (edição por cláusula, botão "Reescrever com IA").
+
+**Testes:** `tests/gerador-documentos/` — `render.test.ts` (14, inclui o fix de fuso horário), `schemas.test.ts` (14), `ownership.test.ts` (13, cobre IDOR e o caso do token não-público). 41/41 passando, zero regressão na suíte completa do projeto (1818 passando, as 30 falhas são os mesmos baselines pré-existentes de `tests/bpm/`, `tests/alpha-seo/`, `tests/apresentacoes/`, `tests/bibble/`, `tests/google-calendar/cli`).
+
+**Qualidade:** `tsc --noEmit`/`eslint`/`npm run build` limpos (zero erro novo, só os 6 baselines de sempre). Verificação visual em navegador não foi possível — sem credenciais de usuário de teste disponíveis (mesma limitação honesta já documentada em outras entregas).
+
+**Ambiente:** todo o trabalho (migration + dados) foi no banco `basetestes-alphacomex` (Turso), confirmado com o usuário como o ambiente correto — `banco-alpha-alphacomex` está comentado (`#`) em `.env`/`.env.local` e não é o ativo hoje.
+
 ## ChatBot Alpha — módulo de acesso administrativo à infraestrutura ChatbotX (2026-08-28)
 
 Novo módulo (`category: 'admin'` em `MODULOS_REGISTRY`, id `chatBotAlpha`) — hub de atalhos para 3 ferramentas administrativas de um sistema **ChatbotX** self-hosted externo (projeto de referência consultado em `C:\Users\TI\Downloads\ChatbotX-main`, não implementado neste repositório, só consumido via URL): **Adminer** (cliente Postgres), **RedisInsight** (console Redis, env `REDIS_URL`/`REDIS_TOKEN`), **MailHog** (capturador de e-mail de teste, env `BASMAILOG_URL` — nome da env mantido apesar do nome real da ferramenta ser MailHog).

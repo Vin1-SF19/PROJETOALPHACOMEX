@@ -188,6 +188,9 @@ model usuarios {
   alphaSeoOperacoesExternasSolicitadas AlphaSeoExternalOperationRun[]  @relation("AlphaSeoExternalOperationRequestedBy")
   alphaSeoEventosAuditoria             AlphaSeoAuditEvent[]
   linksExternosCriados                 LinkExterno[]
+
+  documentoTemplatesCriados DocumentoTemplate[]
+  documentosGerados         DocumentoGerado[]
 }
 
 /// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;
@@ -4995,4 +4998,93 @@ model AlphaSeoAuditEvent {
   @@index([userId, createdAt])
   @@index([entityType, entityId, createdAt])
   @@index([requestId])
+}
+
+/// Módulo Gerador de Documentos (RM-2026-999766). Template com variáveis
+/// dinâmicas + cláusulas separadas — cada cláusula é uma unidade editável
+/// independente, tanto no template quanto no documento gerado a partir dele.
+model DocumentoTemplate {
+  id            String   @id @default(cuid())
+  titulo        String
+  descricao     String?
+  categoria     String? // "contrato" | "proposta" | "aviso" | "outro" — texto livre, sem enum real
+  variaveisJson Json // array de { nome, label, tipo, obrigatorio, placeholder }
+  status        String   @default("ATIVO") // "ATIVO" | "ARQUIVADO"
+  criadoPorId   Int
+  criadoPor     usuarios @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  clausulas  DocumentoClasula[]
+  documentos DocumentoGerado[]
+
+  @@index([criadoPorId, criadoEm])
+  @@index([status, criadoEm])
+}
+
+/// Cláusula de um template — unidade independente e ordenável dentro do
+/// documento, com placeholders {{variavel}} substituídos na geração.
+model DocumentoClasula {
+  id           String   @id @default(cuid())
+  templateId   String
+  ordem        Int
+  titulo       String
+  conteudo     String // texto com placeholders {{variavel}}
+  tipo         String   @default("TEXTO") // "TEXTO" | "TABELA" | "ASSINATURA"
+  editavel     Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  template DocumentoTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, ordem])
+  @@index([templateId])
+}
+
+/// Instância gerada de um template com variáveis preenchidas. `tokenAcesso`
+/// identifica o documento na URL de conferência, mas NUNCA é autorização por
+/// si só — a rota exige auth() + ownership antes de renderizar (decisão
+/// 2026-08-28, ver docs/stories/story-gerador-documentos-fase1-blueprint.md
+/// seção 9 item 5 — objetivo original exige link não-público).
+model DocumentoGerado {
+  id            String    @id @default(cuid())
+  templateId    String
+  titulo        String
+  variaveisJson Json // valores preenchidos nas variáveis do template
+  status        String    @default("RASCUNHO") // "RASCUNHO" | "CONFERENCIA" | "FINALIZADO" | "ARQUIVADO"
+  tokenAcesso   String    @unique
+  criadoPorId   Int
+  criadoPor     usuarios  @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+  finalizadoEm  DateTime?
+
+  template  DocumentoTemplate        @relation(fields: [templateId], references: [id])
+  clausulas DocumentoClasulaGerada[]
+
+  @@index([criadoPorId, criadoEm])
+  @@index([status, criadoEm])
+  @@index([templateId])
+  @@index([tokenAcesso])
+}
+
+/// Cláusula de um documento já gerado — mantém o texto original do template
+/// (para diff/auditoria) separado do texto final, que pode ter sido
+/// reescrito pela IA padrão do painel (Onyx) mediante instrução do usuário.
+model DocumentoClasulaGerada {
+  id               String   @id @default(cuid())
+  documentoId      String
+  ordem            Int
+  titulo           String
+  conteudo         String // texto final (variáveis substituídas, possivelmente reescrito por IA)
+  conteudoOriginal String // texto do template no momento da geração, para diff
+  reescritoPorIA   Boolean  @default(false)
+  instrucaoIA      String? // instrução do usuário usada na última reescrita (auditoria)
+  criadoEm         DateTime @default(now())
+  atualizadoEm     DateTime @updatedAt
+
+  documento DocumentoGerado @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@unique([documentoId, ordem])
+  @@index([documentoId])
 }
