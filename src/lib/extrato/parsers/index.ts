@@ -63,6 +63,14 @@ export function detectarParserExtrato(texto: string): ParserDetectado | null {
   }
 
   if (
+    normalizado.includes("extrato mensal") &&
+    normalizado.includes("conta corrente | movimentacao") &&
+    normalizado.includes("aplicacoes automaticas")
+  ) {
+    return { bancoId: "itau", parser: parserItau };
+  }
+
+  if (
     normalizado.includes("extrato consolidado inteligente") &&
     normalizado.includes("conta corrente") &&
     normalizado.includes("movimentacao")

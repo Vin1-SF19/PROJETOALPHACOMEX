@@ -47,6 +47,21 @@ Comprovantes de Pagamento
 03/06 INTERNET BANKING PIX FORNECEDOR EXEMPLO 99999999 0000 0000000000000 120,00
 `;
 
+const ITAU_MENSAL = `
+extrato mensal ag 0000 cc 00000-0 jul 2026 001|004
+Conta Corrente | Movimentação A = agendamento data descrição entradas R$ saídas R$ saldo R$
+B = ações movimentadas (créditos) (débitos) pela Bolsa de Valores 23/06 Saldo anterior 0,08
+C = crédito a compensar D = débito a compensar 06/07 PIX TRANSF PESSOA EXEMPLO04/07 240,80
+G = aplicação programada Apl Aplic Aut Mais 239,88- 1,00 P = poupança automática SALDO APLIC AUT MAIS 239,88
+14/07 PIX ENVIADO FAVORECIDO EXEMPLO 66,00-
+data descrição entradas R$ saídas R$ saldo R$
+Res Aplic Aut Mais 66,00 1,00
+SALDO APLIC AUT MAIS 173,88
+Saldo em C/C 1,00
+Conta Corrente | Aplicações Automáticas
+06/07 239,88 0,00 0,00 0,00 0,00 0,00 239,88
+`;
+
 describe("parsers de extratos validados contra PDFs reais", () => {
   it("recompõe linhas e quebras de página do Itaú simplificado", () => {
     expect(obterParser("itau").parse(ITAU_SIMPLIFICADO)).toEqual([
@@ -96,8 +111,18 @@ describe("parsers de extratos validados contra PDFs reais", () => {
     ]);
   });
 
+  it("lê o extrato mensal do Itaú com lançamento dividido entre páginas", () => {
+    expect(obterParser("itau").parse(ITAU_MENSAL)).toEqual([
+      { data: "06/07/2026", descricao: "PIX TRANSF PESSOA EXEMPLO04/07", valor: 240.8 },
+      { data: "06/07/2026", descricao: "APL APLIC AUT MAIS", valor: -239.88 },
+      { data: "14/07/2026", descricao: "PIX ENVIADO FAVORECIDO EXEMPLO", valor: -66 },
+      { data: "14/07/2026", descricao: "RES APLIC AUT MAIS", valor: 66 },
+    ]);
+  });
+
   it("autodetecta apenas as assinaturas validadas e preserva o fallback", () => {
     expect(detectarParserExtrato(ITAU_SIMPLIFICADO)?.bancoId).toBe("itau");
+    expect(detectarParserExtrato(ITAU_MENSAL)?.bancoId).toBe("itau");
     expect(detectarParserExtrato(SANTANDER_CONSOLIDADO)?.bancoId).toBe("santander");
     expect(detectarParserExtrato("extrato de outro banco sem assinatura")).toBeNull();
     expect(obterParser("banco-inexistente").parse("texto sem transações")).toEqual([]);
