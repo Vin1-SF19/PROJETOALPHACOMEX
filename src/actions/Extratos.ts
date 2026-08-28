@@ -75,13 +75,7 @@ export async function ListarExtratos(params?: { page?: number; pageSize?: number
   }
 }
 
-/**
- * Vincula uma empresa já cadastrada no CRM/CS&NPS (Cliente Master) ao módulo de
- * Extratos — Fase 3.3 do Cliente Master. NUNCA cria `Cliente` novo (mesma regra
- * dos demais módulos satélite: BPM é a única porta de entrada de Cliente novo no
- * sistema). Se o CNPJ não existir ainda, bloqueia com mensagem orientando a
- * cadastrar a empresa no Alpha CRM primeiro.
- */
+/** Vincula uma empresa ao módulo de Extratos, criando seu cadastro mestre quando necessário. */
 export async function ExtratosClientes(dados: unknown) {
   try {
     const session = await auth();
@@ -94,13 +88,20 @@ export async function ExtratosClientes(dados: unknown) {
     }
     const cnpjNormalizado = parsed.data.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
-    const cliente = await db.cliente.findUnique({ where: { cnpj: cnpjNormalizado }, select: { id: true } });
-    if (!cliente) {
-      return {
-        success: false,
-        error: "Esta empresa ainda não está cadastrada no CRM — cadastre-a primeiro no Alpha CRM antes de vincular ao Extratos.",
-      };
-    }
+    const cliente = await db.cliente.upsert({
+      where: { cnpj: cnpjNormalizado },
+      update: {},
+      create: {
+        cnpj: cnpjNormalizado,
+        razaoSocial: parsed.data.razaoSocial,
+        nomeFantasia: parsed.data.nomeFantasia || null,
+        dataConstituicao: parsed.data.dataConstituicao || null,
+        municipio: parsed.data.municipio || null,
+        uf: parsed.data.uf || null,
+        regimeTributario: parsed.data.regimeTributario || null,
+      },
+      select: { id: true },
+    });
 
     await db.extratos.upsert({
       where: { clienteId: cliente.id },

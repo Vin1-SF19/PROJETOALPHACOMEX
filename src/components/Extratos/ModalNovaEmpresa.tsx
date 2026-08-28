@@ -39,10 +39,8 @@ export function ModalNovaEmpresa({ isOpen, onClose, aoSucesso }: ModalNovaEmpres
   const [carregando, setCarregando] = useState(false);
   const [dadosEmpresa, setDadosEmpresa] = useState<DadosEmpresa | null>(null);
 
-  // Busca na Receita Federal é só confirmação visual (mostra qual empresa é o
-  // CNPJ informado) — desde a Fase 3.3 do Cliente Master, o vínculo real exige
-  // que a empresa já esteja cadastrada no CRM/CS&NPS, essa consulta não cria
-  // cadastro nenhum.
+  // A consulta à Receita Federal confirma os dados cadastrais antes de criar o
+  // vínculo da empresa com o módulo de Extratos.
   const handleConsultarCNPJ = async () => {
     const cnpjLimpo = cnpj.replace(/\D/g, "");
     if (cnpjLimpo.length !== 14) return toast.error("CNPJ Inválido!");
@@ -79,7 +77,7 @@ export function ModalNovaEmpresa({ isOpen, onClose, aoSucesso }: ModalNovaEmpres
 
     setCarregando(true);
     try {
-      const res = await ExtratosClientes({ cnpj });
+      const res = await ExtratosClientes({ cnpj, ...dadosEmpresa });
 
       if (res.success) {
         toast.success("Empresa vinculada — análise de extrato iniciada!");
@@ -125,7 +123,7 @@ export function ModalNovaEmpresa({ isOpen, onClose, aoSucesso }: ModalNovaEmpres
         <div className="p-10 space-y-10">
           <div className="space-y-4">
             <label htmlFor="empresa-cnpj" className="text-[10px] font-black uppercase text-indigo-500 tracking-widest ml-1">Documento de Identificação (CNPJ)</label>
-            <p className="text-[11px] text-slate-500 -mt-2 ml-1">A empresa precisa já estar cadastrada no Alpha CRM. Esta consulta só confirma visualmente qual empresa é.</p>
+            <p className="text-[11px] text-slate-500 -mt-2 ml-1">Consulte o CNPJ para confirmar os dados e cadastrar a empresa no módulo de Extratos.</p>
             <div className="flex gap-4">
               <div className="relative flex-1 group">
                 <Hash aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-all" size={20} />
@@ -174,7 +172,7 @@ export function ModalNovaEmpresa({ isOpen, onClose, aoSucesso }: ModalNovaEmpres
               disabled={!dadosEmpresa || carregando}
               className="cursor-pointer flex-[2] py-5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-indigo-500 transition-all shadow-2xl shadow-indigo-500/20 disabled:opacity-10 italic"
             >
-              {carregando ? "Vinculando..." : "Confirmar e Vincular"}
+              {carregando ? "Cadastrando..." : "Confirmar e Cadastrar"}
             </button>
           </div>
         </div>

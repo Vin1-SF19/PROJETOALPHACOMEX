@@ -5,11 +5,14 @@ export const cnpjSchema = z
   .transform((v) => v.replace(/\D/g, ""))
   .refine((v) => v.length === 14, "CNPJ deve conter 14 dígitos");
 
-// Fase 3.3 do Cliente Master (2026-08-13) — Extratos não cadastra mais dado
-// cadastral de empresa (isso agora vive só em `Cliente`), só vincula uma
-// empresa já existente pelo CNPJ.
 export const vincularEmpresaExtratoSchema = z.object({
-  cnpj: z.string().min(11, "CNPJ inválido").max(20),
+  cnpj: cnpjSchema,
+  razaoSocial: z.string().trim().min(1, "Razão social é obrigatória").max(255),
+  nomeFantasia: z.string().trim().max(255).optional(),
+  dataConstituicao: z.string().trim().max(30).optional(),
+  municipio: z.string().trim().max(120).optional(),
+  uf: z.string().trim().max(2).optional(),
+  regimeTributario: z.string().trim().max(120).optional(),
 });
 export type VincularEmpresaExtratoInput = z.infer<typeof vincularEmpresaExtratoSchema>;
 
