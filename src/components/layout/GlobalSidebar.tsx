@@ -378,8 +378,11 @@ export default function GlobalSidebar({
       >
         <a
           href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
+          onClick={(e) => {
+            e.preventDefault();
+            if (onOpenTab) onOpenTab(link.url, link.label);
+            else window.open(link.url, '_blank', 'noopener,noreferrer');
+          }}
           aria-label={link.label}
           className={`
             flex items-center gap-3 rounded-xl border transition-all duration-200 group
