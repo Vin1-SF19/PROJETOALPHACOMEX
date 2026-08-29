@@ -2,7 +2,43 @@
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-28 (Alpha CRM — card fechado com Razão Social/Nome Fantasia/CNPJ)
+> Última atualização: 2026-08-29 (Gerador de Documentos — Contratante/Contratada + Qualificação, Parte 1)
+
+---
+
+## Gerador de Documentos — Contratante/Contratada + Qualificação (2026-08-29, Parte 1 de 2)
+
+**Arquivos tocados:**
+- `prisma/schema.prisma` — model `EmpresaContratada` novo; `DocumentoGerado.clienteId`/`empresaContratadaId`/`pdfUrl` (nullable, aditivo)
+- `src/lib/gerador-documentos/ownership.ts` — `getSessaoGeradorDocumentos()` novo (fonte única de sessão para o módulo)
+- `src/lib/gerador-documentos/schemas.ts` — `EmpresaContratadaSchema`, `AtualizarEmpresaContratadaSchema`, `GerarDocumentoSchema` estendido
+- `src/actions/gerador-documentos.ts` — `BuscarClientesParaContratante()` novo, `GerarDocumento` persiste vínculos
+- `src/actions/empresas-contratadas.ts` (novo) — CRUD completo + consulta Receita Federal
+- `src/components/GeradorDocumentos/ModalNovaEmpresaContratada.tsx` (novo)
+- `src/components/GeradorDocumentos/GerarDocumentoForm.tsx` — reescrito com seletores de contratante/contratada
+- `tests/gerador-documentos/{schemas,empresas-contratadas,buscar-clientes-contratante,ownership}.test.ts`
+
+**Pendência consciente:** geração de PDF real (item 4 do pedido original do usuário) NÃO implementada nesta parte — `pdfUrl` existe no schema mas não é populado ainda. Fica para a Parte 2.
+
+Ver detalhe completo em `architecture.md`.
+
+---
+
+## Gerador de Documentos — criação de template via upload (RM-2026-93645F, 2026-08-29)
+
+**Arquivos tocados:**
+- `prisma/schema.prisma` — `DocumentoTemplate.arquivoOrigemUrl`/`arquivoOrigemNome` (nullable, aditivo)
+- `src/lib/gerador-documentos/schemas.ts` — `IdentificacaoTemplateSchema` novo
+- `src/lib/gerador-documentos/onyx.ts` — `identificarVariaveisEClasulasViaIA()` novo (+ `extrairJson()` privada)
+- `src/actions/gerador-documentos.ts` — `CriarTemplateViaUpload()` novo, `persistirNovoTemplate()` extraído como helper reaproveitado por ela e por `CriarTemplateDocumento`
+- `src/components/GeradorDocumentos/NovoTemplateDialog.tsx` — reescrito integralmente (upload-only, drag-and-drop)
+- `src/components/GeradorDocumentos/GeradorDocumentosClient.tsx` — `onCriado` virou `() => void` + `router.refresh()` (antes montava `TemplateResumo` manualmente no client)
+- `src/components/GeradorDocumentos/TemplateDetalheClient.tsx` — CRUD de variáveis novo (antes só cláusulas)
+- `tests/gerador-documentos/{schemas,onyx-identificacao,criar-template-via-upload}.test.ts` — novo/expandido, 24 testes
+
+**Padrão reaproveitável:** upload → `extractTextFromBuffer` (extração) → IA (Onyx, JSON estrito parseado por Zod) → persistência transacional. Se outro módulo precisar de "documento vira dado estruturado via IA", este é o precedente a seguir — inclusive o padrão de teste (mock de `createChatSession`/`sendChatMessageStream` com stream NDJSON sintético).
+
+Ver detalhe completo em `architecture.md`.
 
 ---
 

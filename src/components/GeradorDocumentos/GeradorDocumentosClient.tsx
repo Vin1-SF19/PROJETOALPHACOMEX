@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FileText, Plus, FilePlus2, Archive, ExternalLink } from "lucide-react";
 
@@ -52,6 +53,7 @@ export function GeradorDocumentosClient({
   templatesIniciais: TemplateResumo[];
   documentosIniciais: DocumentoResumo[];
 }) {
+  const router = useRouter();
   const [templates, setTemplates] = useState(templatesIniciais);
   const [documentos] = useState(documentosIniciais);
   const [novoTemplateOpen, setNovoTemplateOpen] = useState(false);
@@ -144,11 +146,7 @@ export function GeradorDocumentosClient({
         )}
       </Tabs>
 
-      <NovoTemplateDialog
-        open={novoTemplateOpen}
-        onOpenChange={setNovoTemplateOpen}
-        onCriado={(template) => setTemplates((prev) => [template, ...prev])}
-      />
+      <NovoTemplateDialog open={novoTemplateOpen} onOpenChange={setNovoTemplateOpen} onCriado={() => router.refresh()} />
     </div>
   );
 }

@@ -66,8 +66,35 @@ export const GerarDocumentoSchema = z.object({
   templateId: z.string().cuid(),
   titulo: z.string().min(1).max(200),
   variaveis: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable()),
+  clienteId: z.number().int().positive().optional(),
+  empresaContratadaId: z.string().cuid().optional(),
 });
 export type GerarDocumentoInput = z.infer<typeof GerarDocumentoSchema>;
+
+/** Qualificação de empresa CONTRATADA — cadastro global do módulo Gerador de Documentos. */
+export const EmpresaContratadaSchema = z.object({
+  razaoSocial: z.string().min(1).max(200),
+  nomeFantasia: z.string().max(200).optional(),
+  cnpj: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length === 14, "CNPJ deve conter 14 dígitos"),
+  logradouro: z.string().max(200).optional(),
+  numero: z.string().max(20).optional(),
+  bairro: z.string().max(100).optional(),
+  municipio: z.string().max(100).optional(),
+  uf: z.string().max(2).optional(),
+  cep: z.string().max(10).optional(),
+  naturezaJuridica: z.string().max(200).optional(),
+  representanteLegalNome: z.string().max(200).optional(),
+  representanteLegalCpf: z.string().max(20).optional(),
+  representanteLegalCargo: z.string().max(100).optional(),
+});
+export type EmpresaContratadaInput = z.infer<typeof EmpresaContratadaSchema>;
+
+export const AtualizarEmpresaContratadaSchema = EmpresaContratadaSchema.partial().extend({
+  empresaId: z.string().cuid(),
+});
 
 export const ReescreverClasulaSchema = z.object({
   documentoId: z.string().cuid(),
@@ -80,3 +107,18 @@ export const EditarClasulaGeradaSchema = z.object({
   clasulaId: z.string().cuid(),
   conteudo: z.string().min(1).max(20_000),
 });
+
+/** Resposta da IA ao identificar variáveis e cláusulas de um documento enviado (RM-2026-93645F). */
+export const IdentificacaoTemplateSchema = z.object({
+  variaveis: z.array(VariavelTemplateSchema).max(50),
+  clausulas: z
+    .array(
+      z.object({
+        titulo: z.string().min(1).max(200),
+        conteudo: z.string().min(1).max(20_000),
+      }),
+    )
+    .min(1)
+    .max(MAX_CLAUSULAS_POR_TEMPLATE),
+});
+export type IdentificacaoTemplate = z.infer<typeof IdentificacaoTemplateSchema>;

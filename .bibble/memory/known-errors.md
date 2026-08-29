@@ -5,6 +5,23 @@
 
 ---
 
+### Baseline do `npx vitest run` (suíte completa) maior do que o documentado — 29 falhas / 17 arquivos, não 26
+**Contexto:** o baseline de 26 falhas (`tests/bpm/standby-follow-up.test.ts` + `tests/google-calendar/*`) documentado em `architecture.md` está desatualizado/incompleto. Em 2026-08-29 (sessão "Gerador de Documentos — contratante/contratada"), a suíte completa mostrou **29 falhas em 17 arquivos**, incluindo `tests/bpm/fechado-actions.test.ts`, `tests/bpm/lost-actions.test.ts`, `tests/bpm/card-modal-integration.test.ts`, `tests/bpm/lost-ui.test.ts`, `tests/bpm/membros-card-ui.test.ts`, `tests/bpm/fechado-ui.test.ts`, `tests/bpm/prazo-anotacao-card.test.ts`, `tests/bpm/sem-viabilidade-actions.test.ts`, `tests/bpm/formulario-etapa.test.ts`, `tests/alpha-seo/*` (4 arquivos), `tests/apresentacoes/pptx-parser.test.ts`, `tests/bibble/context-budget.test.ts` — além dos 2 já catalogados.
+**Confirmado não-regressão:** `git stash` temporário (revertendo TODO o trabalho desta sessão) + rodar `tests/bpm/fechado-actions.test.ts` isolado reproduziu a MESMA falha ("Erro ao mover card" / "Erro ao salvar requisitos e mover card") sem nenhuma mudança minha presente — confirma que é dívida técnica pré-existente do projeto, não introduzida por nenhuma sessão específica de Gerador de Documentos.
+**Ação para sessões futuras:** ao comparar contra "o baseline", usar 29/17 como referência mais atual, não 26/2. Ainda assim, sempre prefira reproduzir a falha suspeita ISOLADA (fora da sua mudança) antes de assumir regressão — `git stash`/`git stash pop` é seguro para esse teste pontual, mas sempre confirme `git stash pop` bem-sucedido antes de continuar (usar `git status`/`git diff --stat` para validar que nada ficou perdido).
+**Adicionado em:** 2026-08-29 (Bibble, sessão contratante/contratada no Gerador de Documentos)
+
+---
+
+### `npm run build` falha com "Unable to acquire lock at .next\lock" após interromper um build anterior em background
+**Sintoma:** um `npm run build` rodado via task em background, interrompido manualmente (ex: `TaskStop`) antes de terminar, pode deixar o processo filho `node .../next/dist/bin/next build` vivo no Windows mesmo com o wrapper bash morto — o mesmo padrão de "processo órfão sobrevive ao Stop do supervisor" já documentado para os workers PowerShell do Roadmap (ver seção "Mecanismo dos supervisores" em `architecture.md`). O próximo `npm run build` falha rápido com `⨯ Unable to acquire lock at .next\lock, is another instance of next build running?`.
+**Como confirmar:** `powershell.exe -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId,CommandLine"` — procurar linhas com `next build` ou `npm-cli.js" run build`/`run lint` que não deveriam mais existir. Tentar reabrir `.next/lock` (ex: redirecionar um FD pra ele) retorna "Device or resource busy" se ainda está seguro por um processo real.
+**Fix:** com autorização do usuário, `Stop-Process -Id <PID> -Force` nos PIDs órfãos identificados (nunca nos processos MCP `roadmap-status` nem nos workers PowerShell legítimos), depois `rm .next/lock` e rodar o build de novo — resolve imediatamente.
+**Lição geral:** `TaskStop` numa Bash task em background mata o wrapper, não necessariamente o processo filho no Windows. Ao interromper um `npm run build`/`npm run lint` em background, considerar sempre a possibilidade de processo órfão antes de simplesmente re-rodar o mesmo comando.
+**Adicionado em:** 2026-08-29 (Bibble, RM-2026-93645F — Gerador de Documentos, verificação Forge)
+
+---
+
 ### ChatBot Alpha — Adminer/RedisInsight recusam conexão dentro do iframe em localhost/staging (não é bug de código)
 **Sintoma:** no módulo ChatBot Alpha, o iframe de Adminer/RedisInsight mostra "conexão recusada" quando testado fora de `https://painel.alpha-comex.com` (ex: localhost, staging) — mesmo a URL com token funcionando perfeitamente quando aberta direto numa aba do navegador.
 **Causa raiz confirmada:** o Nginx/Cloudflare na frente de `adminer.alpha-comex.com` e `redisinsight.alpha-comex.com` envia `Content-Security-Policy: frame-ancestors 'self' https://painel.alpha-comex.com` — só permite ser embutido em iframe por esse domínio exato de produção. Confirmado via `curl -D -` simulando headers de iframe (`Sec-Fetch-Dest: iframe`), reproduzindo o header CSP restritivo em ambos os serviços. Sem essa página pai específica, o navegador bloqueia o embed (alguns navegadores relatam esse bloqueio de CSP como "ERR_CONNECTION_REFUSED" em vez de uma mensagem clara de frame-ancestors).

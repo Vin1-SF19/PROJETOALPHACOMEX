@@ -8,12 +8,33 @@ import { ArrowLeft, GripVertical, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   CriarClasulaTemplate,
   AtualizarClasulaTemplate,
   RemoverClasulaTemplate,
+  AtualizarTemplateDocumento,
 } from "@/actions/gerador-documentos";
-import type { VariavelTemplate } from "@/lib/gerador-documentos/schemas";
+import type { TipoVariavel, VariavelTemplate } from "@/lib/gerador-documentos/schemas";
+
+const TIPOS_VARIAVEL_OPCOES: { value: TipoVariavel; label: string }[] = [
+  { value: "texto", label: "Texto" },
+  { value: "numero", label: "Número" },
+  { value: "moeda", label: "Moeda (R$)" },
+  { value: "data", label: "Data" },
+  { value: "booleano", label: "Sim/Não" },
+];
+
+const NOVA_VARIAVEL_VAZIA: VariavelTemplate = {
+  nome: "",
+  label: "",
+  tipo: "texto",
+  obrigatorio: true,
+  placeholder: "",
+};
 
 interface Clasula {
   id: string;
@@ -36,7 +57,44 @@ interface TemplateDetalhe {
 
 export function TemplateDetalheClient({ template }: { template: TemplateDetalhe }) {
   const [clausulas, setClausulas] = useState(template.clausulas);
+  const [variaveis, setVariaveis] = useState(template.variaveis);
+  const [novaVariavel, setNovaVariavel] = useState<VariavelTemplate | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isPendingVariaveis, startTransitionVariaveis] = useTransition();
+
+  function salvarVariaveis(proximasVariaveis: VariavelTemplate[], aoSucesso?: () => void) {
+    startTransitionVariaveis(async () => {
+      const resultado = await AtualizarTemplateDocumento({
+        templateId: template.id,
+        variaveis: proximasVariaveis,
+      });
+      if (!resultado.success) {
+        toast.error(resultado.error);
+        return;
+      }
+      setVariaveis(proximasVariaveis);
+      toast.success("Variáveis atualizadas");
+      aoSucesso?.();
+    });
+  }
+
+  function handleAdicionarVariavel() {
+    if (!novaVariavel) return;
+    if (!novaVariavel.nome.trim() || !novaVariavel.label.trim()) {
+      toast.error("Informe nome e rótulo da variável");
+      return;
+    }
+    if (variaveis.some((v) => v.nome === novaVariavel.nome.trim())) {
+      toast.error("Já existe uma variável com esse nome");
+      return;
+    }
+    const proximas = [...variaveis, { ...novaVariavel, nome: novaVariavel.nome.trim(), label: novaVariavel.label.trim() }];
+    salvarVariaveis(proximas, () => setNovaVariavel(null));
+  }
+
+  function handleRemoverVariavel(nome: string) {
+    salvarVariaveis(variaveis.filter((v) => v.nome !== nome));
+  }
 
   function handleAdicionar() {
     startTransition(async () => {
@@ -108,15 +166,93 @@ export function TemplateDetalheClient({ template }: { template: TemplateDetalhe 
         )}
       </div>
 
-      {template.variaveis.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          {template.variaveis.map((variavel) => (
-            <Badge key={variavel.nome} variant="secondary">
-              {`{{${variavel.nome}}}`} — {variavel.label}
-            </Badge>
-          ))}
+      <section className="mb-6 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Variáveis ({variaveis.length})</h2>
+          {!novaVariavel && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setNovaVariavel(NOVA_VARIAVEL_VAZIA)}
+              disabled={isPendingVariaveis}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Adicionar variável
+            </Button>
+          )}
         </div>
-      )}
+
+        {variaveis.length === 0 && !novaVariavel && (
+          <p className="text-xs text-neutral-400">Nenhuma variável ainda.</p>
+        )}
+
+        {variaveis.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {variaveis.map((variavel) => (
+              <Badge key={variavel.nome} variant="secondary" className="flex items-center gap-1.5 pr-1">
+                {`{{${variavel.nome}}}`} — {variavel.label}
+                <button
+                  type="button"
+                  onClick={() => handleRemoverVariavel(variavel.nome)}
+                  disabled={isPendingVariaveis}
+                  aria-label={`Remover variável ${variavel.label}`}
+                  className="rounded-full p-0.5 hover:bg-neutral-300/50 dark:hover:bg-neutral-700/50"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {novaVariavel && (
+          <div className="grid grid-cols-1 gap-2 rounded-lg border border-neutral-200 p-3 sm:grid-cols-[1fr_1fr_140px_auto_auto] sm:items-center dark:border-neutral-800">
+            <Input
+              placeholder="nome_variavel"
+              value={novaVariavel.nome}
+              onChange={(e) => setNovaVariavel({ ...novaVariavel, nome: e.target.value.replace(/\s+/g, "_") })}
+            />
+            <Input
+              placeholder="Rótulo exibido"
+              value={novaVariavel.label}
+              onChange={(e) => setNovaVariavel({ ...novaVariavel, label: e.target.value })}
+            />
+            <Select
+              value={novaVariavel.tipo}
+              onValueChange={(v) => setNovaVariavel({ ...novaVariavel, tipo: v as TipoVariavel })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPOS_VARIAVEL_OPCOES.map((opcao) => (
+                  <SelectItem key={opcao.value} value={opcao.value}>
+                    {opcao.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id="nova-variavel-obrigatoria"
+                checked={novaVariavel.obrigatorio}
+                onCheckedChange={(checked) => setNovaVariavel({ ...novaVariavel, obrigatorio: Boolean(checked) })}
+              />
+              <Label htmlFor="nova-variavel-obrigatoria" className="text-xs font-normal">
+                Obrigatória
+              </Label>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="sm" onClick={handleAdicionarVariavel} disabled={isPendingVariaveis}>
+                Salvar
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setNovaVariavel(null)} aria-label="Cancelar">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </section>
 
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Cláusulas ({clausulas.length})</h2>

@@ -3,15 +3,18 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { put } from "@vercel/blob";
 
 import db from "@/lib/prisma";
-import { auth } from "../../auth";
 import { getUserOnyxToken } from "@/lib/onyx/user-token";
 import { OnyxError } from "@/lib/onyx/client";
+import { extractTextFromBuffer } from "@/lib/bibble/tika";
 import {
   exigirAcessoModulo,
   exigirOwnershipTemplate,
   exigirOwnershipDocumento,
+  getSessaoGeradorDocumentos,
+  type ContextoGeradorDocumentos,
 } from "@/lib/gerador-documentos/ownership";
 import {
   CriarTemplateSchema,
@@ -24,19 +27,27 @@ import {
   EditarClasulaGeradaSchema,
   VariavelTemplateSchema,
   type VariavelTemplate,
+  type CriarTemplateInput,
 } from "@/lib/gerador-documentos/schemas";
 import { renderizarConteudo, validarVariaveisObrigatorias } from "@/lib/gerador-documentos/render";
-import { reescreverClasulaViaIA } from "@/lib/gerador-documentos/onyx";
+import { reescreverClasulaViaIA, identificarVariaveisEClasulasViaIA } from "@/lib/gerador-documentos/onyx";
+import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
+
+// Mesma lista de tipos suportados por extractTextFromBuffer (src/lib/bibble/tika.ts) — mantida em
+// sincronia manual, já que a extração é responsabilidade daquele módulo, não deste.
+const TIPOS_UPLOAD_TEMPLATE_SUPORTADOS = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.oasis.opendocument.text",
+  "text/plain",
+  "application/rtf",
+];
+const TAMANHO_MAXIMO_UPLOAD_TEMPLATE = 10 * 1024 * 1024; // 10MB — mesmo teto já usado em outros uploads do painel
 
 const ROTA_BASE = "/PainelAlpha/GeradorDocumentos";
 
-async function getSessao() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Não autenticado");
-  const userId = Number(session.user.id);
-  const role = (session.user as { role?: string }).role ?? null;
-  return { userId, role };
-}
+const getSessao = getSessaoGeradorDocumentos;
 
 function parseVariaveisJson(json: unknown): VariavelTemplate[] {
   const parsed = z.array(VariavelTemplateSchema).safeParse(json);
@@ -104,6 +115,43 @@ export async function ObterTemplateDocumento(templateId: string) {
   }
 }
 
+/**
+ * Persiste um template (DocumentoTemplate + DocumentoClasula[]) em uma única
+ * transação — helper reaproveitado tanto pela criação manual (CriarTemplateDocumento)
+ * quanto pela criação via upload (CriarTemplateViaUpload).
+ */
+async function persistirNovoTemplate(
+  input: CriarTemplateInput,
+  criadoPorId: number,
+  arquivoOrigem?: { url: string; nome: string },
+) {
+  return db.$transaction(async (tx) => {
+    const criado = await tx.documentoTemplate.create({
+      data: {
+        titulo: input.titulo,
+        descricao: input.descricao,
+        categoria: input.categoria,
+        variaveisJson: JSON.stringify(input.variaveis),
+        criadoPorId,
+        ...(arquivoOrigem
+          ? { arquivoOrigemUrl: arquivoOrigem.url, arquivoOrigemNome: arquivoOrigem.nome }
+          : {}),
+      },
+    });
+    await tx.documentoClasula.createMany({
+      data: input.clausulas.map((c, ordem) => ({
+        templateId: criado.id,
+        ordem,
+        titulo: c.titulo,
+        conteudo: c.conteudo,
+        tipo: c.tipo,
+        editavel: c.editavel,
+      })),
+    });
+    return criado;
+  });
+}
+
 export async function CriarTemplateDocumento(payload: unknown) {
   try {
     const { userId, role } = await getSessao();
@@ -115,28 +163,72 @@ export async function CriarTemplateDocumento(payload: unknown) {
       return { success: false as const, error: "Nomes de variáveis duplicados" };
     }
 
-    const template = await db.$transaction(async (tx) => {
-      const criado = await tx.documentoTemplate.create({
-        data: {
-          titulo: input.titulo,
-          descricao: input.descricao,
-          categoria: input.categoria,
-          variaveisJson: JSON.stringify(input.variaveis),
-          criadoPorId: ctx.userId,
-        },
-      });
-      await tx.documentoClasula.createMany({
-        data: input.clausulas.map((c, ordem) => ({
-          templateId: criado.id,
-          ordem,
-          titulo: c.titulo,
-          conteudo: c.conteudo,
-          tipo: c.tipo,
-          editavel: c.editavel,
-        })),
-      });
-      return criado;
+    const template = await persistirNovoTemplate(input, ctx.userId);
+
+    revalidatePath(ROTA_BASE);
+    return { success: true as const, templateId: template.id };
+  } catch (error) {
+    return { success: false as const, error: mensagemErro(error) };
+  }
+}
+
+/**
+ * Cria um template a partir de um documento enviado por upload: extrai o
+ * texto (Tika/pdf-parse/OCR, via extractTextFromBuffer), guarda o arquivo
+ * original em Vercel Blob, e usa IA (Onyx) para identificar variáveis e
+ * cláusulas automaticamente (RM-2026-93645F). Único campo de entrada real é
+ * o arquivo — nada mais é obrigatório no cadastro.
+ */
+export async function CriarTemplateViaUpload(formData: FormData) {
+  try {
+    const { userId, role } = await getSessao();
+    const ctx: ContextoGeradorDocumentos = await exigirAcessoModulo(userId, role);
+
+    const arquivo = formData.get("arquivo");
+    if (!(arquivo instanceof File)) {
+      return { success: false as const, error: "Envie um documento para criar o template" };
+    }
+    if (arquivo.size === 0) {
+      return { success: false as const, error: "O arquivo enviado está vazio" };
+    }
+    if (arquivo.size > TAMANHO_MAXIMO_UPLOAD_TEMPLATE) {
+      return { success: false as const, error: "O arquivo excede o limite de 10MB" };
+    }
+    if (!TIPOS_UPLOAD_TEMPLATE_SUPORTADOS.includes(arquivo.type)) {
+      return {
+        success: false as const,
+        error: "Formato não suportado. Envie PDF, DOC, DOCX, ODT, RTF ou TXT.",
+      };
+    }
+
+    const buffer = Buffer.from(await arquivo.arrayBuffer());
+
+    const { text: textoExtraido, source } = await extractTextFromBuffer(buffer, arquivo.type, arquivo.name);
+    if (source === "unsupported" || !textoExtraido.trim()) {
+      return {
+        success: false as const,
+        error: "Não foi possível extrair texto deste documento. Verifique se ele não está vazio ou ilegível (ex: scan sem OCR).",
+      };
+    }
+
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) throw new Error("Armazenamento de arquivos não configurado");
+    const blob = await put(`gerador-documentos/templates-origem/${ctx.userId}/${Date.now()}_${arquivo.name}`, buffer, {
+      access: "public",
+      addRandomSuffix: true,
+      token: blobToken,
     });
+
+    const userToken = await getUserOnyxToken(ctx.userId);
+    const identificacao = await identificarVariaveisEClasulasViaIA(textoExtraido, userToken);
+
+    const input = CriarTemplateSchema.parse({
+      titulo: arquivo.name.replace(/\.[^.]+$/, "").slice(0, 200) || "Novo template",
+      variaveis: identificacao.variaveis,
+      clausulas: identificacao.clausulas.map((c) => ({ ...c, tipo: "TEXTO" as const, editavel: true })),
+    });
+
+    const template = await persistirNovoTemplate(input, ctx.userId, { url: blob.url, nome: arquivo.name });
 
     revalidatePath(ROTA_BASE);
     return { success: true as const, templateId: template.id };
@@ -340,6 +432,8 @@ export async function GerarDocumento(payload: unknown) {
           tokenAcesso,
           criadoPorId: ctx.userId,
           status: "CONFERENCIA",
+          ...(input.clienteId !== undefined ? { clienteId: input.clienteId } : {}),
+          ...(input.empresaContratadaId !== undefined ? { empresaContratadaId: input.empresaContratadaId } : {}),
         },
       });
       await tx.documentoClasulaGerada.createMany({
@@ -387,6 +481,34 @@ export async function ListarDocumentosGerados() {
     });
 
     return { success: true as const, data: documentos };
+  } catch (error) {
+    return { success: false as const, error: mensagemErro(error), data: [] };
+  }
+}
+
+/** Busca de Cliente master (contratante) por razão social/nome fantasia/CNPJ — mesmo padrão de BuscarEmpresasBpm (src/actions/bpm/Cards.ts), mas sob o gate do módulo Gerador de Documentos. */
+export async function BuscarClientesParaContratante(termo: string) {
+  try {
+    const { userId, role } = await getSessao();
+    await exigirAcessoModulo(userId, role);
+
+    const termoSeguro = termo.trim().slice(0, 120);
+    if (termoSeguro.length < 2) return { success: true as const, data: [] };
+
+    const clientes = await db.cliente.findMany({
+      where: {
+        OR: [
+          { razaoSocial: { contains: termoSeguro } },
+          { nomeFantasia: { contains: termoSeguro } },
+          { cnpj: { contains: termoSeguro.replace(/\D/g, "") || termoSeguro } },
+        ],
+      },
+      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
+      take: 20,
+      orderBy: { razaoSocial: "asc" },
+    });
+
+    return { success: true as const, data: clientes };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error), data: [] };
   }
@@ -481,13 +603,31 @@ export async function FinalizarDocumento(documentoId: string) {
     const ctx = await exigirAcessoModulo(userId, role);
     await exigirOwnershipDocumento(documentoId, ctx);
 
+    const documento = await db.documentoGerado.findUnique({
+      where: { id: documentoId },
+      select: { titulo: true, clausulas: { orderBy: { ordem: "asc" }, select: { titulo: true, conteudo: true } } },
+    });
+    if (!documento) return { success: false as const, error: "Documento não encontrado" };
+
+    // Gera o PDF ANTES de mudar o status — se a geração/upload falhar, a
+    // finalização inteira falha (nunca fica FINALIZADO sem pdfUrl).
+    const bufferPdf = await gerarPdfDocumento({ titulo: documento.titulo, clausulas: documento.clausulas });
+
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) throw new Error("Armazenamento de arquivos não configurado");
+    const blob = await put(`gerador-documentos/pdfs-gerados/${ctx.userId}/${documentoId}.pdf`, bufferPdf, {
+      access: "public",
+      addRandomSuffix: false,
+      token: blobToken,
+    });
+
     await db.documentoGerado.update({
       where: { id: documentoId },
-      data: { status: "FINALIZADO", finalizadoEm: new Date() },
+      data: { status: "FINALIZADO", finalizadoEm: new Date(), pdfUrl: blob.url },
     });
 
     revalidatePath(`${ROTA_BASE}/conferencia`);
-    return { success: true as const };
+    return { success: true as const, pdfUrl: blob.url };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error) };
   }

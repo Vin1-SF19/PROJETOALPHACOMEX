@@ -2,6 +2,84 @@
 
 ---
 
+## [2026-08-29 16:00] — Gerador de Documentos: Contratante/Contratada + Qualificação (Parte 1 de 2)
+
+**Tags:** #feature #database #testing #decision #concluido
+**Agentes envolvidos:** Bibble, Scout, Echo, Vault, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `prisma/migrations/20260829153000_add_empresa_contratada_e_vinculos_documento_gerado/`, `src/lib/gerador-documentos/{ownership,schemas}.ts`, `src/actions/{gerador-documentos,empresas-contratadas}.ts`, `src/components/GeradorDocumentos/{ModalNovaEmpresaContratada,GerarDocumentoForm}.tsx`, `tests/gerador-documentos/{schemas,empresas-contratadas,buscar-clientes-contratante,ownership}.test.ts`, `.bibble/memory/{architecture.md,codebase-map.md,known-errors.md}`
+
+### Contexto
+Usuário pediu 4 correções/evoluções no Gerador de Documentos num único pedido: (1) selecionar cliente contratante e empresa contratada ao gerar contrato, (2) botão para cadastrar empresa contratada com dados da Receita Federal, (3) "qualificação não aparece no frontend" — Scout confirmou por leitura de código que isso não era bug, era feature inexistente, (4) gerar PDF real vinculado ao cliente. Esta Parte 1 cobre os itens 1-3; item 4 (PDF) fica para a Parte 2 da mesma sessão.
+
+### O que foi feito
+- Model `EmpresaContratada` novo (qualificação completa: razão social/CNPJ/endereço/natureza jurídica + representante legal sempre manual)
+- `DocumentoGerado` ganhou `clienteId`/`empresaContratadaId`/`pdfUrl` (nullable, aditivo)
+- `GerarDocumentoForm.tsx`: combobox de busca de Cliente (contratante, debounce 300ms) + select de EmpresaContratada (contratada) + botão "Nova empresa contratada"
+- `ModalNovaEmpresaContratada.tsx` novo: CNPJ + botão "Buscar na Receita Federal" (reaproveita `getReceitaData`, já existente), representante legal sempre manual
+- `src/actions/empresas-contratadas.ts` novo: CRUD completo + `ConsultarCnpjParaQualificacao`
+- Migration aditiva aplicada no Turso remoto via Vault (backup reaproveitado, ~1h de idade, dentro da janela de 48h)
+- 32 testes novos (96 no módulo, 100% passando)
+
+### Decisões tomadas
+- `EmpresaContratada` é cadastro global do módulo (sem ownership por usuário) — diferente de `DocumentoTemplate`, que é por usuário; confirmado como intencional pelo Scout (é "catálogo compartilhado", não dado pessoal)
+- Botão "Gerar documento" **bloqueia** (não só avisa) se nem contratante nem contratada estiverem selecionados — Probe levantou essa dúvida de UX, usuário confirmou explicitamente que quer manter o bloqueio
+- `BuscarClientesParaContratante` não reaproveita `BuscarEmpresasBpm` diretamente (mesmo padrão de query, mas gate de permissão diferente — `exigirAcessoModuloBpm` vs `exigirAcessoModulo` do Gerador de Documentos)
+
+### Problemas encontrados / resolvidos
+- **Duplicação de `getSessao()`** entre `gerador-documentos.ts` e `empresas-contratadas.ts` (achado do Lens) — extraída para `getSessaoGeradorDocumentos()` em `ownership.ts`. Isso quebrou `tests/gerador-documentos/ownership.test.ts` (passou a importar `auth` de verdade, sem mock) — corrigido adicionando `vi.mock("../../auth", ...)` no teste. **Lição de Vitest confirmada:** `vi.mock` resolve pelo caminho relativo ao ARQUIVO DE TESTE que faz a chamada, não pelo caminho relativo do módulo importado internamente — os dois podem ter profundidades diferentes.
+- **Baseline de testes da suíte completa estava desatualizado:** ao rodar a suíte inteira, apareceram 29 falhas em 17 arquivos, não as 26/2 documentadas antes. Investigado com `git stash` temporário (reverte tudo → roda teste isolado → `git stash pop` restaura) — confirmado que as falhas extras (`bpm/fechado-actions`, `bpm/lost-actions`, `alpha-seo/*` etc) já existiam ANTES desta sessão, sem relação com Gerador de Documentos. Baseline corrigido em `known-errors.md`.
+
+### Pendências
+- 🔜 **Parte 2 da mesma sessão:** geração de PDF real (`@react-pdf/renderer`, mesmo conteúdo/formatação simples — usuário confirmou explicitamente que não precisa ser visualmente idêntico ao Word original), disponibilização para download, vínculo com `DocumentoGerado.pdfUrl`.
+- 🟡 Débitos técnicos do Anubis (não bloqueantes): race condition de CNPJ duplicado com mensagem genérica no catch; rate limit ausente em `/api/ReceitaFederal` (herdado, não introduzido aqui).
+
+### Refletido também em
+- `architecture.md`: nova seção "Gerador de Documentos — Contratante/Contratada + Qualificação (Parte 1 de 2)"
+- `codebase-map.md`: nova entrada com arquivos tocados e pendência da Parte 2
+- `known-errors.md`: baseline de testes corrigido (29/17, não 26/2) + nota sobre resolução de `vi.mock`
+
+---
+
+## [2026-08-29 14:50] — Gerador de Documentos: criação de template via upload com IA (RM-2026-93645F)
+
+**Tags:** #feature #ai #database #security #testing #concluido
+**Agentes envolvidos:** Bibble, Scout, Echo, Vault, Nova, Forge, Probe, Anubis, Lens, Sage, Scribe
+**Arquivos tocados:** `prisma/schema.prisma`, `prisma/migrations/20260829142500_add_documento_template_arquivo_origem/`, `src/lib/gerador-documentos/{schemas,onyx}.ts`, `src/actions/gerador-documentos.ts`, `src/components/GeradorDocumentos/{NovoTemplateDialog,GeradorDocumentosClient,TemplateDetalheClient}.tsx`, `tests/gerador-documentos/{schemas,onyx-identificacao,criar-template-via-upload}.test.ts`, `.bibble/memory/{architecture.md,codebase-map.md,known-errors.md}`
+
+### Contexto
+Objetivo do Roadmap: no modal de cadastro de template do Gerador de Documentos (módulo já existente, RM-2026-999766), trocar o formulário manual (título/descrição/variáveis/cláusulas digitados) por um fluxo de upload único — o sistema identifica variáveis e cláusulas automaticamente a partir do documento enviado.
+
+### O que foi feito
+- `NovoTemplateDialog.tsx` reescrito integralmente: único campo é upload (drag-and-drop + clique), sem outro campo obrigatório
+- Nova Server Action `CriarTemplateViaUpload`: valida arquivo no servidor (tipo/tamanho/vazio), extrai texto (`extractTextFromBuffer`, já existia), sobe o arquivo original pro Vercel Blob, chama IA (Onyx) para identificar variáveis/cláusulas, persiste tudo numa transação
+- Nova `identificarVariaveisEClasulasViaIA` (`onyx.ts`): prompt estruturado + parser de JSON tolerante a markdown/preâmbulo (`extrairJson`), validado por `IdentificacaoTemplateSchema` (Zod)
+- Helper `persistirNovoTemplate()` extraído para eliminar duplicação entre o fluxo novo e o antigo (`CriarTemplateDocumento`)
+- `TemplateDetalheClient.tsx` ganhou CRUD de variáveis pós-criação (antes só tinha cláusulas — crítério de aceite exigia isso)
+- Migration aditiva: `DocumentoTemplate.arquivoOrigemUrl`/`arquivoOrigemNome` (nullable), aplicada no Turso remoto via Vault (backup pré-change + confirmação explícita do usuário)
+- 24 testes novos (65 no módulo, 100% passando), zero regressão na suíte completa (1847 passando, 26 falhas pré-existentes em `bpm/standby-follow-up` e `google-calendar`, nada relacionado)
+
+### Decisões tomadas
+- Arquivo original SEMPRE guardado em Vercel Blob (não descartado após extração) — decisão explícita do usuário, para permitir rever/baixar o documento fonte depois
+- Upload processado via `FormData` direto em Server Action, sem rota HTTP dedicada — mais simples, um endpoint a menos
+- Tipos aceitos: PDF/DOC/DOCX/ODT/RTF/TXT (subconjunto de `extractTextFromBuffer`), 10MB, mesmo teto de outros uploads do painel
+- `router.refresh()` em vez de montar `TemplateResumo` manualmente no client após criação (título/contagens agora decididos no servidor, não há mais dado suficiente no client pra montar o objeto)
+
+### Problemas encontrados / resolvidos
+- **`.next/lock` preso por processo `next build` órfão:** um `npm run build` em background foi interrompido (`TaskStop`) antes de terminar, deixando o processo filho `node .../next/dist/bin/next build` vivo no Windows mesmo com o wrapper morto. Diagnosticado via `Get-CimInstance Win32_Process`, confirmado com "Device or resource busy" ao tentar reabrir o lock. Resolvido encerrando os PIDs órfãos (com autorização do usuário) + removendo o lock. **Registrado em `known-errors.md`** para sessões futuras.
+- **Objetivo sem `runId` de produção:** criado minutos antes da sessão, `documentationStatus` ainda `DOCUMENTING` (worker automático não tinha processado), sem `RoadmapPromptArtifact` publicado — impossível usar as tools MCP de roadmap (`roadmap_marcar_fase_iniciada` etc, todas exigem `runId`). Decisão do usuário: implementar direto sem esperar o pipeline de documentação. Quando pedido para mover pra "em desenvolvimento", `RoadmapObjective.status` foi atualizado manualmente pra `IN_DEVELOPMENT` via UPDATE direto no Turso — replicando exatamente a mesma transição que `updateRoadmapProductionRunStatus` (`src/lib/roadmap-production-api/operations.ts:144-148`) faz automaticamente quando um run real começa.
+- **Duplicação de sessão em `CriarTemplateViaUpload`** (achado do Lens): a action reimplementava `getSessao()` manualmente só para ter `session.user.id` bruto para `getUserOnyxToken`. Corrigido reaproveitando `getSessao()` normal + `getUserOnyxToken(ctx.userId)` (a função já aceita `number`).
+
+### Pendências
+- 🟡 Rate limiting ausente em `CriarTemplateViaUpload` (débito técnico, Anubis) — é a primeira action do módulo combinando upload + custo de IA numa chamada só, sem limite por usuário/tempo.
+- 🟡 Nome do arquivo (`arquivo.name`, vindo do cliente) não é sanitizado antes de compor a chave do Vercel Blob — risco baixo (`addRandomSuffix` evita colisão), mas vale normalizar numa iteração futura.
+
+### Refletido também em
+- `architecture.md`: nova seção "Gerador de Documentos — criação de template via upload com IA (RM-2026-93645F)"
+- `codebase-map.md`: nova entrada com arquivos tocados e padrão reaproveitável (upload → extração → IA → persistência transacional)
+- `known-errors.md`: novo erro catalogado — `.next/lock` preso por build interrompido em background
+
+---
+
 ## [2026-08-28] — Módulo novo: ChatBot Alpha (acesso admin à infraestrutura ChatbotX)
 
 **Tags:** #feature #integration #security #concluido

@@ -191,6 +191,7 @@ model usuarios {
 
   documentoTemplatesCriados DocumentoTemplate[]
   documentosGerados         DocumentoGerado[]
+  empresasContratadasCriadas EmpresaContratada[]
 }
 
 /// Objetivo priorizado do Roadmap Alpha. O registry de módulos vive em código;
@@ -701,6 +702,7 @@ model Cliente {
   businessProcesses     BusinessProcess[]
   eligibilityOverrides  EligibilityOverride[]
   nolossLeadsPromovidos NolossLead[]
+  documentosGerados     DocumentoGerado[]
 
   @@index([razaoSocial])
   @@index([status])
@@ -5004,16 +5006,18 @@ model AlphaSeoAuditEvent {
 /// dinâmicas + cláusulas separadas — cada cláusula é uma unidade editável
 /// independente, tanto no template quanto no documento gerado a partir dele.
 model DocumentoTemplate {
-  id            String   @id @default(cuid())
-  titulo        String
-  descricao     String?
-  categoria     String? // "contrato" | "proposta" | "aviso" | "outro" — texto livre, sem enum real
-  variaveisJson Json // array de { nome, label, tipo, obrigatorio, placeholder }
-  status        String   @default("ATIVO") // "ATIVO" | "ARQUIVADO"
-  criadoPorId   Int
-  criadoPor     usuarios @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  id                String   @id @default(cuid())
+  titulo            String
+  descricao         String?
+  categoria         String? // "contrato" | "proposta" | "aviso" | "outro" — texto livre, sem enum real
+  variaveisJson     Json // array de { nome, label, tipo, obrigatorio, placeholder }
+  status            String   @default("ATIVO") // "ATIVO" | "ARQUIVADO"
+  arquivoOrigemUrl  String? // Vercel Blob do documento original, quando o template nasce de upload (RM-2026-93645F)
+  arquivoOrigemNome String? // nome do arquivo original enviado pelo usuário
+  criadoPorId       Int
+  criadoPor         usuarios @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
 
   clausulas  DocumentoClasula[]
   documentos DocumentoGerado[]
@@ -5047,17 +5051,24 @@ model DocumentoClasula {
 /// 2026-08-28, ver docs/stories/story-gerador-documentos-fase1-blueprint.md
 /// seção 9 item 5 — objetivo original exige link não-público).
 model DocumentoGerado {
-  id            String    @id @default(cuid())
-  templateId    String
-  titulo        String
-  variaveisJson Json // valores preenchidos nas variáveis do template
-  status        String    @default("RASCUNHO") // "RASCUNHO" | "CONFERENCIA" | "FINALIZADO" | "ARQUIVADO"
-  tokenAcesso   String    @unique
-  criadoPorId   Int
-  criadoPor     usuarios  @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
-  criadoEm      DateTime  @default(now())
-  atualizadoEm  DateTime  @updatedAt
-  finalizadoEm  DateTime?
+  id                  String    @id @default(cuid())
+  templateId          String
+  titulo              String
+  variaveisJson       Json // valores preenchidos nas variáveis do template
+  status              String    @default("RASCUNHO") // "RASCUNHO" | "CONFERENCIA" | "FINALIZADO" | "ARQUIVADO"
+  tokenAcesso         String    @unique
+  criadoPorId         Int
+  criadoPor           usuarios  @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  criadoEm            DateTime  @default(now())
+  atualizadoEm        DateTime  @updatedAt
+  finalizadoEm        DateTime?
+  // Contratante/contratada + PDF final (evolução pós-RM-2026-93645F): todos
+  // opcionais/aditivos — documentos gerados antes desta mudança ficam null.
+  clienteId           Int? // contratante — FK para o Cliente master (empresa da carteira Alpha Comex)
+  cliente             Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  empresaContratadaId String? // contratada — FK para EmpresaContratada (cadastro de qualificação)
+  empresaContratada   EmpresaContratada? @relation(fields: [empresaContratadaId], references: [id], onDelete: SetNull)
+  pdfUrl              String? // URL do PDF final gerado (Vercel Blob), disponível para download
 
   template  DocumentoTemplate        @relation(fields: [templateId], references: [id])
   clausulas DocumentoClasulaGerada[]
@@ -5066,6 +5077,38 @@ model DocumentoGerado {
   @@index([status, criadoEm])
   @@index([templateId])
   @@index([tokenAcesso])
+  @@index([clienteId])
+  @@index([empresaContratadaId])
+}
+
+/// Qualificação de empresa CONTRATADA em documentos gerados pelo módulo —
+/// cadastro global do módulo (não por usuário), populável via consulta à
+/// Receita Federal (dados cadastrais) + preenchimento manual (representante
+/// legal, que a Receita não retorna formalmente).
+model EmpresaContratada {
+  id                      String   @id @default(cuid())
+  razaoSocial             String
+  nomeFantasia            String?
+  cnpj                    String   @unique
+  logradouro              String?
+  numero                  String?
+  bairro                  String?
+  municipio               String?
+  uf                      String?
+  cep                     String?
+  naturezaJuridica        String?
+  representanteLegalNome  String?
+  representanteLegalCpf   String?
+  representanteLegalCargo String?
+  status                  String   @default("ATIVO") // "ATIVO" | "ARQUIVADO"
+  criadoPorId             Int
+  criadoPor               usuarios @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  criadoEm                DateTime @default(now())
+  atualizadoEm            DateTime @updatedAt
+
+  documentosGerados DocumentoGerado[]
+
+  @@index([status, criadoEm])
 }
 
 /// Cláusula de um documento já gerado — mantém o texto original do template

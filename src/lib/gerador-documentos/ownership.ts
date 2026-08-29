@@ -1,6 +1,7 @@
 import db from "@/lib/prisma";
 import { isAdminRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
+import { auth } from "../../../auth";
 
 const MODULO_PERMISSION = "geradorDocumentos";
 
@@ -8,6 +9,15 @@ export interface ContextoGeradorDocumentos {
   userId: number;
   role: string | null;
   isAdmin: boolean;
+}
+
+/** Resolve userId/role da sessão atual — fonte única para as actions do módulo (gerador-documentos.ts, empresas-contratadas.ts). */
+export async function getSessaoGeradorDocumentos() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Não autenticado");
+  const userId = Number(session.user.id);
+  const role = (session.user as { role?: string }).role ?? null;
+  return { userId, role };
 }
 
 /**

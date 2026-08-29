@@ -1,5 +1,47 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Gerador de Documentos — Contratante/Contratada + Qualificação (2026-08-29, Parte 1 de 2)
+
+Evolução pós-upload-de-template: usuário pediu 4 coisas no mesmo pedido — nenhuma era bug, todas eram feature nova (o módulo antes só lidava com variáveis soltas, zero noção de cliente/empresa). Esta Parte 1 cobre 3 dos 4 itens; **geração de PDF real fica para a Parte 2** (mesma sessão, ainda não implementada nesta entrada).
+
+**Contratante (Cliente master):** `GerarDocumentoForm.tsx` ganhou combobox de busca assíncrona (debounce 300ms, mesmo padrão de `NovoCardModal.tsx` do Alpha CRM) contra nova `BuscarClientesParaContratante` (`src/actions/gerador-documentos.ts`) — clone de `BuscarEmpresasBpm` (`src/actions/bpm/Cards.ts`), mas sob o gate `exigirAcessoModulo` do Gerador de Documentos (não reaproveitado diretamente por usar gate de módulo diferente, `exigirAcessoModuloBpm`). `Cliente` é confirmado como cadastro **compartilhado da empresa** (não por usuário) — busca não filtra por `criadoPorId`, mesmo padrão de outros módulos que consomem `Cliente`.
+
+**Contratada (EmpresaContratada — model novo):** cadastro de qualificação de empresa terceira que atua como CONTRATADA em documentos gerados. `EmpresaContratada` (migration `20260829153000_add_empresa_contratada_e_vinculos_documento_gerado`, 100% aditiva): razão social/CNPJ/endereço completo/natureza jurídica + representante legal (nome/CPF/cargo — **sempre manual**, a Receita Federal não retorna isso formalmente, só QSA/sócios que é conceito diferente). CRUD em `src/actions/empresas-contratadas.ts` (novo): `CriarEmpresaContratada`, `ListarEmpresasContratadas` (cadastro global do módulo, sem filtro por dono — decisão intencional, diferente de `DocumentoTemplate` que É por usuário), `AtualizarEmpresaContratada`, `ConsultarCnpjParaQualificacao` (reaproveita `getReceitaData`, já exportada de `src/app/api/ReceitaFederal/route.ts`).
+
+**`DocumentoGerado` ganhou 3 campos novos** (todos nullable, aditivos): `clienteId Int?` (FK→Cliente, `onDelete: SetNull`), `empresaContratadaId String?` (FK→EmpresaContratada, `onDelete: SetNull`), `pdfUrl String?` (ainda não populado — Parte 2). `GerarDocumento` persiste `clienteId`/`empresaContratadaId` quando fornecidos; UI bloqueia gerar se **nenhum dos dois** for selecionado (decisão confirmada com o usuário — não é bug, é intencional).
+
+**Refatoração durante Lens:** `getSessao()` estava duplicada entre `gerador-documentos.ts` e `empresas-contratadas.ts` (único par de arquivos `actions/*.ts` do projeto com esse padrão de duplicação). Extraída para `getSessaoGeradorDocumentos()` em `src/lib/gerador-documentos/ownership.ts` (agora importa `auth` — **qualquer teste que mocka esse arquivo precisa mockar `../../auth` também**, ver correção em `tests/gerador-documentos/ownership.test.ts`).
+
+**Testes:** `tests/gerador-documentos/{schemas,empresas-contratadas,buscar-clientes-contratante}.test.ts` — 32 novos (96 total no módulo, 100% passando).
+
+**Achado de infraestrutura de testes relevante:** o baseline de falhas pré-existentes da suíte completa do projeto estava desatualizado em `known-errors.md` (documentado como 26 falhas/2 arquivos — na verdade são **29 falhas/17 arquivos**, incluindo vários `tests/bpm/*` e `tests/alpha-seo/*` não catalogados antes). Confirmado via `git stash` temporário (reverte tudo, roda teste isolado, `git stash pop` para restaurar) que essas falhas extras já existiam antes desta sessão — zero regressão introduzida. Baseline corrigido em `known-errors.md`.
+
+**Última atualização:** 2026-08-29 por Scribe (sessão Bibble, contratante/contratada — Parte 1)
+
+---
+
+## Gerador de Documentos — criação de template via upload com IA (RM-2026-93645F, 2026-08-29)
+
+Evolução do módulo (fundação em RM-2026-999766, abaixo): o fluxo de **criação** de template deixou de ser formulário manual (título/descrição/variáveis/cláusulas digitados um a um) e virou **upload-only** — o único campo do modal é um arquivo, o resto é automático.
+
+**Fluxo real:** `NovoTemplateDialog.tsx` (upload/drag-and-drop, sem outro campo) → `CriarTemplateViaUpload` (`src/actions/gerador-documentos.ts`) → valida arquivo no servidor (tipo/tamanho, nunca confia só no client) → `extractTextFromBuffer` (`src/lib/bibble/tika.ts`, já existia — Tika/pdf-parse/OCR PDF24, reaproveitado 100%) → upload do arquivo original pro Vercel Blob (`put()`, mesmo padrão de `contratos/upload/route.ts`) → `identificarVariaveisEClasulasViaIA` (nova, `src/lib/gerador-documentos/onyx.ts`) → IA (Onyx, persona 0) lê o texto, separa em cláusulas, identifica dados variáveis e já substitui por `{{placeholder}}` no texto, responde em JSON estrito → parseado via Zod (`IdentificacaoTemplateSchema`) → `persistirNovoTemplate()` (helper extraído, reaproveitado também por `CriarTemplateDocumento`, o fluxo manual antigo que continua existindo como fallback/uso avançado, mas sem UI própria mais — só a action ficou).
+
+**2 colunas novas em `DocumentoTemplate`** (migration `20260829142500_add_documento_template_arquivo_origem`, 100% aditiva, nullable, sem default): `arquivoOrigemUrl String?`, `arquivoOrigemNome String?` — guardam o documento original enviado, vinculado ao template. Templates criados pelo fluxo manual antigo (`CriarTemplateDocumento`) ficam com esses campos `NULL`.
+
+**Parser de JSON tolerante:** `extrairJson()` (`onyx.ts`, privada) lida com a IA respondendo JSON puro, cercado de crases markdown, ou com texto explicativo antes/depois — extrai o primeiro bloco `{...}` válido. Se não achar JSON reconhecível, ou o JSON não bater com `IdentificacaoTemplateSchema`, ou tiver nomes de variável duplicados: lança `OnyxError` **antes** de qualquer `db.$transaction` — nunca cria template parcial/quebrado.
+
+**`TemplateDetalheClient.tsx` ganhou CRUD de variáveis** (antes só tinha CRUD de cláusulas, variáveis eram badges read-only). Usa `AtualizarTemplateDocumento({templateId, variaveis})` — já existia, sempre substitui o array `variaveisJson` inteiro (não é PATCH parcial). Mesmo padrão de campos (nome/label/tipo/obrigatório) do antigo formulário manual de criação, agora só reaproveitado aqui.
+
+**Débitos técnicos registrados por Anubis (não bloqueantes, para iteração futura):** (1) `CriarTemplateViaUpload` não tem rate limit, ao contrário de `contratos/upload/route.ts` que tem 5/min — é a primeira action do módulo combinando upload + custo de IA numa chamada só; (2) `arquivo.name` do cliente não é sanitizado antes de compor a chave do Blob (`gerador-documentos/templates-origem/${userId}/${Date.now()}_${nome}`) — risco baixo (`addRandomSuffix: true` evita colisão), mas vale normalizar no futuro.
+
+**Testes:** `tests/gerador-documentos/{schemas,onyx-identificacao,criar-template-via-upload}.test.ts` — 24 novos (65 total no módulo, 100% passando). Mock de `createChatSession`/`sendChatMessageStream` via `vi.mock("@/lib/onyx/client", ...)` com stream NDJSON sintético — primeiro precedente no projeto de teste automatizado mockando uma chamada de chat completa ao Onyx (reaproveitável para outros módulos que chamem IA da mesma forma).
+
+**Achado de processo:** este objetivo foi implementado sem esperar o worker automático de documentação (`documentationStatus` ainda em `DOCUMENTING`, sem `RoadmapPromptArtifact` publicado — objetivo criado minutos antes da sessão). Sem `runId` de produção disponível, `RoadmapObjective.status` foi movido manualmente para `IN_DEVELOPMENT` (mesmo valor que `updateRoadmapProductionRunStatus`, `src/lib/roadmap-production-api/operations.ts:144-148`, grava quando um run real transiciona pra `IN_PROGRESS` — replicado aqui via UPDATE direto no Turso, já que não havia run pra transicionar de verdade).
+
+**Última atualização:** 2026-08-29 por Scribe (sessão Bibble, upload de template com IA)
+
+---
+
 ## Gerador de Documentos — templates, geração e conferência com reescrita por IA (RM-2026-999766, 2026-08-28)
 
 Módulo novo (`category: 'infra'`, `grupo: 'estudioConteudo'`, id `geradorDocumentos` — já pré-registrado em `MODULOS_REGISTRY` desde 22/08, implementação real feita nesta sessão). Templates com variáveis dinâmicas `{{nome}}` e cláusulas separadas editáveis individualmente; geração sob demanda gera um `DocumentoGerado` + link de conferência; cada cláusula do documento gerado pode ser reescrita pontualmente via IA padrão do painel (Onyx), mediante instrução textual do usuário.

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   findUniqueTemplate: vi.fn(),
   findUniqueDocumento: vi.fn(),
   getPermissoesEfetivas: vi.fn(),
+  auth: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -16,6 +17,11 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/actions/PermissoesSetor", () => ({
   getPermissoesEfetivas: mocks.getPermissoesEfetivas,
 }));
+
+// ownership.ts importa `auth` (para getSessaoGeradorDocumentos) — mock necessário para
+// não puxar next-auth de verdade fora do runtime Next.js. Caminho relativo à raiz do
+// projeto (Vitest resolve pelo módulo real, não pelo caminho do arquivo de teste).
+vi.mock("../../auth", () => ({ auth: mocks.auth }));
 
 import {
   exigirAcessoModulo,

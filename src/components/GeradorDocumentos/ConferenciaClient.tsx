@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Sparkles, FileCheck } from "lucide-react";
+import { CheckCircle2, Sparkles, FileCheck, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,6 +27,7 @@ interface DocumentoConferencia {
   titulo: string;
   status: string;
   finalizadoEm: Date | string | null;
+  pdfUrl: string | null;
   template: { titulo: string };
   clausulas: ClasulaGerada[];
 }
@@ -41,6 +42,7 @@ const STATUS_LABEL: Record<string, string> = {
 export function ConferenciaClient({ documento }: { documento: DocumentoConferencia }) {
   const [clausulas, setClausulas] = useState(documento.clausulas);
   const [status, setStatus] = useState(documento.status);
+  const [pdfUrl, setPdfUrl] = useState(documento.pdfUrl);
   const [clasulaEmEdicao, setClasulaEmEdicao] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -83,6 +85,7 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         return;
       }
       setStatus("FINALIZADO");
+      setPdfUrl(resultado.pdfUrl);
       toast.success("Documento finalizado");
     });
   }
@@ -96,6 +99,14 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={status === "FINALIZADO" ? "default" : "secondary"}>{STATUS_LABEL[status] ?? status}</Badge>
+          {pdfUrl && (
+            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary">
+                <Download className="mr-1.5 h-4 w-4" />
+                Baixar PDF
+              </Button>
+            </a>
+          )}
           {!somenteLeitura && (
             <Button onClick={handleFinalizar} disabled={isPending}>
               <CheckCircle2 className="mr-1.5 h-4 w-4" />
