@@ -222,14 +222,14 @@ describe("GerarDocumentoSchema — clienteId/empresaContratadaId opcionais", () 
 });
 
 describe("EmpresaContratadaSchema", () => {
-  it("aceita CNPJ com 14 dígitos, com máscara (normalizado antes de validar)", () => {
+  it("aceita CNPJ com 14 dígitos e dígitos verificadores válidos, com máscara (normalizado antes de validar)", () => {
     const resultado = EmpresaContratadaSchema.safeParse({
       razaoSocial: "Empresa Teste LTDA",
-      cnpj: "12.345.678/0001-90",
+      cnpj: "11.222.333/0001-81",
     });
     expect(resultado.success).toBe(true);
     if (resultado.success) {
-      expect(resultado.data.cnpj).toBe("12345678000190");
+      expect(resultado.data.cnpj).toBe("11222333000181");
     }
   });
 
@@ -249,10 +249,30 @@ describe("EmpresaContratadaSchema", () => {
     expect(resultado.success).toBe(false);
   });
 
+  it("rejeita CNPJ com 14 dígitos mas dígitos verificadores inválidos", () => {
+    const resultado = EmpresaContratadaSchema.safeParse({
+      razaoSocial: "Empresa Teste LTDA",
+      cnpj: "12345678000190",
+    });
+    expect(resultado.success).toBe(false);
+    if (!resultado.success) {
+      const msgs = resultado.error.issues.map((i) => i.message);
+      expect(msgs.some((m) => m.includes("dígitos verificadores"))).toBe(true);
+    }
+  });
+
+  it("rejeita CNPJ com todos os dígitos iguais", () => {
+    const resultado = EmpresaContratadaSchema.safeParse({
+      razaoSocial: "Empresa Teste LTDA",
+      cnpj: "11111111111111",
+    });
+    expect(resultado.success).toBe(false);
+  });
+
   it("rejeita razão social vazia", () => {
     const resultado = EmpresaContratadaSchema.safeParse({
       razaoSocial: "",
-      cnpj: "12345678000190",
+      cnpj: "11222333000181",
     });
     expect(resultado.success).toBe(false);
   });
@@ -260,7 +280,7 @@ describe("EmpresaContratadaSchema", () => {
   it("aceita payload só com os campos obrigatórios — todos os demais são opcionais", () => {
     const resultado = EmpresaContratadaSchema.safeParse({
       razaoSocial: "Empresa Mínima LTDA",
-      cnpj: "12345678000190",
+      cnpj: "11222333000181",
     });
     expect(resultado.success).toBe(true);
   });
@@ -269,7 +289,7 @@ describe("EmpresaContratadaSchema", () => {
     const resultado = EmpresaContratadaSchema.safeParse({
       razaoSocial: "Empresa Completa LTDA",
       nomeFantasia: "Completa",
-      cnpj: "12345678000190",
+      cnpj: "11222333000181",
       logradouro: "Rua Teste",
       numero: "100",
       bairro: "Centro",

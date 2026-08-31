@@ -57,6 +57,13 @@ export async function ListarEmpresasContratadas() {
         razaoSocial: true,
         nomeFantasia: true,
         cnpj: true,
+        logradouro: true,
+        numero: true,
+        bairro: true,
+        municipio: true,
+        uf: true,
+        cep: true,
+        naturezaJuridica: true,
       },
     });
 

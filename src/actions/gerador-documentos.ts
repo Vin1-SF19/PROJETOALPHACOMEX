@@ -448,10 +448,78 @@ export async function GerarDocumento(payload: unknown) {
       return criado;
     });
 
+    // Gera o PDF com qualificação das partes (se cliente/empresa foram fornecidos)
+    let pdfUrl: string | undefined;
+    try {
+      const clausulasRenderizadas = template.clausulas.map((c) => ({
+        titulo: c.titulo,
+        conteudo: renderizarConteudo(c.conteudo, variaveisTemplate, input.variaveis),
+      }));
+
+      let partes: { contratante?: { razaoSocial: string; cnpj?: string | null; endereco?: string }; contratada?: { razaoSocial: string; cnpj?: string | null; endereco?: string; naturezaJuridica?: string | null; representanteLegal?: string } } | undefined;
+
+      if (input.clienteId || input.empresaContratadaId) {
+        partes = {};
+        if (input.clienteId) {
+          const cliente = await db.cliente.findUnique({
+            where: { id: input.clienteId },
+            select: { razaoSocial: true, cnpj: true, uf: true, municipio: true },
+          });
+          if (cliente) {
+            partes.contratante = {
+              razaoSocial: cliente.razaoSocial,
+              cnpj: cliente.cnpj,
+              endereco: [cliente.municipio, cliente.uf].filter(Boolean).join(", "),
+            };
+          }
+        }
+        if (input.empresaContratadaId) {
+          const empresa = await db.empresaContratada.findUnique({
+            where: { id: input.empresaContratadaId },
+            select: {
+              razaoSocial: true, cnpj: true, logradouro: true, numero: true,
+              bairro: true, municipio: true, uf: true, cep: true,
+              naturezaJuridica: true, representanteLegalNome: true,
+            },
+          });
+          if (empresa) {
+            partes.contratada = {
+              razaoSocial: empresa.razaoSocial,
+              cnpj: empresa.cnpj,
+              endereco: [empresa.logradouro, empresa.numero, empresa.bairro, empresa.municipio, empresa.uf, empresa.cep ? `CEP ${empresa.cep}` : ""].filter(Boolean).join(", "),
+              naturezaJuridica: empresa.naturezaJuridica,
+              representanteLegal: empresa.representanteLegalNome,
+            };
+          }
+        }
+      }
+
+      const bufferPdf = await gerarPdfDocumento({
+        titulo: input.titulo,
+        clausulas: clausulasRenderizadas,
+        partes,
+        numeroContrato: documento.id,
+      });
+
+      const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (blobToken) {
+        const blob = await put(`gerador-documentos/pdfs-gerados/${ctx.userId}/${documento.id}.pdf`, bufferPdf, {
+          access: "public",
+          addRandomSuffix: false,
+          token: blobToken,
+        });
+        pdfUrl = blob.url;
+        await db.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl } });
+      }
+    } catch {
+      // PDF generation is best-effort at this stage; FinalizarDocumento can retry
+    }
+
     revalidatePath(ROTA_BASE);
     return {
       success: true as const,
       documentoId: documento.id,
+      pdfUrl,
       urlConferencia: `${ROTA_BASE}/conferencia/${documento.tokenAcesso}`,
     };
   } catch (error) {

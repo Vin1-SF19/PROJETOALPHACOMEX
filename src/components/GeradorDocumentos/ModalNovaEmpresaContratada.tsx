@@ -15,6 +15,13 @@ export interface EmpresaContratadaResumo {
   razaoSocial: string;
   nomeFantasia: string | null;
   cnpj: string;
+  logradouro: string | null;
+  numero: string | null;
+  bairro: string | null;
+  municipio: string | null;
+  uf: string | null;
+  cep: string | null;
+  naturezaJuridica: string | null;
 }
 
 interface FormEmpresaContratada {
@@ -134,6 +141,13 @@ export function ModalNovaEmpresaContratada({
         razaoSocial: form.razaoSocial.trim(),
         nomeFantasia: form.nomeFantasia.trim() || null,
         cnpj: form.cnpj.replace(/\D/g, ""),
+        logradouro: form.logradouro.trim() || null,
+        numero: form.numero.trim() || null,
+        bairro: form.bairro.trim() || null,
+        municipio: form.municipio.trim() || null,
+        uf: form.uf.trim() || null,
+        cep: form.cep.trim() || null,
+        naturezaJuridica: form.naturezaJuridica.trim() || null,
       });
       resetar();
       onOpenChange(false);

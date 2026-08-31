@@ -145,10 +145,12 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
                 value={buscaCliente}
                 onChange={(e) => setBuscaCliente(e.target.value)}
               />
-              {(clientesEncontrados.length > 0 || buscandoClientes) && (
-                <div className="absolute z-10 mt-1 w-full rounded-md border border-neutral-200 bg-white shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
+              {(clientesEncontrados.length > 0 || buscandoClientes || (buscaCliente.trim().length >= 2 && !buscandoClientes)) && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-neutral-200 bg-white shadow-lg dark:border-neutral-800 dark:bg-neutral-900" aria-live="polite">
                   {buscandoClientes ? (
                     <p className="px-3 py-2 text-xs text-neutral-400">Buscando...</p>
+                  ) : clientesEncontrados.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-neutral-400">Nenhum cliente encontrado</p>
                   ) : (
                     clientesEncontrados.map((cliente) => (
                       <button
@@ -159,6 +161,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
                       >
                         <span className="font-medium text-neutral-900 dark:text-neutral-100">{cliente.razaoSocial}</span>
                         {cliente.nomeFantasia && <span className="ml-1.5 text-xs text-neutral-400">{cliente.nomeFantasia}</span>}
+                        {cliente.cnpj && <span className="ml-1.5 text-xs text-neutral-400">{cliente.cnpj}</span>}
                       </button>
                     ))
                   )}
@@ -176,12 +179,16 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
                 <SelectValue placeholder="Selecione a empresa contratada" />
               </SelectTrigger>
               <SelectContent>
-                {empresasContratadas.map((empresa) => (
-                  <SelectItem key={empresa.id} value={empresa.id}>
-                    {empresa.razaoSocial}
-                    {empresa.nomeFantasia ? ` — ${empresa.nomeFantasia}` : ""}
-                  </SelectItem>
-                ))}
+                {empresasContratadas.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-neutral-400">Nenhuma empresa cadastrada</div>
+                ) : (
+                  empresasContratadas.map((empresa) => (
+                    <SelectItem key={empresa.id} value={empresa.id}>
+                      {empresa.razaoSocial}
+                      {empresa.cnpj ? ` — ${empresa.cnpj}` : ""}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <Button type="button" variant="secondary" size="sm" onClick={() => setModalEmpresaOpen(true)}>
@@ -189,6 +196,49 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
               Nova
             </Button>
           </div>
+
+          {empresaContratadaId && (() => {
+            const empresa = empresasContratadas.find((e) => e.id === empresaContratadaId);
+            if (!empresa) return null;
+            const endereco = [empresa.logradouro, empresa.numero, empresa.bairro, empresa.municipio, empresa.uf, empresa.cep]
+              .filter(Boolean)
+              .join(", ");
+            return (
+              <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900" aria-live="polite">
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                  Qualificação da empresa contratada
+                </h4>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+                  <div className="flex gap-1">
+                    <dt className="font-medium text-neutral-600 dark:text-neutral-300">Razão social:</dt>
+                    <dd className="text-neutral-900 dark:text-neutral-100">{empresa.razaoSocial}</dd>
+                  </div>
+                  <div className="flex gap-1">
+                    <dt className="font-medium text-neutral-600 dark:text-neutral-300">CNPJ:</dt>
+                    <dd className="text-neutral-900 dark:text-neutral-100">{empresa.cnpj}</dd>
+                  </div>
+                  {empresa.nomeFantasia && (
+                    <div className="flex gap-1">
+                      <dt className="font-medium text-neutral-600 dark:text-neutral-300">Nome fantasia:</dt>
+                      <dd className="text-neutral-900 dark:text-neutral-100">{empresa.nomeFantasia}</dd>
+                    </div>
+                  )}
+                  {empresa.naturezaJuridica && (
+                    <div className="flex gap-1">
+                      <dt className="font-medium text-neutral-600 dark:text-neutral-300">Natureza jurídica:</dt>
+                      <dd className="text-neutral-900 dark:text-neutral-100">{empresa.naturezaJuridica}</dd>
+                    </div>
+                  )}
+                  {endereco && (
+                    <div className="flex gap-1 sm:col-span-2">
+                      <dt className="font-medium text-neutral-600 dark:text-neutral-300">Endereço:</dt>
+                      <dd className="text-neutral-900 dark:text-neutral-100">{endereco}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            );
+          })()}
         </section>
 
         {template.variaveis.map((variavel) => (

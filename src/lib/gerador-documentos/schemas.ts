@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validarCnpj } from "@/lib/gerador-documentos/cnpj";
 
 export const TIPOS_VARIAVEL = ["texto", "numero", "moeda", "data", "booleano"] as const;
 export type TipoVariavel = (typeof TIPOS_VARIAVEL)[number];
@@ -78,7 +79,8 @@ export const EmpresaContratadaSchema = z.object({
   cnpj: z
     .string()
     .transform((v) => v.replace(/\D/g, ""))
-    .refine((v) => v.length === 14, "CNPJ deve conter 14 dígitos"),
+    .refine((v) => v.length === 14, "CNPJ deve conter 14 dígitos")
+    .refine((v) => validarCnpj(v), "CNPJ inválido: dígitos verificadores não conferem"),
   logradouro: z.string().max(200).optional(),
   numero: z.string().max(20).optional(),
   bairro: z.string().max(100).optional(),
