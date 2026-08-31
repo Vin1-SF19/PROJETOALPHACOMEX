@@ -1,0 +1,501 @@
+"use client";
+
+import { useState } from "react";
+import {
+  Building2, User, Loader2, Search, MapPin,
+  CheckCircle2, AlertCircle, Plus, X, ChevronDown,
+} from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { CriarLeadCompletoAquisicao } from "@/actions/parceiros-aquisicao";
+import ModalEndereco, { type EnderecoData } from "@/components/Parceiros/ModalEndereco";
+
+type Responsavel = { id: number; nome: string };
+type Resp = { nome: string; cpf: string; dataNascimento: string; cargo: string; whatsapp: string };
+
+const respVazio = (): Resp => ({ nome: "", cpf: "", dataNascimento: "", cargo: "", whatsapp: "" });
+
+const TIPO_PIX = ["cpf", "cnpj", "email", "telefone", "aleatoria"] as const;
+const TIPO_PARCEIRO = [
+  { valor: "PADRAO", label: "Padrão" },
+  { valor: "SEM_COMISSAO", label: "Sem Comissão" },
+  { valor: "ESPECIAL", label: "Especial" },
+] as const;
+const COMISSAO_FIXA_OPCOES = ["5", "10", "15", "20", "25", "30", "outro"] as const;
+
+function formatarDocumento(v: string, tipo: "PF" | "PJ"): string {
+  const d = v.replace(/\D/g, "");
+  if (tipo === "PJ") {
+    return d.slice(0, 14)
+      .replace(/(\d{2})(\d)/, "$1.$2")
+      .replace(/(\d{2}\.\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{2}\.\d{3}\.\d{3})(\d)/, "$1/$2")
+      .replace(/(\d{2}\.\d{3}\.\d{3}\/\d{4})(\d)/, "$1-$2");
+  }
+  return d.slice(0, 11)
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3}\.\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3}\.\d{3}\.\d{3})(\d)/, "$1-$2");
+}
+
+/** Mesmo cadastro completo do "Novo Parceiro" (NovoParceiro.tsx), em modal — só
+ * muda o destino: aqui vira um lead do funil de Aquisição (ParceiroLead), sem
+ * criar login/senha nem qualquer vínculo real. A promoção pra Parceiro de
+ * verdade continua manual, lá no card do lead. */
+export default function NovoLeadCompleto({
+  accent,
+  responsaveis,
+  onClose,
+  onCriado,
+}: {
+  accent: string;
+  responsaveis: Responsavel[];
+  onClose: () => void;
+  onCriado: () => void;
+}) {
+  const [tipo, setTipo] = useState<"PF" | "PJ">("PJ");
+  const [documento, setDocumento] = useState("");
+  const [dataNascPF, setDataNascPF] = useState("");
+  const [consultando, setConsultando] = useState(false);
+  const [consultaDone, setConsultaDone] = useState(false);
+  const [consultaErro, setConsultaErro] = useState("");
+
+  const [tipoParceiro, setTipoParceiro] = useState<"PADRAO" | "SEM_COMISSAO" | "ESPECIAL">("PADRAO");
+  const [comissaoFixaOpcao, setComissaoFixaOpcao] = useState<string>("5");
+  const [comissaoFixaOutro, setComissaoFixaOutro] = useState("");
+
+  const [nome, setNome] = useState("");
+  const [nomeFantasia, setNomeFantasia] = useState("");
+  const [email, setEmail] = useState("");
+  const [whatsappPF, setWhatsappPF] = useState("");
+  const [chavePix, setChavePix] = useState("");
+  const [tipoChavePix, setTipoChavePix] = useState("");
+  const [nomeBanco, setNomeBanco] = useState("");
+  const [agencia, setAgencia] = useState("");
+  const [conta, setConta] = useState("");
+  const [dadosConsultaBrutos, setDadosConsultaBrutos] = useState("");
+  const [segmento, setSegmento] = useState("");
+  const [origem, setOrigem] = useState("");
+  const [responsavelId, setResponsavelId] = useState<string>(() => {
+    const padrao = responsaveis.find((r) => r.nome.toUpperCase().includes("DANILO SILVA GOMES"));
+    return padrao ? String(padrao.id) : "";
+  });
+
+  // Responsáveis físicos (vários) — em "gaveta": só um aberto por vez
+  const [respsFisicos, setRespsFisicos] = useState<Resp[]>([respVazio()]);
+  const [respAbertoIdx, setRespAbertoIdx] = useState<number>(0);
+
+  const respCompleto = (r: Resp) => r.nome.trim().length >= 2;
+  const updateResp = (i: number, campo: keyof Resp, valor: string) =>
+    setRespsFisicos(prev => prev.map((r, idx) => idx === i ? { ...r, [campo]: valor } : r));
+  const addResp = () => {
+    setRespsFisicos(prev => [...prev, respVazio()]);
+    setRespAbertoIdx(respsFisicos.length);
+  };
+  const removeResp = (i: number) => {
+    setRespsFisicos(prev => prev.filter((_, idx) => idx !== i));
+    setRespAbertoIdx(-1);
+  };
+
+  const [endereco, setEndereco] = useState<EnderecoData | null>(null);
+  const [modalEnderecoOpen, setModalEnderecoOpen] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+
+  function changeTipo(t: "PF" | "PJ") {
+    setTipo(t);
+    setDocumento("");
+    setConsultaDone(false);
+    setConsultaErro("");
+  }
+
+  function onChangeDoc(v: string) {
+    setDocumento(formatarDocumento(v, tipo));
+    setConsultaDone(false);
+    setConsultaErro("");
+  }
+
+  async function consultar() {
+    const docLimpo = documento.replace(/\D/g, "");
+    if (tipo === "PJ" && docLimpo.length !== 14) { toast.error("CNPJ inválido"); return; }
+    if (tipo === "PF" && docLimpo.length !== 11) { toast.error("CPF inválido"); return; }
+    if (tipo === "PF" && !dataNascPF) { toast.error("Data de nascimento obrigatória para buscar CPF"); return; }
+
+    setConsultando(true);
+    setConsultaErro("");
+    try {
+      if (tipo === "PJ") {
+        const r = await fetch(`/api/ReceitaFederal?cnpj=${docLimpo}`);
+        const d = await r.json();
+        if (d.error || d.message) throw new Error(d.error || d.message);
+        setNome(d.razaoSocial || "");
+        setNomeFantasia(d.nomeFantasia || "");
+        setEmail(d.email || "");
+        setDadosConsultaBrutos(JSON.stringify(d));
+      } else {
+        const r = await fetch("/api/ConsultaCpf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cpf: docLimpo, dataNascimento: dataNascPF }),
+        });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        setNome(d.nome || "");
+        setDadosConsultaBrutos(JSON.stringify(d));
+      }
+      setConsultaDone(true);
+      toast.success("Dados preenchidos pela consulta");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro na consulta";
+      setConsultaErro(msg);
+      toast.error(msg);
+    } finally {
+      setConsultando(false);
+    }
+  }
+
+  async function handleSalvar() {
+    if (!nome.trim()) { toast.error("Informe o nome"); return; }
+    if (tipoParceiro === "ESPECIAL" && comissaoFixaOpcao === "outro" && !comissaoFixaOutro) {
+      toast.error("Informe o valor da comissão fixa");
+      return;
+    }
+
+    const comissaoPercentual = tipoParceiro === "ESPECIAL"
+      ? Number(comissaoFixaOpcao === "outro" ? comissaoFixaOutro : comissaoFixaOpcao)
+      : undefined;
+    const respValidos = respsFisicos.filter(respCompleto);
+
+    setSalvando(true);
+    try {
+      const result = await CriarLeadCompletoAquisicao({
+        tipo,
+        tipoParceiro,
+        documento: documento ? documento.replace(/\D/g, "") : undefined,
+        nome: nome.trim(),
+        nomeFantasia: nomeFantasia || undefined,
+        dataNascimento: tipo === "PF" ? dataNascPF || undefined : undefined,
+        email: email || undefined,
+        telefone: tipo === "PJ" ? (respValidos[0]?.whatsapp || undefined) : (whatsappPF || undefined),
+        chavePix: chavePix || undefined,
+        tipoChavePix: (tipoChavePix as "cpf" | "cnpj" | "email" | "telefone" | "aleatoria") || undefined,
+        nomeBanco: nomeBanco || undefined,
+        agencia: agencia || undefined,
+        conta: conta || undefined,
+        comissaoPercentual,
+        dadosConsulta: dadosConsultaBrutos || undefined,
+        segmento: segmento || undefined,
+        origem: origem || undefined,
+        responsavelId: responsavelId ? Number(responsavelId) : undefined,
+        endereco: endereco ?? undefined,
+        responsaveis: tipo === "PJ"
+          ? respValidos.map(r => ({
+              nome: r.nome.trim(),
+              cpf: r.cpf ? r.cpf.replace(/\D/g, "") : undefined,
+              dataNascimento: r.dataNascimento || undefined,
+              cargo: r.cargo || undefined,
+              telefone: r.whatsapp.trim() || undefined,
+            }))
+          : undefined,
+      });
+
+      if (!result.success) {
+        toast.error(result.error ?? "Erro ao cadastrar lead");
+        return;
+      }
+      toast.success("Lead cadastrado no funil de Aquisição");
+      onCriado();
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const docLimpo = documento.replace(/\D/g, "");
+  const podeConsultar = tipo === "PJ" ? docLimpo.length === 14 : (docLimpo.length === 11 && !!dataNascPF);
+  const inputCls = "bg-black/40 border-white/10 rounded-2xl h-11 text-sm";
+  const labelCls = "text-[10px] font-black uppercase text-slate-500 tracking-widest";
+
+  return (
+    <>
+      <Dialog open onOpenChange={(v) => !v && onClose()}>
+        <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto bg-[#0a1020] border-white/10 p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle className="text-xl font-black uppercase italic tracking-tight text-white">
+              Novo <span style={{ color: `rgba(${accent}, 1)` }}>Lead</span>
+            </DialogTitle>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Mesmo cadastro do Parceiro — entra no funil de Aquisição</p>
+          </DialogHeader>
+
+          <div className="px-6 pb-6 space-y-4">
+
+            <div className="space-y-3 pb-4 border-b border-white/5">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">1. Tipo de parceiro</p>
+              <div className="flex gap-3">
+                {(["PJ", "PF"] as const).map(t => (
+                  <button key={t} type="button" onClick={() => changeTipo(t)}
+                    className="flex-1 h-12 rounded-2xl border font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2"
+                    style={tipo === t ? { background: `rgba(${accent}, 0.15)`, borderColor: `rgba(${accent}, 0.5)`, color: `rgba(${accent}, 1)` } : {}}>
+                    {t === "PJ" ? <Building2 size={14} /> : <User size={14} />}
+                    {t === "PF" ? "Pessoa Física" : "Pessoa Jurídica"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-1">
+                <Label className={labelCls}>{tipo === "PJ" ? "CNPJ" : "CPF"}</Label>
+                <div className="flex gap-2">
+                  <Input value={documento} onChange={e => onChangeDoc(e.target.value)}
+                    placeholder={tipo === "PJ" ? "00.000.000/0000-00" : "000.000.000-00"}
+                    className={`${inputCls} font-mono flex-1`} />
+                  <Button type="button" onClick={consultar} disabled={!podeConsultar || consultando}
+                    title="Buscar dados por API (opcional)"
+                    className="h-11 w-11 shrink-0 rounded-2xl disabled:opacity-40 text-white" style={{ background: `rgba(${accent}, 0.9)` }}>
+                    {consultando ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                  </Button>
+                </div>
+                <p className="text-[9px] text-slate-600">🔍 Opcional — se já tem os dados, preencha manual abaixo e economize a consulta.</p>
+              </div>
+
+              {tipo === "PF" && (
+                <div className="space-y-1">
+                  <Label className={labelCls}>Data de Nascimento (p/ busca)</Label>
+                  <Input type="date" value={dataNascPF} onChange={e => setDataNascPF(e.target.value)} className={inputCls} />
+                </div>
+              )}
+
+              {consultaDone && <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold"><CheckCircle2 size={14} /> Consulta realizada</div>}
+              {consultaErro && <div className="flex items-center gap-2 text-red-400 text-xs font-bold"><AlertCircle size={14} /> {consultaErro}</div>}
+
+              <div className="space-y-1">
+                <Label className={labelCls}>Tipo de Parceiro</Label>
+                <Select value={tipoParceiro} onValueChange={(v) => setTipoParceiro(v as typeof tipoParceiro)}>
+                  <SelectTrigger className="bg-black/40 border-white/10 rounded-2xl h-11 text-xs font-black uppercase"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
+                    {TIPO_PARCEIRO.map(t => <SelectItem key={t.valor} value={t.valor} className="text-xs uppercase font-bold py-3">{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-3 pb-4 border-b border-white/5">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">2. Dados do lead</p>
+
+              <div className="space-y-1">
+                <Label className={labelCls}>{tipo === "PJ" ? "Razão Social" : "Nome"} *</Label>
+                <Input value={nome} onChange={e => setNome(e.target.value)} className={inputCls} />
+              </div>
+
+              {tipo === "PJ" && (
+                <div className="space-y-1">
+                  <Label className={labelCls}>Nome Fantasia</Label>
+                  <Input value={nomeFantasia} onChange={e => setNomeFantasia(e.target.value)} className={inputCls} />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className={labelCls}>E-mail</Label>
+                  <Input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} />
+                </div>
+                {tipo === "PF" ? (
+                  <div className="space-y-1">
+                    <Label className={labelCls}>WhatsApp</Label>
+                    <Input value={whatsappPF} onChange={e => setWhatsappPF(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <Label className={labelCls}>Segmento</Label>
+                    <Input value={segmento} onChange={e => setSegmento(e.target.value)} className={inputCls} />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {tipo === "PF" && (
+                  <div className="space-y-1">
+                    <Label className={labelCls}>Segmento</Label>
+                    <Input value={segmento} onChange={e => setSegmento(e.target.value)} className={inputCls} />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label className={labelCls}>Origem</Label>
+                  <Input value={origem} onChange={e => setOrigem(e.target.value)} className={inputCls} />
+                </div>
+              </div>
+
+              {responsaveis.length > 0 && (
+                <div className="space-y-1">
+                  <Label className={labelCls}>Responsável (interno)</Label>
+                  <Select value={responsavelId} onValueChange={setResponsavelId}>
+                    <SelectTrigger className="bg-black/40 border-white/10 rounded-2xl h-11 text-xs font-black uppercase"><SelectValue placeholder="Responsável" /></SelectTrigger>
+                    <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
+                      {responsaveis.map((r) => <SelectItem key={r.id} value={String(r.id)} className="text-xs uppercase font-bold py-3">{r.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {tipoParceiro === "ESPECIAL" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className={labelCls}>Comissão fixa (%)</Label>
+                    <Select value={comissaoFixaOpcao} onValueChange={setComissaoFixaOpcao}>
+                      <SelectTrigger className="bg-black/40 border-white/10 rounded-2xl h-11 text-xs font-black uppercase"><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
+                        {COMISSAO_FIXA_OPCOES.map(v => (
+                          <SelectItem key={v} value={v} className="text-xs uppercase font-bold py-3">
+                            {v === "outro" ? "Outro valor" : `${v}%`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {comissaoFixaOpcao === "outro" && (
+                    <div className="space-y-1">
+                      <Label className={labelCls}>Valor (%)</Label>
+                      <Input type="number" min={0} max={100} step="0.5" value={comissaoFixaOutro}
+                        onChange={e => setComissaoFixaOutro(e.target.value)} placeholder="Ex: 12.5" className={inputCls} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <Button type="button" variant="outline" onClick={() => setModalEnderecoOpen(true)}
+                className={`w-full h-11 rounded-2xl border font-black uppercase text-xs tracking-widest gap-2 transition-all ${endereco ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" : "border-white/10 text-slate-400 hover:border-indigo-500/50"}`}>
+                <MapPin size={13} />
+                {endereco ? `${endereco.logradouro}, ${endereco.numero || "S/N"} — ${endereco.cidade}/${endereco.uf}` : "Endereço"}
+                {!endereco && <Plus size={11} />}
+              </Button>
+            </div>
+
+            <div className="space-y-3 pb-4 border-b border-white/5">
+              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">3. Dados Bancários</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className={labelCls}>Nome do Banco</Label>
+                  <Input value={nomeBanco} onChange={e => setNomeBanco(e.target.value)} placeholder="Ex: Banco do Brasil" className={inputCls} />
+                </div>
+                <div className="space-y-1">
+                  <Label className={labelCls}>Agência</Label>
+                  <Input value={agencia} onChange={e => setAgencia(e.target.value)} placeholder="0000" className={inputCls} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className={labelCls}>Conta</Label>
+                  <Input value={conta} onChange={e => setConta(e.target.value)} placeholder="00000-0" className={inputCls} />
+                </div>
+                <div className="space-y-1">
+                  <Label className={labelCls}>Chave Pix</Label>
+                  <Input value={chavePix} onChange={e => setChavePix(e.target.value)} placeholder="Chave pix" className={inputCls} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className={labelCls}>Tipo Pix</Label>
+                <Select value={tipoChavePix} onValueChange={setTipoChavePix}>
+                  <SelectTrigger className="bg-black/40 border-white/10 rounded-2xl h-11 text-xs font-black uppercase"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                  <SelectContent className="bg-slate-950 border-white/10 text-white rounded-xl">
+                    {TIPO_PIX.map(t => <SelectItem key={t} value={t} className="text-xs uppercase font-bold py-3">{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {tipo === "PJ" && (
+              <div className="space-y-3 pb-4 border-b border-white/5">
+                <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">
+                  4. Responsáveis Físicos <span className="text-slate-600">(opcional nesta etapa)</span>
+                </p>
+
+                {respsFisicos.map((r, i) => {
+                  const aberto = respAbertoIdx === i;
+                  const completo = respCompleto(r);
+                  return (
+                    <div key={i} className="rounded-2xl overflow-hidden" style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                      <div className="flex items-center gap-2 px-4 py-3">
+                        <button type="button" onClick={() => setRespAbertoIdx(aberto ? -1 : i)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                          <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0" style={{ background: completo ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.12)" }}>
+                            <User size={13} className={completo ? "text-emerald-400" : "text-amber-400"} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12.5px] font-bold text-slate-200 truncate">{r.nome || `Responsável ${i + 1}`}</p>
+                            {completo && <p className="text-[10px] text-slate-500 truncate font-mono">{r.cpf}{r.cargo ? ` · ${r.cargo}` : ""}{r.whatsapp ? ` · ${r.whatsapp}` : ""}</p>}
+                          </div>
+                          <ChevronDown size={15} className={`shrink-0 text-slate-500 transition-transform ${aberto ? "rotate-180" : ""}`} />
+                        </button>
+                        {respsFisicos.length > 1 && (
+                          <button type="button" onClick={() => removeResp(i)} title="Remover" className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 shrink-0">
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {aberto && (
+                        <div className="px-4 pb-4 pt-1 space-y-3 border-t" style={{ borderColor: "rgba(245,158,11,0.15)" }}>
+                          <div className="space-y-1">
+                            <Label className={labelCls}>Nome Completo</Label>
+                            <Input value={r.nome} onChange={e => updateResp(i, "nome", e.target.value)} className={inputCls} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className={labelCls}>CPF</Label>
+                              <Input value={r.cpf} onChange={e => updateResp(i, "cpf", formatarDocumento(e.target.value, "PF"))} placeholder="000.000.000-00" className={`${inputCls} font-mono`} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className={labelCls}>Data Nasc.</Label>
+                              <Input type="date" value={r.dataNascimento} onChange={e => updateResp(i, "dataNascimento", e.target.value)} className={inputCls} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className={labelCls}>Cargo / Relação</Label>
+                              <Input value={r.cargo} onChange={e => updateResp(i, "cargo", e.target.value)} placeholder="Sócio, Diretor, Procurador..." className={inputCls} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className={labelCls}>WhatsApp</Label>
+                              <Input value={r.whatsapp} onChange={e => updateResp(i, "whatsapp", e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
+                            </div>
+                          </div>
+                          <Button type="button" variant="outline" disabled={!completo}
+                            onClick={() => setRespAbertoIdx(-1)}
+                            className="w-full h-9 rounded-xl border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-black uppercase text-[11px] tracking-widest gap-2 disabled:opacity-30">
+                            <CheckCircle2 size={14} /> Salvar responsável
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <Button type="button" variant="outline"
+                  onClick={addResp}
+                  className="w-full h-10 rounded-xl border-dashed border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-black uppercase text-[11px] tracking-widest gap-2">
+                  <Plus size={14} /> Adicionar responsável
+                </Button>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={onClose}
+                className="h-12 px-6 rounded-2xl border-white/10 text-slate-400 hover:text-white font-black uppercase tracking-widest text-xs gap-2">
+                <X size={16} /> Cancelar
+              </Button>
+              <Button type="button" onClick={handleSalvar} disabled={salvando}
+                className="flex-1 h-12 font-black uppercase tracking-widest text-xs rounded-2xl gap-2 disabled:opacity-40 text-white" style={{ background: `rgba(${accent}, 1)` }}>
+                {salvando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                {salvando ? "Cadastrando..." : "Cadastrar Lead"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ModalEndereco open={modalEnderecoOpen} onClose={() => setModalEnderecoOpen(false)} onSalvar={setEndereco} inicial={endereco ?? undefined} />
+    </>
+  );
+}

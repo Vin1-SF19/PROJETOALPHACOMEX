@@ -2487,6 +2487,32 @@ model ParceiroLead {
   cidade    String?
   uf        String?
 
+  // ─── Cadastro completo (mesmos campos de `Parceiro`) ────────────────────────
+  // Preenchidos quando o lead é criado pelo formulário completo (igual ao "Novo
+  // Parceiro"), mas SEM criar login/senha nem vínculo real — fica só no card
+  // virtual do funil de Aquisição até uma promoção manual (`PromoverLeadParaParceiro`).
+  nomeFantasia        String?
+  tipoParceiro        String? // "PADRAO" | "SEM_COMISSAO" | "ESPECIAL"
+  dataNascimento      String? // só quando tipo=PF
+  chavePix            String?
+  tipoChavePix        String?
+  nomeBanco           String?
+  agencia             String?
+  conta               String?
+  comissaoPercentual  Float?
+  dadosConsulta       String?
+  // Endereço (achatado no próprio lead — não é entidade própria como
+  // `ParceiroEndereco`, é só rascunho até a promoção).
+  cep                 String?
+  logradouro          String?
+  numero              String?
+  complemento         String?
+  bairro              String?
+  // Responsáveis físicos (PJ) — array JSON de {nome,cpf,dataNascimento,cargo,email,telefone},
+  // mesmo formato do input `responsaveis` de `criarParceiro`. Fica como JSON (não uma tabela
+  // relacional) porque é só rascunho do lead, não a entidade `Pessoa` real usada pelo parceiro.
+  responsaveisJson    String?
+
   responsavelId Int?
   responsavel   usuarios? @relation("ParceiroLeadResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
 

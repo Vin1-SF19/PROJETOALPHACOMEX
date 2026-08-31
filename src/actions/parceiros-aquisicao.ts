@@ -107,6 +107,100 @@ export async function CriarLeadAquisicaoParceiro(input: z.input<typeof CriarLead
   return { success: true as const, lead };
 }
 
+// ─── Criar lead com cadastro completo (mesmo formulário do "Novo Parceiro") ──
+// A pedido do usuário: o botão "Novo Lead" da Aquisição usa o MESMO cadastro do
+// "Novo Parceiro" (tipo/documento, dados, comissão, endereço, dados bancários,
+// responsáveis físicos) — só muda o destino: aqui vira um `ParceiroLead` (card
+// virtual do funil), sem criar login/senha nem qualquer vínculo real. A promoção
+// para `Parceiro` de verdade continua sendo manual (`PromoverLeadParaParceiro`).
+
+const EnderecoLeadSchema = z.object({
+  cep: z.string().min(8),
+  logradouro: z.string().min(1),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+  bairro: z.string().min(1),
+  cidade: z.string().min(1),
+  uf: z.string().length(2),
+});
+
+const ResponsavelLeadSchema = z.object({
+  nome: z.string().min(2),
+  cpf: z.string().optional(),
+  dataNascimento: z.string().optional(),
+  cargo: z.string().optional(),
+  email: z.string().optional(),
+  telefone: z.string().optional(),
+});
+
+const CriarLeadCompletoSchema = z.object({
+  tipo: z.enum(["PF", "PJ"]),
+  tipoParceiro: z.enum(["PADRAO", "SEM_COMISSAO", "ESPECIAL"]).optional(),
+  documento: z.string().optional(),
+  nome: z.string().min(2),
+  nomeFantasia: z.string().optional(),
+  dataNascimento: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  telefone: z.string().optional(),
+  chavePix: z.string().optional(),
+  tipoChavePix: z.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional(),
+  nomeBanco: z.string().optional(),
+  agencia: z.string().optional(),
+  conta: z.string().optional(),
+  comissaoPercentual: z.number().min(0).max(100).optional(),
+  dadosConsulta: z.string().optional(),
+  segmento: z.string().optional(),
+  origem: z.string().optional(),
+  responsavelId: z.number().int().positive().optional(),
+  endereco: EnderecoLeadSchema.optional(),
+  responsaveis: z.array(ResponsavelLeadSchema).optional(),
+});
+
+export async function CriarLeadCompletoAquisicao(input: z.input<typeof CriarLeadCompletoSchema>) {
+  const ctx = await getCtx();
+  if (!ctx || (!ctx.isAdmin && !ctx.podeEditar)) return { success: false as const, error: "Sem permissão" };
+
+  const parsed = CriarLeadCompletoSchema.safeParse(input);
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  const d = parsed.data;
+
+  const respValidos = (d.responsaveis ?? []).filter((r) => r.nome.trim());
+
+  const lead = await db.parceiroLead.create({
+    data: {
+      nome: d.nome,
+      tipo: d.tipo,
+      tipoParceiro: d.tipoParceiro ?? null,
+      documento: d.documento?.replace(/\D/g, "") || null,
+      nomeFantasia: d.nomeFantasia || null,
+      dataNascimento: d.dataNascimento || null,
+      email: d.email || null,
+      telefone: d.telefone || null,
+      chavePix: d.chavePix || null,
+      tipoChavePix: d.tipoChavePix || null,
+      nomeBanco: d.nomeBanco || null,
+      agencia: d.agencia || null,
+      conta: d.conta || null,
+      comissaoPercentual: d.comissaoPercentual ?? null,
+      dadosConsulta: d.dadosConsulta || null,
+      segmento: d.segmento || null,
+      origem: d.origem || null,
+      responsavelId: d.responsavelId ?? null,
+      cep: d.endereco?.cep.replace(/\D/g, "") || null,
+      logradouro: d.endereco?.logradouro || null,
+      numero: d.endereco?.numero || null,
+      complemento: d.endereco?.complemento || null,
+      bairro: d.endereco?.bairro || null,
+      cidade: d.endereco?.cidade || null,
+      uf: d.endereco?.uf?.toUpperCase() || null,
+      responsaveisJson: respValidos.length > 0 ? JSON.stringify(respValidos) : null,
+    },
+  });
+  await registrarHistoricoLead(lead.id, "LEAD_CRIADO_COMPLETO", null, JSON.stringify({ status: lead.status }), ctx.userId);
+  revalidatePath("/PainelAlpha/Parceiros/Aquisicao");
+  return { success: true as const, leadId: lead.id };
+}
+
 // ─── Mover etapa ─────────────────────────────────────────────────────────────
 
 const MoverLeadSchema = z.object({

@@ -13,7 +13,6 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { getTema } from "@/lib/temas";
 import {
-  CriarLeadAquisicaoParceiro,
   MoverLeadAquisicaoParceiro,
   RegistrarSaidaLateralLeadAquisicao,
   AtualizarPotencialLeadAquisicao,
@@ -27,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
+import NovoLeadCompleto from "@/components/Parceiros/Aquisicao/NovoLeadCompleto";
 import { cn } from "@/lib/utils";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
@@ -225,8 +225,8 @@ export default function AquisicaoParceirosClient({
   const accent = tema.accent;
   const reduceMotion = useReducedMotion();
   const [leads, setLeads] = useState<Lead[]>(leadsIniciais);
-  const [novoLeadOpen, setNovoLeadOpen] = useState(false);
   const [leadFoco, setLeadFoco] = useState<Lead | null>(null);
+  const [novoLeadOpen, setNovoLeadOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const podeEditar = permissao.isAdmin || permissao.podeEditar;
@@ -371,7 +371,7 @@ export default function AquisicaoParceirosClient({
       </DndContext>
 
       {novoLeadOpen && (
-        <NovoLeadDialog
+        <NovoLeadCompleto
           accent={accent}
           responsaveis={responsaveis}
           onClose={() => setNovoLeadOpen(false)}
@@ -476,102 +476,6 @@ function SaidaLateralDragDialog({
         </div>
       </div>
     </div>
-  );
-}
-
-function NovoLeadDialog({
-  accent,
-  responsaveis,
-  onClose,
-  onCriado,
-}: {
-  accent: string;
-  responsaveis: Responsavel[];
-  onClose: () => void;
-  onCriado: () => void;
-}) {
-  const [nome, setNome] = useState("");
-  const [tipo, setTipo] = useState<"PF" | "PJ" | "">("");
-  const [email, setEmail] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [segmento, setSegmento] = useState("");
-  const [origem, setOrigem] = useState("");
-  const [cidade, setCidade] = useState("");
-  const [uf, setUf] = useState("");
-  // Responsável padrão de novo lead: Danilo Silva Gomes, a pedido do usuário —
-  // só aplica se ele estiver na lista de responsáveis ativos carregada do backend.
-  const [responsavelId, setResponsavelId] = useState<string>(() => {
-    const padrao = responsaveis.find((r) => r.nome.toUpperCase().includes("DANILO SILVA GOMES"));
-    return padrao ? String(padrao.id) : "";
-  });
-  const [salvando, setSalvando] = useState(false);
-
-  async function salvar() {
-    if (!nome.trim()) return toast.error("Informe o nome");
-    setSalvando(true);
-    const r = await CriarLeadAquisicaoParceiro({
-      nome: nome.trim(),
-      tipo: tipo || undefined,
-      email: email || undefined,
-      telefone: telefone || undefined,
-      segmento: segmento || undefined,
-      origem: origem || undefined,
-      cidade: cidade || undefined,
-      uf: uf || undefined,
-      responsavelId: responsavelId ? Number(responsavelId) : undefined,
-    });
-    setSalvando(false);
-    if (!r.success) return toast.error(r.error);
-    toast.success("Lead criado");
-    onCriado();
-  }
-
-  const inputCls = "w-full h-10 rounded-xl px-3 text-[12px] outline-none text-slate-200";
-  const inputStyle = { background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` };
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md bg-[#0a1020] border-white/10">
-        <DialogHeader>
-          <DialogTitle className="text-slate-100">Novo lead de aquisição</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2.5">
-          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome *" className={inputCls} style={inputStyle} />
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={tipo} onValueChange={(v) => setTipo(v as "PF" | "PJ")}>
-              <SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Tipo" /></SelectTrigger>
-              <SelectContent><SelectItem value="PF">Pessoa Física</SelectItem><SelectItem value="PJ">Pessoa Jurídica</SelectItem></SelectContent>
-            </Select>
-            <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Telefone" className={inputCls} style={inputStyle} />
-          </div>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={inputCls} style={inputStyle} />
-          <div className="grid grid-cols-2 gap-2">
-            <input value={segmento} onChange={(e) => setSegmento(e.target.value)} placeholder="Segmento" className={inputCls} style={inputStyle} />
-            <input value={origem} onChange={(e) => setOrigem(e.target.value)} placeholder="Origem" className={inputCls} style={inputStyle} />
-          </div>
-          <div className="grid grid-cols-[1fr_80px] gap-2">
-            <input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Cidade" className={inputCls} style={inputStyle} />
-            <input value={uf} onChange={(e) => setUf(e.target.value.toUpperCase().slice(0, 2))} placeholder="UF" className={inputCls} style={inputStyle} />
-          </div>
-          {responsaveis.length > 0 && (
-            <Select value={responsavelId} onValueChange={setResponsavelId}>
-              <SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Responsável" /></SelectTrigger>
-              <SelectContent>
-                {responsaveis.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-          <button
-            onClick={() => void salvar()}
-            disabled={salvando}
-            className="w-full h-11 rounded-xl font-black uppercase text-[11px] tracking-widest text-black disabled:opacity-50"
-            style={{ background: `rgba(${accent},1)` }}
-          >
-            {salvando ? "Salvando..." : "Criar lead"}
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
