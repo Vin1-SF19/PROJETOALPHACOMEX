@@ -68,5 +68,8 @@ next-env.d.ts
 # Configuração, telemetria e logs locais da execução em Produção do Roadmap
 /.roadmap-production/
 
+# Estado/lock local do orquestrador Central Roadmap (execuções, PID, histórico)
+/.central-roadmap-production/
+
 # Registro local de MCP servers (contém tokens/credenciais em claro)
 /.mcp.json

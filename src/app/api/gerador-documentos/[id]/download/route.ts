@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
-import { auth } from "@/auth";
+import { auth } from "../../../../../../auth";
 import db from "@/lib/prisma";
 
 /**
