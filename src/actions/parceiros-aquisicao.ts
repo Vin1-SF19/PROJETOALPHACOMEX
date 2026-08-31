@@ -9,6 +9,7 @@ import { z } from "zod";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCtx, criarParceiro } from "./parceiros";
+import { parseDataLocalInput } from "@/lib/format-date";
 
 // ─── Máquina de estados (etapas fixas do funil, conforme pedido do usuário) ───
 
@@ -370,7 +371,10 @@ export async function AtualizarPotencialLeadAquisicao(input: z.input<typeof Pote
 
 const ProximaAcaoLeadSchema = z.object({
   leadId: z.string().cuid(),
-  proximaAcaoEm: z.coerce.date(),
+  // String de <input type="date"> ("YYYY-MM-DD") — NUNCA z.coerce.date() direto:
+  // isso ancora em meia-noite UTC, que em fuso negativo (Brasil) exibe o dia
+  // anterior. Ver parseDataLocalInput em src/lib/format-date.ts.
+  proximaAcaoEm: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida").transform(parseDataLocalInput),
   proximaAcaoDescricao: z.string().min(1),
 });
 

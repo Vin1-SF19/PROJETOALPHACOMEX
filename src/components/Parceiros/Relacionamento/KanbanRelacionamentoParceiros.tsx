@@ -90,7 +90,7 @@ function ParceiroCard({ card, cor, onAbrirCard }: { card: Card; cor: string; onA
           </span>
         ) : card.proximaAcaoEm ? (
           <span className="flex items-center gap-1 text-[10px] text-slate-400">
-            <CalendarClock size={11} /> {new Date(card.proximaAcaoEm).toLocaleDateString("pt-BR")}
+            <CalendarClock size={11} /> {new Date(card.proximaAcaoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
           </span>
         ) : null}
       </div>

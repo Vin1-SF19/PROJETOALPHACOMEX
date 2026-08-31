@@ -132,7 +132,7 @@ function labelHistorico(acao: string): string {
 
 function BadgeProximaAcao({ proximaAcaoEm }: { proximaAcaoEm: Date | string }) {
   const urgencia = calcularUrgenciaProximaAcao(proximaAcaoEm);
-  const formatado = new Date(proximaAcaoEm).toLocaleDateString("pt-BR");
+  const formatado = new Date(proximaAcaoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   return (
     <span
       role="status"

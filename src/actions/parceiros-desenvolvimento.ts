@@ -13,6 +13,7 @@ import {
   ESTAGIOS_DESENVOLVIMENTO,
   type EstagioDesenvolvimento,
 } from "@/lib/parceiros/desenvolvimento";
+import { parseDataLocalInput } from "@/lib/format-date";
 import { calcularPrioridadeFollowUp, followUpEstaVencido } from "@/lib/parceiros/prioridade";
 
 const PotencialParceiroSchema = z.object({
@@ -111,7 +112,10 @@ export async function MoverEstagioParceiro(input: z.input<typeof MoverEstagioSch
 
 const ProximaAcaoParceiroSchema = z.object({
   parceiroId: z.number().int().positive(),
-  proximaAcaoEm: z.coerce.date(),
+  // Ver ProximaAcaoLeadSchema em parceiros-aquisicao.ts — mesmo bug corrigido
+  // aqui: z.coerce.date() direto sobre "YYYY-MM-DD" ancora em meia-noite UTC,
+  // que no fuso do Brasil (UTC-3) exibe o dia anterior.
+  proximaAcaoEm: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida").transform(parseDataLocalInput),
   proximaAcaoDescricao: z.string().min(1),
 });
 

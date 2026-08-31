@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Star, TrendingUp, Users2, Percent, DollarSign, Target, History, GitBranch } from "lucide-react";
 import { AtualizarPotencialRecorrenciaParceiro, RegistrarProximaAcaoParceiro, type ObterIndicadoresDesenvolvimentoParceiro, type ListarHistoricoParceiro } from "@/actions/parceiros-desenvolvimento";
 import type { ListarIndicacoesDoParceiro } from "@/actions/parceiros-indicacoes";
+import { parseDataLocalInput } from "@/lib/format-date";
 
 type Indicadores = Awaited<ReturnType<typeof ObterIndicadoresDesenvolvimentoParceiro>>;
 type Historico = Awaited<ReturnType<typeof ListarHistoricoParceiro>>["historico"];
@@ -93,7 +94,7 @@ export default function Relacionamento360Section({
     const r = await RegistrarProximaAcaoParceiro({ parceiroId, proximaAcaoEm: novaData, proximaAcaoDescricao: novaDesc.trim() });
     setSalvandoProximaAcao(false);
     if (!r.success) { toast.error(r.error); return; }
-    setProximaAcaoEm(new Date(novaData));
+    setProximaAcaoEm(parseDataLocalInput(novaData));
     setProximaAcaoDescricao(novaDesc.trim());
     setNovaData("");
     setNovaDesc("");
@@ -139,7 +140,7 @@ export default function Relacionamento360Section({
           <p className="text-[9px] text-slate-600 uppercase tracking-widest font-bold mb-1.5">Próxima ação</p>
           {proximaAcaoEm && proximaAcaoDescricao && (
             <p className="text-[11px] text-slate-300 mb-1.5">
-              {new Date(proximaAcaoEm).toLocaleDateString("pt-BR")} — {proximaAcaoDescricao}
+              {new Date(proximaAcaoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} — {proximaAcaoDescricao}
             </p>
           )}
           {podeEditar && (

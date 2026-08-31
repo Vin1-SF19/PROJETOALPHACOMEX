@@ -226,7 +226,7 @@ export default function DashboardParceirosClient({
                       {item.followUpVencido ? (
                         <span className="text-red-400 font-bold">Vencido</span>
                       ) : item.proximaAcaoEm ? (
-                        new Date(item.proximaAcaoEm).toLocaleDateString("pt-BR")
+                        new Date(item.proximaAcaoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
                       ) : (
                         <span className="text-amber-400">Sem próxima ação</span>
                       )}
