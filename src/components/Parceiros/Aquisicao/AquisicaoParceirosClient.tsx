@@ -654,37 +654,20 @@ function LeadDetalheDialog({
           <section className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="grid w-full gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
               <div className="min-w-0 border-b border-white/[0.08] pb-4 lg:border-b-0 lg:border-r lg:pr-5">
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">Passado</p>
-                <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-slate-500">Etapas percorridas</p>
                 <p className="mt-1 text-xs leading-5 text-slate-300">{etapasPassadas.length ? etapasPassadas.map((e) => e.label).join(" → ") : "Início do funil"}</p>
                 <p className="mt-5 text-[9px] font-black uppercase tracking-wider text-slate-500">Última indicação</p>
                 <p className="mt-1 text-xs font-bold text-slate-200">{diasSemIndicacao}</p>
               </div>
               <div className="min-w-0 border-b border-white/[0.08] px-0 py-4 lg:border-b-0 lg:border-r lg:px-5">
-                <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">Presente</p><p className="mt-2 text-lg font-black text-white">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</p><p className="text-[11px] text-slate-400">{lead.responsavel?.nome || "Responsável não definido"}</p></div><span className={cn("rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wider", prioridade.className)}>Follow-up {prioridade.label}</span></div>
+                <div className="flex items-start justify-between gap-3"><div><p className="mt-2 text-lg font-black text-white">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</p><p className="text-[11px] text-slate-400">{lead.responsavel?.nome || "Responsável não definido"}</p></div><span className={cn("rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wider", prioridade.className)}>Follow-up {prioridade.label}</span></div>
                 <div className="mt-5 grid grid-cols-2 gap-3"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Segmento</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.segmento || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Origem</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.origem || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Cidade/UF</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.cidade ? `${lead.cidade}${lead.uf ? `/${lead.uf}` : ""}` : "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Próxima ação</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.proximaAcaoEm ? new Date(lead.proximaAcaoEm).toLocaleDateString("pt-BR") : "Não definida"}</p></div></div>
                 <div className="mt-4 grid grid-cols-3 gap-2 border-y border-white/[0.07] py-3 text-center"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Indicações</p><p className="text-xl font-black text-white">0</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Contratos</p><p className="text-xl font-black text-white">0</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Conversão</p><p className="text-xl font-black text-white">—</p></div></div>
               </div>
-              <div className="min-w-0 pt-4 lg:pl-5 lg:pt-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-300">Futuro</p><p className="mt-2 text-[10px] font-black uppercase tracking-wider text-slate-500">Etapas disponíveis</p><p className="mt-1 text-xs leading-5 text-slate-300">{etapasFuturas.length ? etapasFuturas.map((e) => e.label).join(" → ") : "Última etapa"}</p><p className="mt-5 text-[9px] font-black uppercase tracking-wider text-slate-500">Potencial de recorrência</p><div className="mt-2 flex gap-1">{[0,1,2,3,4,5].map((n) => <span key={n} className={cn("h-1.5 flex-1 rounded-full", n <= (lead.potencialRecorrencia ?? 0) ? "bg-amber-400" : "bg-white/10")} />)}</div><p className="mt-1 text-right text-xs font-black text-amber-300">{lead.potencialRecorrencia ?? 0}/5</p></div>
+              <div className="min-w-0 pt-4 lg:pl-5 lg:pt-0"><div className="flex flex-wrap gap-2">{etapasFuturas.length ? etapasFuturas.map((e) => <button key={e.status} type="button" onClick={() => setStatusDestino(e.status)} className={cn("rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition-colors", statusDestino === e.status ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.1]")}>{e.label}</button>) : <span className="text-xs text-slate-500">Última etapa</span>}</div><button type="button" onClick={() => void mover()} disabled={salvando || statusDestino === lead.status} className="mt-3 h-9 w-full rounded-xl text-[10px] font-black uppercase tracking-wider text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Mover para etapa selecionada</button><p className="mt-5 text-[9px] font-black uppercase tracking-wider text-slate-500">Potencial de recorrência</p><div className="mt-2 flex gap-1">{[0,1,2,3,4,5].map((n) => <span key={n} className={cn("h-1.5 flex-1 rounded-full", n <= (lead.potencialRecorrencia ?? 0) ? "bg-amber-400" : "bg-white/10")} />)}</div><p className="mt-1 text-right text-xs font-black text-amber-300">{lead.potencialRecorrencia ?? 0}/5</p></div>
             </div>
           </section>
           {podeEditar && (
             <>
-              <section className="space-y-2">
-                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500"><ArrowLeftRight size={12} /> Mover etapa</p>
-                <div className="flex gap-2">
-                  <Select value={statusDestino} onValueChange={setStatusDestino}>
-                    <SelectTrigger className={inputCls} style={inputStyle}><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ETAPAS.map((e) => <SelectItem key={e.status} value={e.status}>{e.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <button onClick={() => void mover()} disabled={salvando} className="h-10 px-4 rounded-xl text-[11px] font-bold text-black shrink-0 transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>
-                    Mover
-                  </button>
-                </div>
-              </section>
-
               <section className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
                 <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500"><Star size={12} /> Potencial de recorrência</p>
                 <div className="flex items-center gap-2">
