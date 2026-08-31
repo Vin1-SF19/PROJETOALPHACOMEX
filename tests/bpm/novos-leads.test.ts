@@ -34,6 +34,44 @@ describe("requisitos de Novos leads", () => {
     });
     expect(faltantes.map((campo) => campo.id)).toEqual(["campo_nome"]);
   });
+
+  it("libera a saída quando Radar pretendido e Confirmar serviço estão preenchidos", () => {
+    const requisitos = [
+      { id: "radar", nome: "Radar pretendido" },
+      { id: "servico", nome: "Confirmar serviço" },
+    ];
+
+    expect(listarCamposObrigatoriosFaltantes(requisitos, {
+      radar: "Radar 150k",
+      servico: "Sim",
+    })).toEqual([]);
+  });
+
+  it("bloqueia a saída quando os campos estão nulos ou ausentes", () => {
+    const requisitos = [
+      { id: "radar", nome: "Radar pretendido" },
+      { id: "servico", nome: "Confirmar serviço" },
+    ];
+
+    expect(listarCamposObrigatoriosFaltantes(requisitos, {
+      radar: null,
+    }).map((campo) => campo.nome)).toEqual([
+      "Radar pretendido",
+      "Confirmar serviço",
+    ]);
+  });
+
+  it("trata string vazia como preenchimento parcial pendente", () => {
+    const requisitos = [
+      { id: "radar", nome: "Radar pretendido" },
+      { id: "servico", nome: "Confirmar serviço" },
+    ];
+
+    expect(listarCamposObrigatoriosFaltantes(requisitos, {
+      radar: "Radar Ilimitado",
+      servico: "",
+    }).map((campo) => campo.nome)).toEqual(["Confirmar serviço"]);
+  });
 });
 
 describe("cadência de oito dias úteis", () => {

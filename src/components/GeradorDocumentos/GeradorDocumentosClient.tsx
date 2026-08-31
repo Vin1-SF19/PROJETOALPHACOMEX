@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileText, Plus, FilePlus2, Archive, ExternalLink } from "lucide-react";
+import { FileText, Plus, FilePlus2, Archive, ExternalLink, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArquivarTemplateDocumento } from "@/actions/gerador-documentos";
+import { filtrarDocumentosPorBusca } from "@/lib/gerador-documentos/busca";
 import { NovoTemplateDialog } from "./NovoTemplateDialog";
 
 export interface TemplateResumo {
@@ -33,6 +35,7 @@ export interface DocumentoResumo {
   finalizadoEm: Date | string | null;
   template: { id: string; titulo: string };
   criadoPor: { id: number; nome: string };
+  cliente: { id: number; razaoSocial: string; nomeFantasia: string | null } | null;
 }
 
 const STATUS_DOCUMENTO_LABEL: Record<string, string> = {
@@ -58,6 +61,18 @@ export function GeradorDocumentosClient({
   const [documentos] = useState(documentosIniciais);
   const [novoTemplateOpen, setNovoTemplateOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [buscaDocumentoInput, setBuscaDocumentoInput] = useState("");
+  const [buscaDocumento, setBuscaDocumento] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBuscaDocumento(buscaDocumentoInput), 300);
+    return () => clearTimeout(timer);
+  }, [buscaDocumentoInput]);
+
+  const documentosFiltrados = useMemo(
+    () => filtrarDocumentosPorBusca(documentos, buscaDocumento),
+    [documentos, buscaDocumento],
+  );
 
   function handleArquivar(templateId: string) {
     startTransition(async () => {
@@ -127,10 +142,25 @@ export function GeradorDocumentosClient({
           {documentos.length === 0 ? (
             <EstadoVazio mensagem="Nenhum documento gerado ainda." />
           ) : (
-            <div className="flex flex-col gap-2">
-              {documentos.map((documento) => (
-                <DocumentoRow key={documento.id} documento={documento} />
-              ))}
+            <div className="flex flex-col gap-4">
+              <div className="relative max-w-sm">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <Input
+                  value={buscaDocumentoInput}
+                  onChange={(e) => setBuscaDocumentoInput(e.target.value)}
+                  placeholder="Buscar por nome..."
+                  className="pl-9"
+                />
+              </div>
+              {documentosFiltrados.length === 0 ? (
+                <EstadoVazio mensagem={`Nenhum documento encontrado para "${buscaDocumento}".`} />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {documentosFiltrados.map((documento) => (
+                    <DocumentoRow key={documento.id} documento={documento} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
@@ -206,6 +236,7 @@ function TemplateCard({
 }
 
 function DocumentoRow({ documento }: { documento: DocumentoResumo }) {
+  const nomeContratante = documento.cliente?.razaoSocial ?? documento.cliente?.nomeFantasia ?? "—";
   return (
     <Card className="flex items-center justify-between gap-4 p-4">
       <div className="min-w-0 flex-1">
@@ -213,6 +244,7 @@ function DocumentoRow({ documento }: { documento: DocumentoResumo }) {
         <p className="text-xs text-neutral-500 dark:text-neutral-400">
           {documento.template.titulo} · {formatarData(documento.criadoEm)}
         </p>
+        <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">Contratante: {nomeContratante}</p>
       </div>
       <Badge variant={documento.status === "FINALIZADO" ? "default" : "secondary"}>
         {STATUS_DOCUMENTO_LABEL[documento.status] ?? documento.status}

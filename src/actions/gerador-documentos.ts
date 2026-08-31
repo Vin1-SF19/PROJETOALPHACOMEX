@@ -545,6 +545,7 @@ export async function ListarDocumentosGerados() {
         finalizadoEm: true,
         template: { select: { id: true, titulo: true } },
         criadoPor: { select: { id: true, nome: true } },
+        cliente: { select: { id: true, razaoSocial: true, nomeFantasia: true } },
       },
     });
 

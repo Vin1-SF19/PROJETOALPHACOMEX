@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Search } from "lucide-react";
@@ -73,6 +72,14 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
     setClientesEncontrados([]);
   }
 
+  function handleVoltar() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(`/PainelAlpha/GeradorDocumentos/${template.id}`);
+    }
+  }
+
   function handleEmpresaCriada(empresa: EmpresaContratadaResumo) {
     setEmpresasContratadas((prev) => [...prev, empresa].sort((a, b) => a.razaoSocial.localeCompare(b.razaoSocial)));
     setEmpresaContratadaId(empresa.id);
@@ -107,10 +114,17 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 md:px-8">
-      <Link href={`/PainelAlpha/GeradorDocumentos/${template.id}`} className="mb-4 inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleVoltar}
+        aria-label="Voltar para a tela anterior"
+        className="mb-4 flex h-auto items-center gap-1.5 px-0 text-sm font-normal text-neutral-500 hover:bg-transparent hover:text-neutral-900 dark:hover:text-neutral-100"
+      >
         <ArrowLeft className="h-4 w-4" />
-        Voltar ao template
-      </Link>
+        Voltar
+      </Button>
 
       <h1 className="mb-1 text-xl font-semibold text-neutral-900 dark:text-neutral-100">Gerar documento</h1>
       <p className="mb-6 text-sm text-neutral-500 dark:text-neutral-400">A partir do template &ldquo;{template.titulo}&rdquo;</p>

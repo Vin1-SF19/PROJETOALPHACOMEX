@@ -2,6 +2,64 @@
 
 ---
 
+## [2026-08-31] — RM-2026-DC0043: Contratante + busca na listagem de documentos gerados
+
+**Tags:** #feature #frontend #testing #concluido
+**Agentes envolvidos:** Bibble, Scout, Forge, Probe, Scribe
+**Arquivos tocados:** `src/actions/gerador-documentos.ts`, `src/components/GeradorDocumentos/GeradorDocumentosClient.tsx`, `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`, `src/lib/gerador-documentos/busca.ts` (novo), `tests/gerador-documentos/busca.test.ts` (novo), `.bibble/memory/{architecture.md,integration-points.md,decisions.md,journal.md}`
+
+### Contexto
+Objetivo do Roadmap pedia exibir o nome da empresa contratante e adicionar busca por nome na tab "Documentos gerados" do Gerador de Documentos.
+
+### O que foi feito
+- Scout (Fase 0) auditou o código e confirmou que `DocumentoGerado.clienteId` já existia no schema (FK→`Cliente`, desde RM-2026-67DF34), mas `ListarDocumentosGerados` não incluía `cliente` no `select`, e nem o componente nem a listagem tinham busca — lacuna puramente de exibição/UI, sem necessidade de migration.
+- Fase 1 ampliou o `select` de `ListarDocumentosGerados` com `cliente: { id, razaoSocial, nomeFantasia }`, tipou `DocumentoResumo` de acordo, exibiu "Contratante: {nome}" em `DocumentoRow` (fallback `razaoSocial` → `nomeFantasia` → "—"), e adicionou campo de busca (Input shadcn + ícone `Search`, debounce 300ms) filtrando client-side por título ou nome do contratante. Lógica de filtro extraída para função pura testável (`filtrarDocumentosPorBusca`, `src/lib/gerador-documentos/busca.ts`).
+- Fase 2 (Probe) verificou os 8 pontos de integração (presença visual, trigger, rota protegida, permissões, persistência, estados de UI, integrações externas, ausência de regressões) — todos atendidos, ownership preservado (`where: ctx.isAdmin ? {} : { criadoPorId: userId }` inalterado).
+- Fase 3 (esta) registra a mudança na memória do projeto.
+
+### Decisões tomadas
+- Busca client-side (não server-side) e exibição de `razaoSocial`/`nomeFantasia` como contratante — ver `decisions.md`.
+
+### Problemas encontrados / resolvidos
+- Nenhum. `tsc --noEmit`/`eslint`/`npm run build` limpos (zero erro novo, confirmado via `git stash` que os erros pré-existentes já existiam antes da sessão). `tests/gerador-documentos/`: 6 novos passando; 4 falhas pré-existentes em `empresas-contratadas.test.ts` (não relacionadas, confirmadas via stash como baseline).
+
+### Resultado
+RESULT: PASS. DELIVERY_READY: `/PainelAlpha/GeradorDocumentos` (tab "Documentos gerados") — nome do contratante visível por linha + busca funcional.
+
+### Pendências manuais
+Commit, push e screenshot não foram realizados — fora do escopo autorizado desta execução (fase local, sem operações Git mutáveis).
+
+---
+
+## [2026-08-31] — RM-2026-2AB551: Botão de voltar na página de geração de contrato
+
+**Tags:** #feature #frontend #concluido
+**Agentes envolvidos:** Bibble, Scout, Probe, Scribe
+**Arquivos tocados:** `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`, `.bibble/memory/{architecture.md,integration-points.md,decisions.md,journal.md}`
+
+### Contexto
+Objetivo do Roadmap pedia botão de voltar na página de geração de contrato/documento.
+
+### O que foi feito
+- Scout (Fase 0) auditou o código e confirmou que já existia um link "Voltar ao template" funcional em `GerarDocumentoForm.tsx`, apontando para `/PainelAlpha/GeradorDocumentos/[templateId]`.
+- Fase 1 ajustou o botão existente para atender à especificação técnica da fase: trocado `Link` simples por `Button` shadcn (`variant="ghost"`, `size="sm"`), `aria-label="Voltar para a tela anterior"`, ícone `ArrowLeft` (lucide-react), handler `handleVoltar()` usando `router.back()` quando há histórico (`window.history.length > 1`) com fallback `router.push()` para a rota do template.
+- Fase 2 (Probe) verificou os 8 pontos de integração: presença visual, trigger, rota protegida, permissões, persistência de dados, estados de UI, integrações externas e ausência de regressões — todos atendidos.
+- Fase 3 (esta) registra a mudança na memória do projeto.
+
+### Decisões tomadas
+- Manter `router.back()` com fallback de rota fixa, em vez de `router.push()` direto — preserva o contexto de navegação do usuário (ver `decisions.md`).
+
+### Problemas encontrados / resolvidos
+- Nenhum. Mudança frontend isolada, sem impacto em backend, schema ou testes. `tsc --noEmit`/`eslint` limpos (zero erro novo); `vitest tests/gerador-documentos/` 105/109 (as 4 falhas são baseline pré-existente em `empresas-contratadas.test.ts`, confirmado via `git stash`/`stash pop`).
+
+### Resultado
+RESULT: PASS. DELIVERY_READY: `src/components/GeradorDocumentos/GerarDocumentoForm.tsx` — botão "Voltar" acessível na rota `/PainelAlpha/GeradorDocumentos/gerar?templateId=<id>`.
+
+### Pendências manuais
+Commit, push e screenshot não foram realizados — fora do escopo autorizado desta execução (fase local, sem operações Git mutáveis).
+
+---
+
 ## [2026-08-29 16:00] — Gerador de Documentos: Contratante/Contratada + Qualificação (Parte 1 de 2)
 
 **Tags:** #feature #database #testing #decision #concluido

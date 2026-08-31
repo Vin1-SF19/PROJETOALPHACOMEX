@@ -1,5 +1,19 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Gerador de Documentos — nome do contratante + busca na listagem de documentos gerados (RM-2026-DC0043, 2026-08-31)
+
+`DocumentoGerado.clienteId` já existia (FK→`Cliente`, desde RM-2026-67DF34) mas `ListarDocumentosGerados` (`src/actions/gerador-documentos.ts`) não incluía `cliente` no `select` — lacuna puramente de exibição, sem mudança de schema. Ampliado o `select` com `cliente: { select: { id, razaoSocial, nomeFantasia } }`.
+
+`GeradorDocumentosClient.tsx` (tab "Documentos gerados"): `DocumentoRow` agora exibe "Contratante: {nome}" (fallback `razaoSocial` → `nomeFantasia` → "—"). Adicionado campo de busca (`Input` shadcn + ícone `Search`, debounce 300ms) que filtra client-side por título OU nome do contratante — decisão consciente de manter client-side porque a listagem já carrega tudo de uma vez sem paginação (mesmo padrão observado, não server-side).
+
+**Lógica de filtro extraída para função pura testável:** `filtrarDocumentosPorBusca()` (`src/lib/gerador-documentos/busca.ts`, novo) — reaproveitada tanto no componente (via `useMemo`) quanto testada isoladamente em `tests/gerador-documentos/busca.test.ts` (6 casos: busca vazia, título, razão social, nome fantasia, documento sem cliente, sem match).
+
+**Qualidade:** `tsc --noEmit`/`eslint`/`npm run build` limpos nos arquivos tocados (confirmado via `git stash` que os erros pré-existentes em `gerador-documentos.ts:491`, `[id]/download/route.ts` e módulos de Google Calendar já existiam antes desta sessão — zero regressão). `tests/gerador-documentos/`: 4 falhas pré-existentes em `empresas-contratadas.test.ts` (não relacionadas, arquivo não tocado, confirmadas via stash) + todos os demais passando, incluindo os 6 novos.
+
+## Gerador de Documentos — botão de voltar na página de geração (RM-2026-2AB551, 2026-08-31)
+
+Página de geração de contrato ganhou botão de voltar (navegação `router.back()` com fallback para a rota do template de origem). Mudança frontend isolada, sem impacto em backend, schema ou testes. Scout já havia confirmado a existência de um link "voltar" funcional; o ajuste desta sessão foi só de forma — trocado por `Button` shadcn com `aria-label` e lógica `router.back()`/fallback baseada em `window.history.length`, preservando o destino correto (`/PainelAlpha/GeradorDocumentos/[templateId]`).
+
 ## Gerador de Documentos — Contratante/Contratada + Qualificação (2026-08-29, Parte 1 de 2)
 
 Evolução pós-upload-de-template: usuário pediu 4 coisas no mesmo pedido — nenhuma era bug, todas eram feature nova (o módulo antes só lidava com variáveis soltas, zero noção de cliente/empresa). Esta Parte 1 cobre 3 dos 4 itens; **geração de PDF real fica para a Parte 2** (mesma sessão, ainda não implementada nesta entrada).

@@ -50,6 +50,7 @@ describe("CRM - formulário unificado por etapa", () => {
     expect(modal).toContain("<PainelProximaEtapa");
   });
 
+
   it("remove o bloco Tentando contato do painel esquerdo", () => {
     expect(historico).not.toContain("Tentando contato");
   });

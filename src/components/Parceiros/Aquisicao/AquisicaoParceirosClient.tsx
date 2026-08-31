@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut, Pencil, Target } from "lucide-react";
 import {
   DndContext, type DragEndEvent, DragOverlay, type DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCorners, useDroppable,
@@ -22,11 +22,10 @@ import {
   ListarLeadsAquisicaoParceiros,
 } from "@/actions/parceiros-aquisicao";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
-import NovoLeadCompleto from "@/components/Parceiros/Aquisicao/NovoLeadCompleto";
+import NovoLeadCompleto, { type LeadEdicao } from "@/components/Parceiros/Aquisicao/NovoLeadCompleto";
 import { cn } from "@/lib/utils";
 
 type Permissao = { isAdmin: boolean; podeEditar: boolean; podeExcluir: boolean; podeAprovar: boolean };
@@ -113,6 +112,16 @@ function BadgeProximaAcao({ proximaAcaoEm }: { proximaAcaoEm: Date | string }) {
   );
 }
 
+function prioridadeFollowUp(lead: Lead): { label: string; detail: string; className: string } {
+  const potencial = lead.potencialRecorrencia ?? 0;
+  if (!lead.proximaAcaoEm) return { label: "URGENTE", detail: "Sem próxima ação definida", className: "text-red-200 bg-red-500/15 border-red-500/30" };
+  const urgencia = calcularUrgenciaProximaAcao(lead.proximaAcaoEm);
+  if (urgencia === "ATRASADO") return { label: "ALTA", detail: `Ação vencida · potencial ${potencial}/5`, className: "text-red-200 bg-red-500/15 border-red-500/30" };
+  if (potencial >= 4) return { label: "ALTA", detail: `Potencial ${potencial}/5`, className: "text-amber-200 bg-amber-500/15 border-amber-500/30" };
+  if (potencial >= 3) return { label: "MÉDIA", detail: `Potencial ${potencial}/5`, className: "text-sky-200 bg-sky-500/15 border-sky-500/30" };
+  return { label: "NORMAL", detail: "Acompanhamento em dia", className: "text-emerald-200 bg-emerald-500/15 border-emerald-500/30" };
+}
+
 /** Card individual do lead — arrastável (dnd-kit `useSortable`), mesmo padrão do
  * BlueprintProjectCard.tsx. */
 function LeadCard({ lead, cor, onAbrirLead }: { lead: Lead; cor: string; onAbrirLead: (lead: Lead) => void }) {
@@ -131,13 +140,16 @@ function LeadCard({ lead, cor, onAbrirLead }: { lead: Lead; cor: string; onAbrir
       aria-label={`Abrir lead ${lead.nome}`}
     >
       <GradientBlobCard accent={cor} className="hover:brightness-110 transition-[filter]">
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-start gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-xs font-black text-slate-200">
               {inicial}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold leading-tight text-slate-100 truncate">{lead.nome}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold leading-tight text-slate-100 truncate">{lead.nomeFantasia || lead.nome}</p>
+                <span className="shrink-0 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-300">{lead.status === "NOVO_LEAD" ? "NOVO" : lead.status.replaceAll("_", " ")}</span>
+              </div>
               <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
                 {lead.segmento && <span className="flex items-center gap-1"><Building2 size={10} /> {lead.segmento}</span>}
                 {lead.uf && <span className="flex items-center gap-1"><MapPin size={10} /> {lead.uf}</span>}
@@ -145,9 +157,20 @@ function LeadCard({ lead, cor, onAbrirLead }: { lead: Lead; cor: string; onAbrir
             </div>
           </div>
 
+          <div className="grid grid-cols-3 gap-1.5 border-y border-white/[0.06] py-2 text-center">
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Indicações</p><p className="text-sm font-black text-slate-200">0</p></div>
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Contratos</p><p className="text-sm font-black text-slate-200">0</p></div>
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Conversão</p><p className="text-sm font-black text-slate-200">—</p></div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500"><Target size={11} /> Recorrência <PotencialBadge valor={lead.potencialRecorrencia} /></div>
+            {lead.proximaAcaoEm ? <BadgeProximaAcao proximaAcaoEm={lead.proximaAcaoEm} /> : <span className="text-[9px] font-bold text-red-300">Sem próxima ação</span>}
+          </div>
+
           <div className="flex items-center justify-between border-t border-white/[0.06] pt-2">
-            <PotencialBadge valor={lead.potencialRecorrencia} />
-            {lead.proximaAcaoEm && <BadgeProximaAcao proximaAcaoEm={lead.proximaAcaoEm} />}
+            {(() => { const p = prioridadeFollowUp(lead); return <span className={cn("rounded-md border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider", p.className)} title={p.detail}>Follow-up {p.label}</span>; })()}
+            <span className="text-[9px] text-slate-600">{lead.origem || "Origem não informada"}</span>
           </div>
 
           {lead.responsavel && (
@@ -562,6 +585,11 @@ function LeadDetalheDialog({
   }
 
   const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
+  const etapaAtual = ETAPAS.findIndex((e) => e.status === lead.status);
+  const etapasPassadas = ETAPAS.slice(0, Math.max(0, etapaAtual));
+  const etapasFuturas = ETAPAS.slice(Math.max(0, etapaAtual + 1));
+  const prioridade = prioridadeFollowUp(lead);
+  const diasSemIndicacao = "Sem indicação registrada";
 
   return (
     <>
@@ -622,7 +650,24 @@ function LeadDetalheDialog({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-4 px-6 sm:px-8 pb-8 max-w-2xl">
+        <div className="flex-1 w-full max-w-none overflow-y-auto space-y-4 px-6 sm:px-8 pb-8">
+          <section className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="grid w-full gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
+              <div className="min-w-0 border-b border-white/[0.08] pb-4 lg:border-b-0 lg:border-r lg:pr-5">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">Passado</p>
+                <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-slate-500">Etapas percorridas</p>
+                <p className="mt-1 text-xs leading-5 text-slate-300">{etapasPassadas.length ? etapasPassadas.map((e) => e.label).join(" → ") : "Início do funil"}</p>
+                <p className="mt-5 text-[9px] font-black uppercase tracking-wider text-slate-500">Última indicação</p>
+                <p className="mt-1 text-xs font-bold text-slate-200">{diasSemIndicacao}</p>
+              </div>
+              <div className="min-w-0 border-b border-white/[0.08] px-0 py-4 lg:border-b-0 lg:border-r lg:px-5">
+                <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">Presente</p><p className="mt-2 text-lg font-black text-white">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</p><p className="text-[11px] text-slate-400">{lead.responsavel?.nome || "Responsável não definido"}</p></div><span className={cn("rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wider", prioridade.className)}>Follow-up {prioridade.label}</span></div>
+                <div className="mt-5 grid grid-cols-2 gap-3"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Segmento</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.segmento || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Origem</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.origem || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Cidade/UF</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.cidade ? `${lead.cidade}${lead.uf ? `/${lead.uf}` : ""}` : "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Próxima ação</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.proximaAcaoEm ? new Date(lead.proximaAcaoEm).toLocaleDateString("pt-BR") : "Não definida"}</p></div></div>
+                <div className="mt-4 grid grid-cols-3 gap-2 border-y border-white/[0.07] py-3 text-center"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Indicações</p><p className="text-xl font-black text-white">0</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Contratos</p><p className="text-xl font-black text-white">0</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Conversão</p><p className="text-xl font-black text-white">—</p></div></div>
+              </div>
+              <div className="min-w-0 pt-4 lg:pl-5 lg:pt-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-300">Futuro</p><p className="mt-2 text-[10px] font-black uppercase tracking-wider text-slate-500">Etapas disponíveis</p><p className="mt-1 text-xs leading-5 text-slate-300">{etapasFuturas.length ? etapasFuturas.map((e) => e.label).join(" → ") : "Última etapa"}</p><p className="mt-5 text-[9px] font-black uppercase tracking-wider text-slate-500">Potencial de recorrência</p><div className="mt-2 flex gap-1">{[0,1,2,3,4,5].map((n) => <span key={n} className={cn("h-1.5 flex-1 rounded-full", n <= (lead.potencialRecorrencia ?? 0) ? "bg-amber-400" : "bg-white/10")} />)}</div><p className="mt-1 text-right text-xs font-black text-amber-300">{lead.potencialRecorrencia ?? 0}/5</p></div>
+            </div>
+          </section>
           {podeEditar && (
             <>
               <section className="space-y-2">
@@ -694,12 +739,12 @@ function LeadDetalheDialog({
     </Sheet>
 
     {editarCadastroAberto && (
-      <EditarLeadDialog
-        lead={lead}
+      <NovoLeadCompleto
+        initialLead={lead as LeadEdicao}
         accent={accent}
         responsaveis={responsaveis}
         onClose={() => setEditarCadastroAberto(false)}
-        onSalvo={() => {
+        onCriado={() => {
           setEditarCadastroAberto(false);
           onAtualizado();
         }}
@@ -760,12 +805,14 @@ function EditarLeadDialog({
   const inputStyle = { background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` };
 
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md bg-[#0a1020] border-white/10">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-slate-100"><Pencil size={15} /> Editar cadastro do lead</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2.5">
+    <Sheet open onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="bottom" className="h-[88vh] max-h-[88vh] rounded-t-[2rem] border-t border-white/10 bg-[#020617] p-0 overflow-hidden" style={{ ["--accent-rgb" as string]: accent }}>
+        <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-white/15" /></div>
+        <div className="px-6 sm:px-8 pt-3 pb-5 border-b border-white/10">
+          <SheetTitle className="flex items-center gap-2 text-xl font-black text-white"><Pencil size={16} /> Editar parceiro</SheetTitle>
+          <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Atualize os dados exibidos no card de aquisição</p>
+        </div>
+        <div className="max-w-2xl mx-auto overflow-y-auto px-6 sm:px-8 py-5 space-y-2.5">
           <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome *" className={inputCls} style={inputStyle} />
           <div className="grid grid-cols-2 gap-2">
             <Select value={tipo} onValueChange={(v) => setTipo(v as "PF" | "PJ")}>
@@ -803,7 +850,7 @@ function EditarLeadDialog({
             {salvando ? "Salvando..." : "Salvar alterações"}
           </button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

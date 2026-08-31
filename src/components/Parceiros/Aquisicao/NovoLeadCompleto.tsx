@@ -13,11 +13,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CriarLeadCompletoAquisicao } from "@/actions/parceiros-aquisicao";
+import { CriarLeadCompletoAquisicao, AtualizarLeadCompletoAquisicao } from "@/actions/parceiros-aquisicao";
 import ModalEndereco, { type EnderecoData } from "@/components/Parceiros/ModalEndereco";
 
 type Responsavel = { id: number; nome: string };
 type Resp = { nome: string; cpf: string; dataNascimento: string; cargo: string; whatsapp: string };
+export type LeadEdicao = {
+  id: string; tipo: string | null; documento: string | null; nome: string; nomeFantasia?: string | null;
+  dataNascimento?: string | null; email: string | null; telefone: string | null; segmento: string | null;
+  origem: string | null; cidade: string | null; uf: string | null; tipoParceiro?: string | null;
+  chavePix?: string | null; tipoChavePix?: string | null; nomeBanco?: string | null; agencia?: string | null;
+  conta?: string | null; comissaoPercentual?: number | null; dadosConsulta?: string | null;
+  responsavelId: number | null; cep?: string | null; logradouro?: string | null; numero?: string | null;
+  complemento?: string | null; bairro?: string | null; responsaveisJson?: string | null;
+};
 
 const respVazio = (): Resp => ({ nome: "", cpf: "", dataNascimento: "", cargo: "", whatsapp: "" });
 
@@ -53,42 +62,49 @@ export default function NovoLeadCompleto({
   responsaveis,
   onClose,
   onCriado,
+  initialLead,
 }: {
   accent: string;
   responsaveis: Responsavel[];
   onClose: () => void;
   onCriado: () => void;
+  initialLead?: LeadEdicao;
 }) {
-  const [tipo, setTipo] = useState<"PF" | "PJ">("PJ");
-  const [documento, setDocumento] = useState("");
-  const [dataNascPF, setDataNascPF] = useState("");
+  const editando = Boolean(initialLead);
+  const [tipo, setTipo] = useState<"PF" | "PJ">((initialLead?.tipo as "PF" | "PJ") || "PJ");
+  const [documento, setDocumento] = useState(initialLead?.documento ?? "");
+  const [dataNascPF, setDataNascPF] = useState(initialLead?.dataNascimento ?? "");
   const [consultando, setConsultando] = useState(false);
   const [consultaDone, setConsultaDone] = useState(false);
   const [consultaErro, setConsultaErro] = useState("");
 
-  const [tipoParceiro, setTipoParceiro] = useState<"PADRAO" | "SEM_COMISSAO" | "ESPECIAL">("PADRAO");
-  const [comissaoFixaOpcao, setComissaoFixaOpcao] = useState<string>("5");
+  const [tipoParceiro, setTipoParceiro] = useState<"PADRAO" | "SEM_COMISSAO" | "ESPECIAL">((initialLead?.tipoParceiro as "PADRAO" | "SEM_COMISSAO" | "ESPECIAL") || "PADRAO");
+  const [comissaoFixaOpcao, setComissaoFixaOpcao] = useState<string>(initialLead?.comissaoPercentual != null ? String(initialLead.comissaoPercentual) : "5");
   const [comissaoFixaOutro, setComissaoFixaOutro] = useState("");
 
-  const [nome, setNome] = useState("");
-  const [nomeFantasia, setNomeFantasia] = useState("");
-  const [email, setEmail] = useState("");
-  const [whatsappPF, setWhatsappPF] = useState("");
-  const [chavePix, setChavePix] = useState("");
-  const [tipoChavePix, setTipoChavePix] = useState("");
-  const [nomeBanco, setNomeBanco] = useState("");
-  const [agencia, setAgencia] = useState("");
-  const [conta, setConta] = useState("");
-  const [dadosConsultaBrutos, setDadosConsultaBrutos] = useState("");
-  const [segmento, setSegmento] = useState("");
-  const [origem, setOrigem] = useState("");
+  const [nome, setNome] = useState(initialLead?.nome ?? "");
+  const [nomeFantasia, setNomeFantasia] = useState(initialLead?.nomeFantasia ?? "");
+  const [email, setEmail] = useState(initialLead?.email ?? "");
+  const [whatsappPF, setWhatsappPF] = useState(initialLead?.telefone ?? "");
+  const [chavePix, setChavePix] = useState(initialLead?.chavePix ?? "");
+  const [tipoChavePix, setTipoChavePix] = useState(initialLead?.tipoChavePix ?? "");
+  const [nomeBanco, setNomeBanco] = useState(initialLead?.nomeBanco ?? "");
+  const [agencia, setAgencia] = useState(initialLead?.agencia ?? "");
+  const [conta, setConta] = useState(initialLead?.conta ?? "");
+  const [dadosConsultaBrutos, setDadosConsultaBrutos] = useState(initialLead?.dadosConsulta ?? "");
+  const [segmento, setSegmento] = useState(initialLead?.segmento ?? "");
+  const [origem, setOrigem] = useState(initialLead?.origem ?? "");
   const [responsavelId, setResponsavelId] = useState<string>(() => {
+    if (initialLead?.responsavelId) return String(initialLead.responsavelId);
     const padrao = responsaveis.find((r) => r.nome.toUpperCase().includes("DANILO SILVA GOMES"));
     return padrao ? String(padrao.id) : "";
   });
 
   // Responsáveis físicos (vários) — em "gaveta": só um aberto por vez
-  const [respsFisicos, setRespsFisicos] = useState<Resp[]>([respVazio()]);
+  const [respsFisicos, setRespsFisicos] = useState<Resp[]>(() => {
+    if (!initialLead?.responsaveisJson) return [respVazio()];
+    try { return (JSON.parse(initialLead.responsaveisJson) as Array<{nome:string;cpf?:string;dataNascimento?:string;cargo?:string;telefone?:string}>).map(r => ({ nome:r.nome ?? "", cpf:r.cpf ?? "", dataNascimento:r.dataNascimento ?? "", cargo:r.cargo ?? "", whatsapp:r.telefone ?? "" })) || [respVazio()]; } catch { return [respVazio()]; }
+  });
   const [respAbertoIdx, setRespAbertoIdx] = useState<number>(0);
 
   const respCompleto = (r: Resp) => r.nome.trim().length >= 2;
@@ -103,7 +119,7 @@ export default function NovoLeadCompleto({
     setRespAbertoIdx(-1);
   };
 
-  const [endereco, setEndereco] = useState<EnderecoData | null>(null);
+  const [endereco, setEndereco] = useState<EnderecoData | null>(() => initialLead?.logradouro ? ({ cep: initialLead.cep ?? "", logradouro: initialLead.logradouro, numero: initialLead.numero ?? "", complemento: initialLead.complemento ?? "", bairro: initialLead.bairro ?? "", cidade: initialLead.cidade ?? "", uf: initialLead.uf ?? "" } as EnderecoData) : null);
   const [modalEnderecoOpen, setModalEnderecoOpen] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
@@ -173,7 +189,7 @@ export default function NovoLeadCompleto({
 
     setSalvando(true);
     try {
-      const result = await CriarLeadCompletoAquisicao({
+      const payload = {
         tipo,
         tipoParceiro,
         documento: documento ? documento.replace(/\D/g, "") : undefined,
@@ -202,13 +218,16 @@ export default function NovoLeadCompleto({
               telefone: r.whatsapp.trim() || undefined,
             }))
           : undefined,
-      });
+      };
+      const result = editando && initialLead
+        ? await AtualizarLeadCompletoAquisicao({ ...payload, leadId: initialLead.id })
+        : await CriarLeadCompletoAquisicao(payload);
 
       if (!result.success) {
         toast.error(result.error ?? "Erro ao cadastrar lead");
         return;
       }
-      toast.success("Lead cadastrado no funil de Aquisição");
+      toast.success(editando ? "Lead atualizado no funil de Aquisição" : "Lead cadastrado no funil de Aquisição");
       onCriado();
     } finally {
       setSalvando(false);
@@ -226,9 +245,9 @@ export default function NovoLeadCompleto({
         <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto bg-[#0a1020] border-white/10 p-0">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle className="text-xl font-black uppercase italic tracking-tight text-white">
-              Novo <span style={{ color: `rgba(${accent}, 1)` }}>Lead</span>
+              {editando ? "Editar " : "Novo "}<span style={{ color: `rgba(${accent}, 1)` }}>Lead</span>
             </DialogTitle>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Mesmo cadastro do Parceiro — entra no funil de Aquisição</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Cadastro completo do Parceiro — {editando ? "edite os dados deste lead" : "entra no funil de Aquisição"}</p>
           </DialogHeader>
 
           <div className="px-6 pb-6 space-y-4">
@@ -488,7 +507,7 @@ export default function NovoLeadCompleto({
               <Button type="button" onClick={handleSalvar} disabled={salvando}
                 className="flex-1 h-12 font-black uppercase tracking-widest text-xs rounded-2xl gap-2 disabled:opacity-40 text-white" style={{ background: `rgba(${accent}, 1)` }}>
                 {salvando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                {salvando ? "Cadastrando..." : "Cadastrar Lead"}
+                {salvando ? "Salvando..." : editando ? "Salvar alterações" : "Cadastrar Lead"}
               </Button>
             </div>
           </div>

@@ -50,6 +50,7 @@ export function PainelCamposEtapaAtual({
   );
   const [camposEtapaBase, setCamposEtapaBase] = useState(card.camposEtapa);
   const [versaoBaseCampos, setVersaoBaseCampos] = useState(() => new Date(card.updatedAt).toISOString());
+  const versaoBaseCamposRef = useRef(versaoBaseCampos);
   const snapshotAtivoRef = useRef<SnapshotCamposRealtime>({
     valores: Object.fromEntries(card.camposEtapa.map((campo) => [campo.id, campo.valor ?? ""])),
     versao: new Date(card.updatedAt).toISOString(),
@@ -102,6 +103,7 @@ export function PainelCamposEtapaAtual({
       setValoresCamposAtuais(resolucao.snapshotAtivo.valores);
       setBaseCamposAtuais(resolucao.snapshotAtivo.valores);
       setVersaoBaseCampos(resolucao.snapshotAtivo.versao);
+      versaoBaseCamposRef.current = resolucao.snapshotAtivo.versao;
       setCamposEtapaBase(camposRemotos);
       setSnapshotRemotoPendente(null);
       setCamposRemotosPendentes(null);
@@ -115,6 +117,7 @@ export function PainelCamposEtapaAtual({
     setValoresCamposAtuais(snapshotRemotoPendente.valores);
     setBaseCamposAtuais(snapshotRemotoPendente.valores);
     setVersaoBaseCampos(snapshotRemotoPendente.versao);
+    versaoBaseCamposRef.current = snapshotRemotoPendente.versao;
     snapshotAtivoRef.current = snapshotRemotoPendente;
     setCamposEtapaBase(camposRemotosPendentes);
     setSnapshotRemotoPendente(null);
@@ -131,28 +134,37 @@ export function PainelCamposEtapaAtual({
     }
     const camposValores = montarPayloadCamposDestino(camposAtuaisVisiveis, valoresCamposAtuais);
     setSalvandoCamposAtuais(true);
-    const promise = AtualizarCardBpm({
-      cardId: card.id,
-      camposValores,
-      versaoEsperadaEm: versaoBaseCampos,
-    }).then(async (resultado) => {
+    const promise = registerSave(async () => {
+      const resultado = await AtualizarCardBpm({
+        cardId: card.id,
+        camposValores,
+        versaoEsperadaEm: versaoBaseCamposRef.current,
+      });
       if (!resultado.success) {
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar os campos da etapa");
-        return;
+        return false;
       }
+      const cardAtualizado = await ObterCardBpm(card.id);
+      if (!cardAtualizado.success || !cardAtualizado.data) {
+        toast.error("Os campos foram salvos, mas não foi possível confirmar a versão atual do card.");
+        return false;
+      }
+      const novaVersao = new Date(cardAtualizado.data.updatedAt).toISOString();
       toast.success("Campos da etapa atualizados");
       setBaseCamposAtuais((atual) => ({ ...atual, ...camposValores }));
       snapshotAtivoRef.current = {
         valores: { ...snapshotAtivoRef.current.valores, ...camposValores },
-        versao: versaoBaseCampos,
+        versao: novaVersao,
       };
+      versaoBaseCamposRef.current = novaVersao;
+      setVersaoBaseCampos(novaVersao);
       camposAtuaisSujosRef.current = false;
       setConflitoCamposAtuais(false);
       onAtualizado();
+      return true;
     }).finally(() => {
       setSalvandoCamposAtuais(false);
     });
-    registerSave(promise);
     await promise;
   }
 

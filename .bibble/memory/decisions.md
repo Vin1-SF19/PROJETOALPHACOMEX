@@ -1,5 +1,23 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-08-31 — RM-2026-DC0043 — Busca client-side e exibição de `razaoSocial`/`nomeFantasia` como contratante
+
+**Contexto:** listagem de "Documentos gerados" precisava exibir o nome da empresa contratante e permitir busca por nome.
+
+**Decisão 1 — busca client-side, não server-side:** `ListarDocumentosGerados` já carrega toda a listagem de uma vez, sem paginação (padrão pré-existente do módulo). Adicionar filtro server-side exigiria parâmetro novo na action e uma query adicional sem ganho real, já que os dados já estão no client. Reaproveitado o mesmo padrão de `ParceirosClient.tsx` (input com debounce 300ms + filtro em memória).
+
+**Decisão 2 — exibir `razaoSocial` com fallback `nomeFantasia`, não um campo único "nome":** `Cliente` não tem coluna `nome` — tem `razaoSocial` (obrigatório) e `nomeFantasia` (opcional). Optou-se por `razaoSocial ?? nomeFantasia ?? "—"` para nunca exibir célula vazia quando há cliente vinculado, mantendo o nome legal como fonte primária de identificação do contratante.
+
+**Decisão 3 — filtro case-insensitive via `.toLowerCase()` em ambos os lados:** por ser client-side (não é uma query Prisma), o padrão `contains`/`mode: "insensitive"` do banco não se aplica; a normalização manual replica o mesmo comportamento esperado (busca insensível a maiúsculas/minúsculas).
+
+**Validação:** `tsc --noEmit`/`eslint`/`npm run build` limpos; 6 testes novos em `tests/gerador-documentos/busca.test.ts`.
+
+### 2026-08-31 — RM-2026-2AB551 — Botão de voltar usa `router.back()` com fallback, não `router.push()` fixo
+
+**Contexto:** botão de voltar na página de geração de documento (`GerarDocumentoForm.tsx`) precisava de uma estratégia de navegação.
+
+**Decisão:** usar `router.back()` (quando há histórico de navegação, `window.history.length > 1`) com fallback `router.push()` para a rota fixa do template de origem, em vez de sempre forçar `router.push()` direto. Preserva o contexto de navegação do usuário — por exemplo, se o usuário chegou à página de geração a partir de uma busca filtrada de templates, o botão volta para essa busca filtrada em vez de sempre cair na tela "crua" do template.
+
 ### 2026-08-28 — RM-2026-999766 — Gerador de Documentos: desarquivamento manual + link de conferência autenticado (não-público)
 
 **Contexto:** usuário pediu para desenvolver um item do Roadmap Alpha que estava `ARCHIVED`. Descoberto que o sistema não tem função de "desarquivar" — `retireRoadmapObjective` é operação terminal, todas as funções de mutação de objetivo rejeitam `archivedAt != null`. Reproduzido o mesmo bug de truncamento (`TRUNCATED_MODEL_RESPONSE`) já catalogado em `known-errors.md` ao tentar reprocessar via worker automático — forte indício de que foi essa a causa do arquivamento original, não uma decisão de produto.

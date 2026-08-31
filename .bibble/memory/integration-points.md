@@ -1,5 +1,15 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Contratante + busca na listagem de documentos gerados (RM-2026-DC0043, 2026-08-31)
+
+Ponto de integração: `ListarDocumentosGerados` (`src/actions/gerador-documentos.ts`) é a única fonte de dados da tab "Documentos gerados" (`GeradorDocumentosClient.tsx`) — carrega tudo de uma vez (sem paginação), então qualquer campo novo de exibição/filtro precisa entrar no `select` dessa action, nunca em uma query separada.
+
+**Padrão de busca client-side com debounce (reaproveitável):** lógica de filtro extraída para função pura em `src/lib/gerador-documentos/busca.ts` (`filtrarDocumentosPorBusca`), aplicada via `useMemo` no componente sobre o estado já carregado — mesmo padrão de "carregar tudo + filtrar no client com `Input` shadcn + debounce 300ms" já usado em outras listagens do projeto (ex. `ParceirosClient.tsx`). Extrair o filtro para uma função pura testável (em vez de inline no componente) é o padrão preferido quando a lógica de match cobre mais de um campo (aqui: título OU nome do contratante).
+
+## Botão Voltar na página de geração de documento (RM-2026-2AB551, 2026-08-31)
+
+Botão Voltar na rota `/PainelAlpha/GeradorDocumentos/gerar?templateId=<id>` (`GerarDocumentoForm.tsx`) → tela anterior do fluxo (`/PainelAlpha/GeradorDocumentos/[templateId]`, detalhe do template com CRUD de cláusulas/variáveis). Navegação client-side via `router.back()` com fallback `router.push()`; ambas as rotas de origem e destino compartilham a mesma proteção (`auth()` + permissão `geradorDocumentos`).
+
 ## Módulo com iframe de sistema externo protegido por token (2026-08-28)
 
 Padrão confirmado com o módulo `ChatBot Alpha` (`src/actions/ChatBotAlpha.ts`, `src/app/PainelAlpha/ChatBotAlpha/`, `src/components/ChatBotAlpha/`): sempre que um módulo embute um sistema externo via iframe e a URL exige token/segredo:

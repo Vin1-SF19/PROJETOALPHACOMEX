@@ -3,26 +3,35 @@
 import { createContext, useCallback, useContext, useRef, type ReactNode } from "react";
 
 interface CardSaveContextValue {
-  /** Registra uma Promise de save para que o flush possa aguardá-la. */
-  registerSave: (promise: Promise<void>) => void;
-  /** Aguarda o save pendente (se houver) antes de prosseguir. */
-  flushSaves: () => Promise<void>;
+  /** Enfileira um save para preservar a ordem e a versão-base do card. */
+  registerSave: (save: () => Promise<boolean>) => Promise<boolean>;
+  /** Aguarda todos os saves e informa se a persistência foi concluída. */
+  flushSaves: () => Promise<boolean>;
 }
 
 const CardSaveContext = createContext<CardSaveContextValue | null>(null);
 
 export function CardSaveProvider({ children }: { children: ReactNode }) {
-  const savePromiseRef = useRef<Promise<void> | null>(null);
+  const savePromiseRef = useRef<Promise<boolean>>(Promise.resolve(true));
 
-  const registerSave = useCallback((promise: Promise<void>) => {
+  const registerSave = useCallback((save: () => Promise<boolean>) => {
+    const promise = savePromiseRef.current
+      .then(async (savesAnterioresConcluidos) => {
+        const saveAtualConcluido = await save();
+        return savesAnterioresConcluidos && saveAtualConcluido;
+      })
+      .catch(() => false);
     savePromiseRef.current = promise;
+    return promise;
   }, []);
 
   const flushSaves = useCallback(async () => {
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
-      savePromiseRef.current = null;
+    const savesPendentes = savePromiseRef.current;
+    const savesConcluidos = await savesPendentes;
+    if (savePromiseRef.current === savesPendentes) {
+      savePromiseRef.current = Promise.resolve(true);
     }
+    return savesConcluidos;
   }, []);
 
   return (

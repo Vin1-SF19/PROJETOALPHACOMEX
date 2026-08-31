@@ -1,7 +1,8 @@
 "use client";
 
 import { toast } from "sonner";
-import { ArrowRight, Check } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm } from "@/actions/bpm/Cards";
 import { useCardSave } from "./CardSaveContext";
 import {
@@ -25,16 +26,26 @@ interface Props {
 
 export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accent, onMovido }: Props) {
   const { flushSaves } = useCardSave();
+  const [movendoEtapa, setMovendoEtapa] = useState(false);
   const aguardandoDataHora = etapaEhAgendarReuniao(card.etapa.nome) && !card.dataReuniao;
   const aguardandoTranscricao = etapaEhReuniaoAgendada(card.etapa.nome)
     && !card.transcricaoReuniao?.trim();
 
   async function handleMover(etapaDestinoId: string) {
-    if (etapaDestinoId === card.etapa.id) return;
-    await flushSaves();
-    const res = await MoverCardBpm({ cardId: card.id, etapaDestinoId });
-    if (res.success) { toast.success("Card movido"); onMovido(); }
-    else toast.error(typeof res.error === "string" ? res.error : "Não foi possível mover o card");
+    if (etapaDestinoId === card.etapa.id || movendoEtapa) return;
+    setMovendoEtapa(true);
+    try {
+      const savesConcluidos = await flushSaves();
+      if (!savesConcluidos) {
+        toast.error("Não foi possível salvar os campos. O card não foi movido.");
+        return;
+      }
+      const res = await MoverCardBpm({ cardId: card.id, etapaDestinoId });
+      if (res.success) { toast.success("Card movido"); onMovido(); }
+      else toast.error(typeof res.error === "string" ? res.error : "Não foi possível mover o card");
+    } finally {
+      setMovendoEtapa(false);
+    }
   }
 
   return (
@@ -61,7 +72,8 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
           <button
             key={etapa.id}
             onClick={() => handleMover(etapa.id)}
-            disabled={!podeMoverEtapa || bloqueadaPorDataHora || bloqueadaPorTranscricao}
+            disabled={movendoEtapa || !podeMoverEtapa || bloqueadaPorDataHora || bloqueadaPorTranscricao}
+            aria-busy={movendoEtapa}
             title={motivoBloqueio}
             className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 not-disabled:hover:bg-white/[0.07]"
             style={
@@ -80,7 +92,11 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
             }
           >
             <span className="whitespace-nowrap">{etapa.nome}</span>
-            {ativa ? <Check size={15} className="shrink-0" /> : <ArrowRight size={14} className="shrink-0 opacity-50" />}
+            {movendoEtapa && !ativa
+              ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden="true" />
+              : ativa
+                ? <Check size={15} className="shrink-0" />
+                : <ArrowRight size={14} className="shrink-0 opacity-50" />}
           </button>
         );
       })}

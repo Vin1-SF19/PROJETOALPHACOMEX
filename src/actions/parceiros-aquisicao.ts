@@ -45,11 +45,13 @@ function podeMoverPara(statusAtual: string, statusDestino: string): boolean {
   // De uma saída lateral, pode retomar para qualquer etapa ativa (reingresso manual).
   if ((SAIDAS_LATERAIS as readonly string[]).includes(statusAtual)) return true;
 
-  // Entre etapas ativas: avança 1 posição ou corrige para qualquer etapa anterior.
+  // Drag-and-drop permite escolher qualquer etapa ativa. A validação de
+  // negócio continua impedindo CADASTRADO (promoção explícita), mas não deve
+  // bloquear o usuário ao reorganizar um card no funil.
   const idxAtual = ETAPAS_ATIVAS.indexOf(statusAtual as EtapaAtiva);
   const idxDestino = ETAPAS_ATIVAS.indexOf(statusDestino as EtapaAtiva);
   if (idxAtual === -1 || idxDestino === -1) return false;
-  return idxDestino === idxAtual + 1 || idxDestino < idxAtual;
+  return idxDestino !== idxAtual;
 }
 
 async function registrarHistoricoLead(
@@ -166,8 +168,9 @@ export async function CriarLeadCompletoAquisicao(input: z.input<typeof CriarLead
 
   const respValidos = (d.responsaveis ?? []).filter((r) => r.nome.trim());
 
-  const lead = await db.parceiroLead.create({
-    data: {
+  try {
+    const lead = await db.parceiroLead.create({
+      data: {
       nome: d.nome,
       tipo: d.tipo,
       tipoParceiro: d.tipoParceiro ?? null,
@@ -194,11 +197,56 @@ export async function CriarLeadCompletoAquisicao(input: z.input<typeof CriarLead
       cidade: d.endereco?.cidade || null,
       uf: d.endereco?.uf?.toUpperCase() || null,
       responsaveisJson: respValidos.length > 0 ? JSON.stringify(respValidos) : null,
-    },
-  });
-  await registrarHistoricoLead(lead.id, "LEAD_CRIADO_COMPLETO", null, JSON.stringify({ status: lead.status }), ctx.userId);
-  revalidatePath("/PainelAlpha/Parceiros/Aquisicao");
-  return { success: true as const, leadId: lead.id };
+      },
+    });
+    await registrarHistoricoLead(lead.id, "LEAD_CRIADO_COMPLETO", null, JSON.stringify({ status: lead.status }), ctx.userId);
+    revalidatePath("/PainelAlpha/Parceiros/Aquisicao");
+    return { success: true as const, leadId: lead.id };
+  } catch (error) {
+    console.error("[parceiros-aquisicao] erro ao criar lead completo", error);
+    return { success: false as const, error: "Não foi possível cadastrar o novo lead. Verifique os dados e tente novamente." };
+  }
+}
+
+const AtualizarLeadCompletoSchema = CriarLeadCompletoSchema.extend({ leadId: z.string().cuid() });
+
+/** Atualiza o mesmo conjunto de campos do formulário Novo Lead, sem perder os
+ * dados de cadastro completo ao editar um card existente. */
+export async function AtualizarLeadCompletoAquisicao(input: z.input<typeof AtualizarLeadCompletoSchema>) {
+  const ctx = await getCtx();
+  if (!ctx || (!ctx.isAdmin && !ctx.podeEditar)) return { success: false as const, error: "Sem permissão" };
+  const parsed = AtualizarLeadCompletoSchema.safeParse(input);
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  const { leadId, ...d } = parsed.data;
+  const antes = await db.parceiroLead.findUnique({ where: { id: leadId } });
+  if (!antes) return { success: false as const, error: "Lead não encontrado" };
+  const responsaveis = (d.responsaveis ?? []).filter((r) => r.nome.trim());
+  try {
+    await db.$transaction([
+      db.parceiroLead.update({ where: { id: leadId }, data: {
+        nome: d.nome, tipo: d.tipo, tipoParceiro: d.tipoParceiro ?? null,
+        documento: d.documento?.replace(/\D/g, "") || null, nomeFantasia: d.nomeFantasia || null,
+        dataNascimento: d.dataNascimento || null, email: d.email || null, telefone: d.telefone || null,
+        chavePix: d.chavePix || null, tipoChavePix: d.tipoChavePix || null, nomeBanco: d.nomeBanco || null,
+        agencia: d.agencia || null, conta: d.conta || null, comissaoPercentual: d.comissaoPercentual ?? null,
+        dadosConsulta: d.dadosConsulta || null, segmento: d.segmento || null, origem: d.origem || null,
+        responsavelId: d.responsavelId ?? null, cep: d.endereco?.cep.replace(/\D/g, "") || null,
+        logradouro: d.endereco?.logradouro || null, numero: d.endereco?.numero || null,
+        complemento: d.endereco?.complemento || null, bairro: d.endereco?.bairro || null,
+        cidade: d.endereco?.cidade || null, uf: d.endereco?.uf?.toUpperCase() || null,
+        responsaveisJson: responsaveis.length ? JSON.stringify(responsaveis) : null,
+      }}),
+      db.parceiroLeadHistorico.create({ data: {
+        leadId, acao: "LEAD_EDITADO_COMPLETO", valorAnteriorJson: JSON.stringify(antes),
+        valorNovoJson: JSON.stringify(d), usuarioId: ctx.userId,
+      }}),
+    ]);
+    revalidatePath("/PainelAlpha/Parceiros/Aquisicao");
+    return { success: true as const };
+  } catch (error) {
+    console.error("[parceiros-aquisicao] erro ao editar lead completo", error);
+    return { success: false as const, error: "Não foi possível salvar a edição do lead." };
+  }
 }
 
 // ─── Mover etapa ─────────────────────────────────────────────────────────────
@@ -451,6 +499,22 @@ export async function ListarLeadsAquisicaoParceiros(filtros?: {
       tipo: true,
       documento: true,
       nome: true,
+      nomeFantasia: true,
+      tipoParceiro: true,
+      dataNascimento: true,
+      chavePix: true,
+      tipoChavePix: true,
+      nomeBanco: true,
+      agencia: true,
+      conta: true,
+      comissaoPercentual: true,
+      dadosConsulta: true,
+      cep: true,
+      logradouro: true,
+      numero: true,
+      complemento: true,
+      bairro: true,
+      responsaveisJson: true,
       email: true,
       telefone: true,
       segmento: true,
