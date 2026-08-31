@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut } from "lucide-react";
+import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut, Pencil } from "lucide-react";
 import {
   DndContext, type DragEndEvent, DragOverlay, type DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCorners, useDroppable,
@@ -18,6 +18,7 @@ import {
   RegistrarSaidaLateralLeadAquisicao,
   AtualizarPotencialLeadAquisicao,
   RegistrarProximaAcaoLeadAquisicao,
+  AtualizarCadastroLeadAquisicao,
   PromoverLeadParaParceiro,
   ListarLeadsAquisicaoParceiros,
 } from "@/actions/parceiros-aquisicao";
@@ -386,6 +387,7 @@ export default function AquisicaoParceirosClient({
           lead={leadFoco}
           accent={accent}
           podeEditar={podeEditar}
+          responsaveis={responsaveis}
           onClose={() => setLeadFoco(null)}
           onAtualizado={() => {
             setLeadFoco(null);
@@ -496,7 +498,12 @@ function NovoLeadDialog({
   const [origem, setOrigem] = useState("");
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
-  const [responsavelId, setResponsavelId] = useState<string>("");
+  // Responsável padrão de novo lead: Danilo Silva Gomes, a pedido do usuário —
+  // só aplica se ele estiver na lista de responsáveis ativos carregada do backend.
+  const [responsavelId, setResponsavelId] = useState<string>(() => {
+    const padrao = responsaveis.find((r) => r.nome.toUpperCase().includes("DANILO SILVA GOMES"));
+    return padrao ? String(padrao.id) : "";
+  });
   const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
@@ -572,12 +579,14 @@ function LeadDetalheDialog({
   lead,
   accent,
   podeEditar,
+  responsaveis,
   onClose,
   onAtualizado,
 }: {
   lead: Lead;
   accent: string;
   podeEditar: boolean;
+  responsaveis: Responsavel[];
   onClose: () => void;
   onAtualizado: () => void;
 }) {
@@ -590,6 +599,7 @@ function LeadDetalheDialog({
   const [salvando, setSalvando] = useState(false);
   const [docPromocao, setDocPromocao] = useState(lead.documento ?? "");
   const [emailPromocao, setEmailPromocao] = useState(lead.email ?? "");
+  const [editarCadastroAberto, setEditarCadastroAberto] = useState(false);
 
   const inputCls = "w-full h-10 rounded-xl px-3 text-[12px] outline-none text-slate-200";
   const inputStyle = { background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` };
@@ -650,6 +660,7 @@ function LeadDetalheDialog({
   const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
 
   return (
+    <>
     <Sheet open onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="bottom"
@@ -673,7 +684,20 @@ function LeadDetalheDialog({
               {inicial}
             </div>
             <div className="min-w-0 flex-1">
-              <SheetTitle className="text-xl font-black text-white tracking-tight truncate">{lead.nome}</SheetTitle>
+              <div className="flex items-center gap-2 min-w-0">
+                <SheetTitle className="text-xl font-black text-white tracking-tight truncate">{lead.nome}</SheetTitle>
+                {podeEditar && (
+                  <button
+                    onClick={() => setEditarCadastroAberto(true)}
+                    className="h-7 w-7 shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-white transition-colors"
+                    style={{ background: "rgba(255,255,255,0.06)" }}
+                    aria-label="Editar dados de cadastro do lead"
+                    title="Editar dados de cadastro"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-500">
                 {lead.segmento && <span className="flex items-center gap-1"><Building2 size={11} /> {lead.segmento}</span>}
                 {lead.telefone && <span>{lead.telefone}</span>}
@@ -764,5 +788,118 @@ function LeadDetalheDialog({
         </div>
       </SheetContent>
     </Sheet>
+
+    {editarCadastroAberto && (
+      <EditarLeadDialog
+        lead={lead}
+        accent={accent}
+        responsaveis={responsaveis}
+        onClose={() => setEditarCadastroAberto(false)}
+        onSalvo={() => {
+          setEditarCadastroAberto(false);
+          onAtualizado();
+        }}
+      />
+    )}
+    </>
+  );
+}
+
+function EditarLeadDialog({
+  lead,
+  accent,
+  responsaveis,
+  onClose,
+  onSalvo,
+}: {
+  lead: Lead;
+  accent: string;
+  responsaveis: Responsavel[];
+  onClose: () => void;
+  onSalvo: () => void;
+}) {
+  const [nome, setNome] = useState(lead.nome);
+  const [tipo, setTipo] = useState<"PF" | "PJ" | "">((lead.tipo as "PF" | "PJ" | null) ?? "");
+  const [documento, setDocumento] = useState(lead.documento ?? "");
+  const [email, setEmail] = useState(lead.email ?? "");
+  const [telefone, setTelefone] = useState(lead.telefone ?? "");
+  const [segmento, setSegmento] = useState(lead.segmento ?? "");
+  const [origem, setOrigem] = useState(lead.origem ?? "");
+  const [cidade, setCidade] = useState(lead.cidade ?? "");
+  const [uf, setUf] = useState(lead.uf ?? "");
+  const [responsavelId, setResponsavelId] = useState<string>(lead.responsavelId ? String(lead.responsavelId) : "");
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    if (!nome.trim()) return toast.error("Informe o nome");
+    setSalvando(true);
+    const r = await AtualizarCadastroLeadAquisicao({
+      leadId: lead.id,
+      nome: nome.trim(),
+      tipo: tipo || undefined,
+      documento: documento || undefined,
+      email: email || undefined,
+      telefone: telefone || undefined,
+      segmento: segmento || undefined,
+      origem: origem || undefined,
+      cidade: cidade || undefined,
+      uf: uf || undefined,
+      responsavelId: responsavelId ? Number(responsavelId) : null,
+    });
+    setSalvando(false);
+    if (!r.success) return toast.error(r.error);
+    toast.success("Cadastro atualizado");
+    onSalvo();
+  }
+
+  const inputCls = "w-full h-10 rounded-xl px-3 text-[12px] outline-none text-slate-200";
+  const inputStyle = { background: "rgba(15,23,42,0.6)", border: `1px solid rgba(${accent},0.2)` };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md bg-[#0a1020] border-white/10">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-slate-100"><Pencil size={15} /> Editar cadastro do lead</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2.5">
+          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome *" className={inputCls} style={inputStyle} />
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={tipo} onValueChange={(v) => setTipo(v as "PF" | "PJ")}>
+              <SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent><SelectItem value="PF">Pessoa Física</SelectItem><SelectItem value="PJ">Pessoa Jurídica</SelectItem></SelectContent>
+            </Select>
+            <input value={documento} onChange={(e) => setDocumento(e.target.value)} placeholder="CPF/CNPJ" className={inputCls} style={inputStyle} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={inputCls} style={inputStyle} />
+            <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Telefone" className={inputCls} style={inputStyle} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={segmento} onChange={(e) => setSegmento(e.target.value)} placeholder="Segmento" className={inputCls} style={inputStyle} />
+            <input value={origem} onChange={(e) => setOrigem(e.target.value)} placeholder="Origem" className={inputCls} style={inputStyle} />
+          </div>
+          <div className="grid grid-cols-[1fr_80px] gap-2">
+            <input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Cidade" className={inputCls} style={inputStyle} />
+            <input value={uf} onChange={(e) => setUf(e.target.value.toUpperCase().slice(0, 2))} placeholder="UF" className={inputCls} style={inputStyle} />
+          </div>
+          {responsaveis.length > 0 && (
+            <Select value={responsavelId} onValueChange={setResponsavelId}>
+              <SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Responsável" /></SelectTrigger>
+              <SelectContent>
+                {responsaveis.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          <button
+            onClick={() => void salvar()}
+            disabled={salvando}
+            className="w-full h-11 rounded-xl font-black uppercase text-[11px] tracking-widest text-black disabled:opacity-50"
+            style={{ background: `rgba(${accent},1)` }}
+          >
+            {salvando ? "Salvando..." : "Salvar alterações"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

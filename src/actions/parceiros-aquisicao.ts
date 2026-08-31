@@ -246,6 +246,74 @@ export async function RegistrarProximaAcaoLeadAquisicao(input: z.input<typeof Pr
   return { success: true as const };
 }
 
+// ─── Editar dados de cadastro do lead ────────────────────────────────────────
+
+const AtualizarCadastroLeadSchema = z.object({
+  leadId: z.string().cuid(),
+  nome: z.string().min(2),
+  tipo: z.enum(["PF", "PJ"]).optional(),
+  documento: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  telefone: z.string().optional(),
+  segmento: z.string().optional(),
+  origem: z.string().optional(),
+  cidade: z.string().optional(),
+  uf: z.string().max(2).optional(),
+  responsavelId: z.number().int().positive().nullable().optional(),
+});
+
+export async function AtualizarCadastroLeadAquisicao(input: z.input<typeof AtualizarCadastroLeadSchema>) {
+  const ctx = await getCtx();
+  if (!ctx || (!ctx.isAdmin && !ctx.podeEditar)) return { success: false as const, error: "Sem permissão" };
+
+  const parsed = AtualizarCadastroLeadSchema.safeParse(input);
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  const d = parsed.data;
+
+  const leadAntes = await db.parceiroLead.findUnique({ where: { id: d.leadId } });
+  if (!leadAntes) return { success: false as const, error: "Lead não encontrado" };
+
+  const dadosNovos = {
+    nome: d.nome,
+    tipo: d.tipo ?? null,
+    documento: d.documento?.replace(/\D/g, "") || null,
+    email: d.email || null,
+    telefone: d.telefone || null,
+    segmento: d.segmento || null,
+    origem: d.origem || null,
+    cidade: d.cidade || null,
+    uf: d.uf || null,
+    responsavelId: d.responsavelId ?? null,
+  };
+
+  await db.$transaction([
+    db.parceiroLead.update({ where: { id: d.leadId }, data: dadosNovos }),
+    db.parceiroLeadHistorico.create({
+      data: {
+        leadId: d.leadId,
+        acao: "CADASTRO_EDITADO",
+        valorAnteriorJson: JSON.stringify({
+          nome: leadAntes.nome,
+          tipo: leadAntes.tipo,
+          documento: leadAntes.documento,
+          email: leadAntes.email,
+          telefone: leadAntes.telefone,
+          segmento: leadAntes.segmento,
+          origem: leadAntes.origem,
+          cidade: leadAntes.cidade,
+          uf: leadAntes.uf,
+          responsavelId: leadAntes.responsavelId,
+        }),
+        valorNovoJson: JSON.stringify(dadosNovos),
+        usuarioId: ctx.userId,
+      },
+    }),
+  ]);
+
+  revalidatePath("/PainelAlpha/Parceiros/Aquisicao");
+  return { success: true as const };
+}
+
 // ─── Responsáveis (para o seletor da UI) ─────────────────────────────────────
 
 export async function ListarResponsaveisParceiros() {
