@@ -17,6 +17,7 @@ model usuarios {
   role               String             @default("User")
   permissoes         String?
   chamados_criados   chamados[]         @relation("Solicitante")
+  chamadosAssumidos  chamados[]         @relation("TecnicoChamado")
   mensagens          MensagensChamado[]
   Auditoria          Auditoria[]
   imagemUrl          String?
@@ -510,14 +511,17 @@ model chamados {
   templateId     Int?
   closedAt       DateTime?
   usuarioId      Int
+  tecnicoId      Int?
   createdAt      DateTime                    @default(now())
   updatedAt      DateTime                    @updatedAt
   solicitante    usuarios                    @relation("Solicitante", fields: [usuarioId], references: [id], onDelete: Cascade)
+  tecnico        usuarios?                   @relation("TecnicoChamado", fields: [tecnicoId], references: [id], onDelete: SetNull)
   mensagens      MensagensChamado[]
   tarefaAgendada GoogleCalendarTaskSchedule?
 
   @@index([usuarioId])
   @@index([status])
+  @@index([tecnicoId])
 }
 
 model ProtocoloTemplate {

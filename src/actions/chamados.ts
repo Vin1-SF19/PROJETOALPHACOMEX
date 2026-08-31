@@ -197,6 +197,55 @@ export async function enviarMensagemAction(
   }
 }
 
+export async function assumirChamado(id: number) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Não autorizado" };
+
+  try {
+    const chamado = await db.chamados.findUnique({ where: { id } });
+    if (!chamado) return { success: false, error: "Chamado não encontrado" };
+    if (chamado.tecnicoId !== null) return { success: false, error: "Chamado já foi assumido por outro técnico" };
+    if (chamado.status !== "ABERTO") return { success: false, error: "Chamado não está em estado inicial" };
+
+    const tecnicoId = Number(session.user.id);
+    const atribuicao = await db.chamados.updateMany({
+      where: { id, tecnicoId: null, status: "ABERTO" },
+      data: { status: "EM_ATENDIMENTO", tecnicoId },
+    });
+    if (atribuicao.count === 0) {
+      return { success: false, error: "Chamado já foi assumido por outro técnico" };
+    }
+
+    try {
+      const atualizado = await db.chamados.findUnique({
+        where: { id },
+        select: { id: true, titulo: true, descricao: true, usuarioId: true, solucao: true, updatedAt: true },
+      });
+      if (atualizado) {
+        await criarTarefaAgendadaParaChamado({
+          chamado: atualizado,
+          tecnicoId,
+          tecnicoRole: session.user.role,
+        });
+      }
+    } catch (e) {
+      console.error("[chamados] Falha na automação da Agenda Alpha ao assumir", {
+        chamadoId: id,
+        message: e instanceof Error ? e.message : "erro desconhecido",
+      });
+    }
+
+    revalidatePath("/PainelAlpha/Chamados");
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return {
+      success: true,
+      chamado: { id, status: "EM_ATENDIMENTO", tecnicoId },
+    };
+  } catch {
+    return { success: false, error: "Erro ao assumir chamado." };
+  }
+}
+
 export async function marcarComoLidaAction(chamadoId: number, isAdmin: boolean) {
   const session = await auth();
   if (!session) return { error: "Não autorizado" };

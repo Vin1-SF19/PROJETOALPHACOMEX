@@ -6,10 +6,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { updateChamadosStatus } from "@/actions/chamados";
+import { assumirChamado } from "@/actions/chamados";
 import {
-  Clock, CheckCircle, User, MessageSquare, Calendar,
-  CheckCircle2, Tag, AlertTriangle, Eye, FileText,
+  Clock, User, MessageSquare, Calendar,
+  CheckCircle2, Tag, Eye, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import ModalProtocolo from "./ModalProtocolo";
@@ -33,6 +33,7 @@ type ChamadoDetalhes = {
   causa?: string | null;
   mensagemFinal?: string | null;
   usuarioId?: number;
+  tecnicoId?: number | null;
   createdAt: Date | string;
   solicitante: Solicitante;
 };
@@ -69,42 +70,24 @@ function tempoAberto(data: Date | string): string {
 
 export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Props) {
   const [open, setOpen] = useState(false);
-  const [solucaoInput, setSolucaoInput] = useState("");
-  const [confirmando, setConfirmando] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [modalProtocolo, setModalProtocolo] = useState(false);
+  const [tecnicoId, setTecnicoId] = useState(chamado.tecnicoId ?? null);
 
-  const handleStatus = async (status: string) => {
-    if (status === "CONCLUIDO") {
-      setConfirmando(true);
-      return;
-    }
+  const handleAssumir = async () => {
     setCarregando(true);
-    const res = await updateChamadosStatus(chamado.id, status);
-    setCarregando(false);
-    if (res.success) {
-      toast.success("Status atualizado");
-      setOpen(false);
-    } else {
-      toast.error(res.error || "Erro ao atualizar");
-    }
-  };
-
-  const handleConcluir = async () => {
-    if (!solucaoInput.trim()) {
-      toast.error("Descreva a solução antes de concluir");
-      return;
-    }
-    setCarregando(true);
-    const res = await updateChamadosStatus(chamado.id, "CONCLUIDO", solucaoInput.trim());
-    setCarregando(false);
-    if (res.success) {
-      toast.success("Chamado concluído");
-      setOpen(false);
-      setConfirmando(false);
-      setSolucaoInput("");
-    } else {
-      toast.error(res.error || "Erro ao concluir");
+    try {
+      const res = await assumirChamado(chamado.id);
+      if (res.success && res.chamado) {
+        setTecnicoId(res.chamado.tecnicoId);
+        toast.success("Chamado assumido com sucesso");
+      } else {
+        toast.error(res.error || "Erro ao assumir chamado");
+      }
+    } catch {
+      toast.error("Erro ao assumir chamado");
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -122,7 +105,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
         Detalhes
       </Button>
 
-      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setConfirmando(false); setSolucaoInput(""); } }}>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-[1.5rem] border-blue-500/10 bg-[#080e1a] p-0 text-white sm:max-h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)] sm:max-w-4xl sm:rounded-[2rem] lg:max-w-5xl 2xl:max-w-6xl">
 
           {/* Header */}
@@ -197,7 +180,7 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
             </div>
 
             {/* Solução cadastrada */}
-            {chamado.solucao && !confirmando && (
+            {chamado.solucao && (
               <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
                 <h4 className="text-emerald-400 text-[10px] font-black uppercase flex items-center gap-2">
                   <CheckCircle2 size={14} />
@@ -218,74 +201,27 @@ export default function DetalhesChamado({ chamado, isAdmin, templates = [] }: Pr
               </div>
             )}
 
-            {/* Input de solução rápida (aparece ao clicar em Finalizar Rápido) */}
-            {confirmando && (
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-2">
-                  <AlertTriangle size={14} />
-                  Descreva a solução aplicada
-                </h4>
-                <textarea
-                  value={solucaoInput}
-                  onChange={(e) => setSolucaoInput(e.target.value)}
-                  rows={4}
-                  placeholder="Explique como o problema foi resolvido..."
-                  className="w-full rounded-2xl border border-white/5 bg-black/40 p-4 text-sm text-white font-medium focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/10 transition-all resize-none placeholder:text-slate-700"
-                  autoFocus
-                />
-              </div>
-            )}
-
             {/* Ações do admin */}
             {isAdmin && chamado.status !== "CONCLUIDO" && (
               <div className="pt-5 border-t border-white/5 space-y-2">
-                {confirmando ? (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => { setConfirmando(false); setSolucaoInput(""); }}
-                      className="cursor-pointer h-12 font-bold rounded-xl border border-white/10 hover:border-white/20 text-slate-400 hover:text-white"
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      onClick={handleConcluir}
-                      disabled={carregando || !solucaoInput.trim()}
-                      className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white h-12 font-black rounded-xl shadow-lg shadow-emerald-900/20 disabled:opacity-40"
-                    >
-                      <CheckCircle className="mr-2 w-4 h-4" />
-                      {carregando ? "Salvando..." : "Confirmar Solução"}
-                    </Button>
-                  </div>
+                {tecnicoId == null ? (
+                  <Button
+                    onClick={handleAssumir}
+                    disabled={carregando}
+                    aria-busy={carregando}
+                    className="w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white h-12 font-black rounded-xl shadow-lg shadow-blue-900/20 disabled:opacity-40"
+                  >
+                    <User className="mr-2 w-4 h-4" />
+                    {carregando ? "Assumindo..." : "Assumir Chamado"}
+                  </Button>
                 ) : (
-                  <>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Button
-                        onClick={() => handleStatus("EM_ATENDIMENTO")}
-                        disabled={carregando || chamado.status === "EM_ATENDIMENTO"}
-                        className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/20 h-12 font-bold rounded-xl disabled:opacity-40"
-                      >
-                        <Clock className="mr-2 w-4 h-4" />
-                        Em Atendimento
-                      </Button>
-                      <Button
-                        onClick={() => handleStatus("CONCLUIDO")}
-                        disabled={carregando}
-                        className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/20 h-12 font-bold rounded-xl disabled:opacity-40"
-                      >
-                        <CheckCircle className="mr-2 w-4 h-4" />
-                        Finalizar Rápido
-                      </Button>
-                    </div>
-                    {/* Botão principal de protocolo */}
-                    <Button
-                      onClick={() => { setOpen(false); setModalProtocolo(true); }}
-                      className="w-full cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white h-12 font-black rounded-xl shadow-lg shadow-emerald-900/20"
-                    >
-                      <FileText className="mr-2 w-4 h-4" />
-                      Finalizar com Protocolo
-                    </Button>
-                  </>
+                  <Button
+                    onClick={() => { setOpen(false); setModalProtocolo(true); }}
+                    className="w-full cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white h-12 font-black rounded-xl shadow-lg shadow-emerald-900/20"
+                  >
+                    <FileText className="mr-2 w-4 h-4" />
+                    Finalizar com Protocolo
+                  </Button>
                 )}
               </div>
             )}

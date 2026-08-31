@@ -14,6 +14,15 @@ interface OnyxPkt {
   obj?: { type: string; content?: string; reasoning?: string };
 }
 
+// Watchdog do corpo do stream: o timeout de `onyxFetch` (client.ts) só cobre até
+// os headers chegarem — ele é limpo (`clearTimeout`) assim que `fetch()` resolve,
+// antes do corpo começar a ser lido. Se o stream do Onyx travar depois disso (ex.:
+// a IA nunca produz o primeiro chunk), o loop de leitura ficava esperando pra
+// sempre, sem nenhuma proteção — foi exatamente esse bug que deixava "Novo
+// template" no Gerador de Documentos com carregamento infinito. Reproduzido
+// manualmente: a conexão abre (200), mas a 1ª leitura do corpo nunca retorna.
+const STREAM_READ_TIMEOUT_MS = 90_000;
+
 /** Lê o stream NDJSON do Onyx e retorna só o texto de resposta final (sem reasoning). */
 async function coletarRespostaTexto(response: Response, label: string): Promise<string> {
   if (!response.ok || !response.body) {
@@ -41,14 +50,34 @@ async function coletarRespostaTexto(response: Response, label: string): Promise<
     }
   };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const linhas = buf.split("\n");
-    buf = linhas.pop() ?? "";
-    for (const linha of linhas) processar(linha);
-    if (encerrado) break;
+  try {
+    while (true) {
+      const { done, value } = await Promise.race([
+        reader.read(),
+        new Promise<never>((_, reject) => {
+          setTimeout(
+            () =>
+              reject(
+                new OnyxError(
+                  `A IA (Onyx) não respondeu dentro do tempo limite (${label}).`,
+                  504,
+                ),
+              ),
+            STREAM_READ_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const linhas = buf.split("\n");
+      buf = linhas.pop() ?? "";
+      for (const linha of linhas) processar(linha);
+      if (encerrado) break;
+    }
+  } finally {
+    // Libera a conexão mesmo quando saímos por timeout — sem isso o socket
+    // fica pendurado esperando um corpo que nunca vai terminar de chegar.
+    await reader.cancel().catch(() => undefined);
   }
   if (buf.trim()) processar(buf);
 
