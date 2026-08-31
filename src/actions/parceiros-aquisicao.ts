@@ -271,21 +271,25 @@ export async function MoverLeadAquisicaoParceiro(input: z.input<typeof MoverLead
     return { success: false as const, error: `Transição inválida: ${lead.status} → ${statusDestino}` };
   }
 
-  await db.$transaction([
-    db.parceiroLead.update({ where: { id: leadId }, data: { status: statusDestino } }),
-    db.parceiroLeadHistorico.create({
-      data: {
-        leadId,
-        acao: "ETAPA_ALTERADA",
-        valorAnteriorJson: JSON.stringify({ status: lead.status }),
-        valorNovoJson: JSON.stringify({ status: statusDestino }),
-        usuarioId: ctx.userId,
-      },
-    }),
-  ]);
-
-  revalidatePath("/PainelAlpha/Parceiros/Aquisicao");
-  return { success: true as const };
+  try {
+    await db.$transaction([
+      db.parceiroLead.update({ where: { id: leadId }, data: { status: statusDestino } }),
+      db.parceiroLeadHistorico.create({
+        data: {
+          leadId,
+          acao: "ETAPA_ALTERADA",
+          valorAnteriorJson: JSON.stringify({ status: lead.status }),
+          valorNovoJson: JSON.stringify({ status: statusDestino }),
+          usuarioId: ctx.userId,
+        },
+      }),
+    ]);
+    revalidatePath("/PainelAlpha/Parceiros/Aquisicao");
+    return { success: true as const };
+  } catch (error) {
+    console.error("[parceiros-aquisicao] erro ao mover lead", { leadId, statusDestino, error });
+    return { success: false as const, error: `Não foi possível mover o lead para ${statusDestino.replaceAll("_", " ").toLowerCase()}.` };
+  }
 }
 
 // ─── Saída lateral ────────────────────────────────────────────────────────────
@@ -527,13 +531,75 @@ export async function ListarLeadsAquisicaoParceiros(filtros?: {
       proximaAcaoEm: true,
       proximaAcaoDescricao: true,
       motivoSaidaLateral: true,
+      promovidoParceiroId: true,
+      promovidoParceiro: {
+        select: {
+          nivel: true,
+          indicacoes: {
+            where: { status: "ATIVA" },
+            select: { dataIndicacao: true },
+            orderBy: { dataIndicacao: "desc" },
+            take: 1,
+          },
+          _count: { select: { indicacoes: { where: { status: "ATIVA" } } } },
+        },
+      },
+      historico: {
+        select: {
+          id: true,
+          acao: true,
+          valorAnteriorJson: true,
+          valorNovoJson: true,
+          automacaoOrigem: true,
+          createdAt: true,
+          usuario: { select: { nome: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+      },
       createdAt: true,
       updatedAt: true,
     },
     orderBy: { updatedAt: "desc" },
   });
 
-  return { success: true as const, leads };
+  const parceiroIds = leads.flatMap((lead) => lead.promovidoParceiroId ? [lead.promovidoParceiroId] : []);
+  const contratosPorParceiro = parceiroIds.length
+    ? await db.contratoComercial.groupBy({
+        by: ["indicadoPorParceiroId"],
+        where: {
+          indicadoPorParceiroId: { in: parceiroIds },
+          status: "FECHADO",
+          arquivado: false,
+        },
+        _count: { _all: true },
+      })
+    : [];
+  const contratosMap = new Map(
+    contratosPorParceiro.map((item) => [item.indicadoPorParceiroId, item._count._all]),
+  );
+
+  return {
+    success: true as const,
+    leads: leads.map((lead) => {
+      const indicacoesCount = lead.promovidoParceiro?._count.indicacoes ?? 0;
+      const contratosCount = lead.promovidoParceiroId
+        ? (contratosMap.get(lead.promovidoParceiroId) ?? 0)
+        : 0;
+      const ultimoContato = lead.historico.find((item) => item.acao !== "LEAD_CRIADO" && item.acao !== "LEAD_CRIADO_COMPLETO");
+      return {
+        ...lead,
+        classificacao: lead.promovidoParceiro?.nivel ?? null,
+        ultimaIndicacaoEm: lead.promovidoParceiro?.indicacoes[0]?.dataIndicacao ?? null,
+        ultimoContatoEm: ultimoContato?.createdAt ?? null,
+        indicacoesCount,
+        contratosCount,
+        conversaoPercentual: indicacoesCount > 0
+          ? Math.round((contratosCount / indicacoesCount) * 1_000) / 10
+          : null,
+      };
+    }),
+  };
 }
 
 // ─── Promoção: Lead → Parceiro real (idempotente, sem duplicidade) ───────────

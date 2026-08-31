@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut, Pencil, Target } from "lucide-react";
+import { ArrowLeft, Plus, Star, CalendarClock, Building2, MapPin, ArrowLeftRight, Handshake, LogOut, Pencil, Target, Search, X } from "lucide-react";
 import {
   DndContext, type DragEndEvent, DragOverlay, type DragStartEvent,
   PointerSensor, useSensor, useSensors, closestCorners, useDroppable,
@@ -94,6 +94,42 @@ const BADGE_URGENCIA_CLASSNAME: Record<UrgenciaProximaAcao, string> = {
   FUTURO: "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
 };
 
+const REGRAS_PRIORIDADE_FOLLOW_UP = {
+  diasAtencao: 14,
+  diasAlta: 30,
+  potencialAlto: 4,
+  potencialMedio: 3,
+} as const;
+
+function formatarDataCard(data: Date | string | null): string {
+  return data ? new Date(data).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—";
+}
+
+function diasDesde(data: Date | string): number {
+  const inicio = new Date(data);
+  const agora = new Date();
+  return Math.max(0, Math.floor((agora.getTime() - inicio.getTime()) / 86_400_000));
+}
+
+function diasSemIndicacaoDoLead(lead: Lead): number {
+  return diasDesde(lead.ultimaIndicacaoEm ?? lead.createdAt);
+}
+
+const LABEL_ACAO_HISTORICO: Record<string, string> = {
+  LEAD_CRIADO: "Lead criado",
+  LEAD_CRIADO_COMPLETO: "Lead criado com cadastro completo",
+  LEAD_EDITADO_COMPLETO: "Cadastro completo atualizado",
+  CADASTRO_EDITADO: "Cadastro atualizado",
+  ETAPA_ALTERADA: "Etapa alterada",
+  POTENCIAL_ALTERADO: "Potencial de recorrência atualizado",
+  PROXIMA_ACAO_REGISTRADA: "Próxima ação registrada",
+  SAIDA_LATERAL: "Saída lateral registrada",
+};
+
+function labelHistorico(acao: string): string {
+  return LABEL_ACAO_HISTORICO[acao] ?? acao.replaceAll("_", " ").toLowerCase();
+}
+
 function BadgeProximaAcao({ proximaAcaoEm }: { proximaAcaoEm: Date | string }) {
   const urgencia = calcularUrgenciaProximaAcao(proximaAcaoEm);
   const formatado = new Date(proximaAcaoEm).toLocaleDateString("pt-BR");
@@ -114,12 +150,13 @@ function BadgeProximaAcao({ proximaAcaoEm }: { proximaAcaoEm: Date | string }) {
 
 function prioridadeFollowUp(lead: Lead): { label: string; detail: string; className: string } {
   const potencial = lead.potencialRecorrencia ?? 0;
-  if (!lead.proximaAcaoEm) return { label: "URGENTE", detail: "Sem próxima ação definida", className: "text-red-200 bg-red-500/15 border-red-500/30" };
+  const diasSemIndicacao = diasSemIndicacaoDoLead(lead);
+  if (!lead.proximaAcaoEm) return { label: "URGENTE", detail: `Sem próxima ação · ${diasSemIndicacao} dias sem indicação`, className: "text-red-200 bg-red-500/15 border-red-500/30" };
   const urgencia = calcularUrgenciaProximaAcao(lead.proximaAcaoEm);
-  if (urgencia === "ATRASADO") return { label: "ALTA", detail: `Ação vencida · potencial ${potencial}/5`, className: "text-red-200 bg-red-500/15 border-red-500/30" };
-  if (potencial >= 4) return { label: "ALTA", detail: `Potencial ${potencial}/5`, className: "text-amber-200 bg-amber-500/15 border-amber-500/30" };
-  if (potencial >= 3) return { label: "MÉDIA", detail: `Potencial ${potencial}/5`, className: "text-sky-200 bg-sky-500/15 border-sky-500/30" };
-  return { label: "NORMAL", detail: "Acompanhamento em dia", className: "text-emerald-200 bg-emerald-500/15 border-emerald-500/30" };
+  if (urgencia === "ATRASADO") return { label: "URGENTE", detail: `Próxima ação vencida · ${diasSemIndicacao} dias sem indicação`, className: "text-red-200 bg-red-500/15 border-red-500/30" };
+  if (diasSemIndicacao >= REGRAS_PRIORIDADE_FOLLOW_UP.diasAlta || (potencial >= REGRAS_PRIORIDADE_FOLLOW_UP.potencialAlto && diasSemIndicacao >= REGRAS_PRIORIDADE_FOLLOW_UP.diasAtencao)) return { label: "ALTA", detail: `Potencial ${potencial}/5 · ${diasSemIndicacao} dias sem indicação`, className: "text-amber-200 bg-amber-500/15 border-amber-500/30" };
+  if (diasSemIndicacao >= REGRAS_PRIORIDADE_FOLLOW_UP.diasAtencao || potencial >= REGRAS_PRIORIDADE_FOLLOW_UP.potencialMedio) return { label: "MÉDIA", detail: `Potencial ${potencial}/5 · ${diasSemIndicacao} dias sem indicação`, className: "text-sky-200 bg-sky-500/15 border-sky-500/30" };
+  return { label: "NORMAL", detail: `Acompanhamento em dia · ${diasSemIndicacao} dias sem indicação`, className: "text-emerald-200 bg-emerald-500/15 border-emerald-500/30" };
 }
 
 /** Card individual do lead — arrastável (dnd-kit `useSortable`), mesmo padrão do
@@ -150,6 +187,7 @@ function LeadCard({ lead, cor, onAbrirLead }: { lead: Lead; cor: string; onAbrir
                 <p className="text-sm font-semibold leading-tight text-slate-100 truncate">{lead.nomeFantasia || lead.nome}</p>
                 <span className="shrink-0 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-300">{lead.status === "NOVO_LEAD" ? "NOVO" : lead.status.replaceAll("_", " ")}</span>
               </div>
+              {lead.classificacao && <span className="mt-1 inline-flex rounded-md border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-300">{lead.classificacao}</span>}
               <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
                 {lead.segmento && <span className="flex items-center gap-1"><Building2 size={10} /> {lead.segmento}</span>}
                 {lead.uf && <span className="flex items-center gap-1"><MapPin size={10} /> {lead.uf}</span>}
@@ -157,10 +195,15 @@ function LeadCard({ lead, cor, onAbrirLead }: { lead: Lead; cor: string; onAbrir
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-2">
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Última indicação</p><p className="text-[10px] font-bold text-slate-300">{formatarDataCard(lead.ultimaIndicacaoEm)}</p><p className="text-[9px] text-slate-500">há {diasSemIndicacaoDoLead(lead)} dias</p></div>
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Próxima ação</p><p className="text-[10px] font-bold text-slate-300">{lead.proximaAcaoDescricao || "Não definida"}</p>{lead.proximaAcaoEm && <p className="text-[9px] text-slate-500">{formatarDataCard(lead.proximaAcaoEm)}</p>}</div>
+          </div>
+
           <div className="grid grid-cols-3 gap-1.5 border-y border-white/[0.06] py-2 text-center">
-            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Indicações</p><p className="text-sm font-black text-slate-200">0</p></div>
-            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Contratos</p><p className="text-sm font-black text-slate-200">0</p></div>
-            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Conversão</p><p className="text-sm font-black text-slate-200">—</p></div>
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Indicações</p><p className="text-sm font-black text-slate-200">{lead.indicacoesCount}</p></div>
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Contratos</p><p className="text-sm font-black text-slate-200">{lead.contratosCount}</p></div>
+            <div><p className="text-[8px] uppercase tracking-wider text-slate-600">Conversão</p><p className="text-sm font-black text-slate-200">{lead.conversaoPercentual === null ? "—" : `${lead.conversaoPercentual.toLocaleString("pt-BR")}%`}</p></div>
           </div>
 
           <div className="flex items-center justify-between gap-2">
@@ -202,30 +245,43 @@ function KanbanColuna({
   tracejada?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
+  const [buscaAberta, setBuscaAberta] = useState(false);
+  const [termoBusca, setTermoBusca] = useState("");
+  const permiteBusca = status === "NOVO_LEAD";
+  const termoNormalizado = termoBusca.trim().toLocaleLowerCase("pt-BR");
+  const itensVisiveis = termoNormalizado
+    ? itens.filter((lead) => (lead.nomeFantasia || lead.nome).toLocaleLowerCase("pt-BR").includes(termoNormalizado))
+    : itens;
 
   return (
     <div className="shrink-0 w-[280px] h-full flex flex-col rounded-2xl overflow-hidden" style={{ background: "rgba(8,11,20,0.55)", border: `1px solid rgba(${cor},0.22)`, boxShadow: `0 0 0 1px rgba(0,0,0,0.2), 0 12px 30px -18px rgba(${cor},0.35)` }}>
-      <div className="shrink-0 flex items-center justify-between px-3.5 py-3 border-b" style={{ borderColor: `rgba(${cor},0.18)`, background: `rgba(${cor},0.06)` }}>
+      <div className="shrink-0 border-b px-3.5 py-3" style={{ borderColor: `rgba(${cor},0.18)`, background: `rgba(${cor},0.06)` }}>
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: `rgb(${cor})`, boxShadow: `0 0 8px rgba(${cor},0.7)` }} />
           <span className="text-[11px] font-black uppercase tracking-widest text-slate-200 truncate">{label}</span>
         </div>
-        <span className="text-[10px] font-bold shrink-0 rounded-full px-2 py-0.5" style={{ background: `rgba(${cor},0.18)`, color: `rgb(${cor})` }}>
-          {itens.length}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {permiteBusca && <button type="button" onClick={() => setBuscaAberta((aberta) => !aberta)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white" aria-label="Pesquisar leads por nome" title="Pesquisar leads por nome"><Search size={13} /></button>}
+          <span className="text-[10px] font-bold shrink-0 rounded-full px-2 py-0.5" style={{ background: `rgba(${cor},0.18)`, color: `rgb(${cor})` }}>
+            {termoNormalizado ? `${itensVisiveis.length}/${itens.length}` : itens.length}
+          </span>
+        </div>
+        </div>
+        {permiteBusca && buscaAberta && <div className="relative mt-2"><Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" /><input autoFocus value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)} placeholder="Buscar pelo nome..." className="h-8 w-full rounded-lg border border-white/10 bg-black/30 pl-8 pr-8 text-[11px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-white/20" />{termoBusca && <button type="button" onClick={() => setTermoBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white" aria-label="Limpar pesquisa"><X size={12} /></button>}</div>}
       </div>
       <div
         ref={setNodeRef}
         className={`flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 rounded-b-2xl transition-colors ${tracejada ? "border-dashed" : ""} ${isOver ? "bg-white/[0.04]" : ""}`}
         style={tracejada ? { border: `1px dashed rgba(${cor},0.12)`, borderTop: "none" } : undefined}
       >
-        <SortableContext items={itens.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-          {itens.length === 0 ? (
+        <SortableContext items={itensVisiveis.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+          {itensVisiveis.length === 0 ? (
             <div className="h-full flex items-center justify-center">
-              <p className="text-[10px] text-slate-600">Vazio</p>
+              <p className="text-[10px] text-slate-600">{termoNormalizado ? "Nenhum lead encontrado" : "Vazio"}</p>
             </div>
           ) : (
-            itens.map((lead) => <LeadCard key={lead.id} lead={lead} cor={cor} onAbrirLead={onAbrirLead} />)
+            itensVisiveis.map((lead) => <LeadCard key={lead.id} lead={lead} cor={cor} onAbrirLead={onAbrirLead} />)
           )}
         </SortableContext>
       </div>
@@ -586,10 +642,7 @@ function LeadDetalheDialog({
 
   const inicial = lead.nome.trim().charAt(0).toUpperCase() || "?";
   const etapaAtual = ETAPAS.findIndex((e) => e.status === lead.status);
-  const etapasPassadas = ETAPAS.slice(0, Math.max(0, etapaAtual));
-  const etapasFuturas = ETAPAS.slice(Math.max(0, etapaAtual + 1));
   const prioridade = prioridadeFollowUp(lead);
-  const diasSemIndicacao = "Sem indicação registrada";
 
   return (
     <>
@@ -618,6 +671,8 @@ function LeadDetalheDialog({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
                 <SheetTitle className="text-xl font-black text-white tracking-tight truncate">{lead.nome}</SheetTitle>
+                <span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-cyan-200">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</span>
+                {lead.classificacao && <span className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-200">{lead.classificacao}</span>}
                 {podeEditar && (
                   <button
                     onClick={() => setEditarCadastroAberto(true)}
@@ -650,73 +705,33 @@ function LeadDetalheDialog({
           </div>
         </div>
 
-        <div className="flex-1 w-full max-w-none overflow-y-auto space-y-4 px-6 sm:px-8 pb-8">
-          <section className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="grid w-full gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
-              <div className="min-w-0 border-b border-white/[0.08] pb-4 lg:border-b-0 lg:border-r lg:pr-5">
-                <p className="mt-1 text-xs leading-5 text-slate-300">{etapasPassadas.length ? etapasPassadas.map((e) => e.label).join(" → ") : "Início do funil"}</p>
-                <p className="mt-5 text-[9px] font-black uppercase tracking-wider text-slate-500">Última indicação</p>
-                <p className="mt-1 text-xs font-bold text-slate-200">{diasSemIndicacao}</p>
-              </div>
-              <div className="min-w-0 border-b border-white/[0.08] px-0 py-4 lg:border-b-0 lg:border-r lg:px-5">
-                <div className="flex items-start justify-between gap-3"><div><p className="mt-2 text-lg font-black text-white">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</p><p className="text-[11px] text-slate-400">{lead.responsavel?.nome || "Responsável não definido"}</p></div><span className={cn("rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wider", prioridade.className)}>Follow-up {prioridade.label}</span></div>
-                <div className="mt-5 grid grid-cols-2 gap-3"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Segmento</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.segmento || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Origem</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.origem || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Cidade/UF</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.cidade ? `${lead.cidade}${lead.uf ? `/${lead.uf}` : ""}` : "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Próxima ação</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.proximaAcaoEm ? new Date(lead.proximaAcaoEm).toLocaleDateString("pt-BR") : "Não definida"}</p></div></div>
-                <div className="mt-4 grid grid-cols-3 gap-2 border-y border-white/[0.07] py-3 text-center"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Indicações</p><p className="text-xl font-black text-white">0</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Contratos</p><p className="text-xl font-black text-white">0</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Conversão</p><p className="text-xl font-black text-white">—</p></div></div>
-              </div>
-              <div className="min-w-0 pt-4 lg:pl-5 lg:pt-0"><div className="flex flex-wrap gap-2">{etapasFuturas.length ? etapasFuturas.map((e) => <button key={e.status} type="button" onClick={() => setStatusDestino(e.status)} className={cn("rounded-lg border px-2.5 py-1.5 text-[10px] font-bold transition-colors", statusDestino === e.status ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.1]")}>{e.label}</button>) : <span className="text-xs text-slate-500">Última etapa</span>}</div><button type="button" onClick={() => void mover()} disabled={salvando || statusDestino === lead.status} className="mt-3 h-9 w-full rounded-xl text-[10px] font-black uppercase tracking-wider text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Mover para etapa selecionada</button><p className="mt-5 text-[9px] font-black uppercase tracking-wider text-slate-500">Potencial de recorrência</p><div className="mt-2 flex gap-1">{[0,1,2,3,4,5].map((n) => <span key={n} className={cn("h-1.5 flex-1 rounded-full", n <= (lead.potencialRecorrencia ?? 0) ? "bg-amber-400" : "bg-white/10")} />)}</div><p className="mt-1 text-right text-xs font-black text-amber-300">{lead.potencialRecorrencia ?? 0}/5</p></div>
+        <div className="flex-1 grid grid-cols-1 gap-4 overflow-y-auto px-4 pb-6 sm:px-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(260px,0.65fr)] lg:overflow-hidden min-h-0">
+          <section className="min-h-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:overflow-y-auto">
+            <div className="grid grid-cols-2 gap-3 border-b border-white/[0.07] pb-4">
+              <div><p className="text-[9px] uppercase tracking-wider text-slate-500">Última indicação</p><p className="mt-1 text-sm font-black text-white">{formatarDataCard(lead.ultimaIndicacaoEm)}</p><p className="text-[10px] text-slate-400">há {diasSemIndicacaoDoLead(lead)} dias</p></div>
+              <div><p className="text-[9px] uppercase tracking-wider text-slate-500">Último contato</p><p className="mt-1 text-sm font-black text-white">{formatarDataCard(lead.ultimoContatoEm)}</p></div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {lead.historico.length ? lead.historico.map((item) => (
+                <div key={item.id} className="flex gap-3"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: `rgb(${accent})`, boxShadow: `0 0 8px rgba(${accent},.6)` }} /><div className="min-w-0"><p className="text-xs font-semibold text-slate-200">{labelHistorico(item.acao)}</p><p className="text-[10px] text-slate-500">{formatarDataCard(item.createdAt)}{item.usuario?.nome ? ` · ${item.usuario.nome}` : ""}</p></div></div>
+              )) : <p className="text-xs text-slate-500">Nenhuma atividade registrada.</p>}
             </div>
           </section>
-          {podeEditar && (
-            <>
-              <section className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500"><Star size={12} /> Potencial de recorrência</p>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {[0, 1, 2, 3, 4, 5].map((n) => (
-                      <button key={n} onClick={() => setPotencial(n)} className="h-8 w-8 rounded-lg text-[11px] font-bold transition-colors" style={{ background: potencial === n ? `rgba(${accent},0.4)` : "rgba(255,255,255,0.05)", color: potencial === n ? "#fff" : "#94a3b8" }}>
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                  <button onClick={() => void salvarPotencial()} disabled={salvando} className="h-8 px-3 rounded-lg text-[10px] font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Salvar</button>
-                </div>
-              </section>
 
-              <section className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500"><CalendarClock size={12} /> Próxima ação</p>
-                <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <input type="date" value={proximaAcaoData} onChange={(e) => setProximaAcaoData(e.target.value)} className={inputCls} style={inputStyle} />
-                  <input value={proximaAcaoDesc} onChange={(e) => setProximaAcaoDesc(e.target.value)} placeholder="Ex: Ligação, WhatsApp..." className={inputCls} style={inputStyle} />
-                </div>
-                <button onClick={() => void salvarProximaAcao()} disabled={salvando} className="h-9 px-4 rounded-xl text-[11px] font-bold text-black transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Registrar</button>
-              </section>
+          <section className="min-h-0 space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:overflow-y-auto">
+            <div className="flex items-start justify-between gap-3"><div><p className="text-lg font-black text-white">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</p><p className="text-[11px] text-slate-400">{lead.responsavel?.nome || "Responsável não definido"}</p></div><span className={cn("rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wider", prioridade.className)}>Follow-up {prioridade.label}</span></div>
+            <p className="text-[10px] leading-4 text-slate-400">{prioridade.detail}</p>
+            <div className="grid grid-cols-2 gap-3"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Segmento</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.segmento || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Origem</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.origem || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Cidade/UF</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.cidade ? `${lead.cidade}${lead.uf ? `/${lead.uf}` : ""}` : "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Próxima ação</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.proximaAcaoDescricao || "Não definida"}</p><p className="text-[10px] text-slate-500">{formatarDataCard(lead.proximaAcaoEm)}</p></div></div>
+            <div className="grid grid-cols-3 gap-2 border-y border-white/[0.07] py-3 text-center"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Indicações</p><p className="text-xl font-black text-white">{lead.indicacoesCount}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Contratos</p><p className="text-xl font-black text-white">{lead.contratosCount}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Conversão</p><p className="text-xl font-black text-white">{lead.conversaoPercentual === null ? "—" : `${lead.conversaoPercentual.toLocaleString("pt-BR")}%`}</p></div></div>
+            <div><div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Potencial de recorrência</p><span className="text-xs font-black text-amber-300">{lead.potencialRecorrencia ?? 0}/5</span></div><div className="mt-2 flex gap-1">{[0,1,2,3,4,5].map((n) => <span key={n} className={cn("h-1.5 flex-1 rounded-full", n <= (lead.potencialRecorrencia ?? 0) ? "bg-amber-400" : "bg-white/10")} />)}</div></div>
+            {podeEditar && <><div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><div className="flex flex-wrap items-center gap-1">{[0,1,2,3,4,5].map((n) => <button key={n} onClick={() => setPotencial(n)} className="h-8 w-8 rounded-lg text-[11px] font-bold" style={{ background: potencial === n ? `rgba(${accent},0.4)` : "rgba(255,255,255,0.05)" }}>{n}</button>)}<button onClick={() => void salvarPotencial()} disabled={salvando} className="ml-1 h-8 rounded-lg px-3 text-[10px] font-bold text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Salvar</button></div></div><div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><div className="grid grid-cols-[130px_1fr] gap-2"><input type="date" value={proximaAcaoData} onChange={(e) => setProximaAcaoData(e.target.value)} className={inputCls} style={inputStyle} /><input value={proximaAcaoDesc} onChange={(e) => setProximaAcaoDesc(e.target.value)} placeholder="Ligação, WhatsApp, reunião..." className={inputCls} style={inputStyle} /></div><button onClick={() => void salvarProximaAcao()} disabled={salvando} className="h-9 px-4 rounded-xl text-[11px] font-bold text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Registrar próxima ação</button></div></>}
+          </section>
 
-              {lead.status !== "PRE_CADASTRO" ? null : (
-                <section className="space-y-2 p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)" }}>
-                  <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400"><Handshake size={12} /> Promover a parceiro cadastrado</p>
-                  <input value={docPromocao} onChange={(e) => setDocPromocao(e.target.value)} placeholder="CPF/CNPJ *" className={inputCls} style={inputStyle} />
-                  <input value={emailPromocao} onChange={(e) => setEmailPromocao(e.target.value)} placeholder="E-mail *" className={inputCls} style={inputStyle} />
-                  <button onClick={() => void promover()} disabled={salvando} className="w-full h-10 rounded-xl text-[11px] font-black uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: "rgb(16,185,129)" }}>
-                    Cadastrar Parceiro
-                  </button>
-                </section>
-              )}
-
-              <section className="space-y-2 p-3 rounded-xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-red-400"><LogOut size={12} /> Saída lateral</p>
-                <Select value={saidaSelecionada} onValueChange={setSaidaSelecionada}>
-                  <SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Motivo" /></SelectTrigger>
-                  <SelectContent>
-                    {SAIDAS.map((s) => <SelectItem key={s.status} value={s.status}>{s.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <textarea value={motivoSaida} onChange={(e) => setMotivoSaida(e.target.value)} placeholder="Descreva o motivo..." className="w-full min-h-16 rounded-xl px-3 py-2 text-[12px] outline-none text-slate-200 resize-none" style={inputStyle} />
-                <button onClick={() => void registrarSaida()} disabled={salvando} className="w-full h-9 rounded-xl text-[11px] font-bold text-red-300 transition-opacity hover:opacity-90 disabled:opacity-40" style={{ background: "rgba(239,68,68,0.15)" }}>
-                  Registrar saída
-                </button>
-              </section>
-            </>
-          )}
+          <aside className="min-h-0 space-y-4 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="space-y-2">{ETAPAS.filter((e) => e.status !== lead.status).map((e) => <button key={e.status} type="button" onClick={() => setStatusDestino(e.status)} className={cn("block w-full rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition-colors", statusDestino === e.status ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.1]")}>{e.label}</button>)}</div>
+            <button type="button" onClick={() => void mover()} disabled={salvando || statusDestino === lead.status} className="h-10 w-full rounded-xl text-[10px] font-black uppercase tracking-wider text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Mover para etapa selecionada</button>
+            {podeEditar && <><div className="border-t border-white/[0.07] pt-4"><Select value={saidaSelecionada} onValueChange={setSaidaSelecionada}><SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Saída lateral" /></SelectTrigger><SelectContent>{SAIDAS.map((s) => <SelectItem key={s.status} value={s.status}>{s.label}</SelectItem>)}</SelectContent></Select><textarea value={motivoSaida} onChange={(e) => setMotivoSaida(e.target.value)} placeholder="Motivo da saída..." className="mt-2 min-h-16 w-full rounded-xl px-3 py-2 text-[12px] text-slate-200" style={inputStyle} /><button onClick={() => void registrarSaida()} disabled={salvando} className="mt-2 h-9 w-full rounded-xl text-[11px] font-bold text-red-300 disabled:opacity-40" style={{ background: "rgba(239,68,68,0.15)" }}>Registrar saída</button></div>{lead.status === "PRE_CADASTRO" && <div className="space-y-2 border-t border-white/[0.07] pt-4"><input value={docPromocao} onChange={(e) => setDocPromocao(e.target.value)} placeholder="CPF/CNPJ *" className={inputCls} style={inputStyle} /><input value={emailPromocao} onChange={(e) => setEmailPromocao(e.target.value)} placeholder="E-mail *" className={inputCls} style={inputStyle} /><button onClick={() => void promover()} disabled={salvando} className="h-10 w-full rounded-xl text-[10px] font-black uppercase text-white disabled:opacity-40" style={{ background: "rgb(16,185,129)" }}>Cadastrar parceiro</button></div>}</>}
+          </aside>
         </div>
       </SheetContent>
     </Sheet>
