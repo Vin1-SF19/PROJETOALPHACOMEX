@@ -555,6 +555,53 @@ export async function atualizarEventoParcial(params: AtualizarEventoParcialParam
   }
 }
 
+interface ResponderConviteParams {
+  emailUsuario: string;
+  calendarId: string;
+  googleEventId: string;
+  resposta: "accepted" | "declined" | "tentative";
+  etagConhecido?: string;
+}
+
+/** Atualiza só o `responseStatus` do participante `self` (RSVP), preservando os demais convidados. */
+export async function responderConvite(params: ResponderConviteParams): Promise<GoogleEventoDTO> {
+  const calendar = clienteCalendar(params.emailUsuario);
+  try {
+    const eventoAtual = await executarComRetry(() =>
+      calendar.events.get({
+        calendarId: params.calendarId,
+        eventId: params.googleEventId,
+      }),
+    );
+    const participantes = eventoAtual.data.attendees ?? [];
+    const indiceProprio = participantes.findIndex((participante) => participante.self === true);
+    if (indiceProprio === -1) {
+      throw new GoogleCalendarError("Você não está na lista de convidados deste evento.", { kind: "invalid_request" });
+    }
+    const attendees = participantes.map((participante, indice) =>
+      indice === indiceProprio ? { ...participante, responseStatus: params.resposta } : participante,
+    );
+
+    const resposta = await executarComRetry(() =>
+      calendar.events.patch(
+        {
+          calendarId: params.calendarId,
+          eventId: params.googleEventId,
+          requestBody: { attendees },
+          sendUpdates: "all",
+        },
+        params.etagConhecido
+          ? { headers: { "If-Match": params.etagConhecido } }
+          : undefined,
+      ),
+    );
+    return mapEventoParaDTO(resposta.data);
+  } catch (erroOriginal) {
+    if (erroOriginal instanceof GoogleCalendarError) throw erroOriginal;
+    throw classificarErroGoogle(erroOriginal);
+  }
+}
+
 interface CancelarEventoParams {
   emailUsuario: string;
   calendarId: string;

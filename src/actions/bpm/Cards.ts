@@ -17,7 +17,9 @@ import {
   isAdminRole,
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
-import { executarAutomacaoFechamentoComercial, executarAutomacaoTarefaNotaFiscal } from "@/lib/bpm/automacoes";
+import { type CardFilhoCriado, executarAutomacaoFechamentoComercial, executarAutomacaoTarefaNotaFiscal } from "@/lib/bpm/automacoes";
+
+export type { CardFilhoCriado };
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
@@ -1319,27 +1321,39 @@ async function executarMovimentoComRequisitos(
     if (!validacaoLost.success) return validacaoLost;
   }
 
+  const proximoContatoEfetivo = proximoContatoEm === undefined
+    ? card.proximoContatoEm
+    : proximoContatoEm;
+  // "Próximo Contato" não é um BpmCampo dinâmico (é BpmCard.proximoContatoEm),
+  // mas para o pipeline Revisão de Radar é tão obrigatório pra sair de uma
+  // etapa quanto os campos dinâmicos — reportado junto na mesma mensagem em
+  // vez de um erro separado descoberto só depois que os outros são corrigidos.
+  const proximoContatoAusente = pipelineEhRevisaoRadar(card.pipeline?.nome)
+    && etapaEhNovosLeads(card.etapa.nome)
+    && !proximoContatoEfetivo;
+
   const valoresEfetivos = new Map(
     camposTransicao.map((campo) => [campo.id, valoresValidados[campo.id] ?? campo.valor]),
   );
   const faltantes = camposTransicao.filter(
     (campo) => campo.obrigatorio && !valoresEfetivos.get(campo.id)?.trim(),
   );
-  if (faltantes.length > 0) {
+  if (faltantes.length > 0 || proximoContatoAusente) {
     const faltantesOrigem = faltantes.filter(
       (campo) => campo.contexto === "ORIGEM" || campo.contexto === "AMBOS",
     );
+    const nomesPendentes = [
+      ...faltantes.map((campo) => campo.nome),
+      ...(proximoContatoAusente ? ["Próximo Contato"] : []),
+    ];
     return {
       success: false,
-      error: faltantesOrigem.length > 0
-        ? `Não é possível sair de ${card.etapa.nome}: campos obrigatórios pendentes (${faltantes.map((campo) => campo.nome).join(", ")}).`
-        : `Não é possível avançar: campos obrigatórios pendentes (${faltantes.map((campo) => campo.nome).join(", ")})`,
+      error: faltantesOrigem.length > 0 || proximoContatoAusente
+        ? `Não é possível sair de ${card.etapa.nome}: campos obrigatórios pendentes (${nomesPendentes.join(", ")}).`
+        : `Não é possível avançar: campos obrigatórios pendentes (${nomesPendentes.join(", ")})`,
     };
   }
 
-  const proximoContatoEfetivo = proximoContatoEm === undefined
-    ? card.proximoContatoEm
-    : proximoContatoEm;
   const camposEtapaOrigem = await carregarCamposOrigemParaGuard({
     cardId,
     pipelineId: card.pipelineId,
@@ -1520,13 +1534,28 @@ async function executarMovimentoComRequisitos(
     return { pipelineId: cardAtual.pipelineId };
   });
 
-  await executarAutomacaoFechamentoComercial(cardId, userId);
-  await executarAutomacaoTarefaNotaFiscal(cardId, userId);
+  const cardsFilhosCriados: CardFilhoCriado[] = [];
+
+  // Automações D-009/D-035 rodam fora da transação do movimento: uma falha nelas
+  // não pode reverter nem derrubar a movimentação do card pai já commitada acima.
+  try {
+    cardsFilhosCriados.push(...(await executarAutomacaoFechamentoComercial(cardId, userId)));
+  } catch (error) {
+    console.error("[executarAutomacaoFechamentoComercial]", error);
+  }
+  try {
+    await executarAutomacaoTarefaNotaFiscal(cardId, userId);
+  } catch (error) {
+    console.error("[executarAutomacaoTarefaNotaFiscal]", error);
+  }
+
   await notificarPipelineBpm({ pipelineId: resultadoMovimento.pipelineId, cardId, tipo: "CARD_MOVIDO" });
   revalidatePath(`${ROTA_BASE}/pipeline/${resultadoMovimento.pipelineId}`);
   revalidatePath(ROTA_BASE);
   revalidatePath(`${ROTA_BASE}/tarefas`);
-  return { success: true };
+  return cardsFilhosCriados.length > 0
+    ? { success: true, cardsFilhosCriados }
+    : { success: true };
 }
 
 export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {

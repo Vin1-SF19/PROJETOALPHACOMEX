@@ -35,6 +35,15 @@ describe("CRM - persistência antes da movimentação", () => {
     expect(guarda).toBeLessThan(mover);
   });
 
+  it("força o blur do campo em edição antes de aguardar a fila de saves", () => {
+    const movimento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
+    const blur = movimento.indexOf("document.activeElement.blur()");
+    const flush = movimento.indexOf("const savesConcluidos = await flushSaves()");
+
+    expect(blur).toBeGreaterThan(-1);
+    expect(blur).toBeLessThan(flush);
+  });
+
   it("bloqueia acionamentos repetidos enquanto salva e move o card", () => {
     const movimento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
 

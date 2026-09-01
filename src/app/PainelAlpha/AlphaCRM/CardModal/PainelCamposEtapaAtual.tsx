@@ -132,7 +132,12 @@ export function PainelCamposEtapaAtual({
       toast.error(MOTIVO_LOST_OUTRO_OBRIGATORIO_MENSAGEM);
       return;
     }
-    const camposValores = montarPayloadCamposDestino(camposAtuaisVisiveis, valoresCamposAtuais);
+    const camposAlterados = camposAtuaisVisiveis.filter(
+      (campo) => (valoresCamposAtuais[campo.id] ?? "") !== (baseCamposAtuais[campo.id] ?? ""),
+    );
+    // Valores apenas hidratados da entidade mestre (por exemplo Cliente.cnpj)
+    // não viram cópias em BpmCardCampoValor quando outro campo é salvo.
+    const camposValores = montarPayloadCamposDestino(camposAlterados, valoresCamposAtuais);
     setSalvandoCamposAtuais(true);
     const promise = registerSave(async () => {
       const resultado = await AtualizarCardBpm({

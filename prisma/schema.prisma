@@ -3732,6 +3732,7 @@ model BpmEtapa {
   transicoesOrigem   BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
   transicoesDestino  BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
   camposObrigatorios BpmCampoObrigatorioEtapa[]
+  camposOcultos      BpmCampoOcultoEtapa[]
 
   @@index([pipelineId])
   @@index([pipelineId, ordem])
@@ -3754,6 +3755,7 @@ model BpmCampo {
   etapa               BpmEtapa?                  @relation(fields: [etapaId], references: [id], onDelete: Cascade)
   valores             BpmCardCampoValor[]
   obrigatorioEmEtapas BpmCampoObrigatorioEtapa[]
+  ocultoEmEtapas      BpmCampoOcultoEtapa[]
 
   @@index([pipelineId])
   @@index([etapaId])
@@ -4020,6 +4022,20 @@ model NolossLead {
 // específicas, sem duplicar o campo por etapa (ex: "Valor acordado no contrato" é o mesmo
 // campo em Reunião Agendada/Em Tratativa/Fechado, mas só passa a ser obrigatório nelas).
 model BpmCampoObrigatorioEtapa {
+  id      String   @id @default(cuid())
+  campoId String
+  etapaId String
+  campo   BpmCampo @relation(fields: [campoId], references: [id], onDelete: Cascade)
+  etapa   BpmEtapa @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+
+  @@unique([campoId, etapaId])
+  @@index([etapaId])
+}
+
+// Espelha BpmCampoObrigatorioEtapa: permite ocultar um BpmCampo de nível pipeline
+// (etapaId: null, visível em todas as etapas por padrão) de uma etapa específica,
+// sem apagar o campo nem afetar sua visibilidade nas demais etapas onde é usado.
+model BpmCampoOcultoEtapa {
   id      String   @id @default(cuid())
   campoId String
   etapaId String

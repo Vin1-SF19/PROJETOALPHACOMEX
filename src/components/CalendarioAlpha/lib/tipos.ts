@@ -60,6 +60,20 @@ export function eventoFoiRecusadoPeloUsuario(statusPropertiesJson: string | null
   }
 }
 
+/** Resposta atual do usuário ao convite (`self.responseStatus` do Google), quando conhecida. */
+export function respostaAtualDoUsuario(statusPropertiesJson: string | null): "accepted" | "declined" | "tentative" | "needsAction" | null {
+  if (!statusPropertiesJson) return null;
+  try {
+    const propriedades = JSON.parse(statusPropertiesJson) as { respostaDoUsuario?: unknown };
+    const resposta = propriedades.respostaDoUsuario;
+    return resposta === "accepted" || resposta === "declined" || resposta === "tentative" || resposta === "needsAction"
+      ? resposta
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Evento organizado por outra pessoa e colocado na agenda do usuário atual. */
 export function eventoFoiCompartilhadoComUsuario(statusPropertiesJson: string | null): boolean {
   if (!statusPropertiesJson) return false;

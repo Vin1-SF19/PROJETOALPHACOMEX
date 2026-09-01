@@ -12,6 +12,7 @@ import {
   criarEvento as criarEventoGoogleApi,
   listarCalendarios,
   obterEvento as obterEventoGoogleApi,
+  responderConvite as responderConviteGoogleApi,
 } from "@/lib/google-calendar/client";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import type { GoogleCalendarioDTO, GoogleEventoDTO } from "@/lib/google-calendar/types";
@@ -23,12 +24,14 @@ import {
   consultarFreeBusySchema,
   corHexSchema,
   criarEventoSchema,
+  responderConviteSchema,
   selecionarCalendarioSchema,
   type AtualizarEventoInput,
   type AtualizarEventoParcialInput,
   type CancelarEventoInput,
   type ConsultarFreeBusyInput,
   type CriarEventoInput,
+  type ResponderConviteInput,
   type SelecionarCalendarioInput,
 } from "@/lib/validations/google-calendar";
 import db from "@/lib/prisma";
@@ -637,5 +640,51 @@ export async function cancelarEventoNoCalendario(input: CancelarEventoInput): Pr
       };
     }
     return { success: false, error: "Não foi possível cancelar o evento no Google Agenda." };
+  }
+}
+
+/** Registra a resposta (aceitar/recusar/talvez) ao convite de um evento compartilhado com o usuário. */
+export async function responderConvite(input: ResponderConviteInput): Promise<ResultadoAcao<GoogleEventoDTO>> {
+  const acesso = await verificarAcessoCalendarioAlpha();
+  if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
+
+  const validacao = responderConviteSchema.safeParse(input);
+  if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
+  const dados = validacao.data;
+
+  const calendario = await db.googleCalendarSelecionado.findFirst({
+    where: { conexao: { userId: acesso.userId }, googleCalendarId: dados.calendarId },
+  });
+  if (!calendario) return { success: false, error: "Calendário não encontrado." };
+
+  const usuarioGoogle = await obterUsuarioGoogleAtivo(acesso.userId);
+  if (!usuarioGoogle.ok) return { success: false, error: erroMensagemAmigavel(usuarioGoogle.motivo) };
+
+  try {
+    const evento = await responderConviteGoogleApi({
+      emailUsuario: usuarioGoogle.emailUsuario,
+      calendarId: dados.calendarId,
+      googleEventId: dados.googleEventId,
+      resposta: dados.resposta,
+      etagConhecido: dados.etagConhecido,
+    });
+
+    const dadosCache = dadosCacheDeEvento(evento);
+    await db.googleCalendarEventoCache.upsert({
+      where: { calendarioId_googleEventId: { calendarioId: calendario.id, googleEventId: dados.googleEventId } },
+      create: { calendarioId: calendario.id, googleEventId: dados.googleEventId, ...dadosCache },
+      update: dadosCache,
+    });
+
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return { success: true, data: evento };
+  } catch (erro) {
+    if (erro instanceof GoogleCalendarError && erro.status === 412) {
+      return { success: false, error: "O evento mudou desde a última leitura. Reabra o evento e tente responder de novo." };
+    }
+    if (erro instanceof GoogleCalendarError && erro.kind === "invalid_request") {
+      return { success: false, error: erro.message };
+    }
+    return { success: false, error: "Não foi possível registrar sua resposta agora." };
   }
 }

@@ -178,7 +178,7 @@ describe("PainelCamposEtapaAtual", () => {
   it("renderiza a definição inclusive valor nulo, sinaliza obrigatório e envia o payload atual", () => {
     expect(painel).toContain('map((campo) => [campo.id, campo.valor ?? ""])');
     expect(painel).toContain('campo.obrigatorio ? " *" : ""');
-    expect(painel).toContain("montarPayloadCamposDestino(camposAtuaisVisiveis, valoresCamposAtuais)");
+    expect(painel).toContain("montarPayloadCamposDestino(camposAlterados, valoresCamposAtuais)");
     expect(painel).toContain("<CampoBpmInput");
     expect(input).toContain("required={campo.obrigatorio}");
     expect(input).toContain("aria-required={campo.obrigatorio}");

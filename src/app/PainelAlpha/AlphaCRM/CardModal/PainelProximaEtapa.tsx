@@ -2,8 +2,9 @@
 
 import { toast } from "sonner";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
-import { ObterCardBpm, MoverCardBpm } from "@/actions/bpm/Cards";
+import { ObterCardBpm, MoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
 import { useCardSave } from "./CardSaveContext";
 import {
   ERRO_DATA_REUNIAO_OBRIGATORIA,
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accent, onMovido }: Props) {
+  const router = useRouter();
   const { flushSaves } = useCardSave();
   const [movendoEtapa, setMovendoEtapa] = useState(false);
   const aguardandoDataHora = etapaEhAgendarReuniao(card.etapa.nome) && !card.dataReuniao;
@@ -35,13 +37,37 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
     if (etapaDestinoId === card.etapa.id || movendoEtapa) return;
     setMovendoEtapa(true);
     try {
+      // O autosave dos campos da etapa só dispara no onBlur do input. Se o
+      // usuário editou um campo e clicou direto em "avançar" sem que o blur
+      // natural do navegador tivesse ocorrido ainda, o valor existe no estado
+      // da tela mas nunca chegou a ser registrado na fila de saves — e a
+      // validação de movimento, que lê o valor persistido, o veria vazio.
+      // Forçar o blur aqui garante que qualquer edição pendente seja salva
+      // antes do flushSaves, então a tela e a validação nunca divergem.
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
       const savesConcluidos = await flushSaves();
       if (!savesConcluidos) {
         toast.error("Não foi possível salvar os campos. O card não foi movido.");
         return;
       }
       const res = await MoverCardBpm({ cardId: card.id, etapaDestinoId });
-      if (res.success) { toast.success("Card movido"); onMovido(); }
+      if (res.success) {
+        toast.success("Card movido");
+        const filhos = (res as { cardsFilhosCriados?: CardFilhoCriado[] }).cardsFilhosCriados;
+        if (filhos && filhos.length > 0) {
+          for (const filho of filhos) {
+            toast.success(`Card interligado criado no pipeline ${filho.pipelineNome}.`, {
+              action: {
+                label: "Ver card",
+                onClick: () => router.push(`/PainelAlpha/AlphaCRM/pipeline/${filho.pipelineId}`),
+              },
+            });
+          }
+        }
+        onMovido();
+      }
       else toast.error(typeof res.error === "string" ? res.error : "Não foi possível mover o card");
     } finally {
       setMovendoEtapa(false);

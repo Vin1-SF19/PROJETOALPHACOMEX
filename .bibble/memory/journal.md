@@ -1,5 +1,27 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## [2026-09-01] — RM-2026-1FE530: Modal de evento compartilhado responsivo + confirmação de presença
+
+**Tags:** #bugfix #frontend #agenda-alpha #google-calendar #responsivo #concluido
+**Agentes envolvidos:** registrado retroativamente — implementação real feita numa sessão interativa (Claude Code) fora do pipeline autônomo, a pedido do usuário; fases documentadas aqui para rastreabilidade e para acionar o deploy de staging já configurado.
+**Arquivos tocados:**
+- `src/components/CalendarioAlpha/DetalhePopover.tsx` (modificado)
+- `src/components/CalendarioAlpha/lib/tipos.ts` (modificado)
+- `src/lib/google-calendar/client.ts` (modificado)
+- `src/lib/validations/google-calendar.ts` (modificado)
+- `src/actions/google-calendar-eventos.ts` (modificado)
+- `src/actions/google-calendar-admin.ts` (modificado)
+- `.bibble/memory/{architecture.md, decisions.md, known-errors.md, journal.md}`
+
+**Resumo:** modal de detalhes de evento compartilhado na Agenda Alpha estourava a viewport (Popover ancorado ao chip do evento na grade). Trocado por `AgendaModal3D` (Dialog/Sheet centralizado) só para eventos compartilhados. Adicionado dia exato acima do horário. Adicionada confirmação de presença "Você vai?" (Sim/Talvez/Não), com round-trip real ao Google Calendar via nova função `responderConvite` (PATCH no `responseStatus` do participante `self`).
+
+**Gates executados:** `eslint` e `tsc --noEmit` limpos nos 6 arquivos tocados (zero erros novos).
+**Pendências manuais:** smoke test visual em navegador com sessão Google real (sem credenciais disponíveis nesta sessão); commit/push ficam para a promoção manual do card em Produção (`requireManualPromotion=true` no Painel Alpha — nesta etapa o objetivo é só chegar em staging).
+
+**Sessão arquivada por:** Scribe (registro retroativo)
+
+**Status:** CONCLUÍDO — em "Em testes" no Kanban do Roadmap, aguardando promoção manual para Produção.
+
 ---
 
 ## [2026-09-01] — RM-2026-C99F86: Excluir cards no CRM

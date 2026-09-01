@@ -1,5 +1,18 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-01 — RM-2026-1FE530 — Reusar AgendaModal3D (Dialog/Sheet centralizado) em vez de ajustar collision detection do Popover
+
+**Contexto:** o modal de detalhes de evento compartilhado (Popover Radix ancorado ao chip do evento) estourava a viewport em telas menores, para eventos com muitos convidados/conteúdo.
+
+**Decisão:** trocar o Popover ancorado por `AgendaModal3D` (padrão já existente e testado no projeto, usado para a confirmação de cancelamento no mesmo arquivo) só para o caso de evento compartilhado, em vez de tentar ajustar `collisionPadding`/`avoidCollisions` do Radix Popover.
+
+**Justificativa:**
+1. Posicionamento ancorado/flutuante nunca garante permanência na viewport quando o trigger pode estar em qualquer lugar de um grid (mês/semana) e o conteúdo é grande/variável (Meet, localização, descrição, N convidados).
+2. Dialog/Sheet centralizado (`AgendaModal3D`) já resolve isso de forma genérica (`max-h-[calc(100dvh-2rem)]` + scroll interno no desktop, `Sheet` inferior `max-h-[88dvh]` no mobile) e já é o padrão usado em outros modais do mesmo módulo.
+3. Eventos não compartilhados (popover leve, conteúdo pequeno) não tinham o problema reportado — mantidos sem alteração para não arriscar regressão.
+
+**Consequência:** dois padrões de apresentação coexistem em `DetalhePopover.tsx` (Popover leve vs. AgendaModal3D), sempre que o conteúdo puder crescer (Meet/descrição/lista de convidados) o padrão correto é o modal centralizado, não o Popover ancorado.
+
 ### 2026-09-01 — RM-2026-C99F86 — Hard delete (não soft delete) para exclusão de card BPM
 
 **Contexto:** o objetivo pedia "excluir cards no CRM". O model `BpmCard` não tem `deletedAt`/`excluidoEm` — `status` só aceita `"ATIVO"|"CONCLUIDO"|"CANCELADO"`. Não existe infraestrutura de soft delete no projeto.

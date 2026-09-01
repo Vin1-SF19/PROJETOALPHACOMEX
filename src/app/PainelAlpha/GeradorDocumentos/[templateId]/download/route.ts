@@ -20,9 +20,9 @@ function verificarRateLimit(userId: string): boolean {
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ templateId: string }> },
 ): Promise<NextResponse> {
-  const { id: documentoId } = await params;
+  const { templateId: documentoId } = await params;
 
   const session = await auth();
   const user = session?.user as { id?: string | number; role?: string } | undefined;

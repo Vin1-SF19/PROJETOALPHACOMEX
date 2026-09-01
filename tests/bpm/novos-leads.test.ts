@@ -35,42 +35,42 @@ describe("requisitos de Novos leads", () => {
     expect(faltantes.map((campo) => campo.id)).toEqual(["campo_nome"]);
   });
 
-  it("libera a saída quando Radar pretendido e Confirmar serviço estão preenchidos", () => {
+  it("libera os requisitos dinâmicos com Nome, CNPJ e Radar preenchidos", () => {
     const requisitos = [
+      { id: "nome", nome: "Nome do responsável" },
+      { id: "cnpj", nome: "CNPJ" },
       { id: "radar", nome: "Radar pretendido" },
-      { id: "servico", nome: "Confirmar serviço" },
     ];
 
     expect(listarCamposObrigatoriosFaltantes(requisitos, {
+      nome: "Maria",
+      cnpj: "12.345.678/0001-90",
       radar: "Radar 150k",
-      servico: "Sim",
     })).toEqual([]);
   });
 
-  it("bloqueia a saída quando os campos estão nulos ou ausentes", () => {
+  it("lista somente Radar pretendido quando apenas ele está ausente", () => {
     const requisitos = [
+      { id: "nome", nome: "Nome do responsável" },
+      { id: "cnpj", nome: "CNPJ" },
       { id: "radar", nome: "Radar pretendido" },
-      { id: "servico", nome: "Confirmar serviço" },
     ];
 
     expect(listarCamposObrigatoriosFaltantes(requisitos, {
+      nome: "Maria",
+      cnpj: "12.345.678/0001-90",
       radar: null,
-    }).map((campo) => campo.nome)).toEqual([
-      "Radar pretendido",
-      "Confirmar serviço",
-    ]);
+    }).map((campo) => campo.nome)).toEqual(["Radar pretendido"]);
   });
 
-  it("trata string vazia como preenchimento parcial pendente", () => {
+  it("não exige Confirmar serviço quando ele está vazio ou ausente", () => {
     const requisitos = [
       { id: "radar", nome: "Radar pretendido" },
-      { id: "servico", nome: "Confirmar serviço" },
     ];
 
     expect(listarCamposObrigatoriosFaltantes(requisitos, {
       radar: "Radar Ilimitado",
-      servico: "",
-    }).map((campo) => campo.nome)).toEqual(["Confirmar serviço"]);
+    })).toEqual([]);
   });
 });
 

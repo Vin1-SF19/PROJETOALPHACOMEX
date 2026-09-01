@@ -11,6 +11,7 @@ import {
   criarEvento as criarEventoGoogleApi,
   listarCalendarios,
   obterEvento as obterEventoGoogleApi,
+  responderConvite as responderConviteGoogleApi,
 } from "@/lib/google-calendar/client";
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { isAdminRole } from "@/lib/google-calendar/colegas";
@@ -21,10 +22,12 @@ import {
   atualizarEventoParcialSchema,
   cancelarEventoSchema,
   criarEventoSchema,
+  responderConviteSchema,
   type AtualizarEventoInput,
   type AtualizarEventoParcialInput,
   type CancelarEventoInput,
   type CriarEventoInput,
+  type ResponderConviteInput,
 } from "@/lib/validations/google-calendar";
 import db from "@/lib/prisma";
 
@@ -427,5 +430,51 @@ export async function cancelarEventoParaColega(
       };
     }
     return { success: false, error: "Não foi possível cancelar o evento na agenda do colaborador." };
+  }
+}
+
+/** Registra a resposta (aceitar/recusar/talvez) ao convite de um evento na agenda de um colaborador. */
+export async function responderConviteParaColega(
+  colegaId: number,
+  input: ResponderConviteInput,
+): Promise<ResultadoAcao<GoogleEventoDTO>> {
+  const alvo = await resolverAlvoAdmin(colegaId);
+  if (!alvo.ok) return { success: false, error: alvo.error };
+
+  const validacao = responderConviteSchema.safeParse(input);
+  if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
+  const dados = validacao.data;
+
+  try {
+    const calendario = await resolverCalendarioGravavelDoColega(alvo.colegaEmail, dados.calendarId);
+    if (!calendario.ok) return { success: false, error: calendario.error };
+
+    const evento = await responderConviteGoogleApi({
+      emailUsuario: alvo.colegaEmail,
+      calendarId: calendario.calendarId,
+      googleEventId: dados.googleEventId,
+      resposta: dados.resposta,
+      etagConhecido: dados.etagConhecido,
+    });
+
+    await registrarAuditoriaCalendarioAlpha(
+      alvo.adminUserId,
+      "CALENDARIO_ALPHA_ADMIN_RESPONDEU_CONVITE_COLEGA",
+      `colegaId=${colegaId} googleEventId=${dados.googleEventId} resposta=${dados.resposta}`,
+    );
+
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return { success: true, data: evento };
+  } catch (erro) {
+    if (erro instanceof GoogleCalendarError && erro.status === 412) {
+      return {
+        success: false,
+        error: "O evento mudou desde a última leitura. Consulte a agenda do colaborador novamente antes de responder.",
+      };
+    }
+    if (erro instanceof GoogleCalendarError && erro.kind === "invalid_request") {
+      return { success: false, error: erro.message };
+    }
+    return { success: false, error: "Não foi possível registrar a resposta na agenda do colaborador." };
   }
 }

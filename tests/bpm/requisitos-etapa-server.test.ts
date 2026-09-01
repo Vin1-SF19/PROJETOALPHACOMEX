@@ -4,12 +4,24 @@ vi.mock("server-only", () => ({}));
 
 import {
   carregarCamposAplicaveisCardEtapa,
+  carregarCamposFaltantesCardEtapa,
   carregarCamposObrigatoriosEtapa,
 } from "@/lib/bpm/requisitos-etapa-server";
 
+function criarCliente(overrides: Record<string, unknown>) {
+  return {
+    bpmCampo: { findMany: vi.fn().mockResolvedValue([]) },
+    bpmCampoObrigatorioEtapa: { findMany: vi.fn().mockResolvedValue([]) },
+    bpmCampoOcultoEtapa: { findMany: vi.fn().mockResolvedValue([]) },
+    bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
+    bpmCard: { findUnique: vi.fn().mockResolvedValue(null) },
+    ...overrides,
+  };
+}
+
 describe("campos aplicáveis por etapa", () => {
   it("retorna somente campos diretos e globais explicitamente associados", async () => {
-    const client = {
+    const client = criarCliente({
       bpmCampo: {
         findMany: vi.fn().mockResolvedValue([
           {
@@ -45,7 +57,7 @@ describe("campos aplicáveis por etapa", () => {
           { campoId: "campo-direto", valor: "valor existente" },
         ]),
       },
-    };
+    });
 
     const campos = await carregarCamposAplicaveisCardEtapa(
       "card-1",
@@ -69,7 +81,7 @@ describe("campos aplicáveis por etapa", () => {
   });
 
   it("inclui campo com etapaId null (\"Todas as etapas\" no admin) mesmo sem vínculo em BpmCampoObrigatorioEtapa — RM-2026-04C4B0", async () => {
-    const client = {
+    const client = criarCliente({
       bpmCampo: {
         findMany: vi.fn().mockResolvedValue([
           {
@@ -90,7 +102,7 @@ describe("campos aplicáveis por etapa", () => {
           { campoId: "campo-global-direto", valor: "12.345.678/0001-90" },
         ]),
       },
-    };
+    });
 
     const campos = await carregarCamposAplicaveisCardEtapa(
       "card-1",
@@ -121,13 +133,13 @@ describe("campos aplicáveis por etapa", () => {
       obrigatorio: false,
       ordem: 1,
     };
-    const client = {
+    const client = criarCliente({
       bpmCampo: { findMany: vi.fn().mockResolvedValue([campo]) },
       bpmCampoObrigatorioEtapa: {
         findMany: vi.fn().mockResolvedValue([{ campo }]),
       },
       bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
-    };
+    });
 
     const campos = await carregarCamposAplicaveisCardEtapa(
       "card-1",
@@ -150,7 +162,7 @@ describe("campos aplicáveis por etapa", () => {
       obrigatorio: false,
       ordem: 2,
     };
-    const client = {
+    const client = criarCliente({
       bpmCampo: {
         findMany: vi.fn().mockResolvedValue([
           campoRepetido,
@@ -184,7 +196,7 @@ describe("campos aplicáveis por etapa", () => {
         ]),
       },
       bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
-    };
+    });
 
     const campos = await carregarCamposAplicaveisCardEtapa(
       "card-1",
@@ -206,7 +218,7 @@ describe("campos aplicáveis por etapa", () => {
   });
 
   it("campo global sem valor salvo aparece com valor null, não é omitido", async () => {
-    const client = {
+    const client = criarCliente({
       bpmCampo: {
         findMany: vi.fn().mockResolvedValue([
           {
@@ -223,7 +235,7 @@ describe("campos aplicáveis por etapa", () => {
       },
       bpmCampoObrigatorioEtapa: { findMany: vi.fn().mockResolvedValue([]) },
       bpmCardCampoValor: { findMany: vi.fn().mockResolvedValue([]) },
-    };
+    });
 
     const campos = await carregarCamposAplicaveisCardEtapa(
       "card-1",
@@ -235,18 +247,129 @@ describe("campos aplicáveis por etapa", () => {
     expect(campos).toHaveLength(1);
     expect(campos[0]).toMatchObject({ id: "campo-global-vazio", valor: null });
   });
+
+  it("oculta o campo apenas na etapa configurada, mesmo se houver associação obrigatória", async () => {
+    const campo = {
+      id: "confirmar-servico",
+      pipelineId: "pipeline-1",
+      etapaId: null,
+      nome: "Confirmar serviço",
+      tipo: "texto",
+      opcoesJson: null,
+      obrigatorio: false,
+      ordem: 4,
+    };
+    const client = criarCliente({
+      bpmCampo: { findMany: vi.fn().mockResolvedValue([campo]) },
+      bpmCampoObrigatorioEtapa: {
+        findMany: vi.fn().mockResolvedValue([{ campo }]),
+      },
+      bpmCampoOcultoEtapa: {
+        findMany: vi.fn().mockResolvedValue([{ campoId: campo.id }]),
+      },
+    });
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-legado",
+      "pipeline-1",
+      "novos-leads",
+      client as never,
+    );
+
+    expect(campos).toEqual([]);
+  });
+
+  it("hidrata CNPJ e contato inequívoco da entidade mestre sem sobrescrever valor local", async () => {
+    const camposConfigurados = [
+      {
+        id: "cnpj",
+        pipelineId: "pipeline-1",
+        etapaId: null,
+        nome: "CNPJ",
+        tipo: "texto",
+        opcoesJson: null,
+        obrigatorio: false,
+        ordem: 1,
+      },
+      {
+        id: "responsavel",
+        pipelineId: "pipeline-1",
+        etapaId: null,
+        nome: "Nome do responsável",
+        tipo: "texto",
+        opcoesJson: null,
+        obrigatorio: false,
+        ordem: 2,
+      },
+      {
+        id: "email",
+        pipelineId: "pipeline-1",
+        etapaId: null,
+        nome: "E-mail",
+        tipo: "texto",
+        opcoesJson: null,
+        obrigatorio: false,
+        ordem: 3,
+      },
+    ];
+    const client = criarCliente({
+      bpmCampo: { findMany: vi.fn().mockResolvedValue(camposConfigurados) },
+      bpmCardCampoValor: {
+        findMany: vi.fn().mockResolvedValue([{ campoId: "email", valor: "local@exemplo.com" }]),
+      },
+      bpmCard: {
+        findUnique: vi.fn().mockResolvedValue({
+          empresa: {
+            cnpj: "12345678000190",
+            razaoSocial: "Alpha Ltda",
+            nomeFantasia: "Alpha",
+            pessoas: [{
+              principal: true,
+              pessoa: {
+                nome: "Maria",
+                celular: "11999999999",
+                email: "mestre@exemplo.com",
+                telefoneExtra: null,
+              },
+            }],
+          },
+        }),
+      },
+    });
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-legado",
+      "pipeline-1",
+      "novos-leads",
+      client as never,
+    );
+
+    expect(Object.fromEntries(campos.map((campo) => [campo.nome, campo.valor]))).toEqual({
+      CNPJ: "12345678000190",
+      "Nome do responsável": "Maria",
+      "E-mail": "local@exemplo.com",
+    });
+  });
 });
 
 describe("campos obrigatórios por etapa (validação de transição)", () => {
   it("RM-2026-04C4B0: inclui campo global (etapaId null) marcado como obrigatório, sem depender de BpmCampoObrigatorioEtapa", async () => {
-    const client = {
+    const client = criarCliente({
       bpmCampo: {
         findMany: vi.fn().mockResolvedValue([
-          { id: "campo-global-obrigatorio", nome: "CNPJ" },
+          {
+            id: "campo-global-obrigatorio",
+            pipelineId: "pipeline-1",
+            etapaId: null,
+            nome: "CNPJ",
+            tipo: "texto",
+            opcoesJson: null,
+            obrigatorio: true,
+            ordem: 1,
+          },
         ]),
       },
-      bpmCampoObrigatorioEtapa: { findMany: vi.fn().mockResolvedValue([]) },
-    };
+    });
 
     const campos = await carregarCamposObrigatoriosEtapa(
       "pipeline-1",
@@ -258,9 +381,46 @@ describe("campos obrigatórios por etapa (validação de transição)", () => {
       where: {
         pipelineId: "pipeline-1",
         OR: [{ etapaId: "etapa-2" }, { etapaId: null }],
-        obrigatorio: true,
       },
     }));
     expect(campos).toEqual([{ id: "campo-global-obrigatorio", nome: "CNPJ" }]);
+  });
+
+  it("considera CNPJ mestre preenchido ao validar card legado", async () => {
+    const campo = {
+      id: "cnpj",
+      pipelineId: "pipeline-1",
+      etapaId: null,
+      nome: "CNPJ",
+      tipo: "texto",
+      opcoesJson: null,
+      obrigatorio: false,
+      ordem: 1,
+    };
+    const client = criarCliente({
+      bpmCampo: { findMany: vi.fn().mockResolvedValue([campo]) },
+      bpmCampoObrigatorioEtapa: {
+        findMany: vi.fn().mockResolvedValue([{ campo }]),
+      },
+      bpmCard: {
+        findUnique: vi.fn().mockResolvedValue({
+          empresa: {
+            cnpj: "12345678000190",
+            razaoSocial: "Alpha Ltda",
+            nomeFantasia: null,
+            pessoas: [],
+          },
+        }),
+      },
+    });
+
+    const faltantes = await carregarCamposFaltantesCardEtapa(
+      "card-antigo",
+      "pipeline-1",
+      "novos-leads",
+      client as never,
+    );
+
+    expect(faltantes).toEqual([]);
   });
 });

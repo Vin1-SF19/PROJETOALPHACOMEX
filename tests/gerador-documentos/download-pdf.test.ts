@@ -34,7 +34,7 @@ vi.mock("@/lib/prisma", () => ({
 import { auth } from "../../../src/auth";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
 import db from "@/lib/prisma";
-import { GET } from "../../../src/app/PainelAlpha/GeradorDocumentos/[id]/download/route";
+import { GET } from "../../../src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockPerms = getPermissoesEfetivas as ReturnType<typeof vi.fn>;

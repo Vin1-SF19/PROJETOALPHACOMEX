@@ -1,5 +1,20 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Agenda Alpha — modal de evento compartilhado responsivo + confirmação de presença (RM-2026-1FE530, 2026-09-01)
+
+**Objetivo:** corrigir o modal de detalhes de evento compartilhado que abria fora da viewport, e adicionar dia exato + confirmação de presença ("Você vai?").
+
+**Causa raiz:** `src/components/CalendarioAlpha/DetalhePopover.tsx` renderizava o conteúdo completo do convite (Meet, localização, descrição, convidados) dentro de um `Popover` do Radix ancorado ao chip do evento na grade do calendário, com `w-[min(94vw,46rem)]`. Posicionamento flutuante ancorado não garante permanência na viewport para conteúdo grande/variável perto das bordas da grade.
+
+**Correção aplicada:**
+- Para eventos com `compartilhadoComUsuario`, o clique agora abre `AgendaModal3D` (Dialog centralizado no desktop / Sheet inferior no mobile, já existente e usado no mesmo arquivo para a confirmação de cancelamento) em vez do Popover ancorado. Eventos não compartilhados continuam no Popover leve original.
+- Nova linha "Dia: " (`formatarTituloDia`) acima de "Quando: ".
+- Confirmação de presença "Você vai?" (Sim/Talvez/Não): `responderConvite`/`responderConviteParaColega` (`src/actions/google-calendar-eventos.ts`, `src/actions/google-calendar-admin.ts`) chamam nova `responderConvite` em `src/lib/google-calendar/client.ts`, que faz `PATCH` só no `responseStatus` do participante `self` (preserva os demais convidados, `sendUpdates: "all"`). Resposta atual lida via novo helper `respostaAtualDoUsuario` (`lib/tipos.ts`).
+
+**Caminho de consumo:** `/PainelAlpha/CalendarioAlpha` → clicar em evento compartilhado (mês/semana/dia) → modal.
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-1FE530)
+
 ## Alpha CRM — Exclusão de cards (RM-2026-C99F86, 2026-09-01)
 
 **Objetivo:** permitir admins e gestores excluir cards do Kanban BPM.

@@ -1,4 +1,5 @@
 import db from "@/lib/prisma";
+import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 
 /**
  * Automações do BPM (D-034): implementadas em código, não configuráveis via UI.
@@ -7,25 +8,35 @@ import db from "@/lib/prisma";
  * mover um card do pipeline Comercial).
  */
 
-const NOME_PIPELINE_COMERCIAL = "Comercial";
-const NOME_ETAPA_FECHADO_GANHO = "Fechado Ganho";
 const NOME_PIPELINE_FINANCEIRO = "Financeiro";
 const NOME_PIPELINE_RADAR = "Radar";
 const NOME_ETAPA_NOTA_FISCAL = "Nota Fiscal";
 
+export interface CardFilhoCriado {
+  pipelineId: string;
+  pipelineNome: string;
+  cardId: string;
+}
+
 /**
- * D-009: ao fechar com sucesso uma oportunidade do Comercial, cria automaticamente
- * card(s) nos pipelines Financeiro e Radar, mantendo vínculo com o card de origem
- * e a empresa (D-027 — histórico cruzado via BpmCardVinculo).
+ * D-009: ao mover um card para a etapa de fechamento (normalizada "fechado"), cria
+ * automaticamente card(s) nos pipelines Financeiro e Radar, mantendo vínculo com o
+ * card de origem e a empresa (D-027 — histórico cruzado via BpmCardVinculo).
+ * Retorna os cards filhos criados (para feedback ao usuário) ou lista vazia se
+ * idempotente/bloqueado.
  */
-export async function executarAutomacaoFechamentoComercial(cardId: string, usuarioId: number) {
+export async function executarAutomacaoFechamentoComercial(
+  cardId: string,
+  usuarioId: number,
+): Promise<CardFilhoCriado[]> {
   const card = await db.bpmCard.findUnique({
     where: { id: cardId },
     include: { pipeline: true, etapa: true },
   });
-  if (!card) return;
-  if (card.pipeline.nome !== NOME_PIPELINE_COMERCIAL) return;
-  if (card.etapa.nome !== NOME_ETAPA_FECHADO_GANHO) return;
+  if (!card) return [];
+  // Anti-loop: um card fechado dentro do Financeiro/Radar não gera outro card neles.
+  if (card.pipeline.nome === NOME_PIPELINE_FINANCEIRO || card.pipeline.nome === NOME_PIPELINE_RADAR) return [];
+  if (!etapaEhFechado(card.etapa.nome)) return [];
 
   const [pipelineFinanceiro, pipelineRadar] = await Promise.all([
     db.bpmPipeline.findFirst({ where: { nome: NOME_PIPELINE_FINANCEIRO } }),
@@ -35,6 +46,8 @@ export async function executarAutomacaoFechamentoComercial(cardId: string, usuar
   const pipelinesDestino = [pipelineFinanceiro, pipelineRadar].filter(
     (p): p is NonNullable<typeof p> => p !== null,
   );
+
+  const cardsCriados: CardFilhoCriado[] = [];
 
   for (const pipelineDestino of pipelinesDestino) {
     const cardExistente = await db.bpmCard.findFirst({
@@ -49,6 +62,8 @@ export async function executarAutomacaoFechamentoComercial(cardId: string, usuar
     });
     if (!primeiraEtapa) continue;
 
+    let novoCardId: string | null = null;
+
     await db.$transaction(async (tx) => {
       const novoCard = await tx.bpmCard.create({
         data: {
@@ -58,6 +73,7 @@ export async function executarAutomacaoFechamentoComercial(cardId: string, usuar
           responsavelId: card.responsavelId,
         },
       });
+      novoCardId = novoCard.id;
 
       await tx.bpmCardMembro.create({
         data: { cardId: novoCard.id, userId: card.responsavelId, role: "RESPONSAVEL" },
@@ -72,7 +88,7 @@ export async function executarAutomacaoFechamentoComercial(cardId: string, usuar
           cardId: novoCard.id,
           acao: "CARD_CRIADO_POR_AUTOMACAO",
           automacaoOrigem: "fechamento_comercial",
-          valorNovoJson: JSON.stringify({ cardOrigemId: card.id, pipelineOrigem: NOME_PIPELINE_COMERCIAL }),
+          valorNovoJson: JSON.stringify({ cardOrigemId: card.id, pipelineOrigem: card.pipeline.nome }),
         },
       });
 
@@ -86,7 +102,17 @@ export async function executarAutomacaoFechamentoComercial(cardId: string, usuar
         },
       });
     });
+
+    if (novoCardId) {
+      cardsCriados.push({
+        pipelineId: pipelineDestino.id,
+        pipelineNome: pipelineDestino.nome,
+        cardId: novoCardId,
+      });
+    }
   }
+
+  return cardsCriados;
 }
 
 /**

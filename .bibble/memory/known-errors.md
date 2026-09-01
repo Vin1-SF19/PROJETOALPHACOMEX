@@ -5,6 +5,13 @@
 
 ---
 
+### Padrão de armadilha — Popover ancorado não serve para conteúdo grande/variável perto da borda de um grid (RM-2026-1FE530)
+**Sintoma:** modal de detalhes de evento compartilhado na Agenda Alpha abria parcialmente fora da tela ao clicar em eventos perto das bordas da grade do calendário (mês/semana), sem responsividade.
+**Causa raiz:** `Popover` do Radix (posicionamento flutuante ancorado ao elemento-trigger) foi usado para conteúdo grande e variável (Meet, localização, descrição, N convidados) disparado por um trigger pequeno posicionado em qualquer lugar de um grid — mesmo com collision detection padrão do Radix, o resultado não é confiável quando o trigger está perto da borda da viewport/container.
+**Lição para armadilhas semelhantes:** Popover ancorado (Radix `Popover`/tooltip-like) é adequado só para conteúdo pequeno e previsível. Sempre que o conteúdo puder crescer de forma variável (listas, descrições longas, formulários), usar um Dialog/Sheet centralizado na viewport (no projeto: `AgendaModal3D`) em vez de tentar afinar `collisionPadding`/`avoidCollisions` do Popover.
+**Fix aplicado:** ver `architecture.md` — `DetalhePopover.tsx` passou a usar `AgendaModal3D` para eventos compartilhados.
+**Adicionado em:** 2026-09-01 (Scribe, fechamento RM-2026-1FE530)
+
 ### Componentes com autosave-on-blur fora do CardSaveContext — perda de dados ao mover card (RM-2026-5BDA0D)
 **Sintoma:** campos editáveis em cards CRM (`proximoContatoEm`, `statusPosFechamento`, respostas do checklist) não persistiam ao sair do card — usuário precisava redigitar.
 **Causa raiz:** `PainelProximoContato.tsx`, `PainelStatusPosFechamento.tsx` e `PainelChecklistFollowUp.tsx` salvavam via `onBlur`/`onChange` chamando `AtualizarCardBpm`/`SalvarChecklistFollowUpBpm` diretamente, **sem** registrar no `CardSaveContext`. Consequência: `flushSaves()` (chamado por `PainelProximaEtapa.handleMover` antes de `MoverCardBpm`) não aguardava esses saves — o backend recebia `MoverCardBpm` antes dos saves concluírem, e os valores editados eram perdidos.

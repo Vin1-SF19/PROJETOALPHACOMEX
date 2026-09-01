@@ -39,14 +39,34 @@ const manifestPath = path.join(outputDirectory, `${baseName}.manifest.json`);
 
 await mkdir(outputDirectory, { recursive: true });
 
-const schema = await client.execute({
-  sql: `SELECT type, name, tbl_name AS tableName, sql
-        FROM sqlite_master
-        WHERE sql IS NOT NULL
-          AND name NOT LIKE 'sqlite_%'
-          AND type IN ('table', 'index', 'trigger', 'view')
-        ORDER BY CASE type WHEN 'table' THEN 1 WHEN 'view' THEN 2 WHEN 'index' THEN 3 ELSE 4 END, name`,
-});
+// Schema e dados precisam vir do mesmo snapshot. Sem uma transação de leitura,
+// uma escrita concorrente entre os lotes poderia gerar um dump logicamente
+// inconsistente mesmo com hash e tamanho válidos.
+const transaction = await client.transaction("read");
+let schema;
+let tables;
+const rowsByTable = [];
+try {
+  schema = await transaction.execute({
+    sql: `SELECT type, name, tbl_name AS tableName, sql
+          FROM sqlite_master
+          WHERE sql IS NOT NULL
+            AND name NOT LIKE 'sqlite_%'
+            AND type IN ('table', 'index', 'trigger', 'view')
+          ORDER BY CASE type WHEN 'table' THEN 1 WHEN 'view' THEN 2 WHEN 'index' THEN 3 ELSE 4 END, name`,
+  });
+  tables = schema.rows.filter((row) => row.type === "table");
+  const selectStatements = tables.map((table) => ({
+    sql: `SELECT * FROM ${quoteIdentifier(table.name)}`,
+  }));
+  for (let offset = 0; offset < selectStatements.length; offset += 24) {
+    const batch = await transaction.batch(selectStatements.slice(offset, offset + 24));
+    rowsByTable.push(...batch);
+  }
+  await transaction.commit();
+} finally {
+  transaction.close();
+}
 
 const chunks = [
   "-- PainelAlpha logical backup generated through @libsql/client (read-only).",
@@ -56,24 +76,16 @@ const chunks = [
   "BEGIN TRANSACTION;",
 ];
 
-const tables = schema.rows.filter((row) => row.type === "table");
 for (const row of tables) {
   chunks.push(`${row.sql};`);
-}
-
-const selectStatements = tables.map((table) => ({
-  sql: `SELECT * FROM ${quoteIdentifier(table.name)}`,
-}));
-const rowsByTable = [];
-for (let offset = 0; offset < selectStatements.length; offset += 24) {
-  const batch = await client.batch(selectStatements.slice(offset, offset + 24), "deferred");
-  rowsByTable.push(...batch);
 }
 
 let totalRows = 0;
 for (const [index, table] of tables.entries()) {
   const rowsResult = rowsByTable[index];
-  const columns = rowsResult.columns.map((column) => column.name);
+  // @libsql/client expõe ResultSet.columns como string[]. A implementação
+  // anterior lia column.name e serializava literalmente "undefined".
+  const columns = rowsResult.columns;
   if (columns.length === 0) continue;
 
   totalRows += rowsResult.rows.length;

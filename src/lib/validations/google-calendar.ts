@@ -158,6 +158,14 @@ export const cancelarEventoSchema = z.object({
 }).strict();
 export type CancelarEventoInput = z.infer<typeof cancelarEventoSchema>;
 
+export const responderConviteSchema = z.object({
+  calendarId: z.string().trim().min(1).max(300),
+  googleEventId: z.string().trim().min(1),
+  resposta: z.enum(["accepted", "declined", "tentative"]),
+  etagConhecido: z.string().trim().min(1).max(1024).optional(),
+}).strict();
+export type ResponderConviteInput = z.infer<typeof responderConviteSchema>;
+
 export const corHexSchema = z
   .string()
   .trim()
