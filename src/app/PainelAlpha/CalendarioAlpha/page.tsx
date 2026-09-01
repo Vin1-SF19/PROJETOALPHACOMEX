@@ -119,6 +119,8 @@ export default async function CalendarioAlphaPage({
       notas: true,
       status: true,
       vencimentoEm: true,
+      inicioLocalEm: true,
+      fimLocalEm: true,
       agendamentoChamado: { select: { inicioEm: true, fimPlanejadoEm: true, fimConcluidoEm: true, status: true } },
       taskList: { select: { googleTaskListId: true, titulo: true } },
     },
@@ -134,6 +136,8 @@ export default async function CalendarioAlphaPage({
     fimPlanejadoAgendadoEm: tarefa.agendamentoChamado?.fimPlanejadoEm.toISOString() ?? null,
     fimConcluidoAgendadoEm: tarefa.agendamentoChamado?.fimConcluidoEm?.toISOString() ?? null,
     statusAgendamento: tarefa.agendamentoChamado?.status === "CONCLUIDO" ? "CONCLUIDO" : tarefa.agendamentoChamado?.status === "EM_ATENDIMENTO" ? "EM_ATENDIMENTO" : null,
+    inicioLocalEm: tarefa.inicioLocalEm?.toISOString() ?? null,
+    fimLocalEm: tarefa.fimLocalEm?.toISOString() ?? null,
   })));
   const listasTarefas: ListaTarefasAgendaView[] = await db.googleCalendarTaskListCache.findMany({
     where: { conexaoId: statusConexao.conexaoId ?? "" },

@@ -1,5 +1,192 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-01 — RM-2026-C99F86 — Hard delete (não soft delete) para exclusão de card BPM
+
+**Contexto:** o objetivo pedia "excluir cards no CRM". O model `BpmCard` não tem `deletedAt`/`excluidoEm` — `status` só aceita `"ATIVO"|"CONCLUIDO"|"CANCELADO"`. Não existe infraestrutura de soft delete no projeto.
+
+**Decisão:** hard delete via `db.$transaction(tx => tx.bpmCard.delete({ where: { id } }))` — irreversível, pedido do usuário.
+
+**Justificativa:**
+1. **Sem soft delete no projeto:** nenhum model BPM tem `deletedAt` — criar um só para `BpmCard` seria inconsistente.
+2. **Cascades já corretos:** todas as relações filhas diretas têm `onDelete: Cascade` no schema — `db.bpmCard.delete` remove tudo automaticamente, sem limpeza manual.
+3. **`Indicacao` usa `SetNull`:** ao excluir o card, a `Indicacao` permanece no banco, só perde o vínculo — comportamento correto, sem ação manual.
+4. **Confirmação explícita na UI:** `AlertDialog` com mensagem "irreversível" — o usuário sabe que não pode desfazer.
+
+**Consequência:** se no futuro for necessário soft delete, será preciso migration aditiva (`deletedAt DateTime?`) + filtro em todas as queries — fora do escopo desta fase.
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-C99F86)
+
+### 2026-09-01 — RM-2026-C99F86 — Permissão por card-role (RESPONSAVEL/ADMINISTRADOR), não por role global de usuário
+
+**Contexto:** o objetivo do Roadmap descrevia "admins e gestores" como autorizados. O sistema não tem role global "GESTOR" (zero ocorrências em `src/`). A infraestrutura de permissão para exclusão já existia: `excluirCard` em `BpmAcao` + `PERMISSOES_POR_ROLE` em `ownership.ts`.
+
+**Decisão:** usar `exigirAcessoBpmCard(cardId, userId, userRole, "excluirCard")` — autoriza card-roles RESPONSAVEL e ADMINISTRADOR (papéis de `BpmCardMembro.role`), com bypass global para Admin/CEO/TI via `isAdminRole`. Não criar `exigirRoleMinima` nem role global "GESTOR".
+
+**Justificativa:**
+1. **Infraestrutura já existe:** `excluirCard` já estava mapeado em `PERMISSOES_POR_ROLE` para RESPONSAVEL e ADMINISTRADOR — só faltava ser usado por uma action.
+2. **Consistência com o padrão do projeto:** todas as outras actions de card (`MoverCardBpm`, `ObterHistoricoServicoEmpresa`, etc.) usam `exigirAcessoBpmCard` — mesma abordagem.
+3. **PARTICIPANTE não tem `excluirCard`:** a exclusão é uma ação destrutiva — restrita a quem gerencia o card, não a quem apenas trabalha nele.
+4. **Bypass Admin/CEO/TI:** `isAdminRole` em `checarAcessoBpmCard` dá acesso pleno a qualquer card — mesmo padrão de outras actions.
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-C99F86)
+
+### 2026-09-01 — RM-2026-C99F86 — Exclusão individual (não em lote) nesta fase
+
+**Contexto:** o objetivo pedia "excluir cards" (plural). Não havia requisito explícito de exclusão em lote.
+
+**Decisão:** exclusão individual — um card por vez, via botão no header do modal do card.
+
+**Justificativa:**
+1. **Escopo mínimo:** o objetivo não especificava exclusão em lote — não inventar requisitos.
+2. **UX mais segura:** exclusão individual com confirmação explícita por card é mais segura que exclusão em lote (risco de excluir cards errados).
+3. **Futuro:** se exclusão em lote for necessária, pode ser adicionada como feature separada — a action `ExcluirCardBpm` já é reutilizável (chamar em loop com confirmação por card).
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-C99F86)
+
+### 2026-09-01 — RM-2026-C99F86 — Cascades do schema Prisma (não limpeza manual)
+
+**Contexto:** ao excluir um `BpmCard`, há 8+ relações filhas diretas. A auditoria (Fase 0) confirmou que todas têm `onDelete: Cascade` no schema.
+
+**Decisão:** confiar nos cascades do schema Prisma — `db.$transaction(tx => tx.bpmCard.delete({ where: { id } }))` é suficiente. Não fazer limpeza manual de filhos.
+
+**Justificativa:**
+1. **Cascades já corretos:** `BpmCardCampoValor`, `BpmCardMembro`, `BpmTarefa`, `BpmCardAnexo`, `BpmCardHistorico`, `BpmInteracaoCard`, `BpmChecklistFollowUp`, `BpmCardVinculo` — todos `onDelete: Cascade`.
+2. **Transação atômica:** `db.$transaction` garante que o delete do card e dos filhos são atômicos — se um falhar, todos rolam.
+3. **Menos código = menos bugs:** limpeza manual seria redundante e propensa a erros (esquecer uma relação).
+4. **`Indicacao` usa `SetNull`:** comportamento correto — a `Indicacao` permanece, só perde o vínculo.
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-C99F86)
+
+### 2026-09-01 — RM-2026-29F59C — "Serviços" no card do CRM, não "pipelines"; texto do objetivo do Roadmap divergia da terminologia real do projeto
+
+**Contexto:** o objetivo do Roadmap (`RM-2026-29F59C — Tabs de serviços no layout do card`) e o Markdown gerado automaticamente para a fase de fechamento descreviam a mudança como "nome do pipeline atual" e "tabs exibindo pipelines reais do banco". O Scout (Fase 0) auditou o código e confirmou que essa terminologia estava incorreta: `BpmPipeline` (`ListarPipelinesBpm()`, `src/actions/bpm/Pipelines.ts`) é um conceito de fluxo interno de processo (ex.: "Revisão de Radar", "Financeiro") — não corresponde ao que a tab hardcoded (`SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"]`) já representava, que são **serviços comerciais** vendidos.
+
+**Decisão:** seguir a terminologia correta do domínio (serviços comerciais) em vez do texto literal do objetivo/fase, reaproveitando `getServicosComerciais()`/model `ServicosComerciais` — infraestrutura já existente e já usada com o mesmo propósito em `ModalGerenciamentoLeads.tsx`/`ModalNovaIndicacao.tsx`/`AbaServicos.tsx` (mesma decisão já tomada antes em RM-2026-97934A, ver entrada de 2026-08-26 abaixo). Substituir por `BpmPipeline` teria sido tecnicamente incorreto (pipelines não são um catálogo de produtos vendáveis) e teria exigido navegação entre pipelines diferentes dentro do card, um comportamento não solicitado nem faz sentido de produto. A aba fixa "Este card" foi preservada — é a própria aba de detalhe do card, não um "nome de pipeline".
+
+**Consequência:** a fonte do objetivo no Roadmap deveria ser corrigida para refletir a terminologia real ("serviços comerciais", não "pipelines") — evita confusão em futuras sessões automatizadas que leiam esse objetivo sem o contexto desta auditoria.
+
+**Validação:** `tsc`/`eslint`/`npx vitest run tests/bpm/` limpos nos arquivos da fase, zero regressão (baseline idêntico: 20 falhas pré-existentes / 307 passando).
+
+---
+
+### 2026-09-01 — RM-2026-1BA46D — Campos vazios não renderizam bloco vazio (guarda condicional por campo)
+
+**Contexto:** o card da tarefa na aba "Tarefas" do CRM (`PainelTarefasPorTipo.tsx`) passou a exibir 6 campos novos (descrição, prioridade, status, responsável, concluída em), todos opcionais (`String?`/`DateTime?`/`Int?` no model `BpmTarefa`).
+
+**Decisão:** cada bloco de campo tem guarda condicional própria (`{tarefa.descricao && ...}`, `{tarefa.prioridade && ...}`, etc.) em vez de exibir um placeholder tipo "—" ou "Não informado".
+
+**Justificativa:**
+1. **Densidade visual:** a maioria das tarefas não usa todos os campos (ex.: tipo LEMBRETE_RAPIDO não tem responsável nem prioridade sempre) — exibir "—" para cada campo ausente poluiria o card sem agregar informação.
+2. **Consistência com o padrão do projeto:** outros painéis do card (`PainelProximoContato`, `PainelStatusPosFechamento`) já usam esse padrão de renderização condicional.
+3. **Descrição truncada:** `line-clamp-3` + `whitespace-pre-line` evita que descrições longas (ex.: mensagem de e-mail/WhatsApp) estourem o layout do card, mantendo a informação visível sem exigir expansão.
+
+**Decisão 2 — prioridade usa cor fixa por valor, não escala dinâmica:** `ALTA=red`, `MEDIA=amber`, qualquer outro valor (incluindo `BAIXA` ou valores não previstos) cai no fallback `slate`. Evita quebra visual se um valor de prioridade não mapeado for persistido.
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-1BA46D)
+
+### 2026-09-01 — RM-2026-66F07D — Alerta de tarefa usa opções predefinidas (enum) em vez de campo numérico livre
+
+**Contexto:** o formulário de criação de tarefas (`/PainelAlpha/PainelTarefas/GerenciarTarefas`) não tinha campo de alerta (antecedência de notificação). O requisito pedia "alerta" sem especificar o formato.
+
+**Decisão:** usar um `<select>` com 7 opções predefinidas (`15MIN_ANTES` a `1SEMANA_ANTES`) em vez de um campo numérico livre (ex.: "quantos minutos antes?").
+
+**Justificativa:**
+1. **UX:** opções predefinidas são mais rápidas de selecionar que digitar um número — o usuário não precisa pensar em "15" vs "30" vs "60".
+2. **Consistência:** todas as tarefas usam o mesmo conjunto de opções — evita valores arbitrários (ex.: "47 minutos antes") que seriam difíceis de exibir e comparar.
+3. **Validação mais simples:** `z.enum([...])` no Zod schema — impossível inserir valor inválido. Com campo numérico livre, seria necessário validar faixa (min/max) e unidade (minutos/horas/dias).
+4. **Persistência determinística:** a chave (`"1H_ANTES"`) é estável e legível — facilita debug e migração futura para sistema de notificação.
+
+**Mapeamento chave→minutos:** `ALERTA_OPCOES` em `src/lib/tarefas/schemas.ts` define a correspondência. Função `alertaChaveParaMinutos(chave)` converte para minutos quando necessário (ex.: cálculo de `alertaEm = prazo - minutos`).
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, RM-2026-66F07D)
+
+### 2026-09-01 — RM-2026-66F07D — Prazo de tarefa é data+hora completa (não apenas data)
+
+**Contexto:** o formulário de criação de tarefas já tinha `dataInicio` (input `type="date"`) e `horario` (input `type="time"`) separados. O requisito pedia "prazo (data+hora)".
+
+**Decisão:** manter os dois inputs separados (`type="date"` + `type="time"`) em vez de criar um `DateTimePicker` único.
+
+**Justificativa:**
+1. **Padrão do projeto:** inputs nativos HTML `type="date"` e `type="time"` são o padrão estabelecido (usados em `GerenciarTarefas`, `CalendarioAlpha`, `GerarDocumentoForm`). Não reinventar.
+2. **Precisão do lembrete:** a hora é necessária para calcular `alertaEm = prazo - antecedência` com precisão de minutos.
+3. **Simplicidade:** dois inputs nativos são mais leves que um componente `DateTimePicker` customizado (que não existe no projeto).
+4. **Compatibilidade:** inputs nativos funcionam em todos os navegadores modernos sem dependência extra.
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, RM-2026-66F07D)
+
+### 2026-09-01 — RM-2026-1D1118 — Pré-preenchimento por nome exato de campo, não por semântica
+
+**Contexto:** ao selecionar Contratante/Contratada no `GerarDocumentoForm`, as variáveis do template (CNPJ, razão social, e-mail, telefone) permaneciam vazias — o usuário precisava redigitar dados que já existiam no banco.
+
+**Decisão 1 — mapeamento por nome exato da variável, não por semântica:** a função `prePreencherVariaveis()` compara `v.nome` (nome da variável no template) diretamente com as chaves do objeto de dados (`cnpj`, `documento`, `razaoSocial`, `nomeFantasia`, `email`, `telefone`). Não há fuzzy matching, não há tradução de nomes. Motivo: evitar mapeamento ambíguo — "documento" pode significar CNPJ ou CPF dependendo do contexto; "razão social" pode ser `razaoSocial` ou `nomeFantasia`. Só o nome exato é determinístico.
+
+**Decisão 2 — campo pré-preenchido continua editável:** o `Input` não recebe `disabled`. Motivo: o dado no banco pode estar desatualizado; o usuário precisa poder corrigir antes de gerar o documento.
+
+**Decisão 3 — não sobrescrever valor já digitado:** `prePreencherVariaveis` só preenche se `atual === undefined || atual === ""`. Motivo: UX — evitar perda de trabalho do usuário que já digitou um valor (mesmo que diferente do banco).
+
+**Decisão 4 — escopo limitado a campos estruturais:** só CNPJ, CPF, e-mail, telefone, razão social, nome fantasia. Campos dinâmicos de etapa (`BpmCardCampoValor`) têm nomes arbitrários definidos pelo usuário — não é possível mapear semântica de forma segura.
+
+**Decisão 5 — outros formulários já cobertos:** `NovoCardModal`, `NovoLeadCompleto` e `ModalNovaEmpresaContratada` já possuem pré-preenchimento via Receita Federal (`ConsultarCnpjParaQualificacao`) — sem lacuna, não alterados.
+
+**Validação:** `typecheck`/`eslint` — baseline pré-existente, zero regressão.
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, RM-2026-1D1118)
+
+### 2026-09-01 — RM-2026-5BDA0D — Campos fixos usam o mesmo CardSaveContext dos dinâmicos
+
+**Contexto:** a correção de RM-2026-2403E5 estabeleceu o padrão `registerSave`/`flushSaves` para campos dinâmicos (`BpmCampo`/`BpmCardCampoValor`). Os campos fixos (`proximoContatoEm`, `statusPosFechamento`, respostas do checklist) salvavam fora desse padrão — cada um com sua própria chamada direta à Server Action.
+
+**Decisão:** todos os componentes editáveis com autosave-on-blur/onChange dentro de `CardSaveProvider` devem usar `registerSave` — não importa se o campo é dinâmico (`BpmCampo`) ou fixo (coluna direta em `BpmCard`). O `CardSaveContext` é o único ponto de sincronização entre saves paralelos e `MoverCardBpm`.
+
+**Justificativa:**
+1. **Consistência:** um único mecanismo de save para todos os campos editáveis no card — reduz a superfície de bugs de timing.
+2. **Segurança:** `flushSaves()` garante que TODOS os saves (dinâmicos + fixos) concluíram antes de `MoverCardBpm` — sem exceções.
+3. **Simplicidade:** não é necessário criar um segundo contexto ou mecanismo de sincronização para campos fixos.
+
+**Exceções intencionais (fora do `registerSave`):**
+- `PainelReuniao.tsx` — botão explícito "Agendar" (não autosave-on-blur)
+- `PainelStandbyFollowUp.tsx` — botão explícito "Interromper" (ação destrutiva com confirmação)
+- `SeletorMembrosCard.tsx` — clique explícito em membro (não autosave)
+
+**Validação:** 3 novos casos em `tests/bpm/card-save-flow.test.ts`; `typecheck`/`tests` — baseline pré-existente, zero regressão.
+
+**Adicionado em:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-5BDA0D)
+
+### 2026-09-01 — RM-2026-948ED5 — Card virtual usa modal dedicado, não o CardFullViewModal
+
+**Contexto:** o card virtual de lead do site (`NolossLead`, status `pending`) não é um `BpmCard` — não tem `empresaId`, `etapaId`, `campos`, `pipelineId` próprios. O `CardFullViewModal` depende de todos esses campos para renderizar suas tabs (Formulário da Etapa, Próxima Etapa, Histórico, Tarefas).
+
+**Decisão:** criar um modal dedicado (`NolossLeadModal`) em vez de forçar o `CardFullViewModal` a lidar com um card incompleto. O modal dedicado é mais simples, exibe apenas os dados relevantes do lead (nome, e-mail, telefone, data) e oferece a única ação disponível: promoção.
+
+**Justificativa:**
+1. **Read-only vs. editável:** o card virtual é read-only — não há campos para editar, não há etapas para avançar, não há tarefas. O `CardFullViewModal` com suas 4+ tabs seria vazio/quebrado para um `NolossLead`.
+2. **Reutilizar vs. criar separado:** criar separado é mais seguro — zero risco de regressão no `CardFullViewModal` (que é usado por todos os cards nativos). O `NolossLeadModal` é um componente isolado com superfície mínima.
+3. **Ação única:** a única ação disponível para um lead pendente é "Assumir lead" (promoção). Um modal com 1 ação + 4 campos de dados é mais claro que um modal com 4 tabs vazias + 1 botão escondido.
+
+**Impacto:** nenhum. O `CardFullViewModal` não foi alterado. A detecção `origem === "noloss"` no `abrirCard()` é o único ponto de ramificação.
+
+### 2026-08-31 — RM-2026-5830C2 — Restrição de campos no card é visual, não de dados
+
+**Contexto:** na etapa "Novos leads" (pipeline "Revisão de Radar"), o card do Kanban exibia ~12 campos, muitos irrelevantes para a triagem inicial de leads.
+
+**Decisão:** exibir apenas 5 campos no card quando `novosLeads === true`: nome do responsável, CNPJ, Radar pretendido, Próximo Contato e Anotação. Restrição é puramente visual (renderização condicional no componente) — zero mudança de schema, migration, Server Action ou dados no banco. Todos os campos continuam disponíveis no detalhe do card (`CardFullViewModal`) e nas demais etapas do pipeline.
+
+**Por que visual e não de dados:** os campos "removidos" (serviço, canal de origem, status pós-fechamento, etc.) são relevantes em outras etapas do pipeline. Removê-los do banco ou da query quebraria as demais etapas. A restrição é de UX, não de dados.
+
+**Validação:** `tests/bpm/card-campos-novos-leads.test.ts` (2 casos); `tsc --noEmit`/`eslint`/`npm run build` limpos; suíte `tests/bpm/` 299/321 (22 falhas pré-existentes não relacionadas).
+
+### 2026-08-31 — RM-2026-2403E5 — Autosave propaga sucesso/falha real (`Promise<boolean>`), CAS só avança após confirmação do servidor
+
+**Contexto:** bug de movimento de card BPM travado em "Novos leads" mesmo com campos obrigatórios preenchidos — causa raiz era de sincronização client-side, não de validação (ver `architecture.md`/`known-errors.md`).
+
+**Decisão:** a validação de campos obrigatórios (`!valor?.trim()` em `src/lib/bpm/requisitos-etapa.ts`) foi mantida sem alteração — é a fonte de verdade correta e não deve ser reescrita para "compensar" um problema que na verdade é de timing. Em vez disso, a API de autosave (`CardSaveContext.tsx`) passou a propagar sucesso/falha real via `Promise<boolean>` (`registerSave`/`flushSaves`), e a versão-base do CAS otimista (`versaoBaseCampos`, `PainelCamposEtapaAtual.tsx`) só avança após confirmação da versão real do servidor — nunca de forma otimista antecipada. `PainelProximaEtapa.tsx` só chama `MoverCardBpm` se `flushSaves()` confirmar sucesso.
+
+**Por que não alterar a validação:** alterar a comparação de campos obrigatórios teria mascarado o sintoma sem corrigir a causa — o mesmo tipo de dessincronia poderia reaparecer em qualquer outro fluxo que dependesse do autosave. Corrigir na origem (propagação de erro + CAS pós-confirmação) é a correção estrutural.
+
+**Validação:** `tests/bpm/novos-leads.test.ts` + `tests/bpm/card-save-flow.test.ts` (14/14); suíte `tests/bpm/` completa 298/319 (21 falhas pré-existentes não relacionadas, ver `known-errors.md`); `tsc --noEmit`/`eslint`/`npm run build` limpos.
+
+**Adicionado em:** 2026-08-31 por Bibble (fechamento RM-2026-2403E5, correção já commitada em `5d67abcc`).
+
 ### 2026-08-31 — RM-2026-DC0043 — Busca client-side e exibição de `razaoSocial`/`nomeFantasia` como contratante
 
 **Contexto:** listagem de "Documentos gerados" precisava exibir o nome da empresa contratante e permitir busca por nome.

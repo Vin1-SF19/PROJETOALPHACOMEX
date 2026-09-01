@@ -32,6 +32,9 @@ import {
 import { renderizarConteudo, validarVariaveisObrigatorias } from "@/lib/gerador-documentos/render";
 import { reescreverClasulaViaIA, identificarVariaveisEClasulasViaIA } from "@/lib/gerador-documentos/onyx";
 import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
+import { converterParaHtml } from "@/lib/gerador-documentos/html";
+import { renderHtmlComVariaveis } from "@/lib/gerador-documentos/html-render";
+import { renderHtmlParaPdf } from "@/lib/gerador-documentos/pdf-renderer";
 
 // Mesma lista de tipos suportados por extractTextFromBuffer (src/lib/bibble/tika.ts) — mantida em
 // sincronia manual, já que a extração é responsabilidade daquele módulo, não deste.
@@ -228,7 +231,30 @@ export async function CriarTemplateViaUpload(formData: FormData) {
       clausulas: identificacao.clausulas.map((c) => ({ ...c, tipo: "TEXTO" as const, editavel: true })),
     });
 
+    // HTML fiel (RM-2026-94CBF6): conversão best-effort — se falhar, não bloqueia a criação
+    let htmlUrl: string | undefined;
+    try {
+      const html = await converterParaHtml(buffer, arquivo.type, arquivo.name);
+      const blobTokenHtml = process.env.BLOB_READ_WRITE_TOKEN;
+      if (blobTokenHtml) {
+        const htmlBlob = await put(`gerador-documentos/templates-html/${ctx.userId}/${Date.now()}.html`, Buffer.from(html, "utf-8"), {
+          access: "public",
+          addRandomSuffix: true,
+          token: blobTokenHtml,
+          contentType: "text/html",
+        });
+        htmlUrl = htmlBlob.url;
+      }
+    } catch (htmlErr) {
+      console.warn("[GeradorDocumentos] Falha na conversão para HTML (não bloqueante):", htmlErr);
+    }
+
     const template = await persistirNovoTemplate(input, ctx.userId, { url: blob.url, nome: arquivo.name });
+
+    // Salva htmlUrl via raw query (campo adicionado por migration aditiva — RM-2026-94CBF6)
+    if (htmlUrl) {
+      await db.$executeRaw`UPDATE "DocumentoTemplate" SET "htmlUrl" = ${htmlUrl} WHERE "id" = ${template.id}`;
+    }
 
     revalidatePath(ROTA_BASE);
     return { success: true as const, templateId: template.id };
@@ -515,11 +541,63 @@ export async function GerarDocumento(payload: unknown) {
       // PDF generation is best-effort at this stage; FinalizarDocumento can retry
     }
 
+    // HTML renderizado com variáveis (RM-2026-94CBF6): best-effort, não bloqueia
+    let htmlUrl: string | undefined;
+    try {
+      // htmlUrl não está no schema Prisma (migration aditiva pendente) — busca via raw query
+      let templateHtmlUrl: string | null = null;
+      try {
+        const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
+          SELECT "htmlUrl" FROM "DocumentoTemplate" WHERE "id" = ${template.id}
+        `;
+        templateHtmlUrl = rows[0]?.htmlUrl ?? null;
+      } catch {
+        // coluna ainda não existe (migration não aplicada) — ignora
+      }
+      if (templateHtmlUrl) {
+        const htmlRes = await fetch(templateHtmlUrl);
+        if (htmlRes.ok) {
+          const htmlOriginal = await htmlRes.text();
+          const htmlRenderizado = renderHtmlComVariaveis(htmlOriginal, variaveisTemplate, input.variaveis);
+          const blobTokenHtml = process.env.BLOB_READ_WRITE_TOKEN;
+          if (blobTokenHtml) {
+            const htmlBlob = await put(`gerador-documentos/documentos-html/${ctx.userId}/${documento.id}.html`, Buffer.from(htmlRenderizado, "utf-8"), {
+              access: "public",
+              addRandomSuffix: false,
+              token: blobTokenHtml,
+              contentType: "text/html",
+            });
+            htmlUrl = htmlBlob.url;
+            await db.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlUrl} WHERE "id" = ${documento.id}`;
+
+            // HTML→PDF (RM-2026-94CBF6 Fase 3): gera PDF mais fiel a partir do HTML
+            // Se o PDF baseado em cláusulas já foi gerado acima, este substitui (mais fiel).
+            // Se falhar, mantém o PDF anterior (best-effort).
+            try {
+              const bufferPdfHtml = await renderHtmlParaPdf(htmlRenderizado);
+              const blobPdfHtml = await put(`gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}.pdf`, bufferPdfHtml, {
+                access: "public",
+                addRandomSuffix: false,
+                token: blobTokenHtml,
+              });
+              pdfUrl = blobPdfHtml.url;
+              await db.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl } });
+            } catch (pdfHtmlErr) {
+              console.warn("[GeradorDocumentos] Falha na renderização HTML→PDF (mantém PDF anterior):", pdfHtmlErr);
+            }
+          }
+        }
+      }
+    } catch (htmlErr) {
+      console.warn("[GeradorDocumentos] Falha na renderização HTML (não bloqueante):", htmlErr);
+    }
+
     revalidatePath(ROTA_BASE);
     return {
       success: true as const,
       documentoId: documento.id,
       pdfUrl,
+      htmlUrl,
       urlConferencia: `${ROTA_BASE}/conferencia/${documento.tokenAcesso}`,
     };
   } catch (error) {
@@ -541,6 +619,7 @@ export async function ListarDocumentosGerados() {
         titulo: true,
         status: true,
         tokenAcesso: true,
+        pdfUrl: true,
         criadoEm: true,
         finalizadoEm: true,
         template: { select: { id: true, titulo: true } },
@@ -572,7 +651,7 @@ export async function BuscarClientesParaContratante(termo: string) {
           { cnpj: { contains: termoSeguro.replace(/\D/g, "") || termoSeguro } },
         ],
       },
-      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
+      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true, email: true, telefone: true },
       take: 20,
       orderBy: { razaoSocial: "asc" },
     });
@@ -599,7 +678,18 @@ export async function ObterDocumentoConferencia(tokenAcesso: string) {
       return { success: false as const, error: "Não autorizado" };
     }
 
-    return { success: true as const, data: documento };
+    // htmlUrl (RM-2026-94CBF6): campo adicionado por migration aditiva — busca via raw query
+    let htmlUrl: string | null = null;
+    try {
+      const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
+        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+      `;
+      htmlUrl = rows[0]?.htmlUrl ?? null;
+    } catch {
+      // coluna ainda não existe (migration não aplicada) — ignora
+    }
+
+    return { success: true as const, data: { ...documento, htmlUrl } };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error) };
   }

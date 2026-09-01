@@ -31,8 +31,6 @@ type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 
-const SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"];
-
 function resultadoRevogaAcessoCard(resultado: Awaited<ReturnType<typeof ObterCardBpm>>) {
   return (!resultado.success && resultado.error === "Não autorizado") || (resultado.success && !resultado.data);
 }

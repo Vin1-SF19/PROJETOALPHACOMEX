@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileText, Plus, FilePlus2, Archive, ExternalLink, Search } from "lucide-react";
+import { FileText, Plus, FilePlus2, Archive, ExternalLink, Search, Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,6 +31,7 @@ export interface DocumentoResumo {
   titulo: string;
   status: string;
   tokenAcesso: string;
+  pdfUrl: string | null;
   criadoEm: Date | string;
   finalizadoEm: Date | string | null;
   template: { id: string; titulo: string };
@@ -249,6 +250,13 @@ function DocumentoRow({ documento }: { documento: DocumentoResumo }) {
       <Badge variant={documento.status === "FINALIZADO" ? "default" : "secondary"}>
         {STATUS_DOCUMENTO_LABEL[documento.status] ?? documento.status}
       </Badge>
+      {documento.pdfUrl && (
+        <a href={`/PainelAlpha/GeradorDocumentos/${documento.id}/download`} target="_blank" rel="noopener noreferrer">
+          <Button variant="ghost" size="icon" aria-label="Baixar PDF">
+            <Download className="h-4 w-4" />
+          </Button>
+        </a>
+      )}
       <Link href={`/PainelAlpha/GeradorDocumentos/conferencia/${documento.tokenAcesso}`}>
         <Button variant="ghost" size="icon" aria-label="Abrir conferência">
           <ExternalLink className="h-4 w-4" />

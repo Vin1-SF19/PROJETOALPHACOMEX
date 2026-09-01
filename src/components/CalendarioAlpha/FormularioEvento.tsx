@@ -138,12 +138,16 @@ export function FormularioEvento({
             titulo,
             notas: descricao || undefined,
             vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
+            inicioLocalEm: new Date(inicio),
+            fimLocalEm: new Date(fim),
           })
           : await criarTarefaAgendaAlpha({
             taskListId,
             titulo,
             notas: descricao || undefined,
             vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
+            inicioLocalEm: new Date(inicio),
+            fimLocalEm: new Date(fim),
           });
         if (!resultado.success) {
           toast.error(resultado.error);
@@ -261,6 +265,10 @@ export function FormularioEvento({
           </div>
         )}
 
+        <div className="space-y-1.5">
+          <Input id="ca-titulo" placeholder="Adicionar título" value={titulo} onChange={(evento) => setTitulo(evento.target.value)} maxLength={300} required className="h-12 border-x-0 border-t-0 rounded-none bg-transparent px-0 text-lg font-semibold" />
+        </div>
+
         {!emEdicao && (
           <div className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-white/[0.035] p-1.5">
             {TIPOS_EVENTO.map(([valor, rotulo]) => <button key={valor} type="button" onClick={() => setEventType(valor)} className={cn("rounded-xl px-3 py-2 text-sm font-bold transition-colors", eventType === valor ? cn(tema.bg, "text-white shadow-lg") : "text-slate-400 hover:bg-white/10 hover:text-white")}>{rotulo}</button>)}
@@ -269,6 +277,57 @@ export function FormularioEvento({
             )}
           </div>
         )}
+
+        {eventType !== "task" && <div className="flex items-center gap-2">
+          <Checkbox id="ca-dia-inteiro" checked={diaInteiro} onCheckedChange={(valor) => setDiaInteiro(valor === true)} />
+          <Label htmlFor="ca-dia-inteiro" className="cursor-pointer">Dia inteiro</Label>
+        </div>}
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-3">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500"><Clock3 className="size-4" /> Quando</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="ca-inicio">Início</Label>
+            <Input
+              id="ca-inicio"
+              type={diaInteiro ? "date" : "datetime-local"}
+              value={diaInteiro ? inicio.slice(0, 10) : inicio}
+              onChange={(evento) => {
+                const novoInicio = diaInteiro ? `${evento.target.value}T00:00` : evento.target.value;
+                setInicio(novoInicio);
+                setFim((atual) => new Date(atual) <= new Date(novoInicio) ? somarUmaHora(novoInicio) : atual);
+              }}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ca-fim">{eventType === "task" ? "Conclusão" : "Fim"}</Label>
+            <Input id="ca-fim" type={diaInteiro ? "date" : "datetime-local"} value={diaInteiro ? fim.slice(0, 10) : fim} onChange={(evento) => setFim(diaInteiro ? `${evento.target.value}T00:00` : evento.target.value)} required />
+          </div>
+          </div>
+          {eventType === "task" && (
+            <p className="mt-2 text-xs text-slate-500">O Google Tasks só guarda a data de vencimento; o horário de início e conclusão fica salvo aqui na Agenda Alpha.</p>
+          )}
+          {eventType !== "task" && (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label htmlFor="ca-repeticao">Repetição</Label><Select value={repeticao} onValueChange={setRepeticao}><SelectTrigger id="ca-repeticao"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="nunca">Não se repete</SelectItem><SelectItem value="diaria">Todos os dias</SelectItem><SelectItem value="semanal">Toda semana</SelectItem><SelectItem value="mensal">Todo mês</SelectItem><SelectItem value="anual">Todo ano</SelectItem></SelectContent></Select></div>
+              <div className="space-y-1.5"><Label htmlFor="ca-fuso">Fuso horário</Label><Input id="ca-fuso" value={TIMEZONE_PADRAO} readOnly className="text-slate-400" /></div>
+            </div>
+          )}
+        </div>
+
+        {eventType !== "task" && <div className="space-y-1.5">
+          <Label htmlFor="ca-participantes">Convidados (e-mails separados por vírgula)</Label>
+          <div className="relative"><UsersRound className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" /><Input id="ca-participantes" value={participantes} onChange={(evento) => setParticipantes(evento.target.value)} className="pl-9" placeholder="Adicionar convidados: nome@empresa.com" /></div>
+        </div>}
+        {eventType !== "task" && <div className="space-y-1.5">
+          <Label htmlFor="ca-local">Local</Label>
+          <div className="relative"><MapPin className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" /><Input id="ca-local" value={localizacao} onChange={(evento) => setLocalizacao(evento.target.value)} maxLength={300} className="pl-9" placeholder="Adicionar local" /></div>
+        </div>}
+        <div className="space-y-1.5">
+          <Label htmlFor="ca-descricao">Descrição</Label>
+          <textarea id="ca-descricao" value={descricao} onChange={(evento) => setDescricao(evento.target.value)} maxLength={8000} rows={4} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-white/20" />
+        </div>
 
         {eventType === "task" ? (
           <div className="space-y-1.5">
@@ -300,61 +359,6 @@ export function FormularioEvento({
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="ca-titulo">Título</Label>
-          <Input id="ca-titulo" placeholder="Adicionar título" value={titulo} onChange={(evento) => setTitulo(evento.target.value)} maxLength={300} required className="h-12 border-x-0 border-t-0 rounded-none bg-transparent px-0 text-lg font-semibold" />
-        </div>
-
-        {eventType !== "task" && <div className="flex items-center gap-2">
-          <Checkbox id="ca-dia-inteiro" checked={diaInteiro} onCheckedChange={(valor) => setDiaInteiro(valor === true)} />
-          <Label htmlFor="ca-dia-inteiro" className="cursor-pointer">Dia inteiro</Label>
-        </div>}
-
-        {eventType === "task" ? (
-          <div className="space-y-1.5">
-            <Label htmlFor="ca-vencimento">Data da tarefa</Label>
-            <Input id="ca-vencimento" type="date" value={inicio.slice(0, 10)} onChange={(evento) => setInicio(`${evento.target.value}T12:00`)} required />
-          </div>
-        ) : <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-3">
-          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500"><Clock3 className="size-4" /> Quando</div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="ca-inicio">Início</Label>
-            <Input
-              id="ca-inicio"
-              type={diaInteiro ? "date" : "datetime-local"}
-              value={diaInteiro ? inicio.slice(0, 10) : inicio}
-              onChange={(evento) => {
-                const novoInicio = diaInteiro ? `${evento.target.value}T00:00` : evento.target.value;
-                setInicio(novoInicio);
-                setFim((atual) => new Date(atual) <= new Date(novoInicio) ? somarUmaHora(novoInicio) : atual);
-              }}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="ca-fim">Fim</Label>
-            <Input id="ca-fim" type={diaInteiro ? "date" : "datetime-local"} value={diaInteiro ? fim.slice(0, 10) : fim} onChange={(evento) => setFim(diaInteiro ? `${evento.target.value}T00:00` : evento.target.value)} required />
-          </div>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5"><Label htmlFor="ca-repeticao">Repetição</Label><Select value={repeticao} onValueChange={setRepeticao}><SelectTrigger id="ca-repeticao"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="nunca">Não se repete</SelectItem><SelectItem value="diaria">Todos os dias</SelectItem><SelectItem value="semanal">Toda semana</SelectItem><SelectItem value="mensal">Todo mês</SelectItem><SelectItem value="anual">Todo ano</SelectItem></SelectContent></Select></div>
-            <div className="space-y-1.5"><Label htmlFor="ca-fuso">Fuso horário</Label><Input id="ca-fuso" value={TIMEZONE_PADRAO} readOnly className="text-slate-400" /></div>
-          </div>
-        </div>}
-
-        {eventType !== "task" && <div className="space-y-1.5">
-          <Label htmlFor="ca-local">Localização</Label>
-          <div className="relative"><MapPin className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" /><Input id="ca-local" value={localizacao} onChange={(evento) => setLocalizacao(evento.target.value)} maxLength={300} className="pl-9" placeholder="Adicionar local" /></div>
-        </div>}
-        <div className="space-y-1.5">
-          <Label htmlFor="ca-descricao">Descrição</Label>
-          <textarea id="ca-descricao" value={descricao} onChange={(evento) => setDescricao(evento.target.value)} maxLength={8000} rows={4} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-white/20" />
-        </div>
-        {eventType !== "task" && <div className="space-y-1.5">
-          <Label htmlFor="ca-participantes">Participantes (e-mails separados por vírgula)</Label>
-          <div className="relative"><UsersRound className="pointer-events-none absolute left-3 top-3 size-4 text-slate-500" /><Input id="ca-participantes" value={participantes} onChange={(evento) => setParticipantes(evento.target.value)} className="pl-9" placeholder="Adicionar convidados: nome@empresa.com" /></div>
-        </div>}
         {eventType === "task" || eventType !== "default" ? null : detalhesEvento?.linkMeet ? (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
             Este evento já possui Google Meet. O link será preservado.

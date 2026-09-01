@@ -22,7 +22,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, PhoneCall, Plus, RefreshCw, StickyNote } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote } from "lucide-react";
 import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
 import {
@@ -35,6 +35,7 @@ import type { TemaAlpha } from "@/lib/temas";
 import NovoCardModal from "./NovoCardModal";
 import AtribuirResponsavelPromocaoModal from "./AtribuirResponsavelPromocaoModal";
 import CardFullViewModal from "../../CardModal/CardFullViewModal";
+import NolossLeadModal from "./NolossLeadModal";
 import { GrupoAvataresMembrosCard, type MembroCard } from "../../CardModal/SeletorMembrosCard";
 import { obterStatusPosFechamentoVisivel } from "@/lib/bpm/status-pos-fechamento";
 import { etapaEhNovosLeads } from "@/lib/bpm/novos-leads";
@@ -74,6 +75,8 @@ interface CardBpm {
   status: string;
   origem: "real" | "noloss";
   nolossLeadId: string | null;
+  nolossEmail?: string | null;
+  nolossTelefone?: string | null;
   createdAt: Date | string;
   primeiraVisualizacaoEm?: Date | string | null;
   proximoContatoEm?: Date | string | null;
@@ -174,6 +177,7 @@ function KanbanCard({
   const naoAcessado = !card.primeiraVisualizacaoEm;
   const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome) && naoAcessado;
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
+  const radarPretendido = card.campoValores?.find((campo) => campo.campo.nome === "Radar pretendido")?.valor;
   const resumoAlinhamento = card.campoValores?.find((campo) => campoEhResumoAlinhamento(campo.campo.nome))?.valor;
   const alertaAlinhamento = etapaEhAlinhamentoEstrategico(etapaNome) && !resumoAlinhamento?.trim();
   const statusConfig = obterStatusPosFechamentoVisivel({ etapaNome, status: card.statusPosFechamento });
@@ -199,7 +203,7 @@ function KanbanCard({
       style={style}
       {...attributes}
       {...listeners}
-      onClick={() => { if (!ehLeadVirtual) onAbrir(card.id); }}
+      onClick={() => onAbrir(card.id)}
       aria-label={ehLeadVirtual ? `${nomeEmpresa}. Lead do site, ainda sem card` : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
         "cursor-grab active:cursor-grabbing select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
@@ -255,17 +259,17 @@ function KanbanCard({
                   </button>
                 )}
               </div>
-              {!ehLeadVirtual && (nomeFantasiaSecundario || cnpjFormatado) && (
+              {!ehLeadVirtual && ((!novosLeads && nomeFantasiaSecundario) || cnpjFormatado) && (
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {nomeFantasiaSecundario && <span className="line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{nomeFantasiaSecundario}</span>}
+                  {!novosLeads && nomeFantasiaSecundario && <span className="line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{nomeFantasiaSecundario}</span>}
                   {cnpjFormatado && <span className="font-mono text-[10px] leading-tight text-slate-500">{cnpjFormatado}</span>}
                 </div>
               )}
-              {card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
+              {!novosLeads && card.servico && <p className="mt-1 line-clamp-1 text-[11px] font-medium leading-tight text-slate-400">{card.servico}</p>}
             </div>
           </div>
 
-        {(alertaBoasVindas || alertaAlinhamento) && (
+        {!novosLeads && (alertaBoasVindas || alertaAlinhamento) && (
           <div
             role="status"
             className="flex items-center gap-1.5 rounded-xl border border-red-400/35 bg-red-500/15 px-2.5 py-2 text-[10px] font-extrabold uppercase tracking-wide text-red-100"
@@ -289,16 +293,21 @@ function KanbanCard({
           </div>
         )}
 
-        {!ehLeadVirtual && (canalOrigem || statusConfig || card.proximoContatoEm !== undefined) && (
+        {!ehLeadVirtual && ((!novosLeads && (canalOrigem || statusConfig)) || (novosLeads && radarPretendido) || card.proximoContatoEm !== undefined) && (
           <div className="flex flex-wrap items-center gap-1.5">
-            {canalOrigem && (
+            {!novosLeads && canalOrigem && (
               <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
                 {canalOrigem}
               </span>
             )}
-            {statusConfig && (
+            {!novosLeads && statusConfig && (
               <span className={cn("rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-wide", statusConfig.badgeClassName)}>
                 {statusConfig.label}
+              </span>
+            )}
+            {novosLeads && radarPretendido && (
+              <span className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-300">
+                {radarPretendido}
               </span>
             )}
             {card.proximoContatoEm !== undefined && (
@@ -307,28 +316,9 @@ function KanbanCard({
           </div>
         )}
 
-        {novosLeads && !ehLeadVirtual && (
-          <div className="grid grid-cols-2 gap-1.5 border-t border-white/[0.06] pt-2.5">
-            <div
-              className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-[9px] font-bold ${
-                (card.ligacoesHoje ?? 0) >= (card.metaLigacoesDia ?? 5)
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                  : "border-amber-500/30 bg-amber-500/10 text-amber-300"
-              }`}
-            >
-              <PhoneCall size={11} aria-hidden="true" />
-              <span className="tabular-nums">{card.ligacoesHoje ?? 0}/{card.metaLigacoesDia ?? 5}</span>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 px-2 py-1.5 text-[9px] font-bold text-sky-300">
-              <CalendarClock size={11} aria-hidden="true" />
-              <span className="tabular-nums">Dia {card.diaCiclo ?? 1}/8</span>
-            </div>
-          </div>
-        )}
-
-        {(proximaTarefaComPrazo || anotacaoRapidaPendente) && (
+        {((!novosLeads && proximaTarefaComPrazo) || anotacaoRapidaPendente) && (
           <div className="space-y-1.5 border-t border-white/[0.06] pt-2.5">
-            {proximaTarefaComPrazo && (
+            {!novosLeads && proximaTarefaComPrazo && (
               <div className="flex items-center gap-1.5 text-[10px] font-semibold text-sky-200" title={`Próximo prazo: ${proximaTarefaComPrazo.titulo}`}>
                 <CalendarClock size={12} aria-hidden="true" className="shrink-0 text-sky-300" />
                 <span className="shrink-0 uppercase tracking-wide text-sky-300/75">Prazo</span>
@@ -348,21 +338,21 @@ function KanbanCard({
         {!ehLeadVirtual && (
           <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5">
             <div className="flex min-h-6 items-center gap-2 text-[10px] font-medium text-slate-400">
-              {card._count.tarefas > 0 && (
+              {!novosLeads && card._count.tarefas > 0 && (
                 <span className="inline-flex items-center gap-1" title={`${card._count.tarefas} tarefa(s)`}>
                   <ClipboardList size={12} aria-hidden="true" />
                   <span className="tabular-nums">{card._count.tarefas}</span>
                   <span className="sr-only">tarefa(s)</span>
                 </span>
               )}
-              {card._count.anexos > 0 && (
+              {!novosLeads && card._count.anexos > 0 && (
                 <span className="inline-flex items-center gap-1" title={`${card._count.anexos} anexo(s)`}>
                   <Paperclip size={12} aria-hidden="true" />
                   <span className="tabular-nums">{card._count.anexos}</span>
                   <span className="sr-only">anexo(s)</span>
                 </span>
               )}
-              {card._count.tarefas === 0 && card._count.anexos === 0 && (
+              {!novosLeads && card._count.tarefas === 0 && card._count.anexos === 0 && (
                 <span className="text-slate-500">Sem pendências</span>
               )}
             </div>
@@ -500,6 +490,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const router = useRouter();
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
+  const [nolossLeadAberto, setNolossLeadAberto] = useState<CardBpm | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [novoCardAberto, setNovoCardAberto] = useState(false);
@@ -601,9 +592,14 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   }, [pipeline.id, recarregarCards, router]);
 
   const abrirCard = useCallback((cardId: string) => {
+    const card = cards.find((c) => c.id === cardId);
+    if (card?.origem === "noloss") {
+      setNolossLeadAberto(card);
+      return;
+    }
     cardSelecionadoIdRef.current = cardId;
     setCardSelecionadoId(cardId);
-  }, []);
+  }, [cards]);
 
   const fecharCard = useCallback(() => {
     cardSelecionadoIdRef.current = null;
@@ -866,6 +862,36 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
             router.refresh();
           }}
           onAbrirCard={abrirCard}
+        />
+      )}
+
+      {nolossLeadAberto && (
+        <NolossLeadModal
+          lead={{
+            id: nolossLeadAberto.nolossLeadId ?? nolossLeadAberto.id,
+            nome: nolossLeadAberto.empresa.razaoSocial,
+            email: nolossLeadAberto.nolossEmail ?? null,
+            telefone: nolossLeadAberto.nolossTelefone ?? null,
+            receivedAt: nolossLeadAberto.createdAt,
+          }}
+          pipelineId={pipeline.id}
+          accent={accent}
+          currentUserId={currentUserId}
+          onClose={() => setNolossLeadAberto(null)}
+          onPromovido={async () => {
+            setNolossLeadAberto(null);
+            await recarregarCards();
+            router.refresh();
+          }}
+          onConfirmarPromocao={async (responsavelId) => {
+            const res = await PromoverNolossLead({
+              nolossLeadId: nolossLeadAberto.nolossLeadId ?? nolossLeadAberto.id,
+              etapaDestinoId: nolossLeadAberto.etapaId,
+              responsavelId,
+            });
+            if (res.success) return { success: true as const };
+            return { success: false as const, error: typeof res.error === "string" ? res.error : "Erro ao promover lead" };
+          }}
         />
       )}
 

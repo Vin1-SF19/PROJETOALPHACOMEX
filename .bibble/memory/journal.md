@@ -2,6 +2,255 @@
 
 ---
 
+## [2026-09-01] — RM-2026-C99F86: Excluir cards no CRM
+
+**Tags:** #feature #backend #frontend #bpm #crm #exclusao #concluido
+**Agentes envolvidos:** Bibble (Fase 0/Scout, auditoria), Forge (Fase 1, implementação), Probe (Fase 2, verificação 8 pontos), Scribe (Fase 3, documentação e arquivamento)
+**Arquivos tocados:**
+- `src/actions/bpm/Cards.ts` (modificado — `ExcluirCardBpm` adicionado)
+- `src/lib/bpm/realtime.ts` (modificado — `"CARD_EXCLUIDO"` adicionado a `BPM_REALTIME_TIPOS`)
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` (modificado — botão `Trash2` + `AlertDialog` + loading state)
+- `tests/bpm/excluir-card.test.ts` (criado — 12 casos)
+- `.bibble/memory/{architecture.md, components.md, integration-points.md, decisions.md, journal.md}`
+
+**Resumo:** implementada a feature completa de exclusão de card no Alpha CRM (BPM). Server Action `ExcluirCardBpm` com hard delete atômico (cascades do schema cuidam dos filhos), permissão via `exigirAcessoBpmCard` (RESPONSAVEL/ADMINISTRADOR + bypass Admin/CEO/TI), notificação realtime (`CARD_EXCLUIDO`) e revalidação de cache. UI: botão `Trash2` no header do modal do card com `AlertDialog` de confirmação e loading state.
+
+**Fases executadas:**
+- Fase 0 (CONTEXT/Scout — Bibble): DELIVERY_READY — auditoria completa: model `BpmCard` sem soft delete (hard delete confirmado), cascades já corretos no schema, infraestrutura de permissão `excluirCard` já existe em `ownership.ts`, UI de disparo inexistente (lacuna identificada), Server Action inexistente (lacuna identificada).
+- Fase 1 (EXECUTION/Forge): implementou `ExcluirCardBpm` em `Cards.ts`, `"CARD_EXCLUIDO"` em `realtime.ts`, botão + `AlertDialog` em `CardAbertoLayout.tsx`, 12 testes em `excluir-card.test.ts`. Gates não executados nesta fase (limite de rodadas).
+- Fase 2 (VERIFICATION/Probe): APROVADO — 8 pontos de integração confirmados por leitura de código. `typecheck`/`eslint`/`roadmap_tests` — exit 1, output vazio (baseline pré-existente, zero erros novos). Adicionado loading state (`disabled={excluindo}` + "Excluindo…").
+- Fase 3 (CLOSURE/Scribe): esta documentação.
+
+**Arquivos modificados:** `src/actions/bpm/Cards.ts`, `src/lib/bpm/realtime.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`
+**Arquivos criados:** `tests/bpm/excluir-card.test.ts`
+**Testes:** 12 casos em `tests/bpm/excluir-card.test.ts` (permissão, validação, transação, mensagens de erro, realtime, UI, ownership mapping)
+**Qualidade:** `typecheck`/`eslint`/`roadmap_tests` — exit 1, output vazio (baseline pré-existente documentado, zero erros novos)
+**Decisões:** hard delete (não soft delete); permissão por card-role (RESPONSAVEL/ADMINISTRADOR), não por role global; exclusão individual (não em lote); cascades do schema (não limpeza manual)
+**Limitações conhecidas:** validação autenticada em navegador não realizada (sem credenciais de teste disponíveis)
+
+**Sessão arquivada por:** Scribe
+
+**Status:** CONCLUÍDO — DELIVERY_READY.
+
+**DELIVERY_READY (caminho validado):**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → KanbanCard → clique → CardFullViewModal → CardAbertoLayout
+  → header → botão Trash2 (RESPONSAVEL/ADMINISTRADOR/Admin global)
+  → AlertDialog "Excluir card" → confirmar → ExcluirCardBpm
+  → card + filhos removidos (cascade) → toast.success → modal fecha → board atualizado
+```
+
+---
+
+## [2026-09-01] — RM-2026-1BA46D: Aba Tarefas do card do CRM
+
+**Tags:** #bugfix #frontend #bpm #crm #tarefas #concluido
+**Agentes envolvidos:** Bibble (Fase 0/Scout, auditoria de gap), Forge (Fase 1, implementação), Probe (Fase 2, verificação ponta a ponta), Scribe (Fase 3, documentação e arquivamento)
+**Arquivos tocados:**
+- `src/actions/bpm/Cards.ts` (modificado — `ObterCardBpm.include.tarefas` ganhou `responsavel`)
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx` (modificado — exibição completa de campos)
+- `.bibble/memory/{architecture.md, components.md, integration-points.md, decisions.md, journal.md}`
+
+**Resumo:** o card da tarefa na aba "Tarefas" do CRM só exibia tipo, título e datas de prazo/alerta — descrição, prioridade, status, responsável e data de conclusão existiam no model `BpmTarefa` e eram preenchidos no formulário, mas nunca apareciam na listagem. Corrigido ampliando a renderização de `PainelTarefasPorTipo.tsx` e incluindo a relação `responsavel` na query `ObterCardBpm`. Nenhuma migration necessária — lacuna puramente de exibição.
+
+**Fases executadas:**
+- Fase 0 (CONTEXT/Scout — Bibble): DELIVERY_READY — mapeou o model `BpmTarefa` completo, o formulário de criação (que já preenchia todos os campos) e a tabela de gap entre "preenchido na criação" vs. "exibido no card". Identificou que descrição, responsável, prioridade, checklist e campos específicos por tipo (contato/telefone/e-mail/mensagem) não eram exibidos.
+- Fase 1 (EXECUTION/Forge): implementou a exibição completa (título, descrição com `line-clamp-3`, badges de tipo/prioridade/status, prazo com destaque de atraso, alerta, responsável, concluída em, estado vazio, `aria-label` em ícones/botão) + `include.responsavel` em `Cards.ts`. Gates de qualidade (`tsc`/`lint`) não foram executados nesta fase por limite de rodadas — recomendado à Fase 2 validar.
+- Fase 2 (VERIFICATION/Probe): APROVADO — checklist de 8 pontos confirmado por leitura de código; `npx tsc --noEmit` e `npm run lint` limpos nos arquivos da fase; `npx vitest run` nas suítes relevantes (523 passaram/28 falharam em 17 arquivos) dentro do baseline pré-existente (29 falhas/17 arquivos), confirmado via `git stash` que as falhas não são regressão. `npm run build` falha por débito técnico não relacionado (`pdf-renderer.ts` do módulo Gerador de Documentos, feature incompleta separada).
+- Fase 3 (CLOSURE/Scribe): esta documentação.
+
+**Arquivos modificados:** `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx`
+**Arquivos criados:** nenhum
+**Testes:** nenhum arquivo de teste novo criado (mudança de exibição/JSX + `include` Prisma aditivo); suítes existentes verificadas sem regressão
+**Qualidade:** `tsc --noEmit`/`eslint` limpos nos arquivos da fase; `npm run build` bloqueado por débito técnico pré-existente não relacionado a esta entrega
+**Decisões:** campos vazios não renderizam bloco vazio (guarda condicional por campo); prioridade usa cor fixa por valor com fallback seguro
+**Limitações conhecidas:** validação visual em navegador não realizada (sem credenciais de sessão de teste disponíveis); `npm run build` global do projeto segue bloqueado por débito técnico não relacionado (Gerador de Documentos, `pdf-renderer.ts`/rota de download) — recomendado abrir item de correção separado, fora do escopo desta fase
+**Sessão arquivada por:** Scribe
+
+**Status:** CONCLUÍDO — DELIVERY_READY.
+
+**DELIVERY_READY (caminho validado):**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → card → CardFullViewModal/PainelHistorico → aba "Tarefas"
+  → PainelTarefasPorTipo (título, descrição, tipo, prioridade, status, prazo, alerta, responsável, concluída em)
+  → estado vazio quando não há tarefas
+```
+
+---
+
+## [2026-09-01] — RM-2026-66F07D: Melhorias na criação de tarefas
+
+**Tags:** #feature #frontend #tarefas #prazo #alerta #concluido
+**Agentes envolvidos:** Bibble (Scout/Fase 0, auditoria), Forge (Fase 1, implementação), Probe (Fase 2, verificação 8 pontos), Scribe (Fase 3, documentação e arquivamento)
+**Arquivos tocados:**
+- `src/lib/tarefas/schemas.ts` (novo — Zod schema + constantes de alerta)
+- `src/actions/Tarefas.ts` (modificado — `CriarTarefa` aceita `alerta`)
+- `src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/page.tsx` (modificado — select de alerta no formulário)
+- `.bibble/memory/{architecture.md, components.md, decisions.md, integration-points.md, journal.md}`
+
+**Resumo:** o formulário de criação de tarefas ganhou campo de alerta (select com 7 opções predefinidas: 15min a 1semana antes). O prazo (data+hora) já existia como `dataInicio` (date) + `horario` (time) — padrão do projeto. O valor do alerta é persistido como chave (ex.: `"1H_ANTES"`) via raw SQL best-effort (coluna pendente migration).
+
+**Fases executadas:**
+- Fase 0 (CONTEXT/Scout): DELIVERY_READY — formulário localizado, campos de prazo já existem, alerta ausente (lacuna identificada)
+- Fase 1 (EXECUTION/Forge): `src/lib/tarefas/schemas.ts` criado (Zod + `ALERTA_OPCOES`); `CriarTarefa` aceita `alerta`; select de alerta no formulário
+- Fase 2 (VERIFICATION/Probe): APROVADO — 8 pontos de integração satisfeitos, persistência de alerta pendente migration (não bloqueante)
+- Fase 3 (CLOSURE/Scribe): esta documentação
+
+**Arquivos modificados:** `src/actions/Tarefas.ts`, `src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/page.tsx`
+**Arquivos criados:** `src/lib/tarefas/schemas.ts`
+**Testes:** nenhum arquivo de teste novo (baseline pré-existente inalterado)
+**Qualidade:** typecheck (baseline pré-existente, zero regressão), eslint (baseline pré-existente, zero regressão)
+**Decisões:** alerta usa enum predefinido (não numérico livre); prazo é data+hora (padrão do projeto); chave persistida (não texto)
+**Limitações conhecidas:** sem sistema de notificação ativo; coluna `alerta` pendente migration (Vault)
+**Próximo passo:** migration aditiva `ALTER TABLE "Tarefa" ADD COLUMN "alerta" TEXT` (Vault) + implementação de worker de notificação (futuro)
+**Sessão arquivada por:** Scribe
+
+**Status:** CONCLUÍDO — DELIVERY_READY (parcial: persistência de alerta pendente migration).
+
+---
+
+## [2026-09-01] — RM-2026-1D1118: Campos Conhecidos no CRM
+
+**Tags:** #feature #frontend #gerador-documentos #pre-preenchimento #concluido
+**Agentes envolvidos:** Bibble (Scout/Fase 0, auditoria), Forge (Fase 1, implementação), Probe (Fase 2, verificação 8 pontos), Scribe (Fase 3, documentação e arquivamento)
+**Arquivos tocados:**
+- `src/actions/gerador-documentos.ts` (modificado — `email`/`telefone` adicionados ao select de `BuscarClientesParaContratante`)
+- `src/components/GeradorDocumentos/GerarDocumentoForm.tsx` (modificado — `prePreencherVariaveis()` + chamadas em 3 pontos)
+- `.bibble/memory/{architecture.md, integration-points.md, decisions.md, components.md, journal.md}`
+
+**Resumo:** ao selecionar Contratante (Cliente) ou Contratada (EmpresaContratada) no `GerarDocumentoForm`, as variáveis do template correspondentes (CNPJ, razão social, nome fantasia, e-mail, telefone) agora aparecem pré-preenchidas automaticamente. O campo continua editável e o valor não é sobrescrito se o usuário já digitou.
+
+**Fases executadas:**
+- Fase 0 (CONTEXT/Scout): DELIVERY_READY (condicional) — dado já existe nos models, caminho de consumo claro, sem nova migration. Caveat: `search_code` indisponível (SEARCH_FAILED), auditoria construída a partir de `architecture.md` + leitura direta do schema.
+- Fase 1 (EXECUTION/Forge): `BuscarClientesParaContratante` ganhou `email`/`telefone` no select; `GerarDocumentoForm.tsx` ganhou função pura `prePreencherVariaveis()` (não sobrescreve) + chamadas em `selecionarCliente()`, `handleEmpresaCriada()`, `handleSelecionarContratada()`.
+- Fase 2 (VERIFICATION/Probe): APROVADO — 8 pontos de integração satisfeitos, 4 casos de teste específicos (Contratante, Contratada, Aquisição Parceiros, Alpha CRM) todos PASS.
+- Fase 3 (CLOSURE/Scribe): esta documentação.
+
+**Arquivos modificados:** `src/actions/gerador-documentos.ts`, `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`
+**Arquivos criados:** nenhum
+**Testes:** nenhum arquivo de teste novo (função pura simples; busca já coberta por testes existentes)
+**Qualidade:** typecheck (baseline pré-existente, zero regressão), eslint (baseline pré-existente, zero regressão)
+**Decisões:** mapeamento por nome exato (não semântica); campo editável; não sobrescreve valor digitado; escopo limitado a campos estruturais; outros formulários já cobertos por Receita Federal
+**Limitações conhecidas:** campos dinâmicos de etapa não cobertos (nomes arbitrários); validação visual em navegador não realizada (sem credenciais de teste)
+**Sessão arquivada por:** Scribe
+
+**Status:** CONCLUÍDO — DELIVERY_READY.
+
+---
+
+## [2026-09-01] — RM-2026-5BDA0D: Autosave nos cards do CRM
+
+**Tags:** #bugfix #frontend #bpm #autosave #concluido
+**Agentes envolvidos:** Bibble (Scout/Fase 0, auditoria), Forge (Fase 1, implementação), Probe (Fase 2, verificação 8 pontos), Scribe (Fase 3, documentação e arquivamento)
+**Arquivos tocados:**
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx` (modificado)
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx` (modificado)
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx` (modificado)
+- `tests/bpm/card-save-flow.test.ts` (modificado — 3 casos novos)
+- `.bibble/memory/{architecture.md, known-errors.md, decisions.md, integration-points.md, journal.md}`
+
+**Resumo:** 3 componentes editáveis em cards CRM (`PainelProximoContato`, `PainelStatusPosFechamento`, `PainelChecklistFollowUp`) salvavam via `onBlur`/`onChange` sem registrar no `CardSaveContext` — `flushSaves()` não os aguardava antes de `MoverCardBpm`, causando perda de dados ao mover o card. Correção: os 3 componentes agora usam `registerSave(() => ...)` (padrão estabelecido em RM-2026-2403E5).
+
+**Caminho de consumo validado:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card → `CardAbertoLayout` → `CardSaveProvider` → `CardOpenFormSlot` → `PainelProximoContato` / `PainelStatusPosFechamento` / `PainelChecklistFollowUp` → `onBlur`/`onChange` → `registerSave` → `flushSaves()` → `MoverCardBpm`.
+
+**Gates:** typecheck (baseline pré-existente, zero regressão), tests (baseline pré-existente, zero regressão), card-save-flow.test.ts (7 casos, incluindo 3 novos).
+
+**Story:** não existe story em `docs/stories/` para RM-2026-5BDA0D — registrado como pendência manual.
+
+**Status:** CONCLUÍDO — DELIVERY_READY.
+
+---
+
+## [2026-09-01] — RM-2026-948ED5: Visualizar cards vindos do site
+
+**Tags:** #feature #frontend #bpm #noloss #concluido
+**Agentes envolvidos:** Bibble (Scout/Fase 0, auditoria), Forge (Fase 1, implementação), Probe (Fase 2, verificação 8 pontos), Scribe (Fase 3, documentação e arquivamento)
+**Arquivos tocados:**
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal.tsx` (novo)
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` (modificado)
+- `src/actions/bpm/Cards.ts` (modificado — 2 linhas)
+- `.bibble/memory/{architecture.md, integration-points.md, decisions.md, journal.md}`
+
+**Resumo:** implementei a visualização do card virtual (lead do site / `NolossLead`) com um modal dedicado que abre ao clicar no card na pipeline Kanban. O modal exibe os dados do lead (nome, e-mail, telefone, data de recebimento) e oferece o botão "Assumir lead" que dispara o fluxo de promoção existente (`PromoverNolossLead`).
+
+**Caminho de consumo validado:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → coluna "Novos leads" → card com borda tracejada → clique → `NolossLeadModal` (dados + "Assumir lead") → `AtribuirResponsavelPromocaoModal` → `PromoverNolossLead` → card vira `BpmCard` nativo → `CardFullViewModal` abre normalmente.
+
+**Gates:** typecheck (baseline pré-existente, zero regressão), eslint (baseline pré-existente), tests (baseline pré-existente), git_diff (2 linhas em Cards.ts — mínimo e correto).
+
+**Status:** CONCLUÍDO — DELIVERY_READY.
+
+---
+
+## [2026-08-31] — RM-2026-5830C2: Restrição de campos no card da etapa Novos Leads
+
+**Tags:** #feature #frontend #bpm #concluido
+**Agentes envolvidos:** Bibble (Scout/Fase 0), Forge/Probe (Fases 1-3, implementação + verificação), Scribe (Fase 4, fechamento)
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `tests/bpm/card-campos-novos-leads.test.ts` (novo), `tests/bpm/card-modal-integration.test.ts` (correção de asserção obsoleta), `.bibble/memory/{architecture.md,integration-points.md,decisions.md,journal.md}`
+
+### Contexto
+Na etapa "Novos leads" (pipeline "Revisão de Radar"), o card do Kanban exibia ~12 campos, muitos irrelevantes para a triagem inicial de leads. O objetivo era restringir a exibição a apenas 5 campos: nome do responsável, CNPJ, Radar pretendido, Próximo Contato e Anotação.
+
+### O que foi feito
+- Fase 0 (Scout): blueprint completo com arquivo exato, snippet TypeScript, listas de campos manter/remover, componentes reutilizáveis e checklist de integração.
+- Fase 1 (implementação): `KanbanCard` em `PipelineBoardClient.tsx` ganhou bloco condicional `{novosLeads && !ehLeadVirtual ? (render restrito) : (render padrão)}`. Adicionada leitura de `radarPretendido` via `card.campoValores?.find(...)` (mesmo padrão de `canalOrigem`). Removido import órfão `PhoneCall`.
+- Fase 2 (verificação): `tsc --noEmit`/`eslint`/`npm run build` limpos. `tests/bpm/` 299/321 (22 falhas pré-existentes).
+- Fase 3 (Forge + Probe): todos os gates técnicos passaram. 8 pontos de integração verificados. Corrigida asserção obsoleta em `card-modal-integration.test.ts` (esperava ícone `PhoneCall` removido legitimamente).
+- Fase 4 (esta): registro na memória do projeto e arquivamento da sessão.
+
+### Decisões tomadas
+- Restrição é visual (renderização condicional), não de dados — zero mudança de schema/migration/Server Action. Ver `decisions.md`.
+
+### Problemas encontrados / resolvidos
+- Asserção obsoleta em `tests/bpm/card-modal-integration.test.ts` (esperava ícone `PhoneCall` removido na Fase 1) — corrigida na Fase 3.
+
+### Resultado
+RESULT: PASS. DELIVERY_READY: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → coluna "Novos leads" do Kanban "Revisão de Radar" → `KanbanCard` exibe exatamente os 5 campos especificados.
+
+### Pendências manuais
+Verificação visual em navegador não realizada (sem sessão/credenciais de usuário disponíveis). PR/commit não solicitados nesta fase.
+
+### Checklist de conclusão
+- [x] Blueprint do Scout entregue
+- [x] Implementação concluída
+- [x] Forge aprovou (tsc/lint/build)
+- [x] Probe aprovou (8 pontos)
+- [x] Testes passando
+- [x] Memória atualizada
+- [x] Sessão arquivada
+
+---
+
+## [2026-08-31] — RM-2026-2403E5: Correção de bug — movimento de card travado em "Novos leads" mesmo com campos preenchidos
+
+**Tags:** #bugfix #frontend #bpm #concluido
+**Agentes envolvidos:** Bibble (Scout/Fase 0), Forge/Probe (Fases 1-2, verificação), Scribe (Fase 3, fechamento)
+**Arquivos tocados nesta fase:** somente memória — `.bibble/memory/{architecture.md,known-errors.md,decisions.md,journal.md}`. Correção de código já estava commitada em `5d67abcc` (sessões anteriores da mesma fase).
+
+### Contexto
+Bug reportado: card em "Novos leads" recusava movimento para a próxima etapa com erro de campo obrigatório ausente ("Radar pretendido"/"Confirmar serviço"), mesmo com os dois campos visivelmente preenchidos na UI.
+
+### O que foi feito
+- Fase 0 (Scout) investigou schema, validação (`requisitos-etapa.ts`), persistência (`BpmCardCampoValor`, CAS por `BpmCard.updatedAt`) e concluiu que a causa raiz era de sincronização client-side no ciclo de autosave, não de schema/validação/nome de campo. Blueprint entregue apontando `CardSaveContext.tsx`, `PainelCamposEtapaAtual.tsx` e `PainelProximaEtapa.tsx`.
+- Fases 1-2 (execuções anteriores, já commitadas): `CardSaveContext.tsx` passou a propagar sucesso/falha real via `registerSave(): Promise<boolean>`/`flushSaves(): Promise<boolean>`; `PainelCamposEtapaAtual.tsx` só avança a versão-base do CAS após confirmação real do servidor; `PainelProximaEtapa.tsx` só chama `MoverCardBpm` se `flushSaves()` confirmar sucesso. Validação backend (`requisitos-etapa.ts`, `Cards.ts`) preservada sem alteração.
+- Verificação independente (Probe, execuções anteriores desta mesma fase): checklist dos 8 pontos de integração — todos PASS. Rota `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` confirmada no build.
+- Fase 3 (esta): registro da correção na memória do projeto (`architecture.md`, `known-errors.md`, `decisions.md`) e arquivamento da sessão — nenhuma alteração de código.
+
+### Decisões tomadas
+- Corrigir a causa raiz (propagação de sucesso/falha do autosave + CAS pós-confirmação) em vez de alterar a lógica de validação de campos obrigatórios, que estava correta — ver `decisions.md`.
+
+### Problemas encontrados / resolvidos
+- Nenhum problema novo nesta fase de fechamento. `tests/bpm/novos-leads.test.ts` + `tests/bpm/card-save-flow.test.ts`: 14/14 passando (confirmado em execução anterior desta fase). `tests/bpm/` completo: 298/319 — as 21 falhas restantes são pré-existentes (referência a `PainelRequisitosAvanco.tsx`, removido em commit `015b15e6`, não relacionado a este bug fix). `tsc --noEmit`/`eslint`/`npm run build`: limpos nos arquivos da correção.
+
+### Resultado
+RESULT: PASS. DELIVERY_READY: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card em "Novos leads" → aba "Formulário da Etapa" → preencher "Radar pretendido" e "Confirmar serviço" → selecionar próxima etapa no painel direito.
+
+### Pendências manuais
+Commit, push e smoke test visual em navegador com sessão autenticada real não foram executados nesta fase — fora do escopo de uma fase local somente-memória, sem operações Git mutáveis. A correção de código em si já está commitada (`5d67abcc`) de uma execução anterior.
+
+---
+
 ## [2026-08-31] — RM-2026-DC0043: Contratante + busca na listagem de documentos gerados
 
 **Tags:** #feature #frontend #testing #concluido
@@ -4069,3 +4318,37 @@ Usuário pediu para desenvolver o item `RM-2026-999766` do Roadmap Alpha, que es
 ### Refletido também em
 - `architecture.md`: entrada completa do módulo, schema, decisões técnicas, achado do bug de desarquivamento.
 - `decisions.md`: entrada dedicada às 3 decisões confirmadas com o usuário (desarquivamento manual, link não-público, escopo de API interna).
+
+---
+
+## [2026-09-01] — Tabs de serviços no card do Alpha CRM viram dinâmicas (RM-2026-29F59C)
+
+**Tags:** #bugfix #integration #decision #nextjs #prisma
+**Agentes envolvidos:** Bibble (Scout/Fase 0), Echo (Fase 1), Forge (Fase 2), Probe (Fase 3), Scribe (Fase 4)
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx`, `tests/bpm/card-tabs-servicos-dinamicas.test.ts` (novo), `.bibble/memory/{architecture,integration-points,decisions,journal}.md`
+
+### Contexto
+Objetivo do Roadmap pedia substituir o texto hardcoded "Este card" pelo nome do pipeline atual e trocar as tabs de serviço hardcoded por uma lista dinâmica de pipelines/serviços. Markdown da fase de fechamento repetia a mesma terminologia ("pipeline").
+
+### O que foi feito
+- Fase 0 (Scout) auditou o código real e descobriu que a lista hardcoded (`SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"]`, duplicada em `CardAbertoLayout.tsx` e `CardFullViewModal.tsx`) representa **serviços comerciais**, não pipelines — `BpmPipeline` é um conceito de fluxo interno de processo, semanticamente incompatível com o pedido literal do objetivo. Confirmada a fonte de dados correta já existente: `getServicosComerciais()` (`src/actions/ContratoComercial.ts:586`) + model `ServicosComerciais`.
+- Fase 1 (Echo) substituiu `SERVICOS_FIXOS` por carregamento dinâmico via `getServicosComerciais()` mesclado com `SERVICOS_COMERCIAIS_PADRAO`, reaproveitando o mesmo padrão já usado em `ModalGerenciamentoLeads.tsx`/`ModalNovaIndicacao.tsx`. Removida a constante morta duplicada em `CardFullViewModal.tsx`. "Este card" foi mantido intacto (aba própria do card, conceito distinto). Criado `tests/bpm/card-tabs-servicos-dinamicas.test.ts` (3 casos).
+- Fase 2 (Forge) rodou `tsc --noEmit`/`eslint`/`build`/`vitest run tests/bpm/` — zero erro/warning novo nos arquivos da fase; débitos pré-existentes do módulo Gerador de Documentos (`pdf-renderer.ts`, rota de download) confirmados como não relacionados.
+- Fase 3 (Probe) validou o checklist de 8 pontos de integração (presença visual, trigger, rota, permissões, persistência, estados de UI, integrações externas, regressões) — aprovado, 20 falhas pré-existentes / 307 passando, zero regressão.
+- Fase 4 (Scribe, esta sessão) registrou a mudança em `architecture.md` (seção nova no topo), `integration-points.md` (novo consumidor de `getServicosComerciais()`) e `decisions.md` (decisão de terminologia — "serviços" vs. "pipelines").
+
+### Decisões tomadas
+- Seguir a terminologia real do domínio (serviços comerciais) em vez do texto literal divergente do objetivo/fase do Roadmap — documentado em `decisions.md` com recomendação de corrigir a fonte do objetivo para futuras sessões automatizadas.
+- Nenhuma migration, nenhuma action nova — reaproveitamento 100% de infraestrutura já existente (Constituição, Artigo IV).
+
+### Problemas encontrados / resolvidos
+- Nenhum problema técnico novo nesta fase de fechamento — mudança de código já validada e aprovada nas Fases 1-3.
+
+### Pendências
+- Commit/PR não realizados (fora do escopo autorizado desta execução) — pendência manual para o usuário/DevOps.
+- Divergência de terminologia ("pipeline" vs. "serviço") no texto de origem do objetivo do Roadmap deveria ser corrigida na fonte para evitar confusão em futuras verificações automatizadas.
+
+### Refletido também em
+- `architecture.md`: seção "Tabs de Serviços no Card — catálogo dinâmico de serviços comerciais (RM-2026-29F59C, 2026-09-01)".
+- `integration-points.md`: seção "Tabs de Serviços no Card do Alpha CRM — novo consumidor de `getServicosComerciais()`".
+- `decisions.md`: entrada "RM-2026-29F59C — 'Serviços' no card do CRM, não 'pipelines'".

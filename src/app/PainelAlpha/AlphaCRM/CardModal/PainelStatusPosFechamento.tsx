@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Milestone } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm } from "@/actions/bpm/Cards";
+import { useCardSave } from "./CardSaveContext";
 import {
   STATUS_POS_FECHAMENTO_OPCOES,
   obterStatusPosFechamentoConfig,
@@ -49,6 +50,7 @@ export function PainelStatusPosFechamento({
     status: StatusPosFechamento;
     versaoAnterior: string;
   } | null>(null);
+  const { registerSave } = useCardSave();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -94,34 +96,38 @@ export function PainelStatusPosFechamento({
 
   async function salvar(status: StatusPosFechamento) {
     if (!podeEditar || status === base) return;
+    const versaoBaseAtual = versaoBase;
     setSalvando(true);
-    const resultado = await AtualizarCardBpm({
-      cardId,
-      statusPosFechamento: status,
-      versaoEsperadaEm: versaoBase,
+    const sucesso = await registerSave(async () => {
+      const resultado = await AtualizarCardBpm({
+        cardId,
+        statusPosFechamento: status,
+        versaoEsperadaEm: versaoBaseAtual,
+      });
+      if (!resultado.success) {
+        const mensagem = typeof resultado.error === "string"
+          ? resultado.error
+          : "Não foi possível salvar o status pós-fechamento.";
+        const houveConflito = mensagem.toLocaleLowerCase("pt-BR").includes("mudou enquanto");
+        setConflitoRealtime(houveConflito);
+        toast.error(mensagem);
+        if (houveConflito) onAtualizado();
+        return false;
+      }
+      confirmacaoLocalPendenteRef.current = {
+        status,
+        versaoAnterior: versaoBaseAtual,
+      };
+      rascunhoSujoRef.current = false;
+      setBase(status);
+      setConflitoRealtime(false);
+      toast.success("Status pós-fechamento atualizado");
+      onAtualizado();
+      return true;
+    }).finally(() => {
+      setSalvando(false);
     });
-    setSalvando(false);
-
-    if (!resultado.success) {
-      const mensagem = typeof resultado.error === "string"
-        ? resultado.error
-        : "Não foi possível salvar o status pós-fechamento.";
-      const houveConflito = mensagem.toLocaleLowerCase("pt-BR").includes("mudou enquanto");
-      setConflitoRealtime(houveConflito);
-      toast.error(mensagem);
-      if (houveConflito) onAtualizado();
-      return;
-    }
-
-    confirmacaoLocalPendenteRef.current = {
-      status,
-      versaoAnterior: versaoBase,
-    };
-    rascunhoSujoRef.current = false;
-    setBase(status);
-    setConflitoRealtime(false);
-    toast.success("Status pós-fechamento atualizado");
-    onAtualizado();
+    return sucesso;
   }
 
   function usarStatusAtualizado() {

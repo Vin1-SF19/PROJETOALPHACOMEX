@@ -5,6 +5,24 @@
 
 ---
 
+### Componentes com autosave-on-blur fora do CardSaveContext — perda de dados ao mover card (RM-2026-5BDA0D)
+**Sintoma:** campos editáveis em cards CRM (`proximoContatoEm`, `statusPosFechamento`, respostas do checklist) não persistiam ao sair do card — usuário precisava redigitar.
+**Causa raiz:** `PainelProximoContato.tsx`, `PainelStatusPosFechamento.tsx` e `PainelChecklistFollowUp.tsx` salvavam via `onBlur`/`onChange` chamando `AtualizarCardBpm`/`SalvarChecklistFollowUpBpm` diretamente, **sem** registrar no `CardSaveContext`. Consequência: `flushSaves()` (chamado por `PainelProximaEtapa.handleMover` antes de `MoverCardBpm`) não aguardava esses saves — o backend recebia `MoverCardBpm` antes dos saves concluírem, e os valores editados eram perdidos.
+**Lição para armadilhas semelhantes:** qualquer componente editável com autosave-on-blur/onChange dentro de `CardSaveProvider` DEVE registrar via `registerSave` — nunca chamar a Server Action diretamente. O `CardSaveContext` é o único ponto de sincronização entre saves paralelos e a ação de mover o card. Componentes com botão explícito (não autosave) estão fora desse requisito.
+**Fix aplicado:** os 3 componentes agora usam `registerSave(() => ...)` — ver `architecture.md` para o detalhe completo.
+**Adicionado em:** 2026-09-01 (Bibble, fechamento RM-2026-5BDA0D)
+
+---
+
+### Padrão de armadilha — autosave com CAS otimista precisa propagar falha real, não só toast (RM-2026-2403E5)
+**Sintoma:** card BPM em "Novos leads" (ou qualquer etapa com campos dinâmicos obrigatórios) recusava movimento com "campo obrigatório ausente" mesmo com os campos visivelmente preenchidos na UI, logo após editar e mover em sequência rápida.
+**Causa raiz:** `Promise` de autosave (`registerSave` em `CardSaveContext.tsx`) resolvia sempre com sucesso, independente de `AtualizarCardBpm` ter retornado erro (que só virava toast) — e a versão-base do CAS (`versaoBaseCampos`) só era atualizada de forma otimista, não a partir da confirmação real do servidor. O consumidor do save (`PainelProximaEtapa.tsx`) confiava cegamente nesse sinal e chamava `MoverCardBpm` com dados desatualizados/ausentes no backend.
+**Lição para armadilhas semelhantes:** qualquer fluxo de autosave que alimenta uma validação subsequente (CAS, obrigatoriedade, revalidação transacional) precisa que a Promise/callback de save propague sucesso/falha REAL (não apenas efeito colateral tipo toast), e que a versão-base usada para otimismo/CAS só avance após confirmação do servidor, nunca antes. A validação de campos obrigatórios em si (`!valor?.trim()` tratando `null`/`undefined`/`""`/espaços como ausente, em `src/lib/bpm/requisitos-etapa.ts`) estava correta — o bug nunca esteve na lógica de comparação, sempre no timing de quem a alimentava.
+**Fix aplicado:** `registerSave(save: () => Promise<boolean>) => Promise<boolean>` + `flushSaves(): Promise<boolean>` em `CardSaveContext.tsx`; `PainelProximaEtapa.handleMover` só chama `MoverCardBpm` se `flushSaves()` retornar `true`. Ver `architecture.md` para o detalhe completo.
+**Adicionado em:** 2026-08-31 (Bibble, fechamento RM-2026-2403E5)
+
+---
+
 ### Baseline do `npx vitest run` (suíte completa) maior do que o documentado — 29 falhas / 17 arquivos, não 26
 **Contexto:** o baseline de 26 falhas (`tests/bpm/standby-follow-up.test.ts` + `tests/google-calendar/*`) documentado em `architecture.md` está desatualizado/incompleto. Em 2026-08-29 (sessão "Gerador de Documentos — contratante/contratada"), a suíte completa mostrou **29 falhas em 17 arquivos**, incluindo `tests/bpm/fechado-actions.test.ts`, `tests/bpm/lost-actions.test.ts`, `tests/bpm/card-modal-integration.test.ts`, `tests/bpm/lost-ui.test.ts`, `tests/bpm/membros-card-ui.test.ts`, `tests/bpm/fechado-ui.test.ts`, `tests/bpm/prazo-anotacao-card.test.ts`, `tests/bpm/sem-viabilidade-actions.test.ts`, `tests/bpm/formulario-etapa.test.ts`, `tests/alpha-seo/*` (4 arquivos), `tests/apresentacoes/pptx-parser.test.ts`, `tests/bibble/context-budget.test.ts` — além dos 2 já catalogados.
 **Confirmado não-regressão:** `git stash` temporário (revertendo TODO o trabalho desta sessão) + rodar `tests/bpm/fechado-actions.test.ts` isolado reproduziu a MESMA falha ("Erro ao mover card" / "Erro ao salvar requisitos e mover card") sem nenhuma mudança minha presente — confirma que é dívida técnica pré-existente do projeto, não introduzida por nenhuma sessão específica de Gerador de Documentos.

@@ -54,7 +54,8 @@ export default function AdminTarefas() {
         intervaloDias: null as number | null,
         dataInicio: new Date(),
         prioridade: "baixa",
-        horario: ""
+        horario: "",
+        alerta: "1H_ANTES"
     });
 
 
@@ -276,7 +277,7 @@ export default function AdminTarefas() {
             toast.success("Diretriz lançada!");
             setShowModalAdd(false);
             setIsPending(false);
-            setNovaTarefa({ texto: "", descricao: "", fixa: false, diasSemana: [], intervaloDias: null, dataInicio: new Date(), prioridade: "baixa", horario: "" });
+            setNovaTarefa({ texto: "", descricao: "", fixa: false, diasSemana: [], intervaloDias: null, dataInicio: new Date(), prioridade: "baixa", horario: "", alerta: "1H_ANTES" });
             carregarDados();
         } catch (error) {
             toast.error("Falha ao comunicar com o servidor.");
@@ -328,7 +329,8 @@ export default function AdminTarefas() {
             intervaloDias: tarefa.intervaloDias,
             diasSemana: tarefa.diasSemana || [],
             dataInicio: new Date(tarefa.dataInicio),
-            horario: tarefa.horario || ""
+            horario: tarefa.horario || "",
+            alerta: tarefa.alerta || "1H_ANTES"
         });
         setShowModalAdd(true);
     };
@@ -881,6 +883,26 @@ export default function AdminTarefas() {
                                             onChange={(e) => setNovaTarefa({ ...novaTarefa, dataInicio: new Date(e.target.value + 'T00:00:00') })}
                                             className="w-full bg-black/40 border border-white/5 p-4 rounded-xl text-white text-[10px] font-black outline-none focus:border-indigo-500 [color-scheme:dark]"
                                         />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 pt-4 border-t border-white/5">
+                                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest px-1">Alerta (antecedência)</label>
+                                    <div className="relative">
+                                        <select
+                                            value={novaTarefa.alerta}
+                                            onChange={e => setNovaTarefa({ ...novaTarefa, alerta: e.target.value })}
+                                            className="w-full bg-black/40 border border-white/5 p-4 rounded-xl text-[10px] font-black uppercase text-white outline-none appearance-none focus:border-indigo-500"
+                                        >
+                                            <option value="15MIN_ANTES">⏱ 15 minutos antes</option>
+                                            <option value="30MIN_ANTES">⏱ 30 minutos antes</option>
+                                            <option value="1H_ANTES">⏱ 1 hora antes</option>
+                                            <option value="3H_ANTES">⏱ 3 horas antes</option>
+                                            <option value="1DIA_ANTES">📅 1 dia antes</option>
+                                            <option value="2DIAS_ANTES">📅 2 dias antes</option>
+                                            <option value="1SEMANA_ANTES">📅 1 semana antes</option>
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" size={14} />
                                     </div>
                                 </div>
 

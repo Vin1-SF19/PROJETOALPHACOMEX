@@ -9,13 +9,22 @@ import { obterUsuarioGoogleAtivo } from "@/lib/google-calendar/usuario-google";
 import db from "@/lib/prisma";
 
 type Resultado<T> = { success: true; data: T } | { success: false; error: string };
-const tarefaSchema = z.object({ taskListId: z.string().min(1).max(300), titulo: z.string().trim().min(1).max(1024), notas: z.string().trim().max(8192).optional(), vencimentoEm: z.coerce.date().optional() }).strict();
+const tarefaSchema = z.object({
+  taskListId: z.string().min(1).max(300),
+  titulo: z.string().trim().min(1).max(1024),
+  notas: z.string().trim().max(8192).optional(),
+  vencimentoEm: z.coerce.date().optional(),
+  inicioLocalEm: z.coerce.date().optional(),
+  fimLocalEm: z.coerce.date().optional(),
+}).strict();
 const concluirSchema = z.object({ tarefaCacheId: z.string().min(1) }).strict();
 const atualizarSchema = z.object({
   tarefaCacheId: z.string().min(1),
   titulo: z.string().trim().min(1).max(1024),
   notas: z.string().trim().max(8192).optional(),
   vencimentoEm: z.coerce.date().optional(),
+  inicioLocalEm: z.coerce.date().optional(),
+  fimLocalEm: z.coerce.date().optional(),
 }).strict();
 
 async function contextoAtivo(): Promise<Resultado<{ conexaoId: string; emailUsuario: string }>> {
@@ -62,8 +71,14 @@ export async function criarTarefaAgendaAlpha(input: z.input<typeof tarefaSchema>
   const lista = await db.googleCalendarTaskListCache.findFirst({ where: { conexaoId: contexto.data.conexaoId, googleTaskListId: parsed.data.taskListId }, select: { id: true } });
   if (!lista) return { success: false, error: "Lista de tarefas não encontrada. Sincronize primeiro." };
   try {
-    const tarefa = await criarTarefaGoogleTasks({ emailUsuario: contexto.data.emailUsuario, ...parsed.data });
-    const salva = await db.googleCalendarTaskCache.upsert({ where: { taskListId_googleTaskId: { taskListId: lista.id, googleTaskId: tarefa.googleTaskId } }, create: { taskListId: lista.id, ...tarefa }, update: { ...tarefa } });
+    const { inicioLocalEm, fimLocalEm, ...dadosGoogle } = parsed.data;
+    const tarefa = await criarTarefaGoogleTasks({ emailUsuario: contexto.data.emailUsuario, ...dadosGoogle });
+    const camposLocais = { inicioLocalEm: inicioLocalEm ?? null, fimLocalEm: fimLocalEm ?? null };
+    const salva = await db.googleCalendarTaskCache.upsert({
+      where: { taskListId_googleTaskId: { taskListId: lista.id, googleTaskId: tarefa.googleTaskId } },
+      create: { taskListId: lista.id, ...tarefa, ...camposLocais },
+      update: { ...tarefa, ...camposLocais },
+    });
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { id: salva.id } };
   } catch { return { success: false, error: "Não foi possível criar a tarefa no Google." }; }
@@ -100,7 +115,10 @@ export async function atualizarTarefaAgendaAlpha(input: z.input<typeof atualizar
       notas: parsed.data.notas,
       vencimentoEm: parsed.data.vencimentoEm,
     });
-    await db.googleCalendarTaskCache.update({ where: { id: tarefa.id }, data: atualizada });
+    await db.googleCalendarTaskCache.update({
+      where: { id: tarefa.id },
+      data: { ...atualizada, inicioLocalEm: parsed.data.inicioLocalEm ?? null, fimLocalEm: parsed.data.fimLocalEm ?? null },
+    });
     revalidatePath("/PainelAlpha/CalendarioAlpha");
     return { success: true, data: { id: tarefa.id } };
   } catch { return { success: false, error: "Não foi possível atualizar a tarefa no Google." }; }

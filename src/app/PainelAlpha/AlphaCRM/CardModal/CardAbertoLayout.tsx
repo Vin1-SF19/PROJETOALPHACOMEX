@@ -1,11 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { BriefcaseBusiness, Building2 } from "lucide-react";
+import { BriefcaseBusiness, Building2, Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { ExcluirCardBpm } from "@/actions/bpm/Cards";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
+import { getServicosComerciais } from "@/actions/ContratoComercial";
+import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
 import { isAdminRole } from "@/lib/roles";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoServico from "./PainelHistoricoServico";
@@ -23,8 +38,6 @@ import { CardSaveProvider } from "./CardSaveContext";
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
-
-const SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"];
 
 export interface CardAbertoLayoutProps {
   card: CardDetalhe;
@@ -74,8 +87,20 @@ export function CardAbertoLayout({
   children,
 }: CardAbertoLayoutProps) {
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
+  const [servicos, setServicos] = useState<string[]>([...SERVICOS_COMERCIAIS_PADRAO]);
+  const [excluindo, setExcluindo] = useState(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(card.id);
   const { openPerfilEmpresa } = usePerfilEmpresa();
+
+  useEffect(() => {
+    let cancelado = false;
+    getServicosComerciais().then((res) => {
+      if (cancelado) return;
+      const fromDb = res.success ? res.servicos.map((s) => s.nome) : [];
+      setServicos([...new Set([...SERVICOS_COMERCIAIS_PADRAO, ...fromDb])]);
+    });
+    return () => { cancelado = true; };
+  }, []);
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo);
@@ -185,6 +210,52 @@ export function CardAbertoLayout({
               cardId={card.id}
               empresaNome={card.empresa.nomeFantasia || card.empresa.razaoSocial}
             />
+            {podeGerenciarMembros && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Excluir card"
+                    className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir card</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Tem certeza que deseja excluir o card{" "}
+                      <strong>{card.empresa.nomeFantasia || card.empresa.razaoSocial}</strong>?
+                      Esta ação é irreversível e removerá todos os campos, tarefas e anexos vinculados.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      disabled={excluindo}
+                      onClick={async () => {
+                        setExcluindo(true);
+                        try {
+                          const res = await ExcluirCardBpm(card.id);
+                          if (res.success) {
+                            toast.success("Card excluído com sucesso");
+                            onClose();
+                          } else {
+                            toast.error(res.error ?? "Erro ao excluir card");
+                          }
+                        } finally {
+                          setExcluindo(false);
+                        }
+                      }}
+                    >
+                      {excluindo ? "Excluindo…" : "Excluir"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
 
@@ -202,7 +273,7 @@ export function CardAbertoLayout({
             >
               Este card
             </TabsTrigger>
-            {SERVICOS_FIXOS.map((servico) => {
+            {servicos.map((servico) => {
               const ativo = abaAtiva === servico;
               return (
                 <TabsTrigger
@@ -248,7 +319,7 @@ export function CardAbertoLayout({
                 anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
               />
             </TabsContent>
-            {SERVICOS_FIXOS.map((servico) => (
+            {servicos.map((servico) => (
               <TabsContent key={servico} value={servico} className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
                 <PainelHistoricoServico
                   cardId={card.id}

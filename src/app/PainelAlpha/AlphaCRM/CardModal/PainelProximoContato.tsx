@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarPlus, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
+import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -27,6 +28,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const sujoRef = useRef(false);
+  const { registerSave } = useCardSave();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -49,23 +51,27 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
     const valorPersistido = paraInputDatetimeLocal(card.proximoContatoEm);
     if (!sujoRef.current && (proximoContatoEm ?? "") === valorPersistido) return;
     setSalvando(true);
-    const resultado = await AtualizarCardBpm({
-      cardId: card.id,
-      proximoContatoEm: proximoContatoEm ? new Date(proximoContatoEm).toISOString() : null,
+    const sucesso = await registerSave(async () => {
+      const resultado = await AtualizarCardBpm({
+        cardId: card.id,
+        proximoContatoEm: proximoContatoEm ? new Date(proximoContatoEm).toISOString() : null,
+      });
+      if (!resultado.success) {
+        toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível atualizar o próximo contato");
+        return false;
+      }
+      sujoRef.current = false;
+      setConflitoRealtime(false);
+      setErro(null);
+      toast.success(proximoContatoEm ? "Próximo contato atualizado" : "Próximo contato removido");
+      onAtualizado();
+      return true;
+    }).finally(() => {
+      setSalvando(false);
     });
-    setSalvando(false);
-
-    if (!resultado.success) {
-      toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível atualizar o próximo contato");
-      return;
+    if (sucesso) {
+      if (!proximoContatoEm) setValor("");
     }
-
-    if (!proximoContatoEm) setValor("");
-    sujoRef.current = false;
-    setConflitoRealtime(false);
-    setErro(null);
-    toast.success(proximoContatoEm ? "Próximo contato atualizado" : "Próximo contato removido");
-    onAtualizado();
   }
 
   return (

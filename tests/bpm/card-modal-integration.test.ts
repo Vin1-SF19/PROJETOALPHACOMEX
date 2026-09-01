@@ -140,7 +140,6 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(gradientBlobCard).not.toContain("animate-blob");
     expect(gradientBlobCard).not.toContain("dark:bg-black/50");
     expect(kanbanCard).toContain("const inicialEmpresa");
-    expect(kanbanCard).toContain("<PhoneCall");
     expect(kanbanCard).toContain("<CalendarClock");
     expect(kanbanCard).toContain("<ClipboardList");
     expect(kanbanCard).toContain("const membrosVisiveis = card.membros.length > 0");

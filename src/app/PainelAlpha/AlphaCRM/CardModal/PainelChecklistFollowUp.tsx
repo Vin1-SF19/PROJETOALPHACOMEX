@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, ClipboardList, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ObterUltimoFollowUpBpm, SalvarChecklistFollowUpBpm } from "@/actions/bpm/FollowUp";
+import { useCardSave } from "./CardSaveContext";
 
 type RespostaObterFollowUp = NonNullable<Awaited<ReturnType<typeof ObterUltimoFollowUpBpm>>["data"]>;
 type Checklist = NonNullable<RespostaObterFollowUp["checklist"]>;
@@ -38,6 +39,7 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
   const draftSujoRef = useRef(false);
   const revisaoAnteriorRef = useRef(realtimeRevision);
+  const { registerSave } = useCardSave();
 
   useEffect(() => {
     let cancelado = false;
@@ -74,25 +76,32 @@ export function PainelChecklistFollowUp({ cardId, accent, onAtualizado, onEstado
 
   async function persistir(concluir: boolean) {
     if (!concluir && estado?.checklist && (!draftSujoRef.current || salvando)) return;
+    const respostasAtual = respostas;
+    const checklistIdAtual = estado?.checklist?.id;
+    const estadoAnterior = estado?.estado;
     setSalvando(true);
-    const resultado = await SalvarChecklistFollowUpBpm({
-      cardId,
-      checklistId: estado?.checklist?.id,
-      respostas,
-      concluir,
+    await registerSave(async () => {
+      const resultado = await SalvarChecklistFollowUpBpm({
+        cardId,
+        checklistId: checklistIdAtual,
+        respostas: respostasAtual,
+        concluir,
+      });
+      if (!resultado.success || !resultado.data) {
+        toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar o follow-up");
+        return false;
+      }
+      setEstado({ estado: resultado.data.estado, checklist: resultado.data.checklist });
+      setRespostas(resultado.data.checklist?.respostas ?? {});
+      draftSujoRef.current = false;
+      setConflitoRealtime(false);
+      onEstadoChange(resultado.data.estado);
+      toast.success(concluir ? "Follow-up concluído" : estadoAnterior === "NAO_INICIADO" ? "Follow-up iniciado" : "Rascunho do follow-up salvo");
+      onAtualizado();
+      return true;
+    }).finally(() => {
+      setSalvando(false);
     });
-    setSalvando(false);
-    if (!resultado.success || !resultado.data) {
-      toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível salvar o follow-up");
-      return;
-    }
-    setEstado({ estado: resultado.data.estado, checklist: resultado.data.checklist });
-    setRespostas(resultado.data.checklist?.respostas ?? {});
-    draftSujoRef.current = false;
-    setConflitoRealtime(false);
-    onEstadoChange(resultado.data.estado);
-    toast.success(concluir ? "Follow-up concluído" : estado?.estado === "NAO_INICIADO" ? "Follow-up iniciado" : "Rascunho do follow-up salvo");
-    onAtualizado();
   }
 
   async function iniciarNovoFollowUp() {

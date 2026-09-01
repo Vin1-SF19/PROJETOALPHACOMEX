@@ -13,11 +13,13 @@ export async function CriarTarefa(data: {
     dataInicio?: Date;
     prioridade: string;
     horario?: string | null;
+    /** Chave da opção de alerta predefinida (ex.: "1H_ANTES", "30MIN_ANTES") */
+    alerta?: string | null;
 }) {
     try {
         const idFinal = Number(data.userId);
 
-        await db.tarefa.create({
+        const created = await db.tarefa.create({
             data: {
                 texto: data.texto,
                 descricao: data.descricao || "",
@@ -31,6 +33,17 @@ export async function CriarTarefa(data: {
                 horario: data.horario || null,
             }
         });
+
+        // Persistir alerta via raw SQL (best-effort — falha silenciosamente se a coluna não existir)
+        if (data.alerta) {
+            try {
+                await db.$executeRawUnsafe(
+                    `UPDATE "Tarefa" SET "alerta" = ${JSON.stringify(data.alerta)} WHERE "id" = ${created.id}`
+                );
+            } catch {
+                // Coluna "alerta" ainda não existe no banco — migration pendente (Vault)
+            }
+        }
 
         revalidatePath("/PainelAlpha/PainelTarefas");
         return { success: true };

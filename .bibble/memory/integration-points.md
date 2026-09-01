@@ -1,5 +1,162 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Exclusão de card no Alpha CRM — `ExcluirCardBpm` (RM-2026-C99F86, 2026-09-01)
+
+**Onde está implementado:**
+- `src/actions/bpm/Cards.ts` — `ExcluirCardBpm` (Server Action, `"use server"`)
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` — botão `Trash2` + `AlertDialog` de confirmação
+- `src/lib/bpm/realtime.ts` — `"CARD_EXCLUIDO"` em `BPM_REALTIME_TIPOS`
+
+**Como funciona (fluxo):**
+1. Usuário abre `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → clica num card → `CardFullViewModal` → `CardAbertoLayout`
+2. Botão `Trash2` visível quando `podeGerenciarMembros` (RESPONSAVEL/ADMINISTRADOR do card, ou Admin/CEO/TI global)
+3. Clique → `AlertDialog` "Excluir card" → mensagem "irreversível" → botão "Excluir"
+4. `ExcluirCardBpm(cardId)` → `auth()` → `exigirAcessoBpmCard(cardId, userId, userRole, "excluirCard")` → `db.$transaction(tx => tx.bpmCard.delete(...))` → `notificarPipelineBpm({ tipo: "CARD_EXCLUIDO" })` → `revalidatePath`
+5. `toast.success("Card excluído com sucesso")` → `onClose()` → board atualizado
+
+**Dependências de permissão:**
+- `excluirCard` em `PERMISSOES_POR_ROLE` (`src/lib/bpm/ownership.ts`) — mapeado para RESPONSAVEL e ADMINISTRADOR (card-roles), não para PARTICIPANTE
+- Bypass global: `isAdminRole` (Admin/CEO/TI) — aplicado em `checarAcessoBpmCard`
+- Verificação real no servidor; gate visual no client é apenas UX
+
+**Cascades do schema (sem limpeza manual):**
+- `BpmCardCampoValor`, `BpmCardMembro`, `BpmTarefa`, `BpmCardAnexo`, `BpmCardHistorico`, `BpmInteracaoCard`, `BpmChecklistFollowUp`, `BpmCardVinculo` — todos `onDelete: Cascade`
+- `Indicacao.bpmCardId` — `onDelete: SetNull` (Indicacao permanece, perde vínculo)
+
+**Última atualização:** 2026-09-01 por Scribe
+
+---
+
+## Tabs de Serviços no Card do Alpha CRM — novo consumidor de `getServicosComerciais()` (RM-2026-29F59C, 2026-09-01)
+
+**Onde está implementado:**
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` — `useEffect` no header do card chama `getServicosComerciais()` (`src/actions/ContratoComercial.ts:586`, Server Action já existente e autenticada, sem alteração), mescla com `SERVICOS_COMERCIAIS_PADRAO` (`src/lib/comercial/servicos.ts`) e alimenta as `TabsTrigger` de serviço.
+
+**Ação/model reutilizado (nenhuma action nova criada):**
+- `getServicosComerciais()` — já era consumida por `ModalGerenciamentoLeads.tsx`, `ModalNovaIndicacao.tsx`, `AbaServicos.tsx`. `CardAbertoLayout.tsx` é o 4º ponto de consumo, mesmo padrão de merge com o catálogo padrão.
+- Model `ServicosComerciais` (`prisma/schema.prisma:1639`) — sem migration, sem campo novo.
+
+**Trigger/navegação:** clique na `TabsTrigger` altera state local `abaAtiva`; sem rota nova, sem API HTTP nova.
+
+---
+
+## Aba Tarefas do card CRM — exibição completa de campos (RM-2026-1BA46D, 2026-09-01)
+
+**Onde está implementado:**
+- `src/actions/bpm/Cards.ts` — `ObterCardBpm`, `include.tarefas` ganhou `responsavel: { select: { id, nome } }`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx` — renderização ampliada (título, descrição, prioridade, status, prazo, alerta, responsável, concluída em)
+
+**Como funciona (fluxo):**
+1. Usuário abre `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → clica num card → `CardFullViewModal`/`PainelHistorico` → aba "Tarefas"
+2. `PainelTarefasPorTipo` recebe a lista de `BpmTarefa` já carregada por `ObterCardBpm` (com `responsavel` incluído)
+3. Cada tarefa é renderizada com todos os campos disponíveis, condicionalmente (campos vazios não geram bloco vazio)
+4. Ao criar/concluir tarefa, `onAtualizado()` reconsulta o card — lista atualiza sem refresh manual
+
+**Dependência de integração:** o campo "Responsável" depende exclusivamente do `include` em `ObterCardBpm` — se outro ponto do código também buscar tarefas de um card (fora de `ObterCardBpm`), precisará do mesmo `include` para exibir o responsável.
+
+**Sem novo endpoint, rota ou permissão** — reaproveita os gates de acesso já existentes do módulo `bpm`.
+
+**Última atualização:** 2026-09-01 por Scribe
+
+---
+
+## Formulário de criação de tarefas — prazo e alerta (RM-2026-66F07D, 2026-09-01)
+
+**Onde está implementado:**
+- `src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/page.tsx` — modal "Nova Diretriz" com campos `dataInicio` (date), `horario` (time), `alerta` (select 7 opções)
+- `src/actions/Tarefas.ts` — `CriarTarefa` aceita `alerta?: string` e persiste via raw SQL (best-effort)
+- `src/lib/tarefas/schemas.ts` — `ALERTA_OPCOES`, `CriarTarefaSchema`, `alertaChaveParaMinutos()`
+
+**Como funciona (fluxo):**
+1. Usuário abre `/PainelAlpha/PainelTarefas/GerenciarTarefas?id=<userId>`
+2. Clica "Nova Ordem" → modal "Nova Diretriz" abre
+3. Preenche: texto, descrição, prioridade (select), data de início (date), horário (time), alerta (select predefinido)
+4. Submit → `CriarTarefa` (Server Action) → persistência via Prisma + raw SQL (alerta)
+5. `toast.success("Diretriz lançada!")` → `carregarDados()` → listagem atualizada
+
+**Integrações conhecidas:**
+- **Alpha CRM (BPM):** o model `BpmTarefa` já possui `prazo`, `alertaEm`, `alertaDisparadoEm` — infraestrutura de dados pronta. O formulário de `PainelTarefas` usa o model `Tarefa` (diferente de `BpmTarefa`).
+- **Sistema de notificação:** NÃO existe — o campo `alerta` é persistido mas não dispara nenhuma notificação. Limitação conhecida, não bloqueio.
+
+**Como adicionar notificação real (futuro):**
+1. Criar worker/queue que lê `Tarefa.alerta` + `Tarefa.dataInicio` + `Tarefa.horario`
+2. Calcular `alertaEm = dataInicio + horario - antecedência(minutos)`
+3. Disparar notificação (push/e-mail) quando `now >= alertaEm`
+4. Marcar `alertaDisparadoEm` (coluna já existe em `BpmTarefa`, não em `Tarefa`)
+
+**Última atualização:** 2026-09-01 por Scribe
+
+---
+
+## Pré-preenchimento de campos conhecidos no GerarDocumentoForm (RM-2026-1D1118, 2026-09-01)
+
+**Onde está implementado:**
+- `src/components/GeradorDocumentos/GerarDocumentoForm.tsx` — função pura `prePreencherVariaveis()` + chamadas em `selecionarCliente()`, `handleEmpresaCriada()`, `handleSelecionarContratada()`
+- `src/actions/gerador-documentos.ts` — `BuscarClientesParaContratante` (select inclui `cnpj`, `email`, `telefone`, `razaoSocial`, `nomeFantasia`)
+
+**Como funciona (fluxo):**
+1. Usuário digita busca → debounce 300ms → `BuscarClientesParaContratante(termo)` → lista de `ClienteResumo`
+2. Usuário clica num resultado → `selecionarCliente(cliente)` → `prePreencherVariaveis(prev, template.variaveis, { cnpj, documento, razaoSocial, nomeFantasia, email, telefone })` → `setValores(novo)`
+3. Para Contratada: `handleSelecionarContratada(id)` → busca empresa em `empresasContratadas` → `prePreencherVariaveis(prev, template.variaveis, { cnpj, documento, razaoSocial, nomeFantasia })` → `setValores(novo)`
+4. Para empresa nova criada: `handleEmpresaCriada(empresa)` → mesmo padrão
+
+**Como adicionar um novo campo ao pré-preenchimento:**
+1. Confirmar que o campo existe no model (`Cliente` ou `EmpresaContratada`)
+2. Adicionar ao `select` da action de busca (`BuscarClientesParaContratante` ou `ListarEmpresasContratadas`)
+3. Adicionar ao objeto de dados passado a `prePreencherVariaveis()` nos 3 pontos de chamada
+4. O nome da chave no objeto DEVE ser igual ao nome da variável no template (ex.: `cnpj`, `email`, `telefone`)
+
+**Limitações:**
+- Só nome exato de campo, não semântica (ex.: "documento" mapeia para `cnpj` porque o objeto passa `{ documento: cliente.cnpj }`)
+- Só campos estruturais (CNPJ, CPF, e-mail, telefone, razão social, nome fantasia) — campos dinâmicos de etapa não são cobertos
+- Não sobrescreve valor já digitado pelo usuário
+- Campo continua editável (não `disabled`)
+
+## Autosave em Cards CRM — componentes com registerSave (RM-2026-5BDA0D, 2026-09-01)
+
+**Padrão obrigatório:** qualquer componente editável com autosave-on-blur/onChange dentro de `CardSaveProvider` DEVE registrar via `registerSave` do `CardSaveContext`. Nunca chamar a Server Action diretamente.
+
+**Componentes que usam `registerSave` (lista completa):**
+
+| Componente | Campo(s) | Trigger | Server Action |
+|---|---|---|---|
+| `PainelCamposEtapaAtual.tsx` | campos dinâmicos (`BpmCampo`) | `onBlur` | `AtualizarCardBpm` |
+| `PainelProximoContato.tsx` | `proximoContatoEm` | `onBlur` | `AtualizarCardBpm` |
+| `PainelStatusPosFechamento.tsx` | `statusPosFechamento` | `onChange` | `AtualizarCardBpm` |
+| `PainelChecklistFollowUp.tsx` | respostas do checklist | `onBlur` | `SalvarChecklistFollowUpBpm` |
+
+**Componentes intencionalmente fora (botão explícito, não autosave):**
+
+| Componente | Ação | Motivo |
+|---|---|---|
+| `PainelReuniao.tsx` | "Agendar" | ação deliberada, não autosave |
+| `PainelStandbyFollowUp.tsx` | "Interromper" | ação destrutiva com confirmação |
+| `SeletorMembrosCard.tsx` | clique em membro | ação deliberada, não autosave |
+
+**Consumidor:** `PainelProximaEtapa.handleMover` → `flushSaves()` → se `true` → `MoverCardBpm`.
+
+**Novo componente editável no card?** Se usa autosave-on-blur/onChange, registrar via `registerSave`. Se usa botão explícito, não precisa.
+
+## Card virtual de lead do site — visualização + promoção (RM-2026-948ED5, 2026-09-01)
+
+**Novo ponto de integração:** `NolossLeadModal` (`src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/NolossLeadModal.tsx`) — modal bottom-sheet dedicado à visualização de `NolossLead` pendente (status `pending`).
+
+**Fluxo de clique:** `KanbanCard.onClick` → `abrirCard()` em `PipelineBoardClient.tsx` → se `card.origem === "noloss"` → `setNolossLeadAberto(card)` → `NolossLeadModal` renderiza. Se `origem !== "noloss"` → `CardFullViewModal` (comportamento inalterado).
+
+**O modal é agnóstico ao tipo de card:** `CardFullViewModal` continua sendo o modal para `BpmCard` nativos (incluindo cards promovidos de `NolossLead`). `NolossLeadModal` é um componente separado, mais simples, que exibe apenas os dados do lead pendente e oferece a ação de promoção. Não há conflito entre os dois — a detecção é feita no `abrirCard()` antes de qualquer renderização.
+
+**Props do `NolossLeadModal`:** `card` (objeto `CardBpm` com `nolossEmail?`, `nolossTelefone?`), `onPromover` (callback que dispara `PromoverNolossLead`), `onClose`.
+
+**Dados disponíveis no card virtual:** `nome`, `nolossEmail`, `nolossTelefone`, `createdAt` (data de recebimento). Campos nulos exibidos como `"—"`.
+
+**Integração com promoção:** o botão "Assumir lead" abre `AtribuirResponsavelPromocaoModal` (componente existente) que lista responsáveis elegíveis (`ListarUsuariosResponsavelBpm`) e dispara `PromoverNolossLead` com `nolossLeadId`, `etapaDestinoId` e `responsavelId`.
+
+## Card BPM — restrição de campos na etapa Novos Leads (RM-2026-5830C2, 2026-08-31)
+
+`KanbanCard` (`PipelineBoardClient.tsx`) é o único ponto de renderização do card no Kanban. A restrição de campos na etapa "Novos leads" se aplica exclusivamente a esse componente — o detalhe do card (`CardFullViewModal` → `PainelCamposEtapaAtual`) é um modal separado com renderização própria e não é afetado. Não existe variante mobile separada do Kanban. A tela de configuração de pipelines (`AdminPipelineClient.tsx`) não exibe cards.
+
+**Padrão de leitura de campo dinâmico (reaproveitável):** `card.campoValores?.find(campo => campo.campo.nome === "<nome>")?.valor` — mesmo padrão já usado para `canalOrigem` (linha ~176). Qualquer novo campo dinâmico a exibir no card deve seguir esse mesmo padrão, nunca uma query separada.
+
 ## Contratante + busca na listagem de documentos gerados (RM-2026-DC0043, 2026-08-31)
 
 Ponto de integração: `ListarDocumentosGerados` (`src/actions/gerador-documentos.ts`) é a única fonte de dados da tab "Documentos gerados" (`GeradorDocumentosClient.tsx`) — carrega tudo de uma vez (sem paginação), então qualquer campo novo de exibição/filtro precisa entrar no `select` dessa action, nunca em uma query separada.

@@ -3009,6 +3009,13 @@ model GoogleCalendarTaskCache {
   posicao            String?
   atualizadoGoogleEm DateTime
 
+  // Horário de início/fim escolhido pelo usuário na Agenda Alpha. A API do
+  // Google Tasks só persiste a data de vencimento (sem hora); estas colunas
+  // guardam o período localmente para exibir a tarefa como um bloco de
+  // horário na grade, para tarefas criadas fora do fluxo de chamados.
+  inicioLocalEm DateTime?
+  fimLocalEm    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

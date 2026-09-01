@@ -4,8 +4,13 @@ import type { EventoExibicao, TarefaAgendaExibicao } from "./tipos";
 export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoExibicao[] {
   return tarefas.flatMap((tarefa) => {
     const possuiHorarioAgendado = Boolean(tarefa.inicioAgendadoEm && tarefa.fimPlanejadoAgendadoEm);
+    const possuiHorarioLocal = Boolean(tarefa.inicioLocalEm && tarefa.fimLocalEm);
     const concluidaAgendada = tarefa.status === "completed" && tarefa.statusAgendamento === "CONCLUIDO";
-    if ((tarefa.status === "completed" && !concluidaAgendada) || (!possuiHorarioAgendado && !tarefa.vencimentoEm)) return [];
+    if (
+      (tarefa.status === "completed" && !concluidaAgendada && !possuiHorarioLocal) ||
+      (!possuiHorarioAgendado && !possuiHorarioLocal && !tarefa.vencimentoEm)
+    )
+      return [];
 
     if (possuiHorarioAgendado) {
       return [{
@@ -26,6 +31,29 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
         calendarioGoogleId: tarefa.taskListGoogleId,
         calendarioNome: tarefa.listaTitulo,
         calendarioCorHex: tarefa.statusAgendamento === "CONCLUIDO" ? "#22c55e" : "#3b82f6",
+        calendarioGravavel: true,
+      }];
+    }
+
+    if (possuiHorarioLocal) {
+      return [{
+        id: `tarefa-${tarefa.id}`,
+        googleEventId: `tarefa-${tarefa.id}`,
+        status: tarefa.status,
+        titulo: tarefa.titulo,
+        inicioEm: tarefa.inicioLocalEm ?? null,
+        fimEm: tarefa.fimLocalEm ?? null,
+        diaInteiro: false,
+        etag: "",
+        linkMeet: null,
+        eventType: "task",
+        tipo: "tarefa" as const,
+        tarefaCacheId: tarefa.id,
+        tarefaNotas: tarefa.notas,
+        calendarioId: "tarefas-google",
+        calendarioGoogleId: tarefa.taskListGoogleId,
+        calendarioNome: tarefa.listaTitulo,
+        calendarioCorHex: tarefa.status === "completed" ? "#22c55e" : null,
         calendarioGravavel: true,
       }];
     }

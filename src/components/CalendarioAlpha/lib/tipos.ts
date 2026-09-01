@@ -131,6 +131,9 @@ export interface TarefaAgendaExibicao {
   fimPlanejadoAgendadoEm?: string | null;
   fimConcluidoAgendadoEm?: string | null;
   statusAgendamento?: "EM_ATENDIMENTO" | "CONCLUIDO" | null;
+  /** Horário definido manualmente pelo usuário na Agenda Alpha (Google Tasks não guarda hora). */
+  inicioLocalEm?: string | null;
+  fimLocalEm?: string | null;
 }
 
 export interface ListaTarefasAgendaView {

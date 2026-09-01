@@ -44,4 +44,25 @@ describe("CRM - persistência antes da movimentação", () => {
     expect(movimento).toContain('aria-busy={movendoEtapa}');
     expect(movimento).toContain('className="shrink-0 animate-spin"');
   });
+
+  it("PainelProximoContato registra save via CardSaveContext", () => {
+    const painel = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx");
+    expect(painel).toContain("useCardSave");
+    expect(painel).toContain("registerSave");
+    expect(painel).toContain("AtualizarCardBpm");
+  });
+
+  it("PainelStatusPosFechamento registra save via CardSaveContext", () => {
+    const painel = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx");
+    expect(painel).toContain("useCardSave");
+    expect(painel).toContain("registerSave");
+    expect(painel).toContain("AtualizarCardBpm");
+  });
+
+  it("PainelChecklistFollowUp registra save via CardSaveContext", () => {
+    const painel = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx");
+    expect(painel).toContain("useCardSave");
+    expect(painel).toContain("registerSave");
+    expect(painel).toContain("SalvarChecklistFollowUpBpm");
+  });
 });

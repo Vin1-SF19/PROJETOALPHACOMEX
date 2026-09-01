@@ -26,6 +26,26 @@ interface ClienteResumo {
   razaoSocial: string;
   nomeFantasia: string | null;
   cnpj: string | null;
+  email: string | null;
+  telefone: string | null;
+}
+
+/** Pré-preenche variáveis do template com dados conhecidos da entidade,
+ *  sem sobrescrever valores já digitados pelo usuário. */
+function prePreencherVariaveis(
+  valores: Record<string, string | boolean>,
+  variaveis: VariavelTemplate[],
+  dados: Record<string, string | null | undefined>,
+): Record<string, string | boolean> {
+  const novo = { ...valores };
+  for (const v of variaveis) {
+    if (v.tipo === "booleano") continue;
+    const atual = novo[v.nome];
+    if (atual !== undefined && atual !== "") continue; // não sobrescrever
+    const valor = dados[v.nome];
+    if (valor) novo[v.nome] = valor;
+  }
+  return novo;
 }
 
 export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao }) {
@@ -70,6 +90,17 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
     setClienteSelecionado(cliente);
     setBuscaCliente("");
     setClientesEncontrados([]);
+    // Pré-preenche variáveis do template com dados conhecidos do cliente
+    setValores((prev) =>
+      prePreencherVariaveis(prev, template.variaveis, {
+        cnpj: cliente.cnpj,
+        documento: cliente.cnpj,
+        razaoSocial: cliente.razaoSocial,
+        nomeFantasia: cliente.nomeFantasia,
+        email: cliente.email,
+        telefone: cliente.telefone,
+      }),
+    );
   }
 
   function handleVoltar() {
@@ -83,6 +114,32 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
   function handleEmpresaCriada(empresa: EmpresaContratadaResumo) {
     setEmpresasContratadas((prev) => [...prev, empresa].sort((a, b) => a.razaoSocial.localeCompare(b.razaoSocial)));
     setEmpresaContratadaId(empresa.id);
+    // Pré-preenche variáveis do template com dados conhecidos da contratada
+    setValores((prev) =>
+      prePreencherVariaveis(prev, template.variaveis, {
+        cnpj: empresa.cnpj,
+        documento: empresa.cnpj,
+        razaoSocial: empresa.razaoSocial,
+        nomeFantasia: empresa.nomeFantasia,
+      }),
+    );
+  }
+
+  function handleSelecionarContratada(id: string | undefined) {
+    setEmpresaContratadaId(id ?? null);
+    if (id) {
+      const empresa = empresasContratadas.find((e) => e.id === id);
+      if (empresa) {
+        setValores((prev) =>
+          prePreencherVariaveis(prev, template.variaveis, {
+            cnpj: empresa.cnpj,
+            documento: empresa.cnpj,
+            razaoSocial: empresa.razaoSocial,
+            nomeFantasia: empresa.nomeFantasia,
+          }),
+        );
+      }
+    }
   }
 
   function handleGerar() {
@@ -188,7 +245,7 @@ export function GerarDocumentoForm({ template }: { template: TemplateParaGeracao
         <section className="flex flex-col gap-1.5">
           <Label htmlFor="select-contratada">Contratada (empresa)</Label>
           <div className="flex items-center gap-2">
-            <Select value={empresaContratadaId ?? undefined} onValueChange={setEmpresaContratadaId}>
+            <Select value={empresaContratadaId ?? undefined} onValueChange={handleSelecionarContratada}>
               <SelectTrigger id="select-contratada" className="flex-1">
                 <SelectValue placeholder="Selecione a empresa contratada" />
               </SelectTrigger>

@@ -28,6 +28,7 @@ interface DocumentoConferencia {
   status: string;
   finalizadoEm: Date | string | null;
   pdfUrl: string | null;
+  htmlUrl?: string | null; // RM-2026-94CBF6 — HTML renderizado com variáveis preenchidas
   template: { titulo: string };
   clausulas: ClasulaGerada[];
 }
@@ -100,12 +101,18 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         <div className="flex items-center gap-2">
           <Badge variant={status === "FINALIZADO" ? "default" : "secondary"}>{STATUS_LABEL[status] ?? status}</Badge>
           {pdfUrl && (
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+            <a href={`/PainelAlpha/GeradorDocumentos/${documento.id}/download`} target="_blank" rel="noopener noreferrer">
               <Button variant="secondary">
                 <Download className="mr-1.5 h-4 w-4" />
                 Baixar PDF
               </Button>
             </a>
+          )}
+          {!pdfUrl && (
+            <Button variant="secondary" disabled title="PDF ainda não gerado">
+              <Download className="mr-1.5 h-4 w-4" />
+              Baixar PDF
+            </Button>
           )}
           {!somenteLeitura && (
             <Button onClick={handleFinalizar} disabled={isPending}>
@@ -121,6 +128,28 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
           <FileCheck className="h-4 w-4 shrink-0" />
           Este documento já foi finalizado e não pode mais ser editado.
         </div>
+      )}
+
+      {/* HTML fiel renderizado (RM-2026-94CBF6) — exibição acima das cláusulas editáveis */}
+      {documento.htmlUrl && (
+        <Card className="mb-6 flex flex-col gap-3 p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-neutral-900 dark:text-neutral-100">Visualização fiel do documento</h3>
+            <a href={documento.htmlUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary" size="sm">
+                <Download className="mr-1.5 h-4 w-4" />
+                Baixar HTML
+              </Button>
+            </a>
+          </div>
+          <iframe
+            srcDoc={undefined}
+            src={documento.htmlUrl}
+            title="Documento HTML"
+            className="h-[600px] w-full rounded-md border border-neutral-200 bg-white dark:border-neutral-800"
+            sandbox="allow-same-origin"
+          />
+        </Card>
       )}
 
       <div className="flex flex-col gap-4">

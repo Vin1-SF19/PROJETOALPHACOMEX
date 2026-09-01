@@ -22,6 +22,49 @@
 
 <!-- Adicionar aqui conforme o projeto cresce -->
 
+### Botão de exclusão de card — `CardAbertoLayout.tsx` (RM-2026-C99F86, 2026-09-01)
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx`
+**Tipo:** Client Component (inline, não é componente separado)
+**Uso:** header do modal de card do Alpha CRM — botão `Trash2` (ícone) → `AlertDialog` de confirmação → `ExcluirCardBpm` → `toast` → `onClose()`.
+**Gate visual:** `podeGerenciarMembros` (RESPONSAVEL/ADMINISTRADOR do card, ou Admin/CEO/TI global). Verificação real no servidor.
+**Loading state:** `disabled={excluindo}` + texto "Excluindo…" no botão de ação.
+**Padrão reutilizável:** botão de ação destrutiva com `AlertDialog` de confirmação — pode ser reaproveitado em outros contextos de exclusão irreversível no projeto.
+
+**Última atualização:** 2026-09-01 por Scribe
+
+### PainelTarefasPorTipo — exibição completa de campos (RM-2026-1BA46D, 2026-09-01)
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx`
+**Tipo:** Client Component
+**Props:** `cardId`, dados do card BPM (mesmas props já existentes — sem mudança de assinatura).
+**Uso:** aba "Tarefas" do modal de card do Alpha CRM (`PainelHistorico.tsx` → `TabsTrigger value="tarefas"`).
+**Notas:** ampliado (não é componente novo) para exibir, por tarefa: título (destaque, fallback "Tarefa sem título"), descrição (`line-clamp-3`, `whitespace-pre-line`, só se presente), badge de tipo (já existia), badge de prioridade (cor por valor — ALTA=red, MEDIA=amber, fallback=slate, só se presente), badge de status (Concluída=emerald / Pendente=slate), prazo (ícone `Calendar` + `fmtDateTime`, cor vermelha se vencido e não concluída), alerta (ícone `Bell`, já existia), responsável (ícone `User` + nome, só se presente — depende de `ObterCardBpm` incluir `responsavel` na relação `tarefas`), concluída em (ícone `CheckCircle2`, só se presente). Estado vazio: "Nenhuma tarefa cadastrada para este card". Padrão de campo condicional (bloco só renderiza se o valor não for `null`/vazio) é o padrão a seguir em qualquer exibição futura de campos opcionais neste componente ou similares.
+
+**Última atualização:** 2026-09-01 por Scribe
+
+### Select de alerta predefinido — tarefas (RM-2026-66F07D, 2026-09-01)
+
+**Nenhum componente novo criado** — `<select>` nativo HTML inline em `src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/page.tsx`.
+
+**Padrão:** 7 opções predefinidas (`15MIN_ANTES` a `1SEMANA_ANTES`) definidas em `ALERTA_OPCOES` (`src/lib/tarefas/schemas.ts`). O valor persistido é a **chave** (ex.: `"1H_ANTES"`), não o texto exibido.
+
+**Uso:** formulário de criação de tarefas (`/PainelAlpha/PainelTarefas/GerenciarTarefas`) — campo "Alerta" no modal "Nova Diretriz".
+
+**Reutilizável:** sim — o padrão de "select com opções predefinidas + chave persistida" pode ser reaproveitado em outros formulários que precisem de enumeração fixa.
+
+**Última atualização:** 2026-09-01 por Scribe
+
+### Pré-preenchimento de campos conhecidos (RM-2026-1D1118, 2026-09-01)
+
+**Nenhum componente novo criado** — lógica inline em `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`.
+
+**Função pura:** `prePreencherVariaveis(valores, variaveis, dados)` — itera sobre as variáveis do template, só preenche campos vazios, nunca sobrescreve. Mapeamento por nome exato da variável.
+
+**Uso:** chamada em `selecionarCliente()`, `handleEmpresaCriada()` e `handleSelecionarContratada()` — sempre via `setValores((prev) => prePreencherVariaveis(prev, template.variaveis, { ... }))`.
+
+**Última atualização:** 2026-09-01 por Scribe
+
 ### AlphaSeoShell + workspaces Alpha SEO
 **Arquivo:** `src/components/AlphaSEO/AlphaSeoShell.tsx` e subpastas `audit/`, `dashboard/`, `gsc/`, `projects/`, `rank/`, `research/`, `sam/`, `saved/`, `settings/`, `shared/`, `visibility/`
 **Tipo:** composição de Server e Client Components

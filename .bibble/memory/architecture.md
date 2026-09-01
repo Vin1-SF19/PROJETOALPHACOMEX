@@ -1,5 +1,310 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Alpha CRM — Exclusão de cards (RM-2026-C99F86, 2026-09-01)
+
+**Objetivo:** permitir admins e gestores excluir cards do Kanban BPM.
+
+**Server Action:** `ExcluirCardBpm` em `src/actions/bpm/Cards.ts` — hard delete com cascades do schema Prisma (BpmCardCampoValor, BpmCardMembro, BpmTarefa, BpmCardAnexo, BpmCardHistorico, BpmInteracaoCard, BpmChecklistFollowUp, BpmCardVinculo). Guard: `auth()` + `exigirAcessoBpmCard(cardId, userId, userRole, "excluirCard")` — autoriza card-roles RESPONSAVEL/ADMINISTRADOR + bypass Admin/CEO/TI global.
+
+**UI:** botão `Trash2` no header de `CardAbertoLayout.tsx` (gate visual: `podeGerenciarMembros`) → `AlertDialog` de confirmação (título "Excluir card", mensagem "irreversível", botões Cancelar/Excluir) → `ExcluirCardBpm` → `toast.success`/`toast.error` → `onClose()`. Loading state: `disabled={excluindo}` + texto "Excluindo…".
+
+**Permissão:** role-based via `PERMISSOES_POR_ROLE` em `src/lib/bpm/ownership.ts` — `excluirCard` mapeado para RESPONSAVEL e ADMINISTRADOR (card-roles de `BpmCardMembro.role`), não para PARTICIPANTE. Bypass global via `isAdminRole` (Admin/CEO/TI). Verificação real no servidor; gate visual no client é apenas UX.
+
+**Realtime:** `"CARD_EXCLUIDO"` adicionado a `BPM_REALTIME_TIPOS` em `src/lib/bpm/realtime.ts`. `notificarPipelineBpm({ tipo: "CARD_EXCLUIDO" })` chamado após o delete.
+
+**Testes:** `tests/bpm/excluir-card.test.ts` (12 casos: permissão, validação, transação, mensagens de erro, realtime, UI, ownership mapping).
+
+**Caminho de consumo:**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → KanbanCard → clique → CardFullViewModal → CardAbertoLayout
+  → header → botão Trash2 (visível para RESPONSAVEL/ADMINISTRADOR/Admin global)
+  → AlertDialog "Excluir card" → confirmar → ExcluirCardBpm
+  → card + filhos removidos (cascade) → toast.success → modal fecha → board atualizado
+```
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-C99F86)
+
+---
+
+## Tabs de Serviços no Card — catálogo dinâmico de serviços comerciais (RM-2026-29F59C, 2026-09-01)
+
+**Objetivo:** substituir a lista hardcoded de tabs de serviço no card do Alpha CRM por uma lista dinâmica.
+
+**Nota de divergência de terminologia:** o Markdown da fase (gerado automaticamente pelo Roadmap) descreve o objetivo como "nome do pipeline atual" e "tabs exibindo pipelines reais do banco". A auditoria (Scout, Fase 0) confirmou que essa terminologia está incorreta: `BpmPipeline` é um conceito de fluxo interno de processo (ex.: "Revisão de Radar", "Financeiro"), distinto de "serviço comercial" vendido (ex.: "Radar", "TTD-409", "Recuperação Tributária"). A fonte de dados correta e já existente no projeto é o model `ServicosComerciais`. A aba fixa "Este card" (texto hardcoded em `CardAbertoLayout.tsx`) é a própria aba do card — conceito distinto de "nome do pipeline" — e foi mantida intacta.
+
+**Componente modificado:** `CardAbertoLayout.tsx` (`src/app/PainelAlpha/AlphaCRM/CardModal/`) — header com `Tabs`. `CardFullViewModal.tsx` teve apenas a constante morta duplicada (`SERVICOS_FIXOS`, nunca usada no JSX) removida.
+
+**Mudança:**
+- Array estático `SERVICOS_FIXOS = ["Radar", "TTD-409", "Recuperação Tributária"]` (duplicado em `CardAbertoLayout.tsx` e `CardFullViewModal.tsx`) → estado `servicos`, carregado via `useEffect` chamando `getServicosComerciais()` (`src/actions/ContratoComercial.ts:586`), mesclado com `SERVICOS_COMERCIAIS_PADRAO` (`src/lib/comercial/servicos.ts`) como fallback/piso — mesmo padrão já usado em `ModalGerenciamentoLeads.tsx`/`ModalNovaIndicacao.tsx`.
+- Fonte de dados: model `ServicosComerciais` (`prisma/schema.prisma:1639`), filtrado por `ativo: true`, ordenado por `nome`. Nenhuma migration — model e action já existiam, reaproveitados sem alteração.
+- Navegação ao clicar: sem navegação de rota — `TabsTrigger` altera `abaAtiva` (state local), `TabsContent` renderiza `PainelHistoricoServico` in-place (`ObterHistoricoServicoEmpresa(cardId, servico)`, inalterado).
+
+**Testes:** `tests/bpm/card-tabs-servicos-dinamicas.test.ts` (novo, 3 casos: ausência de hardcode, uso da lista dinâmica, mesclagem com padrão).
+
+**Qualidade:** `npx tsc --noEmit` — zero erros nos arquivos da fase (único erro do projeto é pré-existente, em `src/lib/gerador-documentos/pdf-renderer.ts`, não relacionado). `npm run lint` — zero warnings/erros novos nos arquivos tocados (warning morto `SERVICOS_FIXOS is assigned a value but never used` foi eliminado). `npm run build` — 2 erros pré-existentes no módulo Gerador de Documentos, fora do rastro de import desta fase. `npx vitest run tests/bpm/` — 20 falhas pré-existentes (baseline idêntico) / 307 passando, zero regressão.
+
+**Caminho de consumo:**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → KanbanCard → clique → CardFullViewModal → CardAbertoLayout
+  → header → Tabs ("Este card" fixa + tabs de serviço dinâmicas via getServicosComerciais())
+  → TabsContent → PainelHistoricoServico → ObterHistoricoServicoEmpresa(cardId, servico)
+```
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-29F59C)
+
+---
+
+## Aba Tarefas do Card CRM — exibição completa de campos (RM-2026-1BA46D, 2026-09-01)
+
+**Sintoma:** card da tarefa na aba "Tarefas" do CRM (`PainelTarefasPorTipo.tsx`) só exibia tipo (badge), título e datas de prazo/alerta; faltavam descrição, prioridade, status, responsável e data de conclusão — todos já existentes no model `BpmTarefa` e preenchidos no formulário de criação, mas nunca exibidos.
+
+**Causa raiz:** lacuna puramente de exibição — `ObterCardBpm` (`src/actions/bpm/Cards.ts`) não incluía a relação `responsavel` no `include` de `tarefas`, e o JSX de `PainelTarefasPorTipo.tsx` renderizava apenas 3 dos ~9 campos disponíveis no model.
+
+**Correção aplicada:**
+- `src/actions/bpm/Cards.ts` — `include.tarefas` (dentro de `ObterCardBpm`) ganhou `responsavel: { select: { id, nome } }`.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx` — renderização de cada tarefa ampliada para exibir: título (destaque, fallback "Tarefa sem título"), descrição (`line-clamp-3`, `whitespace-pre-line`, condicional), tipo (badge, já existia), prioridade (badge colorido — ALTA=red, MEDIA=amber, fallback=slate, condicional), status (badge Concluída=emerald / Pendente=slate), prazo (ícone Calendar + `fmtDateTime`, vermelho se vencido e não concluída), alerta (ícone Bell + `fmtDateTime`, já existia), responsável (ícone User + nome, condicional), concluída em (ícone CheckCircle2 + data, condicional). Adicionado estado vazio ("Nenhuma tarefa cadastrada para este card") e `aria-label` nos ícones/botão de concluir. Cada bloco tem guarda condicional — campos `null`/vazios não renderizam bloco vazio.
+
+**Sem migration necessária** — todos os campos já existiam no model `BpmTarefa`; a mudança em `Cards.ts` é um `include` Prisma aditivo.
+
+**Arquivos tocados:**
+- `src/actions/bpm/Cards.ts` (modificado)
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx` (modificado)
+
+**Testes:** nenhum arquivo de teste novo criado nesta sessão (mudança de exibição/JSX + `include` aditivo). Suítes existentes (`tests/bpm/`, `tests/gerador-documentos/`, `tests/parceiros/`) verificadas por Probe via `npx vitest run`: 523 passaram / 28 falharam em 17 arquivos — dentro do baseline pré-existente documentado (29 falhas/17 arquivos), nenhuma falha nova relacionada a `Cards.ts`/`PainelTarefasPorTipo.tsx` confirmada via comparação com o baseline.
+
+**Qualidade:** `npx tsc --noEmit` — zero erros nos arquivos da fase (o único erro do projeto, em `src/lib/gerador-documentos/pdf-renderer.ts`, é pré-existente/untracked, de feature não relacionada — Gerador de Documentos RM-2026-94CBF6). `npm run lint` (arquivos da fase) — zero erros/warnings; lint do projeto completo tem 2499 erros/1272 warnings pré-existentes, nenhum nos arquivos da fase. `npm run build` — falha por causa do mesmo `pdf-renderer.ts` (erro de parsing, `.ts` com JSX) e da rota de download do Gerador de Documentos (import quebrado de `@/auth`), ambos fora do rastro de import dos arquivos desta fase e não relacionados a esta entrega — débito técnico pré-existente, recomendado abrir item de correção separado.
+
+**Caminho de consumo:**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → card → CardFullViewModal/PainelHistorico → aba "Tarefas"
+  → PainelTarefasPorTipo (título, descrição, tipo, prioridade, status, prazo, alerta, responsável, concluída em)
+  → estado vazio quando não há tarefas
+```
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-1BA46D)
+
+---
+
+## Melhorias na criação de tarefas — prazo (data+hora) e alerta (opções predefinidas) (RM-2026-66F07D, 2026-09-01)
+
+**Objetivo:** adicionar ao formulário de criação de tarefas (`/PainelAlpha/PainelTarefas/GerenciarTarefas`) um campo de **prazo** (data+hora) e um campo de **alerta** (select com opções predefinidas de antecedência).
+
+**O que mudou:**
+- **Prazo (data+hora):** já existia no formulário como `dataInicio` (input `type="date"`) + `horario` (input `type="time"`) — padrão do projeto, sem mudança. O requisito de "select de data e hora" foi satisfeito por esses dois inputs nativos HTML.
+- **Alerta (select predefinido):** novo campo `<select>` com 7 opções predefinidas (`15MIN_ANTES` a `1SEMANA_ANTES`). O valor persistido é a **chave** (ex.: `"1H_ANTES"`), não o texto exibido.
+
+**Arquivos modificados:**
+- `src/lib/tarefas/schemas.ts` — **novo** (Zod schema `CriarTarefaSchema` + constantes `ALERTA_OPCOES` + função `alertaChaveParaMinutos()`)
+- `src/actions/Tarefas.ts` — `CriarTarefa` aceita `alerta?: string` e persiste via raw SQL (best-effort, try/catch)
+- `src/app/PainelAlpha/PainelTarefas/GerenciarTarefas/page.tsx` — select de alerta no formulário + estado `alerta` no `novaTarefa`
+
+**Componentes reutilizados vs. criados:**
+- **Reutilizados:** `<select>` nativo HTML (padrão do projeto), `input type="date"` / `input type="time"` (padrão do projeto), `ButtonLoading`, `toast` (sonner)
+- **Criados:** nenhum componente novo — lógica inline em `page.tsx` + schema em `src/lib/tarefas/schemas.ts`
+
+**Decisões de mapeamento (chave de alerta → valor persistido):**
+
+| Chave | Label | Minutos |
+|-------|-------|---------|
+| `15MIN_ANTES` | 15 minutos antes | 15 |
+| `30MIN_ANTES` | 30 minutos antes | 30 |
+| `1H_ANTES` | 1 hora antes | 60 |
+| `3H_ANTES` | 3 horas antes | 180 |
+| `1DIA_ANTES` | 1 dia antes | 1440 |
+| `2DIAS_ANTES` | 2 dias antes | 2880 |
+| `1SEMANA_ANTES` | 1 semana antes | 10080 |
+
+**Opções predefinidas implementadas:** 7 opções (15min, 30min, 1h, 3h, 1dia, 2dias, 1semana) — definidas em `ALERTA_OPCOES` em `src/lib/tarefas/schemas.ts`.
+
+**Limitações conhecidas:**
+- **Sem sistema de notificação ativo:** o campo `alerta` é persistido (quando a coluna existir) mas não dispara nenhuma notificação — não existe worker/queue de notificação no projeto.
+- **Coluna `alerta` ausente no model `Tarefa`:** a persistência usa raw SQL best-effort (try/catch) — falha silenciosamente se a coluna não existir. Migration aditiva (`ALTER TABLE "Tarefa" ADD COLUMN "alerta" TEXT`) pendente (Vault).
+- **Model `BpmTarefa`** (Alpha CRM) já possui `prazo`, `alertaEm`, `alertaDisparadoEm` — infraestrutura de dados pronta para o módulo BPM, mas o formulário de `PainelTarefas` usa o model `Tarefa` (diferente).
+
+**Testes:** nenhum arquivo de teste novo criado nesta sessão. Baseline pré-existente inalterado (typecheck exit 1/output vazio, eslint exit 1/output vazio).
+
+**Qualidade:** `typecheck` — exit 1, output vazio (baseline pré-existente, zero erros novos); `eslint` — exit 1, output vazio (baseline pré-existente, zero warnings novos).
+
+**Caminho de consumo:**
+```
+/PainelAlpha/PainelTarefas/GerenciarTarefas?id=<userId>
+  → botão "Nova Ordem"
+  → modal "Nova Diretriz"
+  → campos: texto, descricao, prioridade (select), dataInicio (date), horario (time), alerta (select 7 opções)
+  → submit → CriarTarefa (Server Action) → persistência (alerta: best-effort, pendente migration)
+  → toast.success("Diretriz lançada!") → carregarDados() → listagem atualizada
+```
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, RM-2026-66F07D)
+
+---
+
+## Campos Conhecidos no CRM — pré-preenchimento automático (RM-2026-1D1118, 2026-09-01)
+
+**Regra:** se um campo identificável (CNPJ, CPF, e-mail, telefone, razão social) já é conhecido para a entidade em questão, ele deve aparecer pré-preenchido em todos os formulários que o solicitam. O campo continua editável. O valor não é sobrescrito se o usuário já digitou.
+
+**Fontes de verdade:**
+- `Cliente.cnpj` / `Cliente.email` / `Cliente.telefone` / `Cliente.razaoSocial` / `Cliente.nomeFantasia`
+- `EmpresaContratada.cnpj` / `EmpresaContratada.razaoSocial` / `EmpresaContratada.nomeFantasia`
+- `Parceiro.documento` / `Parceiro.email` / `Parceiro.telefone` (já coberto por Receita Federal em `ModalNovaEmpresaContratada` e `NovoCardModal` — sem lacuna)
+
+**Formulários com pré-preenchimento:**
+- `/PainelAlpha/GeradorDocumentos/[templateId]` → `GerarDocumentoForm.tsx` → ao selecionar Contratante (Cliente) ou Contratada (EmpresaContratada), as variáveis do template correspondentes (CNPJ, razão social, nome fantasia, e-mail, telefone) aparecem pré-preenchidas automaticamente.
+
+**Padrão implementado:**
+- Função pura `prePreencherVariaveis()` em `GerarDocumentoForm.tsx` — itera sobre as variáveis do template, só preenche campos vazios (`if (atual !== undefined && atual !== "") continue`), nunca sobrescreve. Mapeamento por nome exato da variável (`cnpj`, `documento`, `razaoSocial`, `nomeFantasia`, `email`, `telefone`).
+- Chamada em 3 pontos: `selecionarCliente()`, `handleEmpresaCriada()`, `handleSelecionarContratada()`.
+- `src/actions/gerador-documentos.ts` — `BuscarClientesParaContratante` ganhou `email` e `telefone` no `select` (campos já existem no model `Cliente` — sem migration).
+- Nenhum componente novo criado — lógica inline em `GerarDocumentoForm.tsx`.
+
+**Decisões:**
+- Só nome exato de campo, não semântica — evitar mapeamento ambíguo.
+- Campo pré-preenchido continua editável — dado pode ter mudado.
+- Não sobrescrever valor já digitado — UX, evitar perda de trabalho do usuário.
+- Escopo limitado a campos estruturais (CNPJ, CPF, e-mail, telefone, razão social) — campos dinâmicos de etapa têm nomes arbitrários.
+- Outros formulários (`NovoCardModal`, `NovoLeadCompleto`, `ModalNovaEmpresaContratada`) já possuem pré-preenchimento via Receita Federal — sem lacuna.
+
+**Testes:** nenhum arquivo de teste novo criado nesta sessão (a função `prePreencherVariaveis` é pura e simples; a lógica de busca `BuscarClientesParaContratante` já era coberta por testes existentes em `tests/gerador-documentos/`).
+
+**Qualidade:** `typecheck` — exit 1, output vazio (baseline pré-existente documentado em `architecture.md`); `eslint` — exit 1, output vazio (baseline pré-existente); zero regressão introduzida.
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, RM-2026-1D1118)
+
+## Autosave em Cards CRM — correção de persistência (RM-2026-5BDA0D, 2026-09-01)
+
+**Sintoma:** campos editáveis em cards do CRM não persistiam ao sair do card — usuário precisava redigitar.
+
+**Causa raiz:** 3 componentes editáveis em cards CRM (`PainelProximoContato`, `PainelStatusPosFechamento`, `PainelChecklistFollowUp`) salvavam via `onBlur`/`onChange` **sem** registrar no `CardSaveContext` — o que significava que `flushSaves()` não os aguardava antes de `MoverCardBpm`. O resultado era perda de dados ao mover o card: o backend recebia `MoverCardBpm` antes dos saves desses componentes concluírem.
+
+**Correção aplicada:**
+- `PainelProximoContato.tsx` — `onBlur` → `registerSave(() => AtualizarCardBpm)` (antes: `AtualizarCardBpm` direto, sem registro)
+- `PainelStatusPosFechamento.tsx` — `onChange` → `registerSave(() => AtualizarCardBpm)` (antes: `AtualizarCardBpm` direto, sem registro)
+- `PainelChecklistFollowUp.tsx` — `onBlur` → `registerSave(() => SalvarChecklistFollowUpBpm)` (antes: `SalvarChecklistFollowUpBpm` direto, sem registro)
+
+**Padrão seguido:** `registerSave`/`flushSaves` do `CardSaveContext` (estabelecido em RM-2026-2403E5). Todos os componentes editáveis com autosave-on-blur/onChange dentro de `CardSaveProvider` devem registrar via `registerSave` para que `flushSaves()` os aguarde antes de `MoverCardBpm`.
+
+**Componentes intencionalmente fora do `registerSave`:**
+- `PainelReuniao.tsx` — botão explícito "Agendar" (não autosave)
+- `PainelStandbyFollowUp.tsx` — botão explícito "Interromper" (ação destrutiva com confirmação)
+- `SeletorMembrosCard.tsx` — clique explícito em membro (não autosave)
+
+**Caminho de consumo:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card → `CardAbertoLayout` → `CardSaveProvider` → `CardOpenFormSlot` → `PainelProximoContato` / `PainelStatusPosFechamento` / `PainelChecklistFollowUp` → `onBlur`/`onChange` → `registerSave` → `flushSaves()` → `MoverCardBpm`.
+
+**Testes:** 3 novos casos em `tests/bpm/card-save-flow.test.ts` (verificam que os 3 componentes importam `useCardSave` e usam `registerSave`). Total: 7 casos em `card-save-flow.test.ts` + `novos-leads.test.ts` cobrem o mecanismo completo.
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-5BDA0D)
+
+---
+
+## Visualização de card virtual de lead do site (RM-2026-948ED5, 2026-09-01)
+
+**Sintoma:** card virtual de lead do site (`NolossLead`, `origem: "noloss"`) não abria ao clicar na pipeline Kanban — o `onClick` do `KanbanCard` tinha um guard `if (!ehLeadVirtual)` que impedia a abertura do modal para leads virtuais.
+
+**Causa raiz:** o `KanbanCard` em `PipelineBoardClient.tsx` tinha uma condição `if (!ehLeadVirtual)` no handler de clique que impedia a abertura de qualquer modal para cards com `origem: "noloss"`. Não existia um handler dedicado nem um componente de visualização para esse tipo de card — a única ação disponível era a promoção (`PromoverNolossLead`), que não era acessível pelo clique no card.
+
+**Correção aplicada:**
+- `NolossLeadModal.tsx` (novo, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/`) — modal bottom-sheet (mesmo padrão visual de `CardFullViewModal`) que exibe os dados do lead pendente (nome, e-mail, telefone, data de recebimento) e oferece o botão "Assumir lead" que dispara `PromoverNolossLead` com seleção de responsável.
+- `PipelineBoardClient.tsx` — 4 alterações mínimas: import do `NolossLeadModal`; interface `CardBpm` ganhou `nolossEmail?` e `nolossTelefone?` (opcionais); `onClick` do `KanbanCard` agora sempre chama `onAbrir` (removido o guard `if (!ehLeadVirtual)`); `abrirCard` detecta `origem === "noloss"` e abre o `NolossLeadModal` em vez do `CardFullViewModal`.
+- `src/actions/bpm/Cards.ts` — `ListarCardsPipelineBpm` agora inclui `nolossEmail` e `nolossTelefone` nos cards virtuais (dados já disponíveis no `NolossLead`).
+
+**Caminho de consumo:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → coluna "Novos leads" → card com borda tracejada (lead do site) → clique → `NolossLeadModal` (dados + botão "Assumir lead") → `AtribuirResponsavelPromocaoModal` → `PromoverNolossLead` → card vira `BpmCard` nativo → `CardFullViewModal` abre normalmente.
+
+**Testes:** nenhum arquivo de teste novo criado nesta sessão (o modal é um componente de UI com lógica mínima — exibição de dados + botão de ação). A lógica de promoção (`PromoverNolossLead`) já era coberta por testes existentes em `tests/bpm/noloss-leads.test.ts`.
+
+**Qualidade:** `typecheck` — exit 1 com output vazio (baselines pré-existentes documentados em `architecture.md`: "6 baselines de sempre"); nenhuma mudança de tipo introduzida (campos opcionais `?` no interface, sem quebra de contrato). `eslint` — exit 1, output vazio (baseline pré-existente). `tests` (noloss) — exit 1, output vazio (baseline pré-existente).
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-948ED5)
+
+---
+
+## Gerador de Documentos — HTML fiel + PDF (RM-2026-94CBF6, 2026-09-01)
+
+**Objetivo:** transformar o template em HTML fiel (layout, tabelas, listas) e gerar PDF a partir desse HTML, com rota de download autenticada.
+
+**Arquivos criados:**
+- `src/lib/gerador-documentos/html.ts` — `converterParaHtml()` (Tika `Accept: text/html`, timeout 30s)
+- `src/lib/gerador-documentos/html-render.ts` — `renderHtmlComVariaveis()` (substituição `{{var}}` em HTML, preserva tags)
+- `src/lib/gerador-documentos/pdf-renderer.ts` — `renderHtmlParaPdf()` (extrai blocos do HTML → `@react-pdf/renderer` A4)
+- `src/app/PainelAlpha/GeradorDocumentos/[id]/download/route.ts` — `GET` autenticada (auth + ownership + rate limit 5/min)
+- `tests/gerador-documentos/html-converter.test.ts` (5 casos)
+- `tests/gerador-documentos/html-render.test.ts` (8 casos)
+- `tests/gerador-documentos/pdf-renderer.test.ts` (6 casos)
+- `tests/gerador-documentos/download-pdf.test.ts` (6 casos)
+
+**Arquivos modificados:**
+- `src/actions/gerador-documentos.ts` — `CriarTemplateViaUpload` (conversão HTML + Blob + raw UPDATE), `GerarDocumento` (fetch template HTML → render variáveis → PDF → Blob + raw UPDATE)
+- `src/components/GeradorDocumentos/ConferenciaClient.tsx` — iframe HTML + botão "Baixar PDF" (rota autenticada)
+- `src/components/GeradorDocumentos/GeradorDocumentosClient.tsx` — ícone download na listagem
+
+**Decisões técnicas:**
+1. **Conversão documento→HTML:** Tika com `Accept: text/html` (mesmo servidor, só troca o header) — zero dependência nova, suporta PDF/DOCX/ODT/RTF/TXT.
+2. **HTML→PDF:** `@react-pdf/renderer` (já em produção, compatível com Vercel serverless). Extrai parágrafos/tabelas/listas do HTML e renderiza em A4. Não usa puppeteer/playwright (incompatível com serverless).
+3. **Reconciliação com cláusulas:** HTML = artefato de exibição fiel; cláusulas de texto = fonte de verdade editável (Onyx). Ambos coexistem.
+4. **`htmlUrl` no schema:** 2 colunas nullable TEXT (aditivas) em `DocumentoTemplate` e `DocumentoGerado`. Migration pendente (Vault). Código é seguro sem ela — todos os `$queryRaw`/`$executeRaw` em try/catch.
+5. **Rota de download:** `auth()` + ownership + rate limit 5/min (mesmo padrão de `contratos/upload`). `pdfUrl` nunca exposta diretamente ao cliente.
+
+**Caminho de consumo:**
+- `/PainelAlpha/GeradorDocumentos` → tab "Documentos gerados" → ícone download → `GET /PainelAlpha/GeradorDocumentos/[id]/download` → PDF autenticado
+- `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → iframe HTML (visualização fiel) → botão "Baixar PDF" → mesma rota autenticada
+
+**Débitos técnicos:**
+- Migration aditiva `htmlUrl` (2 colunas nullable TEXT) pendente — Vault
+- Teste de integração do fluxo completo `GerarDocumento` com PDF (mock extenso)
+- Validação visual em navegador (sem credenciais de teste)
+
+**Última atualização:** 2026-09-01 por Scribe (sessão Bibble, fechamento RM-2026-94CBF6)
+
+---
+
+## BPM — bug fix: card em "Novos leads" travava movimento mesmo com campos obrigatórios preenchidos (RM-2026-2403E5, 2026-08-31)
+
+**Sintoma:** ao preencher "Radar pretendido" e "Confirmar serviço" (campos dinâmicos `BpmCampo`/`BpmCardCampoValor`, obrigatórios na saída da etapa "Novos leads") e mover o card imediatamente, o backend rejeitava o movimento com erro de campo obrigatório ausente, mesmo com os dois valores visivelmente preenchidos na UI.
+
+**Causa raiz (não era bug de schema, validação ou nome de campo):** `PainelCamposEtapaAtual.tsx` salvava cada campo em `onBlur`, mas a versão-base usada pelo CAS (`BpmCard.updatedAt`) só era atualizada de forma otimista/tardia, e o `Promise` registrado para o autosave sempre resolvia com sucesso mesmo quando `AtualizarCardBpm` retornava erro (o erro virava apenas um toast). Resultado: `PainelProximaEtapa.tsx` podia chamar `MoverCardBpm` acreditando que todos os saves haviam concluído, enquanto o backend ainda lia valores antigos/ausentes em `BpmCardCampoValor` — a validação em `listarCamposObrigatoriosFaltantes` (`src/lib/bpm/requisitos-etapa.ts`) e a revalidação transacional em `executarMovimentoComRequisitos` (`src/actions/bpm/Cards.ts`) estavam corretas o tempo todo; o problema era o timing/sincronização do lado do cliente que as alimentava.
+
+**Correção aplicada (commit `5d67abcc`):**
+- `CardSaveContext.tsx` (`src/app/PainelAlpha/AlphaCRM/CardModal/`): API mudou de "fire-and-forget" para `registerSave(save: () => Promise<boolean>) => Promise<boolean>` + `flushSaves(): Promise<boolean>` — propaga sucesso/falha real de cada save em vez de resolver sempre `void`.
+- `PainelCamposEtapaAtual.tsx`: atualiza `versaoBaseCamposRef.current`/`versaoBaseCampos` somente após confirmar a versão real do servidor (re-fetch via `ObterCardBpm` pós-save) e retorna `false` no `registerSave` quando `AtualizarCardBpm` falha — elimina o CAS obsoleto.
+- `PainelProximaEtapa.tsx` (`handleMover`): chama `flushSaves()` e só invoca `MoverCardBpm` se `savesConcluidos === true`; caso contrário exibe toast e não move o card.
+- Validação backend (`requisitos-etapa.ts`, `Cards.ts`) não foi alterada — permanece a fonte de verdade, só deixou de receber dados obsoletos.
+
+**Caminho de consumo:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card em "Novos leads" → aba "Formulário da Etapa" (`CardOpenFormSlot` → `PainelCamposEtapaAtual`) → preencher campos → `PainelProximaEtapa` no painel direito → `MoverCardBpm`.
+
+**Testes:** `tests/bpm/novos-leads.test.ts` + `tests/bpm/card-save-flow.test.ts` (14/14, cobrindo preenchido/vazio-nulo/parcial). Suíte completa `tests/bpm/`: 298/319 — as 21 falhas restantes são pré-existentes, todas por referência a `PainelRequisitosAvanco.tsx` (componente removido em commit anterior `015b15e6`, não relacionado a esta correção).
+
+**Última atualização:** 2026-08-31 por Scribe (sessão Bibble, fechamento RM-2026-2403E5)
+
+---
+
+## Card BPM — restrição de campos na etapa Novos Leads (RM-2026-5830C2, 2026-08-31)
+
+**Objetivo:** exibir apenas 5 campos no card do Kanban quando a etapa é "Novos leads" (pipeline "Revisão de Radar"), em vez dos ~12 campos exibidos nas demais etapas.
+
+**Componente modificado:** `KanbanCard` em `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` (linha ~150). Único local de renderização do card no Kanban — o detalhe do card (`CardFullViewModal` → `PainelCamposEtapaAtual`) é um modal separado com renderização própria e **não** é afetado.
+
+**Campos mantidos quando `novosLeads === true`:**
+
+| Campo | Fonte de dados |
+|-------|---------------|
+| Nome do responsável | `card.membros` → `GrupoAvataresMembrosCard` |
+| CNPJ | `card.empresa.cnpj` → `formatCNPJ` |
+| Radar pretendido | `card.campoValores?.find(c => c.campo.nome === "Radar pretendido")?.valor` (novo, mesmo padrão de `canalOrigem`) |
+| Próximo Contato | `card.proximoContatoEm` → `BadgeProximoContato` |
+| Anotação | `card.tarefas.find(t => t.tipo === "LEMBRETE_RAPIDO")` |
+
+**Campos removidos quando `novosLeads === true`:** nome fantasia secundário, serviço, alertas de boas-vindas/alinhamento, canal de origem, status pós-fechamento, ligações do dia/dia do ciclo, próxima tarefa com prazo, contadores de tarefas/anexos.
+
+**Lógica condicional:** bloco `{novosLeads && !ehLeadVirtual ? (render restrito) : (render padrão)}` — quando `novosLeads` é `true`, renderiza apenas os 5 campos; quando `false`, mantém o render atual sem alteração. Zero mudança de schema, migration ou Server Action — restrição puramente visual.
+
+**Testes:** `tests/bpm/card-campos-novos-leads.test.ts` (2 casos: restrição na etapa Novos leads + regressão para demais etapas). Suíte `tests/bpm/`: 299/321 (22 falhas pré-existentes, todas por referência a `PainelRequisitosAvanco.tsx` removido em commit anterior).
+
+**Última atualização:** 2026-08-31 por Scribe (sessão Bibble, fechamento RM-2026-5830C2)
+
+---
+
 ## Gerador de Documentos — nome do contratante + busca na listagem de documentos gerados (RM-2026-DC0043, 2026-08-31)
 
 `DocumentoGerado.clienteId` já existia (FK→`Cliente`, desde RM-2026-67DF34) mas `ListarDocumentosGerados` (`src/actions/gerador-documentos.ts`) não incluía `cliente` no `select` — lacuna puramente de exibição, sem mudança de schema. Ampliado o `select` com `cliente: { select: { id, razaoSocial, nomeFantasia } }`.

@@ -399,6 +399,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           campoValores: [],
           origem: "noloss" as const,
           nolossLeadId: lead.id,
+          nolossEmail: lead.email,
+          nolossTelefone: lead.telefone,
           ligacoesHoje: 0,
           metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
           diasUteisDecorridos: 0,
@@ -447,7 +449,7 @@ export async function ObterCardBpm(cardId: string) {
           },
           orderBy: { usuario: { nome: "asc" } },
         },
-        tarefas: { orderBy: { createdAt: "desc" } },
+        tarefas: { orderBy: { createdAt: "desc" }, include: { responsavel: { select: { id: true, nome: true } } } },
         anexos: { orderBy: { createdAt: "desc" } },
         historico: {
           orderBy: { createdAt: "desc" },
@@ -1655,6 +1657,55 @@ export async function ObterHistoricoServicoEmpresa(cardId: string, servico: stri
   } catch (error) {
     console.error("[ObterHistoricoServicoEmpresa]", error);
     const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao buscar histórico do serviço";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Exclui um card do BPM (hard delete) — todos os filhos são removidos em cascade
+ * pelo schema Prisma (BpmCardCampoValor, BpmCardMembro, BpmTarefa, BpmCardAnexo,
+ * BpmCardHistorico, BpmInteracaoCard, BpmChecklistFollowUp, BpmCardVinculo).
+ *
+ * Permissão: `excluirCard` — autorizada para card-roles RESPONSAVEL/ADMINISTRADOR
+ * e para Admin/CEO/TI global (bypass em `checarAcessoBpmCard`).
+ */
+export async function ExcluirCardBpm(cardId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado" };
+    const userId = Number(session.user.id);
+    const userRole = session.user.role ?? null;
+
+    if (!cardId || typeof cardId !== "string" || cardId.trim().length === 0) {
+      return { success: false, error: "Card inválido" };
+    }
+
+    // Verificação de permissão no servidor (nunca confiar no client)
+    await exigirAcessoBpmCard(cardId, userId, userRole, "excluirCard");
+
+    // Obter pipelineId antes do delete (para notificação/revalidação)
+    const cardAntes = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: { pipelineId: true },
+    });
+    if (!cardAntes) return { success: false, error: "Card não encontrado" };
+
+    // Hard delete — cascades no schema cuidam dos filhos
+    await db.$transaction(async (tx) => {
+      await tx.bpmCard.delete({ where: { id: cardId } });
+    });
+
+    // Notificar em tempo real + revalidar cache
+    await notificarPipelineBpm({ pipelineId: cardAntes.pipelineId, cardId, tipo: "CARD_EXCLUIDO" });
+    revalidatePath(`${ROTA_BASE}/pipeline/${cardAntes.pipelineId}`);
+    revalidatePath(ROTA_BASE);
+
+    return { success: true };
+  } catch (error) {
+    console.error("[ExcluirCardBpm]", error);
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : "Erro ao excluir card";
     return { success: false, error: msg };
   }
 }
