@@ -4374,3 +4374,12 @@ Objetivo do Roadmap pedia substituir o texto hardcoded "Este card" pelo nome do 
 - `architecture.md`: seção "Tabs de Serviços no Card — catálogo dinâmico de serviços comerciais (RM-2026-29F59C, 2026-09-01)".
 - `integration-points.md`: seção "Tabs de Serviços no Card do Alpha CRM — novo consumidor de `getServicosComerciais()`".
 - `decisions.md`: entrada "RM-2026-29F59C — 'Serviços' no card do CRM, não 'pipelines'".
+
+## Sessão 2026-09-01 — RM-2026-43AA46 (CRUD completo de campos por Pipeline)
+
+- Objetivo: `adicionar, editar, excluir, escolher o tipo, se é obrigatório` por coluna/etapa do Pipeline.
+- Sessão: implementou CRUD completo nos 3 pontos: `validations/bpm.ts` (schemas), `actions/bpm/Campos.ts` (CRIAR / ATUALIZAR com tipo+etapaId+opcoes opcional-nulo / EXCLUIR via cascade), `AdminPipelineClient.tsx` (edit inline, delete, textarea de opções, 7 tipos).
+- Testes: `tests/bpm/crud-campos-bpm.test.ts` (6/6 pass).
+- Gates: tsc + eslint limpos nos 4 arquivos tocados; débitos pré-existentes do projeto fora do escopo.
+- Documentação: `docs/stories/story-rm-2026-43aa46-crud-campos-pipeline.md`.
+- Restrição: sem migration, sem commit/push (requireManualPromotion=true em Painel Alpha).

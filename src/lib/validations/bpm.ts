@@ -71,9 +71,15 @@ export const criarCampoSchema = z.object({
 export const atualizarCampoSchema = z.object({
   campoId: z.string().cuid(),
   nome: z.string().trim().min(1).max(MAX_NOME).optional(),
-  opcoes: z.array(z.string().trim().min(1).max(120)).max(50).optional(),
+  tipo: z.enum(BPM_CAMPO_TIPO).optional(),
+  opcoes: z.array(z.string().trim().min(1).max(120)).max(50).nullable().optional(),
+  etapaId: z.string().cuid().nullable().optional(),
   obrigatorio: z.boolean().optional(),
   ordem: z.number().int().min(0).optional(),
+});
+
+export const excluirCampoSchema = z.object({
+  campoId: z.string().cuid(),
 });
 
 // Cadastro real de empresa nova — só usado pelo botão "+" da etapa "Novos Leads"
