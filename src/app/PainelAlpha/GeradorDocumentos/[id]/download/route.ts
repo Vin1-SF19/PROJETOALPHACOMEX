@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "../../../../../../auth";
 import { NextResponse } from "next/server";
 import { isAdminRole } from "@/lib/roles";
 import { getPermissoesEfetivas } from "@/actions/PermissoesSetor";
