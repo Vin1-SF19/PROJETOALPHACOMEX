@@ -10,7 +10,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import XLSX from 'xlsx-js-style';
 import { getExportDataColaborador } from '@/actions/ComercialControle';
-import { useSession } from 'next-auth/react';
 
 function MetricCard({ label, valor, cor }: any) {
     return (
@@ -73,7 +72,7 @@ function MiniCardComparativo({ titulo, atual, anteriores }: any) {
                 </div>
                 <div className="h-8 w-px bg-white/5" />
                 <div className="text-center">
-                    <p className="text-[8px] text-slate-500 uppercase font-bold">Anteriores</p>
+                    <p className="text-[8px] text-slate-500 uppercase font-bold">Mês anterior</p>
                     <p className="text-xl font-black text-indigo-400 tabular-nums">{anteriores}</p>
                 </div>
             </div>
@@ -81,7 +80,7 @@ function MiniCardComparativo({ titulo, atual, anteriores }: any) {
     );
 }
 
-function CardColaborador({ colab, mesAnteriorLabel, dadosEquipe = [] }: any) {
+function CardColaborador({ colab, anterior, mesAnteriorLabel }: any) {
     const totalContratosRev = (Number(colab.revisao) || 0);
     const totalContratosHab = (Number(colab.habilitacao) || 0);
     const naoAgendadas = Math.max(0, (Number(colab.leads) || 0) - (Number(colab.agendadas) || 0) - (Number(colab.leadsDesqualificados) || 0));
@@ -189,18 +188,18 @@ function CardColaborador({ colab, mesAnteriorLabel, dadosEquipe = [] }: any) {
                     <MiniCardComparativo
                         titulo="Contratos Revisão"
                         atual={colab.revisao || 0}
-                        anteriores={colab.revisao || 0}
+                        anteriores={anterior?.revisao || 0}
                     />
                     <MiniCardComparativo
                         titulo="Contratos Habilitação"
                         atual={colab.habilitacao || 0}
-                        anteriores={colab.hab_anteriores || 0}
+                        anteriores={anterior?.habilitacao || 0}
                     />
 
                     <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex justify-between items-center">
                         <div>
                             <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Leads Qualificados</p>
-                            <p className="text-xl font-black text-emerald-400">{colab.leads || 0}</p>
+                            <p className="text-xl font-black text-emerald-400">{Math.max(0, (Number(colab.leads) || 0) - totalDesqualificados)}</p>
                         </div>
                         <div className="text-right">
                             <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Desqualificados</p>
@@ -238,8 +237,7 @@ function CardColaborador({ colab, mesAnteriorLabel, dadosEquipe = [] }: any) {
     );
 }
 
-export default function MarketingDashboard({ dadosEquipe = [] }: any) {
-    const { data: session } = useSession();
+export default function MarketingDashboard({ dadosEquipe = [], dadosEquipeAnterior = [] }: any) {
     const [colaboradorAtivo, setColaboradorAtivo] = useState<string>("GERAL");
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -277,7 +275,6 @@ export default function MarketingDashboard({ dadosEquipe = [] }: any) {
             hab_CALLIX: acc.hab_CALLIX + (Number(curr.hab_CALLIX) || 0),
             hab_INDICACAO: acc.hab_INDICACAO + (Number(curr.hab_INDICACAO) || 0),
             hab_EVENTOS: acc.hab_EVENTOS + (Number(curr.hab_EVENTOS) || 0),
-            hab_CHINA: acc.hab_CHINA + (Number(curr.hab_CHINA) || 0),
             rev_TRAFEGO: acc.rev_TRAFEGO + (Number(curr.rev_TRAFEGO) || 0),
             rev_CALLIX: acc.rev_CALLIX + (Number(curr.rev_CALLIX) || 0),
             rev_INDICACAO: acc.rev_INDICACAO + (Number(curr.rev_INDICACAO) || 0),
@@ -292,10 +289,22 @@ export default function MarketingDashboard({ dadosEquipe = [] }: any) {
         });
     }, [dadosEquipe]);
 
+    const statsGeraisAnterior = useMemo(() => {
+        return dadosEquipeAnterior.reduce((acc: any, curr: any) => ({
+            revisao: acc.revisao + (Number(curr.revisao) || 0),
+            habilitacao: acc.habilitacao + (Number(curr.habilitacao) || 0),
+        }), { revisao: 0, habilitacao: 0 });
+    }, [dadosEquipeAnterior]);
+
     const dadosSelecionados = useMemo(() => {
         if (colaboradorAtivo === "GERAL") return statsGerais;
         return dadosEquipe.find((c: any) => c.id === colaboradorAtivo);
     }, [dadosEquipe, colaboradorAtivo, statsGerais]);
+
+    const dadosAnterioresSelecionados = useMemo(() => {
+        if (colaboradorAtivo === "GERAL") return statsGeraisAnterior;
+        return dadosEquipeAnterior.find((c: any) => c.id === colaboradorAtivo) || null;
+    }, [colaboradorAtivo, dadosEquipeAnterior, statsGeraisAnterior]);
 
     const mesAnteriorIndex = useMemo(() => mesAtualUrl === 0 ? 11 : mesAtualUrl - 1, [mesAtualUrl]);
 
@@ -395,14 +404,16 @@ export default function MarketingDashboard({ dadosEquipe = [] }: any) {
                             Exportar {colaboradorAtivo === "GERAL" ? "Equipe" : "Colaborador"}
                         </span>
                     </button>
-                    <select value={mesAtualUrl} onChange={(e) => {
+                    <label htmlFor="mes-performance-marketing" className="sr-only">Mês da performance</label>
+                    <select id="mes-performance-marketing" value={mesAtualUrl} onChange={(e) => {
                         const params = new URLSearchParams(searchParams.toString());
                         params.set('mes', e.target.value);
                         router.push(`?${params.toString()}`);
                     }} className="bg-black/20 border border-white/10 p-3 rounded-2xl text-[11px] font-black text-white outline-none uppercase">
                         {meses.map((nome, index) => <option key={index} value={index} className="bg-slate-900">{nome}</option>)}
                     </select>
-                    <select value={colaboradorAtivo} onChange={(e) => setColaboradorAtivo(e.target.value)} className="bg-black/20 border border-white/10 p-3 rounded-2xl text-[11px] font-black text-white outline-none uppercase min-w-[220px]">
+                    <label htmlFor="closer-performance-marketing" className="sr-only">Filtrar performance por closer</label>
+                    <select id="closer-performance-marketing" value={colaboradorAtivo} onChange={(e) => setColaboradorAtivo(e.target.value)} className="bg-black/20 border border-white/10 p-3 rounded-2xl text-[11px] font-black text-white outline-none uppercase min-w-[220px]">
                         <option value="GERAL" className="bg-slate-900 text-emerald-400 font-bold">VISÃO GERAL (EQUIPE)</option>
                         {rankingVendas.map((colab) => <option key={colab.id} value={colab.id} className="bg-slate-900">{colab.nome}</option>)}
                     </select>
@@ -416,12 +427,19 @@ export default function MarketingDashboard({ dadosEquipe = [] }: any) {
                 <CardDestaque titulo="Hot Leads" valor={statsGerais.hotLeadsHabilitacao + statsGerais.hotLeadsRevisao} sub="Alta Intenção" icon={<Zap className="text-orange-400" />} gradient="from-orange-500/10 to-transparent" />
             </div>
 
-            {dadosSelecionados && (
+            {dadosSelecionados ? (
                 <CardColaborador
                     colab={dadosSelecionados}
+                    anterior={dadosAnterioresSelecionados}
                     mesAnteriorLabel={meses[mesAnteriorIndex]}
                 />
-            )}
+            ) : colaboradorAtivo !== "GERAL" ? (
+                <div className="bg-slate-900/40 border border-white/5 rounded-[2rem] p-12 text-center">
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                        Nenhum lead lançado por este closer em {meses[mesAtualUrl]}.
+                    </p>
+                </div>
+            ) : null}
         </div>
     );
 }

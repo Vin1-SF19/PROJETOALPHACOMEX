@@ -35,6 +35,8 @@ export default function PaginaControle({
 }: Props) {
     const { data: session } = useSession();
 
+    // Coerente com o gate real do backend (podeGerenciarMetas: TI/Admin/CEO/Lider Comercial)
+    // aplicado em getPerformanceMarketing/getPerformanceEquipeCompleta.
     const TemPermissao = podeAcompanharEquipe;
 
     const [abaAtiva, setAbaAtiva] = useState<Aba>('lancamento');
@@ -47,18 +49,6 @@ export default function PaginaControle({
     const modoAuditoria = Boolean(
         colaboradoraSelecionada && colaboradoraSelecionada !== usuarioLogado,
     );
-
-    const [metricas, setMetricas] = useState({
-        leads_recebidos: 0,
-        leads_desqualificados: 0,
-        reunioes_agendadas: 0,
-        reunioes_realizadas: 0,
-        no_show: 0,
-        contratos_Habilit: 0,
-        contratos_Revisao: 0,
-        HotLeadsHabilitacao: 0,
-        HotLeadsRevisao: 0
-    });
 
     const [resumoLateral, setResumoLateral] = useState<{
         canais: any;
@@ -210,8 +200,6 @@ export default function PaginaControle({
                     />
                 ) : (
                     <Grafico
-                        usuario={colaboradoraSelecionada}
-                        metricas={metricas}
                         dadosAcumulados={resumoLateral}
                     />
                 )}
@@ -221,5 +209,3 @@ export default function PaginaControle({
         </div>
     );
 }
-
-

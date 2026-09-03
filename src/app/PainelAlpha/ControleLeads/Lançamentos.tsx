@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import XLSX from 'xlsx-js-style';
+import { CalendarioCheckIn } from "./CalendarioCheckIn";
 
 type Canal = 'TRAFEGO_PAGO' | 'CALLIX' | 'INDICACAO' | 'EVENTOS' | 'CHINA';
 type Servico = 'REVISAO' | 'HABILITACAO';
@@ -179,10 +180,14 @@ export default function Lancamentos({
             const response = await upsertPerformance(payload);
             if (response.success) {
                 setStatus('success');
-                const novoAcumulado = await getPerformanceAcumulada(session?.user?.nome || usuario || "", mesAtualUrl, anoAtualUrl);
+                const novoAcumulado = await getPerformanceAcumulada(usuarioNome, mesAtualUrl, anoAtualUrl);
                 setResumoLateral(novoAcumulado);
+                window.dispatchEvent(new Event("alpha-leads:lancamento-salvo"));
                 router.refresh();
                 setTimeout(() => setStatus('idle'), 2000);
+            } else {
+                alert(response.error || "Erro ao salvar.");
+                setStatus('idle');
             }
         } catch (error) {
             alert("Erro ao salvar.");
@@ -198,7 +203,7 @@ export default function Lancamentos({
     };
 
     const handleInputChange = (field: string, value: string) => {
-        setMetricas(prev => ({ ...prev, [field]: parseInt(value) || 0 }));
+        setMetricas(prev => ({ ...prev, [field]: Math.max(0, parseInt(value) || 0) }));
     };
 
     const exportarRelatorioPessoal = async () => {
@@ -344,6 +349,8 @@ export default function Lancamentos({
                         <p className="text-xs font-bold text-white uppercase italic">Exportar meus dados completos</p>
                     </div>
                 </button>}
+
+                <CalendarioCheckIn colaboradoraId={usuarioNome} somenteLeitura={somenteLeitura} />
 
             </div>
 
@@ -595,6 +602,7 @@ function InputMetrica({ label, value, onChange, color, flat, disabled = false }:
             </label>
             <input
                 type="number"
+                min={0}
                 value={value}
                 disabled={disabled}
                 onChange={(e) => onChange(e.target.value)}

@@ -13,6 +13,7 @@ vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import {
+  getDiasComLancamento,
   getPerformanceAcumulada,
   getPerformanceDiaria,
   getPerformanceMarketing,
@@ -84,6 +85,24 @@ describe("visibilidade dos lançamentos por closer no Alpha Leads", () => {
     expect(where.canal).toBe("CALLIX");
   });
 
+  it("monta o checklist a partir dos dias com lançamentos reais, sem tabela paralela", async () => {
+    authMock.mockResolvedValue(SESSION_LIDER);
+    prismaMock.comercialPerformance.findMany.mockResolvedValue([
+      { dataRegistro: new Date("2026-09-01T00:00:00.000Z") },
+      { dataRegistro: new Date("2026-09-01T00:00:00.000Z") },
+      { dataRegistro: new Date("2026-09-03T00:00:00.000Z") },
+    ]);
+
+    await expect(getDiasComLancamento("GISELLE GLEYCE SOUZA SANTOS", 8, 2026)).resolves.toEqual([
+      "2026-09-01",
+      "2026-09-03",
+    ]);
+    expect(prismaMock.comercialPerformance.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ colaboradoraId: "GISELLE GLEYCE SOUZA SANTOS" }),
+      select: { dataRegistro: true },
+    }));
+  });
+
   it("bloqueia uma closer comum tentando consultar os dados de outra closer", async () => {
     authMock.mockResolvedValue(SESSION_CLOSER);
 
@@ -107,12 +126,15 @@ describe("visibilidade dos lançamentos por closer no Alpha Leads", () => {
       canal: "TRAFEGO_PAGO",
       servico: "REVISAO",
       leadsRecebidos: 3,
+      noShow: -2,
     });
 
     expect(resultado.success).toBe(true);
     const chamada = prismaMock.comercialPerformance.upsert.mock.calls[0][0];
     expect(chamada.create.colaboradoraId).toBe("GESTORA COMERCIAL");
     expect(chamada.where.performance_pk.colaboradoraId).toBe("GESTORA COMERCIAL");
+    expect(chamada.create.noShow).toBe(0);
+    expect(chamada.update.noShow).toBe(0);
   });
 
   it("bloqueia gravação sem identidade autenticada", async () => {
@@ -136,6 +158,38 @@ describe("visibilidade dos lançamentos por closer no Alpha Leads", () => {
     const where = prismaMock.comercialPerformance.findMany.mock.calls[0][0].where;
     expect(where).toHaveProperty("dataRegistro");
     expect(where).not.toHaveProperty("colaboradoraId");
+  });
+
+  it("inclui leads desqualificados no consolidado exibido pelo Marketing", async () => {
+    authMock.mockResolvedValue(SESSION_LIDER);
+    prismaMock.comercialPerformance.findMany.mockResolvedValue([
+      {
+        colaboradoraId: "CLOSER ALFA", canal: "TRAFEGO_PAGO",
+        leadsRecebidos: 10, leadsDesqualificados: 4,
+        reunioesAgendadas: 3, reunioesRealizadas: 2, noShow: 1,
+        contratosHabilitacao: 1, contratosRevisao: 1,
+        HotLeadsHabilitacao: 1, HotLeadsRevisao: 0,
+      },
+      {
+        colaboradoraId: "CLOSER ALFA", canal: "CALLIX",
+        leadsRecebidos: 5, leadsDesqualificados: 2,
+        reunioesAgendadas: 1, reunioesRealizadas: 1, noShow: -3,
+        contratosHabilitacao: 0, contratosRevisao: 1,
+        HotLeadsHabilitacao: 0, HotLeadsRevisao: 1,
+      },
+    ]);
+
+    const resultado = await getPerformanceMarketing(8, 2026) as Array<Record<string, number | string>>;
+
+    expect(resultado[0]).toMatchObject({
+      leads: 15,
+      leadsDesqualificados: 6,
+      TRAFEGO_PAGO: 10,
+      CALLIX: 5,
+      habilitacao: 1,
+      revisao: 2,
+      noShow: 1,
+    });
   });
 
   it("mantém filtros e seleção ao alternar closer, data, mês e canal", () => {
@@ -169,5 +223,21 @@ describe("visibilidade dos lançamentos por closer no Alpha Leads", () => {
     expect(lancamentos).toContain("if (somenteLeitura) return");
     expect(lancamentos).toContain("setResumoLateral(RESUMO_VAZIO)");
     expect(lancamentos).toContain("resumoLateral?.canais || RESUMO_VAZIO.canais");
+  });
+
+  it("faz o calendário acompanhar a closer e abrir o dia selecionado", () => {
+    const calendario = readFileSync(
+      resolve(process.cwd(), "src/app/PainelAlpha/ControleLeads/CalendarioCheckIn.tsx"),
+      "utf8",
+    );
+    const lancamentos = readFileSync(
+      resolve(process.cwd(), "src/app/PainelAlpha/ControleLeads/Lançamentos.tsx"),
+      "utf8",
+    );
+
+    expect(lancamentos).toContain("<CalendarioCheckIn colaboradoraId={usuarioNome}");
+    expect(calendario).toContain("getDiasComLancamento(colaboradoraId, mes, ano)");
+    expect(calendario).toContain('params.set("data", iso)');
+    expect(calendario).not.toContain("RegistrarCheckLeadsDia");
   });
 });

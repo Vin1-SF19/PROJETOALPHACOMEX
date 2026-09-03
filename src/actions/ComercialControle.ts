@@ -1,11 +1,16 @@
 "use server"
 
 import db from "@/lib/prisma";
-import { startOfMonth, startOfWeek, startOfDay, endOfDay, endOfMonth } from "date-fns";
+import { startOfMonth, startOfDay, endOfDay, endOfMonth } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "../../auth";
 import { podeGerenciarMetas } from "@/lib/metas-permissoes";
+
+function contagem(valor: unknown) {
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? Math.max(0, Math.trunc(numero)) : 0;
+}
 
 /**
  * TI, Admin, CEO e Lider Comercial podem consultar leads de qualquer closer;
@@ -99,30 +104,30 @@ export async function upsertPerformance(dados: any) {
         },
       },
       update: {
-        leadsRecebidos: Number(dados.leadsRecebidos) || 0,
-        leadsDesqualificados: Number(dados.leadsDesqualificados) || 0,
-        reunioesAgendadas: Number(dados.reunioesAgendadas) || 0,
-        reunioesRealizadas: Number(dados.reunioesRealizadas) || 0,
-        noShow: Number(dados.noShow) || 0,
-        contratosHabilitacao: Number(dados.contratosHabilitacao) || 0,
-        contratosRevisao: Number(dados.contratosRevisao) || 0,
-        HotLeadsHabilitacao: Number(dados.HotLeadsHabilitacao) || 0,
-        HotLeadsRevisao: Number(dados.HotLeadsRevisao) || 0,
+        leadsRecebidos: contagem(dados.leadsRecebidos),
+        leadsDesqualificados: contagem(dados.leadsDesqualificados),
+        reunioesAgendadas: contagem(dados.reunioesAgendadas),
+        reunioesRealizadas: contagem(dados.reunioesRealizadas),
+        noShow: contagem(dados.noShow),
+        contratosHabilitacao: contagem(dados.contratosHabilitacao),
+        contratosRevisao: contagem(dados.contratosRevisao),
+        HotLeadsHabilitacao: contagem(dados.HotLeadsHabilitacao),
+        HotLeadsRevisao: contagem(dados.HotLeadsRevisao),
       },
       create: {
         dataRegistro: dataNormalizada,
         colaboradoraId: colaboradoraId,
         canal: dados.canal,
         servico: dados.servico,
-        leadsRecebidos: Number(dados.leadsRecebidos) || 0,
-        leadsDesqualificados: Number(dados.leadsDesqualificados) || 0,
-        reunioesAgendadas: Number(dados.reunioesAgendadas) || 0,
-        reunioesRealizadas: Number(dados.reunioesRealizadas) || 0,
-        noShow: Number(dados.noShow) || 0,
-        contratosHabilitacao: Number(dados.contratosHabilitacao) || 0,
-        contratosRevisao: Number(dados.contratosRevisao) || 0,
-        HotLeadsHabilitacao: Number(dados.HotLeadsHabilitacao) || 0,
-        HotLeadsRevisao: Number(dados.HotLeadsRevisao) || 0,
+        leadsRecebidos: contagem(dados.leadsRecebidos),
+        leadsDesqualificados: contagem(dados.leadsDesqualificados),
+        reunioesAgendadas: contagem(dados.reunioesAgendadas),
+        reunioesRealizadas: contagem(dados.reunioesRealizadas),
+        noShow: contagem(dados.noShow),
+        contratosHabilitacao: contagem(dados.contratosHabilitacao),
+        contratosRevisao: contagem(dados.contratosRevisao),
+        HotLeadsHabilitacao: contagem(dados.HotLeadsHabilitacao),
+        HotLeadsRevisao: contagem(dados.HotLeadsRevisao),
       },
     });
 
@@ -157,16 +162,16 @@ export async function getPerformanceDiaria(colaboradoraId: string, data: Date, c
     });
 
     return registros.reduce((acc, reg) => ({
-      leads_recebidos: acc.leads_recebidos + (reg.leadsRecebidos || 0),
-      leads_desqualificados: acc.leads_desqualificados + (reg.leadsDesqualificados || 0),
-      reunioes_agendadas: acc.reunioes_agendadas + (reg.reunioesAgendadas || 0),
-      reunioes_realizadas: acc.reunioes_realizadas + (reg.reunioesRealizadas || 0),
-      no_show: acc.no_show + (reg.noShow || 0),
-      contratos_Habilit: acc.contratos_Habilit + (reg.contratosHabilitacao || 0),
-      contratos_Revisao: acc.contratos_Revisao + (reg.contratosRevisao || 0),
+      leads_recebidos: acc.leads_recebidos + contagem(reg.leadsRecebidos),
+      leads_desqualificados: acc.leads_desqualificados + contagem(reg.leadsDesqualificados),
+      reunioes_agendadas: acc.reunioes_agendadas + contagem(reg.reunioesAgendadas),
+      reunioes_realizadas: acc.reunioes_realizadas + contagem(reg.reunioesRealizadas),
+      no_show: acc.no_show + contagem(reg.noShow),
+      contratos_Habilit: acc.contratos_Habilit + contagem(reg.contratosHabilitacao),
+      contratos_Revisao: acc.contratos_Revisao + contagem(reg.contratosRevisao),
       
-      HotLeadsHabilitacao: acc.HotLeadsHabilitacao + (reg.HotLeadsHabilitacao || 0),
-      HotLeadsRevisao: acc.HotLeadsRevisao + (reg.HotLeadsRevisao || 0)
+      HotLeadsHabilitacao: acc.HotLeadsHabilitacao + contagem(reg.HotLeadsHabilitacao),
+      HotLeadsRevisao: acc.HotLeadsRevisao + contagem(reg.HotLeadsRevisao)
     }), {
       leads_recebidos: 0, leads_desqualificados: 0, reunioes_agendadas: 0,
       reunioes_realizadas: 0, no_show: 0, contratos_Habilit: 0, contratos_Revisao: 0,
@@ -204,15 +209,15 @@ export async function getPerformanceAcumulada(colaboradoraId: string, mes: numbe
     });
 
     const soma = (regs: any[]) => regs.reduce((acc, reg) => ({
-      leads: acc.leads + (reg.leadsRecebidos || 0),
-      leadsDesqualificados: acc.leadsDesqualificados + (reg.leadsDesqualificados || 0),
-      agendadas: acc.agendadas + (reg.reunioesAgendadas || 0),
-      realizadas: acc.realizadas + (reg.reunioesRealizadas || 0),
-      noShow: acc.noShow + (reg.noShow || 0),
-      habilitacao: acc.habilitacao + (reg.contratosHabilitacao || 0),
-      revisao: acc.revisao + (reg.contratosRevisao || 0),
-      HotLeadsHabilitacao: acc.HotLeadsHabilitacao + (reg.HotLeadsHabilitacao || 0),
-      HotLeadsRevisao: acc.HotLeadsRevisao + (reg.HotLeadsRevisao || 0)
+      leads: acc.leads + contagem(reg.leadsRecebidos),
+      leadsDesqualificados: acc.leadsDesqualificados + contagem(reg.leadsDesqualificados),
+      agendadas: acc.agendadas + contagem(reg.reunioesAgendadas),
+      realizadas: acc.realizadas + contagem(reg.reunioesRealizadas),
+      noShow: acc.noShow + contagem(reg.noShow),
+      habilitacao: acc.habilitacao + contagem(reg.contratosHabilitacao),
+      revisao: acc.revisao + contagem(reg.contratosRevisao),
+      HotLeadsHabilitacao: acc.HotLeadsHabilitacao + contagem(reg.HotLeadsHabilitacao),
+      HotLeadsRevisao: acc.HotLeadsRevisao + contagem(reg.HotLeadsRevisao)
     }), { 
       leads: 0, 
       leadsDesqualificados: 0, 
@@ -247,6 +252,34 @@ export async function getPerformanceAcumulada(colaboradoraId: string, mes: numbe
       }
     };
   }
+}
+
+/**
+ * Dias que possuem ao menos um lançamento real no Alpha Leads.
+ * O calendário usa a própria performance como fonte da verdade, evitando que
+ * um dia seja marcado como concluído sem que os números tenham sido salvos.
+ */
+export async function getDiasComLancamento(colaboradoraId: string, mes: number, ano: number) {
+  const { mes: mesValidado, ano: anoValidado } = MesAnoSchema.parse({ mes, ano });
+  const colaboradoraIdValidado = z.string().min(1).parse(colaboradoraId);
+  await exigirAcessoColaborador(colaboradoraIdValidado);
+
+  const dataReferencia = new Date(anoValidado, mesValidado, 1);
+  const registros = await db.comercialPerformance.findMany({
+    where: {
+      colaboradoraId: colaboradoraIdValidado,
+      dataRegistro: {
+        gte: startOfMonth(dataReferencia),
+        lte: endOfMonth(dataReferencia),
+      },
+    },
+    select: { dataRegistro: true },
+    orderBy: { dataRegistro: "asc" },
+  });
+
+  return Array.from(
+    new Set(registros.map(({ dataRegistro }) => dataRegistro.toISOString().slice(0, 10))),
+  );
 }
 
 export async function getPerformanceEquipeCompleta(mes: number, ano: number) {
@@ -323,6 +356,7 @@ export async function getPerformanceMarketing(mes: number, ano: number) {
           id: id, 
           nome: id, 
           leads: 0, 
+          leadsDesqualificados: 0,
           agendadas: 0,
           realizadas: 0,
           noShow: 0,
@@ -336,32 +370,33 @@ export async function getPerformanceMarketing(mes: number, ano: number) {
         };
       }
 
-      acc[id].leads += reg.leadsRecebidos || 0;
+      acc[id].leads += contagem(reg.leadsRecebidos);
+      acc[id].leadsDesqualificados += contagem(reg.leadsDesqualificados);
       
-      acc[id].agendadas += reg.reunioesAgendadas || 0;
-      acc[id].realizadas += reg.reunioesRealizadas || 0;
-      acc[id].noShow += reg.noShow || 0;
+      acc[id].agendadas += contagem(reg.reunioesAgendadas);
+      acc[id].realizadas += contagem(reg.reunioesRealizadas);
+      acc[id].noShow += contagem(reg.noShow);
       
-      acc[id].habilitacao += reg.contratosHabilitacao || 0;
-      acc[id].revisao += reg.contratosRevisao || 0;
-      acc[id].hotLeadsHabilitacao += reg.HotLeadsHabilitacao || 0;
-      acc[id].hotLeadsRevisao += reg.HotLeadsRevisao || 0;
+      acc[id].habilitacao += contagem(reg.contratosHabilitacao);
+      acc[id].revisao += contagem(reg.contratosRevisao);
+      acc[id].hotLeadsHabilitacao += contagem(reg.HotLeadsHabilitacao);
+      acc[id].hotLeadsRevisao += contagem(reg.HotLeadsRevisao);
 
       const canal = reg.canal; 
       if (canal) {
-        if (acc[id].hasOwnProperty(canal)) acc[id][canal] += reg.leadsRecebidos || 0;
+        if (acc[id].hasOwnProperty(canal)) acc[id][canal] += contagem(reg.leadsRecebidos);
 
-        if (canal === "TRAFEGO_PAGO") acc[id].hab_TRAFEGO += reg.contratosHabilitacao || 0;
-        if (canal === "CALLIX")       acc[id].hab_CALLIX += reg.contratosHabilitacao || 0;
-        if (canal === "INDICACAO")    acc[id].hab_INDICACAO += reg.contratosHabilitacao || 0;
-        if (canal === "EVENTOS")      acc[id].hab_EVENTOS += reg.contratosHabilitacao || 0;
-        if (canal === "CHINA")        acc[id].hab_CHINA += reg.contratosHabilitacao || 0;
+        if (canal === "TRAFEGO_PAGO") acc[id].hab_TRAFEGO += contagem(reg.contratosHabilitacao);
+        if (canal === "CALLIX")       acc[id].hab_CALLIX += contagem(reg.contratosHabilitacao);
+        if (canal === "INDICACAO")    acc[id].hab_INDICACAO += contagem(reg.contratosHabilitacao);
+        if (canal === "EVENTOS")      acc[id].hab_EVENTOS += contagem(reg.contratosHabilitacao);
+        if (canal === "CHINA")        acc[id].hab_CHINA += contagem(reg.contratosHabilitacao);
 
-        if (canal === "TRAFEGO_PAGO") acc[id].rev_TRAFEGO += reg.contratosRevisao || 0;
-        if (canal === "CALLIX")       acc[id].rev_CALLIX += reg.contratosRevisao || 0;
-        if (canal === "INDICACAO")    acc[id].rev_INDICACAO += reg.contratosRevisao || 0;
-        if (canal === "EVENTOS")      acc[id].rev_EVENTOS += reg.contratosRevisao || 0;
-        if (canal === "CHINA")        acc[id].rev_CHINA += reg.contratosRevisao || 0;
+        if (canal === "TRAFEGO_PAGO") acc[id].rev_TRAFEGO += contagem(reg.contratosRevisao);
+        if (canal === "CALLIX")       acc[id].rev_CALLIX += contagem(reg.contratosRevisao);
+        if (canal === "INDICACAO")    acc[id].rev_INDICACAO += contagem(reg.contratosRevisao);
+        if (canal === "EVENTOS")      acc[id].rev_EVENTOS += contagem(reg.contratosRevisao);
+        if (canal === "CHINA")        acc[id].rev_CHINA += contagem(reg.contratosRevisao);
       }
       return acc;
     }, {});
