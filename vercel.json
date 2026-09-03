@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/bpm/jobs/automacoes",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/bpm/jobs/automacao-novos-leads",
       "schedule": "0 12 * * *"
     },

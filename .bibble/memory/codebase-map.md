@@ -6,6 +6,18 @@
 
 ---
 
+## Alpha CRM/BPM — aba Automações (RM-2026-35A772, 2026-09-02)
+
+- `src/app/PainelAlpha/AlphaCRM/automacoes/page.tsx` e `src/components/bpm/automacoes/` — workspace global por pipeline/coluna e formulários dinâmicos.
+- `src/actions/bpm/Automacoes.ts` — listagem, CRUD, status, duplicação e templates, sempre sob autorização administrativa.
+- `src/lib/bpm/automacoes/{schemas,placeholders,fila,executor}.ts` — contratos, interpolação, fila idempotente, gatilho temporal e dispatch das três ações.
+- `src/actions/bpm/Cards.ts` — hook pós-commit do movimento manual; falha da fila é isolada do movimento.
+- `src/app/api/bpm/jobs/automacoes/route.ts` e `vercel.json` — worker autenticado por `CRON_SECRET`, agendado a cada cinco minutos.
+- `prisma/migrations/20260902185000_add_bpm_automacoes/migration.sql` — tabelas `BpmAutomacao` e `BpmAutomacaoExecucao`.
+- `tests/bpm/automacoes*.test.ts` — 14 casos direcionados.
+
+---
+
 ## Gerador de Documentos — Contratante/Contratada + Qualificação (2026-08-29, Parte 1 de 2)
 
 **Arquivos tocados:**
@@ -1267,5 +1279,11 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - Campo `current_stage_code` — rejeitado; `BpmCard.etapaId` (FK) já é o campo de referência.
 
 **Última atualização:** 2026-08-20 por Scribe
+
+## RM-2026-429476 — agrupamento de campos no admin do CRM/BPM
+
+- `src/lib/bpm/campos-admin.ts`: helper puro `agruparCamposPorColuna`, responsável por ordenação, seção geral, etapas vazias e fallback de vínculos indisponíveis.
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/AdminPipelineClient.tsx`: consumidor via `useMemo`; renderiza os grupos sem retirar os controles CRUD.
+- `tests/bpm/campos-agrupados-por-coluna.test.ts`: cobertura de ordem, vazio, preservação sem duplicação e wiring da UI.
 
 **Última atualização:** 2026-08-17 por Scribe

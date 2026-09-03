@@ -2,6 +2,10 @@ import db from "@/lib/prisma";
 
 import { isAdminRole, isSameRole } from "@/lib/roles";
 import { etapaEhBoasVindas, usuarioEhDiretoriaBpm } from "@/lib/bpm/boas-vindas";
+import {
+  acaoBpmExigeSomenteVisualizacao,
+  resolverVisibilidadeEtapa,
+} from "@/lib/bpm/visibilidade-etapa";
 
 const PERMISSAO_CRM = "crm";
 
@@ -349,6 +353,8 @@ export interface AcessoBpmCard {
   autorizado: boolean;
   isAdminGlobal: boolean;
   role: string | null;
+  perfilGlobal: string | null;
+  podeAgirEtapa: boolean;
 }
 
 /**
@@ -372,20 +378,40 @@ export async function checarAcessoBpmCard(
     carregarUsuarioEPermissoesBpm(userId, client),
     client.bpmCard.findUnique({
       where: { id: cardId },
-      select: { etapa: { select: { nome: true } } },
+      select: {
+        etapa: {
+          select: {
+            nome: true,
+            visibilidades: {
+              select: { perfil: true, podeVer: true, podeAgir: true },
+            },
+          },
+        },
+      },
     }),
   ]);
   if (!acessoModulo || !card) {
-    return { autorizado: false, isAdminGlobal: false, role: null };
+    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: null, podeAgirEtapa: false };
   }
   if (etapaEhBoasVindas(card.etapa.nome) && !usuarioEhDiretoriaBpm(acessoModulo.usuario.role)) {
-    return { autorizado: false, isAdminGlobal: false, role: null };
+    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
   }
   if (isAdminRole(acessoModulo.usuario.role)) {
-    return { autorizado: true, isAdminGlobal: true, role: "ADMINISTRADOR" };
+    return { autorizado: true, isAdminGlobal: true, role: "ADMINISTRADOR", perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: true };
   }
   if (!possuiPermissaoCrm(acessoModulo.permissoes)) {
-    return { autorizado: false, isAdminGlobal: false, role: null };
+    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
+  }
+
+  const permissaoEtapa = resolverVisibilidadeEtapa(
+    acessoModulo.usuario.role,
+    card.etapa.visibilidades,
+  );
+  const permitidoNaEtapa = acaoBpmExigeSomenteVisualizacao(acao)
+    ? permissaoEtapa.podeVer
+    : permissaoEtapa.podeAgir;
+  if (!permitidoNaEtapa) {
+    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
   }
 
   const membro = await client.bpmCardMembro.findUnique({
@@ -393,10 +419,18 @@ export async function checarAcessoBpmCard(
     select: { role: true },
   });
 
-  if (!membro) return { autorizado: false, isAdminGlobal: false, role: null };
+  if (!membro) {
+    return { autorizado: false, isAdminGlobal: false, role: null, perfilGlobal: acessoModulo.usuario.role, podeAgirEtapa: false };
+  }
 
   const permitido = PERMISSOES_POR_ROLE[membro.role]?.includes(acao) ?? false;
-  return { autorizado: permitido, isAdminGlobal: false, role: membro.role };
+  return {
+    autorizado: permitido,
+    isAdminGlobal: false,
+    role: membro.role,
+    perfilGlobal: acessoModulo.usuario.role,
+    podeAgirEtapa: permissaoEtapa.podeAgir,
+  };
 }
 
 /** Lança erro padronizado se o acesso não for autorizado — usar no início de toda action. */

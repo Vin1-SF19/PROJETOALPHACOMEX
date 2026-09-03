@@ -152,6 +152,7 @@ model usuarios {
   bpmCardAnexosEnviados        BpmCardAnexo[]
   bpmInteracoesRegistradas     BpmInteracaoCard[]
   bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
+  bpmAutomacoesCriadas         BpmAutomacao[]
   nolossLeadsPromovidos        NolossLead[]
 
   justificativasMetaEnviadas     JustificativaMeta[]
@@ -3695,6 +3696,7 @@ model BpmPipeline {
   etapas             BpmEtapa[]
   campos             BpmCampo[]
   cards              BpmCard[]
+  automacoes         BpmAutomacao[]
   configAuditoria    BpmPipelineConfigAuditoria[]
   checklistPerguntas BpmChecklistFollowUpPergunta[]
 
@@ -3733,9 +3735,76 @@ model BpmEtapa {
   transicoesDestino  BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
   camposObrigatorios BpmCampoObrigatorioEtapa[]
   camposOcultos      BpmCampoOcultoEtapa[]
+  visibilidades      BpmEtapaVisibilidade[]
+  automacoes         BpmAutomacao[]
 
   @@index([pipelineId])
   @@index([pipelineId, ordem])
+}
+
+model BpmEtapaVisibilidade {
+  id        String   @id @default(cuid())
+  etapaId   String
+  perfil    String
+  podeVer   Boolean  @default(true)
+  podeAgir  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  etapa BpmEtapa @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+
+  @@unique([etapaId, perfil])
+  @@index([etapaId])
+}
+
+model BpmAutomacao {
+  id             String   @id @default(cuid())
+  nome           String
+  descricao      String?
+  pipelineId     String
+  etapaId        String
+  gatilhoTipo    String
+  tempoMinutos   Int?
+  acaoTipo       String
+  parametrosJson String   @default("{}")
+  ativa          Boolean  @default(true)
+  criadoPorId    Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pipeline  BpmPipeline            @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapa     BpmEtapa               @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  criadoPor usuarios               @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
+  execucoes BpmAutomacaoExecucao[]
+
+  @@index([pipelineId, etapaId, ativa])
+  @@index([etapaId, gatilhoTipo, ativa])
+  @@index([criadoPorId])
+}
+
+model BpmAutomacaoExecucao {
+  id            String    @id @default(cuid())
+  automacaoId   String
+  cardId        String
+  eventoChave   String
+  gatilhoTipo   String
+  status        String    @default("PENDENTE")
+  tentativas    Int       @default(0)
+  mensagemErro  String?
+  resultadoJson String?
+  disponivelEm  DateTime  @default(now())
+  iniciadoEm    DateTime?
+  executadoEm   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  automacao BpmAutomacao @relation(fields: [automacaoId], references: [id], onDelete: Cascade)
+  card      BpmCard      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([automacaoId, eventoChave])
+  @@index([status, disponivelEm])
+  @@index([automacaoId])
+  @@index([cardId])
 }
 
 model BpmCampo {
@@ -3803,6 +3872,7 @@ model BpmCard {
   anexos             BpmCardAnexo[]
   interacoes         BpmInteracaoCard[]
   checklistsFollowUp BpmChecklistFollowUp[]
+  automacaoExecucoes BpmAutomacaoExecucao[]
 
   vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
   vinculosDestino BpmCardVinculo[] @relation("CardDestino")

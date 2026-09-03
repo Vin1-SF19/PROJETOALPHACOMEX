@@ -1,5 +1,49 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-02 — RM-2026-70EFE1 — Filtro por responsável no Kanban é client-side, não server-side
+
+**Decisão:** o filtro por membro responsável no board Kanban do Alpha CRM (`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]`) é implementado inteiramente no cliente, em memória, sobre os `cards` já carregados — sem nova Server Action, sem parâmetro de query na busca original, sem persistência do filtro selecionado.
+
+**Justificativa:** os dados de `membros[].usuario.{id,nome}` já chegam no payload de `ListarCardsPipelineBpm` para cada card; o volume de cards por pipeline é pequeno o suficiente para filtrar em memória sem custo perceptível. Fazer o filtro no servidor exigiria uma nova Server Action ou parâmetro adicional sem ganho real de performance.
+
+**Decisão complementar:** colunas do Kanban permanecem visíveis mesmo quando ficam vazias após o filtro ser aplicado (consistência do layout Kanban — não esconder etapas do fluxo).
+
+**Consequência:** o filtro é perdido ao recarregar a página (estado local, não persistido); qualquer sessão futura que precise de filtro persistente entre sessões ou compartilhável por URL exigirá nova decisão explícita (ex.: query param), já que a implementação atual não passa por ali.
+
+### 2026-09-02 — RM-2026-35A772 — automações globais por coluna usam fila persistente
+
+**Decisão:** tratar “Aba Automações” como configuração global do módulo CRM/BPM, agrupada por `BpmPipeline -> BpmEtapa`, com acesso exclusivo Admin/CEO/TI. Os gatilhos de movimento só enfileiram; o cron executa e-mail, contrato e ficha fora da requisição do usuário.
+
+**Justificativa:** a tela precisa mostrar todos os pipelines e as integrações podem ser lentas ou indisponíveis. A chave única por automação/evento oferece idempotência; o enfileiramento pós-commit impede que falhas na infraestrutura da fila revertam o movimento do card.
+
+**Consequência:** ações externas são eventualmente consistentes e dependem de `CRON_SECRET`; e-mail requer `RESEND_API_KEY`, e PDF persistido requer as credenciais de Blob já usadas pelo projeto. Falhas ficam registradas na execução e não são mascaradas como sucesso.
+
+### 2026-09-02 — RM-2026-35A772 — migration aditiva no Turso após confirmação explícita
+
+**Decisão:** criar somente `BpmAutomacao`, `BpmAutomacaoExecucao` e seus índices/FKs. O backup verificado anterior à mudança é `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-02T18-39-17-794Z.sql` (SHA-256 `da1f379618b68684d67daf56506c3a55154ca1998bd4b38a8ef76587512fd623`).
+
+**Consequência:** nenhum dado ou schema legado foi transformado; rollback, se necessário, pode remover apenas as duas tabelas novas na ordem execução → automação.
+
+### 2026-09-02 — Staging de Em testes usa releases isoladas com symlink atômico
+
+**Contexto:** o comando anterior fazia build no workspace e reiniciava um serviço preso à release `20260901-1230`; portanto, o restart não publicava o build novo.
+
+**Decisão:** o Roadmap passa a executar `bash scripts/deploy-staging-release.sh`. O serviço aponta para `painel-alpha-stage/current`, e o script só troca esse symlink depois de build e smoke aprovados. A release anterior permanece disponível e é restaurada automaticamente se a ativação não ficar saudável.
+
+**Consequência:** cada objetivo que conclui ou reconclui e entra em **Em testes** gera uma release nova e observável, sem alterar a release anterior no lugar.
+
+### 2026-09-02 — RM-2026-A4294C — Tabs do card usam `BpmPipeline`, não `ServicosComerciais`
+
+**Contexto:** RM-2026-29F59C (sessão anterior) havia trocado as tabs hardcoded do card por `getServicosComerciais()`, com base numa leitura de que "serviço comercial" era a interpretação correta do objetivo original do Roadmap. O objetivo RM-2026-A4294C pediu explicitamente a correção para pipelines reais (`BpmPipeline`).
+
+**Decisão:** as tabs do card Alpha CRM passam a usar `BpmPipeline` como fonte de dados — 1ª tab é o pipeline atual do card (`card.pipeline.nome`, dinâmico, substitui o texto "Este card" hardcoded), demais tabs são os outros pipelines ativos do sistema via `ListarPipelinesBpm()` (reaproveitada sem alteração). O pipeline atual não se repete nas demais tabs.
+
+**Decisão de conteúdo (lacuna resolvida):** como um `BpmCard` pertence a exatamente um `pipelineId`, não existe "o mesmo card" nos outros pipelines. Em vez de deixar a tab de outro pipeline sem conteúdo definido (erro/tela vazia) ou navegar para fora do modal, a tab de "outro pipeline" lista os demais cards da mesma empresa naquele pipeline (nova `ListarCardsEmpresaPorPipeline`), reabrindo qualquer um deles no mesmo modal — mesmo padrão já usado em "Outros Cards do CRM".
+
+**Alternativas rejeitadas:** manter `ServicosComerciais` (rejeitado — diverge explicitamente do objetivo desta fase, que pede pipelines reais); fazer a tab de outro pipeline navegar para o board daquele pipeline fora do card (rejeitado — quebra o padrão de permanência no modal já estabelecido pelas demais abas do card).
+
+**Consequências:** qualquer sessão futura que tocar as tabs do header do card deve preservar `BpmPipeline` como fonte de dados; não reintroduzir `ServicosComerciais`/`getServicosComerciais()` nesse local sem nova decisão explícita do usuário. `PainelHistoricoServico.tsx` continua existindo e válido para outros usos (histórico por serviço comercial contratado), mas não é mais consumido pelo header de tabs do card.
+
 ### 2026-09-01 — RM-2026-1FE530 — Reusar AgendaModal3D (Dialog/Sheet centralizado) em vez de ajustar collision detection do Popover
 
 **Contexto:** o modal de detalhes de evento compartilhado (Popover Radix ancorado ao chip do evento) estourava a viewport em telas menores, para eventos com muitos convidados/conteúdo.
@@ -1109,3 +1153,19 @@ Sócio sem telefone agora É persistido de verdade: `gerarTelefonePendente()` (`
 **Decisão:** Bibble perguntou explicitamente duas vezes se a leitura de arquivos deveria excluir `.env`/credenciais (para não expor segredo literal no manifesto salvo, visível na UI do Roadmap para qualquer um com acesso ao módulo). **O usuário respondeu duas vezes, de forma inequívoca, que quer leitura total sem nenhuma exceção, `.env` incluso** — justificativa dele: o Qwen roda localmente, em servidor dentro da rede da própria empresa, então não há vetor de vazamento externo (diferente de mandar para um provider de IA terceiro na nuvem).
 **Alternativa rejeitada:** Bloquear automaticamente `.env`/`.env.*`/chaves `.pem`/`secrets.json` da varredura (era a recomendação padrão de segurança) — rejeitada explicitamente pelo usuário nas duas vezes em que foi perguntado.
 **Consequências:** Qualquer sessão futura que tocar `qwen-generator.ts`/o mecanismo de leitura de projeto NÃO deve reintroduzir esse bloqueio por conta própria como "correção de segurança" — é uma escolha consciente e já confirmada, não um bug. Se o ambiente mudar no futuro (Qwen deixar de ser 100% local/interno, ex. passar a rodar num provider externo), essa decisão precisa ser reaberta com o usuário antes de qualquer sessão assumir que continua válida.
+
+### 2026-09-02 — RM-2026-1EA5C1: visibilidade refere-se às colunas do CRM/BPM
+
+**Contexto:** O título curto "Visibilidade por coluna" era ambíguo. O usuário confirmou que se refere às etapas/colunas dos pipelines do módulo Alpha CRM/BPM.
+
+**Decisão:** Persistir uma allow-list opcional em `BpmEtapaVisibilidade`, por `etapaId + perfil` global. Sem linha alguma, a etapa fica sem restrição para manter compatibilidade; com linhas, perfis ausentes não veem nem agem. `podeAgir` implica `podeVer`. Admin/CEO/TI têm bypass, e as regras existentes de permissão do módulo, vínculo no card e reserva de "Boas-vindas" continuam cumulativas.
+
+**Consequências:** SDR/BDR não são criados nem hardcoded; aparecem quando existirem como roles ativas. O backend é a fonte de verdade, a UI somente reflete a permissão efetiva. A migration aditiva foi autorizada explicitamente e aplicada ao Turso após backup íntegro.
+
+### 2026-09-02 — RM-2026-429476: agrupamento client-side preserva `etapaId = null`
+
+**Contexto:** A configuração do CRM/BPM já recebia `campos` com `etapaId` e `etapas` ordenadas, mas exibia tudo em uma lista plana.
+
+**Decisão:** Agrupar a apresentação no cliente, sem alterar `ObterPipelineBpm` ou o schema. Campos com `etapaId = null` ficam em **Todas as etapas**, pois são gerais por definição existente; colunas ativas são sempre exibidas, mesmo vazias; vínculos fora da lista ativa aparecem em **Etapa inativa ou indisponível** para que nenhum campo seja ocultado.
+
+**Consequências:** O CRUD existente permanece a única fonte de mutação. Renomear/reordenar etapas ou trocar o `etapaId` de um campo atualiza os grupos pelo mesmo estado React, sem consulta adicional ou duplicação de dados.

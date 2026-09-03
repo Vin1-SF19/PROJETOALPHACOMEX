@@ -13,6 +13,7 @@ import {
   KanbanSquare,
   ListChecks,
   Settings2,
+  Zap,
   Menu,
   X,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const NAV = [
   { href: "/PainelAlpha/AlphaCRM", label: "Dashboard", icon: LayoutDashboard, exact: true, adminOnly: false },
   { href: "/PainelAlpha/AlphaCRM/pipelines", label: "Pipelines", icon: KanbanSquare, exact: true, adminOnly: false },
   { href: "/PainelAlpha/AlphaCRM/tarefas", label: "Tarefas", icon: ListChecks, exact: false, adminOnly: false },
+  { href: "/PainelAlpha/AlphaCRM/automacoes", label: "Automações", icon: Zap, exact: false, adminOnly: true },
   { href: "/PainelAlpha/AlphaCRM/admin", label: "Configurações", icon: Settings2, exact: false, adminOnly: true },
 ];
 

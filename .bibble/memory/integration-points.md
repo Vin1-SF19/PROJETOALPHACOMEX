@@ -1,5 +1,23 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Filtro por responsável no board Kanban do Alpha CRM (RM-2026-70EFE1, 2026-09-02)
+
+**Onde está implementado:**
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` — único arquivo tocado.
+
+**Como funciona (fluxo):**
+1. Usuário abre `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` — board já carrega `cards` com `membros[].usuario.{id,nome}` (via `ListarCardsPipelineBpm`, sem alteração).
+2. `responsaveisDisponiveis` (`useMemo`) deduplica os `usuario.id/nome` de todos os `cards` carregados e ordena por nome.
+3. `Select` shadcn no header (ao lado do botão "Atualizar") lista "Todos os responsáveis" + cada responsável único.
+4. `onValueChange` atualiza `responsavelFiltro` (estado local, `string | null`); `getByEtapa(etapaId)` passa a exigir também `c.membros.some(m => String(m.usuario.id) === responsavelFiltro)` quando o filtro está ativo.
+5. Filtro é 100% client-side e em memória — nenhuma chamada de rede nova, nenhuma persistência; recarregar a página reseta o filtro para "Todos os responsáveis".
+
+**Não afetado pelo filtro:** rotas, permissões (`exigirAcessoBpmPipeline`/`exigirAcessoBpmCard` inalteradas), drag-and-drop (`activeCard`/`DragOverlay` leem o array `cards` bruto, não `getByEtapa`), realtime e `recarregarCards`.
+
+**Última atualização:** 2026-09-02 por Scribe
+
+---
+
 ## Exclusão de card no Alpha CRM — `ExcluirCardBpm` (RM-2026-C99F86, 2026-09-01)
 
 **Onde está implementado:**

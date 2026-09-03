@@ -17,7 +17,13 @@ import {
   isAdminRole,
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
-import { type CardFilhoCriado, executarAutomacaoFechamentoComercial, executarAutomacaoTarefaNotaFiscal } from "@/lib/bpm/automacoes";
+import {
+  executarAutomacaoFechamentoComercial,
+  executarAutomacaoTarefaNotaFiscal,
+} from "@/lib/bpm/automacoes";
+import type { CardFilhoCriado } from "@/lib/bpm/automacoes";
+import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
+
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
@@ -78,6 +84,7 @@ import {
   obterErroCamposAlinhamentoParaSaida,
 } from "@/lib/bpm/alinhamento-estrategico";
 import { etapaFinanceiraValida, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
+import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -273,16 +280,43 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
     await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
     const diretoria = await checarAcessoDiretoriaBpm(userId);
-    const pipelineInfo = await db.bpmPipeline.findUnique({
-      where: { id: pipelineId },
-      select: { nome: true },
-    });
+    const [pipelineInfo, usuarioAtual] = await Promise.all([
+      db.bpmPipeline.findUnique({
+        where: { id: pipelineId },
+        select: {
+          nome: true,
+          etapas: {
+            where: { ativo: true },
+            select: {
+              id: true,
+              visibilidades: {
+                select: { perfil: true, podeVer: true, podeAgir: true },
+              },
+            },
+          },
+        },
+      }),
+      db.usuarios.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      }),
+    ]);
+    const visibilidadePorEtapa = new Map(
+      (pipelineInfo?.etapas ?? []).map((etapa) => [
+        etapa.id,
+        resolverVisibilidadeEtapa(usuarioAtual?.role, etapa.visibilidades),
+      ]),
+    );
+    const etapasVisiveis = [...visibilidadePorEtapa.entries()]
+      .filter(([, permissao]) => permissao.podeVer)
+      .map(([etapaId]) => etapaId);
 
     // D-021: card sempre tem empresa vinculada — select sempre inclui a empresa.
     const cards = await db.bpmCard.findMany({
       where: {
         pipelineId,
         status: "ATIVO",
+        etapaId: { in: etapasVisiveis },
         ...(diretoria ? {} : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } }),
         ...(admin ? {} : { membros: { some: { userId } } }),
       },
@@ -365,13 +399,22 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         diaCiclo: ehNovoLead
           ? calcularDiaCicloNovosLeads(card.createdAt, agora)
           : 1,
+        podeAgirEtapa:
+          visibilidadePorEtapa.get(card.etapaId)?.podeAgir ?? false,
       };
     });
 
     // Leads do NoLoss viram cards VIRTUAIS na coluna "Novos leads" do pipeline
     // "Revisão de Radar" — nunca em outro pipeline, nunca fora dessa etapa.
     // Visíveis a qualquer usuário com acesso ao pipeline (sem filtro de membro).
-    const cardsVirtuais = (etapaNovosLeads && pipelineEhRevisaoRadar(pipelineInfo?.nome))
+    const permissaoNovosLeads = etapaNovosLeads
+      ? visibilidadePorEtapa.get(etapaNovosLeads.id)
+      : null;
+    const cardsVirtuais = (
+      etapaNovosLeads
+      && permissaoNovosLeads?.podeVer
+      && pipelineEhRevisaoRadar(pipelineInfo?.nome)
+    )
       ? (await buscarNolossLeadsPendentes()).map((lead) => ({
           id: lead.id,
           etapaId: etapaNovosLeads.id,
@@ -405,6 +448,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           metaLigacoesDia: META_LIGACOES_NOVOS_LEADS,
           diasUteisDecorridos: 0,
           diaCiclo: 1,
+          podeAgirEtapa: permissaoNovosLeads.podeAgir,
         }))
       : [];
 
@@ -424,7 +468,12 @@ export async function ObterCardBpm(cardId: string) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
 
-    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+    const acessoCard = await exigirAcessoBpmCard(
+      cardId,
+      userId,
+      session.user.role ?? null,
+      "visualizar",
+    );
 
     const card = await db.bpmCard.findUnique({
       where: { id: cardId },
@@ -516,6 +565,10 @@ export async function ObterCardBpm(cardId: string) {
         ...card,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,
+        permissaoEtapa: {
+          podeVer: true,
+          podeAgir: acessoCard.podeAgirEtapa,
+        },
       },
     };
   } catch (error) {
@@ -1026,7 +1079,14 @@ async function carregarContextoMovimento(
         pipeline: { select: { nome: true } },
       },
     }),
-    client.bpmEtapa.findUnique({ where: { id: etapaDestinoId } }),
+    client.bpmEtapa.findUnique({
+      where: { id: etapaDestinoId },
+      include: {
+        visibilidades: {
+          select: { perfil: true, podeVer: true, podeAgir: true },
+        },
+      },
+    }),
   ]);
   if (!card) return { error: "Card não encontrado" } as const;
   if (!etapaDestino || etapaDestino.pipelineId !== card.pipelineId) {
@@ -1268,10 +1328,24 @@ async function executarMovimentoComRequisitos(
   userRole: string | null,
 ) {
   const { cardId, etapaDestinoId, camposValores, proximoContatoEm } = dados;
-  await exigirAcessoBpmCard(cardId, userId, userRole, "moverEtapa");
+  const acessoOrigem = await exigirAcessoBpmCard(
+    cardId,
+    userId,
+    userRole,
+    "moverEtapa",
+  );
   const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
   if ("error" in contexto) return { success: false, error: contexto.error };
   const { card, etapaDestino } = contexto;
+  if (!resolverVisibilidadeEtapa(
+    acessoOrigem.perfilGlobal,
+    etapaDestino.visibilidades,
+  ).podeAgir) {
+    return {
+      success: false,
+      error: `Seu perfil não pode agir na etapa "${etapaDestino.nome}".`,
+    };
+  }
   let camposFinanceirosPorId: Array<{ id: string; nome: string }> = [];
   let validacaoFinanceira: ReturnType<typeof validateFinancialTransition> = { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
   if (etapaFinanceiraValida(card.etapa.nome) && etapaFinanceiraValida(etapaDestino.nome)) {
@@ -1371,12 +1445,26 @@ async function executarMovimentoComRequisitos(
   if (guardas.length > 0) return { success: false, error: guardas[0] };
 
   const resultadoMovimento = await db.$transaction(async (tx) => {
-    await exigirAcessoBpmCard(cardId, userId, userRole, "moverEtapa", tx);
+    const acessoOrigemAtual = await exigirAcessoBpmCard(
+      cardId,
+      userId,
+      userRole,
+      "moverEtapa",
+      tx,
+    );
     const contextoAtual = await carregarContextoMovimento(cardId, etapaDestinoId, tx);
     if ("error" in contextoAtual) {
       throw new Error(`MOVIMENTO_INVALIDO:${contextoAtual.error}`);
     }
     const { card: cardAtual, etapaDestino: destinoAtual } = contextoAtual;
+    if (!resolverVisibilidadeEtapa(
+      acessoOrigemAtual.perfilGlobal,
+      destinoAtual.visibilidades,
+    ).podeAgir) {
+      throw new Error(
+        `MOVIMENTO_INVALIDO:Seu perfil não pode agir na etapa "${destinoAtual.nome}".`,
+      );
+    }
     let validacaoFinanceiraAtual: ReturnType<typeof validateFinancialTransition> = { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
     if (etapaFinanceiraValida(cardAtual.etapa.nome) && etapaFinanceiraValida(destinoAtual.nome)) {
       const financeiroAtual = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipeline: { select: { nome: true } }, campoValores: { select: { valor: true, campo: { select: { nome: true } } } }, anexos: { select: { nome: true } } } });
@@ -1510,7 +1598,7 @@ async function executarMovimentoComRequisitos(
     if (movimento.count !== 1) {
       throw new Error("CONFLITO_MOVIMENTO_CARD");
     }
-    await tx.bpmCardHistorico.create({
+    const historicoMovimento = await tx.bpmCardHistorico.create({
       data: {
         cardId,
         acao: "CARD_MOVIDO",
@@ -1529,10 +1617,29 @@ async function executarMovimentoComRequisitos(
         }),
       },
     });
-    return { pipelineId: cardAtual.pipelineId };
+    return {
+      pipelineId: cardAtual.pipelineId,
+      etapaOrigemId: cardAtual.etapaId,
+      eventoId: historicoMovimento.id,
+    };
   });
 
   const cardsFilhosCriados: CardFilhoCriado[] = [];
+
+  // A fila configurável é isolada do commit do movimento: se a infraestrutura
+  // da fila estiver indisponível, o card permanece movido e o erro fica visível
+  // nos logs operacionais, sem derrubar a ação do usuário.
+  try {
+    await enfileirarAutomacoesMovimentoBpm({
+      cardId,
+      pipelineId: resultadoMovimento.pipelineId,
+      etapaOrigemId: resultadoMovimento.etapaOrigemId,
+      etapaDestinoId,
+      eventoId: resultadoMovimento.eventoId,
+    });
+  } catch (error) {
+    console.error("[enfileirarAutomacoesMovimentoBpm]", error);
+  }
 
   // Automações D-009/D-035 rodam fora da transação do movimento: uma falha nelas
   // não pode reverter nem derrubar a movimentação do card pai já commitada acima.
@@ -1689,6 +1796,56 @@ export async function ObterHistoricoServicoEmpresa(cardId: string, servico: stri
 }
 
 /**
+ * Lista os demais cards da mesma empresa dentro de um pipeline específico —
+ * usado nas tabs de "outros pipelines" do card aberto (RM-2026-A4294C).
+ */
+export async function ListarCardsEmpresaPorPipeline(cardId: string, pipelineId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+    const userId = Number(session.user.id);
+
+    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+
+    const card = await db.bpmCard.findUnique({
+      where: { id: cardId },
+      select: { empresaId: true },
+    });
+    if (!card) return { success: false, error: "Card não encontrado", data: [] };
+
+    const outrosCardsTodos = await db.bpmCard.findMany({
+      where: { empresaId: card.empresaId, pipelineId, id: { not: cardId } },
+      select: {
+        id: true,
+        servico: true,
+        status: true,
+        createdAt: true,
+        etapa: { select: { nome: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const acessos = await Promise.all(
+      outrosCardsTodos.map(async (outroCard) => {
+        try {
+          await exigirAcessoBpmCard(outroCard.id, userId, session.user.role ?? null, "visualizar");
+          return outroCard;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const data = acessos.filter((outroCard): outroCard is (typeof outrosCardsTodos)[number] => Boolean(outroCard));
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("[ListarCardsEmpresaPorPipeline]", error);
+    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao buscar cards do pipeline";
+    return { success: false, error: msg, data: [] };
+  }
+}
+
+/**
  * Exclui um card do BPM (hard delete) — todos os filhos são removidos em cascade
  * pelo schema Prisma (BpmCardCampoValor, BpmCardMembro, BpmTarefa, BpmCardAnexo,
  * BpmCardHistorico, BpmInteracaoCard, BpmChecklistFollowUp, BpmCardVinculo).
@@ -1719,6 +1876,15 @@ export async function ExcluirCardBpm(cardId: string) {
 
     // Hard delete — cascades no schema cuidam dos filhos
     await db.$transaction(async (tx) => {
+      // Revalida a permissão dentro da mesma transação para que uma mudança
+      // concorrente na visibilidade da etapa não abra uma janela TOCTOU.
+      await exigirAcessoBpmCard(
+        cardId,
+        userId,
+        userRole,
+        "excluirCard",
+        tx,
+      );
       await tx.bpmCard.delete({ where: { id: cardId } });
     });
 

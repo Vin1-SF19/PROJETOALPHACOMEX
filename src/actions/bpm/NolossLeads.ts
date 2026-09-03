@@ -7,6 +7,7 @@ import {
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
 async function obterPipelineRevisaoRadar() {
   return db.bpmPipeline.findFirst({
@@ -30,11 +31,25 @@ export async function PromoverNolossLead(dados: unknown) {
 
     await exigirAcessoBpmPipeline(pipeline.id, userId);
 
-    const etapaDestino = await db.bpmEtapa.findFirst({
-      where: { id: etapaDestinoId, pipelineId: pipeline.id, ativo: true },
-      select: { id: true },
-    });
+    const [etapaDestino, usuarioAtual] = await Promise.all([
+      db.bpmEtapa.findFirst({
+        where: { id: etapaDestinoId, pipelineId: pipeline.id, ativo: true },
+        select: {
+          id: true,
+          visibilidades: {
+            select: { perfil: true, podeVer: true, podeAgir: true },
+          },
+        },
+      }),
+      db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
+    ]);
     if (!etapaDestino) return { success: false, error: "Etapa de destino inválida" };
+    if (!resolverVisibilidadeEtapa(
+      usuarioAtual?.role,
+      etapaDestino.visibilidades,
+    ).podeAgir) {
+      return { success: false, error: "Seu perfil não pode agir na etapa de destino." };
+    }
 
     if (!(await usuarioElegivelResponsavelBpm(pipeline.id, responsavelId))) {
       return { success: false, error: "Responsável inválido para este pipeline." };
@@ -49,6 +64,24 @@ export async function PromoverNolossLead(dados: unknown) {
     }
 
     const resultado = await db.$transaction(async (tx) => {
+      const [destinoAtual, perfilAtual] = await Promise.all([
+        tx.bpmEtapa.findFirst({
+          where: { id: etapaDestinoId, pipelineId: pipeline.id, ativo: true },
+          select: {
+            visibilidades: {
+              select: { perfil: true, podeVer: true, podeAgir: true },
+            },
+          },
+        }),
+        tx.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
+      ]);
+      if (!destinoAtual || !resolverVisibilidadeEtapa(
+        perfilAtual?.role,
+        destinoAtual.visibilidades,
+      ).podeAgir) {
+        throw new Error("VISIBILIDADE_ETAPA_NEGADA");
+      }
+
       // CAS: garante que nenhuma outra promoção concorrente já consumiu este lead.
       const reservado = await tx.nolossLead.updateMany({
         where: { id: nolossLeadId, status: "pending" },
@@ -105,7 +138,9 @@ export async function PromoverNolossLead(dados: unknown) {
     console.error("[PromoverNolossLead]", error);
     const msg = error instanceof Error && error.message === "Não autorizado"
       ? "Não autorizado"
-      : "Erro ao promover lead";
+      : error instanceof Error && error.message === "VISIBILIDADE_ETAPA_NEGADA"
+        ? "Seu perfil não pode agir na etapa de destino."
+        : "Erro ao promover lead";
     return { success: false, error: msg };
   }
 }

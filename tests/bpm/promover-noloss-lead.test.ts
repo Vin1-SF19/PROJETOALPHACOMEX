@@ -8,6 +8,7 @@ const notificarPipelineBpmMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   bpmPipeline: { findFirst: vi.fn() },
   bpmEtapa: { findFirst: vi.fn() },
+  usuarios: { findUnique: vi.fn() },
   nolossLead: { findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
   cliente: { create: vi.fn() },
   bpmCard: { create: vi.fn() },
@@ -40,7 +41,8 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
     exigirAcessoBpmPipelineMock.mockResolvedValue(undefined);
     usuarioElegivelResponsavelBpmMock.mockResolvedValue(true);
     prismaMock.bpmPipeline.findFirst.mockResolvedValue({ id: PIPELINE_ID });
-    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_ID });
+    prismaMock.bpmEtapa.findFirst.mockResolvedValue({ id: ETAPA_ID, visibilidades: [] });
+    prismaMock.usuarios.findUnique.mockResolvedValue({ role: "COMERCIAL" });
     mockTransacaoFeliz();
   });
 
@@ -167,6 +169,25 @@ describe("PromoverNolossLead — cria Cliente+BpmCard a partir do lead do NoLoss
     });
 
     expect(resultado).toEqual({ success: false, error: "Etapa de destino inválida" });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejeita promoção quando o perfil não pode agir na etapa de destino", async () => {
+    prismaMock.bpmEtapa.findFirst.mockResolvedValue({
+      id: ETAPA_ID,
+      visibilidades: [{ perfil: "COMERCIAL", podeVer: true, podeAgir: false }],
+    });
+
+    const resultado = await PromoverNolossLead({
+      nolossLeadId: NOLOSS_LEAD_ID,
+      etapaDestinoId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "Seu perfil não pode agir na etapa de destino.",
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 

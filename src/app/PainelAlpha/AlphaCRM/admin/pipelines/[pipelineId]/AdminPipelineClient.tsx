@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { CriarEtapaBpm, AtualizarEtapaBpm, ReordenarEtapasBpm } from "@/actions/bpm/Etapas";
 import { CriarCampoBpm, AtualizarCampoBpm, ExcluirCampoBpm } from "@/actions/bpm/Campos";
 import type { TemaAlpha } from "@/lib/temas";
 import { FINANCIAL_PIPELINE_NAME, hasConfiguredFinancialPipeline } from "@/lib/bpm/pipeline-financeiro";
+import { agruparCamposPorColuna } from "@/lib/bpm/campos-admin";
 import { ConfigurarEtapasFinanceiroButton } from "./ConfigurarEtapasFinanceiroButton";
+import { VisibilidadeEtapasSection } from "./VisibilidadeEtapasSection";
 
 interface EtapaBpm {
   id: string;
@@ -66,6 +68,10 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
   const [editCampoObrigatorio, setEditCampoObrigatorio] = useState(false);
   const [editCampoOpcoes, setEditCampoOpcoes] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const gruposCampos = useMemo(
+    () => agruparCamposPorColuna(campos, etapas),
+    [campos, etapas],
+  );
 
   async function handleCriarEtapa() {
     if (!novaEtapaNome.trim()) return;
@@ -301,99 +307,122 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
         </div>
       </section>
 
+      <VisibilidadeEtapasSection
+        pipelineId={pipeline.id}
+        etapas={etapas}
+        accent={accent}
+      />
+
       {/* Campos personalizados */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-white uppercase tracking-wide">Campos Personalizados</h2>
-        <div className="space-y-2">
-          {campos.map((campo) => {
-            const editando = editandoCampoId === campo.id;
-            return (
-              <div key={campo.id} className="bg-slate-800/60 border border-white/5 rounded-xl">
-                <div className="flex items-center gap-3 px-3 py-2">
-                  <span className="flex-1 text-sm text-white">{campo.nome}</span>
-                  <span className="text-xs text-slate-500">{campo.tipo}</span>
-                  <span className="text-xs text-slate-500">
-                    {etapas.find((e) => e.id === campo.etapaId)?.nome || "Todas as etapas"}
-                  </span>
-                  <label className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <input
-                      type="checkbox"
-                      disabled={editando}
-                      checked={campo.obrigatorio}
-                      onChange={(e) => handleToggleObrigatorio(campo.id, e.target.checked)}
-                    />
-                    Obrigatório
-                  </label>
-                  <button
-                    onClick={() => (editando ? cancelarEdicao() : abrirEditor(campo))}
-                    className="p-1.5 rounded text-slate-400 hover:text-white"
-                    aria-label={editando ? "Cancelar edição do campo" : `Editar campo ${campo.nome}`}
-                    title={editando ? "Cancelar edição" : "Editar campo"}
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    onClick={() => void excluirCampo(campo.id, campo.nome)}
-                    disabled={editando}
-                    className="p-1.5 rounded text-slate-400 hover:text-rose-300 disabled:opacity-30"
-                    aria-label={`Excluir campo ${campo.nome}`}
-                    title="Excluir campo"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+        <div className="space-y-4">
+          {gruposCampos.map((grupo) => (
+            <div key={grupo.id} className="overflow-hidden rounded-2xl border border-white/5 bg-slate-900/35">
+              <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
+                <div>
+                  <h3 className="text-sm font-bold text-white">{grupo.nome}</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">Campos configurados nesta coluna</p>
                 </div>
-
-                {editando && (
-                  <div className="border-t border-white/10 px-3 py-3 space-y-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <label className="space-y-1 text-xs text-slate-400">
-                        <span>Nome</span>
-                        <input className={inputCls + " w-full"} value={editCampoNome} onChange={(e) => setEditCampoNome(e.target.value)} />
-                      </label>
-                      <label className="space-y-1 text-xs text-slate-400">
-                        <span>Tipo</span>
-                        <select className={inputCls + " w-full"} value={editCampoTipo} onChange={(e) => setEditCampoTipo(e.target.value)}>
-                          {TIPOS_CAMPO.map((t) => (
-                            <option key={t.value} value={t.value}>{t.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="space-y-1 text-xs text-slate-400">
-                        <span>Etapa</span>
-                        <select className={inputCls + " w-full"} value={editCampoEtapaId} onChange={(e) => setEditCampoEtapaId(e.target.value)}>
-                          <option value="">Todas as etapas</option>
-                          {etapas.map((e) => (
-                            <option key={e.id} value={e.id}>{e.nome}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="space-y-1 text-xs text-slate-400 flex items-end">
-                        <span />
-                        <span className="flex items-center gap-1.5 text-slate-400 pb-2">
-                          <input type="checkbox" checked={editCampoObrigatorio} onChange={(e) => setEditCampoObrigatorio(e.target.checked)} />
-                          Obrigatório
-                        </span>
-                      </label>
-                      {TIPOS_COM_OPICOES.has(editCampoTipo) && (
-                        <label className="sm:col-span-2 space-y-1 text-xs text-slate-400">
-                          <span>Opções (uma por linha)</span>
-                          <textarea className={inputCls + " w-full min-h-[72px] font-mono"} value={editCampoOpcoes} onChange={(e) => setEditCampoOpcoes(e.target.value)} />
-                        </label>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => void salvarEdicao(campo.id)} className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white" style={{ background: `rgba(${accent},0.85)` }}>
-                        Salvar
-                      </button>
-                      <button onClick={cancelarEdicao} className="px-3 py-1.5 rounded-lg text-sm text-slate-300 hover:text-white">
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
+                  {grupo.campos.length} {grupo.campos.length === 1 ? "campo" : "campos"}
+                </span>
               </div>
-            );
-          })}
+
+              {grupo.campos.length === 0 ? (
+                <p className="px-4 py-5 text-sm text-slate-500">Nenhum campo configurado nesta coluna</p>
+              ) : (
+                <div className="divide-y divide-white/5">
+                  {grupo.campos.map((campo) => {
+                    const editando = editandoCampoId === campo.id;
+                    return (
+                      <div key={campo.id} className="bg-slate-800/40">
+                        <div className="flex items-center gap-3 px-3 py-2">
+                          <span className="flex-1 text-sm text-white">{campo.nome}</span>
+                          <span className="text-xs text-slate-500">{campo.tipo}</span>
+                          <label className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <input
+                              type="checkbox"
+                              disabled={editando}
+                              checked={campo.obrigatorio}
+                              onChange={(e) => handleToggleObrigatorio(campo.id, e.target.checked)}
+                            />
+                            Obrigatório
+                          </label>
+                          <button
+                            onClick={() => (editando ? cancelarEdicao() : abrirEditor(campo))}
+                            className="p-1.5 rounded text-slate-400 hover:text-white"
+                            aria-label={editando ? "Cancelar edição do campo" : `Editar campo ${campo.nome}`}
+                            title={editando ? "Cancelar edição" : "Editar campo"}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => void excluirCampo(campo.id, campo.nome)}
+                            disabled={editando}
+                            className="p-1.5 rounded text-slate-400 hover:text-rose-300 disabled:opacity-30"
+                            aria-label={`Excluir campo ${campo.nome}`}
+                            title="Excluir campo"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+
+                        {editando && (
+                          <div className="border-t border-white/10 px-3 py-3 space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <label className="space-y-1 text-xs text-slate-400">
+                                <span>Nome</span>
+                                <input className={inputCls + " w-full"} value={editCampoNome} onChange={(e) => setEditCampoNome(e.target.value)} />
+                              </label>
+                              <label className="space-y-1 text-xs text-slate-400">
+                                <span>Tipo</span>
+                                <select className={inputCls + " w-full"} value={editCampoTipo} onChange={(e) => setEditCampoTipo(e.target.value)}>
+                                  {TIPOS_CAMPO.map((t) => (
+                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="space-y-1 text-xs text-slate-400">
+                                <span>Etapa</span>
+                                <select className={inputCls + " w-full"} value={editCampoEtapaId} onChange={(e) => setEditCampoEtapaId(e.target.value)}>
+                                  <option value="">Todas as etapas</option>
+                                  {etapas.map((e) => (
+                                    <option key={e.id} value={e.id}>{e.nome}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="space-y-1 text-xs text-slate-400 flex items-end">
+                                <span />
+                                <span className="flex items-center gap-1.5 text-slate-400 pb-2">
+                                  <input type="checkbox" checked={editCampoObrigatorio} onChange={(e) => setEditCampoObrigatorio(e.target.checked)} />
+                                  Obrigatório
+                                </span>
+                              </label>
+                              {TIPOS_COM_OPICOES.has(editCampoTipo) && (
+                                <label className="sm:col-span-2 space-y-1 text-xs text-slate-400">
+                                  <span>Opções (uma por linha)</span>
+                                  <textarea className={inputCls + " w-full min-h-[72px] font-mono"} value={editCampoOpcoes} onChange={(e) => setEditCampoOpcoes(e.target.value)} />
+                                </label>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => void salvarEdicao(campo.id)} className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white" style={{ background: `rgba(${accent},0.85)` }}>
+                                Salvar
+                              </button>
+                              <button onClick={cancelarEdicao} className="px-3 py-1.5 rounded-lg text-sm text-slate-300 hover:text-white">
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <input

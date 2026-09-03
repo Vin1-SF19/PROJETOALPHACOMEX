@@ -3,6 +3,40 @@
 > Mantido por: Nova (frontend) e Scribe (cartógrafo)
 > Consultar SEMPRE antes de criar um novo componente.
 
+### AutomacoesWorkspace + AutomacaoFormDialog (Alpha CRM/BPM)
+
+**Arquivos:** `src/components/bpm/automacoes/AutomacoesWorkspace.tsx` e `AutomacaoFormDialog.tsx`
+**Tipo:** Client Components
+**Uso:** rota administrativa `/PainelAlpha/AlphaCRM/automacoes`.
+
+**Notas:** o workspace agrupa todos os pipelines e colunas, permite busca, toggle, edição, exclusão confirmada e duplicação entre colunas. O diálogo reutilizável cria/edita e alterna parâmetros de e-mail, contrato ou ficha, validando o mesmo schema Zod no cliente e no servidor. A autorização real permanece no servidor; `adminOnly` no menu é apenas gate visual.
+
+**Última atualização:** 2026-09-02 (RM-2026-35A772)
+
+---
+
+### PainelHistoricoPipeline (Alpha CRM — card aberto, tabs de "outro pipeline")
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistoricoPipeline.tsx`
+**Tipo:** Client Component
+**Props:** `cardId: string`, `pipelineId: string`, `pipelineNome: string`, `onAbrirCard: (cardId: string) => void`
+**Uso:** renderizado por `CardAbertoLayout.tsx` como `TabsContent` de cada tab de "outro pipeline" (não o pipeline atual do card).
+
+**Notas:** chama `ListarCardsEmpresaPorPipeline(cardId, pipelineId)` (`src/actions/bpm/Cards.ts`) para listar outros cards da mesma empresa naquele pipeline. Estados tratados: loading (`Loader2`), error (mensagem), empty ("Esta empresa não possui outros cards em {pipeline}"), success (lista, clique reabre o card via `onAbrirCard`). Criado para resolver a lacuna de RM-2026-A4294C: `BpmCard` pertence a um único `pipelineId`, então não existe "o mesmo card" em outro pipeline — este painel evita erro/tela vazia listando o contexto real disponível (outros cards da empresa naquele pipeline).
+
+**Última atualização:** 2026-09-02 por Scribe (RM-2026-A4294C)
+
+### ListarCardsEmpresaPorPipeline (Server Action — Alpha CRM)
+
+**Arquivo:** `src/actions/bpm/Cards.ts`
+**Tipo:** Server Action
+**Assinatura:** `ListarCardsEmpresaPorPipeline(cardId: string, pipelineId: string)`
+**Uso:** consumida por `PainelHistoricoPipeline.tsx`.
+
+**Notas:** `auth()` + `exigirAcessoBpmCard` antes de qualquer leitura; retorna `BpmCard[]` da mesma empresa do card de origem, filtrados pelo `pipelineId` informado, excluindo o próprio `cardId`. Aditiva — não altera assinatura de nenhuma action existente.
+
+**Última atualização:** 2026-09-02 por Scribe (RM-2026-A4294C)
+
 ---
 
 ## Template de entrada
@@ -21,6 +55,15 @@
 ## Componentes
 
 <!-- Adicionar aqui conforme o projeto cresce -->
+
+### CalendarioCheckIn (Alpha Leads)
+
+**Arquivos:** `src/app/PainelAlpha/ControleLeads/CalendarioCheckIn.tsx` e `CalendarioCheckInClient.tsx`
+**Tipo:** Server Component de carga inicial + Client Component interativo
+**Uso:** renderizado na sidebar de `Lançamentos.tsx`, acessível pela aba "Lançamento" de `/PainelAlpha/ControleLeads`.
+**Notas:** exibe o mês corrente, permite registrar check-in em hoje ou dias passados e marca dias confirmados com indicador visual. TI/Admin/CEO/Lider Comercial recebem um seletor para auditar outro closer em modo somente leitura; a opção padrão "Meu calendário" sempre consulta o ID do usuário logado. A carga inicial ocorre no servidor e é passada como slot pela página, sem fetch em `useEffect`; trocas de closer e retry são ações explícitas no client. Consome `RegistrarCheckLeadsDia`, `ListarChecksCalendario` e `ListarUsuariosParaCheckIn`, mantendo a autorização real nas Server Actions.
+
+**Última atualização:** 2026-09-03 por Nova (RM-2026-DA0B7D)
 
 ### Botão de exclusão de card — `CardAbertoLayout.tsx` (RM-2026-C99F86, 2026-09-01)
 

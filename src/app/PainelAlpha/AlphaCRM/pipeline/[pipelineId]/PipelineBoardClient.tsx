@@ -6,7 +6,7 @@ import {
 } from "@/lib/bpm/proximo-contato";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -22,7 +22,8 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote } from "lucide-react";
+import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote, Users } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
 import {
@@ -91,6 +92,7 @@ interface CardBpm {
   metaLigacoesDia?: number;
   diasUteisDecorridos?: number;
   diaCiclo?: number;
+  podeAgirEtapa: boolean;
 }
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
@@ -420,7 +422,7 @@ function KanbanColumn({
               etapaNome={etapa.nome}
               accent={accent}
               novosLeads={novosLeads}
-              arrastoDesabilitado={arrastoDesabilitado}
+              arrastoDesabilitado={arrastoDesabilitado || !c.podeAgirEtapa}
               onAbrir={onAbrirCard}
               index={i}
             />
@@ -489,6 +491,7 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   const accent = visual.accent;
   const router = useRouter();
   const [cards, setCards] = useState<CardBpm[]>(cardsIniciais);
+  const [responsavelFiltro, setResponsavelFiltro] = useState<string | null>(null);
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
   const [nolossLeadAberto, setNolossLeadAberto] = useState<CardBpm | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -518,7 +521,29 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const getByEtapa = (etapaId: string) => cards.filter((c) => c.etapaId === etapaId);
+  const responsaveisDisponiveis = useMemo(() => {
+    const mapa = new Map<number, string>();
+    for (const card of cards) {
+      if (card.responsavel.id > 0) {
+        mapa.set(card.responsavel.id, card.responsavel.nome);
+      }
+      for (const m of card.membros) {
+        mapa.set(m.usuario.id, m.usuario.nome);
+      }
+    }
+    return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) =>
+      a.nome.localeCompare(b.nome)
+    );
+  }, [cards]);
+
+  const getByEtapa = (etapaId: string) =>
+    cards.filter(
+      (c) =>
+        c.etapaId === etapaId &&
+        (!responsavelFiltro ||
+          String(c.responsavel.id) === responsavelFiltro ||
+          c.membros.some((m) => String(m.usuario.id) === responsavelFiltro))
+    );
 
   const recarregarCards = useCallback(async (opcoes: OpcoesRecarregarCards = {}) => {
     const requisicao = ++ultimaRequisicaoRef.current;
@@ -759,17 +784,40 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between gap-3 p-6 pb-4">
         <h1 className="min-w-0 truncate text-xl font-black text-white">{pipeline.nome}</h1>
-        <button
-          type="button"
-          onClick={() => void atualizarPipeline()}
-          disabled={atualizandoManual || movimentoPendente}
-          aria-label="Atualizar pipeline"
-          title="Atualizar pipeline"
-          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-slate-200 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-wait disabled:opacity-60"
-        >
-          <RefreshCw className={`h-4 w-4 ${atualizandoManual ? "animate-spin" : ""}`} aria-hidden="true" />
-          <span className="hidden sm:inline">Atualizar</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <Select
+            value={responsavelFiltro ?? "todos"}
+            onValueChange={(v) => setResponsavelFiltro(v === "todos" ? null : v)}
+          >
+            <SelectTrigger
+              aria-label="Filtrar cards por responsável"
+              className="w-[180px] shrink-0 border-white/10 bg-white/[0.04] text-xs text-slate-200"
+            >
+              <Users className="h-4 w-4" aria-hidden="true" />
+              <SelectValue placeholder="Todos os responsáveis" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os responsáveis</SelectItem>
+              {responsaveisDisponiveis.map((r) => (
+                <SelectItem key={r.id} value={String(r.id)} aria-label={r.nome}>
+                  {r.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <button
+            type="button"
+            onClick={() => void atualizarPipeline()}
+            disabled={atualizandoManual || movimentoPendente}
+            aria-label="Atualizar pipeline"
+            title="Atualizar pipeline"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-slate-200 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${atualizandoManual ? "animate-spin" : ""}`} aria-hidden="true" />
+            <span className="hidden sm:inline">Atualizar</span>
+          </button>
+        </div>
       </div>
 
       {erro && (

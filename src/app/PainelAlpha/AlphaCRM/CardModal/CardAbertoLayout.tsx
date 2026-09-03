@@ -19,11 +19,10 @@ import { toast } from "sonner";
 import { ExcluirCardBpm } from "@/actions/bpm/Cards";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
-import { getServicosComerciais } from "@/actions/ContratoComercial";
-import { SERVICOS_COMERCIAIS_PADRAO } from "@/lib/comercial/servicos";
+import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
 import { isAdminRole } from "@/lib/roles";
 import PainelHistorico from "./PainelHistorico";
-import PainelHistoricoServico from "./PainelHistoricoServico";
+import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
 import PainelProximaEtapa from "./PainelProximaEtapa";
 import {
   DadosEmpresaDrawer,
@@ -62,7 +61,7 @@ export interface CardAbertoLayoutProps {
  *
  * Estrutura:
  * - Handle visual do bottom-sheet
- * - Header (empresa, CNPJ, serviço, tabs de serviço, ações)
+ * - Header (empresa, CNPJ, serviço, tabs de pipeline, ações)
  * - Grid de 3 painéis:
  *   - Esquerda: PainelHistorico (ou DadosEmpresaDrawer)
  *   - Centro: children (formulário da etapa ativa)
@@ -86,30 +85,35 @@ export function CardAbertoLayout({
   estadoFollowUpAtual,
   children,
 }: CardAbertoLayoutProps) {
-  const [abaAtiva, setAbaAtiva] = useState<string>("card");
-  const [servicos, setServicos] = useState<string[]>([...SERVICOS_COMERCIAIS_PADRAO]);
+  const [abaAtiva, setAbaAtiva] = useState<string>(card.pipeline.id);
+  const [outrosPipelines, setOutrosPipelines] = useState<{ id: string; nome: string }[]>([]);
   const [excluindo, setExcluindo] = useState(false);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(card.id);
   const { openPerfilEmpresa } = usePerfilEmpresa();
 
   useEffect(() => {
     let cancelado = false;
-    getServicosComerciais().then((res) => {
+    ListarPipelinesBpm().then((res) => {
       if (cancelado) return;
-      const fromDb = res.success ? res.servicos.map((s) => s.nome) : [];
-      setServicos([...new Set([...SERVICOS_COMERCIAIS_PADRAO, ...fromDb])]);
+      if (res.success) {
+        setOutrosPipelines(res.data.filter((p) => p.id !== card.pipelineId).map((p) => ({ id: p.id, nome: p.nome })));
+      }
     });
     return () => { cancelado = true; };
-  }, []);
+  }, [card.pipelineId]);
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
-  const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo);
+  const podeAgirNaEtapa = card.permissaoEtapa?.podeAgir ?? true;
+  const podeTrabalharNoCard = isAdminRole(currentUserRole)
+    || (Boolean(meuVinculo) && podeAgirNaEtapa);
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
   const podeGerenciarMembros = isAdminRole(currentUserRole)
-    || meuVinculo?.role === "RESPONSAVEL"
-    || meuVinculo?.role === "ADMINISTRADOR";
+    || (podeAgirNaEtapa && (
+      meuVinculo?.role === "RESPONSAVEL"
+      || meuVinculo?.role === "ADMINISTRADOR"
+    ));
   const etapaAtual = etapas.find((e) => e.id === card.etapa.id) ?? null;
 
   const transicoesDaEtapaAtual = card.etapa.transicoesOrigem ?? [];
@@ -259,26 +263,26 @@ export function CardAbertoLayout({
           </div>
         </div>
 
-        {/* Tabs de serviço */}
+        {/* Tabs de pipeline (1ª: pipeline atual do card; demais: outros pipelines do sistema) */}
         <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="mt-4">
           <TabsList className="flex-wrap h-auto bg-transparent border-none p-0 gap-2 justify-start">
             <TabsTrigger
-              value="card"
+              value={card.pipeline.id}
               className="rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm transition-colors border data-[state=active]:shadow-none"
               style={
-                abaAtiva === "card"
+                abaAtiva === card.pipeline.id
                   ? { background: `rgba(${accent},0.18)`, color: `rgb(${accent})`, borderColor: `rgba(${accent},0.35)` }
                   : { background: "rgba(255,255,255,0.03)", color: "#64748b", borderColor: "rgba(255,255,255,0.08)" }
               }
             >
-              Este card
+              {card.pipeline.nome}
             </TabsTrigger>
-            {servicos.map((servico) => {
-              const ativo = abaAtiva === servico;
+            {outrosPipelines.map((pipeline) => {
+              const ativo = abaAtiva === pipeline.id;
               return (
                 <TabsTrigger
-                  key={servico}
-                  value={servico}
+                  key={pipeline.id}
+                  value={pipeline.id}
                   className="rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-sm transition-colors border data-[state=active]:shadow-none"
                   style={
                     ativo
@@ -286,7 +290,7 @@ export function CardAbertoLayout({
                       : { background: "rgba(255,255,255,0.03)", color: "#64748b", borderColor: "rgba(255,255,255,0.08)" }
                   }
                 >
-                  {servico}
+                  {pipeline.nome}
                 </TabsTrigger>
               );
             })}
@@ -307,7 +311,7 @@ export function CardAbertoLayout({
           />
         ) : (
           <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="min-h-0 lg:h-full lg:overflow-hidden">
-            <TabsContent value="card" className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
+            <TabsContent value={card.pipeline.id} className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
               <PainelHistorico
                 card={card}
                 accent={accent}
@@ -319,11 +323,12 @@ export function CardAbertoLayout({
                 anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
               />
             </TabsContent>
-            {servicos.map((servico) => (
-              <TabsContent key={servico} value={servico} className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
-                <PainelHistoricoServico
+            {outrosPipelines.map((pipeline) => (
+              <TabsContent key={pipeline.id} value={pipeline.id} className="min-h-0 m-0 lg:h-full lg:overflow-hidden">
+                <PainelHistoricoPipeline
                   cardId={card.id}
-                  servico={servico}
+                  pipelineId={pipeline.id}
+                  pipelineNome={pipeline.nome}
                   accent={accent}
                   onAbrirCard={onAbrirCard}
                 />

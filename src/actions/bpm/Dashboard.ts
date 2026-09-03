@@ -8,6 +8,7 @@ import {
   exigirAcessoModuloBpm,
 } from "@/lib/bpm/ownership";
 import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
+import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 
 /**
  * Agregação central do módulo BPM (Fase 3): métricas por pipeline, tarefas
@@ -22,9 +23,32 @@ export async function ObterDashboardBpm() {
     await exigirAcessoModuloBpm(userId);
     const admin = await checarAcessoConfigPipeline(userId, "visualizarPipeline");
     const diretoria = await checarAcessoDiretoriaBpm(userId);
+    const [usuarioAtual, etapas] = await Promise.all([
+      db.usuarios.findUnique({ where: { id: userId }, select: { role: true } }),
+      db.bpmEtapa.findMany({
+        where: { pipeline: { ativo: true } },
+        select: {
+          id: true,
+          visibilidades: {
+            select: { perfil: true, podeVer: true, podeAgir: true },
+          },
+        },
+      }),
+    ]);
+    const etapaIdsVisiveis = etapas
+      .filter((etapa) => resolverVisibilidadeEtapa(
+        usuarioAtual?.role,
+        etapa.visibilidades,
+      ).podeVer)
+      .map((etapa) => etapa.id);
+    const filtroEtapasVisiveis = { etapaId: { in: etapaIdsVisiveis } };
     const filtroCardBoasVindas = diretoria
       ? {}
       : { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } };
+    const filtroCardVisivel = {
+      ...filtroCardBoasVindas,
+      ...filtroEtapasVisiveis,
+    };
 
     const [pipelines, contagemPorPipelineStatus] = await Promise.all([
       db.bpmPipeline.findMany({
@@ -37,7 +61,7 @@ export async function ObterDashboardBpm() {
       }),
       db.bpmCard.groupBy({
         by: ["pipelineId", "status"],
-        where: filtroCardBoasVindas,
+        where: filtroCardVisivel,
         _count: { _all: true },
       }),
     ]);
@@ -46,7 +70,7 @@ export async function ObterDashboardBpm() {
       ? null
       : (
           await db.bpmCardMembro.findMany({
-            where: { userId, card: filtroCardBoasVindas },
+            where: { userId, card: filtroCardVisivel },
             select: { cardId: true },
           })
         ).map((m) => m.cardId);
@@ -62,7 +86,7 @@ export async function ObterDashboardBpm() {
       db.bpmTarefa.findMany({
         where: {
           status: "PENDENTE",
-          ...(diretoria ? {} : { card: filtroCardBoasVindas }),
+          card: filtroCardVisivel,
           ...(admin ? {} : { cardId: { in: cardIdsDoUsuario ?? [] } }),
         },
         select: {
@@ -86,13 +110,13 @@ export async function ObterDashboardBpm() {
         where: {
           status: "PENDENTE",
           prazo: { lt: agora },
-          ...(diretoria ? {} : { card: filtroCardBoasVindas }),
+          card: filtroCardVisivel,
           ...(admin ? {} : { cardId: { in: cardIdsDoUsuario ?? [] } }),
         },
       }),
       db.bpmCardHistorico.findMany({
         where: admin
-          ? { card: { pipelineId: { in: pipelineIdsVisiveis }, ...filtroCardBoasVindas } }
+          ? { card: { pipelineId: { in: pipelineIdsVisiveis }, ...filtroCardVisivel } }
           : { cardId: { in: cardIdsDoUsuario ?? [] } },
         select: {
           id: true,
@@ -115,7 +139,7 @@ export async function ObterDashboardBpm() {
           status: "CONCLUIDO",
           concluidoEm: { gte: new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000) },
           ...(admin
-            ? { pipelineId: { in: pipelineIdsVisiveis }, ...filtroCardBoasVindas }
+            ? { pipelineId: { in: pipelineIdsVisiveis }, ...filtroCardVisivel }
             : { id: { in: cardIdsDoUsuario ?? [] } }),
         },
       }),
@@ -128,7 +152,7 @@ export async function ObterDashboardBpm() {
           where: {
             id: { in: cardIdsDoUsuario ?? [] },
             pipelineId: { in: pipelineIdsVisiveis },
-            ...filtroCardBoasVindas,
+            ...filtroCardVisivel,
           },
           _count: { _all: true },
         });
