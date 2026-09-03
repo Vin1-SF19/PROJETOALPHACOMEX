@@ -7,6 +7,13 @@ import { z } from "zod";
 import { auth } from "../../auth";
 import { podeGerenciarMetas } from "@/lib/metas-permissoes";
 
+const CLOSERS_VISIVEIS_ALPHA_LEADS = [
+  "GISELLE GLEYCE SOUZA SANTOS",
+  "SHEILA ANGELICA BAHRI",
+  "NATHALIA FERNANDA FORTES",
+  "DOUGLAS WESLEI RIBEIRO MACEDO",
+] as const;
+
 function contagem(valor: unknown) {
   const numero = Number(valor);
   return Number.isFinite(numero) ? Math.max(0, Math.trunc(numero)) : 0;
@@ -46,13 +53,20 @@ async function exigirAcessoEquipe() {
 export async function listarClosersAlphaLeads() {
   await exigirAcessoEquipe();
 
-  return db.usuarios.findMany({
+  const closers = await db.usuarios.findMany({
     where: {
       status: "ATIVO",
       role: { in: ["COMERCIAL", "Lider Comercial"] },
+      nome: { in: [...CLOSERS_VISIVEIS_ALPHA_LEADS] },
     },
     select: { id: true, nome: true },
-    orderBy: { nome: "asc" },
+  });
+
+  const closerPorNome = new Map(closers.map((closer) => [closer.nome, closer]));
+
+  return CLOSERS_VISIVEIS_ALPHA_LEADS.flatMap((nome) => {
+    const closer = closerPorNome.get(nome);
+    return closer ? [closer] : [];
   });
 }
 

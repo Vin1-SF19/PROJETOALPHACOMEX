@@ -34,22 +34,35 @@ describe("visibilidade dos lançamentos por closer no Alpha Leads", () => {
     prismaMock.comercialPerformance.findMany.mockResolvedValue([]);
   });
 
-  it("lista closers ativas somente para gestores autorizados", async () => {
+  it("lista somente as quatro closers autorizadas na ordem definida para a UI", async () => {
     authMock.mockResolvedValue(SESSION_LIDER);
     prismaMock.usuarios.findMany.mockResolvedValue([
+      { id: 36, nome: "DOUGLAS WESLEI RIBEIRO MACEDO" },
       { id: 22, nome: "GISELLE GLEYCE SOUZA SANTOS" },
+      { id: 24, nome: "NATHALIA FERNANDA FORTES" },
+      { id: 16, nome: "SHEILA ANGELICA BAHRI" },
     ]);
 
     await expect(listarClosersAlphaLeads()).resolves.toEqual([
       { id: 22, nome: "GISELLE GLEYCE SOUZA SANTOS" },
+      { id: 16, nome: "SHEILA ANGELICA BAHRI" },
+      { id: 24, nome: "NATHALIA FERNANDA FORTES" },
+      { id: 36, nome: "DOUGLAS WESLEI RIBEIRO MACEDO" },
     ]);
     expect(prismaMock.usuarios.findMany).toHaveBeenCalledWith({
       where: {
         status: "ATIVO",
         role: { in: ["COMERCIAL", "Lider Comercial"] },
+        nome: {
+          in: [
+            "GISELLE GLEYCE SOUZA SANTOS",
+            "SHEILA ANGELICA BAHRI",
+            "NATHALIA FERNANDA FORTES",
+            "DOUGLAS WESLEI RIBEIRO MACEDO",
+          ],
+        },
       },
       select: { id: true, nome: true },
-      orderBy: { nome: "asc" },
     });
   });
 

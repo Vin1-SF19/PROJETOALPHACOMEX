@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import {
     BarChart3, ArrowLeft,
     ClipboardList,
+    ChevronDown,
+    UsersRound,
     Zap
 } from 'lucide-react';
 
@@ -16,6 +18,17 @@ import { useSearchParams } from 'next/navigation';
 
 // --- Tipos ---
 type Aba = 'lancamento' | 'graficos';
+
+const NOMES_CURTOS_CLOSERS: Record<string, string> = {
+    'GISELLE GLEYCE SOUZA SANTOS': 'Giselle',
+    'SHEILA ANGELICA BAHRI': 'Sheila',
+    'NATHALIA FERNANDA FORTES': 'Nathalia',
+    'DOUGLAS WESLEI RIBEIRO MACEDO': 'Douglas',
+};
+
+function nomeCurtoCloser(nome: string) {
+    return NOMES_CURTOS_CLOSERS[nome] ?? nome;
+}
 
 interface Props {
     usuario: {
@@ -45,7 +58,11 @@ export default function PaginaControle({
     const searchParams = useSearchParams();
     const canalAtual = searchParams.get('canal') || 'TRAFEGO_PAGO';
     const usuarioLogado = usuario?.nome || session?.user?.nome || "";
-    const [colaboradoraSelecionada, setColaboradoraSelecionada] = useState(usuarioLogado);
+    const closerInicial = closersAcompanhamento.some((closer) => closer.nome === usuarioLogado)
+        ? usuarioLogado
+        : closersAcompanhamento[0]?.nome ?? usuarioLogado;
+    const [colaboradoraSelecionada, setColaboradoraSelecionada] = useState(closerInicial);
+    const nomeCloserSelecionada = nomeCurtoCloser(colaboradoraSelecionada);
     const modoAuditoria = Boolean(
         colaboradoraSelecionada && colaboradoraSelecionada !== usuarioLogado,
     );
@@ -148,43 +165,72 @@ export default function PaginaControle({
             <main className="max-w-[1400px] mx-auto p-6">
 
                 {podeAcompanharEquipe && (
-                    <section className="mb-6 flex flex-col gap-3 rounded-3xl border border-indigo-500/20 bg-indigo-500/5 p-4 sm:flex-row sm:items-end sm:justify-between">
-                        <div className="min-w-0 flex-1">
-                            <label
-                                htmlFor="closer-alpha-leads"
-                                className="mb-2 block text-[10px] font-black uppercase tracking-widest text-indigo-500"
+                    <section className="mb-6 overflow-hidden rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-white via-indigo-50/70 to-violet-50 shadow-sm dark:from-slate-900 dark:via-indigo-950/30 dark:to-slate-900">
+                        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+                                    <UsersRound size={20} aria-hidden="true" />
+                                </div>
+                                <div className="min-w-0">
+                                    <label
+                                        htmlFor="closer-alpha-leads"
+                                        className="block text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400"
+                                    >
+                                        Acompanhar lançamentos da closer
+                                    </label>
+                                    <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        Selecione uma pessoa para consultar lançamentos e resultados.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                role="status"
+                                aria-live="polite"
+                                className={`w-fit shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wider ${
+                                    modoAuditoria
+                                        ? "border border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                        : "border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                }`}
                             >
-                                Acompanhar lançamentos da closer
-                            </label>
-                            <select
-                                id="closer-alpha-leads"
-                                value={colaboradoraSelecionada}
-                                onChange={(evento) => {
-                                    setResumoLateral(null);
-                                    setColaboradoraSelecionada(evento.target.value);
-                                }}
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:max-w-xl"
-                            >
-                                <option value={usuarioLogado}>Meus lançamentos — {usuarioLogado}</option>
-                                {closersAcompanhamento
-                                    .filter((closer) => closer.nome !== usuarioLogado)
-                                    .map((closer) => (
+                                {modoAuditoria ? "Consulta somente leitura" : "Edição dos meus dados"}
+                            </div>
+                        </div>
+
+                        <div className="border-t border-indigo-500/10 bg-white/65 p-5 backdrop-blur-sm dark:bg-slate-950/25">
+                            <div className="relative max-w-2xl">
+                                <div className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center">
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-sm font-black text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                                        {nomeCloserSelecionada.charAt(0).toUpperCase()}
+                                    </span>
+                                </div>
+                                <select
+                                    id="closer-alpha-leads"
+                                    value={colaboradoraSelecionada}
+                                    onChange={(evento) => {
+                                        setResumoLateral(null);
+                                        setColaboradoraSelecionada(evento.target.value);
+                                    }}
+                                    className="h-14 w-full cursor-pointer appearance-none rounded-2xl border border-slate-200 bg-white pl-16 pr-12 text-sm font-black text-slate-800 shadow-sm outline-none transition hover:border-indigo-300 hover:shadow-md focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-indigo-500/60"
+                                >
+                                    {closersAcompanhamento.length === 0 && (
+                                        <option value={usuarioLogado}>Nenhuma closer disponível</option>
+                                    )}
+                                    {closersAcompanhamento.map((closer) => (
                                         <option key={closer.id} value={closer.nome}>
-                                            {closer.nome}
+                                            {nomeCurtoCloser(closer.nome)}
                                         </option>
                                     ))}
-                            </select>
-                        </div>
-                        <div
-                            role="status"
-                            aria-live="polite"
-                            className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wider ${
-                                modoAuditoria
-                                    ? "border border-amber-500/20 bg-amber-500/10 text-amber-500"
-                                    : "border border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
-                            }`}
-                        >
-                            {modoAuditoria ? "Consulta somente leitura" : "Edição dos meus dados"}
+                                </select>
+                                <ChevronDown
+                                    size={18}
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-indigo-500"
+                                />
+                            </div>
+                            <p className="mt-2 pl-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+                                Giselle, Sheila, Nathalia e Douglas disponíveis para acompanhamento.
+                            </p>
                         </div>
                     </section>
                 )}
