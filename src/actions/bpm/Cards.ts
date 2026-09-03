@@ -18,8 +18,6 @@ import {
   usuarioElegivelResponsavelBpm,
 } from "@/lib/bpm/ownership";
 import { type CardFilhoCriado, executarAutomacaoFechamentoComercial, executarAutomacaoTarefaNotaFiscal } from "@/lib/bpm/automacoes";
-
-export type { CardFilhoCriado };
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
