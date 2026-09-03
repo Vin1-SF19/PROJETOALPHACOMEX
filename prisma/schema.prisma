@@ -152,7 +152,6 @@ model usuarios {
   bpmCardAnexosEnviados        BpmCardAnexo[]
   bpmInteracoesRegistradas     BpmInteracaoCard[]
   bpmChecklistsFollowUpCriados BpmChecklistFollowUp[]
-  bpmAutomacoesCriadas         BpmAutomacao[]
   nolossLeadsPromovidos        NolossLead[]
 
   justificativasMetaEnviadas     JustificativaMeta[]
@@ -1389,21 +1388,6 @@ model ComercialPerformance {
 
   @@unique([dataRegistro, colaboradoraId, canal, servico], name: "performance_pk")
   @@map("comercial_performance")
-}
-
-// RM-2026-DA0B7D — check-in diário de leads por closer (Alpha Leads).
-// Migration aditiva pendente de aplicação (Vault): ver
-// prisma/migrations/20260903120000_add_comercial_checkin_diario/migration.sql
-model ComercialCheckInDiario {
-  id           Int      @id @default(autoincrement())
-  usuarioId    Int
-  data         DateTime
-  confirmadoEm DateTime @default(now())
-  createdAt    DateTime @default(now())
-
-  @@unique([usuarioId, data], name: "checkin_dia_pk")
-  @@index([data])
-  @@map("comercial_checkin_diario")
 }
 
 model ClienteOperacional {
@@ -3713,7 +3697,6 @@ model BpmPipeline {
   cards              BpmCard[]
   configAuditoria    BpmPipelineConfigAuditoria[]
   checklistPerguntas BpmChecklistFollowUpPergunta[]
-  automacoes          BpmAutomacao[]
 
   @@index([ativo])
 }
@@ -3750,28 +3733,9 @@ model BpmEtapa {
   transicoesDestino  BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
   camposObrigatorios BpmCampoObrigatorioEtapa[]
   camposOcultos      BpmCampoOcultoEtapa[]
-  visibilidades      BpmEtapaVisibilidade[]
-  automacoes         BpmAutomacao[]
 
   @@index([pipelineId])
   @@index([pipelineId, ordem])
-}
-
-/// Allow-list opcional por perfil global (`usuarios.role`) para uma coluna do
-/// CRM/BPM. Sem linhas para a etapa, o acesso legado permanece inalterado.
-model BpmEtapaVisibilidade {
-  id        String   @id @default(cuid())
-  etapaId   String
-  perfil    String
-  podeVer   Boolean  @default(true)
-  podeAgir  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  etapa BpmEtapa @relation(fields: [etapaId], references: [id], onDelete: Cascade)
-
-  @@unique([etapaId, perfil])
-  @@index([etapaId])
 }
 
 model BpmCampo {
@@ -3839,7 +3803,6 @@ model BpmCard {
   anexos             BpmCardAnexo[]
   interacoes         BpmInteracaoCard[]
   checklistsFollowUp BpmChecklistFollowUp[]
-  automacaoExecucoes BpmAutomacaoExecucao[]
 
   vinculosOrigem  BpmCardVinculo[] @relation("CardOrigem")
   vinculosDestino BpmCardVinculo[] @relation("CardDestino")
@@ -3957,62 +3920,6 @@ model BpmCardHistorico {
 
   @@index([cardId])
   @@index([createdAt])
-}
-
-/// Regra configurável vinculada a uma coluna do CRM/BPM. Tipos e parâmetros
-/// permanecem String/JSON serializado para compatibilidade com SQLite/Turso;
-/// os contratos discriminados são validados por Zod antes da persistência.
-model BpmAutomacao {
-  id             String  @id @default(cuid())
-  nome           String
-  descricao      String?
-  pipelineId     String
-  etapaId        String
-  gatilhoTipo    String // ENTRAR_COLUNA | SAIR_COLUNA | TEMPO_NA_COLUNA
-  tempoMinutos   Int?
-  acaoTipo       String // ENVIAR_EMAIL | GERAR_CONTRATO | GERAR_FICHA
-  parametrosJson String  @default("{}")
-  ativa          Boolean @default(true)
-  criadoPorId    Int
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  pipeline BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  etapa    BpmEtapa    @relation(fields: [etapaId], references: [id], onDelete: Cascade)
-  criadoPor usuarios   @relation(fields: [criadoPorId], references: [id], onDelete: Restrict)
-  execucoes BpmAutomacaoExecucao[]
-
-  @@index([pipelineId, etapaId, ativa])
-  @@index([etapaId, gatilhoTipo, ativa])
-  @@index([criadoPorId])
-}
-
-/// Fila persistente e trilha de auditoria das automações. A chave composta
-/// garante no máximo uma execução da regra para o mesmo movimento/ciclo.
-model BpmAutomacaoExecucao {
-  id             String   @id @default(cuid())
-  automacaoId    String
-  cardId         String
-  eventoChave    String
-  gatilhoTipo    String
-  status         String   @default("PENDENTE") // PENDENTE | EM_EXECUCAO | SUCESSO | FALHA
-  tentativas     Int      @default(0)
-  mensagemErro   String?
-  resultadoJson  String?
-  disponivelEm   DateTime @default(now())
-  iniciadoEm     DateTime?
-  executadoEm    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  automacao BpmAutomacao @relation(fields: [automacaoId], references: [id], onDelete: Cascade)
-  card      BpmCard      @relation(fields: [cardId], references: [id], onDelete: Cascade)
-
-  @@unique([automacaoId, eventoChave])
-  @@index([status, disponivelEm])
-  @@index([automacaoId])
-  @@index([cardId])
 }
 
 model BpmPipelineConfigAuditoria {
