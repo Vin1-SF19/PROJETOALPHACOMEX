@@ -10,9 +10,53 @@ import XLSX from 'xlsx-js-style';
 type Canal = 'TRAFEGO_PAGO' | 'CALLIX' | 'INDICACAO' | 'EVENTOS' | 'CHINA';
 type Servico = 'REVISAO' | 'HABILITACAO';
 
-export default function Lancamentos({ dadosAcumulados }: any) {
+const METRICAS_VAZIAS = {
+    leads_recebidos: 0,
+    leads_desqualificados: 0,
+    no_show: 0,
+    reunioes_agendadas: 0,
+    reunioes_realizadas: 0,
+    contratos_Habilit: 0,
+    contratos_Revisao: 0,
+    HotLeadsRevisao: 0,
+    HotLeadsHabilitacao: 0,
+};
+
+const RESUMO_VAZIO = {
+    canais: Object.fromEntries(
+        ['TRAFEGO_PAGO', 'CALLIX', 'INDICACAO', 'EVENTOS', 'CHINA'].map((canal) => [
+            canal,
+            {
+                leads: 0,
+                leadsDesqualificados: 0,
+                agendadas: 0,
+                realizadas: 0,
+                noShow: 0,
+                habilitacao: 0,
+                revisao: 0,
+                HotLeadsHabilitacao: 0,
+                HotLeadsRevisao: 0,
+            },
+        ]),
+    ),
+};
+
+interface LancamentosProps {
+    dadosAcumulados: any;
+    canalAtual?: string;
+    usuario?: string;
+    colaboradoraId: string;
+    somenteLeitura: boolean;
+}
+
+export default function Lancamentos({
+    dadosAcumulados,
+    usuario,
+    colaboradoraId,
+    somenteLeitura,
+}: LancamentosProps) {
     const { data: session } = useSession();
-    const usuarioNome = session?.user?.nome;
+    const usuarioNome = colaboradoraId || usuario || session?.user?.nome || "";
     const router = useRouter();
     const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
     const [servico, setServico] = useState<Servico>('REVISAO');
@@ -20,17 +64,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
     const [canal, setCanal] = useState<Canal>((searchParams.get('canal') as Canal) || 'TRAFEGO_PAGO');
     const canalAtual = searchParams.get('canal') || 'TRAFEGO_PAGO';
     const [loading, setLoading] = useState(true);
-    const [metricas, setMetricas] = useState({
-        leads_recebidos: 0,
-        leads_desqualificados: 0,
-        no_show: 0,
-        reunioes_agendadas: 0,
-        reunioes_realizadas: 0,
-        contratos_Habilit: 0,
-        contratos_Revisao: 0,
-        HotLeadsRevisao: 0,
-        HotLeadsHabilitacao: 0
-    });
+    const [metricas, setMetricas] = useState(METRICAS_VAZIAS);
     const [resumoLateral, setResumoLateral] = useState(dadosAcumulados);
     const v = { leads: 0, agendadas: 0, realizadas: 0, noShow: 0, habilitacao: 0, revisao: 0, leadsDesqualificados: 0 };
     const mesAtualUrl = parseInt(searchParams.get('mes') || new Date().getMonth().toString());
@@ -58,53 +92,44 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
 
     useEffect(() => {
+        let cancelado = false;
         setLoading(true);
 
 
-        setMetricas({
-            leads_recebidos: 0,
-            leads_desqualificados: 0,
-            reunioes_agendadas: 0,
-            reunioes_realizadas: 0,
-            no_show: 0,
-            contratos_Habilit: 0,
-            contratos_Revisao: 0,
-            HotLeadsHabilitacao: 0,
-            HotLeadsRevisao: 0
-        });
+        setMetricas(METRICAS_VAZIAS);
 
         async function carregarNovoCanal() {
             if (usuarioNome) {
-                setLoading(true);
-
-                const dataObjeto = new Date(dataUrl + 'T12:00:00');
-
-                const diario = await getPerformanceDiaria(usuarioNome, dataObjeto, canalAtual);
-                setMetricas(diario || {
-                    leads_recebidos: 0,
-                    leads_desqualificados: 0,
-                    reunioes_agendadas: 0,
-                    reunioes_realizadas: 0,
-                    no_show: 0,
-                    contratos_Habilit: 0,
-                    contratos_Revisao: 0,
-                    HotLeadsHabilitacao: 0,
-                    HotLeadsRevisao: 0
-
-                });
-
-                const acumulado = await getPerformanceAcumulada(
-                    usuarioNome,
-                    dataObjeto.getMonth(),
-                    dataObjeto.getFullYear()
-                );
-                setResumoLateral(acumulado);
-
+                try {
+                    const dataObjeto = new Date(dataUrl + 'T12:00:00');
+                    const [diario, acumulado] = await Promise.all([
+                        getPerformanceDiaria(usuarioNome, dataObjeto, canalAtual),
+                        getPerformanceAcumulada(
+                            usuarioNome,
+                            dataObjeto.getMonth(),
+                            dataObjeto.getFullYear()
+                        ),
+                    ]);
+                    if (cancelado) return;
+                    setMetricas(diario || METRICAS_VAZIAS);
+                    setResumoLateral(acumulado || RESUMO_VAZIO);
+                } catch {
+                    if (!cancelado) {
+                        setMetricas(METRICAS_VAZIAS);
+                        setResumoLateral(RESUMO_VAZIO);
+                    }
+                } finally {
+                    if (!cancelado) setLoading(false);
+                }
+            } else if (!cancelado) {
                 setLoading(false);
             }
 
         }
-        carregarNovoCanal();
+        void carregarNovoCanal();
+        return () => {
+            cancelado = true;
+        };
     }, [canalAtual, dataUrl, mesAtualUrl, usuarioNome]);
 
 
@@ -133,6 +158,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
 
     const handleSave = async () => {
+        if (somenteLeitura) return;
         setStatus('saving');
         try {
             const payload = {
@@ -153,7 +179,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
             const response = await upsertPerformance(payload);
             if (response.success) {
                 setStatus('success');
-                const novoAcumulado = await getPerformanceAcumulada(session?.user?.nome || "SISTEMA", mesAtualUrl, anoAtualUrl);
+                const novoAcumulado = await getPerformanceAcumulada(session?.user?.nome || usuario || "", mesAtualUrl, anoAtualUrl);
                 setResumoLateral(novoAcumulado);
                 router.refresh();
                 setTimeout(() => setStatus('idle'), 2000);
@@ -166,7 +192,9 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
     const handleCanalChange = (novoCanal: Canal) => {
         setCanal(novoCanal);
-        router.push(`?canal=${novoCanal}`);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('canal', novoCanal);
+        router.push(`?${params.toString()}`, { scroll: false });
     };
 
     const handleInputChange = (field: string, value: string) => {
@@ -304,7 +332,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
                     dados={dadosMensaisTotais}
                 />
 
-                <button
+                {!somenteLeitura && <button
                     onClick={exportarRelatorioPessoal}
                     className="cursor-pointer w-full py-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-[2rem] flex items-center justify-center gap-3 transition-all group"
                 >
@@ -315,7 +343,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
                         <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Relatório Pessoal</p>
                         <p className="text-xs font-bold text-white uppercase italic">Exportar meus dados completos</p>
                     </div>
-                </button>
+                </button>}
 
             </div>
 
@@ -392,20 +420,21 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InputMetrica label="Leads Diario" value={metricas.leads_recebidos} onChange={(v: string) => handleInputChange('leads_recebidos', v)} color="blue" />
-                        <InputMetrica label="Leads Desqualificados" value={metricas.leads_desqualificados} onChange={(v: string) => handleInputChange('leads_desqualificados', v)} color="red" />
-                        <InputMetrica label="Reuniões Agendadas" value={metricas.reunioes_agendadas} onChange={(v: string) => handleInputChange('reunioes_agendadas', v)} color="purple" />
-                        <InputMetrica label="Reuniões Realizadas" value={metricas.reunioes_realizadas} onChange={(v: string) => handleInputChange('reunioes_realizadas', v)} color="indigo" />
-                        <InputMetrica label="No Show (Faltas)" value={metricas.no_show} onChange={(v: string) => handleInputChange('no_show', v)} color="orange" />
+                        <InputMetrica disabled={somenteLeitura} label="Leads Diario" value={metricas.leads_recebidos} onChange={(v: string) => handleInputChange('leads_recebidos', v)} color="blue" />
+                        <InputMetrica disabled={somenteLeitura} label="Leads Desqualificados" value={metricas.leads_desqualificados} onChange={(v: string) => handleInputChange('leads_desqualificados', v)} color="red" />
+                        <InputMetrica disabled={somenteLeitura} label="Reuniões Agendadas" value={metricas.reunioes_agendadas} onChange={(v: string) => handleInputChange('reunioes_agendadas', v)} color="purple" />
+                        <InputMetrica disabled={somenteLeitura} label="Reuniões Realizadas" value={metricas.reunioes_realizadas} onChange={(v: string) => handleInputChange('reunioes_realizadas', v)} color="indigo" />
+                        <InputMetrica disabled={somenteLeitura} label="No Show (Faltas)" value={metricas.no_show} onChange={(v: string) => handleInputChange('no_show', v)} color="orange" />
 
 
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 grid grid-cols-2 gap-4">
-                            <InputMetrica label="Venda Habilit." value={metricas.contratos_Habilit} onChange={(v: string) => handleInputChange('contratos_Habilit', v)} color="cyan" flat />
-                            <InputMetrica label="Venda Revisão" value={metricas.contratos_Revisao} onChange={(v: string) => handleInputChange('contratos_Revisao', v)} color="emerald" flat />
+                            <InputMetrica disabled={somenteLeitura} label="Venda Habilit." value={metricas.contratos_Habilit} onChange={(v: string) => handleInputChange('contratos_Habilit', v)} color="cyan" flat />
+                            <InputMetrica disabled={somenteLeitura} label="Venda Revisão" value={metricas.contratos_Revisao} onChange={(v: string) => handleInputChange('contratos_Revisao', v)} color="emerald" flat />
                         </div>
 
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 grid grid-cols-2 gap-4">
                             <InputMetrica
+                                disabled={somenteLeitura}
                                 label="Hot Habilit."
                                 value={metricas.HotLeadsHabilitacao}
                                 onChange={(v: string) => handleInputChange('HotLeadsHabilitacao', v)}
@@ -415,6 +444,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 grid grid-cols-2 gap-4">
                             <InputMetrica
+                                disabled={somenteLeitura}
                                 label="Hot Revisão"
                                 value={metricas.HotLeadsRevisao}
                                 onChange={(v: string) => handleInputChange('HotLeadsRevisao', v)}
@@ -428,13 +458,17 @@ export default function Lancamentos({ dadosAcumulados }: any) {
 
                     <button
                         onClick={handleSave}
-                        disabled={status === 'saving'}
-                        className={`w-full mt-10 py-5 rounded-2xl font-black text-lg transition-all ${status === 'success'
+                        disabled={status === 'saving' || somenteLeitura}
+                        className={`w-full mt-10 py-5 rounded-2xl font-black text-lg transition-all disabled:cursor-not-allowed ${somenteLeitura
+                            ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                            : status === 'success'
                             ? 'bg-green-500 text-white'
                             : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 hover:bg-blue-700 hover:-translate-y-1'
                             }`}
                     >
-                        {status === 'saving' ? (
+                        {somenteLeitura ? (
+                            `CONSULTA DE ${usuarioNome} — SOMENTE LEITURA`
+                        ) : status === 'saving' ? (
                             'PROCESSANDO...'
                         ) : status === 'success' ? (
                             'DADOS SINCRONIZADOS!'
@@ -451,8 +485,8 @@ export default function Lancamentos({ dadosAcumulados }: any) {
             <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-24">
                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Resumo Mensal / Canal</h3>
 
-                {(Object.keys(resumoLateral.canais) as Canal[]).map((key) => {
-                    const dadosCanal = resumoLateral.canais[key];
+                {(Object.keys(resumoLateral?.canais || RESUMO_VAZIO.canais) as Canal[]).map((key) => {
+                    const dadosCanal = (resumoLateral?.canais || RESUMO_VAZIO.canais)[key];
                     return (
                         <CardCanalSimples
                             key={key}
@@ -540,7 +574,7 @@ export default function Lancamentos({ dadosAcumulados }: any) {
     }
 }
 
-function InputMetrica({ label, value, onChange, color, flat }: any) {
+function InputMetrica({ label, value, onChange, color, flat, disabled = false }: any) {
     const colors: any = {
         blue: 'focus-within:border-blue-500 text-blue-600',
         red: 'focus-within:border-red-500 text-red-600',
@@ -562,9 +596,10 @@ function InputMetrica({ label, value, onChange, color, flat }: any) {
             <input
                 type="number"
                 value={value}
+                disabled={disabled}
                 onChange={(e) => onChange(e.target.value)}
                 onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                className="w-full bg-transparent text-3xl font-black outline-none appearance-none"
+                className="w-full bg-transparent text-3xl font-black outline-none appearance-none disabled:cursor-not-allowed disabled:opacity-70"
             />
         </div>
     );

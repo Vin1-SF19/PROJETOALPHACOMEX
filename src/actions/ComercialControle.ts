@@ -3,16 +3,70 @@
 import db from "@/lib/prisma";
 import { startOfMonth, startOfWeek, startOfDay, endOfDay, endOfMonth } from "date-fns";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { auth } from "../../auth";
+import { podeGerenciarMetas } from "@/lib/metas-permissoes";
+
+/**
+ * TI, Admin, CEO e Lider Comercial podem consultar leads de qualquer closer;
+ * um closer comum só pode consultar os próprios (identificados por nome/usuario,
+ * mesmo campo usado como `colaboradoraId` em `upsertPerformance`).
+ */
+async function exigirAcessoColaborador(colaboradoraId: string) {
+  const session = await auth();
+  const u = session?.user as { nome?: string; usuario?: string; role?: string } | undefined;
+  if (!u) throw new Error("Não autenticado");
+
+  const proprioId = u.nome || u.usuario || "Sistema";
+  if (colaboradoraId === proprioId) return;
+  if (podeGerenciarMetas(u.role ?? "")) return;
+
+  throw new Error("Acesso negado: você só pode visualizar os próprios leads.");
+}
+
+/** Visão de equipe completa (todas as closers) restrita a TI/Admin/CEO/Lider Comercial. */
+async function exigirAcessoEquipe() {
+  const session = await auth();
+  const u = session?.user as { role?: string } | undefined;
+  if (!u) throw new Error("Não autenticado");
+  if (!podeGerenciarMetas(u.role ?? "")) {
+    throw new Error("Acesso negado: apenas TI, Admin, CEO ou Lider Comercial podem visualizar a equipe completa.");
+  }
+}
+
+/**
+ * Lista as closers ativas que podem ser consultadas na tela operacional do
+ * Alpha Leads. A lista é protegida pelo mesmo gate das consultas de equipe.
+ */
+export async function listarClosersAlphaLeads() {
+  await exigirAcessoEquipe();
+
+  return db.usuarios.findMany({
+    where: {
+      status: "ATIVO",
+      role: { in: ["COMERCIAL", "Lider Comercial"] },
+    },
+    select: { id: true, nome: true },
+    orderBy: { nome: "asc" },
+  });
+}
+
+const ColaboradorDataSchema = z.object({
+  colaboradoraId: z.string().min(1),
+  data: z.coerce.date(),
+});
 
 export async function getPerformanceColaborador(colaboradoraId: string, data: Date) {
+  const input = ColaboradorDataSchema.parse({ colaboradoraId, data });
+  await exigirAcessoColaborador(input.colaboradoraId);
+
   try {
     const registros = await db.comercialPerformance.findMany({
       where: {
-        colaboradoraId,
+        colaboradoraId: input.colaboradoraId,
         dataRegistro: {
-          gte: startOfDay(new Date(data)),
-          lte: endOfDay(new Date(data)),
+          gte: startOfDay(input.data),
+          lte: endOfDay(input.data),
         },
       },
     });
@@ -28,7 +82,10 @@ export async function upsertPerformance(dados: any) {
   try {
     const session = await auth();
     const u = session?.user as { nome?: string; usuario?: string } | undefined;
-    const colaboradoraId = u?.nome || u?.usuario || "Sistema";
+    const colaboradoraId = u?.nome || u?.usuario;
+    if (!colaboradoraId) {
+      return { success: false, error: "Usuário não autenticado." };
+    }
 
     const dataNormalizada = startOfDay(new Date(dados.dataRegistro));
 
@@ -77,12 +134,21 @@ export async function upsertPerformance(dados: any) {
   }
 }
 
+const PerformanceDiariaSchema = z.object({
+  colaboradoraId: z.string().min(1),
+  data: z.coerce.date(),
+  canal: z.string().min(1),
+});
+
 export async function getPerformanceDiaria(colaboradoraId: string, data: Date, canal: string) {
+  const input = PerformanceDiariaSchema.parse({ colaboradoraId, data, canal });
+  await exigirAcessoColaborador(input.colaboradoraId);
+
   try {
     const registros = await db.comercialPerformance.findMany({
       where: {
-        colaboradoraId,
-        canal,
+        colaboradoraId: input.colaboradoraId,
+        canal: input.canal,
         dataRegistro: {
           gte: startOfDay(new Date(data)),
           lte: endOfDay(new Date(data)),
@@ -112,9 +178,18 @@ export async function getPerformanceDiaria(colaboradoraId: string, data: Date, c
   }
 }
 
+const MesAnoSchema = z.object({
+  mes: z.number().int().min(0).max(11),
+  ano: z.number().int().min(2000).max(2100),
+});
+
 export async function getPerformanceAcumulada(colaboradoraId: string, mes: number, ano: number) {
+  const { mes: mesValidado, ano: anoValidado } = MesAnoSchema.parse({ mes, ano });
+  const colaboradoraIdValidado = z.string().min(1).parse(colaboradoraId);
+  await exigirAcessoColaborador(colaboradoraIdValidado);
+
   try {
-    const dataReferencia = new Date(ano, mes, 1);
+    const dataReferencia = new Date(anoValidado, mesValidado, 1);
     const inicioMes = startOfMonth(dataReferencia);
     const fimMes = endOfMonth(dataReferencia);
 
@@ -175,8 +250,11 @@ export async function getPerformanceAcumulada(colaboradoraId: string, mes: numbe
 }
 
 export async function getPerformanceEquipeCompleta(mes: number, ano: number) {
+  const { mes: mesValidado, ano: anoValidado } = MesAnoSchema.parse({ mes, ano });
+  await exigirAcessoEquipe();
+
   try {
-    const dataReferencia = new Date(ano, mes, 1);
+    const dataReferencia = new Date(anoValidado, mesValidado, 1);
     const inicioMes = startOfMonth(dataReferencia);
     const fimMes = endOfMonth(dataReferencia);
 
@@ -226,8 +304,11 @@ export async function getPerformanceEquipeCompleta(mes: number, ano: number) {
 }
 
 export async function getPerformanceMarketing(mes: number, ano: number) {
+  const { mes: mesValidado, ano: anoValidado } = MesAnoSchema.parse({ mes, ano });
+  await exigirAcessoEquipe();
+
   try {
-    const dataReferencia = new Date(ano, mes, 1);
+    const dataReferencia = new Date(anoValidado, mesValidado, 1);
     const inicioMes = startOfMonth(dataReferencia);
     const fimMes = endOfMonth(dataReferencia);
 
@@ -293,8 +374,11 @@ export async function getPerformanceMarketing(mes: number, ano: number) {
 }
 
 export async function getExportData(mes: number, ano: number) {
+  const { mes: mesValidado, ano: anoValidado } = MesAnoSchema.parse({ mes, ano });
+  await exigirAcessoEquipe();
+
   try {
-    const dataReferencia = new Date(ano, mes, 1);
+    const dataReferencia = new Date(anoValidado, mesValidado, 1);
     const inicioMes = startOfMonth(dataReferencia);
     const fimMes = endOfMonth(dataReferencia);
 
@@ -311,14 +395,18 @@ export async function getExportData(mes: number, ano: number) {
 }
 
 export async function getExportDataColaborador(colaboradoraId: string, mes: number, ano: number) {
+  const { mes: mesValidado, ano: anoValidado } = MesAnoSchema.parse({ mes, ano });
+  const colaboradoraIdValidado = z.string().min(1).parse(colaboradoraId);
+  await exigirAcessoColaborador(colaboradoraIdValidado);
+
   try {
-    const dataReferencia = new Date(ano, mes, 1);
+    const dataReferencia = new Date(anoValidado, mesValidado, 1);
     const inicioMes = startOfMonth(dataReferencia);
     const fimMes = endOfMonth(dataReferencia);
 
     return await db.comercialPerformance.findMany({
       where: {
-        colaboradoraId: colaboradoraId,
+        colaboradoraId: colaboradoraIdValidado,
         dataRegistro: { gte: inicioMes, lte: fimMes }
       },
       orderBy: { dataRegistro: 'asc' }

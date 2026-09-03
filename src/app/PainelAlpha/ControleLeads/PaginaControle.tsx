@@ -11,10 +11,8 @@ import Link from 'next/link';
 import Grafico from './grafico';
 import Lancamentos from './Lançamentos';
 import { useSession } from 'next-auth/react';
-import { getPerformanceAcumulada, getPerformanceDiaria } from '@/actions/ComercialControle';
+import { getPerformanceAcumulada } from '@/actions/ComercialControle';
 import { useSearchParams } from 'next/navigation';
-import router from 'next/router';
-import { isAdminRole } from '@/lib/roles';
 
 // --- Tipos ---
 type Aba = 'lancamento' | 'graficos';
@@ -25,20 +23,30 @@ interface Props {
         userImage?: string | null;
     },
     temaConfig: any;
+    podeAcompanharEquipe: boolean;
+    closersAcompanhamento: Array<{ id: number; nome: string }>;
 }
 
-export default function PaginaControle({ usuario, temaConfig }: Props) {
-    const { data: session, update } = useSession();
-    const isAdmin = isAdminRole(session?.user?.role);
+export default function PaginaControle({
+    usuario,
+    temaConfig,
+    podeAcompanharEquipe,
+    closersAcompanhamento,
+}: Props) {
+    const { data: session } = useSession();
 
-    const TemPermissao = isAdmin
+    const TemPermissao = podeAcompanharEquipe;
 
     const [abaAtiva, setAbaAtiva] = useState<Aba>('lancamento');
     const userImage = session?.user?.imagemUrl;
     const fotoFinal = userImage || session?.user?.imagemUrl || (session?.user as any)?.image;
     const searchParams = useSearchParams();
     const canalAtual = searchParams.get('canal') || 'TRAFEGO_PAGO';
-    const [dadosAcumulados, setDadosAcumulados] = useState(null);
+    const usuarioLogado = usuario?.nome || session?.user?.nome || "";
+    const [colaboradoraSelecionada, setColaboradoraSelecionada] = useState(usuarioLogado);
+    const modoAuditoria = Boolean(
+        colaboradoraSelecionada && colaboradoraSelecionada !== usuarioLogado,
+    );
 
     const [metricas, setMetricas] = useState({
         leads_recebidos: 0,
@@ -54,25 +62,33 @@ export default function PaginaControle({ usuario, temaConfig }: Props) {
 
     const [resumoLateral, setResumoLateral] = useState<{
         canais: any;
-    } | null>(dadosAcumulados);
+    } | null>(null);
 
     useEffect(() => {
+        let cancelado = false;
+
         async function atualizarDados() {
-            const nomeUsuario = session?.user?.nome;
-            if (!nomeUsuario) return;
+            if (!colaboradoraSelecionada) return;
 
             const mes = parseInt(searchParams.get('mes') || new Date().getMonth().toString());
             const ano = parseInt(searchParams.get('ano') || new Date().getFullYear().toString());
 
-            const novosDados = await getPerformanceAcumulada(nomeUsuario, mes, ano);
+            try {
+                const novosDados = await getPerformanceAcumulada(colaboradoraSelecionada, mes, ano);
 
-            if (novosDados) {
-                setResumoLateral(novosDados);
+                if (!cancelado && novosDados) {
+                    setResumoLateral(novosDados);
+                }
+            } catch {
+                if (!cancelado) setResumoLateral(null);
             }
         }
 
-        atualizarDados();
-    }, [searchParams, session]);
+        void atualizarDados();
+        return () => {
+            cancelado = true;
+        };
+    }, [colaboradoraSelecionada, searchParams]);
 
 
     return (
@@ -141,16 +157,60 @@ export default function PaginaControle({ usuario, temaConfig }: Props) {
 
             <main className="max-w-[1400px] mx-auto p-6">
 
+                {podeAcompanharEquipe && (
+                    <section className="mb-6 flex flex-col gap-3 rounded-3xl border border-indigo-500/20 bg-indigo-500/5 p-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                            <label
+                                htmlFor="closer-alpha-leads"
+                                className="mb-2 block text-[10px] font-black uppercase tracking-widest text-indigo-500"
+                            >
+                                Acompanhar lançamentos da closer
+                            </label>
+                            <select
+                                id="closer-alpha-leads"
+                                value={colaboradoraSelecionada}
+                                onChange={(evento) => {
+                                    setResumoLateral(null);
+                                    setColaboradoraSelecionada(evento.target.value);
+                                }}
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:max-w-xl"
+                            >
+                                <option value={usuarioLogado}>Meus lançamentos — {usuarioLogado}</option>
+                                {closersAcompanhamento
+                                    .filter((closer) => closer.nome !== usuarioLogado)
+                                    .map((closer) => (
+                                        <option key={closer.id} value={closer.nome}>
+                                            {closer.nome}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-wider ${
+                                modoAuditoria
+                                    ? "border border-amber-500/20 bg-amber-500/10 text-amber-500"
+                                    : "border border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                            }`}
+                        >
+                            {modoAuditoria ? "Consulta somente leitura" : "Edição dos meus dados"}
+                        </div>
+                    </section>
+                )}
+
                 {abaAtiva === 'lancamento' ? (
                     <Lancamentos
-                        key={canalAtual}
+                        key={`${canalAtual}:${colaboradoraSelecionada}`}
                         canalAtual={canalAtual}
-                        usuario={session?.user.nome}
-                        dadosAcumulados={dadosAcumulados}
+                        usuario={usuarioLogado}
+                        colaboradoraId={colaboradoraSelecionada}
+                        somenteLeitura={modoAuditoria}
+                        dadosAcumulados={resumoLateral}
                     />
                 ) : (
                     <Grafico
-                        usuario={session?.user.nome}
+                        usuario={colaboradoraSelecionada}
                         metricas={metricas}
                         dadosAcumulados={resumoLateral}
                     />
@@ -161,6 +221,5 @@ export default function PaginaControle({ usuario, temaConfig }: Props) {
         </div>
     );
 }
-
 
 
