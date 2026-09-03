@@ -247,7 +247,6 @@ function KanbanColuna({
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [termoBusca, setTermoBusca] = useState("");
-  const permiteBusca = status === "NOVO_LEAD";
   const termoNormalizado = termoBusca.trim().toLocaleLowerCase("pt-BR");
   const itensVisiveis = termoNormalizado
     ? itens.filter((lead) => (lead.nomeFantasia || lead.nome).toLocaleLowerCase("pt-BR").includes(termoNormalizado))
@@ -262,13 +261,13 @@ function KanbanColuna({
           <span className="text-[11px] font-black uppercase tracking-widest text-slate-200 truncate">{label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {permiteBusca && <button type="button" onClick={() => setBuscaAberta((aberta) => !aberta)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white" aria-label="Pesquisar leads por nome" title="Pesquisar leads por nome"><Search size={13} /></button>}
+          <button type="button" onClick={() => setBuscaAberta((aberta) => !aberta)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white" aria-label="Pesquisar leads por nome" title="Pesquisar leads por nome"><Search size={13} /></button>
           <span className="text-[10px] font-bold shrink-0 rounded-full px-2 py-0.5" style={{ background: `rgba(${cor},0.18)`, color: `rgb(${cor})` }}>
             {termoNormalizado ? `${itensVisiveis.length}/${itens.length}` : itens.length}
           </span>
         </div>
         </div>
-        {permiteBusca && buscaAberta && <div className="relative mt-2"><Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" /><input autoFocus value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)} placeholder="Buscar pelo nome..." className="h-8 w-full rounded-lg border border-white/10 bg-black/30 pl-8 pr-8 text-[11px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-white/20" />{termoBusca && <button type="button" onClick={() => setTermoBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white" aria-label="Limpar pesquisa"><X size={12} /></button>}</div>}
+        {buscaAberta && <div className="relative mt-2"><Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" /><input autoFocus value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)} placeholder="Buscar pelo nome..." className="h-8 w-full rounded-lg border border-white/10 bg-black/30 pl-8 pr-8 text-[11px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-white/20" />{termoBusca && <button type="button" onClick={() => setTermoBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white" aria-label="Limpar pesquisa"><X size={12} /></button>}</div>}
       </div>
       <div
         ref={setNodeRef}

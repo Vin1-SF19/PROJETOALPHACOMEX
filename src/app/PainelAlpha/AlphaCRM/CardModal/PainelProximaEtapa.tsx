@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
-import { ObterCardBpm, MoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
+import { ObterCardBpm, MoverCardBpm } from "@/actions/bpm/Cards";
+import type { CardFilhoCriado } from "@/lib/bpm/automacoes";
 import { useCardSave } from "./CardSaveContext";
 import {
   ERRO_DATA_REUNIAO_OBRIGATORIA,

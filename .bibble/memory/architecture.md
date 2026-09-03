@@ -1,5 +1,142 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Alpha Leads — UI de acompanhamento por closer e calendário de check-in (RM-2026-DA0B7D, 2026-09-03, Fase 2/frontend)
+
+**Objetivo:** consumir na UI real do módulo Alpha Leads (`/PainelAlpha/ControleLeads`) as Server Actions e o model entregues na Fase 1.
+
+**Capacidade 1 — acompanhamento por closer:** o seletor de closers já existia, mas incompleto — `MarketingDashboard` (`Marketing/dashboard.tsx`, rota `/PainelAlpha/ControleLeads/Marketing`) já tinha um `<select>` que filtra toda a visão para os dados agregados (`getPerformanceMarketing`) de um closer específico. A lacuna real era de **gate**: o botão que leva a essa rota (`PaginaControle.tsx`) só era visível para `isAdminRole` (Admin/CEO/TI), **sem "Lider Comercial"** — incoerente com o gate real já aplicado no backend pela Fase 1 (`exigirAcessoEquipe`/`podeGerenciarMetas`, que inclui as 4 roles). Corrigido trocando `TemPermissao = isAdmin` por `TemPermissao = podeGerenciarMetas(session?.user?.role ?? "")`. Também adicionado gate real (redirect) em `Marketing/page.tsx` (route handler nunca checava role — dependia só do throw interno da Server Action, que quebrava a página em vez de redirecionar) e um estado vazio (`dadosSelecionados` não encontrado → mensagem "Nenhum lead lançado por este closer em {mês}" em vez de renderizar nada).
+
+**Capacidade 2 — calendário de check-in:** novo componente `CalendarioCheckIn.tsx` (`src/app/PainelAlpha/ControleLeads/`), renderizado na sidebar esquerda de `Lançamentos.tsx` (mesma coluna sticky do resumo mensal e do botão de exportar). Grid mensal simples (sem lib de calendário — `react-day-picker` segue não usado no projeto; grid construído com `Date` nativo, mesmo padrão de cálculo de mês já usado em `Lançamentos.tsx`/`grafico.tsx`). Dias passados/hoje sem check são clicáveis → `RegistrarCheckLeadsDia`; dias com check exibem ícone verde (`CheckCircle2`); dias futuros ficam desabilitados. Para TI/Admin/CEO/Lider Comercial, um `<select>` adicional ("Meu calendário" / lista de closers) alterna para modo auditoria (somente leitura, sem botão de registrar) chamando `ListarChecksCalendario(mes, ano, usuarioIdFiltro)`.
+
+**Nova Server Action:** `ListarUsuariosParaCheckIn()` em `src/actions/ComercialCheckIn.ts` — lista `{id, nome}` de usuários ativos (`db.usuarios`), gated por `podeGerenciarMetas`. Necessária porque o seletor de closer da Capacidade 1 é indexado por **nome** (`colaboradoraId`, string livre em `ComercialPerformance`), enquanto o check-in é indexado por **id numérico** (`ComercialCheckInDiario.usuarioId`, FK real de `usuarios.id`) — os dois espaços de identidade não são intercambiáveis, por isso não foi possível reaproveitar diretamente `getPerformanceEquipeCompleta` para o seletor de auditoria do calendário.
+
+**Pendência herdada da Fase 1 (fora do escopo desta fase):** a migration `20260903120000_add_comercial_checkin_diario` continua não aplicada — o widget de calendário está funcional no frontend, mas `RegistrarCheckLeadsDia`/`ListarChecksCalendario` retornam erro tratado ("Falha ao registrar check-in...") até o Vault aplicar a migration com backup e confirmação do usuário.
+
+**Caminho de consumo:**
+```
+/PainelAlpha/ControleLeads (aba Lançamento)
+  → sidebar esquerda → CalendarioCheckIn (grid do mês corrente, clique no dia → RegistrarCheckLeadsDia)
+  → (só TI/Admin/CEO/Lider Comercial) select "Meu calendário"/closer → modo auditoria via ListarChecksCalendario
+
+/PainelAlpha/ControleLeads → botão "Marketing" (só TI/Admin/CEO/Lider Comercial, gate corrigido)
+  → /PainelAlpha/ControleLeads/Marketing → select de closer → filtra todo o dashboard (getPerformanceMarketing)
+```
+
+**Qualidade:** `npx tsc --noEmit` (projeto completo, `NODE_OPTIONS=--max-old-space-size=8192` necessário neste ambiente) — zero erros novos nos arquivos da fase (erros remanescentes pré-existentes em módulos não relacionados: Gerador de Documentos, Google Calendar). `npx eslint` — `CalendarioCheckIn.tsx` e `ComercialCheckIn.ts` (novo/alterado): 0 problemas; `Lançamentos.tsx`/`PaginaControle.tsx`/`Marketing/{page,dashboard}.tsx`: 59 problemas (45 erros/14 warnings), confirmado idêntico ao baseline via `git stash` (todos `any`/variáveis não usadas pré-existentes). `npx vitest run tests/bpm/` — 16 falhas/7 arquivos, idêntico ao baseline documentado, zero regressão (módulo Alpha Leads ainda sem suíte de testes dedicada).
+
+**Última atualização:** 2026-09-03 por Nova/dev (sessão Bibble, Fase 2 de RM-2026-DA0B7D)
+
+---
+
+## Alpha Leads — filtro por closer/role + check-in diário (RM-2026-DA0B7D, 2026-09-03, Fase 1/backend)
+
+**Objetivo:** endereçar as duas lacunas sinalizadas `AUTO_ADJUSTMENT_REQUIRED` pela Fase 0 (auditoria) — acompanhamento de leads por closer com gate de role, e persistência de check-in diário — na granularidade real do módulo Alpha Leads (`ComercialPerformance`, contadores agregados por dia/colaborador/canal, sem lead individual).
+
+**Capacidade 1 — gate de role no filtro por closer:** `src/actions/ComercialControle.ts` não tinha nenhuma checagem de `auth()`/role — qualquer chamador podia consultar `colaboradoraId` de terceiros ou a equipe completa. Adicionados dois helpers (`exigirAcessoColaborador`, `exigirAcessoEquipe`) que reaproveitam `podeGerenciarMetas()` (`src/lib/metas-permissoes.ts`, já cobre TI/Admin/CEO via `isAdminRole` + `"Lider Comercial"` — exatamente as 4 roles pedidas, sem sistema de permissão novo). Aplicados a `getPerformanceColaborador`, `getPerformanceDiaria`, `getPerformanceAcumulada`, `getExportDataColaborador` (só o próprio `colaboradoraId` — nome/usuario da sessão — ou role autorizada) e a `getPerformanceEquipeCompleta`, `getPerformanceMarketing`, `getExportData` (visão de equipe completa, só role autorizada). Zod adicionado nos inputs de todas as funções tocadas (Artigo V). `getPerformanceEquipeCompleta` já retornava lista de closers com contagem agregada de leads — agora protegida, serve de metadado para a UI montar o filtro/botão por closer sem nova Server Action.
+
+**Capacidade 2 — check-in diário:** novo model aditivo `ComercialCheckInDiario` (`usuarioId Int`, `data DateTime` normalizada para início do dia, `confirmadoEm`, unique `(usuarioId, data)` — idempotente). **Migration não aplicada** (`prisma/migrations/20260903120000_add_comercial_checkin_diario/migration.sql`, pronta e documentada) — bloqueada intencionalmente porque a sessão que implementou esta fase opera sob restrição explícita de não executar migrations/alterações de banco; fluxo do Vault (relatório de impacto, backup em `database-backups/pre-change/` ≤48h, confirmação explícita do usuário) é pré-requisito documentado em `AGENTS.md`/Constitution e permanece pendente. `npx prisma generate` foi executado (só gera o client TS a partir do schema, não toca o banco) para permitir typecheck; chamadas reais falharão com erro tratado até a migration ser aplicada.
+
+**Server Actions novas:** `src/actions/ComercialCheckIn.ts` — `RegistrarCheckLeadsDia(data?)` (auth + upsert idempotente no dia normalizado do usuário logado) e `ListarChecksCalendario(mes, ano, usuarioIdFiltro?)` (auth + Zod; sem filtro, TI/Admin/CEO/Lider Comercial veem todos os closers e demais veem só o próprio histórico; filtro por outro usuário exige role autorizada).
+
+**Sem migration destrutiva, sem renomear/remover coluna existente.** Nenhuma alteração ao model `usuarios` (sem relação Prisma declarada — mesmo padrão já usado por `ComercialPerformance.colaboradoraId`, FK apenas em SQL bruto na migration, não como relation object).
+
+**Qualidade:** `npx prisma generate` — client gerado sem erros. `npx tsc --noEmit` (projeto completo) — 0 erros. `npx eslint` nos arquivos tocados/criados — `ComercialControle.ts`: 4 erros/1 warning, todos pré-existentes (confirmado via `git stash`, mesmas linhas de `any`/import não usado, deslocadas pelas novas linhas); `ComercialCheckIn.ts` (novo): 0 problemas. `npx vitest run tests/` — 18 arquivos falhando/38 testes falhando, idêntico ao baseline pré-existente (nenhuma falha em teste que importe `ComercialControle`/`ComercialCheckIn` — módulo ainda sem suíte dedicada).
+
+**Pendências explícitas para a próxima fase (UI/Fase 2) e para o Vault:**
+- Migration do check-in aguardando aprovação/backup do Vault antes de qualquer ambiente real.
+- Nenhuma tela/rota nova criada nesta fase (fase é só backend) — a Fase 2 deve consumir `getPerformanceEquipeCompleta`/`getPerformanceColaborador` (já filtráveis) e as duas novas Server Actions de check-in a partir de `/PainelAlpha/ControleLeads`, incluindo o componente de calendário visual (lacuna também sinalizada pela Fase 0, ainda sem componente `calendar.tsx` no projeto).
+- Testes automatizados dedicados a `ComercialControle.ts`/`ComercialCheckIn.ts` ainda não existem — recomendado antes do fechamento da entrega.
+
+**Última atualização:** 2026-09-03 por Nova/dev (sessão Bibble, Fase 1 de RM-2026-DA0B7D)
+
+---
+
+## Search em todas as etapas do pipeline de Aquisição (RM-2026-687FAE, 2026-09-02)
+
+**Objetivo:** replicar a lupa de busca já existente na etapa "Novo Lead" para todas as demais colunas do Kanban de Aquisição do módulo Parceiros.
+
+**Arquivo modificado:** `src/components/Parceiros/Aquisicao/AquisicaoParceirosClient.tsx` (componente `KanbanColuna`, reutilizado nas 11 colunas do funil + saídas laterais).
+
+**Mudança:** removido o gate `const permiteBusca = status === "NOVO_LEAD"` que restringia o botão de lupa (`Search`) e o input de busca (`termoBusca`/`buscaAberta`, estado local por instância da coluna) a uma única etapa. `itensVisiveis` (filtro client-side por `nomeFantasia || nome`, já existente) passa a operar em todas as colunas. Zero mudança de schema, Server Action ou rota — puramente visual/estado local, mesmo padrão já registrado para `responsavelFiltro` no BPM.
+
+**Caminho de consumo:** `/PainelAlpha/Parceiros/Aquisicao` → header de qualquer coluna → ícone de lupa → input "Buscar pelo nome..." → filtra apenas os cards daquela coluna.
+
+**Qualidade:** `npx tsc --noEmit` — zero erros novos no arquivo alterado (erros remanescentes do projeto são pré-existentes, em módulos não relacionados). `npx eslint` no arquivo — 3 warnings pré-existentes (imports não usados em outras linhas), zero novos. `npx vitest run tests/parceiros/aquisicao.test.ts` — 15/16 passando, 1 falha pré-existente confirmada via `git stash` (Server Action `MoverLeadAquisicaoParceiro`, não relacionada a esta mudança de UI).
+
+**Última atualização:** 2026-09-02 por Nova/dev (sessão Bibble, fechamento RM-2026-687FAE)
+
+---
+
+## Filtro por responsável no pipeline Kanban (RM-2026-70EFE1, 2026-09-02)
+
+**Objetivo:** filtrar cards do Kanban por membro responsável, via Select no header do pipeline.
+
+**Arquivo modificado:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
+
+**Mudança:** estado `responsavelFiltro` (`useState<string | null>`) + `useMemo` para `responsaveisDisponiveis` (deduplicado a partir de `card.membros[].usuario.{id,nome}`, ordenado alfabeticamente) + `<Select>` shadcn no header, ao lado do botão "Atualizar". `getByEtapa` — único ponto de leitura de `cards` usado para renderizar as colunas — passou a filtrar também por `responsavelFiltro`; o array `cards` em si (usado por drag-and-drop, `activeCard`/`DragOverlay`, realtime e `recarregarCards`) permanece intocado.
+
+**Sem migration, sem nova Server Action, sem novo componente.**
+
+**Caminho de consumo:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → header do board → Select "Filtrar cards por responsável" → selecionar responsável → cards filtrados em todas as colunas (colunas vazias permanecem visíveis).
+
+**Qualidade:** `npx tsc --noEmit` — zero erros no arquivo alterado. `npx eslint` — zero erros/warnings. `npx vitest run tests/bpm/` — baseline idêntico (7 arquivos/16 testes falhando pré-existentes), zero regressão. `npm run build` — build completa, rota presente no bundle.
+
+**Última atualização:** 2026-09-02 por Scribe (sessão Bibble, fechamento RM-2026-70EFE1)
+
+---
+
+## Automações configuráveis do Alpha CRM/BPM (RM-2026-35A772, 2026-09-02)
+
+**Fluxo:** aba administrativa global `/PainelAlpha/AlphaCRM/automacoes` → Server Actions protegidas por `exigirAcessoConfigPipeline` → `BpmAutomacao`. Movimentos manuais criam itens idempotentes em `BpmAutomacaoExecucao`; cron de cinco minutos materializa permanência na coluna e processa a fila.
+
+**Ações:** e-mail via Resend, contrato via templates do Gerador de Documentos e ficha PDF via `gerarFichaServer`. Integrações externas nunca rodam na transação do movimento. O enfileiramento também é best-effort após o commit, de modo que indisponibilidade da fila não desfaz a movimentação do card.
+
+**Persistência:** migration aditiva `20260902185000_add_bpm_automacoes`; chave única `(automacaoId, eventoChave)` garante uma execução por evento/ciclo. Turso validado com cinco FKs, zero violações e integridade `ok`.
+
+**Qualidade:** 14/14 testes direcionados, ESLint limpo e zero erros de typecheck nos arquivos do objetivo. Gates globais seguem com débitos fora do escopo documentados na story.
+
+**Staging:** `scripts/deploy-staging-release.sh` é o deploy canônico da coluna **Em testes**. Ele serializa deploys com `flock`, builda o workspace, cria uma release isolada, executa smoke em porta temporária, troca atomicamente o symlink `painel-alpha-stage/current`, reinicia o serviço e restaura a release anterior se a ativação falhar. O `stagingDeployCommand` do Roadmap chama esse script a cada nova conclusão ou reconclusão elegível.
+
+**Última atualização:** 2026-09-02 (RM-2026-35A772 em testes)
+
+---
+
+## Tabs de Pipeline no Card — correção de fonte de dados (RM-2026-A4294C, 2026-09-02)
+
+**Objetivo:** corrigir as tabs do card Alpha CRM para exibir pipelines reais do sistema (`BpmPipeline`) em vez de serviços comerciais (`ServicosComerciais`), estabelecidos na entrega anterior RM-2026-29F59C.
+
+**Antes (RM-2026-29F59C):** 1ª tab "Este card" (hardcoded) + demais tabs de serviços comerciais via `getServicosComerciais()`.
+
+**Depois:** 1ª tab = nome do pipeline atual do card (`card.pipeline.nome`, dinâmico) + demais tabs = outros pipelines ativos do sistema via `ListarPipelinesBpm()` (já existente, reaproveitada sem alteração), excluindo o pipeline atual, ordenadas por nome.
+
+**Lacuna resolvida (identificada na auditoria da Fase 0):** `PainelHistoricoServico.tsx` (usado no modelo anterior) é amarrado a serviço comercial via `ObterHistoricoServicoEmpresa`, não a pipeline — não havia conteúdo definido para o que renderizar dentro da tab de "outro pipeline", já que um `BpmCard` pertence a exatamente um `pipelineId` e não existe instância do card nos demais pipelines. Resolvido com um painel novo dedicado (ver abaixo) que lista outros cards da mesma empresa naquele pipeline, com estado vazio tratado — em vez de navegação para fora do modal ou tela em branco.
+
+**Arquivos modificados:**
+- `src/actions/bpm/Cards.ts` — nova server action `ListarCardsEmpresaPorPipeline(cardId, pipelineId)`: autenticação + `exigirAcessoBpmCard`, retorna outros `BpmCard` da mesma empresa naquele pipeline (exclui o card atual).
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx` — fonte de dados das tabs trocada de `getServicosComerciais()` para `card.pipeline.nome` (1ª tab) + `ListarPipelinesBpm()` (demais tabs, filtrado `ativo: true`, exclui pipeline atual).
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistoricoPipeline.tsx` (novo) — conteúdo de cada `TabsContent` de "outro pipeline": chama `ListarCardsEmpresaPorPipeline`, exibe loading/error/empty/success (empty: "Esta empresa não possui outros cards em {pipeline}"), reabre outro card via `onAbrirCard` (mesmo padrão de "Outros Cards do CRM").
+- `tests/bpm/card-tabs-servicos-dinamicas.test.ts` (removido) → `tests/bpm/card-tabs-pipelines.test.ts` (novo, 7 casos).
+
+**Fonte de dados:** `BpmPipeline` (model já existente, FK `BpmCard.pipelineId`). Filtro: `ativo: true`. Ordenação: nome.
+
+**Sem migration** — model, relação e `ListarPipelinesBpm` já existiam; só a nova `ListarCardsEmpresaPorPipeline` foi adicionada (aditiva, sem alterar assinaturas existentes).
+
+**Caminho de consumo:**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → KanbanCard → clique → CardFullViewModal → CardAbertoLayout
+  → Tabs (1ª = pipeline atual do card, dinâmica; demais = outros pipelines ativos)
+  → TabsContent → PainelHistoricoPipeline → ListarCardsEmpresaPorPipeline (estado vazio tratado)
+```
+
+**Qualidade:** `npx tsc --noEmit` — zero erros novos nos arquivos da fase (erros restantes pré-existentes, confirmados fora do escopo). `npx eslint` nos arquivos tocados — zero erros/warnings novos (6 warnings pré-existentes em `CardAbertoLayout.tsx`, confirmados idênticos via `git stash`). `npx vitest run tests/bpm/` — baseline idêntico (16 testes falhando/7 arquivos, pré-existentes, confirmado via `git stash`), zero regressão; novo arquivo 7/7 passando. `npm run build` — falha por `ReferenceError: CardFilhoCriado is not defined`, confirmado pré-existente via `git stash` (débito técnico do bundler Turbopack, não relacionado a esta fase).
+
+**Pendência manual:** validação visual em navegador (sem sessão interativa disponível neste ambiente); commit/PR não solicitados nesta fase.
+
+**Última atualização:** 2026-09-02 por Scribe (sessão Bibble, fechamento RM-2026-A4294C)
+
+---
+
 ## Agenda Alpha — modal de evento compartilhado responsivo + confirmação de presença (RM-2026-1FE530, 2026-09-01)
 
 **Objetivo:** corrigir o modal de detalhes de evento compartilhado que abria fora da viewport, e adicionar dia exato + confirmação de presença ("Você vai?").
@@ -1261,3 +1398,15 @@ O helper `src/lib/comercial/prospeccao-ativa.ts` é a fonte única do rótulo, v
 ## Equipes privadas de notas (2026-08-12)
 
 O módulo de Notas possui equipes privadas reutilizáveis. `NoteTeam` define o criador, `NoteTeamMember` mantém um papel por membro (`LEITOR`, `COMENTARISTA`, `EDITOR`, `ADMIN`) e `NoteTeamShare` relaciona equipes e notas por FKs reais. O criador é `ADMIN` implícito e é o único gestor da equipe; o papel `ADMIN` de um membro vale para a nota e não delega gestão da equipe. O acesso efetivo escolhe sempre o papel mais permissivo entre propriedade, usuário, setor/role e todas as equipes.
+
+## Alpha CRM/BPM — visibilidade por coluna (RM-2026-1EA5C1, 2026-09-02)
+
+`BpmEtapaVisibilidade` é a allow-list opcional por etapa e perfil global (`usuarios.role`). A ausência de linhas mantém o comportamento legado; havendo linhas, `podeVer` controla listagem/abertura e `podeAgir` controla mutações. Admin, CEO e TI mantêm bypass. A regra complementa, sem substituir, a permissão do módulo e o vínculo `BpmCardMembro`.
+
+A autorização é centralizada em `src/lib/bpm/ownership.ts`, usando `src/lib/bpm/visibilidade-etapa.ts`. O Kanban e o dashboard filtram etapas não visíveis; movimentos e a promoção de leads NoLoss validam o destino também dentro da transação. A UI administrativa vive em `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]`. A migration `20260902174500_add_bpm_etapa_visibilidade` foi aplicada no Turso após backup verificado.
+
+## Aba Configurações — campos agrupados por coluna (RM-2026-429476, 2026-09-02)
+
+A seção **Campos Personalizados** de `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` deixou de renderizar o array de `BpmCampo` como lista plana. `agruparCamposPorColuna`, em `src/lib/bpm/campos-admin.ts`, produz uma seção geral para `etapaId = null`, uma seção para cada `BpmEtapa` ativa na ordem do pipeline e um fallback que preserva campos ligados a etapas indisponíveis.
+
+O agrupamento é derivado em memória com `useMemo`; nenhuma action, migration ou semântica de persistência mudou. O editor inline existente continua atualizando `campos`, portanto criar, excluir ou trocar a etapa de um campo recompõe imediatamente os grupos.

@@ -1,5 +1,47 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## [2026-09-02] — RM-2026-70EFE1: Filtro por responsável no pipeline
+
+**Tags:** #feature #frontend #crm #kanban #filtro #concluido
+**Objetivo:** Select no header do Kanban para filtrar cards por membro responsável.
+**Fases:** 0 (context/Scout) → 1 (blueprint) → 2 (dev/implementação) → 3 (Forge) → 4 (Probe) → 5 (Scribe) → 6 (Kowalski)
+
+**Resumo:** implementado filtro client-side por responsável no header do board Kanban do Alpha CRM. Estado `responsavelFiltro` + lista `responsaveisDisponiveis` (derivada de `card.membros[].usuario`, deduplicada e ordenada) + `Select` do shadcn ao lado do botão "Atualizar". `getByEtapa` — único ponto de leitura de `cards` usado para renderizar as colunas — passou a filtrar também por `responsavelFiltro`; o array `cards` (drag-and-drop, `activeCard`/`DragOverlay`, realtime, `recarregarCards`) permanece intocado. Toda a infraestrutura necessária (dados de membros, componente `Select`) já existia — nenhuma Server Action ou migration nova.
+
+**Arquivos tocados:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` (modificado)
+**Arquivos criados:** nenhum
+**Migrations:** nenhuma
+**Testes:** `npx vitest run tests/bpm/` — baseline idêntico (7 arquivos/16 testes falhando pré-existentes, 388 passando), zero regressão (mudança client-side, sem lógica nova testável isoladamente).
+
+**Gates:** `npx tsc --noEmit` — zero erros no arquivo alterado; `npx eslint` — zero erros/warnings novos; `npm run build` — build completa, rota presente no bundle final.
+
+**Checklist de sessão:**
+- [x] Blueprint (Fase 1) existe
+- [x] Implementação (Fase 2) concluída
+- [x] Forge aprovou (Fase 3)
+- [x] Probe aprovou (Fase 4)
+- [x] Scribe documentou (Fase 5)
+- [x] Kowalski arquivou (Fase 6)
+
+**Sessão arquivada por:** Kowalski
+
+**Status:** ENTREGUE — caminho de acesso: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → header do board → `Select` "Filtrar cards por responsável" → filtra `getByEtapa` em todas as colunas, sem afetar drag-and-drop, realtime ou modais. Nenhuma fase anterior foi rejeitada ou refeita — execução linear sem iteração.
+
+---
+
+## [2026-09-02] — RM-2026-35A772: Aba Automações do Alpha CRM/BPM
+
+**Tags:** #feature #crm #bpm #automacoes #turso #em-testes
+**Resumo:** entregue workspace administrativo global, CRUD completo, duplicação entre colunas, gatilhos de entrada/saída/tempo, fila persistente idempotente e worker para e-mail, contrato e ficha PDF. A migration aditiva foi executada no Turso após confirmação explícita e verificada contra backup íntegro.
+
+**Gates:** 14/14 testes direcionados e lint aprovados; `prisma validate` aprovado; Turso com integridade `ok`. A regressão BPM ficou em 388/404, sem falha nas suítes do objetivo. Typecheck global e coleta final do build continuam bloqueados exclusivamente por débitos externos documentados na story; a compilação otimizada passou.
+
+**Status:** CONCLUÍDO — card deixado em **Em testes**, sem promoção automática para Produção.
+
+**Adendo de deploy:** corrigido o reexport de tipo que fazia o Turbopack emitir `CardFilhoCriado` em runtime. Build completo passou e o staging foi publicado na release isolada `20260902-193109` (build ID `3MFv6xhuquokyblu65wJ_`). O pipeline agora usa `scripts/deploy-staging-release.sh` em cada entrada/reentrada elegível na coluna Em testes, com smoke, symlink atômico e rollback.
+
+---
+
 ## [2026-09-01] — RM-2026-1FE530: Modal de evento compartilhado responsivo + confirmação de presença
 
 **Tags:** #bugfix #frontend #agenda-alpha #google-calendar #responsivo #concluido
@@ -4383,3 +4425,71 @@ Objetivo do Roadmap pedia substituir o texto hardcoded "Este card" pelo nome do 
 - Gates: tsc + eslint limpos nos 4 arquivos tocados; débitos pré-existentes do projeto fora do escopo.
 - Documentação: `docs/stories/story-rm-2026-43aa46-crud-campos-pipeline.md`.
 - Restrição: sem migration, sem commit/push (requireManualPromotion=true em Painel Alpha).
+
+## Sessão RM-2026-A4294C — Tabs de Pipeline no Card
+
+**Tags:** #bugfix #integration #decision #nextjs #prisma
+**Agentes envolvidos:** Bibble (Scout/Fase 0), Echo (Fase 1), Forge/Probe (Fase 2/3), Scribe (Fase 4)
+**Data:** 2026-09-02
+**Objetivo:** corrigir as tabs do card Alpha CRM (estabelecidas em RM-2026-29F59C com `ServicosComerciais`) para exibir pipelines reais (`BpmPipeline`), conforme divergência apontada no objetivo desta fase.
+**Fases:** 0 (auditoria/Scout) → 1 (implementação) → 2/3 (Forge + Probe, gate técnico e checklist de 8 pontos) → 4 (Scribe, esta entrada)
+
+### Contexto
+A Fase 0 confirmou que a infraestrutura de tabs (`Tabs`/`TabsTrigger`/`TabsContent` em `CardAbertoLayout.tsx`), o model `BpmPipeline` e a action `ListarPipelinesBpm` já existiam e estavam prontos para a troca de fonte de dados. Identificou também uma lacuna não coberta pelo Markdown da fase: `PainelHistoricoServico` (usado até então) é amarrado a serviço comercial, não a pipeline — não havia definição de conteúdo para as tabs de "outro pipeline", já que um `BpmCard` pertence a exatamente um pipeline.
+
+### O que foi feito
+- Fonte de dados das tabs trocada de `getServicosComerciais()` para `BpmPipeline`: 1ª tab = `card.pipeline.nome` (dinâmico, substitui "Este card"); demais tabs = outros pipelines ativos via `ListarPipelinesBpm()` (reaproveitada, sem alteração), excluindo o pipeline atual.
+- Nova server action `ListarCardsEmpresaPorPipeline` (`src/actions/bpm/Cards.ts`) e novo componente `PainelHistoricoPipeline.tsx` para resolver a lacuna: listam outros cards da mesma empresa no pipeline selecionado, com estados de loading/error/empty/success tratados (empty: "Esta empresa não possui outros cards em {pipeline}"), reabrindo cards via `onAbrirCard` (mesmo padrão de "Outros Cards do CRM").
+- `tests/bpm/card-tabs-servicos-dinamicas.test.ts` removido, substituído por `tests/bpm/card-tabs-pipelines.test.ts` (7 casos, 7/7 passando).
+- Forge rodou `tsc --noEmit`, `eslint`, `npm run build`, `vitest run tests/bpm/` — zero regressão nova (comparado via `git stash` contra o baseline pré-existente: 16 testes falhando/7 arquivos idênticos antes/depois; `CardFilhoCriado is not defined` no build confirmado pré-existente).
+- Probe validou o checklist de 8 pontos de integração (presença visual, trigger, rota/permissões via `exigirAcessoBpmCard`, persistência, estados de UI, integrações externas intactas, sem regressões) por inspeção estática — aprovado.
+
+### Decisões tomadas
+- `BpmPipeline` (não `ServicosComerciais`) é a fonte de dados definitiva das tabs do card — registrado em `decisions.md` para não ser revertido em sessões futuras sem decisão explícita nova.
+- Conteúdo da tab de "outro pipeline" = outros cards da mesma empresa naquele pipeline (não navegação para fora do modal) — mantém o padrão de permanência já estabelecido pelas demais abas do card.
+- Nenhuma migration, nenhuma tabela/rota REST nova — reaproveitamento de `BpmPipeline`/`BpmCard`/`ListarPipelinesBpm` já existentes (Constituição, Artigo IV).
+
+### Problemas encontrados / resolvidos
+- Lacuna de conteúdo das tabs de "outro pipeline" (identificada na Fase 0) — resolvida com `PainelHistoricoPipeline`/`ListarCardsEmpresaPorPipeline` (ver acima), evitando erro/tela vazia.
+
+### Pendências
+- Validação visual em navegador — sem sessão interativa disponível neste ambiente; pendência manual.
+- Commit/PR/push não realizados (fora do escopo autorizado desta execução) — pendência manual do usuário/DevOps.
+- Débito técnico pré-existente `CardFilhoCriado is not defined` no build (não relacionado a esta fase) — recomendável abrir item de correção separado.
+
+### Refletido também em
+- `architecture.md`: seção "Tabs de Pipeline no Card — correção de fonte de dados (RM-2026-A4294C, 2026-09-02)".
+- `decisions.md`: entrada "RM-2026-A4294C — Tabs do card usam `BpmPipeline`, não `ServicosComerciais`".
+- `components.md`: `PainelHistoricoPipeline` e `ListarCardsEmpresaPorPipeline`.
+
+### Gates de fechamento
+- [x] `architecture.md` atualizado
+- [x] `decisions.md` atualizado
+- [x] `components.md` atualizado
+- [x] `journal.md` arquivado
+- [ ] Checklist/file list de story — não há story dedicada em `docs/stories/` para RM-2026-A4294C (não criada nesta sessão; item de arquitetura/journal cobre o registro exigido pela Constituição, Artigo VI)
+
+## Sessão RM-2026-1EA5C1 — Visibilidade por coluna no Alpha CRM/BPM
+
+**Data:** 2026-09-02
+**Objetivo:** configurar, por etapa do pipeline, quais perfis globais podem visualizar e agir sobre cards.
+
+- O card foi assumido com lock exclusivo no Roadmap, sem interferir nas execuções paralelas de outros objetivos.
+- Criada a tabela aditiva `BpmEtapaVisibilidade`, com unicidade `(etapaId, perfil)`, índice de etapa e FK cascade.
+- Antes da escrita no Turso foi gerado e verificado backup de 82.112.274 bytes (261 tabelas/47.643 linhas; SHA-256 `549ab02cb1062679fdfa51a476413c416793326cdc12a82906ca3932b1a9d215`). A migration foi aplicada após confirmação explícita do usuário e validada com zero violações de FK.
+- Criadas actions administrativas com autenticação, autorização de admin, Zod, atualização atômica, auditoria e notificação realtime.
+- Enforcement adicionado à autorização central de cards, à listagem do Kanban, ao dashboard, à promoção de leads NoLoss e à validação transacional de movimentos; UI recebeu configuração por coluna e modo somente leitura.
+- 38/38 testes direcionados e lint direcionado passaram. A suíte BPM manteve 16 falhas preexistentes/concorrentes em 7 arquivos (370 passaram). O build compilou e parou no débito externo `CardFilhoCriado is not defined`; lint/typecheck globais também mantêm débitos históricos fora do escopo.
+- Objetivo encerrado para validação manual na coluna **Em testes**, sem commit, push ou promoção a produção.
+
+## Sessão RM-2026-429476 — Campos personalizados agrupados por coluna
+
+**Data:** 2026-09-02
+
+- O card foi assumido por Codex no Roadmap com lock exclusivo do projeto.
+- Auditoria confirmou a rota administrativa, a lista plana em `AdminPipelineClient.tsx` e a FK opcional `BpmCampo.etapaId`; nenhuma migration foi necessária.
+- Criado `agruparCamposPorColuna` e integrada a renderização de **Todas as etapas**, colunas em ordem, contadores, estados vazios e fallback para etapa indisponível.
+- CRUD, tipos, opções e obrigatoriedade foram preservados; 10/10 testes direcionados e lint direcionado passaram.
+- O typecheck global foi executado e não apontou erro nos arquivos desta entrega; mantém débitos preexistentes em Google Calendar, Gerador de Documentos e outros módulos.
+- Durante os gates finais, o processo local de modelo de outra IA ocupava cerca de 29 GiB e todo o swap; tentativas posteriores de `npm test` e build terminaram com `SIGSEGV`. O processo concorrente não foi interrompido para não afetar outro objetivo.
+- Entrega preparada para validação manual em **Em testes**, sem commit, push ou promoção a produção.

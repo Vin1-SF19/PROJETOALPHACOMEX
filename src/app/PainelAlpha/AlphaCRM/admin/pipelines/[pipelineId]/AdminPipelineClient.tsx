@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { CriarEtapaBpm, AtualizarEtapaBpm, ReordenarEtapasBpm } from "@/actions/bpm/Etapas";
@@ -8,6 +8,8 @@ import { CriarCampoBpm, AtualizarCampoBpm, ExcluirCampoBpm } from "@/actions/bpm
 import type { TemaAlpha } from "@/lib/temas";
 import { FINANCIAL_PIPELINE_NAME, hasConfiguredFinancialPipeline } from "@/lib/bpm/pipeline-financeiro";
 import { ConfigurarEtapasFinanceiroButton } from "./ConfigurarEtapasFinanceiroButton";
+import { VisibilidadeEtapasSection } from "./VisibilidadeEtapasSection";
+import { agruparCamposPorColuna } from "@/lib/bpm/campos-admin";
 
 interface EtapaBpm {
   id: string;
@@ -66,6 +68,10 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
   const [editCampoObrigatorio, setEditCampoObrigatorio] = useState(false);
   const [editCampoOpcoes, setEditCampoOpcoes] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const camposPorColuna = useMemo(
+    () => agruparCamposPorColuna(campos, etapas),
+    [campos, etapas],
+  );
 
   async function handleCriarEtapa() {
     if (!novaEtapaNome.trim()) return;
@@ -304,17 +310,42 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
       {/* Campos personalizados */}
       <section className="space-y-3">
         <h2 className="text-sm font-bold text-white uppercase tracking-wide">Campos Personalizados</h2>
-        <div className="space-y-2">
-          {campos.map((campo) => {
-            const editando = editandoCampoId === campo.id;
-            return (
-              <div key={campo.id} className="bg-slate-800/60 border border-white/5 rounded-xl">
+        <div className="space-y-4">
+          {camposPorColuna.map((grupo) => (
+            <div
+              key={grupo.id}
+              className="overflow-hidden rounded-2xl border border-white/5 bg-slate-900/35"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-white/5 bg-white/[0.025] px-4 py-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-100">{grupo.nome}</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {grupo.tipo === "GERAL"
+                      ? "Campos exibidos em todas as colunas"
+                      : grupo.tipo === "INDISPONIVEL"
+                        ? "Revise o vínculo destes campos"
+                        : "Campos configurados nesta coluna"}
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-300">
+                  {grupo.campos.length} {grupo.campos.length === 1 ? "campo" : "campos"}
+                </span>
+              </div>
+
+              <div className="space-y-2 p-2">
+                {grupo.campos.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-white/5 px-3 py-4 text-center text-xs text-slate-600">
+                    {grupo.tipo === "GERAL"
+                      ? "Nenhum campo configurado para todas as etapas."
+                      : "Nenhum campo configurado nesta coluna."}
+                  </p>
+                ) : grupo.campos.map((campo) => {
+                  const editando = editandoCampoId === campo.id;
+                  return (
+                    <div key={campo.id} className="bg-slate-800/60 border border-white/5 rounded-xl">
                 <div className="flex items-center gap-3 px-3 py-2">
                   <span className="flex-1 text-sm text-white">{campo.nome}</span>
                   <span className="text-xs text-slate-500">{campo.tipo}</span>
-                  <span className="text-xs text-slate-500">
-                    {etapas.find((e) => e.id === campo.etapaId)?.nome || "Todas as etapas"}
-                  </span>
                   <label className="flex items-center gap-1.5 text-xs text-slate-400">
                     <input
                       type="checkbox"
@@ -391,9 +422,12 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
                     </div>
                   </div>
                 )}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <input
@@ -434,6 +468,12 @@ export default function AdminPipelineClient({ pipeline, visual }: { pipeline: Pi
           </button>
         </div>
       </section>
+
+      <VisibilidadeEtapasSection
+        pipelineId={pipeline.id}
+        etapas={etapas}
+        accent={accent}
+      />
     </div>
   );
 }
