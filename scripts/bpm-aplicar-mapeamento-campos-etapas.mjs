@@ -35,7 +35,7 @@ const CAMPOS = {
   "Embasamento do processo": ["texto_longo", "GLOBAL"],
   "Radar atual": ["selecao", "GLOBAL"],
   "Mês de protocolo": ["texto", "GLOBAL", null, null, ["Mês para protocolar"]],
-  "Faturamento dos últimos 5 anos": ["texto_longo", "GLOBAL"],
+  "Faturamento dos últimos 5 anos": ["texto_longo", "GLOBAL", null, null, ["Faturamento nos últimos 5 anos"]],
   "Status da sede": ["selecao", "GLOBAL"],
   Armazenagem: ["texto_longo", "GLOBAL", null, null, ["Armazenamento"]],
   "Contas/faturas": ["texto_longo", "GLOBAL", null, null, ["Faturas sob titularidade da empresa"]],

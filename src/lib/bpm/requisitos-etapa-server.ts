@@ -261,7 +261,11 @@ export async function carregarCamposAplicaveisEtapa(
       nome: campo.nome,
       tipo: campo.tipo,
       opcoesJson: opcoes.length ? JSON.stringify(opcoes.map((opcao) => opcao.rotulo)) : campo.opcoesJson,
-      obrigatorio: true,
+      // BpmCampoObrigatorioEtapa continua sendo o fallback para cadastros
+      // legados. Quando a etapa já possui a configuração nova, ela é a fonte
+      // autoritativa da obrigatoriedade e não pode ser sobrescrita pelo vínculo
+      // legado que permaneceu no banco após a migração.
+      obrigatorio: configEtapa ? acesso.obrigatorio : true,
       obrigatorioEntrada: configEtapa?.obrigatorioEntrada ?? false,
       obrigatorioSaida: configEtapa?.obrigatorioSaida ?? false,
       ordem: configEtapa?.ordem ?? campo.ordem,

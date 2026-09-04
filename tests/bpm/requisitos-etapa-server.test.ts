@@ -85,6 +85,48 @@ describe("campos aplicáveis por etapa", () => {
     });
   });
 
+  it("prioriza a configuração atual da etapa sobre associação obrigatória legada", async () => {
+    const campo = {
+      id: "campo-reuniao",
+      pipelineId: "pipeline-radar",
+      etapaId: null,
+      nome: "Mês para protocolar",
+      tipo: "texto",
+      opcoesJson: null,
+      obrigatorio: false,
+      ordem: 1,
+      etapaConfiguracoes: [{
+        etapaId: "reuniao-agendada",
+        visivel: true,
+        editavel: true,
+        somenteLeitura: false,
+        obrigatorio: false,
+        obrigatorioEntrada: false,
+        obrigatorioSaida: false,
+        ordem: 1,
+      }],
+    };
+    const client = criarCliente({
+      bpmCampo: { findMany: vi.fn().mockResolvedValue([campo]) },
+      bpmCampoObrigatorioEtapa: {
+        findMany: vi.fn().mockResolvedValue([{ campo }]),
+      },
+    });
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-1",
+      "pipeline-radar",
+      "reuniao-agendada",
+      client as never,
+    );
+
+    expect(campos).toHaveLength(1);
+    expect(campos[0]).toMatchObject({
+      id: "campo-reuniao",
+      obrigatorio: false,
+    });
+  });
+
   it("inclui campo com etapaId null (\"Todas as etapas\" no admin) mesmo sem vínculo em BpmCampoObrigatorioEtapa — RM-2026-04C4B0", async () => {
     const client = criarCliente({
       bpmCampo: {
