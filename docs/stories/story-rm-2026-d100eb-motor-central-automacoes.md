@@ -275,25 +275,25 @@ representação por etapa.
 
 ### Critérios adicionais
 
-- [ ] Inventariar banco, motores, frontend, backend, crons, filas, webhooks,
+- [x] Inventariar banco, motores, frontend, backend, crons, filas, webhooks,
       cadências, SLA, integrações e mutações automáticas do CRM/BPM.
-- [ ] Documentar gatilho, condição, ação, recorrência, escopo e idempotência de
+- [x] Documentar gatilho, condição, ação, recorrência, escopo e idempotência de
       cada comportamento encontrado.
-- [ ] Toda definição criada/editada pelo painel gera uma versão central válida;
+- [x] Toda definição criada/editada pelo painel gera uma versão central válida;
       o executor legado não pode disputar a mesma definição.
 - [ ] Migrar definições legadas e rotinas hardcoded antes de desligar seus
       entrypoints antigos, preservando comportamento e histórico.
-- [ ] A página de Automações usar a mesma fonte persistida do runtime, sem uma
+- [x] A página de Automações usar a mesma fonte persistida do runtime, sem uma
       lista manual ou um segundo editor para legados.
-- [ ] Suportar automações globais no pipeline e vínculo com uma ou várias etapas
+- [x] Suportar automações globais no pipeline e vínculo com uma ou várias etapas
       sem duplicar a definição no banco.
-- [ ] Exibir nome, descrição, pipeline, etapas, status, gatilho, condições,
+- [x] Exibir nome, descrição, pipeline, etapas, status, gatilho, condições,
       ações, recorrência, próxima/última execução, resultado e origem.
-- [ ] Mostrar resumos das automações em cada coluna do Kanban, derivados da
+- [x] Mostrar resumos das automações em cada coluna do Kanban, derivados da
       mesma versão ativa usada pelo worker.
-- [ ] Cadências, SLA, alertas e integrações automáticas ficarem visíveis e
+- [x] Cadências, SLA, alertas e integrações automáticas ficarem visíveis e
       rastreáveis no catálogo central.
-- [ ] Cobrir migração, equivalência, ausência de duplicidade, edição e projeção
+- [x] Cobrir migração, equivalência, ausência de duplicidade, edição e projeção
       por etapa com testes e E2E isolado.
 
 ### Auditoria desta extensão
@@ -303,3 +303,44 @@ representação por etapa.
   `BpmAutomacaoVersao`, zero `BpmCadencia`, zero `BpmSlaConfig`; um webhook
   global de teste sem entradas.
 - Nenhum `CREATE TRIGGER` foi encontrado nas migrations ou no schema Prisma.
+
+### Implementação e gates desta extensão
+
+- O CRUD amigável passou a publicar uma versão central; a fila legada ignora
+  qualquer definição que já possua versão ativa, impedindo execução dupla.
+- O editor central é o único editor da página e grava identidade, escopo,
+  condições e grafo executável na mesma operação.
+- A listagem geral e o Kanban projetam a versão ativa em uma ou várias etapas,
+  ou em `Automações globais`, sem duplicar a definição persistida.
+- Foram modeladas 13 definições equivalentes às rotinas hardcoded encontradas.
+  O plano é idempotente, prepara definições alteradas como inativas e faz o
+  cutover das 13 identidades em uma única transação. Os entrypoints antigos só
+  ficam dormentes depois que todas as respectivas definições centrais estiverem
+  ativas; uma interrupção anterior mantém os fallbacks antigos operacionais.
+- Cadências e configurações de SLA foram auditadas no banco e não possuem
+  registros atuais para migrar. Eventos `CADENCIA_INICIADA` e
+  `SLA_STATUS_ALTERADO`, esperas, recorrências e a ação genérica `CRIAR_SLA`
+  permanecem disponíveis no catálogo central; alertas e o polling do Google
+  Meet estão contemplados nas definições de migração.
+- Em restauração descartável do backup de produção, a primeira aplicação criou
+  13 definições e 13 versões; a segunda manteve as 13 inalteradas. Integridade e
+  FKs permaneceram íntegras. Fechamento comercial criou exatamente um filho em
+  Financeiro e um em Radar; a repetição não duplicou. Entrada em Nota Fiscal
+  criou uma única tarefa e a repetição também não duplicou.
+- Gates locais: Prisma válido; ESLint focado limpo; 9 arquivos/45 testes de
+  automações aprovados. O typecheck global foi executado com 8 GB e não mostrou
+  diagnósticos nos arquivos desta extensão; falhou por débitos concorrentes de
+  outros módulos registrados no workspace compartilhado.
+
+### Checkpoint de cutover — aguardando autorização específica
+
+- Backup dedicado e verificado:
+  `painelalpha_turso_pre_change_2026-09-04T20-47-34-663Z.sql`.
+- SHA-256:
+  `beae8d1b7651964195cd19e7887b02eae22c6ae775f3e7cf1653b52e9fd8fc9f`.
+- Pré-flight remoto mais recente: zero automações, versões, agendas, execuções,
+  cadências e configurações de SLA; usuário administrador `id=1` ativo.
+- Comando mutante ainda **não executado**:
+  `npm run bpm:automacoes:migrar-hardcoded -- --apply --user-id=1`.
+- O critério de migração acima permanece aberto até o cutover real e a
+  verificação de que os fallbacks antigos ficaram dormentes.

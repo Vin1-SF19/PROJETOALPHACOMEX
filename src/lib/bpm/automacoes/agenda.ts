@@ -1,12 +1,13 @@
 import "server-only";
 
+import type { z } from "zod";
 import db from "@/lib/prisma";
 import { resolverInicioCicloNaEtapa } from "@/lib/bpm/agendar-reuniao";
 import { contarDiasUteisDecorridos } from "@/lib/bpm/novos-leads";
 import { gatilhoConfigSchema } from "./central-schemas";
 import { publicarEventoBpm } from "./eventos";
 
-type Recorrencia = NonNullable<ReturnType<typeof gatilhoConfigSchema.parse>["recorrencia"]>;
+type Recorrencia = NonNullable<z.input<typeof gatilhoConfigSchema>["recorrencia"]>;
 
 function parseObjeto(valor: string | null): Record<string, unknown> {
   if (!valor) return {};
@@ -52,7 +53,7 @@ export function calcularProximaRecorrencia(config: Recorrencia, referencia = new
 
 export async function sincronizarAgendasVersaoAutomacao(versaoId: string) {
   const versao = await db.bpmAutomacaoVersao.findUnique({ where: { id: versaoId }, include: { automacao: true } });
-  if (!versao || versao.status !== "ATIVA") return { criadas: 0 };
+  if (!versao || versao.status !== "ATIVA" || !versao.automacao.ativa) return { criadas: 0 };
   const config = gatilhoConfigSchema.parse(parseObjeto(versao.gatilhoConfigJson));
   if (versao.gatilhoTipo !== "RECORRENCIA_ATINGIDA" || !config.recorrencia) return { criadas: 0 };
   const etapasIds = [...new Set([...(config.etapasIds ?? []), ...(config.etapaId ? [config.etapaId] : [])])];
@@ -62,6 +63,7 @@ export async function sincronizarAgendasVersaoAutomacao(versaoId: string) {
     : [];
   const porCard = new Map<string, typeof historicos>();
   for (const historico of historicos) porCard.set(historico.cardId, [...(porCard.get(historico.cardId) ?? []), historico]);
+  const chavesAtivas: string[] = [];
   let criadas = 0;
   for (const card of cards) {
     const referencia = config.recorrencia.ancora === "ENTRADA_ETAPA"
@@ -69,13 +71,21 @@ export async function sincronizarAgendasVersaoAutomacao(versaoId: string) {
       : new Date();
     const proxima = calcularProximaRecorrencia(config.recorrencia, referencia, versao.timezone);
     if (!proxima) continue;
+    const chaveAgendamento = config.recorrencia.ancora === "ENTRADA_ETAPA"
+      ? `recorrencia:${versao.id}:${card.id}:${referencia.getTime()}`
+      : `recorrencia:${versao.id}:${card.id}`;
+    chavesAtivas.push(chaveAgendamento);
     await db.bpmAutomacaoAgenda.upsert({
-    where: { chaveAgendamento: `recorrencia:${versao.id}:${card.id}` },
-    create: { automacaoVersaoId: versao.id, cardId: card.id, chaveAgendamento: `recorrencia:${versao.id}:${card.id}`, tipo: "RECORRENTE", proximaExecucaoEm: proxima, timezone: versao.timezone, recorrenciaJson: JSON.stringify(config.recorrencia) },
+    where: { chaveAgendamento },
+    create: { automacaoVersaoId: versao.id, cardId: card.id, chaveAgendamento, tipo: "RECORRENTE", proximaExecucaoEm: proxima, timezone: versao.timezone, recorrenciaJson: JSON.stringify(config.recorrencia) },
     update: { recorrenciaJson: JSON.stringify(config.recorrencia), ativo: true },
   });
     criadas++;
   }
+  await db.bpmAutomacaoAgenda.updateMany({
+    where: { automacaoVersaoId: versao.id, tipo: "RECORRENTE", ativo: true, ...(chavesAtivas.length ? { chaveAgendamento: { notIn: chavesAtivas } } : {}) },
+    data: { ativo: false },
+  });
   return { criadas };
 }
 

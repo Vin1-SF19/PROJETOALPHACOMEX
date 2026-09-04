@@ -150,6 +150,18 @@ function resumoVersao(automacao: AutomacaoBpmView) {
   } catch { return "Versão central com configuração inválida"; }
 }
 
+function resumoUltimoResultado(automacao: AutomacaoBpmView) {
+  const execucao = automacao.ultimaExecucao;
+  if (!execucao) return null;
+  const origem = execucao.evento ? `${execucao.evento.tipo.replaceAll("_", " ")} por ${execucao.evento.atorTipo.toLocaleLowerCase("pt-BR")}` : execucao.gatilhoTipo?.replaceAll("_", " ");
+  let resultado = "";
+  try {
+    const parsed = execucao.resultadoJson ? JSON.parse(execucao.resultadoJson) : null;
+    if (parsed) resultado = JSON.stringify(parsed).slice(0, 160);
+  } catch { resultado = "resultado inválido"; }
+  return [origem ? `Origem: ${origem}` : null, resultado ? `Resultado: ${resultado}` : null].filter(Boolean).join(" · ");
+}
+
 export function AutomacoesWorkspace({ pipelines, catalogos, erro, accent }: Props) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
@@ -299,6 +311,7 @@ export function AutomacoesWorkspace({ pipelines, catalogos, erro, accent }: Prop
                   <article key={automacao.id} className="rounded-xl border border-cyan-400/10 bg-slate-950/70 p-3">
                     <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-white">{automacao.nome}</p><p className="mt-1 text-xs text-slate-500">{automacao.descricao || resumoVersao(automacao)}</p></div><Switch checked={automacao.ativa} onCheckedChange={(valor) => alternar(automacao, valor)} disabled={isPending} /></div>
                     <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-400"><Badge variant="secondary"><Clock3 size={12} /> {GATILHO_LABEL[automacao.versaoAtiva?.gatilhoTipo ?? automacao.gatilhoTipo] ?? automacao.gatilhoTipo}</Badge><span>{resumoVersao(automacao)}</span>{automacao.proximaExecucao && <span>Próxima: {dataCurta(automacao.proximaExecucao)}</span>}{automacao.ultimaExecucao && <span>Última: {automacao.ultimaExecucao.status.toLocaleLowerCase("pt-BR")} · {dataCurta(automacao.ultimaExecucao.executadoEm ?? automacao.ultimaExecucao.createdAt)}</span>}</div>
+                    {resumoUltimoResultado(automacao) && <p className="mt-1 line-clamp-2 text-[10px] text-slate-600">{resumoUltimoResultado(automacao)}</p>}
                     <div className="mt-2 flex justify-end"><button type="button" onClick={() => setEditor({ mode: "edit", automacao })} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label={`Editar ${automacao.nome}`}><Pencil size={14} /></button></div>
                   </article>
                 ))}
@@ -346,6 +359,7 @@ export function AutomacoesWorkspace({ pipelines, catalogos, erro, accent }: Prop
                         <button type="button" onClick={() => setEditor({ mode: "edit", automacao })} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label={`Editar ${automacao.nome}`}><Pencil size={14} /></button>
                         <button type="button" onClick={() => setExcluir(automacao)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" aria-label={`Excluir ${automacao.nome}`}><Trash2 size={14} /></button>
                       </div>
+                      {resumoUltimoResultado(automacao) && <p className="mt-1 line-clamp-2 text-[10px] text-slate-600">{resumoUltimoResultado(automacao)}</p>}
                     </article>
                   ))}
                 </div>

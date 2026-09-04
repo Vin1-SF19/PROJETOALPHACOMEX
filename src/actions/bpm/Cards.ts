@@ -30,6 +30,8 @@ import {
   enfileirarAutomacoesMovimentoBpm,
 } from "@/lib/bpm/automacoes/fila";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
+import { executarAutomacoesCentraisDoCardAgora } from "@/lib/bpm/automacoes/orquestrador";
+import { automacaoMigradaEstaAtiva, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 
 import { buscarServicosContratados } from "@/actions/Clientes";
@@ -1848,17 +1850,37 @@ async function executarMovimentoComRequisitos(
     console.error("[enfileirarAutomacoesMovimentoBpm]", error);
   }
 
-  // Automações D-009/D-035 rodam fora da transação do movimento: uma falha nelas
-  // não pode reverter nem derrubar a movimentação do card pai já commitada acima.
-  try {
-    cardsFilhosCriados.push(...(await executarAutomacaoFechamentoComercial(cardId, userId)));
-  } catch (error) {
-    console.error("[executarAutomacaoFechamentoComercial]", error);
+  // Durante a migração, o fallback antigo só permanece ativo até a definição
+  // equivalente existir no Motor Central. Isso mantém o rollout reversível sem
+  // permitir que os dois executores produzam o mesmo efeito.
+  const [fechamentoCentral, notaFiscalCentral] = await Promise.all([
+    automacaoMigradaEstaAtiva(NOMES_AUTOMACOES_MIGRADAS.fechamento),
+    automacaoMigradaEstaAtiva(NOMES_AUTOMACOES_MIGRADAS.notaFiscal),
+  ]);
+  if (fechamentoCentral || notaFiscalCentral) {
+    try {
+      const vinculosAntes = fechamentoCentral
+        ? new Set((await db.bpmCardVinculo.findMany({ where: { cardOrigemId: cardId }, select: { id: true } })).map((item) => item.id))
+        : new Set<string>();
+      await executarAutomacoesCentraisDoCardAgora(cardId);
+      if (fechamentoCentral) {
+        const criados = await db.bpmCardVinculo.findMany({
+          where: { cardOrigemId: cardId, id: { notIn: [...vinculosAntes] } },
+          select: { cardDestino: { select: { id: true, pipelineId: true, pipeline: { select: { nome: true } } } } },
+        });
+        cardsFilhosCriados.push(...criados.map(({ cardDestino }) => ({ cardId: cardDestino.id, pipelineId: cardDestino.pipelineId, pipelineNome: cardDestino.pipeline.nome })));
+      }
+    } catch (error) {
+      console.error("[executarAutomacoesCentraisDoCardAgora]", error);
+    }
   }
-  try {
-    await executarAutomacaoTarefaNotaFiscal(cardId, userId);
-  } catch (error) {
-    console.error("[executarAutomacaoTarefaNotaFiscal]", error);
+  if (!fechamentoCentral) {
+    try { cardsFilhosCriados.push(...(await executarAutomacaoFechamentoComercial(cardId, userId))); }
+    catch (error) { console.error("[executarAutomacaoFechamentoComercial]", error); }
+  }
+  if (!notaFiscalCentral) {
+    try { await executarAutomacaoTarefaNotaFiscal(cardId, userId); }
+    catch (error) { console.error("[executarAutomacaoTarefaNotaFiscal]", error); }
   }
   try {
     await sincronizarComissoesDoCardFinanceiro(cardId);

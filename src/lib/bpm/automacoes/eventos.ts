@@ -90,7 +90,11 @@ function correspondeAoGatilho(params: {
   try { config = gatilhoConfigSchema.parse(parseJson(params.configJson)); } catch { return false; }
   const { gatilhoTipo, eventoTipo, eventoNovo, eventoAnterior, etapaAutomacaoId } = params;
   const etapasIds = new Set([...(config.etapasIds ?? []), ...(config.etapaId ? [config.etapaId] : []), ...(!config.etapaId && !config.etapasIds?.length && config.escopo !== "GLOBAL_PIPELINE" ? [etapaAutomacaoId] : [])]);
-  const escopoCorresponde = (etapaId: unknown) => config.escopo === "GLOBAL_PIPELINE" || typeof etapaId === "string" && etapasIds.has(etapaId);
+  const escopoCorresponde = (etapaId: unknown) => {
+    if (config.escopo === "GLOBAL_PIPELINE") return true;
+    const etapaResolvida = typeof etapaId === "string" ? etapaId : params.etapaAtualCardId ?? etapaAutomacaoId;
+    return etapasIds.has(etapaResolvida);
+  };
   if (gatilhoTipo === "ENTRAR_COLUNA") {
     return eventoTipo === "CARD_MOVIDO" && escopoCorresponde(eventoNovo.etapaId);
   }
@@ -110,10 +114,10 @@ function correspondeAoGatilho(params: {
   if (gatilhoTipo === "SLA_STATUS_ALTERADO" && config.slaStatus) {
     return eventoTipo === gatilhoTipo && escopoCorresponde(params.etapaAtualCardId) && eventoNovo.status === config.slaStatus;
   }
-  return gatilhoTipo === eventoTipo && escopoCorresponde(eventoNovo.etapaId ?? params.etapaAtualCardId);
+  return gatilhoTipo === eventoTipo && escopoCorresponde(eventoNovo.etapaId ?? params.etapaAtualCardId ?? etapaAutomacaoId);
 }
 
-export async function materializarExecucoesEventosBpm(limite = 100, client: ClienteEventos = db) {
+export async function materializarExecucoesEventosBpm(limite = 100, client: ClienteEventos = db, filtro?: { cardId?: string }) {
   const versoes = await client.bpmAutomacaoVersao.findMany({
     where: { status: "ATIVA", automacao: { ativa: true } },
     select: { id: true, automacaoId: true, gatilhoTipo: true, gatilhoConfigJson: true, automacao: { select: { etapaId: true, pipelineId: true } } },
@@ -125,7 +129,7 @@ export async function materializarExecucoesEventosBpm(limite = 100, client: Clie
       ? "CARD_MOVIDO" : versao.gatilhoTipo === "CAMPO_VALOR_ASSUMIDO" ? "CAMPO_ALTERADO" : versao.gatilhoTipo;
     const eventos = await client.bpmEventoDominio.findMany({
       where: {
-        tipo: tipoEvento, cardId: { not: null }, pipelineId: versao.automacao.pipelineId,
+        tipo: tipoEvento, cardId: filtro?.cardId ?? { not: null }, pipelineId: versao.automacao.pipelineId,
         profundidade: { lt: 10 }, execucoes: { none: { automacaoVersaoId: versao.id } },
       },
       orderBy: { ocorridoEm: "asc" }, take: Math.min(Math.max(limite, 1), 500),

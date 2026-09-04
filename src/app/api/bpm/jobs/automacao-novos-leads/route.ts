@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { executarAutomacaoFollowUpBpm } from "@/lib/bpm/automacao-novos-leads";
 import { autorizarCron } from "@/lib/bpm/cron-auth";
 import { executarPollingTranscricoesBpm } from "@/lib/bpm/transcricao-reuniao-server";
+import { automacoesMigradasEstaoAtivas, NOMES_AUTOMACOES_MIGRADAS } from "@/lib/bpm/automacoes/migracao-hardcoded";
 
 export const dynamic = "force-dynamic";
 let jobEmAndamento = false;
@@ -29,6 +30,16 @@ export async function GET(request: Request) {
 
   jobEmAndamento = true;
   try {
+    const migradas = await automacoesMigradasEstaoAtivas([
+      NOMES_AUTOMACOES_MIGRADAS.novosLeadsOitoDias,
+      NOMES_AUTOMACOES_MIGRADAS.agendarReuniaoOitoDias,
+      NOMES_AUTOMACOES_MIGRADAS.reuniaoAgendadaOitoDias,
+      NOMES_AUTOMACOES_MIGRADAS.ligacoesDiarias,
+      NOMES_AUTOMACOES_MIGRADAS.standbySemanal,
+      NOMES_AUTOMACOES_MIGRADAS.monitoramentoMensal,
+      NOMES_AUTOMACOES_MIGRADAS.transcricaoMeet,
+    ]);
+    if (migradas) return NextResponse.json({ success: true, data: { ignorado: true, motivo: "MIGRADO_PARA_MOTOR_CENTRAL" } });
     const transcricoes = await executarPollingTranscricoesBpm();
     const followUp = await executarAutomacaoFollowUpBpm();
     return NextResponse.json({ success: true, data: { transcricoes, followUp } });

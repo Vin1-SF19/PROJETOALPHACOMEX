@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   templateFindMany: vi.fn(),
   automacaoFindUnique: vi.fn(),
   automacaoCreate: vi.fn(),
+  versaoAggregate: vi.fn(),
+  versaoUpdateMany: vi.fn(),
+  versaoCreate: vi.fn(),
+  agendaUpdateMany: vi.fn(),
   auditoriaCreate: vi.fn(),
   transaction: vi.fn(),
 }));
@@ -48,12 +52,25 @@ describe("actions da aba Automações", () => {
     mocks.auth.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     mocks.exigirConfig.mockResolvedValue(undefined);
     mocks.etapaFindFirst.mockResolvedValue({ id: ETAPA_ID });
-    mocks.automacaoCreate.mockResolvedValue({ id: AUTOMACAO_ID });
+    mocks.automacaoCreate.mockImplementation(async ({ data }) => ({
+      ...data,
+      id: AUTOMACAO_ID,
+    }));
+    mocks.versaoAggregate.mockResolvedValue({ _max: { versao: null } });
+    mocks.versaoUpdateMany.mockResolvedValue({ count: 0 });
+    mocks.versaoCreate.mockResolvedValue({ id: "versao-1" });
+    mocks.agendaUpdateMany.mockResolvedValue({ count: 0 });
     mocks.auditoriaCreate.mockResolvedValue({ id: "auditoria-1" });
     mocks.transaction.mockImplementation(async (operacao) => {
       if (typeof operacao === "function") {
         return operacao({
           bpmAutomacao: { create: mocks.automacaoCreate },
+          bpmAutomacaoVersao: {
+            aggregate: mocks.versaoAggregate,
+            updateMany: mocks.versaoUpdateMany,
+            create: mocks.versaoCreate,
+          },
+          bpmAutomacaoAgenda: { updateMany: mocks.agendaUpdateMany },
           bpmPipelineConfigAuditoria: { create: mocks.auditoriaCreate },
         });
       }
@@ -115,6 +132,7 @@ describe("actions da aba Automações", () => {
       tempoMinutos: null,
       acaoTipo: "GERAR_FICHA",
       parametrosJson: "{}",
+      versoes: [],
     });
     const resultado = await DuplicarAutomacaoBpm({
       automacaoId: AUTOMACAO_ID,

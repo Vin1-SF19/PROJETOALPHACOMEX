@@ -124,6 +124,7 @@ export async function SalvarDefinicaoAutomacaoCentralBpm(payload: unknown) {
           });
       const ultima = await tx.bpmAutomacaoVersao.aggregate({ where: { automacaoId: automacao.id }, _max: { versao: true } });
       await tx.bpmAutomacaoVersao.updateMany({ where: { automacaoId: automacao.id, status: "ATIVA" }, data: { status: "ARQUIVADA", arquivadaEm: agora } });
+      await tx.bpmAutomacaoAgenda.updateMany({ where: { automacaoVersao: { automacaoId: automacao.id }, ativo: true }, data: { ativo: false } });
       const versao = await tx.bpmAutomacaoVersao.create({ data: {
         automacaoId: automacao.id,
         versao: (ultima._max.versao ?? 0) + 1,

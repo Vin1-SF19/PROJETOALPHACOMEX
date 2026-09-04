@@ -513,6 +513,7 @@ export async function AlternarAutomacaoBpm(automacaoId: string, ativa: boolean) 
     if (!atual) throw new Error("Automação não encontrada");
     await db.$transaction([
       db.bpmAutomacao.update({ where: { id }, data: { ativa } }),
+      ...(!ativa ? [db.bpmAutomacaoAgenda.updateMany({ where: { automacaoVersao: { automacaoId: id }, ativo: true }, data: { ativo: false } })] : []),
       db.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: atual.pipelineId,
@@ -523,6 +524,10 @@ export async function AlternarAutomacaoBpm(automacaoId: string, ativa: boolean) 
         },
       }),
     ]);
+    if (ativa) {
+      const versao = await db.bpmAutomacaoVersao.findFirst({ where: { automacaoId: id, status: "ATIVA" }, orderBy: { versao: "desc" }, select: { id: true } });
+      if (versao) await (await import("@/lib/bpm/automacoes/agenda")).sincronizarAgendasVersaoAutomacao(versao.id);
+    }
     revalidatePath(ROTA_AUTOMACOES);
     return { success: true as const };
   } catch (error) {
@@ -558,7 +563,10 @@ export async function DuplicarAutomacaoBpm(payload: unknown) {
   try {
     const { userId } = await exigirAdminAutomacoes();
     const dados = duplicarAutomacaoBpmSchema.parse(payload);
-    const origem = await db.bpmAutomacao.findUnique({ where: { id: dados.automacaoId } });
+    const origem = await db.bpmAutomacao.findUnique({
+      where: { id: dados.automacaoId },
+      include: { versoes: { where: { status: "ATIVA" }, orderBy: { versao: "desc" }, take: 1 } },
+    });
     if (!origem) throw new Error("Automação não encontrada");
     await validarPipelineEtapa(dados.pipelineId, dados.etapaId);
     const nome = (dados.nome ?? `${origem.nome} (cópia)`).slice(0, 120);
@@ -577,7 +585,26 @@ export async function DuplicarAutomacaoBpm(payload: unknown) {
           criadoPorId: userId,
         },
       });
-      await publicarVersaoCentralDaDefinicaoSimples(tx, automacao);
+      const versaoOrigem = origem.versoes[0];
+      if (versaoOrigem) {
+        let gatilhoConfig: Record<string, unknown> = {};
+        try { gatilhoConfig = JSON.parse(versaoOrigem.gatilhoConfigJson); } catch { gatilhoConfig = {}; }
+        delete gatilhoConfig.origemChave;
+        await tx.bpmAutomacaoVersao.create({ data: {
+          automacaoId: automacao.id,
+          versao: 1,
+          status: "ATIVA",
+          gatilhoTipo: versaoOrigem.gatilhoTipo,
+          gatilhoConfigJson: JSON.stringify({ ...gatilhoConfig, escopo: "ETAPAS", etapaId: dados.etapaId, etapasIds: [dados.etapaId] }),
+          condicaoJson: versaoOrigem.condicaoJson,
+          grafoJson: versaoOrigem.grafoJson,
+          timezone: versaoOrigem.timezone,
+          criadoPorId: userId,
+          ativadaEm: new Date(),
+        } });
+      } else {
+        await publicarVersaoCentralDaDefinicaoSimples(tx, automacao);
+      }
       await tx.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: dados.pipelineId,

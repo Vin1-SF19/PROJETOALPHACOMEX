@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { autorizarCron } from "@/lib/bpm/cron-auth";
 import { executarAlertasTarefasBpm } from "@/lib/bpm/alertas-tarefas";
+import { alertasTarefasForamMigrados } from "@/lib/bpm/automacoes/migracao-hardcoded";
 
 export const dynamic = "force-dynamic";
 let jobEmAndamento = false;
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
 
   jobEmAndamento = true;
   try {
+    if (await alertasTarefasForamMigrados()) return NextResponse.json({ success: true, data: { ignorado: true, motivo: "MIGRADO_PARA_MOTOR_CENTRAL" } });
     return NextResponse.json({ success: true, data: await executarAlertasTarefasBpm() });
   } catch (error) {
     console.error("[AlertasTarefasRoute] Falha no lote", error);

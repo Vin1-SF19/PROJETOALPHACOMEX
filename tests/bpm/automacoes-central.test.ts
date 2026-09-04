@@ -49,6 +49,15 @@ describe("Motor Central de Automações", () => {
     expect(calcularProximaRecorrencia({ tipo: "INTERVALO_HORAS", intervaloHoras: 2 }, base)?.toISOString()).toBe("2026-09-04T12:00:00.000Z");
     expect(calcularProximaRecorrencia({ tipo: "INTERVALO_HORAS", intervaloHoras: 2, ate: "2026-09-04T11:00:00.000Z" }, base)).toBeNull();
     expect(calcularProximaRecorrencia({ tipo: "DIARIA", hora: "09:00" }, new Date("2026-09-04T13:00:00.000Z"), "America/Sao_Paulo")?.toISOString()).toBe("2026-09-05T12:00:00.000Z");
+    expect(calcularProximaRecorrencia({ tipo: "INTERVALO_DIAS", intervaloDias: 7, ancora: "ENTRADA_ETAPA" }, base)?.toISOString()).toBe("2026-09-11T10:00:00.000Z");
+  });
+
+  it("valida capacidades genéricas usadas na migração das rotinas hardcoded", () => {
+    expect(validarParametrosAcaoCentral("MOVER_CARD", { etapaId: "cm12345678901234567890123", validarRequisitos: false, exigirProximoContatoVazio: true })).toMatchObject({ validarRequisitos: false });
+    expect(validarParametrosAcaoCentral("CRIAR_TAREFA", { titulo: "Emitir NF", tipo: "EMISSAO_NF", prioridade: "ALTA", naoDuplicarPendenteTipo: true })).toMatchObject({ naoDuplicarPendenteTipo: true });
+    expect(validarParametrosAcaoCentral("CRIAR_TAREFAS_POR_META", { meta: 5, interacaoTipo: "LIGACAO", tarefaTipo: "LIGACAO", titulo: "Ligação {{indice}}", prioridade: "NORMAL", maximoDiasUteisDesdeCriacao: 8 })).toMatchObject({ meta: 5 });
+    expect(validarParametrosAcaoCentral("MARCAR_ALERTA_TAREFA", {})).toEqual({});
+    expect(validarParametrosAcaoCentral("SINCRONIZAR_TRANSCRICAO_REUNIAO", {})).toEqual({});
   });
 
   it("deduplica a publicação de evento pela chave de idempotência", async () => {

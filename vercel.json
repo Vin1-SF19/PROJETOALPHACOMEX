@@ -5,14 +5,6 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/bpm/jobs/automacao-novos-leads",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/bpm/jobs/alertas-tarefas",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/calendario-alpha/jobs/alertas-compromissos",
       "schedule": "*/5 * * * *"
     },

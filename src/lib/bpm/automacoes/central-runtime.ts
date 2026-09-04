@@ -357,10 +357,10 @@ async function processarUma(id: string) {
   } finally { await liberarLease(recurso, token); }
 }
 
-export async function processarFilaAutomacoesCentraisBpm(limite = 20) {
+export async function processarFilaAutomacoesCentraisBpm(limite = 20, filtro?: { cardId?: string }) {
   const agora = new Date();
   await db.bpmAutomacaoExecucao.updateMany({ where: { automacaoVersaoId: { not: null }, status: "EM_EXECUCAO", iniciadoEm: { lte: new Date(agora.getTime() - LEASE_MS) }, tentativas: { lt: LIMITE_TENTATIVAS } }, data: { status: "PENDENTE", claimToken: null, disponivelEm: agora } });
-  const pendentes = await db.bpmAutomacaoExecucao.findMany({ where: { automacaoVersaoId: { not: null }, status: "PENDENTE", disponivelEm: { lte: agora }, tentativas: { lt: LIMITE_TENTATIVAS } }, select: { id: true }, orderBy: { createdAt: "asc" }, take: Math.min(Math.max(limite, 1), 50) });
+  const pendentes = await db.bpmAutomacaoExecucao.findMany({ where: { automacaoVersaoId: { not: null }, status: "PENDENTE", disponivelEm: { lte: agora }, tentativas: { lt: LIMITE_TENTATIVAS }, ...(filtro?.cardId ? { cardId: filtro.cardId } : {}) }, select: { id: true }, orderBy: { createdAt: "asc" }, take: Math.min(Math.max(limite, 1), 50) });
   const total = { encontrados: pendentes.length, executados: 0, falhos: 0, adiados: 0, ignorados: 0 };
   for (const item of pendentes) {
     const resultado = await processarUma(item.id);
