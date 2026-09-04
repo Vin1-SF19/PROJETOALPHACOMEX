@@ -171,6 +171,19 @@ export async function ObterPipelineBpm(pipelineId: string, incluirInativas = fal
     });
 
     if (!pipeline) return { success: false, error: "Pipeline não encontrado" };
+    const camposAssociados = await db.bpmCampo.findMany({
+      where: {
+        pipelineId: { not: pipelineId },
+        pipelinesAssociados: { some: { pipelineId } },
+      },
+      include: {
+        pipelinesAssociados: { select: { pipelineId: true } },
+        etapaConfiguracoes: true,
+        acessos: true,
+        opcoes: { orderBy: { ordem: "asc" } },
+        mapeamentoDestino: true,
+      },
+    });
     const automacoes = pipeline.automacoes.map(projetarAutomacaoNoBoard);
     const { automacoes: _definicoes, ...dadosPipeline } = pipeline;
     void _definicoes;
@@ -178,6 +191,8 @@ export async function ObterPipelineBpm(pipelineId: string, incluirInativas = fal
       success: true,
       data: {
         ...dadosPipeline,
+        campos: [...dadosPipeline.campos, ...camposAssociados]
+          .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)),
         automacoesGlobais: automacoes.filter((automacao) => automacao.escopo === "GLOBAL_PIPELINE"),
         etapas: pipeline.etapas.map((etapa) => ({
           ...etapa,

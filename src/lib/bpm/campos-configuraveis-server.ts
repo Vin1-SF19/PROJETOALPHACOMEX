@@ -142,6 +142,9 @@ export async function salvarValoresGlobaisPersonalizadosCampos(
 ): Promise<Set<string>> {
   const ids = Object.keys(valores);
   if (!ids.length) return new Set();
+  // Compatibilidade com clientes mínimos usados por integrações/testes antigos;
+  // o Prisma de produção sempre expõe ambos os delegates após a migração.
+  if (!(client as Partial<typeof db>).bpmCampo || !(client as Partial<typeof db>).bpmCampoValorGlobal) return new Set();
   const [card, campos] = await Promise.all([
     client.bpmCard.findUnique({ where: { id: cardId }, select: { empresaId: true } }),
     client.bpmCampo.findMany({

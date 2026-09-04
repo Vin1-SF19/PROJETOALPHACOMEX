@@ -3,7 +3,7 @@
 **Projeto:** Painel Alpha  
 **Objetivo:** `RM-2026-4C9C6D`  
 **Tipo:** EXECUTION  
-**Status:** Em testes  
+**Status:** Concluído no stage
 **Data de aprovação:** 2026-09-04
 
 ## Autorização
@@ -16,6 +16,11 @@ O usuário autorizou explicitamente a implementação e a alteração aditiva do
 Esta story sucede a Fase 2 documental registrada na versão 0.1. Os caminhos validados
 naquela fase permanecem válidos, mas a restrição de não implementar não se aplica às
 fases 5–16 agora aprovadas.
+
+Em 2026-09-04, o usuário aprovou também o complemento solicitado no “Mapeamento de
+Campos por Etapa”: configuração independente de entrada/saída, grupo, valor padrão e
+condições, armazenamento global personalizado por cliente e aplicação transacional do
+catálogo inicial nos pipelines Comercial, Operacional e Financeiro.
 
 ## Story
 
@@ -120,6 +125,7 @@ etapas e cadastros canônicos, sem apagar histórico nem duplicar a fonte de ver
 | 2026-09-04 | 0.1 | Registro documental da Fase 2. | River (`@sm`) |
 | 2026-09-04 | 1.0 | Story EXECUTION, plano de banco e semânticas aprovadas. | Codex (`@dev`) |
 | 2026-09-04 | 1.1 | Implementação concluída e encaminhada para testes. | Codex (`@dev`) |
+| 2026-09-04 | 1.2 | Mapeamento por etapa, valores globais do cliente, catálogo inicial e stage publicados. | Codex (`@dev`) |
 
 ## Dev Agent Record
 
@@ -149,6 +155,8 @@ Codex
 
 - `prisma/schema.prisma`
 - `prisma/migrations/20260904193000_bpm_gestao_campos_dados/migration.sql`
+- `prisma/migrations/20260904210000_bpm_campos_por_etapa/migration.sql`
+- `scripts/bpm-aplicar-mapeamento-campos-etapas.mjs`
 - `src/actions/bpm/Anexos.ts`
 - `src/actions/bpm/Campos.ts`
 - `src/actions/bpm/Cards.ts`
@@ -164,6 +172,8 @@ Codex
 - `src/lib/validations/bpm.ts`
 - `tests/bpm/campos-configuraveis-actions.test.ts`
 - `tests/bpm/campos-configuraveis.test.ts`
+- `tests/bpm/campos-globais-cliente.test.ts`
+- `tests/bpm/migracao-campos-por-etapa.test.ts`
 - `tests/bpm/requisitos-etapa-server.test.ts`
 - `docs/stories/story-rm-2026-4c9c6d-gestao-campos-dados.md`
 
@@ -177,3 +187,21 @@ Codex
   zero violações de chave estrangeira.
 - Gates globais não bloqueiam esta passagem para testes porque os erros restantes pertencem
   a módulos alheios ao objetivo e já existiam ou foram introduzidos por execuções paralelas.
+
+### Complemento — mapeamento por etapa
+
+- Backup imediatamente anterior: 96.245.670 bytes, 294 tabelas e 68.423 registros;
+  SHA-256 `0be059e87dfd45e736c44a26369c0118a017221146f13d6065f1dff1331ec57a`.
+- Migration `20260904210000_bpm_campos_por_etapa` aplicada no banco autorizado;
+  `integrity_check=ok` e zero violações de chave estrangeira.
+- `BpmCampoEtapaConfig` agora suporta grupo, padrão por etapa, obrigação geral, para
+  entrada, para saída e condições do Motor de Regras.
+- `BpmCampoValorGlobal` mantém campos personalizados no cliente, permitindo reutilização
+  real entre cards e pipelines sem novo preenchimento.
+- Catálogo aplicado de forma idempotente: 93 conceitos canônicos, 164 configurações por
+  etapa, 19 bloqueios de saída e zero divergências de escopo após a promoção segura dos
+  valores legados. Cinco definições redundantes sem valores foram desativadas logicamente;
+  nenhum registro foi excluído e o readback final confirmou zero duplicatas ativas.
+- Testes finais: 9 arquivos e 73 testes aprovados; ESLint focado e build de produção
+  aprovados.
+- Stage: release `20260904-210153`, build `bL9hIydZVKXNkdJ8IAECW`, serviço ativo e HTTPS 200.
