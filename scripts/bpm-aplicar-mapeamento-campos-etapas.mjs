@@ -175,7 +175,10 @@ async function executar(executor) {
     } else if (APPLY) {
       for (const duplicata of candidatas.slice(1).filter((item) => Boolean(item.ativo))) {
         if (Number(duplicata.usos ?? 0) > 0) throw new Error(`Duplicata de ${nome} possui valores e exige reconciliação manual: ${duplicata.id}`);
-        await executor.execute({ sql: "UPDATE BpmCampo SET ativo = false, updatedAt = ? WHERE id = ?", args: [agora(), duplicata.id] });
+        // A chave do campo inativo não pode continuar reservada: o registro
+        // canônico escolhido (normalmente o que possui valores reais) precisa
+        // assumir essa chave durante a consolidação.
+        await executor.execute({ sql: "UPDATE BpmCampo SET ativo = false, chave = NULL, updatedAt = ? WHERE id = ?", args: [agora(), duplicata.id] });
         duplicata.ativo = false;
         duplicatasDesativadas++;
       }
