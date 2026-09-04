@@ -11,7 +11,7 @@ export const ESCOPO_MEETINGS_SPACE_READONLY =
   "https://www.googleapis.com/auth/meetings.space.readonly";
 const MAX_PAGINAS_MEET = 100;
 const MAX_ITENS_MEET = 50_000;
-const TIMEOUT_CHAMADA_MEET_MS = 15_000;
+const TIMEOUT_CHAMADA_MEET_MS = 8_000;
 
 type ClienteMeet = meet_v2.Meet;
 
@@ -75,12 +75,12 @@ function erroEhTimeout(erro: unknown): boolean {
 }
 
 async function executarComRetry<T>(operacao: () => Promise<T>): Promise<T> {
-  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
     try {
       return await operacao();
     } catch (erro) {
       const status = statusErro(erro);
-      if ((status !== 429 && status < 500 && !erroEhTimeout(erro)) || tentativa === 2) throw erro;
+      if ((status !== 429 && status < 500 && !erroEhTimeout(erro)) || tentativa === 1) throw erro;
       await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** tentativa));
     }
   }

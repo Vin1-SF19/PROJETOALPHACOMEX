@@ -1,4 +1,5 @@
 "use server";
+import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -8,6 +9,7 @@ import {
   moverCardSchema,
   salvarRequisitosEMoverCardSchema,
 } from "@/lib/validations/bpm";
+import { normalizarCNPJ } from "@/lib/format-cnpj";
 import {
   exigirAcessoBpmCard,
   exigirAcessoBpmPipeline,
@@ -22,12 +24,21 @@ import {
   executarAutomacaoTarefaNotaFiscal,
 } from "@/lib/bpm/automacoes";
 import type { CardFilhoCriado } from "@/lib/bpm/automacoes";
-import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
+export type { CardFilhoCriado } from "@/lib/bpm/automacoes";
+import {
+  enfileirarAutomacoesCriacaoCardBpm,
+  enfileirarAutomacoesMovimentoBpm,
+} from "@/lib/bpm/automacoes/fila";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
+import { salvarValoresGlobaisPersonalizadosCampos } from "@/lib/bpm/campos-configuraveis-server";
 
 import { buscarServicosContratados } from "@/actions/Clientes";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   carregarCamposAplicaveisCardEtapa,
+  carregarSnapshotsCopiaCamposCard,
+  verificarTransicaoPermitidaBpm,
+  type PerfilAcessoCampoBpm,
 } from "@/lib/bpm/requisitos-etapa-server";
 import {
   calcularDiaCicloNovosLeads,
@@ -79,12 +90,28 @@ import {
   type ConfiguracaoLost,
 } from "@/lib/bpm/lost";
 import { obterErroTransicaoMonitoramento } from "@/lib/bpm/monitoramento";
+import { obterErroRegrasParaMovimento } from "@/lib/bpm/regras/guarda-movimento";
 import {
   etapaEhAlinhamentoEstrategico,
   obterErroCamposAlinhamentoParaSaida,
 } from "@/lib/bpm/alinhamento-estrategico";
-import { etapaFinanceiraValida, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
+import { campoFinanceiroSomenteLeitura, etapaFinanceiraValida, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
+import { calcularRegraTributariaDoCard } from "@/lib/bpm/regras-financeiras/persistencia";
+import { sincronizarComissoesDoCardFinanceiro } from "@/lib/bpm/regras-financeiras/comissoes-card";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
+import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
+import {
+  criarSlaInstancia,
+  obterStatusSlaCards,
+  prioridadeStatusSla,
+  sincronizarSlaMovimentoBpm,
+} from "@/lib/bpm/sla";
+
+function resolverPerfilAcessoCampo(acesso: { isAdminGlobal: boolean; role: string | null }): PerfilAcessoCampoBpm {
+  if (acesso.isAdminGlobal || acesso.role === "ADMINISTRADOR") return "ADMIN";
+  if (acesso.role === "RESPONSAVEL") return "RESPONSAVEL";
+  return "MEMBRO";
+}
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -228,7 +255,7 @@ export async function BuscarEmpresasBpm(termo: string) {
         OR: [
           { razaoSocial: { contains: termoSeguro } },
           { nomeFantasia: { contains: termoSeguro } },
-          { cnpj: { contains: termoSeguro.replace(/\D/g, "") || termoSeguro } },
+          { cnpj: { contains: normalizarCNPJ(termoSeguro) || termoSeguro } },
         ],
       },
       select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
@@ -328,6 +355,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
         createdAt: true,
         primeiraVisualizacaoEm: true,
         proximoContatoEm: true,
+        dataReuniao: true,
+        googleMeetLink: true,
         statusPosFechamento: true,
         empresa: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
         responsavel: { select: { id: true, nome: true } },
@@ -359,6 +388,10 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
     });
 
     const agora = new Date();
+    const slaPorCard = await obterStatusSlaCards(cards.map((card) => card.id), agora);
+    if ([...slaPorCard.values()].some((itens) => itens.some((item) => item.statusAlterado))) {
+      await notificarPipelineBpm({ pipelineId, tipo: "SLA_STATUS_ALTERADO" });
+    }
     const { inicio, fim } = intervaloDiaCivilSaoPaulo(agora);
     const etapaNovosLeads = await db.bpmEtapa.findFirst({
       where: { pipelineId, nome: "Novos leads", ativo: true },
@@ -387,8 +420,12 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
 
     const cardsReais = cards.map((card) => {
       const ehNovoLead = card.etapaId === etapaNovosLeads?.id;
+      const sla = [...(slaPorCard.get(card.id) ?? [])]
+        .filter((item) => item.status !== "CONCLUIDO")
+        .sort((a, b) => prioridadeStatusSla(b.status) - prioridadeStatusSla(a.status))[0] ?? null;
       return {
         ...card,
+        sla,
         origem: "real" as const,
         nolossLeadId: null as string | null,
         ligacoesHoje: ehNovoLead ? (ligacoesPorCard.get(card.id) ?? 0) : 0,
@@ -423,6 +460,8 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           createdAt: lead.receivedAt,
           primeiraVisualizacaoEm: null,
           proximoContatoEm: null,
+          dataReuniao: null,
+          googleMeetLink: null,
           statusPosFechamento: null,
           // Sentinela: id=0 nunca existe em Cliente/usuarios (autoincrement começa
           // em 1) — qualquer consumidor futuro de CardBpm DEVE checar
@@ -440,6 +479,7 @@ export async function ListarCardsPipelineBpm(pipelineId: string) {
           _count: { tarefas: 0, anexos: 0 },
           tarefas: [],
           campoValores: [],
+          sla: null,
           origem: "noloss" as const,
           nolossLeadId: lead.id,
           nolossEmail: lead.email,
@@ -532,6 +572,8 @@ export async function ObterCardBpm(cardId: string) {
       card.id,
       card.pipelineId,
       card.etapaId,
+      db,
+      resolverPerfilAcessoCampo(acessoCard),
     );
     if (etapaEhLost(card.etapa.nome)) {
       const contextoLost = await carregarConfiguracaoLost({
@@ -545,9 +587,15 @@ export async function ObterCardBpm(cardId: string) {
     // Indicador "nunca acessado" — primeiro acesso por QUALQUER usuário apaga a marcação.
     if (!card.primeiraVisualizacaoEm) {
       const agora = new Date();
-      const atualizacao = await db.bpmCard.updateMany({
-        where: { id: cardId, primeiraVisualizacaoEm: null },
-        data: { primeiraVisualizacaoEm: agora },
+      const atualizacao = await db.$transaction(async (tx) => {
+        const resultado = await tx.bpmCard.updateMany({
+          where: { id: cardId, primeiraVisualizacaoEm: null },
+          data: { primeiraVisualizacaoEm: agora },
+        });
+        if (resultado.count > 0) {
+          await criarSlaInstancia({ cardId }, "PRIMEIRA_VISUALIZACAO", tx, agora);
+        }
+        return resultado;
       });
       card.primeiraVisualizacaoEm = agora;
       if (atualizacao.count > 0) {
@@ -691,7 +739,7 @@ export async function CriarCardBpm(dados: unknown) {
     // usado só pelo botão "+" da etapa "Novos Leads").
     let cnpjNovaEmpresa: string | null = null;
     if (novaEmpresa) {
-      cnpjNovaEmpresa = novaEmpresa.cnpj.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      cnpjNovaEmpresa = normalizarCNPJ(novaEmpresa.cnpj);
       const jaExiste = await db.cliente.findUnique({ where: { cnpj: cnpjNovaEmpresa }, select: { id: true } });
       if (jaExiste) {
         return { success: false, error: "Já existe uma empresa cadastrada com este CNPJ — busque e selecione-a." };
@@ -754,6 +802,17 @@ export async function CriarCardBpm(dados: unknown) {
         data: { cardId: novoCard.id, userId: responsavelId, role: "RESPONSAVEL" },
       });
 
+      if (typeof carregarSnapshotsCopiaCamposCard === "function") {
+        const snapshots = await carregarSnapshotsCopiaCamposCard(novoCard.id, pipelineId, etapaId, tx);
+        for (const [campoId, valor] of Object.entries(snapshots)) {
+          await tx.bpmCardCampoValor.upsert({
+            where: { cardId_campoId: { cardId: novoCard.id, campoId } },
+            create: { cardId: novoCard.id, campoId, valor },
+            update: {},
+          });
+        }
+      }
+
       await tx.bpmCardHistorico.create({
         data: {
           cardId: novoCard.id,
@@ -768,6 +827,21 @@ export async function CriarCardBpm(dados: unknown) {
           }),
         },
       });
+
+      await publicarEventoBpm({
+        tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: novoCard.id,
+        cardId: novoCard.id, pipelineId, valorNovo: { etapaId, responsavelId, servico: novoCard.servico },
+        atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(),
+        idempotencyKey: `card-criado:${novoCard.id}`,
+      }, tx);
+
+      await enfileirarAutomacoesCriacaoCardBpm({
+        cardId: novoCard.id,
+        pipelineId: novoCard.pipelineId,
+        etapaId: novoCard.etapaId,
+      }, tx);
+
+      await criarSlaInstancia({ cardId: novoCard.id }, "CRIACAO_CARD", tx, novoCard.createdAt);
 
       return novoCard;
     });
@@ -816,7 +890,7 @@ export async function AtualizarCardBpm(dados: unknown) {
       };
     }
 
-    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
+    const acessoCard = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
     const cardAnterior = await db.bpmCard.findUnique({
       where: { id: cardId },
@@ -826,6 +900,15 @@ export async function AtualizarCardBpm(dados: unknown) {
       },
     });
     if (!cardAnterior) return { success: false, error: "Card não encontrado" };
+    if (cardAnterior.pipeline?.nome === "Financeiro" && camposValores && Object.keys(camposValores).length > 0) {
+      const camposAutomaticos = await db.bpmCampo.findMany({
+        where: { id: { in: Object.keys(camposValores) }, pipelineId: cardAnterior.pipelineId },
+        select: { nome: true },
+      });
+      if (camposAutomaticos.some((campo) => campoFinanceiroSomenteLeitura(campo.nome))) {
+        return { success: false, error: "Campos financeiros automáticos não podem ser alterados manualmente." };
+      }
+    }
     if (
       etapaEhLost(cardAnterior.etapa.nome)
       && camposValores !== undefined
@@ -859,6 +942,8 @@ export async function AtualizarCardBpm(dados: unknown) {
         cardId,
         cardAnterior.pipelineId,
         cardAnterior.etapaId,
+        db,
+        resolverPerfilAcessoCampo(acessoCard),
       );
       const contextoLost = await carregarConfiguracaoLost({
         pipelineId: cardAnterior.pipelineId,
@@ -883,6 +968,7 @@ export async function AtualizarCardBpm(dados: unknown) {
         ? { responsavelId: cardAnterior.responsavelId }
         : {}),
       ...(campos.servico !== undefined ? { servico: cardAnterior.servico } : {}),
+      ...(campos.tipoProcesso !== undefined ? { tipoProcesso: cardAnterior.tipoProcesso } : {}),
       ...(campos.status !== undefined ? { status: cardAnterior.status } : {}),
       ...(campos.statusPosFechamento !== undefined
         ? { statusPosFechamento: cardAnterior.statusPosFechamento }
@@ -893,8 +979,9 @@ export async function AtualizarCardBpm(dados: unknown) {
       ...(camposValores ? { camposAlterados: Object.keys(camposValores) } : {}),
     };
 
+    const correlationId = randomUUID();
     await db.$transaction(async (tx) => {
-      await exigirAcessoBpmCard(
+      const acessoCardAtual = await exigirAcessoBpmCard(
         cardId,
         userId,
         session.user.role ?? null,
@@ -944,6 +1031,7 @@ export async function AtualizarCardBpm(dados: unknown) {
           cardAtual.pipelineId,
           cardAtual.etapaId,
           tx,
+          resolverPerfilAcessoCampo(acessoCardAtual),
         );
         let configuracaoLostAtual: ConfiguracaoLost | null = null;
         if (etapaEhLost(cardAtual.etapa.nome)) {
@@ -990,7 +1078,20 @@ export async function AtualizarCardBpm(dados: unknown) {
       if (atualizacao.count !== 1) throw new Error("CONFLITO_ATUALIZACAO_CARD");
 
       if (camposValores) {
+        const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(cardId, valoresValidados, tx);
+        const snapshots = typeof carregarSnapshotsCopiaCamposCard === "function"
+          ? await carregarSnapshotsCopiaCamposCard(cardId, cardAtual.pipelineId, cardAtual.etapaId, tx)
+          : {};
+        for (const [campoId, valor] of Object.entries(snapshots)) {
+          if (Object.hasOwn(camposValores, campoId)) continue;
+          await tx.bpmCardCampoValor.upsert({
+            where: { cardId_campoId: { cardId, campoId } },
+            create: { cardId, campoId, valor },
+            update: {},
+          });
+        }
         for (const [campoId, valor] of Object.entries(valoresValidados)) {
+          if (idsGlobais.has(campoId)) continue;
           await tx.bpmCardCampoValor.upsert({
             where: { cardId_campoId: { cardId, campoId } },
             create: { cardId, campoId, valor },
@@ -999,7 +1100,7 @@ export async function AtualizarCardBpm(dados: unknown) {
         }
       }
 
-      await tx.bpmCardHistorico.create({
+      const historicoAtualizacao = await tx.bpmCardHistorico.create({
         data: {
           cardId,
           acao: "CARD_ATUALIZADO",
@@ -1011,6 +1112,31 @@ export async function AtualizarCardBpm(dados: unknown) {
           }),
         },
       });
+
+      await publicarEventoBpm({
+        tipo: "CARD_ATUALIZADO", entidadeTipo: "CARD", entidadeId: cardId,
+        cardId, pipelineId: cardAtual.pipelineId, valorAnterior: snapshotAnterior,
+        valorNovo: { ...campos, camposAlterados: camposValores ? Object.keys(camposValores) : [] },
+        atorTipo: "USUARIO", atorUserId: userId, correlationId,
+        causationId: historicoAtualizacao.id, idempotencyKey: `card-atualizado:${historicoAtualizacao.id}`,
+      }, tx);
+      for (const [campoId, valor] of Object.entries(valoresValidados)) {
+        await publicarEventoBpm({
+          tipo: "CAMPO_ALTERADO", entidadeTipo: "CAMPO", entidadeId: campoId,
+          cardId, pipelineId: cardAtual.pipelineId, valorNovo: { campoId, valor },
+          atorTipo: "USUARIO", atorUserId: userId, correlationId,
+          causationId: historicoAtualizacao.id, idempotencyKey: `campo-alterado:${historicoAtualizacao.id}:${campoId}`,
+        }, tx);
+      }
+      if (campos.responsavelId && campos.responsavelId !== cardAnterior.responsavelId) {
+        await publicarEventoBpm({
+          tipo: "RESPONSAVEL_ATRIBUIDO", entidadeTipo: "MEMBRO", entidadeId: String(campos.responsavelId),
+          cardId, pipelineId: cardAtual.pipelineId,
+          valorAnterior: { responsavelId: cardAnterior.responsavelId }, valorNovo: { responsavelId: campos.responsavelId },
+          atorTipo: "USUARIO", atorUserId: userId, correlationId,
+          causationId: historicoAtualizacao.id, idempotencyKey: `responsavel-atribuido:${historicoAtualizacao.id}`,
+        }, tx);
+      }
 
       // Responsável principal sempre reflete o membro com role RESPONSAVEL.
       if (campos.responsavelId && campos.responsavelId !== cardAnterior.responsavelId) {
@@ -1059,6 +1185,7 @@ type DadosMovimentoComRequisitos = {
   etapaDestinoId: string;
   camposValores: Record<string, string>;
   proximoContatoEm?: Date | null;
+  origemMovimentacao?: "MANUAL" | "AUTOMACAO";
 };
 
 type ClienteContextoMovimento = Pick<
@@ -1115,26 +1242,24 @@ async function carregarCamposTransicao(params: {
   etapaOrigemNome: string;
   etapaDestinoId: string;
   etapaDestinoNome: string;
-}, client: Parameters<typeof carregarCamposAplicaveisCardEtapa>[3] = db) {
+}, client: Parameters<typeof carregarCamposAplicaveisCardEtapa>[3] = db, perfilAcesso?: PerfilAcessoCampoBpm) {
   const [camposOrigemTodos, camposDestinoBase] = await Promise.all([
-    (etapaEhNovosLeads(params.etapaOrigemNome) || (etapaFinanceiraValida(params.etapaOrigemNome) && etapaFinanceiraValida(params.etapaDestinoNome)))
-      ? carregarCamposAplicaveisCardEtapa(
-          params.cardId,
-          params.pipelineId,
-          params.etapaOrigemId,
-          client,
-        )
-      : Promise.resolve([]),
+    carregarCamposAplicaveisCardEtapa(
+      params.cardId,
+      params.pipelineId,
+      params.etapaOrigemId,
+      client,
+      perfilAcesso,
+    ),
     carregarCamposAplicaveisCardEtapa(
       params.cardId,
       params.pipelineId,
       params.etapaDestinoId,
       client,
+      perfilAcesso,
     ),
   ]);
-  let camposDestino = etapaFinanceiraValida(params.etapaOrigemNome) && etapaFinanceiraValida(params.etapaDestinoNome)
-    ? []
-    : camposDestinoBase;
+  let camposDestino = camposDestinoBase;
   if (etapaEhLost(params.etapaDestinoNome)) {
     const contextoLost = await carregarConfiguracaoLost({
       pipelineId: params.pipelineId,
@@ -1143,7 +1268,11 @@ async function carregarCamposTransicao(params: {
     }, client);
     camposDestino = mesclarCamposPorId(camposDestino, contextoLost.campos);
   }
-  const camposOrigem = camposOrigemTodos.filter((campo) => campo.obrigatorio);
+  const camposOrigem = camposOrigemTodos.filter((campo) => campo.obrigatorio || campo.obrigatorioSaida);
+  camposDestino = camposDestino.map((campo) => ({
+    ...campo,
+    obrigatorio: campo.obrigatorio || Boolean(campo.obrigatorioEntrada),
+  }));
   const origemPorId = new Map(camposOrigem.map((campo) => [campo.id, campo]));
   const destinoPorId = new Map(camposDestino.map((campo) => [campo.id, campo]));
   const ids = new Set([...origemPorId.keys(), ...destinoPorId.keys()]);
@@ -1160,7 +1289,12 @@ async function carregarCamposTransicao(params: {
         : "DESTINO";
     return {
       ...campo,
-      obrigatorio: Boolean(origem?.obrigatorio || destino?.obrigatorio),
+      obrigatorio: Boolean(
+        origem?.obrigatorio
+        || origem?.obrigatorioSaida
+        || destino?.obrigatorio
+        || destino?.obrigatorioEntrada
+      ),
       valor: destino?.valor ?? origem?.valor ?? null,
       contexto,
       etapaAplicacaoNome: contexto === "ORIGEM"
@@ -1263,7 +1397,7 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const userId = Number(session.user.id);
-    await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
+    const acessoCard = await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "visualizar");
 
     const contexto = await carregarContextoMovimento(cardId, etapaDestinoId);
     if ("error" in contexto) return { success: false, error: contexto.error };
@@ -1281,7 +1415,7 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
       etapaOrigemNome: card.etapa.nome,
       etapaDestinoId,
       etapaDestinoNome: etapaDestino.nome,
-    });
+    }, db, resolverPerfilAcessoCampo(acessoCard));
     const faltantes = campos
       .filter((campo) => campo.obrigatorio && !campo.valor?.trim())
       .map((campo) => ({
@@ -1327,7 +1461,7 @@ async function executarMovimentoComRequisitos(
   userId: number,
   userRole: string | null,
 ) {
-  const { cardId, etapaDestinoId, camposValores, proximoContatoEm } = dados;
+  const { cardId, etapaDestinoId, camposValores, proximoContatoEm, origemMovimentacao = "MANUAL" } = dados;
   const acessoOrigem = await exigirAcessoBpmCard(
     cardId,
     userId,
@@ -1353,13 +1487,27 @@ async function executarMovimentoComRequisitos(
     const valoresFinanceiros: Record<string, string | null> = Object.fromEntries((financeiro?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
     camposFinanceirosPorId = await db.bpmCampo.findMany({ where: { pipelineId: card.pipelineId }, select: { id: true, nome: true } });
     for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceiros[nome] = valor }
+    const regraFinanceira = ["Formalização", "Pagamento", "Nota Fiscal"].includes(card.etapa.nome)
+      ? await calcularRegraTributariaDoCard({ cardId, valoresPorNome: valoresFinanceiros })
+      : null;
+    if (regraFinanceira) Object.assign(valoresFinanceiros, regraFinanceira.valoresAutomaticos);
     validacaoFinanceira = validateFinancialTransition({ pipelineName: financeiro?.pipeline.nome ?? "", fromStage: card.etapa.nome, toStage: etapaDestino.nome, values: valoresFinanceiros, attachmentNames: financeiro?.anexos.map((anexo) => anexo.nome) });
+    if (regraFinanceira) validacaoFinanceira.automaticValues = { ...validacaoFinanceira.automaticValues, ...regraFinanceira.valoresAutomaticos };
   }
   if (validacaoFinanceira.blocked) return { success: false, error: validacaoFinanceira.pendingFields.length > 0 ? `${validacaoFinanceira.message} Campos pendentes: ${validacaoFinanceira.pendingFields.join(", ")}.` : validacaoFinanceira.message };
   if (etapaEhBoasVindas(etapaDestino.nome) && !(await checarAcessoDiretoriaBpm(userId))) {
     return { success: false, error: ACESSO_BOAS_VINDAS_NEGADO_MENSAGEM };
   }
   if (card.etapaId === etapaDestinoId) return { success: true };
+
+  const transicaoPermitida = await verificarTransicaoPermitidaBpm(
+    card.etapaId,
+    etapaDestinoId,
+    origemMovimentacao,
+  );
+  if (!transicaoPermitida.permitida) {
+    return { success: false, error: transicaoPermitida.motivo ?? "Movimento não permitido para esta transição." };
+  }
 
   const camposTransicao = await carregarCamposTransicao({
     cardId,
@@ -1368,7 +1516,7 @@ async function executarMovimentoComRequisitos(
     etapaOrigemNome: card.etapa.nome,
     etapaDestinoId,
     etapaDestinoNome: etapaDestino.nome,
-  });
+  }, db, resolverPerfilAcessoCampo(acessoOrigem));
   if (
     etapaEhFechado(etapaDestino.nome)
     && !configuracaoEntradaFechadoEhValida(camposTransicao)
@@ -1444,6 +1592,16 @@ async function executarMovimentoComRequisitos(
   });
   if (guardas.length > 0) return { success: false, error: guardas[0] };
 
+  const erroRegraBpm = await obterErroRegrasParaMovimento({ card, etapaDestinoId });
+  if (erroRegraBpm) return { success: false, error: erroRegraBpm };
+  const erroChecklist = await obterErroChecklistParaMovimento({
+    id: card.id,
+    pipelineId: card.pipelineId,
+    etapaId: card.etapaId,
+    servico: card.servico,
+  });
+  if (erroChecklist) return { success: false, error: erroChecklist };
+
   const resultadoMovimento = await db.$transaction(async (tx) => {
     const acessoOrigemAtual = await exigirAcessoBpmCard(
       cardId,
@@ -1470,12 +1628,26 @@ async function executarMovimentoComRequisitos(
       const financeiroAtual = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipeline: { select: { nome: true } }, campoValores: { select: { valor: true, campo: { select: { nome: true } } } }, anexos: { select: { nome: true } } } });
       const valoresFinanceirosAtuais: Record<string, string | null> = Object.fromEntries((financeiroAtual?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
       for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceirosAtuais[nome] = valor }
+      const regraFinanceiraAtual = ["Formalização", "Pagamento", "Nota Fiscal"].includes(cardAtual.etapa.nome)
+        ? await calcularRegraTributariaDoCard({ cardId, valoresPorNome: valoresFinanceirosAtuais, client: tx })
+        : null;
+      if (regraFinanceiraAtual) Object.assign(valoresFinanceirosAtuais, regraFinanceiraAtual.valoresAutomaticos);
       validacaoFinanceiraAtual = validateFinancialTransition({ pipelineName: financeiroAtual?.pipeline.nome ?? "", fromStage: cardAtual.etapa.nome, toStage: destinoAtual.nome, values: valoresFinanceirosAtuais, attachmentNames: financeiroAtual?.anexos.map((anexo) => anexo.nome) });
+      if (regraFinanceiraAtual) validacaoFinanceiraAtual.automaticValues = { ...validacaoFinanceiraAtual.automaticValues, ...regraFinanceiraAtual.valoresAutomaticos };
     }
     if (validacaoFinanceiraAtual.blocked) throw new Error(`MOVIMENTO_INVALIDO:${validacaoFinanceiraAtual.pendingFields.length > 0 ? `${validacaoFinanceiraAtual.message} Campos pendentes: ${validacaoFinanceiraAtual.pendingFields.join(", ")}.` : validacaoFinanceiraAtual.message}`);
     if (etapaEhBoasVindas(destinoAtual.nome) && !(await checarAcessoDiretoriaBpm(userId, tx))) {
       throw new Error(`MOVIMENTO_INVALIDO:${ACESSO_BOAS_VINDAS_NEGADO_MENSAGEM}`);
     }
+    const erroRegraBpmAtual = await obterErroRegrasParaMovimento({ card: cardAtual, etapaDestinoId, client: tx });
+    if (erroRegraBpmAtual) throw new Error(`MOVIMENTO_INVALIDO:${erroRegraBpmAtual}`);
+    const erroChecklistAtual = await obterErroChecklistParaMovimento({
+      id: cardAtual.id,
+      pipelineId: cardAtual.pipelineId,
+      etapaId: cardAtual.etapaId,
+      servico: cardAtual.servico,
+    }, tx);
+    if (erroChecklistAtual) throw new Error(`MOVIMENTO_INVALIDO:${erroChecklistAtual}`);
     if (
       cardAtual.etapaId !== card.etapaId
       || cardAtual.status !== card.status
@@ -1491,7 +1663,7 @@ async function executarMovimentoComRequisitos(
       etapaOrigemNome: cardAtual.etapa.nome,
       etapaDestinoId,
       etapaDestinoNome: destinoAtual.nome,
-    }, tx);
+    }, tx, resolverPerfilAcessoCampo(acessoOrigemAtual));
     if (
       etapaEhFechado(destinoAtual.nome)
       && !configuracaoEntradaFechadoEhValida(camposAtuais)
@@ -1502,9 +1674,15 @@ async function executarMovimentoComRequisitos(
     if (Object.keys(camposValores).some((campoId) => !idsAtuais.has(campoId))) {
       throw new Error("MOVIMENTO_INVALIDO:Um ou mais campos não pertencem aos requisitos desta transição.");
     }
+    if (Object.keys(camposValores).some((campoId) => {
+      const campo = camposAtuais.find((item) => item.id === campoId);
+      return (campo?.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)) || campo?.somenteLeitura || campo?.editavel === false;
+    })) {
+      throw new Error("MOVIMENTO_INVALIDO:Um ou mais campos informados são somente leitura.");
+    }
     const valoresParaValidar = etapaEhFechado(destinoAtual.nome)
       ? Object.fromEntries(
-          camposAtuais.map((campo) => [
+          camposAtuais.filter((campo) => !(campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade)) && !campo.somenteLeitura && campo.editavel !== false).map((campo) => [
             campo.id,
             camposValores[campo.id] ?? campo.valor ?? "",
           ]),
@@ -1569,7 +1747,20 @@ async function executarMovimentoComRequisitos(
         validacaoAtual.valores[campoId],
       ]),
     );
+    const idsGlobais = await salvarValoresGlobaisPersonalizadosCampos(cardId, valoresSubmetidosValidados, tx);
+    const snapshotsCopia = typeof carregarSnapshotsCopiaCamposCard === "function"
+      ? await carregarSnapshotsCopiaCamposCard(cardId, cardAtual.pipelineId, etapaDestinoId, tx)
+      : {};
+    for (const [campoId, valor] of Object.entries(snapshotsCopia)) {
+      if (Object.hasOwn(valoresSubmetidosValidados, campoId)) continue;
+      await tx.bpmCardCampoValor.upsert({
+        where: { cardId_campoId: { cardId, campoId } },
+        create: { cardId, campoId, valor },
+        update: {},
+      });
+    }
     for (const [campoId, valor] of Object.entries(valoresSubmetidosValidados)) {
+      if (idsGlobais.has(campoId)) continue;
       await tx.bpmCardCampoValor.upsert({
         where: { cardId_campoId: { cardId, campoId } },
         create: { cardId, campoId, valor },
@@ -1617,6 +1808,22 @@ async function executarMovimentoComRequisitos(
         }),
       },
     });
+    await publicarEventoBpm({
+      tipo: "CARD_MOVIDO", entidadeTipo: "CARD", entidadeId: cardId,
+      cardId, pipelineId: cardAtual.pipelineId,
+      valorAnterior: { etapaId: cardAtual.etapaId }, valorNovo: { etapaId: etapaDestinoId, camposPreenchidos: Object.keys(valoresSubmetidosValidados) },
+      atorTipo: origemMovimentacao === "AUTOMACAO" ? "AUTOMACAO" : "USUARIO",
+      atorUserId: origemMovimentacao === "AUTOMACAO" ? undefined : userId,
+      correlationId: randomUUID(), causationId: historicoMovimento.id,
+      idempotencyKey: `card-movido:${historicoMovimento.id}`,
+    }, tx);
+    await sincronizarSlaMovimentoBpm({
+      cardId,
+      etapaOrigemId: cardAtual.etapaId,
+      etapaOrigemNome: cardAtual.etapa.nome,
+      etapaDestinoNome: destinoAtual.nome,
+      client: tx,
+    });
     return {
       pipelineId: cardAtual.pipelineId,
       etapaOrigemId: cardAtual.etapaId,
@@ -1653,6 +1860,11 @@ async function executarMovimentoComRequisitos(
   } catch (error) {
     console.error("[executarAutomacaoTarefaNotaFiscal]", error);
   }
+  try {
+    await sincronizarComissoesDoCardFinanceiro(cardId);
+  } catch (error) {
+    console.error("[sincronizarComissoesDoCardFinanceiro]", error);
+  }
 
   await notificarPipelineBpm({ pipelineId: resultadoMovimento.pipelineId, cardId, tipo: "CARD_MOVIDO" });
   revalidatePath(`${ROTA_BASE}/pipeline/${resultadoMovimento.pipelineId}`);
@@ -1670,7 +1882,7 @@ export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
     const parsed = salvarRequisitosEMoverCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     return await executarMovimentoComRequisitos(
-      parsed.data,
+      { ...parsed.data, origemMovimentacao: "MANUAL" },
       Number(session.user.id),
       session.user.role ?? null,
     );
@@ -1698,7 +1910,7 @@ export async function MoverCardBpm(dados: unknown) {
     const parsed = moverCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     return await executarMovimentoComRequisitos(
-      { ...parsed.data, camposValores: {} },
+      { ...parsed.data, camposValores: {}, origemMovimentacao: "MANUAL" },
       Number(session.user.id),
       session.user.role ?? null,
     );

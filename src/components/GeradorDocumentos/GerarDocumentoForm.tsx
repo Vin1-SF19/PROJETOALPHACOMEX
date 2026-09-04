@@ -26,8 +26,8 @@ interface ClienteResumo {
   razaoSocial: string;
   nomeFantasia: string | null;
   cnpj: string | null;
-  email: string | null;
-  telefone: string | null;
+  email?: string | null;
+  telefone?: string | null;
 }
 
 /** Pré-preenche variáveis do template com dados conhecidos da entidade,

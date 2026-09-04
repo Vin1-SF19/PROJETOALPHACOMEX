@@ -22,7 +22,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote, Users } from "lucide-react";
+import { AlertTriangle, Bot, Building2, CalendarClock, ClipboardList, Paperclip, Plus, RefreshCw, StickyNote, Users, Video } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoverCardBpm, CriarCardBpm, ListarCardsPipelineBpm } from "@/actions/bpm/Cards";
 import { PromoverNolossLead } from "@/actions/bpm/NolossLeads";
@@ -52,21 +52,35 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCNPJ } from "@/lib/format-cnpj";
 import { GradientBlobCard } from "@/components/ui/gradient-blob-card";
+import { SlaStatusBadge } from "@/components/bpm/sla/SlaStatusBadge";
 
 import { SkeletonColumn } from "./PipelineBoardSkeleton";
 import { useLazyColumn } from "@/hooks/useLazyColumn";
+
+interface AutomacaoBoard {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  ativa: boolean;
+  gatilhoTipo: string;
+  possuiCondicoes: boolean;
+  acoes: string[];
+  recorrencia: unknown | null;
+}
 
 interface EtapaBpm {
   id: string;
   nome: string;
   ordem: number;
   slaDias: number | null;
+  automacoes?: AutomacaoBoard[];
 }
 
 interface PipelineBpm {
   id: string;
   nome: string;
   etapas: EtapaBpm[];
+  automacoesGlobais?: AutomacaoBoard[];
 }
 
 interface CardBpm {
@@ -81,6 +95,8 @@ interface CardBpm {
   createdAt: Date | string;
   primeiraVisualizacaoEm?: Date | string | null;
   proximoContatoEm?: Date | string | null;
+  dataReuniao?: Date | string | null;
+  googleMeetLink?: string | null;
   statusPosFechamento?: string | null;
   empresa: { id: number; razaoSocial: string; nomeFantasia: string | null; cnpj: string | null };
   responsavel: { id: number; nome: string };
@@ -93,6 +109,15 @@ interface CardBpm {
   diasUteisDecorridos?: number;
   diaCiclo?: number;
   podeAgirEtapa: boolean;
+  sla?: {
+    id: string;
+    nome: string;
+    status: "DENTRO_PRAZO" | "PROXIMO_VENCIMENTO" | "ATRASADO" | "PAUSADO" | "CONCLUIDO";
+    cor: string;
+    deadline: Date | string | null;
+    tempoRestanteMs: number | null;
+    pausadoEm: Date | string | null;
+  } | null;
 }
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
@@ -176,6 +201,7 @@ function KanbanCard({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, animationDelay: `${index * 40}ms` };
 
   const ehLeadVirtual = card.origem === "noloss";
+  const agendarReuniao = etapaEhAgendarReuniao(etapaNome);
   const naoAcessado = !card.primeiraVisualizacaoEm;
   const alertaBoasVindas = !ehLeadVirtual && etapaEhBoasVindas(etapaNome) && naoAcessado;
   const canalOrigem = card.campoValores?.find((campo) => campo.campo.nome === "Canal de origem")?.valor;
@@ -209,6 +235,7 @@ function KanbanCard({
       aria-label={ehLeadVirtual ? `${nomeEmpresa}. Lead do site, ainda sem card` : statusConfig ? `${nomeEmpresa}. Status pós-fechamento: ${statusConfig.label}` : nomeEmpresa}
       className={cn(
         "cursor-grab active:cursor-grabbing select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+        card.sla?.status === "ATRASADO" && "rounded-2xl ring-2 ring-rose-500/55 shadow-lg shadow-rose-950/40",
         (alertaBoasVindas || alertaAlinhamento) && "animate-pulse",
         ehLeadVirtual
           ? "border-dashed border-sky-400/40 hover:border-sky-400/60"
@@ -225,9 +252,58 @@ function KanbanCard({
       <GradientBlobCard
         accent={accent}
         className="rounded-2xl"
-        surfaceClassName={statusConfig?.cardClassName}
+        surfaceClassName={cn(
+          statusConfig?.cardClassName,
+          card.sla?.status === "ATRASADO" && "border-rose-500/60 bg-rose-950/20",
+        )}
       >
         <div className="relative space-y-2.5">
+          {!ehLeadVirtual && card.sla && (
+            <div className="flex justify-end">
+              <SlaStatusBadge sla={card.sla} />
+            </div>
+          )}
+          {agendarReuniao && !ehLeadVirtual ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <CalendarClock size={14} className="shrink-0 text-slate-500" aria-hidden="true" />
+                <span className="font-medium">Data e hora</span>
+                <span className="ml-auto tabular-nums text-slate-200">
+                  {card.dataReuniao ? formatarPrazoNoCard(card.dataReuniao) : "Não definida"}
+                </span>
+              </div>
+
+              {card.googleMeetLink ? (
+                <a
+                  href={card.googleMeetLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  aria-label={`Abrir Google Meet de ${nomeEmpresa}`}
+                >
+                  <Video size={14} aria-hidden="true" />
+                  Abrir Google Meet
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAbrir(card.id);
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  aria-label={`Agendar Google Meet para ${nomeEmpresa}`}
+                >
+                  <Video size={14} aria-hidden="true" />
+                  Agendar pelo Google Meet
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
           <div className="flex items-start gap-2.5">
             <div
               aria-hidden="true"
@@ -365,6 +441,8 @@ function KanbanCard({
             />
           </div>
         )}
+            </>
+          )}
         </div>
       </GradientBlobCard>
     </div>
@@ -405,6 +483,22 @@ function KanbanColumn({
       </div>
       {etapa.slaDias && (
         <p className="text-[10px] text-slate-500 mb-2 px-1">SLA: {etapa.slaDias}d</p>
+      )}
+      {(etapa.automacoes?.length ?? 0) > 0 && (
+        <details className="group mb-2 rounded-lg border border-cyan-400/10 bg-cyan-400/[0.035] px-2 py-1.5">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[10px] font-semibold text-cyan-300">
+            <Bot size={11} aria-hidden="true" />
+            {etapa.automacoes!.length} automação(ões)
+          </summary>
+          <div className="mt-1.5 space-y-1 border-t border-cyan-400/10 pt-1.5">
+            {etapa.automacoes!.map((automacao) => (
+              <div key={automacao.id} className="rounded-md bg-slate-950/50 px-2 py-1 text-[10px]" title={automacao.descricao ?? undefined}>
+                <p className="truncate font-semibold text-slate-200">{automacao.nome}</p>
+                <p className="truncate text-slate-500">{automacao.ativa ? "Ativa" : "Inativa"} · {automacao.gatilhoTipo.replaceAll("_", " ").toLocaleLowerCase("pt-BR")}</p>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
       <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <div
@@ -783,7 +877,14 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between gap-3 p-6 pb-4">
-        <h1 className="min-w-0 truncate text-xl font-black text-white">{pipeline.nome}</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-black text-white">{pipeline.nome}</h1>
+          {(pipeline.automacoesGlobais?.length ?? 0) > 0 && (
+            <p className="mt-1 flex items-center gap-1 text-[10px] text-cyan-300" title={pipeline.automacoesGlobais!.map((automacao) => automacao.nome).join(" · ")}>
+              <Bot size={11} aria-hidden="true" /> {pipeline.automacoesGlobais!.length} automação(ões) global(is)
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <Select
             value={responsavelFiltro ?? "todos"}

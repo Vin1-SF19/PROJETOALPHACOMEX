@@ -78,6 +78,38 @@ describe("BPM - ações de tarefas por tipo", () => {
     expect(notificarMock).toHaveBeenCalledAfter(historicoMock);
   });
 
+  it("rejeita datas obrigatórias fora do contrato antes de ownership e persistência", async () => {
+    for (const prazo of [null, "", "2026-08-21", "21/08/2026 15:00", "0", false]) {
+      const resultado = await CriarTarefaBpm({
+        cardId: CARD_ID,
+        tipo: "TAREFA",
+        titulo: "Retornar",
+        prazo,
+        alertaEm: new Date("2026-08-21T14:00:00.000Z"),
+      });
+      expect(resultado.success).toBe(false);
+    }
+    expect(acessoMock).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("exige sessão e propaga recusa de ownership antes da persistência", async () => {
+    authMock.mockResolvedValueOnce(null);
+    await expect(CriarTarefaBpm({})).resolves.toEqual({ success: false, error: "Não autorizado" });
+    expect(acessoMock).not.toHaveBeenCalled();
+
+    acessoMock.mockRejectedValueOnce(new Error("Não autorizado"));
+    const resultado = await CriarTarefaBpm({
+      cardId: CARD_ID,
+      tipo: "TAREFA",
+      titulo: "Retornar",
+      prazo: new Date("2026-08-21T15:00:00.000Z"),
+      alertaEm: new Date("2026-08-21T14:00:00.000Z"),
+    });
+    expect(resultado).toEqual({ success: false, error: "Não autorizado" });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
   it("recusa preset legado que contornaria prazo e alerta", async () => {
     prismaMock.bpmTarefaPreset.findUnique.mockResolvedValue({
       id: PRESET_ID,

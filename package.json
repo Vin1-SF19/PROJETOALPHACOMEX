@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:turbo": "next dev --turbopack",
-    "build": "prisma generate && npm run build:player && next build",
+    "build": "prisma generate && npm run build:player && NODE_OPTIONS=--max-old-space-size=8192 next build",
     "build:player": "node scripts/build-apresentacoes-player.mjs",
     "fonts:alpha-motion": "node scripts/download-alpha-motion-fonts.mjs",
     "start": "next start",
@@ -18,6 +18,9 @@
     "calendar-alpha:maintenance": "tsx scripts/calendar-alpha-maintenance.mjs",
     "calendar-alpha:queue": "tsx scripts/calendar-alpha-queue.mjs",
     "bpm:novos-leads:run": "node scripts/bpm-novos-leads-job.mjs",
+    "bpm:regras": "node --import tsx scripts/bpm-regras-cli.mjs",
+    "bpm:cadencias": "node --import tsx scripts/bpm-cadencias-cli.mjs",
+    "bpm:automacoes": "tsx --conditions=react-server scripts/bpm-automacoes.ts",
     "roadmap:doctor": "tsx scripts/roadmap-alpha.mjs doctor",
     "roadmap:check-modules": "tsx scripts/roadmap-alpha.mjs check-modules",
     "roadmap:sync-modules": "tsx scripts/roadmap-alpha.mjs sync-modules",

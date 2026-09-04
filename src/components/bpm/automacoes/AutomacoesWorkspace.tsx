@@ -3,12 +3,14 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   Bot,
   Clock3,
   Copy,
   FileSignature,
   FileText,
   Mail,
+  ListChecks,
   Pencil,
   Plus,
   Search,
@@ -22,11 +24,12 @@ import {
   DuplicarAutomacaoBpm,
   ExcluirAutomacaoBpm,
 } from "@/actions/bpm/Automacoes";
-import { AutomacaoFormDialog } from "@/components/bpm/automacoes/AutomacaoFormDialog";
+import { AutomacaoCentralFormDialog } from "@/components/bpm/automacoes/AutomacaoCentralFormDialog";
+import { AutomacaoInsightsDialog } from "@/components/bpm/automacoes/AutomacaoInsightsDialog";
 import type {
   AutomacaoBpmView,
+  CatalogosAutomacao,
   PipelineAutomacaoView,
-  TemplateAutomacao,
 } from "@/components/bpm/automacoes/types";
 import {
   AlertDialog,
@@ -65,7 +68,7 @@ type Editor =
 
 type Props = {
   pipelines: PipelineAutomacaoView[];
-  templates: TemplateAutomacao[];
+  catalogos: CatalogosAutomacao;
   erro: string | null;
   accent: string;
 };
@@ -74,17 +77,37 @@ const GATILHO_LABEL: Record<string, string> = {
   ENTRAR_COLUNA: "Ao entrar",
   SAIR_COLUNA: "Ao sair",
   TEMPO_NA_COLUNA: "Tempo na coluna",
+  CARD_CRIADO: "Card criado",
+  TAREFA_CRIADA: "Tarefa criada",
+  PROCESSO_DEFERIDO: "Processo deferido",
+  CARD_ATUALIZADO: "Card atualizado",
+  CAMPO_ALTERADO: "Campo alterado",
+  CAMPO_VALOR_ASSUMIDO: "Valor de campo assumido",
+  TAREFA_CONCLUIDA: "Tarefa concluída",
+  TAREFA_PRAZO_ATINGIDO: "Prazo da tarefa",
+  TAREFA_ALERTA_ATINGIDO: "Alerta da tarefa",
+  TEMPO_NA_ETAPA_ATINGIDO: "Tempo na etapa",
+  RECORRENCIA_ATINGIDA: "Recorrência",
+  SLA_STATUS_ALTERADO: "Mudança de SLA",
+  CADENCIA_INICIADA: "Cadência iniciada",
+  WEBHOOK_RECEBIDO: "Webhook recebido",
 };
 
 const ACAO_LABEL: Record<string, string> = {
   ENVIAR_EMAIL: "Enviar e-mail",
   GERAR_CONTRATO: "Gerar contrato",
   GERAR_FICHA: "Gerar ficha",
+  MATERIALIZAR_CHECKLIST: "Materializar checklists",
+  DISTRIBUIR_RESPONSAVEL: "Distribuir responsável",
+  IDENTIFICAR_OPORTUNIDADE: "Identificar oportunidade",
 };
 
 function AcaoIcon({ tipo }: { tipo: string }) {
   if (tipo === "ENVIAR_EMAIL") return <Mail size={15} />;
   if (tipo === "GERAR_CONTRATO") return <FileSignature size={15} />;
+  if (tipo === "MATERIALIZAR_CHECKLIST") return <ListChecks size={15} />;
+  if (tipo === "DISTRIBUIR_RESPONSAVEL") return <Bot size={15} />;
+  if (tipo === "IDENTIFICAR_OPORTUNIDADE") return <Zap size={15} />;
   return <FileText size={15} />;
 }
 
@@ -97,12 +120,43 @@ function dataCurta(valor: string | null) {
   }).format(new Date(valor));
 }
 
-export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Props) {
+function resumoConfiguracao(automacao: AutomacaoBpmView, catalogos: CatalogosAutomacao) {
+  try {
+    const parametros = JSON.parse(automacao.parametrosJson) as Record<string, unknown>;
+    if (automacao.acaoTipo === "DISTRIBUIR_RESPONSAVEL") {
+      const estrategia = String(parametros.estrategia ?? "").replaceAll("_", " ").toLocaleLowerCase("pt-BR");
+      const total = Array.isArray(parametros.candidatosIds) ? parametros.candidatosIds.length : 0;
+      return `SE as condições forem atendidas, ENTÃO distribuir por ${estrategia} entre ${total} candidato(s).`;
+    }
+    if (automacao.acaoTipo === "IDENTIFICAR_OPORTUNIDADE") {
+      const servico = catalogos.servicos.find((item) => item.id === Number(parametros.servicoAlvoId));
+      const acao = parametros.acao && typeof parametros.acao === "object" && "tipo" in parametros.acao
+        ? String(parametros.acao.tipo).replaceAll("_", " ").toLocaleLowerCase("pt-BR")
+        : "executar ação configurada";
+      return `SE as condições forem atendidas e o cliente não possuir ${servico?.nome ?? "o serviço alvo"}, ENTÃO ${acao}.`;
+    }
+  } catch {
+    return "Configuração inválida — revise antes de ativar.";
+  }
+  return automacao.descricao;
+}
+
+function resumoVersao(automacao: AutomacaoBpmView) {
+  if (!automacao.versaoAtiva) return null;
+  try {
+    const grafo = JSON.parse(automacao.versaoAtiva.grafoJson) as { nos?: Array<{ tipo?: string; acaoTipo?: string }> };
+    const acoes = (grafo.nos ?? []).filter((no) => no.tipo === "ACAO").map((no) => (no.acaoTipo ?? "ação").replaceAll("_", " ").toLocaleLowerCase("pt-BR"));
+    return `${automacao.versaoAtiva.condicaoJson ? "Com condições" : "Sem condições"} · ${acoes.length} ação(ões): ${acoes.join(" → ") || "encerramento"}`;
+  } catch { return "Versão central com configuração inválida"; }
+}
+
+export function AutomacoesWorkspace({ pipelines, catalogos, erro, accent }: Props) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
   const [excluir, setExcluir] = useState<AutomacaoBpmView | null>(null);
   const [duplicar, setDuplicar] = useState<AutomacaoBpmView | null>(null);
+  const [insights, setInsights] = useState<AutomacaoBpmView | null>(null);
   const [destinoPipelineId, setDestinoPipelineId] = useState("");
   const [destinoEtapaId, setDestinoEtapaId] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -113,6 +167,11 @@ export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Prop
     return pipelines
       .map((pipeline) => ({
         ...pipeline,
+        automacoesGlobais: (pipeline.automacoesGlobais ?? []).filter((automacao) =>
+          [automacao.nome, automacao.descricao, automacao.gatilhoTipo, automacao.acaoTipo]
+            .filter(Boolean)
+            .some((valor) => String(valor).toLocaleLowerCase("pt-BR").includes(termo)),
+        ),
         etapas: pipeline.etapas
           .map((etapa) => ({
             ...etapa,
@@ -130,17 +189,15 @@ export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Prop
       }))
       .filter((pipeline) =>
         pipeline.nome.toLocaleLowerCase("pt-BR").includes(termo)
+        || (pipeline.automacoesGlobais?.length ?? 0) > 0
         || pipeline.etapas.length > 0,
       );
   }, [busca, pipelines]);
 
-  const totalAutomacoes = pipelines.reduce(
-    (total, pipeline) => total + pipeline.etapas.reduce(
-      (subtotal, etapa) => subtotal + etapa.automacoes.length,
-      0,
-    ),
-    0,
-  );
+  const totalAutomacoes = new Set(pipelines.flatMap((pipeline) => [
+    ...(pipeline.automacoesGlobais ?? []).map((automacao) => automacao.id),
+    ...pipeline.etapas.flatMap((etapa) => etapa.automacoes.map((automacao) => automacao.id)),
+  ])).size;
 
   function atualizar() {
     setEditor(null);
@@ -169,7 +226,7 @@ export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Prop
         toast.error(resultado.error);
         return;
       }
-      toast.success("Automação excluída");
+      toast.success("Automação arquivada com histórico preservado");
       atualizar();
     });
   }
@@ -234,6 +291,20 @@ export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Prop
               <Plus size={14} /> Adicionar
             </Button>
           </div>
+          {(pipeline.automacoesGlobais?.length ?? 0) > 0 && (
+            <div className="border-b border-white/[0.06] bg-cyan-400/[0.025] p-4">
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-cyan-300">Automações globais</h3>
+              <div className="grid gap-2 xl:grid-cols-2">
+                {pipeline.automacoesGlobais!.map((automacao) => (
+                  <article key={automacao.id} className="rounded-xl border border-cyan-400/10 bg-slate-950/70 p-3">
+                    <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-white">{automacao.nome}</p><p className="mt-1 text-xs text-slate-500">{automacao.descricao || resumoVersao(automacao)}</p></div><Switch checked={automacao.ativa} onCheckedChange={(valor) => alternar(automacao, valor)} disabled={isPending} /></div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-400"><Badge variant="secondary"><Clock3 size={12} /> {GATILHO_LABEL[automacao.versaoAtiva?.gatilhoTipo ?? automacao.gatilhoTipo] ?? automacao.gatilhoTipo}</Badge><span>{resumoVersao(automacao)}</span>{automacao.proximaExecucao && <span>Próxima: {dataCurta(automacao.proximaExecucao)}</span>}{automacao.ultimaExecucao && <span>Última: {automacao.ultimaExecucao.status.toLocaleLowerCase("pt-BR")} · {dataCurta(automacao.ultimaExecucao.executadoEm ?? automacao.ultimaExecucao.createdAt)}</span>}</div>
+                    <div className="mt-2 flex justify-end"><button type="button" onClick={() => setEditor({ mode: "edit", automacao })} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label={`Editar ${automacao.nome}`}><Pencil size={14} /></button></div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="grid gap-4 p-4 xl:grid-cols-2">
             {pipeline.etapas.map((etapa) => (
               <div key={etapa.id} className="rounded-xl border border-white/[0.06] bg-slate-900/55 p-4">
@@ -254,13 +325,15 @@ export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Prop
                             <p className="truncate text-sm font-semibold text-white">{automacao.nome}</p>
                             <Badge variant="outline" className="gap-1 border-cyan-400/20 text-cyan-300"><AcaoIcon tipo={automacao.acaoTipo} />{ACAO_LABEL[automacao.acaoTipo] ?? automacao.acaoTipo}</Badge>
                           </div>
-                          {automacao.descricao && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{automacao.descricao}</p>}
+                          {resumoConfiguracao(automacao, catalogos) && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{resumoConfiguracao(automacao, catalogos)}</p>}
+                          {resumoVersao(automacao) && <p className="mt-1 line-clamp-2 text-[11px] text-slate-600">{resumoVersao(automacao)}</p>}
                         </div>
                         <Switch checked={automacao.ativa} onCheckedChange={(valor) => alternar(automacao, valor)} disabled={isPending} aria-label={`${automacao.ativa ? "Pausar" : "Ativar"} automação ${automacao.nome}`} />
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
                         <Badge variant="secondary" className="gap-1"><Clock3 size={12} />{GATILHO_LABEL[automacao.gatilhoTipo] ?? automacao.gatilhoTipo}{automacao.tempoMinutos ? ` · ${automacao.tempoMinutos} min` : ""}</Badge>
                         <span>{automacao._count.execucoes} execução(ões)</span>
+                        {automacao.proximaExecucao && <span>Próxima: {dataCurta(automacao.proximaExecucao)}</span>}
                         {automacao.ultimaExecucao && (
                           <span className={automacao.ultimaExecucao.status === "FALHA" ? "text-rose-300" : automacao.ultimaExecucao.status === "SUCESSO" ? "text-emerald-300" : "text-amber-300"} title={automacao.ultimaExecucao.mensagemErro ?? undefined}>
                             Última: {automacao.ultimaExecucao.status.toLocaleLowerCase("pt-BR")} {dataCurta(automacao.ultimaExecucao.executadoEm ?? automacao.ultimaExecucao.createdAt)}
@@ -268,6 +341,7 @@ export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Prop
                         )}
                       </div>
                       <div className="mt-3 flex justify-end gap-1 border-t border-white/[0.05] pt-2">
+                        <button type="button" onClick={() => setInsights(automacao)} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label={`Simulação e histórico de ${automacao.nome}`}><Activity size={14} /></button>
                         <button type="button" onClick={() => { setDuplicar(automacao); setDestinoPipelineId(pipeline.id); setDestinoEtapaId(""); }} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label={`Duplicar ${automacao.nome}`}><Copy size={14} /></button>
                         <button type="button" onClick={() => setEditor({ mode: "edit", automacao })} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label={`Editar ${automacao.nome}`}><Pencil size={14} /></button>
                         <button type="button" onClick={() => setExcluir(automacao)} className="rounded-lg p-2 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300" aria-label={`Excluir ${automacao.nome}`}><Trash2 size={14} /></button>
@@ -282,21 +356,24 @@ export function AutomacoesWorkspace({ pipelines, templates, erro, accent }: Prop
       ))}
 
       {editor && (
-        <AutomacaoFormDialog
+        <AutomacaoCentralFormDialog
           automacao={editor.mode === "edit" ? editor.automacao : null}
-          pipelineInicialId={editor.mode === "create" ? editor.pipelineId : pipelines.find((pipeline) => pipeline.etapas.some((etapa) => etapa.automacoes.some((item) => item.id === editor.automacao.id)))?.id}
+          pipelineInicialId={editor.mode === "create" ? editor.pipelineId : pipelines.find((pipeline) => (pipeline.automacoesGlobais ?? []).some((item) => item.id === editor.automacao.id) || pipeline.etapas.some((etapa) => etapa.automacoes.some((item) => item.id === editor.automacao.id)))?.id}
           etapaInicialId={editor.mode === "create" ? editor.etapaId : pipelines.flatMap((pipeline) => pipeline.etapas).find((etapa) => etapa.automacoes.some((item) => item.id === editor.automacao.id))?.id}
           pipelines={pipelines}
-          templates={templates}
           onClose={() => setEditor(null)}
           onSaved={atualizar}
         />
       )}
 
+      {insights && (
+        <AutomacaoInsightsDialog automacao={insights} onClose={() => setInsights(null)} />
+      )}
+
       <AlertDialog open={Boolean(excluir)} onOpenChange={(open) => { if (!open && !isPending) setExcluir(null); }}>
         <AlertDialogContent className="border-white/10 bg-slate-950 text-white">
-          <AlertDialogHeader><AlertDialogTitle>Excluir automação?</AlertDialogTitle><AlertDialogDescription>Esta ação remove a configuração e seu histórico de execuções. O movimento dos cards não será alterado.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmarExclusao} disabled={isPending} className="bg-rose-600 hover:bg-rose-500">{isPending ? "Excluindo..." : "Excluir"}</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Arquivar automação?</AlertDialogTitle><AlertDialogDescription>A automação será desativada, mas sua configuração, versões e histórico permanecerão disponíveis para auditoria.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={confirmarExclusao} disabled={isPending} className="bg-rose-600 hover:bg-rose-500">{isPending ? "Arquivando..." : "Arquivar"}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

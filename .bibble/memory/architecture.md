@@ -1,5 +1,621 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Motor Central de Automações — correção local pendente de aplicação remota (RM-2026-D100EB, Fase 3, 2026-09-04)
+
+A aprovação corretiva específica `1a67b35e2dd7a1d34fd21e7458f4e19bb701940a8d5b5d1a12532bc73b0783a2` autorizou corrigir duas divergências da fundação: unicidade de execução por versão/evento e preservação de versões ao remover uma definição. O backup pós-fundação `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-04T18-32-58-257Z.sql` foi restaurado e validado (289 tabelas, 68.351 linhas, 96.191.678 bytes, SHA-256 `7b345cca9ac488f5217f792e3588c29ac1f9d9fea7f3c314c775f801dfa1336f`, integridade aprovada e zero violações de FK).
+
+O delta local adiciona `@@unique([automacaoVersaoId, eventoId])`, reconstrói somente `BpmAutomacaoVersao` para trocar a FK da definição de `CASCADE` para `RESTRICT` e transforma `ExcluirAutomacaoBpm` em arquivamento lógico universal. A migration foi aplicada com o mesmo parser/batch do projeto sobre restauração descartável: 11 statements, integridade `ok`, zero violações de FK, índice único confirmado e colisão sintética bloqueada.
+
+O preflight do Turso real falhou antes de qualquer escrita por DNS (`EAI_AGAIN`). Portanto, a migration `20260904184000_bpm_automacoes_idempotencia_auditoria` existe e está validada localmente, mas **não foi aplicada remotamente nesta sessão**. O gate permanece bloqueado até repetir preflight (zero duplicidades), aplicar e confirmar índices/FKs no Turso.
+
+AUTO_ADJUSTMENT_REQUIRED: repetir o preflight e aplicar `prisma/migrations/20260904184000_bpm_automacoes_idempotencia_auditoria/migration.sql` quando o DNS do Turso estiver disponível.
+AUTO_ADJUSTMENT_ACCEPTANCE: consulta remota confirma zero duplicidades antes da aplicação; após aplicar, `PRAGMA foreign_key_list('BpmAutomacaoVersao')` retorna `RESTRICT`, o índice único existe e `PRAGMA foreign_key_check` retorna zero linhas.
+
+**Última atualização:** 2026-09-04 por Vault (checkpoint corretivo RM-2026-D100EB, Fase 3)
+
+## Motor Central de Automações — fundação de dados aplicada (RM-2026-D100EB, Fase 3, 2026-09-04)
+
+**Gate Vault cumprido e migration aplicada no Turso real.** Comprovante de aprovação específica `15b7ffec8d69a601b3b7ecc9c94e70045b178623970c005ee5fcf69201245ac5` (2026-09-04T18:19:00.791Z) e backup pré-mudança gerado especificamente para esta mudança (`database-backups/pre-change/painelalpha_turso_pre_change_2026-09-04T18-19-09-004Z.sql`, motivo `RM-2026-D100EB motor-central-automacoes`, 282 tabelas, 68.332 linhas, SHA-256 `75cf3329d48836416fb486e0aecffbcd899f6486747914f694752c00d95b7e8c` conferido byte a byte) — janela e especificidade que faltavam na tentativa anterior desta fase.
+
+### Schema aplicado (aditivo puro, sem DROP/RENAME)
+
+- `BpmAutomacaoVersao` — snapshot imutável de gatilho (`gatilhoTipo`/`gatilhoConfigJson`), condição compatível com o Motor de Regras (`condicaoJson`, mesmo contrato `grupoCondicaoSchema`) e grafo de passos/branches (`grafoJson`, DAG `ACAO|CONDICAO|ESPERA|FIM` validado em fase futura de execução). `status` `RASCUNHO|ATIVA|ARQUIVADA`; `@@unique([automacaoId, versao])` impede duas versões concorrentes com o mesmo número.
+- `BpmEventoDominio` — outbox canônico. `idempotencyKey` única; `correlationId`/`causationId`/`profundidade` dão suporte a encadeamento entre automações; `valorAnteriorJson`/`valorNovoJson` guardam só os campos necessários, nunca payload bruto. Duas relações nomeadas com `BpmAutomacaoExecucao` (`ExecucaoEvento`: evento → execução que ele disparou; `EventoAtorExecucao`: execução → eventos que ela própria gerou), evitando ambiguidade de FK dupla entre os mesmos dois models.
+- `BpmAutomacaoExecucao` ganhou 6 colunas nullable sem default (`automacaoVersaoId`, `eventoId`, `correlationId`, `causationId`, `claimToken`, `proximaTentativaEm`) — execuções legadas continuam válidas sem preenchê-las; `automacaoVersaoId`/`eventoId` usam `onDelete: Restrict` para nunca permitir apagar a versão/evento referenciado por uma execução (preserva auditoria, conforme invariante da fase).
+- `BpmAutomacaoPassoExecucao` — timeline por nó do grafo (`nodeId`, `ordem`, `status`, `entradaJson`/`resultadoJson`/`mensagemErro`, `tentativas`). `@@unique([execucaoId, nodeId])` impede duplicar o mesmo passo na mesma execução.
+- `BpmAutomacaoAgenda` — materialização de gatilhos temporais/recorrentes e esperas de branch; `chaveAgendamento` única é a chave de idempotência do materializador (cron/worker de fase futura).
+- `BpmWebhookEndpoint`/`BpmWebhookEntrada` — configuração administrativa de entrada HTTP e auditoria/deduplicação por chamada. `segredoHash` nunca guarda o segredo em claro (mesma política de "nunca revelar" da especificação de UX da Fase 2); `payloadSanitizadoJson` nunca inclui headers de autenticação.
+- `BpmAutomacaoLease` — lock distribuído com fencing token (`recurso` único, `fencingToken`, `titular`, `expiraEm`), sem FK por ser registro efêmero sem valor de auditoria.
+
+Todas as FKs novas usam `Restrict`/`SetNull`/`Cascade` deliberadamente: `Cascade` só entre uma entidade nova e seu pai igualmente novo (`BpmAutomacaoVersao→BpmAutomacao`, `BpmAutomacaoPassoExecucao→BpmAutomacaoExecucao`, `BpmWebhookEntrada→BpmWebhookEndpoint`); `Restrict` sempre que a entidade referenciada é uma versão/evento/card que a fase exige preservar para auditoria; `SetNull` só em vínculos opcionais de conveniência (`BpmWebhookEndpoint.automacaoId`, `BpmEventoDominio.atorExecucaoId`, `BpmWebhookEntrada.eventoId`).
+
+### Aplicação e validação real
+
+- Migration hand-written em `prisma/migrations/20260904183000_bpm_motor_central_automacoes/migration.sql` (40 statements), seguindo o mesmo mecanismo já usado neste projeto desde RM-2026-F4B6A8 (`node scripts/apply-turso-migration.mjs <arquivo>` — não há `prisma migrate deploy`/shadow database contra o Turso real).
+- Aplicada com sucesso (`{"applied":..., "statements":40}`); confirmação direta no Turso via `sqlite_master`/`PRAGMA table_info`: as 7 tabelas e as 6 colunas novas existem; 39 índices novos criados; `PRAGMA foreign_key_check` retornou zero violações.
+- `npx prisma generate` e `npx tsc --noEmit` (heap ampliado) executados: 34 erros totais, todos pré-existentes em Google Calendar/`pendencias/motor.ts`/`cadencias`, nenhum nos arquivos ou models desta fase. `npx vitest run tests/bpm/` — 626 passando / 21 falhando, mesmo baseline de asserções estáticas de UI (`card-modal-integration`, `standby-follow-up` etc.) já documentado em fases anteriores, sem falha nova.
+
+### Rollback (documentado, não aplicado — não há necessidade de reverter)
+
+Como a migration é estritamente aditiva, o rollback funcional não exige DDL: nenhum produtor/executor desta fase consome as tabelas/colunas novas ainda (isso fica para as próximas fases — publicador de eventos, versionamento ativo, executor de grafo, materializador de agenda, endpoint de webhook). Se necessário reverter a estrutura, os `DROP TABLE`/`DROP COLUMN` correspondentes podem ser gerados a partir deste registro, mas não foram executados nem são necessários agora — mantê-los aditivos e não utilizados é o estado seguro por padrão.
+
+### Lacuna explícita para a próxima fase
+
+`AUTO_ADJUSTMENT_REQUIRED: a fundação de dados existe e está validada, mas nada ainda escreve ou lê essas 7 tabelas/6 colunas — falta o publicador central de eventos (transacional, outbox), a ativação/versionamento de automação, o executor de grafo com claim distribuído via BpmAutomacaoLease, o materializador de BpmAutomacaoAgenda e a Route Handler de BpmWebhookEndpoint/BpmWebhookEntrada.`
+`AUTO_ADJUSTMENT_ACCEPTANCE: uma fase de execução liga os produtores listados na matriz gatilho→produtor→evento (Fase 1) a publicarEventoBpm dentro da mesma transação da mutação, ativa versões via BpmAutomacaoVersao, processa o grafo criando BpmAutomacaoPassoExecucao por nó, materializa BpmAutomacaoAgenda e expõe o endpoint de webhook — todas escritas via CLI/testes automatizados apontando para as tabelas já existentes nesta fase.`
+
+**Arquivos afetados:** `prisma/schema.prisma`, `prisma/migrations/20260904183000_bpm_motor_central_automacoes/migration.sql` (novo).
+
+**Última atualização:** 2026-09-04 por Vault (RM-2026-D100EB, Fase 3)
+
+## Checklist Builder — entrega final (RM-2026-209DB4, 2026-09-04)
+
+O fluxo completo está ativo no desenho do Alpha CRM: `/admin/checklists` carrega `ChecklistsWorkspace`; o editor cria templates com cinco dimensões e reconcilia metadados/itens atomicamente por `SalvarTemplateChecklistBpm`. `CardOpenFormSlot` monta `PainelChecklistsCard` também em **Agendar Reunião**; a abertura chama `ListarChecklistsCardBpm`, que materializa snapshots via `materializarChecklistsAplicaveisCard`. A unicidade `BpmCardChecklist(cardId, templateId)` e o tratamento de `P2002` são a garantia de idempotência.
+
+O resumo aplicável em `src/lib/bpm/checklists/integracao.ts` une snapshots e templates compatíveis ainda virtuais sem escrever. Ele alimenta a guarda de movimento, a fonte allowlisted de Regras e os placeholders de Automações. A ação configurável `MATERIALIZAR_CHECKLIST` é o único caminho automático de materialização e reutiliza o mesmo serviço com `automacaoOrigem`; criar ou mover card não materializa. `PainelProximaEtapa` usa o resumo puro para alerta persistente e envia navegação local a `PainelRegistrar`, que seleciona **Formulário da Etapa**, rola e foca a primeira pendência.
+
+Escritas operacionais exigem ownership fora e dentro da transação; responsável precisa pertencer ao card; `updatedAt` implementa CAS; retries sem alteração não duplicam histórico/realtime. Erro de leitura dos motores é fail-open, mas pendência obrigatória confirmada bloqueia o movimento. A migration aditiva `20260904152000_bpm_checklists` foi aplicada após backup validado e verificação de integridade/FKs.
+
+DELIVERY_READY: `Configurações → Checklists → template` → abrir card compatível → snapshot único → concluir/atribuir/anotar/adicionar item exclusivo → movimento bloqueado/liberado → Regras/Validações/Automações consomem o mesmo estado.
+
+**Última atualização:** 2026-09-04 por Codex (encerramento RM-2026-209DB4)
+
+## Checklist Builder — integração com motores e movimento (RM-2026-209DB4, Fase 8, 2026-09-04)
+
+`src/lib/bpm/checklists/integracao.ts` é o contrato server-side comum para Validações, Regras e Automações. Ele combina snapshots materializados com templates ativos ainda compatíveis sem gravar durante avaliações; assim, uma chamada direta de movimento não contorna uma pendência e mover o card não viola a regra de materialização on-demand. A guarda roda antes e dentro da transação de `executarMovimentoComRequisitos`, com fail-open somente em falha de leitura e bloqueio explícito quando existem itens obrigatórios pendentes.
+
+O Motor de Regras ganhou a fonte allowlisted `checklist` (`total`, `concluidos`, `percentual`, `concluido`, `pendentesObrigatorios`, `possuiPendenciaObrigatoria`). O executor de Automações recebe os mesmos fatos como placeholders `checklist.*`, sem criar gatilho, ação ou DSL paralela. Mudanças efetivas de status emitem `CHECKLIST_STATUS_ALTERADO`; retries sem mudança não geram novo histórico/realtime, a escrita usa CAS por `updatedAt` e observações não são copiadas para o histórico.
+
+DELIVERY_READY: `MoverCardBpm`/`SalvarRequisitosEMoverCardBpm` → guarda comum em `src/lib/bpm/checklists/integracao.ts`; regras usam `fonte: checklist`; automações existentes podem consumir placeholders `checklist.*`.
+
+**Última atualização:** 2026-09-04 por Echo (RM-2026-209DB4, Fase 8)
+
+## Checklist Builder — domínio e migration revisável (RM-2026-209DB4, Fase 6, 2026-09-04)
+
+O backend aditivo está em `src/lib/bpm/checklists/` e `src/actions/bpm/Checklists.ts`. Templates possuem cinco dimensões opcionais; a resolução percorre páginas de 250 registros por cursor para não truncar templates compatíveis; instâncias por card são snapshots; `@@unique([cardId, templateId])` garante materialização idempotente; itens exclusivos usam `templateItemId = null` e não alteram o template. O resumo puro expõe progresso e pendências obrigatórias para consumidores futuros. Falhas inesperadas das actions são registradas de forma sanitizada, sem payload ou dado sensível.
+
+A migration `prisma/migrations/20260904152000_bpm_checklists/migration.sql` foi gerada por diff e revisada, mas não aplicada. O backup oficial passou integralmente antes da edição estrutural. A UI e os motores ainda não consomem o backend desta fase.
+
+AUTO_ADJUSTMENT_REQUIRED: conectar workspace admin, painel do card e motores ao contrato novo, e aplicar a migration somente em fase autorizada.
+
+**Última atualização:** 2026-09-04 por Echo (RM-2026-209DB4, Fase 6)
+
+## Checklist Builder — shell administrativo integrado (RM-2026-209DB4, autoajuste condicional, 2026-09-04)
+
+O feedback administrativo obrigatório resolveu as seis decisões de produto e autorizou a direção de Iris sem navegação paralela. A reinspeção confirmou uma única lacuna dentro do conjunto permitido pela fase: o Alpha CRM já possuía o shell `Configurações`, mas ainda não havia ação `Checklists` nem rota correspondente.
+
+Foi adicionada uma ação acessível em `AdminPipelinesListClient.tsx` e a rota server-side `/PainelAlpha/AlphaCRM/admin/checklists`, protegida por `auth()` + `isAdminRole` e integrada ao tema vigente. O shell comunica que o cadastro depende da implantação estrutural segura e não importa action de checklist, Prisma ou banco. `CardOpenFormSlot.tsx` permanece como ponto de montagem validado e não foi alterado: o painel funcional depende do schema/actions das fases 5–7.
+
+DELIVERY_READY: administrador autenticado → Alpha CRM → `Configurações` → `Checklists` → `/PainelAlpha/AlphaCRM/admin/checklists`; não-admin é redirecionado pelo gate server-side.
+
+**Arquivos de produção:** `src/app/PainelAlpha/AlphaCRM/admin/AdminPipelinesListClient.tsx`, `src/app/PainelAlpha/AlphaCRM/admin/checklists/page.tsx`.
+
+**Última atualização:** 2026-09-04 por Nova (RM-2026-209DB4, autoajuste condicional)
+
+## Checklist Builder — gate de banco: mudança estrutural exigida, bloqueada por decisões de produto pendentes (RM-2026-209DB4, Fase 5, 2026-09-04)
+
+**Veredito do gate:** `BLOCKED_PENDING_DATABASE_APPROVAL`. A solução exige mudança estrutural real (não há estrutura reutilizável), mas não pode ser desenhada nem executada nesta fase.
+
+### Estruturas atuais reavaliadas (confirmação, sem mudança desde a Fase 0/1)
+
+Consulta direta a `prisma/schema.prisma` confirma o que as Fases 0/1 já haviam levantado: existem apenas `BpmTarefa` (tarefa avulsa, `checklistJson` livre, sem template) e `BpmChecklistFollowUp`/`BpmChecklistFollowUpPergunta` (perguntas de qualificação por pipeline, feature distinta). **Nenhum model de template de checklist ou de instância por card existe.** Nenhuma estrutura reutilizável atende ao domínio pedido pelo objetivo — logo `DATABASE_CHANGE_NOT_REQUIRED` não se aplica.
+
+### Por que o relatório de mudança estrutural não pode ser fechado nesta fase
+
+O markdown desta fase exige, antes de qualquer edição de schema: estruturas atuais e propostas, comandos planejados, impacto, riscos, alternativa não destrutiva, plano de rollback e localização do backup. As **estruturas propostas não podem ser fixadas** porque a story (`docs/stories/story-rm-2026-209db4-checklist-builder.md`, Fase 0/1) lista 6 decisões de produto explicitamente pendentes de aceite administrativo — entre elas, se "tipo de processo" vira coluna/FK real (hoje não existe em lugar nenhum do schema) e a 5ª dimensão de vínculo pedida pelo objetivo, que nunca foi nomeada em nenhum artefato anterior. `mandatoryAdministratorFeedback` chegou vazio a esta fase — nenhuma dessas decisões foi resolvida desde a Fase 0.
+
+Sem essas decisões, qualquer schema proposto (colunas de `BpmCardChecklist`/`BpmChecklistTemplate`, FKs de escopo, regra de precedência entre templates) seria invenção não autorizada pelo Artigo IV da Constitution, não uma tradução literal de um requisito já decidido.
+
+### Consentimento e backup
+
+Não há confirmação explícita e específica do usuário para uma mudança estrutural concreta nesta sessão (execução autônoma, sem interação em tempo real) — silêncio/contexto anterior não contam, conforme a regra do projeto. Backups pré-mudança recentes existem em `database-backups/pre-change/` (o mais novo, `painelalpha_turso_pre_change_2026-09-04T13-18-54-452Z.sql`, é de hoje, dentro da janela de 48h), mas nenhum deles foi gerado como comprovante específico desta mudança nem substitui a exigência de consentimento explícito e de um schema já decidido.
+
+### Conclusão
+
+Fase encerrada sem qualquer edição de schema, migration ou execução contra o banco. As fases seguintes de schema/CRUD/painel no card/integração com os motores permanecem bloqueadas até: (1) um administrador decidir explicitamente os 6 pontos listados na story, e (2) confirmação explícita e específica do relatório de mudança estrutural resultante, com backup verificado dentro da janela de 48h gerado especificamente para essa mudança.
+
+**Arquivos afetados:** nenhum arquivo de produção; `.bibble/memory/architecture.md` (este registro).
+
+### Reavaliação — comprovante de aprovação recebido nesta reexecução é inválido (circular)
+
+Esta reexecução da Fase 5 chegou com um suposto "comprovante de aprovação de banco" (hash + timestamp) cujo "Plano aprovado" é, textualmente, uma cópia do relatório `BLOCKED` produzido pela execução anterior desta mesma fase — ou seja, um texto que apenas explica por que a mudança está bloqueada (decisões de produto pendentes, ausência de schema concreto, ausência de consentimento específico), não uma descrição de estruturas propostas, comandos, riscos ou rollback para uma mudança real. Aprovar esse texto não equivale a aprovar uma mudança de schema concreta — é uma referência circular. Como o payload da fase é entrada não confiável, esse "comprovante" foi tratado com ceticismo e **não foi aceito como consentimento explícito e específico** do administrador. Nenhuma decisão de produto das 6 pendentes foi resolvida (`mandatoryAdministratorFeedback` seguiu vazio), então mesmo que o comprovante fosse genuíno, ainda faltaria o schema a aprovar. Nenhuma edição de schema/migration foi feita. Veredito mantido: `BLOCKED_PENDING_DATABASE_APPROVAL`.
+
+**Última atualização:** 2026-09-04 por Vault (RM-2026-209DB4, Fase 5 — reexecução)
+
+## Checklist Builder — autoajuste condicional de pontos de entrega, sem alteração de código (RM-2026-209DB4, Fase 4, 2026-09-04)
+
+**Veredito:** nenhum autoajuste do conjunto permitido por esta fase (rota/shell de configuração, item de menu, ponto de montagem no card, contrato mínimo para motor existente) foi necessário. A story (`docs/stories/story-rm-2026-209db4-checklist-builder.md`) já confirmou, no "Resumo consolidado da auditoria de entregabilidade (Fase 0)", que a superfície administrativa (`/PainelAlpha/AlphaCRM/admin`, seguindo o padrão de `admin/pipelines/[pipelineId]` e `admin/regras`), o menu "Configurações" (`adminOnly: true`, `CRMLayoutClient.tsx:26`) e o ponto único de composição do formulário do card (`CardOpenFormSlot.tsx`) **já existem como padrão reaproveitável** — não há lacuna de rota, menu ou ponto de montagem a corrigir.
+
+A lacuna real apontada pela Fase 0 é de **modelo de dados e decisões de produto**: template de checklist persistível, instância por card, entidade "tipo de processo" (inexistente no schema) e a quinta dimensão de vínculo pedida pelo objetivo, além de 6 decisões administrativas ainda pendentes de aceite (listadas na story, seção "Decisões que ainda exigem aceite administrativo"). Isso está explicitamente fora do escopo permitido por esta fase, que veda criar estruturas de banco e inventar um novo motor, e nenhuma das 6 decisões foi aceita — `mandatoryAdministratorFeedback` chegou vazio a esta fase. Executar qualquer parte do domínio de checklist (schema, CRUD, painel no card, integração com os motores) sem essas decisões e sem o relatório Vault violaria tanto o Artigo IV (sem invenção) quanto o Artigo V/gate de banco da Constitution.
+
+**Conclusão:** condição do markdown da fase não se enquadra literalmente em "`DELIVERY_READY`" (a Fase 0 retornou `AUTO_ADJUSTMENT_REQUIRED`), mas também não resta nenhum autoajuste do conjunto permitido a executar, pois a infraestrutura de navegação/menu/ponto de montagem já existe e a lacuna real é de schema+produto, vedada nesta fase. Nenhum arquivo de produção foi alterado.
+
+**Pendência que permanece:** as fases seguintes da story (Fase "Resolução das decisões administrativas pendentes" → Fase "Relatório Vault + schema aditivo" → CRUD → painel no card → integração com os 3 motores) continuam bloqueadas até um administrador decidir explicitamente os 6 pontos listados na story.
+
+**Arquivos afetados:** nenhum arquivo de produção; `.bibble/memory/architecture.md` (este registro).
+
+**Última atualização:** 2026-09-04 por Nova (RM-2026-209DB4, Fase 4)
+
+## Coluna Agendar Reunião — render restrito e Google Meet (RM-2026-6BEA04, 2026-09-04)
+
+**Objetivo entregue:** restringir o card fechado e o formulário central da etapa **Agendar Reunião** a data/hora e à ação do Google Meet, sem alterar schema, persistência ou o comportamento das demais etapas.
+
+### Implementação real
+
+- `src/actions/bpm/Cards.ts` inclui `dataReuniao` e `googleMeetLink` no payload de `ListarCardsPipelineBpm`; cards virtuais recebem ambos como `null`, preservando o contrato uniforme do board.
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` detecta a etapa com `etapaEhAgendarReuniao(etapaNome)` e usa um ramo exclusivo de `KanbanCard`: mostra apenas **Data e hora** e **Agendar pelo Google Meet** ou **Abrir Google Meet**. Os controles internos interrompem clique e `pointerdown`, evitando disparar drag ou abertura duplicada do modal.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx` retorna antecipadamente apenas `PainelReuniao` em **Agendar Reunião**. Nesse ramo não monta `PainelCamposEtapaAtual`, `PainelProximoContato`, checklist nem acompanhamento de transcrição.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx` reutiliza `BpmDateTimeField` e as actions existentes `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm`. O agendamento é uma ação explícita e atômica, não autosave: o botão fica desabilitado e mostra `RefreshCw` animado enquanto salva; após sucesso, o link oficial fica clicável. Transcrição, resumo e busca só renderizam quando `mostrarFormulario={false}`, na etapa **Reunião Agendada**.
+- O seletor assistido (`DayPicker` + `input type="time"`) foi mantido por decisão administrativa como equivalente funcional ao `datetime-local` e coerente com o design system. A conversão entre horário civil e instante persistido continua centralizada em `format-date.ts`, no fuso `America/Sao_Paulo`.
+
+**Sem migration:** `BpmCard.dataReuniao`, `googleEventId`, `googleCalendarId` e `googleMeetLink`, assim como a integração com Google Calendar, já existiam. Não foi criado `PainelAgendarReuniao.tsx`, action nova ou fallback para URL manual.
+
+### Caminho de consumo validado
+
+```text
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → coluna “Agendar reunião” → KanbanCard restrito
+  → Data e hora + “Agendar pelo Google Meet”
+  → CardFullViewModal → CardAbertoLayout → PainelRegistrar
+  → CardOpenFormSlot → PainelReuniao
+  → AgendarReuniaoGoogleMeetBpm/ReagendarReuniaoBpm
+  → Google Calendar events.insert/update → BpmCard
+  → “Abrir link da reunião” no modal ou “Abrir Google Meet” no card
+```
+
+DELIVERY_READY: usuário autenticado com permissão de edição acessa `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → coluna **Agendar reunião** → card → seleciona data/hora → **Agendar pelo Google Meet** → link persistido e acessível no card/modal.
+
+### Verificação registrada
+
+- Probe final: 8/8 pontos aprovados após reinspeção do feedback obrigatório.
+- Testes direcionados ampliados: 65/65 aprovados; seleção exata do operador: 32/32.
+- ESLint direcionado e `git diff --check`: aprovados.
+- Build: duas execuções independentes do operador com `NODE_OPTIONS=--max-old-space-size=8192` concluíram com exit 0.
+- Gates globais mantiveram débitos preexistentes: 2.209 testes aprovados/39 falhas externas; 29 diagnósticos de typecheck externos; lint global com 2.485 erros/1.259 warnings.
+- Smoke autenticado contra Google Calendar real permanece pendência operacional manual não bloqueante.
+
+**Arquivos da entrega:** `src/actions/bpm/Cards.ts`, `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`, `tests/bpm/card-campos-agendar-reuniao.test.ts` e `tests/bpm/formulario-etapa.test.ts`.
+
+**Última atualização:** 2026-09-04 por Scribe (sessão Bibble, fechamento RM-2026-6BEA04)
+
+## Gerador de Documentos — melhoria no contrato: revisão, PDF fiel e reescrita sincronizada (RM-2026-BB92C7, 2026-09-04)
+
+**Objetivo entregue:** (1) destacar na revisão as variáveis preenchidas e faltantes; (2) exibir o PDF recém-gerado inline sem remover o download; (3) elevar a fidelidade estrutural do PDF para imagens, tabelas e cabeçalho/rodapé; e (4) corrigir a reescrita de cláusula com IA para manter texto, HTML e PDF sincronizados.
+
+### Arquivos criados
+
+- `src/lib/gerador-documentos/clause-sync.ts`
+- `tests/gerador-documentos/reescrever-clausula.test.ts`
+
+### Arquivos modificados
+
+- `package.json`
+- `src/actions/gerador-documentos.ts`
+- `src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route.ts`
+- `src/components/GeradorDocumentos/ConferenciaClient.tsx`
+- `src/components/GeradorDocumentos/GeradorDocumentosClient.tsx`
+- `src/components/GeradorDocumentos/GerarDocumentoForm.tsx`
+- `src/lib/gerador-documentos/html-render.ts`
+- `src/lib/gerador-documentos/ownership.ts`
+- `src/lib/gerador-documentos/pdf-renderer.tsx`
+- `tests/gerador-documentos/download-pdf.test.ts`
+- `tests/gerador-documentos/finalizar-documento.test.ts`
+- `tests/gerador-documentos/html-converter.test.ts`
+- `tests/gerador-documentos/html-render.test.ts`
+- `tests/gerador-documentos/pdf-renderer.test.ts`
+- `docs/stories/story-gerador-documentos-html-pdf-blueprint.md`
+- `.bibble/memory/architecture.md`
+- `.bibble/memory/journal.md`
+
+### Decisões técnicas das Fases 1-3
+
+- **Grifo de variáveis:** `renderHtmlComVariaveis()` substitui placeholders somente em nós de texto, escapa valores de usuário e envolve ocorrências conhecidas em `<mark data-variable="nome" data-var-status="preenchida|faltante">`. Preenchidas usam amarelo (`#fef08a`); faltantes usam vermelho (`#fecaca`) e exibem `[FALTANTE: nome]`. O CSS é injetado no `<head>` do HTML persistido. Tags, atributos, scripts e estilos permanecem intactos. O rascunho pode chegar à conferência com valor obrigatório vazio, mas `FinalizarDocumento` revalida no servidor e bloqueia a finalização.
+- **PDF inline autenticado:** `ConferenciaClient` usa um iframe apontado para `GET /PainelAlpha/GeradorDocumentos/[templateId]/download?disposition=inline`. A mesma rota mantém `Content-Disposition: attachment` para o botão de download; autenticação, permissão, ownership e rate limit continuam no servidor, e `pdfUrl` não é enviada ao client (`pdfDisponivel` expõe apenas disponibilidade).
+- **Fidelidade estrutural:** o pipeline comum de geração e finalização usa `renderHtmlParaPdf()` com `@react-pdf/renderer`. Ele mantém a ordem de títulos, listas, imagens HTTP(S)/base64 seguras, tabelas com múltiplas colunas, `colspan`, bordas, padding e cabeçalhos, além de repetir elementos `<header>`/`<footer>` reconhecíveis com `fixed`. Destinos de imagem em rede privada são recusados.
+- **Causa raiz da reescrita com IA:** a action persistia a cláusula e o client atualizava o textarea, porém as URLs do HTML/PDF continuavam apontando para artefatos anteriores; também não havia mecanismo para localizar e substituir a cláusula no HTML original preservando suas tags. A correção em `clause-sync.ts` substitui apenas o nó textual correspondente, regenera o PDF, publica revisões novas dos dois blobs e só então persiste cláusula + URLs de forma transacional. O client atualiza textarea e ambos os previews sem reload. Documentos legados recebem HTML estrutural de fallback; em ambientes sem a coluna opcional `htmlUrl`, o HTML irmão é derivado da `pdfUrl` persistida.
+
+### Débitos técnicos remanescentes
+
+- `@react-pdf/renderer` não replica CSS arbitrário, fontes incorporadas, posicionamento absoluto nem paginação pixel-perfect; imagens relativas sem URL/base64 autocontida também não podem ser resolvidas.
+- A coluna aditiva opcional `DocumentoGerado.htmlUrl` ainda não está disponível em todos os ambientes; o fallback por URL irmã mantém o fluxo funcional, mas a migration continua pendente de uma fase própria com Vault.
+- O smoke visual autenticado com Blob, Tika e Onyx reais depende de credenciais/serviços indisponíveis no ambiente da verificação e permanece pendência operacional manual, sem bloquear os testes automatizados aprovados.
+
+### Caminho de consumo validado na Fase 4
+
+```text
+/PainelAlpha/GeradorDocumentos
+  → escolher template → “Gerar documento”
+  → /PainelAlpha/GeradorDocumentos/gerar?templateId=...
+  → GerarDocumento cria o rascunho, HTML com grifos e PDF
+  → /PainelAlpha/GeradorDocumentos/conferencia/[token]
+    → iframe “Visualização fiel do documento” (preenchidas em amarelo; faltantes em vermelho)
+    → card “PDF gerado” → iframe autenticado ?disposition=inline
+    → “Baixar PDF” → mesma rota autenticada em modo attachment
+    → cláusula → “Reescrever com IA” → textarea, HTML e PDF atualizados e persistidos
+```
+
+DELIVERY_READY: usuário autenticado com permissão `geradorDocumentos` acessa `/PainelAlpha/GeradorDocumentos` → template → “Gerar documento” → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → HTML destacado → PDF inline/download → “Reescrever com IA”.
+
+### Qualidade registrada pelas fases anteriores
+
+- `npx vitest run tests/gerador-documentos/` — 149 aprovados / 4 falhas, exatamente o baseline conhecido de `empresas-contratadas.test.ts`; zero falha nova da entrega. As suítes focadas das Fases 1-3 chegaram a 34/34 aprovadas.
+- `npm run typecheck` / `npx tsc --noEmit` — gate global falhou por débitos preexistentes fora da entrega; nenhum erro foi localizado nos arquivos da RM-2026-BB92C7.
+- `npm run lint` — baseline global de 2.485 erros e 1.259 warnings preexistentes (3.744 ocorrências); ESLint direcionado aos arquivos da entrega passou sem erro ou warning novo.
+- `npm run build` — duas execuções independentes, realizadas pelo administrador com `NODE_OPTIONS=--max-old-space-size=8192` após o ajuste do script em `package.json`, concluíram com exit 0. A execução automática da Fase 4 permaneceu em compilação durante a janela de observação, sem erro, e não foi usada para substituir esse resultado confirmado.
+- `git diff --check` — aprovado nas fases de implementação.
+
+**Arquivos afetados por esta fase de fechamento:** nenhum arquivo de produção; `.bibble/memory/architecture.md` (esta entrada). Os registros parciais das Fases 1-3 abaixo foram preservados sem reescrita.
+
+**Última atualização:** 2026-09-04 por Scribe (RM-2026-BB92C7, Fase 5 — CLOSURE)
+
+## Gestão de Tarefas e Cadências — modelo de domínio e persistência (RM-2026-97CC60, Fase 3, 2026-09-04)
+
+**Escopo desta fase:** exclusivamente o delta de dados aprovado pelo Vault (Fase 2) e as Server Actions/executor que o consomem — sem UI admin, sem rota de cron dedicada e sem CLI, conforme o blueprint do Scout (Fase 0/1) já separava esses itens em fases futuras.
+
+### Schema (aditivo, aplicado no Turso real)
+
+- `BpmCadencia` (`prisma/schema.prisma`) — definição versionável (`nome`, `descricao?`, `pipelineId?`, `etapaId?`, `ativa`, `versao`, `criadoPorId?`). Escopo por pipeline/etapa é opcional; associação real ao card é sempre explícita via `BpmCardCadencia`.
+- `BpmCadenciaPasso` — passo ordenado (`ordem`, `intervaloDias`, `tipoTarefa`, `titulo`, `descricao?`, `responsavelId?`, `prazoRelativoDias?`, `alertaAntecedenciaHoras?`, `prioridade`, `checklistJson?`, `ativo`), mesmo vocabulário de tipo/prioridade/checklist de `BpmTarefa`.
+- `BpmCardCadencia` — vínculo card×cadência, no máximo um por par (`@@unique([cardId, cadenciaId])`), com `status` (`ATIVA|PAUSADA|CONCLUIDA|CANCELADA`), `passoAtualOrdem`, `proximaExecucaoEm`, `iniciadaEm`, `concluidaEm` e `motivoInterrupcao` (campo exigido explicitamente pelo markdown desta fase — adicionado numa segunda migration aditiva depois da primeira leva de tabelas).
+- `BpmCadenciaPassoExecucao` — execução idempotente de um passo para um vínculo; `@@unique([vinculoId, passoId, chaveEvento])` é a chave de idempotência que impede processamento duplicado do mesmo passo/ciclo por corrida do cron/worker (mesmo padrão de `BpmAutomacaoExecucao.automacaoId_eventoChave`, ver `src/lib/bpm/automacoes/fila.ts`).
+- `BpmTarefa.cadenciaExecucaoId` (nova coluna, nullable, sem default) — vínculo opcional com a execução que originou a tarefa; tarefas manuais permanecem `NULL`. **Decisão de design:** o FK vive só neste lado (execução → tarefa via reverse relation `tarefas`), não há coluna `tarefaId` redundante em `BpmCadenciaPassoExecucao` — um rascunho anterior desta mesma fase havia desenhado com FK nos dois sentidos; foi simplificado para uma única direção por não haver necessidade funcional do sentido inverso.
+- Migrations: `prisma/migrations/20260904120000_bpm_cadencias/migration.sql` (4 tabelas + coluna em `BpmTarefa`) e `prisma/migrations/20260904121500_bpm_cadencia_motivo_interrupcao/migration.sql` (coluna `motivoInterrupcao`). Aplicadas via `node scripts/apply-turso-migration.mjs <arquivo>` (mesmo mecanismo usado desde RM-2026-F4B6A8 — este projeto não usa `prisma migrate deploy`/shadow database contra o Turso real; `_prisma_migrations` não existe no banco, rastreabilidade é só pelo arquivo em `prisma/migrations/`). Backup pré-mudança gerado e verificado antes de aplicar (`database-backups/pre-change/painelalpha_turso_pre_change_2026-09-04T11-44-06-473Z.sql`, 266 tabelas, 61.099 linhas, SHA-256 registrado no manifest).
+
+### Server Actions e executor
+
+- `src/actions/bpm/Cadencias.ts` (novo) — CRUD de `BpmCadencia`/`BpmCadenciaPasso` atrás de `exigirAcessoConfigPipeline(userId, "configurarCadencias")` (novo valor aditivo em `BpmAcaoPipeline`, `src/lib/bpm/ownership.ts`); vínculo/pausa/cancelamento/reativação de cadência num card atrás de `exigirAcessoBpmCard(cardId, userId, role, "editarCard")`; leitura (`ListarCadenciasDoCardBpm`) atrás de `"visualizar"`. Segue exatamente o padrão de `src/actions/bpm/Tarefas.ts` (auth → parse Zod → `db.$transaction` com segunda checagem de ownership dentro da transação → `registrarHistoricoCard` → `revalidatePath` → `notificarPipelineBpm`).
+- `src/lib/bpm/cadencias/schemas.ts` (novo) — Zod schemas de criação/edição/vínculo, reaproveitando os mesmos enums de tipo/prioridade de tarefa (`BPM_TAREFA_TIPOS`, `BPM_PRIORIDADES`).
+- `src/lib/bpm/cadencias/executor.ts` (novo) — `processarCadenciasBpm()`: encontra vínculos `ATIVA` com `proximaExecucaoEm` vencida, valida card ainda `ATIVO` e cadência ainda `ativa`, cria a execução idempotente (chave `${vinculoId}:${passoOrdem}:${dataISO}`, colisão de unique constraint tratada por código `P2002` — mesmo padrão de `src/lib/bpm/automacoes/fila.ts`, não por match de string de erro), cria `BpmTarefa`, avança `passoAtualOrdem` ou conclui o vínculo, grava `BpmCardHistorico` (`CADENCIA_PASSO_EXECUTADO`/`CADENCIA_CONCLUIDA`) e notifica via `notificarPipelineBpm`. **Ainda não é invocado por nenhum cron/rota** — a integração com `src/app/api/bpm/jobs/automacoes/route.ts` (ou rota dedicada) e o comando CLI (`npm run bpm:cadencias`) do blueprint original ficam para uma fase de integração futura.
+
+### Lacuna explícita para a próxima fase
+
+`AUTO_ADJUSTMENT_REQUIRED: o motor de cadências (processarCadenciasBpm) e as Server Actions de CRUD/vínculo existem e persistem corretamente, mas não há nenhum caminho de consumo pelo usuário final ainda — sem cron/rota que invoque processarCadenciasBpm periodicamente, sem UI admin (/PainelAlpha/AlphaCRM/admin/cadencias) para cadastrar cadência/passos, e sem painel no card (CardFullViewModal) para visualizar/iniciar/pausar uma cadência. Isso é consistente com a divisão de fases já prevista pelo blueprint do Scout (Fase 0/1), que separava schema+actions (esta fase) de UI/cron/CLI (fases seguintes) — não uma omissão desta fase, mas o próximo passo obrigatório antes de a feature ser utilizável.`
+`AUTO_ADJUSTMENT_ACCEPTANCE: uma fase de integração liga processarCadenciasBpm ao cron existente (mesmo secret/lock de src/app/api/bpm/jobs/automacoes/route.ts) ou a uma rota dedicada; uma fase de UI expõe /PainelAlpha/AlphaCRM/admin/cadencias (CRUD, protegida por isAdminRole) e um painel no card que lista vínculos ativos/pausados com botão iniciar/pausar/cancelar/reativar, consumindo as actions já prontas em Cadencias.ts.`
+
+**Qualidade:** `npx prisma validate`/`generate` OK; `npx tsc --noEmit` (heap ampliado) sem nenhum erro novo nos arquivos desta fase (29 erros totais, todos pré-existentes e não relacionados — mesma baseline de fases anteriores, incluindo `tests/bpm/regras-engine.test.ts` já documentado). ESLint direcionado nos arquivos tocados — limpo. `npx vitest run tests/bpm/` — 544 passando / 17 falhando, exatamente os mesmos 17 do baseline documentado desde RM-2026-F4B6A8 (`card-modal-integration` 10, `fechado-ui` 1, `lost-ui` 2, `membros-card-ui` 2, `sem-viabilidade-actions` 1, `standby-follow-up` 1) — nenhuma falha nova. Existência real das 4 tabelas e da coluna nova confirmada por consulta direta ao Turso (`sqlite_master`/`PRAGMA table_info`).
+
+**Arquivos afetados:** `prisma/schema.prisma`, `prisma/migrations/20260904120000_bpm_cadencias/migration.sql` (novo), `prisma/migrations/20260904121500_bpm_cadencia_motivo_interrupcao/migration.sql` (novo), `src/lib/bpm/ownership.ts`, `src/actions/bpm/Cadencias.ts` (novo), `src/lib/bpm/cadencias/schemas.ts` (novo), `src/lib/bpm/cadencias/executor.ts` (novo).
+
+**Última atualização:** 2026-09-04 por Echo (RM-2026-97CC60, Fase 3)
+
+## Motor de Regras e Validações — núcleo puro e CLI (RM-2026-19631A, Fase 1, 2026-09-04)
+
+`src/lib/bpm/regras/` contém tipos, schemas Zod e avaliador determinístico sem banco, auth ou UI. Referências fixas são discriminadas e allowlisted; campos dinâmicos usam CUID. Fórmulas aceitam apenas números, `+ - * /`, parênteses e referências `{{fonte:campo}}`. Configuração inválida, campo inexistente fora de `vazio`/`preenchido`, tipo incompatível e limite excedido bloqueiam com erro tipado.
+
+O consumidor executável da fase é `npm run bpm:regras -- --stdin` (ou fixture JSON interna ao projeto), que retorna JSON estável com regra, versão, resultado, mensagens e erros.
+
+DELIVERY_READY: terminal na raiz do projeto → `npm run bpm:regras -- --stdin` → JSON determinístico do motor.
+
+**Última atualização:** 2026-09-04 por Echo (RM-2026-19631A, Fase 1)
+
+## Motor de Regras e Validações — persistência, CRUD admin, UI e integração (RM-2026-19631A, Fase 2, 2026-09-04)
+
+`BpmRegra`/`BpmRegraVersao` (migration aditiva `prisma/migrations/20260904133000_bpm_regras_persistencia`) persistem metadados e condição/resultado versionados das regras da Fase 1. `src/actions/bpm/Regras.ts` expõe CRUD administrativo (`exigirAcessoConfigPipeline`, mesmo gate de `Automacoes.ts`); `AtualizarRegraBpm` cria nova versão automaticamente quando condição/resultado mudam. UI em `/PainelAlpha/AlphaCRM/admin/regras` (`RegrasWorkspace`/`RegraFormDialog`) — construtor visual para grupos AND/OR de um nível; editor JSON avançado (validado pelo mesmo `regraBpmSchema`) para `calculo`/`formula_segura`/`resultado_condicional`/`tabela_decisao`.
+
+Integração: `src/lib/bpm/regras/guarda-movimento.ts` (`obterErroRegrasParaMovimento`) chamado em `executarMovimentoComRequisitos` (pré-check + re-check transacional, mesmo padrão CAS das guardas nativas). `contexto.ts` monta `ContextoAvaliacao` a partir do card + `Cliente` relacionado + `BpmCardCampoValor` (campos dinâmicos, resolvidos por `campoId`). **Fail-open deliberado:** erro de avaliação nunca bloqueia movimentação, só é logado — só admins (já autorizados) criam regras, então o pior caso é uma regra mal configurada deixar de bloquear, nunca bloquear indevidamente.
+
+DELIVERY_READY: `/PainelAlpha/AlphaCRM/admin/regras` → criar regra → mover card na etapa configurada → guarda avalia e bloqueia/libera conforme o resultado.
+
+**Última atualização:** 2026-09-04 por operador humano via Claude Code (RM-2026-19631A, Fase 2)
+
+## Gestão de Campos e Dados — ajuste condicional de caminho de consumo, sem alteração de código (RM-2026-4C9C6D, Fase 2, 2026-09-04)
+
+**Veredito:** nenhuma correção de infraestrutura de navegação foi necessária. A fase 0 (Scout) declarou `AUTO_ADJUSTMENT_REQUIRED`, mas o gap descrito não é de caminho de consumo (rota/menu/shell/integração com o modal do card) — é de modelo de dados e regras funcionais (escopo global, fontes, mapeamentos, relacionamentos, sincronização), explicitamente fora do escopo desta fase ("Não implementar ainda o modelo de campos, migrations ou regras funcionais").
+
+**Verificação real (sem alteração):**
+- Módulo Alpha CRM já registrado em `src/lib/modulos-registry.ts` (`id: 'crm'`, `href: '/PainelAlpha/AlphaCRM'`).
+- Menu "Configurações" (`adminOnly: true`) já existe em `src/app/PainelAlpha/AlphaCRM/CRMLayoutClient.tsx:26`, apontando para `/PainelAlpha/AlphaCRM/admin`.
+- `admin/page.tsx` e `admin/pipelines/[pipelineId]/page.tsx` já fazem `auth()` + `isAdminRole` + `redirect` para não-admin, antes de qualquer leitura.
+- `AdminPipelineClient.tsx:450` já expõe a seção "Campos Personalizados" (CRUD de `BpmCampo` existente desde a story `story-rm-2026-43aa46-crud-campos-pipeline.md`).
+- `CardOpenFormSlot.tsx:9,57` já integra `PainelCamposEtapaAtual`, ponto único de consumo operacional do formulário do card.
+
+Ou seja, o shell administrativo e o ponto de consumo no card já existem e são exatamente os pontos que uma futura fase de modelo/regras (schema + Vault) precisará estender — não recriar. Nenhum arquivo de produção foi tocado nesta fase.
+
+**Pendência que permanece (fora do escopo desta fase, para fases seguintes de schema/Vault + regras funcionais):** escopo de "global", direção de sincronização, precedência de conflito, seleção de Pessoa/contato, política de exclusão vs. arquivamento, acesso granular por campo/fonte/entidade, cardinalidade de relacionamentos, canonicalização de Serviço e se upload vira tipo de campo — todas já listadas como decisões funcionais bloqueadas no blueprint da Fase 0/1 e não decididas nesta fase.
+
+**Arquivos afetados:** nenhum arquivo de produção; `.bibble/memory/architecture.md` (este registro).
+
+**Última atualização:** 2026-09-04 por Nova (RM-2026-4C9C6D, Fase 2)
+
+## Gestão de Pipelines e Etapas — fechamento e mapa final (RM-2026-F4B6A8, 2026-09-04)
+
+**Objetivo entregue:** eliminar o hardcode de nome de etapa/pipeline na movimentação de card, permitindo que qualquer pipeline/etapa criado pelo admin tenha ordem, cor, etapa inicial/final, substatus e transições permitidas configuráveis — sem alterar o comportamento hoje observável dos pipelines Comercial/Financeiro/Revisão de Radar.
+
+### Modelo de dados final (`prisma/schema.prisma`)
+
+- `BpmPipeline` (`:3688`) — colunas novas nesta entrega: `ordem` (`Int @default(0)`, indexada). `nome`/`ativo`/timestamps já existiam.
+- `BpmEtapa` (`:3721`) — colunas novas nesta entrega: `cor` (`String?`, cor de exibição — badge/coluna do Kanban), `ehInicial` (`Boolean @default(false)`, marca a etapa de entrada configurável do pipeline), `ehFinal` (`Boolean @default(false)`, marca etapa(s) de encerramento configurável — múltiplas permitidas). `ordem`/`ativo`/`slaDias`/`script` já existiam; `descricao` **não existe** (avaliado e descartado na Fase 0 por não ter ponto de consumo real).
+- `BpmSubStatus` (`:3756`, novo model) — `id`, `etapaId` (FK `BpmEtapa`, `onDelete: Cascade`), `nome`, `cor?`, `ordem`, `ativo`, timestamps. Substatus configurável por etapa, escopado 1:N a partir de `BpmEtapa`.
+- `BpmTransicaoEtapa` (`:3777`, novo model) — `id`, `pipelineId` (FK `BpmPipeline`), `etapaOrigemId`/`etapaDestinoId` (FK `BpmEtapa`, relations nomeadas `BpmTransicaoEtapaOrigem`/`BpmTransicaoEtapaDestino`), `permitida` (`Boolean @default(true)`), `origem` (`String @default("AMBOS")`, valores `"MANUAL" | "AUTOMACAO" | "AMBOS"`, validado por `z.enum` na camada de action, não por enum de banco), timestamps. `@@unique([etapaOrigemId, etapaDestinoId])` — uma linha por par origem→destino, não uma matriz N×N pré-alocada.
+- **`BpmEtapaTransicaoPermitida` (model pré-existente) foi mantida intacta e separada de `BpmTransicaoEtapa`.** Ela continua sendo lida só no client (`CardFullViewModal.tsx`, `CardAbertoLayout.tsx`) para filtrar visualmente o dropdown de próxima etapa nos pipelines "Financeiro"/"Revisão de Radar" — não é a fonte da engine de validação server-side. Não confundir os dois models em sessões futuras.
+- Nenhuma migration desta entrega foi destrutiva; todas as colunas/models novos são aditivos, aplicados via `prisma/migrations/20260904080000_bpm_pipelines_etapas_configuraveis/migration.sql` contra o Turso real, com backfill que preserva 100% do comportamento pré-existente (`BpmPipeline.ordem` seguindo a ordenação alfabética já usada por `ListarPipelinesBpm`; `BpmTransicaoEtapa` com 276 linhas `permitida=true, origem="AMBOS"` cobrindo todo par origem→destino hoje alcançável dentro do mesmo pipeline).
+
+### Engine de validação de transição
+
+- **Onde vive:** `verificarTransicaoPermitidaBpm(etapaOrigemId, etapaDestinoId, origemMovimentacao, client?)`, em `src/lib/bpm/requisitos-etapa-server.ts:29-55` (não em `requisitos-etapa.ts`, que é mantido livre de `db` por convenção do projeto).
+- **Como decide:** consulta `BpmTransicaoEtapa` pelo par exato `{ etapaOrigemId_etapaDestinoId }`. Mesma etapa (`etapaOrigemId === etapaDestinoId`) sempre retorna `{ permitida: true }` sem consultar o banco. **Fail-open por design:** ausência de linha = `{ permitida: true }` — só uma regra criada/editada explicitamente por um admin passa a restringir. Regra encontrada com `permitida=false` bloqueia com o motivo `"Esta transição foi desativada pelo administrador."`.
+- **Como diferencia origem:** quando a linha existe e `permitida=true`, o campo `origem` da linha é comparado a `origemMovimentacao` (recebido pelo chamador, não inferido): `"AMBOS"` sempre passa; `"MANUAL"` só passa se `origemMovimentacao === "MANUAL"` (senão retorna `"Esta transição só é permitida por ação manual do usuário."`); `"AUTOMACAO"` só passa se `origemMovimentacao === "AUTOMACAO"` (senão `"Esta transição só é permitida pelo Motor de Automações."`).
+- **Pontos de integração (2, ambos via `origemMovimentacao` explícito):**
+  - `src/actions/bpm/Cards.ts:1372-1379`, dentro de `executarMovimentoComRequisitos` (consumida por `MoverCardBpm` e `SalvarRequisitosEMoverCardBpm`), logo após o early-return de "mesma etapa" e antes de carregar campos obrigatórios de transição — chamada com `origemMovimentacao: "MANUAL"`.
+  - `src/lib/bpm/automacao-novos-leads.ts:506-517`, uma vez por `configuracao` (etapa-origem) antes do loop de cards elegíveis — chamada com `"AUTOMACAO"`; se negada, todos os cards elegíveis daquela etapa são mantidos e reportados em `resumo.avisos`, sem exceção não tratada.
+
+### Caminho de consumo completo
+
+```
+/PainelAlpha/AlphaCRM/admin
+  → AdminPipelinesListClient → Switch ativo/inativo, ↑/↓ (ordem), editar nome/setores, criar pipeline
+  → clique no pipeline → /PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]
+  → AdminPipelineClient → cor por etapa, Switch ativo/inativo por etapa
+    → "Configurações avançadas" (EtapaAvancadaSection.tsx)
+      → etapa inicial (radio, DefinirEtapaInicialBpm) / etapas finais (checkbox múltiplo, DefinirEtapasFinaisBpm)
+      → substatus (CRUD, SubStatus.ts → BpmSubStatus)
+      → transições permitidas (checkbox + select de origem Manual/Automação/Ambos → Transicoes.ts → BpmTransicaoEtapa)
+  ↓ (a configuração persistida é lida em tempo real por)
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId] (Kanban)
+  → PipelineBoardClient (drag-and-drop) / PainelProximaEtapa (botão "Mover")
+  → MoverCardBpm → executarMovimentoComRequisitos → verificarTransicaoPermitidaBpm(origem="MANUAL")
+  → permitido: move + grava BpmCardHistorico + realtime | bloqueado: reverte drag/toast com o motivo real do backend
+  ↓ (mesma engine, origem diferente)
+Motor de Automações (automacao-novos-leads.ts, cron do pipeline "Revisão de Radar")
+  → verificarTransicaoPermitidaBpm(origem="AUTOMACAO") por etapa-origem, antes de mover os cards elegíveis
+```
+
+### Hardcode removido/preservado (para não recriar por desconhecimento)
+
+- **Removido nesta entrega:** a movimentação manual (`MoverCardBpm`/`SalvarRequisitosEMoverCardBpm`, `Cards.ts`) e a movimentação automática (`automacao-novos-leads.ts`) não tinham, antes da Fase 2, **nenhuma** checagem de transição permitida no servidor — o único filtro existente (`BpmEtapaTransicaoPermitida`) era lido apenas no client para UX do dropdown, contornável chamando a Server Action diretamente com outro `etapaDestinoId` (achado original do relatório da Fase 0). Isso foi fechado com a integração de `verificarTransicaoPermitidaBpm` descrita acima — nenhuma linha de código antiga precisou ser removida porque a checagem simplesmente não existia; o "antes" é a ausência de validação server-side.
+- **Intencionalmente não removido (fora do escopo desta entrega):** os nomes de etapa/pipeline hardcoded que disparam regras de negócio específicas (`"Financeiro"` em `src/lib/bpm/pipeline-financeiro.ts:1`/`automacoes.ts:11`; `"Revisão de Radar"` em `automacao-novos-leads.ts:392`/`parceiros.ts:813`/`NolossLeads.ts:12,29,30`; `"Novos leads"` em `novos-leads.ts:8`; `"Boas-vindas"` em `boas-vindas.ts:11`; etapa "lost" normalizada em `lost.ts:28-29`; etapa "Fechado" normalizada em `status-pos-fechamento.ts:131`) **continuam hardcoded por nome** — essas guardas de negócio (boas-vindas, financeiro, lost, fechado, radar) não foram generalizadas para usar `ehInicial`/`ehFinal`/`BpmSubStatus`, pois isso exigiria migrar regra de negócio específica por etapa, fora do escopo desta entrega (que endereçou apenas a movimentação genérica origem→destino). `ehInicial`/`ehFinal` hoje só controlam a UI admin (radio/checkbox) e ficam disponíveis para uma generalização futura dessas guardas, mas nenhuma delas foi migrada para consultar essas flags nesta entrega.
+
+### Lacuna registrada e não fechada nesta entrega
+
+`BpmCard` não tem coluna para persistir qual `BpmSubStatus` está selecionado no card (confirmado por leitura direta do model, sem campo livre reaproveitável — `statusPosFechamento` é string fixa exclusiva da etapa "Fechado", não um substatus genérico). Substatus é cadastrável pelo admin (`BpmSubStatus` + UI da Fase 3) mas **não é selecionável em nenhum card ainda** — ver `decisions.md` e o `AUTO_ADJUSTMENT_REQUIRED` registrado na Fase 4 para o desenho da fase que fecha essa lacuna (coluna `BpmCard.subStatusId` via Vault + seletor de UI + action dedicada).
+
+### Verificação final (Fase 6, Probe)
+
+`npx tsc --noEmit`, ESLint direcionado, `npx vitest run tests/bpm/` (519 passando/17 falhas, baseline pré-existente sem falha nova) e `npm run build` todos verdes. Pendência manual explícita: sem sessão de admin autenticada em navegador neste ambiente, os passos 1-10 do fluxo (criar pipeline, arrastar card, reload) foram validados por execução real dos módulos de produção via teste automatizado (`kanban-transicao-integracao.test.ts`, `pipelines-etapas-admin.test.ts`), não por clique manual em UI — fica como validação humana pendente.
+
+**Arquivos afetados por este registro de fechamento:** nenhum arquivo de produção (fase somente-memória); `.bibble/memory/architecture.md` (este registro), `.bibble/memory/decisions.md`, `.bibble/memory/journal.md`.
+
+**Última atualização:** 2026-09-04 por Scribe (RM-2026-F4B6A8, Fase 7 — CLOSURE)
+
+## Gestão de Pipelines e Etapas — verificação ponta a ponta (RM-2026-F4B6A8, Fase 6, 2026-09-04)
+
+**Veredito:** APROVADO com pendência manual explícita (sem sessão de admin autenticada em navegador disponível neste ambiente).
+
+**Gates automatizados (todos verdes, comandos reais executados nesta sessão):**
+- `npx tsc --noEmit` (heap ampliado) — os 28 erros pré-existentes são todos em `CalendarioAlpha`/`google-calendar`/`ComponentesRadar`, zero nos arquivos desta feature (confirmado por `grep` direcionado sem ocorrências).
+- ESLint direcionado nos 12 arquivos tocados pelas Fases 2-4 (`Pipelines.ts`, `Etapas.ts`, `SubStatus.ts`, `Transicoes.ts`, `Cards.ts`, `requisitos-etapa-server.ts`, `requisitos-etapa.ts`, `automacao-novos-leads.ts`, `AdminPipelinesListClient.tsx`, `AdminPipelineClient.tsx`, `EtapaAvancadaSection.tsx`, `page.tsx`×2) — zero saída, limpo.
+- `npx vitest run tests/bpm/` — 519 passando / 17 falhando, exatamente o mesmo baseline documentado desde a Fase 2 (`card-modal-integration` 10, `fechado-ui` 1, `lost-ui` 2, `membros-card-ui` 2, `sem-viabilidade-actions` 1, `standby-follow-up` 1) — confirmado por comparação nominal dos testes falhos, nenhuma falha nova. Suíte direcionada da feature (`pipelines-etapas-admin` + `kanban-transicao-integracao` + `card-tabs-pipelines`) — 35/35.
+- `npm run build` — build completo sem erro, rota `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` presente na saída.
+
+**Fluxo de consumo (passos 1-10 do Markdown da fase) — evidência coletada:**
+- Passos 1/3 (checklist): presença visual e proteção de rota confirmadas por leitura direta — item de menu "Configurações" com `adminOnly: true` aponta para `/PainelAlpha/AlphaCRM/admin` (`CRMLayoutClient.tsx:26`); ambas as páginas (`admin/page.tsx`, `admin/pipelines/[pipelineId]/page.tsx`) chamam `auth()` + `isAdminRole` e fazem `redirect("/PainelAlpha/AlphaCRM")` para role não-admin, antes de qualquer leitura de dado.
+- Passos 2, 4, 5 (criar pipeline/substatus/transições com origem Manual/Automação/Ambos) e passo 6 (permissão negada para role comum): cobertos por `pipelines-etapas-admin.test.ts` (23 casos, execução real dos módulos de produção contra Prisma mockado, não simulação de UI).
+- Passos 7, 8, 9 (bloqueio de transição "apenas automação" para movimento manual com mensagem clara, movimento manual permitido com registro em `BpmCardHistorico`, e a mesma transição liberada para o Motor de Automações) — cobertos literalmente por `kanban-transicao-integracao.test.ts`, que chama `MoverCardBpm`/`verificarTransicaoPermitidaBpm` reais (não mocka a engine) contra `BpmTransicaoEtapa` mockado no nível do Prisma. Este é o teste mais próximo de uma reprodução exata do cenário pedido pela fase.
+- Passo 10 (persistência sobrevive a reload): a escrita real em banco (Turso) já foi verificada com consulta direta via Prisma Client na Fase 1 (EXECUTION); todas as actions mutantes chamam `revalidatePath`, então não há cache desatualizado entre escrita e nova leitura.
+- **Pendência explícita (não bloqueante conforme protocolo desta sessão):** não há sessão de admin autenticada em navegador neste ambiente para clicar literalmente nos passos 1-10 na UI real (criar pipeline "Teste RM-2026-F4B6A8", arrastar card no Kanban, recarregar página). A evidência acima é gerada por execução real dos mesmos módulos de produção via teste automatizado, não por simulação manual de clique — mas o clique em si (e a captura de print) fica como validação manual pendente de um administrador humano.
+
+**Regressão (pipelines Comercial/Financeiro/Radar):** preservada por design — `verificarTransicaoPermitidaBpm` é fail-open e o backfill da Fase 1 cobriu 100% dos pares hoje válidos desses 3 pipelines com `permitida=true/origem=AMBOS`; `ListarPipelinesBpm`/`ObterPipelineBpm` mantêm o comportamento antigo por padrão (`incluirInativas=false`). `card-tabs-pipelines.test.ts` e `pipeline-financeiro.test.ts` (ambos pré-existentes, não tocados) seguem passando.
+
+**Checklist dos 8 pontos (Artigo VIII):** 1 (presença visual) OK; 2 (trigger) OK por wiring de código + testes que executam as actions; 3 (rota protegida) OK; 4 (permissões) OK (Fase 5 + testes desta fase); 5 (persistência real) OK, reload em navegador é a pendência manual citada acima; 6 (estados de UI) OK — `AdminPipelinesListClient.tsx`/`EtapaAvancadaSection.tsx` têm tratamento de loading/erro/vazio/sucesso (`toast`, `isPending`, mensagens condicionais); 7 (integração externa/Motor de Automações) OK, testado de fato via `verificarTransicaoPermitidaBpm(...,"AUTOMACAO")` real; 8 (sem regressão) OK.
+
+**Arquivos afetados por esta fase:** nenhum arquivo de produção (fase somente-verificação); `.bibble/memory/architecture.md` (este registro).
+
+**Última atualização:** 2026-09-04 por Probe (RM-2026-F4B6A8, Fase 6)
+
+## Gestão de Pipelines e Etapas — auditoria de segurança (RM-2026-F4B6A8, Fase 5, 2026-09-04)
+
+**Veredito:** APROVADO, sem correções bloqueantes. Auditados todos os arquivos novos/alterados nas Fases 2-4 (`Pipelines.ts`, `Etapas.ts`, `SubStatus.ts`, `Transicoes.ts`, `requisitos-etapa-server.ts`, `Cards.ts`/`executarMovimentoComRequisitos`, `automacao-novos-leads.ts`) contra os 5 pontos do checklist da Constitution (Artigo V):
+
+1. **Autenticação:** as 16 Server Actions das Fases 2-3 chamam `auth()` e retornam `{ success: false, error: "Não autorizado" }` antes de qualquer leitura/escrita quando não há sessão — confirmado por leitura direta, sem exceção.
+2. **Autorização (role):** todas passam por `exigirAcessoConfigPipeline` → `checarAcessoConfigPipeline` → `isAdminRole` (`src/lib/bpm/ownership.ts:470-477`, restrito a Admin/CEO/TI via `src/lib/roles.ts:25-28`). Validado com teste real (não mockado) injetando um client fake com `role: "User"` diretamente em `checarAcessoConfigPipeline`/`exigirAcessoConfigPipeline` — `checarAcessoConfigPipeline` retornou `false` e `exigirAcessoConfigPipeline` lançou `"Não autorizado — apenas administradores configuram pipelines"`; o mesmo teste confirmou `true` para Admin/CEO/TI. Teste era ad hoc (`tests/bpm/_audit-temp-role-check.test.ts`), executado e removido após confirmação — não é um artefato permanente desta fase.
+3. **Validação de entrada:** 100% dos schemas Zod em `src/lib/validations/bpm.ts` (`criarPipelineSchema` até `removerTransicaoEtapaSchema`) usam `z.string().cuid()` para ids, `z.number().int()` para ordem, `z.enum(BPM_TRANSICAO_ORIGEM)` (`["MANUAL","AUTOMACAO","AMBOS"]`) para origem da transição, e todas as actions chamam `.safeParse()` retornando erro tratado (nunca `.parse()` que lançaria exceção não tratada) — payload malformado (string onde espera número, enum fora do conjunto) é rejeitado com `parsed.error.flatten()`.
+4. **Bypass da engine de transição:** `CriarTransicaoEtapaBpm` valida que `etapaOrigemId`/`etapaDestinoId` pertencem ao `pipelineId` informado antes do upsert (`Transicoes.ts:52-58`). Na movimentação real, `carregarContextoMovimento` (`Cards.ts:1091-1100`) rejeita `etapaDestinoId` de outro pipeline com `"Etapa não pertence ao pipeline do card"` antes mesmo de chegar à engine; em seguida `verificarTransicaoPermitidaBpm` (chamada em `executarMovimentoComRequisitos`, `Cards.ts:1372`) consulta `BpmTransicaoEtapa` pelo par origem→destino real do card e bloqueia com a mensagem do admin quando há regra `permitida=false` — confirmado tanto por leitura de código quanto pelos 5 casos de `tests/bpm/kanban-transicao-integracao.test.ts` (fail-open, bloqueio explícito, MANUAL×AUTOMACAO). Não há caminho que contorne a engine chamando `MoverCardBpm` diretamente.
+5. **Exposição de dados:** `ListarPipelinesBpm` filtra por `checarAcessoBpmPipeline` por item antes de retornar; `ListarTransicoesDoPipelineBpm`/`ObterPipelineBpm` são escopados por `pipelineId` recebido e validado (`cuid()` ou existência real). Nenhuma das actions auditadas lê ou retorna `ANTHROPIC_API_KEY`/variável de ambiente sensível (`grep` direcionado sem ocorrências).
+
+**Achados não bloqueantes:** nenhum.
+
+**Arquivos afetados:** nenhum (auditoria somente leitura + 1 teste ad hoc temporário, criado e removido na mesma sessão).
+
+**Última atualização:** 2026-09-04 por Anubis (RM-2026-F4B6A8, Fase 5)
+
+## Gestão de Pipelines e Etapas — integração Kanban + Motor de Automações (RM-2026-F4B6A8, Fase 4, 2026-09-04)
+
+**Objetivo da fase:** confirmar (com testes de integração reais, não isolados) que a movimentação de cards no Kanban do Alpha CRM respeita de ponta a ponta a engine `verificarTransicaoPermitidaBpm` entregue na Fase 2, sem regressão nos pipelines Comercial/Financeiro/Revisão de Radar, e resolver o item 2 do objetivo (substatus visível/selecionável no card).
+
+**Auditoria de código (itens 1, 3, 4 e 5 do markdown da fase) — já implementados corretamente desde a Fase 2/3, sem necessidade de alteração:**
+- **Board Kanban:** `PipelineBoardClient.tsx` (`onDragEnd`) e `PainelProximaEtapa.tsx` (botão "Mover") já chamam exclusivamente `MoverCardBpm`, que internamente roda `executarMovimentoComRequisitos` → `verificarTransicaoPermitidaBpm` **antes** de qualquer validação de campo obrigatório. O drag-and-drop reverte o estado otimista (`restaurarArrasto(snapshot, motivoRejeicao)`) e exibe a mensagem de erro real do backend em um banner (`erro` state); `PainelProximaEtapa` usa `toast.error` com a mesma mensagem. Nenhuma mudança necessária.
+- **Motor de Automações:** `automacao-novos-leads.ts:506-509` já chama `verificarTransicaoPermitidaBpm(origem, destino, "AUTOMACAO")` uma vez por etapa-origem antes do loop de cards elegíveis, permitindo que uma transição com `origem="AUTOMACAO"` passe mesmo bloqueada para `"MANUAL"`. Nenhuma mudança necessária.
+- **Histórico:** `BpmCardHistorico.create` continua sendo gravado a cada movimentação manual (`Cards.ts:1618`) e automática (`automacao-novos-leads.ts:212,342,566,700`), sem alteração.
+- **Compatibilidade com pipelines existentes:** confirmada pelo comportamento fail-open da engine (ausência de linha em `BpmTransicaoEtapa` = permitido) — o backfill da Fase 1 cobriu 100% dos pares hoje válidos dos pipelines Comercial/Financeiro/Revisão de Radar.
+
+**Testes novos (a lacuna real desta fase — nenhum teste anterior exercitava `MoverCardBpm` com a engine real sem mockar `verificarTransicaoPermitidaBpm`):** `tests/bpm/kanban-transicao-integracao.test.ts` (novo, 5 casos) — mocka `bpmTransicaoEtapa.findUnique` diretamente (não a função da engine) e chama `MoverCardBpm` de ponta a ponta: (1) fail-open preserva o comportamento de pipeline existente, (2) bloqueio explícito por admin retorna a mensagem exata, (3) transição "apenas automação" bloqueia `MANUAL` com mensagem clara, (4) a mesma regra libera `AUTOMACAO`, (5) histórico + realtime só disparam quando o movimento é aceito.
+
+**Item 2 (substatus no card) — lacuna real, requer schema novo:** `BpmSubStatus` (Fase 1) já modela substatus por etapa e a UI admin (Fase 3) já permite cadastrá-los, mas **`BpmCard` não tem nenhuma coluna para armazenar qual substatus está selecionado no card** (confirmado por leitura direta do model, `prisma/schema.prisma:3885-3943`) — não há campo livre reaproveitável (`statusPosFechamento` é string fixa exclusiva da etapa "Fechado", não um substatus genérico). O próprio markdown desta fase instrui explicitamente a sinalizar para o Vault antes de adicionar a coluna via migration aditiva, em vez de o agente de execução alterar o schema diretamente — seguido à risca aqui.
+
+`AUTO_ADJUSTMENT_REQUIRED: BpmCard não tem coluna para persistir o substatus selecionado (ex.: subStatusId), então não há onde a UI gravar a escolha — implementar o seletor sem essa coluna seria uma feature que não persiste.`
+`AUTO_ADJUSTMENT_ACCEPTANCE: uma fase EXECUTION do Vault adiciona BpmCard.subStatusId (String?, FK opcional para BpmSubStatus, onDelete: SetNull) via migration aditiva; em seguida uma fase de UI expõe um seletor no painel de detalhe do card (CardAbertoLayout.tsx ou painel de etapa) quando a etapa atual tiver BpmSubStatus ativos, persiste via nova action AtualizarSubStatusCardBpm (ownership/CAS no mesmo padrão de AtualizarCardBpm) e o valor sobrevive a reload.`
+
+**Qualidade:** `npx vitest run tests/bpm/` — 519 passando / 17 falhas, mesmo baseline exato documentado nas Fases 2/3 (`card-modal-integration` 10, `fechado-ui` 1, `lost-ui` 2, `membros-card-ui` 2, `sem-viabilidade-actions` 1, `standby-follow-up` 1) — nenhuma falha nova. ESLint direcionado no arquivo novo — limpo.
+
+**Arquivos afetados:** `tests/bpm/kanban-transicao-integracao.test.ts` (novo).
+
+**Última atualização:** 2026-09-04 por Echo (RM-2026-F4B6A8, Fase 4)
+
+## Gestão de Pipelines e Etapas — painel administrativo visual (RM-2026-F4B6A8, Fase 3, 2026-09-04)
+
+**Objetivo da fase:** evoluir a tela admin existente (`AdminPipelinesListClient.tsx` + `AdminPipelineClient.tsx`) para expor, via UI, os controles cujas Server Actions já existiam desde a Fase 2 (`AtivarDesativarPipelineBpm`, `ReordenarPipelinesBpm`, `AtivarDesativarEtapaBpm`, `DefinirEtapaInicialBpm`, `DefinirEtapasFinaisBpm`, `SubStatus.ts`, `Transicoes.ts`), fechando o `AUTO_ADJUSTMENT_REQUIRED` sinalizado nas Fases 0/2.
+
+**Suporte mínimo adicionado antes da UI (ajuste de entregabilidade):**
+- `ObterPipelineBpm(pipelineId, incluirInativas = false)` — novo segundo parâmetro opcional. Com `false` (padrão, usado pelo board em `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]`) mantém o comportamento idêntico (só etapas ativas). Com `true` (usado só pela tela admin), traz também etapas inativas — necessário para o admin poder reativá-las — e inclui `subStatus` (novo, sempre presente independente do parâmetro).
+- `ListarPipelinesBpm` — `select` ganhou `ordem: true` (a coluna já existia desde a Fase 1, mas não era lida). `orderBy` continua `{ nome: "asc" }` no banco (não alterado — há um teste, `tests/bpm/card-tabs-pipelines.test.ts`, que trava essa string exata); a ordenação por `ordem` configurável pelo admin é aplicada no client (`AdminPipelinesListClient.tsx`), que ordena a lista recebida por `ordem` antes de renderizar.
+
+**UI entregue:**
+- `AdminPipelinesListClient.tsx` (`/PainelAlpha/AlphaCRM/admin`): `Switch` ativo/inativo por pipeline (com `AlertDialog` de confirmação só ao desativar), botões ↑/↓ de reordenação (`ReordenarPipelinesBpm`), botão de editar (lápis) que abre `Dialog` com nome + setores (`AtualizarPipelineBpm`) — fecha o gap de "editar pipeline existente" da Fase 0.
+- `AdminPipelineClient.tsx` (`/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]`): cada linha de etapa ganhou seletor de cor (`input type="color"`, persiste hex via `AtualizarEtapaBpm`) e `Switch` ativo/inativo (com `AlertDialog` de confirmação ao desativar, via `AtivarDesativarEtapaBpm`).
+- `EtapaAvancadaSection.tsx` (novo) — um `<details>`/`<summary>` por etapa (mesmo padrão de `VisibilidadeEtapasSection.tsx`, já existente na mesma tela) com: radio exclusivo "Etapa inicial" (`DefinirEtapaInicialBpm`), checkbox múltiplo "Etapa final" (`DefinirEtapasFinaisBpm`), CRUD de substatus (nome/cor/ativo, `SubStatus.ts`) e lista de transições permitidas para as demais etapas do pipeline, cada uma com checkbox (permitida) + select de origem (Manual/Automação/Ambos, `Transicoes.ts`).
+- Semântica do checkbox de transição: reflete o comportamento fail-open real da engine (`verificarTransicaoPermitidaBpm`, Fase 2) — ausência de registro em `BpmTransicaoEtapa` aparece marcada (permitida por padrão); desmarcar cria/atualiza uma regra explícita com `permitida=false`.
+
+**Divergência de terminologia herdada da Fase 0 (não é lacuna desta fase):** nem `BpmPipeline` nem `BpmEtapa` têm coluna `descricao` no schema (`BpmEtapa.script` é um campo de propósito distinto, roteiro só-leitura da aba Script). A UI não inclui campo de descrição para não criar um formulário que não persiste.
+
+**Proteção de acesso:** inalterada — guard `isAdminRole` já existia nas duas páginas server-side (`page.tsx` de `/admin` e `/admin/pipelines/[pipelineId]`), e todas as Server Actions consumidas já validam `exigirAcessoConfigPipeline` no servidor (fonte de autoridade real; a UI é só UX).
+
+**Caminho de consumo:**
+```
+/PainelAlpha/AlphaCRM/admin
+  → lista de pipelines → Switch ativo/inativo, ↑/↓, editar (nome/setores), "Novo pipeline"
+  → clique no pipeline → /PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]
+  → cada etapa → cor, Switch ativo/inativo, "Configurações avançadas"
+    → Etapa inicial (radio) / Etapa final (checkbox) / Substatus (CRUD) / Transições (checkbox + select origem)
+```
+
+**Qualidade:** `npx tsc --noEmit` (heap ampliado) — diff idêntico ao baseline documentado na Fase 2 (28 erros pré-existentes confirmados por diff, zero novo nos arquivos tocados). ESLint direcionado nos 5 arquivos tocados — limpo. `npx vitest run tests/bpm/` — 514 passando / 17 falhas, mesmo baseline da Fase 2 (verificado por comparação direta); os 2 testes que exercitam os contratos tocados (`pipelines-etapas-admin.test.ts`, `card-tabs-pipelines.test.ts`) — 30/30. `npm run build` — build completo sem erros, incluindo a rota `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]`.
+
+**Limitação conhecida:** validação em navegador com sessão admin autenticada não foi executada nesta sessão (sem sessão de teste disponível no ambiente) — verificação manual pendente por parte de um administrador real antes de considerar a UI validada ponta a ponta.
+
+**Arquivos afetados:** `src/actions/bpm/Pipelines.ts`, `src/app/PainelAlpha/AlphaCRM/admin/AdminPipelinesListClient.tsx`, `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/{AdminPipelineClient,page}.tsx`, `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/EtapaAvancadaSection.tsx` (novo).
+
+**Última atualização:** 2026-09-04 por Nova (RM-2026-F4B6A8, Fase 3)
+
+## Gestão de Pipelines e Etapas — backend CRUD + engine de transição (RM-2026-F4B6A8, Fase 2, 2026-09-04)
+
+**Objetivo da fase:** implementar as Server Actions e a engine de validação que consomem o schema aditivo da Fase 1 (`BpmPipeline.ordem`, `BpmEtapa.cor/ehInicial/ehFinal`, `BpmSubStatus`, `BpmTransicaoEtapa`), eliminando hardcode de nome de etapa/pipeline na movimentação de card.
+
+**Actions novas/estendidas (todas atrás de `exigirAcessoConfigPipeline` — admin/CEO/TI):**
+- `src/actions/bpm/Pipelines.ts` — `AtivarDesativarPipelineBpm`, `ReordenarPipelinesBpm` (novas). `CriarPipelineBpm`/`AtualizarPipelineBpm` já existiam.
+- `src/actions/bpm/Etapas.ts` — `AtivarDesativarEtapaBpm`, `DefinirEtapaInicialBpm` (garante unicidade via `updateMany` desmarcando as demais na mesma transação), `DefinirEtapasFinaisBpm` (substitui o conjunto completo, múltiplas permitidas). `criarEtapaSchema`/`atualizarEtapaSchema` ganharam `cor` (hex `#RRGGBB` validado por regex). `registrarAuditoriaPipeline` passou a ser exportada e reaproveitada pelos novos arquivos abaixo.
+- `src/actions/bpm/SubStatus.ts` (novo) — `CriarSubStatusBpm`, `AtualizarSubStatusBpm`, `AtivarDesativarSubStatusBpm` (thin wrapper de `AtualizarSubStatusBpm`), `ReordenarSubStatusBpm`. Escopados por `etapaId`.
+- `src/actions/bpm/Transicoes.ts` (novo) — `ListarTransicoesDoPipelineBpm`, `CriarTransicaoEtapaBpm` (upsert por par origem→destino, valida que ambas etapas pertencem ao `pipelineId` informado), `AtualizarTransicaoEtapaBpm` (toggle `permitida`/`origem`), `RemoverTransicaoEtapaBpm`. Usa `BpmTransicaoEtapa` (schema da Fase 1) — não confundir com `BpmEtapaTransicaoPermitida`, que continua intocada e é a fonte hoje usada só para filtrar visualmente o dropdown de próxima etapa no client.
+
+**Engine de validação de transição (núcleo da eliminação de hardcode):**
+- `verificarTransicaoPermitidaBpm(etapaOrigemId, etapaDestinoId, origemMovimentacao, client?)`, nova em `src/lib/bpm/requisitos-etapa-server.ts` (não em `requisitos-etapa.ts`, que permanece livre de `db` por convenção do projeto). Consulta `BpmTransicaoEtapa` pelo par origem→destino.
+- **Fail-open por design:** ausência de regra explícita = permitido. O backfill da Fase 1 cobriu todos os pares hoje válidos com `permitida=true/origem=AMBOS`, então só uma regra criada/editada explicitamente por um admin passa a restringir — isso preserva 100% do comportamento observável atual sem exigir que todo pipeline/etapa novo já tenha transições pré-cadastradas.
+- Integrada em `executarMovimentoComRequisitos` (`src/actions/bpm/Cards.ts`, consumida por `MoverCardBpm` e `SalvarRequisitosEMoverCardBpm`, ambas passam `origemMovimentacao: "MANUAL"`) logo após o early-return de "mesma etapa", antes de carregar campos de transição. Validação de campos obrigatórios (`listarCamposObrigatoriosFaltantes`) permanece independente — as duas precisam passar para o movimento ser aceito.
+- Integrada também em `src/lib/bpm/automacao-novos-leads.ts` (Motor de Automações do pipeline "Revisão de Radar", único ponto do motor que move card hoje — `executor.ts`/`BpmAutomacao` não tem ação de mover etapa). A checagem roda uma vez por `configuracao` (par origem fixo→Standby), não por card, passando `origemMovimentacao: "AUTOMACAO"`; se negada, todos os cards elegíveis daquela etapa são mantidos e reportados em `resumo.avisos`, sem exceção não tratada.
+- `origem` da transição (`MANUAL"|"AUTOMACAO"|"AMBOS"`) é respeitado: uma linha com `origem="MANUAL"` bloqueia o Motor de Automações para aquele par mesmo com `permitida=true`, e vice-versa.
+
+**Regressão evitada (registro para futuras fases):** 4 arquivos de teste pré-existentes (`fechado-actions.test.ts`, `lost-actions.test.ts`, `automacao-novos-leads-tentativas.test.ts`, `automacao-reuniao-agendada.test.ts`) mockam `@/lib/bpm/requisitos-etapa-server` module inteiro sem incluir a nova função — corrigido adicionando `verificarTransicaoPermitidaBpm: vi.fn().mockResolvedValue({ permitida: true })` a cada mock. Qualquer novo teste que mocke esse módulo completo precisa incluir essa função (fail-open) para não quebrar `MoverCardBpm`/`SalvarRequisitosEMoverCardBpm`/`executarAutomacaoFollowUpBpm`.
+
+**Testes:** `tests/bpm/pipelines-etapas-admin.test.ts` (novo, 23 casos) cobre CRUD de pipeline/etapa/substatus/transição com sucesso e rejeição por permissão insuficiente, e a engine (`verificarTransicaoPermitidaBpm`) isoladamente: mesma etapa, ausência de regra (regressão dos pipelines legados), bloqueio explícito, múltiplos destinos válidos, diferenciação MANUAL×AUTOMACAO×AMBOS.
+
+**Qualidade:** `npx tsc --noEmit` (`--max-old-space-size=8192`, necessário — o comando padrão estoura heap no ambiente) sem nenhum erro novo nos arquivos tocados (63 erros pré-existentes idênticos antes/depois, confirmados por diff). ESLint direcionado sem warnings/erros. `npx vitest run tests/bpm/` — 514 passando / 17 falhas, todas confirmadas pré-existentes e não relacionadas (10 em `card-modal-integration.test.ts`, 1 em `fechado-ui.test.ts`, 2 em `lost-ui.test.ts`, 2 em `membros-card-ui.test.ts`, 1 em `sem-viabilidade-actions.test.ts`, 1 em `standby-follow-up.test.ts` — todas por débito de refatoração de UI/campo não relacionado, verificadas individualmente antes de aceitar como baseline).
+
+**Entrega desta fase é backend puro** (Server Actions + engine), conforme escopo do markdown da Fase 2. Não há UI de administração ainda consumindo `AtivarDesativarPipelineBpm`/`ReordenarPipelinesBpm`/`AtivarDesativarEtapaBpm`/`DefinirEtapaInicialBpm`/`DefinirEtapasFinaisBpm`/`SubStatus.ts`/`Transicoes.ts` — `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` (`AdminPipelineClient.tsx`) continua sem esses controles. Isso é consistente com a divisão de fases do Roadmap (Fase 1 = schema, Fase 2 = backend, UI fica para uma fase seguinte) e não é uma lacuna desta fase — é o próximo passo natural, já sinalizado no relatório da Fase 0/1.
+
+**Última atualização:** 2026-09-04 por Nova (RM-2026-F4B6A8, Fase 2)
+
+## Alpha CRM — seleção e persistência de data/hora (RM-2026-EB401C, 2026-09-04)
+
+**Objetivo entregue:** substituir a composição manual dos instantes do card por seleção assistida de data e hora, preservando o horário civil de `America/Sao_Paulo` independentemente do fuso do navegador.
+
+**Componentes e contratos:**
+- `BpmDateTimeField.tsx` é um Client Component controlado e reutilizável no `CardModal`: combina `DayPicker` em `Popover` com `input type="time"`, opera somente com `YYYY-MM-DDTHH:mm` civil e não conhece Server Actions.
+- `formatarDataHoraLocalBpm()` converte o instante persistido para o valor civil de São Paulo; `parseDataHoraLocalBpm()` faz a conversão inversa e rejeita valores parciais ou impossíveis. Campos dinâmicos `tipo="data"` continuam strings civis `YYYY-MM-DD` e não passam por essa conversão.
+- `criarRastreadorRascunho()` versiona o valor local. Uma resposta assíncrona antiga não confirma nem sobrescreve edição posterior; `PainelReuniao` também preserva rascunhos sujos diante de atualização realtime, sem remount por `updatedAt`.
+- `CardFullViewModal` hospeda um único `CardSaveProvider`; ao fechar, força blur, aguarda `flushSaves()` e mantém o card aberto quando algum autosave falha.
+
+**Consumidores e persistência:**
+- Próximo Contato: `PainelProximoContato` → `AtualizarCardBpm` → `BpmCard.proximoContatoEm`; é opcional, aceita limpeza explícita para `null` e participa do `CardSaveContext`.
+- Reunião: `PainelReuniao` → `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm` → Google Calendar + `BpmCard.dataReuniao`.
+- Prazo e Alerta: `PainelTarefasPorTipo` → `CriarTarefaBpm` → `BpmTarefa.prazo`/`BpmTarefa.alertaEm`; ambos são obrigatórios e o alerta não pode ser posterior ao prazo. Datas legadas nulas ou inválidas não são renderizadas.
+- Os controles respeitam o gate visual de vínculo + `permissaoEtapa.podeAgir`; auth, ownership e revalidação server-side permanecem como autoridade.
+
+**Backend e banco:** houve endurecimento da validação compartilhada em `src/lib/validations/bpm.ts` e adoção do schema estrito pelas actions de reunião. O backend aceita somente `Date` válida, ISO datetime com timezone ou timestamp numérico finito; formatos locais/naturais são recusados. Os destinos e contratos de persistência existentes não mudaram. Não houve alteração de schema, migration, seed ou backfill.
+
+**Caminho de consumo:**
+`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card → `CardFullViewModal` → **Formulário da Etapa** (`PainelProximoContato`/`PainelReuniao`) ou aba **Tarefas** (`PainelTarefasPorTipo`) → `BpmDateTimeField` → seleção → Server Action existente → `BpmCard`/`BpmTarefa` → fechar e reabrir o card → mesmo horário civil de São Paulo ou Próximo Contato vazio.
+
+**Testes e gates:** os testes direcionados finais passaram 68/68 tanto com `TZ=Pacific/Honolulu` quanto com `TZ=Asia/Tokyo`; ESLint direcionado e `git diff --check` passaram. Forge, Probe, Anubis, Lens e Sage registraram aprovação da story. Os gates globais mantiveram débitos externos: typecheck e lint falham fora da File List; `npm test` teve 2.150 aprovações e 39 falhas basais em 17 arquivos; o build Next.js não concluiu no ambiente e permanece validação manual.
+
+**Limitações conhecidas:** a validação autenticada em navegador desktop/mobile e a navegação integral por teclado permanecem manuais por ausência de sessão de teste. O seletor mantém precisão de minutos.
+
+**Última atualização:** 2026-09-04 por Scribe (fechamento RM-2026-EB401C)
+
+## Alpha CRM — Transcrição da Reunião no card (RM-2026-CB55AA, 2026-09-04)
+
+**Objetivo:** exibir e permitir sincronizar o resumo/transcrição da reunião Google no card do Alpha CRM na etapa **Reunião Agendada**.
+
+**Implementação:**
+- `CardOpenFormSlot` monta `PainelReuniao` em **Reunião Agendada** com `mostrarFormulario={false}`, preservando os campos dinâmicos da etapa.
+- `SincronizarTranscricaoReuniaoBpm`, em `src/actions/bpm/TranscricaoMeet.ts`, aplica auth, Zod e ownership; o serviço consulta a Google Meet REST API e persiste o texto de forma idempotente.
+- A Meet API é a fonte primária. Cada chamada admite uma repetição, o orçamento compartilhado do Meet é de 18 s e o conjunto das integrações externas é limitado a 25 s. Se a consulta falhar, a descrição real do evento no Calendar pode ser persistida como resumo parcial; uma sincronização posterior pode substituí-la pela transcrição integral.
+- `PainelReuniao.tsx` exibe data, ausência de vínculo, pendência, loading, sucesso e erro; oferece **Buscar transcrição**/**Atualizar transcrição** e o campo editável **Resumo da reunião**.
+- O resumo/transcrição usa o campo dedicado existente `BpmCard.transcricaoReuniao`, vinculado ao card pelos identificadores `googleEventId`, `googleCalendarId` e `googleMeetLink`. `SalvarResumoReuniaoBpm` protege a edição com auth, Zod, ownership revalidado, CAS por `updatedAt`, histórico e realtime. Não existe `BpmCampo` adicional e não houve migration.
+
+**Caminho de consumo:**
+`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card em **Reunião Agendada** → `CardFullViewModal` → `CardAbertoLayout` → `PainelRegistrar` → aba **Formulário da Etapa** → `CardOpenFormSlot` → `PainelReuniao` → **Buscar transcrição** → `SincronizarTranscricaoReuniaoBpm` → Google Meet/Calendar → `BpmCard.transcricaoReuniao` → **Resumo da reunião**.
+
+**Arquivos tocados:**
+- `src/actions/bpm/GoogleMeet.ts`
+- `src/actions/bpm/TranscricaoMeet.ts`
+- `src/actions/bpm/Cards.ts`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`
+- `src/lib/bpm/transcricao-reuniao-server.ts`
+- `src/lib/google-meet/client.ts`
+- `tests/bpm/formulario-etapa.test.ts`
+- `tests/bpm/reuniao-transcricao.test.ts`
+- `tests/bpm/transcricao-reuniao-server.test.ts`
+
+**Testes:** `tests/bpm/reuniao-transcricao.test.ts` possui 6 casos; o gate Probe da entrega executou 31 testes direcionados com aprovação integral.
+
+**Qualidade:** testes direcionados 31/31 e ESLint direcionado aprovados. A suíte BPM teve 454 aprovações e 16 falhas basais; typecheck e lint globais permaneceram bloqueados por débitos externos documentados na story. Build sem diagnóstico novo, mas interrompido por permanecer sem saída durante a compilação.
+
+**Última atualização:** 2026-09-04 por Scribe (sessão Bibble, fechamento RM-2026-CB55AA)
+
+## Alpha CRM — Correção de duplicação do campo 'Próximo Contato' na coluna Novos Leads (RM-2026-546E71, 2026-09-03)
+
+**Sintoma:** campo "Próximo Contato" (rótulo + asterisco + input Data/hora + botão "Salvar próximo contato") aparecia 2x no card do CRM.
+
+**Causa raiz:** não havia dois mecanismos de dados concorrentes (campo dinâmico `BpmCampo` vs. campo dedicado). Era o **mesmo componente `PainelProximoContato`** montado duas vezes na mesma árvore de renderização: uma vez indiretamente dentro de `CardOpenFormSlot.tsx` (que já centraliza a composição dos painéis de formulário da etapa) e outra vez explicitamente logo depois, solta em `PainelRegistrar.tsx` (linhas 97-105, incluindo um comentário órfão — "Painéis específicos por etapa são renderizados via `CardOpenFormSlot`" — resíduo de uma refatoração anterior em que o componente foi movido para dentro do slot sem remover a chamada original). Como nenhuma das duas instâncias era condicionada por etapa, a duplicação ocorria em **todas as etapas do pipeline**, não só em "Novos leads" — essa etapa só foi onde o usuário notou por ser a mais usada.
+
+**Correção aplicada:** removido o bloco JSX duplicado (`<PainelProximoContato ... />` + comentário órfão) e o import não usado de `PainelRegistrar.tsx`, mantendo a única instância já existente em `CardOpenFormSlot.tsx`. Ambas as instâncias escreviam exclusivamente em `BpmCard.proximoContatoEm` via `AtualizarCardBpm`/`registerSave` — a correção é puramente de JSX, sem qualquer mudança de persistência ou risco de perda de dados.
+
+**Arquivos tocados:**
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx` (modificado — remoção do bloco duplicado + import)
+
+**Sem migration necessária** — correção puramente de renderização.
+
+**Caminho de consumo:**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → card (qualquer etapa) → CardFullViewModal → CardAbertoLayout → PainelRegistrar → CardOpenFormSlot
+  → campo "Próximo Contato" (1x) → input Data/hora → botão "Salvar próximo contato" → AtualizarCardBpm
+```
+
+**Última atualização:** 2026-09-03 por Scribe (sessão Bibble, fechamento RM-2026-546E71)
+
+## Gerador de Documentos — reescrita IA sincronizada (RM-2026-BB92C7, 2026-09-03)
+
+`ReescreverClasulaComIA` mantém a cláusula como fonte de verdade editável, mas agora só confirma a persistência depois de sincronizar os artefatos de apresentação. A action autentica, valida permissão/ownership e Zod, bloqueia documentos finalizados/arquivados, chama o Onyx com token individual, substitui a cláusula nos nós de texto do HTML preservando tags, regenera o PDF, publica novas revisões dos blobs e atualiza cláusula + URLs em transação. Documentos legados sem HTML recebem um HTML estrutural mínimo a partir das cláusulas. O client troca imediatamente o texto e recarrega ambos os iframes com as novas revisões.
+
+Como `htmlUrl` ainda não existe no schema/migrations, a `pdfUrl` persistida também identifica o HTML irmão no Blob (`documentos-pdf/.../<revisão>.pdf` → `documentos-html/.../<revisão>.html`). A action só executa o `UPDATE htmlUrl` quando a coluna é detectada; sem ela, a reescrita permanece atômica no banco e o reload recupera o HTML pela URL derivada, sem migration nesta fase.
+
+**Caminho de consumo:** `/PainelAlpha/GeradorDocumentos` → documento → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → cláusula → “Reescrever com IA”.
+
+**Última atualização:** 2026-09-03 por Echo (RM-2026-BB92C7, Fase 3)
+
+## Gerador de Documentos — PDF inline + fidelidade estrutural (RM-2026-BB92C7, 2026-09-03)
+
+`ConferenciaClient` exibe o PDF recém-gerado em iframe pela rota autenticada de download com `?disposition=inline`; o download normal permanece `attachment`. `pdfUrl` foi substituída por `pdfDisponivel` nos payloads de UI tocados. O renderer HTML→PDF agora preserva a ordem de títulos, imagens HTTP(S)/base64, listas e tabelas com `colspan`, bordas e cabeçalhos; `<header>`/`<footer>` reconhecíveis usam `fixed` e se repetem. Destinos de imagem em rede privada são recusados. `FinalizarDocumento` usa o HTML fiel quando `htmlUrl` existe e só recorre ao PDF textual em documentos legados sem HTML.
+
+**Caminho de consumo:** `/PainelAlpha/GeradorDocumentos` → gerar → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → “PDF gerado”.
+
+**Limite:** CSS arbitrário, fontes incorporadas, posicionamento absoluto, paginação pixel-perfect e imagens relativas não autocontidas não são reproduzidos pelo `@react-pdf/renderer`.
+
+**Última atualização:** 2026-09-03 por Nova (RM-2026-BB92C7, Fase 2)
+
+## Gerador de Documentos — grifo de variáveis na revisão (RM-2026-BB92C7, 2026-09-03)
+
+**Objetivo:** identificar visualmente, no HTML fiel da conferência, valores preenchidos e variáveis faltantes sem alterar o layout original.
+
+**Implementação:** `renderHtmlComVariaveis()` agora substitui placeholders somente em nós de texto, escapa o valor inserido e envolve cada ocorrência conhecida em `<mark data-variable data-var-status>`. Preenchidas usam amarelo (`#fef08a`); faltantes exibem `[FALTANTE: nome]` em vermelho (`#fecaca`). O CSS é injetado no `head` do HTML persistido, portanto funciona dentro do iframe remoto de `ConferenciaClient`. Tags, atributos, scripts e estilos não são reescritos.
+
+**Autoajuste da Fase 0:** `GerarDocumento` permite criar o rascunho `CONFERENCIA` com variável obrigatória vazia para que o usuário veja o marcador vermelho. `FinalizarDocumento` revalida as definições do template contra `DocumentoGerado.variaveisJson` e bloqueia a finalização enquanto houver obrigatórias ausentes.
+
+**Caminho de consumo:** `/PainelAlpha/GeradorDocumentos` → template → “Gerar documento” → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → iframe “Visualização fiel do documento”.
+
+**Última atualização:** 2026-09-03 por Nova (sessão Bibble, RM-2026-BB92C7)
+
 ## Agenda Alpha — modal de evento compartilhado responsivo + confirmação de presença (RM-2026-1FE530, 2026-09-01)
 
 **Objetivo:** corrigir o modal de detalhes de evento compartilhado que abria fora da viewport, e adicionar dia exato + confirmação de presença ("Você vai?").
@@ -1258,6 +1874,137 @@ model JustificativaMeta {
 O canal usa `ContratoComercial.canalAquisicao = "Prospecção ativa"` e persiste sua descrição normalizada no `canalOutro` existente. A action exige sessão e papel comercial/administrativo, consulta somente `canalOutro` dos contratos desse canal, limita a leitura aos 500 registros mais recentes e devolve valores tipados, ordenados e deduplicados sem diferenciar caixa ou espaçamento. Não existe endpoint, nova tabela ou migration.
 
 O helper `src/lib/comercial/prospeccao-ativa.ts` é a fonte única do rótulo, validação de até 200 caracteres e normalização do catálogo. `resolverOrigemParceiro()` preserva `canalOutro` somente para `Outro`, `Prospecção ativa` ou o envelope tipado de parceiro pendente; demais canais continuam limpando o campo.
+## Máscara e persistência canônica de CNPJ no CRM (RM-2026-35BA39, Fases 2–3, 2026-09-04)
+
+**Objetivo:** unificar normalização/formatação de CNPJ em todos os consumidores visuais mapeados pelo Scout na Fase 0.
+
+`src/lib/format-cnpj.ts` passou a ser a implementação única: `normalizarCNPJ` (strip não-dígito, limita a 14), `formatarCNPJProgressivo` (máscara `00.000.000/0000-00` aplicada a cada estágio da digitação, usada em `onChange`), `formatCNPJ` (apresentação read-only, `null` se ≠14 dígitos, comportamento preservado) e `cnpjEhValido` (dígito verificador padrão CNPJ, pesos `[5,4,3,2,9,8,7,6,5,4,3,2]`/`[6,5,4,3,2,9,8,7,6,5,4,3,2]`).
+
+**Tipo dedicado `"cnpj"`:** adicionado a `BPM_CAMPO_TIPO` (`src/lib/validations/bpm.ts`) e ao seletor de tipos em `AdminPipelineClient.tsx` (opção "CNPJ"), espelhando o precedente de `"cpf"`. `validarValoresCamposBpm` (`src/lib/bpm/campos-dinamicos.ts`) valida o dígito verificador e normaliza a 14 dígitos antes do upsert em `BpmCardCampoValor`.
+
+**Detecção estrita (`campoBpmEhCnpj`):** exportada em `campos-dinamicos.ts` — verdadeiro para `campo.tipo === "cnpj"` ou, por compatibilidade com campos legados de texto livre (ex.: o campo "CNPJ" do pipeline Financeiro, `tipo: "texto"`), quando o nome normalizado (trim/lowercase/sem acento) é exatamente `"cnpj"`. Nomes aproximados ("Cartão CNPJ", "Contato CNPJ") não contam. `CampoBpmInput.tsx` usa essa detecção para aplicar máscara progressiva + `inputMode="numeric"` + `maxLength={18}` mesmo em campos legados tipados como texto.
+
+**Consumidores atualizados (mesma regra em todos):**
+- `CampoBpmInput.tsx` — máscara progressiva no campo dinâmico da etapa.
+- `NovoCardModal.tsx` — máscara local duplicada removida; usa o utilitário compartilhado no input, na busca da Receita Federal, no submit e na formatação dos resultados de busca de empresa.
+- `src/actions/bpm/Cards.ts` (`BuscarEmpresasBpm`) — normalização da busca por CNPJ usa `normalizarCNPJ` compartilhado.
+- `CardAbertoLayout.tsx` (header do card), `DadosEmpresaConteudo.tsx` (gaveta "Dados da empresa") e `PerfilEmpresaModal.tsx` (perfil global aberto pelo card) — exibem `formatCNPJ(cnpj) ?? cnpj` (fallback seguro para dado legado que não feche em 14 dígitos).
+
+**Fronteiras server-side:** `novaEmpresaCardSchema` verifica que a entrada contém exatamente 14 dígitos antes de normalizar e chegar a `CriarCardBpm`; a action usa novamente `normalizarCNPJ` antes da consulta e escrita em `Cliente.cnpj`. Dígitos excedentes são rejeitados no servidor, em vez de truncados silenciosamente. `validarValoresCamposBpm` aplica `campoBpmEhCnpj`, portanto o tipo dedicado e o campo legado com nome canônico são validados por dígito verificador e persistidos com 14 dígitos sem depender do cliente. Nenhum input de Contratos, Clientes ou outro módulo foi alterado. `pipeline-financeiro.ts` (`cnpjValido` interno, usado em `validateFinancialTransition`) também não foi tocado — sua validação financeira existente permanece intacta.
+
+**Testes:** `tests/bpm/cnpj-mascara.test.ts` cobre normalização, máscara progressiva, apresentação, dígitos verificadores, tamanho estrito, detecção do tipo/fallback legado e wiring; `tests/bpm/criar-card-nova-empresa.test.ts` cobre normalização/rejeição na action e equivalência da busca crua/formatada; `tests/bpm/edicao-campos-card.test.ts` comprova o valor canônico enviado ao upsert pela `AtualizarCardBpm`, inclusive para campo legado, e ausência de persistência parcial em entradas incompletas ou excedentes.
+
+**Caminho de consumo:**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → Novo Card → cadastro de empresa nova → input CNPJ com máscara progressiva
+  → card aberto → header (CNPJ formatado) → "Dados da empresa" / perfil global (CNPJ formatado)
+  → aba Formulário da Etapa → campo dinâmico tipo CNPJ (ou legado nome "CNPJ") → máscara progressiva + validação de dígito verificador no save
+  → admin do pipeline → criar/editar campo → seletor de tipo → opção "CNPJ"
+```
+
+**Última atualização:** 2026-09-04 por Echo (sessão Bibble, RM-2026-35BA39, Fase 3)
+
 ## Equipes privadas de notas (2026-08-12)
 
 O módulo de Notas possui equipes privadas reutilizáveis. `NoteTeam` define o criador, `NoteTeamMember` mantém um papel por membro (`LEITOR`, `COMENTARISTA`, `EDITOR`, `ADMIN`) e `NoteTeamShare` relaciona equipes e notas por FKs reais. O criador é `ADMIN` implícito e é o único gestor da equipe; o papel `ADMIN` de um membro vale para a nota e não delega gestão da equipe. O acesso efetivo escolhe sempre o papel mais permissivo entre propriedade, usuário, setor/role e todas as equipes.
+
+## Distribuição e Oportunidades (RM-2026-6B5F7C) — implementação revertida, ver Motor de Automações
+
+Uma primeira implementação standalone (`BpmDistribuicaoConfig`/`BpmOportunidadeRegra`/`BpmOportunidadeDetectada`, migration `20260904171000_bpm_distribuicao_oportunidades`) foi construída e depois **revertida em 2026-09-04** — descoberta de duplicação: o Motor de Automações já implementa a mesma funcionalidade de forma mais integrada em `src/lib/bpm/automacoes/distribuicao-oportunidades.ts` (ações `DISTRIBUICAO_AUTOMATICA`/`OPORTUNIDADE_IDENTIFICADA` do `BpmAutomacao`, ver `distribuicao-motor.ts` e `schemas.ts` no mesmo diretório), consistente com o pedido original de "integrada ao Motor Central de Automações". Tabelas dropadas (vazias, sem dado real), código e rotas removidos. Referência válida para RM-2026-6B5F7C é a implementação em `src/lib/bpm/automacoes/`.
+
+**Última atualização:** 2026-09-04 por operador humano via Claude Code (reversão)
+
+## Histórico, Conhecimento e Pendências (RM-2026-D6D970, 2026-09-04)
+
+Timeline unificada do card **já existia** antes desta entrega (`src/lib/bpm/timeline.ts` + aba "Histórico" em `PainelHistorico.tsx`), fundindo `BpmCardHistorico` (auditoria completa: quem/quando/ação/valor anterior/valor novo/origem via `automacaoOrigem`) e anotações — todo módulo (tarefas, checklists, automações, distribuição, oportunidades, cadências) já escreve nela via `registrarHistoricoCard`. Em paralelo, o Codex construiu uma segunda via mais abrangente (`PainelTimelineCard.tsx`, nova aba "Timeline", consumindo `src/actions/bpm/Timeline.ts`/`src/lib/timeline/extractors/card.ts` — que fundem também tarefas, checklists, automações e SLA diretamente, além do histórico) — mantida como a referência de timeline completa; a aba "Histórico" original permanece intocada.
+
+Dois entregáveis genuinamente novos, sem duplicar dado: `BpmPipelineConhecimentoLink` (migration aditiva `20260904174200_bpm_pipeline_conhecimento_link`) — links de materiais relevantes por pipeline, exibidos no card (`PainelConhecimentoRelacionado.tsx`) e geridos em `/PainelAlpha/AlphaCRM/admin/conhecimento`; e `src/lib/bpm/pendencias/motor.ts` (`listarPendenciasBpm`) — Central de Pendências em `/PainelAlpha/AlphaCRM/pendencias`, consolidando tarefas pendentes, próximo contato vencido, checklists incompletos, campos obrigatórios faltantes e alertas de SLA (fail-open enquanto RM-2026-095B40 não estiver em produção), sem tabela nova.
+
+**Última atualização:** 2026-09-04 por operador humano via Claude Code (RM-2026-D6D970)
+
+## Motor Central de Automações — Fase 3: schema aditivo fechado, bloqueado por aprovação de banco (RM-2026-D100EB, 2026-09-04)
+
+A story `docs/stories/story-rm-2026-d100eb-motor-central-automacoes.md` agora existe (resolve o `AUTO_ADJUSTMENT_REQUIRED` das fases 0–2 sobre ausência de story) e define regras funcionais, gatilhos, ações e a lista de tabelas propostas, mas deixa explícito que "os nomes e campos definitivos devem ser fechados pela fase de dados" e que a migration exige backup específico e aprovação explícita antes de qualquer SQL remoto.
+
+### Desenho aditivo fechado nesta fase (não aplicado)
+
+Base real consultada em `prisma/schema.prisma:3944` (`BpmAutomacao`) e `:3969` (`BpmAutomacaoExecucao`). Todas as tabelas novas são aditivas; nenhuma coluna existente é removida ou renomeada.
+
+- `BpmAutomacaoVersao` — `id`, `automacaoId` (FK `BpmAutomacao`, `onDelete: Restrict` para preservar auditoria), `numero` (Int sequencial), `status` (`RASCUNHO|ATIVA|ARQUIVADA`), `gatilhoTipo`, `gatilhoConfigJson`, `grafoJson` (nós `ACAO/CONDICAO/ESPERA/FIM`, reutilizando o AST do Motor de Regras dentro dos nós `CONDICAO`), `recorrenciaJson?`, `timezone?`, `criadoPorId`, `ativadaEm?`, `createdAt`, `updatedAt`. `@@unique([automacaoId, numero])`, `@@index([automacaoId, status])`.
+- `BpmEventoDominio` — outbox: `id`, `tipo`, `entidadeTipo`, `entidadeId`, `cardId?`, `pipelineId?`, `valorAnteriorJson?`, `valorNovoJson?`, `atorTipo`, `atorUserId?`, `atorExecucaoId?`, `ocorridoEm`, `correlationId`, `causationId?`, `profundidade` (Int default 0), `idempotencyKey` (`@unique`), `processadoEm?`, `createdAt`. `@@index([correlationId])`, `@@index([tipo, processadoEm])`, `@@index([cardId])`.
+- `BpmAutomacaoExecucao` (evolução aditiva, colunas novas nullable) — `automacaoVersaoId String?` (FK `BpmAutomacaoVersao`), `eventoId String?` (FK `BpmEventoDominio`), `correlationId String?`, `causationId String?`, `claimToken String?`, `proximaTentativaEm DateTime?`. Mantém `@@unique([automacaoId, eventoChave])` existente; adiciona `@@unique([automacaoVersaoId, eventoId])` (SQLite trata `NULL` como distinto, portanto não colide com execuções legadas sem versão/evento).
+- `BpmAutomacaoPassoExecucao` — auditoria por nó: `id`, `execucaoId` (FK `BpmAutomacaoExecucao`, `onDelete: Cascade`), `noId`, `tipo`, `status`, `entradaJson?`, `resultadoJson?`, `erroSanitizado?`, `tentativa` (Int default 1), `iniciadoEm?`, `concluidoEm?`, `createdAt`. `@@unique([execucaoId, noId, tentativa])`.
+- `BpmAutomacaoAgenda` — espera/recorrência persistente: `id`, `automacaoVersaoId` (FK), `cardId?`, `execucaoId?`, `tipo` (`ESPERA|RECORRENCIA`), `proximaExecucaoEm`, `timezone`, `recorrenciaJson?`, `ativo` (default true), `createdAt`, `updatedAt`. `@@index([proximaExecucaoEm, ativo])`.
+- `BpmWebhookEndpoint` — `id`, `automacaoId?` (FK opcional), `nome`, `urlPath` (`@unique`), `segredoHash` (nunca texto plano), `headersPermitidosJson?`, `ativo` (default true), `criadoPorId`, `createdAt`, `updatedAt`.
+- `BpmWebhookEntrada` — auditoria de recebimento: `id`, `endpointId` (FK), `idempotencyKey`, `origemIp?`, `headersSanitizadosJson?`, `payloadSanitizadoJson?`, `status`, `processadoEm?`, `eventoId?` (FK `BpmEventoDominio`), `createdAt`. `@@unique([endpointId, idempotencyKey])`.
+- `BpmAutomacaoLease` — lease distribuído com fencing: `id`, `chave` (`@unique`, ex.: `cardId`/`correlationId`), `titular`, `fencingToken` (Int incremental), `expiraEm`, `createdAt`, `updatedAt`. `@@index([expiraEm])`.
+
+Nenhum `DROP`, renomeação ou backfill mutante é necessário; todas as FKs para entidades auditáveis usam `Restrict`/preservação, nunca cascade que apague histórico.
+
+### Por que a fase encerra bloqueada
+
+Não há comprovante específico de aprovação administrativa para esta mudança estrutural nesta sessão (execução autônoma, sem interação em tempo real) — `mandatoryAdministratorFeedback` chegou vazio. O backup mais recente em `database-backups/pre-change/` (`painelalpha_turso_pre_change_2026-09-04T18-13-55-446Z.sql`, dentro da janela de 48h, verificado: 282 tabelas, 68.332 linhas, SHA-256 `2665112c...`) foi gerado para outra mudança (RM-2026-095B40) e não é um backup específico desta migration. Conforme a política do projeto, aprovação genérica, silêncio ou backup de outra mudança não autorizam a aplicação do DDL. Nenhum arquivo de schema, migration ou dado no Turso foi alterado.
+
+**Pendência para a reexecução autorizada desta fase:** apresentar este relatório ao administrador, obter confirmação explícita e específica, gerar backup pré-mudança dedicado a esta migration, aplicar o DDL aditivo acima, validar estrutura/índices/FKs no Turso real e só então liberar as Fases 4-5 (domínio/runtime) da story.
+
+**Arquivos afetados:** nenhum arquivo de produção nem `prisma/schema.prisma`; `.bibble/memory/architecture.md` (este registro).
+
+**Última atualização:** 2026-09-04 por Vault (RM-2026-D100EB, Fase 3)
+
+## Gestão de Tarefas e Cadências — UI e consumo no card (RM-2026-97CC60, Fase 4, 2026-09-04)
+
+O backend de cadências (`BpmCadencia`/`BpmCadenciaPasso`/`BpmCardCadencia`/`BpmCadenciaPassoExecucao`, `src/lib/bpm/cadencias/executor.ts`, `src/actions/bpm/Cadencias.ts`, cron em `src/app/api/bpm/jobs/automacoes/route.ts`) já existia e passava nos testes antes desta fase. Faltava apenas a superfície de uso: admin `/PainelAlpha/AlphaCRM/admin/cadencias` (`CadenciasWorkspace.tsx`/`CadenciaFormDialog.tsx`, CRUD de cadências e passos) e uma nova aba "Cadências" em `PainelHistorico.tsx` (`PainelCadenciasCard.tsx`) que lista vínculos do card por status (ATIVA/PAUSADA/CONCLUIDA/CANCELADA), inicia nova cadência a partir de um `Select` das cadências ativas, e permite pausar/reativar/cancelar. Nenhuma alteração de schema; nenhuma migration nova.
+
+Ficaram deliberadamente fora desta rodada (arquivos em edição ativa por trabalho paralelo no mesmo repositório): integração da ação `INICIAR_CADENCIA` no Motor de Automações (`src/lib/bpm/automacoes/executor.ts`/`schemas.ts`) e interrupção automática de cadência ao preencher "Próximo Contato" no card — hoje só manual via botão. Central de tarefas com filtro por cadência também não foi implementada.
+
+**Última atualização:** 2026-09-04 por operador humano via Claude Code (RM-2026-97CC60, Fase 4)
+## Gestão de Prazos, SLA e Alertas — motor temporal (RM-2026-095B40, Fase 2, 2026-09-04)
+
+`src/lib/bpm/sla.ts` implementa prazo em minutos/horas/dias/dias úteis, limites configuráveis, provisionamento idempotente por card/tarefa, pausa com congelamento e retomada que acumula milissegundos e desloca o deadline. O status é recalculado on-read e persiste transições na trilha `BpmSlaEventoLog`, sem disparar notificação ou automação.
+
+`src/actions/bpm/Sla.ts` expõe criação e leitura com Zod, auth e ownership. `MoverCardBpm` sincroniza SLA dentro da mesma transação do card: conclui a instância da etapa anterior, cria a da etapa de destino e pausa/retoma ao atravessar `Standby - Follow Up`.
+
+AUTO_ADJUSTMENT_REQUIRED: Kanban e modal ainda não consomem `ObterStatusSlaCard`; CRUD administrativo e alertas/automações pertencem às fases seguintes.
+AUTO_ADJUSTMENT_ACCEPTANCE: badge semântico e tempo restante aparecem no card fechado/modal usando a action autoritativa, sem cálculo duplicado no client.
+
+DELIVERY_READY: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → `MoverCardBpm` → `sincronizarSlaMovimentoBpm` → `BpmSlaInstancia`/`BpmSlaEventoLog`; leitura autenticada por `ObterStatusSlaCard`/`ObterStatusSlaTarefa`.
+# Gestão de SLA — UI administrativa (RM-2026-095B40, Fase 3, 2026-09-04)
+
+O CRUD administrativo usa as tabelas SLA definitivas sem nova migration. A rota protegida `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` carrega configurações e serviços no servidor e monta `SlaConfigSection`. `SlaConfigForm` compartilha `slaConfiguracaoAdminSchema` com as Server Actions e permite configurar escopo, prazo, início, pausa em Standby e os limites amarelo/vermelho, com preview imediato.
+
+O save reconcilia configuração e dois limites na mesma transação, com autenticação e gate administrativo repetidos dentro dela. Exclusão é aceita apenas quando não existem instâncias; depois do primeiro uso, a configuração deve ser desativada para preservar histórico.
+
+DELIVERY_READY: Alpha CRM → Configurações → pipeline → seção **SLA e Alertas** → criar/editar/ativar/desativar/excluir configuração ainda não utilizada → recarregar a rota e reencontrar os dados persistidos.
+
+AUTO_ADJUSTMENT_REQUIRED: Kanban e modal ainda não consomem `ObterStatusSlaCard`; alertas/automações operacionais pertencem às próximas fases.
+AUTO_ADJUSTMENT_ACCEPTANCE: card com SLA exibe badge e tempo restante autoritativos no board/modal e cruza cada limiar uma única vez no worker.
+
+## Motor Central de Automações — arquitetura final (RM-2026-D100EB)
+
+O Alpha CRM usa uma outbox transacional (`BpmEventoDominio`) como entrada
+canônica do motor. Produtores de card, campo, responsável, tarefa, membros e
+vínculos publicam na mesma transação da mudança. O materializador seleciona as
+versões ativas compatíveis e cria no máximo uma execução por
+`automacaoVersaoId + eventoId`.
+
+O runtime interpreta somente grafos validados `ACAO/CONDICAO/ESPERA/FIM`;
+condições delegam ao Motor de Regras existente. Claims CAS e leases com fencing
+serializam efeitos por card, enquanto passos, tentativas, agendas, correlação e
+causalidade permanecem persistidos. O executor legado continua isolado para
+execuções sem versão central e é reutilizado por adaptadores controlados.
+
+Entradas externas passam por endpoint com segredo hash, idempotência e limites.
+Saídas HTTP passam pelo cliente seguro que exige HTTPS, revalida redirects e
+DNS, recusa redes privadas/headers sensíveis e limita tempo e tamanho. Operação
+ocorre pela rota admin, cron existente e CLI `bpm:automacoes`.
+
+**Última atualização:** 2026-09-04 por Codex (RM-2026-D100EB, Fases 4–17)
+
+## Gestão de Prazos, SLA e Alertas — entrega operacional (RM-2026-095B40, 2026-09-04)
+
+O SLA passou a ser um fluxo transacional e orientado a eventos. Os momentos `CRIACAO_CARD`, `PRIMEIRA_VISUALIZACAO`, `ENTRADA_ETAPA`, `CRIACAO_TAREFA` e `TAREFA_CONCLUIDA` provisionam ou encerram instâncias pelo domínio em `src/lib/bpm/sla.ts`. A mudança de estado persiste log, usa `BpmSlaDisparo` como trava idempotente para amarelo/vermelho e publica `SLA_STATUS_ALTERADO` na outbox `BpmEventoDominio` dentro da mesma transação. O Motor Central filtra esse evento por status e a deduplicação de correlação só considera execuções efetivamente materializadas.
+
+O Kanban usa leitura em lote e exibe badge com cor configurada, contagem regressiva e destaque de atraso; o modal apresenta deadline e histórico de pausas. Em Standby, somente SLAs configurados para pausa são congelados e, na retomada, o tempo pausado desloca o deadline. O E2E real isolado comprovou verde → amarelo → vermelho, disparos únicos, automação executada, criação de tarefa e retomada com 30 minutos de deslocamento.
+
+**Última atualização:** 2026-09-04 por Codex (RM-2026-095B40)

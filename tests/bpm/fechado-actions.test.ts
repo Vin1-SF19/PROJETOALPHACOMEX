@@ -42,8 +42,10 @@ vi.mock("@/lib/bpm/ownership", () => ({
 }));
 vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
   carregarCamposObrigatoriosEtapa: carregarCamposObrigatoriosEtapaMock,
+  carregarSnapshotsCopiaCamposCard: vi.fn().mockResolvedValue({}),
   carregarCamposAplicaveisEtapa: carregarCamposAplicaveisEtapaMock,
   carregarCamposAplicaveisCardEtapa: carregarCamposAplicaveisCardEtapaMock,
+  verificarTransicaoPermitidaBpm: vi.fn().mockResolvedValue({ permitida: true }),
 }));
 
 import {

@@ -7,11 +7,23 @@ import { auth } from "../../../auth";
 import db from "@/lib/prisma";
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import {
+  listarUsuariosVinculaveisBpm,
+  usuarioElegivelResponsavelBpm,
+} from "@/lib/bpm/ownership";
+import {
   atualizarAutomacaoBpmSchema,
   duplicarAutomacaoBpmSchema,
   salvarAutomacaoBpmSchema,
+  parametrosDistribuicaoSchema,
+  parametrosOportunidadeSchema,
 } from "@/lib/bpm/automacoes/schemas";
 import { VariavelTemplateSchema } from "@/lib/gerador-documentos/schemas";
+import {
+  simularDistribuicaoBpm,
+  simularOportunidadeBpm,
+} from "@/lib/bpm/automacoes/distribuicao-oportunidades";
+import type { GrupoCondicao } from "@/lib/bpm/regras/types";
+import { publicarVersaoCentralDaDefinicaoSimples } from "@/lib/bpm/automacoes/centralizacao";
 
 const ROTA_AUTOMACOES = "/PainelAlpha/AlphaCRM/automacoes";
 const idSchema = z.string().cuid();
@@ -42,6 +54,14 @@ function erroPublico(error: unknown): string {
     "Pipeline ou coluna inválida",
     "Automação não encontrada",
     "Template de contrato inválido",
+    "Serviço alvo inválido",
+    "Responsável comercial inválido",
+    "Responsável configurado inválido",
+    "Um ou mais candidatos estão inativos ou sem acesso ao pipeline",
+    "Uma condição usa campo fora do pipeline",
+    "Uma condição ou ação usa campo fora do pipeline",
+    "Automação ou card incompatível",
+    "Uma condição usa parceiro inválido",
   ].includes(error.message)) return error.message;
   return "Não foi possível concluir a operação";
 }
@@ -65,6 +85,187 @@ async function validarTemplateContrato(acaoTipo: string, parametros: unknown) {
   if (!template) throw new Error("Template de contrato inválido");
 }
 
+function idsCamposDinamicos(condicao: GrupoCondicao | null | undefined): string[] {
+  if (!condicao) return [];
+  const ids: string[] = [];
+  const visitar = (grupo: GrupoCondicao) => {
+    for (const item of grupo.condicoes) {
+      if ("tipo" in item) {
+        if (item.campo.fonte === "campo_dinamico") ids.push(item.campo.campo);
+      } else visitar(item);
+    }
+  };
+  visitar(condicao);
+  return [...new Set(ids)];
+}
+
+function idsParceiros(condicao: GrupoCondicao | null | undefined): number[] {
+  if (!condicao) return [];
+  const ids: number[] = [];
+  const visitar = (grupo: GrupoCondicao) => {
+    for (const item of grupo.condicoes) {
+      if ("tipo" in item) {
+        if (item.campo.fonte === "contratacao" && item.campo.campo === "indicadoPorParceiroId") {
+          const valores = Array.isArray(item.valor) ? item.valor : [item.valor];
+          for (const valor of valores) {
+            const id = Number(valor);
+            if (Number.isInteger(id) && id > 0) ids.push(id);
+          }
+        }
+      } else visitar(item);
+    }
+  };
+  visitar(condicao);
+  return [...new Set(ids)];
+}
+
+async function validarParceiros(condicao: GrupoCondicao | null | undefined) {
+  const ids = idsParceiros(condicao);
+  if (ids.length === 0) return;
+  const total = await db.parceiro.count({ where: { id: { in: ids }, ativo: true } });
+  if (total !== ids.length) throw new Error("Uma condição usa parceiro inválido");
+}
+
+async function validarConfiguracaoEspecial(dados: z.infer<typeof salvarAutomacaoBpmSchema>) {
+  if (dados.acaoTipo === "DISTRIBUIR_RESPONSAVEL") {
+    const parametros = parametrosDistribuicaoSchema.parse(dados.parametros);
+    for (const usuarioId of parametros.candidatosIds) {
+      if (!(await usuarioElegivelResponsavelBpm(dados.pipelineId, usuarioId))) {
+        throw new Error("Um ou mais candidatos estão inativos ou sem acesso ao pipeline");
+      }
+    }
+    const ids = idsCamposDinamicos(parametros.condicao);
+    if (ids.length > 0) {
+      const total = await db.bpmCampo.count({ where: { id: { in: ids }, pipelineId: dados.pipelineId } });
+      if (total !== ids.length) throw new Error("Uma condição usa campo fora do pipeline");
+    }
+    await validarParceiros(parametros.condicao);
+    return;
+  }
+  if (dados.acaoTipo !== "IDENTIFICAR_OPORTUNIDADE") return;
+  const parametros = parametrosOportunidadeSchema.parse(dados.parametros);
+  const servico = await db.servicosComerciais.findFirst({
+    where: { id: parametros.servicoAlvoId, ativo: true },
+    select: { id: true },
+  });
+  if (!servico) throw new Error("Serviço alvo inválido");
+  const ids = idsCamposDinamicos(parametros.condicao);
+  if (parametros.acao.tipo === "ALTERAR_CAMPO") ids.push(parametros.acao.campoId);
+  const unicos = [...new Set(ids)];
+  if (unicos.length > 0) {
+    const total = await db.bpmCampo.count({ where: { id: { in: unicos }, pipelineId: dados.pipelineId } });
+    if (total !== unicos.length) throw new Error("Uma condição ou ação usa campo fora do pipeline");
+  }
+  await validarParceiros(parametros.condicao);
+  if (parametros.acao.tipo === "CRIAR_CARD_COMERCIAL") {
+    await validarPipelineEtapa(parametros.acao.pipelineId, parametros.acao.etapaId);
+    if (!(await usuarioElegivelResponsavelBpm(parametros.acao.pipelineId, parametros.acao.responsavelId))) {
+      throw new Error("Responsável comercial inválido");
+    }
+  }
+  if (parametros.acao.tipo === "ATRIBUIR_VENDEDOR" || parametros.acao.tipo === "CRIAR_TAREFA" && parametros.acao.responsavelId) {
+    const responsavelId = parametros.acao.responsavelId;
+    if (responsavelId && !(await usuarioElegivelResponsavelBpm(dados.pipelineId, responsavelId))) {
+      throw new Error("Responsável configurado inválido");
+    }
+  }
+}
+
+export async function ListarCatalogosAutomacoesBpm() {
+  try {
+    await exigirAdminAutomacoes();
+    const [usuarios, servicos, parceiros, pipelines] = await Promise.all([
+      listarUsuariosVinculaveisBpm(),
+      db.servicosComerciais.findMany({ where: { ativo: true }, orderBy: { nome: "asc" }, select: { id: true, nome: true } }),
+      db.parceiro.findMany({ where: { ativo: true }, orderBy: { nome: "asc" }, select: { id: true, nome: true, nomeFantasia: true } }),
+      db.bpmPipeline.findMany({
+        where: { ativo: true },
+        orderBy: { nome: "asc" },
+        select: {
+          id: true,
+          nome: true,
+          campos: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, tipo: true, opcoesJson: true } },
+        },
+      }),
+    ]);
+    return { success: true as const, data: { usuarios, servicos, parceiros, pipelines } };
+  } catch (error) {
+    return { success: false as const, error: erroPublico(error), data: { usuarios: [], servicos: [], parceiros: [], pipelines: [] } };
+  }
+}
+
+const simularAutomacaoSchema = z.object({
+  automacaoId: z.string().cuid(),
+  cardId: z.string().cuid(),
+}).strict();
+
+export async function SimularAutomacaoBpm(payload: unknown) {
+  try {
+    await exigirAdminAutomacoes();
+    const dados = simularAutomacaoSchema.parse(payload);
+    const [automacao, card] = await Promise.all([
+      db.bpmAutomacao.findUnique({ where: { id: dados.automacaoId } }),
+      db.bpmCard.findUnique({
+        where: { id: dados.cardId },
+        select: {
+          id: true, pipelineId: true, etapaId: true, responsavelId: true,
+          servico: true, tipoProcesso: true, status: true, createdAt: true,
+          updatedAt: true, concluidoEm: true, primeiraVisualizacaoEm: true,
+          proximoContatoEm: true, dataReuniao: true, statusPosFechamento: true,
+          empresaId: true,
+        },
+      }),
+    ]);
+    if (!automacao || !card || automacao.pipelineId !== card.pipelineId) {
+      throw new Error("Automação ou card incompatível");
+    }
+    if (automacao.acaoTipo === "DISTRIBUIR_RESPONSAVEL") {
+      const configuracao = parametrosDistribuicaoSchema.parse(JSON.parse(automacao.parametrosJson));
+      const cursor = await db.bpmCardHistorico.count({
+        where: { acao: "DISTRIBUICAO_AUTOMATICA", automacaoOrigem: automacao.id },
+      });
+      return { success: true as const, data: await simularDistribuicaoBpm({ card, configuracao, cursor }) };
+    }
+    if (automacao.acaoTipo === "IDENTIFICAR_OPORTUNIDADE") {
+      const configuracao = parametrosOportunidadeSchema.parse(JSON.parse(automacao.parametrosJson));
+      return { success: true as const, data: await simularOportunidadeBpm({ card, configuracao }) };
+    }
+    return { success: false as const, error: "Simulação disponível para distribuição e oportunidades" };
+  } catch (error) {
+    return { success: false as const, error: erroPublico(error) };
+  }
+}
+
+export async function ListarHistoricoAutomacaoBpm(automacaoId: string) {
+  try {
+    await exigirAdminAutomacoes();
+    const id = idSchema.parse(automacaoId);
+    const automacao = await db.bpmAutomacao.findUnique({ where: { id }, select: { id: true } });
+    if (!automacao) throw new Error("Automação não encontrada");
+    const execucoes = await db.bpmAutomacaoExecucao.findMany({
+      where: { automacaoId: id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true, cardId: true, eventoChave: true, gatilhoTipo: true, status: true,
+        tentativas: true, mensagemErro: true, resultadoJson: true, iniciadoEm: true,
+        executadoEm: true, createdAt: true,
+      },
+    });
+    return {
+      success: true as const,
+      data: execucoes.map((execucao) => ({
+        ...execucao,
+        iniciadoEm: execucao.iniciadoEm?.toISOString() ?? null,
+        executadoEm: execucao.executadoEm?.toISOString() ?? null,
+        createdAt: execucao.createdAt.toISOString(),
+      })),
+    };
+  } catch (error) {
+    return { success: false as const, error: erroPublico(error), data: [] };
+  }
+}
+
 export async function ListarWorkspaceAutomacoesBpm() {
   try {
     await exigirAdminAutomacoes();
@@ -81,59 +282,114 @@ export async function ListarWorkspaceAutomacoesBpm() {
             nome: true,
             ordem: true,
             ativo: true,
-            automacoes: {
-              orderBy: { createdAt: "desc" },
+          },
+        },
+        automacoes: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            nome: true,
+            descricao: true,
+            gatilhoTipo: true,
+            tempoMinutos: true,
+            acaoTipo: true,
+            parametrosJson: true,
+            ativa: true,
+            etapaId: true,
+            criadoPor: { select: { id: true, nome: true } },
+            createdAt: true,
+            updatedAt: true,
+            versoes: {
+              where: { status: "ATIVA" },
+              orderBy: { versao: "desc" },
+              take: 1,
               select: {
                 id: true,
-                nome: true,
-                descricao: true,
+                versao: true,
+                status: true,
                 gatilhoTipo: true,
-                tempoMinutos: true,
-                acaoTipo: true,
-                parametrosJson: true,
-                ativa: true,
-                criadoPor: { select: { id: true, nome: true } },
-                createdAt: true,
-                updatedAt: true,
-                execucoes: {
-                  orderBy: { createdAt: "desc" },
+                gatilhoConfigJson: true,
+                condicaoJson: true,
+                grafoJson: true,
+                timezone: true,
+                agendas: {
+                  where: { ativo: true },
+                  orderBy: { proximaExecucaoEm: "asc" },
                   take: 1,
-                  select: {
-                    id: true,
-                    status: true,
-                    mensagemErro: true,
-                    executadoEm: true,
-                    createdAt: true,
-                  },
+                  select: { proximaExecucaoEm: true },
                 },
-                _count: { select: { execucoes: true } },
               },
             },
+            execucoes: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: {
+                id: true,
+                status: true,
+                mensagemErro: true,
+                resultadoJson: true,
+                gatilhoTipo: true,
+                executadoEm: true,
+                createdAt: true,
+                evento: { select: { tipo: true, atorTipo: true, ocorridoEm: true } },
+              },
+            },
+            _count: { select: { execucoes: true } },
           },
         },
       },
     });
     return {
       success: true as const,
-      data: pipelines.map((pipeline) => ({
-        ...pipeline,
-        etapas: pipeline.etapas.map((etapa) => ({
-          ...etapa,
-          automacoes: etapa.automacoes.map((automacao) => ({
+      data: pipelines.map((pipeline) => {
+        const automacoes = pipeline.automacoes.map((automacao) => {
+          const versaoAtiva = automacao.versoes[0] ?? null;
+          let config: { escopo?: string; etapaId?: string; etapasIds?: string[]; recorrencia?: unknown } = {};
+          try { config = versaoAtiva ? JSON.parse(versaoAtiva.gatilhoConfigJson) : {}; } catch { config = {}; }
+          const escopo: "GLOBAL_PIPELINE" | "ETAPAS" = config.escopo === "GLOBAL_PIPELINE" ? "GLOBAL_PIPELINE" : "ETAPAS";
+          const etapasIds = escopo === "GLOBAL_PIPELINE"
+            ? []
+            : [...new Set([...(Array.isArray(config.etapasIds) ? config.etapasIds : []), config.etapaId, automacao.etapaId].filter((id): id is string => typeof id === "string"))];
+          const ultima = automacao.execucoes[0] ?? null;
+          return {
             ...automacao,
+            escopo,
+            etapasIds,
+            recorrencia: config.recorrencia ?? null,
+            versaoAtiva: versaoAtiva ? {
+              id: versaoAtiva.id,
+              versao: versaoAtiva.versao,
+              status: versaoAtiva.status,
+              gatilhoTipo: versaoAtiva.gatilhoTipo,
+              gatilhoConfigJson: versaoAtiva.gatilhoConfigJson,
+              condicaoJson: versaoAtiva.condicaoJson,
+              grafoJson: versaoAtiva.grafoJson,
+              timezone: versaoAtiva.timezone,
+            } : null,
+            proximaExecucao: versaoAtiva?.agendas[0]?.proximaExecucaoEm.toISOString() ?? null,
             createdAt: automacao.createdAt.toISOString(),
             updatedAt: automacao.updatedAt.toISOString(),
-            ultimaExecucao: automacao.execucoes[0]
-              ? {
-                  ...automacao.execucoes[0],
-                  executadoEm: automacao.execucoes[0].executadoEm?.toISOString() ?? null,
-                  createdAt: automacao.execucoes[0].createdAt.toISOString(),
-                }
-              : null,
+            ultimaExecucao: ultima ? {
+              ...ultima,
+              executadoEm: ultima.executadoEm?.toISOString() ?? null,
+              createdAt: ultima.createdAt.toISOString(),
+              evento: ultima.evento ? { ...ultima.evento, ocorridoEm: ultima.evento.ocorridoEm.toISOString() } : null,
+            } : null,
             execucoes: undefined,
+            versoes: undefined,
+          };
+        });
+        return {
+          id: pipeline.id,
+          nome: pipeline.nome,
+          ativo: pipeline.ativo,
+          automacoesGlobais: automacoes.filter((automacao) => automacao.escopo === "GLOBAL_PIPELINE"),
+          etapas: pipeline.etapas.map((etapa) => ({
+            ...etapa,
+            automacoes: automacoes.filter((automacao) => automacao.etapasIds.includes(etapa.id)),
           })),
-        })),
-      })),
+        };
+      }),
     };
   } catch (error) {
     return { success: false as const, error: erroPublico(error), data: [] };
@@ -169,6 +425,7 @@ export async function CriarAutomacaoBpm(payload: unknown) {
     const dados = salvarAutomacaoBpmSchema.parse(payload);
     await validarPipelineEtapa(dados.pipelineId, dados.etapaId);
     await validarTemplateContrato(dados.acaoTipo, dados.parametros);
+    await validarConfiguracaoEspecial(dados);
     const automacao = await db.$transaction(async (tx) => {
       const criada = await tx.bpmAutomacao.create({
         data: {
@@ -184,6 +441,7 @@ export async function CriarAutomacaoBpm(payload: unknown) {
           criadoPorId: userId,
         },
       });
+      await publicarVersaoCentralDaDefinicaoSimples(tx, criada);
       await tx.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: dados.pipelineId,
@@ -209,8 +467,9 @@ export async function AtualizarAutomacaoBpm(payload: unknown) {
     if (!anterior) throw new Error("Automação não encontrada");
     await validarPipelineEtapa(dados.pipelineId, dados.etapaId);
     await validarTemplateContrato(dados.acaoTipo, dados.parametros);
-    await db.$transaction([
-      db.bpmAutomacao.update({
+    await validarConfiguracaoEspecial(dados);
+    await db.$transaction(async (tx) => {
+      const atualizada = await tx.bpmAutomacao.update({
         where: { id: automacaoId },
         data: {
           nome: dados.nome,
@@ -223,8 +482,9 @@ export async function AtualizarAutomacaoBpm(payload: unknown) {
           parametrosJson: JSON.stringify(dados.parametros),
           ativa: dados.ativa,
         },
-      }),
-      db.bpmPipelineConfigAuditoria.create({
+      });
+      await publicarVersaoCentralDaDefinicaoSimples(tx, atualizada);
+      await tx.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: dados.pipelineId,
           adminId: userId,
@@ -236,8 +496,8 @@ export async function AtualizarAutomacaoBpm(payload: unknown) {
           }),
           valorNovoJson: JSON.stringify({ automacaoId, etapaId: dados.etapaId }),
         },
-      }),
-    ]);
+      });
+    });
     revalidatePath(ROTA_AUTOMACOES);
     return { success: true as const };
   } catch (error) {
@@ -276,17 +536,17 @@ export async function ExcluirAutomacaoBpm(automacaoId: string) {
     const id = idSchema.parse(automacaoId);
     const atual = await db.bpmAutomacao.findUnique({ where: { id } });
     if (!atual) throw new Error("Automação não encontrada");
-    await db.$transaction([
-      db.bpmPipelineConfigAuditoria.create({
+    await db.$transaction(async (tx) => {
+      await tx.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: atual.pipelineId,
           adminId: userId,
-          campoAlterado: "AUTOMACAO_EXCLUIDA",
+          campoAlterado: "AUTOMACAO_ARQUIVADA",
           valorAnteriorJson: JSON.stringify({ automacaoId: id, etapaId: atual.etapaId, nome: atual.nome }),
         },
-      }),
-      db.bpmAutomacao.delete({ where: { id } }),
-    ]);
+      });
+      await tx.bpmAutomacao.update({ where: { id }, data: { ativa: false } });
+    });
     revalidatePath(ROTA_AUTOMACOES);
     return { success: true as const };
   } catch (error) {
@@ -317,6 +577,7 @@ export async function DuplicarAutomacaoBpm(payload: unknown) {
           criadoPorId: userId,
         },
       });
+      await publicarVersaoCentralDaDefinicaoSimples(tx, automacao);
       await tx.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId: dados.pipelineId,

@@ -10,6 +10,7 @@ import { regrasSeedDoCargo } from "./cargo-rule-matching";
 import { decomporTotalFixoComDsr } from "./dsr-formula";
 import { contarDiasUteisEDescansoDoMes, toCivilParts } from "./calendar-engine";
 import { feriadosNacionais } from "./holidays-seed";
+import { carregarRegrasComissaoPublicadas } from "./persisted-rule-loader";
 import type { CommissionRuleVersionData, FactRecord } from "./types";
 import type { HolidayRecord } from "./calendar-engine";
 import type { EligibilityOverrideRecord } from "./eligibility-filter";
@@ -224,9 +225,21 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
 
     // Regras candidatas — seed-rules (Fase 04) filtradas por cargo REAL do colaborador
     // (casamento por nome, ver cargo-rule-matching.ts) e eventType.
-    const regrasDoCargo = colaborador.cargoNome
-      ? regrasSeedDoCargo(colaborador.cargoNome, event.eventType, colaborador.cargoId)
-      : [];
+    const regrasPersistidas = await carregarRegrasComissaoPublicadas({
+      eventType: event.eventType,
+      eventDate: event.eventDate,
+      collaboratorId,
+      cargoId: colaborador.cargoId,
+      setorId: colaborador.setorId,
+      servico: event.servico,
+    });
+    const regrasDoCargo = regrasPersistidas.length > 0
+      ? regrasPersistidas
+      : event.sourceSystem === "alpha-bpm"
+        ? []
+      : colaborador.cargoNome
+        ? regrasSeedDoCargo(colaborador.cargoNome, event.eventType, colaborador.cargoId)
+        : [];
 
     if (regrasDoCargo.length === 0) {
       await criarLancamentoDivergente({
@@ -257,7 +270,7 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
     // Sênior), ela já gera COMISSAO+DSR decompostos numa única passada — o grupo "DSR"
     // avaliado separadamente é pulado para este cargo, evitando duplicar o benefício.
     const benefitTypes: Array<CommissionRuleVersionData["benefitType"]> = ["COMMISSION", "BONUS", "DSR"];
-    const componentesParaCriar: Array<{ tipo: string; valorCents: number; percentual: number | null; memoriaCalculoJson: string }> = [];
+    const componentesParaCriar: Array<{ tipo: string; valorCents: number; percentual: number | null; memoriaCalculoJson: string; ruleVersionId?: string }> = [];
     let divergenciaNesteColaborador: string | null = null;
     let dsrJaGeradoPorDecomposicao = false;
 
@@ -301,6 +314,7 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
             calculatedAmountCents: decomposicao.comissaoCents,
             reason: `Decomposição de total fixo (${rule.calculation.totalFixoComDsrCents} centavos): ${decomposicao.memoriaCalculo.formula}`,
           }),
+          ruleVersionId: rule.ruleVersionId,
         });
         componentesParaCriar.push({
           tipo: "DSR",
@@ -313,6 +327,7 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
             calculatedAmountCents: decomposicao.dsrCents,
             reason: `DSR decomposto do total fixo: ${decomposicao.memoriaCalculo.formula}`,
           }),
+          ruleVersionId: rule.ruleVersionId,
         });
         dsrJaGeradoPorDecomposicao = true;
         continue;
@@ -322,6 +337,7 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
         let baseResult: ReturnType<typeof calculateCommissionableBase> | undefined;
 
         if (rule.calculation.type === "PERCENTAGE" || rule.calculation.type === "PROPORTIONAL") {
+          const baseConfigurada = rule.calculation.baseCalculo;
           const formaPagamento: FormaPagamento = [
             "PARCELADO_CONTRATACAO_EXITO",
             "CARTAO_PARCELADO",
@@ -329,19 +345,39 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
           ].includes(event.formaPagamento ?? "")
             ? (event.formaPagamento as FormaPagamento)
             : "PARCELADO_CONTRATACAO_EXITO";
-          baseResult = calculateCommissionableBase({
-            tariffAmountCents: event.grossContractAmountCents,
-            contractAmountCents: event.netContractAmountCents,
-            formaPagamento,
-            preservaTarifarioEmDescontoAte10: true,
-          });
+          if (baseConfigurada) {
+            commissionableBaseCents = baseConfigurada === "VALOR_BRUTO"
+              ? event.grossContractAmountCents
+              : event.netContractAmountCents;
+            baseResult = {
+              grossContractAmountCents: event.grossContractAmountCents,
+              partnerSpreadCents: event.partnerSpreadCents ?? 0,
+              thirdPartyCostsCents: event.thirdPartyCostsCents ?? 0,
+              discountAmountCents: event.discountAmountCents ?? Math.max(0, event.grossContractAmountCents - event.netContractAmountCents),
+              netContractAmountCents: event.netContractAmountCents,
+              commissionableBaseCents,
+              discountPercent: event.grossContractAmountCents > 0
+                ? Math.max(0, event.grossContractAmountCents - event.netContractAmountCents) / event.grossContractAmountCents
+                : 0,
+              preservedOriginalTariff: false,
+              requiresApproval: false,
+              reason: `Base ${baseConfigurada === "VALOR_BRUTO" ? "bruta" : "líquida"} definida pela versão publicada da regra.`,
+            };
+          } else {
+            baseResult = calculateCommissionableBase({
+              tariffAmountCents: event.grossContractAmountCents,
+              contractAmountCents: event.netContractAmountCents,
+              formaPagamento,
+              preservaTarifarioEmDescontoAte10: true,
+            });
+            commissionableBaseCents = baseResult.commissionableBaseCents;
+          }
 
           if (baseResult.requiresApproval) {
             divergenciaNesteColaborador = baseResult.reason;
             break;
           }
 
-          commissionableBaseCents = baseResult.commissionableBaseCents;
         }
 
         const dsrInput =
@@ -369,6 +405,7 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
           valorCents,
           percentual: rule.calculation.rate ?? null,
           memoriaCalculoJson: JSON.stringify(memoria),
+          ruleVersionId: rule.ruleVersionId,
         });
       }
 
@@ -422,6 +459,7 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
           status: "Pendente",
           contractualDueDate: schedule.contractualDueDate,
           operationalSuggestedDate: schedule.operationalSuggestedDate,
+          ruleVersionId: componentesParaCriar.find((item) => item.ruleVersionId)?.ruleVersionId,
         },
         create: {
           eventId,
@@ -432,13 +470,22 @@ export async function gerarLancamentosParaEvento(params: GerarLancamentosParams)
           status: "Pendente",
           contractualDueDate: schedule.contractualDueDate,
           operationalSuggestedDate: schedule.operationalSuggestedDate,
+          ruleVersionId: componentesParaCriar.find((item) => item.ruleVersionId)?.ruleVersionId,
         },
       });
 
       // Recálculo é substitutivo e atômico: componentes antigos nunca sobrevivem.
       await tx.entryComponent.deleteMany({ where: { entryId: entry.id } });
       for (const componente of componentesParaCriar) {
-        await tx.entryComponent.create({ data: { entryId: entry.id, ...componente } });
+        await tx.entryComponent.create({
+          data: {
+            entryId: entry.id,
+            tipo: componente.tipo,
+            valorCents: componente.valorCents,
+            percentual: componente.percentual,
+            memoriaCalculoJson: componente.memoriaCalculoJson,
+          },
+        });
       }
     });
 

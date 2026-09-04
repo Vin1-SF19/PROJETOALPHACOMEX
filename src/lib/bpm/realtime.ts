@@ -15,6 +15,8 @@ export const BPM_REALTIME_TIPOS = [
   "ETAPA_ALTERADA",
   "CAMPO_ALTERADO",
   "PIPELINE_ALTERADO",
+  "SLA_ALTERADA",
+  "SLA_STATUS_ALTERADO",
 ] as const;
 
 export type BpmRealtimeTipo = (typeof BPM_REALTIME_TIPOS)[number];

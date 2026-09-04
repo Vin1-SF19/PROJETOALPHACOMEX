@@ -51,6 +51,8 @@ export interface RuleCalculation {
   benefitType: BenefitType;
   /** Percentual expresso como fração (0.04 = 4%), usado quando type === "PERCENTAGE". */
   rate?: number;
+  /** Base explícita da regra percentual. Ausente preserva o cálculo legado por tarifário. */
+  baseCalculo?: "VALOR_BRUTO" | "VALOR_LIQUIDO";
   /** Valor fixo em centavos, usado quando type === "FIXED" | "ADDITIONAL". */
   fixedAmountCents?: number;
   /** Valor por unidade em centavos, usado quando type === "PER_UNIT". */
@@ -82,6 +84,8 @@ export interface CommissionRuleVersionData {
   ruleId: string;
   ruleName: string;
   version: number;
+  /** FK da versão persistida; ausente apenas nas regras legadas em código. */
+  ruleVersionId?: string;
   eventType: EventType;
   benefitType: BenefitType;
   /** Quanto maior, mais precedência dentro do MESMO nível hierárquico (ver PrecedenceLevel). */

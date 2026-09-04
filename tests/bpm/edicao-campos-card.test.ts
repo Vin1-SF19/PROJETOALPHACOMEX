@@ -34,6 +34,7 @@ vi.mock("@/lib/bpm/ownership", () => ({
 }));
 vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
   carregarCamposAplicaveisCardEtapa: carregarCamposAplicaveisCardEtapaMock,
+  carregarSnapshotsCopiaCamposCard: vi.fn().mockResolvedValue({}),
   carregarCamposAplicaveisEtapa: vi.fn(),
   carregarCamposObrigatoriosEtapa: vi.fn(),
 }));
@@ -88,6 +89,24 @@ describe("CRM - edição dos campos definidos da etapa", () => {
     prismaMock.$transaction.mockImplementation(async (callback) => callback(prismaMock));
   });
 
+  it("rejeita próximo contato fora do contrato antes de ownership e persistência", async () => {
+    for (const proximoContatoEm of [
+      "09/04/2026 10:30",
+      "September 4, 2026 10:30",
+      "0",
+      "2026-09-04",
+      "2026-02-30T10:30:00Z",
+      false,
+    ]) {
+      const resultado = await AtualizarCardBpm({ cardId: CARD_ID, proximoContatoEm });
+      expect(resultado.success).toBe(false);
+    }
+
+    expect(exigirAcessoBpmCardMock).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
   it("faz upsert de um campo inicialmente nulo sob CAS e notifica somente depois do histórico", async () => {
     const resultado = await AtualizarCardBpm({
       cardId: CARD_ID,
@@ -123,6 +142,73 @@ describe("CRM - edição dos campos definidos da etapa", () => {
       tipo: "CARD_ATUALIZADO",
     });
     expect(notificarPipelineBpmMock).toHaveBeenCalledAfter(prismaMock.bpmCardHistorico.create);
+  });
+
+  it("persiste somente os 14 dígitos ao atualizar um campo CNPJ formatado", async () => {
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([
+      { ...campoNulo, nome: "CNPJ", tipo: "cnpj" },
+    ]);
+
+    const resultado = await AtualizarCardBpm({
+      cardId: CARD_ID,
+      camposValores: { [CAMPO_ID]: "11.222.333/0001-81" },
+      versaoEsperadaEm: UPDATED_AT.toISOString(),
+    });
+
+    expect(resultado).toEqual({ success: true });
+    expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith({
+      where: { cardId_campoId: { cardId: CARD_ID, campoId: CAMPO_ID } },
+      create: { cardId: CARD_ID, campoId: CAMPO_ID, valor: "11222333000181" },
+      update: { valor: "11222333000181" },
+    });
+  });
+
+  it("normaliza também o campo legado chamado exatamente CNPJ", async () => {
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([
+      { ...campoNulo, nome: " cnpj ", tipo: "texto" },
+    ]);
+
+    const resultado = await AtualizarCardBpm({
+      cardId: CARD_ID,
+      camposValores: { [CAMPO_ID]: "CNPJ: 11.222.333/0001-81" },
+      versaoEsperadaEm: UPDATED_AT.toISOString(),
+    });
+
+    expect(resultado).toEqual({ success: true });
+    expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ valor: "11222333000181" }),
+        update: { valor: "11222333000181" },
+      }),
+    );
+  });
+
+  it("rejeita CNPJ incompleto ou excedente sem persistência parcial", async () => {
+    carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([
+      { ...campoNulo, nome: "CNPJ", tipo: "cnpj" },
+    ]);
+
+    for (const valor of ["11.222.333/0001", "112223330001819"]) {
+      vi.clearAllMocks();
+      authMock.mockResolvedValue({ user: { id: "7", role: "COMERCIAL" } });
+      exigirAcessoBpmCardMock.mockResolvedValue({ autorizado: true });
+      carregarCamposAplicaveisCardEtapaMock.mockResolvedValue([
+        { ...campoNulo, nome: "CNPJ", tipo: "cnpj" },
+      ]);
+      prismaMock.bpmCard.findUnique.mockResolvedValue(cardNaEtapaAtual());
+
+      const resultado = await AtualizarCardBpm({
+        cardId: CARD_ID,
+        camposValores: { [CAMPO_ID]: valor },
+        versaoEsperadaEm: UPDATED_AT.toISOString(),
+      });
+
+      expect(resultado.success).toBe(false);
+      expect(prismaMock.bpmCard.updateMany).not.toHaveBeenCalled();
+      expect(prismaMock.bpmCardCampoValor.upsert).not.toHaveBeenCalled();
+      expect(prismaMock.bpmCardHistorico.create).not.toHaveBeenCalled();
+      expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
+    }
   });
 
   it("rejeita campo que não pertence à etapa atual sem escrita parcial nem realtime", async () => {

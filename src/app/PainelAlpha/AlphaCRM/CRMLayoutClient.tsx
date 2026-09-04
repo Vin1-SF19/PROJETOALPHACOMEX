@@ -12,18 +12,26 @@ import {
   LayoutDashboard,
   KanbanSquare,
   ListChecks,
+  ClipboardCheck,
   Settings2,
   Zap,
   Menu,
   X,
+  AlertTriangle,
+  BookOpen,
+  CalendarClock,
 } from "lucide-react";
 
 const NAV = [
   { href: "/PainelAlpha/AlphaCRM", label: "Dashboard", icon: LayoutDashboard, exact: true, adminOnly: false },
   { href: "/PainelAlpha/AlphaCRM/pipelines", label: "Pipelines", icon: KanbanSquare, exact: true, adminOnly: false },
   { href: "/PainelAlpha/AlphaCRM/tarefas", label: "Tarefas", icon: ListChecks, exact: false, adminOnly: false },
+  { href: "/PainelAlpha/AlphaCRM/pendencias", label: "Pendências", icon: AlertTriangle, exact: false, adminOnly: false },
   { href: "/PainelAlpha/AlphaCRM/automacoes", label: "Automações", icon: Zap, exact: false, adminOnly: true },
   { href: "/PainelAlpha/AlphaCRM/admin", label: "Configurações", icon: Settings2, exact: false, adminOnly: true },
+  { href: "/PainelAlpha/AlphaCRM/admin/checklists", label: "Checklists", icon: ClipboardCheck, exact: false, adminOnly: true },
+  { href: "/PainelAlpha/AlphaCRM/admin/conhecimento", label: "Base de Conhecimento", icon: BookOpen, exact: false, adminOnly: true },
+  { href: "/PainelAlpha/AlphaCRM/admin/cadencias", label: "Cadências", icon: CalendarClock, exact: false, adminOnly: true },
 ];
 
 export default function CRMLayout({ children, session }: { children: React.ReactNode; session: Session | null }) {
@@ -63,7 +71,10 @@ export default function CRMLayout({ children, session }: { children: React.React
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-2">
         {NAV.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon, exact }) => {
-          const active = exact ? pathname === href : pathname.startsWith(href);
+          const active = exact
+            ? pathname === href
+            : pathname.startsWith(href) &&
+              !NAV.some((item) => item.href.length > href.length && pathname.startsWith(item.href));
           return (
             <FlowButton
               key={href}

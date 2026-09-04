@@ -18,8 +18,12 @@ describe("BPM - tarefas por tipo", () => {
 
   it("exige prazo e alerta anterior ao prazo", () => {
     expect(criarTarefaSchema.safeParse({ cardId, tipo: "TAREFA", titulo: "Retornar", prazo }).success).toBe(false);
+    expect(criarTarefaSchema.safeParse({ cardId, tipo: "TAREFA", titulo: "Retornar", prazo: null, alertaEm: alerta }).success).toBe(false);
+    expect(criarTarefaSchema.safeParse({ cardId, tipo: "TAREFA", titulo: "Retornar", prazo, alertaEm: null }).success).toBe(false);
+    expect(criarTarefaSchema.safeParse({ cardId, tipo: "TAREFA", titulo: "Retornar", prazo: "data-invalida", alertaEm: alerta }).success).toBe(false);
     expect(criarTarefaSchema.safeParse({ cardId, tipo: "TAREFA", titulo: "Retornar", prazo, alertaEm: "2026-08-21T14:00:00.000Z" }).success).toBe(false);
     expect(criarTarefaSchema.safeParse({ cardId, tipo: "TAREFA", titulo: "Retornar", prazo, alertaEm: alerta }).success).toBe(true);
+    expect(criarTarefaSchema.safeParse({ cardId, tipo: "TAREFA", titulo: "Retornar", prazo: "2026-09-05T02:59:00.000Z", alertaEm: "2026-09-04T03:00:00.000Z" }).success).toBe(true);
   });
 
   it("valida os campos particulares de checklist, ligação, WhatsApp e e-mail", () => {
@@ -51,7 +55,9 @@ describe("BPM - tarefas por tipo", () => {
     expect(painel).toContain('tipo === "WHATSAPP"');
     expect(painel).toContain('tipo === "EMAIL"');
     expect(painel).toContain('tipo === "LEMBRETE_RAPIDO"');
-    expect(painel).toContain('type="datetime-local"');
+    expect(painel).toContain("<BpmDateTimeField");
+    expect(painel).toContain("parseDataHoraLocalBpm");
+    expect(painel).toContain("const prazoData = tarefa.prazo ?");
     expect(historico).toContain("<PainelTarefasPorTipo");
     expect(historico).toContain("podeTrabalharTarefas={podeTrabalharTarefas}");
     expect(painel).toContain("podeTrabalharTarefas: boolean");

@@ -61,6 +61,21 @@ describe("CRM - persistência antes da movimentação", () => {
     expect(painel).toContain("AtualizarCardBpm");
   });
 
+  it("força blur e flush antes de fechar, mantendo o modal aberto em falha", () => {
+    const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx");
+    const layout = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx");
+    const blur = modal.indexOf("document.activeElement.blur()");
+    const flush = modal.indexOf("const savesConcluidos = await flushSaves()");
+    const fechar = modal.indexOf("onClose();", flush);
+
+    expect(modal).toContain("<CardSaveProvider>");
+    expect(layout).not.toContain("<CardSaveProvider>");
+    expect(blur).toBeGreaterThan(-1);
+    expect(blur).toBeLessThan(flush);
+    expect(modal).toContain("if (!savesConcluidos)");
+    expect(fechar).toBeGreaterThan(flush);
+  });
+
   it("PainelStatusPosFechamento registra save via CardSaveContext", () => {
     const painel = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx");
     expect(painel).toContain("useCardSave");

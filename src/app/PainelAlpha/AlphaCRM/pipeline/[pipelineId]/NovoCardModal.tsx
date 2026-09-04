@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ClipboardCheck, Loader2, Search, X } from "lucide-react";
 import { BuscarEmpresasBpm, ListarUsuariosResponsavelBpm } from "@/actions/bpm/Cards";
+import { formatCNPJ, formatarCNPJProgressivo, normalizarCNPJ } from "@/lib/format-cnpj";
 
 interface EmpresaOpcao {
   id: number;
@@ -42,14 +43,6 @@ const NOVA_EMPRESA_VAZIA: NovaEmpresaForm = {
 };
 
 const inputCls = "w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/20";
-
-function formatarCnpjInput(valor: string): string {
-  return valor.replace(/\D/g, "").slice(0, 14)
-    .replace(/(\d{2})(\d)/, "$1.$2")
-    .replace(/(\d{2}\.\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{2}\.\d{3}\.\d{3})(\d)/, "$1/$2")
-    .replace(/(\d{2}\.\d{3}\.\d{3}\/\d{4})(\d)/, "$1-$2");
-}
 
 function FieldRow({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
@@ -113,7 +106,7 @@ export default function NovoCardModal({
   }, [buscaEmpresa]);
 
   async function buscarCnpjReceita() {
-    const cnpjLimpo = novaEmpresa.cnpj.replace(/\D/g, "");
+    const cnpjLimpo = normalizarCNPJ(novaEmpresa.cnpj);
     if (cnpjLimpo.length !== 14) {
       setErroBuscaCnpj("Informe um CNPJ válido (14 dígitos)");
       return;
@@ -145,7 +138,7 @@ export default function NovoCardModal({
     setErro(null);
 
     if (modoCadastro) {
-      if (novaEmpresa.cnpj.replace(/\D/g, "").length !== 14) {
+      if (normalizarCNPJ(novaEmpresa.cnpj).length !== 14) {
         setErro("Informe um CNPJ válido (14 dígitos).");
         return;
       }
@@ -168,7 +161,7 @@ export default function NovoCardModal({
         ...(modoCadastro
           ? {
               novaEmpresa: {
-                cnpj: novaEmpresa.cnpj.replace(/\D/g, ""),
+                cnpj: normalizarCNPJ(novaEmpresa.cnpj),
                 razaoSocial: novaEmpresa.razaoSocial.trim(),
                 nomeFantasia: novaEmpresa.nomeFantasia.trim() || undefined,
                 uf: novaEmpresa.uf.trim() || undefined,
@@ -222,7 +215,7 @@ export default function NovoCardModal({
                   <button type="button" onClick={() => { setModoCadastro(false); setNovaEmpresa(NOVA_EMPRESA_VAZIA); setErroBuscaCnpj(null); }} className="text-xs text-slate-400 hover:text-white">Buscar existente</button>
                 </div>
                 <div className="flex gap-2">
-                  <input id="novo-card-empresa" autoFocus aria-label="CNPJ" className={`${inputCls} font-mono`} placeholder="00.000.000/0000-00" value={novaEmpresa.cnpj} onChange={(e) => setNovaEmpresa((anterior) => ({ ...anterior, cnpj: formatarCnpjInput(e.target.value) }))} />
+                  <input id="novo-card-empresa" autoFocus aria-label="CNPJ" inputMode="numeric" maxLength={18} className={`${inputCls} font-mono`} placeholder="00.000.000/0000-00" value={formatarCNPJProgressivo(novaEmpresa.cnpj)} onChange={(e) => setNovaEmpresa((anterior) => ({ ...anterior, cnpj: normalizarCNPJ(e.target.value) }))} />
                   <button type="button" aria-label="Buscar CNPJ" onClick={buscarCnpjReceita} disabled={buscandoCnpj} className="h-9 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shrink-0 transition-all disabled:opacity-50 flex items-center justify-center">
                     {buscandoCnpj ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <Search size={14} aria-hidden="true" />}
                   </button>
@@ -248,7 +241,7 @@ export default function NovoCardModal({
                     {empresas.map((empresa) => (
                       <button key={empresa.id} type="button" onClick={() => { setEmpresaSelecionada(empresa); setEmpresas([]); setBuscaEmpresa(""); }} className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-white/5">
                         {empresa.nomeFantasia || empresa.razaoSocial}
-                        <span className="block text-[10px] text-slate-500">{empresa.cnpj}</span>
+                        <span className="block text-[10px] text-slate-500">{formatCNPJ(empresa.cnpj) ?? empresa.cnpj}</span>
                       </button>
                     ))}
                   </div>

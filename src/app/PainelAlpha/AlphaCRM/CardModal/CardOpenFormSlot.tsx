@@ -4,11 +4,13 @@ import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
 import { etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
+import { etapaEhReuniaoAgendada } from "@/lib/bpm/reuniao-agendada";
 import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 import { PainelCamposEtapaAtual } from "./PainelCamposEtapaAtual";
 import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
+import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { PainelProximoContato } from "./PainelProximoContato";
-import PainelReuniao from "./PainelReuniao";
+import { PainelReuniao } from "./PainelReuniao";
 import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
 import { PainelStandbyFollowUp } from "./PainelStandbyFollowUp";
 
@@ -40,6 +42,26 @@ export function CardOpenFormSlot({
   onAtualizado,
   onEstadoFollowUpChange = () => {},
 }: CardOpenFormSlotProps) {
+  if (etapaEhAgendarReuniao(card.etapa.nome)) {
+    return (
+      <>
+        <PainelReuniao
+          card={card}
+          accent={accent}
+          podeEditar={podeEditar}
+          onAtualizado={onAtualizado}
+        />
+        <PainelChecklistsCard
+          card={card}
+          accent={accent}
+          podeEditar={podeEditar}
+          realtimeRevision={realtimeRevision}
+          onAtualizado={onAtualizado}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <PainelCamposEtapaAtual
@@ -50,10 +72,20 @@ export function CardOpenFormSlot({
         onAtualizado={onAtualizado}
       />
 
-      {etapaEhAgendarReuniao(card.etapa.nome) && (
+      <PainelChecklistsCard
+        card={card}
+        accent={accent}
+        podeEditar={podeEditar}
+        realtimeRevision={realtimeRevision}
+        onAtualizado={onAtualizado}
+      />
+
+      {etapaEhReuniaoAgendada(card.etapa.nome) && (
         <PainelReuniao
           card={card}
           accent={accent}
+          podeEditar={podeEditar}
+          mostrarFormulario={false}
           onAtualizado={onAtualizado}
         />
       )}

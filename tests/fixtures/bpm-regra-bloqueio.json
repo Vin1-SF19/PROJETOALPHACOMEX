@@ -1,0 +1,17 @@
+{
+  "contexto": { "card": { "status": "ATIVO" } },
+  "regra": {
+    "id": "regra-cli-1",
+    "versao": 1,
+    "nome": "Bloqueio CLI",
+    "ativa": true,
+    "prioridade": 0,
+    "condicao": {
+      "operador": "AND",
+      "condicoes": [
+        { "tipo": "condicao", "campo": { "fonte": "card", "campo": "status" }, "operador": "igual", "valor": "ATIVO" }
+      ]
+    },
+    "resultado": { "tipo": "bloqueio_movimentacao", "mensagem": "Sem avanço" }
+  }
+}

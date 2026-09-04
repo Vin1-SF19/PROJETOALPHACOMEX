@@ -3,6 +3,26 @@
 > Mantido por: Nova (frontend) e Scribe (cartógrafo)
 > Consultar SEMPRE antes de criar um novo componente.
 
+### BpmDateTimeField — seleção assistida de data e hora no card CRM
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField.tsx`
+**Tipo:** Client Component controlado
+**Props:** `id`, `label`, `value`, `onChange`, `onCommit?`, `required?`, `disabled?`, `allowClear?`, `error?`, `describedBy?`
+**Uso:** Próximo Contato, Reunião e criação de tarefas no modal do card do Alpha CRM.
+**Notas:** combina `DayPicker` em `Popover` responsivo com `input type="time"`; opera apenas com valor civil `YYYY-MM-DDTHH:mm`. A conversão para instante de São Paulo pertence ao consumidor via `format-date.ts`. Não chama Server Actions. A seleção da data só altera o valor controlado; `onCommit` ocorre no blur da hora ou na limpeza explícita, preservando o autosave/botão de cada formulário. `allowClear` só deve ser habilitado em contratos nullable.
+
+**Última atualização:** 2026-09-04 por Scribe (fechamento RM-2026-EB401C)
+
+### PainelReuniao — agendamento e acompanhamento de reunião no card CRM
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`
+**Tipo:** Client Component existente, ampliado
+**Props:** `card`, `accent`, `podeEditar`, `onAtualizado`, `mostrarFormulario?`
+**Uso:** `CardOpenFormSlot` em **Agendar Reunião** (`mostrarFormulario=true`: somente data/hora, criar/reagendar e link Meet) e **Reunião Agendada** (`mostrarFormulario=false`: somente acompanhamento/transcrição/resumo).
+**Notas:** o formulário usa `BpmDateTimeField` e botão explícito para `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm`; durante a action exibe spinner e bloqueia nova submissão. O modo de acompanhamento busca a transcrição real, diferencia vazio/pendente/erro/sucesso e registra `SalvarResumoReuniaoBpm` no `CardSaveContext`. Não existe `PainelAgendarReuniao.tsx`: a variante pertence a este componente compartilhado.
+
+**Última atualização:** 2026-09-04 por Scribe (RM-2026-6BEA04)
+
 ### AutomacoesWorkspace + AutomacaoFormDialog (Alpha CRM/BPM)
 
 **Arquivos:** `src/components/bpm/automacoes/AutomacoesWorkspace.tsx` e `AutomacaoFormDialog.tsx`
@@ -572,3 +592,32 @@ Os componentes compartilhados finais para datasets são `PaginationControls.tsx`
 - **Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelContatos.tsx`
 - **Uso:** seção do card aberto para registrar e listar contatos (ligação, e-mail, reunião e WhatsApp), reutilizando `BpmInteracaoCard` sem schema paralelo.
 - **Integração:** renderizado por `PainelRegistrar`; atualiza a lista local do `CardFullViewModal` após a Server Action autenticada.
+# SlaConfigSection / SlaConfigForm (Alpha CRM)
+
+- **Arquivos:** `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/SlaConfigSection.tsx` e `SlaConfigForm.tsx`.
+- **Uso:** seção administrativa de listagem, criação, edição, ativação, desativação e exclusão segura de configurações de SLA e seus limites.
+- **Integração:** montada por `AdminPipelineClient`; recebe dados carregados no Server Component da rota e usa `src/actions/bpm/Sla.ts` para mutações/reload.
+- **Padrões:** React Hook Form + schema Zod compartilhado, estados vazio/loading/erro via UI e toast, preview semântico com ícone+texto, serviços do catálogo comercial e tipos de tarefa oficiais.
+
+### MotorCentralPanel
+
+**Arquivo:** `src/components/bpm/automacoes/MotorCentralPanel.tsx`
+
+**Rota:** `/PainelAlpha/AlphaCRM/automacoes`
+
+**Acesso:** Admin/CEO/TI, reforçado no servidor.
+
+Editor e console operacional do Motor Central. Permite salvar rascunhos
+imutavelmente versionados, ativar versões, configurar gatilho/condição/grafo,
+consultar execuções paginadas, abrir passos e erros sanitizados e solicitar
+retry manual. A atualização usa refresh periódico de 15 segundos como fallback
+observável. A criação de webhook revela o segredo somente na resposta inicial.
+
+**Última atualização:** 2026-09-04 por Codex (RM-2026-D100EB)
+
+# SlaStatusBadge / PainelSlaCard (Alpha CRM)
+
+- **Arquivos:** `src/components/bpm/sla/SlaStatusBadge.tsx` e `src/app/PainelAlpha/AlphaCRM/CardModal/PainelSlaCard.tsx`.
+- **Uso:** o badge aparece no card fechado do Kanban; o painel aparece na lateral do card aberto.
+- **Dados:** ambos consomem o resumo calculado no servidor; o client apenas atualiza a apresentação do tempo restante, sem decidir transições nem emitir alertas.
+- **Acessibilidade:** cor é acompanhada por texto/ícone; SLA pausado congela a contagem e atraso recebe destaque visual adicional no card.

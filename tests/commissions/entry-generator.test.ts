@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   $transaction: vi.fn(),
   commissionEvent: { findUnique: vi.fn(), findFirst: vi.fn() },
+  commissionRule: { findMany: vi.fn() },
   businessProcess: { findUnique: vi.fn() },
   commissionEntry: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
   entryComponent: { create: vi.fn(), deleteMany: vi.fn() },
@@ -42,6 +43,7 @@ describe("gerarLancamentosParaEvento", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.eligibilityOverride.findMany.mockResolvedValue([]);
+    prismaMock.commissionRule.findMany.mockResolvedValue([]);
     prismaMock.commissionEntry.findFirst.mockResolvedValue(null);
     prismaMock.commissionEntry.upsert.mockResolvedValue({ id: "entry-1" });
     prismaMock.entryComponent.deleteMany.mockResolvedValue({ count: 0 });
@@ -79,6 +81,42 @@ describe("gerarLancamentosParaEvento", () => {
     const componentCall = prismaMock.entryComponent.create.mock.calls[0][0];
     expect(componentCall.data.tipo).toBe("COMISSAO");
     expect(componentCall.data.valorCents).toBe(23_652); // R$236,52 fixo do Auditor Contábil
+  });
+
+  it("usa regra percentual publicada e persiste sua versão em vez da seed", async () => {
+    prismaMock.commissionEvent.findUnique.mockResolvedValue(eventoBase({
+      grossContractAmountCents: 1_000_000,
+      netContractAmountCents: 900_000,
+    }));
+    prismaMock.usuarios.findUnique.mockResolvedValue(usuarioComCargo(2, "Closer"));
+    prismaMock.contratoColaborador.findMany.mockResolvedValue([
+      { id: "c2", usuarioId: 42, tipo: "CLT", dataInicio: new Date("2026-01-01"), dataFim: null },
+    ]);
+    prismaMock.cargoColaborador.findUnique.mockResolvedValue({
+      id: 2, nome: "Closer", setorId: null, naturezaRecebimento: null, permiteMultiplosOcupantes: true,
+    });
+    prismaMock.commissionRule.findMany.mockResolvedValue([{
+      id: "regra-db", name: "5% sobre bruto", active: true, priority: 10,
+      eventType: "CONTRACTING", benefitType: "COMMISSION", cargoId: 2,
+      setorId: null, collaboratorId: null, servico: null, approvalRequired: false,
+      versoes: [{
+        id: "versao-db", version: 3,
+        conditionsJson: "[]",
+        calculationJson: JSON.stringify({ type: "PERCENTAGE", benefitType: "COMMISSION", rate: 0.05, baseCalculo: "VALOR_BRUTO" }),
+        paymentScheduleJson: JSON.stringify({ scheduleRuleName: "QUINTO_DIA_UTIL_CLT" }),
+      }],
+    }]);
+
+    const result = await gerarLancamentosParaEvento({ eventId: "evento-1", collaboratorIds: [42] });
+
+    expect(result.entriesCreated).toBe(1);
+    expect(prismaMock.entryComponent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ valorCents: 50_000 }),
+    }));
+    expect(prismaMock.commissionEntry.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ ruleVersionId: "versao-db" }),
+      update: expect.objectContaining({ ruleVersionId: "versao-db" }),
+    }));
   });
 
   it("Closer NÃO recebe DSR (decisão do usuário, 2026-07-30) — só o componente COMISSAO", async () => {

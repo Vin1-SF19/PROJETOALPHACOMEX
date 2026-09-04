@@ -70,7 +70,7 @@ export async function exigirOwnershipDocumento(
 ) {
   const documento = await db.documentoGerado.findUnique({
     where: { id: documentoId },
-    select: { id: true, criadoPorId: true, status: true, templateId: true },
+    select: { id: true, criadoPorId: true, status: true, templateId: true, titulo: true, pdfUrl: true },
   });
   if (!documento) throw new Error("Documento não encontrado");
   if (!ctx.isAdmin && documento.criadoPorId !== ctx.userId) {

@@ -72,4 +72,36 @@ describe("Google Meet: guard de etapa no backend", () => {
     expect(atualizarEventoMock).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
+
+  it("rejeita data fora do contrato antes de ownership, Calendar e persistência", async () => {
+    const invalidas = [
+      null,
+      "",
+      "data-invalida",
+      "09/04/2026 10:30",
+      "September 4, 2026 10:30",
+      "0",
+      "2026-09-04",
+      "2026-02-30T10:30:00Z",
+      false,
+    ];
+    for (const dataHora of invalidas) {
+      expect((await AgendarReuniaoGoogleMeetBpm({ cardId: CARD_ID, dataHora })).success).toBe(false);
+      expect((await ReagendarReuniaoBpm({ cardId: CARD_ID, dataHora })).success).toBe(false);
+    }
+    expect(acessoMock).not.toHaveBeenCalled();
+    expect(criarEventoMock).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("exige sessão antes de validar ou consultar o card", async () => {
+    authMock.mockResolvedValueOnce(null);
+    await expect(AgendarReuniaoGoogleMeetBpm({ cardId: CARD_ID, dataHora: DATA })).resolves.toEqual({
+      success: false,
+      error: "Não autorizado",
+    });
+    expect(acessoMock).not.toHaveBeenCalled();
+    expect(prismaMock.bpmCard.findUnique).not.toHaveBeenCalled();
+  });
 });

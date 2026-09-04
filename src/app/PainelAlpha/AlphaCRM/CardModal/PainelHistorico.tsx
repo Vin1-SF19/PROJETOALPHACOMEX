@@ -12,6 +12,13 @@ import {
   Paperclip,
   ListTodo,
   MessageSquareText,
+  ArrowRightLeft,
+  Pencil,
+  CalendarClock,
+  Zap,
+  Repeat,
+  Bot,
+  Clock,
 } from "lucide-react";
 import { fmtDateTime } from "@/lib/format-date";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
@@ -19,9 +26,13 @@ import { RegistrarAnexoBpm, ExcluirAnexoBpm } from "@/actions/bpm/Anexos";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { isAdminRole } from "@/lib/roles";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { montarFeedTimelineCard, type ItemTimelineCard } from "@/lib/bpm/timeline";
+import PainelTimelineCard from "./PainelTimelineCard";
+import { PainelCadenciasCard } from "@/components/bpm/cadencias/PainelCadenciasCard";
 
 import { PainelResumoEtapas } from "./PainelResumoEtapas";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
+import { PainelConhecimentoRelacionado } from "@/components/bpm/conhecimento/PainelConhecimentoRelacionado";
 import { etapasAnterioresParaResumo } from "@/lib/bpm/resumo-etapas";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -90,9 +101,29 @@ export function SectionCard({
   );
 }
 
-type ItemFeedHistorico =
-  | { tipo: "evento"; id: string; data: Date; acao: string; autor: string }
-  | { tipo: "anotacao"; id: string; data: Date; texto: string; autor: string };
+function iconePorAcao(acao: string): typeof History {
+  if (acao.startsWith("CARD_MOVIDO")) return ArrowRightLeft;
+  if (acao === "CARD_ATUALIZADO" || acao === "MEMBROS_ATUALIZADOS") return Pencil;
+  if (acao.startsWith("TAREFA_") || acao === "PRESET_APLICADO") return ListTodo;
+  if (acao.startsWith("REUNIAO_")) return CalendarClock;
+  if (acao.startsWith("CHECKLIST_")) return CheckCircle2;
+  if (acao.startsWith("ANEXO_")) return Paperclip;
+  if (acao.startsWith("CADENCIA_")) return Repeat;
+  if (acao.startsWith("AUTOMACAO") || acao === "DISTRIBUICAO_AUTOMATICA" || acao === "ENVIAR_EMAIL") return Zap;
+  if (acao.startsWith("STANDBY_")) return Bot;
+  return History;
+}
+
+function formatarValorHistorico(valor: string | null | undefined): string | null {
+  if (!valor) return null;
+  try {
+    const parsed = JSON.parse(valor);
+    if (typeof parsed === "string") return parsed;
+    return JSON.stringify(parsed);
+  } catch {
+    return valor;
+  }
+}
 
 export default function PainelHistorico({ card, accent, currentUserId, currentUserRole, onAtualizado, etapas, podeTrabalharTarefas, anotacoes }: Props) {
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
@@ -101,26 +132,7 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
 
-  // A ação "ANOTACAO_REGISTRADA" é filtrada aqui porque cada anotação já entra
-  // no feed abaixo com o texto completo — mantê-la duplicaria o mesmo evento.
-  const feedHistorico: ItemFeedHistorico[] = [
-    ...card.historico
-      .filter((h) => h.acao !== "ANOTACAO_REGISTRADA")
-      .map((h): ItemFeedHistorico => ({
-        tipo: "evento",
-        id: h.id,
-        data: new Date(h.createdAt),
-        acao: h.acao,
-        autor: h.usuario?.nome ?? (h.automacaoOrigem ? `automação (${h.automacaoOrigem})` : "sistema"),
-      })),
-    ...anotacoes.map((a): ItemFeedHistorico => ({
-      tipo: "anotacao",
-      id: a.id,
-      data: new Date(a.createdAt),
-      texto: a.observacoes ?? "",
-      autor: a.registradoPor.nome,
-    })),
-  ].sort((a, b) => b.data.getTime() - a.data.getTime());
+  const feedHistorico: ItemTimelineCard[] = montarFeedTimelineCard(card.historico, anotacoes);
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeExcluirAnexo = isAdminRole(currentUserRole) || Boolean(meuVinculo);
@@ -158,6 +170,7 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
 
   return (
     <div className="min-h-0 flex flex-col rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 gap-3 lg:h-full">
+      <PainelConhecimentoRelacionado pipelineId={card.pipeline.id} accent={accent} />
       <Tabs value={abaEsquerda} onValueChange={setAbaEsquerda} className="min-h-0 flex-1 lg:overflow-hidden">
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="etapas" className="flex-none gap-1.5">
@@ -187,6 +200,14 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
             {feedHistorico.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{feedHistorico.length}</span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="timeline" className="flex-none gap-1.5">
+            <Clock size={13} />
+            Timeline
+          </TabsTrigger>
+          <TabsTrigger value="cadencias" className="flex-none gap-1.5">
+            <CalendarClock size={13} />
+            Cadências
           </TabsTrigger>
         </TabsList>
 
@@ -251,17 +272,42 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
                   <p className="mt-1 text-[10px] text-slate-500">{item.autor} · {fmtDateTime(item.data)}</p>
                 </div>
               ) : (
-                <div key={`evento-${item.id}`} className="text-xs text-slate-400 border-l-2 pl-2 py-0.5" style={{ borderColor: `rgba(${accent},0.3)` }}>
-                  <span className="text-slate-300">{item.acao}</span>
-                  {" — "}
-                  {item.autor}
-                  {" · "}
-                  {fmtDateTime(item.data)}
+                <div key={`evento-${item.id}`} className="flex items-start gap-1.5 text-xs text-slate-400 border-l-2 pl-2 py-0.5" style={{ borderColor: `rgba(${accent},0.3)` }}>
+                  {(() => {
+                    const Icone = iconePorAcao(item.acao ?? "");
+                    return <Icone size={12} className="mt-0.5 shrink-0 text-slate-500" />;
+                  })()}
+                  <div className="min-w-0">
+                    <span className="text-slate-300">{item.label}</span>
+                    {" — "}
+                    {item.autor}
+                    {" · "}
+                    {fmtDateTime(item.data)}
+                    {(item.valorAnterior || item.valorNovo) && (
+                      <p className="mt-0.5 text-[10px] text-slate-500">
+                        {formatarValorHistorico(item.valorAnterior) && (
+                          <span className="line-through decoration-rose-500/60">{formatarValorHistorico(item.valorAnterior)}</span>
+                        )}
+                        {formatarValorHistorico(item.valorAnterior) && formatarValorHistorico(item.valorNovo) && " → "}
+                        {formatarValorHistorico(item.valorNovo) && (
+                          <span className="text-emerald-400/90">{formatarValorHistorico(item.valorNovo)}</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ),
             )}
             {feedHistorico.length === 0 && <p className="text-xs text-slate-600">Sem histórico.</p>}
           </div>
+        </TabsContent>
+
+        <TabsContent value="timeline" className="min-h-0 lg:h-full lg:overflow-y-auto">
+          <PainelTimelineCard cardId={card.id} />
+        </TabsContent>
+
+        <TabsContent value="cadencias" className="min-h-0 lg:h-full lg:overflow-y-auto">
+          <PainelCadenciasCard cardId={card.id} accent={accent} />
         </TabsContent>
       </Tabs>
     </div>

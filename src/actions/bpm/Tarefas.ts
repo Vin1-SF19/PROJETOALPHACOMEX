@@ -1,4 +1,5 @@
 "use server";
+import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -15,6 +16,9 @@ import { NOME_ETAPA_BOAS_VINDAS } from "@/lib/bpm/boas-vindas";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { tipoTarefaEhValido } from "@/lib/bpm/tarefas-tipo";
+import { enfileirarAutomacoesCriacaoTarefaBpm } from "@/lib/bpm/automacoes/fila";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
+import { criarSlaInstancia } from "@/lib/bpm/sla";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -86,6 +90,25 @@ export async function CriarTarefaBpm(dados: unknown) {
         },
         tx,
       );
+      const card = await tx.bpmCard.findUnique({
+        where: { id: cardId },
+        select: { pipelineId: true, etapaId: true },
+      });
+      if (card) {
+        await publicarEventoBpm({
+          tipo: "TAREFA_CRIADA", entidadeTipo: "TAREFA", entidadeId: criada.id,
+          cardId, pipelineId: card.pipelineId, valorNovo: { tarefaId: criada.id, tipo, titulo, responsavelId, prazo },
+          atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(),
+          idempotencyKey: `tarefa-criada:${criada.id}`,
+        }, tx);
+        await enfileirarAutomacoesCriacaoTarefaBpm({
+          tarefaId: criada.id,
+          cardId,
+          pipelineId: card.pipelineId,
+          etapaId: card.etapaId,
+        }, tx);
+        await criarSlaInstancia({ tarefaId: criada.id }, "CRIACAO_TAREFA", tx, criada.createdAt);
+      }
       return criada;
     });
 
@@ -174,6 +197,9 @@ export async function AplicarPresetTarefaBpm(dados: { cardId: string; presetId: 
           }),
         ),
       );
+      for (const criada of criadas) {
+        await criarSlaInstancia({ tarefaId: criada.id }, "CRIACAO_TAREFA", tx, criada.createdAt);
+      }
       await registrarHistoricoCard(
         {
           cardId: dados.cardId,
@@ -226,6 +252,15 @@ export async function ConcluirTarefaBpm(dados: unknown) {
         },
         tx,
       );
+      const card = await tx.bpmCard.findUnique({ where: { id: tarefa.cardId }, select: { pipelineId: true } });
+      if (card) await publicarEventoBpm({
+        tipo: "TAREFA_CONCLUIDA", entidadeTipo: "TAREFA", entidadeId: tarefa.id,
+        cardId: tarefa.cardId, pipelineId: card.pipelineId,
+        valorAnterior: { status: tarefa.status }, valorNovo: { tarefaId: tarefa.id, tipo: tarefa.tipo, titulo: tarefa.titulo, status: "CONCLUIDA" },
+        atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(),
+        idempotencyKey: `tarefa-concluida:${tarefa.id}`,
+      }, tx);
+      await criarSlaInstancia({ tarefaId: tarefa.id }, "TAREFA_CONCLUIDA", tx);
     });
 
     revalidatePath(`${ROTA_BASE}/pipeline`);

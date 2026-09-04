@@ -1,4 +1,55 @@
-const TZ = "America/Sao_Paulo";
+export const TZ = "America/Sao_Paulo";
+
+const DATA_HORA_LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+
+function partesEmSaoPaulo(data: Date): Record<string, string> {
+    return Object.fromEntries(
+        new Intl.DateTimeFormat("en-CA", {
+            timeZone: TZ,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23",
+        }).formatToParts(data).map((parte) => [parte.type, parte.value]),
+    );
+}
+
+function offsetSaoPauloEmMilissegundos(data: Date): number {
+    const nomeOffset = new Intl.DateTimeFormat("en-US", {
+        timeZone: TZ,
+        timeZoneName: "longOffset",
+    }).formatToParts(data).find((parte) => parte.type === "timeZoneName")?.value;
+    const match = nomeOffset?.match(/^GMT([+-])(\d{2}):(\d{2})$/);
+    if (!match) return -3 * 60 * 60 * 1000;
+    const sinal = match[1] === "+" ? 1 : -1;
+    return sinal * (Number(match[2]) * 60 + Number(match[3])) * 60 * 1000;
+}
+
+/** Formata um instante persistido como valor civil do CRM em São Paulo. */
+export function formatarDataHoraLocalBpm(value: string | Date | null | undefined): string {
+    if (!value) return "";
+    const data = new Date(value);
+    if (Number.isNaN(data.getTime())) return "";
+    const partes = partesEmSaoPaulo(data);
+    return `${partes.year}-${partes.month}-${partes.day}T${partes.hour}:${partes.minute}`;
+}
+
+/**
+ * Converte `YYYY-MM-DDTHH:mm` civil de São Paulo em instante sem depender do
+ * fuso do navegador. Retorna null para datas impossíveis e valores parciais.
+ */
+export function parseDataHoraLocalBpm(value: string): Date | null {
+    const match = DATA_HORA_LOCAL_RE.exec(value);
+    if (!match) return null;
+    const [, ano, mes, dia, hora, minuto] = match;
+    const civilComoUtc = Date.UTC(Number(ano), Number(mes) - 1, Number(dia), Number(hora), Number(minuto));
+    let candidato = new Date(civilComoUtc);
+    candidato = new Date(civilComoUtc - offsetSaoPauloEmMilissegundos(candidato));
+    candidato = new Date(civilComoUtc - offsetSaoPauloEmMilissegundos(candidato));
+    return formatarDataHoraLocalBpm(candidato) === value ? candidato : null;
+}
 
 /**
  * Converte o valor de um <input type="date"> ("YYYY-MM-DD", sem horário) para

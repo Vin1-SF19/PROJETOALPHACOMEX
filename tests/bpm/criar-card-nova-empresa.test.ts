@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const exigirAcessoBpmPipelineMock = vi.hoisted(() => vi.fn());
+const exigirAcessoModuloBpmMock = vi.hoisted(() => vi.fn());
 const usuarioElegivelResponsavelBpmMock = vi.hoisted(() => vi.fn());
 const carregarCamposObrigatoriosEtapaMock = vi.hoisted(() => vi.fn());
 const carregarCamposAplicaveisEtapaMock = vi.hoisted(() => vi.fn());
@@ -9,7 +10,7 @@ const validarValoresCamposBpmMock = vi.hoisted(() => vi.fn());
 const notificarPipelineBpmMock = vi.hoisted(() => vi.fn());
 
 const prismaMock = vi.hoisted(() => ({
-  cliente: { findUnique: vi.fn(), create: vi.fn() },
+  cliente: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn() },
   bpmPipeline: { findUnique: vi.fn() },
   bpmEtapa: { findUnique: vi.fn(), findMany: vi.fn() },
   bpmCard: { create: vi.fn() },
@@ -27,18 +28,19 @@ vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: notificarPip
 vi.mock("@/lib/bpm/ownership", () => ({
   exigirAcessoBpmCard: vi.fn(),
   exigirAcessoBpmPipeline: exigirAcessoBpmPipelineMock,
-  exigirAcessoModuloBpm: vi.fn(),
+  exigirAcessoModuloBpm: exigirAcessoModuloBpmMock,
   isAdminRole: vi.fn().mockReturnValue(false),
   usuarioElegivelResponsavelBpm: usuarioElegivelResponsavelBpmMock,
 }));
 vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
   carregarCamposAplicaveisCardEtapa: vi.fn(),
+  carregarSnapshotsCopiaCamposCard: vi.fn().mockResolvedValue({}),
   carregarCamposAplicaveisEtapa: carregarCamposAplicaveisEtapaMock,
   carregarCamposObrigatoriosEtapa: carregarCamposObrigatoriosEtapaMock,
 }));
 vi.mock("@/lib/bpm/campos-dinamicos", () => ({ validarValoresCamposBpm: validarValoresCamposBpmMock }));
 
-import { CriarCardBpm } from "@/actions/bpm/Cards";
+import { BuscarEmpresasBpm, CriarCardBpm } from "@/actions/bpm/Cards";
 
 const PIPELINE_ID = "clw0000000000000pipe";
 const ETAPA_ID = "clw0000000000000etap";
@@ -60,6 +62,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     vi.clearAllMocks();
     authMock.mockResolvedValue({ user: { id: "7" } });
     exigirAcessoBpmPipelineMock.mockResolvedValue(undefined);
+    exigirAcessoModuloBpmMock.mockResolvedValue(undefined);
     usuarioElegivelResponsavelBpmMock.mockResolvedValue(true);
     carregarCamposObrigatoriosEtapaMock.mockResolvedValue([]);
     carregarCamposAplicaveisEtapaMock.mockResolvedValue([]);
@@ -85,7 +88,7 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     prismaMock.bpmCard.create.mockResolvedValue({ id: "card-1", empresaId: 501 });
 
     const resultado = await CriarCardBpm({
-      novaEmpresa: { cnpj: "12.345.678/0001-90", razaoSocial: "Empresa Nova Ltda", nomeFantasia: "Nova", uf: "sp", municipio: "São Paulo" },
+      novaEmpresa: { cnpj: "CNPJ: 12.345.678/0001-90", razaoSocial: "Empresa Nova Ltda", nomeFantasia: "Nova", uf: "sp", municipio: "São Paulo" },
       pipelineId: PIPELINE_ID,
       etapaId: ETAPA_ID,
       responsavelId: 7,
@@ -169,6 +172,34 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     });
 
     expect(resultado.success).toBe(false);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejeita CNPJ incompleto antes de consultar ou persistir empresa", async () => {
+    const resultado = await CriarCardBpm({
+      novaEmpresa: { cnpj: "12.345.678/0001", razaoSocial: "Empresa Incompleta Ltda" },
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado.success).toBe(false);
+    expect(prismaMock.cliente.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.cliente.create).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejeita CNPJ com dígitos excedentes antes de consultar ou persistir empresa", async () => {
+    const resultado = await CriarCardBpm({
+      novaEmpresa: { cnpj: "12.345.678/0001-900", razaoSocial: "Empresa Excedente Ltda" },
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      responsavelId: 7,
+    });
+
+    expect(resultado.success).toBe(false);
+    expect(prismaMock.cliente.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.cliente.create).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
@@ -281,5 +312,26 @@ describe("CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master)", 
     expect(resultado).toEqual({ success: false, error: "Não autorizado" });
     expect(prismaMock.bpmPipeline.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("BuscarEmpresasBpm — CNPJ canônico", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.mockResolvedValue({ user: { id: "7" } });
+    exigirAcessoModuloBpmMock.mockResolvedValue(undefined);
+    prismaMock.cliente.findMany.mockResolvedValue([]);
+  });
+
+  it("gera a mesma busca por CNPJ para entrada formatada e crua", async () => {
+    await BuscarEmpresasBpm("12.345.678/0001-90");
+    await BuscarEmpresasBpm("12345678000190");
+
+    expect(prismaMock.cliente.findMany).toHaveBeenCalledTimes(2);
+    for (const chamada of prismaMock.cliente.findMany.mock.calls) {
+      expect(chamada[0].where.OR[2]).toEqual({
+        cnpj: { contains: "12345678000190" },
+      });
+    }
   });
 });

@@ -6,7 +6,10 @@ import {
   NOME_ETAPA_AGENDAR_REUNIAO,
   resolverInicioCicloNaEtapa,
 } from "@/lib/bpm/agendar-reuniao";
-import { carregarCamposObrigatoriosEtapa } from "@/lib/bpm/requisitos-etapa-server";
+import {
+  carregarCamposObrigatoriosEtapa,
+  verificarTransicaoPermitidaBpm,
+} from "@/lib/bpm/requisitos-etapa-server";
 import { listarCamposObrigatoriosFaltantes } from "@/lib/bpm/requisitos-etapa";
 import {
   ACAO_LIGACOES_NOVOS_LEADS_PLANEJADAS,
@@ -498,6 +501,21 @@ export async function executarAutomacaoFollowUpBpm(
     });
     resumoEtapa.elegiveis = elegiveis.length;
     resumoEtapa.ignorados = cardsEtapa.length - elegiveis.length;
+
+    if (elegiveis.length > 0) {
+      const transicaoPermitida = await verificarTransicaoPermitidaBpm(
+        configuracao.id,
+        destino.id,
+        "AUTOMACAO",
+      );
+      if (!transicaoPermitida.permitida) {
+        resumoEtapa.ignorados += elegiveis.length;
+        resumo.avisos.push(
+          `Cards de ${configuracao.nome} não movidos para Standby - Follow Up: ${transicaoPermitida.motivo ?? "transição não permitida."}`,
+        );
+        continue;
+      }
+    }
 
     const camposObrigatorios = configuracao.validarRequisitos
       ? await carregarCamposObrigatoriosEtapa(pipeline.id, configuracao.id)

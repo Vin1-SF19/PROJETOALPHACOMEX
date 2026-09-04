@@ -20,7 +20,7 @@ Consolidar o detalhe do card para que a etapa atual seja a fonte única do conte
 | Etapa | Conteúdo da aba central |
 | --- | --- |
 | Novos Leads | Campos dinâmicos de qualificação da etapa atual. |
-| Agendar Reunião | Campos dinâmicos + data/hora + criar/reagendar Google Meet. |
+| Agendar Reunião | Exclusivamente data/hora + criar/reagendar Google Meet. |
 | Reunião Agendada | Campos dinâmicos; acompanhamento/transcrição sem criar/reagendar Meet. |
 | Em Tratativa | Campos dinâmicos, Próximo Contato e checklist/anotações do último follow-up. |
 | Sem Viabilidade | Campos dinâmicos e Próximo Contato. |
@@ -46,8 +46,22 @@ Consolidar o detalhe do card para que a etapa atual seja a fonte única do conte
 - [ ] Extrair e centralizar o editor de campos da etapa atual.
 - [ ] Associar controles nativos à etapa correta na aba central.
 - [ ] Reorganizar o painel esquerdo/direito sem duplicar formulários.
-- [ ] Atualizar testes de integração e regressão.
+- [x] Restringir o Kanban e o formulário central de Agendar Reunião a data/hora + Google Meet (RM-2026-6BEA04).
+- [x] Atualizar testes de integração e regressão de Agendar Reunião.
 - [ ] Executar lint, typecheck, testes BPM e build quando possível.
+
+### Fechamento RM-2026-6BEA04 — Entregue
+
+- [x] Card fechado de Agendar Reunião restrito a data/hora e ação Google Meet.
+- [x] Formulário central restrito a `PainelReuniao`, sem campos dinâmicos, Próximo Contato ou transcrição.
+- [x] Loading com botão desabilitado e spinner visível.
+- [x] Link oficial persistido acessível no card e no modal.
+- [x] Seletor assistido de data/hora aceito pelo administrador como equivalente funcional ao `datetime-local`.
+- [x] Testes direcionados e regressões da RM aprovados.
+- [x] Forge e Probe registrados; feedback obrigatório corrigido e reinspecionado.
+- [x] Memórias Scribe e journal Kowalski atualizados.
+
+> A story permanece `Ready for Dev` porque contém tarefas guarda-chuva fora da RM-2026-6BEA04 ainda abertas; o escopo desta RM está fechado.
 
 ## File List
 
@@ -56,11 +70,26 @@ Consolidar o detalhe do card para que a etapa atual seja a fonte única do conte
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx`
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx`
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`
+- `src/actions/bpm/Cards.ts`
 - `tests/bpm/card-modal-integration.test.ts`
+- `tests/bpm/card-campos-agendar-reuniao.test.ts`
+- `tests/bpm/formulario-etapa.test.ts`
 - `tests/bpm/lost-ui.test.ts`
+- `.bibble/memory/architecture.md`
+- `.bibble/memory/codebase-map.md`
+- `.bibble/memory/components.md`
+- `.bibble/memory/decisions.md`
+- `.bibble/memory/integration-points.md`
+- `.bibble/memory/known-errors.md`
+- `.bibble/memory/journal.md`
+- `docs/stories/story-alpha-crm-formulario-unificado-por-etapa.md`
 
 ## Change Log
 
 | Date | Description |
 | --- | --- |
 | 2026-08-13 | Story criada a partir da regra explícita de formulário por etapa dentro do card. |
+| 2026-09-04 | RM-2026-6BEA04 restringe Agendar Reunião a data/hora + Google Meet no Kanban e formulário central. |
+| 2026-09-04 | Fechamento Scribe/Kowalski da RM: feedback visual validado, memória e checklist específico consolidados. |

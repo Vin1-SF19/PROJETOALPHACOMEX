@@ -5,6 +5,47 @@
 
 ---
 
+### Formulário de Agendar Reunião vazava acompanhamento e não sinalizava loading visualmente (RM-2026-6BEA04)
+**Sintoma:** depois de agendar, o formulário da etapa **Agendar Reunião** também mostrava transcrição, resumo e **Buscar transcrição**; durante a criação/reagenda, o botão exibia apenas “Salvando...” sem spinner.
+**Causa raiz:** os blocos de acompanhamento de `PainelReuniao` não estavam condicionados ao modo de acompanhamento, e o estado `salvando` alterava somente texto/disabled.
+**Fix aplicado:** o acompanhamento passou a renderizar apenas sob `!mostrarFormulario` (modo usado em **Reunião Agendada**) e o botão passou a alternar o ícone para `RefreshCw` com `animate-spin` enquanto `salvando`. O ramo de **Agendar Reunião** ficou limitado a `BpmDateTimeField`, botão Meet e link resultante.
+**Como evitar:** componentes compartilhados entre etapas devem condicionar todo bloco específico à variante explícita, não somente o campo principal; testes de render devem cobrir os estados antes, durante e depois da action.
+**Adicionado em:** 2026-09-04 (Scribe, fechamento RM-2026-6BEA04)
+
+---
+
+### Padrão de armadilha — mock de módulo inteiro fica desatualizado quando uma função nova é adicionada ao módulo real (RM-2026-F4B6A8)
+**Sintoma:** ao adicionar `verificarTransicaoPermitidaBpm` a `src/lib/bpm/requisitos-etapa-server.ts`, 4 testes pré-existentes (`fechado-actions.test.ts`, `lost-actions.test.ts`, `automacao-novos-leads-tentativas.test.ts`, `automacao-reuniao-agendada.test.ts`) passaram a falhar — todos usavam `vi.mock("@/lib/bpm/requisitos-etapa-server", ...)` mockando o **módulo inteiro** sem incluir a nova função, então `MoverCardBpm`/`SalvarRequisitosEMoverCardBpm`/`executarAutomacaoFollowUpBpm` chamavam `undefined` em vez da função real.
+**Causa raiz:** `vi.mock()` de um módulo inteiro substitui todos os exports, inclusive os que não existiam quando o mock foi escrito — qualquer função nova adicionada ao módulo real fica `undefined` no mock até ser explicitamente incluída, mesmo que o comportamento esperado seja "passar sempre" (fail-open).
+**Fix aplicado:** adicionado `verificarTransicaoPermitidaBpm: vi.fn().mockResolvedValue({ permitida: true })` a cada um dos 4 mocks — sem mudança de comportamento, só completando o mock para refletir o fail-open real da função.
+**Lição para armadilhas semelhantes:** ao adicionar uma função nova a um módulo `server-only` já mockado por `vi.mock()` em outros arquivos de teste, buscar (`grep`) todos os `vi.mock("<caminho-do-módulo>"` no projeto e confirmar que cada um inclui a função nova com um valor coerente com o comportamento padrão esperado (aqui, fail-open = `{ permitida: true }`) — não assumir que só os testes do arquivo novo são afetados.
+**Adicionado em:** 2026-09-04 (Scribe, fechamento RM-2026-F4B6A8)
+
+---
+
+### Save assíncrono ou remount podia descartar data/hora editada no card (RM-2026-EB401C)
+**Sintoma:** ao editar Próximo Contato ou Reunião enquanto um save/realtime estava em andamento, uma resposta antiga podia limpar o estado sujo ou a atualização de `card.updatedAt` podia remontar `PainelReuniao`, descartando o rascunho mais recente.
+**Causa raiz:** confirmação do save sem identidade de revisão e montagem do painel condicionada a uma chave mutável do card.
+**Fix aplicado:** `criarRastreadorRascunho()` captura `{ valor, revisao }` e só confirma o snapshot que ainda corresponde ao rascunho atual; `PainelReuniao` não usa mais `key={card.updatedAt}` e sincroniza props apenas quando o campo está limpo, sinalizando conflito quando o remoto diverge. A seleção de data no `BpmDateTimeField` não dispara commit prematuro; o commit ocorre no blur da hora, na limpeza explícita ou no botão do consumidor.
+**Como evitar:** em campos editáveis com save assíncrono/realtime, não associe ciclo de vida React à versão remota e nunca considere uma resposta antiga como confirmação do estado atual. Registre autosaves no `CardSaveContext` e cubra duas Promises controladas resolvidas fora de ordem.
+**Adicionado em:** 2026-09-04 (Scribe, fechamento RM-2026-EB401C)
+
+---
+
+### Google Meet pode disponibilizar a transcrição com atraso ou negar a leitura (RM-2026-CB55AA)
+**Sintoma:** após o horário da reunião, **Buscar transcrição** permanece pendente ou retorna erro de autorização, indisponibilidade ou timeout.
+**Causa conhecida:** `conferenceRecord`, transcript e entries são artefatos pós-reunião processados de forma assíncrona pelo Google. A leitura também depende de Meet API habilitada, licença/geração de transcrição, Domain-Wide Delegation e escopo `meetings.space.readonly` autorizado para o usuário impersonado.
+**Comportamento implementado:** ausência temporária de artefato é pendência recuperável; cada chamada Meet tem uma repetição, o orçamento Meet é de 18 s e o total das integrações externas é de 25 s. Se a Meet API falhar e o evento vinculado tiver descrição real, o sistema persiste essa descrição com o prefixo `Resumo parcial do evento (Google Calendar)`; sincronização futura pode substituí-la pela transcrição integral.
+**Limitação:** o fallback Calendar não é transcrição e pode estar vazio ou incompleto. O smoke com Google real depende de configuração e credenciais externas e permanece uma validação operacional manual.
+**Adicionado em:** 2026-09-04 (Scribe, fechamento RM-2026-CB55AA)
+
+### Padrão de armadilha — componente de painel montado duas vezes na árvore (slot centralizado + chamada solta residual) (RM-2026-546E71)
+**Sintoma:** campo "Próximo Contato" aparecia 2x no card do Alpha CRM, em todas as etapas do pipeline.
+**Causa raiz:** o mesmo componente (`PainelProximoContato`) era importado e renderizado em dois lugares da mesma árvore React — uma vez dentro do slot que já centraliza os painéis de formulário da etapa (`CardOpenFormSlot.tsx`), e outra vez solta logo depois, em `PainelRegistrar.tsx`, resíduo de uma refatoração anterior em que o componente foi movido para dentro do slot sem remover a chamada original (havia inclusive um comentário órfão no código indicando a intenção de centralização, mas a chamada duplicada continuava presente).
+**Lição para armadilhas semelhantes:** ao criar um "slot" ou ponto central de composição para um grupo de painéis, sempre remover as chamadas antigas/soltas do(s) componente(s) migrados para dentro dele. Antes de adicionar ou depurar um painel de card, buscar todas as ocorrências do import do componente (`grep`) para confirmar que ele é montado uma única vez na árvore — duplicação de componente idêntico (mesmas props, mesmo comportamento) é mais fácil de passar despercebida do que duplicação de dois componentes diferentes, porque visualmente e funcionalmente cada instância "funciona" isoladamente.
+**Fix aplicado:** removida a chamada solta e o comentário órfão em `PainelRegistrar.tsx`, mantendo apenas a instância em `CardOpenFormSlot.tsx`. Ver `architecture.md` para o detalhe completo.
+**Adicionado em:** 2026-09-03 (Scribe, fechamento RM-2026-546E71)
+
 ### Padrão de armadilha — Popover ancorado não serve para conteúdo grande/variável perto da borda de um grid (RM-2026-1FE530)
 **Sintoma:** modal de detalhes de evento compartilhado na Agenda Alpha abria parcialmente fora da tela ao clicar em eventos perto das bordas da grade do calendário (mês/semana), sem responsividade.
 **Causa raiz:** `Popover` do Radix (posicionamento flutuante ancorado ao elemento-trigger) foi usado para conteúdo grande e variável (Meet, localização, descrição, N convidados) disparado por um trigger pequeno posicionado em qualquer lugar de um grid — mesmo com collision detection padrão do Radix, o resultado não é confiável quando o trigger está perto da borda da viewport/container.

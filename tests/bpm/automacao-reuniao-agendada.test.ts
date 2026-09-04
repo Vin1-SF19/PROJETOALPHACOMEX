@@ -22,6 +22,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
   carregarCamposObrigatoriosEtapa: vi.fn().mockResolvedValue([]),
+  verificarTransicaoPermitidaBpm: vi.fn().mockResolvedValue({ permitida: true }),
 }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: notificarMock }));
 

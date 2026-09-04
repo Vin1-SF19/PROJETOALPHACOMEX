@@ -21,6 +21,7 @@ import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { ListarPipelinesBpm } from "@/actions/bpm/Pipelines";
 import { isAdminRole } from "@/lib/roles";
+import { formatCNPJ } from "@/lib/format-cnpj";
 import PainelHistorico from "./PainelHistorico";
 import PainelHistoricoPipeline from "./PainelHistoricoPipeline";
 import PainelProximaEtapa from "./PainelProximaEtapa";
@@ -32,7 +33,7 @@ import {
 import { TelefonesCardButton } from "./TelefonesCardButton";
 import { usePerfilEmpresa } from "@/components/PerfilEmpresaGlobal";
 import { SeletorMembrosCard } from "./SeletorMembrosCard";
-import { CardSaveProvider } from "./CardSaveContext";
+import { PainelSlaCard } from "./PainelSlaCard";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -125,7 +126,6 @@ export function CardAbertoLayout({
       : etapas;
 
   return (
-    <CardSaveProvider>
     <div className="flex flex-col h-full">
       {/* Handle visual do bottom-sheet */}
       <div className="flex justify-center pt-3 pb-1 shrink-0">
@@ -150,7 +150,7 @@ export function CardAbertoLayout({
                 {card.empresa.nomeFantasia || card.empresa.razaoSocial}
               </h1>
               <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                <span>{card.empresa.cnpj}</span>
+                <span>{formatCNPJ(card.empresa.cnpj) ?? card.empresa.cnpj}</span>
                 <span className="text-slate-700">·</span>
                 <button
                   type="button"
@@ -342,6 +342,7 @@ export function CardAbertoLayout({
 
         {/* Direita: próxima etapa */}
         <div className="flex flex-col gap-4 min-h-0 overflow-y-auto">
+          <PainelSlaCard cardId={card.id} realtimeRevision={realtimeRevision} />
           <PainelProximaEtapa
             card={card}
             etapas={etapasParaMover}
@@ -352,6 +353,5 @@ export function CardAbertoLayout({
         </div>
       </div>
     </div>
-    </CardSaveProvider>
   );
 }

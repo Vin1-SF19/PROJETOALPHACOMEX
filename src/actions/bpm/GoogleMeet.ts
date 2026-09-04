@@ -21,6 +21,7 @@ import {
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
+import { dataHoraObrigatoriaBpmSchema } from "@/lib/validations/bpm";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
@@ -144,7 +145,7 @@ async function reagendarEventoVinculado(params: {
 
 const agendarSchema = z.object({
   cardId: z.string().min(1),
-  dataHora: z.coerce.date(),
+  dataHora: dataHoraObrigatoriaBpmSchema("Data e hora da reunião são obrigatórias"),
 });
 
 /**
@@ -244,6 +245,10 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
       fim,
       participantes: [],
       criarMeet: true,
+      eventType: "default",
+      visibilidade: "default",
+      transparencia: "opaque",
+      lembretesMinutos: [],
     });
 
     if (!resultado.success) return { success: false, error: resultado.error };
@@ -326,7 +331,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
 
 const reagendarSchema = z.object({
   cardId: z.string().min(1),
-  dataHora: z.coerce.date(),
+  dataHora: dataHoraObrigatoriaBpmSchema("Data e hora da reunião são obrigatórias"),
 });
 
 export async function ReagendarReuniaoBpm(dados: unknown) {

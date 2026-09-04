@@ -18,6 +18,28 @@ describe("pipeline financeiro", () => {
   it("mapeia as etapas legadas sem deslocar cards semanticamente", () => { expect(financialStageKeyFromLabel("Solicitação de Contrato")).toBe("solicitacao_contrato"); expect(financialStageKeyFromLabel("Contrato")).toBe("elaboracao_contrato"); expect(financialStageKeyFromLabel("Elaboração do Contrato")).toBe("elaboracao_contrato"); expect(financialStageKeyFromLabel("Formalização da Contratação")).toBe("formalizacao"); expect(financialStageKeyFromLabel("Emissão da Nota Fiscal")).toBe("nota_fiscal") });
   it("classifica todos os campos", () => { expect(FINANCIAL_FIELDS.length).toBeGreaterThan(40); expect(FINANCIAL_FIELDS.every((field) => ["OBRIGATORIO", "OBRIGATORIO_CONDICIONAL", "AUTOMATICO_CALCULADO"].includes(field.category))).toBe(true); expect(campoFinanceiroSomenteLeitura("Valor líquido para pagamento")).toBe(true) });
   it("calcula retenções com memória", () => { const result = calcularRetencoesFinanceiras(10000, 1.5, 4.65); expect(result).toMatchObject({ valorIrrf: 150, valorCsrf: 465, totalRetencoes: 615, valorLiquido: 9385 }); expect(JSON.parse(result.memoriaCalculo).resultados.valorLiquido).toBe(9385) });
+  it("interpreta alíquota canônica com ponto sem multiplicá-la por dez", () => {
+    const result = validateFinancialTransition({
+      pipelineName: "Financeiro",
+      fromStage: "Formalização",
+      toStage: "Pagamento",
+      values: {
+        "Status do contrato/assinatura": "Assinado",
+        "Contrato assinado/anexo": "contrato.pdf",
+        "Regime tributário do prestador": "Lucro Presumido",
+        "Regime tributário do cliente": "Simples Nacional",
+        "Forma de pagamento": "PIX",
+        Vencimento: "2026-09-10",
+        "Link/dados para pagamento": "pix",
+        "IRRF aplicável": "Sim",
+        "CSRF aplicável": "Não",
+        "Alíquota IRRF": "1.5",
+        "Valor bruto do contrato": "1000",
+      },
+    });
+    expect(result.automaticValues["Valor IRRF"]).toBe("15");
+    expect(result.automaticValues["Valor líquido para pagamento"]).toBe("985");
+  });
   it("bloqueia salto e lista pendências", () => { expect(validateFinancialTransition({ pipelineName: "Financeiro", fromStage: FINANCIAL_STAGES[0].label, toStage: FINANCIAL_STAGES[2].label, values: {} }).blocked).toBe(true); const result = validateFinancialTransition({ pipelineName: "Financeiro", fromStage: FINANCIAL_STAGES[0].label, toStage: FINANCIAL_STAGES[1].label, values: {} }); expect(result.pendingFields).toContain("CNPJ"); expect(result.message).toBe("Dados pendentes para avançar de etapa.") });
   it("bloqueia a saída da Etapa 1 (Solicitação de Contrato) com campo obrigatório vazio", () => {
     const result = validateFinancialTransition({ pipelineName: "Financeiro", fromStage: "Solicitação de Contrato", toStage: "Elaboração do Contrato", values: { CNPJ: gerarCnpjValido(), "Razão Social": "Empresa Teste", Rua: "Rua A", Número: "10", Bairro: "Centro", CEP: "01310-100", Município: "São Paulo", Estado: "SP", "E-mail": "contato@teste.com", "Regime tributário do cliente": "Simples Nacional", "Serviço contratado": "Consultoria", "Valor bruto do contrato": "1000", "Forma de pagamento": "PIX", "Condição negociada": "À vista", "Vendedor responsável": "Fulano", "Origem do cliente": "Parceiro", "Contato/Nome do responsável": "Ciclano" } });

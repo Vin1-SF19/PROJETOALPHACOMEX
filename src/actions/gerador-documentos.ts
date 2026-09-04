@@ -35,6 +35,11 @@ import { gerarPdfDocumento } from "@/lib/gerador-documentos/pdf";
 import { converterParaHtml } from "@/lib/gerador-documentos/html";
 import { renderHtmlComVariaveis } from "@/lib/gerador-documentos/html-render";
 import { renderHtmlParaPdf } from "@/lib/gerador-documentos/pdf-renderer";
+import {
+  criarHtmlDeClausulas,
+  derivarHtmlUrlDoPdf,
+  substituirClausulaNoHtml,
+} from "@/lib/gerador-documentos/clause-sync";
 
 // Mesma lista de tipos suportados por extractTextFromBuffer (src/lib/bibble/tika.ts) — mantida em
 // sincronia manual, já que a extração é responsabilidade daquele módulo, não deste.
@@ -443,10 +448,6 @@ export async function GerarDocumento(payload: unknown) {
     }
 
     const variaveisTemplate = parseVariaveisJson(template.variaveisJson);
-    const faltando = validarVariaveisObrigatorias(variaveisTemplate, input.variaveis);
-    if (faltando.length > 0) {
-      return { success: false as const, error: `Variáveis obrigatórias ausentes: ${faltando.join(", ")}` };
-    }
 
     const tokenAcesso = randomUUID();
     const documento = await db.$transaction(async (tx) => {
@@ -514,7 +515,7 @@ export async function GerarDocumento(payload: unknown) {
               cnpj: empresa.cnpj,
               endereco: [empresa.logradouro, empresa.numero, empresa.bairro, empresa.municipio, empresa.uf, empresa.cep ? `CEP ${empresa.cep}` : ""].filter(Boolean).join(", "),
               naturezaJuridica: empresa.naturezaJuridica,
-              representanteLegal: empresa.representanteLegalNome,
+              representanteLegal: empresa.representanteLegalNome ?? undefined,
             };
           }
         }
@@ -568,7 +569,11 @@ export async function GerarDocumento(payload: unknown) {
               contentType: "text/html",
             });
             htmlUrl = htmlBlob.url;
-            await db.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlUrl} WHERE "id" = ${documento.id}`;
+            try {
+              await db.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlUrl} WHERE "id" = ${documento.id}`;
+            } catch {
+              // Sem a coluna opcional, o HTML continua recuperável pela URL irmã do PDF.
+            }
 
             // HTML→PDF (RM-2026-94CBF6 Fase 3): gera PDF mais fiel a partir do HTML
             // Se o PDF baseado em cláusulas já foi gerado acima, este substitui (mais fiel).
@@ -596,7 +601,7 @@ export async function GerarDocumento(payload: unknown) {
     return {
       success: true as const,
       documentoId: documento.id,
-      pdfUrl,
+      pdfDisponivel: Boolean(pdfUrl),
       htmlUrl,
       urlConferencia: `${ROTA_BASE}/conferencia/${documento.tokenAcesso}`,
     };
@@ -628,7 +633,7 @@ export async function ListarDocumentosGerados() {
       },
     });
 
-    return { success: true as const, data: documentos };
+    return { success: true as const, data: documentos.map(({ pdfUrl: urlInterna, ...documento }) => ({ ...documento, pdfDisponivel: Boolean(urlInterna) })) };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error), data: [] };
   }
@@ -651,7 +656,7 @@ export async function BuscarClientesParaContratante(termo: string) {
           { cnpj: { contains: termoSeguro.replace(/\D/g, "") || termoSeguro } },
         ],
       },
-      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true, email: true, telefone: true },
+      select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
       take: 20,
       orderBy: { razaoSocial: "asc" },
     });
@@ -688,8 +693,10 @@ export async function ObterDocumentoConferencia(tokenAcesso: string) {
     } catch {
       // coluna ainda não existe (migration não aplicada) — ignora
     }
+    htmlUrl ??= derivarHtmlUrlDoPdf(documento.pdfUrl);
 
-    return { success: true as const, data: { ...documento, htmlUrl } };
+    const { pdfUrl: urlInterna, ...documentoSeguro } = documento;
+    return { success: true as const, data: { ...documentoSeguro, pdfDisponivel: Boolean(urlInterna), htmlUrl } };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error) };
   }
@@ -720,16 +727,17 @@ export async function ReescreverClasulaComIA(payload: unknown) {
     const ctx = await exigirAcessoModulo(userId, role);
     const input = ReescreverClasulaSchema.parse(payload);
     const documento = await exigirOwnershipDocumento(input.documentoId, ctx);
+    if (documento.status === "FINALIZADO" || documento.status === "ARQUIVADO") {
+      return { success: false as const, error: "Este documento não pode mais ser editado" };
+    }
 
-    const [clasula, todasClausulas] = await Promise.all([
-      db.documentoClasulaGerada.findUnique({ where: { id: input.clasulaId } }),
-      db.documentoClasulaGerada.findMany({
-        where: { documentoId: documento.id },
-        orderBy: { ordem: "asc" },
-        select: { titulo: true, conteudo: true },
-      }),
-    ]);
-    if (!clasula || clasula.documentoId !== documento.id) {
+    const todasClausulas = await db.documentoClasulaGerada.findMany({
+      where: { documentoId: documento.id },
+      orderBy: { ordem: "asc" },
+      select: { id: true, titulo: true, conteudo: true },
+    });
+    const clasula = todasClausulas.find((item) => item.id === input.clasulaId);
+    if (!clasula) {
       return { success: false as const, error: "Cláusula não encontrada" };
     }
 
@@ -744,13 +752,77 @@ export async function ReescreverClasulaComIA(payload: unknown) {
       userToken,
     });
 
-    await db.documentoClasulaGerada.update({
-      where: { id: clasula.id },
-      data: { conteudo: novoTexto, reescritoPorIA: true, instrucaoIA: input.instrucao },
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) throw new Error("Armazenamento de arquivos não configurado");
+
+    let htmlAtual: string | null = null;
+    let rows: Array<{ htmlUrl: string | null }> = [];
+    let colunaHtmlDisponivel = false;
+    try {
+      rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
+        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documento.id}
+      `;
+      colunaHtmlDisponivel = true;
+    } catch {
+      // Compatibilidade com ambientes/documentos legados sem a coluna aditiva htmlUrl.
+    }
+    const htmlUrlPersistida = rows[0]?.htmlUrl ?? derivarHtmlUrlDoPdf(documento.pdfUrl);
+    if (htmlUrlPersistida) {
+      const respostaHtml = await fetch(htmlUrlPersistida);
+      if (respostaHtml.ok) {
+        htmlAtual = await respostaHtml.text();
+      } else if (rows[0]?.htmlUrl) {
+        throw new Error("Não foi possível carregar o HTML do documento");
+      }
+    }
+
+    const clausulasAtualizadas = todasClausulas.map((item) =>
+      item.id === clasula.id ? { ...item, conteudo: novoTexto } : item,
+    );
+    let htmlAtualizado: string;
+    if (htmlAtual) {
+      const resultado = substituirClausulaNoHtml(htmlAtual, clasula.conteudo, novoTexto);
+      if (!resultado.substituida) {
+        throw new Error("Não foi possível localizar a cláusula no HTML do documento");
+      }
+      htmlAtualizado = resultado.html;
+    } else {
+      htmlAtualizado = criarHtmlDeClausulas(documento.titulo, clausulasAtualizadas);
+    }
+
+    const bufferPdf = await renderHtmlParaPdf(htmlAtualizado);
+    const revisao = randomUUID();
+    const [htmlBlob, pdfBlob] = await Promise.all([
+      put(
+        `gerador-documentos/documentos-html/${ctx.userId}/${documento.id}-${revisao}.html`,
+        Buffer.from(htmlAtualizado, "utf-8"),
+        { access: "public", addRandomSuffix: false, token: blobToken, contentType: "text/html" },
+      ),
+      put(
+        `gerador-documentos/documentos-pdf/${ctx.userId}/${documento.id}-${revisao}.pdf`,
+        bufferPdf,
+        { access: "public", addRandomSuffix: false, token: blobToken, contentType: "application/pdf" },
+      ),
+    ]);
+
+    await db.$transaction(async (tx) => {
+      await tx.documentoClasulaGerada.update({
+        where: { id: clasula.id },
+        data: { conteudo: novoTexto, reescritoPorIA: true, instrucaoIA: input.instrucao },
+      });
+      await tx.documentoGerado.update({ where: { id: documento.id }, data: { pdfUrl: pdfBlob.url } });
+      if (colunaHtmlDisponivel) {
+        await tx.$executeRaw`UPDATE "DocumentoGerado" SET "htmlUrl" = ${htmlBlob.url} WHERE "id" = ${documento.id}`;
+      }
     });
 
     revalidatePath(`${ROTA_BASE}/conferencia`);
-    return { success: true as const, conteudo: novoTexto };
+    return {
+      success: true as const,
+      conteudo: novoTexto,
+      htmlUrl: htmlBlob.url,
+      pdfDisponivel: true as const,
+    };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error) };
   }
@@ -764,13 +836,45 @@ export async function FinalizarDocumento(documentoId: string) {
 
     const documento = await db.documentoGerado.findUnique({
       where: { id: documentoId },
-      select: { titulo: true, clausulas: { orderBy: { ordem: "asc" }, select: { titulo: true, conteudo: true } } },
+      select: {
+        titulo: true,
+        pdfUrl: true,
+        variaveisJson: true,
+        template: { select: { variaveisJson: true } },
+        clausulas: { orderBy: { ordem: "asc" }, select: { titulo: true, conteudo: true } },
+      },
     });
     if (!documento) return { success: false as const, error: "Documento não encontrado" };
 
+    const variaveisTemplate = parseVariaveisJson(documento.template.variaveisJson);
+    const valores = z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]).nullable())
+      .safeParse(documento.variaveisJson);
+    const faltando = validarVariaveisObrigatorias(variaveisTemplate, valores.success ? valores.data : {});
+    if (faltando.length > 0) {
+      return { success: false as const, error: `Variáveis obrigatórias ausentes: ${faltando.join(", ")}` };
+    }
+
     // Gera o PDF ANTES de mudar o status — se a geração/upload falhar, a
     // finalização inteira falha (nunca fica FINALIZADO sem pdfUrl).
-    const bufferPdf = await gerarPdfDocumento({ titulo: documento.titulo, clausulas: documento.clausulas });
+    let bufferPdf: Buffer;
+    let htmlUrl: string | null = null;
+    try {
+      const rows = await db.$queryRaw<Array<{ htmlUrl: string | null }>>`
+        SELECT "htmlUrl" FROM "DocumentoGerado" WHERE "id" = ${documentoId}
+      `;
+      htmlUrl = rows[0]?.htmlUrl ?? null;
+    } catch {
+      // Compatibilidade enquanto a coluna aditiva htmlUrl não existir no ambiente.
+    }
+    htmlUrl ??= derivarHtmlUrlDoPdf(documento.pdfUrl);
+    if (htmlUrl) {
+      const respostaHtml = await fetch(htmlUrl);
+      if (!respostaHtml.ok) throw new Error("Não foi possível carregar o HTML fiel do documento");
+      bufferPdf = await renderHtmlParaPdf(await respostaHtml.text());
+    } else {
+      bufferPdf = await gerarPdfDocumento({ titulo: documento.titulo, clausulas: documento.clausulas });
+    }
 
     const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
     if (!blobToken) throw new Error("Armazenamento de arquivos não configurado");
@@ -786,7 +890,7 @@ export async function FinalizarDocumento(documentoId: string) {
     });
 
     revalidatePath(`${ROTA_BASE}/conferencia`);
-    return { success: true as const, pdfUrl: blob.url };
+    return { success: true as const, pdfDisponivel: true as const };
   } catch (error) {
     return { success: false as const, error: mensagemErro(error) };
   }

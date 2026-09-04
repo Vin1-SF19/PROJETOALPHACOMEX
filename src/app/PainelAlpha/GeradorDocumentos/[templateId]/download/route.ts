@@ -19,7 +19,7 @@ function verificarRateLimit(userId: string): boolean {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ templateId: string }> },
 ): Promise<NextResponse> {
   const { templateId: documentoId } = await params;
@@ -72,12 +72,14 @@ export async function GET(
     }
     const buffer = Buffer.from(await res.arrayBuffer());
     const filename = `${documento.titulo.replace(/[^a-zA-Z0-9à-úÀ-Ú\s-]/g, "").trim() || "documento"}.pdf`;
+    const disposition = new URL(request.url).searchParams.get("disposition") === "inline" ? "inline" : "attachment";
 
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(filename)}"`,
+        "Content-Disposition": `${disposition}; filename="${encodeURIComponent(filename)}"`,
         "Content-Length": String(buffer.length),
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {

@@ -459,7 +459,9 @@ export type BpmAcaoPipeline =
   | "configurarEtapas"
   | "configurarCampos"
   | "configurarSla"
-  | "criarPipeline";
+  | "criarPipeline"
+  | "configurarCadencias"
+  | "configurarChecklists";
 
 /**
  * Ownership de configuração de pipeline (D-031): apenas administradores globais

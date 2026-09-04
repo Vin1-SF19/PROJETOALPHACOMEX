@@ -18,7 +18,7 @@ import {
   TEMPLATE_RESUMO_ALINHAMENTO,
 } from "@/lib/bpm/alinhamento-estrategico";
 import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
-import { CalculoTributario } from "./CalculoTributario";
+import { PainelCalculoFinanceiro } from "@/components/bpm/regras-financeiras/PainelCalculoFinanceiro";
 import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -68,6 +68,11 @@ export function PainelCamposEtapaAtual({
     valoresCamposAtuais,
   );
   const camposAtuaisVisiveis = configuracaoLostUi.camposVisiveis;
+  const camposPorGrupo = camposAtuaisVisiveis.reduce<Record<string, CamposEtapaCard>>((grupos, campo) => {
+    const grupo = campo.grupo?.trim() || "Informações gerais";
+    (grupos[grupo] ??= []).push(campo);
+    return grupos;
+  }, {});
   const complementoLostPendente = Boolean(
     configuracaoLostUi.exigeComplemento
     && configuracaoLostUi.campoComplementoId
@@ -216,14 +221,20 @@ export function PainelCamposEtapaAtual({
               </button>
             </div>
           )}
-          {camposAtuaisVisiveis.map((campo) => {
+          {Object.entries(camposPorGrupo).map(([grupo, camposGrupo]) => (
+            <fieldset key={grupo} className="space-y-3 rounded-xl border border-white/[0.06] p-3">
+              <legend className="px-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{grupo}</legend>
+              {camposGrupo.map((campo) => {
             const complementoPendente = campo.id === configuracaoLostUi.campoComplementoId && complementoLostPendente;
-            const somenteLeitura = campoFinanceiroSomenteLeitura(campo.nome);
+            const somenteLeitura = campoFinanceiroSomenteLeitura(campo.nome)
+              || campo.somenteLeitura
+              || (campo.escopo === "GLOBAL" && Boolean(campo.fonteEntidade))
+              || campo.editavel === false;
             const descricaoId = complementoPendente ? `campo-bpm-${campo.id}-erro` : undefined;
             return (
               <div key={campo.id} className="space-y-1.5">
                 <label htmlFor={`campo-bpm-${campo.id}`} className="text-[11px] font-medium text-slate-400">
-                  {campo.nome}{campo.obrigatorio ? " *" : ""}{somenteLeitura ? " · automático" : ""}
+                  {campo.nome}{campo.obrigatorio ? " *" : ""}{campo.obrigatorioEntrada ? " · exigido na entrada" : ""}{campo.obrigatorioSaida ? " · exigido na saída" : ""}{somenteLeitura ? " · automático" : ""}
                 </label>
                 {campoEhResumoAlinhamento(campo.nome) && (
                   <button
@@ -251,6 +262,7 @@ export function PainelCamposEtapaAtual({
                   className={inputCls}
                   disabled={!podeEditar}
                   readOnly={somenteLeitura}
+                  cardId={card.id}
                 />
                 {complementoPendente && (
                   <p id={descricaoId} role="alert" className="text-[11px] text-amber-300">
@@ -259,21 +271,10 @@ export function PainelCamposEtapaAtual({
                 )}
               </div>
             );
-          })}
-          {card.etapa.nome === "Formalização" && (() => {
-            const v = (nome: string) => { const c = camposEtapaBase.find((x) => x.nome === nome); return c ? (valoresCamposAtuais[c.id] ?? "") : ""; };
-            const num = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
-            return (
-              <CalculoTributario
-                valorBruto={num(v("Valor bruto do contrato"))}
-                aliquotaIrrf={num(v("Alíquota IRRF"))}
-                aliquotaCsrf={num(v("Alíquota CSRF"))}
-                regimePrestador={v("Regime tributário do prestador") || undefined}
-                regimeTomador={v("Regime tributário do cliente") || undefined}
-                servico={v("Serviço contratado") || undefined}
-              />
-            );
-          })()}
+              })}
+            </fieldset>
+          ))}
+          {card.pipeline.nome === "Financeiro" && <PainelCalculoFinanceiro cardId={card.id} realtimeRevision={realtimeRevision} />}
           {salvandoCamposAtuais && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando alterações...</p>}
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}
         </div>

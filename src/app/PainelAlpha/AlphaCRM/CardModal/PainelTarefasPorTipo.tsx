@@ -5,8 +5,9 @@ import { Bell, Calendar, CheckCircle2, ClipboardCheck, Mail, MessageCircle, Phon
 import { toast } from "sonner";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CriarTarefaBpm, ConcluirTarefaBpm } from "@/actions/bpm/Tarefas";
-import { fmtDateTime } from "@/lib/format-date";
+import { fmtDateTime, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { BPM_TAREFA_TIPOS, obterConfigTipoTarefa, type BpmTarefaTipo } from "@/lib/bpm/tarefas-tipo";
+import { BpmDateTimeField } from "./BpmDateTimeField";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Tarefa = CardDetalhe["tarefas"][number];
@@ -50,8 +51,15 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
   }
 
   async function salvar() {
-    if (!prazo || !alertaEm) {
+    if (salvando || !podeTrabalharTarefas) return;
+    const prazoPersistido = parseDataHoraLocalBpm(prazo);
+    const alertaPersistido = parseDataHoraLocalBpm(alertaEm);
+    if (!prazoPersistido || !alertaPersistido) {
       toast.error("Informe prazo e alerta.");
+      return;
+    }
+    if (alertaPersistido > prazoPersistido) {
+      toast.error("O alerta deve ocorrer antes ou no mesmo horário do prazo.");
       return;
     }
     setSalvando(true);
@@ -68,8 +76,8 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         ? itensChecklist.split("\n").map((item) => item.trim()).filter(Boolean)
         : undefined,
       responsavelId: responsavelId ?? undefined,
-      prazo: new Date(prazo),
-      alertaEm: new Date(alertaEm),
+      prazo: prazoPersistido,
+      alertaEm: alertaPersistido,
     });
     setSalvando(false);
     if (!resultado.success) {
@@ -95,7 +103,9 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
         const alertaAtivo = tarefa.status === "PENDENTE" && Boolean(tarefa.alertaDisparadoEm);
         const prioridadeCor = tarefa.prioridade === "ALTA" ? "bg-red-500/15 text-red-300" : tarefa.prioridade === "MEDIA" ? "bg-amber-500/15 text-amber-300" : "bg-slate-500/15 text-slate-300";
         const statusCor = tarefa.status === "CONCLUIDA" ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-500/15 text-slate-300";
-        const prazoVencido = tarefa.status !== "CONCLUIDA" && new Date(tarefa.prazo) < new Date();
+        const prazoData = tarefa.prazo ? new Date(tarefa.prazo) : null;
+        const prazoValido = prazoData !== null && !Number.isNaN(prazoData.getTime());
+        const prazoVencido = tarefa.status !== "CONCLUIDA" && prazoValido && prazoData < new Date();
         return (
           <div key={tarefa.id} className={`rounded-xl border px-3 py-2.5 ${alertaAtivo ? "border-amber-400/35 bg-amber-400/[0.07]" : "border-white/5 bg-white/[0.03]"}`}>
             <div className="flex items-start gap-2">
@@ -114,8 +124,8 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
                   <p className={`mt-1 text-xs leading-relaxed ${tarefa.status === "CONCLUIDA" ? "text-slate-600" : "text-slate-400"} line-clamp-3 whitespace-pre-line`}>{tarefa.descricao}</p>
                 )}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                  <span className={`inline-flex items-center gap-1 ${prazoVencido ? "text-red-400" : ""}`}><Calendar size={11} aria-label="Prazo" /> {fmtDateTime(tarefa.prazo)}</span>
-                  <span className="inline-flex items-center gap-1"><Bell size={11} aria-label="Alerta" /> {fmtDateTime(tarefa.alertaEm)}</span>
+                  {prazoValido && <span className={`inline-flex items-center gap-1 ${prazoVencido ? "text-red-400" : ""}`}><Calendar size={11} aria-label="Prazo" /> {fmtDateTime(tarefa.prazo)}</span>}
+                  {tarefa.alertaEm && !Number.isNaN(new Date(tarefa.alertaEm).getTime()) && <span className="inline-flex items-center gap-1"><Bell size={11} aria-label="Alerta" /> {fmtDateTime(tarefa.alertaEm)}</span>}
                   {tarefa.responsavel && <span className="inline-flex items-center gap-1"><User size={11} aria-label="Responsável" /> {tarefa.responsavel.nome}</span>}
                   {tarefa.concluidaEm && <span className="inline-flex items-center gap-1 text-emerald-400/70"><CheckCircle2 size={11} aria-label="Concluída em" /> {fmtDateTime(tarefa.concluidaEm)}</span>}
                 </div>
@@ -147,8 +157,11 @@ export function PainelTarefasPorTipo({ cardId, responsavelId, tarefas, accent, p
           {tipo === "TAREFA" && <><input className={inputCls} placeholder="Título da tarefa" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
           {tipo === "LEMBRETE_RAPIDO" && <><input className={inputCls} placeholder="Do que você precisa lembrar?" value={titulo} onChange={(e) => setTitulo(e.target.value)} /><textarea className={`${inputCls} min-h-20 resize-none`} placeholder="Contexto opcional" value={descricao} onChange={(e) => setDescricao(e.target.value)} /></>}
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-[11px] font-medium text-slate-400">Prazo<input required type="datetime-local" className={`${inputCls} mt-1`} value={prazo} onChange={(e) => setPrazo(e.target.value)} /></label><label className="text-[11px] font-medium text-slate-400">Alerta<input required type="datetime-local" className={`${inputCls} mt-1`} value={alertaEm} onChange={(e) => setAlertaEm(e.target.value)} /></label></div>
-          <button type="button" onClick={() => void salvar()} disabled={salvando} className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: `rgb(${accent})` }}>{salvando ? "Criando..." : `Criar ${obterConfigTipoTarefa(tipo).label}`}</button>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <BpmDateTimeField id={`tarefa-prazo-${cardId}`} label="Prazo" value={prazo} onChange={setPrazo} required disabled={salvando || !podeTrabalharTarefas} />
+            <BpmDateTimeField id={`tarefa-alerta-${cardId}`} label="Alerta" value={alertaEm} onChange={setAlertaEm} required disabled={salvando || !podeTrabalharTarefas} />
+          </div>
+          <button type="button" onClick={() => void salvar()} disabled={salvando || !podeTrabalharTarefas} aria-busy={salvando} className="w-full rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-50" style={{ background: `rgb(${accent})` }}>{salvando ? "Criando..." : `Criar ${obterConfigTipoTarefa(tipo).label}`}</button>
         </div>
       )}
     </div>

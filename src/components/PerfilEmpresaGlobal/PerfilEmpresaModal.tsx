@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Timeline } from "./Timeline";
 import { useClientTimeline } from "./useClientTimeline";
 import { fmtDate } from "@/lib/format-date";
+import { formatCNPJ } from "@/lib/format-cnpj";
 import { cn } from "@/lib/utils";
 import type { TimelineEvent } from "@/lib/timeline/types";
 
@@ -119,7 +120,7 @@ export function PerfilEmpresaModal({
                 </span>
               </DialogTitle>
               <DialogDescription className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                <span className="font-mono">{empresa.cnpj}</span>
+                <span className="font-mono">{formatCNPJ(empresa.cnpj) ?? empresa.cnpj}</span>
                 {empresa.uf && (
                   <span className="flex items-center gap-1">
                     <MapPin size={12} aria-hidden="true" />

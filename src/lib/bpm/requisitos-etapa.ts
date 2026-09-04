@@ -3,6 +3,8 @@ export type CampoObrigatorioBpm = {
   nome: string;
 };
 
+export type OrigemMovimentacaoBpm = "MANUAL" | "AUTOMACAO";
+
 export function deduplicarCamposObrigatorios(
   campos: CampoObrigatorioBpm[],
 ): CampoObrigatorioBpm[] {

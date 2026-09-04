@@ -127,7 +127,7 @@ export function calcularRetencoesFinanceiras(valorBruto: number, aliquotaIrrf: n
   return { valorIrrf, valorCsrf, totalRetencoes, valorLiquido, regraAplicada, memoriaCalculo: JSON.stringify({ schemaVersion: FINANCIAL_PIPELINE_SCHEMA_VERSION, formula: "liquido = bruto - ((bruto × irrf%) + (bruto × csrf%))", entradas: { valorBruto, aliquotaIrrf, aliquotaCsrf, regimePrestador: contexto?.regimePrestador ?? null, regimeTomador: contexto?.regimeTomador ?? null, servico: contexto?.servico ?? null }, resultados: { valorIrrf, valorCsrf, totalRetencoes, valorLiquido }, regra: regraAplicada, timestamp: (contexto?.now ?? new Date()).toISOString() }) };
 }
 function normalizar(valor: string | null | undefined) { return valor?.trim() ?? "" }
-function numero(valor: string | null | undefined) { const text = normalizar(valor); const parsed = Number(text.replace(/\./g, "").replace(",", ".")); return Number.isFinite(parsed) ? parsed : 0 }
+function numero(valor: string | null | undefined) { const text = normalizar(valor); const canonical = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text; const parsed = Number(canonical); return Number.isFinite(parsed) ? parsed : 0 }
 function sim(valor: string | null | undefined) { const text = normalizar(valor).toLowerCase(); return text === "sim" || text === "true" || text === "1" || text === "yes" }
 function cnpjValido(cnpj: string) { const digits = cnpj.replace(/\D/g, ""); if (digits.length !== 14) return false; if (digits === digits[0].repeat(14)) return false; let sum = 0; for (let i = 0; i < 12; i++) sum += Number(digits[i]) * (12 - i); if ((sum % 11) >= 2) return false; sum = 0; for (let i = 0; i < 13; i++) sum += Number(digits[i]) * (13 - i); return (sum % 11) < 2 }
 

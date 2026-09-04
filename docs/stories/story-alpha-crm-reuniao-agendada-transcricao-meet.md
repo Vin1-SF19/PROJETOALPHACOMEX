@@ -301,6 +301,33 @@ Codex GPT-5.
 
 Anubis: aprovado com ressalvas; achados de limite, logs, PII e concorrência corrigidos. Probe/Sage: aprovado após corrigir ETag fresco, revalidação pós-API e starvation do polling. Lens: aprovado após corrigir CAS do vínculo, confirmação do link criado, timeout/retry e concorrência limitada.
 
+## Roadmap Alpha — RM-2026-CB55AA (2026-09-04)
+
+- [x] `PainelReuniao` disponível em **Reunião Agendada**, com o formulário de agendamento oculto.
+- [x] Transcrição existente exibida como resumo editável e persistida em `BpmCard.transcricaoReuniao` via `registerSave`.
+- [x] Busca manual diferencia carregamento, pendência, sucesso e erro.
+- [x] Agendamento atende ao contrato atual da Agenda e persiste `googleEventId`, `googleCalendarId` e `googleMeetLink`.
+- [x] Persistência manual protegida por sessão, Zod, ownership revalidado e CAS por `updatedAt`.
+- [x] Testes de integração da fase adicionados em `tests/bpm/reuniao-transcricao.test.ts`.
+- [x] Data da reunião e estado vazio explícito adicionados ao acompanhamento em **Reunião Agendada**.
+- [x] Estado pendente inicial usa a mensagem operacional completa e acessível.
+- [x] Sincronização limitada a 25 s nas integrações externas, com uma repetição por chamada Meet e fallback para a descrição real do evento no Calendar.
+- [x] `CardFilhoCriado` reexportado por `Cards.ts`, eliminando o erro de tipo da cadeia do modal.
+
+### File List do autoajuste
+
+- `src/actions/bpm/GoogleMeet.ts` — payload completo do evento.
+- `src/actions/bpm/TranscricaoMeet.ts` — action de edição persistente do resumo/transcrição.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx` — entrega na etapa Reunião Agendada.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx` — estados e textarea editável com autosave.
+- `tests/bpm/formulario-etapa.test.ts` — integração por etapa.
+- `tests/bpm/reuniao-transcricao.test.ts` — critérios da fase.
+- `tests/bpm/transcricao-reuniao-server.test.ts` — timeout global e fallback Calendar.
+- `src/lib/google-meet/client.ts` — timeout por chamada e retry único.
+- `src/lib/bpm/transcricao-reuniao-server.ts` — orçamento global e fallback parcial persistente.
+- `.bibble/memory/architecture.md`, `.bibble/memory/components.md`, `.bibble/memory/integration-points.md`, `.bibble/memory/journal.md` — documentação da entrega.
+- `.bibble/memory/decisions.md`, `.bibble/memory/known-errors.md` — decisões técnicas e limitações operacionais da integração.
+
 ## Story Draft Validation
 
 | Category | Status | Issues |
@@ -313,3 +340,29 @@ Anubis: aprovado com ressalvas; achados de limite, logs, PII e concorrência cor
 | CodeRabbit Integration | PASS | Agentes, complexidade e focos de revisão foram definidos. |
 
 **Final Assessment:** READY — a implementação pode iniciar pelo Scout e pela validação da configuração Google. A ausência de setup DWD/licença/transcrição no tenant impede o smoke real, mas não autoriza simular sucesso nem persistir texto fictício.
+
+### Gates do autoajuste Probe — 2026-09-04
+
+- Testes direcionados: 18/18 aprovados.
+- ESLint direcionado: aprovado, sem diagnósticos.
+- `npm run typecheck`: falhou por erros preexistentes fora desta fase; o erro relevante de `CardFilhoCriado` foi eliminado.
+- `npx vitest run tests/bpm/`: 451 aprovados / 16 falhas basais reproduzidas; nenhum teste da transcrição falhou.
+- `npm test -- --run`: 2.113 aprovados / 38 falhas basais ou ambientais.
+- `npm run lint`: executado; o resultado global permaneceu incompatível com o gate do repositório e não introduziu diagnóstico nos arquivos direcionados.
+
+### Checklist de fechamento documental — 2026-09-04
+
+- [x] `architecture.md` atualizado com implementação, arquivos, testes, qualidade e caminho de consumo.
+- [x] `decisions.md` atualizado com fonte Meet/fallback Calendar, campo dedicado e escopo OAuth.
+- [x] `known-errors.md` atualizado com latência/disponibilidade e limitação do fallback.
+- [x] `integration-points.md` atualizado com o fluxo UI → actions → Google APIs → persistência.
+- [x] `journal.md` atualizado no formato Kowalski, com fases, agentes, resultado e pendências.
+- [x] Entregabilidade validada pelo Probe no caminho real do Alpha CRM.
+
+### Gates do fechamento Scribe — 2026-09-04
+
+- `git diff --check`: PASS.
+- Testes documentais/direcionados: 23/23 PASS (`reuniao-transcricao`, `transcricao-reuniao-server`, `formulario-etapa`).
+- `npm test`: 2.113 PASS / 38 FAIL em baseline preexistente ou limitação ambiental; nenhuma falha pertence aos documentos desta fase.
+- `npm run typecheck`: FAIL por erros globais preexistentes fora dos arquivos documentais desta fase.
+- `npm run lint`: FAIL no baseline global do repositório.

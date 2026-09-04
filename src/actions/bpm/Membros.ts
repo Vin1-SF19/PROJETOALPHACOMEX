@@ -1,4 +1,5 @@
 "use server";
+import { randomUUID } from "node:crypto";
 
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -12,6 +13,7 @@ import {
   listarUsuariosVinculaveisBpm,
 } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -179,6 +181,14 @@ export async function AtualizarMembrosCardBpm(dados: unknown) {
           }),
         },
       });
+      await publicarEventoBpm({
+        tipo: "MEMBROS_ATUALIZADOS", entidadeTipo: "MEMBRO", entidadeId: cardId,
+        cardId, pipelineId: cardAtual.pipelineId,
+        valorAnterior: { membrosIds: ordenarIds(membrosAtuais.map((membro) => membro.userId)) },
+        valorNovo: { membrosIds: membrosDesejados.map((membro) => membro.userId) },
+        atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(),
+        idempotencyKey: `membros-atualizados:${cardId}:${Date.now()}`,
+      }, tx);
       const membros = await tx.bpmCardMembro.findMany({
         where: { cardId },
         select: {

@@ -1,4 +1,5 @@
 "use server";
+import { randomUUID } from "node:crypto";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
@@ -6,6 +7,7 @@ import { criarVinculoCardSchema } from "@/lib/validations/bpm";
 import { exigirAcessoBpmCard } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -52,6 +54,13 @@ export async function CriarVinculoCardBpm(dados: unknown) {
         },
         tx,
       );
+      const origem = await tx.bpmCard.findUnique({ where: { id: cardOrigemId }, select: { pipelineId: true } });
+      if (origem) await publicarEventoBpm({
+        tipo: "VINCULO_CRIADO", entidadeTipo: "VINCULO", entidadeId: criado.id,
+        cardId: cardOrigemId, pipelineId: origem.pipelineId,
+        valorNovo: { vinculoId: criado.id, cardDestinoId }, atorTipo: "USUARIO", atorUserId: userId,
+        correlationId: randomUUID(), idempotencyKey: `vinculo-criado:${criado.id}`,
+      }, tx);
       return criado;
     });
 

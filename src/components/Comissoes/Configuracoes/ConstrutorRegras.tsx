@@ -79,6 +79,8 @@ interface RegraConfigRow {
   priority: number;
   eventType: string;
   benefitType: "COMMISSION" | "BONUS" | "DSR";
+  collaboratorId: number | null;
+  servico: string | null;
   ultimaVersao: {
     id: string;
     version: number;
@@ -98,7 +100,7 @@ function lerJson<T>(valor: string | undefined, fallback: T): T {
   }
 }
 
-export function ConstrutorRegras() {
+export function ConstrutorRegras({ colaboradores = [] }: { colaboradores?: Array<{ id: number; nome: string; cargo: string | null }> }) {
   const [regras, setRegras] = useState<RegraConfigRow[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -113,6 +115,10 @@ export function ConstrutorRegras() {
   const [rate, setRate] = useState("");
   const [fixedAmountReais, setFixedAmountReais] = useState("");
   const [scheduleRuleName, setScheduleRuleName] = useState("QUINTO_DIA_UTIL_CLT");
+  const [priority, setPriority] = useState("0");
+  const [servico, setServico] = useState("");
+  const [collaboratorId, setCollaboratorId] = useState("");
+  const [baseCalculo, setBaseCalculo] = useState<"VALOR_BRUTO" | "VALOR_LIQUIDO">("VALOR_LIQUIDO");
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -138,6 +144,10 @@ export function ConstrutorRegras() {
     setRate("");
     setFixedAmountReais("");
     setScheduleRuleName("QUINTO_DIA_UTIL_CLT");
+    setPriority("0");
+    setServico("");
+    setCollaboratorId("");
+    setBaseCalculo("VALOR_LIQUIDO");
   }
 
   function editarRegra(regra: RegraConfigRow) {
@@ -161,6 +171,10 @@ export function ConstrutorRegras() {
     const cents = calculation?.fixedAmountCents ?? calculation?.totalFixoComDsrCents;
     setFixedAmountReais(cents === undefined ? "" : (cents / 100).toFixed(2).replace(".", ","));
     setScheduleRuleName(schedule.scheduleRuleName ?? "QUINTO_DIA_UTIL_CLT");
+    setPriority(String(regra.priority));
+    setServico(regra.servico ?? "");
+    setCollaboratorId(regra.collaboratorId ? String(regra.collaboratorId) : "");
+    setBaseCalculo(calculation?.baseCalculo ?? "VALOR_LIQUIDO");
   }
 
   function adicionarCondicao() {
@@ -198,6 +212,7 @@ export function ConstrutorRegras() {
       type: tipoCalculo,
       benefitType,
       rate: tipoCalculo === "PERCENTAGE" || tipoCalculo === "PROPORTIONAL" ? percentual : undefined,
+      baseCalculo: tipoCalculo === "PERCENTAGE" || tipoCalculo === "PROPORTIONAL" ? baseCalculo : undefined,
       fixedAmountCents: tipoCalculo === "FIXED" || tipoCalculo === "ADDITIONAL" ? valorCents : undefined,
       totalFixoComDsrCents: tipoCalculo === "TOTAL_FIXO_COM_DSR" ? valorCents : undefined,
     };
@@ -213,7 +228,7 @@ export function ConstrutorRegras() {
 
     startTransition(async () => {
       const base = {
-        priority: 0,
+        priority: Number(priority) || 0,
         conditions: montarConditions(),
         calculation,
         paymentSchedule: { scheduleRuleName },
@@ -225,6 +240,8 @@ export function ConstrutorRegras() {
             name: nome.trim(),
             eventType: eventType as Parameters<typeof CriarVersaoRegra>[0]["eventType"],
             benefitType,
+            collaboratorId: collaboratorId ? Number(collaboratorId) : null,
+            servico: servico.trim() || null,
             ...base,
           });
 
@@ -244,6 +261,8 @@ export function ConstrutorRegras() {
         eventType: eventType as Parameters<typeof SalvarRascunhoRegra>[0]["eventType"],
         benefitType,
         approvalRequired: false,
+        collaboratorId: collaboratorId ? Number(collaboratorId) : undefined,
+        servico: servico.trim() || undefined,
         ...base,
       });
       if (!resultado.success) {
@@ -296,7 +315,7 @@ export function ConstrutorRegras() {
 
       <div className="rounded-2xl border border-white/5 bg-slate-900/40 p-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Quando</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div><Label htmlFor="nomeRegra" className="text-slate-400">Nome da Regra</Label><Input id="nomeRegra" value={nome} onChange={(e) => setNome(e.target.value)} className="mt-1 border-white/10 bg-slate-950/60 text-slate-200" /></div>
           <div>
             <Label className="text-slate-400">Evento</Label>
@@ -310,6 +329,9 @@ export function ConstrutorRegras() {
               </SelectContent>
             </Select>
           </div>
+          <div><Label htmlFor="prioridadeRegra" className="text-slate-400">Prioridade</Label><Input id="prioridadeRegra" type="number" value={priority} onChange={(e) => setPriority(e.target.value)} className="mt-1 border-white/10 bg-slate-950/60 text-slate-200" /></div>
+          <div><Label htmlFor="servicoRegra" className="text-slate-400">Serviço (opcional)</Label><Input id="servicoRegra" value={servico} onChange={(e) => setServico(e.target.value)} className="mt-1 border-white/10 bg-slate-950/60 text-slate-200" /></div>
+          <div><Label className="text-slate-400">Beneficiário</Label><Select value={collaboratorId || "cargo"} onValueChange={(value) => setCollaboratorId(value === "cargo" ? "" : value)}><SelectTrigger className="mt-1 w-full border-white/10 bg-slate-950/60 text-slate-200"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cargo">Conforme cargo/escopo</SelectItem>{colaboradores.map((item) => <SelectItem key={item.id} value={String(item.id)}>{item.nome}{item.cargo ? ` · ${item.cargo}` : ""}</SelectItem>)}</SelectContent></Select></div>
         </div>
         <div className="mt-3 space-y-2">
           {condicoes.map((condicao, index) => (
@@ -345,6 +367,7 @@ export function ConstrutorRegras() {
             </Select>
           </div>
           {(tipoCalculo === "PERCENTAGE" || tipoCalculo === "PROPORTIONAL") && <div><Label htmlFor="rate" className="text-slate-400">Percentual (%)</Label><Input id="rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="4" className="mt-1 border-white/10 bg-slate-950/60 text-slate-200" /></div>}
+          {(tipoCalculo === "PERCENTAGE" || tipoCalculo === "PROPORTIONAL") && <div><Label className="text-slate-400">Base</Label><Select value={baseCalculo} onValueChange={(value) => setBaseCalculo(value as typeof baseCalculo)}><SelectTrigger className="mt-1 w-full border-white/10 bg-slate-950/60 text-slate-200"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="VALOR_BRUTO">Valor bruto</SelectItem><SelectItem value="VALOR_LIQUIDO">Valor líquido</SelectItem></SelectContent></Select></div>}
           {(tipoCalculo === "FIXED" || tipoCalculo === "ADDITIONAL" || tipoCalculo === "TOTAL_FIXO_COM_DSR") && <div><Label htmlFor="fixedAmount" className="text-slate-400">{tipoCalculo === "TOTAL_FIXO_COM_DSR" ? "Total comissão + DSR (R$)" : "Valor Fixo (R$)"}</Label><Input id="fixedAmount" value={fixedAmountReais} onChange={(e) => setFixedAmountReais(e.target.value)} placeholder="350,00" className="mt-1 border-white/10 bg-slate-950/60 text-slate-200" /></div>}
           <div>
             <Label className="text-slate-400">Regra de Calendário</Label>

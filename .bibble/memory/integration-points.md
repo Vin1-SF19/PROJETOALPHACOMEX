@@ -1,5 +1,43 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+- Checklist Builder: `materializarChecklistsAplicaveisCard` é o único serviço de materialização para abertura do card e ação explícita `MATERIALIZAR_CHECKLIST`; `carregarResumoChecklistAplicavelCard` é a leitura pura compartilhada por Validações, Regras, Automações e alerta de avanço; `ListarChecklistsCardBpm` é a entrada autenticada do painel; `SalvarTemplateChecklistBpm` é o save atômico do builder.
+
+## Alpha CRM — Checklist Builder (RM-2026-209DB4)
+
+**Caminho administrativo:** `Configurações → Checklists → /PainelAlpha/AlphaCRM/admin/checklists` → `ListarWorkspaceChecklistsBpm`/`ChecklistsWorkspace` → `CriarTemplateChecklistBpm` ou `SalvarTemplateChecklistBpm`.
+
+**Caminho operacional:** card aberto → `PainelRegistrar` → `CardOpenFormSlot` → `PainelChecklistsCard` → `ListarChecklistsCardBpm` → `materializarChecklistsAplicaveisCard`. Atualizações usam `AtualizarItemChecklistCardBpm`; item exclusivo usa `AdicionarItemExclusivoChecklistCardBpm`.
+
+**Movimento e motores:** `Cards.ts/executarMovimentoComRequisitos` chama `obterErroChecklistParaMovimento` antes e dentro da transação. `regras/contexto.ts` expõe a fonte fixa `checklist`. `automacoes/executor.ts` monta placeholders `checklist.*`; somente a ação `MATERIALIZAR_CHECKLIST` grava snapshots automaticamente.
+
+**Pendências:** `PainelProximaEtapa` chama `ObterResumoChecklistCardBpm` sem materialização, mostra quantidade/templates e dispara `bpm:abrir-pendencias-checklist`; `PainelRegistrar` abre a aba e foca `checklist-item-<id>`, com fallback para `checklist-pendencias`.
+
+**Ao estender:** não materialize em criação/movimento; preserve snapshot e `@@unique([cardId, templateId])`; mantenha ownership dentro da transação, CAS por `updatedAt`, fail-open em erro de leitura e fail-closed somente para pendência obrigatória confirmada.
+
+**Última atualização:** 2026-09-04 por Codex (encerramento RM-2026-209DB4)
+
+## Alpha CRM — campo de data/hora no modal do card (RM-2026-EB401C)
+
+**Arquivos:** `src/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField.tsx`, `PainelProximoContato.tsx`, `PainelReuniao.tsx`, `PainelTarefasPorTipo.tsx`, `CardFullViewModal.tsx`, `CardOpenFormSlot.tsx`, `src/lib/format-date.ts`, `src/lib/bpm/rascunho-versionado.ts` e `src/lib/validations/bpm.ts`.
+
+**Propósito:** padronizar a seleção assistida, o timezone, o autosave e a reabertura dos instantes editáveis no card do CRM.
+
+**Editado quando:** um novo instante do `BpmCard`/`BpmTarefa` for exposto no modal, um campo existente mudar entre obrigatório e nullable, ou o contrato de data/hora aceito pelas Server Actions mudar.
+
+**Como adicionar:**
+1. Renderize `BpmDateTimeField` no consumidor e mantenha no estado apenas `YYYY-MM-DDTHH:mm` civil.
+2. Na carga/realtime, use `formatarDataHoraLocalBpm(instante)`; antes da action, use `parseDataHoraLocalBpm(valor)` e envie `Date`/ISO com timezone. Não use `new Date(valorCivil)` nem o timezone do navegador.
+3. Para autosave, registre a Promise real no `CardSaveContext`; para estado editável durante requests/realtime, use o rastreador versionado e não remonte o painel com `key={updatedAt}`.
+4. Propague o gate `isAdminRole(role) || (vinculado && permissaoEtapa.podeAgir)` ao controle e mantenha auth/ownership na action. Habilite `allowClear` somente se o schema e a coluna aceitarem `null`.
+5. Campos somente de data (`YYYY-MM-DD`) são valores civis distintos e não devem passar pelos helpers de instante.
+6. Cubra round-trip em processo com timezone diferente, entrada inválida, valor nulo/obrigatório, concorrência, blur + `flushSaves()` e reabertura.
+
+**Caminho de acesso:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card → **Formulário da Etapa** ou aba **Tarefas** → `BpmDateTimeField` → action → persistência → reabertura.
+
+**Última atualização:** 2026-09-04 por Scribe (fechamento RM-2026-EB401C)
+
+---
+
 ## Filtro por responsável no board Kanban do Alpha CRM (RM-2026-70EFE1, 2026-09-02)
 
 **Onde está implementado:**
@@ -239,12 +277,47 @@ Novo integration point: agrupar um módulo dentro de uma "gaveta" (accordion) da
 
 **Dependência:** form depende de `pipelineId` (da rota) para resolver o serviço. Se o pipeline não existir, `servico` cai em `null` (coluna nullable, sem crash).
 
-**CNPJ como campo-chave para pesquisa de empresa:**
-- Modo busca: `BuscarEmpresasBpm` normaliza o termo (remove não-dígitos) antes da query `contains` na coluna `cnpj`
-- Modo cadastro: `novaEmpresa.cnpj` → `formatarCnpjInput()` (exibição) → `.replace(/\D/g,"")` (submit) → `cliente.cnpj` (banco)
+**CNPJ como campo-chave para pesquisa de empresa (atualizado em RM-2026-35BA39, ver abaixo para a implementação atual — a versão anterior desta nota, com `formatarCnpjInput()` local, foi substituída pelo utilitário compartilhado):**
+- Modo busca: `BuscarEmpresasBpm` normaliza o termo (`normalizarCNPJ`) antes da query `contains` na coluna `cnpj`
+- Modo cadastro: `novaEmpresa.cnpj` → `formatarCNPJProgressivo()` (exibição) → `normalizarCNPJ()` (submit) → `cliente.cnpj` (banco)
 - **Nunca** armazenar CNPJ formatado no banco — sempre dígitos puros
 
 **Última atualização:** 2026-08-26 por Scribe
+
+---
+
+## Máscara de CNPJ no CRM — caminho completo de integração (RM-2026-35BA39, 2026-09-04)
+
+Caminho ponta a ponta, do input até a busca, para todos os pontos de entrada/saída de CNPJ no Alpha CRM:
+
+```
+ENTRADA (digitação em input)
+  NovoCardModal.tsx (cadastro de empresa nova)
+  ou CampoBpmInput.tsx (campo dinâmico da etapa, tipo "cnpj" ou legado nome exato "CNPJ")
+    → onChange: valor cru do usuário → normalizarCNPJ() (state React sempre guarda dígitos puros)
+    → render: formatarCNPJProgressivo(state) (máscara 00.000.000/0000-00 aplicada em cada estágio)
+
+NORMALIZAÇÃO (client → antes do submit)
+  → normalizarCNPJ() novamente no submit (garante que o payload enviado ao servidor já são dígitos puros)
+
+ACTION (server-side, nunca confia no client)
+  Cadastro novo: novaEmpresaCardSchema (Zod, src/lib/validations/bpm.ts) → transform(normalizarCNPJ) → exige exatamente 14 dígitos → CriarCardBpm (src/actions/bpm/Cards.ts) normaliza de novo antes de gravar
+  Campo dinâmico: AtualizarCardBpm → validarValoresCamposBpm (src/lib/bpm/campos-dinamicos.ts) → campoBpmEhCnpj() detecta o campo → cnpjEhValido() valida dígito verificador → normalizarCNPJ() antes do upsert
+
+PERSISTÊNCIA (sempre 14 dígitos puros, nunca formatado)
+  Cliente.cnpj (cadastro de empresa) | BpmCardCampoValor.valor (campo dinâmico tipo "cnpj" ou legado nome "CNPJ")
+
+BUSCA (aceita cru ou formatado, resultado equivalente)
+  BuscarEmpresasBpm (src/actions/bpm/Cards.ts) → normalizarCNPJ(termo) || termo → db.cliente.findMany({ cnpj: { contains } }) → resultados formatados na UI via formatCNPJ()
+
+EXIBIÇÃO (read-only, nunca reformata o valor persistido)
+  CardAbertoLayout.tsx (header) | DadosEmpresaConteudo.tsx (gaveta "Dados da empresa") | PerfilEmpresaModal.tsx (perfil global)
+    → formatCNPJ(cnpj) ?? cnpj (fallback seguro se o valor legado não fechar em 14 dígitos)
+```
+
+Fonte única: `src/lib/format-cnpj.ts` (`normalizarCNPJ`, `formatarCNPJProgressivo`, `formatCNPJ`, `cnpjEhValido`). Nenhum consumidor implementa regex própria de máscara/validação — ver `.bibble/memory/decisions.md` para a decisão de separação apresentação × persistência.
+
+**Última atualização:** 2026-09-04 por Scribe (sessão Bibble, fechamento RM-2026-35BA39)
 
 ---
 
@@ -2118,15 +2191,19 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 
 ### Alpha CRM — transcrição pós-reunião do Google Meet
 
-**Arquivos:** `src/lib/google-meet/client.ts`, `src/lib/bpm/transcricao-reuniao.ts`, `src/lib/bpm/transcricao-reuniao-server.ts`, `src/actions/bpm/TranscricaoMeet.ts`, `src/actions/bpm/GoogleMeet.ts`, `PainelReuniao.tsx`, `Cards.ts`, rota de automação do CRM.
+**Arquivos:** `src/lib/google-meet/client.ts`, `src/lib/bpm/transcricao-reuniao.ts`, `src/lib/bpm/transcricao-reuniao-server.ts`, `src/actions/bpm/TranscricaoMeet.ts`, `src/actions/bpm/GoogleMeet.ts`, `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx`, `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`, `src/actions/bpm/Cards.ts` e a rota de automação do CRM.
 
-**Propósito:** captura os artefatos pós-conferência do Meet, persiste a transcrição no card, reconhece o estado no modal e impede avanço comercial sem evidência.
+**Propósito:** conecta `PainelReuniao` a `SincronizarTranscricaoReuniaoBpm`, captura os artefatos pós-conferência do Meet, persiste a transcrição/resumo no card, reconhece o estado no modal e impede avanço comercial sem evidência.
 
-**Como integrar:** o meeting code vem somente de `googleMeetLink` oficial; o subject DWD é resolvido pelo cache do evento/calendário no servidor. Use o cliente Meet dedicado com `meetings.space.readonly`; não amplie os escopos do cliente Calendar. Toda sincronização manual exige ownership e a persistência usa CAS, histórico sem texto bruto e realtime após commit. O polling permanece no cron protegido existente e cards em Reunião Agendada entram no ciclo de oito dias úteis.
+**Como integrar:** `CardOpenFormSlot` deve montar `PainelReuniao` com `mostrarFormulario={false}` em **Reunião Agendada**. O meeting code vem somente de `googleMeetLink` oficial; o subject DWD é resolvido pelo cache do evento/calendário no servidor. Use o cliente Meet dedicado com `meetings.space.readonly`; não amplie os escopos do cliente Calendar. Toda sincronização manual exige ownership, e a persistência usa comparação do vínculo/valor anterior, histórico sem texto bruto e realtime após commit. A edição do **Resumo da reunião** chama `SalvarResumoReuniaoBpm` via `registerSave`, com CAS por `updatedAt`. O polling permanece no cron protegido existente e cards em Reunião Agendada entram no ciclo de oito dias úteis.
 
-**Limites:** a API e a delegação precisam estar configuradas no Google; a transcrição deve ser realmente gerada pelo Meet. Após recebida, a reunião não pode ser reagendada/reutilizada. Não houve migration.
+**Persistência:** o rótulo **Resumo da reunião** usa o campo dedicado `BpmCard.transcricaoReuniao`; não existe `BpmCampo` dinâmico para esse conteúdo. O fallback persiste somente a descrição real do evento Calendar, prefixada como resumo parcial.
 
-**Última atualização:** 2026-08-12 por Scribe/Codex.
+**Caminho de acesso:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card em **Reunião Agendada** → `CardFullViewModal` → `CardAbertoLayout` → `PainelRegistrar` → aba **Formulário da Etapa** → `CardOpenFormSlot` → `PainelReuniao` → **Buscar transcrição** / **Resumo da reunião**.
+
+**Limites:** a API e a delegação precisam estar configuradas no Google; a transcrição deve ser realmente gerada pelo Meet. Após recebida, a reunião não pode ser reagendada/reutilizada. O fallback Calendar é parcial e depende de descrição no evento. Não houve migration.
+
+**Última atualização:** 2026-09-04 por Scribe (fechamento RM-2026-CB55AA).
 
 ### Alpha CRM — regras e cadência de Novos leads
 
@@ -2145,11 +2222,13 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 
 **Formulários por etapa:** campos personalizados e controles nativos da etapa atual pertencem ao painel central do detalhe do card, na aba **Formulário da Etapa** (`CardFullViewModal`/`PainelRegistrar`/`PainelCamposEtapaAtual`). Requisitos de transição continuam no painel esquerdo (`PainelHistorico`). Eles não devem ser antecipados no modal de criação.
 
-**Google Meet:** o formulário de criação/reagendamento é renderizado somente em **Agendar Reunião**, dentro da aba central **Formulário da Etapa**. Em **Reunião Agendada**, `PainelReuniao` opera em modo de acompanhamento, sem controles para criar ou reagendar.
+**Google Meet:** `ListarCardsPipelineBpm` precisa entregar `dataReuniao`/`googleMeetLink` ao `PipelineBoardClient`. No board, o ramo `etapaEhAgendarReuniao` de `KanbanCard` é exclusivo: data/hora + ação Meet, com propagação de clique/`pointerdown` interrompida nos controles internos. No modal, `CardOpenFormSlot` retorna somente `PainelReuniao` em **Agendar Reunião**; em **Reunião Agendada**, o mesmo componente opera com `mostrarFormulario={false}` para acompanhamento, sem criar ou reagendar. Não adicionar fallback manual: o link exibido deve vir de `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm` e estar persistido no card.
+
+**Caminho de acesso do agendamento:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → coluna **Agendar reunião** → `KanbanCard` → `CardFullViewModal` → `CardAbertoLayout` → `PainelRegistrar` → aba **Formulário da Etapa** → `CardOpenFormSlot` → `PainelReuniao` → Google Calendar → link no card/modal.
 
 **Compatibilidade:** guards de movimento para Fechado, Lost, Em Tratativa, Sem Viabilidade e outras etapas permanecem ativos. Eles validam a entrada por movimento e não constituem permissão para criar diretamente no destino.
 
-**Última atualização:** 2026-08-13 por Bibble/Codex.
+**Última atualização:** 2026-09-04 por Scribe (RM-2026-6BEA04).
 
 ### Alpha CRM — Standby — Follow Up NoLoss
 
@@ -2352,3 +2431,54 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 **Como adicionar/manter:** configure `roadmap_status_codex` em `.codex/config.toml`; forneça os valores por variáveis de ambiente User do Windows, sem versionar segredos, usando uma `RoadmapApiKey` dedicada ao Codex; depois recarregue o Codex para herdar o novo ambiente. Não altere `.mcp.json` nem compartilhe a chave do Claude. Esta integração não requer menu, rota, permissão ou atalho novos.
 
 **Última atualização:** 2026-08-26 por Scribe
+### Checklist Builder — entrada administrativa preparada
+
+**Caminho:** `/PainelAlpha/AlphaCRM` → `Configurações` → ação `Checklists` em `AdminPipelinesListClient.tsx` → `/PainelAlpha/AlphaCRM/admin/checklists`.
+
+**Proteção:** a página chama `auth()` e aplica `isAdminRole` antes de renderizar. O shell não consulta banco nem importa actions de checklist enquanto a estrutura aditiva não passar pelo Vault.
+
+**Próxima integração:** após schema/actions, substituir o estado informativo pelo workspace funcional e montar `PainelChecklistsCard` no `CardOpenFormSlot.tsx`, inclusive abaixo de `PainelReuniao` no ramo especial `Agendar Reunião`.
+
+**Última atualização:** 2026-09-04 por Nova (RM-2026-209DB4)
+
+### Regras Financeiras — CRM/BPM → Comissões
+
+**Caminho:** `Configurações → Regras Financeiras` grava versões tributárias em `BpmRegraVersao`. `executarMovimentoComRequisitos` relê a regra dentro da transação, mescla os valores submetidos no mesmo movimento e persiste campos automáticos/memória antes de mover o card. Após commit, `sincronizarComissoesDoCardFinanceiro` faz upsert idempotente de `CommissionEvent` por card/pagamento e o gerador consome somente `CommissionRuleVersion` publicada e vigente para eventos `alpha-bpm`.
+
+**Proteções:** sessão/permissão administrativa nas configurações, ownership na consulta do card, fórmulas sem `eval`, validação de campos dinâmicos no mesmo pipeline, campos automáticos protegidos também no servidor e falha do subsistema de comissão isolada após o movimento.
+
+**Última atualização:** 2026-09-04 por Codex (RM-2026-002817)
+## SLA BPM — motor temporal (RM-2026-095B40, Fase 2)
+
+- **Produtor operacional:** `MoverCardBpm` chama `sincronizarSlaMovimentoBpm` dentro da transação que persiste `BpmCard.etapaId`; conclui instâncias da etapa anterior, provisiona a configuração `ENTRADA_ETAPA` de destino e pausa/retoma instâncias ao entrar/sair de `Standby - Follow Up`.
+- **Leitura autoritativa:** `ObterStatusSlaCard` e `ObterStatusSlaTarefa` aplicam auth + ownership e recalculam pelo relógio atual; futuros badges do Kanban/modal devem consumir essas actions, sem duplicar cálculo no client.
+- **Sem UI nesta fase:** o caminho visual permanece pendente da fase de indicadores; não existe componente SLA novo.
+# SLA administrativo — RM-2026-095B40
+
+**Caminho:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → `AdminPipelinePage` carrega `ListarConfiguracoesSlaBpm` + `getServicosComerciais` → `AdminPipelineClient` → `SlaConfigSection` → `SlaConfigForm` → `SalvarConfiguracaoSlaBpm`.
+
+**Segurança:** a rota exige papel administrativo; cada Server Action repete `exigirAcessoConfigPipeline(..., "configurarSla")`; o save valida etapa/serviço e ownership novamente dentro da transação. Configurações com instâncias só podem ser desativadas, evitando apagar auditoria.
+
+## Motor Central de Automações — caminho completo
+
+`Server Action BPM` → `publicarEventoBpm(..., tx)` → `BpmEventoDominio` →
+`/api/bpm/jobs/automacoes` → materialização idempotente →
+`executarLoteAutomacoesCentrais` → claim/lease → grafo validado → passo/agenda
+persistido → efeito no domínio ou adaptador legado.
+
+Entradas externas seguem
+`POST /api/bpm/webhooks/[slug]` → autenticação/deduplicação/sanitização → outbox.
+Operação humana segue `/PainelAlpha/AlphaCRM/automacoes` ou
+`npm run bpm:automacoes -- status|run|retry`. O executor legado filtra
+`automacaoVersaoId = null`, evitando que o mesmo job seja processado pelos dois
+runtimes.
+
+**Última atualização:** 2026-09-04 por Codex (RM-2026-D100EB)
+
+### SLA operacional e Motor Central — RM-2026-095B40
+
+**Produção:** `Cards.ts` e `Tarefas.ts` chamam o domínio SLA dentro das transações dos eventos reais. `sla.ts` grava transição + `BpmSlaEventoLog` + trava `BpmSlaDisparo` + evento `SLA_STATUS_ALTERADO` atomicamente.
+
+**Consumo visual:** a listagem do pipeline consulta `obterStatusSlaCards` em lote; o modal usa `ObterStatusSlaCard`. O realtime reconhece `SLA_STATUS_ALTERADO` para atualizar as superfícies abertas.
+
+**Automação:** `eventos.ts` materializa versões ativas cujo gatilho é `SLA_STATUS_ALTERADO` e cujo filtro opcional `slaStatus` corresponde ao valor novo. A unicidade de disparo e da outbox impede duplicação em leitura repetida, retry ou concorrência.

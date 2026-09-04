@@ -51,6 +51,7 @@ const calculationSchema = z.object({
   type: z.enum(["PERCENTAGE", "FIXED", "PER_UNIT", "ADDITIONAL", "DSR", "CAP", "FLOOR", "PROPORTIONAL", "SUM_OF_COMPONENTS", "TOTAL_FIXO_COM_DSR"]),
   benefitType: z.enum(["COMMISSION", "BONUS", "DSR"]),
   rate: z.number().min(0).max(1).optional(),
+  baseCalculo: z.enum(["VALOR_BRUTO", "VALOR_LIQUIDO"]).optional(),
   fixedAmountCents: z.number().int().optional(),
   perUnitAmountCents: z.number().int().optional(),
   quantity: z.number().optional(),
@@ -216,8 +217,14 @@ export async function CriarVersaoRegra(input: z.infer<typeof criarVersaoSchema>)
 
     const novaVersaoNumero = (ultimaVersao?.version ?? 0) + 1;
 
-    if (priority !== rule.priority || Object.keys(rulePatch).length > 0) {
-      await db.commissionRule.update({ where: { id: ruleId }, data: { priority, ...rulePatch } });
+    const metadadosAlterados = priority !== rule.priority || Object.entries(rulePatch).some(
+      ([chave, valor]) => valor !== undefined && valor !== rule[chave as keyof typeof rule],
+    );
+    if (metadadosAlterados) {
+      return {
+        success: false,
+        error: "Escopo e prioridade são imutáveis entre versões; inative a regra e crie outra.",
+      } as const;
     }
 
     const novaVersao = await db.commissionRuleVersion.create({
@@ -239,7 +246,7 @@ export async function CriarVersaoRegra(input: z.infer<typeof criarVersaoSchema>)
       entityType: "CommissionRule",
       entityId: ruleId,
       before: { ultimaVersao: ultimaVersao?.version ?? null, priority: rule.priority },
-      after: { novaVersao: novaVersao.version, priority, ...rulePatch },
+      after: { novaVersao: novaVersao.version },
     });
 
     return { success: true, data: novaVersao } as const;

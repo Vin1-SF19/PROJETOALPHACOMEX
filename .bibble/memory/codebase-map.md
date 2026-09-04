@@ -1,8 +1,30 @@
 # CODEBASE MAP — Mapa Estrutural do Projeto
 
+- Checklist Builder: models Prisma `BpmChecklistTemplate*`/`BpmCardChecklist*`; domínio em `src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts`; actions em `src/actions/bpm/Checklists.ts`; workspace em `src/components/bpm/checklists/ChecklistsWorkspace.tsx`; painel em `CardModal/PainelChecklistsCard.tsx`; alerta/navegação em `PainelProximaEtapa.tsx` + `PainelRegistrar.tsx`; ação automática `MATERIALIZAR_CHECKLIST` em `src/lib/bpm/automacoes/{schemas,executor}.ts`.
+- SLA BPM: cálculo, provisionamento idempotente, pausa/retomada, recálculo on-read e sincronização de movimento em `src/lib/bpm/sla.ts`; fachada autenticada em `src/actions/bpm/Sla.ts`; `Cards.ts` sincroniza a saída/entrada de etapa e o standby na mesma transação do movimento.
+
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-08-29 (Gerador de Documentos — Contratante/Contratada + Qualificação, Parte 1)
+> Última atualização: 2026-09-04 (RM-2026-209DB4 — Checklist Builder concluído)
+
+---
+
+## Alpha CRM — infraestrutura de data/hora do card (RM-2026-EB401C, 2026-09-04)
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `src/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField.tsx` | Seletor controlado de calendário + hora; emite valor civil e não chama backend |
+| `src/lib/format-date.ts` | Conversão determinística entre valor civil `YYYY-MM-DDTHH:mm` de São Paulo e instante persistido |
+| `src/lib/bpm/rascunho-versionado.ts` | Snapshot/revisão para impedir confirmação de saves obsoletos |
+| `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximoContato.tsx` | Consumidor nullable com autosave, limpeza e conflito realtime |
+| `src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx` | Consumidor obrigatório para agendar/reagendar e preservar rascunho |
+| `src/app/PainelAlpha/AlphaCRM/CardModal/PainelTarefasPorTipo.tsx` | Consumidores obrigatórios de prazo e alerta e guarda de datas legadas nulas |
+| `src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx` | Limite do `CardSaveProvider`; blur + flush antes de fechar |
+| `src/lib/validations/bpm.ts` | Contrato server-side estrito de instantes aceitos pelas actions BPM |
+
+Montagem: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → `CardFullViewModal` → `CardAbertoLayout`; o centro monta `CardOpenFormSlot` para Próximo Contato/Reunião e a lateral monta `PainelTarefasPorTipo` para Prazo/Alerta. Ver `integration-points.md` para o protocolo de novos consumidores.
+
+**Última atualização:** 2026-09-04 por Scribe (fechamento RM-2026-EB401C)
 
 ---
 
@@ -410,7 +432,9 @@ CardFullViewModal.tsx (3 consumidores: DashboardClient, PipelineBoardClient em
       - Direita: PainelProximaEtapa.tsx
 ```
 
-**`CardOpenFormSlot.tsx`** é o ÚNICO ponto real de seleção de formulário por etapa — IS a fonte de verdade, não `PainelRegistrar.tsx` (que só monta as Tabs e a Anotação). Painéis condicionais: `PainelReuniao` (etapaEhAgendarReuniao), `PainelStatusPosFechamento` (etapaEhFechado), `PainelChecklistFollowUp` (etapaEhEmTratativa), `PainelStandbyFollowUp` (etapaEhStandbyFollowUp). Sempre renderizados: `PainelCamposEtapaAtual`, `PainelProximoContato`.
+**`CardOpenFormSlot.tsx`** é o ÚNICO ponto real de seleção de formulário por etapa — é a fonte de verdade, não `PainelRegistrar.tsx` (que só monta as Tabs e a Anotação). **Agendar Reunião** é um ramo exclusivo com retorno antecipado de `PainelReuniao`: não monta campos dinâmicos, Próximo Contato nem acompanhamento. No ramo genérico, `PainelCamposEtapaAtual` e `PainelProximoContato` são montados; `PainelReuniao` em modo de acompanhamento é condicional a **Reunião Agendada**, e `PainelStatusPosFechamento`, `PainelChecklistFollowUp` e `PainelStandbyFollowUp` seguem condicionados às respectivas etapas.
+
+**Última atualização desta cadeia:** 2026-09-04 por Scribe (RM-2026-6BEA04)
 
 **3 arquivos órfãos removidos nesta sessão** (zero consumidores confirmados via grep em todo `src/`, todas as remoções validadas por `tsc --noEmit`/`eslint`/`npm run build`/`tests/bpm` sem regressão):
 - `CardOpenShell.tsx` (308 linhas) — 2ª implementação completa e duplicada do mesmo layout, com registry paralelo INCOMPATÍVEL (chaveado por `pipeline.id`, o real é por `pipeline.nome`). Nunca deve ser recriado — se um dia for necessário customizar o layout por pipeline, popular `pipelines/index.ts` (o registry real).
@@ -1287,3 +1311,23 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - `tests/bpm/campos-agrupados-por-coluna.test.ts`: cobertura de ordem, vazio, preservação sem duplicação e wiring da UI.
 
 **Última atualização:** 2026-08-17 por Scribe
+# Checklist Builder — shell administrativo (RM-2026-209DB4, 2026-09-04)
+
+- `src/app/PainelAlpha/AlphaCRM/admin/AdminPipelinesListClient.tsx`: expõe a ação `Checklists` dentro da configuração existente.
+- `src/app/PainelAlpha/AlphaCRM/admin/checklists/page.tsx`: shell server-side temático, protegido por `auth()` + `isAdminRole`, sem acesso ao banco até a fase Vault.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`: ponto de montagem já existente, preservado para receber o painel funcional somente após schema/actions.
+# SLA administrativo — RM-2026-095B40 (Fase 3)
+
+- `src/lib/validations/bpm-sla.ts`: contrato Zod compartilhado do CRUD administrativo.
+- `src/actions/bpm/Sla.ts`: listagem, save transacional de configuração+limites, toggle e exclusão protegida quando não há instâncias.
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/SlaConfigSection.tsx`: workspace de listagem e mutações.
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/SlaConfigForm.tsx`: formulário e preview dos estados.
+
+# SLA operacional — RM-2026-095B40 (Fases 4–6)
+
+- `src/lib/bpm/sla.ts`: cálculo autoritativo, provisionamento pelos cinco momentos, pausa/retomada, transições, logs, disparos idempotentes e publicação da outbox.
+- `src/actions/bpm/{Cards,Tarefas,Sla}.ts`: integração transacional com criação/visualização/movimento de card, criação/conclusão de tarefa e consultas autenticadas.
+- `src/components/bpm/sla/SlaStatusBadge.tsx`: estado semântico e relógio visual; `PipelineBoardClient.tsx` consome status em lote.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/PainelSlaCard.tsx`: detalhes, deadline e histórico de pausa no card aberto.
+- `src/lib/bpm/automacoes/{central-schemas,eventos}.ts`: gatilho `SLA_STATUS_ALTERADO`, filtro por status e materialização idempotente.
+- `tests/bpm/sla-alertas-automacao.test.ts` e `scripts/verify-sla-e2e.ts`: regressões estáticas/isoladas e cenário real de ponta a ponta.

@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
 import { resolveCardAbertoLayout } from "./pipelines";
+import { CardSaveProvider, useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
@@ -46,7 +47,8 @@ interface Props {
   onAbrirCard: (cardId: string) => void;
 }
 
-export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard }: Props) {
+function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard }: Props) {
+  const { flushSaves } = useCardSave();
   const [card, setCard] = useState<CardDetalhe | null>(null);
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
@@ -117,17 +119,24 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
     return () => { cancelado = true; };
   }, [cardId, fecharPorAcessoRevogado, realtimeRevision]);
 
-  async function recarregar() {
+  const recarregar = useCallback(async () => {
     const res = await ObterCardBpm(cardId);
     if (resultadoRevogaAcessoCard(res)) {
       fecharPorAcessoRevogado();
       return;
     }
     if (res.success && res.data) setCard(res.data);
-  }
+  }, [cardId, fecharPorAcessoRevogado]);
+
+  const handleAtualizado = useCallback(() => {
+    void recarregar();
+    onAtualizado();
+  }, [onAtualizado, recarregar]);
 
   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
-  const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo);
+  const podeAgirNaEtapa = card?.permissaoEtapa?.podeAgir ?? true;
+  const podeTrabalharNoCard = isAdminRole(currentUserRole)
+    || (Boolean(meuVinculo) && podeAgirNaEtapa);
   const podeMoverEtapa = podeTrabalharNoCard;
   const podeEditar = podeTrabalharNoCard;
   const podeTrabalharTarefas = podeTrabalharNoCard;
@@ -150,21 +159,32 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
   const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
   const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual);
 
+  async function solicitarFechamento() {
+    if (deveBloquearFechamento && card) {
+      const checklist = document.getElementById(`follow-up-${card.id}`);
+      checklist?.scrollIntoView({ behavior: "smooth", block: "center" });
+      checklist?.focus({ preventScroll: true });
+      toast.error(estadoFollowUpAtual === "CARREGANDO"
+        ? "Aguarde a validação do último follow-up antes de fechar este card."
+        : estadoFollowUpAtual === "ERRO"
+          ? "Não foi possível validar o follow-up. Recarregue a seção antes de fechar o card."
+          : "Conclua o checklist do último follow-up antes de fechar este card.");
+      return;
+    }
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    await Promise.resolve();
+    const savesConcluidos = await flushSaves();
+    if (!savesConcluidos) {
+      toast.error("Não foi possível salvar todas as alterações. O card permanecerá aberto.");
+      return;
+    }
+    onClose();
+  }
+
   return (
     <Sheet open onOpenChange={(open) => {
       if (open) return;
-      if (deveBloquearFechamento && card) {
-        const checklist = document.getElementById(`follow-up-${card.id}`);
-        checklist?.scrollIntoView({ behavior: "smooth", block: "center" });
-        checklist?.focus({ preventScroll: true });
-        toast.error(estadoFollowUpAtual === "CARREGANDO"
-          ? "Aguarde a validação do último follow-up antes de fechar este card."
-          : estadoFollowUpAtual === "ERRO"
-            ? "Não foi possível validar o follow-up. Recarregue a seção antes de fechar o card."
-            : "Conclua o checklist do último follow-up antes de fechar este card.");
-        return;
-      }
-      onClose();
+      void solicitarFechamento();
     }}>
       <SheetContent
         side="bottom"
@@ -191,7 +211,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                 card={card} etapas={etapas} interacoes={interacoes}
                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
                 realtimeRevision={realtimeRevision} onClose={onClose}
-                onAtualizado={() => { void recarregar(); onAtualizado(); }}
+                onAtualizado={handleAtualizado}
                 onAbrirCard={onAbrirCard}
                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
                 onEstadoFollowUpChange={atualizarEstadoFollowUp}
@@ -201,7 +221,7 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
                   interacoes={interacoes}
                   onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
-                  onAtualizado={() => { void recarregar(); onAtualizado(); }}
+                  onAtualizado={handleAtualizado}
                   />
               </Layout>
             );
@@ -209,5 +229,13 @@ export default function CardFullViewModal({ cardId, realtimeRevision = 0, accent
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+export default function CardFullViewModal(props: Props) {
+  return (
+    <CardSaveProvider>
+      <CardFullViewModalContent {...props} />
+    </CardSaveProvider>
   );
 }

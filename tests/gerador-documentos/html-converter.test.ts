@@ -8,6 +8,7 @@ vi.stubGlobal("fetch", mockFetch);
 describe("converterParaHtml", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("fetch", mockFetch);
   });
 
   afterEach(() => {

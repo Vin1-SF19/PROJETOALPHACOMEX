@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   updateDocumento: vi.fn(),
   put: vi.fn(),
   gerarPdfDocumento: vi.fn(),
+  renderHtmlParaPdf: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
@@ -30,6 +32,7 @@ vi.mock("@/lib/prisma", () => ({
       update: mocks.updateDocumento,
     },
     documentoTemplate: { findUnique: vi.fn() },
+    $queryRaw: (...args: unknown[]) => mocks.queryRaw(...args),
   },
 }));
 
@@ -42,6 +45,7 @@ vi.mock("@vercel/blob", () => ({ put: mocks.put }));
 vi.mock("@/lib/gerador-documentos/pdf", () => ({
   gerarPdfDocumento: mocks.gerarPdfDocumento,
 }));
+vi.mock("@/lib/gerador-documentos/pdf-renderer", () => ({ renderHtmlParaPdf: mocks.renderHtmlParaPdf }));
 
 vi.mock("@/lib/bibble/tika", () => ({ extractTextFromBuffer: vi.fn() }));
 vi.mock("@/lib/onyx/user-token", () => ({ getUserOnyxToken: vi.fn() }));
@@ -66,11 +70,14 @@ describe("FinalizarDocumento", () => {
       templateId: "template-1",
     });
     process.env.BLOB_READ_WRITE_TOKEN = "fake-token";
+    mocks.queryRaw.mockResolvedValue([]);
   });
 
   it("caminho feliz: gera PDF, sobe pro blob, atualiza status+pdfUrl e retorna pdfUrl", async () => {
     mocks.findUniqueDocumento.mockResolvedValue({
       titulo: "Contrato de Teste",
+      variaveisJson: {},
+      template: { variaveisJson: [] },
       clausulas: [{ titulo: "Objeto", conteudo: "Texto da cláusula." }],
     });
     mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF-fake"));
@@ -79,7 +86,7 @@ describe("FinalizarDocumento", () => {
 
     const resultado = await FinalizarDocumento(DOCUMENTO_ID);
 
-    expect(resultado).toEqual({ success: true, pdfUrl: "https://blob.vercel-storage.com/documento-final.pdf" });
+    expect(resultado).toEqual({ success: true, pdfDisponivel: true });
     expect(mocks.gerarPdfDocumento).toHaveBeenCalledWith({
       titulo: "Contrato de Teste",
       clausulas: [{ titulo: "Objeto", conteudo: "Texto da cláusula." }],
@@ -91,9 +98,27 @@ describe("FinalizarDocumento", () => {
     });
   });
 
+  it("na finalização regenera o PDF pelo HTML fiel quando htmlUrl existe", async () => {
+    mocks.findUniqueDocumento.mockResolvedValue({ titulo: "Contrato", variaveisJson: {}, template: { variaveisJson: [] }, clausulas: [] });
+    mocks.queryRaw.mockResolvedValue([{ htmlUrl: "https://blob.example.com/documento.html" }]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: async () => "<p>HTML fiel</p>" }));
+    mocks.renderHtmlParaPdf.mockResolvedValue(Buffer.from("%PDF-html"));
+    mocks.put.mockResolvedValue({ url: "https://blob.vercel-storage.com/documento-final.pdf" });
+    mocks.updateDocumento.mockResolvedValue({});
+
+    const resultado = await FinalizarDocumento(DOCUMENTO_ID);
+
+    expect(resultado).toEqual({ success: true, pdfDisponivel: true });
+    expect(mocks.renderHtmlParaPdf).toHaveBeenCalledWith("<p>HTML fiel</p>");
+    expect(mocks.gerarPdfDocumento).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it("se gerarPdfDocumento falhar, o update de status NUNCA é chamado (garantia de atomicidade)", async () => {
     mocks.findUniqueDocumento.mockResolvedValue({
       titulo: "Contrato de Teste",
+      variaveisJson: {},
+      template: { variaveisJson: [] },
       clausulas: [{ titulo: "Objeto", conteudo: "Texto." }],
     });
     mocks.gerarPdfDocumento.mockRejectedValue(new Error("Falha ao renderizar PDF"));
@@ -108,6 +133,8 @@ describe("FinalizarDocumento", () => {
   it("se o upload (put) falhar, o update de status NUNCA é chamado", async () => {
     mocks.findUniqueDocumento.mockResolvedValue({
       titulo: "Contrato de Teste",
+      variaveisJson: {},
+      template: { variaveisJson: [] },
       clausulas: [{ titulo: "Objeto", conteudo: "Texto." }],
     });
     mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF-fake"));
@@ -129,6 +156,29 @@ describe("FinalizarDocumento", () => {
     expect(mocks.put).not.toHaveBeenCalled();
   });
 
+  it("bloqueia a finalização quando uma variável obrigatória está vazia", async () => {
+    mocks.findUniqueDocumento.mockResolvedValue({
+      titulo: "Contrato de Teste",
+      variaveisJson: { nome_cliente: "" },
+      template: {
+        variaveisJson: [
+          { nome: "nome_cliente", label: "Nome", tipo: "texto", obrigatorio: true },
+        ],
+      },
+      clausulas: [{ titulo: "Objeto", conteudo: "Texto." }],
+    });
+
+    const resultado = await FinalizarDocumento(DOCUMENTO_ID);
+
+    expect(resultado).toEqual({
+      success: false,
+      error: "Variáveis obrigatórias ausentes: nome_cliente",
+    });
+    expect(mocks.gerarPdfDocumento).not.toHaveBeenCalled();
+    expect(mocks.put).not.toHaveBeenCalled();
+    expect(mocks.updateDocumento).not.toHaveBeenCalled();
+  });
+
   it("usuário sem ownership do documento é bloqueado antes de buscar cláusulas", async () => {
     mocks.findUniqueDocumentoOwnership.mockResolvedValue({
       id: DOCUMENTO_ID,
@@ -148,6 +198,8 @@ describe("FinalizarDocumento", () => {
     delete process.env.BLOB_READ_WRITE_TOKEN;
     mocks.findUniqueDocumento.mockResolvedValue({
       titulo: "Contrato de Teste",
+      variaveisJson: {},
+      template: { variaveisJson: [] },
       clausulas: [{ titulo: "Objeto", conteudo: "Texto." }],
     });
     mocks.gerarPdfDocumento.mockResolvedValue(Buffer.from("%PDF-fake"));

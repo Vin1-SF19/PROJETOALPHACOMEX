@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import type { DadosEmpresaConsolidado } from "@/lib/bpm/dados-empresa";
+import { formatCNPJ } from "@/lib/format-cnpj";
 
 interface DadosEmpresaConteudoProps {
   dados: DadosEmpresaConsolidado;
@@ -93,7 +94,7 @@ export function DadosEmpresaConteudo({ dados, accent }: DadosEmpresaConteudoProp
             <p className="mt-1 text-sm text-slate-400">{dados.empresa.nomeFantasia || "Sem nome fantasia"}</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Campo rotulo="CNPJ" valor={<span className="font-mono">{dados.empresa.cnpj}</span>} />
+            <Campo rotulo="CNPJ" valor={<span className="font-mono">{formatCNPJ(dados.empresa.cnpj) ?? dados.empresa.cnpj}</span>} />
             <Campo rotulo="Capital social" valor={formatarMoeda(dados.empresa.capitalSocial)} />
           </div>
         </div>

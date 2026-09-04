@@ -253,9 +253,104 @@ htmlUrl String?   // URL do HTML renderizado com variáveis preenchidas (Vercel 
 
 ---
 
-## 10. Escopo fora desta fase
+## 10. Execução — grifo de variáveis na revisão (RM-2026-BB92C7, Fase 1)
+
+### Checklist
+
+- [x] Marcar variáveis preenchidas em amarelo no HTML de conferência.
+- [x] Marcar variáveis faltantes em vermelho com o texto `[FALTANTE: nome]`.
+- [x] Injetar o CSS no `head` do próprio documento para funcionamento no iframe.
+- [x] Preservar tags, atributos, scripts, estilos, tabelas e imagens do template.
+- [x] Escapar valores fornecidos pelo usuário antes de inseri-los no HTML.
+- [x] Permitir a criação do rascunho em conferência com valores faltantes.
+- [x] Impedir a finalização no servidor enquanto houver obrigatórias vazias.
+- [x] Cobrir preenchida, faltante, CSS no iframe, escape e gate de finalização com testes.
+- [x] Validar o caminho real de consumo na tela de conferência.
+
+### File List
+
+- `src/lib/gerador-documentos/html-render.ts`
+- `src/actions/gerador-documentos.ts`
+- `tests/gerador-documentos/html-render.test.ts`
+- `tests/gerador-documentos/finalizar-documento.test.ts`
+- `docs/stories/story-gerador-documentos-html-pdf-blueprint.md`
+- `.bibble/memory/architecture.md`
+- `.bibble/memory/journal.md`
+
+### Entregabilidade
+
+`/PainelAlpha/GeradorDocumentos` → template → “Gerar documento” → formulário de geração → `GerarDocumento` persiste HTML com grifos → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → iframe “Visualização fiel do documento”. O botão “Finalizar” permanece disponível na conferência, mas a Server Action recusa obrigatórias faltantes.
+
+## 11. Escopo fora desta fase
 
 - PDF pixel-perfect (serviço externo) — aditivo futuro
 - Edição visual do HTML (WYSIWYG) — fora de escopo
 - Conversão de XLSX/PPTX para HTML — fora de escopo (módulo é "documentos", não planilhas/apresentações)
 - Assinatura digital no HTML — fora de escopo
+
+## 12. Execução — PDF inline e fidelidade estrutural (RM-2026-BB92C7, Fase 2)
+
+### Checklist
+
+- [x] Exibir o PDF na conferência por rota autenticada, sem expor `pdfUrl` ao client.
+- [x] Preservar o download como `attachment` e oferecer modo `inline` ao iframe.
+- [x] Cobrir loading, sucesso e erro/indisponibilidade do preview.
+- [x] Renderizar imagens HTTP(S)/base64 seguras e rejeitar destinos de rede privada.
+- [x] Preservar títulos e tabelas multicoluna com bordas, padding, cabeçalhos e `colspan`.
+- [x] Repetir `<header>`/`<footer>` reconhecíveis com `fixed` do `@react-pdf/renderer`.
+- [x] Fazer `FinalizarDocumento` reutilizar o HTML fiel quando `htmlUrl` estiver disponível.
+- [x] Cobrir renderer, endpoint inline e finalização fiel com testes.
+- [x] Validar o caminho de consumo real na conferência.
+
+### File List
+
+- `src/lib/gerador-documentos/pdf-renderer.tsx`
+- `src/actions/gerador-documentos.ts`
+- `src/app/PainelAlpha/GeradorDocumentos/[templateId]/download/route.ts`
+- `src/components/GeradorDocumentos/ConferenciaClient.tsx`
+- `src/components/GeradorDocumentos/GeradorDocumentosClient.tsx`
+- `tests/gerador-documentos/pdf-renderer.test.ts`
+- `tests/gerador-documentos/download-pdf.test.ts`
+- `tests/gerador-documentos/finalizar-documento.test.ts`
+- `docs/stories/story-gerador-documentos-html-pdf-blueprint.md`
+- `.bibble/memory/architecture.md`
+- `.bibble/memory/journal.md`
+
+### Limitação explícita
+
+O renderer preserva a estrutura reconhecível pelo HTML do Tika, mas não reproduz CSS arbitrário, fontes incorporadas, posicionamento absoluto ou paginação pixel-perfect. Imagens relativas sem URL/base64 autocontida também não podem ser resolvidas. Header/footer são repetidos quando o HTML contém `<header>`, `<footer>` ou classes `header/page-header/document-header` e equivalentes de footer.
+
+### Entregabilidade
+
+`/PainelAlpha/GeradorDocumentos` → “Gerar documento” → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → card “PDF gerado” → iframe autenticado `/PainelAlpha/GeradorDocumentos/[id]/download?disposition=inline`; o botão “Baixar PDF” usa a mesma rota no modo `attachment`.
+
+## 13. Execução — reescrita de cláusula com IA (RM-2026-BB92C7, Fase 3)
+
+### Checklist
+
+- [x] Manter auth, permissão do módulo, ownership e validação Zod na Server Action existente.
+- [x] Bloquear reescrita de documentos finalizados/arquivados também no servidor.
+- [x] Chamar o Onyx com token individual sem expor credenciais ao client.
+- [x] Persistir a cláusula reescrita e regenerar HTML/PDF na mesma ação de usuário.
+- [x] Preservar as tags do HTML fiel ao substituir somente os nós de texto da cláusula.
+- [x] Atualizar textarea, iframe HTML e iframe PDF sem reload da página.
+- [x] Cobrir sucesso da IA, ownership, timeout e resposta vazia/inválida com teste automatizado.
+- [x] Validar o caminho real de consumo na conferência.
+- [x] Corrigir o isolamento do mock global em `html-converter.test.ts`, sem acesso ao Tika real entre casos.
+- [x] Manter reload sincronizado sem depender da migration pendente de `htmlUrl`, derivando o HTML irmão da `pdfUrl` persistida.
+
+### File List
+
+- `src/lib/gerador-documentos/clause-sync.ts`
+- `src/lib/gerador-documentos/ownership.ts`
+- `src/actions/gerador-documentos.ts`
+- `src/components/GeradorDocumentos/ConferenciaClient.tsx`
+- `tests/gerador-documentos/reescrever-clausula.test.ts`
+- `tests/gerador-documentos/html-converter.test.ts`
+- `docs/stories/story-gerador-documentos-html-pdf-blueprint.md`
+- `.bibble/memory/architecture.md`
+- `.bibble/memory/journal.md`
+
+### Entregabilidade
+
+`/PainelAlpha/GeradorDocumentos` → documento gerado → `/PainelAlpha/GeradorDocumentos/conferencia/[token]` → cláusula → “Reescrever com IA” → instrução → textarea, HTML fiel e PDF atualizados; ao recarregar, os três artefatos são obtidos das URLs persistidas.

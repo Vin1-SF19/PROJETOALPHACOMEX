@@ -17,9 +17,17 @@ import {
 import {
   type AcaoAutomacaoBpm,
   type ParametrosContratoBpm,
+  type ParametrosDistribuicaoBpm,
   type ParametrosEmailBpm,
+  type ParametrosOportunidadeBpm,
   validarParametrosAutomacaoBpm,
 } from "@/lib/bpm/automacoes/schemas";
+import { montarFatoChecklistAutomacaoBpm } from "@/lib/bpm/checklists/integracao";
+import { materializarChecklistsAplicaveisCard } from "@/lib/bpm/checklists/service";
+import {
+  executarDistribuicaoBpm,
+  executarOportunidadeBpm,
+} from "@/lib/bpm/automacoes/distribuicao-oportunidades";
 
 const variaveisTemplateSchema = z.array(VariavelTemplateSchema).max(50);
 
@@ -31,7 +39,19 @@ function lerVariaveisTemplate(valor: unknown) {
 type ContextoExecucao = {
   card: {
     id: string;
+    pipelineId: string;
+    etapaId: string;
     servico: string | null;
+    tipoProcesso: string | null;
+    responsavelId: number;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+    concluidoEm: Date | null;
+    primeiraVisualizacaoEm: Date | null;
+    proximoContatoEm: Date | null;
+    dataReuniao: Date | null;
+    statusPosFechamento: string | null;
     empresaId: number;
     empresa: { razaoSocial: string; nomeFantasia: string | null; cnpj: string | null };
     responsavel: { nome: string };
@@ -41,7 +61,14 @@ type ContextoExecucao = {
   placeholders: Record<string, string>;
 };
 
-function montarContexto(card: ContextoExecucao["card"]): ContextoExecucao {
+async function montarContexto(card: ContextoExecucao["card"]): Promise<ContextoExecucao> {
+  const fatoChecklist = await montarFatoChecklistAutomacaoBpm({
+    id: card.id,
+    pipelineId: card.pipelineId,
+    etapaId: card.etapaId,
+    servico: card.servico,
+    tipoProcesso: card.tipoProcesso,
+  });
   return {
     card,
     placeholders: {
@@ -53,6 +80,7 @@ function montarContexto(card: ContextoExecucao["card"]): ContextoExecucao {
       "responsavel.nome": card.responsavel.nome,
       "pipeline.nome": card.pipeline.nome,
       "coluna.nome": card.etapa.nome,
+      ...fatoChecklist.placeholders,
     },
   };
 }
@@ -60,6 +88,7 @@ function montarContexto(card: ContextoExecucao["card"]): ContextoExecucao {
 async function enviarEmail(
   parametros: ParametrosEmailBpm,
   contexto: ContextoExecucao,
+  idempotencyKey?: string,
 ) {
   if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY não configurada");
   const remetente = process.env.BPM_AUTOMACOES_EMAIL_FROM
@@ -81,7 +110,7 @@ async function enviarEmail(
     subject: assunto,
     html,
     ...(cc.length > 0 ? { cc } : {}),
-  });
+  }, idempotencyKey ? { idempotencyKey } : undefined);
   if (resposta.error) throw new Error(`Falha no envio: ${resposta.error.message}`);
   return { tipo: "EMAIL", destinatario: para, messageId: resposta.data?.id ?? null };
 }
@@ -226,6 +255,12 @@ async function executarAcao(params: {
   acaoTipo: AcaoAutomacaoBpm;
   parametrosJson: string;
   criadoPorId: number;
+  automacaoId: string;
+  automacaoNome: string;
+  execucaoId: string;
+  eventoChave: string;
+  gatilhoTipo: string;
+  automacaoEtapaId: string;
   contexto: ContextoExecucao;
 }) {
   let bruto: unknown;
@@ -245,12 +280,105 @@ async function executarAcao(params: {
       params.criadoPorId,
     );
   }
-  return gerarFicha(params.contexto, params.criadoPorId);
+  if (params.acaoTipo === "GERAR_FICHA") {
+    return gerarFicha(params.contexto, params.criadoPorId);
+  }
+  if (params.acaoTipo === "MATERIALIZAR_CHECKLIST") {
+    const resultado = await materializarChecklistsAplicaveisCard({
+      cardId: params.contexto.card.id,
+      automacaoOrigem: params.automacaoId,
+    });
+    return {
+      tipo: "CHECKLIST",
+      materializados: resultado.criados.length,
+      checklistIds: resultado.criados,
+    };
+  }
+  if (params.acaoTipo === "DISTRIBUIR_RESPONSAVEL") {
+    return executarDistribuicaoBpm({
+      automacaoId: params.automacaoId,
+      automacaoNome: params.automacaoNome,
+      execucaoId: params.execucaoId,
+      eventoChave: params.eventoChave,
+      gatilhoTipo: params.gatilhoTipo,
+      automacaoEtapaId: params.automacaoEtapaId,
+      card: params.contexto.card,
+      configuracao: parametros as ParametrosDistribuicaoBpm,
+    });
+  }
+  const oportunidade = await executarOportunidadeBpm({
+    automacaoId: params.automacaoId,
+    automacaoNome: params.automacaoNome,
+    execucaoId: params.execucaoId,
+    criadoPorId: params.criadoPorId,
+    card: params.contexto.card,
+    configuracao: parametros as ParametrosOportunidadeBpm,
+  });
+  if (!("status" in oportunidade) || oportunidade.status !== "COMUNICACAO_PENDENTE") return oportunidade;
+  const configuracao = parametros as ParametrosOportunidadeBpm;
+  if (configuracao.acao.tipo !== "ENVIAR_EMAIL") return oportunidade;
+  const email = await enviarEmail(
+    configuracao.acao.parametros,
+    params.contexto,
+    `bpm-opportunity:${params.execucaoId}`,
+  );
+  await db.bpmCardHistorico.create({
+    data: {
+      cardId: params.contexto.card.id,
+      acao: "OPORTUNIDADE_IDENTIFICADA",
+      automacaoOrigem: params.automacaoId,
+      valorNovoJson: JSON.stringify({
+        execucaoId: params.execucaoId,
+        servicoId: configuracao.servicoAlvoId,
+        acao: "ENVIAR_EMAIL",
+        messageId: email.messageId,
+      }),
+    },
+  });
+  return { ...oportunidade, status: "CRIADA", acao: "ENVIAR_EMAIL", messageId: email.messageId };
 }
 
 function mensagemErro(error: unknown): string {
   if (error instanceof z.ZodError) return "Configuração da ação inválida";
   return error instanceof Error ? error.message.slice(0, 2_000) : "Falha inesperada";
+}
+
+/** Adaptador do catálogo legado para versões do Motor Central. */
+export async function executarAcaoLegadaNoMotorCentral(params: {
+  execucaoId: string;
+  automacaoId: string;
+  automacaoNome: string;
+  criadoPorId: number;
+  cardId: string;
+  gatilhoTipo: string;
+  automacaoEtapaId: string;
+  acaoTipo: AcaoAutomacaoBpm;
+  parametros: unknown;
+}) {
+  const card = await db.bpmCard.findUnique({
+    where: { id: params.cardId },
+    select: {
+      id: true, pipelineId: true, etapaId: true, servico: true, tipoProcesso: true,
+      responsavelId: true, status: true, createdAt: true, updatedAt: true,
+      concluidoEm: true, primeiraVisualizacaoEm: true, proximoContatoEm: true,
+      dataReuniao: true, statusPosFechamento: true, empresaId: true,
+      empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
+      responsavel: { select: { nome: true } }, pipeline: { select: { nome: true } }, etapa: { select: { nome: true } },
+    },
+  });
+  if (!card) throw new Error("Card não encontrado");
+  return executarAcao({
+    acaoTipo: params.acaoTipo,
+    parametrosJson: JSON.stringify(params.parametros),
+    criadoPorId: params.criadoPorId,
+    automacaoId: params.automacaoId,
+    automacaoNome: params.automacaoNome,
+    execucaoId: params.execucaoId,
+    eventoChave: `central:${params.execucaoId}`,
+    gatilhoTipo: params.gatilhoTipo,
+    automacaoEtapaId: params.automacaoEtapaId,
+    contexto: await montarContexto(card),
+  });
 }
 
 export async function processarFilaAutomacoesBpm(
@@ -259,11 +387,11 @@ export async function processarFilaAutomacoesBpm(
   const agora = new Date();
   const stale = new Date(agora.getTime() - 15 * 60_000);
   await db.bpmAutomacaoExecucao.updateMany({
-    where: { status: "EM_EXECUCAO", iniciadoEm: { lte: stale }, tentativas: { lt: 3 } },
+    where: { automacaoVersaoId: null, status: "EM_EXECUCAO", iniciadoEm: { lte: stale }, tentativas: { lt: 3 } },
     data: { status: "PENDENTE", iniciadoEm: null, disponivelEm: agora },
   });
   const pendentes = await db.bpmAutomacaoExecucao.findMany({
-    where: { status: "PENDENTE", disponivelEm: { lte: agora }, tentativas: { lt: 3 } },
+    where: { automacaoVersaoId: null, status: "PENDENTE", disponivelEm: { lte: agora }, tentativas: { lt: 3 } },
     select: { id: true },
     orderBy: { createdAt: "asc" },
     take: Math.min(Math.max(limite, 1), 50),
@@ -285,7 +413,19 @@ export async function processarFilaAutomacoesBpm(
         card: {
           select: {
             id: true,
+            pipelineId: true,
+            etapaId: true,
             servico: true,
+            tipoProcesso: true,
+            responsavelId: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            concluidoEm: true,
+            primeiraVisualizacaoEm: true,
+            proximoContatoEm: true,
+            dataReuniao: true,
+            statusPosFechamento: true,
             empresaId: true,
             empresa: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true } },
             responsavel: { select: { nome: true } },
@@ -303,8 +443,23 @@ export async function processarFilaAutomacoesBpm(
         acaoTipo: execucao.automacao.acaoTipo as AcaoAutomacaoBpm,
         parametrosJson: execucao.automacao.parametrosJson,
         criadoPorId: execucao.automacao.criadoPorId,
-        contexto: montarContexto(execucao.card),
+        automacaoId: execucao.automacaoId,
+        automacaoNome: execucao.automacao.nome,
+        execucaoId: execucao.id,
+        eventoChave: execucao.eventoChave,
+        gatilhoTipo: execucao.gatilhoTipo,
+        automacaoEtapaId: execucao.automacao.etapaId,
+        contexto: await montarContexto(execucao.card),
       });
+      if (
+        typeof resultado === "object"
+        && resultado !== null
+        && "execucaoFinalizada" in resultado
+        && resultado.execucaoFinalizada === true
+      ) {
+        executados += 1;
+        continue;
+      }
       const concluidoEm = new Date();
       await db.$transaction([
         db.bpmAutomacaoExecucao.update({

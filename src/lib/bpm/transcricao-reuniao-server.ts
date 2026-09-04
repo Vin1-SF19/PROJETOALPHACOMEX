@@ -8,6 +8,7 @@ import {
   listarRegistrosConferenciaMeet,
 } from "@/lib/google-meet/client";
 import { obterUsuarioGoogleAtivoPorCalendario } from "@/lib/google-calendar/usuario-google";
+import { obterEvento as obterEventoGoogle } from "@/lib/google-calendar/client";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   consolidarTranscricao,
@@ -18,6 +19,8 @@ import { NOME_ETAPA_REUNIAO_AGENDADA } from "@/lib/bpm/reuniao-agendada";
 import { NOME_ETAPA_STANDBY } from "@/lib/bpm/novos-leads";
 
 const MAX_CARACTERES_TRANSCRICAO = 1_000_000;
+const PRAZO_MEET_MS = 18_000;
+const PRAZO_TOTAL_INTEGRACOES_MS = 25_000;
 const sincronizacoesEmAndamento = new Map<string, Promise<ResultadoSincronizacaoTranscricao>>();
 
 export type ResultadoSincronizacaoTranscricao =
@@ -36,6 +39,56 @@ export type ResumoPollingTranscricoes = {
   ignorados: number;
   falhos: number;
 };
+
+export async function executarComPrazoGoogleMeet<T>(
+  operacao: () => Promise<T>,
+  limiteMs: number,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operacao(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new GoogleMeetIntegracaoError(
+          "A consulta ao Google Meet excedeu o tempo limite. Tente novamente.",
+          true,
+        )), limiteMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+function textoPlanoDeHtml(valor: string): string {
+  return valor
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+async function obterResumoParcialDoEvento(params: {
+  emailUsuario: string;
+  googleCalendarId: string;
+  googleEventId: string;
+  limiteMs: number;
+}): Promise<string | null> {
+  const evento = await executarComPrazoGoogleMeet(() => obterEventoGoogle({
+    emailUsuario: params.emailUsuario,
+    calendarId: params.googleCalendarId,
+    googleEventId: params.googleEventId,
+  }), params.limiteMs);
+  const descricao = evento.descricao ? textoPlanoDeHtml(evento.descricao) : "";
+  return descricao ? `Resumo parcial do evento (Google Calendar):\n${descricao}` : null;
+}
 
 async function resolverEmailOrganizador(params: {
   googleEventId: string;
@@ -109,24 +162,62 @@ async function executarSincronizacaoTranscricaoCardBpm(
       googleCalendarId: card.googleCalendarId,
       googleMeetLink: card.googleMeetLink,
     });
-    const registros = await listarRegistrosConferenciaMeet(emailOrganizador, meetingCode);
-    const registro = selecionarRegistroConferencia(registros, card.dataReuniao);
-    if (!registro) {
-      return {
-        status: "PENDENTE",
-        motivo: "A conferência encerrada ainda não está disponível no Google Meet.",
-      };
+    const inicioIntegracoes = Date.now();
+    const prazoMeetEm = inicioIntegracoes + PRAZO_MEET_MS;
+    const prazoTotalEm = inicioIntegracoes + PRAZO_TOTAL_INTEGRACOES_MS;
+    let transcricao: string | null = null;
+    let conferencia: string | null = null;
+    let quantidadeEntradas = 0;
+    let fonte: "google_meet" | "google_calendar_fallback" = "google_meet";
+
+    try {
+      const registros = await executarComPrazoGoogleMeet(
+        () => listarRegistrosConferenciaMeet(emailOrganizador, meetingCode),
+        Math.max(1, prazoMeetEm - Date.now()),
+      );
+      const registro = selecionarRegistroConferencia(registros, card.dataReuniao);
+      if (!registro) {
+        return {
+          status: "PENDENTE",
+          motivo: "A conferência encerrada ainda não está disponível no Google Meet.",
+        };
+      }
+
+      const artefato = await executarComPrazoGoogleMeet(
+        () => carregarArtefatoTranscricaoMeet(emailOrganizador, registro.name),
+        Math.max(1, prazoMeetEm - Date.now()),
+      );
+      conferencia = registro.name;
+      quantidadeEntradas = artefato.entradas.length;
+      transcricao = consolidarTranscricao(artefato.entradas, artefato.participantes);
+      if (!transcricao) {
+        return {
+          status: "PENDENTE",
+          motivo: artefato.transcriptsEncontrados > 0
+            ? "A transcrição ainda está sendo processada pelo Google Meet."
+            : "A reunião foi encontrada, mas ainda não possui transcrição gerada.",
+        };
+      }
+    } catch (erroMeet) {
+      const falhaMeet = erroMeet instanceof GoogleMeetIntegracaoError
+        ? erroMeet
+        : new GoogleMeetIntegracaoError("Não foi possível consultar a transcrição no Google Meet.", true);
+      try {
+        transcricao = await obterResumoParcialDoEvento({
+          emailUsuario: emailOrganizador,
+          googleCalendarId: card.googleCalendarId,
+          googleEventId: card.googleEventId,
+          limiteMs: Math.max(1, prazoTotalEm - Date.now()),
+        });
+      } catch {
+        throw falhaMeet;
+      }
+      if (!transcricao) throw falhaMeet;
+      fonte = "google_calendar_fallback";
     }
 
-    const artefato = await carregarArtefatoTranscricaoMeet(emailOrganizador, registro.name);
-    const transcricao = consolidarTranscricao(artefato.entradas, artefato.participantes);
     if (!transcricao) {
-      return {
-        status: "PENDENTE",
-        motivo: artefato.transcriptsEncontrados > 0
-          ? "A transcrição ainda está sendo processada pelo Google Meet."
-          : "A reunião foi encontrada, mas ainda não possui transcrição gerada.",
-      };
+      return { status: "PENDENTE", motivo: "A transcrição ainda não está disponível." };
     }
     if (transcricao.length > MAX_CARACTERES_TRANSCRICAO) {
       return {
@@ -172,8 +263,9 @@ async function executarSincronizacaoTranscricaoCardBpm(
           automacaoOrigem: origem === "automatica" ? "google_meet_polling" : undefined,
           valorNovoJson: JSON.stringify({
             origem,
-            conferenceRecord: registro.name,
-            entradas: artefato.entradas.length,
+            fonte,
+            conferenceRecord: conferencia,
+            entradas: quantidadeEntradas,
             caracteres: transcricao.length,
           }),
         },

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const listarRegistrosMock = vi.hoisted(() => vi.fn());
 const carregarArtefatoMock = vi.hoisted(() => vi.fn());
 const obterUsuarioGoogleMock = vi.hoisted(() => vi.fn());
+const obterEventoGoogleMock = vi.hoisted(() => vi.fn());
 const notificarPipelineMock = vi.hoisted(() => vi.fn());
 const cardFindUniqueMock = vi.hoisted(() => vi.fn());
 const cacheFindManyMock = vi.hoisted(() => vi.fn());
@@ -23,6 +24,9 @@ vi.mock("@/lib/google-meet/client", () => ({
 vi.mock("@/lib/google-calendar/usuario-google", () => ({
   obterUsuarioGoogleAtivoPorCalendario: obterUsuarioGoogleMock,
 }));
+vi.mock("@/lib/google-calendar/client", () => ({
+  obterEvento: obterEventoGoogleMock,
+}));
 vi.mock("@/lib/bpm/realtime-server", () => ({
   notificarPipelineBpm: notificarPipelineMock,
 }));
@@ -34,7 +38,10 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
+import {
+  executarComPrazoGoogleMeet,
+  sincronizarTranscricaoCardBpm,
+} from "@/lib/bpm/transcricao-reuniao-server";
 
 const cardBase = {
   id: "card-1",
@@ -55,6 +62,7 @@ describe("sincronizarTranscricaoCardBpm", () => {
     cardFindUniqueMock.mockResolvedValue(cardBase);
     cacheFindManyMock.mockResolvedValue([{ calendarioId: "calendario-local-1" }]);
     obterUsuarioGoogleMock.mockResolvedValue({ ok: true, emailUsuario: "organizador@example.com" });
+    obterEventoGoogleMock.mockResolvedValue({ descricao: null });
     listarRegistrosMock.mockResolvedValue([{
       name: "conferenceRecords/1",
       startTime: "2026-08-12T12:02:00.000Z",
@@ -132,5 +140,33 @@ describe("sincronizarTranscricaoCardBpm", () => {
     });
     expect(cacheFindManyMock).not.toHaveBeenCalled();
     expect(listarRegistrosMock).not.toHaveBeenCalled();
+  });
+
+  it("usa a descrição do Calendar como resumo parcial quando a API Meet falha", async () => {
+    listarRegistrosMock.mockRejectedValue(new Error("falha transitória"));
+    obterEventoGoogleMock.mockResolvedValue({ descricao: "<p>Decisão: enviar proposta.</p>" });
+
+    const resultado = await sincronizarTranscricaoCardBpm("card-1", "automatica");
+
+    expect(resultado).toEqual(expect.objectContaining({ status: "RECEBIDA", atualizada: true }));
+    expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: { transcricaoReuniao: "Resumo parcial do evento (Google Calendar):\nDecisão: enviar proposta." },
+    }));
+    expect(historicoCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        valorNovoJson: expect.stringContaining('"fonte":"google_calendar_fallback"'),
+      }),
+    });
+  });
+
+  it("encerra uma integração pendurada antes de 30 segundos", async () => {
+    const consulta = executarComPrazoGoogleMeet(
+      () => new Promise<never>(() => undefined),
+      25_000,
+    );
+    const assercao = expect(consulta).rejects.toThrow("excedeu o tempo limite");
+
+    await vi.advanceTimersByTimeAsync(25_000);
+    await assercao;
   });
 });

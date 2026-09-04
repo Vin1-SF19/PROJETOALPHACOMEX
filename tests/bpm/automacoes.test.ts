@@ -99,6 +99,20 @@ describe("automações configuráveis do BPM", () => {
     expect(resultado.success).toBe(false);
   });
 
+  it("aceita somente configuração vazia para materialização explícita de checklist", () => {
+    const base = {
+      pipelineId: PIPELINE_ID,
+      etapaId: ETAPA_ID,
+      nome: "Preparar checklists",
+      gatilhoTipo: "ENTRAR_COLUNA" as const,
+      tempoMinutos: null,
+      acaoTipo: "MATERIALIZAR_CHECKLIST" as const,
+      ativa: true,
+    };
+    expect(salvarAutomacaoBpmSchema.safeParse({ ...base, parametros: {} }).success).toBe(true);
+    expect(salvarAutomacaoBpmSchema.safeParse({ ...base, parametros: { templateId: TEMPLATE_ID } }).success).toBe(false);
+  });
+
   it("substitui somente placeholders reconhecidos", () => {
     expect(renderizarPlaceholdersAutomacaoBpm(
       "{{empresa.razaoSocial}} / {{ card.id }} / {{nao.existe}}",
@@ -229,5 +243,33 @@ describe("integração da aba Automações", () => {
     expect(rota).toContain("autorizarCron");
     expect(rota).toContain("materializarAutomacoesTempoBpm");
     expect(rota).toContain("processarFilaAutomacoesBpm");
+  });
+
+  it("preserva versões e execuções ao arquivar uma automação", async () => {
+    const fs = await import("node:fs/promises");
+    const [action, schema, migration] = await Promise.all([
+      fs.readFile("src/actions/bpm/Automacoes.ts", "utf8"),
+      fs.readFile("prisma/schema.prisma", "utf8"),
+      fs.readFile(
+        "prisma/migrations/20260904184000_bpm_automacoes_idempotencia_auditoria/migration.sql",
+        "utf8",
+      ),
+    ]);
+
+    const excluir = action.slice(
+      action.indexOf("export async function ExcluirAutomacaoBpm"),
+      action.indexOf("export async function DuplicarAutomacaoBpm"),
+    );
+    expect(excluir).toContain('campoAlterado: "AUTOMACAO_ARQUIVADA"');
+    expect(excluir).toContain("tx.bpmAutomacao.update");
+    expect(excluir).not.toContain("tx.bpmAutomacao.delete");
+    expect(schema).toContain("@@unique([automacaoVersaoId, eventoId])");
+    expect(schema).toMatch(
+      /automacao BpmAutomacao\s+@relation\(fields: \[automacaoId\], references: \[id\], onDelete: Restrict\)/,
+    );
+    expect(migration).toContain('ON DELETE RESTRICT ON UPDATE CASCADE');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "BpmAutomacaoExecucao_automacaoVersaoId_eventoId_key"',
+    );
   });
 });

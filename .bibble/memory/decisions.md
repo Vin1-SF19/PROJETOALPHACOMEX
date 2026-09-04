@@ -1,5 +1,129 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-04 — RM-2026-209DB4 — automação explícita e save administrativo atômico
+
+**Decisão:** adicionar `MATERIALIZAR_CHECKLIST` ao catálogo persistido de ações do Motor de Automações, com parâmetros estritamente vazios, chamando `materializarChecklistsAplicaveisCard({ cardId, automacaoOrigem })`. Não materializar em criação ou movimento. No builder, editar template passa por `SalvarTemplateChecklistBpm`, que revalida escopo e reconcilia metadados, remoções, edições, criações e ordem dentro de uma única transação.
+
+**Consequência:** a automação atende ao requisito sem criar outro executor nem perder idempotência; falha intermediária no editor não deixa template parcialmente salvo. As actions granulares permanecem disponíveis, mas a UI usa o contrato transacional.
+
+### 2026-09-04 — RM-2026-209DB4 — navegação de pendências por evento local do modal
+
+**Decisão:** `PainelProximaEtapa` lê o resumo aplicável sem efeitos colaterais e mantém o alerta. O botão envia `bpm:abrir-pendencias-checklist` com `cardId/itemId`; `PainelRegistrar` controla a aba, seleciona **Formulário da Etapa** e foca o item, com fallback ao painel.
+
+**Consequência:** componentes irmãos permanecem desacoplados sem store global ou nova navegação, e o caminho funciona inclusive quando a aba **Script** estava ativa ou o identificador virtual foi substituído durante materialização.
+
+### 2026-09-04 — RM-2026-209DB4 — um estado aplicável para três motores, sem materializar no movimento
+
+**Decisão:** Validações, Regras e Automações consomem o mesmo resumo que une instâncias snapshot e templates ativos compatíveis ainda não materializados. A leitura é side-effect free; somente abertura do card ou automação explícita materializa. A guarda de movimento revalida dentro da transação. Regras recebem uma fonte fixa allowlisted e automações recebem placeholders no contrato existente, sem ampliar a DSL persistida.
+
+**Consequência:** chamadas diretas não contornam pendências; erro de leitura continua fail-open; pendência obrigatória confirmada bloqueia com nomes de template/item. Eventos de status são emitidos apenas para mudanças efetivas e não incluem o texto da observação.
+
+### 2026-09-04 — RM-2026-209DB4 — snapshot por instância e idempotência no banco
+
+**Decisão:** templates mantêm os cinco vínculos diretamente e cada materialização copia nome/descrição e itens para `BpmCardChecklist`/`BpmCardChecklistItem`. A constraint `cardId + templateId`, e não uma checagem apenas em memória, é a autoridade de idempotência. Template só é inativado; instâncias preservam evidência operacional.
+
+**Consequência:** edição de template não propaga para cards existentes, retries/realtime não duplicam instâncias e a automação futura deve chamar o mesmo serviço interno de materialização.
+
+### 2026-09-04 — RM-2026-6BEA04 — restrição por etapa no JSX, sem schema novo
+
+**Decisão:** especializar **Agendar Reunião** nos dois pontos de apresentação existentes: ramo condicional de `KanbanCard` em `PipelineBoardClient.tsx` e retorno antecipado de `CardOpenFormSlot.tsx`. O padrão é o mesmo de especializações por etapa já existentes, usando `etapaEhAgendarReuniao`; nenhuma coluna, `BpmCampo`, migration ou componente paralelo foi criado.
+
+**Consequência:** o board e o formulário central mostram apenas data/hora e Google Meet nessa etapa, enquanto os dados dinâmicos permanecem preservados no banco e as outras etapas continuam no ramo genérico.
+
+### 2026-09-04 — RM-2026-6BEA04 — Meet oficial pela Calendar API, sem link manual inventado
+
+**Decisão:** reutilizar `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm`, que criam ou atualizam o evento com conferência via Google Calendar e persistem o link retornado. Não adicionar fallback para uma URL manual de `meet.google.com`.
+
+**Consequência:** quando ainda não existe link, o card abre o formulário real; somente um `googleMeetLink` persistido é apresentado como link externo. Credenciais ou indisponibilidade da API continuam produzindo erro observável, não um link simulado.
+
+### 2026-09-04 — RM-2026-6BEA04 — agendamento explícito; seletor assistido aceito
+
+**Decisão:** data/hora de reunião usa `BpmDateTimeField` como controle civil de São Paulo, mas a persistência ocorre somente no botão de agendar/reagendar, junto da operação do Calendar. `registerSave`/`flushSaves()` não coordenam esse agendamento; eles continuam aplicáveis ao resumo editável da etapa **Reunião Agendada**. O administrador aceitou o seletor `DayPicker` + hora como equivalente funcional ao `datetime-local` nativo.
+
+**Consequência:** data, evento e link são confirmados atomicamente pela action existente, com spinner e botão desabilitado durante a chamada, sem salvar uma data isolada antes da criação/reagenda do evento.
+
+### 2026-09-04 — RM-2026-97CC60 — Cadências não fundem com `Tarefa`/`BpmTarefa`; FK de execução é unidirecional
+
+**Decisão:** `BpmCadencia`/`BpmCadenciaPasso`/`BpmCardCadencia`/`BpmCadenciaPassoExecucao` são modelos novos, não uma extensão do model legado `Tarefa` (que pertence a outro domínio, ligado a `usuarios`, e usa SQL raw sem ownership) nem uma reestruturação de `BpmTarefa` (que permanece a única tabela de tarefa operacional do CRM). `BpmTarefa` ganhou apenas `cadenciaExecucaoId?` (nullable) apontando para a execução que a originou; tarefas manuais continuam com esse campo `NULL`. Descartada a alternativa de também ter `tarefaId` em `BpmCadenciaPassoExecucao` (FK nos dois sentidos) por redundância sem necessidade funcional — a relação reversa (`execucao.tarefas`) já resolve a auditoria. Idempotência de execução usa `@@unique([vinculoId, passoId, chaveEvento])`, mesmo padrão de `BpmAutomacaoExecucao.automacaoId_eventoChave`; colisão é tratada por código de erro Prisma `P2002`, nunca por match de string de mensagem de erro. Escopo desta fase (RM-2026-97CC60, Fase 3) foi só schema + Server Actions + executor puro — cron/rota de invocação, CLI e UI ficam para fases seguintes (ver `AUTO_ADJUSTMENT_REQUIRED` em `architecture.md`).
+
+### 2026-09-04 — RM-2026-19631A — DSL segura, timezone e campo ausente
+
+**Decisão:** referências de condição são objetos `{ fonte, campo }` validados por allowlist; fórmulas usam somente `{{fonte:campo}}`, números, parênteses e `+ - * /`. Datas civis `YYYY-MM-DD` representam meia-noite UTC e datetimes exigem `Z` ou offset. Campo ausente pode satisfazer apenas `vazio` (e falha `preenchido`); qualquer outro operador gera erro fail-closed.
+
+**Consequência:** não há busca ambígua entre fontes, acesso por prototype/path arbitrário ou comportamento dependente do timezone local. Novos campos fixos exigem inclusão explícita na allowlist e teste; campos administráveis continuam referenciados pelo CUID de `BpmCampo`.
+
+### 2026-09-04 — RM-2026-F4B6A8 — uma linha por par origem/destino em `BpmTransicaoEtapa`, não matriz N×N pré-alocada
+
+**Decisão:** modelar transições permitidas como `BpmTransicaoEtapa` (`pipelineId`, `etapaOrigemId`, `etapaDestinoId`, `permitida`, `origem`), com `@@unique([etapaOrigemId, etapaDestinoId])` e **fail-open**: ausência de linha para um par = permitido. Não pré-criar uma linha para cada par origem→destino possível de um pipeline (matriz completa).
+
+**Justificativa:** o backfill da Fase 1 populou 276 linhas cobrindo todos os pares hoje válidos dos pipelines Comercial/Financeiro/Revisão de Radar com `permitida=true, origem="AMBOS"`, preservando 100% do comportamento observável sem exigir que todo pipeline/etapa novo já nasça com transições pré-cadastradas. Uma matriz N×N pré-alocada cresceria automaticamente a cada etapa nova criada pelo admin (custo de manutenção sem benefício) e obrigaria decidir um valor padrão para toda combinação nova; o fail-open evita essa decisão em cascata — só uma regra explicitamente criada por um admin restringe algo.
+
+**Consequência:** qualquer consulta de "quais transições existem" precisa tratar ausência de linha como permitida, não como indefinido/vazio. Novas etapas/pipelines não exigem nenhuma migration de dados para funcionar com o comportamento atual.
+
+### 2026-09-04 — RM-2026-F4B6A8 — `BpmTransicaoEtapa` mantida separada de `BpmEtapaTransicaoPermitida` (pré-existente)
+
+**Decisão:** não reaproveitar/migrar `BpmEtapaTransicaoPermitida` (model pré-existente, hoje só lida no client para filtrar visualmente o dropdown de próxima etapa nos pipelines "Financeiro"/"Revisão de Radar"). Criar `BpmTransicaoEtapa` como model novo e separado, fonte única da engine server-side (`verificarTransicaoPermitidaBpm`).
+
+**Justificativa:** reaproveitar a tabela existente para o backfill "todo par alcançável" quebraria a curadoria visual já feita manualmente nela para esses dois pipelines. Manter os dois models desacoplados evita que uma mudança na engine de enforcement real afete, sem querer, o filtro de UX do dropdown (e vice-versa).
+
+**Consequência:** existem hoje dois models com propósito parecido mas fontes de verdade distintas — `BpmEtapaTransicaoPermitida` (UX do dropdown, client-only) e `BpmTransicaoEtapa` (enforcement real, server-side). Sessões futuras não devem unificá-los sem uma decisão explícita nova, e qualquer nova feature de transição deve escrever/ler `BpmTransicaoEtapa`, não a tabela antiga.
+
+### 2026-09-04 — RM-2026-F4B6A8 — `origemMovimentacao` passado explicitamente pelo chamador, nunca inferido
+
+**Decisão:** `verificarTransicaoPermitidaBpm(etapaOrigemId, etapaDestinoId, origemMovimentacao, client?)` recebe `origemMovimentacao: "MANUAL" | "AUTOMACAO"` como parâmetro obrigatório do chamador — a função não tenta inferir a origem a partir de contexto de sessão/requisição. `Cards.ts` (`executarMovimentoComRequisitos`, consumida por `MoverCardBpm`/`SalvarRequisitosEMoverCardBpm`) sempre passa `"MANUAL"`; `automacao-novos-leads.ts` (Motor de Automações) sempre passa `"AUTOMACAO"`.
+
+**Justificativa:** inferir a origem por heurística (ex.: presença de `userId` de sessão) seria frágil e menos auditável do que cada caminho de código declarar explicitamente sua própria natureza. Isso também torna trivial testar os dois caminhos de forma isolada (ver `tests/bpm/pipelines-etapas-admin.test.ts` e `tests/bpm/kanban-transicao-integracao.test.ts`), sem precisar simular sessão real dentro do teste da engine.
+
+**Consequência:** qualquer novo caminho de movimentação de card (hoje só existem esses dois) precisa decidir explicitamente e declarar sua origem ao chamar a engine; esquecer de passar a origem correta silenciosamente aplicaria a regra errada para aquele caminho.
+
+### 2026-09-04 — RM-2026-F4B6A8 — migração aditiva sem backfill de `BpmEtapa.ehInicial`/`ehFinal`
+
+**Decisão:** as novas colunas `BpmEtapa.ehInicial`/`ehFinal` (Boolean, default `false`) foram adicionadas sem backfill algum — diferente de `BpmPipeline.ordem` (backfillada pela ordenação alfabética já em uso) e `BpmTransicaoEtapa` (backfillada com todos os pares hoje válidos). Nenhuma etapa existente foi marcada automaticamente como inicial/final.
+
+**Justificativa:** "etapa inicial" hoje é implícito por ordem/nome (ex.: "Novos leads") e "etapa final" é hardcoded por nome ("Fechado", "Lost") só em alguns pipelines — não há uma regra determinística e universal para inferir corretamente essas flags em todos os pipelines existentes sem risco de errar uma etapa. Essas flags controlam hoje somente a UI admin (radio/checkbox em `EtapaAvancadaSection.tsx`); nenhuma guarda de negócio existente (boas-vindas, financeiro, lost, fechado) foi migrada para consultá-las nesta entrega, então marcar errado não teria efeito silencioso incorreto imediato — mas ainda assim optou-se por deixar em branco em vez de adivinhar.
+
+**Consequência:** um admin precisa marcar manualmente `ehInicial`/`ehFinal` para cada pipeline existente se quiser que uma feature futura passe a depender dessas flags. Até lá, essas flags são metadado descritivo sem efeito nas guardas de negócio já hardcoded por nome (ver `architecture.md`, seção "Hardcode removido/preservado").
+
+### 2026-09-04 — RM-2026-EB401C — horário civil de São Paulo na UI, instante com timezone na persistência
+
+**Decisão:** todo seletor de data/hora do card CRM mantém `YYYY-MM-DDTHH:mm` como valor civil controlado e converte esse valor na fronteira da Server Action usando `America/Sao_Paulo`. A persistência continua em colunas `DateTime` como instante; campos somente de data continuam `YYYY-MM-DD` sem conversão de fuso.
+
+**Justificativa:** `new Date(valorCivil)` interpreta o valor no timezone do navegador e fazia o horário exibido variar entre dispositivos. Separar o valor de edição do instante persistido torna o round-trip determinístico sem mudar schema ou contratos de armazenamento.
+
+**Consequências:** novos consumidores devem reutilizar `BpmDateTimeField`, `formatarDataHoraLocalBpm()` e `parseDataHoraLocalBpm()`. Server Actions aceitam somente `Date` válida, ISO datetime com timezone ou timestamp numérico finito. Campos nullable precisam declarar a limpeza; autosaves devem usar rascunho versionado e `CardSaveContext` para não perder edições concorrentes.
+
+### 2026-09-04 — RM-2026-CB55AA — Meet como fonte primária e Calendar como fallback parcial
+
+**Decisão:** consultar a Google Meet REST API como fonte primária da transcrição. Somente quando a consulta Meet falha, usar a descrição real do evento vinculado no Google Calendar como `Resumo parcial do evento`; uma sincronização posterior pode substituir esse fallback pela transcrição integral.
+
+**Justificativa:** a Meet API entrega a evidência completa da conferência, enquanto a descrição do Calendar já está vinculada pelos identificadores persistidos e mantém alguma informação operacional durante indisponibilidade, timeout ou erro recuperável do Meet. O fallback nunca é texto inventado.
+
+**Consequência:** a presença de conteúdo em `transcricaoReuniao` pode representar transcrição integral ou resumo parcial explicitamente rotulado. Ausência de `conferenceRecord`/transcript sem falha da API continua sendo estado pendente e não aciona o fallback.
+
+### 2026-09-04 — RM-2026-CB55AA — resumo e transcrição compartilham o campo dedicado do card
+
+**Decisão:** manter `BpmCard.transcricaoReuniao` como fonte de verdade tanto para a captura automática quanto para o resumo editável apresentado por `PainelReuniao`; não criar `BpmCampo` dinâmico nem coluna adicional.
+
+**Justificativa:** o campo dedicado e os vínculos Google já existiam, atendem ao escopo sem migration e permitem que o guard de avanço, polling, UI e histórico usem a mesma evidência. A edição manual é protegida por CAS, ownership revalidado e histórico sem copiar o texto bruto.
+
+**Consequência:** “Resumo da reunião” é a apresentação editável do conteúdo de `transcricaoReuniao`, não um artefato independente. Qualquer separação futura entre resumo e transcrição exigirá requisito e decisão estrutural próprios.
+
+### 2026-09-04 — RM-2026-CB55AA — escopo Meet isolado do cliente Calendar
+
+**Decisão:** usar um cliente JWT server-side dedicado ao Meet com somente `https://www.googleapis.com/auth/meetings.space.readonly`, reutilizando as credenciais de conta de serviço e o usuário impersonado. Os escopos do cliente Calendar não foram ampliados.
+
+**Justificativa:** o escopo é suficiente para localizar `conferenceRecords`, transcripts, entries e participantes, reduzindo privilégio e impedindo acoplamento entre as autorizações das duas APIs.
+
+**Consequência:** o client ID da conta de serviço precisa ter esse escopo autorizado separadamente no Domain-Wide Delegation do Google Admin; sem essa configuração, o sistema retorna erro observável e pode usar apenas o fallback Calendar quando o evento vinculado tiver descrição.
+
+### 2026-09-03 — RM-2026-546E71 — Manter `PainelProximoContato` só dentro de `CardOpenFormSlot`
+
+**Decisão:** entre as duas montagens idênticas de `PainelProximoContato` no card do Alpha CRM, manter a instância dentro de `CardOpenFormSlot.tsx` e remover a instância solta em `PainelRegistrar.tsx`.
+
+**Critério:** `CardOpenFormSlot` já é o ponto documentado (por comentário do próprio código, pré-existente) de composição dos painéis de formulário da etapa; a instância em `PainelRegistrar` era resíduo órfão de uma refatoração anterior. As duas instâncias eram o mesmo componente com as mesmas props, mesmo botão funcional e mesma persistência — não havia diferença de comportamento a preservar.
+
+**Impacto:** nenhum em schema, Server Action ou coluna — `AtualizarCardBpm`/`registerSave` permanecem exatamente como estavam. Mudança restrita a JSX/import em `PainelRegistrar.tsx`.
+
 ### 2026-09-02 — RM-2026-70EFE1 — Filtro por responsável no Kanban é client-side, não server-side
 
 **Decisão:** o filtro por membro responsável no board Kanban do Alpha CRM (`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]`) é implementado inteiramente no cliente, em memória, sobre os `cards` já carregados — sem nova Server Action, sem parâmetro de query na busca original, sem persistência do filtro selecionado.
@@ -1169,3 +1293,47 @@ Sócio sem telefone agora É persistido de verdade: `gerarTelefonePendente()` (`
 **Decisão:** Agrupar a apresentação no cliente, sem alterar `ObterPipelineBpm` ou o schema. Campos com `etapaId = null` ficam em **Todas as etapas**, pois são gerais por definição existente; colunas ativas são sempre exibidas, mesmo vazias; vínculos fora da lista ativa aparecem em **Etapa inativa ou indisponível** para que nenhum campo seja ocultado.
 
 **Consequências:** O CRUD existente permanece a única fonte de mutação. Renomear/reordenar etapas ou trocar o `etapaId` de um campo atualiza os grupos pelo mesmo estado React, sem consulta adicional ou duplicação de dados.
+
+### 2026-09-04 — RM-2026-35BA39: separação estrita entre valor de apresentação (máscara) e valor canônico (persistência) do CNPJ
+
+**Contexto:** o CRM tinha implementações fragmentadas de máscara de CNPJ (`formatarCnpjInput()` duplicada em `NovoCardModal.tsx`) e nenhuma normalização em campos dinâmicos digitados como texto livre (nome "CNPJ"). Isso abria risco de gravar CNPJ pontuado ou parcial no banco, dependendo de qual tela o usuário usava.
+
+**Decisão:** `src/lib/format-cnpj.ts` é a única fonte de verdade e define o contrato: o **estado (React/banco) sempre guarda dígitos puros (`normalizarCNPJ`, máx. 14)**; a **máscara é responsabilidade exclusiva da camada de apresentação**, aplicada em dois pontos que nunca se misturam:
+- **Input editável** → `formatarCNPJProgressivo()`, recalculada a cada `onChange` a partir do valor cru — o valor mascarado nunca é o que é enviado ao servidor nem gravado no `state` canônico.
+- **Exibição read-only** → `formatCNPJ()`, chamada só no JSX de leitura (header do card, gaveta "Dados da empresa", perfil global, resultados de busca), sempre com fallback (`formatCNPJ(v) ?? v`) para não quebrar em dado legado que não feche em 14 dígitos.
+
+Persistência (`Cliente.cnpj`, `BpmCardCampoValor.valor`) e busca (`BuscarEmpresasBpm`) trabalham exclusivamente com o valor normalizado — nunca com o valor mascarado. O servidor não confia na máscara aplicada pelo cliente: `normalizarCNPJ()`/`cnpjEhValido()` são reaplicados dentro da action (`CriarCardBpm`, `validarValoresCamposBpm`) independentemente do que a UI enviou.
+
+**Alternativas rejeitadas:** manter máscara e normalização juntas numa função só (rejeitado — acoplaria apresentação a persistência e repetiria o bug de `formatarCnpjInput()` duplicada, que só existia porque cada tela reimplementava as duas responsabilidades juntas).
+
+**Consequências:** qualquer novo consumidor de CNPJ no CRM deve importar de `src/lib/format-cnpj.ts` e nunca formatar o valor antes de gravá-lo ou usá-lo em query — ver `.bibble/memory/integration-points.md` (seção "Máscara de CNPJ no CRM — caminho completo de integração") para o fluxo completo por camada.
+
+### 2026-09-04 — RM-2026-209DB4: decisões do Checklist Builder aprovadas e story pronta para Vault
+
+**Contexto:** a auditoria de entregabilidade e o blueprint confirmaram que "checklist" hoje só existe como tarefa avulsa (`BpmTarefa.tipo = "CHECKLIST"`), sem template reutilizável nem instância por card. A especificação de Iris e a aprovação administrativa de 2026-09-04 chegaram nesta reexecução e substituem o estado anterior de seis decisões pendentes.
+
+**Decisão:** as cinco dimensões são pipeline, etapa, serviço, tipo de processo e card específico. `tipoProcesso` será texto opcional controlado no card, sem catálogo. Todos os templates ativos compatíveis se aplicam, com unicidade template×card; instâncias são snapshots; a UI segue o workspace de Iris integrado a `Configurações`; materialização ocorre on-demand na abertura do card compatível ou por automação explicitamente configurada, nunca apenas por criar/mover o card.
+
+**Consequências:** a story está pronta para a fase Vault desenhar o inventário exato de uma migration exclusivamente aditiva. A aprovação em princípio não autoriza ampliar o plano: antes de SQL, Vault deve validar o backup exclusivo registrado na story e documentar estruturas, comandos, riscos e rollback; `DROP`, perda de dados, backfill mutante ou ampliação exigem nova confirmação. A integração de bloqueio permanece em `executarMovimentoComRequisitos`, fail-open para erro de leitura/configuração e bloqueio apenas diante de pendência obrigatória confirmada.
+
+### 2026-09-04 — RM-2026-002817: regras financeiras reutilizam motores versionados existentes
+
+**Decisão:** regras tributárias são versões especializadas de `BpmRegra`; comissões continuam em `CommissionRuleVersion`. Não foi criada migration nem terceira DSL. Cálculos monetários novos usam centavos, fórmulas passam pelo parser seguro e regras financeiras ativas falham fechadas quando inválidas ou sem correspondência. Eventos originados no Alpha BPM nunca usam percentuais seed: exigem uma regra publicada persistida.
+
+**Consequências:** edição preserva histórico, exclusão tributária é lógica, metadados de escopo de comissão não mudam em uma nova versão e o lançamento registra `ruleVersionId`. O fluxo sem qualquer regra tributária cadastrada mantém compatibilidade legada; o fluxo novo de comissão sem configuração gera divergência observável.
+
+### 2026-09-04 — RM-2026-D100EB: automações passam por outbox versionada e runtime central
+
+**Decisão:** manter `BpmAutomacao` como identidade administrativa, congelar a
+configuração em `BpmAutomacaoVersao` e publicar eventos BPM por outbox na mesma
+transação do domínio. Branches usam o Motor de Regras já existente; o runtime
+não aceita scripts. O motor legado permanece compatível, porém só processa
+execuções sem `automacaoVersaoId` e é chamado pelo catálogo central quando uma
+ação legada for explicitamente escolhida.
+
+**Consequências:** efeitos são deduplicados por versão/evento, esperas sobrevivem
+a reinícios, histórico não é apagado ao arquivar uma automação e operação pode
+ser feita pela UI, cron ou CLI. Webhooks nunca persistem segredo em claro e HTTP
+externo é HTTPS-only com proteção SSRF. A auditoria formal da fase 13 foi
+dispensada explicitamente pelo usuário; essa dispensa não equivale a um parecer
+de segurança.

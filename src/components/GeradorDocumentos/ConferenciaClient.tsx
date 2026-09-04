@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Sparkles, FileCheck, Download } from "lucide-react";
+import { CheckCircle2, Sparkles, FileCheck, Download, Loader2, FileWarning } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,7 +27,7 @@ interface DocumentoConferencia {
   titulo: string;
   status: string;
   finalizadoEm: Date | string | null;
-  pdfUrl: string | null;
+  pdfDisponivel: boolean;
   htmlUrl?: string | null; // RM-2026-94CBF6 — HTML renderizado com variáveis preenchidas
   template: { titulo: string };
   clausulas: ClasulaGerada[];
@@ -43,7 +43,11 @@ const STATUS_LABEL: Record<string, string> = {
 export function ConferenciaClient({ documento }: { documento: DocumentoConferencia }) {
   const [clausulas, setClausulas] = useState(documento.clausulas);
   const [status, setStatus] = useState(documento.status);
-  const [pdfUrl, setPdfUrl] = useState(documento.pdfUrl);
+  const [pdfDisponivel, setPdfDisponivel] = useState(documento.pdfDisponivel);
+  const [pdfStatus, setPdfStatus] = useState<"loading" | "success" | "error">("loading");
+  const [pdfRevision, setPdfRevision] = useState(0);
+  const [htmlUrl, setHtmlUrl] = useState(documento.htmlUrl ?? null);
+  const [htmlRevision, setHtmlRevision] = useState(0);
   const [clasulaEmEdicao, setClasulaEmEdicao] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -73,6 +77,11 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
       setClausulas((prev) =>
         prev.map((c) => (c.id === clasulaId ? { ...c, conteudo: resultado.conteudo, reescritoPorIA: true } : c)),
       );
+      setHtmlUrl(resultado.htmlUrl);
+      setHtmlRevision((revision) => revision + 1);
+      setPdfDisponivel(resultado.pdfDisponivel);
+      setPdfStatus("loading");
+      setPdfRevision((revision) => revision + 1);
       toast.success("Cláusula reescrita pela IA");
       setClasulaEmEdicao(null);
     });
@@ -86,7 +95,9 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         return;
       }
       setStatus("FINALIZADO");
-      setPdfUrl(resultado.pdfUrl);
+      setPdfDisponivel(true);
+      setPdfStatus("loading");
+      setPdfRevision((revision) => revision + 1);
       toast.success("Documento finalizado");
     });
   }
@@ -100,7 +111,7 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={status === "FINALIZADO" ? "default" : "secondary"}>{STATUS_LABEL[status] ?? status}</Badge>
-          {pdfUrl && (
+          {pdfDisponivel && (
             <a href={`/PainelAlpha/GeradorDocumentos/${documento.id}/download`} target="_blank" rel="noopener noreferrer">
               <Button variant="secondary">
                 <Download className="mr-1.5 h-4 w-4" />
@@ -108,7 +119,7 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
               </Button>
             </a>
           )}
-          {!pdfUrl && (
+          {!pdfDisponivel && (
             <Button variant="secondary" disabled title="PDF ainda não gerado">
               <Download className="mr-1.5 h-4 w-4" />
               Baixar PDF
@@ -130,12 +141,45 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
         </div>
       )}
 
+      {pdfDisponivel ? (
+        <Card className="mb-6 flex flex-col gap-3 p-5">
+          <h2 className="font-medium text-neutral-900 dark:text-neutral-100">PDF gerado</h2>
+          <div className="relative min-h-[32rem] overflow-hidden rounded-md border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950">
+            {pdfStatus === "loading" && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-sm text-neutral-600 dark:text-neutral-300" role="status">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Carregando visualização do PDF…
+              </div>
+            )}
+            {pdfStatus === "error" && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-6 text-center text-sm text-red-600 dark:text-red-400" role="alert">
+                <FileWarning className="h-5 w-5" aria-hidden="true" />
+                Não foi possível exibir o PDF. Use o botão “Baixar PDF” para tentar novamente.
+              </div>
+            )}
+            <iframe
+              key={pdfRevision}
+              src={`/PainelAlpha/GeradorDocumentos/${documento.id}/download?disposition=inline`}
+              title={`Visualização do PDF: ${documento.titulo}`}
+              className="h-[70vh] min-h-[32rem] w-full bg-white"
+              onLoad={() => setPdfStatus("success")}
+              onError={() => setPdfStatus("error")}
+            />
+          </div>
+        </Card>
+      ) : (
+        <div className="mb-6 flex items-center gap-2 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300" role="alert">
+          <FileWarning className="h-4 w-4 shrink-0" aria-hidden="true" />
+          O PDF não foi gerado. A visualização HTML continua disponível para conferência.
+        </div>
+      )}
+
       {/* HTML fiel renderizado (RM-2026-94CBF6) — exibição acima das cláusulas editáveis */}
-      {documento.htmlUrl && (
+      {htmlUrl && (
         <Card className="mb-6 flex flex-col gap-3 p-5">
           <div className="flex items-center justify-between">
             <h3 className="font-medium text-neutral-900 dark:text-neutral-100">Visualização fiel do documento</h3>
-            <a href={documento.htmlUrl} target="_blank" rel="noopener noreferrer">
+            <a href={htmlUrl} target="_blank" rel="noopener noreferrer">
               <Button variant="secondary" size="sm">
                 <Download className="mr-1.5 h-4 w-4" />
                 Baixar HTML
@@ -143,8 +187,9 @@ export function ConferenciaClient({ documento }: { documento: DocumentoConferenc
             </a>
           </div>
           <iframe
+            key={htmlRevision}
             srcDoc={undefined}
-            src={documento.htmlUrl}
+            src={htmlUrl ?? undefined}
             title="Documento HTML"
             className="h-[600px] w-full rounded-md border border-neutral-200 bg-white dark:border-neutral-800"
             sandbox="allow-same-origin"

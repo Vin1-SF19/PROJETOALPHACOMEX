@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarPlus, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AtualizarCardBpm, ObterCardBpm } from "@/actions/bpm/Cards";
+import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
+import { formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
+import { BpmDateTimeField } from "./BpmDateTimeField";
 import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -15,62 +18,71 @@ interface PainelProximoContatoProps {
   realtimeRevision: number;
 }
 
-function paraInputDatetimeLocal(data: Date | string | null): string {
-  if (!data) return "";
-  const valor = new Date(data);
-  const pad = (numero: number) => String(numero).padStart(2, "0");
-  return `${valor.getFullYear()}-${pad(valor.getMonth() + 1)}-${pad(valor.getDate())}T${pad(valor.getHours())}:${pad(valor.getMinutes())}`;
-}
-
 export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeRevision }: PainelProximoContatoProps) {
-  const [valor, setValor] = useState(() => paraInputDatetimeLocal(card.proximoContatoEm));
+  const [valor, setValor] = useState(() => formatarDataHoraLocalBpm(card.proximoContatoEm));
   const [salvando, setSalvando] = useState(false);
   const [conflitoRealtime, setConflitoRealtime] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const sujoRef = useRef(false);
+  const valorPersistidoRef = useRef(formatarDataHoraLocalBpm(card.proximoContatoEm));
+  const rascunhoRef = useRef(criarRastreadorRascunho(formatarDataHoraLocalBpm(card.proximoContatoEm)));
+  const savesPendentesRef = useRef(0);
   const { registerSave } = useCardSave();
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (sujoRef.current) {
-        setConflitoRealtime(true);
+        const valorRecebido = formatarDataHoraLocalBpm(card.proximoContatoEm);
+        if (valorRecebido !== valorPersistidoRef.current) setConflitoRealtime(true);
         return;
       }
-      setValor(paraInputDatetimeLocal(card.proximoContatoEm));
+      const valorRecebido = formatarDataHoraLocalBpm(card.proximoContatoEm);
+      valorPersistidoRef.current = valorRecebido;
+      rascunhoRef.current.sincronizar(valorRecebido);
+      setValor(valorRecebido);
       setConflitoRealtime(false);
     }, 0);
     return () => clearTimeout(timer);
   }, [card.proximoContatoEm, realtimeRevision]);
 
   async function persistir(proximoContatoEm: string | null) {
-    if (!podeEditar || salvando) return;
-    if (!proximoContatoEm) {
-      setErro("Preencha a data do próximo contato.");
+    if (!podeEditar) return;
+    const dataPersistida = proximoContatoEm
+      ? parseDataHoraLocalBpm(proximoContatoEm)
+      : null;
+    if (proximoContatoEm && !dataPersistida) {
+      setErro("Escolha uma data e uma hora válidas.");
       return;
     }
-    const valorPersistido = paraInputDatetimeLocal(card.proximoContatoEm);
+    const valorPersistido = formatarDataHoraLocalBpm(card.proximoContatoEm);
     if (!sujoRef.current && (proximoContatoEm ?? "") === valorPersistido) return;
+    const snapshot = rascunhoRef.current.capturar();
+    savesPendentesRef.current += 1;
     setSalvando(true);
     const sucesso = await registerSave(async () => {
       const resultado = await AtualizarCardBpm({
         cardId: card.id,
-        proximoContatoEm: proximoContatoEm ? new Date(proximoContatoEm).toISOString() : null,
+        proximoContatoEm: dataPersistida?.toISOString() ?? null,
       });
       if (!resultado.success) {
         toast.error(typeof resultado.error === "string" ? resultado.error : "Não foi possível atualizar o próximo contato");
         return false;
       }
-      sujoRef.current = false;
-      setConflitoRealtime(false);
-      setErro(null);
+      valorPersistidoRef.current = snapshot.valor;
+      if (rascunhoRef.current.corresponde(snapshot)) {
+        sujoRef.current = false;
+        setConflitoRealtime(false);
+        setErro(null);
+      }
       toast.success(proximoContatoEm ? "Próximo contato atualizado" : "Próximo contato removido");
       onAtualizado();
       return true;
     }).finally(() => {
-      setSalvando(false);
+      savesPendentesRef.current -= 1;
+      if (savesPendentesRef.current === 0) setSalvando(false);
     });
     if (sucesso) {
-      if (!proximoContatoEm) setValor("");
+      if (!proximoContatoEm && rascunhoRef.current.corresponde(snapshot)) setValor("");
     }
   }
 
@@ -78,32 +90,26 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
     <section className="space-y-3 rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4">
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
         <CalendarPlus size={13} className="text-slate-500" aria-hidden="true" />
-        Próximo Contato <span className="text-rose-400" aria-hidden="true">*</span>
+        Próximo Contato
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor={`proximo-contato-${card.id}`} className="text-[11px] font-medium text-slate-400">
-          Data e hora
-        </label>
-        <input
+        <BpmDateTimeField
           id={`proximo-contato-${card.id}`}
-          type="datetime-local"
-          required
-          aria-required="true"
-          aria-invalid={Boolean(erro)}
-          aria-describedby={erro ? `proximo-contato-erro-${card.id}` : undefined}
+          label="Data e hora"
+          allowClear
           value={valor}
           disabled={!podeEditar}
-          onChange={(event) => {
+          error={erro}
+          onChange={(novoValor) => {
             sujoRef.current = true;
-            setValor(event.target.value);
+            rascunhoRef.current.alterar(novoValor);
+            setValor(novoValor);
             setErro(null);
           }}
-          onBlur={() => void persistir(valor || null)}
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs text-slate-200 outline-none transition-colors focus:border-white/25"
+          onCommit={(novoValor) => void persistir(novoValor || null)}
         />
       </div>
-      {erro && <p id={`proximo-contato-erro-${card.id}`} role="alert" className="text-xs text-rose-300">{erro}</p>}
       {conflitoRealtime && <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200">O próximo contato mudou externamente. Seu rascunho foi preservado.</p>}
 
       <div className="flex items-center gap-2">
@@ -117,7 +123,7 @@ export function PainelProximoContato({ card, onAtualizado, podeEditar, realtimeR
         </button>
         {salvando && <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500"><Loader2 size={12} className="animate-spin" /> Salvando...</span>}
       </div>
-      {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode alterar o próximo contato.</p>}
+      {!podeEditar && <p className="text-[11px] text-slate-500">Você não tem permissão para alterar o próximo contato neste card.</p>}
     </section>
   );
 }

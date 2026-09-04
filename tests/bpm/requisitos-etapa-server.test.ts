@@ -67,7 +67,12 @@ describe("campos aplicáveis por etapa", () => {
     );
 
     expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-2" }, { etapaId: null }] },
+      where: expect.objectContaining({
+        ativo: true,
+        OR: expect.arrayContaining([
+          { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-2" }, { etapaId: null }] },
+        ]),
+      }),
     }));
     expect(campos.map((campo) => campo.id)).toEqual([
       "campo-global-associado",
@@ -112,7 +117,12 @@ describe("campos aplicáveis por etapa", () => {
     );
 
     expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-qualquer" }, { etapaId: null }] },
+      where: expect.objectContaining({
+        ativo: true,
+        OR: expect.arrayContaining([
+          { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-qualquer" }, { etapaId: null }] },
+        ]),
+      }),
     }));
     expect(campos).toHaveLength(1);
     expect(campos[0]).toMatchObject({
@@ -279,6 +289,54 @@ describe("campos aplicáveis por etapa", () => {
     expect(campos).toEqual([]);
   });
 
+  it("aplica visibilidade e somente leitura do perfil no servidor", async () => {
+    const base = {
+      pipelineId: "pipeline-1",
+      etapaId: "etapa-2",
+      tipo: "texto",
+      opcoesJson: null,
+      obrigatorio: false,
+      ordem: 1,
+      visivel: true,
+      editavel: true,
+      somenteLeitura: false,
+    };
+    const client = criarCliente({
+      bpmCampo: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            ...base,
+            id: "campo-oculto-membro",
+            nome: "Segredo interno",
+            acessos: [{ perfil: "MEMBRO", visivel: false, editavel: false, somenteLeitura: true, obrigatorio: false }],
+          },
+          {
+            ...base,
+            id: "campo-leitura-membro",
+            nome: "Resultado automático",
+            acessos: [{ perfil: "MEMBRO", visivel: true, editavel: false, somenteLeitura: true, obrigatorio: false }],
+          },
+        ]),
+      },
+    });
+
+    const campos = await carregarCamposAplicaveisCardEtapa(
+      "card-1",
+      "pipeline-1",
+      "etapa-2",
+      client as never,
+      "MEMBRO",
+    );
+
+    expect(campos).toHaveLength(1);
+    expect(campos[0]).toMatchObject({
+      id: "campo-leitura-membro",
+      visivel: true,
+      editavel: false,
+      somenteLeitura: true,
+    });
+  });
+
   it("hidrata CNPJ e contato inequívoco da entidade mestre sem sobrescrever valor local", async () => {
     const camposConfigurados = [
       {
@@ -378,10 +436,12 @@ describe("campos obrigatórios por etapa (validação de transição)", () => {
     );
 
     expect(client.bpmCampo.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: {
-        pipelineId: "pipeline-1",
-        OR: [{ etapaId: "etapa-2" }, { etapaId: null }],
-      },
+      where: expect.objectContaining({
+        ativo: true,
+        OR: expect.arrayContaining([
+          { pipelineId: "pipeline-1", OR: [{ etapaId: "etapa-2" }, { etapaId: null }] },
+        ]),
+      }),
     }));
     expect(campos).toEqual([{ id: "campo-global-obrigatorio", nome: "CNPJ" }]);
   });

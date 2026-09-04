@@ -31,7 +31,7 @@ export interface DocumentoResumo {
   titulo: string;
   status: string;
   tokenAcesso: string;
-  pdfUrl: string | null;
+  pdfDisponivel: boolean;
   criadoEm: Date | string;
   finalizadoEm: Date | string | null;
   template: { id: string; titulo: string };
@@ -250,7 +250,7 @@ function DocumentoRow({ documento }: { documento: DocumentoResumo }) {
       <Badge variant={documento.status === "FINALIZADO" ? "default" : "secondary"}>
         {STATUS_DOCUMENTO_LABEL[documento.status] ?? documento.status}
       </Badge>
-      {documento.pdfUrl && (
+      {documento.pdfDisponivel && (
         <a href={`/PainelAlpha/GeradorDocumentos/${documento.id}/download`} target="_blank" rel="noopener noreferrer">
           <Button variant="ghost" size="icon" aria-label="Baixar PDF">
             <Download className="h-4 w-4" />

@@ -29,13 +29,28 @@ export async function RegistrarAnexoBpm(dados: unknown) {
     if (!recibo || recibo.cardId !== parsed.data.cardId) {
       return { success: false, error: "Comprovante de upload inválido ou expirado" };
     }
-    const { cardId } = parsed.data;
+    const { cardId, campoId } = parsed.data;
     const { nome, tipo, tamanho } = recibo;
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo");
 
     const resultado = await db.$transaction(async (tx) => {
       await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "enviarArquivo", tx);
+      if (campoId) {
+        const campo = await tx.bpmCampo.findFirst({
+          where: {
+            id: campoId,
+            tipo: "arquivo",
+            ativo: true,
+            OR: [
+              { pipeline: { cards: { some: { id: cardId } } } },
+              { pipelinesAssociados: { some: { pipeline: { cards: { some: { id: cardId } } } } } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!campo) throw new Error("CAMPO_ARQUIVO_INVALIDO");
+      }
       const referencia = criarReferenciaAnexoBpm(recibo.pathname);
       // O mesmo recibo assinado sempre descreve o mesmo pathname. Em caso de
       // retry/replay dentro da janela do recibo, devolvemos o registro original
@@ -52,8 +67,16 @@ export async function RegistrarAnexoBpm(dados: unknown) {
           tipo,
           tamanho,
           enviadoPorId: userId,
+          campoId,
         },
       });
+      if (campoId) {
+        await tx.bpmCardCampoValor.upsert({
+          where: { cardId_campoId: { cardId, campoId } },
+          create: { cardId, campoId, valor: criado.id },
+          update: { valor: criado.id },
+        });
+      }
       await registrarHistoricoCard(
         {
           cardId,
@@ -116,7 +139,11 @@ export async function RegistrarAnexoBpm(dados: unknown) {
       }
     }
     console.error("[RegistrarAnexoBpm]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao registrar anexo";
+    const msg = error instanceof Error && error.message === "Não autorizado"
+      ? "Não autorizado"
+      : error instanceof Error && error.message === "CAMPO_ARQUIVO_INVALIDO"
+        ? "Campo de arquivo inválido para este card"
+        : "Erro ao registrar anexo";
     return { success: false, error: msg };
   }
 }
