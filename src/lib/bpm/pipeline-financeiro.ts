@@ -134,6 +134,130 @@ function cnpjValido(cnpj: string) { const digits = cnpj.replace(/\D/g, ""); if (
 export interface FinancialTransitionInput { pipelineName: string; fromStage: string; toStage: string; values: Record<string, string | null>; now?: Date; attachmentNames?: string[] }
 export interface FinancialTransitionResult { applicable: boolean; blocked: boolean; message?: string; pendingFields: string[]; automaticValues: Record<string, string> }
 
+/** Contrato estável usado pelo domínio. Os valores são indexados por BpmCampo.chave. */
+export const FINANCIAL_FIELD_KEYS = {
+  CNPJ: "alpha.cnpj",
+  RAZAO_SOCIAL: "alpha.razao.social",
+  RUA: "alpha.rua",
+  NUMERO: "alpha.numero",
+  BAIRRO: "alpha.bairro",
+  CEP: "alpha.cep",
+  MUNICIPIO: "alpha.municipio",
+  ESTADO: "alpha.estado",
+  EMAIL: "alpha.e.mail",
+  REGIME_CLIENTE: "alpha.regime.tributario.cliente",
+  SERVICO: "alpha.servico.contratado",
+  VALOR_BRUTO: "alpha.legacy.valor.bruto.contrato",
+  FORMA_PAGAMENTO: "alpha.forma.de.pagamento",
+  CONDICAO: "alpha.condicao.negociada",
+  VENDEDOR: "alpha.vendedor.a",
+  ORIGEM: "alpha.canal.origem.do.cliente",
+  PARCEIRO: "alpha.parceiro.responsavel",
+  CONTATO: "alpha.contato.nome.responsavel",
+  CONTRATO_ELABORADO: "alpha.contrato.elaborado",
+  DATA_ELABORACAO: "alpha.data.de.elaboracao",
+  CONTRATO_ENVIADO: "alpha.contrato.enviado.para.assinatura",
+  DATA_ENVIO: "alpha.data.do.envio",
+  LINK_CONTRATO: "alpha.link.arquivo.do.contrato",
+  STATUS_ASSINATURA: "alpha.financeiro.status.contrato.assinatura",
+  DATA_ASSINATURA: "alpha.data.da.assinatura",
+  CONTRATO_ASSINADO: "alpha.contrato.assinado.anexo",
+  REGIME_PRESTADOR: "alpha.regime.tributario.prestador",
+  IRRF_APLICAVEL: "alpha.irrf.aplicavel",
+  ALIQUOTA_IRRF: "alpha.aliquota.irrf",
+  VALOR_IRRF: "alpha.financeiro.valor.irrf",
+  CSRF_APLICAVEL: "alpha.csrf.aplicavel",
+  ALIQUOTA_CSRF: "alpha.aliquota.csrf",
+  VALOR_CSRF: "alpha.financeiro.valor.csrf",
+  TOTAL_RETENCOES: "alpha.total.retencoes",
+  VALOR_LIQUIDO: "alpha.financeiro.valor.liquido.pagamento",
+  VENCIMENTO: "alpha.vencimento",
+  DADOS_PAGAMENTO: "alpha.link.dados.para.pagamento",
+  MEMORIA_CALCULO: "alpha.memoria.calculo",
+  PAGAMENTO_CONFIRMADO: "alpha.pagamento.confirmado",
+  VALOR_ESPERADO: "alpha.valor.esperado",
+  DATA_PAGAMENTO: "alpha.data.do.pagamento",
+  VALOR_RECEBIDO: "alpha.valor.recebido",
+  FORMA_PAGAMENTO_USADA: "alpha.legacy.forma.pagamento.utilizada",
+  NF_EMITIDA: "alpha.nf.emitida",
+  NUMERO_NF: "alpha.numero.da.nf",
+  DATA_EMISSAO_NF: "alpha.data.de.emissao",
+  VALOR_NF: "alpha.valor.da.nf",
+  ARQUIVO_NF: "alpha.arquivo.link.da.nf",
+} as const;
+
+export interface CanonicalFinancialTransitionInput {
+  pipelineKey: string;
+  fromStageKey: string;
+  toStageKey: string;
+  valuesByFieldKey: Record<string, string | null>;
+  now?: Date;
+  attachmentNames?: string[];
+}
+
+const FINANCIAL_STAGE_SEQUENCE = [
+  "solicitacao_contrato",
+  "elaboracao_contrato",
+  "formalizacao_contratacao",
+  "confirmacao_pagamento",
+  "emissao_nota_fiscal",
+  "contratacao_finalizada",
+] as const;
+
+export function validateCanonicalFinancialTransition(input: CanonicalFinancialTransitionInput): FinancialTransitionResult {
+  if (input.pipelineKey !== "financeiro") return { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
+  const index = FINANCIAL_STAGE_SEQUENCE.indexOf(input.fromStageKey as (typeof FINANCIAL_STAGE_SEQUENCE)[number]);
+  if (index < 0 || FINANCIAL_STAGE_SEQUENCE[index + 1] !== input.toStageKey) {
+    return { applicable: true, blocked: true, message: "Não é permitido pular etapas no pipeline Financeiro.", pendingFields: [], automaticValues: {} };
+  }
+  const k = FINANCIAL_FIELD_KEYS;
+  const v = input.valuesByFieldKey;
+  const missing: string[] = [];
+  const automaticValues: Record<string, string> = {};
+  const today = (input.now ?? new Date()).toISOString().slice(0, 10);
+  const require = (...keys: string[]) => keys.forEach((key) => { if (!normalizar(v[key])) missing.push(key); });
+  const requirePositive = (key: string) => { if (!(numero(v[key]) > 0)) missing.push(key); };
+
+  if (index === 0) {
+    require(k.CNPJ,k.RAZAO_SOCIAL,k.RUA,k.NUMERO,k.BAIRRO,k.CEP,k.MUNICIPIO,k.ESTADO,k.EMAIL,k.REGIME_CLIENTE,k.SERVICO,k.FORMA_PAGAMENTO,k.CONDICAO,k.VENDEDOR,k.ORIGEM,k.CONTATO);
+    requirePositive(k.VALOR_BRUTO);
+    if (normalizar(v[k.ORIGEM]).toLowerCase() === "parceiro") require(k.PARCEIRO);
+    if (normalizar(v[k.CNPJ]) && !cnpjValido(normalizar(v[k.CNPJ]))) missing.push(k.CNPJ);
+    if (normalizar(v[k.CEP]).replace(/\D/g, "").length !== 8) missing.push(k.CEP);
+    if (normalizar(v[k.EMAIL]) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizar(v[k.EMAIL]))) missing.push(k.EMAIL);
+  } else if (index === 1) {
+    if (!sim(v[k.CONTRATO_ELABORADO])) missing.push(k.CONTRATO_ELABORADO);
+    if (!sim(v[k.CONTRATO_ENVIADO])) missing.push(k.CONTRATO_ENVIADO);
+    require(k.DATA_ELABORACAO,k.LINK_CONTRATO);
+    automaticValues[k.DATA_ENVIO] = normalizar(v[k.DATA_ENVIO]) || today;
+  } else if (index === 2) {
+    if (normalizar(v[k.STATUS_ASSINATURA]).toLowerCase() !== "assinado") missing.push(k.STATUS_ASSINATURA);
+    if (!normalizar(v[k.CONTRATO_ASSINADO]) && !input.attachmentNames?.some((name) => /contrato/i.test(name))) missing.push(k.CONTRATO_ASSINADO);
+    require(k.REGIME_PRESTADOR,k.REGIME_CLIENTE,k.FORMA_PAGAMENTO,k.VENCIMENTO,k.DADOS_PAGAMENTO,k.IRRF_APLICAVEL,k.CSRF_APLICAVEL);
+    requirePositive(k.VALOR_BRUTO);
+    if (sim(v[k.IRRF_APLICAVEL]) && !(numero(v[k.ALIQUOTA_IRRF]) >= 0 && numero(v[k.ALIQUOTA_IRRF]) <= 100)) missing.push(k.ALIQUOTA_IRRF);
+    if (sim(v[k.CSRF_APLICAVEL]) && !(numero(v[k.ALIQUOTA_CSRF]) >= 0 && numero(v[k.ALIQUOTA_CSRF]) <= 100)) missing.push(k.ALIQUOTA_CSRF);
+    const calc = calcularRetencoesFinanceiras(numero(v[k.VALOR_BRUTO]),sim(v[k.IRRF_APLICAVEL]) ? numero(v[k.ALIQUOTA_IRRF]) : 0,sim(v[k.CSRF_APLICAVEL]) ? numero(v[k.ALIQUOTA_CSRF]) : 0,{ regimePrestador: normalizar(v[k.REGIME_PRESTADOR]) || undefined, regimeTomador: normalizar(v[k.REGIME_CLIENTE]) || undefined, servico: normalizar(v[k.SERVICO]) || undefined, now: input.now });
+    if (!(calc.valorLiquido > 0)) missing.push(k.VALOR_LIQUIDO);
+    Object.assign(automaticValues,{ [k.DATA_ASSINATURA]: normalizar(v[k.DATA_ASSINATURA]) || today, [k.VALOR_IRRF]: String(calc.valorIrrf), [k.VALOR_CSRF]: String(calc.valorCsrf), [k.TOTAL_RETENCOES]: String(calc.totalRetencoes), [k.VALOR_LIQUIDO]: String(calc.valorLiquido), [k.VALOR_ESPERADO]: String(calc.valorLiquido), [k.MEMORIA_CALCULO]: calc.memoriaCalculo });
+  } else if (index === 3) {
+    if (!sim(v[k.PAGAMENTO_CONFIRMADO])) missing.push(k.PAGAMENTO_CONFIRMADO);
+    requirePositive(k.VALOR_ESPERADO);
+    requirePositive(k.VALOR_RECEBIDO);
+    require(k.FORMA_PAGAMENTO_USADA);
+    automaticValues[k.DATA_PAGAMENTO] = normalizar(v[k.DATA_PAGAMENTO]) || today;
+  } else if (index === 4) {
+    if (!sim(v[k.NF_EMITIDA])) missing.push(k.NF_EMITIDA);
+    require(k.NUMERO_NF,k.DATA_EMISSAO_NF);
+    requirePositive(k.VALOR_NF);
+    if (!normalizar(v[k.ARQUIVO_NF]) && !input.attachmentNames?.some((name) => /nota|nf/i.test(name))) missing.push(k.ARQUIVO_NF);
+    if (normalizar(v[k.STATUS_ASSINATURA]).toLowerCase() !== "assinado") missing.push(k.STATUS_ASSINATURA);
+    if (!sim(v[k.PAGAMENTO_CONFIRMADO])) missing.push(k.PAGAMENTO_CONFIRMADO);
+  }
+  const pendingFields = [...new Set(missing)];
+  return { applicable: true, blocked: pendingFields.length > 0, message: pendingFields.length ? "Dados pendentes para avançar de etapa." : undefined, pendingFields, automaticValues };
+}
+
 export function validateFinancialTransition(input: FinancialTransitionInput): FinancialTransitionResult {
   if (input.pipelineName !== FINANCIAL_PIPELINE_NAME) return { applicable: false, blocked: false, pendingFields: [], automaticValues: {} };
   const index = FINANCIAL_STAGES.findIndex((stage) => stage.label === input.fromStage); const expected = FINANCIAL_STAGES[index + 1]?.label;

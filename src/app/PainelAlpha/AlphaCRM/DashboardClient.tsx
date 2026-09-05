@@ -1,23 +1,33 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
-  KanbanSquare,
-  ArrowRight,
+  Activity as ActivityLucide,
   AlertTriangle,
   ListChecks,
   CheckCircle2,
-  Activity,
   Clock,
-} from "lucide-react";
-import type { TemaAlpha } from "@/lib/temas";
-import { fmtDateTime } from "@/lib/format-date";
-import { ObterDashboardBpm } from "@/actions/bpm/Dashboard";
-import CardFullViewModal from "./CardModal/CardFullViewModal";
-import { CrmPipelineBorder } from "@/components/ui/crm-pipeline-border";
+  ArrowRight,
+  Building2,
+  type LucideIcon,
+} from 'lucide-react';
+import type { TemaAlpha } from '@/lib/temas';
+import { fmtDateTime } from '@/lib/format-date';
+import { ObterDashboardBpm } from '@/actions/bpm/Dashboard';
+import CardFullViewModal from './CardModal/CardFullViewModal';
+import {
+  GlowIcon,
+  GlassCard,
+  TiltSpotCard,
+  SectionHeader,
+  StatusBadge,
+  PipelineGlyph,
+  getPipelineIdentity,
+  getAcaoVisual,
+} from '@/components/crm-visual';
 
-type DashboardData = NonNullable<Awaited<ReturnType<typeof ObterDashboardBpm>>["data"]>;
+type DashboardData = NonNullable<Awaited<ReturnType<typeof ObterDashboardBpm>>['data']>;
 
 interface Props {
   dashboard: DashboardData | null;
@@ -27,39 +37,84 @@ interface Props {
   currentUserRole: string | null;
 }
 
-function StatCard({
-  icon: Icon,
+/* ── KPI card (apenas visual; dados vêm de `dashboard`) ────────── */
+function KpiCard({
+  icon,
   label,
   value,
   accent,
   tone,
+  delay,
 }: {
-  icon: typeof Activity;
+  icon: LucideIcon;
   label: string;
   value: number;
-  accent: string;
-  tone?: "danger";
+  accent: string; // rgb
+  tone?: 'danger' | 'ok' | 'warn';
+  delay?: number;
 }) {
+  const accentRgb =
+    tone === 'danger'
+      ? '251, 113, 133'
+      : tone === 'ok'
+        ? '52, 211, 153'
+        : tone === 'warn'
+          ? '245, 158, 11'
+          : accent;
+
   return (
-    <div className="bg-slate-900/60 border border-white/5 rounded-2xl p-4 flex items-center gap-3">
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: tone === "danger" ? "rgba(244,63,94,0.15)" : `rgba(${accent},0.15)` }}
-      >
-        <Icon size={18} style={{ color: tone === "danger" ? "rgb(244,63,94)" : `rgb(${accent})` }} />
+    <TiltSpotCard
+      maxTilt={1.4}
+      className="p-4 sm:p-5 min-h-[96px]"
+      style={{ animationDelay: `${delay ?? 0}ms` }}
+    >
+      <div className="flex items-start justify-between">
+        <GlowIcon icon={icon} accent={accentRgb} chip={46} size={22} />
+        <span
+          className="hidden sm:block h-15 w-[3px] rounded-full"
+          aria-hidden
+          style={{
+            height: 46,
+            background: `linear-gradient(180deg, rgba(${accentRgb},0.4), rgba(${accentRgb},0.05))`,
+          }}
+        />
       </div>
-      <div>
-        <p className="text-2xl font-black text-white leading-none">{value}</p>
-        <p className="text-xs text-slate-500 mt-1">{label}</p>
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <p
+          className="text-3xl sm:text-[34px] leading-none font-black tabular-nums text-white"
+          style={{ textShadow: `0 0 18px rgba(${accentRgb},0.16)` }}
+        >
+          {value === 0 ? '—' : value}
+        </p>
+        {value > 0 && (
+          <span
+            className="mb-1.5 h-2 w-2 rounded-full crm-pulse-dot"
+            style={{
+              background: `rgb(${accentRgb})`,
+              boxShadow: `0 0 12px rgba(${accentRgb},0.7)`,
+            }}
+            aria-hidden
+          />
+        )}
       </div>
-    </div>
+      <p className="mt-1.5 text-[11px] font-medium tracking-wide uppercase text-[hsl(215,16%,46%)]">
+        {label}
+      </p>
+    </TiltSpotCard>
   );
 }
 
-export default function DashboardClient({ dashboard, erro, visual, currentUserId, currentUserRole }: Props) {
+export default function DashboardClient({
+  dashboard,
+  erro,
+  visual,
+  currentUserId,
+  currentUserRole,
+}: Props) {
   const accent = visual.accent;
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
   const [agora] = useState(() => Date.now());
+
   const tarefasOrdenadas = useMemo(() => {
     const tarefasPendentes = dashboard?.tarefasPendentes ?? [];
     return [...tarefasPendentes].sort((a, b) => {
@@ -72,114 +127,302 @@ export default function DashboardClient({ dashboard, erro, visual, currentUserId
 
   if (erro || !dashboard) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-rose-300">{erro ?? "Erro ao carregar dashboard"}</p>
+      <div className="p-8">
+        <GlassCard className="p-6">
+          <p className="text-sm text-[hsl(4,90%,82%)]">{erro ?? 'Erro ao carregar dashboard'}</p>
+        </GlassCard>
       </div>
     );
   }
 
-  const { pipelines, totalAtivos, concluidasSemana, tarefasAtrasadasCount, historicoRecente } = dashboard;
+  const {
+    pipelines,
+    totalAtivos,
+    concluidasSemana,
+    tarefasAtrasadasCount,
+    historicoRecente,
+  } = dashboard;
 
   return (
-    <div className="p-6 space-y-8">
-      <div>
-        <h1 className="text-xl font-black text-white mb-1">Dashboard</h1>
-        <p className="text-sm text-slate-400">Visão geral dos processos em andamento.</p>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Activity} label="Cards ativos" value={totalAtivos} accent={accent} />
-        <StatCard icon={AlertTriangle} label="Tarefas atrasadas" value={tarefasAtrasadasCount} accent={accent} tone="danger" />
-        <StatCard icon={ListChecks} label="Tarefas pendentes" value={tarefasOrdenadas.length} accent={accent} />
-        <StatCard icon={CheckCircle2} label="Concluídos (7 dias)" value={concluidasSemana} accent={accent} />
-      </div>
-
-      {/* Pipelines */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wide">Pipelines</h2>
-        {pipelines.length === 0 ? (
-          <p className="text-sm text-slate-500">Nenhum pipeline configurado ainda.</p>
-        ) : (
-          <div className="flex flex-wrap gap-6">
-            {pipelines.map((pipeline) => (
-              <CrmPipelineBorder key={pipeline.id} className="w-full md:w-[340px] lg:w-[380px] xl:w-[420px] max-w-full min-h-[200px] shadow-[0_4px_16px_rgba(0,0,0,0.3),0_12px_40px_rgba(0,0,0,0.2)] transition-shadow duration-300 ease-out hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.25)]">
-                <Link
-                  href={`/PainelAlpha/AlphaCRM/pipeline/${pipeline.id}`}
-                  className="block p-5 transition-colors group"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center"
-                      style={{ background: `rgba(${accent},0.15)` }}
-                    >
-                      <KanbanSquare size={17} style={{ color: `rgb(${accent})` }} />
-                    </div>
-                    <ArrowRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-bold text-white mb-1">{pipeline.nome}</h3>
-                  <p className="text-xs text-slate-400">{pipeline._count.cards} card(s)</p>
-                </Link>
-              </CrmPipelineBorder>
-            ))}
+    <div className="px-5 sm:px-7 lg:px-10 py-7 sm:py-10 max-w-[1600px] mx-auto space-y-8">
+      {/* ── Header ── */}
+      <header className="relative">
+        <div
+          className="absolute -top-1 left-0 h-[3px] w-24 rounded-full"
+          style={{
+            background: 'linear-gradient(90deg, #00e6c3, #3485ff, transparent)',
+            boxShadow: '0 0 14px rgba(0,230,195,0.5)',
+          }}
+          aria-hidden
+        />
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1
+              className="text-2xl sm:text-[32px] font-black tracking-[0.01em] text-white"
+              style={{ textShadow: '0 0 24px rgba(120,200,255,0.14)' }}
+            >
+              Dashboard
+            </h1>
+            <p className="mt-1.5 text-[13px] sm:text-sm text-[hsl(214,20%,52%)]">
+              Controle seus processos em tempo real.
+            </p>
           </div>
-        )}
+          <span
+            className="relative flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+            style={{
+              borderColor: 'rgba(0,230,195,0.22)',
+              background: 'rgba(0,230,195,0.06)',
+              color: 'rgb(0,230,195)',
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full crm-pulse-dot"
+              style={{ background: 'rgb(0,230,195)', boxShadow: '0 0 10px rgb(0,230,195)' }}
+              aria-hidden
+            />
+            Ao vivo
+          </span>
+        </div>
+      </header>
+
+      {/* ── KPI cards ── */}
+      <section aria-label="Indicadores" className="crm-enter grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5" style={{ animationDelay: "60ms" }}>
+        <KpiCard
+          icon={ActivityLucide}
+          label="Cards ativos"
+          value={totalAtivos}
+          accent={accent}
+          delay={0}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          label="Tarefas atrasadas"
+          value={tarefasAtrasadasCount}
+          accent={accent}
+          tone={tarefasAtrasadasCount > 0 ? 'danger' : undefined}
+          delay={60}
+        />
+        <KpiCard
+          icon={ListChecks}
+          label="Tarefas pendentes"
+          value={tarefasOrdenadas.length}
+          accent={accent}
+          tone={tarefasOrdenadas.length > 0 ? 'warn' : undefined}
+          delay={120}
+        />
+        <KpiCard
+          icon={CheckCircle2}
+          label="Concluídos (7 dias)"
+          value={concluidasSemana}
+          accent={accent}
+          tone="ok"
+          delay={180}
+        />
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Tarefas pendentes/atrasadas */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wide">Tarefas pendentes</h2>
-          <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
-            {tarefasOrdenadas.length === 0 && <p className="text-xs text-slate-600">Nenhuma tarefa pendente.</p>}
-            {tarefasOrdenadas.map((t) => {
-              const atrasada = t.prazo ? new Date(t.prazo).getTime() < agora : false;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setCardSelecionadoId(t.cardId)}
-                  className="w-full flex items-center justify-between gap-3 bg-slate-900/60 border border-white/5 rounded-xl px-3 py-2.5 text-left hover:border-white/15 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm text-white truncate">{t.titulo}</p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {t.card.empresa.razaoSocial} · {t.card.pipeline.nome}
-                    </p>
-                  </div>
-                  {t.prazo && (
-                    <span
-                      className={`shrink-0 flex items-center gap-1 text-[11px] font-semibold ${atrasada ? "text-rose-400" : "text-slate-400"}`}
+      {/* ── Pipelines ── */}
+      <section aria-label="Pipelines" className="crm-enter" style={{ animationDelay: "120ms" }}>
+        <SectionHeader title="Pipelines" />
+        <div className="mt-3">
+          {pipelines.length === 0 ? (
+            <GlassCard className="p-6">
+              <p className="text-sm text-[hsl(215,18%,50%)]">Nenhum pipeline configurado ainda.</p>
+            </GlassCard>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+              {pipelines.map((pipeline) => {
+                const ident = getPipelineIdentity(pipeline.nome);
+                const Icon = ident.icon;
+                return (
+                  <TiltSpotCard
+                    key={pipeline.id}
+                    maxTilt={1.5}
+                    className="group p-5"
+                    aria-label={pipeline.nome}
+                  >
+                    <Link
+                      href={`/PainelAlpha/AlphaCRM/pipeline/${pipeline.id}`}
+                      className="flex flex-col h-full"
                     >
-                      <Clock size={11} />
-                      {fmtDateTime(t.prazo)}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                      <div className="flex items-start justify-between">
+                        <PipelineGlyph identity={ident} className="crm-float" />
+                        <span
+                          className="mt-1 h-px w-1/3"
+                          style={{
+                            background: `linear-gradient(90deg, transparent, rgba(${ident.accent},0.45), transparent)`,
+                          }}
+                          aria-hidden
+                        />
+                      </div>
+
+                      <h3
+                        className="mt-4 text-[15px] sm:text-base font-bold text-white"
+                        style={{ textShadow: '0 0 12px rgba(255,255,255,0.05)' }}
+                      >
+                        {pipeline.nome}
+                      </h3>
+                      <p className="mt-1 text-xs text-[hsl(215,16%,46%)]">
+                        {pipeline._count.cards === 0
+                          ? 'Nenhum card ativo'
+                          : `${pipeline._count.cards} card${pipeline._count.cards > 1 ? 's' : ''} ativo${pipeline._count.cards > 1 ? 's' : ''}`}
+                      </p>
+
+                      <div className="mt-5 flex items-center justify-between">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium"
+                          style={{
+                            borderColor: `rgba(${ident.accent},0.24)`,
+                            background: `linear-gradient(90deg, rgba(${ident.accent},0.12), rgba(${ident.accent},0.02))`,
+                            color: `rgb(${ident.accent})`,
+                          }}
+                        >
+                          <Icon size={12} strokeWidth={2} />
+                          Módulo
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-[hsl(215,16%,46%)] transition-all duration-200 group-hover:text-[hsl(160,100%,55%)] group-hover:gap-2"
+                          aria-hidden
+                        >
+                          Acessar
+                          <ArrowRight size={13} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                        </span>
+                      </div>
+                    </Link>
+                  </TiltSpotCard>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Tarefas pendentes + Atividade recente ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Tarefas pendentes */}
+        <section aria-label="Tarefas pendentes" className="crm-enter" style={{ animationDelay: "200ms" }}>
+          <SectionHeader title="Tarefas pendentes" hint={`${tarefasOrdenadas.length} item${tarefasOrdenadas.length > 1 ? 's' : ''}`} />
+          <GlassCard className="mt-3 h-full p-3 sm:p-4">
+            <div className="crm-scroll max-h-[440px] overflow-y-auto pr-1 space-y-2">
+              {tarefasOrdenadas.length === 0 && (
+                <p className="text-xs text-[hsl(215,16%,42%)]">Nenhuma tarefa pendente.</p>
+              )}
+              {tarefasOrdenadas.map((t) => {
+                const atrasada = t.prazo ? new Date(t.prazo).getTime() < agora : false;
+                const c = atrasada ? '251, 113, 133' : '52, 133, 255';
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setCardSelecionadoId(t.cardId)}
+                    className="group w-full text-left crm-surface crm-inner-light rounded-xl border border-white/[0.04] px-3 py-2.5 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.03] hover:translate-x-[2px] hover:border-white/[0.10]"
+                    style={{ background: 'rgba(10,20,38,0.42)' }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+                        style={{
+                          border: `1px solid rgba(${c},0.26)`,
+                          background: `linear-gradient(155deg, rgba(${c},0.22), rgba(${c},0.05) 65%)`,
+                        }}
+                      >
+                        <Clock
+                          size={14}
+                          strokeWidth={2}
+                          style={{ color: `rgb(${c})`, filter: `drop-shadow(0 0 6px rgba(${c},0.6))` }}
+                        />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[13px] font-medium text-white truncate">{t.titulo}</p>
+                          {atrasada ? (
+                            <StatusBadge label="Atrasada" tone="danger" className="shrink-0" />
+                          ) : t.prazo ? (
+                            <StatusBadge label="Pendente" tone="info" className="shrink-0" />
+                          ) : null}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-[11px] text-[hsl(215,16%,46%)]">
+                          <Building2 size={12} />
+                          <span className="truncate">{t.card.empresa.razaoSocial}</span>
+                          <span aria-hidden className="h-1 w-1 rounded-full bg-white/20 shrink-0" />
+                          <span className="truncate max-w-[130px]">{t.card.pipeline.nome}</span>
+                        </div>
+                      </div>
+                      {t.prazo && (
+                        <span
+                          className="shrink-0 text-[10.5px] tabular-nums"
+                          style={{ color: atrasada ? `rgb(${c})` : 'hsl(215,16%,46%)' }}
+                        >
+                          {fmtDateTime(t.prazo)}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </GlassCard>
         </section>
 
         {/* Atividade recente */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wide">Atividade recente</h2>
-          <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
-            {historicoRecente.length === 0 && <p className="text-xs text-slate-600">Sem atividade recente.</p>}
-            {historicoRecente.map((h) => (
-              <button
-                key={h.id}
-                onClick={() => setCardSelecionadoId(h.card.id)}
-                className="w-full text-left bg-slate-900/60 border border-white/5 rounded-xl px-3 py-2.5 hover:border-white/15 transition-colors block"
-              >
-                <p className="text-sm text-slate-200">
-                  <span className="text-white font-medium">{h.usuario?.nome ?? "sistema"}</span> — {h.acao}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {h.card.empresa.razaoSocial} · {h.card.pipeline.nome} · {fmtDateTime(h.createdAt)}
-                </p>
-              </button>
-            ))}
-          </div>
+        <section aria-label="Atividade recente" className="crm-enter" style={{ animationDelay: "280ms" }}>
+          <SectionHeader title="Atividade recente" hint={`${historicoRecente.length} eventos`} />
+          <GlassCard className="mt-3 h-full p-3 sm:p-4">
+            <div className="crm-scroll max-h-[440px] overflow-y-auto pr-1">
+              {historicoRecente.length === 0 ? (
+                <p className="text-xs text-[hsl(215,16%,42%)]">Sem atividade recente.</p>
+              ) : (
+                <ul className="crm-timeline pl-0 space-y-2">
+                  {historicoRecente.map((h) => {
+                    const Icone = getAcaoVisual(h.acao);
+                    return (
+                      <li key={h.id} className="relative pl-7">
+                        <span
+                          className="absolute left-1 top-1.5 h-2.5 w-2.5 rounded-full"
+                          style={{
+                            background: 'rgb(0,230,195)',
+                            boxShadow: '0 0 0 3px rgba(0,230,195,0.14), 0 0 12px rgba(0,230,195,0.6)',
+                          }}
+                          aria-hidden
+                        />
+                        <button
+                          onClick={() => setCardSelecionadoId(h.card.id)}
+                          className="group w-full text-left rounded-xl border border-white/[0.04] px-3 py-2.5 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.03] hover:translate-x-[2px] hover:border-white/[0.10]"
+                          style={{ background: 'rgba(10,20,38,0.42)' }}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <span
+                              className="mt-0.5 grid h-6 w-6 place-items-center rounded-md shrink-0"
+                              style={{
+                                background: 'rgba(0,230,195,0.08)',
+                                border: '1px solid rgba(0,230,195,0.18)',
+                              }}
+                            >
+                              <Icone
+                                size={12}
+                                strokeWidth={2}
+                                className="text-[hsl(160,100%,55%)]"
+                              />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12.5px] text-white">
+                                <span className="font-medium">{h.usuario?.nome ?? 'sistema'}</span>
+                                <span className="text-[hsl(215,16%,46%)]"> · {h.acao.replace(/_/g, ' ').toLowerCase()}</span>
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-[hsl(215,16%,42%)] truncate">
+                                {h.card.empresa.razaoSocial} · {h.card.pipeline.nome}
+                              </p>
+                              <p className="mt-0.5 text-[10.5px] tabular-nums text-[hsl(215,16%,38%)]">
+                                {fmtDateTime(h.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </GlassCard>
         </section>
       </div>
 

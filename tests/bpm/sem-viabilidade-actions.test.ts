@@ -33,8 +33,15 @@ vi.mock("@/lib/bpm/ownership", () => ({
 }));
 vi.mock("@/lib/bpm/requisitos-etapa-server", () => ({
   carregarCamposAplicaveisCardEtapa: vi.fn(),
+  carregarSnapshotsCopiaCamposCard: vi.fn().mockResolvedValue({}),
   carregarCamposAplicaveisEtapa: aplicaveisEtapaMock,
   carregarCamposObrigatoriosEtapa: obrigatoriosEtapaMock,
+}));
+vi.mock("@/lib/bpm/sla", () => ({
+  criarSlaInstancia: vi.fn().mockResolvedValue(null),
+  obterStatusSlaCards: vi.fn().mockResolvedValue(new Map()),
+  prioridadeStatusSla: vi.fn().mockReturnValue(0),
+  sincronizarSlaMovimentoBpm: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { CriarCardBpm } from "@/actions/bpm/Cards";
@@ -177,7 +184,7 @@ describe("CriarCardBpm em etapa que exige Proximo Contato", () => {
         pipelineId: PIPELINE,
         etapaId: ETAPA,
         responsavelId: 7,
-        servico: undefined,
+        servico: null,
       },
     });
   });

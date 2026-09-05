@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   historicoCreate: vi.fn(),
   transaction: vi.fn(),
   gerarFicha: vi.fn(),
+  montarFatoChecklist: vi.fn(),
+  materializarChecklists: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -20,6 +22,12 @@ vi.mock("@/lib/bibble/gerar-ficha-server", () => ({
 }));
 vi.mock("@/lib/gerador-documentos/pdf", () => ({ gerarPdfDocumento: vi.fn() }));
 vi.mock("@/lib/gerador-documentos/render", () => ({ renderizarConteudo: vi.fn() }));
+vi.mock("@/lib/bpm/checklists/integracao", () => ({
+  montarFatoChecklistAutomacaoBpm: mocks.montarFatoChecklist,
+}));
+vi.mock("@/lib/bpm/checklists/service", () => ({
+  materializarChecklistsAplicaveisCard: mocks.materializarChecklists,
+}));
 vi.mock("@/lib/prisma", () => ({
   default: {
     bpmAutomacaoExecucao: {
@@ -81,6 +89,8 @@ describe("worker das automações BPM", () => {
     mocks.execucaoUpdate.mockResolvedValue({ id: "execucao-1" });
     mocks.historicoCreate.mockResolvedValue({ id: "historico-1" });
     mocks.transaction.mockImplementation((operacoes) => Promise.all(operacoes));
+    mocks.montarFatoChecklist.mockResolvedValue({ placeholders: {} });
+    mocks.materializarChecklists.mockResolvedValue({ criados: [], checklists: [] });
   });
 
   it("faz claim, gera a ficha, anexa ao card e registra sucesso", async () => {
@@ -107,6 +117,53 @@ describe("worker das automações BPM", () => {
         cardId: "card-1",
         acao: "AUTOMACAO_EXECUTADA",
         automacaoOrigem: "automacao-1",
+      }),
+    });
+    expect(resultado).toEqual({ encontrados: 1, executados: 1, falhos: 0 });
+  });
+
+  it("materializa checklists somente quando a ação explícita é executada", async () => {
+    mocks.execucaoFindUnique.mockResolvedValue({
+      id: "execucao-1",
+      cardId: "card-1",
+      automacaoId: "automacao-1",
+      automacao: {
+        id: "automacao-1",
+        nome: "Preparar documentação",
+        ativa: true,
+        acaoTipo: "MATERIALIZAR_CHECKLIST",
+        parametrosJson: "{}",
+        criadoPorId: 7,
+      },
+      card: {
+        id: "card-1",
+        pipelineId: "pipeline-1",
+        etapaId: "etapa-1",
+        servico: "Assessoria",
+        tipoProcesso: "Importação",
+        empresaId: 42,
+        empresa: { razaoSocial: "Alpha Comércio Ltda", nomeFantasia: "Alpha", cnpj: "12345678000190" },
+        responsavel: { nome: "Pessoa Responsável" },
+        pipeline: { nome: "Comercial" },
+        etapa: { nome: "Proposta" },
+      },
+    });
+    mocks.materializarChecklists.mockResolvedValue({
+      criados: ["checklist-1"],
+      checklists: [{ id: "checklist-1" }],
+    });
+
+    const resultado = await processarFilaAutomacoesBpm(10);
+
+    expect(mocks.materializarChecklists).toHaveBeenCalledWith({
+      cardId: "card-1",
+      automacaoOrigem: "automacao-1",
+    });
+    expect(mocks.execucaoUpdate).toHaveBeenCalledWith({
+      where: { id: "execucao-1" },
+      data: expect.objectContaining({
+        status: "SUCESSO",
+        resultadoJson: expect.stringContaining('\"materializados\":1'),
       }),
     });
     expect(resultado).toEqual({ encontrados: 1, executados: 1, falhos: 0 });

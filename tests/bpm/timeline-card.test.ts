@@ -95,12 +95,25 @@ describe("montarFeedTimelineCard — agregação de múltiplas fontes", () => {
 
 describe("PainelHistorico — ownership e estado vazio da timeline do card", () => {
   const painelHistorico = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
+  const painelHistoricoShared = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistoricoShared.tsx");
+  const painelTimeline = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelTimelineCard.tsx");
+  const timelineAction = ler("src/actions/bpm/Timeline.ts");
   const cardsAction = ler("src/actions/bpm/Cards.ts");
   const interacoesAction = ler("src/actions/bpm/Interacoes.ts");
 
   it("exibe estado vazio quando não há eventos no feed", () => {
     expect(painelHistorico).toContain("Sem histórico.");
     expect(painelHistorico).toContain("feedHistorico.length === 0");
+    expect(painelHistoricoShared).toContain("formatarValorHistorico");
+  });
+
+  it("oculta somente o acionador e preserva a implementação da Timeline", () => {
+    expect(painelHistorico).not.toContain('<TabsTrigger value="timeline"');
+    expect(painelHistorico).toContain('<TabsContent value="timeline"');
+    expect(painelHistorico).toContain("<PainelTimelineCard");
+    expect(painelTimeline).toContain("ListarTimelineCardBpm");
+    expect(timelineAction).toContain("export async function ListarTimelineCardBpm");
+    expect(timelineAction).toContain("exigirAcessoBpmCard");
   });
 
   it("a leitura do card (fonte do histórico) exige exigirAcessoBpmCard antes de retornar dados", () => {

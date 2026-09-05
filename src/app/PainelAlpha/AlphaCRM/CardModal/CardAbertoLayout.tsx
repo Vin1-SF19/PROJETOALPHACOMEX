@@ -320,6 +320,9 @@ export function CardAbertoLayout({
                 onAtualizado={() => { onAtualizado(); }}
                 etapas={etapas}
                 podeTrabalharTarefas={podeTrabalharTarefas}
+                podeEditar={podeEditar}
+                realtimeRevision={realtimeRevision}
+                onInteracaoCriada={onInteracaoCriada}
                 anotacoes={interacoes.filter((interacao) => interacao.tipo === "ANOTACAO" || Boolean(interacao.observacoes))}
               />
             </TabsContent>

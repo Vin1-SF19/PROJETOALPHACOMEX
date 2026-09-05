@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -8,17 +8,11 @@ import {
   Trash2,
   History,
   CheckCircle2,
-  ChevronDown,
   Paperclip,
   ListTodo,
   MessageSquareText,
-  ArrowRightLeft,
-  Pencil,
   CalendarClock,
-  Zap,
-  Repeat,
-  Bot,
-  Clock,
+  ClipboardCheck,
 } from "lucide-react";
 import { fmtDateTime } from "@/lib/format-date";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
@@ -34,6 +28,9 @@ import { PainelResumoEtapas } from "./PainelResumoEtapas";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
 import { PainelConhecimentoRelacionado } from "@/components/bpm/conhecimento/PainelConhecimentoRelacionado";
 import { etapasAnterioresParaResumo } from "@/lib/bpm/resumo-etapas";
+import { PainelChecklistsCard } from "./PainelChecklistsCard";
+import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
+import { formatarBytes, formatarValorHistorico, iconePorAcao } from "./PainelHistoricoShared";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -49,88 +46,47 @@ interface Props {
 
 
   podeTrabalharTarefas: boolean;
-
-
+  podeEditar: boolean;
+  realtimeRevision: number;
+  onInteracaoCriada: (interacao: Interacao) => void;
   anotacoes: Interacao[];
 }
 
-function formatarBytes(bytes: number | null): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-export function SectionCard({
-  icon: Icon,
-  title,
-  count,
+export default function PainelHistorico({
+  card,
   accent,
-  defaultOpen,
-  children,
-}: {
-  icon: typeof History;
-  title: string;
-  count?: number;
-  accent: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <details
-      open={defaultOpen}
-      className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm overflow-hidden transition-colors hover:border-white/10"
-    >
-      <summary className="flex items-center justify-between gap-2 cursor-pointer list-none px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: `rgba(${accent},0.15)` }}
-          >
-            <Icon size={13} style={{ color: `rgb(${accent})` }} />
-          </div>
-          <span className="text-xs font-bold text-white uppercase tracking-wide">{title}</span>
-          {typeof count === "number" && count > 0 && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{count}</span>
-          )}
-        </div>
-        <ChevronDown size={14} className="text-slate-500 group-open:rotate-180 transition-transform shrink-0" />
-      </summary>
-      <div className="px-4 pb-4 pt-1 border-t border-white/[0.04]">{children}</div>
-    </details>
-  );
-}
-
-function iconePorAcao(acao: string): typeof History {
-  if (acao.startsWith("CARD_MOVIDO")) return ArrowRightLeft;
-  if (acao === "CARD_ATUALIZADO" || acao === "MEMBROS_ATUALIZADOS") return Pencil;
-  if (acao.startsWith("TAREFA_") || acao === "PRESET_APLICADO") return ListTodo;
-  if (acao.startsWith("REUNIAO_")) return CalendarClock;
-  if (acao.startsWith("CHECKLIST_")) return CheckCircle2;
-  if (acao.startsWith("ANEXO_")) return Paperclip;
-  if (acao.startsWith("CADENCIA_")) return Repeat;
-  if (acao.startsWith("AUTOMACAO") || acao === "DISTRIBUICAO_AUTOMATICA" || acao === "ENVIAR_EMAIL") return Zap;
-  if (acao.startsWith("STANDBY_")) return Bot;
-  return History;
-}
-
-function formatarValorHistorico(valor: string | null | undefined): string | null {
-  if (!valor) return null;
-  try {
-    const parsed = JSON.parse(valor);
-    if (typeof parsed === "string") return parsed;
-    return JSON.stringify(parsed);
-  } catch {
-    return valor;
-  }
-}
-
-export default function PainelHistorico({ card, accent, currentUserId, currentUserRole, onAtualizado, etapas, podeTrabalharTarefas, anotacoes }: Props) {
+  currentUserId,
+  currentUserRole,
+  onAtualizado,
+  etapas,
+  podeTrabalharTarefas,
+  podeEditar,
+  realtimeRevision,
+  onInteracaoCriada,
+  anotacoes,
+}: Props) {
   const [enviandoAnexo, setEnviandoAnexo] = useState(false);
   const [arrastandoAnexo, setArrastandoAnexo] = useState(false);
   const [abaEsquerda, setAbaEsquerda] = useState("etapas");
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
+
+  useEffect(() => {
+    function abrirPendencias(event: Event) {
+      const detail = (event as CustomEvent<{ cardId: string; itemId?: string | null }>).detail;
+      if (detail?.cardId !== card.id) return;
+      setAbaEsquerda("checklist");
+      window.setTimeout(() => {
+        const alvo = (detail.itemId
+          ? document.getElementById(`checklist-item-${detail.itemId}`)
+          : null) ?? document.getElementById("checklist-pendencias");
+        alvo?.scrollIntoView({ behavior: "smooth", block: "center" });
+        alvo?.focus({ preventScroll: true });
+      }, 0);
+    }
+    window.addEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
+    return () => window.removeEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
+  }, [card.id]);
 
   const feedHistorico: ItemTimelineCard[] = montarFeedTimelineCard(card.historico, anotacoes);
 
@@ -169,22 +125,26 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
   }
 
   return (
-    <div className="min-h-0 flex flex-col rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 gap-3 lg:h-full">
+    <div className="flex max-h-[85vh] min-h-0 flex-col gap-3 overflow-hidden rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 lg:h-full lg:max-h-none">
       <PainelConhecimentoRelacionado pipelineId={card.pipeline.id} accent={accent} />
-      <Tabs value={abaEsquerda} onValueChange={setAbaEsquerda} className="min-h-0 flex-1 lg:overflow-hidden">
+      <Tabs value={abaEsquerda} onValueChange={setAbaEsquerda} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
-          <TabsTrigger value="etapas" className="flex-none gap-1.5">
-            <CheckCircle2 size={13} />
-            Etapas concluídas
-            {etapasAnteriores.length > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{etapasAnteriores.length}</span>
-            )}
-          </TabsTrigger>
           <TabsTrigger value="tarefas" className="flex-none gap-1.5">
             <ListTodo size={13} />
             Tarefas
             {card.tarefas.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{card.tarefas.length}</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="checklist" className="flex-none gap-1.5">
+            <ClipboardCheck size={13} />
+            Checklist
+          </TabsTrigger>
+          <TabsTrigger value="etapas" className="flex-none gap-1.5">
+            <CheckCircle2 size={13} />
+            Etapas concluídas
+            {etapasAnteriores.length > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{etapasAnteriores.length}</span>
             )}
           </TabsTrigger>
           <TabsTrigger value="anexos" className="flex-none gap-1.5">
@@ -201,21 +161,13 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{feedHistorico.length}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="timeline" className="flex-none gap-1.5">
-            <Clock size={13} />
-            Timeline
-          </TabsTrigger>
           <TabsTrigger value="cadencias" className="flex-none gap-1.5">
             <CalendarClock size={13} />
             Cadências
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="etapas" className="min-h-0 lg:h-full lg:overflow-y-auto">
-          <PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} ocultarTitulo />
-        </TabsContent>
-
-        <TabsContent value="tarefas" className="min-h-0 lg:h-full lg:overflow-y-auto">
+        <TabsContent value="tarefas" className="min-h-0 flex-1 overflow-y-auto">
           <PainelTarefasPorTipo
             cardId={card.id}
             responsavelId={card.responsavel?.id ?? null}
@@ -226,7 +178,21 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
           />
         </TabsContent>
 
-        <TabsContent value="anexos" className="min-h-0 lg:h-full lg:overflow-y-auto">
+        <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto">
+          <PainelChecklistsCard
+            card={card}
+            accent={accent}
+            podeEditar={podeEditar}
+            realtimeRevision={realtimeRevision}
+            onAtualizado={onAtualizado}
+          />
+        </TabsContent>
+
+        <TabsContent value="etapas" className="min-h-0 flex-1 overflow-y-auto">
+          <PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} ocultarTitulo />
+        </TabsContent>
+
+        <TabsContent value="anexos" className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-1.5">
             {card.anexos.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-2 bg-white/[0.03] border border-white/5 rounded-xl px-3 py-2">
@@ -256,7 +222,7 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
           </div>
         </TabsContent>
 
-        <TabsContent value="historico" className="min-h-0 lg:h-full lg:overflow-y-auto">
+        <TabsContent value="historico" className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-1.5">
             {feedHistorico.map((item) =>
               item.tipo === "anotacao" ? (
@@ -302,14 +268,20 @@ export default function PainelHistorico({ card, accent, currentUserId, currentUs
           </div>
         </TabsContent>
 
-        <TabsContent value="timeline" className="min-h-0 lg:h-full lg:overflow-y-auto">
+        <TabsContent value="timeline" className="min-h-0 flex-1 overflow-y-auto">
           <PainelTimelineCard cardId={card.id} />
         </TabsContent>
 
-        <TabsContent value="cadencias" className="min-h-0 lg:h-full lg:overflow-y-auto">
+        <TabsContent value="cadencias" className="min-h-0 flex-1 overflow-y-auto">
           <PainelCadenciasCard cardId={card.id} accent={accent} />
         </TabsContent>
       </Tabs>
+      <EditorAnotacaoCard
+        card={card}
+        accent={accent}
+        podeEditar={podeEditar}
+        onInteracaoCriada={onInteracaoCriada}
+      />
     </div>
   );
 }

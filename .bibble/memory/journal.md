@@ -4802,6 +4802,10 @@ Nova implementou o motor temporal de SLA sem mudança de schema: cálculo, resol
 
 Nova implementou o CRUD e a UI administrativa de SLA no editor existente de pipeline. Foram adicionados schema Zod compartilhado, actions autenticadas/transacionais, listagem responsiva, formulário de cinco escopos, política de pausa, limites configuráveis e preview verde/amarelo/vermelho. Nenhuma mudança de schema/migration ou operação Git mutável foi executada.
 
+## 2026-09-05 — Nova — RM-2026-B7694F Fase 4
+
+Checklist passou a ter uma única montagem antecipada no painel esquerdo; as seis abas foram reordenadas e somente o acionador Timeline foi ocultado. O evento de pendências agora abre Checklist e transfere foco. Anotação foi extraída para `EditorAnotacaoCard` no rodapé esquerdo, preservando action, permissões, feedback e atualização do Histórico. O centro manteve apenas Formulário da Etapa e Script. Não houve alteração de banco, API ou Server Action. Testes direcionados: 48/48; débitos globais externos registrados na story.
+
 ## 2026-09-04 — Codex — RM-2026-D100EB Motor Central concluído
 
 Após a aplicação e validação das duas migrations autorizadas, foram entregues

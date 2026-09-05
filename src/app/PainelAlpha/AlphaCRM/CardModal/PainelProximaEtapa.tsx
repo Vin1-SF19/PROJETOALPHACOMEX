@@ -1,10 +1,11 @@
 "use client";
 
 import { toast } from "sonner";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Loader2 } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
+import { ObterResumoChecklistCardBpm } from "@/actions/bpm/Checklists";
 import { useCardSave } from "./CardSaveContext";
 import {
   ERRO_DATA_REUNIAO_OBRIGATORIA,
@@ -29,9 +30,53 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
   const router = useRouter();
   const { flushSaves } = useCardSave();
   const [movendoEtapa, setMovendoEtapa] = useState(false);
+  const [pendenciasChecklist, setPendenciasChecklist] = useState<{
+    quantidade: number;
+    templates: string[];
+    primeiroItemId: string | null;
+  } | null>(null);
   const aguardandoDataHora = etapaEhAgendarReuniao(card.etapa.nome) && !card.dataReuniao;
   const aguardandoTranscricao = etapaEhReuniaoAgendada(card.etapa.nome)
     && !card.transcricaoReuniao?.trim();
+
+  const carregarPendencias = useCallback(async () => {
+    const resposta = await ObterResumoChecklistCardBpm({ cardId: card.id });
+    if (!resposta.success) return;
+    setPendenciasChecklist(resposta.data.pendentesObrigatorios > 0 ? {
+      quantidade: resposta.data.pendentesObrigatorios,
+      templates: resposta.data.templatesComPendencia.map((item) => item.nome),
+      primeiroItemId: resposta.data.itensObrigatoriosPendentes[0]?.id ?? null,
+    } : null);
+  }, [card.id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void carregarPendencias(), 0);
+    function atualizarResumo(event: Event) {
+      const detail = (event as CustomEvent<{
+        cardId: string;
+        pendentesObrigatorios: number;
+        templates: string[];
+        primeiroItemId: string | null;
+      }>).detail;
+      if (detail?.cardId !== card.id) return;
+      setPendenciasChecklist(detail.pendentesObrigatorios > 0 ? {
+        quantidade: detail.pendentesObrigatorios,
+        templates: detail.templates,
+        primeiroItemId: detail.primeiroItemId,
+      } : null);
+    }
+    window.addEventListener("bpm:checklist-resumo", atualizarResumo);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("bpm:checklist-resumo", atualizarResumo);
+    };
+  }, [card.id, carregarPendencias]);
+
+  function irParaPendencias() {
+    window.dispatchEvent(new CustomEvent("bpm:abrir-pendencias-checklist", {
+      detail: { cardId: card.id, itemId: pendenciasChecklist?.primeiroItemId ?? null },
+    }));
+  }
 
   async function handleMover(etapaDestinoId: string) {
     if (etapaDestinoId === card.etapa.id || movendoEtapa) return;
@@ -68,7 +113,12 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
         }
         onMovido();
       }
-      else toast.error(typeof res.error === "string" ? res.error : "Não foi possível mover o card");
+      else {
+        toast.error(typeof res.error === "string" ? res.error : "Não foi possível mover o card");
+        if (typeof res.error === "string" && res.error.startsWith("Avanço bloqueado:")) {
+          await carregarPendencias();
+        }
+      }
     } finally {
       setMovendoEtapa(false);
     }
@@ -76,10 +126,20 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
 
   return (
     <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent overflow-y-auto p-3 space-y-1.5">
-      {false && (
-        <div className="mb-3 flex gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
-
-
+      {pendenciasChecklist && (
+        <div role="alert" className="mb-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-3 text-[11px] leading-relaxed text-amber-100">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <div>
+              <p className="font-bold">
+                {pendenciasChecklist.quantidade} {pendenciasChecklist.quantidade === 1 ? "item obrigatório pendente" : "itens obrigatórios pendentes"}
+              </p>
+              <p className="mt-1 text-amber-200/80">{pendenciasChecklist.templates.join(", ")}</p>
+              <button type="button" onClick={irParaPendencias} className="mt-2 min-h-11 rounded-lg border border-amber-300/30 px-3 font-bold text-amber-100 transition hover:bg-amber-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
+                Ir para pendências
+              </button>
+            </div>
+          </div>
         </div>
       )}
       

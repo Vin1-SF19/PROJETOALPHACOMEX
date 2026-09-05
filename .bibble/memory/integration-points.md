@@ -2475,6 +2475,14 @@ runtimes.
 
 **Última atualização:** 2026-09-04 por Codex (RM-2026-D100EB)
 
+### Card nativo — Checklist e Anotação no painel esquerdo (RM-2026-B7694F)
+
+**Caminho:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card nativo → `CardFullViewModal` → `CardAbertoLayout` → `PainelHistorico`.
+
+**Composição:** abas visíveis Tarefas, Checklist, Etapas concluídas, Anexos, Histórico e Cadências. `PainelChecklistsCard` tem uma montagem com `forceMount`; o evento de pendências abre essa aba e foca o item. `EditorAnotacaoCard` é o rodapé irmão do scroll. Timeline conserva conteúdo, componente e action, sem acionador visível.
+
+**Última atualização:** 2026-09-05 por Nova (RM-2026-B7694F)
+
 ### SLA operacional e Motor Central — RM-2026-095B40
 
 **Produção:** `Cards.ts` e `Tarefas.ts` chamam o domínio SLA dentro das transações dos eventos reais. `sla.ts` grava transição + `BpmSlaEventoLog` + trava `BpmSlaDisparo` + evento `SLA_STATUS_ALTERADO` atomicamente.

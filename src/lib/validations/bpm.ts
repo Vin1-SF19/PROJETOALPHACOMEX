@@ -388,6 +388,9 @@ export const interromperStandbyFollowUpSchema = z.object({
 export const moverCardSchema = z.object({
   cardId: z.string().cuid(),
   etapaDestinoId: z.string().cuid(),
+  etapaOrigemEsperadaId: z.string().cuid().optional(),
+  versaoEsperada: z.number().int().min(0).optional(),
+  idempotencyKey: z.string().trim().min(8).max(200).optional(),
 });
 
 export const salvarRequisitosEMoverCardSchema = moverCardSchema.extend({

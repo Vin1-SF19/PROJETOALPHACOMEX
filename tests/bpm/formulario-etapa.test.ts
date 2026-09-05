@@ -9,6 +9,7 @@ const modal = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardFullViewModal.tsx"
 const layoutCard = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardAbertoLayout.tsx");
 const historico = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
 const formulario = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx");
+const editorAnotacao = ler("src/app/PainelAlpha/AlphaCRM/CardModal/EditorAnotacaoCard.tsx");
 const slotFormulario = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx");
 const campos = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelCamposEtapaAtual.tsx");
 const reuniao = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelReuniao.tsx");
@@ -74,16 +75,19 @@ describe("CRM - formulário unificado por etapa", () => {
     expect(historico).not.toContain("Tentando contato");
   });
   it("mantém a Anotação como accordion compacto no rodapé, com botão Salvar explícito", () => {
-    expect(formulario).toContain("Anotação");
-    expect(formulario).toContain("<details");
-    expect(formulario).toContain("<summary");
-    expect(formulario).toContain("sticky bottom-0 z-10 shrink-0");
-    expect(formulario).toContain("value={anotacao}");
-    expect(formulario).toContain("salvarAnotacao");
-    expect(formulario).toContain("onClick={() => void salvarAnotacao()}");
-    expect(formulario).not.toContain("onBlur={() => void salvarAnotacao()}");
-    expect(formulario).not.toContain("anotacoes.length > 0");
-    expect(formulario.indexOf("</Tabs>")).toBeLessThan(formulario.indexOf("<details"));
+    expect(historico).toContain("<EditorAnotacaoCard");
+    expect(historico.indexOf("</Tabs>")).toBeLessThan(historico.indexOf("<EditorAnotacaoCard"));
+    expect(editorAnotacao).toContain("Anotação");
+    expect(editorAnotacao).toContain("<details");
+    expect(editorAnotacao).toContain("<summary");
+    expect(editorAnotacao).toContain("shrink-0");
+    expect(editorAnotacao).toContain("value={anotacao}");
+    expect(editorAnotacao).toContain("salvarAnotacao");
+    expect(editorAnotacao).toContain("onClick={() => void salvarAnotacao()}");
+    expect(editorAnotacao).not.toContain("onBlur={() => void salvarAnotacao()}");
+    expect(editorAnotacao).toContain("Aparece no Histórico");
+    expect(formulario).not.toContain("EditorAnotacaoCard");
+    expect(formulario).not.toContain("CriarInteracaoCardBpm");
   });
 
   it("persiste a anotação identificada, com autor, sem tratá-la como ligação", () => {

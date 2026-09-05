@@ -46,12 +46,12 @@ describe("integração com a aba Configurações", () => {
   );
 
   it("renderiza os grupos e seus estados vazios sem remover o CRUD", () => {
-    expect(admin).toContain("agruparCamposPorColuna(campos, etapas)");
+    expect(admin).toContain("agruparCamposPorColuna(filtrados, etapas)");
     expect(admin).toContain("Campos configurados nesta coluna");
     expect(admin).toContain("Nenhum campo configurado nesta coluna");
     expect(admin).toContain("handleCriarCampo");
     expect(admin).toContain("salvarEdicao(campo.id)");
-    expect(admin).toContain("excluirCampo(campo.id, campo.nome)");
+    expect(admin).toContain("alterarAtivacaoCampo(campo.id, campo.nome, campo.ativo === false)");
     expect(admin).toContain("handleToggleObrigatorio");
   });
 });

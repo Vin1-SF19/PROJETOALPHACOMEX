@@ -7,7 +7,11 @@ import { Resend } from 'resend';
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function criarClienteResend() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY não configurada");
+  return new Resend(apiKey);
+}
 const BASE_URL = "https://painel-alpha-projeto.vercel.app";
 
 export async function solicitarRecuperacao(email: string) {
@@ -25,7 +29,7 @@ export async function solicitarRecuperacao(email: string) {
 
     const link = `${BASE_URL}/auth/redefinir-senha?token=${token}`;
 
-    await resend.emails.send({
+    await criarClienteResend().emails.send({
       from: 'Sistema Alpha <onboarding@resend.dev>',
       to: email,
       subject: 'Recuperação de Senha - Alpha',
@@ -72,4 +76,3 @@ export async function redefinirSenha(token: string, novaSenhaRaw: string) {
     return { error: "Erro ao atualizar senha" };
   }
 }
-

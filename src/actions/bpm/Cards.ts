@@ -100,6 +100,7 @@ import {
 import { campoFinanceiroSomenteLeitura, etapaFinanceiraValida, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
 import { calcularRegraTributariaDoCard } from "@/lib/bpm/regras-financeiras/persistencia";
 import { sincronizarComissoesDoCardFinanceiro } from "@/lib/bpm/regras-financeiras/comissoes-card";
+import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
 import {
@@ -1458,7 +1459,12 @@ export async function ObterRequisitosTransicaoBpm(cardId: string, etapaDestinoId
   }
 }
 
-async function executarMovimentoComRequisitos(
+/**
+ * Implementação anterior preservada temporariamente apenas como referência de
+ * caracterização. Nenhum caller runtime a utiliza após a convergência para o
+ * TransitionCommand canônico.
+ */
+async function executarMovimentoLegadoDesativado(
   dados: DadosMovimentoComRequisitos,
   userId: number,
   userRole: string | null,
@@ -1897,13 +1903,72 @@ async function executarMovimentoComRequisitos(
     : { success: true };
 }
 
+async function executarMovimentoCanonico(
+  dados: DadosMovimentoComRequisitos & {
+    etapaOrigemEsperadaId?: string;
+    versaoEsperada?: number;
+    idempotencyKey?: string;
+  },
+  userId: number,
+  userRole: string | null,
+) {
+  const atual = await db.bpmCard.findUnique({
+    where: { id: dados.cardId },
+    select: { etapaId: true, versao: true, pipelineId: true },
+  });
+  if (!atual) return { success: false, error: "Card não encontrado" };
+  const etapaEsperada = dados.etapaOrigemEsperadaId ?? atual.etapaId;
+  const versaoEsperada = dados.versaoEsperada ?? atual.versao;
+  const vinculosAntes = new Set((await db.bpmCardVinculo.findMany({
+    where: { cardOrigemId: dados.cardId },
+    select: { id: true },
+  })).map((item) => item.id));
+  const resultado = await executarTransicaoBpm({
+    cardId: dados.cardId,
+    etapaOrigemEsperadaId: etapaEsperada,
+    etapaDestinoId: dados.etapaDestinoId,
+    versaoEsperada,
+    idempotencyKey: dados.idempotencyKey ?? randomUUID(),
+    ator: { tipo: "MANUAL", userId, userRole },
+    camposValores: dados.camposValores,
+    proximoContatoEm: dados.proximoContatoEm,
+  });
+  if (!resultado.success) return { success: false, error: resultado.error };
+
+  try {
+    await executarAutomacoesCentraisDoCardAgora(dados.cardId);
+  } catch (error) {
+    console.error("[executarAutomacoesCentraisDoCardAgora]", error);
+  }
+  try {
+    await sincronizarComissoesDoCardFinanceiro(dados.cardId);
+  } catch (error) {
+    console.error("[sincronizarComissoesDoCardFinanceiro]", error);
+  }
+  const criados = await db.bpmCardVinculo.findMany({
+    where: { cardOrigemId: dados.cardId, id: { notIn: [...vinculosAntes] } },
+    select: { cardDestino: { select: { id: true, pipelineId: true, pipeline: { select: { nome: true } } } } },
+  });
+  const cardsFilhosCriados = criados.map(({ cardDestino }) => ({
+    cardId: cardDestino.id,
+    pipelineId: cardDestino.pipelineId,
+    pipelineNome: cardDestino.pipeline.nome,
+  }));
+
+  await notificarPipelineBpm({ pipelineId: atual.pipelineId, cardId: dados.cardId, tipo: "CARD_MOVIDO" });
+  revalidatePath(`${ROTA_BASE}/pipeline/${atual.pipelineId}`);
+  revalidatePath(ROTA_BASE);
+  revalidatePath(`${ROTA_BASE}/tarefas`);
+  return cardsFilhosCriados.length ? { success: true, cardsFilhosCriados } : { success: true };
+}
+
 export async function SalvarRequisitosEMoverCardBpm(dados: unknown) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const parsed = salvarRequisitosEMoverCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    return await executarMovimentoComRequisitos(
+    return await executarMovimentoCanonico(
       { ...parsed.data, origemMovimentacao: "MANUAL" },
       Number(session.user.id),
       session.user.role ?? null,
@@ -1931,7 +1996,7 @@ export async function MoverCardBpm(dados: unknown) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const parsed = moverCardSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    return await executarMovimentoComRequisitos(
+    return await executarMovimentoCanonico(
       { ...parsed.data, camposValores: {}, origemMovimentacao: "MANUAL" },
       Number(session.user.id),
       session.user.role ?? null,

@@ -35,10 +35,8 @@ type ClienteRequisitosEtapa = Pick<
 type ClienteTransicaoBpm = typeof db | Prisma.TransactionClient;
 
 /**
- * Consulta BpmTransicaoEtapa para o par origem→destino. Ausência de regra
- * explícita não bloqueia (fail-open): o backfill da Fase 1 cobriu todos os
- * pares hoje válidos com permitida=true/origem=AMBOS, então só uma regra
- * criada/editada explicitamente por um admin pode passar a restringir.
+ * Consulta a única definição canônica para origem→destino. A ausência da
+ * aresta é uma decisão negativa: transições são fail-closed.
  */
 export async function verificarTransicaoPermitidaBpm(
   etapaOrigemId: string,
@@ -52,7 +50,9 @@ export async function verificarTransicaoPermitidaBpm(
     where: { etapaOrigemId_etapaDestinoId: { etapaOrigemId, etapaDestinoId } },
     select: { permitida: true, origem: true },
   });
-  if (!transicao) return { permitida: true };
+  if (!transicao) {
+    return { permitida: false, motivo: "Esta transição não está definida no pipeline." };
+  }
 
   if (!transicao.permitida) {
     return { permitida: false, motivo: "Esta transição foi desativada pelo administrador." };
@@ -135,7 +135,8 @@ function resolverConfiguracaoAcessoCampo(
     visivel,
     editavel,
     somenteLeitura,
-    obrigatorio: acesso?.obrigatorio ?? configEtapa?.obrigatorio ?? campo.obrigatorio,
+    // BpmCampoAcesso controla apresentação/autorização, jamais requisito de negócio.
+    obrigatorio: configEtapa?.obrigatorio ?? campo.obrigatorio,
   };
 }
 

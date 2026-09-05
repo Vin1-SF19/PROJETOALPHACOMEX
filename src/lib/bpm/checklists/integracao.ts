@@ -124,7 +124,9 @@ export async function obterErroChecklistParaMovimento(
   card: ContextoCardChecklist,
   client: ClienteIntegracaoChecklist = db,
 ): Promise<string | null> {
-  const resumo = await carregarResumoChecklistAplicavelSeguro(card, client);
+  // Commit de domínio é fail-closed. O fallback seguro permanece apenas nas
+  // projeções/consultas em que indisponibilidade não autoriza uma transição.
+  const resumo = await carregarResumoChecklistAplicavelCard(card, client);
   if (!resumo.possuiPendenciaObrigatoria) return null;
   const templates = resumo.templatesComPendencia.map((item) => item.nome).join(", ");
   const itens = resumo.itensObrigatoriosPendentes.slice(0, 5).map((item) => item.nome);

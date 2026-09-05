@@ -1,0 +1,16 @@
+[Unit]
+Description=Painel Alpha - Stage (release isolada)
+After=network.target
+
+[Service]
+Type=simple
+User=ialpha
+Group=ialpha
+WorkingDirectory=/home/ialpha/deployments/painel-alpha-stage/current
+Environment=NODE_ENV=production
+ExecStart=/home/ialpha/.config/nvm/versions/node/v22.22.3/bin/node node_modules/next/dist/bin/next start -p 3300
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -164,6 +164,7 @@ model usuarios {
   bpmSlaConfigsCriadas         BpmSlaConfig[]                @relation("BpmSlaConfigCriador")
   bpmAutomacaoVersoesCriadas   BpmAutomacaoVersao[]
   bpmWebhookEndpointsCriados   BpmWebhookEndpoint[]
+  comercialCheckinsDiarios     ComercialCheckInDiario[]
 
   justificativasMetaEnviadas     JustificativaMeta[]
   roadmapObjectives              RoadmapObjective[]
@@ -751,6 +752,7 @@ model ClienteServico {
   commissionEvents     CommissionEvent[]
   businessProcesses    BusinessProcess[]
   eligibilityOverrides EligibilityOverride[]
+  bpmCardContextos     BpmCardServicoContexto[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1401,6 +1403,20 @@ model ComercialPerformance {
   @@map("comercial_performance")
 }
 
+model ComercialCheckInDiario {
+  id           Int      @id @default(autoincrement())
+  usuarioId    Int
+  data         DateTime
+  confirmadoEm DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  usuario usuarios @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([usuarioId, data], name: "checkin_dia_pk", map: "comercial_checkin_diario_usuarioId_data_key")
+  @@index([data], map: "comercial_checkin_diario_data_idx")
+  @@map("comercial_checkin_diario")
+}
+
 model ClienteOperacional {
   id           String                @id @default(cuid())
   nome         String
@@ -1624,6 +1640,7 @@ model ContratoComercial {
   commissionEvents     CommissionEvent[]
   businessProcesses    BusinessProcess[]
   eligibilityOverrides EligibilityOverride[]
+  bpmCardContextos     BpmCardServicoContexto[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3699,6 +3716,7 @@ model BlueprintActivity {
 
 model BpmPipeline {
   id        String   @id @default(cuid())
+  chave     String?  @unique // identidade semântica estável; nome permanece apenas apresentação
   nome      String
   ordem     Int      @default(0)
   ativo     Boolean  @default(true)
@@ -3720,6 +3738,7 @@ model BpmPipeline {
   conhecimentoLinks  BpmPipelineConhecimentoLink[]
   webhookEndpoints   BpmWebhookEndpoint[]
   camposAssociados   BpmCampoPipeline[]
+  requisitos         BpmRequisito[]
 
   @@index([ativo])
   @@index([ordem])
@@ -3835,16 +3854,18 @@ model BpmSlaAlertaLimite {
 }
 
 model BpmEtapa {
-  id         String  @id @default(cuid())
-  pipelineId String
-  nome       String
-  ordem      Int     @default(0)
-  cor        String? // cor de exibição da etapa (ex.: badge/coluna do Kanban); ausente = cor padrão do tema
-  slaDias    Int?
-  script     String? // roteiro de texto exibido na aba "Script" da coluna Presente — só leitura por enquanto
-  ativo      Boolean @default(true)
-  ehInicial  Boolean @default(false) // marca a etapa de entrada configurável do pipeline
-  ehFinal    Boolean @default(false) // marca etapa(s) de encerramento configurável do pipeline
+  id               String  @id @default(cuid())
+  pipelineId       String
+  chave            String? // identidade semântica estável dentro do pipeline
+  nome             String
+  ordem            Int     @default(0)
+  cor              String? // cor de exibição da etapa (ex.: badge/coluna do Kanban); ausente = cor padrão do tema
+  slaDias          Int?
+  script           String? // roteiro de texto exibido na aba "Script" da coluna Presente — só leitura por enquanto
+  ativo            Boolean @default(true)
+  ehInicial        Boolean @default(false) // marca a etapa de entrada configurável do pipeline
+  ehFinal          Boolean @default(false) // marca etapa(s) de encerramento configurável do pipeline
+  capabilitiesJson String? // capacidades explícitas consumidas por domínio e apresentação
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3853,20 +3874,25 @@ model BpmEtapa {
   campos   BpmCampo[]
   cards    BpmCard[]
 
-  transicoesOrigem       BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
-  transicoesDestino      BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
-  transicoesEtapaOrigem  BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaOrigem")
-  transicoesEtapaDestino BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaDestino")
-  camposObrigatorios     BpmCampoObrigatorioEtapa[]
-  camposOcultos          BpmCampoOcultoEtapa[]
-  visibilidades          BpmEtapaVisibilidade[]
-  automacoes             BpmAutomacao[]
-  subStatus              BpmSubStatus[]
-  cadencias              BpmCadencia[]
-  checklistTemplates     BpmChecklistTemplate[]
-  slaConfigs             BpmSlaConfig[]
-  campoConfiguracoes     BpmCampoEtapaConfig[]
+  transicoesOrigem          BpmEtapaTransicaoPermitida[] @relation("TransicaoOrigem")
+  transicoesDestino         BpmEtapaTransicaoPermitida[] @relation("TransicaoDestino")
+  transicoesEtapaOrigem     BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaOrigem")
+  transicoesEtapaDestino    BpmTransicaoEtapa[]          @relation("BpmTransicaoEtapaDestino")
+  camposObrigatorios        BpmCampoObrigatorioEtapa[]
+  camposOcultos             BpmCampoOcultoEtapa[]
+  visibilidades             BpmEtapaVisibilidade[]
+  automacoes                BpmAutomacao[]
+  subStatus                 BpmSubStatus[]
+  cadencias                 BpmCadencia[]
+  checklistTemplates        BpmChecklistTemplate[]
+  slaConfigs                BpmSlaConfig[]
+  campoConfiguracoes        BpmCampoEtapaConfig[]
+  formulario                BpmEtapaFormulario?
+  requisitos                BpmRequisito[]
+  execucoesTransicaoOrigem  BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoOrigem")
+  execucoesTransicaoDestino BpmTransicaoExecucao[]       @relation("BpmTransicaoExecucaoDestino")
 
+  @@unique([pipelineId, chave])
   @@index([pipelineId])
   @@index([pipelineId, ordem])
 }
@@ -3876,6 +3902,7 @@ model BpmEtapa {
 model BpmSubStatus {
   id      String  @id @default(cuid())
   etapaId String
+  chave   String? // identidade semântica estável; nome/cor são apresentação
   nome    String
   cor     String?
   ordem   Int     @default(0)
@@ -3884,8 +3911,10 @@ model BpmSubStatus {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  etapa BpmEtapa @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  etapa       BpmEtapa        @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  cardsEstado BpmCardEstado[]
 
+  @@unique([etapaId, chave])
   @@index([etapaId])
   @@index([etapaId, ordem])
 }
@@ -3895,23 +3924,116 @@ model BpmSubStatus {
 // próxima etapa no client). Esta tabela nova é a base para restrição real de
 // movimentação no servidor em fase futura; não é lida em nenhum ponto ainda.
 model BpmTransicaoEtapa {
-  id             String  @id @default(cuid())
-  pipelineId     String
-  etapaOrigemId  String
-  etapaDestinoId String
-  permitida      Boolean @default(true)
-  origem         String  @default("AMBOS") // "MANUAL" | "AUTOMACAO" | "AMBOS"
+  id               String  @id @default(cuid())
+  pipelineId       String
+  chave            String? // identidade estável da aresta dentro do pipeline
+  etapaOrigemId    String
+  etapaDestinoId   String
+  permitida        Boolean @default(true)
+  origem           String  @default("AMBOS") // "MANUAL" | "AUTOMACAO" | "AMBOS"
+  lifecycleDestino String? // "ATIVO" | "CONCLUIDO" | "CANCELADO" | "ARQUIVADO"; null preserva
+  outcomeDestino   String? // resultado de negócio explícito; nunca inferido pelo nome da etapa
+  limparSubStatus  Boolean @default(true)
+  slaEfeitoJson    String? // hooks declarativos de SLA, interpretados pelo comando canônico
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pipeline     BpmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  etapaOrigem  BpmEtapa    @relation("BpmTransicaoEtapaOrigem", fields: [etapaOrigemId], references: [id], onDelete: Cascade)
-  etapaDestino BpmEtapa    @relation("BpmTransicaoEtapaDestino", fields: [etapaDestinoId], references: [id], onDelete: Cascade)
+  pipeline     BpmPipeline            @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapaOrigem  BpmEtapa               @relation("BpmTransicaoEtapaOrigem", fields: [etapaOrigemId], references: [id], onDelete: Cascade)
+  etapaDestino BpmEtapa               @relation("BpmTransicaoEtapaDestino", fields: [etapaDestinoId], references: [id], onDelete: Cascade)
+  requisitos   BpmRequisito[]
+  execucoes    BpmTransicaoExecucao[]
 
   @@unique([etapaOrigemId, etapaDestinoId])
+  @@unique([pipelineId, chave])
   @@index([pipelineId])
   @@index([etapaOrigemId])
+}
+
+// Requisito canônico. Apresentação e autorização apenas consultam esta definição;
+// não podem redefinir a necessidade de negócio. A fase explicita quando avaliar.
+model BpmRequisito {
+  id                  String  @id @default(cuid())
+  chave               String
+  pipelineId          String
+  etapaId             String?
+  transicaoId         String?
+  campoId             String?
+  checklistTemplateId String?
+  alvoTipo            String // "CAMPO" | "CHECKLIST" | "CAPABILITY" | "REGRA"
+  alvoChave           String?
+  fase                String // "DURING_STAGE" | "ENTER_STAGE" | "EXIT_STAGE"
+  condicaoJson        String?
+  mensagem            String
+  fonte               String // "CAMPO" | "ETAPA_CONFIG" | "LEGADO" | "NATIVO" | "ADMIN"
+  ativo               Boolean @default(true)
+  ordem               Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pipeline          BpmPipeline           @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapa             BpmEtapa?             @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  transicao         BpmTransicaoEtapa?    @relation(fields: [transicaoId], references: [id], onDelete: Cascade)
+  campo             BpmCampo?             @relation(fields: [campoId], references: [id], onDelete: Cascade)
+  checklistTemplate BpmChecklistTemplate? @relation(fields: [checklistTemplateId], references: [id], onDelete: Cascade)
+
+  @@unique([pipelineId, chave])
+  @@index([etapaId, fase, ativo])
+  @@index([transicaoId, fase, ativo])
+  @@index([campoId])
+  @@index([checklistTemplateId])
+}
+
+// Composição canônica do formulário de uma etapa. Valores, regras e permissões
+// permanecem nos respectivos domínios e são apenas referenciados pelo renderer.
+model BpmEtapaFormulario {
+  id        String   @id @default(cuid())
+  etapaId   String   @unique
+  versao    Int      @default(1)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  etapa  BpmEtapa             @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  secoes BpmFormularioSecao[]
+}
+
+model BpmFormularioSecao {
+  id           String   @id @default(cuid())
+  formularioId String
+  chave        String
+  titulo       String
+  ordem        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  formulario  BpmEtapaFormulario        @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  componentes BpmFormularioComponente[]
+
+  @@unique([formularioId, chave])
+  @@index([formularioId, ordem])
+}
+
+model BpmFormularioComponente {
+  id         String   @id @default(cuid())
+  secaoId    String
+  chave      String
+  tipo       String // "CAMPO" | "CHECKLIST" | "CAPABILITY"
+  campoId    String?
+  capability String?
+  configJson String?
+  ordem      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  secao BpmFormularioSecao @relation(fields: [secaoId], references: [id], onDelete: Cascade)
+  campo BpmCampo?          @relation(fields: [campoId], references: [id], onDelete: Cascade)
+
+  @@unique([secaoId, chave])
+  @@index([secaoId, ordem])
+  @@index([campoId])
 }
 
 // Motor de Regras e Validações (RM-2026-19631A, Fase 2) — persistência do
@@ -3975,6 +4097,7 @@ model BpmEtapaVisibilidade {
 
 model BpmAutomacao {
   id             String   @id @default(cuid())
+  chave          String? // identidade estável; nome permanece apenas apresentação
   nome           String
   descricao      String?
   pipelineId     String
@@ -3995,6 +4118,7 @@ model BpmAutomacao {
   versoes          BpmAutomacaoVersao[]
   webhookEndpoints BpmWebhookEndpoint[]
 
+  @@unique([pipelineId, chave])
   @@index([pipelineId, etapaId, ativa])
   @@index([etapaId, gatilhoTipo, ativa])
   @@index([criadoPorId])
@@ -4246,19 +4370,21 @@ model BpmCampo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pipeline            BpmPipeline                @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  etapa               BpmEtapa?                  @relation(fields: [etapaId], references: [id], onDelete: Cascade)
-  valores             BpmCardCampoValor[]
-  obrigatorioEmEtapas BpmCampoObrigatorioEtapa[]
-  ocultoEmEtapas      BpmCampoOcultoEtapa[]
-  opcoes              BpmCampoOpcao[]
-  pipelinesAssociados BpmCampoPipeline[]
-  etapaConfiguracoes  BpmCampoEtapaConfig[]
-  acessos             BpmCampoAcesso[]
-  mapeamentosOrigem   BpmCampoMapeamento[]       @relation("BpmCampoMapOrigem")
-  mapeamentoDestino   BpmCampoMapeamento?        @relation("BpmCampoMapDestino")
-  anexos              BpmCardAnexo[]
-  valoresGlobais      BpmCampoValorGlobal[]
+  pipeline              BpmPipeline                @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  etapa                 BpmEtapa?                  @relation(fields: [etapaId], references: [id], onDelete: Cascade)
+  valores               BpmCardCampoValor[]
+  obrigatorioEmEtapas   BpmCampoObrigatorioEtapa[]
+  ocultoEmEtapas        BpmCampoOcultoEtapa[]
+  opcoes                BpmCampoOpcao[]
+  pipelinesAssociados   BpmCampoPipeline[]
+  etapaConfiguracoes    BpmCampoEtapaConfig[]
+  acessos               BpmCampoAcesso[]
+  mapeamentosOrigem     BpmCampoMapeamento[]       @relation("BpmCampoMapOrigem")
+  mapeamentoDestino     BpmCampoMapeamento?        @relation("BpmCampoMapDestino")
+  anexos                BpmCardAnexo[]
+  valoresGlobais        BpmCampoValorGlobal[]
+  requisitos            BpmRequisito[]
+  componentesFormulario BpmFormularioComponente[]
 
   @@index([pipelineId])
   @@index([etapaId])
@@ -4380,6 +4506,7 @@ model BpmCard {
   servico       String?
   tipoProcesso  String?
   status        String  @default("ATIVO") // "ATIVO" | "CONCLUIDO" | "CANCELADO"
+  versao        Int     @default(0) // CAS do agregado; incrementado por comandos canônicos
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -4420,6 +4547,11 @@ model BpmCard {
   checklists          BpmCardChecklist[]
   eventosDominio      BpmEventoDominio[]
   automacaoAgendas    BpmAutomacaoAgenda[]
+  estadoOntologico    BpmCardEstado?
+  reunioes            BpmCardReuniao[]
+  followUpEstado      BpmCardFollowUpEstado?
+  servicoContexto     BpmCardServicoContexto?
+  transicaoExecucoes  BpmTransicaoExecucao[]
 
   // SLA e Prazos (RM-2026-095B40) — instâncias vivas por config + registro de alertas disparados.
   slaInstancias BpmSlaInstancia[]
@@ -4439,6 +4571,106 @@ model BpmCard {
   @@index([etapaId])
   @@index([responsavelId])
   @@index([status])
+}
+
+// Dimensões runtime distintas da etapa e do lifecycle (`BpmCard.status`).
+// Histórico explica mudanças, mas esta linha é a fonte do estado corrente.
+model BpmCardEstado {
+  cardId      String    @id
+  outcome     String?
+  subStatusId String?
+  canceladoEm DateTime?
+  arquivadoEm DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  card      BpmCard       @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  subStatus BpmSubStatus? @relation(fields: [subStatusId], references: [id], onDelete: SetNull)
+
+  @@index([outcome])
+  @@index([subStatusId])
+}
+
+// Registro idempotente de cada movimento aceito pelo comando canônico.
+model BpmTransicaoExecucao {
+  id               String   @id @default(cuid())
+  idempotencyKey   String   @unique
+  cardId           String
+  transicaoId      String
+  etapaOrigemId    String
+  etapaDestinoId   String
+  versaoEsperada   Int
+  versaoResultante Int
+  atorTipo         String // "USUARIO" | "AUTOMACAO" | "SISTEMA" | "INTEGRACAO"
+  atorUserId       Int?
+  atorExecucaoId   String?
+  correlationId    String
+  causationId      String?
+  concluidoEm      DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  card         BpmCard           @relation(fields: [cardId], references: [id], onDelete: Restrict)
+  transicao    BpmTransicaoEtapa @relation(fields: [transicaoId], references: [id], onDelete: Restrict)
+  etapaOrigem  BpmEtapa          @relation("BpmTransicaoExecucaoOrigem", fields: [etapaOrigemId], references: [id], onDelete: Restrict)
+  etapaDestino BpmEtapa          @relation("BpmTransicaoExecucaoDestino", fields: [etapaDestinoId], references: [id], onDelete: Restrict)
+
+  @@index([cardId, concluidoEm])
+  @@index([transicaoId])
+  @@index([correlationId])
+  @@index([atorExecucaoId])
+}
+
+// Reunião é entidade relacionada, não coluna semântica do agregado BPM genérico.
+model BpmCardReuniao {
+  id               String    @id @default(cuid())
+  cardId           String
+  chave            String    @default("principal")
+  status           String    @default("AGENDADA")
+  agendadaEm       DateTime?
+  googleEventId    String?
+  googleCalendarId String?
+  googleMeetLink   String?
+  transcricao      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  card BpmCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, chave])
+  @@index([cardId, status])
+  @@index([googleEventId])
+}
+
+// Estado operacional do follow-up/cadência comercial, separado do core do card.
+model BpmCardFollowUpEstado {
+  cardId                String    @id
+  proximoContatoEm      DateTime?
+  standbyUltimoEm       DateTime?
+  standbyInterrompidoEm DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  card BpmCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([proximoContatoEm])
+}
+
+// Vínculo do processo ao serviço/contrato. `nomeLegado` preserva texto que não
+// possa ser associado de modo inequívoco sem inventar identidade.
+model BpmCardServicoContexto {
+  cardId              String   @id
+  clienteServicoId    Int?
+  contratoComercialId String?
+  nomeLegado          String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  card              BpmCard            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  clienteServico    ClienteServico?    @relation(fields: [clienteServicoId], references: [id], onDelete: SetNull)
+  contratoComercial ContratoComercial? @relation(fields: [contratoComercialId], references: [id], onDelete: SetNull)
+
+  @@index([clienteServicoId])
+  @@index([contratoComercialId])
 }
 
 // Templates reutilizáveis com cinco dimensões opcionais de compatibilidade.
@@ -4466,6 +4698,7 @@ model BpmChecklistTemplate {
 
   itens      BpmChecklistTemplateItem[]
   instancias BpmCardChecklist[]
+  requisitos BpmRequisito[]
 
   @@index([ativo])
   @@index([pipelineId])

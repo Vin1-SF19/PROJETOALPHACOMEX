@@ -8,7 +8,6 @@ import { etapaEhReuniaoAgendada } from "@/lib/bpm/reuniao-agendada";
 import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
 import { PainelCamposEtapaAtual } from "./PainelCamposEtapaAtual";
 import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
-import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { PainelProximoContato } from "./PainelProximoContato";
 import { PainelReuniao } from "./PainelReuniao";
 import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
@@ -44,35 +43,18 @@ export function CardOpenFormSlot({
 }: CardOpenFormSlotProps) {
   if (etapaEhAgendarReuniao(card.etapa.nome)) {
     return (
-      <>
-        <PainelReuniao
-          card={card}
-          accent={accent}
-          podeEditar={podeEditar}
-          onAtualizado={onAtualizado}
-        />
-        <PainelChecklistsCard
-          card={card}
-          accent={accent}
-          podeEditar={podeEditar}
-          realtimeRevision={realtimeRevision}
-          onAtualizado={onAtualizado}
-        />
-      </>
+      <PainelReuniao
+        card={card}
+        accent={accent}
+        podeEditar={podeEditar}
+        onAtualizado={onAtualizado}
+      />
     );
   }
 
   return (
     <>
       <PainelCamposEtapaAtual
-        card={card}
-        accent={accent}
-        podeEditar={podeEditar}
-        realtimeRevision={realtimeRevision}
-        onAtualizado={onAtualizado}
-      />
-
-      <PainelChecklistsCard
         card={card}
         accent={accent}
         podeEditar={podeEditar}

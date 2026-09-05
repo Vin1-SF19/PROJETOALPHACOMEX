@@ -33,6 +33,14 @@ export interface ItemPendencia {
   responsavelNome: string | null;
 }
 
+type InstanciaSlaPendencia = {
+  cardId: string | null;
+  deadline: Date | null;
+  alertaPrazoDisparadoEm: Date | null;
+  vencidoEm: Date | null;
+  slaConfig: { nome: string };
+};
+
 /**
  * Escopo: cards onde o usuário é responsável ou membro (mesmo critério usado
  * no restante do BPM para "meus cards"); administradores/diretoria veem tudo.
@@ -111,10 +119,13 @@ export async function listarPendenciasBpm(
       where: { cardId: { in: cardIds } },
       select: { cardId: true, campoId: true, valor: true },
     }),
-    client.bpmSlaInstancia.findMany({
-      where: { cardId: { in: cardIds }, status: { in: ["EM_ANDAMENTO", "PAUSADO"] } },
+    (client.bpmSlaInstancia.findMany({
+      where: {
+        cardId: { in: cardIds },
+        status: { in: ["DENTRO_PRAZO", "PROXIMO_VENCIMENTO", "ATRASADO", "PAUSADO"] },
+      },
       select: { id: true, cardId: true, deadline: true, alertaPrazoDisparadoEm: true, vencidoEm: true, slaConfig: { select: { nome: true } } },
-    }).catch(() => [] as never[]),
+    }) as Promise<InstanciaSlaPendencia[]>).catch(() => []),
   ]);
 
   for (const tarefa of tarefas) {
@@ -156,6 +167,7 @@ export async function listarPendenciasBpm(
   }
 
   for (const instancia of slaInstancias) {
+    if (!instancia.cardId) continue;
     if (instancia.vencidoEm) {
       itens.push({
         ...base(instancia.cardId),

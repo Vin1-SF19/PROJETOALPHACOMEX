@@ -10,7 +10,11 @@ import { hashSync } from "bcryptjs";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const onboardingTemplateModel = (db as any).onboardingTemplate;
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function criarClienteResend() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY não configurada");
+  return new Resend(apiKey);
+}
 
 export type OnboardingTemplate = {
   id: number;
@@ -204,7 +208,7 @@ export async function enviarEmailOnboarding(dados: {
       .map((l) => `<p style="margin:4px 0;font-size:14px;color:#cbd5e1;">${l || "&nbsp;"}</p>`)
       .join("");
 
-    await resend.emails.send({
+    await criarClienteResend().emails.send({
       from: "Painel Alpha <onboarding@resend.dev>",
       to: dados.email,
       subject: `Bem-vindo ao Painel Alpha, ${usuarioDb?.nome ?? ""}!`,

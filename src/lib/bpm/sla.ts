@@ -394,7 +394,9 @@ export async function sincronizarSlaMovimentoBpm(input: {
   cardId: string;
   etapaOrigemId: string;
   etapaOrigemNome: string;
+  etapaOrigemChave?: string | null;
   etapaDestinoNome: string;
+  etapaDestinoChave?: string | null;
   client: ClienteSla;
   agora?: Date;
 }): Promise<void> {
@@ -403,10 +405,14 @@ export async function sincronizarSlaMovimentoBpm(input: {
     throw new Error("Persistência de SLA indisponível");
   }
   const agora = input.agora ?? new Date();
-  const entrouStandby = !etapaEhStandbyFollowUp(input.etapaOrigemNome)
-    && etapaEhStandbyFollowUp(input.etapaDestinoNome);
-  const saiuStandby = etapaEhStandbyFollowUp(input.etapaOrigemNome)
-    && !etapaEhStandbyFollowUp(input.etapaDestinoNome);
+  const origemStandby = input.etapaOrigemChave
+    ? input.etapaOrigemChave === "standby_follow_up"
+    : etapaEhStandbyFollowUp(input.etapaOrigemNome);
+  const destinoStandby = input.etapaDestinoChave
+    ? input.etapaDestinoChave === "standby_follow_up"
+    : etapaEhStandbyFollowUp(input.etapaDestinoNome);
+  const entrouStandby = !origemStandby && destinoStandby;
+  const saiuStandby = origemStandby && !destinoStandby;
 
   await concluirInstanciasEtapa(
     input.cardId,

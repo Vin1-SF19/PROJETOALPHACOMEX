@@ -3,11 +3,8 @@
  * Fase 2). Aplica as BpmRegra ativas escopadas ao pipeline/etapa antes de
  * uma transição de card, reaproveitando o mesmo avaliador puro da Fase 1.
  *
- * Fail-open deliberado: qualquer erro de avaliação (regra malformada, campo
- * fora do allowlist, exceção inesperada) é registrado no console e NÃO
- * bloqueia a movimentação — uma regra mal configurada por um admin não pode
- * travar o Alpha CRM inteiro. O admin corrige a regra a partir dos logs; o
- * comportamento nativo (guardas hardcoded já existentes) continua intacto.
+ * Fail-closed: regra de transição inválida ou indisponível não pode autorizar
+ * um movimento que o domínio não conseguiu avaliar.
  */
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
@@ -34,7 +31,7 @@ export async function obterErroRegrasParaMovimento(params: {
     const resultado = avaliarRegras(regras, contexto);
     return resultado.permitida ? null : (resultado.motivo ?? "Movimentação bloqueada por regra configurada.");
   } catch (error) {
-    console.error("[bpm/regras] falha ao avaliar regras na movimentação — seguindo sem bloquear:", error);
-    return null;
+    console.error("[bpm/regras] falha ao avaliar regras na movimentação — bloqueando:", error);
+    return "Não foi possível validar as regras desta transição. Tente novamente ou contate um administrador.";
   }
 }

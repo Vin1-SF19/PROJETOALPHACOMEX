@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { z } from "zod";
 import crypto from "crypto";
+import { enfileirarAutomacoesDeferimentoBpm } from "@/lib/bpm/automacoes/fila";
 import {
   cadastrarClienteSchema,
   socioSchema,
@@ -675,8 +676,6 @@ export async function salvarAlteracoesServico(clienteServicoId: number, dadosNov
       dataExito: parsed.data.dataExito ?? (parsed.data.status === "Deferido" ? new Date().toISOString() : null),
     };
 
-    await db.clienteServico.update({ where: { id: clienteServicoId }, data: dadosParaAtualizar });
-
     const loteId = crypto.randomUUID();
     const linhasHistorico = montarLinhasHistoricoServico({
       clienteServicoId,
@@ -688,9 +687,19 @@ export async function salvarAlteracoesServico(clienteServicoId: number, dadosNov
       campos: [...CAMPOS_HISTORICO_SERVICO],
     });
 
-    if (linhasHistorico.length > 0) {
-      await db.clienteServicoHistorico.createMany({ data: linhasHistorico });
-    }
+    await db.$transaction(async (tx) => {
+      await tx.clienteServico.update({ where: { id: clienteServicoId }, data: dadosParaAtualizar });
+      if (linhasHistorico.length > 0) {
+        await tx.clienteServicoHistorico.createMany({ data: linhasHistorico });
+      }
+      if (estadoAnterior.status !== "Deferido" && dadosParaAtualizar.status === "Deferido") {
+        await enfileirarAutomacoesDeferimentoBpm({
+          clienteId: estadoAnterior.clienteId,
+          clienteServicoId: estadoAnterior.id,
+          servico: estadoAnterior.servico,
+        }, tx);
+      }
+    });
 
     revalidatePath("/PainelAlpha/CadastroClientes");
     return { success: true };

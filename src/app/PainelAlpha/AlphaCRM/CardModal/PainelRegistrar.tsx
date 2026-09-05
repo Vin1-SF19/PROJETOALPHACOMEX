@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { CalendarClock, ChevronDown, MessageSquareText, ScrollText } from "lucide-react";
+import { useState } from "react";
+import { CalendarClock, ScrollText } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
-import { CriarInteracaoCardBpm, type ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { CardOpenFormSlot } from "./CardOpenFormSlot";
 
 
@@ -21,68 +19,20 @@ import { CardOpenFormSlot } from "./CardOpenFormSlot";
 
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
-type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
 type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
 
 interface Props {
   card: CardDetalhe;
   etapaAtual: EtapaOpcao | null;
   accent: string;
-  onInteracaoCriada: (interacao: Interacao) => void;
-  interacoes: Interacao[];
   podeEditar: boolean;
   realtimeRevision: number;
   onAtualizado: () => void;
 
 }
 
-const inputCls = "w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-white/25 transition-colors";
-
-export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoCriada, podeEditar, realtimeRevision, onAtualizado }: Props) {
-  const [anotacao, setAnotacao] = useState("");
-  const [salvandoAnotacao, setSalvandoAnotacao] = useState(false);
+export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, realtimeRevision, onAtualizado }: Props) {
   const [abaAtiva, setAbaAtiva] = useState("formulario-etapa");
-
-  useEffect(() => {
-    function abrirPendencias(event: Event) {
-      const detail = (event as CustomEvent<{ cardId: string; itemId?: string | null }>).detail;
-      if (detail?.cardId !== card.id) return;
-      setAbaAtiva("formulario-etapa");
-      window.setTimeout(() => {
-        const alvo = (detail.itemId
-          ? document.getElementById(`checklist-item-${detail.itemId}`)
-          : null) ?? document.getElementById("checklist-pendencias");
-        alvo?.scrollIntoView({ behavior: "smooth", block: "center" });
-        alvo?.focus({ preventScroll: true });
-      }, 0);
-    }
-    window.addEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
-    return () => window.removeEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
-  }, [card.id]);
-
-  async function salvarAnotacao() {
-    if (!podeEditar || salvandoAnotacao || !anotacao.trim()) return;
-    setSalvandoAnotacao(true);
-    try {
-      const res = await CriarInteracaoCardBpm({
-        cardId: card.id,
-        tipo: "ANOTACAO",
-        observacoes: anotacao.trim(),
-      });
-
-      if (res.success && res.data) {
-        toast.success("Anotação salva");
-        onInteracaoCriada(res.data as unknown as Interacao);
-        setAnotacao("");
-      } else {
-        toast.error(typeof res.error === "string" ? res.error : "Erro ao salvar anotação");
-      }
-    } catch {
-      toast.error("Erro ao salvar anotação");
-    } finally {
-      setSalvandoAnotacao(false);
-    }
-  }
 
   return (
     <div
@@ -122,57 +72,6 @@ export default function PainelRegistrar({ card, etapaAtual, accent, onInteracaoC
         </TabsContent>
       </Tabs>
 
-      <details
-        className="group sticky bottom-0 z-10 shrink-0 overflow-hidden border-t-2 backdrop-blur-xl lg:static"
-        style={{
-          borderColor: `rgba(${accent},0.55)`,
-          background: `linear-gradient(180deg, rgba(${accent},0.12), rgba(2,6,23,0.92) 65%)`,
-        }}
-      >
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] shadow-lg"
-            style={{
-              background: `linear-gradient(110deg, rgba(${accent},0.4), rgba(${accent},0.15))`,
-              borderColor: `rgba(${accent},0.55)`,
-              borderWidth: 1,
-              color: `rgb(${accent})`,
-              boxShadow: `0 6px 18px -10px rgba(${accent},0.9)`,
-            }}
-          >
-            <MessageSquareText size={13} /> Anotação
-          </span>
-          <span className="flex shrink-0 items-center gap-2 text-[10px] text-slate-500">
-            Aparece no histórico ao lado
-            <ChevronDown size={14} className="shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
-          </span>
-        </summary>
-
-        <div className="px-5 pb-4">
-          <textarea
-            id={`anotacao-card-${card.id}`}
-            aria-label="Anotação"
-            className={`${inputCls} min-h-20 resize-none`}
-            placeholder="Registre uma anotação sobre este contato..."
-            value={anotacao}
-            onChange={(e) => setAnotacao(e.target.value)}
-            disabled={!podeEditar || salvandoAnotacao}
-            style={{ borderColor: `rgba(${accent},0.3)` }}
-          />
-          <div className="mt-2 flex items-center justify-end gap-3">
-            {salvandoAnotacao && <p className="inline-flex items-center gap-1.5 text-[11px] text-slate-500"><MessageSquareText size={13} /> Salvando...</p>}
-            <button
-              type="button"
-              onClick={() => void salvarAnotacao()}
-              disabled={!podeEditar || salvandoAnotacao || !anotacao.trim()}
-              className="rounded-lg px-4 py-2 text-xs font-bold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ background: `rgb(${accent})` }}
-            >
-              Salvar
-            </button>
-          </div>
-        </div>
-      </details>
     </div>
   );
 }

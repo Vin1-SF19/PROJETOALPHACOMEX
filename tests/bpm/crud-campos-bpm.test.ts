@@ -33,7 +33,8 @@ describe("schema de campos BPM (CRUD completo)", () => {
   });
 
   it("rejeita tipo inválido", () => {
-    expect(atualizarCampoSchema.safeParse({ campoId: CUID, tipo: "email" }).success).toBe(false);
+    expect(atualizarCampoSchema.safeParse({ campoId: CUID, tipo: "desconhecido" }).success).toBe(false);
+    expect(atualizarCampoSchema.safeParse({ campoId: CUID, tipo: "email" }).success).toBe(true);
   });
 
   it("excluirCampoSchema exige um campoId cuid", () => {

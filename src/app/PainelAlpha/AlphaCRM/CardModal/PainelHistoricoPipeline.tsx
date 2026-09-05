@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, KanbanSquare } from "lucide-react";
 import { fmtDateTime } from "@/lib/format-date";
 import { ListarCardsEmpresaPorPipeline } from "@/actions/bpm/Cards";
-import { SectionCard } from "./PainelHistorico";
+import { SectionCard } from "./PainelHistoricoShared";
 
 type CardsPipeline = NonNullable<Awaited<ReturnType<typeof ListarCardsEmpresaPorPipeline>>["data"]>;
 

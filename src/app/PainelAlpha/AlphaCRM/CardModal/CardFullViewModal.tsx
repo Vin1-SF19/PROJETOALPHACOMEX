@@ -218,8 +218,6 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
                 estadoFollowUpAtual={estadoFollowUpAtual}
               >
                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
-                  interacoes={interacoes}
-                  onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
                   onAtualizado={handleAtualizado}
                   />

@@ -31,11 +31,14 @@ describe("autoajuste de entrega do Checklist Builder", () => {
     expect(pagina).not.toMatch(/@\/lib\/db|prisma/i);
   });
 
-  it("monta o painel operacional nos dois ramos do formulário do card", () => {
+  it("monta uma única instância antecipada do painel operacional no lado esquerdo", () => {
     const slot = ler("src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx");
+    const historico = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
     const painel = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistsCard.tsx");
 
-    expect(slot.match(/<PainelChecklistsCard/g)).toHaveLength(2);
+    expect(slot).not.toContain("PainelChecklistsCard");
+    expect(historico.match(/<PainelChecklistsCard/g)).toHaveLength(1);
+    expect(historico).toContain('<TabsContent value="checklist" forceMount');
     expect(painel).toContain("ListarChecklistsCardBpm");
     expect(painel).toContain('role="progressbar"');
     expect(painel).toContain('id="checklist-pendencias"');
@@ -45,12 +48,14 @@ describe("autoajuste de entrega do Checklist Builder", () => {
 
   it("expõe alerta persistente e navegação acessível para pendências", () => {
     const proximaEtapa = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
-    const registrar = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelRegistrar.tsx");
+    const historico = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelHistorico.tsx");
 
     expect(proximaEtapa).toContain("ObterResumoChecklistCardBpm");
     expect(proximaEtapa).toContain("Ir para pendências");
     expect(proximaEtapa).toContain('role="alert"');
-    expect(registrar).toContain("bpm:abrir-pendencias-checklist");
-    expect(registrar).toContain('setAbaAtiva("formulario-etapa")');
+    expect(historico).toContain("bpm:abrir-pendencias-checklist");
+    expect(historico).toContain('setAbaEsquerda("checklist")');
+    expect(historico).toContain("scrollIntoView({ behavior: \"smooth\", block: \"center\" })");
+    expect(historico).toContain("focus({ preventScroll: true })");
   });
 });

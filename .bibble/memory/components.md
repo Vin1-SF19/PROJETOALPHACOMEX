@@ -572,6 +572,16 @@ Os componentes compartilhados finais para datasets são `PaginationControls.tsx`
 **Notas:** Background "espaço profundo" do módulo CRM — 60 partículas desktop / 25 mobile, 3 nébulas temáticas (Checklist azul-ciano, CS&NPS verde-âmbar, Extratos violeta), ícones sutis `CheckSquare`/`TrendingUp`/`Banknote` a 3% de opacidade. `pointer-events-none` + `aria-hidden`, `useReducedMotion()` respeitado. Localização no folder do módulo (não em `components/ui/`) — mesmo padrão de `ChecklistBackground.tsx` e `CsNpsBackground.tsx`. Ver `docs/components/crm-space-background.md`.
 **Última atualização:** 2026-08-15 por Scribe (RM-2026-C4A90D)
 
+### EditorAnotacaoCard (Alpha CRM)
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/EditorAnotacaoCard.tsx`
+**Tipo:** Client Component
+**Props:** `card`, `accent`, `podeEditar`, `onInteracaoCriada`
+**Uso:** rodapé único do painel esquerdo `PainelHistorico` no modal de card nativo.
+**Notas:** preserva `CriarInteracaoCardBpm`, toasts, limpeza após sucesso e o ID `anotacao-card-${card.id}`. O `<details>` fica fora do scroll das abas, limitado a metade da coluna e com rolagem própria.
+
+**Última atualização:** 2026-09-05 por Nova (RM-2026-B7694F)
+
 ### PainelProximaEtapa (Alpha CRM — card aberto, coluna direita)
 **Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx`
 **Tipo:** Client Component

@@ -1,0 +1,263 @@
+/* ─────────────── Alpha CRM — Visual Layer (apenas apresentação) ── */
+:where(.crm-scope) {
+  --crm-bg-0: #050b16;
+  --crm-bg-1: #07101e;
+  --crm-bg-2: #0a1424;
+  --crm-bg-3: #0d1728;
+
+  --crm-cyan: #00e6c3;
+  --crm-cyan-2: #12f1d0;
+  --crm-blue: #3485ff;
+  --crm-violet: #8b5cf6;
+  --crm-danger: #fb7185;
+  --crm-warn: #f59e0b;
+  --crm-ok: #34d399;
+
+  --crm-text: #e8eef7;
+  --crm-muted: #8391a7;
+  --crm-muted-2: #5a6b85;
+
+  --crm-glass-bg: rgba(10, 20, 38, 0.72);
+  --crm-glass-bg-strong: rgba(9, 18, 34, 0.86);
+  --crm-border: rgba(120, 190, 255, 0.08);
+  --crm-border-hover: rgba(120, 200, 255, 0.22);
+  --crm-blur: 14px;
+  --crm-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 10px 30px -12px rgba(0, 0, 0, 0.55), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --crm-shadow-lift: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+    0 22px 48px -18px rgba(0, 0, 0, 0.65), 0 8px 16px -6px rgba(0, 0, 0, 0.45);
+  --crm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Fundo ambiental: backgroundCRM + overlay escuro para legibilidade ── */
+.crm-bg-media {
+  position: absolute;
+  inset: 0;
+  background-image: url("/backgroundCRM.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform: translate3d(
+    calc(var(--mouse-x, 0) * 1px),
+    calc(var(--mouse-y, 0) * 1px),
+    0
+  ) scale(1.04);
+  transition: transform 600ms var(--crm-ease);
+  will-change: transform;
+}
+
+.crm-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(3, 9, 20, 0.55) 0%,
+    rgba(3, 9, 20, 0.72) 45%,
+    rgba(3, 9, 20, 0.82) 100%
+  );
+}
+
+/* brilho ambiente extra (ciano/violeta) para dar vida ao espaço */
+.crm-bg-ambient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 42% at 18% 16%, rgba(0, 230, 195, 0.1), transparent 70%),
+    radial-gradient(50% 40% at 84% 72%, rgba(139, 92, 246, 0.09), transparent 70%),
+    radial-gradient(40% 34% at 72% 22%, rgba(52, 133, 255, 0.08), transparent 72%);
+  mix-blend-mode: screen;
+}
+
+/* ── Glass base ─────────────────────────────────────────────────── */
+.crm-scope .crm-glass {
+  background: var(--crm-glass-bg);
+  border: 1px solid var(--crm-border);
+  backdrop-filter: blur(var(--crm-blur)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--crm-blur)) saturate(1.1);
+  box-shadow: var(--crm-shadow);
+}
+
+/* brilho interno sutil (iluminação ambiente) */
+.crm-scope .crm-surface {
+  position: relative;
+  isolation: isolate;
+}
+.crm-scope .crm-surface > * {
+  position: relative;
+  z-index: 1;
+}
+.crm-scope .crm-inner-light::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    120% 80% at 50% 0%,
+    rgba(120, 200, 255, 0.06),
+    transparent 60%
+  );
+  transition: opacity 400ms var(--crm-ease);
+}
+
+/* ── Levantamento no hover (aplica sombra/brilho) ──────────────── */
+.crm-scope .crm-lift {
+  transition: transform 200ms var(--crm-ease), box-shadow 220ms var(--crm-ease),
+    border-color 220ms var(--crm-ease);
+}
+.crm-scope .crm-lift:hover {
+  box-shadow: var(--crm-shadow-lift);
+  border-color: var(--crm-border-hover);
+}
+.crm-scope .crm-lift:not([style*="perspective"]):hover {
+  transform: translateY(-3px) scale(1.01);
+}
+
+/* ── Spotlight que segue o mouse (muito sutil) ─────────────────── */
+.crm-scope .crm-spotlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(
+    260px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgba(120, 210, 255, 0.09),
+    transparent 62%
+  );
+  transition: opacity 300ms var(--crm-ease);
+}
+.crm-scope .crm-spotlight:hover::after {
+  opacity: 1;
+}
+
+/* ── Ícone 3D (pseudo) ──────────────────────────────────────────── */
+.crm-scope .crm-iconchip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 6px 14px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.02) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.12) inset;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 42%),
+    rgba(9, 18, 34, 0.8);
+  transition: transform 320ms var(--crm-ease), box-shadow 320ms var(--crm-ease);
+}
+
+/* ── Linha luminosa da timeline ─────────────────────────────────── */
+.crm-timeline {
+  position: relative;
+}
+.crm-timeline::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 11px;
+  width: 2px;
+  border-radius: 99px;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 230, 195, 0),
+    rgba(120, 200, 255, 0.18) 12%,
+    rgba(120, 200, 255, 0.18) 88%,
+    rgba(0, 230, 195, 0)
+  );
+}
+
+/* ── Scrollbar (região CRM) — thumb ciano/azul escuro ──────────── */
+.crm-scope .crm-scroll,
+.crm-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(52, 90, 140, 0.55) transparent;
+}
+.crm-scroll::-webkit-scrollbar,
+.crm-scope *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.crm-scroll::-webkit-scrollbar-track,
+.crm-scope *::-webkit-scrollbar-track {
+  background: transparent;
+}
+.crm-scroll::-webkit-scrollbar-thumb,
+.crm-scope *::-webkit-scrollbar-thumb {
+  background: rgba(52, 90, 140, 0.5);
+  border-radius: 99px;
+}
+.crm-scroll:hover::-webkit-scrollbar-thumb,
+.crm-scope *::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 210, 190, 0.55);
+}
+
+/* ── Animações decorativas ──────────────────────────────────────── */
+@keyframes crm-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.crm-scope .crm-float {
+  animation: crm-float 6s ease-in-out infinite;
+}
+
+@keyframes crm-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.35); }
+}
+.crm-scope .crm-pulse-dot {
+  animation: crm-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes crm-shimmer-line {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+.crm-scope .crm-accent-line {
+  position: relative;
+  overflow: hidden;
+}
+.crm-scope .crm-accent-line::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 230, 195, 0.8),
+    transparent
+  );
+  animation: crm-shimmer-line 4.2s ease-in-out infinite;
+  opacity: 0.5;
+}
+
+/* ── Entrada suave das seções (fade + translateY + stagger) ─────── */
+@keyframes crm-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.crm-scope .crm-enter {
+  animation: crm-enter 0.5s var(--crm-ease) backwards;
+}
+
+/* ── Respeito a prefers-reduced-motion ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .crm-bg-media,
+  .crm-scope .crm-float,
+  .crm-scope .crm-pulse-dot,
+  .crm-scope .crm-accent-line::after {
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .crm-scope .crm-spotlight::after {
+    display: none;
+  }
+}

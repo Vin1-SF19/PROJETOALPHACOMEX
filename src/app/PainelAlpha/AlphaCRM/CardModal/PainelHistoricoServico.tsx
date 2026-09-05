@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Building2, FileStack, KanbanSquare } from "lucide-react";
 import { fmtDateTime } from "@/lib/format-date";
 import { ObterHistoricoServicoEmpresa } from "@/actions/bpm/Cards";
-import { SectionCard } from "./PainelHistorico";
+import { SectionCard } from "./PainelHistoricoShared";
 
 type HistoricoServico = NonNullable<Awaited<ReturnType<typeof ObterHistoricoServicoEmpresa>>["data"]>;
 
