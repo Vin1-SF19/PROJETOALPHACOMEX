@@ -59,6 +59,9 @@ next-env.d.ts
 !/database-backups/README.md
 !/database-backups/.gitkeep
 
+# Anexos operacionais do módulo Ideias podem conter dados pessoais.
+/.ideias/
+
 # Logs do sync automático com o servidor interno (scripts/sync-servidor.ps1)
 /.sync-logs/
 
