@@ -41,11 +41,21 @@ Convergir o CRM/BPM para identidade estável, uma definição canônica de trans
 
 ## Evidência Vault
 
-- Backup: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T13-42-26-709Z.sql`
-- SHA-256: `4f66f886d8ce379fdca8a82ada0a3e56a1d7f3bb6e3f400b86cc9a8f889d63c3`
-- 96.433.799 bytes, 295 tabelas e 68.807 registros.
+- Backup original: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T13-42-26-709Z.sql`
+- Backup imediatamente anterior à aplicação: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T16-18-58-738Z.sql`
+- SHA-256: `cab3cfe95e117f1458645f01d7777e1c63bcde24895eb3a2d8681cab58d555a4`
+- 96.486.540 bytes, 295 tabelas e 68.909 registros.
 - Restauração descartável, integridade e FKs aprovadas.
 - Autorização específica recebida para migration aditiva, backfills e aplicação no Turso.
+
+## Implantação em produção — 2026-09-05
+
+- Incidente: páginas dinâmicas de pipeline retornavam 404 porque o código publicado consultava o contrato canônico antes da migration correspondente existir no Turso.
+- Migration aplicada: `prisma/migrations/20260905143000_bpm_ontologia_canonica/migration.sql` (`78` statements).
+- Pós-validação: `PRAGMA integrity_check=ok`, zero violações de chave estrangeira e zero chaves canônicas nulas.
+- Readback: 55 requisitos, 32 formulários e 2 estados de card materializados.
+- Smoke da consulta da página: `Revisão de Radar` retornou 9 etapas, 29 campos e 2 cards, todos com `BpmCard.versao` legível.
+- Rollback preservado no backup imediatamente anterior à aplicação; nenhum dump foi versionado.
 
 ## Baseline
 
