@@ -56,6 +56,12 @@ const SAIDAS: { status: string; label: string; cor: string }[] = [
   { status: "PERDIDO", label: "Perdido", cor: "248,113,113" }, // vermelho — encerrado negativo
 ];
 
+// 4ª coluna de saída: mostra o status terminal "CADASTRADO", só atingido via
+// PromoverLeadParaParceiro (botão "Cadastrar parceiro" no card, na etapa
+// Pré-cadastro) — por isso não entra em SAIDAS/podeMoverPara: não é um destino
+// válido de arraste, é só a vitrine dos leads já promovidos a parceiro.
+const SAIDA_CADASTRO_COMPLETO = { status: "CADASTRADO", label: "Cadastro completo", cor: "57,255,20" }; // verde neon
+
 const PARTICULAS_FUNDO_AQUISICAO = [
   { x: 10, y: 18, duracao: 5.6, delay: 0 },
   { x: 85, y: 14, duracao: 6.1, delay: 0.6 },
@@ -130,6 +136,17 @@ function labelHistorico(acao: string): string {
   return LABEL_ACAO_HISTORICO[acao] ?? acao.replaceAll("_", " ").toLowerCase();
 }
 
+/** Rótulo de exibição de um status de lead — busca nas etapas do funil, nas
+ * saídas laterais e no "Cadastro completo" antes de cair no fallback bruto. */
+function labelDoStatus(status: string): string {
+  return (
+    ETAPAS.find((e) => e.status === status)?.label ??
+    SAIDAS.find((s) => s.status === status)?.label ??
+    (status === SAIDA_CADASTRO_COMPLETO.status ? SAIDA_CADASTRO_COMPLETO.label : undefined) ??
+    status.replaceAll("_", " ")
+  );
+}
+
 function BadgeProximaAcao({ proximaAcaoEm }: { proximaAcaoEm: Date | string }) {
   const urgencia = calcularUrgenciaProximaAcao(proximaAcaoEm);
   const formatado = new Date(proximaAcaoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -185,7 +202,7 @@ function LeadCard({ lead, cor, onAbrirLead }: { lead: Lead; cor: string; onAbrir
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-semibold leading-tight text-slate-100 truncate">{lead.nomeFantasia || lead.nome}</p>
-                <span className="shrink-0 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-300">{lead.status === "NOVO_LEAD" ? "NOVO" : lead.status.replaceAll("_", " ")}</span>
+                <span className="shrink-0 rounded-md border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-300">{lead.status === "NOVO_LEAD" ? "NOVO" : labelDoStatus(lead.status)}</span>
               </div>
               {lead.classificacao && <span className="mt-1 inline-flex rounded-md border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-300">{lead.classificacao}</span>}
               <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
@@ -247,7 +264,6 @@ function KanbanColuna({
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [termoBusca, setTermoBusca] = useState("");
-  const permiteBusca = status === "NOVO_LEAD";
   const termoNormalizado = termoBusca.trim().toLocaleLowerCase("pt-BR");
   const itensVisiveis = termoNormalizado
     ? itens.filter((lead) => (lead.nomeFantasia || lead.nome).toLocaleLowerCase("pt-BR").includes(termoNormalizado))
@@ -262,13 +278,13 @@ function KanbanColuna({
           <span className="text-[11px] font-black uppercase tracking-widest text-slate-200 truncate">{label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {permiteBusca && <button type="button" onClick={() => setBuscaAberta((aberta) => !aberta)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white" aria-label="Pesquisar leads por nome" title="Pesquisar leads por nome"><Search size={13} /></button>}
+          <button type="button" onClick={() => setBuscaAberta((aberta) => !aberta)} className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white" aria-label="Pesquisar leads por nome" title="Pesquisar leads por nome"><Search size={13} /></button>
           <span className="text-[10px] font-bold shrink-0 rounded-full px-2 py-0.5" style={{ background: `rgba(${cor},0.18)`, color: `rgb(${cor})` }}>
             {termoNormalizado ? `${itensVisiveis.length}/${itens.length}` : itens.length}
           </span>
         </div>
         </div>
-        {permiteBusca && buscaAberta && <div className="relative mt-2"><Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" /><input autoFocus value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)} placeholder="Buscar pelo nome..." className="h-8 w-full rounded-lg border border-white/10 bg-black/30 pl-8 pr-8 text-[11px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-white/20" />{termoBusca && <button type="button" onClick={() => setTermoBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white" aria-label="Limpar pesquisa"><X size={12} /></button>}</div>}
+        {buscaAberta && <div className="relative mt-2"><Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" /><input autoFocus value={termoBusca} onChange={(event) => setTermoBusca(event.target.value)} placeholder="Buscar pelo nome..." className="h-8 w-full rounded-lg border border-white/10 bg-black/30 pl-8 pr-8 text-[11px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-white/20" />{termoBusca && <button type="button" onClick={() => setTermoBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white" aria-label="Limpar pesquisa"><X size={12} /></button>}</div>}
       </div>
       <div
         ref={setNodeRef}
@@ -323,6 +339,11 @@ export default function AquisicaoParceirosClient({
     return SAIDAS.map((col) => ({ ...col, itens: leads.filter((l) => l.status === col.status) }));
   }, [leads]);
 
+  const colunaCadastroCompleto = useMemo(
+    () => ({ ...SAIDA_CADASTRO_COMPLETO, itens: leads.filter((l) => l.status === SAIDA_CADASTRO_COMPLETO.status) }),
+    [leads],
+  );
+
   // Drag-and-drop — mesmo padrão de BlueprintKanban.tsx: PointerSensor só (sem teclado,
   // consistente com os outros 2 Kanbans do projeto), optimistic update local, servidor
   // valida a transição (podeMoverPara em parceiros-aquisicao.ts) e recusa se inválida.
@@ -346,9 +367,16 @@ export default function AquisicaoParceirosClient({
     if (!leadAtual) return;
 
     const overId = String(over.id);
-    const todosStatus = [...ETAPAS.map((e) => e.status), ...SAIDAS.map((s) => s.status)];
+    const todosStatus = [...ETAPAS.map((e) => e.status), ...SAIDAS.map((s) => s.status), SAIDA_CADASTRO_COMPLETO.status];
     const novoStatus = todosStatus.includes(overId) ? overId : leads.find((l) => l.id === overId)?.status;
     if (!novoStatus || novoStatus === leadAtual.status) return;
+
+    // "Cadastro completo" só é atingido pela promoção (botão "Cadastrar parceiro" no
+    // card, na etapa Pré-cadastro) — arrastar pra lá não é um destino válido.
+    if (novoStatus === SAIDA_CADASTRO_COMPLETO.status) {
+      toast.error('Para completar o cadastro, abra o lead em "Pré-cadastro" e use o botão "Cadastrar parceiro".');
+      return;
+    }
 
     // Saídas laterais exigem motivo (RegistrarSaidaLateralLeadAquisicao) — abre modal em vez
     // de mover direto, mesmo espírito do card noloss no Pipeline BPM (PipelineBoardClient.tsx).
@@ -436,6 +464,16 @@ export default function AquisicaoParceirosClient({
           {colunasSaida.map((col) => (
             <KanbanColuna key={col.status} status={col.status} label={col.label} cor={col.cor} itens={col.itens} onAbrirLead={setLeadFoco} tracejada />
           ))}
+
+          <KanbanColuna
+            key={colunaCadastroCompleto.status}
+            status={colunaCadastroCompleto.status}
+            label={colunaCadastroCompleto.label}
+            cor={colunaCadastroCompleto.cor}
+            itens={colunaCadastroCompleto.itens}
+            onAbrirLead={setLeadFoco}
+            tracejada
+          />
         </div>
 
         <DragOverlay>
@@ -671,7 +709,7 @@ function LeadDetalheDialog({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
                 <SheetTitle className="text-xl font-black text-white tracking-tight truncate">{lead.nome}</SheetTitle>
-                <span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-cyan-200">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</span>
+                <span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-cyan-200">{ETAPAS[etapaAtual]?.label || labelDoStatus(lead.status)}</span>
                 {lead.classificacao && <span className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-200">{lead.classificacao}</span>}
                 {podeEditar && (
                   <button
@@ -719,7 +757,7 @@ function LeadDetalheDialog({
           </section>
 
           <section className="min-h-0 space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:overflow-y-auto">
-            <div className="flex items-start justify-between gap-3"><div><p className="text-lg font-black text-white">{ETAPAS[etapaAtual]?.label || lead.status.replaceAll("_", " ")}</p><p className="text-[11px] text-slate-400">{lead.responsavel?.nome || "Responsável não definido"}</p></div><span className={cn("rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wider", prioridade.className)}>Follow-up {prioridade.label}</span></div>
+            <div className="flex items-start justify-between gap-3"><div><p className="text-lg font-black text-white">{ETAPAS[etapaAtual]?.label || labelDoStatus(lead.status)}</p><p className="text-[11px] text-slate-400">{lead.responsavel?.nome || "Responsável não definido"}</p></div><span className={cn("rounded-lg border px-2 py-1 text-[9px] font-black uppercase tracking-wider", prioridade.className)}>Follow-up {prioridade.label}</span></div>
             <p className="text-[10px] leading-4 text-slate-400">{prioridade.detail}</p>
             <div className="grid grid-cols-2 gap-3"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Segmento</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.segmento || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Origem</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.origem || "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Cidade/UF</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.cidade ? `${lead.cidade}${lead.uf ? `/${lead.uf}` : ""}` : "—"}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Próxima ação</p><p className="mt-1 text-xs font-bold text-slate-200">{lead.proximaAcaoDescricao || "Não definida"}</p><p className="text-[10px] text-slate-500">{formatarDataCard(lead.proximaAcaoEm)}</p></div></div>
             <div className="grid grid-cols-3 gap-2 border-y border-white/[0.07] py-3 text-center"><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Indicações</p><p className="text-xl font-black text-white">{lead.indicacoesCount}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Contratos</p><p className="text-xl font-black text-white">{lead.contratosCount}</p></div><div><p className="text-[9px] uppercase tracking-wider text-slate-500">Conversão</p><p className="text-xl font-black text-white">{lead.conversaoPercentual === null ? "—" : `${lead.conversaoPercentual.toLocaleString("pt-BR")}%`}</p></div></div>
@@ -728,9 +766,17 @@ function LeadDetalheDialog({
           </section>
 
           <aside className="min-h-0 space-y-4 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="space-y-2">{ETAPAS.filter((e) => e.status !== lead.status).map((e) => <button key={e.status} type="button" onClick={() => setStatusDestino(e.status)} className={cn("block w-full rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition-colors", statusDestino === e.status ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.1]")}>{e.label}</button>)}</div>
-            <button type="button" onClick={() => void mover()} disabled={salvando || statusDestino === lead.status} className="h-10 w-full rounded-xl text-[10px] font-black uppercase tracking-wider text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Mover para etapa selecionada</button>
-            {podeEditar && <><div className="border-t border-white/[0.07] pt-4"><Select value={saidaSelecionada} onValueChange={setSaidaSelecionada}><SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Saída lateral" /></SelectTrigger><SelectContent>{SAIDAS.map((s) => <SelectItem key={s.status} value={s.status}>{s.label}</SelectItem>)}</SelectContent></Select><textarea value={motivoSaida} onChange={(e) => setMotivoSaida(e.target.value)} placeholder="Motivo da saída..." className="mt-2 min-h-16 w-full rounded-xl px-3 py-2 text-[12px] text-slate-200" style={inputStyle} /><button onClick={() => void registrarSaida()} disabled={salvando} className="mt-2 h-9 w-full rounded-xl text-[11px] font-bold text-red-300 disabled:opacity-40" style={{ background: "rgba(239,68,68,0.15)" }}>Registrar saída</button></div>{lead.status === "PRE_CADASTRO" && <div className="space-y-2 border-t border-white/[0.07] pt-4"><input value={docPromocao} onChange={(e) => setDocPromocao(e.target.value)} placeholder="CPF/CNPJ *" className={inputCls} style={inputStyle} /><input value={emailPromocao} onChange={(e) => setEmailPromocao(e.target.value)} placeholder="E-mail *" className={inputCls} style={inputStyle} /><button onClick={() => void promover()} disabled={salvando} className="h-10 w-full rounded-xl text-[10px] font-black uppercase text-white disabled:opacity-40" style={{ background: "rgb(16,185,129)" }}>Cadastrar parceiro</button></div>}</>}
+            {lead.status === SAIDA_CADASTRO_COMPLETO.status ? (
+              <p className="rounded-xl border px-3 py-3 text-[11px] font-bold" style={{ borderColor: `rgba(${SAIDA_CADASTRO_COMPLETO.cor},0.35)`, background: `rgba(${SAIDA_CADASTRO_COMPLETO.cor},0.1)`, color: `rgb(${SAIDA_CADASTRO_COMPLETO.cor})` }}>
+                Cadastro completo — este lead já foi promovido a parceiro e não muda mais de etapa.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-2">{ETAPAS.filter((e) => e.status !== lead.status).map((e) => <button key={e.status} type="button" onClick={() => setStatusDestino(e.status)} className={cn("block w-full rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition-colors", statusDestino === e.status ? "border-cyan-300/60 bg-cyan-300/20 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.1]")}>{e.label}</button>)}</div>
+                <button type="button" onClick={() => void mover()} disabled={salvando || statusDestino === lead.status} className="h-10 w-full rounded-xl text-[10px] font-black uppercase tracking-wider text-black disabled:opacity-40" style={{ background: `rgba(${accent},1)` }}>Mover para etapa selecionada</button>
+                {podeEditar && <><div className="border-t border-white/[0.07] pt-4"><Select value={saidaSelecionada} onValueChange={setSaidaSelecionada}><SelectTrigger className={inputCls} style={inputStyle}><SelectValue placeholder="Saída lateral" /></SelectTrigger><SelectContent>{SAIDAS.map((s) => <SelectItem key={s.status} value={s.status}>{s.label}</SelectItem>)}</SelectContent></Select><textarea value={motivoSaida} onChange={(e) => setMotivoSaida(e.target.value)} placeholder="Motivo da saída..." className="mt-2 min-h-16 w-full rounded-xl px-3 py-2 text-[12px] text-slate-200" style={inputStyle} /><button onClick={() => void registrarSaida()} disabled={salvando} className="mt-2 h-9 w-full rounded-xl text-[11px] font-bold text-red-300 disabled:opacity-40" style={{ background: "rgba(239,68,68,0.15)" }}>Registrar saída</button></div>{lead.status === "PRE_CADASTRO" && <div className="space-y-2 border-t border-white/[0.07] pt-4"><input value={docPromocao} onChange={(e) => setDocPromocao(e.target.value)} placeholder="CPF/CNPJ *" className={inputCls} style={inputStyle} /><input value={emailPromocao} onChange={(e) => setEmailPromocao(e.target.value)} placeholder="E-mail *" className={inputCls} style={inputStyle} /><button onClick={() => void promover()} disabled={salvando} className="h-10 w-full rounded-xl text-[10px] font-black uppercase text-white disabled:opacity-40" style={{ background: "rgb(16,185,129)" }}>Cadastrar parceiro</button></div>}</>}
+              </>
+            )}
           </aside>
         </div>
       </SheetContent>

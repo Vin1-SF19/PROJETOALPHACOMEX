@@ -497,9 +497,9 @@ export async function ListarLeadsAquisicaoParceiros(filtros?: {
       segmento: filtros?.segmento ? { contains: filtros.segmento } : undefined,
       origem: filtros?.origem ? { contains: filtros.origem } : undefined,
       uf: filtros?.uf,
-      // "CADASTRADO" some do Kanban de aquisição (processo encerrado) — continua consultável
-      // via histórico/relatório, não na visão operacional do funil.
-      status: filtros?.status ?? { not: "CADASTRADO" },
+      // "CADASTRADO" aparece no Kanban como a 4ª coluna de saída ("Cadastro completo")
+      // — deixou de ser filtrado por padrão (RM pedido do usuário).
+      status: filtros?.status,
     },
     select: {
       id: true,
