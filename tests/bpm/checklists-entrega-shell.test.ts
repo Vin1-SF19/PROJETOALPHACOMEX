@@ -39,6 +39,7 @@ describe("autoajuste de entrega do Checklist Builder", () => {
     expect(slot).not.toContain("PainelChecklistsCard");
     expect(historico.match(/<PainelChecklistsCard/g)).toHaveLength(1);
     expect(historico).toContain('<TabsContent value="checklist" forceMount');
+    expect(historico).toContain("data-[state=inactive]:hidden");
     expect(painel).toContain("ListarChecklistsCardBpm");
     expect(painel).toContain('role="progressbar"');
     expect(painel).toContain('id="checklist-pendencias"');

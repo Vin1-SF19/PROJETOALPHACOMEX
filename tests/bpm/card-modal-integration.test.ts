@@ -217,6 +217,7 @@ describe("CRM - wiring do modal por etapa", () => {
   it("mantém Checklist e Anotação em instância única no painel esquerdo", () => {
     expect(historico.match(/<PainelChecklistsCard/g)).toHaveLength(1);
     expect(historico).toContain('<TabsContent value="checklist" forceMount');
+    expect(historico).toContain("data-[state=inactive]:hidden");
     expect(slotFormulario).not.toContain("PainelChecklistsCard");
     expect(registrar).not.toContain("PainelChecklistsCard");
     expect(historico.match(/<EditorAnotacaoCard/g)).toHaveLength(1);

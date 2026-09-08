@@ -185,7 +185,7 @@ export default function PainelHistorico({
           />
         </TabsContent>
 
-        <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto">
+        <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
           <PainelChecklistsCard
             card={card}
             accent={accent}
