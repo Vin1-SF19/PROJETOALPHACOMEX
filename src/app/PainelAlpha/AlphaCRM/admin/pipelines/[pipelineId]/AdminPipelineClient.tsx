@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Plus, GripVertical, Pencil, Power, Search } from "lucide-react";
+import { Plus, GripVertical, Loader2, Pencil, Power, Search } from "lucide-react";
 import { CriarEtapaBpm, AtualizarEtapaBpm, ReordenarEtapasBpm, AtivarDesativarEtapaBpm } from "@/actions/bpm/Etapas";
-import { AtivarDesativarCampoBpm, ConfigurarMapeamentoCampoBpm, CriarCampoBpm, AtualizarCampoBpm, DesativarMapeamentoCampoBpm } from "@/actions/bpm/Campos";
+import { AtivarDesativarCampoBpm, CriarCampoBpm, AtualizarCampoBpm } from "@/actions/bpm/Campos";
 import type { TemaAlpha } from "@/lib/temas";
 import { FINANCIAL_PIPELINE_NAME, hasConfiguredFinancialPipeline } from "@/lib/bpm/pipeline-financeiro";
 import { agruparCamposPorColuna } from "@/lib/bpm/campos-admin";
@@ -26,6 +26,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { SlaConfiguracaoAdmin } from "@/lib/validations/bpm-sla";
 import { SlaConfigSection } from "./SlaConfigSection";
+import { CadenciaEtapasSection } from "./CadenciaEtapasSection";
+import type { CadenciaView } from "@/components/bpm/cadencias/types";
 
 interface EtapaBpm {
   id: string;
@@ -57,8 +59,9 @@ interface CampoBpm {
   visivel?: boolean;
   editavel?: boolean;
   somenteLeitura?: boolean;
-  pipelinesAssociados?: { pipelineId: string }[];
-  etapaConfiguracoes?: ConfigEtapaCampo[];
+  pipeline?: { id: string; nome: string };
+  pipelinesAssociados?: { pipelineId: string; pipeline?: { id: string; nome: string } }[];
+  etapaConfiguracoes?: Array<ConfigEtapaCampo & { etapa?: { id: string; nome: string; pipelineId: string } }>;
   acessos?: { perfil: string; visivel: boolean; editavel: boolean; somenteLeitura: boolean; obrigatorio: boolean }[];
   opcoes?: { id: string; chave: string; rotulo: string; ordem: number; ativo: boolean }[];
   mapeamentoDestino?: { campoOrigemId: string; modo: string; ativo: boolean } | null;
@@ -135,6 +138,7 @@ export default function AdminPipelineClient({
   configuracoesSlaIniciais,
   servicosComerciais,
   pipelinesDisponiveis,
+  cadenciasIniciais,
   visual,
 }: {
   pipeline: PipelineBpm;
@@ -142,11 +146,14 @@ export default function AdminPipelineClient({
   configuracoesSlaIniciais: SlaConfiguracaoAdmin[];
   servicosComerciais: { id: number; nome: string }[];
   pipelinesDisponiveis: { id: string; nome: string }[];
+  cadenciasIniciais: CadenciaView[];
   visual: TemaAlpha;
 }) {
   const accent = visual.accent;
   const router = useRouter();
-  const [etapas, setEtapas] = useState(pipeline.etapas.slice().sort((a, b) => a.ordem - b.ordem));
+  const etapasIniciais = pipeline.etapas.slice().sort((a, b) => a.ordem - b.ordem);
+  const [etapas, setEtapas] = useState(etapasIniciais);
+  const [etapasConfirmadas, setEtapasConfirmadas] = useState(etapasIniciais);
   const [campos, setCampos] = useState(pipeline.campos);
   const [transicoes, setTransicoes] = useState(transicoesIniciais);
   const [novaEtapaNome, setNovaEtapaNome] = useState("");
@@ -164,8 +171,6 @@ export default function AdminPipelineClient({
   const [editandoCampoId, setEditandoCampoId] = useState<string | null>(null);
   const [editCampoNome, setEditCampoNome] = useState("");
   const [editCampoTipo, setEditCampoTipo] = useState("texto");
-  const [editCampoEtapaId, setEditCampoEtapaId] = useState<string>("");
-  const [editCampoObrigatorio, setEditCampoObrigatorio] = useState(false);
   const [editCampoOpcoes, setEditCampoOpcoes] = useState<OpcaoCampoAdmin[]>([]);
   const [editCampoEscopo, setEditCampoEscopo] = useState("CARD");
   const [editCampoFonteEntidade, setEditCampoFonteEntidade] = useState("CLIENTE");
@@ -182,6 +187,7 @@ export default function AdminPipelineClient({
   const [buscaCampo, setBuscaCampo] = useState("");
   const [filtroAtivo, setFiltroAtivo] = useState<"TODOS" | "ATIVOS" | "INATIVOS">("TODOS");
   const [erro, setErro] = useState<string | null>(null);
+  const [operacao, setOperacao] = useState<string | null>(null);
   const gruposCampos = useMemo(() => {
     const termo = buscaCampo.trim().toLocaleLowerCase("pt-BR");
     const filtrados = campos.filter((campo) =>
@@ -192,71 +198,112 @@ export default function AdminPipelineClient({
   }, [buscaCampo, campos, etapas, filtroAtivo]);
 
   async function handleCriarEtapa() {
-    if (!novaEtapaNome.trim()) return;
-    const res = await CriarEtapaBpm({ pipelineId: pipeline.id, nome: novaEtapaNome, ordem: etapas.length });
-    if (res.success && res.data) {
-      setEtapas((prev) => [...prev, { ...res.data, subStatus: [] }]);
-      setNovaEtapaNome("");
-    } else {
-      setErro(typeof res.error === "string" ? res.error : "Erro ao criar etapa");
+    if (!novaEtapaNome.trim() || operacao) return;
+    setOperacao("criar-etapa");
+    setErro(null);
+    try {
+      const res = await CriarEtapaBpm({ pipelineId: pipeline.id, nome: novaEtapaNome, ordem: etapas.length });
+      if (res.success && res.data) {
+        const nova = { ...res.data, subStatus: [] };
+        setEtapas((prev) => [...prev, nova]);
+        setEtapasConfirmadas((prev) => [...prev, nova]);
+        setNovaEtapaNome("");
+        toast.success("Etapa criada com transições bloqueadas por padrão");
+        router.refresh();
+      } else {
+        setErro(typeof res.error === "string" ? res.error : "Erro ao criar etapa");
+      }
+    } finally {
+      setOperacao(null);
     }
-  }
-
-  async function handleAtualizarSla(etapaId: string, slaDias: number | null) {
-    setEtapas((prev) => prev.map((e) => (e.id === etapaId ? { ...e, slaDias } : e)));
-    await AtualizarEtapaBpm({ etapaId, slaDias });
   }
 
   async function handleRenomearEtapa(etapaId: string, nome: string) {
-    setEtapas((prev) => prev.map((e) => (e.id === etapaId ? { ...e, nome } : e)));
-    if (!nome.trim()) return;
+    const anterior = etapasConfirmadas.find((etapa) => etapa.id === etapaId);
+    if (!anterior || operacao) return;
+    if (!nome.trim()) {
+      setEtapas((prev) => prev.map((etapa) => etapa.id === etapaId ? { ...etapa, nome: anterior.nome } : etapa));
+      return;
+    }
+    if (nome.trim() === anterior.nome) return;
+    setOperacao(`etapa:${etapaId}`);
     const res = await AtualizarEtapaBpm({ etapaId, nome: nome.trim() });
-    if (!res.success) {
+    if (res.success && res.data) {
+      const confirmada = { ...anterior, ...res.data };
+      setEtapas((prev) => prev.map((etapa) => etapa.id === etapaId ? confirmada : etapa));
+      setEtapasConfirmadas((prev) => prev.map((etapa) => etapa.id === etapaId ? confirmada : etapa));
+      toast.success("Nome da etapa salvo");
+    } else {
+      setEtapas((prev) => prev.map((etapa) => etapa.id === etapaId ? { ...etapa, nome: anterior.nome } : etapa));
       setErro(typeof res.error === "string" ? res.error : "Erro ao renomear etapa");
     }
+    setOperacao(null);
   }
 
   async function handleMoverEtapa(index: number, direcao: -1 | 1) {
     const novoIndex = index + direcao;
-    if (novoIndex < 0 || novoIndex >= etapas.length) return;
+    if (novoIndex < 0 || novoIndex >= etapas.length || operacao) return;
 
+    const anteriores = etapas;
     const reordenadas = etapas.slice();
     [reordenadas[index], reordenadas[novoIndex]] = [reordenadas[novoIndex], reordenadas[index]];
     const comOrdemAtualizada = reordenadas.map((e, i) => ({ ...e, ordem: i }));
     setEtapas(comOrdemAtualizada);
-
-    await ReordenarEtapasBpm({
+    setOperacao("reordenar-etapas");
+    const resultado = await ReordenarEtapasBpm({
       pipelineId: pipeline.id,
       ordem: comOrdemAtualizada.map((e) => ({ etapaId: e.id, ordem: e.ordem })),
     });
-    router.refresh();
+    if (resultado.success) {
+      setEtapasConfirmadas(comOrdemAtualizada);
+      toast.success("Ordem das etapas salva");
+      router.refresh();
+    } else {
+      setEtapas(anteriores);
+      setErro(typeof resultado.error === "string" ? resultado.error : "Erro ao reordenar etapas");
+    }
+    setOperacao(null);
   }
 
   async function handleAlterarCorEtapa(etapaId: string, cor: string) {
-    setEtapas((prev) => prev.map((e) => (e.id === etapaId ? { ...e, cor } : e)));
+    const anterior = etapasConfirmadas.find((etapa) => etapa.id === etapaId);
+    if (!anterior || anterior.cor === cor || operacao) return;
+    setOperacao(`etapa:${etapaId}`);
     const res = await AtualizarEtapaBpm({ etapaId, cor });
-    if (!res.success) {
+    if (res.success && res.data) {
+      const confirmada = { ...anterior, ...res.data };
+      setEtapas((prev) => prev.map((etapa) => etapa.id === etapaId ? confirmada : etapa));
+      setEtapasConfirmadas((prev) => prev.map((etapa) => etapa.id === etapaId ? confirmada : etapa));
+      toast.success("Cor da etapa salva");
+    } else {
+      setEtapas((prev) => prev.map((etapa) => etapa.id === etapaId ? { ...etapa, cor: anterior.cor } : etapa));
       toast.error(typeof res.error === "string" ? res.error : "Erro ao atualizar cor da etapa");
     }
+    setOperacao(null);
   }
 
   async function handleToggleAtivoEtapa(etapaId: string, ativo: boolean) {
+    if (operacao) return;
+    setOperacao(`etapa:${etapaId}`);
     const res = await AtivarDesativarEtapaBpm({ etapaId, ativo });
     if (res.success) {
       setEtapas((prev) => prev.map((e) => (e.id === etapaId ? { ...e, ativo } : e)));
+      setEtapasConfirmadas((prev) => prev.map((e) => (e.id === etapaId ? { ...e, ativo } : e)));
       toast.success(ativo ? "Etapa ativada" : "Etapa desativada");
       router.refresh();
     } else {
       toast.error(typeof res.error === "string" ? res.error : "Erro ao atualizar status da etapa");
     }
+    setOperacao(null);
   }
 
   function handleEtapasAtualizadas(patch: Record<string, Partial<EtapaBpm>>) {
     setEtapas((prev) => prev.map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e)));
+    setEtapasConfirmadas((prev) => prev.map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e)));
   }
 
   function handleSubStatusAtualizado(sub: SubStatusBpm) {
-    setEtapas((prev) =>
+    const atualizar = (prev: EtapaBpm[]) =>
       prev.map((e) => {
         if (e.id !== sub.etapaId) return e;
         const existe = e.subStatus.some((s) => s.id === sub.id);
@@ -264,8 +311,9 @@ export default function AdminPipelineClient({
           ...e,
           subStatus: existe ? e.subStatus.map((s) => (s.id === sub.id ? sub : s)) : [...e.subStatus, sub],
         };
-      }),
-    );
+      });
+    setEtapas(atualizar);
+    setEtapasConfirmadas(atualizar);
   }
 
   function handleTransicaoAtualizada(transicao: TransicaoBpm) {
@@ -276,7 +324,7 @@ export default function AdminPipelineClient({
   }
 
   async function handleCriarCampo() {
-    if (!novoCampoNome.trim()) return;
+    if (!novoCampoNome.trim() || operacao) return;
     const opcoes =
       TIPOS_COM_OPICOES.has(novoCampoTipo)
         ? novoCampoOpcoes
@@ -288,12 +336,12 @@ export default function AdminPipelineClient({
       setErro("Campo do tipo Seleção requer ao menos uma opção (uma por linha)");
       return;
     }
+    setOperacao("criar-campo");
     const res = await CriarCampoBpm({
       pipelineId: pipeline.id,
-      etapaId: novoCampoEtapaId || undefined,
       nome: novoCampoNome,
       tipo: novoCampoTipo,
-      obrigatorio: novoCampoObrigatorio,
+      obrigatorio: false,
       opcoes,
       ordem: campos.length,
       escopo: novoCampoEscopo,
@@ -319,14 +367,12 @@ export default function AdminPipelineClient({
       setNovoCampoObrigatorio(false);
       setNovoCampoOpcoes("");
       setNovoCampoValorPadrao("");
+      setNovoCampoEtapaId("");
+      toast.success("Campo criado com o agregado confirmado pelo servidor");
     } else {
       setErro(typeof res.error === "string" ? res.error : "Erro ao criar campo");
     }
-  }
-
-  async function handleToggleObrigatorio(campoId: string, obrigatorio: boolean) {
-    setCampos((prev) => prev.map((c) => (c.id === campoId ? { ...c, obrigatorio } : c)));
-    await AtualizarCampoBpm({ campoId, obrigatorio });
+    setOperacao(null);
   }
 
   /* ===== Editor / Exclusão de campos (D-24) =========================== */
@@ -346,8 +392,6 @@ export default function AdminPipelineClient({
     }
     setEditCampoNome(c.nome);
     setEditCampoTipo(c.tipo);
-    setEditCampoEtapaId(c.etapaId ?? "");
-    setEditCampoObrigatorio(c.obrigatorio);
     setEditCampoOpcoes(opcoes.sort((a, b) => a.ordem - b.ordem));
     setEditCampoEscopo(c.escopo ?? "CARD");
     setEditCampoFonteEntidade(c.escopo === "GLOBAL" && !c.fonteEntidade ? "" : (c.fonteEntidade ?? "CLIENTE"));
@@ -361,20 +405,7 @@ export default function AdminPipelineClient({
       ...item,
       obrigatorioEntrada: item.obrigatorioEntrada ?? false,
       obrigatorioSaida: item.obrigatorioSaida ?? false,
-    })) ?? (c.etapaId ? [{
-      etapaId: c.etapaId,
-      visivel: c.visivel ?? true,
-      editavel: c.editavel ?? true,
-      somenteLeitura: c.somenteLeitura ?? false,
-      obrigatorio: c.obrigatorio,
-      obrigatorioEntrada: false,
-      obrigatorioSaida: false,
-      ordem: c.ordem,
-      grupo: null,
-      valorPadrao: null,
-      condicaoVisibilidadeJson: null,
-      condicaoObrigatoriedadeJson: null,
-    }] : []));
+    })) ?? []);
     setEditCampoAcessos(PERFIS_CAMPO.map(({ value: perfil }) => c.acessos?.find((item) => item.perfil === perfil) ?? {
       perfil,
       visivel: c.visivel ?? true,
@@ -382,7 +413,7 @@ export default function AdminPipelineClient({
       somenteLeitura: c.somenteLeitura ?? false,
       obrigatorio: c.obrigatorio,
     }));
-    setEditMapOrigemId(c.mapeamentoDestino?.campoOrigemId ?? "");
+    setEditMapOrigemId(c.mapeamentoDestino?.ativo ? c.mapeamentoDestino.campoOrigemId : "");
     setEditMapModo(c.mapeamentoDestino?.modo ?? "COPIAR");
     setEditandoCampoId(c.id);
   }
@@ -392,6 +423,7 @@ export default function AdminPipelineClient({
   }
 
   async function salvarEdicao(campoId: string) {
+    if (operacao) return;
     if (!editCampoNome.trim()) {
       setErro("Nome do campo é obrigatório");
       return;
@@ -404,12 +436,13 @@ export default function AdminPipelineClient({
               ? { ...opcao, rotulo: opcao.rotulo.trim(), ordem }
               : opcao.rotulo.trim())
         : [];
+    setOperacao(`campo:${campoId}`);
     const res = await AtualizarCampoBpm({
       campoId,
       nome: editCampoNome.trim(),
       tipo: editCampoTipo,
-      etapaId: editCampoEtapaId || null,
-      obrigatorio: editCampoObrigatorio,
+      etapaId: null,
+      obrigatorio: false,
       opcoes,
       escopo: editCampoEscopo,
       valorPadrao: editCampoValorPadrao || null,
@@ -426,33 +459,24 @@ export default function AdminPipelineClient({
         editavel: (editCampoEscopo === "GLOBAL" && Boolean(editCampoFonteEntidade)) || acesso.somenteLeitura ? false : acesso.editavel,
         somenteLeitura: (editCampoEscopo === "GLOBAL" && Boolean(editCampoFonteEntidade)) || acesso.somenteLeitura,
       })),
+      mapeamento: editMapOrigemId
+        ? { campoOrigemId: editMapOrigemId, modo: editMapModo, ativo: true }
+        : null,
     });
-    if (res.success) {
-      const mapa = editMapOrigemId
-        ? await ConfigurarMapeamentoCampoBpm({ campoDestinoId: campoId, campoOrigemId: editMapOrigemId, modo: editMapModo, ativo: true })
-        : await DesativarMapeamentoCampoBpm({ campoDestinoId: campoId });
-      if (!mapa.success) {
-        setErro(typeof mapa.error === "string" ? mapa.error : "Campo salvo, mas o mapeamento foi rejeitado");
-        return;
-      }
-      setCampos((prev) => prev.map((c) => (c.id === campoId ? {
-        ...(res.data ?? c),
-        nome: editCampoNome.trim(),
-        tipo: editCampoTipo,
-        etapaId: editCampoEtapaId || null,
-        obrigatorio: editCampoObrigatorio,
-        pipelinesAssociados: editCampoPipelineIds.map((pipelineId) => ({ pipelineId })),
-        etapaConfiguracoes: editCampoEtapaConfigs,
-      } : c)));
+    if (res.success && res.data) {
+      setCampos((prev) => prev.map((c) => (c.id === campoId ? res.data : c)));
+      toast.success("Campo salvo");
+      cancelarEdicao();
       router.refresh();
     } else {
       setErro(typeof res.error === "string" ? res.error : "Erro ao salvar campo");
     }
-    cancelarEdicao();
+    setOperacao(null);
   }
 
   async function alterarAtivacaoCampo(campoId: string, nome: string, ativo: boolean) {
-    if (!confirm(`${ativo ? "Ativar" : "Desativar"} o campo "${nome}"? Os valores históricos serão preservados.`)) return;
+    if (operacao || !confirm(`${ativo ? "Ativar" : "Desativar"} o campo "${nome}"? Os valores históricos serão preservados.`)) return;
+    setOperacao(`campo:${campoId}`);
     const res = await AtivarDesativarCampoBpm({ campoId, ativo });
     if (res.success) {
       setCampos((prev) => prev.map((campo) => campo.id === campoId ? { ...campo, ativo } : campo));
@@ -461,6 +485,7 @@ export default function AdminPipelineClient({
     } else {
       setErro(typeof res.error === "string" ? res.error : "Erro ao alterar ativação do campo");
     }
+    setOperacao(null);
   }
 
   return (
@@ -471,7 +496,7 @@ export default function AdminPipelineClient({
       </div>
 
       {erro && (
-        <div className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{erro}</div>
+        <div role="alert" className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{erro}</div>
       )}
 
       {pipeline.nome === FINANCIAL_PIPELINE_NAME && (
@@ -484,15 +509,15 @@ export default function AdminPipelineClient({
             pipelineId={pipeline.id}
             accent={accent}
             onConfigured={(data) => {
-              setEtapas(
-                data.etapas.map((e) => ({
+              const etapasConfiguradas = data.etapas.map((e) => ({
                   cor: null,
                   ehInicial: false,
                   ehFinal: false,
                   subStatus: [],
                   ...e,
-                })),
-              );
+                }));
+              setEtapas(etapasConfiguradas);
+              setEtapasConfirmadas(etapasConfiguradas);
               setCampos(
                 data.campos.map((c) => ({
                   ...c,
@@ -622,6 +647,12 @@ export default function AdminPipelineClient({
         pipelineId={pipeline.id}
         etapas={etapas}
         accent={accent}
+      />
+
+      <CadenciaEtapasSection
+        pipelineId={pipeline.id}
+        etapas={etapas}
+        cadencias={cadenciasIniciais}
       />
 
       <SlaConfigSection

@@ -13,6 +13,7 @@ import { useCardSave } from "./CardSaveContext";
 import { BpmDateTimeField } from "./BpmDateTimeField";
 import { fmtDateTime, formatarDataHoraLocalBpm, parseDataHoraLocalBpm } from "@/lib/format-date";
 import { criarRastreadorRascunho } from "@/lib/bpm/rascunho-versionado";
+import { emailClienteReuniaoSchema } from "@/lib/bpm/email-reuniao";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -29,6 +30,8 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const { registerSave } = useCardSave();
   const [dataHora, setDataHora] = useState(() => formatarDataHoraLocalBpm(card.dataReuniao));
   const [erroDataHora, setErroDataHora] = useState<string | null>(null);
+  const [emailCliente, setEmailCliente] = useState(card.emailClienteReuniao ?? "");
+  const [erroEmailCliente, setErroEmailCliente] = useState<string | null>(null);
   const [resumo, setResumo] = useState(card.transcricaoReuniao ?? "");
   const [salvando, setSalvando] = useState(false);
   const [salvandoResumo, setSalvandoResumo] = useState(false);
@@ -39,6 +42,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
   const [conflitoResumo, setConflitoResumo] = useState(false);
   const cardIdRef = useRef(card.id);
   const dataHoraSujaRef = useRef(false);
+  const emailClienteSujoRef = useRef(false);
   const resumoSujoRef = useRef(false);
   const dataHoraPersistidaRef = useRef(formatarDataHoraLocalBpm(card.dataReuniao));
   const resumoPersistidoRef = useRef(card.transcricaoReuniao ?? "");
@@ -50,21 +54,30 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
 
   useEffect(() => {
     const novaDataHora = formatarDataHoraLocalBpm(card.dataReuniao);
+    const novoEmailCliente = card.emailClienteReuniao ?? "";
     const novoResumo = card.transcricaoReuniao ?? "";
 
     if (cardIdRef.current !== card.id) {
       cardIdRef.current = card.id;
       dataHoraSujaRef.current = false;
+      emailClienteSujoRef.current = false;
       resumoSujoRef.current = false;
       dataHoraPersistidaRef.current = novaDataHora;
       resumoPersistidoRef.current = novoResumo;
       dataHoraRascunhoRef.current = criarRastreadorRascunho(novaDataHora);
       resumoRascunhoRef.current = criarRastreadorRascunho(novoResumo);
       setDataHora(novaDataHora);
+      setEmailCliente(novoEmailCliente);
+      setErroEmailCliente(null);
       setResumo(novoResumo);
       setConflitoDataHora(false);
       setConflitoResumo(false);
       return;
+    }
+
+    if (!emailClienteSujoRef.current) {
+      setEmailCliente(novoEmailCliente);
+      setErroEmailCliente(null);
     }
 
     if (dataHoraSujaRef.current) {
@@ -84,7 +97,7 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       setResumo(novoResumo);
       setConflitoResumo(false);
     }
-  }, [card.id, card.dataReuniao, card.transcricaoReuniao]);
+  }, [card.id, card.dataReuniao, card.emailClienteReuniao, card.transcricaoReuniao]);
 
   async function handleAgendar() {
     if (salvando || !podeEditar) return;
@@ -94,18 +107,33 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
       toast.error("Escolha data e hora da reunião");
       return;
     }
+    const emailValidado = emailClienteReuniaoSchema.safeParse(emailCliente);
+    if (!emailValidado.success) {
+      const mensagem = emailValidado.error.issues[0]?.message ?? "Informe um e-mail válido.";
+      setErroEmailCliente(mensagem);
+      toast.error(mensagem);
+      return;
+    }
     setErroDataHora(null);
-    const snapshot = dataHoraRascunhoRef.current.capturar();
+    setErroEmailCliente(null);
+    if (emailValidado.data !== emailCliente) {
+      setEmailCliente(emailValidado.data);
+    }
+    const snapshotDataHora = dataHoraRascunhoRef.current.capturar();
     setSalvando(true);
-    const dados = { cardId: card.id, dataHora: dataPersistida.toISOString() };
+    const dados = {
+      cardId: card.id,
+      dataHora: dataPersistida.toISOString(),
+      emailCliente: emailValidado.data,
+    };
     const res = jaAgendada
       ? await ReagendarReuniaoBpm(dados)
       : await AgendarReuniaoGoogleMeetBpm(dados);
     setSalvando(false);
 
     if (res.success) {
-      dataHoraPersistidaRef.current = snapshot.valor;
-      if (dataHoraRascunhoRef.current.corresponde(snapshot)) {
+      dataHoraPersistidaRef.current = snapshotDataHora.valor;
+      if (dataHoraRascunhoRef.current.corresponde(snapshotDataHora)) {
         dataHoraSujaRef.current = false;
         setConflitoDataHora(false);
       }
@@ -194,6 +222,37 @@ export function PainelReuniao({ card, accent, podeEditar, onAtualizado, mostrarF
             disabled={!podeEditar || salvando || (jaAgendada && transcricaoRecebida)}
             error={erroDataHora}
           />
+
+          <div className="space-y-1.5">
+            <label htmlFor={`reuniao-email-cliente-${card.id}`} className="text-[10px] font-medium text-slate-400">
+              E-mail do cliente
+            </label>
+            <input
+              id={`reuniao-email-cliente-${card.id}`}
+              name="emailCliente"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={emailCliente}
+              onChange={(event) => {
+                const novoValor = event.target.value;
+                emailClienteSujoRef.current = true;
+                setEmailCliente(novoValor);
+                setErroEmailCliente(null);
+              }}
+              required
+              disabled={!podeEditar || salvando || (jaAgendada && transcricaoRecebida)}
+              aria-invalid={Boolean(erroEmailCliente)}
+              aria-describedby={erroEmailCliente ? `reuniao-email-cliente-erro-${card.id}` : undefined}
+              placeholder="cliente@empresa.com"
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-rose-400/60"
+            />
+            {erroEmailCliente && (
+              <p id={`reuniao-email-cliente-erro-${card.id}`} className="text-[10px] text-rose-300" role="alert">
+                {erroEmailCliente}
+              </p>
+            )}
+          </div>
 
           {conflitoDataHora && (
             <p className="rounded-xl border border-sky-500/25 bg-sky-500/[0.07] p-3 text-xs text-sky-200" role="status">

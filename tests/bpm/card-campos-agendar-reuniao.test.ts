@@ -47,6 +47,16 @@ describe("BPM - card restrito na etapa Agendar reunião", () => {
     expect(painelReuniao).toContain('toast.error(typeof res.error === "string" ? res.error : "Não foi possível salvar a reunião")');
   });
 
+  it("exige e envia o e-mail acessível do cliente no mesmo formulário", () => {
+    expect(cardsAction).toContain("emailClienteReuniao");
+    expect(cardsAction).toContain("selecionarEmailClienteReuniao");
+    expect(painelReuniao).toContain("E-mail do cliente");
+    expect(painelReuniao).toContain('type="email"');
+    expect(painelReuniao).toContain('autoComplete="email"');
+    expect(painelReuniao).toContain("aria-invalid={Boolean(erroEmailCliente)}");
+    expect(painelReuniao).toContain("emailCliente: emailValidado.data");
+  });
+
   it("mantém a renderização padrão como ramo alternativo", () => {
     expect(board).toContain("!novosLeads && canalOrigem");
     expect(board).toContain("!novosLeads && proximaTarefaComPrazo");

@@ -18,6 +18,8 @@ export type CadenciaView = {
   pipelineId: string | null;
   etapaId: string | null;
   ativa: boolean;
+  pipeline?: { id: string; nome: string } | null;
+  etapa?: { id: string; nome: string } | null;
   passos: PassoCadenciaView[];
   _count?: { vinculos: number };
 };

@@ -19,6 +19,10 @@ import { tipoTarefaEhValido } from "@/lib/bpm/tarefas-tipo";
 import { enfileirarAutomacoesCriacaoTarefaBpm } from "@/lib/bpm/automacoes/fila";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { criarSlaInstancia } from "@/lib/bpm/sla";
+import {
+  MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
+  reconciliarTarefaChecklist,
+} from "@/lib/bpm/checklists/reconciliacao-tarefa";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -232,45 +236,81 @@ export async function ConcluirTarefaBpm(dados: unknown) {
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const { tarefaId } = parsed.data;
 
-    const tarefa = await db.bpmTarefa.findUnique({ where: { id: tarefaId } });
+    const tarefa = await db.bpmTarefa.findUnique({
+      where: { id: tarefaId },
+      select: { id: true, cardId: true },
+    });
     if (!tarefa) return { success: false, error: "Tarefa não encontrada" };
 
     await exigirAcessoBpmCard(tarefa.cardId, userId, session.user.role ?? null, "concluirTarefa");
 
-    await db.$transaction(async (tx) => {
-      await exigirAcessoBpmCard(tarefa.cardId, userId, session.user.role ?? null, "concluirTarefa", tx);
+    const resultado = await db.$transaction(async (tx) => {
+      const atual = await tx.bpmTarefa.findUnique({
+        where: { id: tarefaId },
+        select: {
+          id: true,
+          cardId: true,
+          titulo: true,
+          tipo: true,
+          status: true,
+          cardChecklistId: true,
+          cardChecklist: {
+            select: { id: true, itens: { select: { status: true } } },
+          },
+        },
+      });
+      if (!atual) throw new Error("Tarefa não encontrada");
+      await exigirAcessoBpmCard(atual.cardId, userId, session.user.role ?? null, "concluirTarefa", tx);
+      if (atual.cardChecklistId) {
+        const concluido = Boolean(atual.cardChecklist?.itens.length)
+          && atual.cardChecklist!.itens.every((item) => item.status === "CONCLUIDO");
+        if (!concluido) throw new Error(MENSAGEM_TAREFA_CHECKLIST_PENDENTE);
+        const reconciliacao = await reconciliarTarefaChecklist({
+          checklistId: atual.cardChecklistId,
+          usuarioId: userId,
+        }, tx);
+        return { alterou: reconciliacao.acao !== "IGNORADA", cardId: atual.cardId };
+      }
+      if (atual.status === "CONCLUIDA") return { alterou: false, cardId: atual.cardId };
       await tx.bpmTarefa.update({
         where: { id: tarefaId },
         data: { status: "CONCLUIDA", concluidaEm: new Date() },
       });
       await registrarHistoricoCard(
         {
-          cardId: tarefa.cardId,
+          cardId: atual.cardId,
           acao: "TAREFA_CONCLUIDA",
           usuarioId: userId,
-          valorNovoJson: JSON.stringify({ titulo: tarefa.titulo }),
+          valorNovoJson: JSON.stringify({ titulo: atual.titulo }),
         },
         tx,
       );
-      const card = await tx.bpmCard.findUnique({ where: { id: tarefa.cardId }, select: { pipelineId: true } });
+      const card = await tx.bpmCard.findUnique({ where: { id: atual.cardId }, select: { pipelineId: true } });
       if (card) await publicarEventoBpm({
-        tipo: "TAREFA_CONCLUIDA", entidadeTipo: "TAREFA", entidadeId: tarefa.id,
-        cardId: tarefa.cardId, pipelineId: card.pipelineId,
-        valorAnterior: { status: tarefa.status }, valorNovo: { tarefaId: tarefa.id, tipo: tarefa.tipo, titulo: tarefa.titulo, status: "CONCLUIDA" },
+        tipo: "TAREFA_CONCLUIDA", entidadeTipo: "TAREFA", entidadeId: atual.id,
+        cardId: atual.cardId, pipelineId: card.pipelineId,
+        valorAnterior: { status: atual.status }, valorNovo: { tarefaId: atual.id, tipo: atual.tipo, titulo: atual.titulo, status: "CONCLUIDA" },
         atorTipo: "USUARIO", atorUserId: userId, correlationId: randomUUID(),
-        idempotencyKey: `tarefa-concluida:${tarefa.id}`,
+        idempotencyKey: `tarefa-concluida:${atual.id}`,
       }, tx);
-      await criarSlaInstancia({ tarefaId: tarefa.id }, "TAREFA_CONCLUIDA", tx);
+      await criarSlaInstancia({ tarefaId: atual.id }, "TAREFA_CONCLUIDA", tx);
+      return { alterou: true, cardId: atual.cardId };
     });
 
-    revalidatePath(`${ROTA_BASE}/pipeline`);
-    revalidatePath(ROTA_BASE);
-    revalidatePath(`${ROTA_BASE}/tarefas`);
-    await notificarPipelineBpm({ cardId: tarefa.cardId, tipo: "TAREFA_ALTERADA" });
+    if (resultado.alterou) {
+      revalidatePath(`${ROTA_BASE}/pipeline`);
+      revalidatePath(ROTA_BASE);
+      revalidatePath(`${ROTA_BASE}/tarefas`);
+      await notificarPipelineBpm({ cardId: resultado.cardId, tipo: "TAREFA_ALTERADA" });
+    }
     return { success: true };
   } catch (error) {
     console.error("[ConcluirTarefaBpm]", error);
-    const msg = error instanceof Error && error.message === "Não autorizado" ? "Não autorizado" : "Erro ao concluir tarefa";
+    const msg = error instanceof Error && [
+      "Não autorizado",
+      "Tarefa não encontrada",
+      MENSAGEM_TAREFA_CHECKLIST_PENDENTE,
+    ].includes(error.message) ? error.message : "Erro ao concluir tarefa";
     return { success: false, error: msg };
   }
 }
@@ -329,7 +369,25 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
         ...(diretoria ? {} : { card: { etapa: { nome: { not: NOME_ETAPA_BOAS_VINDAS } } } }),
         ...(cardIdsPermitidos ? { cardId: { in: cardIdsPermitidos } } : {}),
       },
-      include: {
+      select: {
+        id: true,
+        cardId: true,
+        titulo: true,
+        descricao: true,
+        responsavelId: true,
+        prazo: true,
+        tipo: true,
+        alertaEm: true,
+        alertaDisparadoEm: true,
+        prioridade: true,
+        status: true,
+        checklistJson: true,
+        presetId: true,
+        cardChecklistId: true,
+        createdAt: true,
+        updatedAt: true,
+        concluidaEm: true,
+        cadenciaExecucaoId: true,
         card: {
           select: {
             id: true,
@@ -338,6 +396,7 @@ export async function ListarTarefasGlobaisBpm(filtros?: { status?: string; respo
           },
         },
         responsavel: { select: { id: true, nome: true } },
+        cardChecklist: { select: { id: true, templateNome: true, status: true } },
       },
       orderBy: [{ status: "asc" }, { prazo: "asc" }],
     });

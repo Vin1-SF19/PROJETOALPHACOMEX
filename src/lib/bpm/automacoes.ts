@@ -1,5 +1,6 @@
 import db from "@/lib/prisma";
 import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
+import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 /**
  * Automações do BPM (D-034): implementadas em código, não configuráveis via UI.
@@ -101,6 +102,16 @@ export async function executarAutomacaoFechamentoComercial(
           valorNovoJson: JSON.stringify({ cardDestinoId: novoCard.id, pipelineDestino: pipelineDestino.nome }),
         },
       });
+
+      await ativarCadenciasNaEntradaBpm({
+        cardId: novoCard.id,
+        pipelineAnteriorId: null,
+        etapaAnteriorId: null,
+        pipelineDestinoId: pipelineDestino.id,
+        etapaDestinoId: primeiraEtapa.id,
+        evento: "CARD_CRIADO",
+        automacaoOrigem: "fechamento_comercial",
+      }, tx);
     });
 
     if (novoCardId) {

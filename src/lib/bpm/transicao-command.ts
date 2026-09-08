@@ -10,7 +10,6 @@ import {
   salvarValoresGlobaisPersonalizadosCampos,
 } from "@/lib/bpm/campos-configuraveis-server";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
-import { contarMaiorSequenciaDiasConsecutivos, CONTATOS_CONSECUTIVOS_EXIGIDOS } from "@/lib/bpm/agendar-reuniao";
 import { obterErroProximoContatoParaMovimento } from "@/lib/bpm/proximo-contato";
 import { obterErroRegrasParaMovimento } from "@/lib/bpm/regras/guarda-movimento";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
@@ -31,6 +30,7 @@ import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { publicarEventoBpm } from "@/lib/bpm/automacoes/eventos";
 import { enfileirarAutomacoesMovimentoBpm } from "@/lib/bpm/automacoes/fila";
 import { sincronizarSlaMovimentoBpm } from "@/lib/bpm/sla";
+import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 export type AtorTransicaoBpm = {
   tipo: BpmTransitionRequester;
@@ -339,16 +339,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
   if (card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA && vazio(meeting?.transcricao)) {
     erro("TRANSCRIPT_REQUIRED", "A transcrição da reunião é obrigatória para avançar.");
   }
-  if (card.etapa.chave === BPM_STAGE_KEYS.AGENDAR_REUNIAO) {
-    const interacoes = await tx.bpmInteracaoCard.findMany({
-      where: { cardId: card.id, tipo: { in: ["LIGACAO", "EMAIL", "REUNIAO", "WHATSAPP"] } },
-      select: { createdAt: true, agendadoEm: true },
-    });
-    const sequencia = contarMaiorSequenciaDiasConsecutivos(interacoes.map((item) => item.agendadoEm ?? item.createdAt));
-    if (sequencia < CONTATOS_CONSECUTIVOS_EXIGIDOS) {
-      erro("CONTACT_SEQUENCE_REQUIRED", `São necessários ${CONTATOS_CONSECUTIVOS_EXIGIDOS} contatos em dias consecutivos. Registrados: ${sequencia}.`);
-    }
-  }
   if (card.etapa.chave === BPM_STAGE_KEYS.EM_TRATATIVA) {
     const ultimo = await tx.bpmChecklistFollowUp.findFirst({ where: { cardId: card.id }, orderBy: [{ criadoEm: "desc" }, { id: "desc" }], select: { completo: true } });
     if (!ultimo?.completo) erro("FOLLOW_UP_CHECKLIST_PENDING", "Conclua o checklist do último follow-up antes de sair de Em Tratativa.");
@@ -562,6 +552,18 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
         agora,
       });
 
+      await ativarCadenciasNaEntradaBpm({
+        cardId: card.id,
+        pipelineAnteriorId: card.pipelineId,
+        etapaAnteriorId: card.etapaId,
+        pipelineDestinoId: card.pipelineId,
+        etapaDestinoId: destino.id,
+        evento: "CARD_MOVIDO",
+        usuarioId: input.ator.tipo === "MANUAL" ? input.ator.userId : undefined,
+        automacaoOrigem: input.ator.tipo === "MANUAL" ? undefined : (input.ator.automacaoId ?? "Transição automática"),
+        agora,
+      }, tx);
+
       await tx.bpmTransicaoExecucao.create({
         data: {
           idempotencyKey: input.idempotencyKey,
@@ -609,6 +611,7 @@ export async function executarTransicaoBpm(input: ComandoTransicaoBpm): Promise<
       }
     }
     const { pipelineId: _pipelineId, ...publicData } = result;
+    void _pipelineId;
     return { success: true, data: publicData };
   } catch (errorValue) {
     return mensagemErroDesconhecido(errorValue);

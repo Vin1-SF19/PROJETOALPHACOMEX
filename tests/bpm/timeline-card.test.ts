@@ -89,6 +89,8 @@ describe("montarFeedTimelineCard — agregação de múltiplas fontes", () => {
 
   it("traduz ações conhecidas para rótulo legível e usa fallback para desconhecidas", () => {
     expect(rotuloEventoTimeline("CARD_MOVIDO")).toBe("Card movido de etapa");
+    expect(rotuloEventoTimeline("TRANSCRICAO_REUNIAO_RECEBIDA")).toBe("Transcrição da reunião recebida");
+    expect(rotuloEventoTimeline("COMUNICACAO_PENDENTE")).toBe("Comunicação aguardando envio");
     expect(rotuloEventoTimeline("ACAO_NUNCA_MAPEADA")).toBe("Acao nunca mapeada");
   });
 });
@@ -104,7 +106,9 @@ describe("PainelHistorico — ownership e estado vazio da timeline do card", () 
   it("exibe estado vazio quando não há eventos no feed", () => {
     expect(painelHistorico).toContain("Sem histórico.");
     expect(painelHistorico).toContain("feedHistorico.length === 0");
-    expect(painelHistoricoShared).toContain("formatarValorHistorico");
+    expect(painelHistorico).toContain("descreverEventoHistorico");
+    expect(painelHistorico).not.toContain("formatarValorHistorico");
+    expect(painelHistoricoShared).not.toContain("JSON.stringify(parsed)");
   });
 
   it("oculta somente o acionador e preserva a implementação da Timeline", () => {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const historicoMock = vi.hoisted(() => vi.fn());
 const realtimeMock = vi.hoisted(() => vi.fn());
+const reconciliarMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   bpmCard: { findUnique: vi.fn() },
   bpmChecklistTemplate: { findMany: vi.fn() },
@@ -13,6 +14,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("@/lib/bpm/historico-server", () => ({ registrarHistoricoCard: historicoMock }));
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: realtimeMock }));
+vi.mock("@/lib/bpm/checklists/reconciliacao-tarefa", () => ({ reconciliarTarefaChecklist: reconciliarMock }));
 
 import { materializarChecklistsAplicaveisCard } from "@/lib/bpm/checklists/service";
 
@@ -82,6 +84,7 @@ describe("serviço de materialização de checklists", () => {
       select: { id: true },
     }));
     expect(historicoMock).toHaveBeenCalledWith(expect.objectContaining({ acao: "CHECKLIST_MATERIALIZADO" }), tx);
+    expect(reconciliarMock).toHaveBeenCalledWith(expect.objectContaining({ checklistId: "checklist-1" }), tx);
     expect(realtimeMock).toHaveBeenCalledWith(expect.objectContaining({ cardId: card.id, pipelineId: card.pipelineId }));
   });
 

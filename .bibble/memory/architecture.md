@@ -1,5 +1,167 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Cadências operacionais por coluna, sem bloqueio de avanço (RM-2026-E4849C, 2026-09-08)
+
+`BpmCadencia.pipelineId + etapaId` é o escopo operacional exato. `ativacao-automatica.ts` encerra vínculos ativos/pausados incompatíveis, ignora definições legadas sem etapa, não usa fallback universal e só inicia quando existe exatamente uma definição ativa com passo ativo para a coluna atual. Reentrada reaproveita o vínculo como novo ciclo; o executor inclui o início desse ciclo na chave idempotente e revalida card/definição dentro da transação antes de criar `BpmTarefa`.
+
+Movimento e sincronização de cadência têm fronteiras transacionais distintas: `executarTransicaoBpm` conclui todas as guardas independentes, movimento, histórico, outbox e SLA; só depois chama a sincronização best-effort. Assim, indisponibilidade ou configuração ambígua da cadência não desfaz nem impede o movimento. Criações e movimentos dos demais entrypoints BPM seguem a mesma fronteira.
+
+O editor do pipeline consome `CadenciaEtapasSection`, que permite uma cadência ou nenhuma por coluna. As Server Actions exigem sessão/admin, Zod e revalidação na transação; operações de cardinalidade usam isolamento serializável. Não houve alteração de banco: os models, relações e chave única de execução existentes bastaram.
+
+DELIVERY_READY: configuração admin → coluna com uma cadência ou nenhuma → entrada do card → sincronização exata best-effort → executor idempotente → tarefa/alerta informativo. Build aprovado e 37/37 testes direcionados; baselines globais externos documentados na story.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-E4849C)
+
+## Base de Conhecimento como gerenciador de scripts (RM-2026-6A27B0, 2026-09-08)
+
+A rota administrativa `/PainelAlpha/AlphaCRM/admin/conhecimento` deixou de gerenciar links genéricos e passou a editar o roteiro da etapa. `ConhecimentoBpmPage` carrega pipelines e etapas ativas; `ConhecimentoWorkspace` oferece exatamente os seletores de pipeline/etapa e `ScriptEtapaEditor`, que reutiliza as primitivas Tiptap extraídas do Bloco de Notas e salva automaticamente por `SalvarScriptEtapaBpm`.
+
+A persistência usa o campo existente `BpmEtapa.script`, em envelope versionado e retrocompatível com texto simples. A Server Action exige sessão e `configurarEtapas`, valida o documento/limites/protocolos, confirma que a etapa pertence ao pipeline, atualiza e audita na mesma transação e publica `ETAPA_ALTERADA`. Não houve schema, migration ou mutação de dados em massa. A tabela legada `BpmPipelineConhecimentoLink` foi preservada fisicamente para não destruir dados sem autorização, mas deixou de ser consumida pela tela e pelo card.
+
+No card, `PainelRegistrar` apresenta a aba **Scripts** e `ConteudoScriptEtapa` renderiza o mesmo documento Tiptap somente para leitura; o painel legado “Documentos relacionados” foi removido do Histórico.
+
+DELIVERY_READY: `Alpha CRM → Base de Conhecimento → pipeline → etapa → editor` → autosave em `BpmEtapa.script` → `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card na etapa → aba **Scripts**.
+
+**Validação:** 49/49 testes direcionados, 20/20 testes do Bloco de Notas, ESLint escopado e `git diff --check` aprovados; build Turbopack aprovado com 78 páginas. Baselines globais externos: typecheck com diagnósticos fora da RM, lint 2.484 erros/1.257 avisos e testes 2.412/2.462.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-6A27B0)
+
+## Histórico amigável do card BPM (RM-2026-B08DA8, concluída, 2026-09-08)
+
+`src/lib/bpm/historico-descricao.ts` é a camada pura de apresentação dos 51 eventos catalogados de `BpmCardHistorico`. Ela interpreta conjuntamente os snapshots anterior/novo, resolve etapas, campos e usuários somente com dados já carregados pelo card, reutiliza `fmtDateTime` (`America/Sao_Paulo`) e os catálogos existentes de status/tarefas, e usa `rotuloEventoTimeline` como fallback seguro. IDs técnicos e objetos nunca são serializados para a interface.
+
+`PainelHistorico.tsx` fornece o contexto local e renderiza uma descrição única; `PainelHistoricoShared.tsx` não contém mais a serialização `JSON.parse`/`JSON.stringify`. Persistência, producers, schema, permissões e `montarFeedTimelineCard` não foram alterados por esta story.
+
+DELIVERY_READY: `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → abrir card → aba **Histórico** → descrição amigável em português, inclusive para registros já persistidos.
+
+**Validação final:** ESLint direcionado e `git diff --check` aprovados; 69/69 testes próprios e 129/129 testes de integração do modal aprovados. O build Turbopack real passou e gerou 78 páginas. O typecheck global manteve somente diagnósticos externos à RM; os demais débitos globais já estavam registrados no baseline.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-B08DA8, retomada das Fases 4–6)
+
+## Checklists pendentes viram tarefas — checkpoint Vault de schema (RM-2026-0FC47A, Fase 3, 2026-09-05)
+
+**Veredito:** `WAITING_APPROVAL` (checkpoint produzido, aguardando aprovação humana explícita e específica fora desta sessão). Nenhuma migration ou backfill foi aplicada.
+
+### Ambiente e banco afetados
+
+Turso real, mesmo banco de produção usado pelas migrations anteriores registradas neste arquivo (`TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` de `.env.local`).
+
+### Estruturas atuais confirmadas (leitura direta do `prisma/schema.prisma`)
+
+- `BpmCardChecklist` (`id`, `cardId`, `templateId`, `status` PENDENTE/CONCLUIDO, `@@unique([cardId, templateId])`).
+- `BpmCardChecklistItem` (`status`, `obrigatorio`, `responsavelId`).
+- `BpmTarefa` (`cardId`, `titulo`, `status` PENDENTE/CONCLUIDA, `checklistJson` texto livre, `presetId`) — **sem** `cardChecklistId` nem FK para `BpmCardChecklist`. Confirmado: a única ligação hoje é o texto livre `checklistJson`, insuficiente como chave idempotente.
+
+### Delta proposto (aditivo puro, sem DROP/RENAME)
+
+- `BpmTarefa.cardChecklistId String?` — nullable, para não invalidar nenhuma tarefa existente.
+- Índice único `BpmTarefa_cardChecklistId_key` — garante no máximo uma tarefa por checklist.
+- FK `cardChecklistId → BpmCardChecklist.id`, `onDelete: Restrict`, `onUpdate: Cascade` — impede apagar um checklist enquanto existir tarefa vinculada (preserva auditoria, mesmo padrão adotado em RM-2026-D100EB para versões/eventos). Aplicação via recriação de tabela (mesmo mecanismo de `scripts/apply-turso-migration.mjs` já usado nas migrations deste projeto contra o Turso real, sem shadow database).
+
+### Comandos e etapas planejados
+
+1. Gerar migration a partir do diff do schema (`prisma/migrations/<timestamp>_bpm_tarefa_card_checklist_fk/migration.sql`), revisada manualmente.
+2. Preflight somente leitura repetido no momento da aplicação (já executado nesta fase, ver abaixo).
+3. Aplicar via `node scripts/apply-turso-migration.mjs <arquivo>`.
+4. Confirmar `PRAGMA table_info(BpmTarefa)`, existência do índice único e `PRAGMA foreign_key_check` = 0 violações.
+5. **Backfill/reconciliação inicial NÃO faz parte deste checkpoint** — fica reservado para checkpoint Vault próprio na Fase 5 da story, após o serviço de reconciliação existir e ser testado.
+
+### Preflight somente leitura (executado nesta fase, contra o Turso real)
+
+| Métrica | Valor |
+|---|---|
+| Checklists totais | 1 |
+| Checklists pendentes | 1 |
+| Checklists concluídos | 0 |
+| Itens obrigatórios pendentes | 3 |
+| Tarefas totais | 2 |
+| Tarefas com `checklistJson` não nulo | 1 |
+| Tarefas com `tipo = CHECKLIST` | 1 |
+
+Volume real é baixo: a mudança estrutural afeta no máximo 1 checklist pendente na eventual reconciliação futura, sem risco de operação de massa pesada.
+
+### Impacto e riscos
+
+- **Duplicação:** mitigada pelo índice único + catch de `P2002` (mesmo padrão já usado em `materializarChecklistsAplicaveisCard`).
+- **Indisponibilidade:** SQLite/Turso recria a tabela `BpmTarefa` para adicionar a FK — operação rápida dado o volume atual (2 tarefas), mas é escrita estrutural em tabela de produção; janela de aplicação deve evitar concorrência com gravação de tarefas.
+- **Vínculo incorreto:** FK `Restrict` previne remoção de checklist com tarefa vinculada; não há como uma tarefa apontar para um checklist inexistente após a migration.
+- **Perda de auditoria:** não há remoção de dado nenhum; coluna nova é nullable, todas as tarefas existentes permanecem válidas com `cardChecklistId = NULL`.
+
+### Alternativa não destrutiva considerada
+
+Projetar o vínculo apenas na consulta da view de tarefas (join por `checklistJson` ou por heurística de texto), sem coluna nova. **Não recomendada**: `checklistJson` é texto livre sem garantia de unicidade nem de estabilidade, não sustentaria a máquina de estado (criar/concluir/reabrir automaticamente) exigida pelos critérios de aceite, e reintroduziria a ambiguidade que a Fase 0/1 já identificaram como bloqueio real. A coluna aditiva nullable é a menor mudança estrutural capaz de garantir a relação 1:1.
+
+### Rollback
+
+- **Estrutura:** `DROP INDEX BpmTarefa_cardChecklistId_key` + recriar `BpmTarefa` sem a coluna/FK (reversível, aditivo puro, nenhuma tarefa/checklist existente é afetada).
+- **Dados:** nenhum dado é alterado por este checkpoint (backfill fica fora de escopo aqui).
+- **Código:** reverter os arquivos da Fase 4 (ainda não criados/editados nesta fase).
+
+### Backup
+
+- Gerado especificamente para esta mudança nesta sessão: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T18-37-23-384Z.sql` (motivo: `RM-2026-0FC47A checklists-pendentes-viram-tarefas`).
+- Manifesto: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T18-37-23-384Z.manifest.json` — 304 tabelas, 70.378 linhas, 97.133.001 bytes, SHA-256 `c8c11afaf793d5fec23248ec656139b55556c8cfe65dcbe8c6667ad754790f6e`.
+- Verificado por `node scripts/verify-turso-backup.mjs` com restauração real em SQLite temporário: `integrity_check=ok`, `foreign_key_check`=0 violações, SHA-256/tamanho/tabelas/linhas conferidos byte a byte. Idade no momento deste registro: minutos (dentro da janela de 48h).
+
+### Checkpoint
+
+Identificador verificável do checkpoint (SHA-256 do plano completo acima, incluindo ambiente, delta, comandos, preflight, riscos, alternativa e backup): `4256c6a9f6d1168be49e1a8abf13f6963cf68bdc7efb2d395f26338fca75bb1a`.
+
+Nenhum comprovante de aprovação específica para este checkpoint foi recebido nesta execução (`mandatoryAdministratorFeedback` vazio). Conforme a regra do projeto, silêncio ou aprovação genérica anterior não substituem consentimento explícito e específico. **Nenhuma migration foi criada em `prisma/migrations/`, nenhum DDL foi executado contra o Turso e nenhum backfill foi realizado.** A fase encerra aqui, aguardando aprovação humana fora desta sessão.
+
+**Arquivos afetados:** `docs/stories/story-rm-2026-0fc47a-checklists-pendentes-tarefas.md` (novo, artefato exigido pela Fase 2, ausente até esta execução), `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T18-37-23-384Z.sql` (novo, fora do Git), `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T18-37-23-384Z.manifest.json` (novo, fora do Git), `.bibble/memory/architecture.md` (este registro).
+
+**Última atualização:** 2026-09-05 por Vault (RM-2026-0FC47A, Fase 3 — checkpoint de schema, `WAITING_APPROVAL`)
+
+## KanbanCard — itens de corpo aditivos (Pendências, Checklist, Cadência) (RM-2026-8852C2, 2026-09-04)
+
+**Objetivo entregue (parcial):** adicionar três novos itens de corpo ao `KanbanCard` — Pendências obrigatórias, Checklist (progresso) e Cadência (próxima execução) — usando dados já existentes no schema, sem migration, sem novo componente reutilizável e sem alterar o comportamento dos ramos condicionais existentes (Agendar Reunião, Novos Leads, Boas-Vindas, Alinhamento Estratégico).
+
+### Implementação real
+
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`:
+  - Interface `CardBpm` ganhou 3 campos opcionais: `checklistProgress?: { total: number; concluidos: number }`, `cadenciaProximaExecucaoEm?: string | null`, `pendenciasObrigatorias?: number | null`.
+  - Bloco de render condicional no corpo do card (após tarefas/anotação, antes do rodapé):
+    - **Pendências**: ícone `AlertTriangle` + "Pendências: N" (âmbar) ou "Sem pendências" (emerald). Guard: `card.pendenciasObrigatorias !== null && card.pendenciasObrigatorias !== undefined` — distingue "campo ausente" (`undefined` → omitido) de "zero pendências" (`0` → exibido em emerald).
+    - **Checklist**: ícone `ClipboardList` + "Checklist X/Y" (ciano, `tabular-nums`). Guard: `card.checklistProgress != null`.
+    - **Cadência**: ícone `CalendarClock` + data formatada via `formatarPrazoNoCard` (slate, `tabular-nums`). Guard: `card.cadenciaProximaExecucaoEm != null`.
+  - Nenhum import novo, nenhum export novo, nenhum componente extraído. Ícones e utilitários já existiam no arquivo.
+  - `src/actions/bpm/Cards.ts` **não foi alterado** nesta entrega — o read model ainda não projeta os 3 campos. O fallback seguro (itens omitidos quando `undefined`) é o comportamento correto até a projeção ser adicionada.
+
+### Sem migration
+
+Nenhum campo novo foi adicionado ao schema. Os dados-fonte (`BpmCardChecklist`/`BpmCardChecklistItem`, `BpmCardCadencia.proximaExecucaoEm`, RequirementPolicy em `requisitos-etapa-server.ts`) já existem. A alteração é puramente de apresentação no client.
+
+### Caminho de consumo validado
+
+```text
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → board → KanbanCard (qualquer etapa, exceto ramo "Agendar Reunião")
+  → corpo do card → itens Pendências / Checklist / Cadência
+  → visíveis quando o read model projetar os dados; omitidos quando ausentes (fallback seguro)
+  → clique no card → CardFullViewModal (comportamento inalterado)
+```
+
+### Qualidade registrada (Fases 4–6)
+
+| Gate | Resultado | Detalhe |
+|------|-----------|---------|
+| `typecheck` | exit 1 | 34 erros pré-existentes (Calendar, `pendencias/motor.ts`, `cadencias`) — **0 nos arquivos desta entrega** |
+| `eslint` (direcionado) | exit 1 | Baseline global 2.484 erros / 1.257 warnings pré-existentes — **0 novos nos arquivos desta entrega** |
+| `roadmap_tests` | exit 1 | 53 falhas pré-existentes (Calendar, Alpha SEO, BPM) — **0 novas atribuível a esta entrega** |
+| `build` | N/A | Não disponível via `run_check`; análise estática confirma ausência de risco (código aditivo, sem import/export novo) |
+| Probe (Fase 5) | 8/8 ✅ | Presença visual, trigger, rota protegida, permissões, persistência (fallback), estados UI, integrações externas, sem regressões |
+| Lens (Fase 6) | Aprovado | Diff inspecionado, imports absolutos, sem código morto, ramo Agendar Reunião coerente, sem necessidade de Anubis |
+
+### Pendências para iniciativa futura (Vault + implementação)
+
+AUTO_ADJUSTMENT_REQUIRED: o read model `ListarCardsPipelineBpm` ainda não projeta `checklistProgress`, `cadenciaProximaExecucaoEm` ou `pendenciasObrigatorias`; o renderer configurável (`CompactCardViewDefinition`) exige o model `BpmEtapaCardViewConfig` (inexistente no schema); a UI de configuração + preview depende desse model; os 18 testes da ideia dependem do renderer configurável.
+AUTO_ADJUSTMENT_ACCEPTANCE: (1) migration aplicada com `BpmEtapaCardViewConfig` (Vault, backup verificado); (2) `ListarCardsPipelineBpm` projeta os 3 campos a partir das fontes canônicas; (3) admin configura elementos por etapa em `Configurações → Pipeline → Etapa → Card do Kanban`; (4) board renderiza a composição configurada; (5) 18 testes passam.
+
+**Arquivos afetados:** `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx`, `docs/stories/story-rm-2026-8852c2-melhoria-kanban-card.md`.
+
+**Última atualização:** 2026-09-04 por Scribe (RM-2026-8852C2, Fase 7 — CLOSURE)
+
 ## Motor Central de Automações — correção local pendente de aplicação remota (RM-2026-D100EB, Fase 3, 2026-09-04)
 
 A aprovação corretiva específica `1a67b35e2dd7a1d34fd21e7458f4e19bb701940a8d5b5d1a12532bc73b0783a2` autorizou corrigir duas divergências da fundação: unicidade de execução por versão/evento e preservação de versões ao remover uma definição. O backup pós-fundação `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-04T18-32-58-257Z.sql` foi restaurado e validado (289 tabelas, 68.351 linhas, 96.191.678 bytes, SHA-256 `7b345cca9ac488f5217f792e3588c29ac1f9d9fea7f3c314c775f801dfa1336f`, integridade aprovada e zero violações de FK).
@@ -1959,6 +2121,14 @@ O backend de cadências (`BpmCadencia`/`BpmCadenciaPasso`/`BpmCardCadencia`/`Bpm
 Ficaram deliberadamente fora desta rodada (arquivos em edição ativa por trabalho paralelo no mesmo repositório): integração da ação `INICIAR_CADENCIA` no Motor de Automações (`src/lib/bpm/automacoes/executor.ts`/`schemas.ts`) e interrupção automática de cadência ao preencher "Próximo Contato" no card — hoje só manual via botão. Central de tarefas com filtro por cadência também não foi implementada.
 
 **Última atualização:** 2026-09-04 por operador humano via Claude Code (RM-2026-97CC60, Fase 4)
+
+## Cadências do BPM por coluna, sem bloqueio — RM-2026-158500
+
+Cada cadência operacional pertence exatamente a `pipelineId + etapaId`; definições legadas sem etapa são inertes. A entrada do card em uma coluna sincroniza o ciclo depois do commit da movimentação, em modo best-effort: cancela vínculos incompatíveis e ativa, no máximo, a única cadência ativa com passos daquela coluna. Assim, falhas ao gerar tarefas ou alertas nunca revertem nem bloqueiam a movimentação.
+
+O executor revalida o escopo exato antes de produzir `BpmTarefa` e usa `iniciadaEm` na identidade do ciclo, permitindo reentrada sem duplicidade no mesmo ciclo. O painel do card é informativo; início, pausa e reativação manuais estão desabilitados, e o cancelamento autorizado permanece disponível. O schema atual já suportava a solução, portanto não houve migration nem mutação direta do dado legado.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-158500)
 ## Gestão de Prazos, SLA e Alertas — motor temporal (RM-2026-095B40, Fase 2, 2026-09-04)
 
 `src/lib/bpm/sla.ts` implementa prazo em minutos/horas/dias/dias úteis, limites configuráveis, provisionamento idempotente por card/tarefa, pausa com congelamento e retomada que acumula milissegundos e desloca o deadline. O status é recalculado on-read e persiste transições na trilha `BpmSlaEventoLog`, sem disparar notificação ou automação.
@@ -2008,3 +2178,11 @@ O SLA passou a ser um fluxo transacional e orientado a eventos. Os momentos `CRI
 O Kanban usa leitura em lote e exibe badge com cor configurada, contagem regressiva e destaque de atraso; o modal apresenta deadline e histórico de pausas. Em Standby, somente SLAs configurados para pausa são congelados e, na retomada, o tempo pausado desloca o deadline. O E2E real isolado comprovou verde → amarelo → vermelho, disparos únicos, automação executada, criação de tarefa e retomada com 30 minutos de deslocamento.
 
 **Última atualização:** 2026-09-04 por Codex (RM-2026-095B40)
+
+## Checklist como tarefa derivada — RM-2026-0FC47A
+
+`BpmTarefa.cardChecklistId` estabelece uma relação opcional 1:1 com `BpmCardChecklist`, protegida por unicidade e FK `ON DELETE RESTRICT`. `reconciliarTarefaChecklist` é a única regra de projeção: relê checklist, itens e card dentro da transação de origem, cria ou atualiza somente os campos gerenciados (`cardId`, título, tipo, responsável, status e `concluidaEm`) e usa a tarefa como projeção, nunca como fonte do progresso.
+
+Checklist com qualquer item incompleto gera tarefa pendente; todos os itens concluídos concluem a mesma tarefa; reabertura reaproveita o mesmo ID. O primeiro item pendente atribuído define o responsável, com fallback para o responsável do card. Colisão `P2002` é resolvida pelo vínculo único. Observações de itens não entram em título, histórico ou logs.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-0FC47A)

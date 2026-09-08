@@ -5,6 +5,7 @@ import { CalendarClock, ScrollText } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ObterCardBpm } from "@/actions/bpm/Cards";
 import { CardOpenFormSlot } from "./CardOpenFormSlot";
+import { ConteudoScriptEtapa } from "@/app/PainelAlpha/AlphaCRM/CardModal/ConteudoScriptEtapa";
 
 
 
@@ -48,7 +49,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
             <CalendarClock size={13} /> Formulário da Etapa
           </TabsTrigger>
           <TabsTrigger value="script" className="gap-1.5">
-            <ScrollText size={13} /> Script
+            <ScrollText size={13} /> Scripts
           </TabsTrigger>
         </TabsList>
 
@@ -65,7 +66,7 @@ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, 
         <TabsContent value="script" className="m-0 mt-5 min-h-0 flex-1 overflow-y-auto px-5 pb-5">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">{etapaAtual?.nome ?? card.etapa.nome}</p>
           {etapaAtual?.script ? (
-            <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{etapaAtual.script}</p>
+            <ConteudoScriptEtapa key={etapaAtual.id} script={etapaAtual.script} />
           ) : (
             <p className="text-xs text-slate-600">Nenhum script configurado para esta etapa ainda.</p>
           )}

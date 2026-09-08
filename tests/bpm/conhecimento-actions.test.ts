@@ -3,74 +3,106 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 const exigirAcessoConfigPipelineMock = vi.hoisted(() => vi.fn());
-const prismaMock = vi.hoisted(() => ({
-  bpmPipeline: { findUnique: vi.fn() },
-  bpmPipelineConhecimentoLink: { create: vi.fn(), delete: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
-}));
+const notificarPipelineBpmMock = vi.hoisted(() => vi.fn());
+const etapaFindUniqueMock = vi.hoisted(() => vi.fn());
+const etapaUpdateMock = vi.hoisted(() => vi.fn());
+const auditoriaCreateMock = vi.hoisted(() => vi.fn());
+const transactionMock = vi.hoisted(() => vi.fn(async (callback) => callback({
+  bpmEtapa: { update: etapaUpdateMock },
+  bpmPipelineConfigAuditoria: { create: auditoriaCreateMock },
+})));
 
 vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
-vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
+vi.mock("@/lib/prisma", () => ({
+  default: {
+    $transaction: transactionMock,
+    bpmEtapa: { findUnique: etapaFindUniqueMock },
+  },
+}));
 vi.mock("@/lib/bpm/ownership", () => ({ exigirAcessoConfigPipeline: exigirAcessoConfigPipelineMock }));
+vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: notificarPipelineBpmMock }));
 
-import { CriarConhecimentoLinkBpm, ExcluirConhecimentoLinkBpm, ListarConhecimentoLinksBpm } from "@/actions/bpm/Conhecimento";
+import { SalvarScriptEtapaBpm } from "@/actions/bpm/Conhecimento";
+import { serializarScriptEtapa } from "@/lib/bpm/script-etapa";
 
 const PIPELINE_ID = "clxpipeline0000000000000001";
+const OUTRO_PIPELINE_ID = "clxpipeline0000000000000002";
+const ETAPA_ID = "clxetapa000000000000000001";
+const SCRIPT = serializarScriptEtapa(
+  { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Olá" }] }] },
+  "Olá",
+);
 
-describe("Conhecimento.ts — Server Actions", () => {
+describe("Conhecimento.ts — gerenciador de scripts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMock.mockResolvedValue({ user: { id: "1", role: "Admin" } });
     exigirAcessoConfigPipelineMock.mockResolvedValue(undefined);
-    prismaMock.bpmPipeline.findUnique.mockResolvedValue({ id: PIPELINE_ID });
+    etapaFindUniqueMock.mockResolvedValue({ id: ETAPA_ID, pipelineId: PIPELINE_ID, script: null });
+    etapaUpdateMock.mockResolvedValue({ id: ETAPA_ID });
+    auditoriaCreateMock.mockResolvedValue({ id: "auditoria-1" });
+    notificarPipelineBpmMock.mockResolvedValue(undefined);
   });
 
-  it("ListarConhecimentoLinksBpm rejeita sem sessão", async () => {
+  it("rejeita escrita sem sessão antes de consultar a etapa", async () => {
     authMock.mockResolvedValue(null);
 
-    const resposta = await ListarConhecimentoLinksBpm(PIPELINE_ID);
+    const resposta = await SalvarScriptEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, script: SCRIPT });
 
-    expect(resposta).toEqual({ success: false, error: "Não autorizado", data: [] });
+    expect(resposta).toEqual({ success: false, error: "Não autorizado" });
+    expect(etapaFindUniqueMock).not.toHaveBeenCalled();
   });
 
-  it("cria um link válido", async () => {
-    prismaMock.bpmPipelineConhecimentoLink.create.mockResolvedValue({ id: "clxlink00000000000000000001" });
+  it("exige permissão de configuração antes de consultar a etapa", async () => {
+    exigirAcessoConfigPipelineMock.mockRejectedValue(
+      new Error("Não autorizado — apenas administradores configuram pipelines"),
+    );
 
-    const resposta = await CriarConhecimentoLinkBpm({ pipelineId: PIPELINE_ID, titulo: "Manual", url: "https://example.com/manual" });
-
-    expect(resposta).toEqual({ success: true, data: { id: "clxlink00000000000000000001" } });
-    expect(revalidatePathMock).toHaveBeenCalled();
-  });
-
-  it("rejeita URL inválida", async () => {
-    const resposta = await CriarConhecimentoLinkBpm({ pipelineId: PIPELINE_ID, titulo: "Manual", url: "nao-e-uma-url" });
+    const resposta = await SalvarScriptEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, script: SCRIPT });
 
     expect(resposta.success).toBe(false);
-    expect(prismaMock.bpmPipelineConhecimentoLink.create).not.toHaveBeenCalled();
+    expect(exigirAcessoConfigPipelineMock).toHaveBeenCalledWith(1, "configurarEtapas");
+    expect(etapaFindUniqueMock).not.toHaveBeenCalled();
   });
 
-  it("rejeita pipeline inexistente", async () => {
-    prismaMock.bpmPipeline.findUnique.mockResolvedValue(null);
+  it("bloqueia etapa que não pertence ao pipeline informado", async () => {
+    etapaFindUniqueMock.mockResolvedValue({ id: ETAPA_ID, pipelineId: OUTRO_PIPELINE_ID, script: null });
 
-    const resposta = await CriarConhecimentoLinkBpm({ pipelineId: PIPELINE_ID, titulo: "Manual", url: "https://example.com" });
+    const resposta = await SalvarScriptEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, script: SCRIPT });
 
-    expect(resposta).toEqual({ success: false, error: "Pipeline inválido" });
+    expect(resposta).toEqual({ success: false, error: "Etapa não encontrada neste pipeline" });
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("exclui um link existente", async () => {
-    prismaMock.bpmPipelineConhecimentoLink.findUnique.mockResolvedValue({ id: "clxlink00000000000000000001", pipelineId: PIPELINE_ID });
+  it("rejeita conteúdo fora do formato estruturado", async () => {
+    const resposta = await SalvarScriptEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, script: "<script>alert(1)</script>" });
 
-    const resposta = await ExcluirConhecimentoLinkBpm({ id: "clxlink00000000000000000001" });
+    expect(resposta).toEqual({ success: false, error: "Revise o conteúdo informado." });
+    expect(etapaFindUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it("salva, audita, revalida e notifica o script da etapa", async () => {
+    const resposta = await SalvarScriptEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, script: SCRIPT });
 
     expect(resposta).toEqual({ success: true });
-    expect(prismaMock.bpmPipelineConhecimentoLink.delete).toHaveBeenCalledWith({ where: { id: "clxlink00000000000000000001" } });
+    expect(etapaUpdateMock).toHaveBeenCalledWith({ where: { id: ETAPA_ID }, data: { script: SCRIPT } });
+    expect(auditoriaCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        pipelineId: PIPELINE_ID,
+        adminId: 1,
+        campoAlterado: "script_etapa_atualizado",
+      }),
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/PainelAlpha/AlphaCRM/admin/conhecimento");
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/PainelAlpha/AlphaCRM/pipeline/${PIPELINE_ID}`);
+    expect(notificarPipelineBpmMock).toHaveBeenCalledWith({ pipelineId: PIPELINE_ID, tipo: "ETAPA_ALTERADA" });
   });
 
-  it("retorna erro amigável ao excluir link inexistente", async () => {
-    prismaMock.bpmPipelineConhecimentoLink.findUnique.mockResolvedValue(null);
+  it("permite limpar o script", async () => {
+    const resposta = await SalvarScriptEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_ID, script: null });
 
-    const resposta = await ExcluirConhecimentoLinkBpm({ id: "clxlink00000000000000000001" });
-
-    expect(resposta).toEqual({ success: false, error: "Link não encontrado" });
+    expect(resposta).toEqual({ success: true });
+    expect(etapaUpdateMock).toHaveBeenCalledWith({ where: { id: ETAPA_ID }, data: { script: null } });
   });
 });

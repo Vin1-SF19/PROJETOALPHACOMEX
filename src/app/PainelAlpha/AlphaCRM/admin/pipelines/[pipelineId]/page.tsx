@@ -4,6 +4,7 @@ import { getTema } from "@/lib/temas";
 import { ListarPipelinesBpm, ObterPipelineBpm } from "@/actions/bpm/Pipelines";
 import { ListarTransicoesDoPipelineBpm } from "@/actions/bpm/Transicoes";
 import { ListarConfiguracoesSlaBpm } from "@/actions/bpm/Sla";
+import { ListarCadenciasBpm } from "@/actions/bpm/Cadencias";
 import { getServicosComerciais } from "@/actions/ContratoComercial";
 import { isAdminRole } from "@/lib/bpm/ownership";
 import { garantirSchemaFinanceiro } from "@/lib/bpm/pipeline-financeiro-migration";
@@ -33,12 +34,13 @@ export default async function AdminPipelinePage({
     console.error("[AdminPipelinePage] garantirSchemaFinanceiro", error);
   }
 
-  const [pipelineResult, pipelinesResult, transicoesResult, slaResult, servicosResult] = await Promise.all([
+  const [pipelineResult, pipelinesResult, transicoesResult, slaResult, servicosResult, cadenciasResult] = await Promise.all([
     ObterPipelineBpm(pipelineId, true),
     ListarPipelinesBpm(true),
     ListarTransicoesDoPipelineBpm(pipelineId),
     ListarConfiguracoesSlaBpm(pipelineId),
     getServicosComerciais(),
+    ListarCadenciasBpm(),
   ]);
   if (!pipelineResult.success || !pipelineResult.data) notFound();
 
@@ -49,6 +51,7 @@ export default async function AdminPipelinePage({
       configuracoesSlaIniciais={slaResult.data ?? []}
       servicosComerciais={servicosResult.success ? servicosResult.servicos.map(({ id, nome }) => ({ id, nome })) : []}
       pipelinesDisponiveis={(pipelinesResult.data ?? []).map(({ id, nome }) => ({ id, nome }))}
+      cadenciasIniciais={cadenciasResult.success ? cadenciasResult.data : []}
       visual={visual}
     />
   );

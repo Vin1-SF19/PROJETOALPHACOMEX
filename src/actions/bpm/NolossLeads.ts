@@ -8,6 +8,7 @@ import {
 } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
+import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 async function obterPipelineRevisaoRadar() {
   return db.bpmPipeline.findFirst({
@@ -119,6 +120,16 @@ export async function PromoverNolossLead(dados: unknown) {
           promotedByUserId: userId,
         },
       });
+
+      await ativarCadenciasNaEntradaBpm({
+        cardId: card.id,
+        pipelineAnteriorId: null,
+        etapaAnteriorId: null,
+        pipelineDestinoId: pipeline.id,
+        etapaDestinoId: etapaDestino.id,
+        evento: "CARD_CRIADO",
+        usuarioId: userId,
+      }, tx);
 
       return { cardId: card.id };
     });

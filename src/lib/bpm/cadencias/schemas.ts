@@ -12,18 +12,34 @@ export const BPM_PRIORIDADES = ["BAIXA", "NORMAL", "ALTA"] as const;
 export const criarCadenciaSchema = z.object({
   nome: z.string().min(1).max(200),
   descricao: z.string().max(2000).optional(),
-  pipelineId: z.string().cuid().optional(),
+  pipelineId: z.string().cuid(),
   etapaId: z.string().cuid().optional(),
+  ativa: z.boolean().default(true),
 });
 
 export const atualizarCadenciaSchema = z.object({
   id: z.string().cuid(),
   nome: z.string().min(1).max(200).optional(),
   descricao: z.string().max(2000).nullable().optional(),
-  pipelineId: z.string().cuid().nullable().optional(),
+  pipelineId: z.string().cuid().optional(),
   etapaId: z.string().cuid().nullable().optional(),
   ativa: z.boolean().optional(),
 });
+
+export const alternarCadenciaSchema = z.object({
+  id: z.string().cuid(),
+  ativa: z.boolean(),
+});
+
+export const configurarCadenciaEtapaSchema = z.object({
+  pipelineId: z.string().cuid(),
+  etapaId: z.string().cuid(),
+  cadenciaId: z.string().cuid().nullable(),
+});
+
+export const cadenciaIdSchema = z.string().cuid();
+export const passoCadenciaIdSchema = z.string().cuid();
+export const cardCadenciaIdSchema = z.string().cuid();
 
 export const criarPassoCadenciaSchema = z.object({
   cadenciaId: z.string().cuid(),

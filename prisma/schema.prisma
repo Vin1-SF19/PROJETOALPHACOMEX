@@ -4741,6 +4741,7 @@ model BpmCardChecklist {
   card     BpmCard                @relation(fields: [cardId], references: [id], onDelete: Cascade)
   template BpmChecklistTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
   itens    BpmCardChecklistItem[]
+  tarefa   BpmTarefa?
 
   @@unique([cardId, templateId])
   @@index([cardId, status])
@@ -4828,6 +4829,7 @@ model BpmTarefa {
   status            String    @default("PENDENTE") // "PENDENTE" | "CONCLUIDA"
   checklistJson     String?
   presetId          String?
+  cardChecklistId   String?   @unique
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -4841,6 +4843,7 @@ model BpmTarefa {
   responsavel      usuarios?                 @relation(fields: [responsavelId], references: [id])
   preset           BpmTarefaPreset?          @relation(fields: [presetId], references: [id])
   cadenciaExecucao BpmCadenciaPassoExecucao? @relation(fields: [cadenciaExecucaoId], references: [id], onDelete: SetNull)
+  cardChecklist     BpmCardChecklist?          @relation(fields: [cardChecklistId], references: [id], onDelete: Restrict)
   slaInstancias    BpmSlaInstancia[]
 
   @@index([cardId])

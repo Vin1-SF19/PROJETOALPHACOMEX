@@ -26,6 +26,7 @@ import {
   TOTAL_DIAS_UTEIS_CICLO_NOVOS_LEADS,
 } from "@/lib/bpm/novos-leads";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import {
   AUTOMACAO_ORIGEM_REUNIAO_AGENDADA,
   NOME_ETAPA_REUNIAO_AGENDADA,
@@ -572,6 +573,15 @@ export async function executarAutomacaoFollowUpBpm(
               valorNovoJson: JSON.stringify({ etapaId: destino.id }),
             },
           });
+          await ativarCadenciasNaEntradaBpm({
+            cardId: card.id,
+            pipelineAnteriorId: pipeline.id,
+            etapaAnteriorId: configuracao.id,
+            pipelineDestinoId: pipeline.id,
+            etapaDestinoId: destino.id,
+            evento: "CARD_MOVIDO",
+            automacaoOrigem: configuracao.automacaoOrigem,
+          }, tx);
           return true;
         });
 

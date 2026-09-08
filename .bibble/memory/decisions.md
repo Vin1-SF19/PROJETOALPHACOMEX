@@ -1,5 +1,29 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-08 — RM-2026-E4849C — cadência é orientação da coluna, nunca guarda de movimento
+
+**Decisão:** remover integralmente a regra fixa de oito contatos e resolver a cadência apenas pela combinação exata `pipelineId + etapaId` do card. Ausência ou ambiguidade resulta em nenhuma ativação; registros sem etapa permanecem inertes. Todas as outras regras de transição continuam independentes.
+
+**Consequência:** cards com zero, um ou oito contatos têm a mesma autorização de movimento; falha na sincronização pós-commit não reverte o card. Uma nova entrada na mesma coluna abre novo ciclo idempotente sem duplicar efeitos do mesmo ciclo.
+
+### 2026-09-08 — RM-2026-E4849C — reutilização do schema e cardinalidade transacional
+
+**Decisão:** não criar migration. A associação usa os campos existentes de `BpmCadencia`; as actions administrativas impedem escopo universal, revalidam permissão/pertencimento na transação e usam isolamento serializável para evitar duas definições ativas concorrentes na mesma coluna.
+
+**Consequência:** “Nenhuma cadência” é representada por ausência de definição ativa naquela coluna, sem registro sentinela ou backfill. Legados só voltam a operar quando um administrador os associa explicitamente.
+
+### 2026-09-08 — RM-2026-6A27B0 — `BpmEtapa.script` como fonte única, sem migration
+
+**Decisão:** reutilizar `BpmEtapa.script` para o gerenciador pipeline + etapa + texto. A estrutura legada `BpmPipelineConhecimentoLink` permanece no banco, mas sua UI/action/painel deixam de ser consumidos; remover fisicamente a tabela exigiria uma migration destrutiva fora do objetivo.
+
+**Consequência:** não há duplicação nem mudança estrutural, textos simples existentes continuam legíveis e todo card recebe o roteiro pelo fluxo já autorizado de `ObterPipelineBpm`.
+
+### 2026-09-08 — RM-2026-6A27B0 — editor Note compartilhado e card somente leitura
+
+**Decisão:** extrair configuração, toolbar e superfície Tiptap para `NoteEditorPrimitives`, consumida pelo Bloco de Notas e pelo gerenciador. O admin salva por debounce em envelope versionado; o card usa o mesmo renderer sem edição.
+
+**Consequência:** formatação e comportamento não são copiados, respostas obsoletas de autosave não liberam a seleção prematuramente e conteúdo arbitrário é recusado por tamanho, tipos de nó/marca e protocolos permitidos.
+
 ### 2026-09-04 — RM-2026-209DB4 — automação explícita e save administrativo atômico
 
 **Decisão:** adicionar `MATERIALIZAR_CHECKLIST` ao catálogo persistido de ações do Motor de Automações, com parâmetros estritamente vazios, chamando `materializarChecklistsAplicaveisCard({ cardId, automacaoOrigem })`. Não materializar em criação ou movimento. No builder, editar template passa por `SalvarTemplateChecklistBpm`, que revalida escopo e reconcilia metadados, remoções, edições, criações e ordem dentro de uma única transação.

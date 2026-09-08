@@ -118,6 +118,9 @@ interface CardBpm {
     tempoRestanteMs: number | null;
     pausadoEm: Date | string | null;
   } | null;
+  checklistProgress?: { total: number; completed: number } | null;
+  cadenciaProximaExecucaoEm?: Date | string | null;
+  pendenciasObrigatorias?: number | null;
 }
 
 const CORES_ETAPA = ["94,234,212", "147,197,253", "196,181,253", "253,224,71", "251,191,36", "52,211,153", "248,113,113"];
@@ -408,6 +411,34 @@ function KanbanCard({
                 <StickyNote size={12} aria-hidden="true" className="shrink-0 text-amber-300" />
                 <span className="shrink-0 uppercase tracking-wide text-amber-300/75">Anotação</span>
                 <span className="truncate">{anotacaoRapidaPendente.titulo}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!ehLeadVirtual && !novosLeads && (card.checklistProgress || card.cadenciaProximaExecucaoEm || card.pendenciasObrigatorias !== null && card.pendenciasObrigatorias !== undefined) && (
+          <div className="space-y-1.5 border-t border-white/[0.06] pt-2.5">
+            {card.pendenciasObrigatorias !== null && card.pendenciasObrigatorias !== undefined && (
+              <div className="flex items-center gap-1.5 text-[10px] font-medium" title={card.pendenciasObrigatorias > 0 ? `${card.pendenciasObrigatorias} pendência(s) obrigatória(s)` : "Sem pendências"}>
+                <AlertTriangle size={12} aria-hidden="true" className={cn("shrink-0", card.pendenciasObrigatorias > 0 ? "text-amber-300" : "text-emerald-300")} />
+                <span className={cn("shrink-0 uppercase tracking-wide", card.pendenciasObrigatorias > 0 ? "text-amber-300/75" : "text-emerald-300/75")}>
+                  {card.pendenciasObrigatorias > 0 ? "Pendências" : "Sem pendências"}
+                </span>
+                {card.pendenciasObrigatorias > 0 && <span className="ml-auto tabular-nums text-slate-200">{card.pendenciasObrigatorias}</span>}
+              </div>
+            )}
+            {card.checklistProgress && (
+              <div className="flex items-center gap-1.5 text-[10px] font-medium" title={`Checklist: ${card.checklistProgress.completed}/${card.checklistProgress.total}`}>
+                <ClipboardList size={12} aria-hidden="true" className="shrink-0 text-cyan-300" />
+                <span className="shrink-0 uppercase tracking-wide text-cyan-300/75">Checklist</span>
+                <span className="ml-auto tabular-nums text-slate-200">{card.checklistProgress.completed}/{card.checklistProgress.total}</span>
+              </div>
+            )}
+            {card.cadenciaProximaExecucaoEm && (
+              <div className="flex items-center gap-1.5 text-[10px] font-medium" title={`Próxima execução da cadência: ${formatarPrazoNoCard(card.cadenciaProximaExecucaoEm)}`}>
+                <CalendarClock size={12} aria-hidden="true" className="shrink-0 text-slate-400" />
+                <span className="shrink-0 uppercase tracking-wide text-slate-400/75">Cadência</span>
+                <span className="ml-auto tabular-nums text-slate-200">{formatarPrazoNoCard(card.cadenciaProximaExecucaoEm)}</span>
               </div>
             )}
           </div>
@@ -821,10 +852,6 @@ export default function PipelineBoardClient({ pipeline, cardsIniciais, visual, c
         await restaurarArrasto(snapshot, erroProximoContato);
         return;
       }
-    }
-
-    if (etapaEhAgendarReuniao(etapasOrdenadas.find((etapa) => etapa.id === activeCard.etapaId)?.nome ?? "")) {
-      setErro("Verificando regra de 8 contatos consecutivos...");
     }
 
     let motivoRejeicao = "Nao foi possivel mover o card";

@@ -67,14 +67,3 @@ export function iconePorAcao(acao: string): typeof History {
   if (acao.startsWith("STANDBY_")) return Bot;
   return History;
 }
-
-export function formatarValorHistorico(valor: string | null | undefined): string | null {
-  if (!valor) return null;
-  try {
-    const parsed: unknown = JSON.parse(valor);
-    if (typeof parsed === "string") return parsed;
-    return JSON.stringify(parsed);
-  } catch {
-    return valor;
-  }
-}

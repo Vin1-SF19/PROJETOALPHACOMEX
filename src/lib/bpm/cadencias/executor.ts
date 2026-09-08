@@ -1,6 +1,8 @@
 import db from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { chaveExecucaoCicloCadencia } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 /**
  * Processa cadências vencidas: encontra vínculos ATIVOS com proximaExecucaoEm <= agora,
@@ -29,6 +31,7 @@ export async function processarCadenciasBpm(): Promise<{
     where: {
       status: "ATIVA",
       proximaExecucaoEm: { lte: agora },
+      cadencia: { ativa: true },
     },
     include: {
       cadencia: {
@@ -61,17 +64,7 @@ export async function processarCadenciasBpm(): Promise<{
         continue;
       }
 
-      // 3. Validar que a cadência ainda está ativa
-      if (!vinculo.cadencia.ativa) {
-        await db.bpmCardCadencia.update({
-          where: { id: vinculo.id },
-          data: { status: "PAUSADA", motivoInterrupcao: "Cadência desativada pelo admin" },
-        });
-        avisos.push(`Vínculo ${vinculo.id} pausado: cadência inativa`);
-        continue;
-      }
-
-      // 4. Encontrar o passo atual
+      // Encontrar o passo atual.
       const passoAtual = vinculo.cadencia.passos.find(
         (p) => p.ordem === vinculo.passoAtualOrdem
       );
@@ -106,16 +99,36 @@ export async function processarCadenciasBpm(): Promise<{
         continue;
       }
 
-      // 5. Gerar chave de idempotência (vinculoId + passoOrdem + data do dia)
-      const chaveEvento = `${vinculo.id}:${passoAtual.ordem}:${agora.toISOString().slice(0, 10)}`;
+      // 6. A identidade inclui o início do ciclo: reentrar na etapa cria um
+      // novo ciclo, enquanto concorrentes do mesmo ciclo continuam idempotentes.
+      const chaveEvento = chaveExecucaoCicloCadencia({
+        vinculoId: vinculo.id,
+        passoId: passoAtual.id,
+        iniciadaEm: vinculo.iniciadaEm,
+        createdAt: vinculo.createdAt,
+      });
 
-      // 6-10. Processar dentro de transação atômica:
+      // 7-11. Processar dentro de transação atômica:
       //   criar execução → criar tarefa → concluir execução → avançar vínculo → histórico
-      let tarefaId: string | null = null;
       let concluido = false;
 
       await db.$transaction(async (tx) => {
-        // 6. Tentar criar execução (idempotente via unique constraint)
+        // Revalida dentro da transação para não gerar tarefa se o card mudou
+        // entre a leitura do lote e o processamento deste vínculo.
+        const [cardAtual, cadenciaAtual] = await Promise.all([
+          tx.bpmCard.findUnique({
+            where: { id: vinculo.cardId },
+            select: { pipelineId: true, etapaId: true, status: true },
+          }),
+          tx.bpmCadencia.findUnique({
+            where: { id: vinculo.cadenciaId },
+            select: { pipelineId: true, etapaId: true, ativa: true },
+          }),
+        ]);
+        if (!cardAtual || cardAtual.status !== "ATIVO") throw new Error("CADENCIA_CARD_INATIVO");
+        if (!cadenciaAtual?.ativa) throw new Error("CADENCIA_DEFINICAO_INATIVA");
+
+        // Tentar criar execução (idempotente via unique constraint)
         let execucao;
         try {
           execucao = await tx.bpmCadenciaPassoExecucao.create({
@@ -129,7 +142,9 @@ export async function processarCadenciasBpm(): Promise<{
           });
         } catch (e: unknown) {
           // Unique constraint violation (P2002) = já processado (idempotência)
-          if (typeof e === "object" && e !== null && "code" in e && (e as { code?: unknown }).code === "P2002") {
+          const p2002Tipado = e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+          const p2002Compatibilidade = typeof e === "object" && e !== null && "code" in e && (e as { code?: unknown }).code === "P2002";
+          if (p2002Tipado || p2002Compatibilidade) {
             throw new Error("IDEMPOTENTE");
           }
           throw e;
@@ -159,8 +174,6 @@ export async function processarCadenciasBpm(): Promise<{
             cadenciaExecucaoId: execucao.id,
           },
         });
-        tarefaId = tarefa.id;
-
         // 8. Concluir a execução
         await tx.bpmCadenciaPassoExecucao.update({
           where: { id: execucao.id },
@@ -218,6 +231,19 @@ export async function processarCadenciasBpm(): Promise<{
       if (msg === "IDEMPOTENTE") {
         avisos.push(`Execução duplicada ignorada (idempotente): vínculo ${vinculo.id}`);
         processadas++;
+        continue;
+      }
+
+      if (msg === "CADENCIA_DEFINICAO_INATIVA") {
+        avisos.push(`Vínculo ${vinculo.id} ignorado: definição inativa revalidada`);
+        continue;
+      }
+      if (msg === "CADENCIA_CARD_INATIVO") {
+        await db.bpmCardCadencia.update({
+          where: { id: vinculo.id },
+          data: { status: "CANCELADA", motivoInterrupcao: "Card não está mais ATIVO", concluidaEm: agora, proximaExecucaoEm: null },
+        });
+        avisos.push(`Vínculo ${vinculo.id} cancelado: card não ATIVO revalidado`);
         continue;
       }
 

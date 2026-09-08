@@ -10,6 +10,7 @@ import { listarCamposObrigatoriosFaltantes } from "@/lib/bpm/requisitos-etapa";
 import { calcularDiaCicloNovosLeads, contarDiasUteisDecorridos, intervaloDiaCivilSaoPaulo } from "@/lib/bpm/novos-leads";
 import { sincronizarTranscricaoCardBpm } from "@/lib/bpm/transcricao-reuniao-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { montarContextoAvaliacaoDoCard } from "@/lib/bpm/regras/contexto";
 import { avaliarGrupo } from "@/lib/bpm/regras/avaliador";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
@@ -123,10 +124,19 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
       }
     }
     if (anterior !== etapaId) {
-      await db.$transaction([
-        db.bpmCard.update({ where: { id: card.id }, data: { etapaId } }),
-        db.bpmCardHistorico.create({ data: { cardId: card.id, acao: "MOVIDO_AUTOMACAO", automacaoOrigem: execucao.automacaoId, valorAnteriorJson: JSON.stringify({ etapaId: anterior }), valorNovoJson: JSON.stringify({ etapaId, execucaoId: execucao.id }) } }),
-      ]);
+      await db.$transaction(async (tx) => {
+        await tx.bpmCard.update({ where: { id: card.id }, data: { etapaId } });
+        await tx.bpmCardHistorico.create({ data: { cardId: card.id, acao: "MOVIDO_AUTOMACAO", automacaoOrigem: execucao.automacaoId, valorAnteriorJson: JSON.stringify({ etapaId: anterior }), valorNovoJson: JSON.stringify({ etapaId, execucaoId: execucao.id }) } });
+        await ativarCadenciasNaEntradaBpm({
+          cardId: card.id,
+          pipelineAnteriorId: card.pipelineId,
+          etapaAnteriorId: anterior,
+          pipelineDestinoId: card.pipelineId,
+          etapaDestinoId: etapaId,
+          evento: "CARD_MOVIDO",
+          automacaoOrigem: execucao.automacaoId,
+        }, tx);
+      });
       await publicarEventoDaAcao(execucao, "CARD_MOVIDO", "CARD", card.id, { etapaId: anterior }, { etapaId });
       await notificarPipelineBpm({ pipelineId: card.pipelineId, cardId: card.id, tipo: "CARD_MOVIDO" });
     }
@@ -230,8 +240,21 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
       const existente = await db.bpmCard.findFirst({ where: { empresaId: card.empresaId, pipelineId, status: "ATIVO" }, select: { id: true } });
       if (existente) return { cardId: existente.id, existente: true };
     }
-    const novo = await db.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: Number(parametros.responsavelId ?? card.responsavelId), servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: Number(parametros.responsavelId ?? card.responsavelId), role: "RESPONSAVEL" } } } });
-    if (parametros.vincularAoOriginal !== false) await db.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: novo.id } });
+    const novo = await db.$transaction(async (tx) => {
+      const criado = await tx.bpmCard.create({ data: { empresaId: card.empresaId, pipelineId, etapaId, responsavelId: Number(parametros.responsavelId ?? card.responsavelId), servico: parametros.servico ? String(parametros.servico) : card.servico, membros: { create: { userId: Number(parametros.responsavelId ?? card.responsavelId), role: "RESPONSAVEL" } } } });
+      if (parametros.vincularAoOriginal !== false) await tx.bpmCardVinculo.create({ data: { cardOrigemId: card.id, cardDestinoId: criado.id } });
+      await ativarCadenciasNaEntradaBpm({
+        cardId: criado.id,
+        pipelineAnteriorId: null,
+        etapaAnteriorId: null,
+        pipelineDestinoId: pipelineId,
+        etapaDestinoId: etapaId,
+        evento: "CARD_CRIADO",
+        automacaoOrigem: execucao.automacaoId,
+        agora: criado.createdAt,
+      }, tx);
+      return criado;
+    });
     await publicarEventoBpm({ tipo: "CARD_CRIADO", entidadeTipo: "CARD", entidadeId: novo.id, cardId: novo.id, pipelineId, valorNovo: { etapaId, cardOrigemId: card.id }, atorTipo: "AUTOMACAO", atorExecucaoId: execucao.id, correlationId: execucao.correlationId ?? execucao.id, causationId: execucao.eventoId ?? execucao.id, profundidade: (execucao.evento?.profundidade ?? 0) + 1, idempotencyKey: `automacao:${execucao.id}:card-criado:${novo.id}` });
     return { cardId: novo.id };
   }
@@ -244,7 +267,29 @@ async function executarAcaoCentral(execucao: ExecucaoCentral, tipo: TipoAcaoCent
     ]);
     for (const id of new Set(ids)) {
       if (parametros.campoId) await db.bpmCardCampoValor.upsert({ where: { cardId_campoId: { cardId: id, campoId: String(parametros.campoId) } }, create: { cardId: id, campoId: String(parametros.campoId), valor: parametros.valor === null ? null : String(parametros.valor) }, update: { valor: parametros.valor === null ? null : String(parametros.valor) } });
-      if (parametros.etapaId || parametros.responsavelId) await db.bpmCard.update({ where: { id }, data: { ...(parametros.etapaId ? { etapaId: String(parametros.etapaId) } : {}), ...(parametros.responsavelId ? { responsavelId: Number(parametros.responsavelId) } : {}) } });
+      if (parametros.etapaId || parametros.responsavelId) {
+        await db.$transaction(async (tx) => {
+          const atual = await tx.bpmCard.findUnique({ where: { id }, select: { pipelineId: true, etapaId: true } });
+          if (!atual) throw new Error("Card relacionado não encontrado");
+          const etapaDestinoId = parametros.etapaId ? String(parametros.etapaId) : atual.etapaId;
+          if (parametros.etapaId) {
+            const etapaValida = await tx.bpmEtapa.findFirst({ where: { id: etapaDestinoId, pipelineId: atual.pipelineId, ativo: true }, select: { id: true } });
+            if (!etapaValida) throw new Error("Etapa inválida para o pipeline do card relacionado");
+          }
+          await tx.bpmCard.update({ where: { id }, data: { ...(parametros.etapaId ? { etapaId: etapaDestinoId } : {}), ...(parametros.responsavelId ? { responsavelId: Number(parametros.responsavelId) } : {}) } });
+          if (atual.etapaId !== etapaDestinoId) {
+            await ativarCadenciasNaEntradaBpm({
+              cardId: id,
+              pipelineAnteriorId: atual.pipelineId,
+              etapaAnteriorId: atual.etapaId,
+              pipelineDestinoId: atual.pipelineId,
+              etapaDestinoId,
+              evento: "CARD_MOVIDO",
+              automacaoOrigem: execucao.automacaoId,
+            }, tx);
+          }
+        });
+      }
     }
     return { cardsAtualizados: [...new Set(ids)] };
   }

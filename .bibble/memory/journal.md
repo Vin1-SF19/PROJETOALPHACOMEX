@@ -1,5 +1,97 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## 2026-09-08 — Codex — RM-2026-E4849C (Cadência por coluna sem bloqueio)
+
+**Tags:** #crm #bpm #cadencia #pipeline #idempotencia #sem-migration #em-testes
+
+**Resumo:** removida a guarda universal de oito contatos na prévia, no backend canônico e no board. A cadência passou a ser resolvida exclusivamente pela coluna atual, com legado universal inerte, cancelamento de vínculo incompatível, novo ciclo na reentrada e executor idempotente. O movimento é concluído antes da sincronização best-effort, preservando todas as demais guardas.
+
+**Admin e segurança:** o editor do pipeline ganhou associação “cadência ou nenhuma” por coluna; cadastro/edição exigem pipeline e etapa. Actions usam sessão, Zod, autorização antes e dentro da transação, pertencimento do recurso e isolamento serializável nas operações de cardinalidade.
+
+**Gates:** 37/37 testes direcionados, ESLint direcionado sem erros, `git diff --check` e build Turbopack/78 páginas aprovados. Baseline global medido: 2.435/2.485 testes aprovados; typecheck e lint mantêm erros externos à RM, discriminados na story.
+
+**Resultado:** `DELIVERY_READY`; 13 fases concluídas, sem migration e sem promoção para produção. Entrega pronta para homologação em **Em testes**.
+
+## 2026-09-08 — Codex — RM-2026-B08DA8 (Histórico amigável, retomada)
+
+**Tags:** #crm #bpm #historico #retomada #sem-migration #concluido
+
+**Resumo:** retomada no checkpoint após as Fases 0–3. A falha anterior da Fase 4 não era funcional: o executor detectou commits concorrentes no HEAD e encerrou com `PROHIBITED_GIT_MUTATION`. Nenhuma fase pronta foi refeita. Os gates 4–6 foram executados diretamente sobre a implementação existente.
+
+**Entrega:** os 51 eventos catalogados de `BpmCardHistorico` são apresentados em frases amigáveis, com datas em `America/Sao_Paulo`, resolução local de nomes, fallback seguro e sem expor JSON ou IDs técnicos. Persistência, produtores, schema e migrations permaneceram inalterados por esta RM.
+
+**Gates finais:** 69/69 testes próprios, 129/129 testes de integração do modal, ESLint direcionado, `git diff --check` e build Turbopack com 78 páginas aprovados. O typecheck global segue com diagnósticos externos já existentes, sem erro nos arquivos da RM.
+
+**Resultado:** `DELIVERY_READY`; fases 0–6 consolidadas e entrega pronta para homologação em **Em testes**.
+
+## 2026-09-08 — Codex — RM-2026-6A27B0 (Base de conhecimento = Gerenciador de script)
+
+**Tags:** #crm #bpm #scripts #tiptap #autosave #sem-migration #concluido
+
+**Resumo:** a Base de Conhecimento foi simplificada de um CRUD de links por pipeline para um gerenciador de roteiro por pipeline e etapa. O editor compartilha as primitivas reais do Bloco de Notas, salva automaticamente em `BpmEtapa.script` e o card renderiza o conteúdo somente leitura na aba **Scripts**. O painel “Documentos relacionados” deixou de ser exibido.
+
+**Decisões:** nenhuma migration; preservar fisicamente a tabela legada para evitar perda de dados; envelope Tiptap versionado com fallback para texto simples; escrita autenticada/autorizada, validada, auditada e propagada por realtime.
+
+**Gates:** 49/49 testes direcionados, 20/20 testes de Notas, ESLint escopado e `git diff --check` aprovados; build Turbopack aprovado (14,1 s, 78 páginas). Suíte BPM: 750/779; suíte global: 2.412/2.462; falhas restantes reproduzem baselines externos. Typecheck global sem diagnóstico nos arquivos da RM; lint global manteve 2.484 erros/1.257 avisos externos.
+
+**Resultado:** `DELIVERY_READY`. Todas as fases 0–8 consolidadas manualmente, sem iniciar o worker do Roadmap. Promoção para produção permanece manual após homologação.
+
+## 2026-09-05 — Vault — RM-2026-0FC47A (Checklists pendentes devem virar tarefas) — Fase 3
+
+**Tags:** #database #vault #checkpoint #bpm #crm #checklist #tarefas #waiting-approval
+
+**Objetivo:** preparar o gate Vault (schema aditivo) para vincular `BpmTarefa` a `BpmCardChecklist` 1:1, sem aplicar migration nem backfill.
+
+**Ações desta fase:**
+1. Criou `docs/stories/story-rm-2026-0fc47a-checklists-pendentes-tarefas.md` (artefato exigido pela Fase 2, ausente até então — modo somente leitura da fase anterior não permitia criá-lo).
+2. Gerou e verificou backup específico para a mudança: `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-05T18-37-23-384Z.sql` (304 tabelas, 70.378 linhas, SHA-256 `c8c11afaf793d5fec23248ec656139b55556c8cfe65dcbe8c6667ad754790f6e`, `integrity_check=ok`, `foreign_key_check`=0 violações via `scripts/verify-turso-backup.mjs`).
+3. Executou preflight somente leitura contra o Turso real: 1 checklist pendente, 3 itens obrigatórios pendentes, 2 tarefas totais — volume baixo.
+4. Registrou o relatório completo (estruturas atuais, delta proposto, comandos, riscos, alternativa não destrutiva, rollback, backup) em `.bibble/memory/architecture.md` com identificador de checkpoint verificável (SHA-256 `4256c6a9f6d1168be49e1a8abf13f6963cf68bdc7efb2d395f26338fca75bb1a`).
+
+**Resultado:** `WAITING_APPROVAL`. Nenhuma migration criada, nenhum DDL executado, nenhum backfill realizado. Aguarda aprovação humana explícita e específica fora desta sessão para a Fase 4 (implementação de schema/serviço).
+
+**Arquivos afetados:** `docs/stories/story-rm-2026-0fc47a-checklists-pendentes-tarefas.md`, `.bibble/memory/architecture.md`, `.bibble/memory/journal.md` (este registro). Backups gerados fora do Git em `database-backups/pre-change/`.
+
+## 2026-09-04 — Kowalski — RM-2026-8852C2 (Melhoria no layout do card no Kanban)
+
+**Tags:** #feature #frontend #bpm #crm #kanban #card #layout #parcial
+**Agentes envolvidos:** Scout (Fase 0, auditoria de entregabilidade), PM (Fase 1, story), Nova (Fase 2, especificação visual), Echo (Fase 3, implementação parcial), Forge (Fase 4, gates técnicos), Probe (Fase 5, verificação de integração 8/8), Lens (Fase 6, revisão de código), Scribe (Fase 7, registro em architecture.md), Kowalski (Fase 8, esta — arquivamento)
+
+**Objetivo:** melhorar o layout do KanbanCard no Alpha CRM, a partir da ideia anexada em `.ideias/cmtohblgt0016ihtp3zdeho8o/melhoria-kanban-card-crm-bpm-defee4501b6c8ac4.md` (593 linhas). A ideia pede um componente único com configuração estruturada por etapa (`CompactCardViewDefinition`), UI administrativa com seleção/ordenação/preview, catálogo de componentes nativos, campos por `fieldId` (não label), read model parametrizado, fallback seguro, permissões e 18 testes.
+
+**Fases percorridas:**
+
+1. **Fase 0 (Scout, auditoria de entregabilidade):** mapeou todos os arquivos relevantes, classificou cada item da ideia (reaproveitável vs. requer schema novo) e retornou `AUTO_ADJUSTMENT_REQUIRED` — a camada de configuração persistida (`BpmEtapaCardViewConfig`) não existe no schema; 5 lacunas identificadas com critérios de aceite.
+2. **Fase 1 (PM, story):** criou `docs/stories/story-rm-2026-8852c2-melhoria-kanban-card.md` incorporando o veredito da Fase 0, traduzindo fielmente a ideia anexada, definindo 18 critérios de aceite (AC1–AC18) e registrando pendências administrativas.
+3. **Fase 2 (Nova, especificação visual):** completou a seção de especificação visual na story — wireframe, hierarquia, estados, responsividade, contrato estruturado do renderer, catálogo v1, configuração completa por etapa, limite de 5 itens, preview mockado, tokens existentes, preservação do ramo "Agendar Reunião".
+4. **Fase 3 (Echo, implementação parcial):** adicionou 3 itens de corpo aditivos ao `KanbanCard` (Pendências, Checklist, Cadência) em `PipelineBoardClient.tsx` — 3 campos opcionais na interface `CardBpm` + bloco de render condicional com fallback seguro (itens omitidos quando dados ausentes). Sem migration, sem import novo, sem alteração de export.
+5. **Fase 4 (Forge, gates técnicos):** `typecheck` exit 1 (34 erros pré-existentes, 0 novos); `eslint` exit 1 (baseline 2.484 erros pré-existentes, 0 novos); `roadmap_tests` exit 1 (53 falhas pré-existentes, 0 novas). Aprovado.
+6. **Fase 5 (Probe, verificação de integração):** 8/8 pontos aprovados — presença visual, trigger, rota protegida, permissões, persistência (fallback), estados UI, integrações externas, sem regressões.
+7. **Fase 6 (Lens, revisão de código):** aprovado — diff inspecionado, imports absolutos, sem código morto, ramo "Agendar Reunião" coerente, sem necessidade de Anubis.
+8. **Fase 7 (Scribe, registro em architecture.md):** entrada completa adicionada no topo de `.bibble/memory/architecture.md` com caminho de consumo validado, resultados reais dos gates e `AUTO_ADJUSTMENT_REQUIRED` para iniciativa futura.
+9. **Fase 8 (Kowalski, esta):** arquivamento desta sessão no journal.
+
+**Resultado final:** **parcialmente entregue com lacuna registrada.** Os 3 itens de corpo (Pendências, Checklist, Cadência) estão implementados no `KanbanCard` com fallback seguro. A configuração completa por etapa (renderer parametrizado, UI administrativa, read model projetando os 3 campos, 18 testes) depende do model `BpmEtapaCardViewConfig` que não existe no schema — pendência para iniciativa futura de Vault.
+
+**Pendência registrada (para sessão futura):**
+- `AUTO_ADJUSTMENT_REQUIRED`: (1) migration aplicada com `BpmEtapaCardViewConfig` (Vault, backup verificado); (2) `ListarCardsPipelineBpm` projeta `checklistProgress`, `cadenciaProximaExecucaoEm` e `pendenciasObrigatorias`; (3) admin configura elementos por etapa em `Configurações → Pipeline → Etapa → Card do Kanban`; (4) board renderiza a composição configurada; (5) 18 testes passam.
+- `AUTO_ADJUSTMENT_ACCEPTANCE`: ver `.bibble/memory/architecture.md` (entrada RM-2026-8852C2) para critérios exatos.
+
+**Arquivos afetados:**
+- `src/app/PainelAlpha/AlphaCRM/pipeline/[pipelineId]/PipelineBoardClient.tsx` (3 campos opcionais + bloco de render condicional)
+- `docs/stories/story-rm-2026-8852c2-melhoria-kanban-card.md` (novo)
+- `.bibble/memory/architecture.md` (entrada RM-2026-8852C2)
+- `.bibble/memory/journal.md` (esta entrada)
+
+**Caminho de consumo validado:**
+```
+/PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+  → board → KanbanCard (qualquer etapa, exceto ramo "Agendar Reunião")
+  → corpo do card → itens Pendências / Checklist / Cadência
+  → visíveis quando o read model projetar os dados; omitidos quando ausentes (fallback seguro)
+  → clique no card → CardFullViewModal (comportamento inalterado)
+```
+
 ## 2026-09-04 — Echo — RM-2026-209DB4 Fase 6
 
 Backup oficial validado; schema aditivo, migration não aplicada, domínio puro, serviço idempotente, Server Actions autenticadas e testes direcionados do Checklist Builder implementados. Pendências deliberadas: aplicação da migration, UI e integração com motores nas fases seguintes.
@@ -4828,3 +4920,25 @@ ativo e resposta pública HTTP 200.
 ## 2026-09-04 — Codex — RM-2026-095B40 concluído
 
 Concluída diretamente no terminal a integração operacional do SLA: cinco momentos de início/conclusão, pausa e retomada em Standby, badges no Kanban, painel no modal, alertas idempotentes, outbox/realtime e gatilho filtrável no Motor Central. Testes direcionados passaram 15/15, ESLint direcionado e diff-check ficaram limpos, a rota administrativa compilou e manteve o gate de acesso, e o build de produção isolado foi aprovado. O E2E com banco libSQL real confirmou verde → amarelo → vermelho, dois disparos/eventos únicos, uma automação executada, uma tarefa e deslocamento de 30 minutos após pausa. Débitos globais preexistentes permaneceram fora do escopo.
+
+## 2026-09-08 — Codex — RM-2026-13CA69 concluída
+
+O formulário existente de **Agendar Reunião** recebeu e-mail obrigatório do cliente, preenchido automaticamente apenas quando o vínculo ativo produz um destinatário inequívoco. O mesmo schema Zod normaliza e valida cliente e servidor. A criação inclui o e-mail em `participantes`; o reagendamento preserva convidados existentes, elimina duplicatas e mantém ETag/CAS, ownership, guards de etapa e transcrição. O cliente Google Calendar passou a usar `sendUpdates: "all"` quando participantes são criados ou atualizados, garantindo o envio do convite.
+
+Não houve mudança de schema, migration ou dados (`DATABASE_CHANGE_NOT_REQUIRED`). Gates: 98/98 testes relevantes, ESLint escopado sem erros, diff-check limpo e build de produção aprovado. A suíte global executou 2.383 testes (2.333 verdes e 50 falhas de baseline fora da RM); o typecheck também manteve apenas diagnósticos externos aos arquivos da entrega. Revisões de segurança, arquitetura e aceite foram aprovadas sem achados bloqueantes.
+
+## 2026-09-08 — Nova — RM-2026-B08DA8 Fase 3
+
+A aba Histórico do card BPM passou a consumir uma camada pura com descrições em português para os 51 eventos catalogados. Datas usam o utilitário oficial de São Paulo, nomes são resolvidos do contexto já carregado e IDs/JSON bruto não são exibidos. Persistência, schema e producers permaneceram inalterados. Os 65 testes direcionados e o lint escopado passaram; débitos globais e o lock concorrente do build foram registrados na story.
+
+## 2026-09-08 — Codex — RM-2026-0FC47A concluída
+
+Após dois checkpoints Vault aprovados, foi criada a relação única e restritiva entre checklist materializado e tarefa. O serviço central passou a reconciliar criação, conclusão, reabertura e responsável dentro das transações de materialização/edição; conclusão manual divergente foi bloqueada no servidor e redirecionada ao checklist na UI. A Central de Tarefas identifica a origem e abre o checklist correto.
+
+O backup remoto completo foi restaurado e verificado antes da migration. O backfill real examinou um checklist e criou uma tarefa; dry-run e apply repetidos produziram zero escritas. O E2E sobre restauração isolada comprovou `CRIADA → CONCLUIDA → REABERTA → IGNORADA`, um único ID, integridade `ok` e zero violações de FK. Gates relacionados: 87 testes aprovados, lint sem erros e build de produção aprovado; a suíte global manteve 50 falhas externas de baseline.
+
+## 2026-09-08 — Codex — RM-2026-158500 concluída
+
+Foi removida a exigência fixa de oito contatos da transição de **Agendar reunião**, preservando todos os demais guards. Cadências agora têm escopo obrigatório de pipeline e coluna, no máximo uma ativa por coluna, e sincronizam automaticamente após criação ou movimento do card. A sincronização é best-effort e o executor revalida o escopo, de modo que tarefas e alertas nunca bloqueiam o avanço. Cadências legadas sem coluna permanecem inertes; nenhuma migration ou escrita direta de dados foi necessária.
+
+Os testes focados passaram 55/55, o lint direcionado ficou sem erros, o diff-check passou e o build de produção gerou 78 páginas. A suíte BPM ampla ficou em 773/802 por 29 falhas externas causadas por alterações concorrentes fora da RM; o typecheck não apontou diagnóstico nos arquivos entregues.

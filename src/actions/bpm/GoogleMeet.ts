@@ -22,6 +22,10 @@ import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
 import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
 import { dataHoraObrigatoriaBpmSchema } from "@/lib/validations/bpm";
+import {
+  combinarParticipantesReuniao,
+  emailClienteReuniaoSchema,
+} from "@/lib/bpm/email-reuniao";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 const DURACAO_PADRAO_MINUTOS = 60; // decisão confirmada com o usuário (plano-novos-leads-bpm.md, Bloco 2)
@@ -84,6 +88,7 @@ async function reagendarEventoVinculado(params: {
   googleMeetLink: string;
   inicio: Date;
   fim: Date;
+  emailCliente: string;
 }) {
   const vinculos = await db.googleCalendarEventoCache.findMany({
     where: {
@@ -126,6 +131,7 @@ async function reagendarEventoVinculado(params: {
       fim: params.fim,
       diaInteiro: false,
       timezone: vinculo.calendario.timezone || "America/Sao_Paulo",
+      participantes: combinarParticipantesReuniao(eventoAtual.participantes, params.emailCliente),
     },
   });
   if (eventoAtualizado.linkMeet !== params.googleMeetLink) {
@@ -146,6 +152,7 @@ async function reagendarEventoVinculado(params: {
 const agendarSchema = z.object({
   cardId: z.string().min(1),
   dataHora: dataHoraObrigatoriaBpmSchema("Data e hora da reunião são obrigatórias"),
+  emailCliente: emailClienteReuniaoSchema,
 });
 
 /**
@@ -189,7 +196,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
 
     const parsed = agendarSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, dataHora } = parsed.data;
+    const { cardId, dataHora, emailCliente } = parsed.data;
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
@@ -243,7 +250,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
       diaInteiro: false,
       inicio,
       fim,
-      participantes: [],
+      participantes: [emailCliente],
       criarMeet: true,
       eventType: "default",
       visibilidade: "default",
@@ -332,6 +339,7 @@ export async function AgendarReuniaoGoogleMeetBpm(dados: unknown) {
 const reagendarSchema = z.object({
   cardId: z.string().min(1),
   dataHora: dataHoraObrigatoriaBpmSchema("Data e hora da reunião são obrigatórias"),
+  emailCliente: emailClienteReuniaoSchema,
 });
 
 export async function ReagendarReuniaoBpm(dados: unknown) {
@@ -342,7 +350,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
 
     const parsed = reagendarSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { cardId, dataHora } = parsed.data;
+    const { cardId, dataHora, emailCliente } = parsed.data;
 
     await exigirAcessoBpmCard(cardId, userId, session.user.role ?? null, "editarCard");
 
@@ -410,6 +418,7 @@ export async function ReagendarReuniaoBpm(dados: unknown) {
       googleMeetLink: card.googleMeetLink,
       inicio,
       fim,
+      emailCliente,
     });
 
     if (!resultado.success) return { success: false, error: resultado.error };

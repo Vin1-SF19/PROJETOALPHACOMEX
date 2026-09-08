@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review
+Em testes
 
 ## Story
 
@@ -313,6 +313,19 @@ Falhas de baseline devem ser registradas com comando, contagem e evidência de q
 - Anubis: nenhuma fronteira de auth/API/action alterada. Probe: composição e caminho verificados estaticamente; smoke visual autenticado pendente. Lens não foi executado porque o Forge global não aprovou, conforme a ordem constitucional.
 - Build: interrompido com exit 130 após mais de dez minutos sem saída nova na compilação otimizada; não foi declarado aprovado.
 - A verificação visual autenticada desktop/mobile permanece pendência operacional manual.
+
+## Consolidação da correção — 2026-09-08
+
+- A falha externa de download das fontes Geist deixou de ocorrer: `npm run build` concluiu com exit 0 em 23,7 s, incluindo compilação Next.js e geração das 78 páginas estáticas.
+- Os quatro testes direcionados da entrega passaram novamente: 4 arquivos, 48 testes, zero falhas.
+- O ESLint direcionado terminou com zero erros; os 13 warnings pertencem a código hospedeiro preexistente e não impedem o build.
+- `git diff --check` e a verificação do commit da entrega passaram.
+- O typecheck global ainda possui diagnósticos fora da File List desta RM; o lint global mantém 2.484 erros de baseline, concentrados sobretudo em código legado e infraestrutura AIOX.
+- A suíte BPM passou em 662/691 testes. As 29 falhas restantes pertencem a outros objetivos (criação/movimentação de cards, Lost/Fechado, membros, transições e Standby) e não exercitam os quatro contratos direcionados desta entrega.
+- Revisão de segurança: nenhum endpoint, Server Action, schema ou regra de autorização foi alterado por esta RM; o editor continua usando `CriarInteracaoCardBpm`, e o Checklist mantém os contratos existentes.
+- Revisão de arquitetura: a composição mantém instância única de Checklist, editor único de Anotação, Timeline preservada sem trigger e overflow isolado no painel esquerdo.
+- As fases foram concluídas manualmente, sem iniciar nem executar fases pelo worker. O worker de fundo já ativo detectou o estado final e publicou o ambiente de staging com sucesso; não houve commit, push ou deploy de produção.
+- O objetivo está pronto para validação manual autenticada em desktop e viewport reduzido na coluna **Em testes**.
 
 ## Notas de segurança e banco
 

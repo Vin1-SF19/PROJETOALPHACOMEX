@@ -475,6 +475,7 @@ export async function criarEvento(params: CriarEventoParams): Promise<GoogleEven
         calendarId: params.calendarId,
         requestBody: paraSchemaEvento(params.evento),
         conferenceDataVersion: params.evento.criarMeet ? 1 : 0,
+        sendUpdates: params.evento.participantes.length > 0 ? "all" : undefined,
       }),
     );
     return mapEventoParaDTO(resposta.data);
@@ -540,6 +541,7 @@ export async function atualizarEventoParcial(params: AtualizarEventoParcialParam
           requestBody,
           // Mantém suporte a conferenceData também quando o Meet existente foi apenas preservado.
           conferenceDataVersion: 1,
+          sendUpdates: params.evento.participantes !== undefined ? "all" : undefined,
         },
         params.etagConhecido
           ? {

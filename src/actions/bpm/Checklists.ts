@@ -26,6 +26,7 @@ import {
   materializarChecklistsAplicaveisCard,
 } from "@/lib/bpm/checklists/service";
 import { carregarResumoChecklistAplicavelCard } from "@/lib/bpm/checklists/integracao";
+import { reconciliarTarefaChecklist } from "@/lib/bpm/checklists/reconciliacao-tarefa";
 
 const ROTA_ADMIN = "/PainelAlpha/AlphaCRM/admin/checklists";
 const ROTA_CRM = "/PainelAlpha/AlphaCRM";
@@ -412,6 +413,7 @@ export async function AdicionarItemExclusivoChecklistCardBpm(payload: unknown) {
         cardId: checklist.cardId, acao: "CHECKLIST_ITEM_EXCLUSIVO_ADICIONADO", usuarioId: userId,
         valorNovoJson: JSON.stringify({ checklistId: checklist.id, itemId: criado.id, nome: criado.nome }),
       }, tx);
+      await reconciliarTarefaChecklist({ checklistId: checklist.id, usuarioId: userId }, tx);
       return criado;
     });
     revalidatePath(ROTA_CRM);
@@ -489,6 +491,10 @@ export async function AtualizarItemChecklistCardBpm(payload: unknown) {
           observacaoAlterada: proximaObservacao !== existente.observacao,
           eventoChave: `CHECKLIST:${item.id}:${item.updatedAt.toISOString()}`,
         }),
+      }, tx);
+      await reconciliarTarefaChecklist({
+        checklistId: existente.cardChecklist.id,
+        usuarioId: userId,
       }, tx);
       return { item, sinalEmitido: true };
     });

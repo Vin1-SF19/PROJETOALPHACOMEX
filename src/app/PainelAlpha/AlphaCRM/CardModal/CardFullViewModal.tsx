@@ -45,9 +45,10 @@ interface Props {
   onClose: () => void;
   onAtualizado: () => void;
   onAbrirCard: (cardId: string) => void;
+  abrirChecklistInicial?: boolean;
 }
 
-function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard }: Props) {
+function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard, abrirChecklistInicial = false }: Props) {
   const { flushSaves } = useCardSave();
   const [card, setCard] = useState<CardDetalhe | null>(null);
   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
@@ -56,6 +57,7 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
   const [abaAtiva, setAbaAtiva] = useState<string>("card");
   const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
   const acessoRevogadoRef = useRef(false);
+  const checklistInicialAbertoRef = useRef<string | null>(null);
   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
   const fecharPorAcessoRevogado = useCallback(() => {
     if (acessoRevogadoRef.current) return;
@@ -103,6 +105,17 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
 
     return () => { cancelado = true; };
   }, [cardId, fecharPorAcessoRevogado]);
+
+  useEffect(() => {
+    if (!abrirChecklistInicial || card?.id !== cardId || checklistInicialAbertoRef.current === cardId) return;
+    checklistInicialAbertoRef.current = cardId;
+    const timeout = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("bpm:abrir-pendencias-checklist", {
+        detail: { cardId },
+      }));
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [abrirChecklistInicial, card?.id, cardId]);
 
   useEffect(() => {
     if (realtimeRevision === 0) return;

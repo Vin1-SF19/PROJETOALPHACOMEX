@@ -1,5 +1,27 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Alpha CRM — cadência resolvida pela coluna (RM-2026-E4849C)
+
+**Configuração:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → `CadenciaEtapasSection` → `ConfigurarCadenciaEtapaBpm` → validação admin/Zod/transação serializável → `BpmCadencia.pipelineId/etapaId/ativa`.
+
+**Movimento:** board/modal/automação → `executarTransicaoBpm` (guardas, persistência, histórico, outbox e SLA) → commit → `sincronizarCadenciasNaEntradaBpm` em best-effort. A cadência nunca participa da autorização do movimento.
+
+**Execução:** cron ou `npm run bpm:cadencias` → `processarCadenciasBpm` → revalidação do escopo exato e status ativo → `BpmCadenciaPassoExecucao` idempotente por vínculo/passo/ciclo → `BpmTarefa` e histórico. Coluna sem definição, ambiguidade ou registro legado sem etapa não gera execução.
+
+**Observação:** o painel do card lista vínculos e próxima execução, permite cancelamento autorizado, mas não permite escolher/iniciar/pausar/reativar uma cadência fora do fluxo da coluna.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-E4849C)
+
+## Alpha CRM — scripts por pipeline e etapa (RM-2026-6A27B0)
+
+**Caminho administrativo:** menu **Base de Conhecimento** → `/PainelAlpha/AlphaCRM/admin/conhecimento` → `ConhecimentoBpmPage` → `ConhecimentoWorkspace` → pipeline/etapa → `ScriptEtapaEditor` → `SalvarScriptEtapaBpm` → `BpmEtapa.script`.
+
+**Caminho operacional:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card autorizado → `CardFullViewModal` carrega `ObterPipelineBpm` → `PainelRegistrar` resolve a etapa atual → aba **Scripts** → `ConteudoScriptEtapa` somente leitura.
+
+**Contrato:** o valor estruturado usa `SCRIPT_NOTE_V1:` + JSON Tiptap validado em `src/lib/bpm/script-etapa.ts`; valores antigos em texto simples são convertidos para parágrafos no leitor. A escrita valida sessão, permissão `configurarEtapas` e pertencimento etapa/pipeline, audita na transação, revalida as duas rotas e emite `ETAPA_ALTERADA`. O card não consulta a action administrativa nem recebe a lista legada de links.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-6A27B0)
+
 - Checklist Builder: `materializarChecklistsAplicaveisCard` é o único serviço de materialização para abertura do card e ação explícita `MATERIALIZAR_CHECKLIST`; `carregarResumoChecklistAplicavelCard` é a leitura pura compartilhada por Validações, Regras, Automações e alerta de avanço; `ListarChecklistsCardBpm` é a entrada autenticada do painel; `SalvarTemplateChecklistBpm` é o save atômico do builder.
 
 ## Alpha CRM — Checklist Builder (RM-2026-209DB4)
@@ -2222,13 +2244,13 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 
 **Formulários por etapa:** campos personalizados e controles nativos da etapa atual pertencem ao painel central do detalhe do card, na aba **Formulário da Etapa** (`CardFullViewModal`/`PainelRegistrar`/`PainelCamposEtapaAtual`). Requisitos de transição continuam no painel esquerdo (`PainelHistorico`). Eles não devem ser antecipados no modal de criação.
 
-**Google Meet:** `ListarCardsPipelineBpm` precisa entregar `dataReuniao`/`googleMeetLink` ao `PipelineBoardClient`. No board, o ramo `etapaEhAgendarReuniao` de `KanbanCard` é exclusivo: data/hora + ação Meet, com propagação de clique/`pointerdown` interrompida nos controles internos. No modal, `CardOpenFormSlot` retorna somente `PainelReuniao` em **Agendar Reunião**; em **Reunião Agendada**, o mesmo componente opera com `mostrarFormulario={false}` para acompanhamento, sem criar ou reagendar. Não adicionar fallback manual: o link exibido deve vir de `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm` e estar persistido no card.
+**Google Meet:** `ListarCardsPipelineBpm` precisa entregar `dataReuniao`/`googleMeetLink` ao `PipelineBoardClient`. No board, o ramo `etapaEhAgendarReuniao` de `KanbanCard` é exclusivo: data/hora + ação Meet, com propagação de clique/`pointerdown` interrompida nos controles internos. No modal, `CardOpenFormSlot` retorna somente `PainelReuniao` em **Agendar Reunião**; em **Reunião Agendada**, o mesmo componente opera com `mostrarFormulario={false}` para acompanhamento, sem criar ou reagendar. `ObterCardBpm` expõe `emailClienteReuniao` somente após ownership e apenas quando `PessoaClienteVinculo` permite selecionar um destinatário ativo inequívoco (principal único, ou contato ativo único). O formulário pode corrigir esse valor, mas `AgendarReuniaoGoogleMeetBpm` e `ReagendarReuniaoBpm` sempre revalidam/normalizam o e-mail. Criação e PATCH enviam `sendUpdates: "all"`; o reagendamento mescla os convidados atuais antes de incluir o cliente. Não adicionar fallback manual: o link exibido deve vir dessas actions e estar persistido no card.
 
 **Caminho de acesso do agendamento:** `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → coluna **Agendar reunião** → `KanbanCard` → `CardFullViewModal` → `CardAbertoLayout` → `PainelRegistrar` → aba **Formulário da Etapa** → `CardOpenFormSlot` → `PainelReuniao` → Google Calendar → link no card/modal.
 
 **Compatibilidade:** guards de movimento para Fechado, Lost, Em Tratativa, Sem Viabilidade e outras etapas permanecem ativos. Eles validam a entrada por movimento e não constituem permissão para criar diretamente no destino.
 
-**Última atualização:** 2026-09-04 por Scribe (RM-2026-6BEA04).
+**Última atualização:** 2026-09-08 por Scribe (RM-2026-13CA69).
 
 ### Alpha CRM — Standby — Follow Up NoLoss
 
@@ -2474,6 +2496,14 @@ Operação humana segue `/PainelAlpha/AlphaCRM/automacoes` ou
 runtimes.
 
 **Última atualização:** 2026-09-04 por Codex (RM-2026-D100EB)
+
+## Checklist materializado → Central de Tarefas (RM-2026-0FC47A)
+
+`materializarChecklistsAplicaveisCard` / `AdicionarItemExclusivoChecklistCardBpm` / `AtualizarItemChecklistCardBpm` → `reconciliarTarefaChecklist(..., tx)` → `BpmTarefa.cardChecklistId`. Após commit e apenas quando há mudança, o fluxo emite `TAREFA_ALTERADA`. A Central seleciona a origem mínima, mostra badge Checklist e abre o card já focado na aba Checklist pelo evento local `bpm:abrir-pendencias-checklist`. `ConcluirTarefaBpm` relê a tarefa e os itens na transação e bloqueia conclusão manual divergente.
+
+Backfill oficial: `npm run bpm:checklists:reconciliar -- --dry-run|--apply --batch-size=N`; pagina por cursor, registra contadores estruturados e é idempotente.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-0FC47A)
 
 ### Card nativo — Checklist e Anotação no painel esquerdo (RM-2026-B7694F)
 

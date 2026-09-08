@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   realtime: vi.fn(),
   revalidate: vi.fn(),
   transaction: vi.fn(),
+  reconciliar: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
@@ -24,6 +25,7 @@ vi.mock("@/lib/bpm/historico-server", () => ({ registrarHistoricoCard: mocks.his
 vi.mock("@/lib/bpm/realtime-server", () => ({ notificarPipelineBpm: mocks.realtime }));
 vi.mock("@/lib/bpm/checklists/service", () => ({ materializarChecklistsAplicaveisCard: vi.fn() }));
 vi.mock("@/lib/bpm/checklists/integracao", () => ({ carregarResumoChecklistAplicavelCard: vi.fn() }));
+vi.mock("@/lib/bpm/checklists/reconciliacao-tarefa", () => ({ reconciliarTarefaChecklist: mocks.reconciliar }));
 vi.mock("@/lib/prisma", () => ({
   default: {
     bpmCardChecklistItem: { findUnique: mocks.itemFindUnique },
@@ -93,6 +95,7 @@ describe("Checklists.ts — operações robustas no card", () => {
       data: expect.objectContaining({ status: "CONCLUIDO" }),
     }));
     expect(mocks.historico).toHaveBeenCalledTimes(1);
+    expect(mocks.reconciliar).toHaveBeenCalledWith(expect.objectContaining({ checklistId: "checklist-1" }), expect.anything());
     expect(mocks.realtime).toHaveBeenCalledTimes(1);
   });
 

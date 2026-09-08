@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Clock } from "lucide-react";
+import { Search, Clock, ClipboardCheck } from "lucide-react";
 import type { TemaAlpha } from "@/lib/temas";
 import { fmtDateTime } from "@/lib/format-date";
 import { ListarTarefasGlobaisBpm } from "@/actions/bpm/Tarefas";
@@ -34,6 +34,7 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
   const [filtroStatus, setFiltroStatus] = useState<(typeof FILTROS)[number]["valor"]>("PENDENTE");
   const [busca, setBusca] = useState("");
   const [cardSelecionadoId, setCardSelecionadoId] = useState<string | null>(null);
+  const [abrirChecklist, setAbrirChecklist] = useState(false);
   const [agora] = useState(() => Date.now());
 
   const tarefasFiltradas = useMemo(() => {
@@ -89,13 +90,24 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
           return (
             <button
               key={t.id}
-              onClick={() => setCardSelecionadoId(t.cardId)}
+              onClick={() => {
+                setAbrirChecklist(Boolean(t.cardChecklistId));
+                setCardSelecionadoId(t.cardId);
+              }}
+              aria-label={t.cardChecklistId
+                ? `Abrir checklist ${t.cardChecklist?.templateNome ?? t.titulo} no card`
+                : `Abrir tarefa ${t.titulo} no card`}
               className="w-full flex items-center justify-between gap-3 bg-slate-900/60 border border-white/5 rounded-xl px-4 py-3 text-left hover:border-white/15 transition-colors"
             >
               <div className="min-w-0 flex-1">
                 <p className={`text-sm ${t.status === "CONCLUIDA" ? "line-through text-slate-500" : "text-white"}`}>
                   {t.titulo}
                 </p>
+                {t.cardChecklistId && (
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-300">
+                    <ClipboardCheck size={11} aria-hidden="true" /> Checklist
+                  </span>
+                )}
                 <p className="text-xs text-slate-500 truncate">
                   {t.card.empresa.razaoSocial} · {t.card.pipeline.nome}
                   {t.responsavel && ` · ${t.responsavel.nome}`}
@@ -123,9 +135,16 @@ export default function TarefasCentralClient({ tarefas, visual, currentUserId, c
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}
           accent={accent}
-          onClose={() => setCardSelecionadoId(null)}
+          abrirChecklistInicial={abrirChecklist}
+          onClose={() => {
+            setCardSelecionadoId(null);
+            setAbrirChecklist(false);
+          }}
           onAtualizado={() => {}}
-          onAbrirCard={(id) => setCardSelecionadoId(id)}
+          onAbrirCard={(id) => {
+            setAbrirChecklist(false);
+            setCardSelecionadoId(id);
+          }}
         />
       )}
     </div>

@@ -6,6 +6,7 @@ import db from "@/lib/prisma";
 import { calcularResumoChecklist } from "@/lib/bpm/checklists/leitura";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { reconciliarTarefaChecklist } from "@/lib/bpm/checklists/reconciliacao-tarefa";
 
 function erroUnicidade(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
@@ -133,6 +134,11 @@ export async function materializarChecklistsAplicaveisCard(params: {
           usuarioId: params.usuarioId,
           automacaoOrigem: params.automacaoOrigem,
           valorNovoJson: JSON.stringify({ checklistId: instancia.id, templateId: template.id, templateNome: template.nome }),
+        }, tx);
+        await reconciliarTarefaChecklist({
+          checklistId: instancia.id,
+          usuarioId: params.usuarioId,
+          automacaoOrigem: params.automacaoOrigem,
         }, tx);
         return instancia.id;
       });

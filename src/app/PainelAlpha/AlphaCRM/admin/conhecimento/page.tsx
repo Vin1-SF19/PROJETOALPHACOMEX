@@ -16,7 +16,15 @@ export default async function ConhecimentoBpmPage() {
   const pipelines = await db.bpmPipeline.findMany({
     where: { ativo: true },
     orderBy: { nome: "asc" },
-    select: { id: true, nome: true },
+    select: {
+      id: true,
+      nome: true,
+      etapas: {
+        where: { ativo: true },
+        orderBy: { ordem: "asc" },
+        select: { id: true, nome: true, ordem: true, script: true },
+      },
+    },
   });
   const temaNome = (session.user as { tema_interface?: string }).tema_interface || "blue";
   const visual = getTema(temaNome);

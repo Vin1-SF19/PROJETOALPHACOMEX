@@ -3,6 +3,24 @@
 > Mantido por: Nova (frontend) e Scribe (cartógrafo)
 > Consultar SEMPRE antes de criar um novo componente.
 
+### CadenciaEtapasSection — associação operacional por coluna
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/CadenciaEtapasSection.tsx`
+**Tipo:** Client Component administrativo
+**Uso:** uma instância no editor real do pipeline; apresenta cada coluna ativa com seletor de cadência ou “Nenhuma cadência” e salva por `ConfigurarCadenciaEtapaBpm`.
+**Notas:** definições de outro pipeline não são candidatas; cadências legadas sem coluna aparecem identificadas para associação explícita. A seleção é otimista com rollback/toast de erro e uma mesma cadência não permanece selecionada visualmente em duas colunas.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-E4849C)
+
+### Gerenciador de scripts e primitivas do editor Note
+
+**Arquivos:** `src/components/bpm/conhecimento/{ConhecimentoWorkspace,ScriptEtapaEditor}.tsx`, `src/components/Notas/NoteEditor/NoteEditorPrimitives.tsx` e `src/app/PainelAlpha/AlphaCRM/CardModal/ConteudoScriptEtapa.tsx`
+**Tipo:** Client Components
+**Uso:** edição administrativa por pipeline/etapa e leitura na aba **Scripts** do card.
+**Notas:** `NoteEditorPrimitives` é a fonte compartilhada da configuração Tiptap, toolbar e superfície de conteúdo usada tanto por `NoteEditor` quanto pelo gerenciador. `ScriptEtapaEditor` aplica o mesmo debounce de 1,5 s, indicador de estado e proteção contra resposta obsoleta; `ConteudoScriptEtapa` usa as mesmas extensões em modo somente leitura. Não crie outro editor ou renderer de script.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-6A27B0)
+
 ### BpmDateTimeField — seleção assistida de data e hora no card CRM
 
 **Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/BpmDateTimeField.tsx`
@@ -19,9 +37,9 @@
 **Tipo:** Client Component existente, ampliado
 **Props:** `card`, `accent`, `podeEditar`, `onAtualizado`, `mostrarFormulario?`
 **Uso:** `CardOpenFormSlot` em **Agendar Reunião** (`mostrarFormulario=true`: somente data/hora, criar/reagendar e link Meet) e **Reunião Agendada** (`mostrarFormulario=false`: somente acompanhamento/transcrição/resumo).
-**Notas:** o formulário usa `BpmDateTimeField` e botão explícito para `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm`; durante a action exibe spinner e bloqueia nova submissão. O modo de acompanhamento busca a transcrição real, diferencia vazio/pendente/erro/sucesso e registra `SalvarResumoReuniaoBpm` no `CardSaveContext`. Não existe `PainelAgendarReuniao.tsx`: a variante pertence a este componente compartilhado.
+**Notas:** o formulário usa `BpmDateTimeField`, e-mail obrigatório do cliente e botão explícito para `AgendarReuniaoGoogleMeetBpm`/`ReagendarReuniaoBpm`; durante a action exibe spinner e bloqueia nova submissão. O e-mail inicial só é fornecido por `ObterCardBpm` quando há um destinatário ativo inequívoco, pode ser corrigido localmente e é validado pelo schema compartilhado antes de seguir ao servidor. O modo de acompanhamento busca a transcrição real, diferencia vazio/pendente/erro/sucesso e registra `SalvarResumoReuniaoBpm` no `CardSaveContext`. Não existe `PainelAgendarReuniao.tsx`: a variante pertence a este componente compartilhado.
 
-**Última atualização:** 2026-09-04 por Scribe (RM-2026-6BEA04)
+**Última atualização:** 2026-09-08 por Scribe (RM-2026-13CA69)
 
 ### AutomacoesWorkspace + AutomacaoFormDialog (Alpha CRM/BPM)
 
@@ -624,6 +642,14 @@ retry manual. A atualização usa refresh periódico de 15 segundos como fallbac
 observável. A criação de webhook revela o segredo somente na resposta inicial.
 
 **Última atualização:** 2026-09-04 por Codex (RM-2026-D100EB)
+
+### Tarefa derivada de checklist na Central BPM
+
+**Arquivos:** `TarefasCentralClient.tsx`, `CardFullViewModal.tsx`, `PainelTarefasPorTipo.tsx`.
+
+**Comportamento:** tarefa com `cardChecklistId` recebe badge “Checklist”. Sua ação principal abre o card correto e seleciona/foca a aba Checklist; no painel interno, o controle de conclusão vira essa mesma navegação enquanto pendente. Tarefas manuais preservam criação, filtros, ordenação e conclusão existentes.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-0FC47A)
 
 # SlaStatusBadge / PainelSlaCard (Alpha CRM)
 

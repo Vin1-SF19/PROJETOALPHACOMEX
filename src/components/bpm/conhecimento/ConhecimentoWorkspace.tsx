@@ -1,112 +1,100 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { BookOpen, ExternalLink, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
+import { BookOpen, ScrollText } from "lucide-react";
 
-import { CriarConhecimentoLinkBpm, ExcluirConhecimentoLinkBpm, ListarConhecimentoLinksBpm } from "@/actions/bpm/Conhecimento";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ScriptEtapaEditor } from "@/components/bpm/conhecimento/ScriptEtapaEditor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type Link = { id: string; titulo: string; url: string; descricao: string | null; ordem: number };
-type Pipeline = { id: string; nome: string };
+type Etapa = { id: string; nome: string; ordem: number; script: string | null };
+type Pipeline = { id: string; nome: string; etapas: Etapa[] };
 
 export function ConhecimentoWorkspace({ pipelines, accent }: { pipelines: Pipeline[]; accent: string }) {
+  const [dados, setDados] = useState(pipelines);
   const [pipelineId, setPipelineId] = useState(pipelines[0]?.id ?? "");
-  const [links, setLinks] = useState<Link[]>([]);
-  const [titulo, setTitulo] = useState("");
-  const [url, setUrl] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [salvando, startTransition] = useTransition();
+  const pipelineAtual = useMemo(
+    () => dados.find((pipeline) => pipeline.id === pipelineId) ?? null,
+    [dados, pipelineId],
+  );
+  const [etapaId, setEtapaId] = useState(pipelines[0]?.etapas[0]?.id ?? "");
+  const [selecaoBloqueada, setSelecaoBloqueada] = useState(false);
+  const etapaAtual = pipelineAtual?.etapas.find((etapa) => etapa.id === etapaId) ?? null;
 
-  function recarregar(id: string) {
-    ListarConhecimentoLinksBpm(id).then((res) => {
-      if (res.success) setLinks(res.data);
-    });
+  function selecionarPipeline(novoPipelineId: string) {
+    const novoPipeline = dados.find((pipeline) => pipeline.id === novoPipelineId);
+    setPipelineId(novoPipelineId);
+    setEtapaId(novoPipeline?.etapas[0]?.id ?? "");
   }
 
-  useEffect(() => {
-    if (pipelineId) recarregar(pipelineId);
-  }, [pipelineId]);
-
-  function adicionar() {
-    if (!titulo.trim() || !url.trim()) {
-      toast.error("Preencha título e URL.");
-      return;
-    }
-    startTransition(async () => {
-      const resposta = await CriarConhecimentoLinkBpm({
-        pipelineId,
-        titulo: titulo.trim(),
-        url: url.trim(),
-        descricao: descricao.trim() || undefined,
-        ordem: links.length,
-      });
-      if (!resposta.success) {
-        toast.error(resposta.error);
-        return;
-      }
-      toast.success("Link adicionado");
-      setTitulo("");
-      setUrl("");
-      setDescricao("");
-      recarregar(pipelineId);
-    });
-  }
-
-  function excluir(id: string) {
-    startTransition(async () => {
-      const resposta = await ExcluirConhecimentoLinkBpm({ id });
-      if (!resposta.success) {
-        toast.error(resposta.error);
-        return;
-      }
-      recarregar(pipelineId);
-    });
+  function registrarScriptSalvo(script: string | null) {
+    setDados((atuais) => atuais.map((pipeline) => pipeline.id !== pipelineId
+      ? pipeline
+      : {
+          ...pipeline,
+          etapas: pipeline.etapas.map((etapa) => etapa.id === etapaId ? { ...etapa, script } : etapa),
+        }));
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4">
+    <div className="mx-auto max-w-4xl space-y-5 p-4">
       <div className="flex items-center gap-2">
         <BookOpen size={18} style={{ color: `rgb(${accent})` }} />
-        <h1 className="text-lg font-bold text-slate-100">Base de Conhecimento por pipeline</h1>
+        <h1 className="text-lg font-bold text-slate-100">Gerenciador de scripts</h1>
       </div>
       <p className="text-xs text-slate-400">
-        Materiais, procedimentos e documentos relevantes de cada pipeline — exibidos no painel do card durante o atendimento.
+        Escolha o pipeline e a etapa. O texto salvo aparece na aba Scripts dos cards que estiverem nessa etapa.
       </p>
 
-      <Select value={pipelineId} onValueChange={setPipelineId}>
-        <SelectTrigger><SelectValue placeholder="Pipeline" /></SelectTrigger>
-        <SelectContent>
-          {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-        </SelectContent>
-      </Select>
+      {dados.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">
+          Nenhum pipeline ativo disponível.
+        </p>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1.5 text-xs font-semibold text-slate-300">
+              <span>Pipeline</span>
+              <Select value={pipelineId} onValueChange={selecionarPipeline} disabled={selecaoBloqueada}>
+                <SelectTrigger aria-label="Pipeline"><SelectValue placeholder="Selecione o pipeline" /></SelectTrigger>
+                <SelectContent>
+                  {dados.map((pipeline) => <SelectItem key={pipeline.id} value={pipeline.id}>{pipeline.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
 
-      <div className="space-y-2">
-        {links.map((link) => (
-          <div key={link.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
-            <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-2 text-sm text-slate-200 hover:underline">
-              <ExternalLink size={14} className="shrink-0" />
-              <span className="min-w-0 truncate">{link.titulo}</span>
-            </a>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-rose-400" onClick={() => excluir(link.id)} disabled={salvando}>
-              <Trash2 size={14} />
-            </Button>
+            <label className="space-y-1.5 text-xs font-semibold text-slate-300">
+              <span>Etapa</span>
+              <Select value={etapaId} onValueChange={setEtapaId} disabled={selecaoBloqueada || !pipelineAtual?.etapas.length}>
+                <SelectTrigger aria-label="Etapa"><SelectValue placeholder="Selecione a etapa" /></SelectTrigger>
+                <SelectContent>
+                  {pipelineAtual?.etapas.map((etapa) => <SelectItem key={etapa.id} value={etapa.id}>{etapa.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
           </div>
-        ))}
-        {links.length === 0 && <p className="rounded-xl border border-dashed border-white/10 p-6 text-center text-xs text-slate-500">Nenhum link cadastrado para este pipeline.</p>}
-      </div>
 
-      <div className="space-y-2 rounded-2xl border border-white/10 p-3">
-        <span className="text-xs font-semibold text-slate-300">Adicionar novo link</span>
-        <Input placeholder="Título" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-        <Input placeholder="URL (https://...)" value={url} onChange={(e) => setUrl(e.target.value)} />
-        <Input placeholder="Descrição (opcional)" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
-        <Button onClick={adicionar} disabled={salvando || !pipelineId}>
-          <Plus size={14} className="mr-1" /> Adicionar
-        </Button>
-      </div>
+          {etapaAtual ? (
+            <section className="space-y-2" aria-labelledby="titulo-script-etapa">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <ScrollText size={14} style={{ color: `rgb(${accent})` }} />
+                <h2 id="titulo-script-etapa" className="font-semibold text-slate-200">Texto da aba Scripts</h2>
+              </div>
+              <ScriptEtapaEditor
+                key={etapaAtual.id}
+                pipelineId={pipelineId}
+                etapaId={etapaAtual.id}
+                scriptInicial={etapaAtual.script}
+                onSalvo={registrarScriptSalvo}
+                onEstadoChange={setSelecaoBloqueada}
+              />
+            </section>
+          ) : (
+            <p className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">
+              Este pipeline não possui etapas ativas.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
 } from "@/lib/bpm/automacoes/fila";
 import { validarValoresCamposBpm } from "@/lib/bpm/campos-dinamicos";
 import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
+import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 
 type ClienteExecucao = Prisma.TransactionClient | typeof db;
 
@@ -355,7 +356,7 @@ export async function executarOportunidadeBpm(params: {
   card: CardAutomacao;
   configuracao: ParametrosOportunidadeBpm;
 }) {
-  return db.$transaction(async (tx) => {
+  const resultado = await db.$transaction(async (tx) => {
     await tx.bpmAutomacao.update({ where: { id: params.automacaoId }, data: { updatedAt: new Date() } });
     const card = await tx.bpmCard.findUnique({ where: { id: params.card.id } });
     if (!card) throw new Error("Card da oportunidade não encontrado");
@@ -434,6 +435,16 @@ export async function executarOportunidadeBpm(params: {
         cardId: novo.id,
         pipelineId: novo.pipelineId,
         etapaId: novo.etapaId,
+      }, tx);
+      await ativarCadenciasNaEntradaBpm({
+        cardId: novo.id,
+        pipelineAnteriorId: null,
+        etapaAnteriorId: null,
+        pipelineDestinoId: novo.pipelineId,
+        etapaDestinoId: novo.etapaId,
+        evento: "CARD_CRIADO",
+        automacaoOrigem: params.automacaoId,
+        agora: novo.createdAt,
       }, tx);
       resultadoAcao = { cardCriadoId: novo.id };
     } else if (acao.tipo === "ATRIBUIR_VENDEDOR") {
@@ -517,4 +528,5 @@ export async function executarOportunidadeBpm(params: {
       resultado: { tipo: "OPORTUNIDADE", status: "CRIADA", servico, acao: acao.tipo, resultado: resultadoAcao },
     });
   });
+  return resultado;
 }

@@ -58,7 +58,6 @@ import {
 } from "@/lib/bpm/boas-vindas";
 import {
   obterErroDataReuniaoParaMovimento,
-  obterErroContatosConsecutivosParaMovimento,
   etapaEhAgendarReuniao,
 } from "@/lib/bpm/agendar-reuniao";
 import { obterErroTranscricaoParaMovimento } from "@/lib/bpm/reuniao-agendada";
@@ -101,8 +100,10 @@ import { campoFinanceiroSomenteLeitura, etapaFinanceiraValida, validateFinancial
 import { calcularRegraTributariaDoCard } from "@/lib/bpm/regras-financeiras/persistencia";
 import { sincronizarComissoesDoCardFinanceiro } from "@/lib/bpm/regras-financeiras/comissoes-card";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
+import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
 import { obterErroChecklistParaMovimento } from "@/lib/bpm/checklists/integracao";
+import { selecionarEmailClienteReuniao } from "@/lib/bpm/email-reuniao";
 import {
   criarSlaInstancia,
   obterStatusSlaCards,
@@ -555,6 +556,23 @@ export async function ObterCardBpm(cardId: string) {
 
     if (!card) return { success: false, error: "Card não encontrado" };
 
+    const LIMITE_CONTATOS_EMAIL = 100;
+    const vinculosEmail = etapaEhAgendarReuniao(card.etapa.nome)
+      ? await db.pessoaClienteVinculo.findMany({
+          where: { clienteId: card.empresa.id, ativo: true },
+          select: {
+            ativo: true,
+            principal: true,
+            pessoa: { select: { email: true } },
+          },
+          orderBy: [{ principal: "desc" }, { criadoEm: "asc" }],
+          take: LIMITE_CONTATOS_EMAIL + 1,
+        })
+      : [];
+    const emailClienteReuniao = vinculosEmail.length <= LIMITE_CONTATOS_EMAIL
+      ? selecionarEmailClienteReuniao(vinculosEmail)
+      : null;
+
     const podeVerVinculado = async (id: string) => {
       try {
         await exigirAcessoBpmCard(id, userId, session.user.role ?? null, "visualizar");
@@ -614,6 +632,7 @@ export async function ObterCardBpm(cardId: string) {
       success: true,
       data: {
         ...card,
+        emailClienteReuniao,
         anexos: card.anexos.map((anexo) => ({ ...anexo, url: `/api/bpm/anexos/${anexo.id}` })),
         camposEtapa,
         permissaoEtapa: {
@@ -846,9 +865,19 @@ export async function CriarCardBpm(dados: unknown) {
 
       await criarSlaInstancia({ cardId: novoCard.id }, "CRIACAO_CARD", tx, novoCard.createdAt);
 
+      await ativarCadenciasNaEntradaBpm({
+        cardId: novoCard.id,
+        pipelineAnteriorId: null,
+        etapaAnteriorId: null,
+        pipelineDestinoId: novoCard.pipelineId,
+        etapaDestinoId: novoCard.etapaId,
+        evento: "CARD_CRIADO",
+        usuarioId: userId,
+        agora: novoCard.createdAt,
+      }, tx);
+
       return novoCard;
     });
-
     revalidatePath(`${ROTA_BASE}/pipeline/${pipelineId}`);
     await notificarPipelineBpm({ pipelineId, cardId: card.id, tipo: "CARD_CRIADO" });
     return { success: true, data: card };
@@ -1333,7 +1362,7 @@ async function carregarGuardasNativasMovimento(params: {
   transcricaoReuniao: string | null;
   proximoContatoEm: Date | null;
   camposEtapaOrigem?: readonly { nome: string; valor: string | null }[];
-}, client: Pick<typeof db, "bpmChecklistFollowUp" | "bpmInteracaoCard"> = db) {
+}, client: Pick<typeof db, "bpmChecklistFollowUp"> = db) {
   const guardas = [
     obterErroTransicaoMonitoramento({
       etapaOrigemNome: params.etapaOrigemNome,
@@ -1375,21 +1404,6 @@ async function carregarGuardasNativasMovimento(params: {
       ultimoChecklist,
     });
     if (erroChecklist) guardas.push(erroChecklist);
-  }
-
-  if (etapaEhAgendarReuniao(params.etapaOrigemNome)) {
-    const interacoes = await client.bpmInteracaoCard.findMany({
-      where: {
-        cardId: params.cardId,
-        tipo: { in: ["LIGACAO", "EMAIL", "REUNIAO", "WHATSAPP"] },
-      },
-      select: { createdAt: true, agendadoEm: true },
-    });
-    const erroContatos = obterErroContatosConsecutivosParaMovimento({
-      etapaOrigemNome: params.etapaOrigemNome,
-      datasContato: interacoes.map((interacao) => interacao.agendadoEm ?? interacao.createdAt),
-    });
-    if (erroContatos) guardas.push(erroContatos);
   }
 
   return guardas;

@@ -67,11 +67,15 @@ function makeVinculo(overrides: Record<string, unknown> = {}) {
     status: "ATIVA",
     passoAtualOrdem: 1,
     proximaExecucaoEm: new Date("2026-01-01"),
+    iniciadaEm: new Date("2026-01-01T00:00:00.000Z"),
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
     card: { id: "card1", pipelineId: "pipe1", etapaId: "et1", status: "ATIVO", responsavelId: 1 },
     cadencia: {
       id: "cad1",
       nome: "Cadência Teste",
       ativa: true,
+      pipelineId: "pipe1",
+      etapaId: "et1",
       passos: [
         { id: "passo1", ordem: 1, intervaloDias: 7, titulo: "Passo 1", tipoTarefa: "TAREFA", prioridade: "NORMAL", ativo: true },
         { id: "passo2", ordem: 2, intervaloDias: 14, titulo: "Passo 2", tipoTarefa: "EMAIL", prioridade: "ALTA", ativo: true },
@@ -96,6 +100,8 @@ describe("processarCadenciasBpm", () => {
     // $transaction calls the fn with a mock tx
     mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
       const tx = {
+        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
+        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
         bpmCadenciaPassoExecucao: {
           create: vi.fn().mockResolvedValue(execucao),
           update: vi.fn().mockResolvedValue({}),
@@ -131,6 +137,8 @@ describe("processarCadenciasBpm", () => {
     const p2002Error = Object.assign(new Error("Unique constraint"), { code: "P2002" });
     mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
       const tx = {
+        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
+        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
         bpmCadenciaPassoExecucao: {
           create: vi.fn().mockRejectedValue(p2002Error),
           update: vi.fn(),
@@ -157,6 +165,8 @@ describe("processarCadenciasBpm", () => {
     // Execution creates OK but tarefa.create throws
     mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
       const tx = {
+        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
+        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
         bpmCadenciaPassoExecucao: {
           create: vi.fn().mockResolvedValue({ id: "exec1" }),
           update: vi.fn(),
@@ -199,20 +209,56 @@ describe("processarCadenciasBpm", () => {
     expect(resultado.falhas).toBe(0);
   });
 
-  it("cadência inativa: vínculo é pausado", async () => {
-    const vinculo = makeVinculo({ cadencia: { id: "cad1", nome: "Cad", ativa: false, passos: [] } });
-    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
+  it("cadência inativa é pausada sem criar tarefa", async () => {
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([makeVinculo({
+      cadencia: { ...makeVinculo().cadencia, ativa: false },
+    })]);
     mockDb.bpmCardCadencia.update.mockResolvedValue({});
 
     const resultado = await processarCadenciasBpm();
 
-    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "vinculo1" },
-        data: expect.objectContaining({ status: "PAUSADA" }),
-      }),
-    );
+    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "PAUSADA", proximaExecucaoEm: null }),
+    }));
     expect(resultado.processadas).toBe(0);
+  });
+
+  it.each([
+    ["legado sem etapa", { pipelineId: "pipe1", etapaId: null }],
+    ["outra etapa", { pipelineId: "pipe1", etapaId: "et2" }],
+    ["outro pipeline", { pipelineId: "pipe2", etapaId: "et1" }],
+  ])("%s é cancelado antes de criar tarefa", async (_caso, escopo) => {
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([makeVinculo({
+      cadencia: { ...makeVinculo().cadencia, ...escopo },
+    })]);
+    mockDb.bpmCardCadencia.update.mockResolvedValue({});
+
+    const resultado = await processarCadenciasBpm();
+
+    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "CANCELADA", proximaExecucaoEm: null }),
+    }));
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+    expect(resultado.falhas).toBe(0);
+  });
+
+  it("revalidação transacional impede tarefa se o card mudar durante o processamento", async () => {
+    const vinculo = makeVinculo();
+    mockDb.bpmCardCadencia.findMany.mockResolvedValue([vinculo]);
+    mockDb.bpmCardCadencia.update.mockResolvedValue({});
+    mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => fn({
+      bpmCard: { findUnique: vi.fn().mockResolvedValue({ ...vinculo.card, etapaId: "et2" }) },
+      bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
+      bpmCadenciaPassoExecucao: { create: vi.fn() },
+      bpmTarefa: { create: vi.fn() },
+    }));
+
+    const resultado = await processarCadenciasBpm();
+
+    expect(mockDb.bpmCardCadencia.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "CANCELADA" }),
+    }));
+    expect(resultado.falhas).toBe(0);
   });
 
   it("último passo: vínculo é concluído", async () => {
@@ -222,6 +268,8 @@ describe("processarCadenciasBpm", () => {
         id: "cad1",
         nome: "Cad",
         ativa: true,
+        pipelineId: "pipe1",
+        etapaId: "et1",
         passos: [
           { id: "passo1", ordem: 1, intervaloDias: 7, titulo: "P1", tipoTarefa: "TAREFA", prioridade: "NORMAL", ativo: true },
           { id: "passo2", ordem: 2, intervaloDias: 14, titulo: "P2", tipoTarefa: "TAREFA", prioridade: "NORMAL", ativo: true },
@@ -234,6 +282,8 @@ describe("processarCadenciasBpm", () => {
     const tarefa = { id: "tarefa1" };
     mockDb.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
       const tx = {
+        bpmCard: { findUnique: vi.fn().mockResolvedValue(vinculo.card) },
+        bpmCadencia: { findUnique: vi.fn().mockResolvedValue({ pipelineId: "pipe1", etapaId: "et1", ativa: true }) },
         bpmCadenciaPassoExecucao: {
           create: vi.fn().mockResolvedValue(execucao),
           update: vi.fn().mockResolvedValue({}),

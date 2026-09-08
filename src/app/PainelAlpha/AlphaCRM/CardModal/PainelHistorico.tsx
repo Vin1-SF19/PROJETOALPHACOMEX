@@ -21,16 +21,16 @@ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
 import { isAdminRole } from "@/lib/roles";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { montarFeedTimelineCard, type ItemTimelineCard } from "@/lib/bpm/timeline";
+import { descreverEventoHistorico, type ContextoDescricaoHistorico } from "@/lib/bpm/historico-descricao";
 import PainelTimelineCard from "./PainelTimelineCard";
 import { PainelCadenciasCard } from "@/components/bpm/cadencias/PainelCadenciasCard";
 
 import { PainelResumoEtapas } from "./PainelResumoEtapas";
 import { PainelTarefasPorTipo } from "./PainelTarefasPorTipo";
-import { PainelConhecimentoRelacionado } from "@/components/bpm/conhecimento/PainelConhecimentoRelacionado";
 import { etapasAnterioresParaResumo } from "@/lib/bpm/resumo-etapas";
 import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
-import { formatarBytes, formatarValorHistorico, iconePorAcao } from "./PainelHistoricoShared";
+import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -89,6 +89,14 @@ export default function PainelHistorico({
   }, [card.id]);
 
   const feedHistorico: ItemTimelineCard[] = montarFeedTimelineCard(card.historico, anotacoes);
+  const contextoHistorico: ContextoDescricaoHistorico = {
+    etapas,
+    campos: card.campoValores.map(({ campo }) => ({ id: campo.id, nome: campo.nome })),
+    usuarios: [
+      ...(card.responsavel ? [card.responsavel] : []),
+      ...card.membros.map(({ usuario }) => usuario),
+    ].filter((usuario, indice, todos) => todos.findIndex(({ id }) => id === usuario.id) === indice),
+  };
 
   const meuVinculo = card.membros.find((m) => m.userId === currentUserId);
   const podeExcluirAnexo = isAdminRole(currentUserRole) || Boolean(meuVinculo);
@@ -126,7 +134,6 @@ export default function PainelHistorico({
 
   return (
     <div className="flex max-h-[85vh] min-h-0 flex-col gap-3 overflow-hidden rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent p-4 lg:h-full lg:max-h-none">
-      <PainelConhecimentoRelacionado pipelineId={card.pipeline.id} accent={accent} />
       <Tabs value={abaEsquerda} onValueChange={setAbaEsquerda} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="tarefas" className="flex-none gap-1.5">
@@ -244,22 +251,18 @@ export default function PainelHistorico({
                     return <Icone size={12} className="mt-0.5 shrink-0 text-slate-500" />;
                   })()}
                   <div className="min-w-0">
-                    <span className="text-slate-300">{item.label}</span>
+                    <span className="text-slate-300">
+                      {descreverEventoHistorico({
+                        acao: item.acao ?? "",
+                        valorAnteriorJson: item.valorAnterior,
+                        valorNovoJson: item.valorNovo,
+                        contexto: contextoHistorico,
+                      })}
+                    </span>
                     {" — "}
                     {item.autor}
                     {" · "}
                     {fmtDateTime(item.data)}
-                    {(item.valorAnterior || item.valorNovo) && (
-                      <p className="mt-0.5 text-[10px] text-slate-500">
-                        {formatarValorHistorico(item.valorAnterior) && (
-                          <span className="line-through decoration-rose-500/60">{formatarValorHistorico(item.valorAnterior)}</span>
-                        )}
-                        {formatarValorHistorico(item.valorAnterior) && formatarValorHistorico(item.valorNovo) && " → "}
-                        {formatarValorHistorico(item.valorNovo) && (
-                          <span className="text-emerald-400/90">{formatarValorHistorico(item.valorNovo)}</span>
-                        )}
-                      </p>
-                    )}
                   </div>
                 </div>
               ),

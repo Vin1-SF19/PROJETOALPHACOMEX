@@ -1,15 +1,17 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { patchMock, deleteMock, getMock, calendarMock } = vi.hoisted(() => {
+const { insertMock, patchMock, deleteMock, getMock, calendarMock } = vi.hoisted(() => {
+  const insert = vi.fn();
   const patch = vi.fn();
   const remove = vi.fn();
   const get = vi.fn();
   return {
+    insertMock: insert,
     patchMock: patch,
     deleteMock: remove,
     getMock: get,
     calendarMock: vi.fn(() => ({
-      events: { patch, delete: remove, get },
+      events: { insert, patch, delete: remove, get },
     })),
   };
 });
@@ -25,6 +27,7 @@ vi.mock("googleapis", () => ({
 import {
   atualizarEventoParcial,
   cancelarEvento,
+  criarEvento,
   mesclarParticipantesGoogle,
   obterEvento,
 } from "@/lib/google-calendar/client";
@@ -38,6 +41,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   patchMock.mockResolvedValue({
     data: { id: "evt-1", etag: '"v2"', summary: "Updated" },
+  });
+  insertMock.mockResolvedValue({
+    data: { id: "evt-new", etag: '"v1"', summary: "Reunião" },
   });
   deleteMock.mockResolvedValue({ data: {} });
   getMock.mockRejectedValue({ response: { status: 404 } });
@@ -123,6 +129,31 @@ describe("Google Calendar optimistic concurrency headers", () => {
     );
     const requestBody = patchMock.mock.calls.at(-1)?.[0]?.requestBody;
     expect(requestBody).not.toHaveProperty("conferenceData");
+    expect(patchMock.mock.calls.at(-1)?.[0]?.sendUpdates).toBe("all");
+  });
+
+  it("envia o convite ao criar evento com participantes", async () => {
+    await criarEvento({
+      emailUsuario: "user@alpha.com",
+      calendarId: "primary",
+      evento: {
+        titulo: "Reunião",
+        timezone: "America/Sao_Paulo",
+        diaInteiro: false,
+        inicio: new Date("2026-08-20T13:00:00.000Z"),
+        fim: new Date("2026-08-20T14:00:00.000Z"),
+        participantes: ["cliente@exemplo.com"],
+        criarMeet: true,
+      },
+    });
+
+    expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      calendarId: "primary",
+      sendUpdates: "all",
+      requestBody: expect.objectContaining({
+        attendees: [{ email: "cliente@exemplo.com" }],
+      }),
+    }));
   });
 
   it("loads the complete Google event before editing", async () => {
