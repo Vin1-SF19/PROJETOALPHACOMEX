@@ -9,7 +9,6 @@ const prismaMock = vi.hoisted(() => ({
   bpmPipeline: { findUnique: vi.fn(), findMany: vi.fn() },
   bpmEtapa: { findUnique: vi.fn() },
   bpmCard: { findUnique: vi.fn(), findMany: vi.fn() },
-  servicosComerciais: { findMany: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -48,6 +47,8 @@ describe("Checklists.ts — Server Actions administrativas", () => {
     prismaMock.bpmChecklistTemplate.create.mockResolvedValue({ id: "cm12345678901234567890123" });
     const resposta = await CriarTemplateChecklistBpm({
       nome: "Documentação", ativo: true,
+      servico: "valor legado ignorado",
+      tipoProcesso: "valor legado ignorado",
       itens: [{ nome: "Contrato", obrigatorio: true, ordem: 0 }],
     });
     expect(resposta).toEqual({ success: true, data: { id: "cm12345678901234567890123" } });
@@ -56,18 +57,21 @@ describe("Checklists.ts — Server Actions administrativas", () => {
       data: expect.objectContaining({ nome: "Documentação", criadoPorId: 7, itens: { create: [expect.objectContaining({ nome: "Contrato", ordem: 0 })] } }),
       select: { id: true },
     }));
+    const dadosPersistidos = prismaMock.bpmChecklistTemplate.create.mock.calls[0]?.[0]?.data;
+    expect(dadosPersistidos).not.toHaveProperty("servico");
+    expect(dadosPersistidos).not.toHaveProperty("tipoProcesso");
     expect(revalidateMock).toHaveBeenCalledWith("/PainelAlpha/AlphaCRM/admin/checklists");
   });
 
   it("carrega as fontes controladas do builder em uma leitura administrativa", async () => {
     prismaMock.bpmChecklistTemplate.findMany.mockResolvedValue([]);
     prismaMock.bpmPipeline.findMany.mockResolvedValue([{ id: "pipeline-1", nome: "Comercial", etapas: [] }]);
-    prismaMock.servicosComerciais.findMany.mockResolvedValue([{ nome: "Radar" }]);
     prismaMock.bpmCard.findMany.mockResolvedValue([]);
 
     const resposta = await ListarWorkspaceChecklistsBpm();
 
-    expect(resposta).toMatchObject({ success: true, data: { servicos: ["Radar"], cards: [] } });
+    expect(resposta).toMatchObject({ success: true, data: { cards: [] } });
+    expect(resposta.data).not.toHaveProperty("servicos");
     expect(acessoConfigMock).toHaveBeenCalledWith(7, "configurarChecklists");
     expect(prismaMock.bpmPipeline.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { ativo: true } }));
   });
@@ -89,6 +93,8 @@ describe("Checklists.ts — Server Actions administrativas", () => {
       id: templateId,
       nome: "Documentação atualizada",
       ativo: true,
+      servico: "legado não deve ser sobrescrito",
+      tipoProcesso: "legado não deve ser sobrescrito",
       itens: [
         { id: itemMantidoId, nome: "Contrato", obrigatorio: true, ordem: 8 },
         { nome: "Procuração", obrigatorio: false, ordem: 9 },
@@ -107,5 +113,8 @@ describe("Checklists.ts — Server Actions administrativas", () => {
     expect(prismaMock.bpmChecklistTemplateItem.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ templateId, nome: "Procuração", ordem: 1 }),
     }));
+    const metadadosPersistidos = prismaMock.bpmChecklistTemplate.update.mock.calls[0]?.[0]?.data;
+    expect(metadadosPersistidos).not.toHaveProperty("servico");
+    expect(metadadosPersistidos).not.toHaveProperty("tipoProcesso");
   });
 });

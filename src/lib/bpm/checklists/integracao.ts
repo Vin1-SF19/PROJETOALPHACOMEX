@@ -12,7 +12,7 @@ import {
 
 type ClienteIntegracaoChecklist = Pick<
   Prisma.TransactionClient,
-  "bpmCard" | "bpmCardChecklist" | "bpmChecklistTemplate"
+  "bpmCardChecklist" | "bpmChecklistTemplate"
 >;
 
 export const RESUMO_CHECKLIST_VAZIO = calcularResumoChecklist([]);
@@ -31,8 +31,6 @@ async function listarTemplatesAplicaveis(card: ContextoCardChecklist, client: Cl
         AND: [
           { OR: [{ pipelineId: null }, { pipelineId: card.pipelineId }] },
           { OR: [{ etapaId: null }, { etapaId: card.etapaId }] },
-          { OR: [{ servico: null }, { servico: card.servico }] },
-          { OR: [{ tipoProcesso: null }, { tipoProcesso: card.tipoProcesso }] },
           { OR: [{ cardId: null }, { cardId: card.id }] },
         ],
       },
@@ -63,16 +61,9 @@ export async function carregarResumoChecklistAplicavelCard(
   card: ContextoCardChecklist,
   client: ClienteIntegracaoChecklist = db,
 ): Promise<ResumoChecklistCard> {
-  const contexto = card.tipoProcesso === undefined
-    ? await client.bpmCard.findUnique({
-        where: { id: card.id },
-        select: { id: true, pipelineId: true, etapaId: true, servico: true, tipoProcesso: true },
-      })
-    : card;
-  if (!contexto) throw new Error("Card não encontrado");
   const [materializados, templates] = await Promise.all([
     client.bpmCardChecklist.findMany({
-      where: { cardId: contexto.id },
+      where: { cardId: card.id },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: {
         id: true,
@@ -84,7 +75,7 @@ export async function carregarResumoChecklistAplicavelCard(
         },
       },
     }),
-    listarTemplatesAplicaveis(contexto, client),
+    listarTemplatesAplicaveis(card, client),
   ]);
   const idsMaterializados = new Set(materializados.map((item) => item.templateId));
   const virtuais: InstanciaEstadoChecklist[] = templates

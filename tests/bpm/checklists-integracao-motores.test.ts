@@ -14,8 +14,6 @@ const card = {
   id: "card-1",
   pipelineId: "pipeline-1",
   etapaId: "etapa-1",
-  servico: "Protocolo",
-  tipoProcesso: "Importação",
 };
 
 function client(status = "PENDENTE") {
@@ -48,6 +46,9 @@ describe("integração do checklist com os motores BPM", () => {
     });
     expect(erro).toContain("Documentação para protocolo");
     expect(erro).toContain("Anexar procuração");
+    const filtroAplicabilidade = banco.bpmChecklistTemplate.findMany.mock.calls[0]?.[0]?.where;
+    expect(JSON.stringify(filtroAplicabilidade)).not.toContain("servico");
+    expect(JSON.stringify(filtroAplicabilidade)).not.toContain("tipoProcesso");
   });
 
   it("libera depois da conclusão e entrega o mesmo fato para regras e automações", async () => {

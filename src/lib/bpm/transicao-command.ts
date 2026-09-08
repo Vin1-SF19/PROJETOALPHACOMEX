@@ -106,12 +106,10 @@ function requisitoAplica(
 }
 
 function campoAplica(
-  campo: { etapaId: string | null; etapaConfiguracoes: Array<{ etapaId: string }> },
+  campo: { etapaConfiguracoes: Array<{ etapaId: string }> },
   etapaOrigemId: string,
   etapaDestinoId: string,
 ): boolean {
-  if (campo.etapaId) return campo.etapaId === etapaOrigemId || campo.etapaId === etapaDestinoId;
-  if (!campo.etapaConfiguracoes.length) return true;
   return campo.etapaConfiguracoes.some((config) => config.etapaId === etapaOrigemId || config.etapaId === etapaDestinoId);
 }
 
@@ -377,8 +375,6 @@ async function prepararTransicao(input: ComandoTransicaoBpm, tx: Tx) {
     id: card.id,
     pipelineId: card.pipelineId,
     etapaId: card.etapaId,
-    servico: card.servicoContexto?.nomeLegado ?? card.servico,
-    tipoProcesso: card.tipoProcesso,
   }, tx);
   if (erroChecklist) erro("CHECKLIST_BLOCKED", erroChecklist);
 

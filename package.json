@@ -23,6 +23,7 @@
     "bpm:automacoes": "tsx --conditions=react-server scripts/bpm-automacoes.ts",
     "bpm:automacoes:migrar-hardcoded": "tsx --conditions=react-server scripts/migrar-automacoes-hardcoded.ts",
     "bpm:checklists:reconciliar": "tsx --conditions=react-server scripts/reconciliar-tarefas-checklists.ts",
+    "bpm:pipeline:diagnostico": "tsx --conditions=react-server scripts/diagnosticar-pipeline-bpm.ts",
     "roadmap:doctor": "tsx scripts/roadmap-alpha.mjs doctor",
     "roadmap:check-modules": "tsx scripts/roadmap-alpha.mjs check-modules",
     "roadmap:sync-modules": "tsx scripts/roadmap-alpha.mjs sync-modules",
@@ -47,7 +48,12 @@
     "alpha-seo:doctor": "tsx scripts/alpha-seo.mjs doctor",
     "alpha-seo:worker": "tsx scripts/alpha-seo.mjs worker",
     "alpha-seo:worker:once": "tsx scripts/alpha-seo.mjs worker --once",
-    "alpha-seo:worker:persistent:once": "tsx --conditions=react-server scripts/alpha-seo.mjs worker --once --persistent"
+    "alpha-seo:worker:persistent:once": "tsx --conditions=react-server scripts/alpha-seo.mjs worker --once --persistent",
+    "chatbot-alpha:doctor": "tsx scripts/chatbot-alpha.mjs doctor",
+    "chatbot-alpha:capabilities": "tsx scripts/chatbot-alpha.mjs capabilities",
+    "chatbot-alpha:list-conversations": "tsx scripts/chatbot-alpha.mjs list-conversations",
+    "chatbot-alpha:list-messages": "tsx scripts/chatbot-alpha.mjs list-messages",
+    "chatbot-alpha:send-message": "tsx scripts/chatbot-alpha.mjs send-message"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1112.0",

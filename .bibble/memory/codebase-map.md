@@ -2,10 +2,11 @@
 
 - Checklist Builder: models Prisma `BpmChecklistTemplate*`/`BpmCardChecklist*`; domínio em `src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts`; actions em `src/actions/bpm/Checklists.ts`; workspace em `src/components/bpm/checklists/ChecklistsWorkspace.tsx`; painel em `CardModal/PainelChecklistsCard.tsx`; alerta/navegação em `PainelProximaEtapa.tsx` + `PainelRegistrar.tsx`; ação automática `MATERIALIZAR_CHECKLIST` em `src/lib/bpm/automacoes/{schemas,executor}.ts`.
 - SLA BPM: cálculo, provisionamento idempotente, pausa/retomada, recálculo on-read e sincronização de movimento em `src/lib/bpm/sla.ts`; fachada autenticada em `src/actions/bpm/Sla.ts`; `Cards.ts` sincroniza a saída/entrada de etapa e o standby na mesma transação do movimento.
+- ChatBot Alpha: rota em `src/app/PainelAlpha/ChatBotAlpha/page.tsx`; client em `src/components/ChatBotAlpha/{ChatBotAlphaClient,ChatConversa,SeletorSistemaChatBot,IframeChatBotAlpha}.tsx`; actions em `src/actions/{ChatBotAlpha,ChatBotAlphaChat}.ts`; domínio em `src/lib/chatbot-alpha/{contracts,doctor,observability,chat-api}.ts`; CLI em `scripts/chatbot-alpha.mjs`; testes em `tests/chatbot-alpha/{contracts,observability,chat-api,actions}.test.ts`.
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-09-04 (RM-2026-209DB4 — Checklist Builder concluído)
+> Última atualização: 2026-09-08 (RM-2026-3D529D — ChatBot Alpha concluído)
 
 ---
 
@@ -1331,3 +1332,27 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - `src/app/PainelAlpha/AlphaCRM/CardModal/PainelSlaCard.tsx`: detalhes, deadline e histórico de pausa no card aberto.
 - `src/lib/bpm/automacoes/{central-schemas,eventos}.ts`: gatilho `SLA_STATUS_ALTERADO`, filtro por status e materialização idempotente.
 - `tests/bpm/sla-alertas-automacao.test.ts` e `scripts/verify-sla-e2e.ts`: regressões estáticas/isoladas e cenário real de ponta a ponta.
+
+## Regras Financeiras removidas — RM-2026-DBEF25
+
+- `src/lib/bpm/regras/legado.ts`: compatibilidade exclusiva para ocultar,
+  desativar no runtime e proteger contra mutação os registros financeiros
+  históricos, preservando regras comuns com descrição nula.
+- `src/actions/bpm/Regras.ts` e `src/lib/bpm/regras/contexto.ts`: consumidores do
+  filtro legado no admin e na guarda de movimento.
+- `tests/bpm/regras-financeiras-remocao.test.ts`: contrato de ausência da rota,
+  UI, actions, motor e ponte removidos, com preservação dos módulos vizinhos.
+- Não existem mais `src/actions/bpm/RegrasFinanceiras.ts`, a rota
+  `admin/regras-financeiras`, componentes ou `src/lib/bpm/regras-financeiras/*`.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-DBEF25)
+
+## Revisão integral de pipeline — RM-2026-8C3862
+
+- `scripts/diagnosticar-pipeline-bpm.ts` e `src/lib/bpm/pipeline-config-diagnostico.ts`: CLI e projeção pura de saúde/schema, sem escrita.
+- `src/lib/bpm/pipeline-config-publicacao.ts` e `src/actions/bpm/ConfiguracaoPipeline.ts`: validação integral, CAS e publicação auditada.
+- `AdminPipelineClient.tsx` e `PipelineWorkspaceSections.tsx`: rascunho, descarte, publicação, saúde, navegação e histórico sanitizado.
+- `src/lib/bpm/sla.ts`, `src/actions/bpm/Sla.ts` e `SlaConfigSection.tsx`: simulação read-only pelo resolvedor do runtime.
+- `tests/bpm/pipeline-config-{diagnostico,publicacao,workspace}.test.ts`: contratos específicos.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)

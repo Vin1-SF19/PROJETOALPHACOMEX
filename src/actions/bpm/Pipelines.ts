@@ -26,24 +26,48 @@ function projetarAutomacaoNoBoard(automacao: {
   ativa: boolean;
   gatilhoTipo: string;
   etapaId: string;
-  versoes: Array<{ gatilhoTipo: string; gatilhoConfigJson: string; condicaoJson: string | null; grafoJson: string }>;
+  versoes: Array<{
+    gatilhoTipo: string;
+    gatilhoConfigJson: string;
+    condicaoJson: string | null;
+    grafoJson: string;
+  }>;
 }) {
   const versao = automacao.versoes[0] ?? null;
-  let config: { escopo?: string; etapaId?: string; etapasIds?: string[]; recorrencia?: unknown } = {};
+  let config: {
+    escopo?: string;
+    etapaId?: string;
+    etapasIds?: string[];
+    recorrencia?: unknown;
+  } = {};
   let acoes: string[] = [];
   try {
     if (versao) {
       config = JSON.parse(versao.gatilhoConfigJson);
-      const grafo = JSON.parse(versao.grafoJson) as { nos?: Array<{ tipo?: string; acaoTipo?: string }> };
-      acoes = (grafo.nos ?? []).filter((no) => no.tipo === "ACAO" && no.acaoTipo).map((no) => no.acaoTipo!);
+      const grafo = JSON.parse(versao.grafoJson) as {
+        nos?: Array<{ tipo?: string; acaoTipo?: string }>;
+      };
+      acoes = (grafo.nos ?? [])
+        .filter((no) => no.tipo === "ACAO" && no.acaoTipo)
+        .map((no) => no.acaoTipo!);
     }
   } catch {
     // Uma definição inválida continua visível para que possa ser corrigida na central.
   }
-  const escopo: "GLOBAL_PIPELINE" | "ETAPAS" = config.escopo === "GLOBAL_PIPELINE" ? "GLOBAL_PIPELINE" : "ETAPAS";
-  const etapasIds = escopo === "GLOBAL_PIPELINE"
-    ? []
-    : [...new Set([...(Array.isArray(config.etapasIds) ? config.etapasIds : []), config.etapaId, automacao.etapaId].filter((id): id is string => typeof id === "string"))];
+  const escopo: "GLOBAL_PIPELINE" | "ETAPAS" =
+    config.escopo === "GLOBAL_PIPELINE" ? "GLOBAL_PIPELINE" : "ETAPAS";
+  const etapasIds =
+    escopo === "GLOBAL_PIPELINE"
+      ? []
+      : [
+          ...new Set(
+            [
+              ...(Array.isArray(config.etapasIds) ? config.etapasIds : []),
+              config.etapaId,
+              automacao.etapaId,
+            ].filter((id): id is string => typeof id === "string"),
+          ),
+        ];
   return {
     id: automacao.id,
     nome: automacao.nome,
@@ -61,7 +85,8 @@ function projetarAutomacaoNoBoard(automacao: {
 export async function ListarPipelinesBpm(incluirInativos = false) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+    if (!session?.user?.id)
+      return { success: false, error: "Não autorizado", data: [] };
     const userId = Number(session.user.id);
     await exigirAcessoModuloBpm(userId);
 
@@ -97,7 +122,8 @@ export async function ListarSetoresParaPipelineBpm() {
     const session = await auth();
     // Resolve permission server-side; a valid session alone cannot enumerate sectors.
     if (session?.user?.id) await exigirAcessoModuloBpm(Number(session.user.id));
-    if (!session?.user?.id) return { success: false, error: "Não autorizado", data: [] };
+    if (!session?.user?.id)
+      return { success: false, error: "Não autorizado", data: [] };
 
     const setores = await db.setor.findMany({
       select: { id: true, nome: true },
@@ -117,11 +143,18 @@ export async function ListarSetoresParaPipelineBpm() {
  * (`incluirInativas=false`, padrão) continua vendo só etapas ativas, sem mudança de
  * comportamento.
  */
-export async function ObterPipelineBpm(pipelineId: string, incluirInativas = false) {
+export async function ObterPipelineBpm(
+  pipelineId: string,
+  incluirInativas = false,
+) {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
-    await exigirAcessoBpmPipeline(pipelineId, Number(session.user.id));
+    const userId = Number(session.user.id);
+    await exigirAcessoBpmPipeline(pipelineId, userId);
+    if (incluirInativas) {
+      await exigirAcessoConfigPipeline(userId, "configurarEtapas");
+    }
 
     const pipeline = await db.bpmPipeline.findUnique({
       where: { id: pipelineId },
@@ -132,13 +165,35 @@ export async function ObterPipelineBpm(pipelineId: string, incluirInativas = fal
           include: {
             camposObrigatorios: { select: { campoId: true } },
             subStatus: { orderBy: { ordem: "asc" } },
+            formulario: {
+              include: {
+                secoes: {
+                  orderBy: { ordem: "asc" },
+                  include: {
+                    componentes: {
+                      orderBy: { ordem: "asc" },
+                      include: {
+                        campo: { select: { id: true, nome: true, tipo: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         campos: {
           orderBy: { ordem: "asc" },
           include: {
-            pipelinesAssociados: { select: { pipelineId: true } },
-            etapaConfiguracoes: true,
+            pipeline: { select: { id: true, nome: true } },
+            pipelinesAssociados: {
+              include: { pipeline: { select: { id: true, nome: true } } },
+            },
+            etapaConfiguracoes: {
+              include: {
+                etapa: { select: { id: true, nome: true, pipelineId: true } },
+              },
+            },
             acessos: true,
             opcoes: { orderBy: { ordem: "asc" } },
             mapeamentoDestino: true,
@@ -167,6 +222,16 @@ export async function ObterPipelineBpm(pipelineId: string, incluirInativas = fal
             },
           },
         },
+        configAuditoria: {
+          orderBy: { createdAt: "desc" },
+          take: incluirInativas ? 50 : 0,
+          select: {
+            id: true,
+            campoAlterado: true,
+            createdAt: true,
+            admin: { select: { id: true, nome: true } },
+          },
+        },
       },
     });
 
@@ -177,8 +242,15 @@ export async function ObterPipelineBpm(pipelineId: string, incluirInativas = fal
         pipelinesAssociados: { some: { pipelineId } },
       },
       include: {
-        pipelinesAssociados: { select: { pipelineId: true } },
-        etapaConfiguracoes: true,
+        pipeline: { select: { id: true, nome: true } },
+        pipelinesAssociados: {
+          include: { pipeline: { select: { id: true, nome: true } } },
+        },
+        etapaConfiguracoes: {
+          include: {
+            etapa: { select: { id: true, nome: true, pipelineId: true } },
+          },
+        },
         acessos: true,
         opcoes: { orderBy: { ordem: "asc" } },
         mapeamentoDestino: true,
@@ -191,12 +263,17 @@ export async function ObterPipelineBpm(pipelineId: string, incluirInativas = fal
       success: true,
       data: {
         ...dadosPipeline,
-        campos: [...dadosPipeline.campos, ...camposAssociados]
-          .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome)),
-        automacoesGlobais: automacoes.filter((automacao) => automacao.escopo === "GLOBAL_PIPELINE"),
+        campos: [...dadosPipeline.campos, ...camposAssociados].sort(
+          (a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome),
+        ),
+        automacoesGlobais: automacoes.filter(
+          (automacao) => automacao.escopo === "GLOBAL_PIPELINE",
+        ),
         etapas: pipeline.etapas.map((etapa) => ({
           ...etapa,
-          automacoes: automacoes.filter((automacao) => automacao.etapasIds.includes(etapa.id)),
+          automacoes: automacoes.filter((automacao) =>
+            automacao.etapasIds.includes(etapa.id),
+          ),
         })),
       },
     };
@@ -215,7 +292,8 @@ export async function CriarPipelineBpm(dados: unknown) {
     await exigirAcessoConfigPipeline(Number(session.user.id), "criarPipeline");
 
     const parsed = criarPipelineSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success)
+      return { success: false, error: parsed.error.flatten() };
     const { nome, setorIds } = parsed.data;
 
     const pipeline = await db.bpmPipeline.create({
@@ -228,11 +306,17 @@ export async function CriarPipelineBpm(dados: unknown) {
 
     revalidatePath(ROTA_BASE);
     revalidatePath(`${ROTA_BASE}/admin`);
-    await notificarPipelineBpm({ pipelineId: pipeline.id, tipo: "PIPELINE_ALTERADO" });
+    await notificarPipelineBpm({
+      pipelineId: pipeline.id,
+      tipo: "PIPELINE_ALTERADO",
+    });
     return { success: true, data: pipeline };
   } catch (error) {
     console.error("[CriarPipelineBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao criar pipeline";
+    const msg =
+      error instanceof Error && error.message.includes("administradores")
+        ? error.message
+        : "Erro ao criar pipeline";
     return { success: false, error: msg };
   }
 }
@@ -242,10 +326,14 @@ export async function AtualizarPipelineBpm(dados: unknown) {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
 
-    await exigirAcessoConfigPipeline(Number(session.user.id), "configurarEtapas");
+    await exigirAcessoConfigPipeline(
+      Number(session.user.id),
+      "configurarEtapas",
+    );
 
     const parsed = atualizarPipelineSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success)
+      return { success: false, error: parsed.error.flatten() };
     const { pipelineId, nome, ativo, setorIds } = parsed.data;
 
     const pipeline = await db.$transaction(async (tx) => {
@@ -269,7 +357,10 @@ export async function AtualizarPipelineBpm(dados: unknown) {
     return { success: true, data: pipeline };
   } catch (error) {
     console.error("[AtualizarPipelineBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao atualizar pipeline";
+    const msg =
+      error instanceof Error && error.message.includes("administradores")
+        ? error.message
+        : "Erro ao atualizar pipeline";
     return { success: false, error: msg };
   }
 }
@@ -283,14 +374,21 @@ export async function AtivarDesativarPipelineBpm(dados: unknown) {
     await exigirAcessoConfigPipeline(userId, "criarPipeline");
 
     const parsed = ativarDesativarPipelineSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success)
+      return { success: false, error: parsed.error.flatten() };
     const { pipelineId, ativo } = parsed.data;
 
-    const pipelineAnterior = await db.bpmPipeline.findUnique({ where: { id: pipelineId } });
-    if (!pipelineAnterior) return { success: false, error: "Pipeline não encontrado" };
+    const pipelineAnterior = await db.bpmPipeline.findUnique({
+      where: { id: pipelineId },
+    });
+    if (!pipelineAnterior)
+      return { success: false, error: "Pipeline não encontrado" };
 
     const pipeline = await db.$transaction(async (tx) => {
-      const atualizado = await tx.bpmPipeline.update({ where: { id: pipelineId }, data: { ativo } });
+      const atualizado = await tx.bpmPipeline.update({
+        where: { id: pipelineId },
+        data: { ativo },
+      });
       await tx.bpmPipelineConfigAuditoria.create({
         data: {
           pipelineId,
@@ -309,7 +407,10 @@ export async function AtivarDesativarPipelineBpm(dados: unknown) {
     return { success: true, data: pipeline };
   } catch (error) {
     console.error("[AtivarDesativarPipelineBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao ativar/desativar pipeline";
+    const msg =
+      error instanceof Error && error.message.includes("administradores")
+        ? error.message
+        : "Erro ao ativar/desativar pipeline";
     return { success: false, error: msg };
   }
 }
@@ -323,12 +424,16 @@ export async function ReordenarPipelinesBpm(dados: unknown) {
     await exigirAcessoConfigPipeline(userId, "criarPipeline");
 
     const parsed = reordenarPipelinesSchema.safeParse(dados);
-    if (!parsed.success) return { success: false, error: parsed.error.flatten() };
+    if (!parsed.success)
+      return { success: false, error: parsed.error.flatten() };
     const { ordem } = parsed.data;
 
     await db.$transaction(
       ordem.map(({ pipelineId, ordem: novaOrdem }) =>
-        db.bpmPipeline.update({ where: { id: pipelineId }, data: { ordem: novaOrdem } }),
+        db.bpmPipeline.update({
+          where: { id: pipelineId },
+          data: { ordem: novaOrdem },
+        }),
       ),
     );
 
@@ -337,7 +442,10 @@ export async function ReordenarPipelinesBpm(dados: unknown) {
     return { success: true };
   } catch (error) {
     console.error("[ReordenarPipelinesBpm]", error);
-    const msg = error instanceof Error && error.message.includes("administradores") ? error.message : "Erro ao reordenar pipelines";
+    const msg =
+      error instanceof Error && error.message.includes("administradores")
+        ? error.message
+        : "Erro ao reordenar pipelines";
     return { success: false, error: msg };
   }
 }

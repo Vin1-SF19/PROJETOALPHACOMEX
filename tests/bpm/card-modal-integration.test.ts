@@ -59,11 +59,11 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(editorAnotacao).toContain("shrink-0");
   });
 
-  it("destaca o serviço ativo no cabeçalho do card", () => {
-    expect(layout).toContain("BriefcaseBusiness");
-    expect(layout).toContain("Serviço ativo");
-    expect(layout).toContain("card.servico?.trim()");
-    expect(layout).toContain('title={card.servico}');
+  it("não expõe Serviço nem Tipo de processo no layout do card", () => {
+    expect(layout).not.toContain("BriefcaseBusiness");
+    expect(layout).not.toContain("Serviço ativo");
+    expect(layout).not.toContain("card.servico?.trim()");
+    expect(layout).not.toContain("Tipo de processo");
   });
 
   it("centraliza o formulário da etapa e mantém o painel direito somente com a próxima etapa", () => {

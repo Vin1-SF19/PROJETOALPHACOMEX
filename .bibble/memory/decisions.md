@@ -1,5 +1,17 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-08 — RM-2026-3D529D — proxy server-side e nenhuma persistência local
+
+**Decisão:** integrar o ChatBot Alpha ao serviço ChatbotX por server actions autenticadas e pelo cliente HTTP server-only `src/lib/chatbot-alpha/chat-api.ts`. Credenciais externas não chegam ao bundle do cliente, respostas são validadas por Zod e falhas são transformadas em erros operacionais sanitizados. Os dados continuam pertencendo ao ChatbotX; não foi criada migration, tabela ou cache persistente local.
+
+**Consequência:** a aba Chat pode listar conversas, carregar mensagens e enviar texto quando o backend compatível estiver configurado. A disponibilidade e a persistência reais dependem do serviço externo, e o Painel Alpha não passa a ser uma segunda fonte de verdade.
+
+### 2026-09-08 — RM-2026-3D529D — entrega incremental sem inventar a referência ausente
+
+**Decisão:** preservar Adminer/RedisInsight/MailHog na aba **Infra** e entregar na aba **Chat** somente as capacidades sustentadas pelo contrato mínimo implementado. Não inventar telas, streaming, upload, ownership ou comportamento de IA sem o código-fonte e a documentação da versão de referência do ChatbotX.
+
+**Consequência:** o shell, a autorização, os estados de UI, a observabilidade, a CLI e o proxy estão verificáveis; “réplica integral” permanece explicitamente condicionada à referência externa. O fechamento técnico desta revisão não equivale a afirmar paridade visual e funcional completa.
+
 ### 2026-09-08 — RM-2026-E4849C — cadência é orientação da coluna, nunca guarda de movimento
 
 **Decisão:** remover integralmente a regra fixa de oito contatos e resolver a cadência apenas pela combinação exata `pipelineId + etapaId` do card. Ausência ou ambiguidade resulta em nenhuma ativação; registros sem etapa permanecem inertes. Todas as outras regras de transição continuam independentes.
@@ -1346,6 +1358,19 @@ Persistência (`Cliente.cnpj`, `BpmCardCampoValor.valor`) e busca (`BuscarEmpres
 
 **Consequências:** edição preserva histórico, exclusão tributária é lógica, metadados de escopo de comissão não mudam em uma nova versão e o lançamento registra `ruleVersionId`. O fluxo sem qualquer regra tributária cadastrada mantém compatibilidade legada; o fluxo novo de comissão sem configuração gera divergência observável.
 
+### 2026-09-08 — RM-2026-DBEF25: regras financeiras configuráveis são descontinuadas sem apagar histórico
+
+**Decisão:** remover do CRM/BPM a superfície, o runtime tributário configurável e
+a ponte específica para Comissões criados pelo RM-2026-002817, sem remover o
+Pipeline Financeiro canônico, o Motor de Regras genérico ou o módulo autônomo de
+Comissões. Nenhuma substituição é criada.
+
+**Consequências:** registros `BpmRegra` com o marcador legado permanecem para
+auditoria, porém são filtrados de listagem e avaliação e não podem ser criados,
+editados, ativados ou excluídos pelas actions genéricas. Não há migration,
+backfill nem escrita de dados. Esta decisão supersede o uso operacional descrito
+na decisão RM-2026-002817, que continua registrada como histórico.
+
 ### 2026-09-04 — RM-2026-D100EB: automações passam por outbox versionada e runtime central
 
 **Decisão:** manter `BpmAutomacao` como identidade administrativa, congelar a
@@ -1361,3 +1386,39 @@ ser feita pela UI, cron ou CLI. Webhooks nunca persistem segredo em claro e HTTP
 externo é HTTPS-only com proteção SSRF. A auditoria formal da fase 13 foi
 dispensada explicitamente pelo usuário; essa dispensa não equivale a um parecer
 de segurança.
+
+### 2026-09-08 — RM-2026-24157F: responsável do checklist permanece por item
+
+**Decisão:** usar `BpmCard.responsavelId` somente como valor padrão no nascimento de `BpmCardChecklistItem`, mantendo `BpmCardChecklistItem.responsavelId` como única fonte canônica da responsabilidade operacional. Itens exclusivos seguem a mesma regra. Não criar responsável no cabeçalho, migration ou backfill.
+
+**Consequências:** novos itens já têm dono visível; transferências para responsável principal, membro vinculado ou `Sem responsável` persistem e não são sobrescritas por materialização ou mudança posterior no card. A tarefa derivada recebe a atribuição já dentro da transação de criação.
+
+### 2026-09-08 — RM-2026-55E27D: entrada automática e atomicidade
+
+**Decisão:** ativar todas as cadências compatíveis na mesma transação que cria ou move o card. `pipelineId` é obrigatório e `etapaId` opcional: etapa dispara ao entrar nela; escopo de pipeline dispara somente ao entrar no pipeline. Um vínculo ativo ou terminal é imutável nessa entrada; somente `PAUSADA` legado pode ser retomado automaticamente. Sair da etapa não pausa nem cancela.
+
+**Consequências:** falha de ativação reverte a mutação de origem, eliminando estado parcial; `P2002` torna retry concorrente no-op; comandos manuais de iniciar, pausar e reativar são recusados após autenticação/ownership. Não houve migration.
+
+### 2026-09-08 — RM-2026-9E89F2: configuração explícita prevalece sobre colunas legadas
+
+**Decisão:** usar exclusivamente `BpmCampoEtapaConfig` para aplicabilidade e obrigatoriedade contextual de campos. Não converter silenciosamente `BpmCampo.etapaId`/`obrigatorio`, não inventar opções de seleção e não executar preset financeiro durante GET. Ausência de transição canônica é uma negação explícita no runtime.
+
+**Consequências:** administrador e runtime deixam de divergir; campos sem configuração moderna ficam visíveis em uma seção de correção, mas não entram no formulário operacional. Os 18 registros legados existentes exigem decisão administrativa. Presets ou correções de dados só ocorrem por ação explícita e auditável; nenhuma migration ou mutação de dados foi necessária nesta RM.
+
+### 2026-09-08 — RM-2026-296ECE: remoção funcional não destrutiva no Checklist
+
+**Decisão:** `Serviço` e `Tipo de processo` deixam de integrar o contrato funcional e visual do Checklist. As colunas legadas são preservadas, mas ignoradas na aplicabilidade e omitidas de leitura e escrita.
+
+**Consequências:** templates antigos continuam materializáveis independentemente desses valores; editar um template não apaga o legado; novos payloads não carregam os campos e payloads de clientes antigos têm as chaves descartadas pelo Zod. Rollback funcional permanece possível sem restaurar dados ou executar migration.
+
+### 2026-09-08 — RM-2026-20FEEB: publicação usa versão canônica sem novo schema
+
+**Decisão:** usar `BpmPipeline.updatedAt` como token de concorrência para publicar o snapshot administrativo completo. O servidor relê e valida IDs, fluxo, etapas e seleções dentro da transação, executa CAS, aplica somente diferenças e registra a nova versão na auditoria existente.
+
+**Consequências:** conflitos entre publicações são fail-closed e exigem reload; dados brutos de auditoria não são enviados ao browser. Editores especializados continuam com salvamento explícito próprio, e `BpmEtapaFormulario` guarda somente apresentação. Nenhuma migration ou escrita corretiva automática foi criada.
+
+### 2026-09-08 — RM-2026-8C3862: decisões administrativas da Revisão de Radar
+
+**Decisão:** preservar `Novos leads` como inicial, `Fechado`/`Lost`/`Sem viabilidade` como finais e as 52 arestas permitidas/20 bloqueadas; novas etapas criam arestas bloqueadas. `Regime tributário` permanece canônico e somente leitura. `Radar atual` e `Status da sede` são desativados por publicação autenticada, aceitando o impacto compartilhado no Operacional.
+
+**Consequências:** a correção não é escrita pelo terminal, pois a auditoria precisa do administrador real. O workspace prepara o rascunho aprovado e o publica com CAS; testes garantem que nenhum outro campo, etapa ou transição é alterado. Sem migration ou backfill.

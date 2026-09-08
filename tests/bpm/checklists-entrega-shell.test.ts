@@ -44,6 +44,23 @@ describe("autoajuste de entrega do Checklist Builder", () => {
     expect(painel).toContain('id="checklist-pendencias"');
     expect(painel).toContain('id={`checklist-item-${item.id}`}');
     expect(painel).toContain("Exclusivo deste card");
+    expect(painel).toContain('aria-label={`Responsável por ${item.nome}`}');
+    expect(painel).toContain('<option value="">Sem responsável</option>');
+    expect(painel).toContain('disabled={!podeEditar || salvando === item.id}');
+    expect(painel).toContain('Responsável: ${nomesResponsaveis[0]}');
+    expect(painel).not.toContain("Tipo de processo");
+    expect(painel).not.toContain("AtualizarCardBpm");
+  });
+
+  it("remove Serviço e Tipo de processo do contrato visual do builder", () => {
+    const workspace = ler("src/components/bpm/checklists/ChecklistsWorkspace.tsx");
+    const schemas = ler("src/lib/bpm/checklists/schemas.ts");
+
+    expect(workspace).not.toMatch(/servico|tipoProcesso|Qualquer serviço|Tipo de processo/);
+    expect(schemas).not.toMatch(/servico|tipoProcesso/);
+    expect(workspace).toContain("Pipeline");
+    expect(workspace).toContain("Etapa");
+    expect(workspace).toContain("Card específico");
   });
 
   it("expõe alerta persistente e navegação acessível para pendências", () => {

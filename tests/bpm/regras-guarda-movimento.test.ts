@@ -39,6 +39,32 @@ describe("obterErroRegrasParaMovimento", () => {
     const erro = await obterErroRegrasParaMovimento({ card: cardBase, etapaDestinoId: "etapa-destino" });
 
     expect(erro).toBeNull();
+    expect(prismaMock.bpmRegra.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { pipelineId: "clxpipeline0000000000000001" },
+                { pipelineId: null },
+              ]),
+            }),
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { descricao: null },
+                {
+                  NOT: {
+                    descricao: {
+                      startsWith: "[REGRA_FINANCEIRA_TRIBUTARIA:v1]",
+                    },
+                  },
+                },
+              ]),
+            }),
+          ]),
+        }),
+      }),
+    );
   });
 
   it("bloqueia a movimentação quando uma regra ativa aplicável avalia como não permitida", async () => {

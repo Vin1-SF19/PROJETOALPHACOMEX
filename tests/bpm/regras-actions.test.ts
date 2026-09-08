@@ -9,8 +9,13 @@ const txMock = vi.hoisted(() => ({
   bpmPipelineConfigAuditoria: { create: vi.fn() },
 }));
 const prismaMock = vi.hoisted(() => ({
-  bpmPipeline: { findUnique: vi.fn() },
-  bpmRegra: { findUnique: vi.fn(), update: vi.fn() },
+  bpmPipeline: { findUnique: vi.fn(), findMany: vi.fn() },
+  bpmRegra: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
   $transaction: vi.fn(),
 }));
 
@@ -21,7 +26,13 @@ vi.mock("@/lib/bpm/ownership", () => ({
   exigirAcessoConfigPipeline: exigirAcessoConfigPipelineMock,
 }));
 
-import { AlternarAtivacaoRegraBpm, CriarRegraBpm } from "@/actions/bpm/Regras";
+import {
+  AlternarAtivacaoRegraBpm,
+  AtualizarRegraBpm,
+  CriarRegraBpm,
+  ExcluirRegraBpm,
+  ListarWorkspaceRegrasBpm,
+} from "@/actions/bpm/Regras";
 
 const condicao = {
   operador: "AND" as const,
@@ -35,6 +46,30 @@ describe("Regras.ts — Server Actions", () => {
     authMock.mockResolvedValue({ user: { id: "1", role: "Admin" } });
     exigirAcessoConfigPipelineMock.mockResolvedValue(undefined);
     prismaMock.$transaction.mockImplementation(async (callback) => callback(txMock));
+    prismaMock.bpmRegra.findMany.mockResolvedValue([]);
+    prismaMock.bpmPipeline.findMany.mockResolvedValue([]);
+  });
+
+  it("mantém regras financeiras descontinuadas fora do workspace genérico", async () => {
+    const resposta = await ListarWorkspaceRegrasBpm();
+
+    expect(resposta.success).toBe(true);
+    expect(prismaMock.bpmRegra.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { descricao: null },
+            {
+              NOT: {
+                descricao: {
+                  startsWith: "[REGRA_FINANCEIRA_TRIBUTARIA:v1]",
+                },
+              },
+            },
+          ]),
+        }),
+      }),
+    );
   });
 
   it("rejeita sem sessão", async () => {
@@ -59,6 +94,21 @@ describe("Regras.ts — Server Actions", () => {
     const resposta = await CriarRegraBpm({ nome: "X", condicao: { operador: "XOR", condicoes: [] }, resultado });
 
     expect(resposta.success).toBe(false);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejeita o marcador reservado em uma regra genérica nova", async () => {
+    const resposta = await CriarRegraBpm({
+      nome: "Regra oculta",
+      descricao: "[REGRA_FINANCEIRA_TRIBUTARIA:v1] tentativa",
+      condicao,
+      resultado,
+    });
+
+    expect(resposta).toEqual({
+      success: false,
+      error: "Regra descontinuada não pode ser alterada",
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
@@ -92,13 +142,49 @@ describe("Regras.ts — Server Actions", () => {
   });
 
   it("ativa/desativa uma regra existente", async () => {
-    prismaMock.bpmRegra.findUnique.mockResolvedValue({ id: "clxregra00000000000000000001" });
+    prismaMock.bpmRegra.findUnique.mockResolvedValue({
+      id: "clxregra00000000000000000001",
+      descricao: null,
+    });
     prismaMock.bpmRegra.update.mockResolvedValue({});
 
     const resposta = await AlternarAtivacaoRegraBpm({ id: "clxregra00000000000000000001", ativa: false });
 
     expect(resposta).toEqual({ success: true });
     expect(prismaMock.bpmRegra.update).toHaveBeenCalledWith({ where: { id: "clxregra00000000000000000001" }, data: { ativa: false } });
+  });
+
+  it.each([
+    ["atualizar", () => AtualizarRegraBpm({
+      id: "clxregra00000000000000000001",
+      nome: "Legada",
+      condicao,
+      resultado,
+    })],
+    ["alternar", () => AlternarAtivacaoRegraBpm({
+      id: "clxregra00000000000000000001",
+      ativa: true,
+    })],
+    ["excluir", () => ExcluirRegraBpm({
+      id: "clxregra00000000000000000001",
+    })],
+  ])("impede %s uma regra financeira histórica", async (_operacao, executar) => {
+    prismaMock.bpmRegra.findUnique.mockResolvedValue({
+      id: "clxregra00000000000000000001",
+      descricao: "[REGRA_FINANCEIRA_TRIBUTARIA:v1] histórico",
+      versaoAtualNum: 1,
+      versoes: [],
+    });
+
+    const resposta = await executar();
+
+    expect(resposta).toEqual({
+      success: false,
+      error: "Regra descontinuada não pode ser alterada",
+    });
+    expect(prismaMock.bpmRegra.update).not.toHaveBeenCalled();
+    expect(prismaMock.bpmRegra.delete).not.toHaveBeenCalled();
+    expect(txMock.bpmRegra.update).not.toHaveBeenCalled();
   });
 
   it("retorna erro amigável para regra inexistente ao alternar ativação", async () => {

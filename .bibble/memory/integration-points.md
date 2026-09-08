@@ -1,5 +1,19 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## ChatBot Alpha → backend ChatbotX externo (RM-2026-3D529D)
+
+**Entrada do usuário:** sidebar → `/PainelAlpha/ChatBotAlpha` → `page.tsx`, que exige sessão e a permissão `chatBotAlpha` (ou perfil administrativo) antes de renderizar `ChatBotAlphaClient`.
+
+**Fluxo de chat:** aba **Chat** → `ChatBotAlphaClient`/`ChatConversa` → `ListarConversasChatbotx`, `ListarMensagensChatbotx` ou `EnviarMensagemChatbotx` → validação Zod e autorização nas server actions → `src/lib/chatbot-alpha/chat-api.ts` → backend externo configurado por `CHATBOTX_API_URL` e `CHATBOTX_API_TOKEN`. O token permanece exclusivamente no servidor; respostas externas são validadas antes de chegar à UI e erros são sanitizados com identificador de suporte.
+
+**Fluxo de infraestrutura preservado:** aba **Infra** → `SeletorSistemaChatBot` → `ObterUrlSistemaChatBot` → `IframeChatBotAlpha` para Adminer, RedisInsight ou MailHog. A integração anterior continua na rota principal e não foi substituída por mocks.
+
+**Operação e diagnóstico:** `npm run chatbot-alpha:doctor` valida os contratos disponíveis e `npm run chatbot-alpha:capabilities` lista capacidades implementadas ou `PENDING_REFERENCE`. Não existe persistência local nem runtime de IA para o chat nesta revisão.
+
+**Limite externo:** sem o código-fonte e a documentação da API do ChatbotX, a integração implementa apenas o contrato HTTP mínimo de conversas/mensagens/envio. Paridade item a item, ownership, streaming e upload não podem ser declarados concluídos.
+
+**Última atualização:** 2026-09-08 por Codex (recuperação da Fase 15 da RM-2026-3D529D)
+
 ## Alpha CRM — cadência resolvida pela coluna (RM-2026-E4849C)
 
 **Configuração:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → `CadenciaEtapasSection` → `ConfigurarCadenciaEtapaBpm` → validação admin/Zod/transação serializável → `BpmCadencia.pipelineId/etapaId/ativa`.
@@ -2463,13 +2477,18 @@ No modal, preserve o rascunho local quando o snapshot remoto mudar e ofereça re
 
 **Última atualização:** 2026-09-04 por Nova (RM-2026-209DB4)
 
-### Regras Financeiras — CRM/BPM → Comissões
+### Regras Financeiras — CRM/BPM → Comissões (descontinuada)
 
-**Caminho:** `Configurações → Regras Financeiras` grava versões tributárias em `BpmRegraVersao`. `executarMovimentoComRequisitos` relê a regra dentro da transação, mescla os valores submetidos no mesmo movimento e persiste campos automáticos/memória antes de mover o card. Após commit, `sincronizarComissoesDoCardFinanceiro` faz upsert idempotente de `CommissionEvent` por card/pagamento e o gerador consome somente `CommissionRuleVersion` publicada e vigente para eventos `alpha-bpm`.
+**Histórico:** o RM-2026-002817 conectava `Configurações → Regras Financeiras`,
+`BpmRegraVersao`, o movimento do card e `CommissionEvent`.
 
-**Proteções:** sessão/permissão administrativa nas configurações, ownership na consulta do card, fórmulas sem `eval`, validação de campos dinâmicos no mesmo pipeline, campos automáticos protegidos também no servidor e falha do subsistema de comissão isolada após o movimento.
+**Estado atual:** o RM-2026-DBEF25 removeu a rota, o workspace, o cálculo
+configurável e o produtor CRM → Comissões. Registros históricos com o marcador
+`[REGRA_FINANCEIRA_TRIBUTARIA:v1]` permanecem armazenados, mas não são listados,
+avaliados nem mutáveis pelas actions genéricas. O Pipeline Financeiro canônico,
+o Motor de Regras BPM e o módulo autônomo de Comissões continuam independentes.
 
-**Última atualização:** 2026-09-04 por Codex (RM-2026-002817)
+**Última atualização:** 2026-09-08 por Codex (RM-2026-DBEF25; supersede a integração do RM-2026-002817)
 ## SLA BPM — motor temporal (RM-2026-095B40, Fase 2)
 
 - **Produtor operacional:** `MoverCardBpm` chama `sincronizarSlaMovimentoBpm` dentro da transação que persiste `BpmCard.etapaId`; conclui instâncias da etapa anterior, provisiona a configuração `ENTRADA_ETAPA` de destino e pausa/retoma instâncias ao entrar/sair de `Standby - Follow Up`.
@@ -2520,3 +2539,51 @@ Backfill oficial: `npm run bpm:checklists:reconciliar -- --dry-run|--apply --bat
 **Consumo visual:** a listagem do pipeline consulta `obterStatusSlaCards` em lote; o modal usa `ObterStatusSlaCard`. O realtime reconhece `SLA_STATUS_ALTERADO` para atualizar as superfícies abertas.
 
 **Automação:** `eventos.ts` materializa versões ativas cujo gatilho é `SLA_STATUS_ALTERADO` e cujo filtro opcional `slaStatus` corresponde ao valor novo. A unicidade de disparo e da outbox impede duplicação em leitura repetida, retry ou concorrência.
+
+### Responsável do checklist — RM-2026-24157F
+
+**Caminho:** pipeline → card nativo → `CardFullViewModal` → `CardAbertoLayout` → `PainelHistorico` → aba Checklist → `PainelChecklistsCard`.
+
+**Criação:** `materializarChecklistsAplicaveisCard` e `AdicionarItemExclusivoChecklistCardBpm` copiam o responsável principal do card para o item antes de chamar `reconciliarTarefaChecklist` na mesma transação.
+
+**Transferência:** `AtualizarItemChecklistCardBpm` valida payload, ownership e vínculo; a escrita CAS registra antes/depois, reconcilia a tarefa e publica um único `TAREFA_ALTERADA`. O reload lê a relação `responsavel` persistida, sem estado paralelo no client.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-24157F)
+
+### Cadências automáticas — RM-2026-55E27D
+
+`CriarCardBpm`, `TransitionCommand`, promoção NoLoss, fechamento comercial, follow-up de novos leads e os runtimes central/distribuição chamam `ativarCadenciasNaEntradaBpm(..., tx)` antes do commit. O serviço grava vínculo e histórico atomicamente; as notificações dos produtores continuam após o commit. O job `processarCadenciasBpm` cria tarefas com chave idempotente por ciclo e não exige que o card permaneça na etapa que originou a cadência.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-55E27D)
+
+### Configuração de pipeline → runtime — RM-2026-9E89F2
+
+`/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → `ObterPipelineBpm` carrega proprietário, associações, opções, acessos, mapeamento e `BpmCampoEtapaConfig` → `AdminPipelineClient` edita → actions BPM validam autenticação/escopo novamente dentro da transação → mutação + auditoria → agregado confirmado → snapshot da UI.
+
+No consumo operacional, `carregarCamposAplicaveisEtapa` e o comando canônico de transição consultam a mesma configuração de etapa. `BpmTransicaoEtapa` ausente ou bloqueada impede movimento. Seleções com fonte mestre são somente leitura; seleção customizada depende de `BpmCampoOpcao` ativa. O preset financeiro é acionado exclusivamente pelo botão administrativo.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-9E89F2)
+
+### Aplicabilidade de Checklist reduzida — RM-2026-296ECE
+
+`ChecklistsWorkspace` → `CriarTemplateChecklistBpm`/`SalvarTemplateChecklistBpm` envia nome, descrição, ativo, pipeline, etapa, card e itens. As ações validam escopo e autorização sem consultar catálogo de serviços.
+
+`ListarChecklistsCardBpm` → `materializarChecklistsAplicaveisCard` e `carregarResumoChecklistAplicavelCard` consultam templates ativos por pipeline, etapa e card. Valores legados de serviço/tipo não entram no `where`. Movimento, regras e automações entregam esse mesmo contexto reduzido; snapshots, idempotência `P2002`, progresso, tarefas derivadas e realtime permanecem inalterados.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-296ECE)
+
+### Workspace administrativo de pipeline — RM-2026-20FEEB
+
+`AdminPipelinePage` → `ObterPipelineBpm(..., true)` exige permissão administrativa e carrega o agregado → `AdminPipelineClient` deriva saúde, matriz, filtros e previews. Publicação de rascunho segue `PublicarConfiguracaoPipelineBpm` → autorização repetida na transação → validação do snapshot → CAS em `updatedAt` → mutations diferenciais + `BpmPipelineConfigAuditoria` → realtime pós-commit.
+
+Composição segue `FormularioEtapaWorkspace` → `SalvarFormularioEtapaBpm` → validação de ownership da etapa e aplicabilidade de cada campo → substituição transacional de seções/componentes + auditoria. Diagnóstico operacional somente leitura: `npm run bpm:pipeline:diagnostico -- --pipeline=<id> [--json] [--check-schema]`.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-20FEEB)
+
+### Diagnóstico, publicação e SLA — RM-2026-8C3862
+
+`npm run bpm:pipeline:diagnostico -- --pipeline=<id> [--json] [--check-schema]` → leitura Prisma + `sqlite_master` → projeção sanitizada de schema, etapas, arestas, campos e SLA. Não existe caminho de escrita.
+
+`AdminPipelineClient` → `PublicarConfiguracaoPipelineBpm` → autorização administrativa repetida dentro da transação → validação integral/ownership → CAS de `updatedAt` → diffs mínimos + auditoria → revalidate/realtime pós-commit. `SlaConfigSection` → `SimularConfiguracaoSlaBpm` → acesso ao card/tarefa → mesmo resolvedor de `sla.ts`, sem persistência.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)

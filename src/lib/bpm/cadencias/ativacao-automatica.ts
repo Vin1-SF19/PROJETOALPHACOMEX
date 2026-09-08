@@ -194,7 +194,7 @@ export async function sincronizarCadenciasNaEntradaBpm(
 }
 
 export async function validarEscopoCadenciaBpm(
-  input: { pipelineId: string | null | undefined; etapaId: string | null | undefined },
+  input: { pipelineId: string | null | undefined; etapaId?: string | null | undefined },
   tx: Pick<Tx, "bpmEtapa">,
 ): Promise<void> {
   if (!input.pipelineId) throw new Error("CADENCIA_PIPELINE_OBRIGATORIO");

@@ -4942,3 +4942,55 @@ O backup remoto completo foi restaurado e verificado antes da migration. O backf
 Foi removida a exigência fixa de oito contatos da transição de **Agendar reunião**, preservando todos os demais guards. Cadências agora têm escopo obrigatório de pipeline e coluna, no máximo uma ativa por coluna, e sincronizam automaticamente após criação ou movimento do card. A sincronização é best-effort e o executor revalida o escopo, de modo que tarefas e alertas nunca bloqueiam o avanço. Cadências legadas sem coluna permanecem inertes; nenhuma migration ou escrita direta de dados foi necessária.
 
 Os testes focados passaram 55/55, o lint direcionado ficou sem erros, o diff-check passou e o build de produção gerou 78 páginas. A suíte BPM ampla ficou em 773/802 por 29 falhas externas causadas por alterações concorrentes fora da RM; o typecheck não apontou diagnóstico nos arquivos entregues.
+
+## 2026-09-08 — Codex — RM-2026-24157F concluída
+
+Novos itens de checklist materializados ou exclusivos agora recebem automaticamente o responsável principal do card. A responsabilidade permanece por item e pode ser transferida para o responsável, um membro vinculado ou `Sem responsável`; snapshots existentes não são reatribuídos. A interface passou a resumir os responsáveis do checklist e bloquear interações concorrentes no item durante o salvamento.
+
+Não houve mudança de banco. Os testes dirigidos ampliados passaram 40/40, o ESLint direcionado e o diff-check ficaram limpos e o build de produção gerou 78 páginas. A suíte global teve 2.424/2.493 testes aprovados, com 69 falhas externas à entrega; typecheck e lint globais também mantiveram somente débitos fora dos arquivos deste objetivo.
+
+## 2026-09-08 — Codex — RM-2026-55E27D concluída
+
+Cadências passaram a ser configuráveis por pipeline ou etapa e são ativadas automaticamente, dentro da mesma transação de todas as criações e movimentos reais do card. A implementação aceita múltiplas definições compatíveis, preserva estados terminais, recupera apenas pausas legadas e não interrompe o ciclo ao sair da etapa. Os comandos manuais foram recusados no servidor e removidos do painel do card.
+
+Não houve mudança de banco. Os 26 testes direcionados, o ESLint escopado, o diff-check e o build de produção passaram. O typecheck não apontou diagnóstico nos arquivos entregues. A suíte global aprovou 2.417/2.493 testes; as 76 falhas restantes pertencem ao worktree concorrente e incluem contratos incompatíveis de outros objetivos de cadência.
+
+## 2026-09-08 — Codex — RM-2026-9E89F2 concluída
+
+A configuração de pipelines passou a confirmar mutations pelo servidor, restaurar o último estado válido em falha e registrar alterações críticas atomicamente com a auditoria. Campos, SLA e transições usam as fontes canônicas consumidas pelo runtime; os controles legados conflitantes foram retirados da UI. Transição ausente agora é bloqueada e novas etapas recebem políticas explícitas bloqueadas.
+
+A auditoria somente leitura confirmou schema compatível e nenhuma necessidade de migration. Dezoito campos ativos sem configuração moderna e duas seleções customizadas sem catálogo foram mantidos visivelmente inválidos para decisão administrativa, sem backfill nem dados inventados. Os 56 testes focados, o lint escopado, o diff-check e o build de 78 páginas passaram; os débitos da suíte/typecheck ampla pertencem ao worktree concorrente.
+
+## 2026-09-08 — Codex — RM-2026-296ECE concluída
+
+`Serviço` e `Tipo de processo` foram removidos da configuração, do contrato funcional e da apresentação do Checklist. O cabeçalho do card também deixou de mostrar o selo de serviço. Templates legados agora são aplicados somente por pipeline, etapa e card específico; os valores antigos permanecem intactos no banco, porém inertes.
+
+Não houve migration ou escrita de dados. A suíte focal final passou 64/64, o ESLint direcionado não teve erros, o diff-check passou e o build concluiu. A suíte global aprovou 2.452/2.506 testes; as 54 falhas e os diagnósticos globais de lint/typecheck permanecem em módulos concorrentes fora desta entrega.
+
+## 2026-09-08 — Codex — RM-2026-DBEF25 concluída
+
+A função configurável de Regras Financeiras foi retirada do Alpha CRM/BPM: rota
+administrativa, link, workspace, painel do card, actions, motor tributário e
+ponte CRM → Comissões. O Pipeline Financeiro canônico, o Motor de Regras BPM e o
+módulo autônomo de Comissões foram mantidos.
+
+Não houve alteração de banco. As regras financeiras históricas permanecem
+armazenadas, mas um filtro null-safe impede sua listagem e avaliação sem ocultar
+regras comuns com descrição nula; o CRUD genérico também bloqueia o marcador
+reservado e qualquer mutação desses registros. Probe e Anubis aprovaram após o
+hardening. A suíte focal passou 64/64, Comissões passou 196/196, o ESLint
+direcionado não teve erros, `git diff --check` passou e dois builds isolados
+concluíram com 78 páginas sem a rota removida. A suíte/typecheck/lint globais
+mantêm débitos concorrentes documentados na story.
+
+## 2026-09-08 — Codex — RM-2026-20FEEB concluída
+
+A configuração de pipeline foi convertida em workspace largo com oito áreas, saúde acionável, lista e matriz de etapas, tabela única de campos, editores laterais, composição visual de formulário, preview do Kanban e histórico administrativo sanitizado. A ativação de campos ganhou publicação transacional versionada, CAS e tratamento explícito de conflito; o diagnóstico operacional é somente leitura.
+
+Não houve mudança de banco nem worker do roadmap. Os 49 testes direcionados, o ESLint escopado, o diff-check e o build de 78 páginas passaram. O typecheck não apontou diagnóstico nos arquivos da entrega; a suíte global aprovou 2.512/2.566 testes, com 54 falhas externas ao objetivo no worktree concorrente.
+
+## 2026-09-08 — Codex — RM-2026-8C3862 concluída
+
+O pipeline Revisão de Radar recebeu diagnóstico CLI sanitizado e somente leitura, gate real das nove estruturas canônicas, publicação de snapshot completo com CAS/auditoria e simulação de SLA pelo mesmo resolvedor operacional. O workspace mantém rascunho descartável, saúde, versão, conflito explícito e oito áreas. A correção aprovada desativa apenas `Radar atual` e `Status da sede` quando um administrador autenticado publica, preservando `Regime tributário`, etapas e 72 transições.
+
+Não houve migration, escrita direta de configuração pelo terminal, worker do Roadmap ou promoção de ambiente. Os 86 testes focados, ESLint direcionado, diff-check, build de 78 páginas, gate de schema e smoke HTTP passaram. A suíte global aprovou 2.512/2.566 testes; os débitos restantes são externos/concorrentes e estão registrados em `known-errors.md`.

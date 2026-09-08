@@ -10,7 +10,10 @@ import {
   atualizarRegraBpmSchema,
   salvarRegraBpmSchema,
 } from "@/lib/bpm/regras/persistencia-schemas";
-import { MARCADOR_REGRA_TRIBUTARIA } from "@/lib/bpm/regras-financeiras/schemas";
+import {
+  ehDescricaoRegraFinanceiraDescontinuada,
+  FILTRO_SEM_REGRAS_FINANCEIRAS_DESCONTINUADAS,
+} from "@/lib/bpm/regras/legado";
 
 const ROTA_REGRAS = "/PainelAlpha/AlphaCRM/admin/regras";
 const idSchema = z.string().cuid();
@@ -29,6 +32,7 @@ function erroPublico(error: unknown): string {
     "Não autorizado",
     "Não autorizado — apenas administradores configuram pipelines",
     "Regra não encontrada",
+    "Regra descontinuada não pode ser alterada",
     "Pipeline inválido",
   ].includes(error.message)) return error.message;
   return "Não foi possível concluir a operação";
@@ -45,9 +49,7 @@ export async function ListarWorkspaceRegrasBpm() {
     await exigirAdminRegras();
     const [regras, pipelines] = await Promise.all([
       db.bpmRegra.findMany({
-        where: {
-          NOT: { descricao: { startsWith: MARCADOR_REGRA_TRIBUTARIA } },
-        },
+        where: FILTRO_SEM_REGRAS_FINANCEIRAS_DESCONTINUADAS,
         orderBy: [{ prioridade: "asc" }, { createdAt: "desc" }],
         select: {
           id: true,
@@ -110,6 +112,9 @@ export async function CriarRegraBpm(payload: unknown) {
   try {
     const { userId } = await exigirAdminRegras();
     const dados = salvarRegraBpmSchema.parse(payload);
+    if (ehDescricaoRegraFinanceiraDescontinuada(dados.descricao)) {
+      throw new Error("Regra descontinuada não pode ser alterada");
+    }
     await validarPipeline(dados.pipelineId);
     const regra = await db.$transaction(async (tx) => {
       const criada = await tx.bpmRegra.create({
@@ -161,6 +166,12 @@ export async function AtualizarRegraBpm(payload: unknown) {
       include: { versoes: { orderBy: { versao: "desc" }, take: 1 } },
     });
     if (!existente) throw new Error("Regra não encontrada");
+    if (
+      ehDescricaoRegraFinanceiraDescontinuada(existente.descricao)
+      || ehDescricaoRegraFinanceiraDescontinuada(dados.descricao)
+    ) {
+      throw new Error("Regra descontinuada não pode ser alterada");
+    }
     const versaoAtual = existente.versoes[0];
     const condicaoMudou = !versaoAtual || versaoAtual.condicaoJson !== JSON.stringify(dados.condicao);
     const resultadoMudou = !versaoAtual || versaoAtual.resultadoJson !== JSON.stringify(dados.resultado);
@@ -212,8 +223,14 @@ export async function AlternarAtivacaoRegraBpm(payload: unknown) {
   try {
     await exigirAdminRegras();
     const dados = z.object({ id: idSchema, ativa: z.boolean() }).parse(payload);
-    const existente = await db.bpmRegra.findUnique({ where: { id: dados.id }, select: { id: true } });
+    const existente = await db.bpmRegra.findUnique({
+      where: { id: dados.id },
+      select: { id: true, descricao: true },
+    });
     if (!existente) throw new Error("Regra não encontrada");
+    if (ehDescricaoRegraFinanceiraDescontinuada(existente.descricao)) {
+      throw new Error("Regra descontinuada não pode ser alterada");
+    }
     await db.bpmRegra.update({ where: { id: dados.id }, data: { ativa: dados.ativa } });
     revalidatePath(ROTA_REGRAS);
     return { success: true as const };
@@ -226,8 +243,14 @@ export async function ExcluirRegraBpm(payload: unknown) {
   try {
     await exigirAdminRegras();
     const dados = z.object({ id: idSchema }).parse(payload);
-    const existente = await db.bpmRegra.findUnique({ where: { id: dados.id }, select: { id: true } });
+    const existente = await db.bpmRegra.findUnique({
+      where: { id: dados.id },
+      select: { id: true, descricao: true },
+    });
     if (!existente) throw new Error("Regra não encontrada");
+    if (ehDescricaoRegraFinanceiraDescontinuada(existente.descricao)) {
+      throw new Error("Regra descontinuada não pode ser alterada");
+    }
     await db.bpmRegra.delete({ where: { id: dados.id } });
     revalidatePath(ROTA_REGRAS);
     return { success: true as const };

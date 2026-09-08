@@ -1,5 +1,52 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## ChatBot Alpha — replicação do frontend ChatbotX (RM-2026-3D529D, concluída, 2026-09-08)
+
+O módulo `/PainelAlpha/ChatBotAlpha` foi reestruturado de hub de infraestrutura (3 iframes) para um módulo com **duas abas**: **Chat** (novo) e **Infra** (preservado). O backend ChatbotX é um serviço self-hosted externo consumido via proxy server-side (`CHATBOTX_API_URL`/`CHATBOTX_API_TOKEN`), sem persistência local (Fase 4: `DATABASE_CHANGE_NOT_REQUIRED`) e sem runtime de IA (Fase 7: `AI_RUNTIME_CHANGE_NOT_REQUIRED`).
+
+### Arquitetura final
+
+| Camada | Arquivo | Função |
+|--------|---------|--------|
+| Rota protegida | `src/app/PainelAlpha/ChatBotAlpha/page.tsx` | `auth()` + permissão `chatBotAlpha` (ou admin) |
+| Client principal | `src/components/ChatBotAlpha/ChatBotAlphaClient.tsx` | Tabs Chat/Infra, sidebar de conversas, estado global |
+| Chat | `src/components/ChatBotAlpha/ChatConversa.tsx` | Mensagens, input, estados (loading/erro+retry/vazio/sucesso) |
+| Infra (preservado) | `src/components/ChatBotAlpha/SeletorSistemaChatBot.tsx` + `IframeChatBotAlpha.tsx` | Adminer/Redis/MailHog via iframe sandbox |
+| Server actions (infra) | `src/actions/ChatBotAlpha.ts` | `ObterUrlSistemaChatBot` — instrumentado com observabilidade |
+| Server actions (chat) | `src/actions/ChatBotAlphaChat.ts` | `ListarConversasChatbotx`, `ListarMensagensChatbotx`, `EnviarMensagemChatbotx` |
+| Cliente HTTP | `src/lib/chatbot-alpha/chat-api.ts` | Proxy server-side, Zod validation, timeout 30s, correlationId |
+| Contratos | `src/lib/chatbot-alpha/contracts.ts` | Schemas Zod, error codes, capability registry (6 capacidades) |
+| Observabilidade | `src/lib/chatbot-alpha/observability.ts` | Logs estruturados, sanitização, métricas, erros operacionais UI-safe |
+| Doctor/CLI | `src/lib/chatbot-alpha/doctor.ts` + `scripts/chatbot-alpha.mjs` | Checks de config/safety/contract/observability; saída JSON, exit codes |
+| Registry | `src/lib/modulos-registry.ts` | `{ id: 'chatBotAlpha', label: 'ChatBot Alpha', href: '/PainelAlpha/ChatBotAlpha', category: 'admin', permission: 'chatBotAlpha' }` |
+
+### Decisões de arquitetura
+
+1. **Sem migration** — dados pertencem ao serviço externo (ChatbotX self-hosted). O frontend consome via proxy server-side.
+2. **Sem runtime de IA** — nenhuma capacidade de streaming, tools, memória de conversa ou seleção de modelos foi implementada (Fase 7: `AI_RUNTIME_CHANGE_NOT_REQUIRED`).
+3. **Infra preservada** — Adminer/Redis/MailHog continuam funcionais na aba Infra, sem regressão.
+4. **Observabilidade** — todas as actions instrumentadas com correlationId, logs estruturados sanitizados e erros operacionais UI-safe com `supportId`.
+5. **Segurança** — tokens nunca expostos ao cliente; Zod validation em todas as actions; `auth()` antes de qualquer operação; `encodeURIComponent` em paths; timeout de rede (30s); XSS prevention (render como texto React).
+
+### Limitações conhecidas
+
+- Código-fonte do ChatbotX-main ausente no repositório — matriz de paridade item a item não produzida (bloqueio persistente desde Fase 0).
+- `CHATBOTX_API_URL`/`CHATBOTX_API_TOKEN` não configurados no ambiente — smoke real de chat pendente.
+- Ownership de conversa não definido no contrato do backend — IDOR potencial (achado Anubis Fase 12).
+- Validação em navegador real (teclado/foco/responsividade) pendente — sem RTL/Playwright no projeto.
+
+### Validação
+
+- 85/85 testes do módulo passando (`tests/chatbot-alpha/`)
+- Build Turbopack aprovado (78 páginas, rota gerada)
+- ESLint: 0 novos erros nos arquivos desta entrega
+- Typecheck: 0 novos erros nos arquivos desta entrega
+- Baseline global pré-existente: 2.484 erros de ESLint, 34 erros de typecheck e 2.412/2.462 testes aprovados (50 falhas fora do módulo nesta medição)
+
+DELIVERY_READY: `Sidebar → "ChatBot Alpha" → /PainelAlpha/ChatBotAlpha` → aba **Infra** (Adminer/Redis/MailHog, comportamento preservado) → aba **Chat** (conversas, mensagens, envio — funcional em toda a camada de UI/estados/observabilidade, aguardando configuração do backend externo). CLI: `npm run chatbot-alpha:doctor` / `npm run chatbot-alpha:capabilities`.
+
+**Última atualização:** 2026-09-08 por Scribe (RM-2026-3D529D, Fase 15 — CLOSURE)
+
 ## Cadências operacionais por coluna, sem bloqueio de avanço (RM-2026-E4849C, 2026-09-08)
 
 `BpmCadencia.pipelineId + etapaId` é o escopo operacional exato. `ativacao-automatica.ts` encerra vínculos ativos/pausados incompatíveis, ignora definições legadas sem etapa, não usa fallback universal e só inicia quando existe exatamente uma definição ativa com passo ativo para a coluna atual. Reentrada reaproveita o vínculo como novo ciclo; o executor inclui o início desse ciclo na chave idempotente e revalida card/definição dentro da transação antes de criar `BpmTarefa`.
@@ -2186,3 +2233,66 @@ O Kanban usa leitura em lote e exibe badge com cor configurada, contagem regress
 Checklist com qualquer item incompleto gera tarefa pendente; todos os itens concluídos concluem a mesma tarefa; reabertura reaproveita o mesmo ID. O primeiro item pendente atribuído define o responsável, com fallback para o responsável do card. Colisão `P2002` é resolvida pelo vínculo único. Observações de itens não entram em título, histórico ou logs.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-0FC47A)
+
+## Responsabilidade padrão de checklist — RM-2026-24157F
+
+A responsabilidade continua granular e canônica em `BpmCardChecklistItem.responsavelId`. Todo item novo, seja materializado de template ou exclusivo do card, copia `BpmCard.responsavelId` no momento da criação. Instâncias existentes são snapshots: reabertura, rematerialização ou troca posterior do responsável principal não reatribuem itens nem apagam transferências.
+
+Transferências usam a action existente, limitada ao responsável principal, membros vinculados ou `null`, com autorização repetida na transação, CAS, histórico, reconciliação da tarefa derivada e realtime. Não foi criada coluna no cabeçalho, migration ou backfill.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-24157F)
+
+## Cadências automáticas por entrada — RM-2026-55E27D
+
+`ativarCadenciasNaEntradaBpm` é o serviço server-only único para criação e movimento. Ele recebe o mesmo `TransactionClient` do produtor, valida o destino e ativa todas as definições compatíveis: escopo de etapa em toda entrada nessa etapa e escopo de pipeline somente em uma entrada real no pipeline. Repetições mantêm vínculos ativos/terminais; apenas o legado pausado é retomado. Sair da etapa não interrompe o ciclo.
+
+Criação manual, pausa e reativação foram removidas do contrato operacional do card. O executor consulta somente definições ativas, preserva o vínculo quando uma definição é desativada e continua idempotente por vínculo, passo e início de ciclo. Esta decisão substitui, para este objetivo, a descrição incompatível registrada pelo RM-2026-158500 sobre pós-commit, cadência única e legado inerte.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-55E27D)
+
+## Configuração canônica de pipeline — RM-2026-9E89F2
+
+`BpmCampoEtapaConfig` é a autoridade única para decidir em quais etapas um campo é aplicável; as colunas base de `BpmCampo` permanecem apenas para leitura de legado. A projeção administrativa e o runtime usam a mesma regra, inclusive para campos compartilhados, e ausência de configuração resulta em campo visivelmente não configurado e não aplicável.
+
+Mutações administrativas críticas escrevem domínio e auditoria na mesma transação e devolvem o agregado completo confirmado. Transições são fail-closed: a ausência de `BpmTransicaoEtapa` bloqueia o movimento, e uma etapa nova recebe arestas bloqueadas explícitas. Leituras de rota não executam presets nem reconciliam dados.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-9E89F2)
+
+## Checklist sem Serviço e Tipo de processo — RM-2026-296ECE
+
+A aplicabilidade de templates de checklist possui três dimensões canônicas: `pipelineId`, `etapaId` e `cardId`. `servico` e `tipoProcesso` foram removidos dos schemas, DTOs, ações, builder, resumo e materialização. Todos os produtores de contexto — movimento, regras e automações — usam o mesmo contrato reduzido.
+
+As colunas antigas em `BpmChecklistTemplate` permanecem no schema e seus valores não são limpos por edição. Elas são armazenamento legado inerte: não aparecem na interface nem restringem templates. A remoção não requer migration, seed, backfill ou escrita de dados.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-296ECE)
+
+## Descontinuação de Regras Financeiras configuráveis — RM-2026-DBEF25
+
+O CRM/BPM não possui mais workspace, actions, motor tributário configurável nem
+ponte automática de cards para eventos de comissão. O Pipeline Financeiro
+continua calculando e persistindo seus valores pelo contrato canônico de
+`pipeline-financeiro.ts` e `transicao-command.ts`.
+
+Como `BpmRegra` é compartilhada, registros financeiros anteriores permanecem no
+banco. `src/lib/bpm/regras/legado.ts` centraliza o marcador reservado e um filtro
+null-safe usado pela listagem e pelo runtime genéricos; as mutações genéricas
+também recusam o marcador. Assim o histórico é inerte sem mudança de schema ou
+dados.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-DBEF25)
+
+## Workspace versionado de configuração de pipeline — RM-2026-20FEEB
+
+A rota administrativa de pipeline é um workspace largo com oito áreas independentes. A leitura agrega etapas, transições, campos canônicos, formulários por etapa, automações projetadas e auditoria sanitizada; saúde e previews são projeções somente leitura desse mesmo agregado.
+
+Alterações de ativação de campos são publicadas como snapshot completo, validado e protegido por CAS em `BpmPipeline.updatedAt`, com auditoria na mesma transação. Formulários persistem apenas composição visual em `BpmEtapaFormulario`; valores, aplicabilidade e permissões continuam nos domínios canônicos. Não houve mudança de schema.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-20FEEB)
+
+## Diagnóstico e publicação integral do pipeline — RM-2026-8C3862
+
+O agregado administrativo pode ser inspecionado por CLI somente leitura e publicado como snapshot completo. A publicação valida os conjuntos exatos de etapas, transições e campos, as invariantes de fluxo e seleção e usa `BpmPipeline.updatedAt` como CAS. Domínio e auditoria confirmam na mesma transação; a notificação ocorre depois do commit.
+
+Campos continuam em `BpmCampoEtapaConfig`, arestas em `BpmTransicaoEtapa` e SLA em `BpmSlaConfig`. A simulação de SLA reutiliza o resolvedor operacional sem materializar instâncias ou eventos. Nenhuma tabela, migration ou fonte paralela foi criada.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)

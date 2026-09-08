@@ -57,7 +57,7 @@ export async function materializarChecklistsAplicaveisCard(params: {
 }) {
   const card = await db.bpmCard.findUnique({
     where: { id: params.cardId },
-    select: { id: true, pipelineId: true, etapaId: true, servico: true, tipoProcesso: true },
+    select: { id: true, pipelineId: true, etapaId: true, responsavelId: true },
   });
   if (!card) throw new Error("Card não encontrado");
 
@@ -75,8 +75,6 @@ export async function materializarChecklistsAplicaveisCard(params: {
         AND: [
           { OR: [{ pipelineId: null }, { pipelineId: card.pipelineId }] },
           { OR: [{ etapaId: null }, { etapaId: card.etapaId }] },
-          { OR: [{ servico: null }, { servico: card.servico }] },
-          { OR: [{ tipoProcesso: null }, { tipoProcesso: card.tipoProcesso }] },
           { OR: [{ cardId: null }, { cardId: card.id }] },
         ],
       },
@@ -123,6 +121,7 @@ export async function materializarChecklistsAplicaveisCard(params: {
                 obrigatorio: item.obrigatorio,
                 ordem: item.ordem,
                 exclusivoCard: false,
+                responsavelId: card.responsavelId,
               })),
             },
           },

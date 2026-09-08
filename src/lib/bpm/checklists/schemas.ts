@@ -16,8 +16,6 @@ const dadosTemplateSchema = z.object({
   ativo: z.boolean().default(true),
   pipelineId: idSchema.nullable().optional(),
   etapaId: idSchema.nullable().optional(),
-  servico: textoOpcional(200),
-  tipoProcesso: textoOpcional(200),
   cardId: idSchema.nullable().optional(),
 });
 

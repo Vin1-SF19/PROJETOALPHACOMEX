@@ -80,23 +80,19 @@ function nuloSeVazio(valor: string | null | undefined) {
 async function validarEscopoTemplate(dados: {
   pipelineId?: string | null;
   etapaId?: string | null;
-  servico?: string | null;
-  tipoProcesso?: string | null;
   cardId?: string | null;
 }, client: Pick<Prisma.TransactionClient, "bpmPipeline" | "bpmEtapa" | "bpmCard"> = db) {
   if (dados.etapaId && !dados.pipelineId) throw new Error("Etapa inválida para o pipeline");
   const [pipeline, etapa, card] = await Promise.all([
     dados.pipelineId ? client.bpmPipeline.findUnique({ where: { id: dados.pipelineId }, select: { id: true } }) : null,
     dados.etapaId ? client.bpmEtapa.findUnique({ where: { id: dados.etapaId }, select: { id: true, pipelineId: true } }) : null,
-    dados.cardId ? client.bpmCard.findUnique({ where: { id: dados.cardId }, select: { id: true, pipelineId: true, etapaId: true, servico: true, tipoProcesso: true } }) : null,
+    dados.cardId ? client.bpmCard.findUnique({ where: { id: dados.cardId }, select: { id: true, pipelineId: true, etapaId: true } }) : null,
   ]);
   if (dados.pipelineId && !pipeline) throw new Error("Pipeline inválido");
   if (dados.etapaId && (!etapa || etapa.pipelineId !== dados.pipelineId)) throw new Error("Etapa inválida para o pipeline");
   if (dados.cardId && !card) throw new Error("Card não encontrado");
   if (card && ((dados.pipelineId && dados.pipelineId !== card.pipelineId)
-    || (dados.etapaId && dados.etapaId !== card.etapaId)
-    || (dados.servico && dados.servico !== card.servico)
-    || (dados.tipoProcesso && dados.tipoProcesso !== card.tipoProcesso))) {
+    || (dados.etapaId && dados.etapaId !== card.etapaId))) {
     throw new Error("Card específico incompatível com os vínculos informados");
   }
 }
@@ -109,7 +105,7 @@ export async function ListarTemplatesChecklistBpm() {
       take: 250,
       select: {
         id: true, nome: true, descricao: true, ativo: true,
-        pipelineId: true, etapaId: true, servico: true, tipoProcesso: true, cardId: true,
+        pipelineId: true, etapaId: true, cardId: true,
         createdAt: true, updatedAt: true,
         pipeline: { select: { id: true, nome: true } },
         etapa: { select: { id: true, nome: true } },
@@ -128,13 +124,13 @@ export async function ListarTemplatesChecklistBpm() {
 export async function ListarWorkspaceChecklistsBpm() {
   try {
     await exigirAdminChecklist();
-    const [templates, pipelines, servicos, cards] = await Promise.all([
+    const [templates, pipelines, cards] = await Promise.all([
       db.bpmChecklistTemplate.findMany({
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         take: 250,
         select: {
           id: true, nome: true, descricao: true, ativo: true,
-          pipelineId: true, etapaId: true, servico: true, tipoProcesso: true, cardId: true,
+          pipelineId: true, etapaId: true, cardId: true,
           createdAt: true, updatedAt: true,
           pipeline: { select: { id: true, nome: true } },
           etapa: { select: { id: true, nome: true } },
@@ -152,26 +148,25 @@ export async function ListarWorkspaceChecklistsBpm() {
           etapas: { where: { ativo: true }, orderBy: [{ ordem: "asc" }, { nome: "asc" }], select: { id: true, nome: true } },
         },
       }),
-      db.servicosComerciais.findMany({ where: { ativo: true }, orderBy: { nome: "asc" }, select: { nome: true } }),
       db.bpmCard.findMany({
         where: { status: "ATIVO" },
         orderBy: { updatedAt: "desc" },
         take: 250,
         select: {
-          id: true, pipelineId: true, etapaId: true, servico: true, tipoProcesso: true,
+          id: true, pipelineId: true, etapaId: true,
           empresa: { select: { razaoSocial: true, nomeFantasia: true } },
         },
       }),
     ]);
     return {
       success: true as const,
-      data: { templates, pipelines, servicos: servicos.map((item) => item.nome), cards },
+      data: { templates, pipelines, cards },
     };
   } catch (error) {
     return {
       success: false as const,
       error: erroPublico(error),
-      data: { templates: [], pipelines: [], servicos: [], cards: [] },
+      data: { templates: [], pipelines: [], cards: [] },
     };
   }
 }
@@ -188,8 +183,6 @@ export async function CriarTemplateChecklistBpm(payload: unknown) {
         ativo: dados.ativo,
         pipelineId: dados.pipelineId ?? null,
         etapaId: dados.etapaId ?? null,
-        servico: nuloSeVazio(dados.servico),
-        tipoProcesso: nuloSeVazio(dados.tipoProcesso),
         cardId: dados.cardId ?? null,
         criadoPorId: userId,
         itens: { create: dados.itens.map((item) => ({ ...item, descricao: nuloSeVazio(item.descricao) })) },
@@ -215,7 +208,7 @@ export async function AtualizarTemplateChecklistBpm(payload: unknown) {
       data: {
         nome: dados.nome, descricao: nuloSeVazio(dados.descricao), ativo: dados.ativo,
         pipelineId: dados.pipelineId ?? null, etapaId: dados.etapaId ?? null,
-        servico: nuloSeVazio(dados.servico), tipoProcesso: nuloSeVazio(dados.tipoProcesso), cardId: dados.cardId ?? null,
+        cardId: dados.cardId ?? null,
       },
       select: { id: true },
     });
@@ -250,8 +243,6 @@ export async function SalvarTemplateChecklistBpm(payload: unknown) {
           ativo: dados.ativo,
           pipelineId: dados.pipelineId ?? null,
           etapaId: dados.etapaId ?? null,
-          servico: nuloSeVazio(dados.servico),
-          tipoProcesso: nuloSeVazio(dados.tipoProcesso),
           cardId: dados.cardId ?? null,
         },
         select: { id: true },
@@ -371,7 +362,7 @@ export async function ObterResumoChecklistCardBpm(payload: unknown) {
     await exigirUsuarioCard(dados.cardId, "visualizar");
     const card = await db.bpmCard.findUnique({
       where: { id: dados.cardId },
-      select: { id: true, pipelineId: true, etapaId: true, servico: true, tipoProcesso: true },
+      select: { id: true, pipelineId: true, etapaId: true },
     });
     if (!card) throw new Error("Card não encontrado");
     return {
@@ -392,7 +383,7 @@ export async function AdicionarItemExclusivoChecklistCardBpm(payload: unknown) {
     const dados = adicionarItemExclusivoChecklistSchema.parse(payload);
     const checklist = await db.bpmCardChecklist.findUnique({
       where: { id: dados.cardChecklistId },
-      select: { id: true, cardId: true, card: { select: { pipelineId: true } } },
+      select: { id: true, cardId: true, card: { select: { pipelineId: true, responsavelId: true } } },
     });
     if (!checklist) throw new Error("Checklist não encontrado");
     await exigirAcessoBpmCard(checklist.cardId, userId, role, "editarCard");
@@ -405,6 +396,7 @@ export async function AdicionarItemExclusivoChecklistCardBpm(payload: unknown) {
         data: {
           cardChecklistId: checklist.id, nome: dados.nome, descricao: nuloSeVazio(dados.descricao),
           obrigatorio: dados.obrigatorio, ordem: (ultimo?.ordem ?? -1) + 1, exclusivoCard: true,
+          responsavelId: checklist.card.responsavelId,
         },
         select: { id: true, nome: true, descricao: true, obrigatorio: true, ordem: true, exclusivoCard: true, status: true },
       });

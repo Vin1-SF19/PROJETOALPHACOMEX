@@ -6,7 +6,7 @@ import { auth } from "../../../auth";
 import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { exigirAcessoBpmCard, exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
-import { criarSlaInstancia, obterStatusSla } from "@/lib/bpm/sla";
+import { criarSlaInstancia, obterStatusSla, simularConfiguracaoSlaAplicavel } from "@/lib/bpm/sla";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import {
   slaConfiguracaoAdminSchema,
@@ -14,6 +14,7 @@ import {
   slaConfigStatusSchema,
   type SlaConfiguracaoAdmin,
 } from "@/lib/validations/bpm-sla";
+import type { BpmSlaAlertaLimite, BpmSlaConfig } from "@prisma/client";
 
 const gatilhoSchema = z.enum([
   "CRIACAO_CARD",
@@ -34,7 +35,21 @@ const criarInstanciaSchema = z.object({
 });
 
 const idSchema = z.string().cuid();
+const simularSlaSchema = z.object({
+  pipelineId: z.string().cuid(),
+  cardId: z.string().cuid(),
+  tarefaId: z.string().cuid().optional(),
+  gatilho: gatilhoSchema,
+}).strict();
 const ROTA_ADMIN = "/PainelAlpha/AlphaCRM/admin/pipelines";
+
+async function notificarConfigSlaConfirmada(pipelineId: string) {
+  try {
+    await notificarPipelineBpm({ pipelineId, tipo: "SLA_STATUS_ALTERADO" });
+  } catch (error) {
+    console.error("[Sla:notificacao_pos_commit]", error);
+  }
+}
 
 function mensagemErro(error: unknown, fallback: string) {
   return error instanceof Error && error.message.includes("administradores") ? error.message : fallback;
@@ -42,6 +57,39 @@ function mensagemErro(error: unknown, fallback: string) {
 
 function pausaRegra(config: { pausaCondicaoJson: string | null }): "NUNCA" | "STANDBY" {
   return config.pausaCondicaoJson?.includes("STANDBY") ? "STANDBY" : "NUNCA";
+}
+
+type SlaConfigCarregada = BpmSlaConfig & {
+  etapa: { nome: string } | null;
+  servicoCatalogo: { nome: string } | null;
+  alertaLimites: BpmSlaAlertaLimite[];
+};
+
+function projetarSlaAdmin(config: SlaConfigCarregada, pipelineId: string): SlaConfiguracaoAdmin {
+  return {
+    id: config.id,
+    pipelineId: config.pipelineId ?? pipelineId,
+    nome: config.nome,
+    etapaId: config.etapaId,
+    etapaNome: config.etapa?.nome ?? null,
+    tipoTarefa: config.tipoTarefa,
+    tipoProcesso: config.tipoProcesso,
+    servicoId: config.servicoId,
+    servicoNome: config.servicoCatalogo?.nome ?? null,
+    quantidade: config.quantidade,
+    unidade: config.unidade,
+    inicioMomento: config.inicioMomento,
+    pausaRegra: pausaRegra(config),
+    ativa: config.ativa,
+    prioridade: config.prioridade,
+    alertaLimites: config.alertaLimites.map((limite) => ({
+      id: limite.id,
+      tipoLimite: limite.tipoLimite,
+      valor: limite.valor,
+      unidade: limite.unidade,
+      statusResultante: limite.statusResultante === "ATRASADO" ? "ATRASADO" : "PROXIMO_VENCIMENTO",
+    })),
+  };
 }
 
 export async function ListarConfiguracoesSlaBpm(pipelineId: string) {
@@ -58,35 +106,39 @@ export async function ListarConfiguracoesSlaBpm(pipelineId: string) {
         servicoCatalogo: { select: { nome: true } },
         alertaLimites: { where: { ativo: true }, orderBy: { ordem: "asc" } },
       },
-      orderBy: [{ ativa: "desc" }, { nome: "asc" }],
+      orderBy: [{ ativa: "desc" }, { prioridade: "desc" }, { createdAt: "asc" }],
     });
-    const data: SlaConfiguracaoAdmin[] = configs.map((config) => ({
-      id: config.id,
-      pipelineId: config.pipelineId ?? parsed.data,
-      nome: config.nome,
-      etapaId: config.etapaId,
-      etapaNome: config.etapa?.nome ?? null,
-      tipoTarefa: config.tipoTarefa,
-      tipoProcesso: config.tipoProcesso,
-      servicoId: config.servicoId,
-      servicoNome: config.servicoCatalogo?.nome ?? null,
-      quantidade: config.quantidade,
-      unidade: config.unidade,
-      inicioMomento: config.inicioMomento,
-      pausaRegra: pausaRegra(config),
-      ativa: config.ativa,
-      alertaLimites: config.alertaLimites.map((limite) => ({
-        id: limite.id,
-        tipoLimite: limite.tipoLimite,
-        valor: limite.valor,
-        unidade: limite.unidade,
-        statusResultante: limite.statusResultante === "ATRASADO" ? "ATRASADO" : "PROXIMO_VENCIMENTO",
-      })),
-    }));
+    const data = configs.map((config) => projetarSlaAdmin(config, parsed.data));
     return { success: true, data };
   } catch (error) {
     console.error("[ListarConfiguracoesSlaBpm]", error);
     return { success: false, error: mensagemErro(error, "Erro ao buscar configurações de SLA"), data: [] };
+  }
+}
+
+export async function SimularConfiguracaoSlaBpm(input: unknown) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false as const, error: "Não autorizado" };
+    const parsed = simularSlaSchema.safeParse(input);
+    if (!parsed.success) return { success: false as const, error: parsed.error.flatten() };
+    const userId = Number(session.user.id);
+    await exigirAcessoConfigPipeline(userId, "configurarSla");
+    await exigirAcessoBpmCard(parsed.data.cardId, userId, session.user.role ?? null, "visualizar");
+    const card = await db.bpmCard.findUnique({ where: { id: parsed.data.cardId }, select: { pipelineId: true } });
+    if (!card || card.pipelineId !== parsed.data.pipelineId) return { success: false as const, error: "Card não pertence a este pipeline" };
+    if (parsed.data.tarefaId) {
+      const tarefa = await db.bpmTarefa.findFirst({ where: { id: parsed.data.tarefaId, cardId: parsed.data.cardId }, select: { id: true } });
+      if (!tarefa) return { success: false as const, error: "Tarefa não pertence ao card informado" };
+    }
+    const data = await simularConfiguracaoSlaAplicavel(
+      { cardId: parsed.data.cardId, tarefaId: parsed.data.tarefaId },
+      parsed.data.gatilho,
+    );
+    return { success: true as const, data };
+  } catch (error) {
+    console.error("[SimularConfiguracaoSlaBpm]", error instanceof Error ? error.name : "erro");
+    return { success: false as const, error: mensagemErro(error, "Erro ao simular configuração de SLA") };
   }
 }
 
@@ -127,6 +179,7 @@ export async function SalvarConfiguracaoSlaBpm(input: unknown) {
         unidade: dados.unidade,
         inicioMomento: dados.inicioMomento,
         ativa: dados.ativa,
+        prioridade: dados.prioridade,
         pausaCondicaoJson: pausa,
         retomadaCondicaoJson: pausa ? JSON.stringify({ tipo: "SAIDA_STANDBY" }) : null,
         ...alvo,
@@ -139,10 +192,31 @@ export async function SalvarConfiguracaoSlaBpm(input: unknown) {
         { slaConfigId: config.id, nome: "Atenção", cor: "AMARELO", tipoLimite: dados.amareloTipo, valor: dados.amareloValor, unidade: dados.amareloTipo === "PERCENTUAL_CONSUMIDO" ? null : dados.amareloUnidade, statusResultante: "PROXIMO_VENCIMENTO", ordem: 1 },
         { slaConfigId: config.id, nome: "Vencido", cor: "VERMELHO", tipoLimite: dados.vermelhoTipo, valor: dados.vermelhoValor, unidade: dados.vermelhoTipo === "PERCENTUAL_CONSUMIDO" ? null : dados.vermelhoUnidade, statusResultante: "ATRASADO", ordem: 2 },
       ] });
-      return config;
+      await tx.bpmPipelineConfigAuditoria.create({
+        data: {
+          pipelineId: dados.pipelineId,
+          adminId: userId,
+          campoAlterado: dados.id ? "sla_atualizado" : "sla_criado",
+          valorNovoJson: JSON.stringify({
+            id: config.id,
+            escopo: dados.escopo,
+            inicioMomento: dados.inicioMomento,
+            prioridade: dados.prioridade,
+          }),
+        },
+      });
+      return tx.bpmSlaConfig.findUniqueOrThrow({
+        where: { id: config.id },
+        include: {
+          etapa: { select: { nome: true } },
+          servicoCatalogo: { select: { nome: true } },
+          alertaLimites: { where: { ativo: true }, orderBy: { ordem: "asc" } },
+        },
+      });
     });
     revalidatePath(`${ROTA_ADMIN}/${dados.pipelineId}`);
-    return { success: true, data: { id: salvo.id } };
+    await notificarConfigSlaConfirmada(dados.pipelineId);
+    return { success: true, data: projetarSlaAdmin(salvo, dados.pipelineId) };
   } catch (error) {
     console.error("[SalvarConfiguracaoSlaBpm]", error);
     return { success: false, error: mensagemErro(error, error instanceof Error ? error.message : "Erro ao salvar configuração de SLA") };
@@ -155,10 +229,28 @@ export async function AtivarDesativarConfiguracaoSlaBpm(input: unknown) {
     if (!session?.user?.id) return { success: false, error: "Não autorizado" };
     const parsed = slaConfigStatusSchema.safeParse(input);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    await exigirAcessoConfigPipeline(Number(session.user.id), "configurarSla");
-    const atualizada = await db.bpmSlaConfig.updateMany({ where: { id: parsed.data.id, pipelineId: parsed.data.pipelineId }, data: { ativa: parsed.data.ativa } });
-    if (atualizada.count !== 1) return { success: false, error: "Configuração de SLA não encontrada" };
+    const userId = Number(session.user.id);
+    await exigirAcessoConfigPipeline(userId, "configurarSla");
+    await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarSla", tx);
+      const existente = await tx.bpmSlaConfig.findFirst({
+        where: { id: parsed.data.id, pipelineId: parsed.data.pipelineId },
+        select: { id: true, ativa: true },
+      });
+      if (!existente) throw new Error("Configuração de SLA não encontrada");
+      await tx.bpmSlaConfig.update({ where: { id: existente.id }, data: { ativa: parsed.data.ativa } });
+      await tx.bpmPipelineConfigAuditoria.create({
+        data: {
+          pipelineId: parsed.data.pipelineId,
+          adminId: userId,
+          campoAlterado: "sla_ativo",
+          valorAnteriorJson: JSON.stringify({ ativa: existente.ativa }),
+          valorNovoJson: JSON.stringify({ ativa: parsed.data.ativa }),
+        },
+      });
+    });
     revalidatePath(`${ROTA_ADMIN}/${parsed.data.pipelineId}`);
+    await notificarConfigSlaConfirmada(parsed.data.pipelineId);
     return { success: true };
   } catch (error) {
     console.error("[AtivarDesativarConfiguracaoSlaBpm]", error);
@@ -180,8 +272,17 @@ export async function ExcluirConfiguracaoSlaBpm(input: unknown) {
       if (!config) throw new Error("Configuração de SLA não encontrada");
       if (config._count.instancias > 0) throw new Error("Este SLA já possui histórico. Desative-o para preservar a auditoria.");
       await tx.bpmSlaConfig.delete({ where: { id: config.id } });
+      await tx.bpmPipelineConfigAuditoria.create({
+        data: {
+          pipelineId: parsed.data.pipelineId,
+          adminId: userId,
+          campoAlterado: "sla_excluido",
+          valorAnteriorJson: JSON.stringify({ id: config.id }),
+        },
+      });
     });
     revalidatePath(`${ROTA_ADMIN}/${parsed.data.pipelineId}`);
+    await notificarConfigSlaConfirmada(parsed.data.pipelineId);
     return { success: true };
   } catch (error) {
     console.error("[ExcluirConfiguracaoSlaBpm]", error);

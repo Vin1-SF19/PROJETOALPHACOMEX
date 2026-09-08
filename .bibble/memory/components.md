@@ -657,3 +657,53 @@ observável. A criação de webhook revela o segredo somente na resposta inicial
 - **Uso:** o badge aparece no card fechado do Kanban; o painel aparece na lateral do card aberto.
 - **Dados:** ambos consomem o resumo calculado no servidor; o client apenas atualiza a apresentação do tempo restante, sem decidir transições nem emitir alertas.
 - **Acessibilidade:** cor é acompanhada por texto/ícone; SLA pausado congela a contagem e atraso recebe destaque visual adicional no card.
+
+### PainelChecklistsCard — responsabilidade por item
+
+**Arquivo:** `src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistsCard.tsx`
+
+**Uso:** modal do card → painel esquerdo → aba Checklist. O cabeçalho de cada checklist resume a pessoa responsável ou a quantidade de responsáveis; cada item mantém o seletor entre responsável principal, membros vinculados e `Sem responsável`. Enquanto uma escrita do item está em andamento, checkbox, observação e seletor ficam bloqueados e o container expõe `aria-busy`.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-24157F)
+
+### CadenciaFormDialog / PainelCadenciasCard — RM-2026-55E27D
+
+O formulário administrativo usa o schema Zod compartilhado e seletores dependentes de pipeline e etapa; trocar o pipeline limpa a etapa anterior. A opção “Entrada no pipeline” mantém o escopo legado explícito. No card, o painel é informativo: mostra escopo, estado, passo e próxima execução, sem botões para iniciar, pausar ou reativar; cancelamento terminal autorizado continua disponível.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-55E27D)
+
+### AdminPipelineClient / EtapaAvancadaSection — RM-2026-9E89F2
+
+A página administrativa mantém snapshots confirmados para etapas, campos, transições, visibilidade e SLA. Enquanto uma mutation está em curso, controles concorrentes ficam bloqueados; sucesso aplica o agregado retornado pelo servidor e falha restaura o snapshot. Cor e nome usam rascunho local e só persistem no blur.
+
+Campos são agrupados pelas configurações de etapa, podem aparecer em várias colunas e distinguem proprietário de pipelines associados. Transição ausente é exibida como “Não configurada”. O editor de SLA torna a prioridade e sua precedência visíveis e não oferece os gatilhos legados que o runtime não dispara.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-9E89F2)
+
+### ChecklistsWorkspace / layout do card — RM-2026-296ECE
+
+`ChecklistsWorkspace` cria e edita templates somente por pipeline, etapa e card específico. O catálogo de serviços, inputs, estados, pesquisa e badges de `Serviço`/`Tipo de processo` não fazem parte do componente. `PainelChecklistsCard` mantém apenas execução, progresso, responsáveis e itens; `CardAbertoLayout` não renderiza mais o selo “Serviço ativo”.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-296ECE)
+
+### Regras Financeiras — componentes descontinuados (RM-2026-DBEF25)
+
+`RegrasFinanceirasWorkspace` e `PainelCalculoFinanceiro` foram removidos. A
+configuração do CRM não oferece mais o card “Regras Financeiras” e o modal do
+card não monta cálculo por regra configurável. `CalculoTributario`, os campos do
+Pipeline Financeiro e o `ConstrutorRegras` da área autônoma de Comissões foram
+preservados.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-DBEF25)
+
+### Workspace administrativo de pipeline — RM-2026-20FEEB
+
+`AdminPipelineClient` organiza Visão geral, Etapas e fluxo, Campos e formulários, Card do Kanban, SLA, Automações, Permissões e Histórico. `PipelineWorkspaceSections` fornece saúde, matriz de transições, preview, automações e histórico; `FormularioEtapaWorkspace` edita seções e componentes canônicos por etapa. Etapas e campos usam editores laterais com rascunho, salvar/cancelar e recuperação de conflito.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-20FEEB)
+
+### Publicação e simulação no workspace — RM-2026-8C3862
+
+`AdminPipelineClient` apresenta versão, saúde, pendências e oito áreas administrativas. A ativação de campos é rascunho local: descartar restaura o snapshot confirmado e publicar executa CAS. `SlaConfigSection` inclui simulação somente leitura por card/tarefa e informa a configuração canônica selecionada sem criar estado operacional.
+
+**Última atualização:** 2026-09-08 por Codex (RM-2026-8C3862)

@@ -242,6 +242,24 @@ async function resolverConfiguracaoAplicavel(
   return config ? { config, cardId } : null;
 }
 
+/** Executa exatamente a mesma seleção do runtime, sem criar instância ou gravar eventos. */
+export async function simularConfiguracaoSlaAplicavel(
+  alvo: { cardId?: string; tarefaId?: string },
+  gatilho: GatilhoSla,
+  client: ClienteSla = db,
+) {
+  const aplicavel = await resolverConfiguracaoAplicavel(alvo, gatilho, client);
+  return aplicavel
+    ? {
+        id: aplicavel.config.id,
+        nome: aplicavel.config.nome,
+        prioridade: aplicavel.config.prioridade,
+        quantidade: aplicavel.config.quantidade,
+        unidade: aplicavel.config.unidade,
+      }
+    : null;
+}
+
 function erroUnicidade(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }

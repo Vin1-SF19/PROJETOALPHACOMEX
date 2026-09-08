@@ -18,7 +18,6 @@ import {
   TEMPLATE_RESUMO_ALINHAMENTO,
 } from "@/lib/bpm/alinhamento-estrategico";
 import { campoFinanceiroSomenteLeitura } from "@/lib/bpm/pipeline-financeiro";
-import { PainelCalculoFinanceiro } from "@/components/bpm/regras-financeiras/PainelCalculoFinanceiro";
 import { useCardSave } from "./CardSaveContext";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
@@ -274,7 +273,6 @@ export function PainelCamposEtapaAtual({
               })}
             </fieldset>
           ))}
-          {card.pipeline.nome === "Financeiro" && <PainelCalculoFinanceiro cardId={card.id} realtimeRevision={realtimeRevision} />}
           {salvandoCamposAtuais && <p className="flex items-center gap-2 text-[11px] text-slate-500"><Loader2 size={13} className="animate-spin" /> Salvando alterações...</p>}
           {!podeEditar && <p className="text-[11px] text-slate-500">Somente o responsável ou um administrador pode editar estes campos.</p>}
         </div>

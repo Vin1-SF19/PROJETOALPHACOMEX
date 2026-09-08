@@ -66,8 +66,6 @@ async function montarContexto(card: ContextoExecucao["card"]): Promise<ContextoE
     id: card.id,
     pipelineId: card.pipelineId,
     etapaId: card.etapaId,
-    servico: card.servico,
-    tipoProcesso: card.tipoProcesso,
   });
   return {
     card,

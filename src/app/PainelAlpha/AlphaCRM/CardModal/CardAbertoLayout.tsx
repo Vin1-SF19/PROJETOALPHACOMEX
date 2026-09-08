@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { BriefcaseBusiness, Building2, Trash2 } from "lucide-react";
+import { Building2, Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -171,28 +171,6 @@ export function CardAbertoLayout({
                   Perfil da empresa
                 </button>
               </div>
-              {card.servico?.trim() && (
-                <div
-                  className="mt-2 inline-flex max-w-full items-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs shadow-[0_8px_20px_-14px_rgba(var(--accent-rgb),0.9)]"
-                  style={{
-                    background: `linear-gradient(110deg, rgba(${accent},0.22), rgba(${accent},0.06))`,
-                    borderColor: `rgba(${accent},0.42)`,
-                  }}
-                >
-                  <BriefcaseBusiness
-                    aria-hidden="true"
-                    size={13}
-                    className="shrink-0"
-                    style={{ color: `rgb(${accent})` }}
-                  />
-                  <span className="shrink-0 font-bold uppercase tracking-[0.11em] text-slate-300">
-                    Serviço ativo
-                  </span>
-                  <span className="truncate font-extrabold text-white" title={card.servico}>
-                    {card.servico}
-                  </span>
-                </div>
-              )}
             </div>
             <DadosEmpresaToggle
               aberto={dadosEmpresaDrawer.aberto}

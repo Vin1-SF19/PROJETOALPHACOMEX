@@ -7,6 +7,7 @@ import type { Prisma } from "@prisma/client";
 import db from "@/lib/prisma";
 import type { ContextoAvaliacao, RegraBpm } from "./types";
 import { regraBpmSchema } from "./schemas";
+import { FILTRO_SEM_REGRAS_FINANCEIRAS_DESCONTINUADAS } from "./legado";
 import { carregarResumoChecklistAplicavelSeguro } from "@/lib/bpm/checklists/integracao";
 
 type CardParaContexto = {
@@ -65,8 +66,6 @@ export async function montarContextoAvaliacaoDoCard(
       id: card.id,
       pipelineId: card.pipelineId,
       etapaId: card.etapaId,
-      servico: card.servico,
-      tipoProcesso: card.tipoProcesso ?? null,
     }, client),
   ]);
   const camposDinamicos = Object.fromEntries(
@@ -119,7 +118,10 @@ export async function carregarRegrasAplicaveis(params: {
   const linhas = await client.bpmRegra.findMany({
     where: {
       ativa: true,
-      OR: [{ pipelineId: params.pipelineId }, { pipelineId: null }],
+      AND: [
+        { OR: [{ pipelineId: params.pipelineId }, { pipelineId: null }] },
+        FILTRO_SEM_REGRAS_FINANCEIRAS_DESCONTINUADAS,
+      ],
     },
     select: {
       id: true,

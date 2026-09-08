@@ -667,3 +667,9 @@ Para casos de leitura síncrona de layout do DOM (ex: `getBoundingClientRect()` 
 **Próximos passos sugeridos (não implementados):** considerar, no `qwen-generator.ts`, detectar `TRUNCATED_MODEL_RESPONSE` e reduzir automaticamente o escopo do manifesto pedido (menos fases, chamadas em lote) em vez de repetir a mesma chamada idêntica até `DEAD_LETTER`.
 **Contexto:** `src/lib/roadmap-alpha/qwen-generator.ts`, `src/lib/roadmap-alpha/objectives.ts`, objetivo `RM-2026-999766`.
 **Adicionado em:** 2026-08-28 (Bibble, ao tentar desenvolver item arquivado a pedido do usuário)
+
+## Gates globais concorrentes durante RM-2026-8C3862
+
+Em 2026-09-08, a suíte global aprovou 2.512/2.566 testes e manteve 54 falhas em módulos concorrentes (calendário, documentos, card, CS/NPS e mocks legados). Em BPM, `kanban-transicao-integracao.test.ts` ainda exige o comportamento antigo fail-open e não simula o comando canônico atual; o runtime deve continuar fail-closed. O lint global reporta 3.044 erros, em grande parte sob `.aiox-core`/`.agents` e arquivos preexistentes, e o typecheck global mantém erros externos à entrega. O typecheck com 4 GB sofreu OOM; com 8 GB concluiu. Testes, lint e typecheck direcionados da RM passaram.
+
+**Adicionado em:** 2026-09-08 por Codex (RM-2026-8C3862)

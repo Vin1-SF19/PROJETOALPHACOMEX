@@ -33,6 +33,7 @@ type Props = {
 const TIPO_LABEL: Record<string, string> = {
   CHECKLIST: "Checklist", LIGACAO: "Ligação", WHATSAPP: "WhatsApp", EMAIL: "E-mail", TAREFA: "Tarefa", LEMBRETE_RAPIDO: "Lembrete rápido",
 };
+const ESCOPO_PIPELINE = "__pipeline__";
 
 export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCreated }: Props) {
   const [ativa, setAtiva] = useState(cadencia?.ativa ?? true);
@@ -49,7 +50,7 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
       nome: cadencia?.nome ?? "",
       descricao: cadencia?.descricao ?? "",
       pipelineId: cadencia?.pipelineId ?? "",
-      etapaId: cadencia?.etapaId ?? "",
+      etapaId: cadencia?.etapaId ?? undefined,
     },
   });
   const pipelineId = useWatch({ control, name: "pipelineId" });
@@ -149,16 +150,17 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <Select value={pipelineId || undefined} onValueChange={(valor) => {
               setValue("pipelineId", valor, { shouldValidate: true });
-              setValue("etapaId", "", { shouldValidate: true });
+              setValue("etapaId", undefined, { shouldValidate: true });
             }}>
               <SelectTrigger aria-label="Pipeline da cadência"><SelectValue placeholder="Selecione o pipeline" /></SelectTrigger>
               <SelectContent>
                 {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={etapaId || undefined} onValueChange={(valor) => setValue("etapaId", valor, { shouldValidate: true })} disabled={!pipelineId}>
-              <SelectTrigger aria-label="Etapa da cadência"><SelectValue placeholder={pipelineId ? "Selecione a etapa" : "Escolha o pipeline"} /></SelectTrigger>
+            <Select value={etapaId ?? ESCOPO_PIPELINE} onValueChange={(valor) => setValue("etapaId", valor === ESCOPO_PIPELINE ? undefined : valor, { shouldValidate: true })} disabled={!pipelineId}>
+              <SelectTrigger aria-label="Etapa da cadência"><SelectValue placeholder={pipelineId ? "Entrada no pipeline" : "Escolha o pipeline"} /></SelectTrigger>
               <SelectContent>
+                <SelectItem value={ESCOPO_PIPELINE}>Entrada no pipeline</SelectItem>
                 {etapasDisponiveis.map((etapa) => <SelectItem key={etapa.id} value={etapa.id}>{etapa.nome}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -168,9 +170,9 @@ export function CadenciaFormDialog({ cadencia, pipelines, onClose, onSaved, onCr
             </div>
           </div>
           {(errors.pipelineId || errors.etapaId) && (
-            <p className="text-xs text-rose-300">Selecione um pipeline e uma etapa válidos.</p>
+            <p className="text-xs text-rose-300">Selecione um pipeline e, se desejar, uma etapa válida.</p>
           )}
-          <p className="text-xs text-slate-500">A cadência será iniciada automaticamente quando o card entrar nesta coluna. Registros sem coluna não são executados.</p>
+          <p className="text-xs text-slate-500">A cadência será iniciada automaticamente quando o card entrar no pipeline ou na coluna selecionada.</p>
           <Button onClick={salvarMetadados} disabled={salvando} variant="outline" className="w-full">
             {cadencia ? "Salvar alterações" : "Criar cadência"}
           </Button>

@@ -24,6 +24,7 @@ const card = {
   etapaId: "etapa-1",
   servico: "Radar",
   tipoProcesso: "Importação",
+  responsavelId: 7,
 };
 
 function template(id: string) {
@@ -55,6 +56,9 @@ describe("serviço de materialização de checklists", () => {
 
     expect(resultado.criados).toEqual([]);
     expect(prismaMock.bpmChecklistTemplate.findMany).toHaveBeenCalledTimes(2);
+    const filtroAplicabilidade = prismaMock.bpmChecklistTemplate.findMany.mock.calls[0]?.[0]?.where;
+    expect(JSON.stringify(filtroAplicabilidade)).not.toContain("servico");
+    expect(JSON.stringify(filtroAplicabilidade)).not.toContain("tipoProcesso");
     expect(prismaMock.bpmChecklistTemplate.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
       cursor: { id: "template-249" },
       skip: 1,
@@ -79,7 +83,11 @@ describe("serviço de materialização de checklists", () => {
         templateId: origem.id,
         templateNome: origem.nome,
         templateDescricao: origem.descricao,
-        itens: { create: [expect.objectContaining({ templateItemId: "item-template-1", exclusivoCard: false })] },
+        itens: { create: [expect.objectContaining({
+          templateItemId: "item-template-1",
+          exclusivoCard: false,
+          responsavelId: card.responsavelId,
+        })] },
       }),
       select: { id: true },
     }));
@@ -94,6 +102,21 @@ describe("serviço de materialização de checklists", () => {
     prismaMock.$transaction.mockRejectedValue({ code: "P2002" });
 
     await expect(materializarChecklistsAplicaveisCard({ cardId: card.id })).resolves.toMatchObject({ criados: [] });
+    expect(realtimeMock).not.toHaveBeenCalled();
+  });
+
+  it("não recria nem reatribui itens de template já materializado", async () => {
+    const origem = template("template-1");
+    prismaMock.bpmChecklistTemplate.findMany.mockResolvedValueOnce([origem]);
+    prismaMock.bpmCardChecklist.findMany
+      .mockResolvedValueOnce([{ templateId: origem.id }])
+      .mockResolvedValueOnce([]);
+
+    const resultado = await materializarChecklistsAplicaveisCard({ cardId: card.id });
+
+    expect(resultado.criados).toEqual([]);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(historicoMock).not.toHaveBeenCalled();
     expect(realtimeMock).not.toHaveBeenCalled();
   });
 });

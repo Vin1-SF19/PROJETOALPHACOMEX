@@ -174,11 +174,13 @@ export async function ConfigurarCadenciaEtapaBpm(input: unknown) {
         throw new Error("CADENCIA_FORA_PIPELINE");
       }
 
-      await tx.bpmCadencia.updateMany({
-        where: { pipelineId, etapaId, ativa: true, ...(cadenciaId ? { id: { not: cadenciaId } } : {}) },
-        data: { ativa: false },
-      });
-      if (!selecionada) return { cadenciaId: null };
+      if (!selecionada) {
+        await tx.bpmCadencia.updateMany({
+          where: { pipelineId, etapaId, ativa: true },
+          data: { ativa: false },
+        });
+        return { cadenciaId: null };
+      }
       const cadencia = await tx.bpmCadencia.update({
         where: { id: selecionada.id },
         data: { pipelineId, etapaId, ativa: true },

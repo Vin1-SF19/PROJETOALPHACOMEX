@@ -97,8 +97,6 @@ import {
   obterErroCamposAlinhamentoParaSaida,
 } from "@/lib/bpm/alinhamento-estrategico";
 import { campoFinanceiroSomenteLeitura, etapaFinanceiraValida, validateFinancialTransition } from "@/lib/bpm/pipeline-financeiro";
-import { calcularRegraTributariaDoCard } from "@/lib/bpm/regras-financeiras/persistencia";
-import { sincronizarComissoesDoCardFinanceiro } from "@/lib/bpm/regras-financeiras/comissoes-card";
 import { executarTransicaoBpm } from "@/lib/bpm/transicao-command";
 import { ativarCadenciasNaEntradaBpm } from "@/lib/bpm/cadencias/ativacao-automatica";
 import { resolverVisibilidadeEtapa } from "@/lib/bpm/visibilidade-etapa";
@@ -1509,12 +1507,7 @@ async function executarMovimentoLegadoDesativado(
     const valoresFinanceiros: Record<string, string | null> = Object.fromEntries((financeiro?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
     camposFinanceirosPorId = await db.bpmCampo.findMany({ where: { pipelineId: card.pipelineId }, select: { id: true, nome: true } });
     for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceiros[nome] = valor }
-    const regraFinanceira = ["Formalização", "Pagamento", "Nota Fiscal"].includes(card.etapa.nome)
-      ? await calcularRegraTributariaDoCard({ cardId, valoresPorNome: valoresFinanceiros })
-      : null;
-    if (regraFinanceira) Object.assign(valoresFinanceiros, regraFinanceira.valoresAutomaticos);
     validacaoFinanceira = validateFinancialTransition({ pipelineName: financeiro?.pipeline.nome ?? "", fromStage: card.etapa.nome, toStage: etapaDestino.nome, values: valoresFinanceiros, attachmentNames: financeiro?.anexos.map((anexo) => anexo.nome) });
-    if (regraFinanceira) validacaoFinanceira.automaticValues = { ...validacaoFinanceira.automaticValues, ...regraFinanceira.valoresAutomaticos };
   }
   if (validacaoFinanceira.blocked) return { success: false, error: validacaoFinanceira.pendingFields.length > 0 ? `${validacaoFinanceira.message} Campos pendentes: ${validacaoFinanceira.pendingFields.join(", ")}.` : validacaoFinanceira.message };
   if (etapaEhBoasVindas(etapaDestino.nome) && !(await checarAcessoDiretoriaBpm(userId))) {
@@ -1620,7 +1613,6 @@ async function executarMovimentoLegadoDesativado(
     id: card.id,
     pipelineId: card.pipelineId,
     etapaId: card.etapaId,
-    servico: card.servico,
   });
   if (erroChecklist) return { success: false, error: erroChecklist };
 
@@ -1650,12 +1642,7 @@ async function executarMovimentoLegadoDesativado(
       const financeiroAtual = await tx.bpmCard.findUnique({ where: { id: cardId }, select: { pipeline: { select: { nome: true } }, campoValores: { select: { valor: true, campo: { select: { nome: true } } } }, anexos: { select: { nome: true } } } });
       const valoresFinanceirosAtuais: Record<string, string | null> = Object.fromEntries((financeiroAtual?.campoValores ?? []).map((item) => [item.campo.nome, item.valor]));
       for (const [campoId, valor] of Object.entries(camposValores)) { const nome = camposFinanceirosPorId.find((campo) => campo.id === campoId)?.nome; if (nome) valoresFinanceirosAtuais[nome] = valor }
-      const regraFinanceiraAtual = ["Formalização", "Pagamento", "Nota Fiscal"].includes(cardAtual.etapa.nome)
-        ? await calcularRegraTributariaDoCard({ cardId, valoresPorNome: valoresFinanceirosAtuais, client: tx })
-        : null;
-      if (regraFinanceiraAtual) Object.assign(valoresFinanceirosAtuais, regraFinanceiraAtual.valoresAutomaticos);
       validacaoFinanceiraAtual = validateFinancialTransition({ pipelineName: financeiroAtual?.pipeline.nome ?? "", fromStage: cardAtual.etapa.nome, toStage: destinoAtual.nome, values: valoresFinanceirosAtuais, attachmentNames: financeiroAtual?.anexos.map((anexo) => anexo.nome) });
-      if (regraFinanceiraAtual) validacaoFinanceiraAtual.automaticValues = { ...validacaoFinanceiraAtual.automaticValues, ...regraFinanceiraAtual.valoresAutomaticos };
     }
     if (validacaoFinanceiraAtual.blocked) throw new Error(`MOVIMENTO_INVALIDO:${validacaoFinanceiraAtual.pendingFields.length > 0 ? `${validacaoFinanceiraAtual.message} Campos pendentes: ${validacaoFinanceiraAtual.pendingFields.join(", ")}.` : validacaoFinanceiraAtual.message}`);
     if (etapaEhBoasVindas(destinoAtual.nome) && !(await checarAcessoDiretoriaBpm(userId, tx))) {
@@ -1667,7 +1654,6 @@ async function executarMovimentoLegadoDesativado(
       id: cardAtual.id,
       pipelineId: cardAtual.pipelineId,
       etapaId: cardAtual.etapaId,
-      servico: cardAtual.servico,
     }, tx);
     if (erroChecklistAtual) throw new Error(`MOVIMENTO_INVALIDO:${erroChecklistAtual}`);
     if (
@@ -1902,12 +1888,6 @@ async function executarMovimentoLegadoDesativado(
     try { await executarAutomacaoTarefaNotaFiscal(cardId, userId); }
     catch (error) { console.error("[executarAutomacaoTarefaNotaFiscal]", error); }
   }
-  try {
-    await sincronizarComissoesDoCardFinanceiro(cardId);
-  } catch (error) {
-    console.error("[sincronizarComissoesDoCardFinanceiro]", error);
-  }
-
   await notificarPipelineBpm({ pipelineId: resultadoMovimento.pipelineId, cardId, tipo: "CARD_MOVIDO" });
   revalidatePath(`${ROTA_BASE}/pipeline/${resultadoMovimento.pipelineId}`);
   revalidatePath(ROTA_BASE);
@@ -1933,10 +1913,13 @@ async function executarMovimentoCanonico(
   if (!atual) return { success: false, error: "Card não encontrado" };
   const etapaEsperada = dados.etapaOrigemEsperadaId ?? atual.etapaId;
   const versaoEsperada = dados.versaoEsperada ?? atual.versao;
-  const vinculosAntes = new Set((await db.bpmCardVinculo.findMany({
-    where: { cardOrigemId: dados.cardId },
-    select: { id: true },
-  })).map((item) => item.id));
+  const clienteVinculos = db.bpmCardVinculo as typeof db.bpmCardVinculo | undefined;
+  const vinculosAntes = new Set(clienteVinculos?.findMany
+    ? (await clienteVinculos.findMany({
+        where: { cardOrigemId: dados.cardId },
+        select: { id: true },
+      })).map((item) => item.id)
+    : []);
   const resultado = await executarTransicaoBpm({
     cardId: dados.cardId,
     etapaOrigemEsperadaId: etapaEsperada,
@@ -1954,15 +1937,12 @@ async function executarMovimentoCanonico(
   } catch (error) {
     console.error("[executarAutomacoesCentraisDoCardAgora]", error);
   }
-  try {
-    await sincronizarComissoesDoCardFinanceiro(dados.cardId);
-  } catch (error) {
-    console.error("[sincronizarComissoesDoCardFinanceiro]", error);
-  }
-  const criados = await db.bpmCardVinculo.findMany({
-    where: { cardOrigemId: dados.cardId, id: { notIn: [...vinculosAntes] } },
-    select: { cardDestino: { select: { id: true, pipelineId: true, pipeline: { select: { nome: true } } } } },
-  });
+  const criados = clienteVinculos?.findMany
+    ? await clienteVinculos.findMany({
+        where: { cardOrigemId: dados.cardId, id: { notIn: [...vinculosAntes] } },
+        select: { cardDestino: { select: { id: true, pipelineId: true, pipeline: { select: { nome: true } } } } },
+      })
+    : [];
   const cardsFilhosCriados = criados.map(({ cardDestino }) => ({
     cardId: cardDestino.id,
     pipelineId: cardDestino.pipelineId,

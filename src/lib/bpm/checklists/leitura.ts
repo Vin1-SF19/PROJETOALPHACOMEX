@@ -1,8 +1,6 @@
 export type EscopoTemplateChecklist = {
   pipelineId: string | null;
   etapaId: string | null;
-  servico: string | null;
-  tipoProcesso: string | null;
   cardId: string | null;
 };
 
@@ -10,8 +8,6 @@ export type ContextoCardChecklist = {
   id: string;
   pipelineId: string;
   etapaId: string;
-  servico: string | null;
-  tipoProcesso?: string | null;
 };
 
 export type ItemEstadoChecklist = {
@@ -34,8 +30,6 @@ export type ResumoChecklistCard = ReturnType<typeof calcularResumoChecklist>;
 export function templateChecklistCompativel(escopo: EscopoTemplateChecklist, card: ContextoCardChecklist): boolean {
   return (!escopo.pipelineId || escopo.pipelineId === card.pipelineId)
     && (!escopo.etapaId || escopo.etapaId === card.etapaId)
-    && (!escopo.servico || escopo.servico === card.servico)
-    && (!escopo.tipoProcesso || escopo.tipoProcesso === card.tipoProcesso)
     && (!escopo.cardId || escopo.cardId === card.id);
 }
 

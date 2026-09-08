@@ -72,7 +72,7 @@ export function PainelCadenciasCard({ cardId, accent }: { cardId: string; accent
         const proximoPasso = v.cadencia.passos.find((passo) => passo.ordem === v.passoAtualOrdem);
         const escopo = v.cadencia.pipeline && v.cadencia.etapa
           ? `${v.cadencia.pipeline.nome} / ${v.cadencia.etapa.nome}`
-          : "Legado sem coluna — inoperante";
+          : v.cadencia.pipeline ? `Entrada no pipeline ${v.cadencia.pipeline.nome}` : "Sem pipeline configurado";
         return (
           <div key={v.id} className={`rounded-xl border px-3 py-2 text-xs ${meta.cor}`}>
             <div className="flex items-center justify-between gap-2">
@@ -97,7 +97,7 @@ export function PainelCadenciasCard({ cardId, accent }: { cardId: string; accent
           </div>
         );
       })}
-      {vinculos.length === 0 && <p className="text-xs text-slate-600">Nenhuma cadência configurada para esta coluna. O card pode avançar normalmente.</p>}
+      {vinculos.length === 0 && <p className="text-xs text-slate-600">Nenhuma cadência ativa para este card. Ele pode avançar normalmente.</p>}
     </div>
   );
 }
