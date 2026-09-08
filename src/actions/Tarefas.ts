@@ -92,6 +92,27 @@ export async function BuscarTarefasPorUsuario(userId: string, role: string) {
     }
 }
 
+/**
+ * Busca as tarefas de um usuário fixo a partir do e-mail cadastrado.
+ * Usado pelo Painel de Serviços Gerais, que exibe sempre as tarefas
+ * da conta "Serviços Gerais", independente de quem está logado.
+ */
+export async function BuscarTarefasPorEmail(email: string) {
+    try {
+        const usuario = await db.usuarios.findUnique({
+            where: { email },
+            select: { id: true },
+        });
+
+        if (!usuario) return [];
+
+        return BuscarTarefasPorUsuario(String(usuario.id), "");
+    } catch (error) {
+        console.error("Erro ao buscar tarefas por e-mail:", error);
+        return [];
+    }
+}
+
 export async function AlternarStatusTarefa(id: string, novoStatus: boolean) {
     try {
         if (!id) return { success: false, error: "ID ausente" };

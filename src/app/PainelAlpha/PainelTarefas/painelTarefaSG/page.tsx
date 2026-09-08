@@ -9,11 +9,15 @@ import {
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
-import { BuscarTarefasPorUsuario, AlternarStatusTarefa } from '@/actions/Tarefas';
+import { BuscarTarefasPorEmail, AlternarStatusTarefa } from '@/actions/Tarefas';
 import { toast } from 'sonner';
 import { buscarReservasAtivas, BuscarTodasDiretrizes } from '@/actions/Reservas';
 import ListaCompras from './Carrinho/page';
 import { buscarListaCompra, buscarProdutos } from "@/actions/Estoque";
+
+// Este painel sempre exibe as tarefas da conta "Serviços Gerais",
+// independente de qual usuário estiver logado.
+const EMAIL_USUARIO_SERVICOS_GERAIS = "alexandra@alpha-comex.com";
 
 export default function PainelTarefas() {
     const { data: session } = useSession();
@@ -119,7 +123,7 @@ export default function PainelTarefas() {
         setLoading(true);
         try {
             const [dadosTarefas, dadosReservas, dadosDiretrizes] = await Promise.all([
-                BuscarTarefasPorUsuario(String(currentUserId), user.role),
+                BuscarTarefasPorEmail(EMAIL_USUARIO_SERVICOS_GERAIS),
                 buscarReservasAtivas(),
                 BuscarTodasDiretrizes()
             ]);
@@ -149,8 +153,7 @@ export default function PainelTarefas() {
 
         setLoading(true);
         try {
-            const idLimpo = String(session.user.id).replace('.0', '');
-            const data = await BuscarTarefasPorUsuario(idLimpo, user.role);
+            const data = await BuscarTarefasPorEmail(EMAIL_USUARIO_SERVICOS_GERAIS);
             setTarefas(data || []);
         } catch (error) {
             toast.error("Erro ao sincronizar.");
