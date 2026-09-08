@@ -31,6 +31,11 @@ import { isAdminRole } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
+// Campos de data ordenáveis pelo ModalFiltros — comparados por timestamp, não
+// como string (criteria explícita em vez de checar se o nome do campo "parece"
+// data, que não pegaria "createdAt").
+const CAMPOS_DATA_ORDENACAO = new Set(['dataContratacao', 'dataExito', 'createdAt']);
+
 
 
 export default function CadastroCliente() {
@@ -94,7 +99,7 @@ export default function CadastroCliente() {
             let valA: string | number = String(a.principal[campo] ?? "");
             let valB: string | number = String(b.principal[campo] ?? "");
 
-            if (ordenacao.campo.toLowerCase().includes('data')) {
+            if (CAMPOS_DATA_ORDENACAO.has(ordenacao.campo)) {
                 valA = valA ? new Date(valA).getTime() : 0;
                 valB = valB ? new Date(valB).getTime() : 0;
             } else {

@@ -7,13 +7,14 @@ export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao 
     if (!isOpen) return null;
 
     const opcoes = [
-        { label: "Razão Social", campo: "razaoSocial", icon: SortAsc },
-        { label: "Nome Fantasia", campo: "nomeFantasia", icon: SortAsc },
-        { label: "Data Contratação", campo: "dataContratacao", icon: Calendar },
-        { label: "Data Êxito", campo: "dataExito", icon: Calendar },
-        { label: "Status", campo: "status", icon: ShieldCheck },
-        { label: "Analista", campo: "analistaResponsavel", icon: User },
-        { label: "Feedback Google", campo: "feedbackGoogle", icon: CheckCircle2 }, 
+        { label: "Data de Cadastro", campo: "createdAt", icon: Calendar, tipo: "data" as const },
+        { label: "Razão Social", campo: "razaoSocial", icon: SortAsc, tipo: "texto" as const },
+        { label: "Nome Fantasia", campo: "nomeFantasia", icon: SortAsc, tipo: "texto" as const },
+        { label: "Data Contratação", campo: "dataContratacao", icon: Calendar, tipo: "data" as const },
+        { label: "Data Êxito", campo: "dataExito", icon: Calendar, tipo: "data" as const },
+        { label: "Status", campo: "status", icon: ShieldCheck, tipo: "texto" as const },
+        { label: "Analista", campo: "analistaResponsavel", icon: User, tipo: "texto" as const },
+        { label: "Feedback Google", campo: "feedbackGoogle", icon: CheckCircle2, tipo: "binario" as const },
     ];
 
     return (
@@ -36,13 +37,13 @@ export default function ModalFiltros({ isOpen, onClose, ordenacao, setOrdenacao 
                                     onClick={() => setOrdenacao({ campo: item.campo, direcao: 'desc' })}
                                     className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all ${ordenacao.campo === item.campo && ordenacao.direcao === 'desc' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}
                                 >
-                                    {item.campo === 'feedbackGoogle' ? 'Com Feedback' : item.campo.includes('data') ? 'Recentes' : 'Z-A'}
+                                    {item.tipo === 'binario' ? 'Com Feedback' : item.tipo === 'data' ? 'Recentes' : 'Z-A'}
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setOrdenacao({ campo: item.campo, direcao: 'asc' })}
                                     className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all ${ordenacao.campo === item.campo && ordenacao.direcao === 'asc' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}
                                 >
-                                    {item.campo === 'feedbackGoogle' ? 'Sem Feedback' : item.campo.includes('data') ? 'Antigos' : 'A-Z'}
+                                    {item.tipo === 'binario' ? 'Sem Feedback' : item.tipo === 'data' ? 'Antigos' : 'A-Z'}
                                 </button>
                             </div>
                         </div>
