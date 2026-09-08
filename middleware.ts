@@ -22,8 +22,17 @@ export async function middleware(req: NextRequest) {
   const retornandoDeBloqueio =
     req.nextUrl.searchParams.get("acesso") === "bloqueado";
 
+  // Usuário TV: acesso exclusivo ao placar de Metas em modo TV, sem sidebar/abas do painel.
+  const isRoleTV = token?.role === "TV";
+
   if (pathname === "/" && isLoggedIn && !retornandoDeBloqueio) {
-    return NextResponse.redirect(new URL("/PainelAlpha", req.nextUrl));
+    return NextResponse.redirect(
+      new URL(isRoleTV ? "/PainelAlpha/Metas" : "/PainelAlpha", req.nextUrl)
+    );
+  }
+
+  if (isRoleTV && pathname === "/PainelAlpha") {
+    return NextResponse.redirect(new URL("/PainelAlpha/Metas", req.nextUrl));
   }
 
   if (!isLoggedIn && pathname.startsWith("/PainelAlpha")) {
