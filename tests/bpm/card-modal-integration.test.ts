@@ -203,15 +203,18 @@ describe("CRM - wiring do modal por etapa", () => {
     expect(slotFormulario).toContain("versaoPersistidaEm={card.updatedAt}");
   });
 
-  it("ordena as seis abas esquerdas e mantém Timeline apenas como conteúdo oculto", () => {
-    const triggers = ["tarefas", "checklist", "etapas", "anexos", "historico", "cadencias"]
+  it("ordena as cinco abas visíveis e mantém Timeline e Cadências apenas como conteúdo oculto", () => {
+    const triggers = ["tarefas", "checklist", "etapas", "anexos", "historico"]
       .map((value) => historico.indexOf(`<TabsTrigger value="${value}"`));
 
     expect(triggers.every((index) => index >= 0)).toBe(true);
     expect(triggers).toEqual([...triggers].sort((a, b) => a - b));
     expect(historico).not.toContain('<TabsTrigger value="timeline"');
+    expect(historico).not.toContain('<TabsTrigger value="cadencias"');
     expect(historico).toContain('<TabsContent value="timeline"');
+    expect(historico).toContain('<TabsContent value="cadencias"');
     expect(historico).toContain("<PainelTimelineCard");
+    expect(historico).toContain("<PainelCadenciasCard");
   });
 
   it("mantém Checklist e Anotação em instância única no painel esquerdo", () => {

@@ -11,7 +11,6 @@ import {
   Paperclip,
   ListTodo,
   MessageSquareText,
-  CalendarClock,
   ClipboardCheck,
 } from "lucide-react";
 import { fmtDateTime } from "@/lib/format-date";
@@ -167,10 +166,6 @@ export default function PainelHistorico({
             {feedHistorico.length > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{feedHistorico.length}</span>
             )}
-          </TabsTrigger>
-          <TabsTrigger value="cadencias" className="flex-none gap-1.5">
-            <CalendarClock size={13} />
-            Cadências
           </TabsTrigger>
         </TabsList>
 

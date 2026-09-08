@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "../../../../../auth";
 import {
   ListarCatalogosAutomacoesBpm,
+  ListarTemplatesAutomacoesBpm,
   ListarWorkspaceAutomacoesBpm,
 } from "@/actions/bpm/Automacoes";
 import { AutomacoesWorkspace } from "@/components/bpm/automacoes/AutomacoesWorkspace";
@@ -18,9 +19,10 @@ export default async function AutomacoesBpmPage() {
   if (!session?.user) redirect("/");
   if (!isAdminRole(session.user.role ?? null)) redirect("/PainelAlpha/AlphaCRM");
 
-  const [workspace, catalogos, central] = await Promise.all([
+  const [workspace, catalogos, templates, central] = await Promise.all([
     ListarWorkspaceAutomacoesBpm(),
     ListarCatalogosAutomacoesBpm(),
+    ListarTemplatesAutomacoesBpm(),
     ListarMonitoramentoAutomacoesCentraisBpm(),
   ]);
   const temaNome = (session.user as { tema_interface?: string }).tema_interface || "blue";
@@ -32,7 +34,8 @@ export default async function AutomacoesBpmPage() {
       <AutomacoesWorkspace
       pipelines={workspace.data}
       catalogos={catalogos.data}
-      erro={workspace.success ? (catalogos.success ? null : catalogos.error) : workspace.error}
+      templates={templates.data}
+      erro={workspace.success ? (catalogos.success ? (templates.success ? null : templates.error) : catalogos.error) : workspace.error}
       accent={visual.accent}
       />
     </div>

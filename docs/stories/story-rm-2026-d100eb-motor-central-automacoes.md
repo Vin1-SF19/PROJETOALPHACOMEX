@@ -344,3 +344,35 @@ representação por etapa.
   `npm run bpm:automacoes:migrar-hardcoded -- --apply --user-id=1`.
 - O critério de migração acima permanece aberto até o cutover real e a
   verificação de que os fallbacks antigos ficaram dormentes.
+
+## Extensão — auditoria visual do catálogo de módulos (2026-09-08)
+
+O administrador solicitou que as integrações encontradas no Painel Alpha sejam
+visíveis no próprio CRM, com evidência suficiente para distinguir uma ação
+realmente executável pelo Motor Central de uma integração existente que ainda
+depende de acionamento manual.
+
+### Critérios adicionais
+
+- [x] A tela de Automações mostra a contagem das ações aceitas pelo Motor e das
+      integrações somente manuais.
+- [x] Cada item informa módulo, caminho funcional, pré-requisitos, resultado,
+      identificador canônico e arquivos que comprovam sua implementação.
+- [x] O catálogo tipado cobre todas as ações de `TIPOS_ACAO_CENTRAL`; adicionar
+      uma ação ao contrato sem documentá-la passa a falhar no typecheck/teste.
+- [x] Contrato, ficha de reunião e transcrição do Meet aparecem em destaque.
+- [x] O agendamento Google Meet aparece honestamente como integração manual e
+      não como ação automática ainda inexistente no Motor Central.
+- [x] O editor oferece seleção amigável das ações reais e formulários diretos
+      para os casos principais; JSON permanece recolhido no modo avançado.
+- [x] Nenhum schema, migration, backfill ou dado de produção foi alterado.
+
+### File List — auditoria visual
+
+- `src/lib/bpm/automacoes/catalogo-modulos.ts`
+- `src/components/bpm/automacoes/AuditoriaAutomacoesCodigo.tsx`
+- `src/components/bpm/automacoes/AutomacaoCentralFormDialog.tsx`
+- `src/components/bpm/automacoes/AutomacoesWorkspace.tsx`
+- `src/app/PainelAlpha/AlphaCRM/automacoes/page.tsx`
+- `tests/bpm/automacoes-auditoria-ui.test.ts`
+- `docs/stories/story-rm-2026-d100eb-motor-central-automacoes.md`

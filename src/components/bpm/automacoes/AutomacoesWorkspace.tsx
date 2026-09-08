@@ -26,10 +26,12 @@ import {
 } from "@/actions/bpm/Automacoes";
 import { AutomacaoCentralFormDialog } from "@/components/bpm/automacoes/AutomacaoCentralFormDialog";
 import { AutomacaoInsightsDialog } from "@/components/bpm/automacoes/AutomacaoInsightsDialog";
+import { AuditoriaAutomacoesCodigo } from "@/components/bpm/automacoes/AuditoriaAutomacoesCodigo";
 import type {
   AutomacaoBpmView,
   CatalogosAutomacao,
   PipelineAutomacaoView,
+  TemplateAutomacao,
 } from "@/components/bpm/automacoes/types";
 import {
   AlertDialog,
@@ -52,6 +54,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AUTOMACOES_EXECUTAVEIS_AUDITADAS, obterAuditoriaAcao } from "@/lib/bpm/automacoes/catalogo-modulos";
 import {
   Select,
   SelectContent,
@@ -69,6 +72,7 @@ type Editor =
 type Props = {
   pipelines: PipelineAutomacaoView[];
   catalogos: CatalogosAutomacao;
+  templates: TemplateAutomacao[];
   erro: string | null;
   accent: string;
 };
@@ -93,14 +97,9 @@ const GATILHO_LABEL: Record<string, string> = {
   WEBHOOK_RECEBIDO: "Webhook recebido",
 };
 
-const ACAO_LABEL: Record<string, string> = {
-  ENVIAR_EMAIL: "Enviar e-mail",
-  GERAR_CONTRATO: "Gerar contrato",
-  GERAR_FICHA: "Gerar ficha",
-  MATERIALIZAR_CHECKLIST: "Materializar checklists",
-  DISTRIBUIR_RESPONSAVEL: "Distribuir responsável",
-  IDENTIFICAR_OPORTUNIDADE: "Identificar oportunidade",
-};
+const ACAO_LABEL: Record<string, string> = Object.fromEntries(
+  AUTOMACOES_EXECUTAVEIS_AUDITADAS.map((item) => [item.id, item.nome]),
+);
 
 function AcaoIcon({ tipo }: { tipo: string }) {
   if (tipo === "ENVIAR_EMAIL") return <Mail size={15} />;
@@ -145,7 +144,7 @@ function resumoVersao(automacao: AutomacaoBpmView) {
   if (!automacao.versaoAtiva) return null;
   try {
     const grafo = JSON.parse(automacao.versaoAtiva.grafoJson) as { nos?: Array<{ tipo?: string; acaoTipo?: string }> };
-    const acoes = (grafo.nos ?? []).filter((no) => no.tipo === "ACAO").map((no) => (no.acaoTipo ?? "ação").replaceAll("_", " ").toLocaleLowerCase("pt-BR"));
+    const acoes = (grafo.nos ?? []).filter((no) => no.tipo === "ACAO").map((no) => obterAuditoriaAcao(no.acaoTipo ?? "")?.nome ?? (no.acaoTipo ?? "ação").replaceAll("_", " ").toLocaleLowerCase("pt-BR"));
     return `${automacao.versaoAtiva.condicaoJson ? "Com condições" : "Sem condições"} · ${acoes.length} ação(ões): ${acoes.join(" → ") || "encerramento"}`;
   } catch { return "Versão central com configuração inválida"; }
 }
@@ -162,7 +161,7 @@ function resumoUltimoResultado(automacao: AutomacaoBpmView) {
   return [origem ? `Origem: ${origem}` : null, resultado ? `Resultado: ${resultado}` : null].filter(Boolean).join(" · ");
 }
 
-export function AutomacoesWorkspace({ pipelines, catalogos, erro, accent }: Props) {
+export function AutomacoesWorkspace({ pipelines, catalogos, templates, erro, accent }: Props) {
   const router = useRouter();
   const [busca, setBusca] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
@@ -287,6 +286,8 @@ export function AutomacoesWorkspace({ pipelines, catalogos, erro, accent }: Prop
         </div>
       </header>
 
+      <AuditoriaAutomacoesCodigo accent={accent} />
+
       {pipelinesFiltrados.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/10 py-20 text-center">
           <Zap className="mx-auto mb-3 text-slate-600" size={28} />
@@ -375,6 +376,8 @@ export function AutomacoesWorkspace({ pipelines, catalogos, erro, accent }: Prop
           pipelineInicialId={editor.mode === "create" ? editor.pipelineId : pipelines.find((pipeline) => (pipeline.automacoesGlobais ?? []).some((item) => item.id === editor.automacao.id) || pipeline.etapas.some((etapa) => etapa.automacoes.some((item) => item.id === editor.automacao.id)))?.id}
           etapaInicialId={editor.mode === "create" ? editor.etapaId : pipelines.flatMap((pipeline) => pipeline.etapas).find((etapa) => etapa.automacoes.some((item) => item.id === editor.automacao.id))?.id}
           pipelines={pipelines}
+          catalogos={catalogos}
+          templates={templates}
           onClose={() => setEditor(null)}
           onSaved={atualizar}
         />
