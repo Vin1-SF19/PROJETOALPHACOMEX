@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+
+ Test Files  11 passed (11)
+      Tests  73 passed (73)
+   Start at  17:03:48
+   Duration  612ms (transform 1.56s, setup 0ms, import 2.58s, tests 122ms, environment 1ms)
+

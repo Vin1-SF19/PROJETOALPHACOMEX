@@ -5,6 +5,15 @@
 
 ---
 
+### Padrão de armadilha — Server Action legada aceita o contrato novo mas grava o campo antigo sem reconciliar a associação normalizada (RM-2026-457A31)
+**Sintoma:** ao migrar `BpmChecklistTemplate` de etapa singular (`etapaId`) para associação normalizada multietapa (`BpmChecklistTemplateEtapa`), a action `AtualizarTemplateChecklistBpm` já validava o payload plural (`etapaIds`) via Zod, mas continuava gravando diretamente `dados.etapaId`/`pipelineId` sem chamar a reconciliação de associações — permitindo, por análise de código, um vínculo com etapa de outro pipeline e deixando associações antigas órfãs quando o escopo mudava para global ou para outro pipeline.
+**Causa raiz:** ao introduzir um contrato novo (schema Zod ampliado) em cima de uma persistência antiga, é possível atualizar só a validação de entrada e esquecer de atualizar TODOS os caminhos de escrita que gravam o dado — não apenas o caminho principal exercitado pela UI. A ausência de consumidor de UI para a action legada mascarou o problema até uma auditoria de segurança dedicada (Anubis) inspecionar cada export da action, não apenas o fluxo feliz.
+**Fix aplicado:** a action passou a chamar `validarEscopoTemplate`/`reconciliarEtapasTemplate` dentro da mesma transação Serializable das demais actions do módulo, unificando o caminho de escrita.
+**Como evitar:** ao ampliar um schema Zod compartilhado por várias Server Actions do mesmo domínio, buscar (`grep`) todos os exports que usam esse schema — não apenas os importados pela UI atual — e confirmar que cada um reconcilia o novo contrato na mesma transação, não só o valida. Ausência de consumidor de UI não é garantia de que uma action exportada está seguindo o contrato novo.
+**Adicionado em:** 2026-09-09 (Scribe, fechamento RM-2026-457A31)
+
+---
+
 ### Formulário de Agendar Reunião vazava acompanhamento e não sinalizava loading visualmente (RM-2026-6BEA04)
 **Sintoma:** depois de agendar, o formulário da etapa **Agendar Reunião** também mostrava transcrição, resumo e **Buscar transcrição**; durante a criação/reagenda, o botão exibia apenas “Salvando...” sem spinner.
 **Causa raiz:** os blocos de acompanhamento de `PainelReuniao` não estavam condicionados ao modo de acompanhamento, e o estado `salvando` alterava somente texto/disabled.
@@ -679,3 +688,7 @@ Em 2026-09-08, a suíte global aprovou 2.512/2.566 testes e manteve 54 falhas em
 Em 2026-09-08, a suíte global aprovou 2.588/2.638 testes, com 49 falhas e 1 todo em módulos externos/concorrentes; os 40 testes direcionados de cadência passaram. O lint global reportou 3.702 erros, principalmente em `.aiox-core`, `.agents` e componentes legados, enquanto o lint do escopo ficou limpo. O typecheck manteve diagnósticos em Exclusão Fiscal, Gerador de Documentos, Calendário e testes legados, sem apontar arquivos desta RM. O build de produção e o smoke HTTP passaram.
 
 **Adicionado em:** 2026-09-08 por Codex (RM-2026-6F3C54)
+
+
+### 2026-09-09 — Echo — RM-2026-457A31: fallback singular
+Lista de associações vazia era tratada como global em templateChecklistCompativel mesmo com shadow preenchido; corrigido para usar o singular, como o filtro Prisma. Auditoria de Salvar/Atualizar também passa a preservar esse shadow anterior. Regressões cobertas nas 65 asserções/testes aprovados do módulo; sem alteração de banco.

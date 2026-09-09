@@ -1,0 +1,5 @@
+
+> alpha_sistema@0.1.0 build
+> prisma generate && npm run build:player && NODE_OPTIONS=--max-old-space-size=8192 next build
+
+sh: 1: prisma: not found

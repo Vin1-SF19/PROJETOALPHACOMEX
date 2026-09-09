@@ -2,7 +2,9 @@
 
 ### 2026-09-09 — RM-2026-457A31 — associação normalizada com shadow legado
 
-**Decisão:** representar várias etapas por `BpmChecklistTemplateEtapa`, usando zero vínculos como global e mantendo `BpmChecklistTemplate.etapaId` como primeira etapa canônica para rollback. A leitura usa uma função única e preserva fallback singular legado; snapshots materializados não são reescritos.
+**Reinspeção Scribe, Fase 12:** semântica conferida no código atual. Isolamento dos gates aplicado por requisito administrativo: débitos externos e smoke remoto pendente não bloqueiam a RM sem regressão atribuível ao checklist.
+
+**Decisão:** representar várias etapas por `BpmChecklistTemplateEtapa`, usando zero vínculos com shadow nulo como global e mantendo `BpmChecklistTemplate.etapaId` como primeira etapa canônica para compatibilidade parcial com runtime singular. A leitura usa uma função única e preserva fallback singular legado; snapshots materializados não são reescritos.
 
 **Consequência:** materialização, bloqueio, Regras e Automações compartilham o mesmo escopo, e a seleção administrativa pode ser reconciliada atomicamente sem remover compatibilidade de leitura.
 
@@ -1363,6 +1365,18 @@ Persistência (`Cliente.cnpj`, `BpmCardCampoValor.valor`) e busca (`BuscarEmpres
 **Decisão:** as cinco dimensões são pipeline, etapa, serviço, tipo de processo e card específico. `tipoProcesso` será texto opcional controlado no card, sem catálogo. Todos os templates ativos compatíveis se aplicam, com unicidade template×card; instâncias são snapshots; a UI segue o workspace de Iris integrado a `Configurações`; materialização ocorre on-demand na abertura do card compatível ou por automação explicitamente configurada, nunca apenas por criar/mover o card.
 
 **Consequências:** a story está pronta para a fase Vault desenhar o inventário exato de uma migration exclusivamente aditiva. A aprovação em princípio não autoriza ampliar o plano: antes de SQL, Vault deve validar o backup exclusivo registrado na story e documentar estruturas, comandos, riscos e rollback; `DROP`, perda de dados, backfill mutante ou ampliação exigem nova confirmação. A integração de bloqueio permanece em `executarMovimentoComRequisitos`, fail-open para erro de leitura/configuração e bloqueio apenas diante de pendência obrigatória confirmada.
+
+### 2026-09-09 — RM-2026-457A31: Checklist Builder passa a suportar múltiplas etapas por template
+
+**Decisão:** `BpmChecklistTemplateEtapa` é a associação normalizada template↔etapa (`unique(templateId, etapaId)`, FK `templateId→Cascade`, FK `etapaId→Restrict`). Semântica canônica: zero associações com shadow `etapaId = null` significa **Todas as etapas** do pipeline/card do template; uma ou mais associações significa exatamente o conjunto de **Etapas selecionadas**. Os dois modos são mutuamente exclusivos — não existe estado persistido com escopo global e associações específicas ao mesmo tempo. A mesma etapa pode estar associada a vários templates diferentes; portanto a unicidade é composta (`templateId + etapaId`), não `etapaId` isolado — decisão deliberada de **não** reutilizar o padrão de unicidade global por etapa de `BpmCadenciaEtapa` (cadências), que é incompatível com checklists multi-template.
+
+**Compatibilidade legada:** `BpmChecklistTemplate.etapaId` permanece como shadow, nunca removido nesta RM. Regra de derivação: primeira etapa em ordem canônica (`BpmEtapa.ordem, BpmEtapa.id`) quando há associações, ou `null` no escopo global. O backfill da migration criou uma associação `legacy:<templateId>:<etapaId>` para cada template com `etapaId` singular legado não nulo, de forma idempotente (`INSERT OR IGNORE`), sem transformar nenhum template restrito em global. `etapaIds` (plural) sempre prevalece sobre `etapaId` (singular) em toda escrita — inclusive na action legada `AtualizarTemplateChecklistBpm`, corrigida para reconciliar associações e revalidar pipeline/etapas/card na mesma transação Serializable em vez de gravar o campo singular isoladamente (achado ANU-457A31-01, resolvido).
+
+**Fallback confirmado por Scribe em 2026-09-09:** na consulta Prisma, ausência de associações com `etapaId` legado preenchido mantém o escopo singular. Na função pura `templateChecklistCompativel`, `etapaIds` preenchido prevalece; fallback singular ocorre quando o plural está vazio ou ausente. Isso descreve o código existente, sem nova decisão de domínio. O shadow singular permite compatibilidade parcial; voltar a um runtime exclusivamente singular não preserva todo o conjunto multietapa.
+
+**Fonte única de aplicabilidade:** `filtroEtapaTemplateChecklist` (`src/lib/bpm/checklists/leitura.ts`) é a única função que constrói a condição de escopo; `service.ts` (materialização) e `integracao.ts` (resumo, bloqueio de movimento, Motor de Regras, Motor de Automações) consomem exclusivamente essa função — nenhum dos dois pode construir um filtro Prisma próprio para etapa. Snapshots já materializados (`BpmCardChecklist`) nunca são reescritos quando o escopo do template muda; a unicidade `(cardId, templateId)` continua sendo a garantia de idempotência da materialização.
+
+**Consequências:** qualquer novo consumidor de aplicabilidade de checklist deve importar `filtroEtapaTemplateChecklist`, nunca reimplementar a regra "zero associações = global". Uma futura RM que remova `BpmChecklistTemplate.etapaId` precisa de checkpoint Vault próprio, pois o shadow ainda é o mecanismo de rollback de código desta RM.
 
 ### 2026-09-04 — RM-2026-002817: regras financeiras reutilizam motores versionados existentes
 

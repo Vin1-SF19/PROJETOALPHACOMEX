@@ -1,12 +1,30 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
-## Checklist em várias etapas — implementação local (RM-2026-457A31, 2026-09-09)
+## Checklist em várias etapas — concluído no escopo (RM-2026-457A31, 2026-09-09)
 
-`BpmChecklistTemplateEtapa` normaliza o escopo de etapas, preservando `BpmChecklistTemplate.etapaId` como shadow legado. Zero associações significa escopo global; uma ou mais associações restringem ao conjunto selecionado. `filtroEtapaTemplateChecklist` é compartilhado por materialização e resumo/motores, com fallback singular legado. As actions validam pipeline, etapas ativas e card, revalidam permissão em transação serializável, reconciliam metadados/itens/associações/auditoria e notificam após commit.
+**Estado: PASS — Fase 12 consolidada com isolamento dos gates conforme feedback administrativo.** Os bloqueios globais da retomada anterior foram superados para esta RM pelas evidências de Forge, Probe, Anubis, Lens e Sage fornecidas pelo pipeline; isso não constitui aprovação global do repositório.
 
-DELIVERY_READY local: `Alpha CRM → Configurações → Checklists` consome as actions; pipeline → abrir card → aba **Checklist** usa a mesma resolução canônica. A UI multiselect pertence à fase frontend subsequente.
+`BpmChecklistTemplateEtapa` normaliza o escopo com unicidade `(templateId, etapaId)`, FK de template Cascade e etapa Restrict. Escrita global usa zero associações e shadow `etapaId` nulo; escrita específica deriva o shadow da primeira etapa em ordem canônica. `filtroEtapaTemplateChecklist` e a função pura `templateChecklistCompativel` preservam o singular legado quando a lista está vazia/ausente e o shadow preenchido. Lista preenchida prevalece. `service.ts` e `integracao.ts` compartilham o filtro para materialização, resumo, movimento, Regras e Automações; snapshots e idempotência permanecem preservados.
 
-**Estado remoto:** migration validada em restauração descartável; o preflight Turso falhou por DNS `EAI_AGAIN` antes de qualquer escrita.
+Criar/Salvar/Atualizar validam sessão, configurarChecklists, pipeline, etapas ativas e card dentro de transação Serializable. Salvar usa CAS quando recebe updatedAt (enviado pelo editor); Atualizar legado não tem CAS, achado baixo não bloqueante. Salvar/Atualizar auditam retirada de pipeline pelo vínculo anterior e notificam origem/destino após commit. O editor usa EtapasMultiSelect e checklist-editor-state; o resumo respeita o legado, global pode ser escolhido sem pipeline, troca de pipeline limpa vínculos e anuncia a limpeza, badges contêm nomes longos e remoção restaura foco.
+
+### Migration aplicada
+
+`prisma/migrations/20260908214000_bpm_checklist_template_multiplas_etapas/migration.sql` — aditiva, sem `DROP`/`RENAME`, aplicada no Turso real sob aprovação específica (comprovante `d21e3e11e0...a96494fa`, checkpoint Vault `225548f9...a04ac`) e backup verificado (`database-backups/pre-change/painelalpha_turso_pre_change_2026-09-09T12-29-03-247Z.sql`, SHA-256 `044c4f115273e0d5ee56dab1c56ce7a26e44a8b903961ab93f627f131579a581`). Pós-aplicação confirmada: 1 associação criada pelo backfill (igual ao preflight), 3 índices (unicidade composta + 2 simples), `PRAGMA foreign_key_check` = 0 violações, zero órfãos de template/etapa.
+
+### Validações e limites atuais
+
+- Scribe: 73/73 testes em 11 arquivos e lint direcionado aprovados nesta retomada; resultados completos dos gates globais e diff documental na story e em `scribe-457a31-closure/`.
+- Build anterior exit 0 conferido em `nova-457a31-final-validation/{build.log,results.json}`; aprovação formal Forge e pareceres Probe/Anubis/Lens/Sage recebidos no pipeline, sem atribuir novas auditorias a esta sessão.
+- Os gaps antigos já estão cobertos: `checklists-workspace-submit.test.ts` testa guarda de submissão vazia/payload/rascunho com hooks simulados; `checklists-multiplas-etapas.test.ts` testa negação/revogação de permissão; `checklists-multiplas-etapas-migration.test.ts` executa SQL duas vezes em memória e verifica backfill, índices, unicidade, FKs Cascade/Restrict e integridade.
+- Pendências não bloqueantes: gates globais externos, smoke autenticado (teclado/foco e 320px), concorrência real e revalidação remota. Testes locais não equivalem a E2E remoto. Aplicação da migration acima é evidência histórica da Fase 5; nenhum banco do projeto foi acessado nesta consolidação.
+
+AUTO_ADJUSTMENT_REQUIRED: memória anterior indicava testes existentes como ausentes e bloqueio global incompatível com o feedback administrativo.
+AUTO_ADJUSTMENT_ACCEPTANCE: documentos e story refletem os testes reais, o PASS isolado e limites de evidência. Autoajuste documental aplicado nesta fase; known-errors preservado, sem novo erro resolvido.
+
+DELIVERY_READY: administrador → Alpha CRM → Checklists → `/PainelAlpha/AlphaCRM/admin/checklists` → criar/editar → Vínculos → Etapas → actions → BpmChecklistTemplateEtapa → resolvedor canônico → usuário autorizado em `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → abrir card → Checklist → PainelChecklistsCard. Menu, rota protegida e consumidor conferidos por código; testes locais aprovados, smoke remoto pendente.
+
+**Última atualização:** 2026-09-09 por Scribe (Fase 12).
 
 ## ChatBot Alpha — contrato workspace-token corrigido (RM-2026-3D529D, retomada da Fase 6, 2026-09-08)
 

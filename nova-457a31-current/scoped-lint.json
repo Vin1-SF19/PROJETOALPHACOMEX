@@ -1,0 +1,1 @@
+{"command": "npx eslint src/actions/bpm/Checklists.ts src/components/bpm/checklists/checklist-editor-state.ts src/components/bpm/checklists/ChecklistsWorkspace.tsx tests/bpm/checklists-multiplas-etapas.test.ts tests/bpm/checklists-multiselect-ui.test.ts", "exit": 0}

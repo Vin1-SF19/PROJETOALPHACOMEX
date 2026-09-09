@@ -1,0 +1,2 @@
+npm error npx canceled due to missing packages and no YES option: ["vitest@5.0.0"]
+npm error A complete log of this run can be found in: /home/ialpha/.npm/_logs/2026-09-09T15_24_01_755Z-debug-0.log

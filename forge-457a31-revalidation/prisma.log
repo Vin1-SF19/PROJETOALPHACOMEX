@@ -1,0 +1,2 @@
+npm warn exec The following package was not found and will be installed: prisma@8.0.0-rc.13
+{"kind":"result","envelope":{"ok":false,"commandId":"","error":{"code":"CLI.UNKNOWN_COMMAND","severity":"error","summary":"No command registered for `validate`","nextActions":[{"kind":"run-command","label":"List every command","command":"prisma --help"}]},"diagnostics":[],"nextActions":[{"kind":"run-command","label":"List every command","command":"prisma --help"}]},"commandId":"","timestamp":"2026-09-09T15:36:32.200Z"}

@@ -1,0 +1,14 @@
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  16:56:29
+   Duration  362ms (transform 91ms, setup 0ms, import 267ms, tests 5ms, environment 0ms)
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

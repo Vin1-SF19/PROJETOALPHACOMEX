@@ -1,0 +1,21 @@
+
+> alpha_sistema@0.1.0 test
+> vitest run --coverage
+
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+      Coverage enabled with v8
+
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: EBUSY: resource busy or locked, rmdir '/home/ialpha/projetos/alpha-comex/painel-alpha/coverage'
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { errno: -16, code: 'EBUSY', syscall: 'rmdir', path: '/home/ialpha/projetos/alpha-comex/painel-alpha/coverage' }
+
+
+
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.19.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.1
+npm notice To update run: npm install -g npm@11.19.1
+npm notice

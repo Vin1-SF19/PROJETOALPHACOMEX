@@ -42,15 +42,32 @@
 
 **Caminho administrativo:** `Configurações → Checklists → /PainelAlpha/AlphaCRM/admin/checklists` → `ListarWorkspaceChecklistsBpm`/`ChecklistsWorkspace` → `CriarTemplateChecklistBpm` ou `SalvarTemplateChecklistBpm`.
 
-**Caminho operacional:** card aberto → `PainelRegistrar` → `CardOpenFormSlot` → `PainelChecklistsCard` → `ListarChecklistsCardBpm` → `materializarChecklistsAplicaveisCard`. Atualizações usam `AtualizarItemChecklistCardBpm`; item exclusivo usa `AdicionarItemExclusivoChecklistCardBpm`.
+**Caminho operacional (corrigido, 2026-09-09):** card aberto → `CardFullViewModal` → `CardAbertoLayout` → `PainelHistorico` → aba **Checklist** → `PainelChecklistsCard` (montado com `forceMount`, disponível inclusive na etapa **Agendar Reunião**) → `ListarChecklistsCardBpm` → `materializarChecklistsAplicaveisCard`. Atualizações usam `AtualizarItemChecklistCardBpm`; item exclusivo usa `AdicionarItemExclusivoChecklistCardBpm`. A referência anterior a `CardOpenFormSlot`/"Formulário da Etapa" como ponto de montagem estava desatualizada e foi substituída por esta entrada.
 
 **Movimento e motores:** `Cards.ts/executarMovimentoComRequisitos` chama `obterErroChecklistParaMovimento` antes e dentro da transação. `regras/contexto.ts` expõe a fonte fixa `checklist`. `automacoes/executor.ts` monta placeholders `checklist.*`; somente a ação `MATERIALIZAR_CHECKLIST` grava snapshots automaticamente.
 
 **Pendências:** `PainelProximaEtapa` chama `ObterResumoChecklistCardBpm` sem materialização, mostra quantidade/templates e dispara `bpm:abrir-pendencias-checklist`; `PainelRegistrar` abre a aba e foca `checklist-item-<id>`, com fallback para `checklist-pendencias`.
 
+### Checklist em múltiplas etapas (RM-2026-457A31, 2026-09-09)
+
+**Caminho editor → action → persistência → resolvedor → card:**
+
+1. `Alpha CRM → Configurações → Checklists` (`/PainelAlpha/AlphaCRM/admin/checklists`, auth + admin) monta `ChecklistsWorkspace.tsx`.
+2. Aba **Vínculos** do editor usa `EtapasMultiSelect.tsx` (fieldset acessível, dois rádios mutuamente exclusivos "Todas as etapas"/"Etapas selecionadas") + `checklist-editor-state.ts` (estado puro do draft, `escopoEtapa`/`etapaIds`, limpeza ao trocar pipeline).
+3. Salvar chama `CriarTemplateChecklistBpm` ou `SalvarTemplateChecklistBpm` (`src/actions/bpm/Checklists.ts`) com `pipelineId` + `etapaIds` (+ `updatedAt` na edição, CAS otimista). a action exige sessão, revalida permissão `configurarChecklists` via `exigirAcessoConfigPipeline` e valida pipeline, etapas ativas e card via `validarEscopoTemplate` dentro de uma transação Serializable; `reconciliarEtapasTemplate` cria/remove linhas de `BpmChecklistTemplateEtapa` e deriva o shadow `BpmChecklistTemplate.etapaId` (primeira etapa em ordem canônica, ou `null` no escopo global).
+4. `src/lib/bpm/checklists/leitura.ts` expõe `filtroEtapaTemplateChecklist`, a única regra de resolução: zero associações e shadow nulo = qualquer etapa compatível; uma ou mais associações = exatamente aquele conjunto. Sem associações e com shadow legado preenchido, preserva-se o escopo singular.
+5. `service.ts` (`materializarChecklistsAplicaveisCard`) e `integracao.ts` (`carregarResumoChecklistAplicavelCard` — resumo, bloqueio de movimento, Regras, Automações) consomem exclusivamente esse filtro; nenhum dos dois constrói condição de escopo própria.
+6. No card, `PainelHistorico → aba Checklist → PainelChecklistsCard → ListarChecklistsCardBpm` materializa snapshots idempotentes (`@@unique([cardId, templateId])`) somente nas etapas resolvidas pelo filtro canônico; snapshots já materializados não são reescritos quando o escopo do template muda depois.
+
+**Reinspeção Scribe, Fase 12 (2026-09-09):** Salvar/Atualizar auditam remoção do pipeline usando o vínculo anterior e notificam os pipelines de origem/destino somente após commit. `resumoEtapasTemplate` compartilha a resolução legada do editor. A função pura também preserva shadow singular com lista vazia. Testes locais cobrem a cadeia e a migration em memória; aplicação remota é evidência histórica, smoke autenticado permanece não bloqueante.
+
+**Migration:** `prisma/migrations/20260908214000_bpm_checklist_template_multiplas_etapas/migration.sql`, aplicada no Turso real (Fase 5, aprovação `d21e3e11e0...a96494fa` sobre o checkpoint Vault `225548f9...a04ac`), aditiva, com backfill idempotente do `etapaId` legado.
+
 **Ao estender:** não materialize em criação/movimento; preserve snapshot e `@@unique([cardId, templateId])`; mantenha ownership dentro da transação, CAS por `updatedAt`, fail-open em erro de leitura e fail-closed somente para pendência obrigatória confirmada.
 
-**Última atualização:** 2026-09-04 por Codex (encerramento RM-2026-209DB4)
+**Exemplo de uso:** `filtroEtapaTemplateChecklist(card.etapaId)` compõe o `AND` da busca de templates; os filtros de pipeline e card continuam independentes.
+
+**Última atualização:** 2026-09-09 por Scribe (RM-2026-457A31).
 
 ## Alpha CRM — campo de data/hora no modal do card (RM-2026-EB401C)
 

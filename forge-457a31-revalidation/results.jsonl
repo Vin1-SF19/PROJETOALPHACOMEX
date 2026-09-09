@@ -1,0 +1,9 @@
+{"gate": "tsc", "command": "npx tsc --noEmit", "exitCode": 1}
+{"gate": "typecheck", "command": "npm run typecheck", "exitCode": 127}
+{"gate": "lint", "command": "npm run lint", "exitCode": 127}
+{"gate": "build", "command": "npm run build", "exitCode": 127}
+{"gate": "prisma", "command": "DATABASE_URL=file:./forge-validation-only.db npx prisma validate", "exitCode": 2}
+{"gate": "prisma-local", "command": "npx --no-install prisma validate", "exitCode": 2}
+{"gate": "scoped-lint-local", "command": "npx --no-install eslint src/actions/bpm/Checklists.ts src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts src/components/bpm/checklists/{ChecklistsWorkspace.tsx,EtapasMultiSelect.tsx,checklist-editor-state.ts} tests/bpm/checklists-*.test.ts", "exitCode": 2}
+{"gate": "scoped-tests-local", "command": "npx --no-install vitest run tests/bpm/checklists-*.test.ts", "exitCode": 1}
+{"gate": "tests-local", "command": "npm test", "exitCode": 127}

@@ -1,0 +1,27 @@
+[
+  {
+    "gate": "scoped-tests",
+    "command": "./node_modules/.bin/vitest run tests/bpm/checklists-*.test.ts",
+    "exit": 0
+  },
+  {
+    "gate": "scoped-lint",
+    "command": "./node_modules/.bin/eslint src/actions/bpm/Checklists.ts src/lib/bpm/checklists/*.ts src/components/bpm/checklists/*.tsx src/components/bpm/checklists/checklist-editor-state.ts tests/bpm/checklists-*.test.ts",
+    "exit": 0
+  },
+  {
+    "gate": "lint",
+    "command": "npm run lint",
+    "exit": 1
+  },
+  {
+    "gate": "typecheck",
+    "command": "npm run typecheck",
+    "exit": 1
+  },
+  {
+    "gate": "tests",
+    "command": "npm test",
+    "exit": 1
+  }
+]

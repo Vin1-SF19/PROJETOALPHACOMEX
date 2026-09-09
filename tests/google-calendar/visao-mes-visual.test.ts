@@ -32,4 +32,16 @@ describe("visão mensal da Agenda Alpha", () => {
     expect(fonte).toContain("onEditarEvento(evento)");
     expect(fonte).toContain("<DiaEventosPopover");
   });
+
+  it("usa o mesmo fundo translúcido das visões de dia e semana", () => {
+    const gradeHoraria = readFileSync(
+      join(process.cwd(), "src/components/CalendarioAlpha/GradeHoraria.tsx"),
+      "utf8",
+    );
+    const fundoCompartilhado = "bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_30%),linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))]";
+
+    expect(fonte).toContain(fundoCompartilhado);
+    expect(gradeHoraria).toContain(fundoCompartilhado);
+    expect(fonte).not.toContain("bg-[#111315]");
+  });
 });

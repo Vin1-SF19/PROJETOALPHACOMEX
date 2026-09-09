@@ -1,0 +1,9 @@
+{
+  "typecheck": 2,
+  "lint": 1,
+  "build": 0,
+  "tests": 1,
+  "scoped-tests": 0,
+  "scoped-lint": 0,
+  "diff-check": 0
+}

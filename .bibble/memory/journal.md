@@ -1,5 +1,16 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## 2026-09-09 — Scribe — RM-2026-457A31 — Fase 12 concluída no escopo
+
+Consolidação documental efetiva: corrigidos status da story, arquitetura, mapa, integração e decisões. Gaps antigos de submissão vazia/permissões/migration isolada já têm testes; preservado fallback singular com plural vazio. Checklist e File List finais reconciliados. Known-errors e alterações funcionais preexistentes preservados.
+
+Feedback obrigatório aplicado: PASS isolado, com 73/73 testes e lint direcionado aprovados. Lint global: 2.484 erros/1.254 avisos; typecheck: mesmos 17 diagnósticos do baseline Nova. npm test encontrou EBUSY; repetição com cobertura isolada concluiu com 2.674 passando/50 falhando/1 todo, mesmas 50 falhas do baseline. Build anterior exit 0 conferido; pareceres Forge/Probe/Anubis/Lens/Sage recebidos do pipeline. Evidências atuais: scribe-457a31-closure/ e seção final da story.
+
+DELIVERY_READY: Alpha CRM → Checklists → criar/editar → Vínculos → Etapas; template consumido no pipeline → card → Checklist. Caminho verificado no código e testes locais. Smoke autenticado, concorrência real, revalidação remota e débitos globais são pendências não bloqueantes. Nenhuma operação de banco ou Git mutável.
+
+Arquivos desta fase: story RM-2026-457A31; memórias architecture, codebase-map, integration-points, decisions e journal; logs locais. Autoajuste documental concluído, sem novo defeito funcional resolvido.
+
+
 ## 2026-09-08 — Kowalski — RM-2026-3D529D (ChatBotX = Chatbot Alpha — Replicar o Frontend) — CLOSURE
 
 **Tags:** #chatbot #chatbotx #frontend #proxy #inbox #mensagens #sem-migration #concluido
@@ -5100,3 +5111,181 @@ Não houve migration, escrita direta de configuração pelo terminal, worker do 
 Cadências agora aceitam zero, uma ou várias colunas ativas do mesmo pipeline por multiselect. A associação normalizada tem FK e unicidade por etapa, foi retroalimentada de modo idempotente e mantém `etapaId` apenas como shadow de rollback. O runtime ativa somente nas colunas selecionadas; entrada no pipeline permanece explícita e ciclos já iniciados não são reprocessados.
 
 O checkpoint Vault foi aprovado pelo administrador. O dump de 106.125.243 bytes foi restaurado e conferido antes da migration; a pós-validação terminou sem vínculo inválido, duplicidade ou violação de FK. Os 40 testes focados, E2E isolado, lint direcionado, diff-check, build de 78 páginas e smoke HTTP passaram. Os débitos dos gates globais são externos e estão registrados em `known-errors.md`. Nenhum worker foi iniciado nem houve promoção para produção.
+
+
+## 2026-09-09 — Forge RM-2026-457A31, retomada
+Build real exit 0 (78 páginas); checklist 48/48 e lint escopado exit 0. Typechecks: 20 diagnósticos externos; lint global: 3.702 erros/17.508 avisos; suíte: 2.635 passando, 50 falhando, 1 todo. Prisma validate aprovado com URL SQLite fictícia após ausência de DATABASE_URL. Nenhuma alteração de fonte/banco. PASS no escopo, Lens liberado; smoke autenticado pendente para Probe. Relatório completo na story e logs locais em forge-457a31-ztlbhr9a/.
+
+
+## 2026-09-09 — Probe RM-2026-457A31, Fase 8
+PASS local por inspeção do caminho admin/editor → actions/associações → card/Checklist e filtro compartilhado com motores. Confirmados troca de pipeline, legado, snapshots e montagem em Agendar Reunião. Evidências Forge reinspecionadas: 48 testes e build 78 páginas aprovados anteriormente. Novas tentativas lint/typecheck/test retornaram 127 por dependências locais ausentes; teste direcionado retornou 1. Smoke autenticado e teclado real pendentes. Nenhuma alteração de fonte/banco. Checklist, File List e limites na story; logs probe-457a31-*.log.
+
+
+## 2026-09-09 — Anubis RM-2026-457A31, Fase 9
+FAIL: ANU-457A31-01 (alta, bloqueante) em AtualizarTemplateChecklistBpm: valida etapaIds, grava etapaId e não reconcilia associações ao mudar pipeline/escopo. Admin-only permanece; exploração HTTP não foi testada. Echo deve unificar a escrita e repetir Forge/Probe/Anubis. Caminho principal UI→actions→card/motores confirmado por inspeção. Lint/typecheck/test e lint direcionado retornaram 127 por dependências ausentes; evidência Forge 48/48 conferida, sem cobertura da action legada. Nenhuma fonte ou banco alterado. Relatório e aceite na story.
+
+
+## 2026-09-09 — Anubis RM-2026-457A31, reauditoria Fase 9
+PASS por inspeção: ANU-457A31-01 resolvido na correção já existente no working tree. AtualizarTemplateChecklistBpm revalida autorização/escopo e reconcilia shadow/associações em transação Serializable. Fontes/teste preservados; alterados somente story e journal. Lint/typecheck/test direcionado tentados, exit 127 por ferramentas ausentes. Não há novo resultado de build/testes nem ensaio de rollback real; Forge/Probe e ampliação de testes negativos permanecem pendentes. Menu→editor→actions→card/motores confirmado por inspeção. Nenhuma operação de banco ou Git mutável.
+
+
+## 2026-09-09 — Forge RM-2026-457A31, revalidação Fase 7
+BLOCKED por dependências locais ausentes: typecheck/lint/build/test exit 127; npx tsc exit 1, Prisma exit 2, lint direcionado exit 2 e testes direcionados exit 1. Nenhum teste executado ou build concluída; aprovação antiga não cobre correção atual. Lens não liberado. Caminho de consumo confirmado somente por inspeção. Story e logs forge-457a31-revalidation atualizados; fontes e banco preservados. Dev deve restaurar dependências e Forge repetir os gates.
+
+
+## 2026-09-09 — Forge RM-2026-457A31, correção legada revalidada
+PASS no escopo; build/Prisma/lint direcionado/testes direcionados exit 0. TypeScript 17 diagnósticos externos (npx exit 2, npm exit 1), lint e testes globais exit 1; suíte 2.636 passando/50 falhando/1 todo. Evidências atuais em forge-457a31-current/ e checklist/File List na story. Fontes e banco preservados; Lens liberado; smoke autenticado e persistência remota pendentes para Probe.
+
+
+### 2026-09-09 — Probe / RM-2026-457A31 / Fase 8 revalidada
+
+PASS de integração por inspeção e testes com mocks: admin → Checklists → Vínculos → Etapas → actions/recarga → card/Checklist e motores canônicos. 49/49 testes direcionados; globais 2.636 passaram/50 falharam/1 todo e 17 diagnósticos TS externos. Build atual do Forge conferida. Evidências: probe-457a31-current/; checklist/File List na story. Smoke autenticado, teclado e persistência remota continuam pendências manuais. Working tree funcional preservado, sem operação de banco.
+
+
+### 2026-09-09 — Anubis RM-2026-457A31 / Fase 9 final
+PASS de segurança por inspeção e 49/49 testes direcionados. ANU-457A31-01 resolvido; fontes preexistentes preservadas. Gates e limitações registrados na story e anubis-457a31-auz9s361/. Testes globais 2636/50/1 todo, diagnósticos TS externos. Migration confrontada com checkpoint histórico, sem operação de banco. Consumo editor/card/motores confirmado; smoke remoto e ensaio de concorrência pendentes.
+
+
+---
+
+## [2026-09-09 16:19 UTC] — RM-2026-457A31: consolidação documental com fechamento pendente
+
+**Tags:** #integration #prisma
+**Agentes envolvidos:** Scribe; protocolo Kowalski para arquivamento.
+**Arquivos tocados:** `.bibble/memory/{architecture,codebase-map,integration-points,decisions,journal}.md`, `docs/stories/story-rm-2026-457a31-checklist-varias-etapas.md`; logs locais `scribe-457a31-current/`.
+
+### Contexto
+Consolidar a fase 12 a partir da implementação existente, preservando o working tree.
+
+### O que foi feito
+- Conferidos menu/rota/editor/actions/resolvedores/card e evidências anteriores de build/49 testes.
+- Corrigidos checklist, File List, fallback singular legado e afirmação prematura de fechamento.
+
+### Decisões tomadas
+- Nenhuma nova decisão funcional: documentação alinhada ao código; fechamento integral condicionado aos gates globais.
+
+### Problemas encontrados / resolvidos
+- Documentação descrevia zero associações sempre como global; corrigida a exceção de shadow singular preenchido.
+- Gates reais falharam: lint 1, typecheck 2, testes 1 (2.635 passaram/51 falharam/1 todo). Diff global impedido pelo tipo de `.env.example`, preservado.
+
+### Pendências
+- Regularizar gates globais, smoke autenticado remoto, dois testes Sage e teste isolado de migration. Nenhuma escrita de banco ou Git mutável executada.
+
+### Refletido também em
+- `decisions.md`: fallback real e limite do shadow no rollback.
+- `architecture.md`: estado atual e limites de validação; `components.md` e `known-errors.md` existentes preservados.
+
+
+## 2026-09-09 — Nova, RM-2026-457A31, retomada da Fase 2
+
+Story existente preparada para desenvolvimento corretivo, preservando histórico e alterações locais. Reinspeção atendeu “realize as mudanças”: corrigidos resumo legado na listagem e auditoria/realtime na retirada/troca de pipeline. A resolução de seleção existente foi reutilizada; nenhum componente ou schema novo. Blueprint Scout fornecido pelo pipeline.
+
+23/23 testes direcionados passaram; testes globais: 2.653 passaram, 50 falharam, 1 todo. Resultados adicionais estão em nova-457a31-current/ e na story. Sem aprovação integral nem pareceres formais de outros agentes: delegação indisponível nesta sessão. Pendentes seleção vazia comportamental, migration isolada e smoke autenticado. Caminho inspecionado: Configurações → Checklists → Vínculos → Etapas; pipeline → card → Checklist. Nenhum Git mutável ou banco alterado.
+
+
+## 2026-09-09 — Echo — RM-2026-457A31, retomada Fase 5
+Corrigidos fallback singular de leitura e snapshot anterior da auditoria, preservando trabalho existente. Ampliados testes de autorização e legado: 65/65 passaram; lint direcionado aprovado. Gates globais: lint: exit do comando 1; typecheck: exit do comando 2; build: exit do comando 0; npm test exit 1 (2.660 passaram/50 falharam/1 todo). Logs em echo-457a31-current/. Story atualizada com checklist, File List e entrega via admin/checklists → card → Checklist. Sem operação de banco/Git mutável; fechamento integral pendente.
+
+
+## Echo — revalidação local da Fase 5 (2026-09-09)
+
+Feedback “realize as mudanças” atendido por reinspeção e complemento dos testes existentes, preservando todas as alterações anteriores.
+
+- [x] Conferidos persistência normalizada, fallback legado, resolução canônica em service/integracao e notificações pós-commit já implementados.
+- [x] Acrescentados três testes: negação de criação antes da transação, permissão revogada dentro dela e etapa desativada entre preflight e escrita. Verificam ausência de criação, auditoria, notificação e revalidação em caso de rejeição.
+- [x] Sete suítes direcionadas: 54/54 testes aprovados; ESLint do arquivo de teste e diff --check aprovados.
+- [x] Gates globais executados: npm run lint exit 1; npm run typecheck exit 2 (17 diagnósticos); npm test exit 1 (2.663 passaram, 50 falharam, 1 todo); npm run build exit 0. Logs em echo-457a31-retry/. Sem atribuir causalidade dos erros globais nem emitir aprovação formal Forge.
+- [ ] Gates globais integralmente aprovados, smoke autenticado, teste isolado de migration e ajustes UX continuam pendentes. Não reaplicar migration.
+
+DATABASE_CHANGE_NOT_REQUIRED: nenhum schema, DDL, migration, backfill ou banco real alterado nesta execução. Nenhuma operação Git mutável executada.
+
+DELIVERY_READY: artefato funcional (template multietapa) consumido por administrador em /PainelAlpha/AlphaCRM/admin/checklists → criar/editar → Vínculos → Etapas, e por usuário autorizado no pipeline → abrir card → Checklist → PainelChecklistsCard. Conferido por inspeção e testes com mocks; smoke remoto pendente.
+
+AUTO_ADJUSTMENT_REQUIRED: gates globais falham; faltam smoke autenticado, teste isolado da migration e ajustes UX descritos no blueprint anterior.
+AUTO_ADJUSTMENT_ACCEPTANCE: gates com exit 0; testes dedicados pertinentes; salvar/reabrir duas etapas em sessão autorizada, conferir aplicabilidade dos cards e interações acessíveis indicadas pelo blueprint.
+
+### File List desta revalidação
+
+- tests/bpm/checklists-multiplas-etapas.test.ts
+- docs/stories/story-rm-2026-457a31-checklist-varias-etapas.md
+- .bibble/memory/journal.md
+- echo-457a31-retry/ (logs locais)
+
+Resultado desta execução: FAIL por gates globais, com testes direcionados aprovados e implementação existente preservada.
+
+
+### 2026-09-09 — Echo RM-2026-457A31, complementação local
+Multiselect corrigido (modo global sem pipeline, anúncio de limpeza, nomes longos/foco/accent) e teste SQL isolado em memória adicionado. 35/35 direcionados; lint escopado/diff escopado passam. lint: exit 1; typecheck: exit 2; tests: exit 1; scoped-lint: exit 0; build: exit 0. Globais: 50 testes falham e 17 diagnósticos TS externos. Story contém checklist/File List e limites. Sem banco real/Git mutável; delegação indisponível, smoke e revisões formais pendentes.
+
+
+## 2026-09-09 — Echo — RM-2026-457A31 — teste de submissão
+
+Acrescentado checklists-workspace-submit.test.ts: handlers reais com hooks simulados bloqueiam modo específico vazio antes da action e habilitam salvar após seleção. 71/71 testes direcionados passaram. Gates: build: exit 0, lint: exit 1, scoped-lint: exit 0, scoped: exit 0, tests: exit 1, typecheck: exit 2. Testes globais: 2666 passaram/50 falharam/1 todo. Story atualizada; sem mudança de banco ou Git mutável. Smoke e aprovação global pendentes.
+
+
+### 2026-09-09 — Echo / RM-2026-457A31 / Fase 5 — PASS por isolamento dos gates
+
+Feedback administrativo aplicado após reinspeção: implementação existente preservada, sem nova alteração funcional ou de banco. Story atualizada para substituir bloqueios históricos por falhas globais. Reexecução: 71/71 testes direcionados, lint direcionado e diff-check aprovados; testes globais com as mesmas 50 falhas (2.666 passam, 1 todo), typecheck sem diagnóstico novo frente a echo-457a31-submit. Lint global executado com evidência em echo-457a31-isolated. Build exit 0 conferido como evidência histórica, não reexecutado. Smoke autenticado e leitura remota permanecem pendências não bloqueantes. Entrega conferida: admin/checklists → Vínculos → Etapas; pipeline → card → Checklist. Nenhuma operação Git mutável.
+
+
+### 2026-09-09 — Nova — RM-2026-457A31, Fase 6, isolamento de gates
+
+Reinspecionados os ajustes Iris existentes; adicionados dois testes de payload e preservação do rascunho quando a action retorna erro ou lança exceção. 73/73 testes e lint direcionado aprovados. Typecheck conserva os mesmos 17 diagnósticos; testes globais conservam as mesmas 50 falhas do baseline Echo. Lint global: exit 1; ✖ 3738 problems (2484 errors, 1254 warnings). Build anterior aprovado conferido, não repetido. Story e File List atualizadas. RESULT: PASS pela política administrativa de isolamento; smoke autenticado e gates posteriores continuam pendentes. Sem alteração de banco ou Git mutável. Logs: nova-457a31-isolated/.
+
+
+### 2026-09-09 — Nova — RM-2026-457A31, Fase 6, build atual validada
+
+Reinspeção preservou UI/testes existentes e confirmou integração menu → editor/Vínculos/Etapas → card/Checklist. Build atual exit 0 resolve o bloqueio EROFS anterior; 73/73 testes direcionados, lint direcionado e diff-check passaram. Typecheck mantém 17 diagnósticos; lint global 2.484 erros/1.254 avisos; testes globais 2.673 passaram/50 falharam/1 todo, sem nova falha contra baseline Nova. Política administrativa de isolamento aplicada: RESULT PASS, smoke autenticado e débitos externos não bloqueantes. Logs: nova-457a31-final-validation/. Somente story/journal atualizados; nenhum componente novo, alteração de banco ou Git mutável. Delegação Forge indisponível (“no thread”); execução local dos comandos, sem aprovação formal inventada.
+
+
+### 2026-09-09 — Nova — RM-2026-457A31 Fase 6: confirmação isolada
+
+Reinspecionados e preservados os ajustes funcionais Iris já existentes. 73/73 testes direcionados, lint direcionado e diff-check passaram. Gates globais executados: lint 2.484 erros/1.254 avisos; typecheck mesmos 17 diagnósticos; testes repetidos em pasta de cobertura própria após EBUSY, 2.674 passaram/mesmas 50 falhas/1 todo. Build anterior exit 0 conferido em nova-457a31-final-validation, não reexecutado. PASS conforme feedback administrativo de isolamento; smoke autenticado/DOM real e débitos externos não bloqueiam esta fase. Caminho administrativo e consumo no card conferidos no código. Somente story/journal e logs nova-457a31-phase6-confirmation atualizados; sem banco ou Git mutável.
+
+
+---
+
+## [2026-09-09 14:38] — RM-2026-457A31 encerrada no escopo (Fase 13)
+
+**Tags:** #feature #integration #decision #prisma
+**Agentes envolvidos:** Kowalski nesta sessão; Scout, preparação de story, Iris, Vault, Echo, Nova, Forge, Probe, Anubis, Lens, Sage e Scribe conforme histórico/pareceres do pipeline; sem nova delegação.
+**Arquivos tocados:** `.bibble/memory/journal.md`, `docs/stories/story-rm-2026-457a31-checklist-varias-etapas.md`; evidências locais em `kowalski-457a31-closure/`. Fontes, testes e memórias alterados anteriormente preservados; File List funcional na story.
+
+### Contexto
+Encerrar Checklist em várias etapas no Painel Alpha, arquivando decisões e evidências reais. Feedback obrigatório atendido: reinspeção e alterações documentais efetivas, com isolamento dos gates externos e smoke autenticado não bloqueante.
+
+### O que foi feito
+- Conferidos story Done, menu/rota protegida, multiselect/save, associação normalizada, filtro compartilhado e consumidor do card. Draft vazio, preservado. Cronologia abaixo segue a ordem das fases fornecidas, sem inventar horários de auditoria.
+- Forge → PASS: build real exit 0, 73/73 testes, lint e diff direcionados aprovados. Artefatos conferidos em `forge-457a31-current/`; globais com 17 diagnósticos TS, 2.484 erros/1.254 avisos de lint e cobertura indisponível; pipeline registra 2.674 testes passando, mesmas 50 falhas e 1 todo no global sem cobertura.
+- Probe → PASS: oito pontos de integração por código/testes, 73/73; smoke autenticado e persistência remota não revalidados. Anubis → PASS: 73/73 e nenhum achado bloqueante; CAS ausente na action legada é baixo. Lens → PASS após Forge: 69/69 selecionados; sugestões de CAS legado/import de auth; lint global sem resultado final naquela sessão.
+- Sage → PASS: 73/73 em 11 arquivos; seleção vazia, permissão/revogação e migration isolada já cobertas. Scribe → PASS: memórias e story consolidadas; 73/73, lint direcionado e diff aprovados. Pareceres desses agentes recebidos do pipeline, não executados por Kowalski.
+- Vault histórico: checkpoint `225548f90b7e05fb4b29adfb775de3c878e88117ec9b7924e65de1482a4a04ac`; aprovação `d21e3e11e054dba110d926dc321db48a11c17f94903831febbccfb6da96494fa` por Administrador em 2026-09-09T12:05:31.759Z. Migration `prisma/migrations/20260908214000_bpm_checklist_template_multiplas_etapas/migration.sql` aplicada conforme Fase 5; backup `database-backups/pre-change/painelalpha_turso_pre_change_2026-09-09T12-29-03-247Z.sql`, SHA-256 `044c4f115273e0d5ee56dab1c56ce7a26e44a8b903961ab93f627f131579a581`, restaurado/verificado naquela fase. Pós-aplicação registrada: 1 associação, 3 índices, zero órfãos/violações FK. Nenhum banco consultado ou alterado agora.
+
+### Decisões tomadas
+- Preservar associação normalizada, fallback singular quando lista vazia e shadow preenchido, snapshots/idempotência e reconciliação transacional; não reaplicar migration.
+- Encerrar PASS no escopo conforme administrador; resultados históricos de falha global não equivalem a regressão do checklist. Build aprovado conferido, sem nova build nesta fase documental.
+
+### Problemas encontrados / resolvidos
+AUTO_ADJUSTMENT_REQUIRED: faltava no journal a consolidação final cronológica de Forge, Probe, Anubis, Lens, Sage e Scribe; entradas históricas ainda descrevem bloqueios e testes ausentes superados.
+AUTO_ADJUSTMENT_ACCEPTANCE: apendar encerramento com fonte dos pareceres, cobertura atual e pendências não bloqueantes, preservando entradas antigas. Autoajuste aplicado por esta entrada e checklist/File List da Fase 13 na story.
+
+### Pendências
+- Probe/administrador: smoke autenticado salvar/reabrir duas etapas, verificar cards selecionados, teclado/foco e 320px; aceitar quando o fluxo real funcionar em sessão autorizada.
+- Vault: revalidação remota somente leitura de tabela/índices/FKs; aceitar com zero conflitos/violações. Echo/Sage: concorrência real; aceitar conflito controlado sem perda de atualização.
+- Forge/manutenção dos módulos externos: regularizar gates globais até exit 0; Echo: CAS na action legada e import de auth sugeridos por Anubis/Lens. Tudo não bloqueante nesta RM, sem regressão atribuível identificada.
+
+### Refletido também em
+- Story: status Fase 13, checklist, File List e gates locais. `decisions.md`, `architecture.md`, `codebase-map.md` e `integration-points.md` já consolidados por Scribe; nenhuma nova decisão arquitetural nesta sessão.
+- DELIVERY_READY: administrador → Alpha CRM → Configurações → Checklists → `/PainelAlpha/AlphaCRM/admin/checklists` → criar/editar → Vínculos → multiselect de etapas → salvar; usuário autorizado → `/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → abrir card em coluna selecionada → Checklist → `PainelChecklistsCard`. Artefato funcional: template multietapa consumido pelo card/motores. Caminho conferido por código e testes locais; não é alegação de E2E remoto. Journal/story são consumidos pelos agentes e manutenção diretamente nos arquivos do projeto.
+
+### Gates locais do encerramento (Kowalski)
+
+- Testes direcionados: exit 0, 73/73 em 11 arquivos; lint direcionado: exit 0.
+- `npm run lint`: exit 1, 2.484 erros/1.254 avisos, contagem igual ao baseline Scribe.
+- `npm run typecheck`: exit 1, 17 diagnósticos; conjunto idêntico a `scribe-457a31-closure/typecheck.log`.
+- `npm test`: exit 1, impedido por EBUSY na pasta coverage compartilhada. Sem nova medição global de testes; resultado global histórico de Scribe: 2.674 aprovados/50 falhas/1 todo.
+- Build e pareceres formais anteriores conferidos; nenhuma nova build ou auditoria de outro agente atribuída a Kowalski. Logs/resultados em `kowalski-457a31-closure/`.
+
+RESULT: PASS — encerramento local conforme isolamento administrativo; pendências globais/remotas não bloqueantes.
+
+Validação documental: `git diff --check` nos dois documentos alterados aprovado (exit 0).

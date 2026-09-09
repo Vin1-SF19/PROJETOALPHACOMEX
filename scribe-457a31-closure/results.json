@@ -1,0 +1,7 @@
+{
+  "lint": 1,
+  "typecheck": 1,
+  "tests": 1,
+  "scoped-tests": 0,
+  "scoped-lint": 0
+}

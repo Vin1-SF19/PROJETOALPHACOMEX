@@ -132,6 +132,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - O indicador `Atualizando agendas compartilhadas…` não depende mais indefinidamente de uma resposta do banco/Google: cada origem recebe limite de 12 segundos, exceções viram erros seguros, o `finally` encerra o loading e as agendas que responderam continuam visíveis. O alerta existente oferece `Tentar novamente`; não houve mudança de schema ou banco.
 - Regressão direcionada do carregamento compartilhado: 18/18 testes aprovados (incluindo timeout determinístico, falha segura, privacidade, escrita compartilhada e wiring), ESLint do recorte, `git diff --check` e build de produção aprovados. Nos gates globais, a linha de base externa ao recorte permanece pendente: lint com 21.210 ocorrências, typecheck com erros em arquivos não alterados e suíte completa com 50 falhas em 19 arquivos contra 2.684 testes aprovados e 1 pendente. O teste estrutural preexistente de `page-cache-wiring` integra essa linha de base por o dashboard ter 304 linhas contra o teto antigo de 300.
 - A visão mensal passou a seguir a referência fornecida: os dias da semana foram integrados à primeira linha, a quantidade de linhas acompanha as semanas reais do mês, compromissos exibem hierarquia compacta por tipo e somente dois itens ocupam cada célula antes de `Mais N`. Local de trabalho, dia inteiro, evento com horário, convite compartilhado e tarefa concluída mantêm identidades distintas; criação, navegação, edição, conclusão e popover completo continuam disponíveis por mouse e teclado.
+- Correção visual pós-validação: removido o fundo sólido exclusivo da visão mensal; o mês reutiliza exatamente o mesmo fundo translúcido das visões Dia e Semana.
 - Regressão visual do mês: ESLint do recorte sem ocorrências, 9/9 testes direcionados aprovados, `git diff --check` e build de produção aprovados. A suíte global manteve a linha de base de 50 falhas em 19 arquivos, com 2.687 testes aprovados e 1 pendente; o lint global manteve 21.210 ocorrências e o typecheck falhou somente em arquivos externos ao recorte. Não houve alteração de banco, migration ou backfill.
 
 ### Change Log
@@ -142,6 +143,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - 2026-09-09: projeção somente leitura e atualização privada em tempo real da tarefa do chamado na agenda do solicitante, refletindo atendimento, conclusão e horário real sem duplicar a tarefa Google.
 - 2026-09-09: correção do loading infinito das agendas compartilhadas com timeout, falha segura e preservação de resultados parciais.
 - 2026-09-09: reformulação da visão mensal conforme `melhoriaAgenda.png`, com grade compacta e adaptativa, hierarquia visual por tipo de compromisso e preservação integral das interações.
+- 2026-09-09: correção do fundo da visão mensal para manter consistência visual com as abas Dia e Semana.
 
 ## Notas operacionais
 

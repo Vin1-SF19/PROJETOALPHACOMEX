@@ -1,0 +1,23 @@
+
+> alpha_sistema@0.1.0 test
+> vitest run --coverage
+
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+      Coverage enabled with v8
+
+ ❯ tests/bpm/membros-card-ui.test.ts (6 tests | 2 failed) 157ms
+     × monta o seletor no cabeçalho do card aberto com edição condicionada à permissão 73ms
+     × permite que participante vinculado trabalhe no card, mantendo a gestão de membros restrita 77ms
+ ❯ tests/bpm/fechado-ui.test.ts (3 tests | 1 failed) 22ms
+     × preserva os estados de nunca acessado, drag, hover e comunicacao textual 10ms
+ ❯ tests/alpha-seo/inventory.test.ts (3 tests | 2 failed) 12ms
+     × freezes 46/46 unique named source registrations without synthetic tools 7ms
+     × is deterministic and sanitizes the absolute source location 1ms
+ ❯ tests/alpha-seo/schema-draft.test.ts (10 tests | 1 failed) 175ms
+     × preserves every non-AlphaSEO candidate model after runtime promotion 38ms
+ ❯ tests/bpm/lost-ui.test.ts (5 tests | 2 failed) 12ms
+     × mantém Lost fora da criação e liga requisitos e edição ao contrato compartilhado 3ms
+     × expõe feedback acessível e preserva o painel direito 0ms
+ ❯ tests/alpha-seo/integration-wiring.test.ts (8 tests | 1 failed) 107ms
+     × participates in the real global sidebar and internal-tab lifecycle from the central registry 11ms

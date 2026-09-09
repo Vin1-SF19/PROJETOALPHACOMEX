@@ -211,7 +211,7 @@ export function VisaoMes({
   const numeroSemanas = dias.length / 7;
 
   return (
-    <div className="h-full min-h-0 overflow-auto rounded-[1.75rem] border border-white/10 bg-[#111315] shadow-2xl shadow-slate-950/25">
+    <div className="h-full min-h-0 overflow-auto rounded-[1.75rem] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_30%),linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-2xl shadow-slate-950/20">
       <div
         role="grid"
         aria-label="Calendário mensal"

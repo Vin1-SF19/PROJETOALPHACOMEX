@@ -1,0 +1,22 @@
+[
+  {
+    "gate": "lint",
+    "exit": 1
+  },
+  {
+    "gate": "typecheck",
+    "exit": 1
+  },
+  {
+    "gate": "tests",
+    "exit": 1
+  },
+  {
+    "gate": "scoped-tests",
+    "exit": 0
+  },
+  {
+    "gate": "scoped-lint",
+    "exit": 0
+  }
+]

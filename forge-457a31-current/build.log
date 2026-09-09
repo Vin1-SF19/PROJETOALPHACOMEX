@@ -1,0 +1,332 @@
+
+> alpha_sistema@0.1.0 build
+> prisma generate && npm run build:player && NODE_OPTIONS=--max-old-space-size=8192 next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+✔ Generated Prisma Client (v6.19.3) to ./node_modules/@prisma/client in 1.43s
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+
+
+> alpha_sistema@0.1.0 build:player
+> node scripts/build-apresentacoes-player.mjs
+
+[build-apresentacoes-player] bundlando JS...
+[build-apresentacoes-player] JS: 3071.5 KB
+[build-apresentacoes-player] compilando CSS...
+[build-apresentacoes-player] CSS: 1840.4 KB
+[build-apresentacoes-player] gerado em src/generated/apresentacoes-player-bundle.ts
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.1.6 (Turbopack)
+- Experiments (use with caution):
+  · serverActions
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 28.0s
+  Skipping validation of types
+  Collecting page data using 23 workers ...
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (83004)
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (83004)
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (83004)
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (83004)
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (83004)
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (385620)
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (385620)
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (385620)
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (385620)
+  Generating static pages using 23 workers (0/78) ...
+[pdfjs-polyfill] não foi possível pré-carregar o worker do pdfjs-dist: The "path" argument must be of type string. Received type number (83004)
+  Generating static pages using 23 workers (19/78) 
+  Generating static pages using 23 workers (38/78) 
+  Generating static pages using 23 workers (58/78) 
+✓ Generating static pages using 23 workers (78/78) in 579.0ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /api/alpha-seo/cron/oauth-cleanup
+├ ƒ /api/alpha-seo/cron/schedules
+├ ƒ /api/alpha-seo/cron/worker
+├ ƒ /api/alpha-seo/mcp
+├ ƒ /api/alpha-seo/mcp/keys
+├ ƒ /api/alpha-seo/mcp/oauth/authorize
+├ ƒ /api/alpha-seo/mcp/oauth/metadata
+├ ƒ /api/alpha-seo/mcp/oauth/register
+├ ƒ /api/alpha-seo/mcp/oauth/revoke
+├ ƒ /api/alpha-seo/mcp/oauth/token
+├ ƒ /api/alpha-seo/oauth/[product]/callback
+├ ƒ /api/alpha-seo/oauth/[product]/start
+├ ƒ /api/alpha-seo/sam/stream
+├ ƒ /api/apresentacoes/[id]/exportar-html
+├ ƒ /api/apresentacoes/[id]/importar-pptx
+├ ƒ /api/apresentacoes/[id]/miniatura
+├ ƒ /api/apresentacoes/[id]/pptx-preview
+├ ƒ /api/apresentacoes/[id]/pptx-upload
+├ ƒ /api/apresentacoes/assets
+├ ƒ /api/apresentacoes/fontes
+├ ƒ /api/apresentacoes/gerar-slide
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/bibble/chat
+├ ƒ /api/bibble/cloud-providers
+├ ƒ /api/bibble/curiosidade
+├ ƒ /api/bibble/documents
+├ ƒ /api/bibble/falas
+├ ƒ /api/bibble/gerar-ficha
+├ ƒ /api/bibble/models
+├ ƒ /api/bibble/piada
+├ ƒ /api/bibble/projects
+├ ƒ /api/bibble/projects/[id]
+├ ƒ /api/bibble/sessions
+├ ƒ /api/bibble/sessions/[id]
+├ ƒ /api/bibble/sessions/[id]/messages
+├ ƒ /api/bibble/upload
+├ ƒ /api/bibble/upload-to-blob
+├ ƒ /api/blueprint/chat
+├ ƒ /api/blueprint/gerar-layout
+├ ƒ /api/blueprint/gerar-prompt
+├ ƒ /api/blueprint/upload
+├ ƒ /api/bpm/anexos/[anexoId]
+├ ƒ /api/bpm/jobs/alertas-tarefas
+├ ƒ /api/bpm/jobs/automacao-novos-leads
+├ ƒ /api/bpm/jobs/automacoes
+├ ƒ /api/bpm/noloss-leads/ingest
+├ ƒ /api/bpm/upload
+├ ƒ /api/bpm/webhooks/[slug]
+├ ƒ /api/broadcast
+├ ƒ /api/BuscaLote
+├ ƒ /api/calendario-alpha/jobs/alertas-compromissos
+├ ƒ /api/calendario-alpha/jobs/worker
+├ ƒ /api/calendario-alpha/webhook
+├ ƒ /api/chat/upload
+├ ƒ /api/ChatBot
+├ ƒ /api/ChatBot/AbrirChamado
+├ ƒ /api/checklist/[empresaId]/documentos/zip
+├ ƒ /api/comissoes/comprovantes/[paymentId]
+├ ƒ /api/ConsultaCompleta
+├ ƒ /api/ConsultaCpf
+├ ƒ /api/ConsultaRadar
+├ ƒ /api/contratos/upload
+├ ƒ /api/convite/consulta-cpf
+├ ƒ /api/convite/validar-pin
+├ ƒ /api/cs-nps/exportar
+├ ƒ /api/cs-nps/importar/modelo
+├ ƒ /api/cs-nps/importar/previsualizar
+├ ƒ /api/cs-nps/importar/salvar
+├ ƒ /api/documentos
+├ ƒ /api/documentos/ordenar
+├ ƒ /api/documentos/salvar
+├ ƒ /api/DownloadArquivos
+├ ƒ /api/EmpresaAqui
+├ ƒ /api/ExclusaoFiscal
+├ ƒ /api/gerador-documentos/[id]/download
+├ ƒ /api/gerador-documentos/clientes/[clienteId]/historico
+├ ƒ /api/gerador-documentos/gerar
+├ ƒ /api/GerarPdf
+├ ƒ /api/heartbeat
+├ ƒ /api/HistoricoRadar
+├ ƒ /api/holerites/[id]/download
+├ ƒ /api/holerites/upload
+├ ƒ /api/ImportarHistorico
+├ ƒ /api/InfoSimples
+├ ƒ /api/LimpezaBd
+├ ƒ /api/ListarArquivos
+├ ƒ /api/metas/justificativas/[id]
+├ ƒ /api/metas/justificativas/upload
+├ ƒ /api/notas/anexos/[id]
+├ ƒ /api/notas/upload
+├ ƒ /api/notificacoes
+├ ƒ /api/onboarding/marcar-visto
+├ ƒ /api/onyx/agent-tools/[tool]
+├ ƒ /api/onyx/agent-tools/register
+├ ƒ /api/onyx/agentes-fixados
+├ ƒ /api/onyx/agents
+├ ƒ /api/onyx/agents/[id]
+├ ƒ /api/onyx/agents/[id]/avatar
+├ ƒ /api/onyx/agents/generate-avatar
+├ ƒ /api/onyx/agents/upload-image
+├ ƒ /api/onyx/chat
+├ ƒ /api/onyx/connectors
+├ ƒ /api/onyx/connectors/[ccPairId]
+├ ƒ /api/onyx/connectors/credentials
+├ ƒ /api/onyx/connectors/document-sets
+├ ƒ /api/onyx/connectors/upload
+├ ƒ /api/onyx/extrato
+├ ƒ /api/onyx/extrato/reprocessar
+├ ƒ /api/onyx/file/[fileId]
+├ ƒ /api/onyx/image-models
+├ ƒ /api/onyx/llm-models
+├ ƒ /api/onyx/session/[id]
+├ ƒ /api/onyx/tools
+├ ƒ /api/onyx/voice/status
+├ ƒ /api/onyx/voice/synthesize
+├ ƒ /api/onyx/voice/transcribe
+├ ƒ /api/painel-alpha/clientes/[id]/timeline
+├ ƒ /api/parceiros/jobs/desenvolvimento
+├ ƒ /api/pusher/auth
+├ ƒ /api/radar
+├ ƒ /api/RadarFiscal
+├ ƒ /api/ReceitaFederal
+├ ƒ /api/roadmap/production/objectives/[objectiveId]/completion-report
+├ ƒ /api/roadmap/production/objectives/[objectiveId]/runs
+├ ƒ /api/roadmap/production/queue
+├ ƒ /api/roadmap/production/runs/[runId]
+├ ƒ /api/roadmap/production/runs/[runId]/approve
+├ ƒ /api/roadmap/production/runs/[runId]/events
+├ ƒ /api/roadmap/production/runs/[runId]/status
+├ ƒ /api/SalvarPlanilhaFiscal
+├ ƒ /api/upload
+├ ƒ /api/UploadSkills
+├ ƒ /api/usuarios/avatar
+├ ƒ /apresentacao/[slug]
+├ ƒ /auth/RedefinirSenha
+├ ƒ /convite/parceiro/[token]
+├ ƒ /PainelAlpha
+├ ƒ /PainelAlpha/AlphaBlueprint
+├ ƒ /PainelAlpha/AlphaBlueprint/[projectId]
+├ ƒ /PainelAlpha/AlphaComm
+├ ƒ /PainelAlpha/AlphaConnect
+├ ƒ /PainelAlpha/AlphaCRM
+├ ƒ /PainelAlpha/AlphaCRM/admin
+├ ƒ /PainelAlpha/AlphaCRM/admin/cadencias
+├ ƒ /PainelAlpha/AlphaCRM/admin/checklists
+├ ƒ /PainelAlpha/AlphaCRM/admin/conhecimento
+├ ƒ /PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]
+├ ƒ /PainelAlpha/AlphaCRM/admin/regras
+├ ƒ /PainelAlpha/AlphaCRM/automacoes
+├ ƒ /PainelAlpha/AlphaCRM/empresa/[empresaId]
+├ ƒ /PainelAlpha/AlphaCRM/pendencias
+├ ƒ /PainelAlpha/AlphaCRM/pipeline/[pipelineId]
+├ ƒ /PainelAlpha/AlphaCRM/pipelines
+├ ƒ /PainelAlpha/AlphaCRM/tarefas
+├ ƒ /PainelAlpha/AlphaSchools
+├ ƒ /PainelAlpha/AlphaSchools/presets
+├ ƒ /PainelAlpha/AlphaSEO
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/audit
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/audit/[auditId]/performance/[resultId]
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/backlinks
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/brand-lookup
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/dashboard
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/domain
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/keywords
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/prompt-explorer
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/rank
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/rank/[trackerId]
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/sam
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/saved
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/search-performance
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/settings
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/settings/context
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/settings/integrations
+├ ƒ /PainelAlpha/AlphaSEO/[projectId]/settings/mcp
+├ ƒ /PainelAlpha/AlphaSEO/invite
+├ ƒ /PainelAlpha/AlphaSkills
+├ ƒ /PainelAlpha/AlphaSkills/Gerenciamento
+├ ƒ /PainelAlpha/AlphaSkills/modulo/[id]
+├ ƒ /PainelAlpha/AlphaVault
+├ ƒ /PainelAlpha/Apresentacoes
+├ ƒ /PainelAlpha/Apresentacoes/[id]/apresentar
+├ ƒ /PainelAlpha/Apresentacoes/[id]/editor
+├ ƒ /PainelAlpha/cadastro
+├ ƒ /PainelAlpha/CadastroClientes
+├ ƒ /PainelAlpha/CalendarioAlpha
+├ ƒ /PainelAlpha/Chamados
+├ ƒ /PainelAlpha/Chamados/ChatChamado
+├ ƒ /PainelAlpha/Chamados/NovoChamado
+├ ƒ /PainelAlpha/ChatBotAlpha
+├ ƒ /PainelAlpha/CheckList
+├ ƒ /PainelAlpha/CheckList/[empresaId]
+├ ƒ /PainelAlpha/CheckList/Embasamentos
+├ ƒ /PainelAlpha/CheckList/Embasamentos/[tipo]
+├ ƒ /PainelAlpha/CheckList/Historico
+├ ƒ /PainelAlpha/Comissoes
+├ ƒ /PainelAlpha/Comissoes/Configuracoes
+├ ƒ /PainelAlpha/Comissoes/Divergencias
+├ ƒ /PainelAlpha/Comissoes/Simulador
+├ ƒ /PainelAlpha/Conectores
+├ ƒ /PainelAlpha/ControleLeads
+├ ƒ /PainelAlpha/ControleLeads/Marketing
+├ ƒ /PainelAlpha/DocsAlpha
+├ ƒ /PainelAlpha/ExtratosBancarios
+├ ƒ /PainelAlpha/ExtratosBancarios/[Id]
+├ ƒ /PainelAlpha/GeradorDocumentos
+├ ƒ /PainelAlpha/GeradorDocumentos/[templateId]
+├ ƒ /PainelAlpha/GeradorDocumentos/[templateId]/download
+├ ƒ /PainelAlpha/GeradorDocumentos/conferencia/[token]
+├ ƒ /PainelAlpha/GeradorDocumentos/gerar
+├ ƒ /PainelAlpha/GerenciamentoArquivos
+├ ƒ /PainelAlpha/GestaoColaboradores
+├ ƒ /PainelAlpha/GestaoOnboarding
+├ ƒ /PainelAlpha/GestaoProtocolos
+├ ƒ /PainelAlpha/GestaoSetores
+├ ƒ /PainelAlpha/Guia
+├ ƒ /PainelAlpha/HabilitacaoRadar
+├ ƒ /PainelAlpha/HistoricoArquivos
+├ ƒ /PainelAlpha/Holerites
+├ ƒ /PainelAlpha/Holerites/[id]
+├ ƒ /PainelAlpha/InfosPerfil/Perfil
+├ ƒ /PainelAlpha/Marketing
+├ ƒ /PainelAlpha/Metas
+├ ƒ /PainelAlpha/mudar-senha
+├ ƒ /PainelAlpha/Notas
+├ ƒ /PainelAlpha/PainelTarefas/GerenciarTarefas
+├ ƒ /PainelAlpha/PainelTarefas/GerenciarTarefas/GerenciamentoUserTarefa
+├ ƒ /PainelAlpha/PainelTarefas/PainelTarefaC
+├ ƒ /PainelAlpha/PainelTarefas/painelTarefaSG
+├ ƒ /PainelAlpha/PainelTarefas/painelTarefaSG/Carrinho
+├ ƒ /PainelAlpha/PainelTarefas/painelTarefaSG/PainelEstoque
+├ ƒ /PainelAlpha/Parceiros
+├ ƒ /PainelAlpha/Parceiros/[id]
+├ ƒ /PainelAlpha/Parceiros/Aquisicao
+├ ƒ /PainelAlpha/Parceiros/Configuracoes
+├ ƒ /PainelAlpha/Parceiros/Dashboard
+├ ƒ /PainelAlpha/Parceiros/Indicacoes
+├ ƒ /PainelAlpha/Parceiros/Lista
+├ ƒ /PainelAlpha/Parceiros/novo
+├ ƒ /PainelAlpha/Parceiros/Relacionamento
+├ ƒ /PainelAlpha/prova/[presetId]
+├ ƒ /PainelAlpha/ReservaSalas
+├ ƒ /PainelAlpha/Roadmap
+├ ƒ /PainelAlpha/SistemaPreAnalise
+├ ƒ /PainelAlpha/UsuariosOnline
+└ ƒ /PdfPreview
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+

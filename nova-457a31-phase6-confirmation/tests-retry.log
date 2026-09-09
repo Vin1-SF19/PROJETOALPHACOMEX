@@ -1,0 +1,3050 @@
+
+> alpha_sistema@0.1.0 test
+> vitest run --coverage --coverage.reportsDirectory=nova-457a31-phase6-confirmation/coverage
+
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+      Coverage enabled with v8
+
+ ❯ tests/bpm/membros-card-ui.test.ts (6 tests | 2 failed) 63ms
+     × monta o seletor no cabeçalho do card aberto com edição condicionada à permissão 28ms
+     × permite que participante vinculado trabalhe no card, mantendo a gestão de membros restrita 29ms
+ ❯ tests/alpha-seo/schema-draft.test.ts (10 tests | 1 failed) 61ms
+     × preserves every non-AlphaSEO candidate model after runtime promotion 12ms
+ ❯ tests/alpha-seo/inventory.test.ts (3 tests | 2 failed) 9ms
+     × freezes 46/46 unique named source registrations without synthetic tools 6ms
+     × is deterministic and sanitizes the absolute source location 1ms
+ ❯ tests/bpm/fechado-ui.test.ts (3 tests | 1 failed) 8ms
+     × preserva os estados de nunca acessado, drag, hover e comunicacao textual 2ms
+ ❯ tests/bpm/lost-ui.test.ts (5 tests | 2 failed) 11ms
+     × mantém Lost fora da criação e liga requisitos e edição ao contrato compartilhado 5ms
+     × expõe feedback acessível e preserva o painel direito 1ms
+ ❯ tests/alpha-seo/integration-wiring.test.ts (8 tests | 1 failed) 56ms
+     × participates in the real global sidebar and internal-tab lifecycle from the central registry 17ms
+ ❯ tests/bibble/context-budget.test.ts (5 tests | 1 failed) 12ms
+     × upgrades the legacy 4,096 window for PDF requests on the server 8ms
+ ❯ tests/google-calendar/layout-eventos.test.ts (9 tests | 6 failed) 20ms
+     × posiciona 1 evento sozinho ocupando a coluna inteira 4ms
+     × dá altura mínima para eventos muito curtos 0ms
+     × divide em 2 colunas quando dois eventos se sobrepõem 3ms
+     × cria 3 colunas quando 3 eventos se sobrepõem entre si 4ms
+     × clusters separados no tempo não compartilham colunas 0ms
+     × retorna só os eventos de dia inteiro do dia certo 1ms
+ ❯ tests/parceiros/aquisicao.test.ts (16 tests | 1 failed) 26ms
+     × rejeita pular 2 etapas de uma vez 6ms
+ ❯ tests/gerador-documentos/empresas-contratadas.test.ts (13 tests | 4 failed) 24ms
+     × cria com sucesso quando o CNPJ é novo 15ms
+     × rejeita CNPJ duplicado sem chamar create 1ms
+     × rejeita quando o novo CNPJ colide com outra empresa 3ms
+     × permite manter o mesmo CNPJ da própria empresa (findFirst exclui o próprio id) 1ms
+ ❯ tests/bpm/standby-follow-up.test.ts (6 tests | 1 failed) 35ms
+     × mantém o controle somente no formulário central da etapa Standby 22ms
+ ❯ tests/alpha-seo/doctor-worker.test.ts (5 tests | 2 failed) 25ms
+     × keeps doctor read-only/redacted and passes the 46/46 named source contract 12ms
+     × returns code 2 offline only for genuinely missing configuration, never for historical MCP metadata 1ms
+stderr | tests/cs-nps/origens-lead.test.ts > persistência das novas origens (Fase 3.6 do Cliente Master) > salva Discadora integralmente na edição
+ERRO salvarAlteracoesServico: TypeError: tx.clienteServico.update is not a function
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/Clientes.ts:691:31
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/cs-nps/origens-lead.test.ts:42:60)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at Module.salvarAlteracoesServico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/Clientes.ts:690:14)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/cs-nps/origens-lead.test.ts:99:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/cs-nps/origens-lead.test.ts > persistência das novas origens (Fase 3.6 do Cliente Master) > salva Prospecção ativa (Log Comex) integralmente na edição
+ERRO salvarAlteracoesServico: TypeError: tx.clienteServico.update is not a function
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/Clientes.ts:691:31
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/cs-nps/origens-lead.test.ts:42:60)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at Module.salvarAlteracoesServico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/Clientes.ts:690:14)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/cs-nps/origens-lead.test.ts:99:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ❯ tests/cs-nps/origens-lead.test.ts (7 tests | 2 failed) 88ms
+     × salva Discadora integralmente na edição 50ms
+     × salva Prospecção ativa (Log Comex) integralmente na edição 1ms
+stderr | tests/notas/acesso-e-lixeira.test.ts
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+ ❯ tests/notas/acesso-e-lixeira.test.ts (8 tests | 1 failed) 16ms
+     × não cria bypass para Admin e limita a dono ou compartilhamento explícito 10ms
+stdout | tests/apresentacoes/pptx-parser.test.ts > extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preenchimento de forma) > custGeom curvo + blipFill: recorta a imagem original pelo path real (clipPath), virando SVG novo
+[pptx-diag] slide 1 (ppt/slides/slide1.xml) — 4 elemento(s) [
+  {
+    slide: 1,
+    shapeId: '2',
+    nome: 'Freeform Retangular',
+    tipoOoxml: 'p:sp',
+    fillEncontrado: 'blipFill',
+    relationshipId: 'rId4',
+    assetResolvido: 'ppt/media/image2.svg',
+    grupoPai: null,
+    geometria: 'custGeom retangular',
+    motivoFallback: null
+  },
+  {
+    slide: 1,
+    shapeId: '8',
+    nome: 'Estrela Gradiente',
+    tipoOoxml: 'p:sp',
+    fillEncontrado: 'custGeom gradiente (fallback SVG)',
+    relationshipId: null,
+    assetResolvido: null,
+    grupoPai: null,
+    geometria: 'custGeom path (500000x500000)',
+    motivoFallback: null
+  },
+  {
+    slide: 1,
+    shapeId: '5',
+    nome: 'Foto Recortada',
+    tipoOoxml: 'p:sp',
+    fillEncontrado: 'blipFill (com recorte custGeom)',
+    relationshipId: 'rId3',
+    assetResolvido: 'ppt/media/image1.png',
+    grupoPai: null,
+    geometria: 'custGeom path (1000000x1000000)',
+    motivoFallback: null
+  },
+  {
+    slide: 1,
+    shapeId: '7',
+    nome: 'Estrela Colorida',
+    tipoOoxml: 'p:sp',
+    fillEncontrado: 'custGeom colorido (fallback SVG)',
+    relationshipId: null,
+    assetResolvido: null,
+    grupoPai: null,
+    geometria: 'custGeom path (500000x500000)',
+    motivoFallback: null
+  }
+]
+
+ ❯ tests/apresentacoes/pptx-parser.test.ts (15 tests | 1 failed) 214ms
+     × custGeom curvo + blipFill: recorta a imagem original pelo path real (clipPath), virando SVG novo 21ms
+stderr | tests/bpm/criar-card-nova-empresa.test.ts > CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master) > cria o Cliente e o card atomicamente quando novaEmpresa é informado
+[CriarCardBpm] ZodError: [
+  {
+    "origin": "string",
+    "code": "invalid_format",
+    "format": "cuid",
+    "pattern": "/^[cC][0-9a-z]{6,}$/",
+    "path": [
+      "cardId"
+    ],
+    "message": "Invalid cuid"
+  }
+]
+    at publicarEventoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/automacoes/eventos.ts:36:43)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:851:13
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+stderr | tests/bpm/criar-card-nova-empresa.test.ts > CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master) > continua vinculando empresa já existente via empresaId, sem criar Cliente novo
+[CriarCardBpm] ZodError: [
+  {
+    "origin": "string",
+    "code": "invalid_format",
+    "format": "cuid",
+    "pattern": "/^[cC][0-9a-z]{6,}$/",
+    "path": [
+      "cardId"
+    ],
+    "message": "Invalid cuid"
+  }
+]
+    at publicarEventoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/automacoes/eventos.ts:36:43)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:851:13
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+stderr | tests/bpm/criar-card-nova-empresa.test.ts > CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master) > ignora payload legado sem validar nem persistir controles de etapa
+[CriarCardBpm] ZodError: [
+  {
+    "origin": "string",
+    "code": "invalid_format",
+    "format": "cuid",
+    "pattern": "/^[cC][0-9a-z]{6,}$/",
+    "path": [
+      "cardId"
+    ],
+    "message": "Invalid cuid"
+  }
+]
+    at publicarEventoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/automacoes/eventos.ts:36:43)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:851:13
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+stderr | tests/bpm/criar-card-nova-empresa.test.ts
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+ ❯ tests/bpm/criar-card-nova-empresa.test.ts (13 tests | 3 failed) 28ms
+     × cria o Cliente e o card atomicamente quando novaEmpresa é informado 20ms
+     × continua vinculando empresa já existente via empresaId, sem criar Cliente novo 1ms
+     × ignora payload legado sem validar nem persistir controles de etapa 1ms
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > permite drag quando o motivo válido já está persistido
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:118:68)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:248:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > exige companion no modal para Outro e persiste ambos atomicamente
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:118:68)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.SalvarRequisitosEMoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1965:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:275:22
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > falha fechada se a configuração mudar dentro da transação
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:118:68)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.SalvarRequisitosEMoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1965:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:301:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > edita Lost com Outro sob CAS e rejeita limpeza do companion
+[AtualizarCardBpm] Error: CONFIGURACAO_LOST_INVALIDA
+    at carregarConfiguracaoLost (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:189:33)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1068:37
+
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > nega participante explicitamente em 'MoverCardBpm' sem efeitos
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:118:68)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:429:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > nega participante explicitamente em 'SalvarRequisitosEMoverCardBpm' sem efeitos
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:118:68)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.SalvarRequisitosEMoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1965:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:429:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > rejeita campo fora da allowlist de requisitos
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:118:68)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.SalvarRequisitosEMoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1965:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:456:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/lost-actions.test.ts > actions de Lost > rejeita conflito dentro da transação sem efeitos parciais
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:118:68)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.SalvarRequisitosEMoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1965:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/lost-actions.test.ts:479:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/lost-actions.test.ts
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+ ❯ tests/bpm/lost-actions.test.ts (20 tests | 8 failed) 44ms
+     × permite drag quando o motivo válido já está persistido 5ms
+     × exige companion no modal para Outro e persiste ambos atomicamente 3ms
+     × falha fechada se a configuração mudar dentro da transação 2ms
+     × edita Lost com Outro sob CAS e rejeita limpeza do companion 3ms
+     × nega participante explicitamente em 'MoverCardBpm' sem efeitos 1ms
+     × nega participante explicitamente em 'SalvarRequisitosEMoverCardBpm' sem efeitos 1ms
+     × rejeita campo fora da allowlist de requisitos 1ms
+     × rejeita conflito dentro da transação sem efeitos parciais 1ms
+(node:3723) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > mantém o comportamento de pipelines existentes quando não há regra cadastrada (fail-open)
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:71:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:126:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > bloqueia movimentação manual quando um admin desativou a transição, com mensagem clara
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:71:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:143:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > bloqueia movimentação manual quando a transição é 'apenas automação', com mensagem clara
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:71:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:160:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > preserva histórico ao mover em transição hoje válida (regressão de pipeline existente)
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:71:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:188:5
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > bloqueia o avanço quando o checklist real tem item obrigatório pendente
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:71:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:203:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > libera o mesmo avanço depois que o item obrigatório é concluído
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:71:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/kanban-transicao-integracao.test.ts:220:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/kanban-transicao-integracao.test.ts
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+ ❯ tests/bpm/kanban-transicao-integracao.test.ts (7 tests | 6 failed) 22ms
+     × mantém o comportamento de pipelines existentes quando não há regra cadastrada (fail-open) 15ms
+     × bloqueia movimentação manual quando um admin desativou a transição, com mensagem clara 1ms
+     × bloqueia movimentação manual quando a transição é 'apenas automação', com mensagem clara 1ms
+     × preserva histórico ao mover em transição hoje válida (regressão de pipeline existente) 1ms
+     × bloqueia o avanço quando o checklist real tem item obrigatório pendente 2ms
+     × libera o mesmo avanço depois que o item obrigatório é concluído 1ms
+stderr | tests/bpm/fechado-actions.test.ts > actions de Fechado > move para Fechado inicializando somente status nulo e registra o status
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:100:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:206:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/fechado-actions.test.ts > actions de Fechado > preserva o status existente ao reentrar em Fechado
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:100:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:232:5
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/fechado-actions.test.ts > actions de Fechado > faz o movimento do modal pelo mesmo executor, persistindo requisitos e status
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:100:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.SalvarRequisitosEMoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1965:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:250:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/fechado-actions.test.ts > actions de Fechado > revalida no servidor valor persistido inválido antes de mover
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:100:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:283:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/fechado-actions.test.ts > actions de Fechado > revalida a configuração canônica dentro da transação
+[TransitionCommand] TypeError: Cannot read properties of undefined (reading 'findUnique')
+    at prepararTransicao (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:148:53)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:438:30
+    at Object.<anonymous> (/home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:100:66)
+    at Object.Mock [as $transaction] (file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/spy/dist/index.js:332:34)
+    at executarTransicaoBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/bpm/transicao-command.ts:437:29)
+    at executarMovimentoCanonico (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1923:27)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at Module.MoverCardBpm (/home/ialpha/projetos/alpha-comex/painel-alpha/src/actions/bpm/Cards.ts:1993:12)
+    at /home/ialpha/projetos/alpha-comex/painel-alpha/tests/bpm/fechado-actions.test.ts:305:23
+    at file:///home/ialpha/projetos/alpha-comex/painel-alpha/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/bpm/fechado-actions.test.ts
+Schema Env Error: Error: EACCES: permission denied, open '/home/ialpha/projetos/alpha-comex/painel-alpha/.env'
+
+ ❯ tests/bpm/fechado-actions.test.ts (14 tests | 5 failed) 29ms
+     × move para Fechado inicializando somente status nulo e registra o status 11ms
+     × preserva o status existente ao reentrar em Fechado 1ms
+     × faz o movimento do modal pelo mesmo executor, persistindo requisitos e status 2ms
+     × revalida no servidor valor persistido inválido antes de mover 2ms
+     × revalida a configuração canônica dentro da transação 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 50 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/apresentacoes/pptx-parser.test.ts > extrairApresentacaoPptx — blipFill dentro de p:sp (imagem como preenchimento de forma) > custGeom curvo + blipFill: recorta a imagem original pelo path real (clipPath), virando SVG novo
+AssertionError: expected 'image/png' to be 'image/svg+xml' // Object.is equality
+
+Expected: "image/svg+xml"
+Received: "image/png"
+
+ ❯ tests/apresentacoes/pptx-parser.test.ts:419:28
+    417|     expect(forma.tipo).toBe("imagem");
+    418|     if (forma.tipo !== "imagem") return;
+    419|     expect(forma.mimeType).toBe("image/svg+xml");
+       |                            ^
+    420|     expect(forma.nomeArquivo).toMatch(/-recortada\.svg$/);
+    421|     const svg = Buffer.from(forma.bytes).toString("utf-8");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/50]⎯
+
+ FAIL  tests/bibble/context-budget.test.ts > Bibble request context budget > upgrades the legacy 4,096 window for PDF requests on the server
+AssertionError: expected 131072 to be 32768 // Object.is equality
+
+- Expected
++ Received
+
+- 32768
++ 131072
+
+ ❯ tests/bibble/context-budget.test.ts:29:45
+     27|     });
+     28|
+     29|     expect(resolved.effectiveContextWindow).toBe(32_768);
+       |                                             ^
+     30|     expect(resolved.legacyContextAdjusted).toBe(true);
+     31|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/50]⎯
+
+ FAIL  tests/alpha-seo/doctor-worker.test.ts > Alpha SEO doctor and fixture worker > keeps doctor read-only/redacted and passes the 46/46 named source contract
+AssertionError: expected 2 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 2
+
+ ❯ tests/alpha-seo/doctor-worker.test.ts:76:25
+     74|       timestamp: "2026-08-20T00:00:00.000Z",
+     75|     });
+     76|     expect(result.code).toBe(0);
+       |                         ^
+     77|     expect(
+     78|       result.checks.find((check) => check.id === "contract.mcp-source-…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/50]⎯
+
+ FAIL  tests/alpha-seo/doctor-worker.test.ts > Alpha SEO doctor and fixture worker > returns code 2 offline only for genuinely missing configuration, never for historical MCP metadata
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/alpha-seo/doctor-worker.test.ts:122:7
+    120|         .filter((check) => !check.ok)
+    121|         .every((check) => check.kind === "config"),
+    122|     ).toBe(true);
+       |       ^
+    123|     expect(
+    124|       result.checks.find((check) => check.id === "contract.mcp-source-…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/50]⎯
+
+ FAIL  tests/alpha-seo/integration-wiring.test.ts > Alpha SEO module integration > participates in the real global sidebar and internal-tab lifecycle from the central registry
+AssertionError: expected '\'use client\';\n\nimport React, { us…' to contain '[...pinnedModulos, ...unpinnedModulos…'
+
+- Expected
++ Received
+
+- [...pinnedModulos, ...unpinnedModulos].map
++ 'use client';
++
++ import React, { useEffect, useRef, useState } from 'react';
++ import Link from 'next/link';
++ import Image from 'next/image';
++ import localFont from 'next/font/local';
++ import { usePathname } from 'next/navigation';
++ import { motion, AnimatePresence } from 'framer-motion';
++ import {
++   MessageSquare, CheckSquare, ListTodo, ClipboardList,
++   CalendarDays, Wrench, BarChart3, UserCheck, Target,
++   Megaphone, Trophy, Landmark, FileSearch, ScanSearch,
++   Scale, FileText, GraduationCap, BookOpen, KeyRound,
++   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
++   X, PanelLeft, User, Pin, ChevronLeft, ChevronRight, ChevronDown,
++   Instagram, Activity, Handshake, Cable, MonitorPlay, CalendarClock, Compass, HandCoins,
++   StickyNote, Search, Map,
++   FolderKanban, Radar, Users2, Clapperboard, CircleDollarSign,
++   Contact, LibraryBig, FolderOpen, CalendarRange, MessagesSquare,
++   Globe, ExternalLink, Settings, Cloud, Server, ShieldCheck, Wallet, Building2, Link2,
++   Plus, Pencil, Bot,
++   type LucideIcon,
++ } from 'lucide-react';
++ import {
++   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
++   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
++ } from '@/components/ui/dropdown-menu';
++ import LogoutButton from '@/components/LogoutUser';
++ import { SeletorTemaSubmenu } from '@/components/SeletorTemaSubmenu';
++ import { CATEGORIAS, GRUPOS_SIDEBAR, MODULOS_REGISTRY, podeVisualizarModulo, type ModuloRegistryItem } from '@/lib/modulos-registry';
++ import { ModalBroadcast } from '@/components/ModalBroadcast';
++ import { getTema } from '@/lib/temas';
++ import { isAdminRole } from '@/lib/roles';
++ import { NotesLauncherButton } from '@/components/Notas/NotesLauncherButton';
++ import { useElementWidth } from '@/hooks/useElementWidth';
++ import { ModalLinkExterno, type LinkExternoEditavel } from '@/components/layout/ModalLinkExterno';
++ import { ListarLinksExternosGestao, type LinkExternoVisivel } from '@/actions/LinksExternos';
++
++ const sfProDisplay = localFont({
++   src: '../../../public/fonts/sidebar/SF-Pro-Display-Bold.otf',
++   weight: '700',
++   variable: '--font-sf-pro-sidebar',
++   display: 'swap',
++ });
++
++ // ── Icon map ──────────────────────────────────────────────
++ const ICON_MAP: Record<string, LucideIcon> = {
++   MessageSquare, CheckSquare, ListTodo, ClipboardList,
++   CalendarDays, Wrench, BarChart3, UserCheck, Target,
++   Megaphone, Trophy, Landmark, FileSearch, ScanSearch,
++   Scale, FileText, GraduationCap, BookOpen, KeyRound,
++   FileStack, Users, Briefcase, TrendingUp, Layers, Shield,
++   Instagram, Handshake, Cable, MonitorPlay, CalendarClock, Compass, HandCoins,
++   StickyNote, Map,
++   FolderKanban, Radar, Users2, Clapperboard, CircleDollarSign,
++   Contact, LibraryBig, FolderOpen, CalendarRange, MessagesSquare,
++   Globe, ExternalLink, Settings, Cloud, Server, ShieldCheck, Wallet, Building2, Link2,
++   Bot,
++ };
++
++ const ACTIVE_BG: Record<string, string> = {
++   operacional: 'bg-blue-500/15 border-blue-500/40 text-blue-400',
++   comercial:   'bg-indigo-500/15 border-indigo-500/40 text-indigo-400',
++   financeiro:  'bg-emerald-500/15 border-emerald-500/40 text-emerald-400',
++   pessoas:     'bg-rose-500/15 border-rose-500/40 text-rose-400',
++   infra:       'bg-amber-500/15 border-amber-500/40 text-amber-400',
++   admin:       'bg-slate-500/15 border-slate-500/40 text-slate-400',
++ };
++
++ const CAT_COLORS: Record<string, string> = {
++   operacional: 'text-blue-400',
++   comercial:   'text-indigo-400',
++   financeiro:  'text-emerald-400',
++   pessoas:     'text-rose-400',
++   infra:       'text-amber-400',
++   admin:       'text-slate-400',
++ };
++
++ const TOOLTIP_ACCENT: Record<string, string> = {
++   operacional: '59, 130, 246',
++   comercial:   '99, 102, 241',
++   financeiro:  '16, 185, 129',
++   pessoas:     '244, 63, 94',
++   infra:       '245, 158, 11',
++   admin:       '148, 163, 184',
++ };
++
++ function normalizarTexto(valor: string): string {
++   return valor
++     .normalize('NFD')
++     .replace(/[̀-ͯ]/g, '')
++     .toLowerCase()
++     .trim();
++ }
++
++ // ── Props ─────────────────────────────────────────────────
++ interface GlobalSidebarProps {
++   permissoes: string[];
++   role: string;
++   nome: string;
++   imagemUrl?: string | null;
++   isCollapsed: boolean;
++   isMobileOpen: boolean;
++   onToggleCollapse?: () => void;
++   onCloseMobile: () => void;
++   onOpenTab?: (href: string, label: string) => void;
++   activeUrl?: string;
++   openUrls?: string[];
++   temaName?: string;
++   /** Reporta a largura REAL (renderizada) da sidebar desktop — permite que elementos irmãos
++    *  (ex: barra global de notas) encostem exatamente onde ela termina, sem depender de um
++    *  valor fixo espelhado que pode dessincronizar do CSS real. */
++   onWidthChange?: (width: number) => void;
++   /** Links visíveis para o usuário atual (já filtrados no server por role/visivelPara). */
++   linksExternos?: LinkExternoVisivel[];
++ }
++
++ export default function GlobalSidebar({
++   permissoes,
++   role,
++   nome,
++   imagemUrl,
++   isCollapsed,
++   isMobileOpen,
++   onToggleCollapse,
++   onCloseMobile,
++   onOpenTab,
++   activeUrl,
++   openUrls = [],
++   temaName,
++   onWidthChange,
++   linksExternos = [],
++ }: GlobalSidebarProps) {
++   const pathname = usePathname();
++   const isAdmin = isAdminRole(role);
++   const temAcessoNotas = isAdmin || permissoes.includes('notas');
++   // Use activeUrl (tab-aware) for highlighting; fallback to pathname
++   const effectiveUrl = activeUrl ?? pathname;
++
++   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
++   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
++   const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
++   const [busca, setBusca] = useState('');
++   const tema = getTema(temaName ?? "blue");
++
++   // Links Externos: estado local espelhado (otimista) — não depende de router.refresh() para essa lista pequena.
++   const [links, setLinks] = useState<LinkExternoEditavel[]>(
++     linksExternos.map(l => ({ ...l, visivelPara: 'TODOS' })),
++   );
++   const [modalLinkAberto, setModalLinkAberto] = useState(false);
++   const [linkEmEdicao, setLinkEmEdicao] = useState<LinkExternoEditavel | null>(null);
++
++   const asideRef = useRef<HTMLElement>(null);
++   const [tooltip, setTooltip] = useState<{ label: string; top: number; category: string } | null>(null);
++
++   useElementWidth(asideRef, onWidthChange ?? (() => {}));
++
++   const showTooltip = (e: React.MouseEvent<HTMLElement>, label: string, category: string) => {
++     if (!isCollapsed || !asideRef.current) return;
++     const itemRect = e.currentTarget.getBoundingClientRect();
++     const asideRect = asideRef.current.getBoundingClientRect();
++     setTooltip({ label, top: itemRect.top - asideRect.top + itemRect.height / 2, category });
++   };
++   const hideTooltip = () => setTooltip(null);
++
++   useEffect(() => {
++     try {
++       const stored = JSON.parse(localStorage.getItem('painel_alpha_sidebar_pins') ?? '[]') as string[];
++       if (stored.length > 0) setPinnedIds(stored); // eslint-disable-line react-hooks/set-state-in-effect
++     } catch { /* ignore */ }
++   }, []);
++
++   const togglePin = (id: string) => {
++     setPinnedIds(prev => {
++       const next = prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id];
++       localStorage.setItem('painel_alpha_sidebar_pins', JSON.stringify(next));
++       return next;
++     });
++   };
++
++   const toggleGroup = (id: string) => {
++     setOpenGroups(prev => {
++       const next = new Set(prev);
++       if (next.has(id)) next.delete(id); else next.add(id);
++       return next;
++     });
++   };
++
++   // Admin precisa do `visivelPara` real de cada link (a prop `linksExternos` já vem filtrada/sem esse campo) —
++   // busca uma vez ao montar, só para quem gerencia. `linksGestaoCarregado` evita que o botão de editar
++   // abra o modal com `visivelPara: 'TODOS'` hardcoded do estado inicial antes desse fetch resolver
++   // (clicar editar + salvar nessa janela sobrescreveria a visibilidade real do link silenciosamente).
++   const [linksGestaoCarregado, setLinksGestaoCarregado] = useState(false);
++   useEffect(() => {
++     if (!isAdminRole(role)) return;
++     ListarLinksExternosGestao().then(res => {
++       if (res.success) setLinks(res.links);
++       setLinksGestaoCarregado(true);
++     });
++   }, [role]);
++
++   const abrirModalCriarLink = () => { setLinkEmEdicao(null); setModalLinkAberto(true); };
++   const abrirModalEditarLink = (link: LinkExternoEditavel) => { setLinkEmEdicao(link); setModalLinkAberto(true); };
++   const fecharModalLink = () => setModalLinkAberto(false);
++
++   const handleLinkSalvo = (link: LinkExternoVisivel) => {
++     setLinks(prev => {
++       const semVisivelPara = { ...link, visivelPara: linkEmEdicao?.id === link.id ? linkEmEdicao.visivelPara : 'TODOS' };
++       const existe = prev.some(l => l.id === link.id);
++       return existe ? prev.map(l => (l.id === link.id ? semVisivelPara : l)) : [...prev, semVisivelPara];
++     });
++   };
++
++   const handleLinkExcluido = (id: string) => {
++     setLinks(prev => prev.filter(l => l.id !== id));
++   };
++
++   // Close mobile drawer on route change
++   useEffect(() => {
++     onCloseMobile();
++   }, [pathname, onCloseMobile]);
++
++   // ESC closes mobile
++   useEffect(() => {
++     const handler = (e: KeyboardEvent) => {
++       if (e.key === 'Escape') onCloseMobile();
++     };
++     document.addEventListener('keydown', handler);
++     return () => document.removeEventListener('keydown', handler);
++   }, [onCloseMobile]);
++
++   // Desktop: clicar fora da sidebar EXPANDIDA → recolhe (só quando aberta)
++   useEffect(() => {
++     if (isCollapsed || !onToggleCollapse) return;
++     const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
++
++     const onMouseDown = (e: MouseEvent) => {
++       if (!isDesktop()) return;
++       if (asideRef.current && !asideRef.current.contains(e.target as Node)) {
++         onToggleCollapse();
++       }
++     };
++     // Clicar dentro de um módulo (iframe) tira o foco da janela → recolhe
++     const onWindowBlur = () => {
++       window.setTimeout(() => {
++         if (isDesktop() && document.activeElement?.tagName === 'IFRAME') {
++           onToggleCollapse();
++         }
++       }, 0);
++     };
++
++     document.addEventListener('mousedown', onMouseDown);
++     window.addEventListener('blur', onWindowBlur);
++     return () => {
++       document.removeEventListener('mousedown', onMouseDown);
++       window.removeEventListener('blur', onWindowBlur);
++     };
++   }, [isCollapsed, onToggleCollapse]);
++
++   const modulos = MODULOS_REGISTRY.filter(m =>
++     !m.hidden && podeVisualizarModulo(m, { permissoes, role }),
++   );
++
++   const buscaNormalizada = normalizarTexto(busca);
++   const modulosVisiveis = buscaNormalizada
++     ? modulos.filter(m =>
++         [m.label, m.id, m.tag, m.desc, ...(m.aliases ?? [])]
++           .filter((valor): valor is string => Boolean(valor))
++           .some(valor => normalizarTexto(valor).includes(buscaNormalizada)),
++       )
++     : modulos;
++
++   const adminModulos = isAdmin ? modulosVisiveis.filter(m => m.category === 'admin') : [];
++   const nonAdminModulos = isAdmin ? modulosVisiveis.filter(m => m.category !== 'admin') : modulosVisiveis;
++   const pinnedModulos = pinnedIds
++     .map(id => nonAdminModulos.find(m => m.id === id))
++     .filter((m): m is typeof nonAdminModulos[number] => !!m);
++   const unpinnedModulos = nonAdminModulos.filter(m => !pinnedIds.includes(m.id));
++   const nenhumResultado = buscaNormalizada.length > 0 && modulosVisiveis.length === 0;
++
++   // Módulos soltos (sem grupo funcional) renderizam como itens de topo, fora de qualquer gaveta
++   const modulosSoltos = unpinnedModulos.filter(m => !m.grupo);
++   // Grupos com pelo menos 1 módulo visível — grupo sem nenhum módulo (ex: sem permissão) não renderiza
++   const gruposComModulos = GRUPOS_SIDEBAR
++     .map(grupo => ({ grupo, itens: unpinnedModulos.filter(m => m.grupo === grupo.id) }))
++     .filter(g => g.itens.length > 0);
++   // Durante busca ativa, grupos com resultado abrem automaticamente (sem sobrescrever o estado manual)
++   const gruposEfetivamenteAbertos = buscaNormalizada
++     ? new Set([...openGroups, ...gruposComModulos.map(g => g.grupo.id)])
++     : openGroups;
++
++   const adminCat = CATEGORIAS.find(c => c.id === 'admin');
++
++   const initials = nome?.substring(0, 2).toUpperCase() || 'OP';
++
++   // ── Item de módulo individual — reaproveitado por soltos, agrupados e collapsed ──
++   // `compact`: variante menor/centralizada usada dentro de uma gaveta aberta em modo collapsed.
++   const renderModuloItem = (mod: ModuloRegistryItem, compact = false) => {
++     const Icon = ICON_MAP[mod.iconName] ?? FileText;
++     const isActive = effectiveUrl === mod.href || effectiveUrl.startsWith(mod.href + '/');
++     const isOpen = !isActive && openUrls.some(u => u === mod.href || u.startsWith(mod.href + '/'));
++     const isPinned = pinnedIds.includes(mod.id);
++     const activeClass = isActive
++       ? ACTIVE_BG[mod.category]
++       : isOpen
++       ? 'text-slate-400 bg-white/[0.03] border-white/[0.07] hover:text-white hover:bg-white/5'
++       : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
++
++     return (
++       <div
++         key={mod.id}
++         className="relative group/item"
++         onMouseEnter={(e) => showTooltip(e, mod.label, mod.category)}
++         onMouseLeave={hideTooltip}
++       >
++         <Link
++           href={mod.href}
++           aria-label={mod.label}
++           onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab(mod.href, mod.label); } : undefined}
++           className={`
++             flex items-center gap-3 rounded-xl border transition-all duration-200 group
++             ${isCollapsed ? 'justify-center' : 'px-3 py-2.5 pr-8'}
++             ${compact ? 'p-1.5 mx-auto w-fit' : isCollapsed ? 'px-3 py-2.5' : ''}
++             ${activeClass}
++           `}
++         >
++           <Icon
++             size={compact ? 14 : isCollapsed ? 16 : 19}
++             className={`shrink-0 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`}
++           />
++           {!isCollapsed && (
++             <span
++               style={{ fontFamily: 'var(--font-sf-pro-sidebar)' }}
++               className="text-[11.5px] font-black uppercase tracking-tight truncate leading-none"
++             >
++               {mod.label}
++             </span>
++           )}
++           {isActive && !isCollapsed && (
++             <div className="ml-auto w-1.5 h-1.5 rounded-full bg-current shrink-0" />
++           )}
++           {isOpen && !isCollapsed && (
++             <div className="ml-auto w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" title="Aba aberta em background" />
++           )}
++           {isOpen && isCollapsed && (
++             <div className="absolute bottom-1 right-1 w-1 h-1 rounded-full bg-slate-500" />
++           )}
++         </Link>
++         {!isCollapsed && (
++           <button
++             onClick={e => { e.preventDefault(); togglePin(mod.id); }}
++             title={isPinned ? 'Desafixar' : 'Fixar no topo'}
++             className={`
++               absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-all duration-200
++               ${isPinned
++                 ? 'text-amber-400 opacity-100'
++                 : 'text-slate-600 opacity-0 group-hover/item:opacity-100 hover:text-amber-400'}
++             `}
++           >
++             <Pin size={11} className={isPinned ? 'fill-amber-400' : ''} />
++           </button>
++         )}
++       </div>
++     );
++   };
++
++   // ── Item de link externo — mesmo padrão visual de renderModuloItem, mas <a target="_blank">
++   //    (não é rota interna) + controles de editar/excluir só para admin. ──
++   const renderLinkExternoItem = (link: LinkExternoEditavel, compact = false) => {
++     const Icon = ICON_MAP[link.iconName] ?? Globe;
++
++     return (
++       <div
++         key={link.id}
++         className="relative group/item"
++         onMouseEnter={(e) => showTooltip(e, link.label, 'infra')}
++         onMouseLeave={hideTooltip}
++       >
++         <a
++           href={link.url}
++           onClick={(e) => {
++             e.preventDefault();
++             if (onOpenTab) onOpenTab(link.url, link.label);
++             else window.open(link.url, '_blank', 'noopener,noreferrer');
++           }}
++           aria-label={link.label}
++           className={`
++             flex items-center gap-3 rounded-xl border transition-all duration-200 group
++             ${isCollapsed ? 'justify-center' : 'px-3 py-2.5'}
++             ${compact ? 'p-1.5 mx-auto w-fit' : isCollapsed ? 'px-3 py-2.5' : ''}
++             ${isAdmin && !isCollapsed ? 'pr-8' : ''}
++             text-slate-500 hover:text-white hover:bg-white/5 border-transparent
++           `}
++         >
++           <Icon
++             size={compact ? 14 : isCollapsed ? 16 : 19}
++             className="shrink-0 transition-transform duration-200 group-hover:scale-110"
++           />
++           {!isCollapsed && (
++             <span
++               style={{ fontFamily: 'var(--font-sf-pro-sidebar)' }}
++               className="text-[11.5px] font-black uppercase tracking-tight truncate leading-none"
++             >
++               {link.label}
++             </span>
++           )}
++         </a>
++         {isAdmin && !isCollapsed && (
++           <button
++             onClick={(e) => { e.preventDefault(); if (linksGestaoCarregado) abrirModalEditarLink(link); }}
++             disabled={!linksGestaoCarregado}
++             title={linksGestaoCarregado ? 'Editar ou excluir' : 'Carregando...'}
++             className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-600 opacity-0 group-hover/item:opacity-100 hover:text-white transition-all duration-200 disabled:cursor-wait disabled:hover:text-slate-600"
++           >
++             <Pencil size={11} />
++           </button>
++         )}
++       </div>
++     );
++   };
++
++   // ── Sidebar inner content ──
++   const SidebarContent = (
++     <div className={`flex flex-col h-full ${sfProDisplay.variable}`}>
++       {/* Logo */}
++       <div className="flex items-center h-16 shrink-0 border-b border-white/5 px-4 justify-between">
++         {isCollapsed ? (
++           <Link
++             href="/PainelAlpha"
++             onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab('/PainelAlpha', 'Início'); } : undefined}
++             className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
++           >
++             <Image src="/A.PNG" alt="Logo" width={32} height={32} className="object-contain" />
++           </Link>
++         ) : (
++           <Link
++             href="/PainelAlpha"
++             onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab('/PainelAlpha', 'Início'); } : undefined}
++             className="flex items-center gap-3 min-w-0"
++           >
++             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0">
++               <Image src="/A.PNG" alt="Logo" width={32} height={32} className="object-contain" />
++             </div>
++             <span className="text-white font-black uppercase italic tracking-tighter text-sm truncate">
++               Painel<span className={tema.text}>Alpha</span>
++             </span>
++           </Link>
++         )}
++         {onToggleCollapse && (
++           <button
++             onClick={onToggleCollapse}
++             title={isCollapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
++             className="p-1.5 rounded-xl text-slate-600 hover:text-white hover:bg-white/5 transition-all cursor-pointer shrink-0"
++           >
++             {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
++           </button>
++         )}
++       </div>
++
++       {/* Busca de módulos */}
++       {!isCollapsed && (
++         <div className="shrink-0 px-2 pt-3">
++           <div className="relative">
++             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
++             <input
++               type="text"
++               value={busca}
++               onChange={(e) => setBusca(e.target.value)}
++               placeholder="Buscar módulo..."
++               aria-label="Buscar módulo"
++               className="w-full h-9 pl-8 pr-3 rounded-xl bg-white/5 border border-white/5 text-[11px] font-medium text-white placeholder:text-slate-600 outline-none focus:border-white/15 focus:bg-white/[0.07] transition-all"
++             />
++           </div>
++         </div>
++       )}
++
++       {/* Nav */}
++       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-0.5 custom-scrollbar">
++         {nenhumResultado && (
++           <p className="px-3 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
++             Nenhum módulo encontrado
++           </p>
++         )}
++
++         {/* Pinned — sempre no topo, fora de qualquer gaveta */}
++         {pinnedModulos.map(mod => renderModuloItem(mod))}
++
++         {/* Módulos soltos (sem grupo funcional) */}
++         {modulosSoltos.map(mod => renderModuloItem(mod))}
++
++         {/* Grupos funcionais — accordion (expandido) ou gaveta de ícone único (collapsed) */}
++         {gruposComModulos.map(({ grupo, itens }, idx) => {
++           const GrupoIcon = ICON_MAP[grupo.iconName] ?? Layers;
++           const isGrupoAberto = gruposEfetivamenteAbertos.has(grupo.id);
++
++           if (isCollapsed) {
++             const grupoActiveClass = itens.some(mod => effectiveUrl === mod.href || effectiveUrl.startsWith(mod.href + '/'))
++               ? ACTIVE_BG[itens[0].category]
++               : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
++
++             return (
++               <div key={grupo.id}>
++                 {idx > 0 && (
++                   <div className="flex justify-center my-1">
++                     <div className="w-4 h-px bg-white/10" />
++                   </div>
++                 )}
++                 <button
++                   onClick={() => toggleGroup(grupo.id)}
++                   onMouseEnter={(e) => showTooltip(e, grupo.label, itens[0].category)}
++                   onMouseLeave={hideTooltip}
++                   aria-expanded={isGrupoAberto}
++                   aria-controls={`grupo-painel-collapsed-${grupo.id}`}
++                   aria-label={grupo.label}
++                   className={`flex items-center justify-center w-full px-3 py-2.5 rounded-xl border transition-all duration-200 ${grupoActiveClass}`}
++                 >
++                   <GrupoIcon size={16} className="shrink-0" />
++                 </button>
++                 {isGrupoAberto && (
++                   <div id={`grupo-painel-collapsed-${grupo.id}`} className="flex flex-col items-center gap-0.5 py-1">
++                     {itens.map(mod => renderModuloItem(mod, true))}
++                   </div>
++                 )}
++               </div>
++             );
++           }
++
++           return (
++             <div key={grupo.id} className="pt-1">
++               <button
++                 onClick={() => toggleGroup(grupo.id)}
++                 aria-expanded={isGrupoAberto}
++                 aria-controls={`grupo-painel-${grupo.id}`}
++                 className="flex items-center gap-2 px-3 py-2 w-full rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all duration-200 group"
++               >
++                 <GrupoIcon size={15} className="shrink-0" />
++                 <span
++                   style={{ fontFamily: 'var(--font-sf-pro-sidebar)' }}
++                   className="text-[10px] font-black uppercase tracking-[0.2em] truncate"
++                 >
++                   {grupo.label}
++                 </span>
++                 <ChevronDown
++                   size={14}
++                   className={`ml-auto shrink-0 transition-transform duration-200 ${isGrupoAberto ? 'rotate-180' : ''}`}
++                 />
++               </button>
++               {isGrupoAberto && (
++                 <div id={`grupo-painel-${grupo.id}`} className="space-y-0.5 pl-1 pt-0.5">
++                   {itens.map(mod => renderModuloItem(mod))}
++                 </div>
++               )}
++             </div>
++           );
++         })}
++
++         {/* Sistema Externo — bloco separado dos 10 grupos: dado dinâmico (não MODULOS_REGISTRY),
++             sempre visível pra admin mesmo vazio, com controles de criar/editar/excluir. */}
++         {(links.length > 0 || isAdmin) && (() => {
++           const isGrupoAberto = openGroups.has('sistemaExterno');
++
++           if (isCollapsed) {
++             return (
++               <div key="sistemaExterno">
++                 {gruposComModulos.length > 0 && (
++                   <div className="flex justify-center my-1">
++                     <div className="w-4 h-px bg-white/10" />
++                   </div>
++                 )}
++                 <button
++                   onClick={() => toggleGroup('sistemaExterno')}
++                   onMouseEnter={(e) => showTooltip(e, 'Sistema Externo', 'infra')}
++                   onMouseLeave={hideTooltip}
++                   aria-expanded={isGrupoAberto}
++                   aria-controls="grupo-painel-collapsed-sistemaExterno"
++                   aria-label="Sistema Externo"
++                   className="flex items-center justify-center w-full px-3 py-2.5 rounded-xl border transition-all duration-200 text-slate-500 hover:text-white hover:bg-white/5 border-transparent"
++                 >
++                   <Globe size={16} className="shrink-0" />
++                 </button>
++                 {isGrupoAberto && (
++                   <div id="grupo-painel-collapsed-sistemaExterno" className="flex flex-col items-center gap-0.5 py-1">
++                     {links.map(link => renderLinkExternoItem(link, true))}
++                   </div>
++                 )}
++               </div>
++             );
++           }
++
++           return (
++             <div key="sistemaExterno" className="pt-1">
++               <div className="flex items-center gap-2 px-3 py-2 w-full rounded-xl text-slate-500 group">
++                 <button
++                   onClick={() => toggleGroup('sistemaExterno')}
++                   aria-expanded={isGrupoAberto}
++                   aria-controls="grupo-painel-sistemaExterno"
++                   className="flex items-center gap-2 flex-1 min-w-0 hover:text-white transition-colors duration-200"
++                 >
++                   <Globe size={15} className="shrink-0" />
++                   <span
++                     style={{ fontFamily: 'var(--font-sf-pro-sidebar)' }}
++                     className="text-[10px] font-black uppercase tracking-[0.2em] truncate"
++                   >
++                     Sistema Externo
++                   </span>
++                 </button>
++                 {isAdmin && (
++                   <button
++                     onClick={(e) => { e.stopPropagation(); abrirModalCriarLink(); }}
++                     title="Adicionar sistema externo"
++                     className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition-colors shrink-0"
++                   >
++                     <Plus size={13} />
++                   </button>
++                 )}
++                 <button
++                   onClick={() => toggleGroup('sistemaExterno')}
++                   aria-label="Expandir Sistema Externo"
++                   className="shrink-0"
++                 >
++                   <ChevronDown
++                     size={14}
++                     className={`transition-transform duration-200 hover:text-white ${isGrupoAberto ? 'rotate-180' : ''}`}
++                   />
++                 </button>
++               </div>
++               {isGrupoAberto && (
++                 <div id="grupo-painel-sistemaExterno" className="space-y-0.5 pl-1 pt-0.5">
++                   {links.length === 0 && isAdmin && (
++                     <button
++                       onClick={abrirModalCriarLink}
++                       className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-xl border border-dashed border-white/10 text-slate-500 hover:text-white hover:border-white/20 transition-all duration-200 text-[10px] font-black uppercase tracking-tight"
++                     >
++                       <Plus size={14} />
++                       Inserir sistema externo
++                     </button>
++                   )}
++                   {links.map(link => renderLinkExternoItem(link))}
++                 </div>
++               )}
++             </div>
++           );
++         })()}
++
++         <ModalLinkExterno
++           open={modalLinkAberto}
++           onClose={fecharModalLink}
++           linkEmEdicao={linkEmEdicao}
++           onSalvo={handleLinkSalvo}
++           onExcluido={handleLinkExcluido}
++         />
++
++         {/* Admin section — only if admin has modules */}
++         {isAdmin && adminModulos.length > 0 && (
++           <div className="pt-4">
++             {!isCollapsed && adminCat && (
++               <div className="flex items-center gap-2 px-3 mb-2">
++                 {(() => { const CatIcon = ICON_MAP[adminCat.iconName] ?? Layers; return <CatIcon size={11} className={CAT_COLORS['admin']} />; })()}
++                 <span className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">
++                   {adminCat.label}
++                 </span>
++                 <div className="flex-1 h-px bg-white/5" />
++               </div>
++             )}
++             {isCollapsed && (
++               <div className="flex justify-center mb-1">
++                 <div className="w-4 h-px bg-white/10" />
++               </div>
++             )}
++             <div className="space-y-0.5">
++               {adminModulos.map(mod => {
++                 const Icon = ICON_MAP[mod.iconName] ?? FileText;
++                 const isActive = effectiveUrl === mod.href || effectiveUrl.startsWith(mod.href + '/');
++                 const activeClass = isActive ? ACTIVE_BG['admin'] : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent';
++
++                 return (
++                   <div
++                     key={mod.id}
++                     className="relative"
++                     onMouseEnter={(e) => showTooltip(e, mod.label, 'admin')}
++                     onMouseLeave={hideTooltip}
++                   >
++                   <Link
++                     href={mod.href}
++                     aria-label={mod.label}
++                     onClick={onOpenTab ? (e) => { e.preventDefault(); onOpenTab(mod.href, mod.label); } : undefined}
++                     className={`
++                       flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200 group
++                       ${isCollapsed ? 'justify-center' : ''}
++                       ${activeClass}
++                     `}
++                   >
++                     <Icon
++                       size={16}
++                       className={`shrink-0 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`}
++                     />
++                     {!isCollapsed && (
++                       <span className="text-[10px] font-black uppercase tracking-tight truncate leading-none">
++                         {mod.label}
++                       </span>
++                     )}
++                     {isActive && !isCollapsed && (
++                       <div className="ml-auto w-1.5 h-1.5 rounded-full bg-current shrink-0" />
++                     )}
++                   </Link>
++                   </div>
++                 );
++               })}
++             </div>
++           </div>
++         )}
++       </nav>
++
++       {/* Footer: avatar + dropdown */}
++       <div className={`shrink-0 border-t border-white/5 p-3 flex flex-col gap-1 ${isCollapsed ? 'items-center' : ''}`}>
++         <DropdownMenu>
++           <DropdownMenuTrigger asChild>
++             <button
++               title={isCollapsed ? nome : undefined}
++               className={`flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all group w-full outline-none cursor-pointer ${isCollapsed ? 'justify-center' : ''}`}
++             >
++               <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
++                 {imagemUrl ? (
++                   <Image src={imagemUrl} alt={nome} width={32} height={32} className="object-cover w-full h-full" unoptimized />
++                 ) : (
++                   <span className="text-blue-400 font-black text-[9px]">{initials}</span>
++                 )}
++               </div>
++               {!isCollapsed && (
++                 <div className="min-w-0 flex-1 text-left">
++                   <p className="text-[10px] font-black text-white uppercase italic tracking-tight truncate">{nome}</p>
++                   <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest truncate">{role}</p>
++                 </div>
++               )}
++             </button>
++           </DropdownMenuTrigger>
++
++           <DropdownMenuContent
++             side="top"
++             align="start"
++             sideOffset={8}
++             className="w-64 bg-[#0b1120]/95 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[200]"
++           >
++             <DropdownMenuLabel className="p-3 mb-2">
++               <div className="flex flex-col gap-1">
++                 <span className="text-[9px] font-black text-blue-500 uppercase tracking-[0.3em]">Painel Alpha</span>
++                 <span className="text-sm font-black text-white uppercase italic truncate">{nome}</span>
++                 <div className="flex items-center gap-2 mt-1">
++                   <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
++                   <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest italic">Online</span>
++                 </div>
++               </div>
++             </DropdownMenuLabel>
++
++             <DropdownMenuSeparator className="bg-white/5 mx-2" />
++
++             <div className="py-3 space-y-2">
++               <DropdownMenuItem
++                 onClick={() => onOpenTab?.('/PainelAlpha/InfosPerfil/Perfil', 'Meu Dossiê')}
++                 className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-blue-500/30 hover:bg-blue-600/10 hover:text-blue-400 focus:bg-blue-600/10 focus:text-blue-400 transition-all duration-300 group outline-none"
++               >
++                 <User size={16} className="group-hover:rotate-12 transition-transform" />
++                 <span className="text-[10px] font-black uppercase tracking-widest italic">Meu Dossiê</span>
++               </DropdownMenuItem>
++
++               <SeletorTemaSubmenu />
++             </div>
++
++             {isAdmin && (
++               <>
++                 <DropdownMenuSeparator className="bg-white/5 mx-2" />
++                 <div className="py-3 space-y-2">
++                   <DropdownMenuItem
++                     onClick={() => setIsBroadcastOpen(true)}
++                     className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-amber-500/30 hover:bg-amber-600/10 hover:text-amber-400 focus:bg-amber-600/10 focus:text-amber-400 transition-all duration-300 group outline-none"
++                   >
++                     <Megaphone size={16} className="text-amber-500 group-hover:scale-110 transition-transform" />
++                     <span className="text-[10px] font-black uppercase tracking-widest italic">Broadcast</span>
++                   </DropdownMenuItem>
++                   <DropdownMenuItem
++                     onClick={() => onOpenTab?.('/PainelAlpha/UsuariosOnline', 'Agentes Online')}
++                     className="flex items-center gap-3 p-3 rounded-2xl text-slate-400 cursor-pointer border border-transparent hover:border-emerald-500/30 hover:bg-emerald-600/10 hover:text-emerald-400 focus:bg-emerald-600/10 focus:text-emerald-400 transition-all duration-300 group outline-none"
++                   >
++                     <Activity size={16} className="text-emerald-500 group-hover:scale-110 transition-transform" />
++                     <span className="text-[10px] font-black uppercase tracking-widest italic">Agentes Online</span>
++                   </DropdownMenuItem>
++                 </div>
++               </>
++             )}
++
++             <DropdownMenuSeparator className="bg-white/5 mx-2" />
++
++             <div className="p-2 mt-2">
++               <LogoutButton variant="inline" />
++             </div>
++           </DropdownMenuContent>
++         </DropdownMenu>
++
++         {temAcessoNotas && <NotesLauncherButton isCollapsed={isCollapsed} />}
++       </div>
++     </div>
++   );
++
++   return (
++     <>
++       <ModalBroadcast
++         isOpen={isBroadcastOpen}
++         onClose={() => setIsBroadcastOpen(false)}
++         style={tema}
++       />
++
++       {/* ── Desktop sidebar ── */}
++       <aside
++         ref={asideRef}
++         className={`
++           hidden lg:flex flex-col fixed left-0 top-0 z-50 h-dvh
++           bg-[#060c1a]/95 backdrop-blur-xl border-r border-white/5
++           transition-all duration-250 ease-in-out
++           ${isCollapsed ? 'w-[72px]' : 'w-[260px]'}
++         `}
++       >
++         {SidebarContent}
++
++         {/* Tooltip customizado — renderizado fora do nav para escapar do overflow:hidden */}
++         <AnimatePresence>
++           {isCollapsed && tooltip && (
++             <motion.div
++               key={tooltip.label}
++               className="absolute pointer-events-none"
++               style={{ left: 80, top: tooltip.top, transform: 'translateY(-50%)', zIndex: 200 }}
++               initial={{ opacity: 0, x: -8 }}
++               animate={{ opacity: 1, x: 0 }}
++               exit={{ opacity: 0, x: -4 }}
++               transition={{ duration: 0.14, ease: 'easeOut' }}
++             >
++               {/* Seta apontando para o ícone */}
++               <div
++                 className="absolute right-full top-1/2 -translate-y-1/2"
++                 style={{
++                   width: 0,
++                   height: 0,
++                   borderRight: '5px solid rgba(14, 20, 38, 0.97)',
++                   borderTop: '4px solid transparent',
++                   borderBottom: '4px solid transparent',
++                 }}
++               />
++               {/* Conteúdo */}
++               <div
++                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl whitespace-nowrap"
++                 style={{
++                   background: 'rgba(8, 14, 28, 0.97)',
++                   border: `1px solid rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 0.2)`,
++                   boxShadow: `0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03), 0 0 12px rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 0.08)`,
++                 }}
++               >
++                 <span
++                   className="w-1.5 h-1.5 rounded-full shrink-0"
++                   style={{
++                     background: `rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 1)`,
++                     boxShadow: `0 0 6px rgba(${TOOLTIP_ACCENT[tooltip.category] ?? '148,163,184'}, 0.7)`,
++                   }}
++                 />
++                 <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.85)' }}>
++                   {tooltip.label}
++                 </span>
++               </div>
++             </motion.div>
++           )}
++         </AnimatePresence>
++       </aside>
++
++       {/* ── Mobile: hamburger trigger (rendered in layout) + drawer ── */}
++       <AnimatePresence>
++         {isMobileOpen && (
++           <>
++             {/* Backdrop */}
++             <motion.div
++               key="backdrop"
++               initial={{ opacity: 0 }}
++               animate={{ opacity: 1 }}
++               exit={{ opacity: 0 }}
++               transition={{ duration: 0.2 }}
++               className="lg:hidden fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm"
++               onClick={onCloseMobile}
++               aria-hidden
++             />
++
++             {/* Drawer */}
++             <motion.aside
++               key="drawer"
++               initial={{ x: -280 }}
++               animate={{ x: 0 }}
++               exit={{ x: -280 }}
++               transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
++               className="lg:hidden fixed left-0 top-0 bottom-0 z-[70] w-[260px] bg-[#060c1a] border-r border-white/5 flex flex-col"
++             >
++               <button
++                 onClick={onCloseMobile}
++                 aria-label="Fechar menu"
++                 className="absolute top-4 right-4 p-2 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
++               >
++                 <X size={18} />
++               </button>
++               {SidebarContent}
++             </motion.aside>
++           </>
++         )}
++       </AnimatePresence>
++     </>
++   );
++ }
++
++ // ── Hamburger button (used in header on mobile) ────────────
++ export function SidebarMobileToggle({ onClick }: { onClick: () => void }) {
++   return (
++     <button
++       onClick={onClick}
++       aria-label="Abrir menu"
++       className="lg:hidden p-2.5 rounded-xl bg-white/5 border border-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
++     >
++       <PanelLeft size={18} />
++     </button>
++   );
++ }
++
+
+ ❯ tests/alpha-seo/integration-wiring.test.ts:89:21
+     87|       expect(consumer).toContain("MODULOS_REGISTRY");
+     88|     }
+     89|     expect(sidebar).toContain("[...pinnedModulos, ...unpinnedModulos].…
+       |                     ^
+     90|     expect(sidebar).toContain("onOpenTab(mod.href, mod.label)");
+     91|     expect(layout).toContain("onOpenTab={openTab}");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/50]⎯
+
+ FAIL  tests/alpha-seo/inventory.test.ts > Alpha SEO source inventory > freezes 46/46 unique named source registrations without synthetic tools
+Error: OpenSEO source checkout is empty or unavailable
+ ❯ buildAlphaSeoSourceManifest src/lib/alpha-seo/inventory.ts:193:33
+    191|   if (basename !== "open-seo-main") throw new Error("Source root must …
+    192|   const files = await existingFiles(sourceRoot);
+    193|   if (files.length === 0) throw new Error("OpenSEO source checkout is …
+       |                                 ^
+    194|
+    195|   const contents = new Map<string, string>();
+ ❯ tests/alpha-seo/inventory.test.ts:15:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/50]⎯
+
+ FAIL  tests/alpha-seo/inventory.test.ts > Alpha SEO source inventory > is deterministic and sanitizes the absolute source location
+Error: OpenSEO source checkout is empty or unavailable
+ ❯ buildAlphaSeoSourceManifest src/lib/alpha-seo/inventory.ts:193:33
+    191|   if (basename !== "open-seo-main") throw new Error("Source root must …
+    192|   const files = await existingFiles(sourceRoot);
+    193|   if (files.length === 0) throw new Error("OpenSEO source checkout is …
+       |                                 ^
+    194|
+    195|   const contents = new Map<string, string>();
+ ❯ tests/alpha-seo/inventory.test.ts:64:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/50]⎯
+
+ FAIL  tests/alpha-seo/schema-draft.test.ts > Alpha SEO Prisma promotion > preserves every non-AlphaSEO candidate model after runtime promotion
+AssertionError: expected [ 'Apresentacao', …(175) ] to deeply equal [ 'Apresentacao', …(240) ]
+
+- Expected
++ Received
+
+@@ -17,74 +17,28 @@
+    "BlueprintFile",
+    "BlueprintMember",
+    "BlueprintProject",
+    "BlueprintQuestion",
+    "BlueprintRequirement",
+-   "BpmAutomacao",
+-   "BpmAutomacaoAgenda",
+-   "BpmAutomacaoExecucao",
+-   "BpmAutomacaoLease",
+-   "BpmAutomacaoPassoExecucao",
+-   "BpmAutomacaoVersao",
+-   "BpmCadencia",
+-   "BpmCadenciaEtapa",
+-   "BpmCadenciaPasso",
+-   "BpmCadenciaPassoExecucao",
+    "BpmCampo",
+-   "BpmCampoAcesso",
+-   "BpmCampoEtapaConfig",
+-   "BpmCampoMapeamento",
+    "BpmCampoObrigatorioEtapa",
+-   "BpmCampoOcultoEtapa",
+-   "BpmCampoOpcao",
+-   "BpmCampoPipeline",
+-   "BpmCampoValorGlobal",
+    "BpmCard",
+    "BpmCardAnexo",
+-   "BpmCardCadencia",
+    "BpmCardCampoValor",
+-   "BpmCardChecklist",
+-   "BpmCardChecklistItem",
+-   "BpmCardEstado",
+-   "BpmCardFollowUpEstado",
+    "BpmCardHistorico",
+    "BpmCardMembro",
+-   "BpmCardReuniao",
+-   "BpmCardServicoContexto",
+    "BpmCardVinculo",
+    "BpmChecklistFollowUp",
+    "BpmChecklistFollowUpPergunta",
+-   "BpmChecklistTemplate",
+-   "BpmChecklistTemplateEtapa",
+-   "BpmChecklistTemplateItem",
+    "BpmEtapa",
+-   "BpmEtapaFormulario",
+    "BpmEtapaTransicaoPermitida",
+-   "BpmEtapaVisibilidade",
+-   "BpmEventoDominio",
+-   "BpmFormularioComponente",
+-   "BpmFormularioSecao",
+    "BpmInteracaoCard",
+    "BpmPipeline",
+    "BpmPipelineConfigAuditoria",
+-   "BpmPipelineConhecimentoLink",
+    "BpmPipelineSetor",
+-   "BpmRegra",
+-   "BpmRegraVersao",
+-   "BpmRequisito",
+-   "BpmSlaAlertaLimite",
+-   "BpmSlaConfig",
+-   "BpmSlaDisparo",
+-   "BpmSlaEventoLog",
+-   "BpmSlaInstancia",
+-   "BpmSubStatus",
+    "BpmTarefa",
+    "BpmTarefaPreset",
+-   "BpmTransicaoEtapa",
+-   "BpmTransicaoExecucao",
+-   "BpmWebhookEndpoint",
+-   "BpmWebhookEntrada",
+    "BusinessProcess",
+    "CargoColaborador",
+    "Categoria",
+    "Checklist",
+    "ChecklistDocumental",
+@@ -92,11 +46,10 @@
+    "ClienteOperacional",
+    "ClienteServico",
+    "ClienteServicoHistorico",
+    "ClienteServicoLogCs",
+    "ClienteServicoLogFeedback",
+-   "ComercialCheckInDiario",
+    "ComercialPerformance",
+    "CommissionAuditLog",
+    "CommissionDivergence",
+    "CommissionEntry",
+    "CommissionEvent",
+@@ -111,17 +64,12 @@
+    "Curso",
+    "CursoModulo",
+    "CursoSetor",
+    "DiretrizSala",
+    "DocumentoChecklist",
+-   "DocumentoClasula",
+-   "DocumentoClasulaGerada",
+-   "DocumentoGerado",
+-   "DocumentoTemplate",
+    "DocumentoUnidade",
+    "EligibilityOverride",
+-   "EmpresaContratada",
+    "EntryComponent",
+    "ExportDocument",
+    "ExportDocumentItem",
+    "Extratos",
+    "GoogleCalendarAlertaCompromisso",
+@@ -132,30 +80,25 @@
+    "GoogleCalendarPermissaoColegas",
+    "GoogleCalendarPushChannel",
+    "GoogleCalendarSelecionado",
+    "GoogleCalendarSolicitacaoCompartilhamento",
+    "GoogleCalendarSyncLease",
+-   "GoogleCalendarTaskCache",
+-   "GoogleCalendarTaskListCache",
+-   "GoogleCalendarTaskSchedule",
+    "HistoricoAlteracaoCliente",
+    "Holerite",
+    "HoleriteAlertaHistorico",
+    "Holiday",
+    "Indicacao",
+    "ItemChecklist",
+    "JustificativaMeta",
+-   "LinkExterno",
+    "ListaCompra",
+    "ManualAdjustment",
+    "MensagensChamado",
+    "MetaEquipe",
+    "MetaUsuario",
+    "ModalidadeContrato",
+    "ModeloItemChecklist",
+    "ModuloVideo",
+-   "NolossLead",
+    "Note",
+    "NoteAttachment",
+    "NoteComment",
+    "NoteContext",
+    "NotePermission",
+@@ -174,15 +117,11 @@
+    "OperacionalClientes",
+    "Parceiro",
+    "ParceiroAcesso",
+    "ParceiroConfig",
+    "ParceiroEndereco",
+-   "ParceiroHistorico",
+-   "ParceiroLead",
+-   "ParceiroLeadHistorico",
+    "ParceiroRepresentante",
+-   "ParceiroTarefa",
+    "ParceiroTermo",
+    "PastaChecklist",
+    "Payment",
+    "PaymentAllocation",
+    "Pergunta",
+@@ -196,17 +135,13 @@
+    "ProdutoEstoque",
+    "ProgressoAula",
+    "ProgressoVideo",
+    "ProtocoloTemplate",
+    "ResultadoProva",
+-   "RoadmapApiKey",
+    "RoadmapDocumentationAttempt",
+    "RoadmapDocumentationJob",
+-   "RoadmapDocumentationWorkerLock",
+    "RoadmapObjective",
+-   "RoadmapProductionEvent",
+-   "RoadmapProductionRun",
+    "RoadmapPromptArtifact",
+    "RoadmapWorkspace",
+    "ServicosComerciais",
+    "Setor",
+    "SetorPermissao",
+
+ ❯ tests/alpha-seo/schema-draft.test.ts:79:33
+     77|       .sort();
+     78|
+     79|     expect(candidateBaseModels).toEqual(runtimeModels);
+       |                                 ^
+     80|   });
+     81|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/50]⎯
+
+ FAIL  tests/cs-nps/origens-lead.test.ts > persistência das novas origens (Fase 3.6 do Cliente Master) > salva Discadora integralmente na edição
+ FAIL  tests/cs-nps/origens-lead.test.ts > persistência das novas origens (Fase 3.6 do Cliente Master) > salva Prospecção ativa (Log Comex) integralmente na edição
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "tx.clienteServico.update is not a function",
++   "success": false,
+  }
+
+ ❯ tests/cs-nps/origens-lead.test.ts:114:23
+    112|     });
+    113|
+    114|     expect(resultado).toEqual({ success: true });
+       |                       ^
+    115|     expect(prismaMock.clienteServico.update).toHaveBeenCalledWith({
+    116|       where: { id: 10 },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/50]⎯
+
+ FAIL  tests/gerador-documentos/empresas-contratadas.test.ts > CriarEmpresaContratada > cria com sucesso quando o CNPJ é novo
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "empresaId": "empresa-1",
+-   "success": true,
++   "error": "Dados inválidos",
++   "success": false,
+  }
+
+ ❯ tests/gerador-documentos/empresas-contratadas.test.ts:62:23
+     60|     const resultado = await CriarEmpresaContratada(PAYLOAD_VALIDO);
+     61|
+     62|     expect(resultado).toEqual({ success: true, empresaId: "empresa-1" …
+       |                       ^
+     63|     expect(mocks.createEmpresa).toHaveBeenCalledTimes(1);
+     64|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/50]⎯
+
+ FAIL  tests/gerador-documentos/empresas-contratadas.test.ts > CriarEmpresaContratada > rejeita CNPJ duplicado sem chamar create
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "CNPJ já cadastrado",
++   "error": "Dados inválidos",
+    "success": false,
+  }
+
+ ❯ tests/gerador-documentos/empresas-contratadas.test.ts:71:23
+     69|     const resultado = await CriarEmpresaContratada(PAYLOAD_VALIDO);
+     70|
+     71|     expect(resultado).toEqual({ success: false, error: "CNPJ já cadast…
+       |                       ^
+     72|     expect(mocks.createEmpresa).not.toHaveBeenCalled();
+     73|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/50]⎯
+
+ FAIL  tests/gerador-documentos/empresas-contratadas.test.ts > AtualizarEmpresaContratada > rejeita quando o novo CNPJ colide com outra empresa
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "CNPJ já cadastrado",
++   "error": "Dados inválidos",
+    "success": false,
+  }
+
+ ❯ tests/gerador-documentos/empresas-contratadas.test.ts:148:23
+    146|     });
+    147|
+    148|     expect(resultado).toEqual({ success: false, error: "CNPJ já cadast…
+       |                       ^
+    149|     expect(mocks.updateEmpresa).not.toHaveBeenCalled();
+    150|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/50]⎯
+
+ FAIL  tests/gerador-documentos/empresas-contratadas.test.ts > AtualizarEmpresaContratada > permite manter o mesmo CNPJ da própria empresa (findFirst exclui o próprio id)
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "Dados inválidos",
++   "success": false,
+  }
+
+ ❯ tests/gerador-documentos/empresas-contratadas.test.ts:162:23
+    160|     });
+    161|
+    162|     expect(resultado).toEqual({ success: true });
+       |                       ^
+    163|     expect(mocks.findFirstEmpresa).toHaveBeenCalledWith(
+    164|       expect.objectContaining({ where: expect.objectContaining({ id: {…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/50]⎯
+
+ FAIL  tests/bpm/criar-card-nova-empresa.test.ts > CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master) > cria o Cliente e o card atomicamente quando novaEmpresa é informado
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/bpm/criar-card-nova-empresa.test.ts:98:31
+     96|     });
+     97|
+     98|     expect(resultado.success).toBe(true);
+       |                               ^
+     99|     expect(prismaMock.cliente.create).toHaveBeenCalledWith({
+    100|       data: {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/50]⎯
+
+ FAIL  tests/bpm/criar-card-nova-empresa.test.ts > CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master) > continua vinculando empresa já existente via empresaId, sem criar Cliente novo
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/bpm/criar-card-nova-empresa.test.ts:161:31
+    159|     });
+    160|
+    161|     expect(resultado.success).toBe(true);
+       |                               ^
+    162|     expect(prismaMock.cliente.create).not.toHaveBeenCalled();
+    163|     expect(prismaMock.bpmCard.create).toHaveBeenCalledWith({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/50]⎯
+
+ FAIL  tests/bpm/criar-card-nova-empresa.test.ts > CriarCardBpm — cadastro de empresa nova (Fase 3.2 Cliente Master) > ignora payload legado sem validar nem persistir controles de etapa
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/bpm/criar-card-nova-empresa.test.ts:287:31
+    285|     });
+    286|
+    287|     expect(resultado.success).toBe(true);
+       |                               ^
+    288|     expect(validarValoresCamposBpmMock).not.toHaveBeenCalled();
+    289|     expect(carregarCamposObrigatoriosEtapaMock).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/50]⎯
+
+ FAIL  tests/bpm/fechado-actions.test.ts > actions de Fechado > move para Fechado inicializando somente status nulo e registra o status
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "Não foi possível concluir a transição.",
++   "success": false,
+  }
+
+ ❯ tests/bpm/fechado-actions.test.ts:208:23
+    206|     const resultado = await MoverCardBpm({ cardId: CARD_ID, etapaDesti…
+    207|
+    208|     expect(resultado).toEqual({ success: true });
+       |                       ^
+    209|     expect(prismaMock.bpmCard.updateMany).toHaveBeenCalledWith({
+    210|       where: expect.objectContaining({ updatedAt: UPDATED_AT }),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/50]⎯
+
+ FAIL  tests/bpm/fechado-actions.test.ts > actions de Fechado > preserva o status existente ao reentrar em Fechado
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ tests/bpm/fechado-actions.test.ts:234:62
+    232|     await MoverCardBpm({ cardId: CARD_ID, etapaDestinoId: FECHADO_ID }…
+    233|
+    234|     const chamada = prismaMock.bpmCard.updateMany.mock.calls[0][0];
+       |                                                              ^
+    235|     expect(chamada.data.statusPosFechamento).toBeUndefined();
+    236|     expect(chamada.data.etapaId).toBe(FECHADO_ID);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/50]⎯
+
+ FAIL  tests/bpm/fechado-actions.test.ts > actions de Fechado > faz o movimento do modal pelo mesmo executor, persistindo requisitos e status
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "Não foi possível concluir a transição.",
++   "success": false,
+  }
+
+ ❯ tests/bpm/fechado-actions.test.ts:259:23
+    257|     });
+    258|
+    259|     expect(resultado).toEqual({ success: true });
+       |                       ^
+    260|     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledTimes(…
+    261|     expect(prismaMock.bpmCard.updateMany).toHaveBeenCalledWith(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/50]⎯
+
+ FAIL  tests/bpm/fechado-actions.test.ts > actions de Fechado > revalida no servidor valor persistido inválido antes de mover
+AssertionError: expected 'Não foi possível concluir a transição.' to contain 'opção inválida'
+
+Expected: "opção inválida"
+Received: "Não foi possível concluir a transição."
+
+ ❯ tests/bpm/fechado-actions.test.ts:286:37
+    284|
+    285|     expect(resultado.success).toBe(false);
+    286|     expect(String(resultado.error)).toContain("opção inválida");
+       |                                     ^
+    287|     expect(prismaMock.bpmCard.updateMany).not.toHaveBeenCalled();
+    288|     expect(notificarPipelineBpmMock).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/50]⎯
+
+ FAIL  tests/bpm/fechado-actions.test.ts > actions de Fechado > revalida a configuração canônica dentro da transação
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "A configuração da etapa Fechado está inconsistente. Contate um administrador.",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/fechado-actions.test.ts:307:23
+    305|     const resultado = await MoverCardBpm({ cardId: CARD_ID, etapaDesti…
+    306|
+    307|     expect(resultado).toEqual({
+       |                       ^
+    308|       success: false,
+    309|       error: "A configuração da etapa Fechado está inconsistente. Cont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/50]⎯
+
+ FAIL  tests/bpm/fechado-ui.test.ts > CRM Fechado - representacao no board > preserva os estados de nunca acessado, drag, hover e comunicacao textual
+AssertionError: expected 8675 to be less than -1
+ ❯ tests/bpm/fechado-ui.test.ts:38:46
+     36|     expect(board).toContain("`${nomeEmpresa}. Status pós-fechamento: $…
+     37|     expect(board).toContain(": nomeEmpresa}");
+     38|     expect(board.indexOf("{...attributes}")).toBeLessThan(board.indexO…
+       |                                              ^
+     39|     expect(board.indexOf("{...listeners}")).toBeLessThan(board.indexOf…
+     40|     expect(board).toContain("statusConfig.label");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/50]⎯
+
+ FAIL  tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > mantém o comportamento de pipelines existentes quando não há regra cadastrada (fail-open)
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "Não foi possível concluir a transição.",
++   "success": false,
+  }
+
+ ❯ tests/bpm/kanban-transicao-integracao.test.ts:128:23
+    126|     const resultado = await MoverCardBpm({ cardId: CARD_ID, etapaDesti…
+    127|
+    128|     expect(resultado).toEqual({ success: true });
+       |                       ^
+    129|     expect(prismaMock.bpmCard.updateMany).toHaveBeenCalledWith(
+    130|       expect.objectContaining({ data: expect.objectContaining({ etapaI…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/50]⎯
+
+ FAIL  tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > bloqueia movimentação manual quando um admin desativou a transição, com mensagem clara
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Esta transição foi desativada pelo administrador.",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/kanban-transicao-integracao.test.ts:145:23
+    143|     const resultado = await MoverCardBpm({ cardId: CARD_ID, etapaDesti…
+    144|
+    145|     expect(resultado).toEqual({
+       |                       ^
+    146|       success: false,
+    147|       error: "Esta transição foi desativada pelo administrador.",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/50]⎯
+
+ FAIL  tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > bloqueia movimentação manual quando a transição é 'apenas automação', com mensagem clara
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Esta transição só é permitida pelo Motor de Automações.",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/kanban-transicao-integracao.test.ts:162:23
+    160|     const resultado = await MoverCardBpm({ cardId: CARD_ID, etapaDesti…
+    161|
+    162|     expect(resultado).toEqual({
+       |                       ^
+    163|       success: false,
+    164|       error: "Esta transição só é permitida pelo Motor de Automações.",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/50]⎯
+
+ FAIL  tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > preserva histórico ao mover em transição hoje válida (regressão de pipeline existente)
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/bpm/kanban-transicao-integracao.test.ts:190:48
+    188|     await MoverCardBpm({ cardId: CARD_ID, etapaDestinoId: DESTINO_ID }…
+    189|
+    190|     expect(prismaMock.bpmCardHistorico.create).toHaveBeenCalledTimes(1…
+       |                                                ^
+    191|     expect(notificarPipelineBpmMock).toHaveBeenCalled();
+    192|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/50]⎯
+
+ FAIL  tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > bloqueia o avanço quando o checklist real tem item obrigatório pendente
+AssertionError: expected 'Não foi possível concluir a transição.' to contain 'item obrigatório pendente'
+
+Expected: "item obrigatório pendente"
+Received: "Não foi possível concluir a transição."
+
+ ❯ tests/bpm/kanban-transicao-integracao.test.ts:206:29
+    204|
+    205|     expect(resultado).toMatchObject({ success: false });
+    206|     expect(resultado.error).toContain("item obrigatório pendente");
+       |                             ^
+    207|     expect(resultado.error).toContain("Anexar contrato");
+    208|     expect(prismaMock.bpmCard.updateMany).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/50]⎯
+
+ FAIL  tests/bpm/kanban-transicao-integracao.test.ts > Kanban — movimentação real respeita BpmTransicaoEtapa (Fase 4) > libera o mesmo avanço depois que o item obrigatório é concluído
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "Não foi possível concluir a transição.",
++   "success": false,
+  }
+
+ ❯ tests/bpm/kanban-transicao-integracao.test.ts:222:23
+    220|     const resultado = await MoverCardBpm({ cardId: CARD_ID, etapaDesti…
+    221|
+    222|     expect(resultado).toEqual({ success: true });
+       |                       ^
+    223|     expect(prismaMock.bpmCard.updateMany).toHaveBeenCalled();
+    224|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/50]⎯
+
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > permite drag quando o motivo válido já está persistido
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "Não foi possível concluir a transição.",
++   "success": false,
+  }
+
+ ❯ tests/bpm/lost-actions.test.ts:250:23
+    248|     const resultado = await MoverCardBpm({ cardId: CARD, etapaDestinoI…
+    249|
+    250|     expect(resultado).toEqual({ success: true });
+       |                       ^
+    251|     expect(prismaMock.bpmCardCampoValor.upsert).not.toHaveBeenCalled();
+    252|     expect(prismaMock.bpmCard.updateMany).toHaveBeenCalledWith(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/50]⎯
+
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > exige companion no modal para Outro e persiste ambos atomicamente
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Descreva o Motivo de Lost - Outro.",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/lost-actions.test.ts:280:22
+    278|       camposValores: { [MOTIVO]: "Outro" },
+    279|     });
+    280|     expect(semTexto).toEqual({ success: false, error: "Descreva o Moti…
+       |                      ^
+    281|
+    282|     const comTexto = await SalvarRequisitosEMoverCardBpm({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/50]⎯
+
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > falha fechada se a configuração mudar dentro da transação
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "A configuração da etapa Lost está inconsistente. Contate um administrador.",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/lost-actions.test.ts:306:23
+    304|       camposValores: { [MOTIVO]: "Sem resposta" },
+    305|     });
+    306|     expect(resultado).toEqual({
+       |                       ^
+    307|       success: false,
+    308|       error: "A configuração da etapa Lost está inconsistente. Contate…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/50]⎯
+
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > edita Lost com Outro sob CAS e rejeita limpeza do companion
+AssertionError: expected { success: false, …(1) } to deeply equal { success: true }
+
+- Expected
++ Received
+
+  {
+-   "success": true,
++   "error": "A configuração da etapa Lost está inconsistente. Contate um administrador.",
++   "success": false,
+  }
+
+ ❯ tests/bpm/lost-actions.test.ts:328:21
+    326|       camposValores: { [MOTIVO]: "Outro", [OUTRO]: "Decisão interna" },
+    327|     });
+    328|     expect(sucesso).toEqual({ success: true });
+       |                     ^
+    329|     expect(prismaMock.bpmCardCampoValor.upsert).toHaveBeenCalledTimes(…
+    330|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/50]⎯
+
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > nega participante explicitamente em 'MoverCardBpm' sem efeitos
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > nega participante explicitamente em 'SalvarRequisitosEMoverCardBpm' sem efeitos
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Não autorizado",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/lost-actions.test.ts:431:23
+    429|     const resultado = await executar();
+    430|
+    431|     expect(resultado).toEqual({ success: false, error: "Não autorizado…
+       |                       ^
+    432|     expect(acessoCardMock).toHaveBeenCalledWith(
+    433|       CARD,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/50]⎯
+
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > rejeita campo fora da allowlist de requisitos
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Um ou mais campos não pertencem aos requisitos desta transição.",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/lost-actions.test.ts:464:23
+    462|       },
+    463|     });
+    464|     expect(resultado).toEqual({
+       |                       ^
+    465|       success: false,
+    466|       error: "Um ou mais campos não pertencem aos requisitos desta tra…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/50]⎯
+
+ FAIL  tests/bpm/lost-actions.test.ts > actions de Lost > rejeita conflito dentro da transação sem efeitos parciais
+AssertionError: expected { success: false, …(1) } to deeply equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "O card mudou enquanto você preenchia os requisitos. Recarregue e tente novamente.",
++   "error": "Não foi possível concluir a transição.",
+    "success": false,
+  }
+
+ ❯ tests/bpm/lost-actions.test.ts:484:23
+    482|       camposValores: { [MOTIVO]: "Sem resposta" },
+    483|     });
+    484|     expect(resultado).toEqual({
+       |                       ^
+    485|       success: false,
+    486|       error: "O card mudou enquanto você preenchia os requisitos. Reca…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/50]⎯
+
+ FAIL  tests/bpm/lost-ui.test.ts > CRM Lost - apresentação condicional do motivo Outro > mantém Lost fora da criação e liga requisitos e edição ao contrato compartilhado
+Error: ENOENT: no such file or directory, open '/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaCRM/CardModal/PainelRequisitosAvanco.tsx'
+ ❯ ler tests/bpm/lost-ui.test.ts:13:34
+     11|
+     12| const raiz = process.cwd();
+     13| const ler = (arquivo: string) => readFileSync(resolve(raiz, arquivo), …
+       |                                  ^
+     14|
+     15| describe("CRM Lost - apresentação condicional do motivo Outro", () => {
+ ❯ tests/bpm/lost-ui.test.ts:53:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/50]⎯
+
+ FAIL  tests/bpm/lost-ui.test.ts > CRM Lost - apresentação condicional do motivo Outro > expõe feedback acessível e preserva o painel direito
+Error: ENOENT: no such file or directory, open '/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/PainelAlpha/AlphaCRM/CardModal/PainelRequisitosAvanco.tsx'
+ ❯ ler tests/bpm/lost-ui.test.ts:13:34
+     11|
+     12| const raiz = process.cwd();
+     13| const ler = (arquivo: string) => readFileSync(resolve(raiz, arquivo), …
+       |                                  ^
+     14|
+     15| describe("CRM Lost - apresentação condicional do motivo Outro", () => {
+ ❯ tests/bpm/lost-ui.test.ts:74:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/50]⎯
+
+ FAIL  tests/bpm/membros-card-ui.test.ts > CRM - pessoas vinculadas ao card na interface > monta o seletor no cabeçalho do card aberto com edição condicionada à permissão
+AssertionError: expected '"use client";\n\nimport { useCallback…' to contain 'import { SeletorMembrosCard } from ".…'
+
+- Expected
++ Received
+
+- import { SeletorMembrosCard } from "./SeletorMembrosCard"
++ "use client";
++
++ import { useCallback, useEffect, useRef, useState } from "react";
++ import { Loader2 } from "lucide-react";
++
++
++
++ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
++
++ import { isAdminRole } from "@/lib/roles";
++ import { ObterCardBpm } from "@/actions/bpm/Cards";
++ import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
++ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
++
++
++ import PainelRegistrar from "./PainelRegistrar";
++
++ import {
++   DadosEmpresaDrawer,
++   DadosEmpresaToggle,
++   useDadosEmpresaDrawer,
++ } from "./DadosEmpresaDrawer";
++
++
++
++ import { toast } from "sonner";
++ import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
++ import { resolveCardAbertoLayout } from "./pipelines";
++ import { CardSaveProvider, useCardSave } from "./CardSaveContext";
++
++ type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
++ type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
++ type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
++
++ function resultadoRevogaAcessoCard(resultado: Awaited<ReturnType<typeof ObterCardBpm>>) {
++   return (!resultado.success && resultado.error === "Não autorizado") || (resultado.success && !resultado.data);
++ }
++
++ interface Props {
++   cardId: string;
++   realtimeRevision?: number;
++   accent: string;
++   currentUserId: number | null;
++   currentUserRole: string | null;
++   onClose: () => void;
++   onAtualizado: () => void;
++   onAbrirCard: (cardId: string) => void;
++   abrirChecklistInicial?: boolean;
++ }
++
++ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard, abrirChecklistInicial = false }: Props) {
++   const { flushSaves } = useCardSave();
++   const [card, setCard] = useState<CardDetalhe | null>(null);
++   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
++   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
++   const [erro, setErro] = useState<string | null>(null);
++   const [abaAtiva, setAbaAtiva] = useState<string>("card");
++   const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
++   const acessoRevogadoRef = useRef(false);
++   const checklistInicialAbertoRef = useRef<string | null>(null);
++   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
++   const fecharPorAcessoRevogado = useCallback(() => {
++     if (acessoRevogadoRef.current) return;
++     acessoRevogadoRef.current = true;
++     toast.error("Seu acesso a este card foi removido.");
++     onClose();
++   }, [onClose]);
++   const atualizarEstadoFollowUp = useCallback((estado: EstadoFollowUpModal) => {
++     setEstadoFollowUpPorCard((estados) => ({ ...estados, [cardId]: estado }));
++   }, [cardId]);
++   const focarPainelReuniao = useCallback(() => {
++     const painel = document.getElementById(`formulario-etapa-${cardId}`);
++     painel?.scrollIntoView({ behavior: "smooth", block: "center" });
++     painel?.focus({ preventScroll: true });
++   }, [cardId]);
++
++   const carregando = card?.id !== cardId && erro === null;
++
++   useEffect(() => {
++     let cancelado = false;
++
++     ObterCardBpm(cardId).then((res) => {
++       if (cancelado) return;
++       if (!res.success || !res.data) {
++         if (resultadoRevogaAcessoCard(res)) {
++           fecharPorAcessoRevogado();
++           return;
++         }
++         setErro(typeof res.error === "string" ? res.error : "Erro ao carregar card");
++         return;
++       }
++       setCard(res.data);
++
++       Promise.all([
++         ObterPipelineBpm(res.data.pipeline.id),
++         ListarInteracoesCardBpm(cardId),
++       ]).then(([pipelineRes, interacoesRes]) => {
++         if (cancelado) return;
++         if (pipelineRes.success && pipelineRes.data) {
++           setEtapas([...pipelineRes.data.etapas].sort((a, b) => a.ordem - b.ordem));
++         }
++         setInteracoes(interacoesRes.data ?? []);
++       });
++     });
++
++     return () => { cancelado = true; };
++   }, [cardId, fecharPorAcessoRevogado]);
++
++   useEffect(() => {
++     if (!abrirChecklistInicial || card?.id !== cardId || checklistInicialAbertoRef.current === cardId) return;
++     checklistInicialAbertoRef.current = cardId;
++     const timeout = window.setTimeout(() => {
++       window.dispatchEvent(new CustomEvent("bpm:abrir-pendencias-checklist", {
++         detail: { cardId },
++       }));
++     }, 0);
++     return () => window.clearTimeout(timeout);
++   }, [abrirChecklistInicial, card?.id, cardId]);
++
++   useEffect(() => {
++     if (realtimeRevision === 0) return;
++     let cancelado = false;
++     Promise.all([ObterCardBpm(cardId), ListarInteracoesCardBpm(cardId)]).then(([cardRes, interacoesRes]) => {
++       if (cancelado) return;
++       if (resultadoRevogaAcessoCard(cardRes)) {
++         fecharPorAcessoRevogado();
++         return;
++       }
++       if (cardRes.success && cardRes.data) setCard(cardRes.data);
++       setInteracoes(interacoesRes.data ?? []);
++     });
++     return () => { cancelado = true; };
++   }, [cardId, fecharPorAcessoRevogado, realtimeRevision]);
++
++   const recarregar = useCallback(async () => {
++     const res = await ObterCardBpm(cardId);
++     if (resultadoRevogaAcessoCard(res)) {
++       fecharPorAcessoRevogado();
++       return;
++     }
++     if (res.success && res.data) setCard(res.data);
++   }, [cardId, fecharPorAcessoRevogado]);
++
++   const handleAtualizado = useCallback(() => {
++     void recarregar();
++     onAtualizado();
++   }, [onAtualizado, recarregar]);
++
++   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
++   const podeAgirNaEtapa = card?.permissaoEtapa?.podeAgir ?? true;
++   const podeTrabalharNoCard = isAdminRole(currentUserRole)
++     || (Boolean(meuVinculo) && podeAgirNaEtapa);
++   const podeMoverEtapa = podeTrabalharNoCard;
++   const podeEditar = podeTrabalharNoCard;
++   const podeTrabalharTarefas = podeTrabalharNoCard;
++   const podeGerenciarMembros = isAdminRole(currentUserRole)
++     || meuVinculo?.role === "RESPONSAVEL"
++     || meuVinculo?.role === "ADMINISTRADOR";
++   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
++
++   // Máquina de estado (BpmEtapaTransicaoPermitida, ver plano-novos-leads-bpm.md): se a etapa
++   // atual tem QUALQUER transição cadastrada, só os destinos permitidos + a própria etapa atual
++   // (referência visual) aparecem. Sem nenhuma transição cadastrada, mostra todas — mesmo
++   // fallback já aplicado em MoverCardBpm, para não quebrar pipelines sem essa restrição.
++   const transicoesDaEtapaAtual = card?.etapa.transicoesOrigem ?? [];
++   const etapasParaMover =
++     transicoesDaEtapaAtual.length > 0
++       ? etapas.filter(
++           (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
++         )
++       : etapas;
++   const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
++   const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual);
++
++   async function solicitarFechamento() {
++     if (deveBloquearFechamento && card) {
++       const checklist = document.getElementById(`follow-up-${card.id}`);
++       checklist?.scrollIntoView({ behavior: "smooth", block: "center" });
++       checklist?.focus({ preventScroll: true });
++       toast.error(estadoFollowUpAtual === "CARREGANDO"
++         ? "Aguarde a validação do último follow-up antes de fechar este card."
++         : estadoFollowUpAtual === "ERRO"
++           ? "Não foi possível validar o follow-up. Recarregue a seção antes de fechar o card."
++           : "Conclua o checklist do último follow-up antes de fechar este card.");
++       return;
++     }
++     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
++     await Promise.resolve();
++     const savesConcluidos = await flushSaves();
++     if (!savesConcluidos) {
++       toast.error("Não foi possível salvar todas as alterações. O card permanecerá aberto.");
++       return;
++     }
++     onClose();
++   }
++
++   return (
++     <Sheet open onOpenChange={(open) => {
++       if (open) return;
++       void solicitarFechamento();
++     }}>
++       <SheetContent
++         side="bottom"
++         className="h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
++         style={{ ["--accent-rgb" as string]: accent }}
++       >
++         {carregando ? (
++           <>
++             <SheetTitle className="sr-only">Carregando card</SheetTitle>
++             <div className="flex-1 flex items-center justify-center h-full">
++               <Loader2 className="animate-spin text-slate-500" size={28} />
++             </div>
++           </>
++         ) : erro || !card ? (
++           <>
++             <SheetTitle className="sr-only">Erro ao carregar card</SheetTitle>
++             <div className="p-8 text-sm text-rose-300">{erro || "Card não encontrado"}</div>
++           </>
++         ) : (
++           (() => {
++             const Layout = resolveCardAbertoLayout(card.pipeline.nome);
++             return (
++               <Layout
++                 card={card} etapas={etapas} interacoes={interacoes}
++                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
++                 realtimeRevision={realtimeRevision} onClose={onClose}
++                 onAtualizado={handleAtualizado}
++                 onAbrirCard={onAbrirCard}
++                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
++                 onEstadoFollowUpChange={atualizarEstadoFollowUp}
++                 estadoFollowUpAtual={estadoFollowUpAtual}
++               >
++                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
++                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
++                   onAtualizado={handleAtualizado}
++                   />
++               </Layout>
++             );
++           })()
++         )}
++       </SheetContent>
++     </Sheet>
++   );
++ }
++
++ export default function CardFullViewModal(props: Props) {
++   return (
++     <CardSaveProvider>
++       <CardFullViewModalContent {...props} />
++     </CardSaveProvider>
++   );
++ }
++
+
+ ❯ tests/bpm/membros-card-ui.test.ts:35:19
+     33|
+     34|   it("monta o seletor no cabeçalho do card aberto com edição condicion…
+     35|     expect(modal).toContain('import { SeletorMembrosCard } from "./Sel…
+       |                   ^
+     36|     expect(modal).toContain("const podeGerenciarMembros = isAdminRole(…
+     37|     expect(modal).toContain("<SeletorMembrosCard");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/50]⎯
+
+ FAIL  tests/bpm/membros-card-ui.test.ts > CRM - pessoas vinculadas ao card na interface > permite que participante vinculado trabalhe no card, mantendo a gestão de membros restrita
+AssertionError: expected '"use client";\n\nimport { useCallback…' to contain 'const podeTrabalharNoCard = isAdminRo…'
+
+- Expected
++ Received
+
+- const podeTrabalharNoCard = isAdminRole(currentUserRole) || Boolean(meuVinculo)
++ "use client";
++
++ import { useCallback, useEffect, useRef, useState } from "react";
++ import { Loader2 } from "lucide-react";
++
++
++
++ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
++
++ import { isAdminRole } from "@/lib/roles";
++ import { ObterCardBpm } from "@/actions/bpm/Cards";
++ import { ObterPipelineBpm } from "@/actions/bpm/Pipelines";
++ import { ListarInteracoesCardBpm } from "@/actions/bpm/Interacoes";
++
++
++ import PainelRegistrar from "./PainelRegistrar";
++
++ import {
++   DadosEmpresaDrawer,
++   DadosEmpresaToggle,
++   useDadosEmpresaDrawer,
++ } from "./DadosEmpresaDrawer";
++
++
++
++ import { toast } from "sonner";
++ import { followUpBloqueiaFechamento, type EstadoFollowUpModal } from "@/lib/bpm/card-modal-ui";
++ import { resolveCardAbertoLayout } from "./pipelines";
++ import { CardSaveProvider, useCardSave } from "./CardSaveContext";
++
++ type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
++ type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
++ type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
++
++ function resultadoRevogaAcessoCard(resultado: Awaited<ReturnType<typeof ObterCardBpm>>) {
++   return (!resultado.success && resultado.error === "Não autorizado") || (resultado.success && !resultado.data);
++ }
++
++ interface Props {
++   cardId: string;
++   realtimeRevision?: number;
++   accent: string;
++   currentUserId: number | null;
++   currentUserRole: string | null;
++   onClose: () => void;
++   onAtualizado: () => void;
++   onAbrirCard: (cardId: string) => void;
++   abrirChecklistInicial?: boolean;
++ }
++
++ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, currentUserId, currentUserRole, onClose, onAtualizado, onAbrirCard, abrirChecklistInicial = false }: Props) {
++   const { flushSaves } = useCardSave();
++   const [card, setCard] = useState<CardDetalhe | null>(null);
++   const [etapas, setEtapas] = useState<EtapaOpcao[]>([]);
++   const [interacoes, setInteracoes] = useState<Interacao[]>([]);
++   const [erro, setErro] = useState<string | null>(null);
++   const [abaAtiva, setAbaAtiva] = useState<string>("card");
++   const [estadoFollowUpPorCard, setEstadoFollowUpPorCard] = useState<Record<string, EstadoFollowUpModal>>({});
++   const acessoRevogadoRef = useRef(false);
++   const checklistInicialAbertoRef = useRef<string | null>(null);
++   const dadosEmpresaDrawer = useDadosEmpresaDrawer(cardId);
++   const fecharPorAcessoRevogado = useCallback(() => {
++     if (acessoRevogadoRef.current) return;
++     acessoRevogadoRef.current = true;
++     toast.error("Seu acesso a este card foi removido.");
++     onClose();
++   }, [onClose]);
++   const atualizarEstadoFollowUp = useCallback((estado: EstadoFollowUpModal) => {
++     setEstadoFollowUpPorCard((estados) => ({ ...estados, [cardId]: estado }));
++   }, [cardId]);
++   const focarPainelReuniao = useCallback(() => {
++     const painel = document.getElementById(`formulario-etapa-${cardId}`);
++     painel?.scrollIntoView({ behavior: "smooth", block: "center" });
++     painel?.focus({ preventScroll: true });
++   }, [cardId]);
++
++   const carregando = card?.id !== cardId && erro === null;
++
++   useEffect(() => {
++     let cancelado = false;
++
++     ObterCardBpm(cardId).then((res) => {
++       if (cancelado) return;
++       if (!res.success || !res.data) {
++         if (resultadoRevogaAcessoCard(res)) {
++           fecharPorAcessoRevogado();
++           return;
++         }
++         setErro(typeof res.error === "string" ? res.error : "Erro ao carregar card");
++         return;
++       }
++       setCard(res.data);
++
++       Promise.all([
++         ObterPipelineBpm(res.data.pipeline.id),
++         ListarInteracoesCardBpm(cardId),
++       ]).then(([pipelineRes, interacoesRes]) => {
++         if (cancelado) return;
++         if (pipelineRes.success && pipelineRes.data) {
++           setEtapas([...pipelineRes.data.etapas].sort((a, b) => a.ordem - b.ordem));
++         }
++         setInteracoes(interacoesRes.data ?? []);
++       });
++     });
++
++     return () => { cancelado = true; };
++   }, [cardId, fecharPorAcessoRevogado]);
++
++   useEffect(() => {
++     if (!abrirChecklistInicial || card?.id !== cardId || checklistInicialAbertoRef.current === cardId) return;
++     checklistInicialAbertoRef.current = cardId;
++     const timeout = window.setTimeout(() => {
++       window.dispatchEvent(new CustomEvent("bpm:abrir-pendencias-checklist", {
++         detail: { cardId },
++       }));
++     }, 0);
++     return () => window.clearTimeout(timeout);
++   }, [abrirChecklistInicial, card?.id, cardId]);
++
++   useEffect(() => {
++     if (realtimeRevision === 0) return;
++     let cancelado = false;
++     Promise.all([ObterCardBpm(cardId), ListarInteracoesCardBpm(cardId)]).then(([cardRes, interacoesRes]) => {
++       if (cancelado) return;
++       if (resultadoRevogaAcessoCard(cardRes)) {
++         fecharPorAcessoRevogado();
++         return;
++       }
++       if (cardRes.success && cardRes.data) setCard(cardRes.data);
++       setInteracoes(interacoesRes.data ?? []);
++     });
++     return () => { cancelado = true; };
++   }, [cardId, fecharPorAcessoRevogado, realtimeRevision]);
++
++   const recarregar = useCallback(async () => {
++     const res = await ObterCardBpm(cardId);
++     if (resultadoRevogaAcessoCard(res)) {
++       fecharPorAcessoRevogado();
++       return;
++     }
++     if (res.success && res.data) setCard(res.data);
++   }, [cardId, fecharPorAcessoRevogado]);
++
++   const handleAtualizado = useCallback(() => {
++     void recarregar();
++     onAtualizado();
++   }, [onAtualizado, recarregar]);
++
++   const meuVinculo = card?.membros.find((m) => m.userId === currentUserId);
++   const podeAgirNaEtapa = card?.permissaoEtapa?.podeAgir ?? true;
++   const podeTrabalharNoCard = isAdminRole(currentUserRole)
++     || (Boolean(meuVinculo) && podeAgirNaEtapa);
++   const podeMoverEtapa = podeTrabalharNoCard;
++   const podeEditar = podeTrabalharNoCard;
++   const podeTrabalharTarefas = podeTrabalharNoCard;
++   const podeGerenciarMembros = isAdminRole(currentUserRole)
++     || meuVinculo?.role === "RESPONSAVEL"
++     || meuVinculo?.role === "ADMINISTRADOR";
++   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
++
++   // Máquina de estado (BpmEtapaTransicaoPermitida, ver plano-novos-leads-bpm.md): se a etapa
++   // atual tem QUALQUER transição cadastrada, só os destinos permitidos + a própria etapa atual
++   // (referência visual) aparecem. Sem nenhuma transição cadastrada, mostra todas — mesmo
++   // fallback já aplicado em MoverCardBpm, para não quebrar pipelines sem essa restrição.
++   const transicoesDaEtapaAtual = card?.etapa.transicoesOrigem ?? [];
++   const etapasParaMover =
++     transicoesDaEtapaAtual.length > 0
++       ? etapas.filter(
++           (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
++         )
++       : etapas;
++   const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
++   const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual);
++
++   async function solicitarFechamento() {
++     if (deveBloquearFechamento && card) {
++       const checklist = document.getElementById(`follow-up-${card.id}`);
++       checklist?.scrollIntoView({ behavior: "smooth", block: "center" });
++       checklist?.focus({ preventScroll: true });
++       toast.error(estadoFollowUpAtual === "CARREGANDO"
++         ? "Aguarde a validação do último follow-up antes de fechar este card."
++         : estadoFollowUpAtual === "ERRO"
++           ? "Não foi possível validar o follow-up. Recarregue a seção antes de fechar o card."
++           : "Conclua o checklist do último follow-up antes de fechar este card.");
++       return;
++     }
++     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
++     await Promise.resolve();
++     const savesConcluidos = await flushSaves();
++     if (!savesConcluidos) {
++       toast.error("Não foi possível salvar todas as alterações. O card permanecerá aberto.");
++       return;
++     }
++     onClose();
++   }
++
++   return (
++     <Sheet open onOpenChange={(open) => {
++       if (open) return;
++       void solicitarFechamento();
++     }}>
++       <SheetContent
++         side="bottom"
++         className="h-[94vh] max-h-[94vh] rounded-t-[2rem] border-t border-white/10 bg-[radial-gradient(ellipse_120%_60%_at_50%_-10%,rgba(var(--accent-rgb),0.12),transparent_60%)] p-0 overflow-hidden sm:max-w-none"
++         style={{ ["--accent-rgb" as string]: accent }}
++       >
++         {carregando ? (
++           <>
++             <SheetTitle className="sr-only">Carregando card</SheetTitle>
++             <div className="flex-1 flex items-center justify-center h-full">
++               <Loader2 className="animate-spin text-slate-500" size={28} />
++             </div>
++           </>
++         ) : erro || !card ? (
++           <>
++             <SheetTitle className="sr-only">Erro ao carregar card</SheetTitle>
++             <div className="p-8 text-sm text-rose-300">{erro || "Card não encontrado"}</div>
++           </>
++         ) : (
++           (() => {
++             const Layout = resolveCardAbertoLayout(card.pipeline.nome);
++             return (
++               <Layout
++                 card={card} etapas={etapas} interacoes={interacoes}
++                 accent={accent} currentUserId={currentUserId} currentUserRole={currentUserRole}
++                 realtimeRevision={realtimeRevision} onClose={onClose}
++                 onAtualizado={handleAtualizado}
++                 onAbrirCard={onAbrirCard}
++                 onInteracaoCriada={(nova) => setInteracoes((prev) => [nova, ...prev])}
++                 onEstadoFollowUpChange={atualizarEstadoFollowUp}
++                 estadoFollowUpAtual={estadoFollowUpAtual}
++               >
++                 <PainelRegistrar card={card} etapaAtual={etapaAtual} accent={accent}
++                   podeEditar={podeEditar} realtimeRevision={realtimeRevision}
++                   onAtualizado={handleAtualizado}
++                   />
++               </Layout>
++             );
++           })()
++         )}
++       </SheetContent>
++     </Sheet>
++   );
++ }
++
++ export default function CardFullViewModal(props: Props) {
++   return (
++     <CardSaveProvider>
++       <CardFullViewModalContent {...props} />
++     </CardSaveProvider>
++   );
++ }
++
+
+ ❯ tests/bpm/membros-card-ui.test.ts:43:19
+     41|
+     42|   it("permite que participante vinculado trabalhe no card, mantendo a …
+     43|     expect(modal).toContain("const podeTrabalharNoCard = isAdminRole(c…
+       |                   ^
+     44|     expect(modal).toContain("const podeMoverEtapa = podeTrabalharNoCar…
+     45|     expect(modal).toContain("const podeEditar = podeTrabalharNoCard");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/50]⎯
+
+ FAIL  tests/bpm/standby-follow-up.test.ts > Standby - Follow Up > mantém o controle somente no formulário central da etapa Standby
+AssertionError: expected '"use client";\n\nimport { useState } …' to contain '<PainelStandbyFollowUp'
+
+- Expected
++ Received
+
+- <PainelStandbyFollowUp
++ "use client";
++
++ import { useState } from "react";
++ import { CalendarClock, ScrollText } from "lucide-react";
++ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
++ import { ObterCardBpm } from "@/actions/bpm/Cards";
++ import { CardOpenFormSlot } from "./CardOpenFormSlot";
++ import { ConteudoScriptEtapa } from "@/app/PainelAlpha/AlphaCRM/CardModal/ConteudoScriptEtapa";
++
++
++
++
++
++
++
++
++
++
++
++
++
++ type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
++ type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
++
++ interface Props {
++   card: CardDetalhe;
++   etapaAtual: EtapaOpcao | null;
++   accent: string;
++   podeEditar: boolean;
++   realtimeRevision: number;
++   onAtualizado: () => void;
++
++ }
++
++ export default function PainelRegistrar({ card, etapaAtual, accent, podeEditar, realtimeRevision, onAtualizado }: Props) {
++   const [abaAtiva, setAbaAtiva] = useState("formulario-etapa");
++
++   return (
++     <div
++       className="relative flex min-h-0 flex-col overflow-hidden rounded-3xl border lg:h-full"
++       style={{
++         borderColor: `rgba(${accent},0.15)`,
++         background: `linear-gradient(180deg, rgba(${accent},0.06), transparent 40%)`,
++       }}
++     >
++       <Tabs value={abaAtiva} onValueChange={setAbaAtiva} className="flex min-h-0 flex-1 flex-col overflow-hidden">
++         <TabsList className="mx-5 mt-5 w-auto shrink-0">
++           <TabsTrigger value="formulario-etapa" className="gap-1.5">
++             <CalendarClock size={13} /> Formulário da Etapa
++           </TabsTrigger>
++           <TabsTrigger value="script" className="gap-1.5">
++             <ScrollText size={13} /> Scripts
++           </TabsTrigger>
++         </TabsList>
++
++         <TabsContent id={`formulario-etapa-${card.id}`} value="formulario-etapa" className="m-0 mt-5 min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5" tabIndex={-1}>
++           <CardOpenFormSlot
++             card={card}
++             accent={accent}
++             podeEditar={podeEditar}
++             realtimeRevision={realtimeRevision}
++             onAtualizado={onAtualizado}
++           />
++         </TabsContent>
++
++         <TabsContent value="script" className="m-0 mt-5 min-h-0 flex-1 overflow-y-auto px-5 pb-5">
++           <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">{etapaAtual?.nome ?? card.etapa.nome}</p>
++           {etapaAtual?.script ? (
++             <ConteudoScriptEtapa key={etapaAtual.id} script={etapaAtual.script} />
++           ) : (
++             <p className="text-xs text-slate-600">Nenhum script configurado para esta etapa ainda.</p>
++           )}
++         </TabsContent>
++       </Tabs>
++
++     </div>
++   );
++ }
++
+
+ ❯ tests/bpm/standby-follow-up.test.ts:139:23
+    137|     const modal = readFileSync(resolve("src/app/PainelAlpha/AlphaCRM/C…
+    138|
+    139|     expect(registrar).toContain("<PainelStandbyFollowUp");
+       |                       ^
+    140|     expect(registrar).toContain("etapaEhStandbyFollowUp(card.etapa.nom…
+    141|     expect(painel).toContain("InterromperStandbyFollowUpBpm");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/50]⎯
+
+ FAIL  tests/google-calendar/layout-eventos.test.ts > calcularPosicoesEventosDoDia > posiciona 1 evento sozinho ocupando a coluna inteira
+TypeError: Cannot read properties of undefined (reading 'coluna')
+ ❯ tests/google-calendar/layout-eventos.test.ts:40:16
+     38|   it("posiciona 1 evento sozinho ocupando a coluna inteira", () => {
+     39|     const [pos] = calcularPosicoesEventosDoDia(DIA, [evento()]);
+     40|     expect(pos.coluna).toBe(0);
+       |                ^
+     41|     expect(pos.totalColunas).toBe(1);
+     42|     expect(pos.topoPercentual).toBeCloseTo((10 * 60 / 1440) * 100, 5);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/50]⎯
+
+ FAIL  tests/google-calendar/layout-eventos.test.ts > calcularPosicoesEventosDoDia > dá altura mínima para eventos muito curtos
+TypeError: Cannot read properties of undefined (reading 'alturaPercentual')
+ ❯ tests/google-calendar/layout-eventos.test.ts:50:16
+     48|       evento({ inicioEm: "2026-07-20T10:00:00", fimEm: "2026-07-20T10:…
+     49|     ]);
+     50|     expect(pos.alturaPercentual).toBe(2.5);
+       |                ^
+     51|   });
+     52|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/50]⎯
+
+ FAIL  tests/google-calendar/layout-eventos.test.ts > calcularPosicoesEventosDoDia > divide em 2 colunas quando dois eventos se sobrepõem
+AssertionError: expected [] to have a length of 2 but got +0
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ tests/google-calendar/layout-eventos.test.ts:58:22
+     56|       evento({ id: "b", inicioEm: "2026-07-20T10:30:00", fimEm: "2026-…
+     57|     ]);
+     58|     expect(posicoes).toHaveLength(2);
+       |                      ^
+     59|     expect(posicoes[0].totalColunas).toBe(2);
+     60|     expect(posicoes[1].totalColunas).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/50]⎯
+
+ FAIL  tests/google-calendar/layout-eventos.test.ts > calcularPosicoesEventosDoDia > cria 3 colunas quando 3 eventos se sobrepõem entre si
+AssertionError: expected Set{} to deeply equal Set{ +0, 1, 2 }
+
+- Expected
++ Received
+
+- Set {
+-   0,
+-   1,
+-   2,
+- }
++ Set {}
+
+ ❯ tests/google-calendar/layout-eventos.test.ts:79:52
+     77|     ]);
+     78|     expect(posicoes.every((p) => p.totalColunas === 3)).toBe(true);
+     79|     expect(new Set(posicoes.map((p) => p.coluna))).toEqual(new Set([0,…
+       |                                                    ^
+     80|   });
+     81|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/50]⎯
+
+ FAIL  tests/google-calendar/layout-eventos.test.ts > calcularPosicoesEventosDoDia > clusters separados no tempo não compartilham colunas
+TypeError: Cannot read properties of undefined (reading 'totalColunas')
+ ❯ tests/google-calendar/layout-eventos.test.ts:91:25
+     89|     const clusterTarde = posicoes.find((p) => p.evento.id === "c")!;
+     90|     expect(clusterManha.every((p) => p.totalColunas === 2)).toBe(true);
+     91|     expect(clusterTarde.totalColunas).toBe(1);
+       |                         ^
+     92|   });
+     93| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/50]⎯
+
+ FAIL  tests/google-calendar/layout-eventos.test.ts > eventosDiaInteiroDoDia > retorna só os eventos de dia inteiro do dia certo
+AssertionError: expected [] to deeply equal [ 'a' ]
+
+- Expected
++ Received
+
+- [
+-   "a",
+- ]
++ []
+
+ ❯ tests/google-calendar/layout-eventos.test.ts:105:40
+    103|     ];
+    104|     const resultado = eventosDiaInteiroDoDia(DIA, eventos);
+    105|     expect(resultado.map((e) => e.id)).toEqual(["a"]);
+       |                                        ^
+    106|   });
+    107|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[46/50]⎯
+
+ FAIL  tests/notas/acesso-e-lixeira.test.ts > Bloco de notas ALpha — isolamento por usuário > não cria bypass para Admin e limita a dono ou compartilhamento explícito
+PrismaClientKnownRequestError: 
+Invalid `db.notePermission.findMany()` invocation in
+/home/ialpha/projetos/alpha-comex/painel-alpha/src/lib/notas/acesso.ts:20:46
+
+  17  */
+  18 async function resolverSubjectIdsDeSetorEquivalentes(role: string): Promise<string[]> {
+  19   if (!role) return [];
+→ 20   const candidatos = await db.notePermission.findMany(
+URL_INVALID: The URL '' is not in a valid format
+ ❯ di.handleRequestError node_modules/@prisma/client/src/runtime/RequestHandler.ts:228:12
+ ❯ di.handleAndLogRequestError node_modules/@prisma/client/src/runtime/RequestHandler.ts:174:11
+ ❯ di.request node_modules/@prisma/client/src/runtime/RequestHandler.ts:143:11
+ ❯ a node_modules/@prisma/client/src/runtime/getPrismaClient.ts:833:23
+ ❯ resolverSubjectIdsDeSetorEquivalentes src/lib/notas/acesso.ts:20:22
+     18| async function resolverSubjectIdsDeSetorEquivalentes(role: string): Pr…
+     19|   if (!role) return [];
+     20|   const candidatos = await db.notePermission.findMany({
+       |                      ^
+     21|     where: { subjectType: { in: ["SETOR", "ROLE"] } },
+     22|     select: { subjectId: true },
+ ❯ criarFiltroAcessoNota src/lib/notas/acesso.ts:33:31
+ ❯ tests/notas/acesso-e-lixeira.test.ts:11:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[47/50]⎯
+
+ FAIL  tests/parceiros/aquisicao.test.ts > Aquisição de Parceiros — MoverLeadAquisicaoParceiro (máquina de estados) > rejeita pular 2 etapas de uma vez
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/parceiros/aquisicao.test.ts:88:23
+     86|     prismaMock.parceiroLead.findUnique.mockResolvedValue({ id: "lead1"…
+     87|     const r = await MoverLeadAquisicaoParceiro({ leadId: "clfake000000…
+     88|     expect(r.success).toBe(false);
+       |                       ^
+     89|     expect(prismaMock.$transaction).not.toHaveBeenCalled();
+     90|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[48/50]⎯
+
+
+ Test Files  19 failed | 329 passed (348)
+      Tests  50 failed | 2674 passed | 1 todo (2725)
+   Start at  17:15:43
+   Duration  11.68s (transform 73.99s, setup 0ms, import 139.14s, tests 15.57s, environment 22ms)
+

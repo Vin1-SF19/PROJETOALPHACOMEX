@@ -1,12 +1,14 @@
 # CODEBASE MAP — Mapa Estrutural do Projeto
 
-- Checklist Builder: models Prisma `BpmChecklistTemplate*`/`BpmCardChecklist*`; domínio em `src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts`; actions em `src/actions/bpm/Checklists.ts`; workspace em `src/components/bpm/checklists/ChecklistsWorkspace.tsx`; painel em `CardModal/PainelChecklistsCard.tsx`; alerta/navegação em `PainelProximaEtapa.tsx` + `PainelRegistrar.tsx`; ação automática `MATERIALIZAR_CHECKLIST` em `src/lib/bpm/automacoes/{schemas,executor}.ts`.
+- Checklist Builder: models Prisma `BpmChecklistTemplate*`/`BpmChecklistTemplateEtapa`/`BpmCardChecklist*`; domínio em `src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts` (`leitura.ts` expõe `filtroEtapaTemplateChecklist`, fonte única de aplicabilidade de etapa, RM-2026-457A31); actions em `src/actions/bpm/Checklists.ts`; workspace em `src/components/bpm/checklists/{ChecklistsWorkspace,EtapasMultiSelect}.tsx` + `checklist-editor-state.ts` (multiselect de etapas, RM-2026-457A31); painel em `CardModal/PainelChecklistsCard.tsx`, montado em `PainelHistorico.tsx` (aba Checklist); alerta/navegação em `PainelProximaEtapa.tsx` + `PainelRegistrar.tsx`; ação automática `MATERIALIZAR_CHECKLIST` em `src/lib/bpm/automacoes/{schemas,executor}.ts`.
 - SLA BPM: cálculo, provisionamento idempotente, pausa/retomada, recálculo on-read e sincronização de movimento em `src/lib/bpm/sla.ts`; fachada autenticada em `src/actions/bpm/Sla.ts`; `Cards.ts` sincroniza a saída/entrada de etapa e o standby na mesma transação do movimento.
 - ChatBot Alpha: rota em `src/app/PainelAlpha/ChatBotAlpha/page.tsx`; client em `src/components/ChatBotAlpha/{ChatBotAlphaClient,ChatConversa,SeletorSistemaChatBot,IframeChatBotAlpha}.tsx`; actions em `src/actions/{ChatBotAlpha,ChatBotAlphaChat}.ts`; domínio em `src/lib/chatbot-alpha/{contracts,doctor,observability,chat-api}.ts`; CLI em `scripts/chatbot-alpha.mjs`; testes em `tests/chatbot-alpha/{contracts,observability,chat-api,actions}.test.ts`.
 
+**RM-2026-457A31 — cobertura conferida por Scribe em 2026-09-09:** `tests/bpm/checklists-workspace-submit.test.ts` (handlers de submissão/payload/rascunho), `checklists-multiplas-etapas-migration.test.ts` (SQL em memória, FKs/backfill/índices) e `checklists-multiplas-etapas.test.ts` (actions/permissões/transações). As 11 suítes `tests/bpm/checklists-*.test.ts` somam 73 testes aprovados; não equivalem a smoke autenticado.
+
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-09-08 (RM-2026-3D529D — ChatBot Alpha concluído)
+> Última atualização: 2026-09-09 por Scribe (RM-2026-457A31 — referências e integrações conferidas).
 
 ---
 

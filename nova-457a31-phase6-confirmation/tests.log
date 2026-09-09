@@ -1,0 +1,16 @@
+
+> alpha_sistema@0.1.0 test
+> vitest run --coverage
+
+
+ RUN  v4.1.10 /home/ialpha/projetos/alpha-comex/painel-alpha
+      Coverage enabled with v8
+
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: EBUSY: resource busy or locked, rmdir '/home/ialpha/projetos/alpha-comex/painel-alpha/coverage'
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { errno: -16, code: 'EBUSY', syscall: 'rmdir', path: '/home/ialpha/projetos/alpha-comex/painel-alpha/coverage' }
+
+
+

@@ -1,0 +1,17 @@
+[
+  {
+    "gate": "lint",
+    "command": "npm run lint",
+    "exit": 1
+  },
+  {
+    "gate": "typecheck",
+    "command": "npm run typecheck",
+    "exit": 2
+  },
+  {
+    "gate": "tests",
+    "command": "npm test",
+    "exit": 1
+  }
+]

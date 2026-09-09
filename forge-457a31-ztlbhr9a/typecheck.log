@@ -1,0 +1,47 @@
+
+> alpha_sistema@0.1.0 typecheck
+> tsc --noEmit
+
+.next-alpha-dev/dev/types/validator.ts(1161,31): error TS2559: Type 'typeof import("/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/ExclusaoFiscal/route")' has no properties in common with type 'RouteHandlerConfig<"/api/ExclusaoFiscal">'.
+.next/dev/types/validator.ts(1161,31): error TS2559: Type 'typeof import("/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/ExclusaoFiscal/route")' has no properties in common with type 'RouteHandlerConfig<"/api/ExclusaoFiscal">'.
+.next/types/validator.ts(1161,31): error TS2559: Type 'typeof import("/home/ialpha/projetos/alpha-comex/painel-alpha/src/app/api/ExclusaoFiscal/route")' has no properties in common with type 'RouteHandlerConfig<"/api/ExclusaoFiscal">'.
+scripts/verify-checklist-task-e2e.ts(5,30): error TS2307: Cannot find module 'node:sqlite' or its corresponding type declarations.
+src/app/api/gerador-documentos/[id]/download/route.ts(36,46): error TS2352: Conversion of type '{ id: string; nome: string; usuario: string; email: string; role: string; permissoes?: string[] | undefined; imagemUrl?: string | null | undefined; atalhos?: string | null | undefined; esconderBloqueados: boolean; statusUsuario?: string | undefined; }' to type '{ id?: number | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'id' are incompatible.
+    Type 'string' is not comparable to type 'number'.
+src/app/api/gerador-documentos/[id]/download/route.ts(45,24): error TS2554: Expected 2 arguments, but got 1.
+src/app/api/gerador-documentos/[id]/download/route.ts(48,29): error TS18047: 'blob' is possibly 'null'.
+src/app/api/gerador-documentos/[id]/download/route.ts(48,34): error TS2339: Property 'body' does not exist on type 'GetBlobResult'.
+  Property 'body' does not exist on type '{ statusCode: 200; stream: ReadableStream<Uint8Array<ArrayBufferLike>>; headers: Headers; blob: GetBlobResultBlobBase & { ...; }; }'.
+src/app/api/gerador-documentos/[id]/download/route.ts(53,34): error TS18047: 'blob' is possibly 'null'.
+src/app/api/gerador-documentos/[id]/download/route.ts(53,39): error TS2339: Property 'size' does not exist on type 'GetBlobResult'.
+  Property 'size' does not exist on type '{ statusCode: 200; stream: ReadableStream<Uint8Array<ArrayBufferLike>>; headers: Headers; blob: GetBlobResultBlobBase & { ...; }; }'.
+src/app/api/gerador-documentos/clientes/[clienteId]/historico/route.ts(29,19): error TS2352: Conversion of type '{ id: string; nome: string; usuario: string; email: string; role: string; permissoes?: string[] | undefined; imagemUrl?: string | null | undefined; atalhos?: string | null | undefined; esconderBloqueados: boolean; statusUsuario?: string | undefined; }' to type '{ id?: number | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'id' are incompatible.
+    Type 'string' is not comparable to type 'number'.
+src/components/ComponentesRadar/HabilitacaoRadarClient.tsx(529,27): error TS18048: 'res.data' is possibly 'undefined'.
+src/lib/bibble/calendar-tools.ts(744,55): error TS2345: Argument of type '{ calendarId: string; titulo: string; descricaoGoogle: string | undefined; localizacao: string | undefined; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; }' is not assignable to parameter of type '{ calendarId: string; titulo: string; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; eventType: "default" | "focusTime" | "outOfOffice" | "workingLocation"; ... 6 more ...; recorrenciaRegras?: string[] | undefined; }'.
+  Type '{ calendarId: string; titulo: string; descricaoGoogle: string | undefined; localizacao: string | undefined; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; }' is missing the following properties from type '{ calendarId: string; titulo: string; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; eventType: "default" | "focusTime" | "outOfOffice" | "workingLocation"; ... 6 more ...; recorrenciaRegras?: string[] | undefined; }': eventType, visibilidade, transparencia, lembretesMinutos
+src/lib/bibble/calendar-tools.ts(967,74): error TS2345: Argument of type '{ calendarId: string; titulo: string; descricaoGoogle: string | undefined; localizacao: string | undefined; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; }' is not assignable to parameter of type '{ calendarId: string; titulo: string; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; eventType: "default" | "focusTime" | "outOfOffice" | "workingLocation"; ... 6 more ...; recorrenciaRegras?: string[] | undefined; }'.
+  Type '{ calendarId: string; titulo: string; descricaoGoogle: string | undefined; localizacao: string | undefined; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; }' is missing the following properties from type '{ calendarId: string; titulo: string; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; eventType: "default" | "focusTime" | "outOfOffice" | "workingLocation"; ... 6 more ...; recorrenciaRegras?: string[] | undefined; }': eventType, visibilidade, transparencia, lembretesMinutos
+tests/google-calendar/cache-eventos.test.ts(7,3): error TS2322: Type '{ googleEventId: string; status: "confirmed" | "tentative" | "cancelled"; titulo: string | null; descricao: string | null; localizacao: string | null; inicio: GoogleEventoDataDTO; ... 11 more ...; statusPropertiesJson?: string | ... 1 more ... | undefined; }' is not assignable to type 'GoogleEventoDTO'.
+  Types of property 'conferencia' are incompatible.
+    Type 'GoogleEventoConferenciaDTO | null | undefined' is not assignable to type 'GoogleEventoConferenciaDTO | null'.
+      Type 'undefined' is not assignable to type 'GoogleEventoConferenciaDTO | null'.
+tests/google-calendar/cache-first-actions.test.ts(172,57): error TS2345: Argument of type '{ calendarId: string; googleEventId: string; etagConhecido: string; titulo: string; timezone: string; diaInteiro: false; inicio: Date; fim: Date; participantes: never[]; criarMeet: false; }' is not assignable to parameter of type '{ googleEventId: string; calendarId: string; titulo: string; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; eventType: "default" | ... 2 more ... | "workingLocation"; ... 7 more ...; recorrenciaRegras?: string[] | undefined; }'.
+  Type '{ calendarId: string; googleEventId: string; etagConhecido: string; titulo: string; timezone: string; diaInteiro: false; inicio: Date; fim: Date; participantes: never[]; criarMeet: false; }' is missing the following properties from type '{ googleEventId: string; calendarId: string; titulo: string; timezone: string; diaInteiro: boolean; inicio: Date; fim: Date; participantes: string[]; criarMeet: boolean; eventType: "default" | ... 2 more ... | "workingLocation"; ... 7 more ...; recorrenciaRegras?: string[] | undefined; }': eventType, visibilidade, transparencia, lembretesMinutos
+tests/google-calendar/layout-eventos.test.ts(10,3): error TS2322: Type '{ id: string; googleEventId: string; status: string; titulo: string | null; inicioEm: string | null; fimEm: string | null; diaInteiro: boolean; etag: string; linkMeet: string | null; ... 12 more ...; colegaId?: number | undefined; }' is not assignable to type 'EventoExibicao'.
+  Types of property 'eventType' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+tests/google-calendar/sync-queue.test.ts(101,45): error TS2345: Argument of type '(args: string | undefined) => void' is not assignable to parameter of type '(...args: [] | [string, string] | [string] | [string, string, string, string]) => Awaitable<void>'.
+  Types of parameters 'args' and 'args' are incompatible.
+    Type '[] | [string, string] | [string] | [string, string, string, string]' is not assignable to type '[args: string | undefined]'.
+      Type '[]' is not assignable to type '[args: string | undefined]'.
+        Source has 0 element(s) but target requires 1.
+tests/google-calendar/sync-queue.test.ts(102,44): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'readonly string[]'.
+  Type 'undefined' is not assignable to type 'readonly string[]'.
+tests/google-calendar/sync.test.ts(26,3): error TS2322: Type '{ googleEventId: string; status: "confirmed" | "tentative" | "cancelled"; titulo: string | null; descricao: string | null; localizacao: string | null; inicio: GoogleEventoDataDTO; ... 11 more ...; statusPropertiesJson?: string | ... 1 more ... | undefined; }' is not assignable to type 'GoogleEventoDTO'.
+  Types of property 'conferencia' are incompatible.
+    Type 'GoogleEventoConferenciaDTO | null | undefined' is not assignable to type 'GoogleEventoConferenciaDTO | null'.
+      Type 'undefined' is not assignable to type 'GoogleEventoConferenciaDTO | null'.
