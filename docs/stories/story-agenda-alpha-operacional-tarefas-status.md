@@ -57,6 +57,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [x] Integrar destinos compartilhados Editor ao formulário e proteger eventos/listas/tarefas por vínculo e identidade Workspace resolvidos no servidor.
 - [x] Substituir o `router.push` das notificações por ativação da aba interna e handshake confiável para abrir o modal de compartilhamentos.
 - [x] Projetar a tarefa do chamado na Agenda Alpha do solicitante como somente leitura e refletir a conclusão e o horário real do atendimento.
+- [x] Encerrar carregamentos de agendas compartilhadas sem resposta, preservando resultados parciais e oferecendo nova tentativa.
 
 ## File List
 
@@ -88,6 +89,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `src/components/layout/PainelLayoutClient.tsx`
 - `src/components/CalendarioAlpha/{CompromissoNotificacaoToast,SinoNotificacoesCompromissos}.tsx`
 - `src/components/CalendarioAlpha/lib/{useAgendasCompartilhadas,tipos,itens-agenda}.ts`
+- `src/components/CalendarioAlpha/lib/carregamento-compartilhadas.ts`
 - `src/lib/google-calendar/navegacao.ts`
 - `src/lib/google-calendar/notificacoes.ts`
 - `src/hooks/useCalendarioAlphaNotifications.ts`
@@ -95,9 +97,11 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `tests/chamados/{finalizar-protocolo-agenda,tarefa-agendada}.test.ts`
 - `tests/chamados/{assumir,notificacoes}.test.ts`
 - `tests/google-calendar/chamado-solicitante-readonly.test.ts`
+- `tests/google-calendar/carregamento-compartilhadas.test.ts`
 - `plan/self-critique-agenda-alpha-sharing.json`
 - `plan/self-critique-chamados-agenda-conclusao.json`
 - `plan/self-critique-chamado-solicitante-agenda.json`
+- `plan/self-critique-agendas-compartilhadas-loading.json`
 
 ## Dev Agent Record
 
@@ -121,6 +125,8 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - Regressão da integração Chamados → Agenda: 20/20 testes direcionados aprovados, ESLint do recorte sem ocorrências e build de produção aprovado. Os gates globais mantêm a mesma linha de base externa ao ajuste: 21.210 ocorrências no lint, 49 falhas em 18 arquivos e erros de typecheck fora dos arquivos alterados; a execução padrão do typecheck excedeu o heap de 4 GB antes da repetição diagnóstica com 8 GB.
 - A tarefa já vinculada ao atendimento também é projetada na Agenda Alpha de quem abriu o chamado, agrupada como `Chamados solicitados`. A projeção não expõe a lista Google privada do técnico e é somente leitura; por compartilhar o mesmo cache/agendamento, recebe automaticamente o estado concluído e o fim real gravado pelo fechamento do chamado. Um evento Pusher privado invalida as agendas abertas do solicitante e do técnico imediatamente após assumir ou concluir, mantendo a revalidação periódica como fallback. Nenhuma estrutura de banco, migration ou backfill foi necessária.
 - Regressão do recorte solicitante/TI: 34/34 testes direcionados aprovados, Prisma schema válido, ESLint dos arquivos alterados, `git diff --check` sem ocorrências e build de produção aprovado. Nos gates globais, a linha de base externa ao recorte permanece pendente: lint com 21.210 ocorrências, typecheck com erros em arquivos não alterados e suíte completa com 50 falhas em 19 arquivos contra 2.680 testes aprovados e 1 pendente.
+- O indicador `Atualizando agendas compartilhadas…` não depende mais indefinidamente de uma resposta do banco/Google: cada origem recebe limite de 12 segundos, exceções viram erros seguros, o `finally` encerra o loading e as agendas que responderam continuam visíveis. O alerta existente oferece `Tentar novamente`; não houve mudança de schema ou banco.
+- Regressão direcionada do carregamento compartilhado: 18/18 testes aprovados (incluindo timeout determinístico, falha segura, privacidade, escrita compartilhada e wiring), ESLint do recorte, `git diff --check` e build de produção aprovados. Nos gates globais, a linha de base externa ao recorte permanece pendente: lint com 21.210 ocorrências, typecheck com erros em arquivos não alterados e suíte completa com 50 falhas em 19 arquivos contra 2.684 testes aprovados e 1 pendente. O teste estrutural preexistente de `page-cache-wiring` integra essa linha de base por o dashboard ter 304 linhas contra o teto antigo de 300.
 
 ### Change Log
 
@@ -128,6 +134,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - 2026-09-09: permanência visual de tarefas concluídas, escrita em agendas compartilhadas Editor e correção do fluxo de notificações/convites nas abas internas.
 - 2026-09-09: correção do encerramento por protocolo para concluir a tarefa vinculada e usar o horário real do fechamento na Agenda Alpha.
 - 2026-09-09: projeção somente leitura e atualização privada em tempo real da tarefa do chamado na agenda do solicitante, refletindo atendimento, conclusão e horário real sem duplicar a tarefa Google.
+- 2026-09-09: correção do loading infinito das agendas compartilhadas com timeout, falha segura e preservação de resultados parciais.
 
 ## Notas operacionais
 

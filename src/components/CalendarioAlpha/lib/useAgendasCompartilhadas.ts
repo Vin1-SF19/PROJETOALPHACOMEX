@@ -8,6 +8,7 @@ import {
   listarTarefasDeColega,
 } from "@/actions/google-calendar-colegas";
 
+import { aguardarResultadoCompartilhado } from "./carregamento-compartilhadas";
 import { calcularIntervaloVisao, type VisaoCalendario } from "./datas";
 import { tarefasParaItensAgenda } from "./itens-agenda";
 import type { ColegaAgendaView, EventoExibicao } from "./tipos";
@@ -54,7 +55,13 @@ export function useAgendasCompartilhadas({
     const tarefa = (async () => {
       setCarregando(true);
       setErro(null);
-      const colegasResultado = await listarColegasVisiveis();
+      const colegasResultado = await aguardarResultadoCompartilhado(
+        listarColegasVisiveis(),
+        {
+          timeout: "A lista de agendas compartilhadas demorou para responder.",
+          falha: "Não foi possível carregar as agendas compartilhadas.",
+        },
+      );
       if (!colegasResultado.success) {
         setErro(colegasResultado.error);
         return;
@@ -67,9 +74,25 @@ export function useAgendasCompartilhadas({
       const resultados = await Promise.all(
         visiveis.map(async (colega) => {
           const [eventosResultado, tarefasResultado] = await Promise.all([
-            listarEventosDeColega(colega.colegaId, inicio.toISOString(), fim.toISOString()),
+            aguardarResultadoCompartilhado(
+              listarEventosDeColega(
+                colega.colegaId,
+                inicio.toISOString(),
+                fim.toISOString(),
+              ),
+              {
+                timeout: "A agenda compartilhada demorou para responder.",
+                falha: "Não foi possível carregar a agenda compartilhada.",
+              },
+            ),
             colega.papel === "EDITOR"
-              ? listarTarefasDeColega(colega.colegaId)
+              ? aguardarResultadoCompartilhado(
+                  listarTarefasDeColega(colega.colegaId),
+                  {
+                    timeout: "As tarefas compartilhadas demoraram para responder.",
+                    falha: "Não foi possível carregar as tarefas compartilhadas.",
+                  },
+                )
               : Promise.resolve({ success: true as const, data: [] }),
           ]);
           return { colega, eventosResultado, tarefasResultado };
