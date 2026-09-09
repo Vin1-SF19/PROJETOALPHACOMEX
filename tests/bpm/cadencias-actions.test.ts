@@ -67,9 +67,9 @@ describe("actions de cadência multicoluna", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("cria uma cadência em duas colunas e espelha a primeira no legado", async () => {
+  it("cria uma cadência em duas colunas sem escrever o vínculo singular legado", async () => {
     expect((await CriarCadenciaBpm({ nome: "Contato", pipelineId: PIPELINE_ID, etapaIds: [ETAPA_1, ETAPA_2] })).success).toBe(true);
-    expect(mocks.cadenciaCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ pipelineId: PIPELINE_ID, etapaId: ETAPA_1 }) });
+    expect(mocks.cadenciaCreate).toHaveBeenCalledWith({ data: expect.not.objectContaining({ etapaId: expect.anything() }) });
     expect(mocks.associacaoCreateMany).toHaveBeenCalledWith({ data: [
       { cadenciaId: CADENCIA_ID, etapaId: ETAPA_1 }, { cadenciaId: CADENCIA_ID, etapaId: ETAPA_2 },
     ] });
@@ -105,16 +105,16 @@ describe("actions de cadência multicoluna", () => {
     expect(mocks.associacaoCreateMany).not.toHaveBeenCalled();
     expect(mocks.cadenciaUpdate).toHaveBeenCalledWith({
       where: { id: CADENCIA_ID },
-      data: { pipelineId: PIPELINE_ID, etapaId: ETAPA_2 },
+      data: { pipelineId: PIPELINE_ID },
     });
   });
 
-  it("remove só a associação e desativa a cadência que ficou sem coluna", async () => {
+  it("remove só a associação e preserva a definição como cadência de entrada do pipeline", async () => {
     mocks.associacaoFindUnique.mockResolvedValue({ cadenciaId: CADENCIA_ID });
     const resultado = await ConfigurarCadenciaEtapaBpm({ pipelineId: PIPELINE_ID, etapaId: ETAPA_1, cadenciaId: null });
     expect(resultado).toEqual({ success: true, data: { cadenciaId: null } });
     expect(mocks.associacaoDelete).toHaveBeenCalledWith({ where: { etapaId: ETAPA_1 } });
-    expect(mocks.cadenciaUpdate).toHaveBeenCalledWith({ where: { id: CADENCIA_ID }, data: { etapaId: null, ativa: false } });
+    expect(mocks.cadenciaUpdate).not.toHaveBeenCalled();
   });
 
   it("adiciona a mesma cadência a outra coluna sem remover as existentes", async () => {

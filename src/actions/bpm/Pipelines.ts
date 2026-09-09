@@ -163,7 +163,6 @@ export async function ObterPipelineBpm(
           where: incluirInativas ? undefined : { ativo: true },
           orderBy: { ordem: "asc" },
           include: {
-            camposObrigatorios: { select: { campoId: true } },
             subStatus: { orderBy: { ordem: "asc" } },
             formulario: {
               include: {

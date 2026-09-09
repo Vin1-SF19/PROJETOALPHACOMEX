@@ -146,7 +146,7 @@ async function destinoEhEtapaCanonicaNovosLeads(
 
 type ClienteConfiguracaoLost = Pick<
   typeof db,
-  "bpmCampo" | "bpmCampoObrigatorioEtapa" | "bpmCardCampoValor"
+  "bpmCampo" | "bpmCardCampoValor"
 >;
 
 type CampoLostCarregado = CampoConfiguracaoLost & { valor: string | null };
@@ -159,32 +159,44 @@ async function carregarConfiguracaoLost(params: {
   configuracao: ConfiguracaoLost;
   campos: CampoLostCarregado[];
 }> {
-  const [camposPipeline, associados] = await Promise.all([
-    client.bpmCampo.findMany({
-      where: { pipelineId: params.pipelineId },
+  const camposCanonicos = await client.bpmCampo.findMany({
+      where: {
+        ativo: true,
+        etapaConfiguracoes: { some: { etapaId: params.etapaLostId, visivel: true } },
+        OR: [
+          { pipelineId: params.pipelineId },
+          { pipelinesAssociados: { some: { pipelineId: params.pipelineId } } },
+        ],
+      },
       select: {
         id: true,
         pipelineId: true,
-        etapaId: true,
         nome: true,
         tipo: true,
         opcoesJson: true,
-        obrigatorio: true,
-        ordem: true,
+        etapaConfiguracoes: {
+          where: { etapaId: params.etapaLostId },
+          select: { etapaId: true, obrigatorio: true, ordem: true },
+          take: 1,
+        },
       },
-    }),
-    client.bpmCampoObrigatorioEtapa.findMany({
-      where: {
-        etapaId: params.etapaLostId,
-        campo: { pipelineId: params.pipelineId },
-      },
-      select: { campoId: true },
-    }),
-  ]);
+    });
+  const camposPipeline = camposCanonicos.flatMap((campo) => {
+    const config = campo.etapaConfiguracoes[0];
+    return config ? [{
+      id: campo.id,
+      pipelineId: campo.pipelineId,
+      etapaId: config.etapaId,
+      nome: campo.nome,
+      tipo: campo.tipo,
+      opcoesJson: campo.opcoesJson,
+      obrigatorio: config.obrigatorio,
+      ordem: config.ordem,
+    }] : [];
+  });
   const resultado = resolverConfiguracaoLost({
     camposPipeline,
     etapaLostId: params.etapaLostId,
-    campoIdsObrigatoriosEtapa: associados.map((item) => item.campoId),
   });
   if (!resultado.success) throw new Error("CONFIGURACAO_LOST_INVALIDA");
 
@@ -524,14 +536,22 @@ export async function ObterCardBpm(cardId: string) {
         pipeline: { select: { id: true, nome: true } },
         etapa: {
           include: {
-            // Transições permitidas a partir da etapa ATUAL — usado pela UI para mostrar só
-            // os destinos alcançáveis (PainelProximaEtapa). Vazio = qualquer destino permitido
-            // (mesmo fallback de MoverCardBpm).
-            transicoesOrigem: { select: { etapaDestinoId: true } },
+            transicoesEtapaOrigem: {
+              where: { permitida: true, origem: { in: ["MANUAL", "AMBOS"] } },
+              select: { etapaDestinoId: true },
+            },
           },
         },
         responsavel: { select: { id: true, nome: true } },
-        campoValores: { include: { campo: true } },
+        campoValores: {
+          include: {
+            campo: {
+              include: {
+                etapaConfiguracoes: { select: { etapaId: true } },
+              },
+            },
+          },
+        },
         membros: {
           select: {
             userId: true,
@@ -1220,7 +1240,7 @@ type DadosMovimentoComRequisitos = {
 
 type ClienteContextoMovimento = Pick<
   typeof db,
-  "bpmCard" | "bpmEtapa" | "bpmEtapaTransicaoPermitida"
+  "bpmCard" | "bpmEtapa" | "bpmTransicaoEtapa"
 >;
 
 async function carregarContextoMovimento(
@@ -1250,14 +1270,16 @@ async function carregarContextoMovimento(
     return { error: "Etapa não pertence ao pipeline do card" } as const;
   }
 
-  const transicoes = await client.bpmEtapaTransicaoPermitida.findMany({
-    where: { etapaOrigemId: card.etapaId },
-    select: { etapaDestinoId: true },
+  const transicao = await client.bpmTransicaoEtapa.findUnique({
+    where: {
+      etapaOrigemId_etapaDestinoId: {
+        etapaOrigemId: card.etapaId,
+        etapaDestinoId,
+      },
+    },
+    select: { permitida: true, origem: true },
   });
-  if (
-    transicoes.length > 0
-    && !transicoes.some((transicao) => transicao.etapaDestinoId === etapaDestinoId)
-  ) {
+  if (!transicao?.permitida || !["MANUAL", "AMBOS"].includes(transicao.origem)) {
     return {
       error: `Não é possível mover diretamente desta etapa para "${etapaDestino.nome}" — verifique as etapas permitidas.`,
     } as const;

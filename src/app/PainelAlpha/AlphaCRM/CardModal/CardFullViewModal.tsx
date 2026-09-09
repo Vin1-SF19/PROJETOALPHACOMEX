@@ -158,17 +158,10 @@ function CardFullViewModalContent({ cardId, realtimeRevision = 0, accent, curren
     || meuVinculo?.role === "ADMINISTRADOR";
   const etapaAtual = card ? etapas.find((e) => e.id === card.etapa.id) ?? null : null;
 
-  // Máquina de estado (BpmEtapaTransicaoPermitida, ver plano-novos-leads-bpm.md): se a etapa
-  // atual tem QUALQUER transição cadastrada, só os destinos permitidos + a própria etapa atual
-  // (referência visual) aparecem. Sem nenhuma transição cadastrada, mostra todas — mesmo
-  // fallback já aplicado em MoverCardBpm, para não quebrar pipelines sem essa restrição.
-  const transicoesDaEtapaAtual = card?.etapa.transicoesOrigem ?? [];
-  const etapasParaMover =
-    transicoesDaEtapaAtual.length > 0
-      ? etapas.filter(
-          (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
-        )
-      : etapas;
+  const transicoesDaEtapaAtual = card?.etapa.transicoesEtapaOrigem ?? [];
+  const etapasParaMover = etapas.filter(
+    (e) => e.id === card?.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
+  );
   const estadoFollowUpAtual = card ? estadoFollowUpPorCard[card.id] ?? "CARREGANDO" : "CARREGANDO";
   const deveBloquearFechamento = followUpBloqueiaFechamento(card?.etapa.nome, estadoFollowUpAtual);
 

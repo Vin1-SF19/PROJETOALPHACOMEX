@@ -50,7 +50,8 @@ describe("cadência por coluna", () => {
     const resolvedor = ler("src/lib/bpm/cadencias/ativacao-automatica.ts");
     expect(resolvedor).toContain("pipelineId: input.pipelineDestinoId");
     expect(resolvedor).toContain("etapas: { some: { etapaId: input.etapaDestinoId } }");
-    expect(resolvedor).toContain("{ etapaId: null, etapas: { none: {} } }");
+    expect(resolvedor).toContain("{ etapas: { none: {} } }");
+    expect(resolvedor).not.toContain("{ etapaId: null, etapas:");
     expect(resolvedor).not.toContain("pipelineId: null");
   });
 });

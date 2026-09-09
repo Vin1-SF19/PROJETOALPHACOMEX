@@ -178,6 +178,10 @@ async function validarDimensoesCampo(
   return idsPipeline;
 }
 
+function pipelinesCompartilhados(pipelineProprietarioId: string, pipelineIds: readonly string[]) {
+  return [...new Set(pipelineIds)].filter((pipelineId) => pipelineId !== pipelineProprietarioId);
+}
+
 export async function ListarCamposConfiguraveisBpm(pipelineId: string) {
   try {
     const session = await auth();
@@ -217,9 +221,6 @@ export async function CriarCampoBpm(dados: unknown) {
     const parsed = criarCampoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const entrada = parsed.data;
-    if (entrada.etapaId || entrada.obrigatorio) {
-      return { success: false, error: "Use a configuração por etapa para aplicabilidade e obrigatoriedade" };
-    }
     validarCondicoesEtapas(entrada.etapaConfiguracoes);
     if (entrada.escopo === "GLOBAL" && entrada.fonteEntidade && !fonteCampoPermitida(entrada.fonteEntidade, entrada.fonteAtributo)) {
       return { success: false, error: "Fonte ou atributo canônico não permitido" };
@@ -235,11 +236,9 @@ export async function CriarCampoBpm(dados: unknown) {
         data: {
           pipelineId: entrada.pipelineId,
           chave: entrada.chave,
-          etapaId: null,
           nome: entrada.nome,
           tipo: entrada.tipo,
           opcoesJson: opcoes.length ? JSON.stringify(opcoes.filter((item) => item.ativo).map((item) => item.rotulo)) : null,
-          obrigatorio: false,
           ordem: entrada.ordem,
           ativo: entrada.ativo,
           escopo: entrada.escopo,
@@ -259,7 +258,12 @@ export async function CriarCampoBpm(dados: unknown) {
         ordem: item.ordem,
         ativo: item.ativo,
       })) });
-      await tx.bpmCampoPipeline.createMany({ data: todosPipelines.map((id) => ({ campoId: criado.id, pipelineId: id })) });
+      const compartilhados = pipelinesCompartilhados(entrada.pipelineId, todosPipelines);
+      if (compartilhados.length) {
+        await tx.bpmCampoPipeline.createMany({
+          data: compartilhados.map((pipelineId) => ({ campoId: criado.id, pipelineId })),
+        });
+      }
       if (entrada.etapaConfiguracoes?.length) {
         await tx.bpmCampoEtapaConfig.createMany({ data: entrada.etapaConfiguracoes.map((item) => ({ ...item, campoId: criado.id, editavel: item.somenteLeitura ? false : item.editavel })) });
       }
@@ -314,9 +318,6 @@ export async function AtualizarCampoBpm(dados: unknown) {
     const parsed = atualizarCampoSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
     const entrada = parsed.data;
-    if (entrada.etapaId || entrada.obrigatorio) {
-      return { success: false, error: "Use a configuração por etapa para aplicabilidade e obrigatoriedade" };
-    }
     validarCondicoesEtapas(entrada.etapaConfiguracoes);
 
     const anterior = await db.bpmCampo.findUnique({
@@ -374,8 +375,6 @@ export async function AtualizarCampoBpm(dados: unknown) {
           chave: entrada.chave,
           nome: entrada.nome,
           tipo: entrada.tipo,
-          etapaId: entrada.etapaConfiguracoes ? null : entrada.etapaId,
-          obrigatorio: entrada.etapaConfiguracoes ? false : entrada.obrigatorio,
           ordem: entrada.ordem,
           ativo: entrada.ativo,
           escopo: entrada.escopo,
@@ -403,7 +402,12 @@ export async function AtualizarCampoBpm(dados: unknown) {
       }
       if (entrada.pipelineIds) {
         await tx.bpmCampoPipeline.deleteMany({ where: { campoId: entrada.campoId } });
-        await tx.bpmCampoPipeline.createMany({ data: todosPipelines.map((pipelineId) => ({ campoId: entrada.campoId, pipelineId })) });
+        const compartilhados = pipelinesCompartilhados(anterior.pipelineId, todosPipelines);
+        if (compartilhados.length) {
+          await tx.bpmCampoPipeline.createMany({
+            data: compartilhados.map((pipelineId) => ({ campoId: entrada.campoId, pipelineId })),
+          });
+        }
       }
       if (entrada.etapaConfiguracoes) {
         await tx.bpmCampoEtapaConfig.deleteMany({ where: { campoId: entrada.campoId } });

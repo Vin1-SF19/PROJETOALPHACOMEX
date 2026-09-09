@@ -66,7 +66,7 @@ describe("ativarCadenciasNaEntradaBpm", () => {
       where: expect.objectContaining({
         OR: [
           { etapas: { some: { etapaId: "etapa-destino" } } },
-          { etapaId: null, etapas: { none: {} } },
+          { etapas: { none: {} } },
         ],
       }),
     }));

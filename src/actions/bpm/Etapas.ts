@@ -46,7 +46,7 @@ export async function CriarEtapaBpm(dados: unknown) {
 
     const parsed = criarEtapaSchema.safeParse(dados);
     if (!parsed.success) return { success: false, error: parsed.error.flatten() };
-    const { pipelineId, nome, ordem, slaDias, cor } = parsed.data;
+    const { pipelineId, nome, ordem, cor } = parsed.data;
 
     const etapa = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarEtapas", tx);
@@ -54,7 +54,7 @@ export async function CriarEtapaBpm(dados: unknown) {
         where: { pipelineId },
         select: { id: true },
       });
-      const criada = await tx.bpmEtapa.create({ data: { pipelineId, nome, ordem, slaDias, cor } });
+      const criada = await tx.bpmEtapa.create({ data: { pipelineId, nome, ordem, cor } });
       if (existentes.length > 0) {
         await tx.bpmTransicaoEtapa.createMany({
           data: existentes.flatMap(({ id }) => [
@@ -67,7 +67,7 @@ export async function CriarEtapaBpm(dados: unknown) {
         pipelineId,
         adminId: userId,
         campoAlterado: "etapa_criada",
-        valorNovoJson: JSON.stringify({ nome, ordem, slaDias, cor, transicoesBloqueadasCriadas: existentes.length * 2 }),
+        valorNovoJson: JSON.stringify({ nome, ordem, cor, transicoesBloqueadasCriadas: existentes.length * 2 }),
       });
       return criada;
     });

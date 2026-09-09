@@ -17,17 +17,17 @@ const LOST_ID = "lost";
 const motivo: CampoConfiguracaoLost = {
   id: "motivo",
   pipelineId: PIPELINE_ID,
-  etapaId: null,
+  etapaId: LOST_ID,
   nome: "Motivo de Lost",
   tipo: "selecao",
   opcoesJson: JSON.stringify(MOTIVOS_LOST),
-  obrigatorio: false,
+  obrigatorio: true,
   ordem: 1,
 };
 const complemento: CampoConfiguracaoLost = {
   id: "complemento",
   pipelineId: PIPELINE_ID,
-  etapaId: null,
+  etapaId: LOST_ID,
   nome: "Motivo de Lost - Outro",
   tipo: "texto",
   opcoesJson: null,
@@ -37,12 +37,10 @@ const complemento: CampoConfiguracaoLost = {
 
 function resolver(
   camposPipeline: CampoConfiguracaoLost[] = [motivo, complemento],
-  obrigatorios: string[] = [motivo.id],
 ) {
   return resolverConfiguracaoLost({
     camposPipeline,
     etapaLostId: LOST_ID,
-    campoIdsObrigatoriosEtapa: obrigatorios,
   });
 }
 
@@ -54,7 +52,7 @@ describe("regra de Motivo de Lost", () => {
     expect(motivoLostExigeComplemento(" Óutro ")).toBe(true);
   });
 
-  it("aceita exatamente o select associado obrigatório e o companion texto global", () => {
+  it("aceita exatamente o select e o companion configurados na etapa canônica", () => {
     const resultado = resolver();
     expect(resultado.success).toBe(true);
     if (resultado.success) {
@@ -71,7 +69,7 @@ describe("regra de Motivo de Lost", () => {
     [{ ...motivo, opcoesJson: "[]" }, complemento],
     [{ ...motivo, opcoesJson: JSON.stringify([...MOTIVOS_LOST].reverse()) }, complemento],
     [motivo, { ...complemento, tipo: "selecao" }],
-    [motivo, { ...complemento, etapaId: LOST_ID }],
+    [motivo, { ...complemento, etapaId: "outra-etapa" }],
   ].map((campos) => ({ campos })))("falha fechada para configuração ausente, ambígua ou incompatível", ({ campos }) => {
     expect(resolver(campos)).toEqual({
       success: false,
@@ -79,12 +77,12 @@ describe("regra de Motivo de Lost", () => {
     });
   });
 
-  it("falha fechada sem associação obrigatória e se companion for associado", () => {
-    expect(resolver([motivo, complemento], [])).toEqual({
+  it("falha fechada quando a configuração canônica de obrigatoriedade diverge", () => {
+    expect(resolver([{ ...motivo, obrigatorio: false }, complemento])).toEqual({
       success: false,
       error: CONFIGURACAO_LOST_INVALIDA_MENSAGEM,
     });
-    expect(resolver([motivo, complemento], [motivo.id, complemento.id])).toEqual({
+    expect(resolver([motivo, { ...complemento, obrigatorio: true }])).toEqual({
       success: false,
       error: CONFIGURACAO_LOST_INVALIDA_MENSAGEM,
     });

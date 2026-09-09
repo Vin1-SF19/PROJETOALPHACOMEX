@@ -84,7 +84,6 @@ function catalogoMotivosEhExato(opcoesJson: string | null): boolean {
 export function resolverConfiguracaoLost(params: {
   camposPipeline: readonly CampoConfiguracaoLost[];
   etapaLostId: string;
-  campoIdsObrigatoriosEtapa: readonly string[];
 }): ResultadoConfiguracaoLost {
   const motivos = params.camposPipeline.filter((campo) =>
     campoEhMotivoLost(campo.nome),
@@ -98,21 +97,14 @@ export function resolverConfiguracaoLost(params: {
 
   const motivo = motivos[0];
   const complemento = complementos[0];
-  const obrigatorios = params.campoIdsObrigatoriosEtapa.filter(
-    (campoId) => campoId === motivo.id,
-  );
-  const motivoDiretoObrigatorio = motivo.etapaId === params.etapaLostId
-    && motivo.obrigatorio;
-  const motivoGlobalAssociado = motivo.etapaId === null
-    && obrigatorios.length === 1;
-
   if (
     normalizarIdentificador(motivo.tipo) !== "selecao"
     || !catalogoMotivosEhExato(motivo.opcoesJson)
-    || (!motivoDiretoObrigatorio && !motivoGlobalAssociado)
+    || motivo.etapaId !== params.etapaLostId
+    || !motivo.obrigatorio
     || normalizarIdentificador(complemento.tipo) !== "texto"
-    || complemento.etapaId !== null
-    || params.campoIdsObrigatoriosEtapa.includes(complemento.id)
+    || complemento.etapaId !== params.etapaLostId
+    || complemento.obrigatorio
   ) {
     return { success: false, error: CONFIGURACAO_LOST_INVALIDA_MENSAGEM };
   }

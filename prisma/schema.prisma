@@ -3860,7 +3860,7 @@ model BpmEtapa {
   nome             String
   ordem            Int     @default(0)
   cor              String? // cor de exibição da etapa (ex.: badge/coluna do Kanban); ausente = cor padrão do tema
-  slaDias          Int?
+  slaDias          Int?    // histórico legado; runtime e administração usam BpmSlaConfig
   script           String? // roteiro de texto exibido na aba "Script" da coluna Presente — só leitura por enquanto
   ativo            Boolean @default(true)
   ehInicial        Boolean @default(false) // marca a etapa de entrada configurável do pipeline
@@ -3921,10 +3921,8 @@ model BpmSubStatus {
   @@index([etapaId, ordem])
 }
 
-// Transições configuráveis de etapa por pipeline — evolução aditiva de
-// BpmEtapaTransicaoPermitida (mantida intacta: hoje só filtra o dropdown de
-// próxima etapa no client). Esta tabela nova é a base para restrição real de
-// movimentação no servidor em fase futura; não é lida em nenhum ponto ainda.
+// Fonte canônica única das transições configuráveis de etapa por pipeline.
+// Estruturas anteriores permanecem somente como histórico de migração.
 model BpmTransicaoEtapa {
   id               String  @id @default(cuid())
   pipelineId       String
@@ -4352,11 +4350,11 @@ model BpmCampo {
   id             String  @id @default(cuid())
   chave          String? @unique // identidade canônica opcional; permite reutilizar o mesmo conceito entre pipelines
   pipelineId     String
-  etapaId        String?
+  etapaId        String? // histórico legado; aplicabilidade por etapa vive em BpmCampoEtapaConfig
   nome           String
   tipo           String // validado via allowlist em Zod; string permite evolução sem rebuild SQLite
   opcoesJson     String? // fallback legado; novas opções vivem em BpmCampoOpcao
-  obrigatorio    Boolean @default(false)
+  obrigatorio    Boolean @default(false) // histórico legado; obrigatoriedade por etapa vive em BpmCampoEtapaConfig
   ordem          Int     @default(0)
   ativo          Boolean @default(true)
   escopo         String  @default("CARD") // "CARD" | "GLOBAL"
@@ -4888,15 +4886,14 @@ model BpmTarefaPreset {
   @@index([pipelineId])
 }
 
-// Definição versionável de uma cadência de tarefas (RM-2026-97CC60). Escopada por pipeline
-// e, opcionalmente, por etapa — quando etapaId é nulo, a cadência é aplicável a qualquer
-// etapa do pipeline (associação ao card é sempre explícita via BpmCardCadencia).
+// Definição versionável de uma cadência de tarefas. O escopo por etapa é definido
+// exclusivamente por BpmCadenciaEtapa; etapaId permanece apenas como dado histórico.
 model BpmCadencia {
   id          String  @id @default(cuid())
   nome        String
   descricao   String?
   pipelineId  String?
-  etapaId     String?
+  etapaId     String? // histórico legado; escopo operacional vive em BpmCadenciaEtapa
   ativa       Boolean @default(true)
   versao      Int     @default(1)
   criadoPorId Int?
@@ -4916,9 +4913,7 @@ model BpmCadencia {
   @@index([etapaId])
 }
 
-// Associação canônica multicoluna da cadência. `BpmCadencia.etapaId` permanece
-// como shadow legado da primeira etapa para rollback seguro, mas o runtime novo
-// resolve o escopo por esta relação. A unicidade garante uma cadência por coluna.
+// Associação canônica multicoluna da cadência. A unicidade garante uma cadência por coluna.
 model BpmCadenciaEtapa {
   id         String   @id @default(cuid())
   cadenciaId String
@@ -5182,10 +5177,8 @@ model BpmInteracaoCard {
   @@index([createdAt])
 }
 
-// Pipeline "Revisão de Radar" — máquina de estado de transições permitidas entre etapas
-// (2026-08-10, ver .bibble/memory/plano-novos-leads-bpm.md). Etapa SEM nenhuma linha aqui
-// como origem continua permitindo qualquer destino — fallback preserva o comportamento
-// atual dos pipelines "Financeiro"/"Radar", que nunca pediram essa restrição.
+// Histórico legado das transições. Nenhum runtime/admin consulta ou escreve esta relação;
+// a definição operacional vive exclusivamente em BpmTransicaoEtapa.
 model BpmEtapaTransicaoPermitida {
   id             String   @id @default(cuid())
   etapaOrigemId  String
@@ -5226,9 +5219,8 @@ model NolossLead {
   @@index([status])
 }
 
-// Permite que um BpmCampo de nível pipeline (etapaId: null) seja obrigatório só em etapas
-// específicas, sem duplicar o campo por etapa (ex: "Valor acordado no contrato" é o mesmo
-// campo em Reunião Agendada/Em Tratativa/Fechado, mas só passa a ser obrigatório nelas).
+// Histórico legado de obrigatoriedade campo-etapa. Mantido para auditoria/rollback;
+// BpmCampoEtapaConfig é a única fonte operacional.
 model BpmCampoObrigatorioEtapa {
   id      String   @id @default(cuid())
   campoId String
@@ -5240,9 +5232,8 @@ model BpmCampoObrigatorioEtapa {
   @@index([etapaId])
 }
 
-// Espelha BpmCampoObrigatorioEtapa: permite ocultar um BpmCampo de nível pipeline
-// (etapaId: null, visível em todas as etapas por padrão) de uma etapa específica,
-// sem apagar o campo nem afetar sua visibilidade nas demais etapas onde é usado.
+// Histórico legado de ocultação campo-etapa. Mantido para auditoria/rollback;
+// BpmCampoEtapaConfig é a única fonte operacional.
 model BpmCampoOcultoEtapa {
   id      String   @id @default(cuid())
   campoId String

@@ -117,13 +117,10 @@ export function CardAbertoLayout({
     ));
   const etapaAtual = etapas.find((e) => e.id === card.etapa.id) ?? null;
 
-  const transicoesDaEtapaAtual = card.etapa.transicoesOrigem ?? [];
-  const etapasParaMover =
-    transicoesDaEtapaAtual.length > 0
-      ? etapas.filter(
-          (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
-        )
-      : etapas;
+  const transicoesDaEtapaAtual = card.etapa.transicoesEtapaOrigem ?? [];
+  const etapasParaMover = etapas.filter(
+    (e) => e.id === card.etapa.id || transicoesDaEtapaAtual.some((t) => t.etapaDestinoId === e.id),
+  );
 
   return (
     <div className="flex flex-col h-full">

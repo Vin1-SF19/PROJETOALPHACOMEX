@@ -31,7 +31,6 @@ const ROTA_ADMIN_CADENCIAS = `${ROTA_BASE}/admin/cadencias`;
 
 const cadenciaInclude = {
   pipeline: { select: { id: true, nome: true } },
-  etapa: { select: { id: true, nome: true } },
   etapas: {
     include: { etapa: { select: { id: true, nome: true, pipelineId: true, ordem: true } } },
   },
@@ -105,23 +104,6 @@ async function salvarAssociacoesCadencia(
   return { atuaisIds, adicionadas, removidas };
 }
 
-async function atualizarShadowLegado(cadenciaId: string, tx: CadenciaTx, desativarSemEtapa = false) {
-  const associacoes = await tx.bpmCadenciaEtapa.findMany({
-    where: { cadenciaId },
-    include: { etapa: { select: { ordem: true } } },
-  });
-  associacoes.sort((a, b) => a.etapa.ordem - b.etapa.ordem || a.etapaId.localeCompare(b.etapaId));
-  const primeiraEtapaId = associacoes[0]?.etapaId ?? null;
-  await tx.bpmCadencia.update({
-    where: { id: cadenciaId },
-    data: {
-      etapaId: primeiraEtapaId,
-      ...(desativarSemEtapa && !primeiraEtapaId ? { ativa: false } : {}),
-    },
-  });
-  return primeiraEtapaId;
-}
-
 function erroCadencia(error: unknown, fallback: string) {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     return "Uma das colunas já pertence a outra cadência.";
@@ -162,7 +144,6 @@ export async function CriarCadenciaBpm(input: unknown) {
           nome: parsed.data.nome,
           descricao: parsed.data.descricao,
           pipelineId: parsed.data.pipelineId,
-          etapaId: etapas[0]?.id ?? null,
           ativa: parsed.data.ativa,
           criadoPorId: userId,
         },
@@ -211,12 +192,12 @@ export async function AtualizarCadenciaBpm(input: unknown) {
       if (!atual) throw new Error("CADENCIA_NAO_ENCONTRADA");
       const pipelineId = data.pipelineId === undefined ? atual.pipelineId : data.pipelineId;
       const etapaIds = etapaIdsInformadas
-        ?? (atual.etapas.length > 0 ? atual.etapas.map((item) => item.etapaId) : atual.etapaId ? [atual.etapaId] : []);
+        ?? atual.etapas.map((item) => item.etapaId);
       const etapas = await validarEtapasCadencia({ pipelineId, etapaIds, cadenciaId: id }, tx);
       const diff = await salvarAssociacoesCadencia(id, etapas.map((etapa) => etapa.id), tx);
       await tx.bpmCadencia.update({
         where: { id },
-        data: { ...data, pipelineId, etapaId: etapas[0]?.id ?? null },
+        data: { ...data, pipelineId },
       });
       if (pipelineId && (diff.adicionadas.length > 0 || diff.removidas.length > 0)) {
         await tx.bpmPipelineConfigAuditoria.create({
@@ -257,9 +238,7 @@ export async function AtivarDesativarCadenciaBpm(input: unknown) {
       });
       if (!atual) throw new Error("CADENCIA_NAO_ENCONTRADA");
       if (parsed.data.ativa) {
-        const etapaIds = atual.etapas.length > 0
-          ? atual.etapas.map((item) => item.etapaId)
-          : atual.etapaId ? [atual.etapaId] : [];
+        const etapaIds = atual.etapas.map((item) => item.etapaId);
         await validarEtapasCadencia({ pipelineId: atual.pipelineId, etapaIds, cadenciaId: atual.id }, tx);
       }
       await tx.bpmCadencia.update({
@@ -314,12 +293,10 @@ export async function ConfigurarCadenciaEtapaBpm(input: unknown) {
       }
       if (associacaoAtual) {
         await tx.bpmCadenciaEtapa.delete({ where: { etapaId } });
-        await atualizarShadowLegado(associacaoAtual.cadenciaId, tx, true);
       }
       if (selecionada) {
         await tx.bpmCadencia.update({ where: { id: selecionada.id }, data: { pipelineId, ativa: true } });
         await tx.bpmCadenciaEtapa.create({ data: { cadenciaId: selecionada.id, etapaId } });
-        await atualizarShadowLegado(selecionada.id, tx);
       }
       await tx.bpmPipelineConfigAuditoria.create({
         data: {
@@ -356,7 +333,6 @@ export async function ListarCadenciasBpm() {
       orderBy: { createdAt: "desc" },
       include: {
         pipeline: { select: { id: true, nome: true } },
-        etapa: { select: { id: true, nome: true } },
         etapas: {
           include: { etapa: { select: { id: true, nome: true, pipelineId: true, ordem: true } } },
         },
@@ -386,7 +362,6 @@ export async function ObterCadenciaBpm(cadenciaId: string) {
       where: { id: parsedId.data },
       include: {
         pipeline: { select: { id: true, nome: true } },
-        etapa: { select: { id: true, nome: true } },
         etapas: {
           include: { etapa: { select: { id: true, nome: true, pipelineId: true, ordem: true } } },
         },
@@ -648,7 +623,6 @@ export async function ListarCadenciasDoCardBpm(cardId: string) {
         cadencia: {
           include: {
             pipeline: { select: { id: true, nome: true } },
-            etapa: { select: { id: true, nome: true } },
             etapas: {
               include: { etapa: { select: { id: true, nome: true, pipelineId: true } } },
             },

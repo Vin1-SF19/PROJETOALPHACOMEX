@@ -22,7 +22,6 @@ import type { ContextoAvaliacao } from "@/lib/bpm/regras/types";
 type ClienteRequisitosEtapa = Pick<
   typeof db,
   | "bpmCampo"
-  | "bpmCampoObrigatorioEtapa"
   | "bpmCardCampoValor"
   | "bpmCard"
   | "bpmCampoMapeamento"
@@ -107,10 +106,6 @@ type ConfiguracaoAcessoCampo = {
 
 function resolverConfiguracaoAcessoCampo(
   campo: {
-    visivel?: boolean;
-    editavel?: boolean;
-    somenteLeitura?: boolean;
-    obrigatorio: boolean;
     acessos?: Array<ConfiguracaoAcessoCampo & { perfil: string }>;
   },
   configEtapa: ConfiguracaoAcessoCampo | undefined,
@@ -119,15 +114,12 @@ function resolverConfiguracaoAcessoCampo(
   const acesso = perfilAcesso
     ? campo.acessos?.find((item) => item.perfil === perfilAcesso)
     : undefined;
-  const visivel = campo.visivel !== false
-    && configEtapa?.visivel !== false
+  const visivel = configEtapa?.visivel === true
     && acesso?.visivel !== false;
-  const somenteLeitura = campo.somenteLeitura === true
-    || configEtapa?.somenteLeitura === true
+  const somenteLeitura = configEtapa?.somenteLeitura === true
     || acesso?.somenteLeitura === true;
   const editavel = visivel
-    && campo.editavel !== false
-    && configEtapa?.editavel !== false
+    && configEtapa?.editavel === true
     && acesso?.editavel !== false
     && !somenteLeitura;
   return {
@@ -135,7 +127,7 @@ function resolverConfiguracaoAcessoCampo(
     editavel,
     somenteLeitura,
     // BpmCampoAcesso controla apresentação/autorização, jamais requisito de negócio.
-    obrigatorio: configEtapa?.obrigatorio ?? campo.obrigatorio,
+    obrigatorio: configEtapa?.obrigatorio === true,
   };
 }
 
@@ -211,7 +203,7 @@ export async function carregarCamposAplicaveisEtapa(
     porId.set(campo.id, {
       id: campo.id,
       pipelineId: campo.pipelineId,
-      etapaId: campo.etapaId,
+      etapaId: configEtapa.etapaId,
       nome: campo.nome,
       tipo: campo.tipo,
       opcoesJson: opcoes.length ? JSON.stringify(opcoes.map((opcao) => opcao.rotulo)) : campo.opcoesJson,
@@ -222,7 +214,7 @@ export async function carregarCamposAplicaveisEtapa(
       grupo: configEtapa?.grupo ?? null,
       ativo: campo.ativo ?? true,
       escopo: campo.escopo ?? "CARD",
-      valorPadrao: configEtapa?.valorPadrao ?? campo.valorPadrao ?? null,
+      valorPadrao: configEtapa?.valorPadrao ?? null,
       fonteEntidade: campo.fonteEntidade ?? null,
       fonteAtributo: campo.fonteAtributo ?? null,
       entidadeGlobal: campo.entidadeGlobal ?? null,

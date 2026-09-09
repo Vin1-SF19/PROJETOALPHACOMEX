@@ -28,7 +28,6 @@ export function CadenciaEtapasSection({
   ])), [cadencias, etapas, pipelineId]);
   const [selecoes, setSelecoes] = useState<Record<string, string>>(iniciais);
   const candidatas = cadencias.filter((cadencia) => !cadencia.pipelineId || cadencia.pipelineId === pipelineId);
-  const legadas = candidatas.filter((cadencia) => cadencia.etapaId && cadencia.etapas.length === 0);
 
   function configurar(etapaId: string, valor: string) {
     const selecoesAnteriores = selecoes;
@@ -86,11 +85,6 @@ export function CadenciaEtapasSection({
       {candidatas.length === 0 && (
         <p className="rounded-xl border border-dashed border-white/10 px-4 py-5 text-center text-xs text-slate-500">
           Nenhuma cadência disponível. Crie uma definição na área Cadências ou mantenha as colunas sem cadência.
-        </p>
-      )}
-      {legadas.length > 0 && (
-        <p className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-xs text-amber-200/80" role="status">
-          {legadas.length} cadência(s) legada(s) ainda não possuem associação normalizada. Revise-as na área Cadências.
         </p>
       )}
     </section>

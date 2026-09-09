@@ -85,7 +85,6 @@ interface EtapaBpm {
   id: string;
   nome: string;
   ordem: number;
-  slaDias: number | null;
   cor: string | null;
   ativo: boolean;
   ehInicial: boolean;
@@ -721,7 +720,6 @@ export default function AdminPipelineClient({
       pipelineId: pipeline.id,
       nome: novoCampoNome,
       tipo: novoCampoTipo,
-      obrigatorio: false,
       opcoes,
       ordem: campos.length,
       escopo: novoCampoEscopo,
@@ -868,8 +866,6 @@ export default function AdminPipelineClient({
       campoId,
       nome: editCampoNome.trim(),
       tipo: editCampoTipo,
-      etapaId: null,
-      obrigatorio: false,
       opcoes,
       escopo: editCampoEscopo,
       valorPadrao: editCampoValorPadrao || null,
