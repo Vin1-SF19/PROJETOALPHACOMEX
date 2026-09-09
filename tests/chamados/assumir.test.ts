@@ -4,12 +4,14 @@ const authMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   chamados: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
 }));
+const notificarAgendaMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("@/lib/pusher-server.ts", () => ({ pusherServer: { trigger: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock("@/lib/chamados/notificacoes-server", () => ({
+  notificarAgendaChamadoAtualizada: notificarAgendaMock,
   notificarChamadoConcluido: vi.fn(),
   notificarNovoChamado: vi.fn(),
 }));
@@ -93,6 +95,13 @@ describe("assumirChamado — fluxo 'Assumir Chamado'", () => {
       where: { id: 10, tecnicoId: null, status: "ABERTO" },
       data: { status: "EM_ATENDIMENTO", tecnicoId: 3 },
     });
+    expect(notificarAgendaMock).toHaveBeenCalledWith(
+      [1, 3],
+      expect.objectContaining({
+        chamadoId: 10,
+        status: "EM_ATENDIMENTO",
+      }),
+    );
   });
 
   it("rejeita uma assunção concorrente sem sobrescrever o técnico vencedor", async () => {

@@ -3,6 +3,10 @@ import type { EventoExibicao, TarefaAgendaExibicao } from "./tipos";
 /** Converte tarefas Google em itens da grade; horários de chamados ficam no cache local. */
 export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoExibicao[] {
   return tarefas.flatMap((tarefa): EventoExibicao[] => {
+    const calendarioGravavel = tarefa.gravavel !== false;
+    const calendarioId = tarefa.visualizacaoSolicitante
+      ? "tarefas-chamados-solicitante"
+      : "tarefas-google";
     const possuiHorarioAgendado = Boolean(tarefa.inicioAgendadoEm && tarefa.fimPlanejadoAgendadoEm);
     const possuiHorarioLocal = Boolean(tarefa.inicioLocalEm && tarefa.fimLocalEm);
     if (!possuiHorarioAgendado && !possuiHorarioLocal && !tarefa.vencimentoEm)
@@ -23,11 +27,11 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
         tipo: "tarefa" as const,
         tarefaCacheId: tarefa.id,
         tarefaNotas: tarefa.notas,
-        calendarioId: "tarefas-google",
+        calendarioId,
         calendarioGoogleId: tarefa.taskListGoogleId,
         calendarioNome: tarefa.listaTitulo,
         calendarioCorHex: tarefa.statusAgendamento === "CONCLUIDO" ? "#22c55e" : "#3b82f6",
-        calendarioGravavel: true,
+        calendarioGravavel,
       }];
     }
 
@@ -46,11 +50,11 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
         tipo: "tarefa" as const,
         tarefaCacheId: tarefa.id,
         tarefaNotas: tarefa.notas,
-        calendarioId: "tarefas-google",
+        calendarioId,
         calendarioGoogleId: tarefa.taskListGoogleId,
         calendarioNome: tarefa.listaTitulo,
         calendarioCorHex: tarefa.status === "completed" ? "#22c55e" : null,
-        calendarioGravavel: true,
+        calendarioGravavel,
       }];
     }
 
@@ -76,11 +80,11 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
       tipo: "tarefa" as const,
       tarefaCacheId: tarefa.id,
       tarefaNotas: tarefa.notas,
-      calendarioId: "tarefas-google",
+      calendarioId,
       calendarioGoogleId: tarefa.taskListGoogleId,
       calendarioNome: tarefa.listaTitulo,
       calendarioCorHex: null,
-      calendarioGravavel: true,
+      calendarioGravavel,
     }];
   });
 }

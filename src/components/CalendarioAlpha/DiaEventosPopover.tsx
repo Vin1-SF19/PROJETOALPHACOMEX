@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Eye, Sparkles } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,8 @@ export function DiaEventosPopover({
               <div key={evento.id} className={cn("group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/15 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/30 hover:brightness-110", evento.status === "completed" && "border-slate-500/35 text-slate-400")} style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3, background: evento.status === "completed" ? FUNDO_TAREFA_CONCLUIDA : `linear-gradient(135deg, ${corDoItemAgenda(evento)}e8, ${corDoItemAgenda(evento)}aa)` }}>
                 {evento.status === "completed" ? (
                   <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/20" title="Tarefa concluída"><CheckCircle2 className="size-3.5 text-white" aria-hidden="true" /></span>
+                ) : !evento.calendarioGravavel ? (
+                  <span role="img" aria-label="Tarefa do chamado — somente leitura" className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-sky-100/70 bg-sky-950/30" title="Tarefa do chamado — somente leitura"><Eye className="size-3.5 text-sky-100" aria-hidden="true" /></span>
                 ) : (
                   <button type="button" onClick={() => { if (evento.tarefaCacheId) onConcluirTarefa(evento.tarefaCacheId); }} className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-white/80 bg-slate-950/25 transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label={`Concluir tarefa: ${evento.titulo || "sem título"}`} title="Concluir tarefa">
                     <CheckCircle2 className="size-3.5 text-white" aria-hidden="true" />
@@ -46,7 +48,7 @@ export function DiaEventosPopover({
                 <button type="button" onClick={() => { setOpen(false); onEditarEvento(evento); }} className="min-w-0 flex-1 text-left focus:outline-none">
                   <span className={cn("block truncate text-sm font-bold text-white", evento.status === "completed" && "text-slate-400 line-through decoration-slate-400")}>{evento.titulo || "(sem título)"}</span>
                   <span className="mt-0.5 block text-[11px] font-medium text-white/75">{evento.diaInteiro ? "Dia inteiro" : evento.inicioEm ? formatarHora(new Date(evento.inicioEm)) : "—"}</span>
-                  <span className="mt-1 block text-[10px] font-bold uppercase tracking-wide text-white/80">{evento.status === "completed" ? "Concluída" : "Clique para editar"}</span>
+                  <span className="mt-1 block text-[10px] font-bold uppercase tracking-wide text-white/80">{evento.status === "completed" ? "Concluída" : evento.calendarioGravavel ? "Clique para editar" : "Acompanhamento — somente leitura"}</span>
                 </button>
               </div>
             ) : (

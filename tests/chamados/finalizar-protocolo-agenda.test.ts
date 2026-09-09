@@ -4,6 +4,7 @@ const authMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 const concluirTarefaMock = vi.hoisted(() => vi.fn());
 const notificarConcluidoMock = vi.hoisted(() => vi.fn());
+const notificarAgendaMock = vi.hoisted(() => vi.fn());
 const prismaMock = vi.hoisted(() => ({
   chamados: { findUnique: vi.fn() },
   $executeRawUnsafe: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock("../../auth", () => ({ auth: authMock }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 vi.mock("@/lib/prisma", () => ({ default: prismaMock }));
 vi.mock("@/lib/chamados/notificacoes-server", () => ({
+  notificarAgendaChamadoAtualizada: notificarAgendaMock,
   notificarChamadoConcluido: notificarConcluidoMock,
 }));
 vi.mock("@/lib/chamados/tarefa-agendada", () => ({
@@ -71,6 +73,14 @@ describe("finalizarComProtocolo — integração com Agenda Alpha", () => {
       tecnicoRole: "T.I",
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/PainelAlpha/CalendarioAlpha");
+    expect(notificarAgendaMock).toHaveBeenCalledWith(
+      [7, 3],
+      {
+        chamadoId: 10,
+        status: "CONCLUIDO",
+        updatedAt: INSTANTE_CONCLUSAO.toISOString(),
+      },
+    );
   });
 
   it("mantém o chamado concluído quando o Google Tasks está indisponível", async () => {

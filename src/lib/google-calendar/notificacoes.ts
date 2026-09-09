@@ -3,6 +3,7 @@ export const CALENDARIO_ALPHA_USUARIO_CHANNEL_PREFIX = "private-calendario-alpha
 export const CALENDARIO_ALPHA_COMPROMISSO_EVENT = "calendario-alpha-compromisso";
 export const CALENDARIO_ALPHA_SOLICITACAO_RECEBIDA_EVENT = "calendario-alpha-solicitacao-recebida";
 export const CALENDARIO_ALPHA_SOLICITACAO_RESPONDIDA_EVENT = "calendario-alpha-solicitacao-respondida";
+export const CALENDARIO_ALPHA_CHAMADO_ATUALIZADO_EVENT = "calendario-alpha-chamado-atualizado";
 
 export interface CalendarioAlphaCompromissoPayload {
   id: string;
@@ -28,6 +29,12 @@ export interface CalendarioAlphaSolicitacaoRespondidaPayload {
   status: "ACEITO" | "RECUSADO";
   papelPedido: "VISUALIZADOR" | "EDITOR";
   createdAt: string;
+}
+
+export interface CalendarioAlphaChamadoAtualizadoPayload {
+  chamadoId: number;
+  status: "EM_ATENDIMENTO" | "CONCLUIDO";
+  updatedAt: string;
 }
 
 export function canalCalendarioAlphaDoUsuario(userId: number): string {

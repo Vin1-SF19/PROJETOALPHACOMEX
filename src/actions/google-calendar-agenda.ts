@@ -100,7 +100,18 @@ export async function carregarIntervaloAgendaAlpha(input: {
       }),
       db.googleCalendarTaskCache.findMany({
         where: {
-          taskList: { conexao: { userId: acesso.userId, status: "ATIVA" } },
+          OR: [
+            {
+              taskList: {
+                conexao: { userId: acesso.userId, status: "ATIVA" },
+              },
+            },
+            {
+              agendamentoChamado: {
+                is: { chamado: { usuarioId: acesso.userId } },
+              },
+            },
+          ],
           excluida: false,
           oculta: false,
         },
@@ -120,10 +131,15 @@ export async function carregarIntervaloAgendaAlpha(input: {
               fimPlanejadoEm: true,
               fimConcluidoEm: true,
               status: true,
+              chamado: { select: { usuarioId: true } },
             },
           },
           taskList: {
-            select: { googleTaskListId: true, titulo: true },
+            select: {
+              googleTaskListId: true,
+              titulo: true,
+              conexao: { select: { userId: true } },
+            },
           },
         },
       }),
@@ -156,29 +172,38 @@ export async function carregarIntervaloAgendaAlpha(input: {
       })),
     );
 
-    const tarefas: TarefaAgendaExibicao[] = tarefasCache.map((tarefa) => ({
-      id: tarefa.id,
-      taskListGoogleId: tarefa.taskList.googleTaskListId,
-      listaTitulo: tarefa.taskList.titulo,
-      titulo: tarefa.titulo,
-      notas: tarefa.notas,
-      status: tarefa.status === "completed" ? "completed" : "needsAction",
-      vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null,
-      inicioAgendadoEm:
-        tarefa.agendamentoChamado?.inicioEm.toISOString() ?? null,
-      fimPlanejadoAgendadoEm:
-        tarefa.agendamentoChamado?.fimPlanejadoEm.toISOString() ?? null,
-      fimConcluidoAgendadoEm:
-        tarefa.agendamentoChamado?.fimConcluidoEm?.toISOString() ?? null,
-      statusAgendamento:
-        tarefa.agendamentoChamado?.status === "CONCLUIDO"
-          ? "CONCLUIDO"
-          : tarefa.agendamentoChamado?.status === "EM_ATENDIMENTO"
-            ? "EM_ATENDIMENTO"
-            : null,
-      inicioLocalEm: tarefa.inicioLocalEm?.toISOString() ?? null,
-      fimLocalEm: tarefa.fimLocalEm?.toISOString() ?? null,
-    }));
+    const tarefas: TarefaAgendaExibicao[] = tarefasCache.map((tarefa) => {
+      const gravavel = tarefa.taskList.conexao.userId === acesso.userId;
+      return {
+        id: tarefa.id,
+        taskListGoogleId: gravavel ? tarefa.taskList.googleTaskListId : "",
+        listaTitulo: gravavel
+          ? tarefa.taskList.titulo
+          : "Chamados solicitados",
+        titulo: tarefa.titulo,
+        notas: tarefa.notas,
+        status: tarefa.status === "completed" ? "completed" : "needsAction",
+        vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null,
+        inicioAgendadoEm:
+          tarefa.agendamentoChamado?.inicioEm.toISOString() ?? null,
+        fimPlanejadoAgendadoEm:
+          tarefa.agendamentoChamado?.fimPlanejadoEm.toISOString() ?? null,
+        fimConcluidoAgendadoEm:
+          tarefa.agendamentoChamado?.fimConcluidoEm?.toISOString() ?? null,
+        statusAgendamento:
+          tarefa.agendamentoChamado?.status === "CONCLUIDO"
+            ? "CONCLUIDO"
+            : tarefa.agendamentoChamado?.status === "EM_ATENDIMENTO"
+              ? "EM_ATENDIMENTO"
+              : null,
+        inicioLocalEm: tarefa.inicioLocalEm?.toISOString() ?? null,
+        fimLocalEm: tarefa.fimLocalEm?.toISOString() ?? null,
+        gravavel,
+        visualizacaoSolicitante:
+          !gravavel &&
+          tarefa.agendamentoChamado?.chamado.usuarioId === acesso.userId,
+      };
+    });
 
     registrarMetricaPerformanceAgendaAlpha({
       correlationId,

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { pusherServer } from "@/lib/pusher-server.ts";
 import {
+  notificarAgendaChamadoAtualizada,
   notificarChamadoConcluido,
   notificarNovoChamado,
 } from "@/lib/chamados/notificacoes-server";
@@ -30,6 +31,7 @@ export async function updateChamadosStatus(id: number, novoStatus: string, soluc
         titulo: true,
         descricao: true,
         usuarioId: true,
+        tecnicoId: true,
         solucao: true,
         updatedAt: true,
       },
@@ -68,6 +70,20 @@ export async function updateChamadosStatus(id: number, novoStatus: string, soluc
         status: novoStatus,
         message: error instanceof Error ? error.message : "erro desconhecido",
       });
+    }
+
+    if (novoStatus === "EM_ATENDIMENTO" || novoStatus === "CONCLUIDO") {
+      await notificarAgendaChamadoAtualizada(
+        [
+          chamadoAtualizado.usuarioId,
+          chamadoAtualizado.tecnicoId ?? Number(session.user.id),
+        ],
+        {
+          chamadoId: chamadoAtualizado.id,
+          status: novoStatus,
+          updatedAt: chamadoAtualizado.updatedAt.toISOString(),
+        },
+      );
     }
 
     revalidatePath("/PainelAlpha/Chamados");
@@ -216,12 +232,14 @@ export async function assumirChamado(id: number) {
       return { success: false, error: "Chamado já foi assumido por outro técnico" };
     }
 
+    let agendaAtualizadaEm = chamado.updatedAt;
     try {
       const atualizado = await db.chamados.findUnique({
         where: { id },
         select: { id: true, titulo: true, descricao: true, usuarioId: true, solucao: true, updatedAt: true },
       });
       if (atualizado) {
+        agendaAtualizadaEm = atualizado.updatedAt;
         await criarTarefaAgendadaParaChamado({
           chamado: atualizado,
           tecnicoId,
@@ -234,6 +252,15 @@ export async function assumirChamado(id: number) {
         message: e instanceof Error ? e.message : "erro desconhecido",
       });
     }
+
+    await notificarAgendaChamadoAtualizada(
+      [chamado.usuarioId, tecnicoId],
+      {
+        chamadoId: id,
+        status: "EM_ATENDIMENTO",
+        updatedAt: agendaAtualizadaEm.toISOString(),
+      },
+    );
 
     revalidatePath("/PainelAlpha/Chamados");
     revalidatePath("/PainelAlpha/CalendarioAlpha");

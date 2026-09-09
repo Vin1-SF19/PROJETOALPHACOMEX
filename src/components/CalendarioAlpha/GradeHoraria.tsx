@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 import type { TemaAlpha } from "@/lib/temas";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Eye, Sparkles } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -159,6 +159,8 @@ export function GradeHoraria({
                 <div key={evento.id} className={cn("group/task flex w-full items-center gap-1.5 overflow-hidden rounded-lg border py-1 pr-1 text-[10px] font-bold shadow-[0_5px_14px_rgba(16,185,129,0.14)] transition-all hover:-translate-y-px", evento.status === "completed" ? "border-slate-500/30 bg-slate-800/80 text-slate-400" : "border-emerald-200/20 bg-emerald-500/15 text-emerald-50 hover:bg-emerald-400/25")} style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3 }}>
                   {evento.status === "completed" ? (
                     <span className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-slate-400/60 bg-slate-950/30" title="Tarefa concluída"><CheckCircle2 className="size-3 text-slate-300" aria-hidden="true" /></span>
+                  ) : !evento.calendarioGravavel ? (
+                    <span role="img" aria-label="Tarefa do chamado — somente leitura" className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-sky-200/60 bg-sky-950/30" title="Tarefa do chamado — somente leitura"><Eye className="size-3 text-sky-100" aria-hidden="true" /></span>
                   ) : (
                     <button type="button" onClick={() => evento.tarefaCacheId && onConcluirTarefa(evento.tarefaCacheId)} className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-emerald-100/80 bg-emerald-950/30 transition-colors hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label={`Concluir tarefa: ${evento.titulo || "sem título"}`} title="Concluir tarefa">
                       <CheckCircle2 className="size-3 text-emerald-100 group-hover/task:text-emerald-600" aria-hidden="true" />
@@ -244,6 +246,8 @@ export function GradeHoraria({
                     <span className="flex items-center gap-1 truncate leading-tight">
                       {evento.status === "completed" ? (
                         <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/20" title="Tarefa concluída"><CheckCircle2 className="size-3 text-white" aria-hidden="true" /></span>
+                      ) : !evento.calendarioGravavel ? (
+                        <span role="img" aria-label="Tarefa do chamado — somente leitura" className="flex size-4 shrink-0 items-center justify-center rounded-full border border-sky-100/70 bg-sky-950/30" title="Tarefa do chamado — somente leitura"><Eye className="size-3 text-sky-100" aria-hidden="true" /></span>
                       ) : (
                         <button type="button" onClick={() => evento.tarefaCacheId && onConcluirTarefa(evento.tarefaCacheId)} className="flex size-4 shrink-0 items-center justify-center rounded-full border border-white/80 bg-slate-950/25 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label={`Concluir tarefa: ${evento.titulo || "sem título"}`} title="Concluir tarefa"><CheckCircle2 className="size-3 text-white" aria-hidden="true" /></button>
                       )}

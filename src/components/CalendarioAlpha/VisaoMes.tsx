@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Plus, Sparkles } from "lucide-react";
+import { CheckCircle2, Eye, Plus, Sparkles } from "lucide-react";
 
 import type { TemaAlpha } from "@/lib/temas";
 import { cn } from "@/lib/utils";
@@ -107,6 +107,8 @@ export function VisaoMes({
                   <div key={evento.id} className={cn("group/task relative flex w-full items-center gap-1 overflow-hidden rounded-lg border border-white/15 py-1 pr-1 text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(15,23,42,0.22)] transition-all hover:-translate-y-px hover:brightness-110 hover:shadow-[0_7px_18px_rgba(15,23,42,0.3)]", evento.status === "completed" && "border-slate-500/35 text-slate-400")} style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3, background: evento.status === "completed" ? FUNDO_TAREFA_CONCLUIDA : `linear-gradient(135deg, ${corDoItemAgenda(evento)}f2, ${corDoItemAgenda(evento)}b8)` }}>
                     {evento.status === "completed" ? (
                       <span className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/20" title="Tarefa concluída"><CheckCircle2 className="size-3 text-white" aria-hidden="true" /></span>
+                    ) : !evento.calendarioGravavel ? (
+                      <span role="img" aria-label="Tarefa do chamado — somente leitura" className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-sky-100/70 bg-sky-950/30" title="Tarefa do chamado — somente leitura"><Eye className="size-3 text-sky-100" aria-hidden="true" /></span>
                     ) : (
                       <button type="button" onClick={(e) => { e.stopPropagation(); if (evento.tarefaCacheId) onConcluirTarefa(evento.tarefaCacheId); }} className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-white/80 bg-slate-950/25 transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label={`Concluir tarefa: ${evento.titulo || "sem título"}`} title="Concluir tarefa">
                         <CheckCircle2 className="size-3 text-white" aria-hidden="true" />

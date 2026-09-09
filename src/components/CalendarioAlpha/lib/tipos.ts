@@ -154,6 +154,10 @@ export interface TarefaAgendaExibicao {
   /** Horário definido manualmente pelo usuário na Agenda Alpha (Google Tasks não guarda hora). */
   inicioLocalEm?: string | null;
   fimLocalEm?: string | null;
+  /** O usuário atual pode alterar esta tarefa na lista Google de origem. */
+  gravavel?: boolean;
+  /** Projeção somente leitura de um chamado aberto pelo usuário atual. */
+  visualizacaoSolicitante?: boolean;
 }
 
 export interface ListaTarefasAgendaView {

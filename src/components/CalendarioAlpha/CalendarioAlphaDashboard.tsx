@@ -79,6 +79,12 @@ export function CalendarioAlphaDashboard({ temaName, statusConexao, conexaoId, c
       toast.error("Tarefa não encontrada neste período.");
       return;
     }
+    if (!tarefa.calendarioGravavel) {
+      toast.info(
+        "Esta tarefa acompanha um chamado aberto por você e é somente leitura.",
+      );
+      return;
+    }
     agenda.executarMutacaoOtimista({
       item: { ...tarefa, status: "completed", calendarioCorHex: "#22c55e" },
       executar: async () => {

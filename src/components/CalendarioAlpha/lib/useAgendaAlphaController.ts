@@ -410,6 +410,12 @@ export function useAgendaAlphaController({
       return;
     }
     if (evento.tipo === "tarefa") {
+      if (!evento.calendarioGravavel) {
+        toast.info(
+          "Esta tarefa acompanha um chamado aberto por você e é somente leitura.",
+        );
+        return;
+      }
       invalidarEdicaoPendente();
       setAlvoEdicao(evento);
       setSessaoEdicao({ evento, detalhes: undefined });

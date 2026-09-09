@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { pusherClient } from "@/lib/pusher";
 import { useCalendarioAlphaNotificacoes } from "@/store/useCalendarioAlphaNotificacoes";
 import {
+  CALENDARIO_ALPHA_CHAMADO_ATUALIZADO_EVENT,
   CALENDARIO_ALPHA_COMPROMISSO_EVENT,
   CALENDARIO_ALPHA_SOLICITACAO_RECEBIDA_EVENT,
   CALENDARIO_ALPHA_SOLICITACAO_RESPONDIDA_EVENT,
@@ -12,6 +13,7 @@ import {
   type CalendarioAlphaSolicitacaoRecebidaPayload,
   type CalendarioAlphaSolicitacaoRespondidaPayload,
 } from "@/lib/google-calendar/notificacoes";
+import { notificarCalendarioAlphaAlterado } from "@/lib/google-calendar/invalidation";
 
 /** Espelha `useAdminChamadosNotifications.ts` (mesmo som `/sounds/notification.mp3`). */
 export function useCalendarioAlphaNotifications(userId: number) {
@@ -53,15 +55,20 @@ export function useCalendarioAlphaNotifications(userId: number) {
       adicionarSolicitacaoRespondida(payload);
       playAudio();
     };
+    const handlerChamadoAtualizado = () => {
+      notificarCalendarioAlphaAlterado();
+    };
 
     canal.bind(CALENDARIO_ALPHA_COMPROMISSO_EVENT, handlerCompromisso);
     canal.bind(CALENDARIO_ALPHA_SOLICITACAO_RECEBIDA_EVENT, handlerSolicitacaoRecebida);
     canal.bind(CALENDARIO_ALPHA_SOLICITACAO_RESPONDIDA_EVENT, handlerSolicitacaoRespondida);
+    canal.bind(CALENDARIO_ALPHA_CHAMADO_ATUALIZADO_EVENT, handlerChamadoAtualizado);
 
     return () => {
       canal.unbind(CALENDARIO_ALPHA_COMPROMISSO_EVENT, handlerCompromisso);
       canal.unbind(CALENDARIO_ALPHA_SOLICITACAO_RECEBIDA_EVENT, handlerSolicitacaoRecebida);
       canal.unbind(CALENDARIO_ALPHA_SOLICITACAO_RESPONDIDA_EVENT, handlerSolicitacaoRespondida);
+      canal.unbind(CALENDARIO_ALPHA_CHAMADO_ATUALIZADO_EVENT, handlerChamadoAtualizado);
       client.unsubscribe(canalCalendarioAlphaDoUsuario(userId));
       subscribedRef.current = false;
     };

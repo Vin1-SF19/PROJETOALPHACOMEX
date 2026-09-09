@@ -4,7 +4,10 @@ import db from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../auth";
 import { isAdminRole } from "@/lib/roles";
-import { notificarChamadoConcluido } from "@/lib/chamados/notificacoes-server";
+import {
+  notificarAgendaChamadoAtualizada,
+  notificarChamadoConcluido,
+} from "@/lib/chamados/notificacoes-server";
 import { concluirTarefaAgendadaDoChamado } from "@/lib/chamados/tarefa-agendada";
 
 // Prisma client types não incluem ProtocoloTemplate ainda.
@@ -172,6 +175,14 @@ export async function finalizarComProtocolo(
       solucao: dados.solucao.trim(),
       createdAt: concluidoEm.toISOString(),
     });
+    await notificarAgendaChamadoAtualizada(
+      [chamado.usuarioId, chamado.tecnicoId ?? 0],
+      {
+        chamadoId: chamado.id,
+        status: "CONCLUIDO",
+        updatedAt: concluidoEm.toISOString(),
+      },
+    );
 
     revalidatePath("/PainelAlpha/Chamados");
     revalidatePath("/PainelAlpha/CalendarioAlpha");

@@ -56,6 +56,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [x] Manter tarefas concluídas no período visível e padronizar o estado visual concluído em dia, semana, mês e lista expandida.
 - [x] Integrar destinos compartilhados Editor ao formulário e proteger eventos/listas/tarefas por vínculo e identidade Workspace resolvidos no servidor.
 - [x] Substituir o `router.push` das notificações por ativação da aba interna e handshake confiável para abrir o modal de compartilhamentos.
+- [x] Projetar a tarefa do chamado na Agenda Alpha do solicitante como somente leitura e refletir a conclusão e o horário real do atendimento.
 
 ## File List
 
@@ -64,6 +65,7 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `prisma/migrations/20260827150000_add_google_calendar_task_schedule_for_chamados/migration.sql`
 - `src/lib/google-calendar/{client,types,cache-eventos,scopes,sync}.ts`
 - `src/lib/chamados/tarefa-agendada.ts`
+- `src/lib/chamados/notificacoes-server.ts`
 - `src/actions/chamados.ts`
 - `src/actions/protocolos.ts`
 - `src/actions/google-calendar-{eventos,sync,tarefas}.ts`
@@ -87,10 +89,15 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `src/components/CalendarioAlpha/{CompromissoNotificacaoToast,SinoNotificacoesCompromissos}.tsx`
 - `src/components/CalendarioAlpha/lib/{useAgendasCompartilhadas,tipos,itens-agenda}.ts`
 - `src/lib/google-calendar/navegacao.ts`
+- `src/lib/google-calendar/notificacoes.ts`
+- `src/hooks/useCalendarioAlphaNotifications.ts`
 - `tests/google-calendar/{compartilhamento-escrita,navegacao-notificacoes}.test.ts`
 - `tests/chamados/{finalizar-protocolo-agenda,tarefa-agendada}.test.ts`
+- `tests/chamados/{assumir,notificacoes}.test.ts`
+- `tests/google-calendar/chamado-solicitante-readonly.test.ts`
 - `plan/self-critique-agenda-alpha-sharing.json`
 - `plan/self-critique-chamados-agenda-conclusao.json`
+- `plan/self-critique-chamado-solicitante-agenda.json`
 
 ## Dev Agent Record
 
@@ -112,12 +119,15 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - Gates do recorte: ESLint sem erros/avisos, 26/26 testes específicos aprovados e build de produção aprovado. Os gates globais continuam bloqueados pela linha de base do repositório: lint com 21.210 ocorrências, typecheck com erros preexistentes fora do recorte e suíte completa com 49 falhas em 18 arquivos; o primeiro `npm run typecheck` também excedeu o heap padrão antes da repetição com 8 GB.
 - O encerramento real por **Finalizar com Protocolo** agora aciona a tarefa vinculada ao técnico responsável, reutiliza exatamente o instante salvo em `closedAt`/`updatedAt` como fim real e invalida a Agenda Alpha. O alias legado `T.I` também é reconhecido; falha externa do Google permanece observável e não reabre nem bloqueia o chamado já concluído. O cache e o agendamento locais são concluídos antes da chamada externa, preservando o estado correto da Agenda Alpha mesmo durante indisponibilidade do Google.
 - Regressão da integração Chamados → Agenda: 20/20 testes direcionados aprovados, ESLint do recorte sem ocorrências e build de produção aprovado. Os gates globais mantêm a mesma linha de base externa ao ajuste: 21.210 ocorrências no lint, 49 falhas em 18 arquivos e erros de typecheck fora dos arquivos alterados; a execução padrão do typecheck excedeu o heap de 4 GB antes da repetição diagnóstica com 8 GB.
+- A tarefa já vinculada ao atendimento também é projetada na Agenda Alpha de quem abriu o chamado, agrupada como `Chamados solicitados`. A projeção não expõe a lista Google privada do técnico e é somente leitura; por compartilhar o mesmo cache/agendamento, recebe automaticamente o estado concluído e o fim real gravado pelo fechamento do chamado. Um evento Pusher privado invalida as agendas abertas do solicitante e do técnico imediatamente após assumir ou concluir, mantendo a revalidação periódica como fallback. Nenhuma estrutura de banco, migration ou backfill foi necessária.
+- Regressão do recorte solicitante/TI: 34/34 testes direcionados aprovados, Prisma schema válido, ESLint dos arquivos alterados, `git diff --check` sem ocorrências e build de produção aprovado. Nos gates globais, a linha de base externa ao recorte permanece pendente: lint com 21.210 ocorrências, typecheck com erros em arquivos não alterados e suíte completa com 50 falhas em 19 arquivos contra 2.680 testes aprovados e 1 pendente.
 
 ### Change Log
 
 - 2026-09-09: carregamento cache-first, navegação sem round-trip de página, mutações otimistas, consulta consolidada e telemetria de latência da Agenda Alpha.
 - 2026-09-09: permanência visual de tarefas concluídas, escrita em agendas compartilhadas Editor e correção do fluxo de notificações/convites nas abas internas.
 - 2026-09-09: correção do encerramento por protocolo para concluir a tarefa vinculada e usar o horário real do fechamento na Agenda Alpha.
+- 2026-09-09: projeção somente leitura e atualização privada em tempo real da tarefa do chamado na agenda do solicitante, refletindo atendimento, conclusão e horário real sem duplicar a tarefa Google.
 
 ## Notas operacionais
 

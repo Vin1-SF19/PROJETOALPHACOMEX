@@ -7,6 +7,10 @@ import {
   extrairUsuarioIdDoCanalChamados,
   podeReceberNovosChamados,
 } from "@/lib/chamados/notificacoes";
+import {
+  CALENDARIO_ALPHA_CHAMADO_ATUALIZADO_EVENT,
+  canalCalendarioAlphaDoUsuario,
+} from "@/lib/google-calendar/notificacoes";
 
 const trigger = vi.fn();
 
@@ -62,6 +66,26 @@ describe("notificações de chamados", () => {
     expect(trigger).toHaveBeenCalledWith(
       "private-chamados-usuario-42",
       CHAMADO_CONCLUIDO_EVENT,
+      payload,
+    );
+  });
+
+  it("invalida em tempo real as agendas do solicitante e do técnico", async () => {
+    const { notificarAgendaChamadoAtualizada } = await import(
+      "@/lib/chamados/notificacoes-server"
+    );
+    const payload = {
+      chamadoId: 15,
+      status: "EM_ATENDIMENTO" as const,
+      updatedAt: "2026-09-09T17:50:00.000Z",
+    };
+
+    await expect(
+      notificarAgendaChamadoAtualizada([42, 8, 42, 0], payload),
+    ).resolves.toBe(true);
+    expect(trigger).toHaveBeenCalledWith(
+      [canalCalendarioAlphaDoUsuario(42), canalCalendarioAlphaDoUsuario(8)],
+      CALENDARIO_ALPHA_CHAMADO_ATUALIZADO_EVENT,
       payload,
     );
   });
