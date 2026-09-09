@@ -9,6 +9,7 @@ type Etapa = { id: string; nome: string };
 export type EscopoEtapaChecklist = "TODAS" | "SELECIONADAS";
 
 interface EtapasMultiSelectProps {
+  accent?: string;
   pipelineSelecionado: boolean;
   etapas: Etapa[];
   escopo: EscopoEtapaChecklist;
@@ -22,6 +23,7 @@ interface EtapasMultiSelectProps {
 }
 
 export function EtapasMultiSelect({
+  accent,
   pipelineSelecionado,
   etapas,
   escopo,
@@ -55,9 +57,9 @@ export function EtapasMultiSelect({
 
   return (
     <fieldset
-      className="space-y-3"
+      className="min-w-0 space-y-3"
       aria-busy={isLoading}
-      aria-disabled={controlesDesabilitados}
+      aria-disabled={Boolean(disabled || isLoading || error)}
       aria-describedby="etapas-checklist-ajuda"
     >
       <legend className="text-sm font-medium text-slate-200">Etapas</legend>
@@ -72,8 +74,9 @@ export function EtapasMultiSelect({
             type="radio"
             name="escopo-etapa-checklist"
             className="size-4 accent-current outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            style={accent ? { accentColor: `rgb(${accent})` } : undefined}
             checked={escopo === "TODAS"}
-            disabled={controlesDesabilitados}
+            disabled={Boolean(disabled || isLoading || error)}
             onChange={() => alterarEscopo("TODAS")}
           />
           Todas as etapas
@@ -83,6 +86,7 @@ export function EtapasMultiSelect({
             type="radio"
             name="escopo-etapa-checklist"
             className="size-4 accent-current outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            style={accent ? { accentColor: `rgb(${accent})` } : undefined}
             checked={escopo === "SELECIONADAS"}
             disabled={controlesDesabilitados}
             onChange={() => alterarEscopo("SELECIONADAS")}
@@ -116,14 +120,15 @@ export function EtapasMultiSelect({
             : (
               <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto rounded-xl border border-white/[0.07] p-2 sm:grid-cols-2">
                 {etapas.map((etapa) => (
-                  <label key={etapa.id} className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-slate-200 hover:bg-white/[0.04]">
+                  <label key={etapa.id} className="flex min-w-0 min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-slate-200 hover:bg-white/[0.04]">
                     <Checkbox
+                      style={accent && selecionadas.includes(etapa.id) ? { backgroundColor: `rgb(${accent})`, borderColor: `rgb(${accent})` } : undefined}
                       checked={selecionadas.includes(etapa.id)}
                       disabled={controlesDesabilitados}
                       aria-invalid={faltantes.length > 0}
                       onCheckedChange={(valor) => alternarEtapa(etapa.id, valor === true)}
                     />
-                    {etapa.nome}
+                    <span className="min-w-0 break-all">{etapa.nome}</span>
                   </label>
                 ))}
               </div>
@@ -135,14 +140,17 @@ export function EtapasMultiSelect({
               <>
                 <span>{selecionadas.length} {selecionadas.length === 1 ? "etapa selecionada" : "etapas selecionadas"}</span>
                 {resumo.map((item) => (
-                  <Badge key={item.id} variant="outline" className="gap-1">
-                    {item.nome}
+                  <Badge key={item.id} variant="outline" className="min-w-0 max-w-full gap-1">
+                    <span className="min-w-0 truncate" title={item.nome}>{item.nome}</span>
                     <button
                       type="button"
                       aria-label={`Remover etapa ${item.nome}`}
-                      className="ml-1 text-slate-400 hover:text-rose-300"
+                      className="ml-1 shrink-0 text-slate-400 hover:text-rose-300 focus-visible:outline-2"
                       disabled={disabled}
-                      onClick={() => alternarEtapa(item.id, false)}
+                      onClick={(event) => {
+                        event.currentTarget.closest("fieldset")?.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.focus();
+                        alternarEtapa(item.id, false);
+                      }}
                     >
                       ×
                     </button>

@@ -35,3 +35,13 @@ export function encontrarEtapasIncompativeis(etapaIds: string[], etapasDisponive
   const idsDisponiveis = new Set(etapasDisponiveis.map((etapa) => etapa.id));
   return etapaIds.filter((id) => !idsDisponiveis.has(id));
 }
+
+export function resumoEtapasTemplate(template: TemplateComEtapas & {
+  etapa: { nome: string } | null;
+  etapas: Array<{ etapaId: string; etapa: { nome: string } }>;
+}) {
+  const { etapaIds } = resolverSelecaoEtapasTemplate(template);
+  if (etapaIds.length === 0) return "Qualquer etapa";
+  if (etapaIds.length > 1) return `${etapaIds.length} etapas`;
+  return template.etapas[0]?.etapa.nome ?? template.etapa?.nome ?? "Etapa específica";
+}

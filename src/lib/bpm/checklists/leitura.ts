@@ -31,7 +31,7 @@ export type InstanciaEstadoChecklist = {
 export type ResumoChecklistCard = ReturnType<typeof calcularResumoChecklist>;
 
 export function templateChecklistCompativel(escopo: EscopoTemplateChecklist, card: ContextoCardChecklist): boolean {
-  const etapaIds = escopo.etapaIds ?? (escopo.etapaId ? [escopo.etapaId] : []);
+  const etapaIds = escopo.etapaIds?.length ? escopo.etapaIds : (escopo.etapaId ? [escopo.etapaId] : []);
   return (!escopo.pipelineId || escopo.pipelineId === card.pipelineId)
     && (etapaIds.length === 0 || etapaIds.includes(card.etapaId))
     && (!escopo.cardId || escopo.cardId === card.id);

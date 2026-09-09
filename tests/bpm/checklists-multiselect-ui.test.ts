@@ -101,7 +101,10 @@ describe("RM-2026-457A31 — interação do multiselect de etapas", () => {
     expect(checkboxes).toHaveLength(4);
     funcao(checkboxes[0], "onCheckedChange")(false);
     expect(onSelecionadasChange).toHaveBeenCalledWith(["etapa-b", "etapa-c", "etapa-d"]);
-    funcao(removerEntrada!, "onClick")();
+    const focus = vi.fn();
+    const querySelector = vi.fn().mockReturnValue({ focus });
+    funcao(removerEntrada!, "onClick")({ currentTarget: { closest: () => ({ querySelector }) } });
+    expect(focus).toHaveBeenCalledOnce();
     expect(onSelecionadasChange).toHaveBeenLastCalledWith(["etapa-b", "etapa-c", "etapa-d"]);
     expect(arvoreElementos.some((elemento) => textoFilhos(elemento) === "+2 etapas")).toBe(true);
   });
@@ -142,4 +145,34 @@ describe("RM-2026-457A31 — interação do multiselect de etapas", () => {
     expect(etapaIdsParaPayload({ escopoEtapa: "TODAS", etapaIds: ["id-obsoleto"] })).toEqual([]);
     expect(etapaIdsParaPayload({ escopoEtapa: "SELECIONADAS", etapaIds: ["a", "b"] })).toEqual(["a", "b"]);
   });
+});
+
+// Regressão: a listagem deve apresentar o mesmo escopo que o editor restaura.
+describe("resumo de etapas do template", () => {
+  it("distingue global, legado singular e associação múltipla", async () => {
+    const { resumoEtapasTemplate } = await import("@/components/bpm/checklists/checklist-editor-state");
+    expect(resumoEtapasTemplate({ etapaId: null, etapa: null, etapas: [] })).toBe("Qualquer etapa");
+    expect(resumoEtapasTemplate({ etapaId: "a", etapa: { nome: "Entrada" }, etapas: [] })).toBe("Entrada");
+    expect(resumoEtapasTemplate({ etapaId: "a", etapa: null, etapas: [] })).toBe("Etapa específica");
+    expect(resumoEtapasTemplate({ etapaId: "a", etapa: { nome: "Entrada" }, etapas: [
+      { etapaId: "b", etapa: { nome: "Diagnóstico" } },
+    ] })).toBe("Diagnóstico");
+    expect(resumoEtapasTemplate({ etapaId: "a", etapa: null, etapas: [
+      { etapaId: "a", etapa: { nome: "Entrada" } },
+      { etapaId: "b", etapa: { nome: "Diagnóstico" } },
+    ] })).toBe("2 etapas");
+  });
+});
+
+
+it("permite recuperar escopo global depois de remover o pipeline", () => {
+  const onEscopoChange = vi.fn();
+  const onSelecionadasChange = vi.fn();
+  const draft = trocarPipelineChecklist({ pipelineId: "a", escopoEtapa: "SELECIONADAS", etapaIds: ["etapa-a"], cardId: "card" }, "");
+  const radios = elementos(EtapasMultiSelect({ pipelineSelecionado: false, etapas: [], escopo: draft.escopoEtapa, selecionadas: draft.etapaIds, onEscopoChange, onSelecionadasChange })).filter((elemento) => elemento.type === "input");
+  expect(radios[0].props.disabled).toBe(false);
+  expect(radios[1].props.disabled).toBe(true);
+  funcao(radios[0], "onChange")();
+  expect(onEscopoChange).toHaveBeenCalledWith("TODAS");
+  expect(onSelecionadasChange).toHaveBeenCalledWith([]);
 });

@@ -111,6 +111,7 @@ async function reconciliarEtapasTemplate(
   templateId: string,
   etapaIds: string[],
   tx: Pick<Prisma.TransactionClient, "bpmChecklistTemplateEtapa">,
+  etapaIdLegada?: string | null,
 ) {
   const atuais = await tx.bpmChecklistTemplateEtapa.findMany({ where: { templateId }, select: { etapaId: true } });
   const anteriores = atuais.map((item) => item.etapaId);
@@ -124,7 +125,7 @@ async function reconciliarEtapasTemplate(
   if (adicionadas.length > 0) {
     await tx.bpmChecklistTemplateEtapa.createMany({ data: adicionadas.map((etapaId) => ({ templateId, etapaId })) });
   }
-  return anteriores;
+  return anteriores.length > 0 ? anteriores : (etapaIdLegada ? [etapaIdLegada] : []);
 }
 
 async function notificarTemplateConfirmado(pipelineId: string | null | undefined) {
@@ -253,21 +254,49 @@ export async function CriarTemplateChecklistBpm(payload: unknown) {
 
 export async function AtualizarTemplateChecklistBpm(payload: unknown) {
   try {
-    await exigirAdminChecklist();
+    const { userId } = await exigirAdminChecklist();
     const dados = atualizarTemplateChecklistSchema.parse(payload);
-    await validarEscopoTemplate(dados);
-    const existente = await db.bpmChecklistTemplate.findUnique({ where: { id: dados.id }, select: { id: true } });
-    if (!existente) throw new Error("Template não encontrado");
-    await db.bpmChecklistTemplate.update({
-      where: { id: dados.id },
-      data: {
-        nome: dados.nome, descricao: nuloSeVazio(dados.descricao), ativo: dados.ativo,
-        pipelineId: dados.pipelineId ?? null, etapaId: dados.etapaId ?? null,
-        cardId: dados.cardId ?? null,
-      },
-      select: { id: true },
-    });
+    const pipelinesNotificacao = await db.$transaction(async (tx) => {
+      await exigirAcessoConfigPipeline(userId, "configurarChecklists", tx);
+      const etapas = await validarEscopoTemplate(dados, tx);
+      const etapaIds = etapas.map((etapa) => etapa.id);
+      const existente = await tx.bpmChecklistTemplate.findUnique({
+        where: { id: dados.id },
+        select: { id: true, pipelineId: true, etapaId: true },
+      });
+      if (!existente) throw new Error("Template não encontrado");
+
+      await tx.bpmChecklistTemplate.update({
+        where: { id: dados.id },
+        data: {
+          nome: dados.nome,
+          descricao: nuloSeVazio(dados.descricao),
+          ativo: dados.ativo,
+          pipelineId: dados.pipelineId ?? null,
+          etapaId: etapaIds[0] ?? null,
+          cardId: dados.cardId ?? null,
+        },
+        select: { id: true },
+      });
+      const etapaIdsAnteriores = await reconciliarEtapasTemplate(dados.id, etapaIds, tx, existente.etapaId);
+      const pipelineAuditoria = dados.pipelineId ?? existente.pipelineId;
+      if (pipelineAuditoria) {
+        await tx.bpmPipelineConfigAuditoria.create({ data: {
+          pipelineId: pipelineAuditoria,
+          adminId: userId,
+          campoAlterado: "checklist_template_atualizado",
+          valorAnteriorJson: JSON.stringify({
+            templateId: dados.id,
+            pipelineId: existente.pipelineId,
+            etapaIds: etapaIdsAnteriores,
+          }),
+          valorNovoJson: JSON.stringify({ templateId: dados.id, pipelineId: dados.pipelineId ?? null, etapaIds }),
+        } });
+      }
+      return [...new Set([existente.pipelineId, dados.pipelineId].filter((id): id is string => Boolean(id)))];
+    }, { isolationLevel: "Serializable" });
     revalidatePath(ROTA_ADMIN);
+    await Promise.all(pipelinesNotificacao.map((pipelineId) => notificarTemplateConfirmado(pipelineId)));
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: erroPublico(error) };
@@ -279,7 +308,7 @@ export async function SalvarTemplateChecklistBpm(payload: unknown) {
   try {
     const { userId } = await exigirAdminChecklist();
     const dados = salvarTemplateChecklistSchema.parse(payload);
-    const pipelineId = await db.$transaction(async (tx) => {
+    const pipelinesNotificacao = await db.$transaction(async (tx) => {
       await exigirAcessoConfigPipeline(userId, "configurarChecklists", tx);
       const etapas = await validarEscopoTemplate(dados, tx);
       const etapaIds = etapas.map((etapa) => etapa.id);
@@ -305,7 +334,7 @@ export async function SalvarTemplateChecklistBpm(payload: unknown) {
         },
         select: { id: true },
       });
-      const etapaIdsAnteriores = await reconciliarEtapasTemplate(dados.id, etapaIds, tx);
+      const etapaIdsAnteriores = await reconciliarEtapasTemplate(dados.id, etapaIds, tx, existente.etapaId);
       await tx.bpmChecklistTemplateItem.deleteMany({
         where: { templateId: dados.id, ...(idsRecebidos.length > 0 ? { id: { notIn: idsRecebidos } } : {}) },
       });
@@ -322,17 +351,18 @@ export async function SalvarTemplateChecklistBpm(payload: unknown) {
           await tx.bpmChecklistTemplateItem.create({ data: { ...data, templateId: dados.id }, select: { id: true } });
         }
       }
-      if (dados.pipelineId) {
+      const pipelineAuditoria = dados.pipelineId ?? existente.pipelineId;
+      if (pipelineAuditoria) {
         await tx.bpmPipelineConfigAuditoria.create({ data: {
-          pipelineId: dados.pipelineId, adminId: userId, campoAlterado: "checklist_template_atualizado",
+          pipelineId: pipelineAuditoria, adminId: userId, campoAlterado: "checklist_template_atualizado",
           valorAnteriorJson: JSON.stringify({ templateId: dados.id, pipelineId: existente.pipelineId, etapaIds: etapaIdsAnteriores }),
-          valorNovoJson: JSON.stringify({ templateId: dados.id, etapaIds }),
+          valorNovoJson: JSON.stringify({ templateId: dados.id, pipelineId: dados.pipelineId ?? null, etapaIds }),
         } });
       }
-      return dados.pipelineId ?? null;
+      return [...new Set([existente.pipelineId, dados.pipelineId].filter((id): id is string => Boolean(id)))];
     }, { isolationLevel: "Serializable" });
     revalidatePath(ROTA_ADMIN);
-    await notificarTemplateConfirmado(pipelineId);
+    await Promise.all(pipelinesNotificacao.map((id) => notificarTemplateConfirmado(id)));
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: erroPublico(error) };
