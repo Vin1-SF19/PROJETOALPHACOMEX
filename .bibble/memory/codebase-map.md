@@ -1369,3 +1369,16 @@ O catálogo 3D ganhou `containerCarga`, adaptação procedural do container da s
 - `scripts/verificar-migration-cadencia-multicoluna.mjs` e `scripts/verificar-cadencia-multicoluna-e2e.ts`: preflight/pós-validação e consumo ponta a ponta isolado.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)
+
+## Renderer canônico do CRM — RM-2026-40526E
+
+- `src/lib/bpm/formularios-etapa.ts`: registry único de targets especializados, schema de configuração e catálogo do builder; também classifica o shell fixo do card.
+- `src/lib/bpm/formulario-renderer.ts`: resolver puro da composição publicada, ordem, visibilidade dinâmica e diagnósticos fail-closed.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/FormularioEtapaRenderer.tsx`: renderer estrutural compartilhado por runtime e preview.
+- `src/actions/bpm/Cards.ts`: aggregate autenticado do card inclui formulário e resolve a árvore contra `BpmCampoEtapaConfig`.
+- `src/app/PainelAlpha/AlphaCRM/CardModal/CardOpenFormSlot.tsx`: bindings dos painéis reais por `rendererId`, sem predicados de label.
+- `src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/{FormularioEtapaWorkspace,PipelineWorkspaceSections}.tsx`: catálogo derivado do registry e preview inerte.
+- `tests/bpm/formulario-renderer.test.ts`: contrato de ordem, invalidade, labels, registry e compartilhamento card/preview.
+- `docs/reports/crm-canonical-renderer-p0-3.md`: inventário, prova em produção, hardcodes restantes e gates.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)

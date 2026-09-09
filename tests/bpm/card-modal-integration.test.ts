@@ -69,7 +69,8 @@ describe("CRM - wiring do modal por etapa", () => {
   it("centraliza o formulário da etapa e mantém o painel direito somente com a próxima etapa", () => {
     expect(registrar).toContain('value="formulario-etapa"');
     expect(registrar).toContain('id={`formulario-etapa-${card.id}`}');
-    expect(slotFormulario).toContain("etapaEhAgendarReuniao(card.etapa.nome)");
+    expect(slotFormulario).toContain('case "meeting-scheduler"');
+    expect(slotFormulario).not.toMatch(/etapaEh[A-Z]/);
     expect(slotFormulario).toContain("<PainelReuniao");
     expect(modal).not.toContain("<PainelReuniao");
     expect(modal).not.toContain("destinoEhReuniaoAgendada");
@@ -184,7 +185,7 @@ describe("CRM - wiring do modal por etapa", () => {
   });
 
   it("compõe o status pós-fechamento no formulário central somente em Fechado", () => {
-    expect(slotFormulario).toContain("etapaEhFechado(card.etapa.nome)");
+    expect(slotFormulario).toContain('case "commercial-post-closing"');
     expect(slotFormulario).toContain("<PainelStatusPosFechamento");
     expect(statusPosFechamento).toContain("STATUS_POS_FECHAMENTO_OPCOES.map");
     expect(statusPosFechamento).toContain("disabled={!podeEditar || salvando}");

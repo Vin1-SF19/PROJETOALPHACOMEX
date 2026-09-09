@@ -2330,3 +2330,13 @@ Campos continuam em `BpmCampoEtapaConfig`, arestas em `BpmTransicaoEtapa` e SLA 
 Criação, edição e configuração por coluna validam etapas ativas, ownership e colisões dentro de transação serializável. A ativação consulta a relação normalizada e continua na mesma transação do card, preservando atomicidade, idempotência e snapshots de ciclos existentes.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)
+
+## Renderer canônico do formulário de etapa — RM-2026-40526E
+
+`BpmEtapaFormulario` passou a ser a autoridade da composição visual do card. `BPM_FORM_COMPONENT_REGISTRY` descreve os targets persistíveis e `resolverFormularioEtapa` combina a árvore publicada com os campos válidos de `BpmCampoEtapaConfig`, sem inferência por nome de pipeline, etapa ou campo. Formulário ausente/inativo e referências inválidas são fail-closed e observáveis.
+
+`FormularioEtapaRenderer` preserva seções, ordem e blocos e é compartilhado pelo card real e pelo preview administrativo. Os bindings de runtime montam os painéis especializados existentes; os de preview são inertes. Tarefas, anexos, histórico, timeline, cadências, SLA, navegação e scripts permanecem no shell global do card.
+
+O aggregate autenticado `ObterCardBpm` inclui formulário/seções/componentes e reutiliza a consulta canônica de campos na avaliação dinâmica, sem N+1. Restrições por perfil ocultam campos sem invalidar a estrutura publicada. Nenhuma migration ou escrita de dados foi necessária.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)

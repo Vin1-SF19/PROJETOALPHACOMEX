@@ -5142,3 +5142,44 @@ Os 32 formulários v1 haviam sido gerados copiando o catálogo de cada pipeline 
 - `decisions.md`: autoridade campo-etapa, save diferencial e migração reversível.
 - `architecture.md`: contrato final e CLI operacional.
 - `codebase-map.md` e `integration-points.md`: arquivos e fluxo administrativo.
+
+---
+
+## 2026-09-09 19:50 — P0-3 tornou o formulário publicado o renderer do card
+
+**Tags:** #refactor #renderer #crm #nextjs #integrity
+**Agentes envolvidos:** Scout, Vault, Echo, Nova, Sage, Forge, Probe, Anubis, Lens, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/bpm/formulario-renderer.ts`, `src/lib/bpm/formularios-etapa.ts`, `src/actions/bpm/Cards.ts`, `CardModal/*`, workspace administrativo, testes e documentação RM-2026-40526E.
+
+### Contexto
+
+Embora a P0-2 tivesse reconciliado os 32 formulários, o card real ainda selecionava painéis por nomes de etapas e o preview usava uma lista independente. A composição persistida não controlava nenhuma das duas superfícies.
+
+### O que foi feito
+
+- Criado registry canônico para checklist e seis capabilities especializadas.
+- Criado resolver puro, ordenado e fail-closed e um renderer estrutural compartilhado por runtime e preview.
+- Ligados os painéis reais aos targets estáveis, removidos o seletor por nome do pipeline e os predicados visuais por nome de etapa.
+- Builder passou a consumir o registry; preview ficou inerte; campo por etapa continua vindo de `BpmCampoEtapaConfig`.
+- Restrição de campo por perfil foi separada de invalidade estrutural e os IDs de múltiplos blocos ficaram únicos.
+
+### Decisões tomadas
+
+- Composição ausente ou inválida nunca recorre a todos os campos do pipeline.
+- Labels são apresentação; targets, chaves e IDs estáveis controlam comportamento.
+- Tarefas, anexos, histórico, timeline, cadências, SLA, navegação e scripts permanecem no shell global.
+
+### Validação
+
+Produção foi consultada somente para leitura: 32/32 formulários `READY`, 249 componentes e zero diagnóstico em quatro pipelines. Testes focados, lint escopado, build e smoke de proteção de rotas passaram; débitos globais preexistentes foram separados. Nenhuma alteração de banco foi executada.
+
+### Pendências
+
+- P0-4: Draft/PUBLISHED, revisão e histórico editorial.
+- CodeRabbit CLI não está instalado neste ambiente; revisão manual de qualidade e segurança foi concluída.
+
+### Refletido também em
+
+- `decisions.md`: autoridade visual e política fail-closed.
+- `architecture.md`: registry, resolver e renderer compartilhado.
+- `codebase-map.md` e `integration-points.md`: arquivos e fluxo ponta a ponta.

@@ -4,6 +4,7 @@ import {
   etapaEhLost,
   motivoLostExigeComplemento,
 } from "@/lib/bpm/lost";
+import { BPM_FIELD_KEYS, BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 
 export type EstadoFollowUpModal = "CARREGANDO" | "ERRO" | "NAO_INICIADO" | "EM_ANDAMENTO" | "CONCLUIDO";
 
@@ -86,6 +87,49 @@ export function prepararCamposMotivoLostUi<T extends CampoMotivoLostUi>(
       .map((campo) => campoEhMotivoLostOutro(campo.nome)
         ? { ...campo, obrigatorio: true }
         : campo),
+    campoMotivoId: campoMotivo?.id ?? null,
+    campoComplementoId: campoComplemento?.id ?? null,
+    exigeComplemento,
+  };
+}
+
+export function prepararCamposMotivoLostUiCanonico<
+  T extends CampoMotivoLostUi & { chave?: string | null },
+>(
+  etapaChave: string | null | undefined,
+  campos: T[],
+  valores: Readonly<Record<string, string>>,
+) {
+  if (etapaChave !== BPM_STAGE_KEYS.LOST) {
+    return {
+      camposVisiveis: campos,
+      campoMotivoId: null,
+      campoComplementoId: null,
+      exigeComplemento: false,
+    };
+  }
+
+  const campoMotivo = campos.find(
+    (campo) => campo.chave === BPM_FIELD_KEYS.LOST_REASON,
+  );
+  const campoComplemento = campos.find(
+    (campo) => campo.chave === BPM_FIELD_KEYS.LOST_REASON_OTHER,
+  );
+  const exigeComplemento = Boolean(
+    campoMotivo && motivoLostExigeComplemento(valores[campoMotivo.id]),
+  );
+
+  return {
+    camposVisiveis: campos
+      .filter(
+        (campo) =>
+          campo.chave !== BPM_FIELD_KEYS.LOST_REASON_OTHER || exigeComplemento,
+      )
+      .map((campo) =>
+        campo.chave === BPM_FIELD_KEYS.LOST_REASON_OTHER
+          ? { ...campo, obrigatorio: true }
+          : campo,
+      ),
     campoMotivoId: campoMotivo?.id ?? null,
     campoComplementoId: campoComplemento?.id ?? null,
     exigeComplemento,

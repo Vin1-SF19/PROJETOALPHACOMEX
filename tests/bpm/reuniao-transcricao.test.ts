@@ -10,7 +10,8 @@ const googleMeet = ler("src/actions/bpm/GoogleMeet.ts");
 
 describe("RM-2026-CB55AA — transcrição da reunião no card", () => {
   it("entrega o painel em Reunião Agendada sem formulário de agendamento", () => {
-    expect(slot).toContain("etapaEhReuniaoAgendada(card.etapa.nome)");
+    expect(slot).toContain('case "meeting-transcript"');
+    expect(slot).not.toContain("etapaEhReuniaoAgendada");
     expect(slot).toContain("mostrarFormulario={false}");
   });
 

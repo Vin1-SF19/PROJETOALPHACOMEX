@@ -1,17 +1,14 @@
 "use client";
 
 import { ObterCardBpm } from "@/actions/bpm/Cards";
-import { etapaEhAgendarReuniao } from "@/lib/bpm/agendar-reuniao";
-import { etapaEhEmTratativa } from "@/lib/bpm/em-tratativa";
-import { etapaEhStandbyFollowUp } from "@/lib/bpm/novos-leads";
-import { etapaEhReuniaoAgendada } from "@/lib/bpm/reuniao-agendada";
-import { etapaEhFechado } from "@/lib/bpm/status-pos-fechamento";
+import { ClipboardCheck } from "lucide-react";
 import { PainelCamposEtapaAtual } from "./PainelCamposEtapaAtual";
 import { PainelChecklistFollowUp } from "./PainelChecklistFollowUp";
 import { PainelProximoContato } from "./PainelProximoContato";
 import { PainelReuniao } from "./PainelReuniao";
 import { PainelStatusPosFechamento } from "./PainelStatusPosFechamento";
 import { PainelStandbyFollowUp } from "./PainelStandbyFollowUp";
+import { FormularioEtapaRenderer } from "./FormularioEtapaRenderer";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 
@@ -26,13 +23,6 @@ export interface CardOpenFormSlotProps {
   ) => void;
 }
 
-/**
- * Slot de formulário do card aberto.
- *
- * Seleciona e renderiza os painéis de formulário específicos da etapa ativa,
- * reaproveitando os componentes `Painel*` existentes. A lógica de seleção
- * (condicionais `etapaEh*`) fica isolada aqui, fora do `PainelRegistrar`.
- */
 export function CardOpenFormSlot({
   card,
   accent,
@@ -41,76 +31,53 @@ export function CardOpenFormSlot({
   onAtualizado,
   onEstadoFollowUpChange = () => {},
 }: CardOpenFormSlotProps) {
-  if (etapaEhAgendarReuniao(card.etapa.nome)) {
-    return (
-      <PainelReuniao
-        card={card}
-        accent={accent}
-        podeEditar={podeEditar}
-        onAtualizado={onAtualizado}
-      />
-    );
-  }
-
   return (
-    <>
-      <PainelCamposEtapaAtual
-        card={card}
-        accent={accent}
-        podeEditar={podeEditar}
-        realtimeRevision={realtimeRevision}
-        onAtualizado={onAtualizado}
-      />
-
-      {etapaEhReuniaoAgendada(card.etapa.nome) && (
-        <PainelReuniao
-          card={card}
-          accent={accent}
-          podeEditar={podeEditar}
-          mostrarFormulario={false}
-          onAtualizado={onAtualizado}
-        />
-      )}
-
-      {etapaEhFechado(card.etapa.nome) && (
-        <PainelStatusPosFechamento
-          cardId={card.id}
-          statusPersistido={card.statusPosFechamento}
-          versaoPersistidaEm={card.updatedAt}
-          podeEditar={podeEditar}
-          realtimeRevision={realtimeRevision}
-          accent={accent}
-          onAtualizado={onAtualizado}
-        />
-      )}
-
-      <PainelProximoContato
-        card={card}
-        onAtualizado={onAtualizado}
-        podeEditar={podeEditar}
-        realtimeRevision={realtimeRevision}
-      />
-
-      {etapaEhEmTratativa(card.etapa.nome) && (
-        <PainelChecklistFollowUp
-          cardId={card.id}
-          accent={accent}
-          onAtualizado={onAtualizado}
-          onEstadoChange={onEstadoFollowUpChange}
-          podeEditar={podeEditar}
-          realtimeRevision={realtimeRevision}
-        />
-      )}
-
-      {etapaEhStandbyFollowUp(card.etapa.nome) && (
-        <PainelStandbyFollowUp
-          cardId={card.id}
-          accent={accent}
-          podeEditar={podeEditar}
-          realtimeRevision={realtimeRevision}
-          onAtualizado={onAtualizado}
-        />
-      )}
-    </>
+    <FormularioEtapaRenderer
+      formulario={card.formularioEtapa}
+      mode="runtime"
+      bindings={{
+        renderCampos: ({ campoIds, secaoTitulo, runKey }) => (
+          <PainelCamposEtapaAtual
+            card={card}
+            campoIds={campoIds}
+            instanceKey={runKey}
+            titulo={secaoTitulo}
+            accent={accent}
+            podeEditar={podeEditar}
+            realtimeRevision={realtimeRevision}
+            onAtualizado={onAtualizado}
+          />
+        ),
+        renderComponente: (componente) => {
+          switch (componente.rendererId) {
+            case "stage-checklist":
+              return (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("bpm:abrir-pendencias-checklist", { detail: { cardId: card.id } }))}
+                  className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 text-left text-sm text-slate-200 hover:bg-white/[0.05]"
+                >
+                  <ClipboardCheck size={17} style={{ color: `rgb(${accent})` }} />
+                  Abrir checklists da etapa
+                </button>
+              );
+            case "meeting-scheduler":
+              return <PainelReuniao card={card} accent={accent} podeEditar={podeEditar} onAtualizado={onAtualizado} />;
+            case "meeting-transcript":
+              return <PainelReuniao card={card} accent={accent} podeEditar={podeEditar} mostrarFormulario={false} onAtualizado={onAtualizado} />;
+            case "follow-up-scheduler":
+              return <PainelProximoContato card={card} onAtualizado={onAtualizado} podeEditar={podeEditar} realtimeRevision={realtimeRevision} />;
+            case "follow-up-checklist":
+              return <PainelChecklistFollowUp cardId={card.id} accent={accent} onAtualizado={onAtualizado} onEstadoChange={onEstadoFollowUpChange} podeEditar={podeEditar} realtimeRevision={realtimeRevision} />;
+            case "standby-follow-up":
+              return <PainelStandbyFollowUp cardId={card.id} accent={accent} podeEditar={podeEditar} realtimeRevision={realtimeRevision} onAtualizado={onAtualizado} />;
+            case "commercial-post-closing":
+              return <PainelStatusPosFechamento cardId={card.id} statusPersistido={card.statusPosFechamento} versaoPersistidaEm={card.updatedAt} podeEditar={podeEditar} realtimeRevision={realtimeRevision} accent={accent} onAtualizado={onAtualizado} />;
+            default:
+              return null;
+          }
+        },
+      }}
+    />
   );
 }

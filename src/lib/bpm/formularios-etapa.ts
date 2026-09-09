@@ -4,14 +4,118 @@ import { BPM_CAPABILITIES, parseBpmCapabilities } from "@/lib/bpm/ontology";
 
 export const BPM_STAGE_CHECKLIST_TARGET = BPM_CAPABILITIES.STAGE_CHECKLIST;
 
-export const BPM_FORM_CAPABILITIES = [
-  BPM_CAPABILITIES.MEETING_SCHEDULER,
-  BPM_CAPABILITIES.MEETING_TRANSCRIPT,
-  BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER,
-  BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST,
-  BPM_CAPABILITIES.STANDBY_FOLLOW_UP,
-  BPM_CAPABILITIES.COMMERCIAL_POST_CLOSING,
-] as const;
+const emptyConfigSchema = z.object({}).strict();
+export const BPM_FORM_FIELD_CONFIG_SCHEMA = emptyConfigSchema;
+
+/**
+ * Registry único dos componentes especializados que podem ser persistidos no
+ * formulário de etapa. Labels são metadados de apresentação; `target` é a
+ * identidade estável usada por save, resolver, builder, preview e runtime.
+ */
+export const BPM_FORM_COMPONENT_REGISTRY = {
+  [BPM_CAPABILITIES.STAGE_CHECKLIST]: {
+    tipo: "CHECKLIST",
+    target: BPM_CAPABILITIES.STAGE_CHECKLIST,
+    label: "Checklists da etapa",
+    description: "Checklists aplicáveis ao card na etapa atual.",
+    rendererId: "stage-checklist",
+    multiple: false,
+    configSchema: emptyConfigSchema,
+  },
+  [BPM_CAPABILITIES.MEETING_SCHEDULER]: {
+    tipo: "CAPABILITY",
+    target: BPM_CAPABILITIES.MEETING_SCHEDULER,
+    label: "Agendamento de reunião",
+    description: "Agenda uma reunião com os contatos do card.",
+    rendererId: "meeting-scheduler",
+    multiple: false,
+    configSchema: emptyConfigSchema,
+  },
+  [BPM_CAPABILITIES.MEETING_TRANSCRIPT]: {
+    tipo: "CAPABILITY",
+    target: BPM_CAPABILITIES.MEETING_TRANSCRIPT,
+    label: "Transcrição da reunião",
+    description: "Exibe e processa a transcrição vinculada ao card.",
+    rendererId: "meeting-transcript",
+    multiple: false,
+    configSchema: emptyConfigSchema,
+  },
+  [BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER]: {
+    tipo: "CAPABILITY",
+    target: BPM_CAPABILITIES.FOLLOW_UP_SCHEDULER,
+    label: "Próximo contato",
+    description: "Agenda o próximo contato do card.",
+    rendererId: "follow-up-scheduler",
+    multiple: false,
+    configSchema: emptyConfigSchema,
+  },
+  [BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST]: {
+    tipo: "CAPABILITY",
+    target: BPM_CAPABILITIES.FOLLOW_UP_CHECKLIST,
+    label: "Checklist de follow-up",
+    description: "Acompanha as ações de follow-up da etapa.",
+    rendererId: "follow-up-checklist",
+    multiple: false,
+    configSchema: emptyConfigSchema,
+  },
+  [BPM_CAPABILITIES.STANDBY_FOLLOW_UP]: {
+    tipo: "CAPABILITY",
+    target: BPM_CAPABILITIES.STANDBY_FOLLOW_UP,
+    label: "Follow-up de standby",
+    description: "Gerencia o acompanhamento do card em standby.",
+    rendererId: "standby-follow-up",
+    multiple: false,
+    configSchema: emptyConfigSchema,
+  },
+  [BPM_CAPABILITIES.COMMERCIAL_POST_CLOSING]: {
+    tipo: "CAPABILITY",
+    target: BPM_CAPABILITIES.COMMERCIAL_POST_CLOSING,
+    label: "Pós-fechamento comercial",
+    description: "Registra o estado operacional após o fechamento.",
+    rendererId: "commercial-post-closing",
+    multiple: false,
+    configSchema: emptyConfigSchema,
+  },
+} as const;
+
+/** Elementos reais do card que são estruturais e não variam por etapa. */
+export const BPM_CARD_SHELL_REGISTRY = {
+  TASKS: { rendererId: "card-tasks", label: "Tarefas", configurable: false },
+  ATTACHMENTS: { rendererId: "card-attachments", label: "Anexos", configurable: false },
+  HISTORY: { rendererId: "card-history", label: "Histórico", configurable: false },
+  TIMELINE: { rendererId: "card-timeline", label: "Timeline", configurable: false },
+  CADENCES: { rendererId: "card-cadences", label: "Cadências", configurable: false },
+  SLA: { rendererId: "card-sla", label: "SLA", configurable: false },
+  STAGE_NAVIGATION: { rendererId: "stage-navigation", label: "Próxima etapa", configurable: false },
+  SCRIPTS: { rendererId: "stage-scripts", label: "Scripts", configurable: false },
+} as const;
+
+export type BpmFormComponentTarget = keyof typeof BPM_FORM_COMPONENT_REGISTRY;
+
+export const BPM_FORM_CAPABILITIES = Object.values(
+  BPM_FORM_COMPONENT_REGISTRY,
+)
+  .filter((item) => item.tipo === "CAPABILITY")
+  .map((item) => item.target) as Array<Exclude<BpmFormComponentTarget, typeof BPM_STAGE_CHECKLIST_TARGET>>;
+
+export function obterDefinicaoComponenteFormulario(target: string | null | undefined) {
+  if (!target) return null;
+  return BPM_FORM_COMPONENT_REGISTRY[target as BpmFormComponentTarget] ?? null;
+}
+
+export function listarCatalogoComponentesFormulario(capabilitiesJson?: string | null) {
+  const permitidas = parseBpmCapabilities(capabilitiesJson);
+  return Object.values(BPM_FORM_COMPONENT_REGISTRY)
+    .filter((item) => item.tipo === "CHECKLIST" || permitidas.has(item.target))
+    .map((item) => ({
+      tipo: item.tipo,
+      target: item.target,
+      label: item.label,
+      description: item.description,
+      rendererId: item.rendererId,
+      multiple: item.multiple,
+    }));
+}
 
 const persistedIdSchema = z.string().trim().min(1).max(200);
 
@@ -70,8 +174,8 @@ const componenteFormularioSchema = z
       }
       if (
         !componente.capability ||
-        !BPM_FORM_CAPABILITIES.includes(
-          componente.capability as (typeof BPM_FORM_CAPABILITIES)[number],
+        !BPM_FORM_CAPABILITIES.some(
+          (capability) => capability === componente.capability,
         )
       ) {
         context.addIssue({
@@ -84,7 +188,18 @@ const componenteFormularioSchema = z
 
     if (componente.configJson) {
       try {
-        JSON.parse(componente.configJson);
+        const config: unknown = JSON.parse(componente.configJson);
+        const definicao = obterDefinicaoComponenteFormulario(componente.capability);
+        const configSchema = componente.tipo === "CAMPO"
+          ? BPM_FORM_FIELD_CONFIG_SCHEMA
+          : definicao?.configSchema;
+        if (configSchema && !configSchema.safeParse(config).success) {
+          context.addIssue({
+            code: "custom",
+            path: ["configJson"],
+            message: "configJson não atende ao schema do componente.",
+          });
+        }
       } catch {
         context.addIssue({
           code: "custom",
@@ -161,6 +276,20 @@ export const salvarFormularioEtapaSchema = z
         path: ["secoes"],
         message: "O mesmo campo não pode aparecer duas vezes no formulário.",
       });
+    }
+
+    for (const definicao of Object.values(BPM_FORM_COMPONENT_REGISTRY)) {
+      if (definicao.multiple) continue;
+      const ocorrencias = componentes.filter(
+        (componente) => componente.capability === definicao.target,
+      ).length;
+      if (ocorrencias > 1) {
+        context.addIssue({
+          code: "custom",
+          path: ["secoes"],
+          message: `O componente ${definicao.target} não pode aparecer mais de uma vez no formulário.`,
+        });
+      }
     }
 
     formulario.secoes.forEach((secao, indice) => {

@@ -83,12 +83,14 @@ import {
 
 interface EtapaBpm {
   id: string;
+  chave?: string | null;
   nome: string;
   ordem: number;
   cor: string | null;
   ativo: boolean;
   ehInicial: boolean;
   ehFinal: boolean;
+  capabilitiesJson?: string | null;
   subStatus: SubStatusBpm[];
   formulario?: FormularioEtapaAdmin | null;
   automacoes?: AutomacaoWorkspace[];

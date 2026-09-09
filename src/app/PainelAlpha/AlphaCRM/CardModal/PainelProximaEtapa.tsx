@@ -7,16 +7,11 @@ import { AlertTriangle, ArrowRight, Check, Loader2 } from "lucide-react";
 import { ObterCardBpm, MoverCardBpm, type CardFilhoCriado } from "@/actions/bpm/Cards";
 import { ObterResumoChecklistCardBpm } from "@/actions/bpm/Checklists";
 import { useCardSave } from "./CardSaveContext";
-import {
-  ERRO_DATA_REUNIAO_OBRIGATORIA,
-  etapaEhAgendarReuniao,
-  destinoEhReuniaoAgendada,
-} from "@/lib/bpm/agendar-reuniao";
-import { etapaEhReuniaoAgendada } from "@/lib/bpm/reuniao-agendada";
-import { normalizarNomeEtapa } from "@/lib/bpm/novos-leads";
+import { ERRO_DATA_REUNIAO_OBRIGATORIA } from "@/lib/bpm/agendar-reuniao";
+import { BPM_STAGE_KEYS } from "@/lib/bpm/ontology";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
-type EtapaOpcao = { id: string; nome: string; ordem: number; script: string | null };
+type EtapaOpcao = { id: string; chave?: string | null; nome: string; ordem: number; script: string | null };
 
 interface Props {
   card: CardDetalhe;
@@ -35,8 +30,8 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
     templates: string[];
     primeiroItemId: string | null;
   } | null>(null);
-  const aguardandoDataHora = etapaEhAgendarReuniao(card.etapa.nome) && !card.dataReuniao;
-  const aguardandoTranscricao = etapaEhReuniaoAgendada(card.etapa.nome)
+  const aguardandoDataHora = card.etapa.chave === BPM_STAGE_KEYS.AGENDAR_REUNIAO && !card.dataReuniao;
+  const aguardandoTranscricao = card.etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA
     && !card.transcricaoReuniao?.trim();
 
   const carregarPendencias = useCallback(async () => {
@@ -145,10 +140,10 @@ export default function PainelProximaEtapa({ card, etapas, podeMoverEtapa, accen
       
       {etapas.map((etapa) => {
         const ativa = etapa.id === card.etapa.id;
-        const bloqueadaPorDataHora = aguardandoDataHora && destinoEhReuniaoAgendada(etapa.nome);
+        const bloqueadaPorDataHora = aguardandoDataHora && etapa.chave === BPM_STAGE_KEYS.REUNIAO_AGENDADA;
         const bloqueadaPorTranscricao = aguardandoTranscricao
-          && ["Em tratativa", "Sem viabilidade"].map(normalizarNomeEtapa)
-            .includes(normalizarNomeEtapa(etapa.nome));
+          && [BPM_STAGE_KEYS.EM_TRATATIVA, BPM_STAGE_KEYS.SEM_VIABILIDADE]
+            .some((chave) => chave === etapa.chave);
         const motivoBloqueio = bloqueadaPorDataHora
           ? ERRO_DATA_REUNIAO_OBRIGATORIA
           : bloqueadaPorTranscricao

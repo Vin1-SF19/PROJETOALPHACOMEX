@@ -30,6 +30,7 @@ import { etapasAnterioresParaResumo } from "@/lib/bpm/resumo-etapas";
 import { PainelChecklistsCard } from "./PainelChecklistsCard";
 import { EditorAnotacaoCard } from "./EditorAnotacaoCard";
 import { formatarBytes, iconePorAcao } from "./PainelHistoricoShared";
+import { formularioPossuiChecklist } from "@/lib/bpm/formulario-renderer";
 
 type CardDetalhe = NonNullable<Awaited<ReturnType<typeof ObterCardBpm>>["data"]>;
 type Interacao = Awaited<ReturnType<typeof ListarInteracoesCardBpm>>["data"][number];
@@ -69,11 +70,12 @@ export default function PainelHistorico({
   const [abaEsquerda, setAbaEsquerda] = useState("etapas");
   const inputAnexoRef = useRef<HTMLInputElement>(null);
   const etapasAnteriores = etapasAnterioresParaResumo(etapas, card.etapa.id);
+  const checklistHabilitado = formularioPossuiChecklist(card.formularioEtapa);
 
   useEffect(() => {
     function abrirPendencias(event: Event) {
       const detail = (event as CustomEvent<{ cardId: string; itemId?: string | null }>).detail;
-      if (detail?.cardId !== card.id) return;
+      if (detail?.cardId !== card.id || !checklistHabilitado) return;
       setAbaEsquerda("checklist");
       window.setTimeout(() => {
         const alvo = (detail.itemId
@@ -85,7 +87,7 @@ export default function PainelHistorico({
     }
     window.addEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
     return () => window.removeEventListener("bpm:abrir-pendencias-checklist", abrirPendencias);
-  }, [card.id]);
+  }, [card.id, checklistHabilitado]);
 
   const feedHistorico: ItemTimelineCard[] = montarFeedTimelineCard(card.historico, anotacoes);
   const contextoHistorico: ContextoDescricaoHistorico = {
@@ -142,10 +144,12 @@ export default function PainelHistorico({
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{card.tarefas.length}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="checklist" className="flex-none gap-1.5">
-            <ClipboardCheck size={13} />
-            Checklist
-          </TabsTrigger>
+          {checklistHabilitado && (
+            <TabsTrigger value="checklist" className="flex-none gap-1.5">
+              <ClipboardCheck size={13} />
+              Checklist
+            </TabsTrigger>
+          )}
           <TabsTrigger value="etapas" className="flex-none gap-1.5">
             <CheckCircle2 size={13} />
             Etapas concluídas
@@ -180,15 +184,17 @@ export default function PainelHistorico({
           />
         </TabsContent>
 
-        <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
-          <PainelChecklistsCard
-            card={card}
-            accent={accent}
-            podeEditar={podeEditar}
-            realtimeRevision={realtimeRevision}
-            onAtualizado={onAtualizado}
-          />
-        </TabsContent>
+        {checklistHabilitado && (
+          <TabsContent value="checklist" forceMount className="min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
+            <PainelChecklistsCard
+              card={card}
+              accent={accent}
+              podeEditar={podeEditar}
+              realtimeRevision={realtimeRevision}
+              onAtualizado={onAtualizado}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="etapas" className="min-h-0 flex-1 overflow-y-auto">
           <PainelResumoEtapas key={card.etapa.id} card={card} etapas={etapas} accent={accent} ocultarTitulo />

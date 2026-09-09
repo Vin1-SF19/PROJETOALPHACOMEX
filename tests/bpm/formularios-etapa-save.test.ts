@@ -302,8 +302,14 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
   });
 
   it("não permite perder ou trocar o target de componente persistido", async () => {
+    mocks.stageFindFirst.mockResolvedValue({
+      id: STAGE_ID,
+      nome: "Novos leads",
+      capabilitiesJson: JSON.stringify(["FOLLOW_UP_SCHEDULER", "MEETING_SCHEDULER"]),
+      formulario: persistedForm(),
+    });
     const changedTarget = input("Alterado");
-    changedTarget.secoes[0].componentes[1].capability = "FOLLOW_UP_SCHEDULER";
+    changedTarget.secoes[0].componentes[1].capability = "MEETING_SCHEDULER";
     changedTarget.secoes[0].componentes[1].tipo = "CAPABILITY";
     const result = await SalvarFormularioEtapaBpm(changedTarget);
     expect(result).toMatchObject({ success: false });

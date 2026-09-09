@@ -1458,3 +1458,9 @@ de segurança.
 **Decisão:** criar `BpmCadenciaEtapa` com FK para cadência/etapa e unicidade global de `etapaId`. A coleção é a fonte canônica; `BpmCadencia.etapaId` guarda somente a primeira etapa como shadow compatível. Coleção vazia continua significando entrada no pipeline, nunca aplicação universal.
 
 **Consequências:** uma definição e seus passos podem ser reutilizados em várias colunas sem duplicação. As mutations fazem diff transacional, validam pipeline/atividade e recusam colisões também no banco. Remover uma coluna não altera vínculos já iniciados. A atomicidade de ativação com criação/movimento definida no RM-2026-55E27D é preservada; apenas realtime pós-commit é best-effort.
+
+### 2026-09-09 — RM-2026-40526E: composição publicada controla o card real
+
+**Decisão:** usar `BpmEtapaFormulario` como única autoridade de composição visual e um registry de targets estáveis como contrato comum de save, builder, resolver, preview e runtime. `BpmCampoEtapaConfig` continua autoridade de aplicabilidade e comportamento de campos. Labels nunca selecionam componentes; ausência ou referência inválida não recebe fallback implícito.
+
+**Consequências:** card e preview compartilham a mesma árvore estrutural, enquanto bindings distintos mantêm o preview inerte. Painéis especializados existentes são preservados por `rendererId`. Elementos invariantes do card permanecem no shell global. Restrição de acesso por perfil oculta sem corromper o diagnóstico estrutural. Draft/PUBLISHED e histórico editorial seguem para P0-4; não houve migration.

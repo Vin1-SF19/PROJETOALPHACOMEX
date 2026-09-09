@@ -2615,3 +2615,13 @@ Composição segue `FormularioEtapaWorkspace` → `SalvarFormularioEtapaBpm` →
 Nos produtores de card, `ativarCadenciasNaEntradaBpm(..., tx)` encontra escopo de coluna por `etapas.some({ etapaId })` e escopo de entrada por `etapas.none + etapaId null`. O executor e os vínculos existentes não mudam; uma remoção afeta somente futuras entradas.
 
 **Última atualização:** 2026-09-08 por Codex (RM-2026-6F3C54)
+
+### Formulário canônico → card real e preview — RM-2026-40526E
+
+`/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → `ObterPipelineBpm` carrega a composição → `FormularioEtapaWorkspace` oferece campos/capabilities do registry → `SalvarFormularioEtapaBpm` valida sessão, permissão, etapa, `BpmCampoEtapaConfig`, capability, identidade e CAS → diff transacional + auditoria → aggregate confirmado.
+
+`/PainelAlpha/AlphaCRM/pipeline/[pipelineId]` → card → `ObterCardBpm` carrega formulário e campos canônicos → `resolverFormularioEtapa` → `CardFullViewModal` → `CardOpenFormSlot` → `FormularioEtapaRenderer` → painéis reais por `rendererId`.
+
+Na administração, `KanbanCardPreview` passa o mesmo formulário resolvido ao mesmo `FormularioEtapaRenderer`, com inputs desabilitados e componentes especializados apenas descritivos. Formulário ausente/inativo ou referência inválida produz fallback explícito; não há retorno para o catálogo inteiro do pipeline.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-40526E)

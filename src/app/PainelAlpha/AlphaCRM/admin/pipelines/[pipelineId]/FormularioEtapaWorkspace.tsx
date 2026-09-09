@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 
 import { SalvarFormularioEtapaBpm } from "@/actions/bpm/FormulariosEtapa";
+import { listarCatalogoComponentesFormulario } from "@/lib/bpm/formularios-etapa";
 
 type CampoFormulario = { id: string; nome: string; tipo: string };
 type ComponenteFormulario = {
@@ -22,12 +23,14 @@ type ComponenteFormulario = {
   campoId: string | null;
   capability: string | null;
   configJson: string | null;
+  ordem?: number;
   campo?: CampoFormulario | null;
 };
 type SecaoFormulario = {
   id?: string;
   chave: string;
   titulo: string;
+  ordem?: number;
   componentes: ComponenteFormulario[];
 };
 export type FormularioEtapaAdmin = {
@@ -41,6 +44,8 @@ type EtapaFormulario = {
   id: string;
   nome: string;
   ativo: boolean;
+  chave?: string | null;
+  capabilitiesJson?: string | null;
   formulario?: FormularioEtapaAdmin | null;
 };
 
@@ -98,6 +103,10 @@ export function FormularioEtapaWorkspace({
       ),
     [campos, etapaId],
   );
+  const catalogoComponentes = useMemo(
+    () => listarCatalogoComponentesFormulario(etapa?.capabilitiesJson),
+    [etapa?.capabilitiesJson],
+  );
 
   function selecionar(id: string) {
     const proxima = etapas.find((item) => item.id === id);
@@ -138,6 +147,29 @@ export function FormularioEtapaWorkspace({
           capability: null,
           configJson: null,
           campo,
+        },
+      ],
+    });
+  }
+
+  function adicionarComponente(indiceSecao: number, target: string) {
+    const definicao = catalogoComponentes.find((item) => item.target === target);
+    if (!definicao) return;
+    if (
+      !definicao.multiple &&
+      secoes.some((secao) =>
+        secao.componentes.some((componente) => componente.capability === target),
+      )
+    ) return;
+    alterarSecao(indiceSecao, {
+      componentes: [
+        ...secoes[indiceSecao].componentes,
+        {
+          chave: `componente-${target.toLocaleLowerCase("pt-BR").replaceAll("_", "-")}`,
+          tipo: definicao.tipo,
+          campoId: null,
+          capability: definicao.target,
+          configJson: null,
         },
       ],
     });
@@ -413,6 +445,34 @@ export function FormularioEtapaWorkspace({
                         .map((campo) => (
                           <option key={campo.id} value={campo.id}>
                             {campo.nome} · {campo.tipo}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-500">
+                    <Plus size={14} />
+                    <select
+                      aria-label={`Adicionar componente à seção ${secao.titulo}`}
+                      value=""
+                      onChange={(event) =>
+                        adicionarComponente(indiceSecao, event.target.value)
+                      }
+                      className="min-h-9 flex-1 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-slate-300"
+                    >
+                      <option value="">Adicionar componente compatível…</option>
+                      {catalogoComponentes
+                        .filter(
+                          (item) =>
+                            item.multiple ||
+                            !secoes.some((secaoAtual) =>
+                              secaoAtual.componentes.some(
+                                (componente) => componente.capability === item.target,
+                              ),
+                            ),
+                        )
+                        .map((item) => (
+                          <option key={item.target} value={item.target}>
+                            {item.label}
                           </option>
                         ))}
                     </select>

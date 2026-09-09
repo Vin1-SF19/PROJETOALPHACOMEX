@@ -36,6 +36,12 @@ export const BPM_CAPABILITIES = {
   STAGE_CHECKLIST: "STAGE_CHECKLIST",
 } as const;
 
+export const BPM_FIELD_KEYS = {
+  LOST_REASON: "alpha.motivo.de.lost",
+  LOST_REASON_OTHER: "alpha.motivo.lost.outro",
+  MEETING_SUMMARY: "alpha.resumo.da.reuniao",
+} as const;
+
 export type BpmLifecycleStatus = "ATIVO" | "CONCLUIDO" | "CANCELADO" | "ARQUIVADO";
 export type BpmTransitionRequester = "MANUAL" | "AUTOMACAO" | "SISTEMA" | "INTEGRACAO";
 
