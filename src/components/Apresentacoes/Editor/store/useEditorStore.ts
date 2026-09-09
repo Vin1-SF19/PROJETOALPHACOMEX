@@ -5,6 +5,14 @@ import type { AnimationGroup, ElementAnimation, SlideAnimationConfig } from "@/l
 import type { GuiasAlinhamento } from "@/lib/apresentacoes/alinhamento";
 
 export type EixoCentralizacao = "horizontal" | "vertical" | "ambos";
+export type AlinhamentoElementos = "esquerda" | "centro-horizontal" | "direita" | "topo" | "centro-vertical" | "base";
+
+export interface SelecaoTextoEditor {
+  componenteId: string;
+  inicio: number;
+  fim: number;
+  origem: "canvas" | "painel";
+}
 
 export interface SlideResumo {
   id: string;
@@ -40,6 +48,7 @@ interface EditorStore {
   transicaoEntrada: string | null;
   componenteSelecionadoId: string | null;
   componentesSelecionadosIds: string[];
+  selecaoTexto: SelecaoTextoEditor | null;
   historicoPassado: EstadoEditavelSlide[];
   historicoFuturo: EstadoEditavelSlide[];
   zoom: number;
@@ -64,8 +73,10 @@ interface EditorStore {
   removerComponente: (id: string) => void;
   removerComponentes: (ids: string[]) => void;
   selecionarComponente: (id: string | null, aditivo?: boolean) => void;
+  definirSelecaoTexto: (selecao: SelecaoTextoEditor | null) => void;
   reordenarCamadas: (ordemDoTopoParaBase: string[]) => void;
   centralizarSelecionados: (eixo?: EixoCentralizacao) => void;
+  alinharSelecionados: (alinhamento: AlinhamentoElementos) => void;
   iniciarTransacaoHistorico: () => void;
   finalizarTransacaoHistorico: () => void;
   desfazer: () => void;
@@ -238,6 +249,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   transicaoEntrada: null,
   componenteSelecionadoId: null,
   componentesSelecionadosIds: [],
+  selecaoTexto: null,
   historicoPassado: [],
   historicoFuturo: [],
   zoom: 1,
@@ -275,6 +287,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       transicaoEntrada,
       componenteSelecionadoId: null,
       componentesSelecionadosIds: [],
+      selecaoTexto: null,
       historicoPassado: [],
       historicoFuturo: [],
       guiasAlinhamento: { verticais: [], horizontais: [] },
@@ -289,6 +302,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       slideAtivoId: slideId,
       componenteSelecionadoId: null,
       componentesSelecionadosIds: [],
+      selecaoTexto: null,
       historicoPassado: [],
       historicoFuturo: [],
       guiasAlinhamento: { verticais: [], horizontais: [] },
@@ -301,6 +315,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
     componentes: [...state.componentes, c],
     componenteSelecionadoId: c.id,
     componentesSelecionadosIds: [c.id],
+    selecaoTexto: null,
     ...estadoAlterado(state),
   })),
   duplicarComponentes: (ids, comOffset = true) => set((state) => {
@@ -321,6 +336,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       componentes: [...state.componentes, ...copias],
       componenteSelecionadoId: copias.at(-1)?.id ?? null,
       componentesSelecionadosIds: copias.map((c) => c.id),
+      selecaoTexto: null,
       ...estadoAlterado(state),
     };
   }),
@@ -339,6 +355,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       componentes: [...state.componentes, ...copias],
       componenteSelecionadoId: copias.at(-1)?.id ?? null,
       componentesSelecionadosIds: copias.map((c) => c.id),
+      selecaoTexto: null,
       ...estadoAlterado(state),
     };
   }),
@@ -359,6 +376,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       componentes: [fundoAjustado, ...semFundo],
       componenteSelecionadoId: null,
       componentesSelecionadosIds: [],
+      selecaoTexto: null,
       ...estadoAlterado(state),
     };
   }),
@@ -367,6 +385,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
     componentes: ajustarFundosAoCanvas(componentes, state.canvas),
     componenteSelecionadoId: null,
     componentesSelecionadosIds: [],
+    selecaoTexto: null,
     ...estadoAlterado(state),
   })),
   atualizarComponente: (id, patch) => set((state) => ({
@@ -397,6 +416,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       animacaoConfig: limparAnimacoesDeElementos(state.animacaoConfig, ids),
       componentesSelecionadosIds: restantes,
       componenteSelecionadoId: restantes.at(-1) ?? null,
+      selecaoTexto: state.selecaoTexto && ids.has(state.selecaoTexto.componenteId) ? null : state.selecaoTexto,
       ...estadoAlterado(state),
     };
   }),
@@ -409,12 +429,13 @@ export const useEditorStore = create<EditorStore>((set) => ({
       animacaoConfig: limparAnimacoesDeElementos(state.animacaoConfig, ids),
       componentesSelecionadosIds: [],
       componenteSelecionadoId: null,
+      selecaoTexto: null,
       ...estadoAlterado(state),
     };
   }),
   selecionarComponente: (id, aditivo = false) => set((state) => {
-    if (!id) return { componenteSelecionadoId: null, componentesSelecionadosIds: [] };
-    if (!aditivo) return { componenteSelecionadoId: id, componentesSelecionadosIds: [id] };
+    if (!id) return { componenteSelecionadoId: null, componentesSelecionadosIds: [], selecaoTexto: null };
+    if (!aditivo) return { componenteSelecionadoId: id, componentesSelecionadosIds: [id], selecaoTexto: null };
     const jaSelecionado = state.componentesSelecionadosIds.includes(id);
     const selecionados = jaSelecionado
       ? state.componentesSelecionadosIds.filter((item) => item !== id)
@@ -422,8 +443,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
     return {
       componentesSelecionadosIds: selecionados,
       componenteSelecionadoId: jaSelecionado ? selecionados.at(-1) ?? null : id,
+      selecaoTexto: null,
     };
   }),
+  definirSelecaoTexto: (selecaoTexto) => set({ selecaoTexto }),
   reordenarCamadas: (ordemDoTopoParaBase) => set((state) => {
     if (ordemDoTopoParaBase.length !== state.componentes.length) return state;
     const idsFundos = new Set(state.componentes.filter((componente) => componente.tipo === "fundoAnimado").map((componente) => componente.id));
@@ -456,6 +479,35 @@ export const useEditorStore = create<EditorStore>((set) => ({
         y: componente.y + (eixo === "horizontal" ? 0 : deltaY),
       },
     ]));
+    return {
+      ...registrarHistorico(state),
+      componentes: atualizarMultiplosNaArvore(state.componentes, patches),
+      ...estadoAlterado(state),
+    };
+  }),
+  alinharSelecionados: (alinhamento) => set((state) => {
+    const selecionados = state.componentes.filter(
+      (componente) => componente.tipo !== "fundoAnimado" && state.componentesSelecionadosIds.includes(componente.id),
+    );
+    if (selecionados.length < 2) return state;
+
+    const esquerda = Math.min(...selecionados.map((componente) => componente.x));
+    const topo = Math.min(...selecionados.map((componente) => componente.y));
+    const direita = Math.max(...selecionados.map((componente) => componente.x + componente.w));
+    const base = Math.max(...selecionados.map((componente) => componente.y + componente.h));
+    const centroX = (esquerda + direita) / 2;
+    const centroY = (topo + base) / 2;
+    const patches = Object.fromEntries(selecionados.map((componente) => {
+      switch (alinhamento) {
+        case "esquerda": return [componente.id, { x: esquerda }];
+        case "centro-horizontal": return [componente.id, { x: centroX - componente.w / 2 }];
+        case "direita": return [componente.id, { x: direita - componente.w }];
+        case "topo": return [componente.id, { y: topo }];
+        case "centro-vertical": return [componente.id, { y: centroY - componente.h / 2 }];
+        case "base": return [componente.id, { y: base - componente.h }];
+      }
+    }));
+
     return {
       ...registrarHistorico(state),
       componentes: atualizarMultiplosNaArvore(state.componentes, patches),
@@ -513,6 +565,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
     canvas,
     componenteSelecionadoId: null,
     componentesSelecionadosIds: [],
+    selecaoTexto: null,
     ...estadoAlterado(state),
   })),
   atualizarFundoCanvas: (backgroundColor) => set((state) => ({

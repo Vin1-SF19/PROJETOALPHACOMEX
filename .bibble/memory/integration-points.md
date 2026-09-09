@@ -2022,6 +2022,12 @@ Pedido curto reconhecido: **“Adicione o Guia Inteligente neste módulo.”**
 
 **Como integrar:** ações discretas devem registrar um snapshot pela store; gestos com vários eventos devem chamar `iniciarTransacaoHistorico()` no início e `finalizarTransacaoHistorico()` no fim. Nunca grave uma entrada por `mousemove`. Ao mover uma seleção, preserve posições relativas e filtre filhos cujo pai também está selecionado.
 
+Seleções de texto feitas no textarea inline do canvas e no campo do painel direito usam `selecaoTexto`/`definirSelecaoTexto` da store. O intervalo sempre carrega `componenteId`, `inicio`, `fim` e `origem`; trocar a seleção de componente ou de slide deve limpá-lo para impedir que um estilo seja aplicado ao elemento anterior.
+
+O alinhamento entre elementos usa `alinharSelecionados()` com seis modos (`esquerda`, `centro-horizontal`, `direita`, `topo`, `centro-vertical`, `base`). A operação calcula a caixa delimitadora da multisseleção, atualiza todos os elementos em lote e cria uma única entrada no histórico. A centralização no slide continua sendo uma ação distinta em `centralizarSelecionados()`.
+
+**Última atualização:** 2026-09-09 por Scribe
+
 ### Ordem de slides e camadas
 
 **Arquivos:** `SidebarEsquerda/SidebarSlides.tsx`, `Timeline/TimelineReal.tsx`, `useEditorStore.ts`
@@ -2038,7 +2044,7 @@ Pedido curto reconhecido: **“Adicione o Guia Inteligente neste módulo.”**
 
 **Como integrar:** formatação com seleção deve usar `aplicarEstiloNoIntervaloRichText`; sem seleção, sincronize propriedades globais e runs. Toda fonte nova precisa existir no catálogo e na URL de provisionamento de `scripts/download-alpha-motion-fonts.mjs`; execute `npm run fonts:alpha-motion` para gerar os WOFF2 e `src/app/alpha-motion-fonts.css`. A folha deve permanecer ao lado de `globals.css` e ser importada como `./alpha-motion-fonts.css`, pois o resolvedor CSS do Turbopack falhou com o caminho transversal `../styles`. Depois execute `npm run build:player`: o script troca `/fonts/alpha-motion/*.woff2` por data URI e falha se sobrar qualquer referência externa ou caminho local no bundle HTML offline.
 
-**Última atualização:** 2026-08-10 por Scribe
+**Última atualização:** 2026-09-09 por Scribe
 
 ---
 

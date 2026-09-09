@@ -57,6 +57,7 @@ export function ComponenteNoCanvas({
   const selecaoMultipla = useEditorStore((s) => s.componentesSelecionadosIds.length > 1);
   const selecionarComponente = useEditorStore((s) => s.selecionarComponente);
   const atualizarComponente = useEditorStore((s) => s.atualizarComponente);
+  const definirSelecaoTexto = useEditorStore((s) => s.definirSelecaoTexto);
   const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
   const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
   const { onMouseDownMover, onMouseDownRedimensionar, onMouseDownRotacionar } = useCanvasDragResize(componente);
@@ -110,8 +111,23 @@ export function ComponenteNoCanvas({
     e.stopPropagation();
     setEditandoTexto(true);
     requestAnimationFrame(() => {
-      textareaEdicaoRef.current?.focus();
-      textareaEdicaoRef.current?.select();
+      const campo = textareaEdicaoRef.current;
+      campo?.focus();
+      campo?.select();
+      if (campo) {
+        definirSelecaoTexto({ componenteId: componente.id, inicio: 0, fim: campo.value.length, origem: "canvas" });
+      }
+    });
+  }
+
+  function atualizarSelecaoTextoInline() {
+    const campo = textareaEdicaoRef.current;
+    if (!campo || componente.tipo !== "texto") return;
+    definirSelecaoTexto({
+      componenteId: componente.id,
+      inicio: campo.selectionStart,
+      fim: campo.selectionEnd,
+      origem: "canvas",
     });
   }
 
@@ -174,6 +190,9 @@ export function ComponenteNoCanvas({
           data-editor-only="true"
           value={componente.texto}
           onChange={(e) => handleTextoEditadoChange(e.target.value)}
+          onSelect={atualizarSelecaoTextoInline}
+          onKeyUp={atualizarSelecaoTextoInline}
+          onMouseUp={atualizarSelecaoTextoInline}
           onFocus={() => iniciarTransacaoHistorico()}
           onBlur={() => {
             finalizarTransacaoHistorico();

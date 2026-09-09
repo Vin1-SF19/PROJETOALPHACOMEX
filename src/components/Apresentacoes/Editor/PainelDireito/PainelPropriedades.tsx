@@ -1,4 +1,16 @@
-import { AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, Crosshair, RotateCcw, Trash2 } from "lucide-react";
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignHorizontalJustifyCenter,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  AlignVerticalJustifyCenter,
+  Crosshair,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { useEditorStore } from "../store/useEditorStore";
 import type { ComponenteSlide } from "@/lib/validations/slide-componentes";
 import { TextoProps } from "./camposPorTipo/TextoProps";
@@ -56,6 +68,7 @@ export function PainelPropriedades() {
   const atualizarComponentes = useEditorStore((s) => s.atualizarComponentes);
   const removerComponentes = useEditorStore((s) => s.removerComponentes);
   const centralizarSelecionados = useEditorStore((s) => s.centralizarSelecionados);
+  const alinharSelecionados = useEditorStore((s) => s.alinharSelecionados);
   const iniciarTransacaoHistorico = useEditorStore((s) => s.iniciarTransacaoHistorico);
   const finalizarTransacaoHistorico = useEditorStore((s) => s.finalizarTransacaoHistorico);
 
@@ -213,7 +226,34 @@ export function PainelPropriedades() {
           Centro
         </button>
       </div>
-        </>
+
+      {selecionadosIds.length > 1 && (
+        <div className="space-y-1.5">
+          <span className="text-[11px] text-slate-400">Alinhar elementos selecionados</span>
+          <div className="grid grid-cols-6 gap-1" role="group" aria-label="Alinhar elementos selecionados entre si">
+            {([
+              ["esquerda", AlignStartVertical, "Alinhar à esquerda"],
+              ["centro-horizontal", AlignCenterVertical, "Alinhar centros horizontalmente"],
+              ["direita", AlignEndVertical, "Alinhar à direita"],
+              ["topo", AlignStartHorizontal, "Alinhar ao topo"],
+              ["centro-vertical", AlignCenterHorizontal, "Alinhar centros verticalmente"],
+              ["base", AlignEndHorizontal, "Alinhar à base"],
+            ] as const).map(([valor, Icone, label]) => (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => alinharSelecionados(valor)}
+                aria-label={label}
+                title={label}
+                className="flex size-8 cursor-pointer items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+              >
+                <Icone size={14} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      </>
       )}
 
       <ControleOpacidade

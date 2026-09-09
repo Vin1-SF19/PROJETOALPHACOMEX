@@ -84,6 +84,9 @@ Ready for Review
 - [x] Compartilhar fontes adicionadas em catalogo global sem alterar o schema do banco.
 - [x] Gerar contorno transparente sem fundo ou preenchimento.
 - [x] Compactar o editor e recalcular o zoom conforme a area disponivel.
+- [x] Compartilhar a seleção de texto do canvas com o painel para aplicar formatação somente ao trecho selecionado.
+- [x] Adicionar alinhamento entre múltiplos elementos por bordas e centros, com Undo/Redo em uma única etapa.
+- [x] Cobrir seleção textual compartilhada e os seis modos de alinhamento com testes direcionados.
 
 ## Testing
 
@@ -110,6 +113,7 @@ Ready for Review
 | 2026-08-10 | 3.0 | Background separado do conteudo e representado por composicoes estaticas fieis aos cinco estilos do Alpha Motion. | Codex |
 | 2026-08-10 | 3.1 | Miniatura substituida por mini visualizador real do Slide 1, montado apenas proximo da viewport. | Codex |
 | 2026-08-11 | 3.2 | Input numerico corrigido, tipografia escalavel, fontes globais, contorno vazado e editor responsivo. | Codex |
+| 2026-09-09 | 3.3 | Seleção textual inline conectada à formatação por trecho e seis comandos de alinhamento entre elementos adicionados. | Dex |
 
 ## Dev Agent Record
 
@@ -118,6 +122,11 @@ Ready for Review
 GPT-5 Codex
 
 ### Debug Log References
+
+- Formatação inline e alinhamento entre elementos: 31/31 testes direcionados aprovados; ESLint dos cinco arquivos alterados e `git diff --check` aprovados.
+- Regressão Alpha Motion: 333/334 testes aprovados; única falha preexistente e fora do escopo no recorte `custGeom + blipFill` do importador PPTX.
+- Gates globais: `npm run build` aprovado com 78 páginas; `npm run typecheck` bloqueado por erros preexistentes em validadores `.next`, Gerador de Documentos, Calendário e outros módulos; `npm test` ficou em 2630 aprovados, 49 falhas fora do escopo e 1 pendente; `npm run lint` manteve o baseline legado de `.agents`, `.aiox-core` e módulos não relacionados.
+- CodeRabbit: indisponível porque `/home/ialpha/.local/bin/coderabbit` não está instalado; fallback de degradação graciosa aplicado.
 
 - `npx vitest run tests/apresentacoes`: 23 arquivos e 268/268 testes aprovados.
 - ESLint direcionado aos 18 arquivos TypeScript/TSX alterados: aprovado sem erros ou avisos.
@@ -170,6 +179,9 @@ GPT-5 Codex
 - Build desta revisao: `npm run build` encontrou o `EPERM` conhecido no `prisma generate`; `npm run build:player` e `npx next build` foram aprovados separadamente com 70 paginas.
 
 ### Completion Notes List
+
+- A seleção feita diretamente na caixa de texto do canvas agora é mantida ao acionar os controles do painel direito, permitindo cor, fonte, tamanho, negrito, itálico e sublinhado somente no trecho escolhido.
+- Ao selecionar dois ou mais elementos com Ctrl/Cmd, o painel exibe alinhamento à esquerda, centro horizontal, direita, topo, centro vertical e base; cada comando pode ser desfeito em uma única etapa.
 
 - Histórico de até 100 snapshots, isolado por slide e agregado por gesto de mover, redimensionar ou rotacionar.
 - Multisseleção com Ctrl/Cmd, movimento conjunto, exclusão em lote e centralização preservando posições relativas.
@@ -285,6 +297,7 @@ GPT-5 Codex
 - `tests/apresentacoes/rich-text-edit.test.ts`
 - `tests/apresentacoes/animacao-catalogo.test.ts`
 - `tests/apresentacoes/texto-justificado-posicionamento.test.ts`
+- `plan/self-critique-alpha-motion-formatacao-inline-alinhamento.json`
 - `.bibble/memory/codebase-map.md`
 - `.bibble/memory/integration-points.md`
 - `.bibble/memory/session-draft.md`

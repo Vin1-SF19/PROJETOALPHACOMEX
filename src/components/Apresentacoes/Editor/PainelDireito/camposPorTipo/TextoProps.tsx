@@ -16,11 +16,7 @@ import {
   type RichRunPatch,
 } from "@/lib/apresentacoes/rich-text-edit";
 import { useFontesPersonalizadas } from "../../FontesPersonalizadasContext";
-
-interface IntervaloTexto {
-  inicio: number;
-  fim: number;
-}
+import { useEditorStore } from "../../store/useEditorStore";
 
 function estiloBase(componente: TextoComponente): RichRunPatch {
   return {
@@ -61,7 +57,8 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputTamanhoRef = useRef<HTMLInputElement>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
-  const [intervalo, setIntervalo] = useState<IntervaloTexto>({ inicio: 0, fim: 0 });
+  const selecaoTexto = useEditorStore((state) => state.selecaoTexto);
+  const definirSelecaoTexto = useEditorStore((state) => state.definirSelecaoTexto);
   const [adicionandoFonte, setAdicionandoFonte] = useState(false);
   const [nomeNovaFonte, setNomeNovaFonte] = useState("");
   const [arquivoNovaFonte, setArquivoNovaFonte] = useState<File | null>(null);
@@ -70,13 +67,36 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
   const [editandoLink, setEditandoLink] = useState(false);
   const [urlDigitada, setUrlDigitada] = useState("");
   const { fontesPersonalizadas, adicionarFonte } = useFontesPersonalizadas();
-  const runs = componente.richText?.paragraphs.flatMap((paragraph) => paragraph.runs) ?? [];
-  const todosEmNegrito = runs.length > 0 ? runs.every((run) => run.bold) : componente.fontWeight === "bold";
-  const todosEmItalico = runs.length > 0 ? runs.every((run) => run.italic) : componente.fontStyle === "italic";
-  const todosSublinhados = runs.length > 0
-    ? runs.every((run) => Boolean(run.underline && run.underline !== "none"))
-    : componente.textDecoration?.includes("underline") === true;
+  const intervalo = selecaoTexto?.componenteId === componente.id
+    ? { inicio: selecaoTexto.inicio, fim: selecaoTexto.fim }
+    : { inicio: 0, fim: 0 };
   const temTrechoSelecionado = intervalo.fim > intervalo.inicio;
+  const runs = componente.richText?.paragraphs.flatMap((paragraph) => paragraph.runs) ?? [];
+  const runsDoTrecho = (() => {
+    if (!temTrechoSelecionado || !componente.richText) return runs;
+    let cursor = 0;
+    return componente.richText.paragraphs.flatMap((paragraph, paragraphIndex) => {
+      const encontrados = paragraph.runs.filter((run) => {
+        const inicioRun = cursor;
+        const fimRun = cursor + run.text.length;
+        cursor = fimRun;
+        return inicioRun < intervalo.fim && fimRun > intervalo.inicio;
+      });
+      if (paragraphIndex < componente.richText!.paragraphs.length - 1) cursor += 1;
+      return encontrados;
+    });
+  })();
+  const todosEmNegrito = runsDoTrecho.length > 0
+    ? runsDoTrecho.every((run) => run.bold ?? componente.fontWeight === "bold")
+    : componente.fontWeight === "bold";
+  const todosEmItalico = runsDoTrecho.length > 0
+    ? runsDoTrecho.every((run) => run.italic ?? componente.fontStyle === "italic")
+    : componente.fontStyle === "italic";
+  const todosSublinhados = runsDoTrecho.length > 0
+    ? runsDoTrecho.every((run) => run.underline === undefined
+      ? componente.textDecoration?.includes("underline") === true
+      : run.underline !== "none")
+    : componente.textDecoration?.includes("underline") === true;
   const linkDoTrechoAtual = (() => {
     if (runs.length === 0) return undefined;
     if (!temTrechoSelecionado) return runs.find((run) => run.hyperlink)?.hyperlink;
@@ -93,7 +113,12 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
   function atualizarSelecao() {
     const campo = textareaRef.current;
     if (!campo) return;
-    setIntervalo({ inicio: campo.selectionStart, fim: campo.selectionEnd });
+    definirSelecaoTexto({
+      componenteId: componente.id,
+      inicio: campo.selectionStart,
+      fim: campo.selectionEnd,
+      origem: "painel",
+    });
   }
 
   function atualizarTexto(texto: string) {
@@ -124,7 +149,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
       richText,
       texto: textoPlanoDoRichText(richText),
     });
-    if (restaurarSelecao) {
+    if (restaurarSelecao && selecaoTexto?.origem === "painel") {
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
         textareaRef.current?.setSelectionRange(intervalo.inicio, intervalo.fim);
@@ -198,7 +223,7 @@ export function TextoProps({ componente, onChange }: { componente: TextoComponen
           onMouseUp={atualizarSelecao}
           className="h-24 w-full resize-y rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
         />
-        <p className="text-[10px] leading-relaxed text-slate-600">Selecione um trecho acima e use fonte, tamanho, cor ou estilo. Sem seleção, a mudança vale para todo o texto.</p>
+        <p className="text-[10px] leading-relaxed text-slate-600">Selecione um trecho acima ou diretamente na caixa do slide e use fonte, tamanho, cor ou estilo. Sem seleção, a mudança vale para todo o texto.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

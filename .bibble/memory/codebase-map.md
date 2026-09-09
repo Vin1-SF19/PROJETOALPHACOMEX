@@ -1139,6 +1139,8 @@ model BlueprintActivity { projectId, userId, action, entityType, entityId?, prev
 ### Alpha Motion — histórico, multisseleção, camadas e tipografia (2026-08-10)
 
 - `src/components/Apresentacoes/Editor/store/useEditorStore.ts` é a fonte única de histórico do slide, multisseleção e operações em lote. O histórico mantém até 100 snapshots e deve ser aberto/fechado como transação em gestos contínuos.
+- A store também compartilha `selecaoTexto` entre a edição inline no canvas e `TextoProps.tsx`, permitindo que cor, fonte, tamanho, negrito, itálico e sublinhado respeitem o trecho selecionado em qualquer uma das duas superfícies.
+- `alinharSelecionados()` alinha dois ou mais elementos pelas bordas ou centros da caixa delimitadora da seleção; `PainelPropriedades.tsx` expõe os seis comandos separadamente da centralização no slide.
 - `EditorKeyboardShortcuts.tsx` concentra Ctrl/Cmd+Z e os atalhos de refazer; inputs e editores de texto conservam o histórico nativo.
 - `Canvas/ComponenteNoCanvas.tsx` e `Canvas/useCanvasDragResize.ts` implementam seleção aditiva, movimento conjunto, resize e rotação. Pais selecionados impedem o deslocamento duplicado de filhos também selecionados.
 - `Timeline/TimelineReal.tsx` representa a ordem visual de cima para baixo, persiste a ordem por `zIndex` e oferece exclusão direta; a store remove animações e grupos ligados aos elementos excluídos.
@@ -1147,7 +1149,7 @@ model BlueprintActivity { projectId, userId, action, entityType, entityId?, prev
 - As 15 famílias tipográficas ficam em `public/fonts/alpha-motion/` como 32 WOFF2 latinos e são declaradas por `src/app/alpha-motion-fonts.css`, junto de `globals.css` para resolução estável no Turbopack. `globals.css` serve esses arquivos localmente; o build do player converte os mesmos arquivos para data URI, mantendo o HTML exportado offline. `npm run fonts:alpha-motion` reprovisiona os ativos e alterações no renderer/CSS exigem `npm run build:player`.
 - Não houve dependência, migration, coluna ou mutação em massa de banco.
 
-**Última atualização:** 2026-08-10 por Scribe
+**Última atualização:** 2026-09-09 por Scribe
 
 ---
 

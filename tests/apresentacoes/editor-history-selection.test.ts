@@ -1,5 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useEditorStore } from "@/components/Apresentacoes/Editor/store/useEditorStore";
 import { ControleOpacidade } from "@/components/Apresentacoes/Editor/PainelDireito/ControleOpacidade";
@@ -29,6 +31,7 @@ describe("Alpha Motion — histórico, multisseleção e camadas", () => {
       transicaoEntrada: null,
       componenteSelecionadoId: null,
       componentesSelecionadosIds: [],
+      selecaoTexto: null,
       historicoPassado: [],
       historicoFuturo: [],
       isDirty: false,
@@ -76,6 +79,26 @@ describe("Alpha Motion — histórico, multisseleção e camadas", () => {
     expect(useEditorStore.getState().componentesSelecionadosIds).toEqual(["a", "b"]);
     store.selecionarComponente("a", true);
     expect(useEditorStore.getState()).toMatchObject({ componenteSelecionadoId: "b", componentesSelecionadosIds: ["b"] });
+  });
+
+  it("compartilha a seleção de texto feita diretamente no canvas", () => {
+    const store = useEditorStore.getState();
+    store.selecionarComponente("a");
+    store.definirSelecaoTexto({ componenteId: "a", inicio: 0, fim: 1, origem: "canvas" });
+
+    expect(useEditorStore.getState().selecaoTexto).toEqual({ componenteId: "a", inicio: 0, fim: 1, origem: "canvas" });
+    store.selecionarComponente("b");
+    expect(useEditorStore.getState().selecaoTexto).toBeNull();
+  });
+
+  it("conecta a seleção inline do canvas aos controles de formatação do painel", () => {
+    const canvas = readFileSync(resolve("src/components/Apresentacoes/Editor/Canvas/ComponenteNoCanvas.tsx"), "utf8");
+    const textoProps = readFileSync(resolve("src/components/Apresentacoes/Editor/PainelDireito/camposPorTipo/TextoProps.tsx"), "utf8");
+
+    expect(canvas).toContain("onSelect={atualizarSelecaoTextoInline}");
+    expect(canvas).toContain('origem: "canvas"');
+    expect(textoProps).toContain("state.selecaoTexto");
+    expect(textoProps).toContain("diretamente na caixa do slide");
   });
 
   it("reordena zIndex conforme a ordem topo para base e permite desfazer", () => {
@@ -138,6 +161,37 @@ describe("Alpha Motion — histórico, multisseleção e camadas", () => {
     const [a, b] = useEditorStore.getState().componentes;
     expect([a.x, b.x]).toEqual(xsAntes);
     expect((Math.min(a.y, b.y) + Math.max(a.y + a.h, b.y + b.h)) / 2).toBe(CANVAS_PADRAO.height / 2);
+  });
+
+  it.each([
+    ["esquerda", (a: ComponenteSlide, b: ComponenteSlide) => a.x === b.x],
+    ["centro-horizontal", (a: ComponenteSlide, b: ComponenteSlide) => a.x + a.w / 2 === b.x + b.w / 2],
+    ["direita", (a: ComponenteSlide, b: ComponenteSlide) => a.x + a.w === b.x + b.w],
+    ["topo", (a: ComponenteSlide, b: ComponenteSlide) => a.y === b.y],
+    ["centro-vertical", (a: ComponenteSlide, b: ComponenteSlide) => a.y + a.h / 2 === b.y + b.h / 2],
+    ["base", (a: ComponenteSlide, b: ComponenteSlide) => a.y + a.h === b.y + b.h],
+  ] as const)("alinha múltiplos elementos por %s em uma etapa do histórico", (alinhamento, estaoAlinhados) => {
+    useEditorStore.setState({
+      componentes: [texto("a", 10, 20, 1), { ...texto("b", 210, 120, 2), w: 200, h: 80 }],
+      componentesSelecionadosIds: ["a", "b"],
+      componenteSelecionadoId: "b",
+      historicoPassado: [],
+    });
+
+    useEditorStore.getState().alinharSelecionados(alinhamento);
+    const [a, b] = useEditorStore.getState().componentes;
+    expect(estaoAlinhados(a, b)).toBe(true);
+    expect(useEditorStore.getState().historicoPassado).toHaveLength(1);
+  });
+
+  it("expõe os seis comandos de alinhamento somente para multisseleção", () => {
+    const painel = readFileSync(resolve("src/components/Apresentacoes/Editor/PainelDireito/PainelPropriedades.tsx"), "utf8");
+
+    expect(painel).toContain("selecionadosIds.length > 1");
+    expect(painel).toContain("Alinhar elementos selecionados entre si");
+    for (const alinhamento of ["esquerda", "centro-horizontal", "direita", "topo", "centro-vertical", "base"]) {
+      expect(painel).toContain(`["${alinhamento}"`);
+    }
   });
 
   it("ajusta a opacidade da multisselecao em uma unica etapa de historico", () => {
