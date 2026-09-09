@@ -21,10 +21,14 @@ export function VisibilidadeEtapasSection({
   pipelineId,
   etapas,
   accent,
+  publicationBlocked = false,
+  onPublished,
 }: {
   pipelineId: string;
   etapas: Etapa[];
   accent: string;
+  publicationBlocked?: boolean;
+  onPublished?: () => void;
 }) {
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [regras, setRegras] = useState<RegrasPorEtapa>({});
@@ -93,7 +97,7 @@ export function VisibilidadeEtapasSection({
   }
 
   async function salvar(etapaId: string) {
-    if (salvandoEtapa) return;
+    if (publicationBlocked || salvandoEtapa) return;
     setSalvandoEtapa(etapaId);
     setErro(null);
     setSucessoEtapa(null);
@@ -123,6 +127,7 @@ export function VisibilidadeEtapasSection({
     setRegras((atuais) => ({ ...atuais, [etapaId]: regrasSalvas }));
     setRegrasConfirmadas((atuais) => ({ ...atuais, [etapaId]: regrasSalvas }));
     setSucessoEtapa(etapaId);
+    onPublished?.();
   }
 
   return (
@@ -236,22 +241,25 @@ export function VisibilidadeEtapasSection({
                     <button
                       type="button"
                       onClick={() => void salvar(etapa.id)}
-                      disabled={Boolean(salvandoEtapa)}
+                      disabled={publicationBlocked || Boolean(salvandoEtapa)}
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                       style={{ background: `rgba(${accent},0.85)` }}
                     >
                       {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                      {salvando ? "Salvando…" : "Salvar etapa"}
+                      {salvando ? "Publicando…" : "Publicar etapa"}
                     </button>
                   </div>
                   {sucessoEtapa === etapa.id && (
-                    <p className="text-xs text-emerald-300" role="status">Configuração salva.</p>
+                    <p className="text-xs text-emerald-300" role="status">Configuração publicada.</p>
                   )}
                 </div>
               </details>
             );
           })}
         </div>
+      )}
+      {publicationBlocked && (
+        <p className="text-xs text-amber-200" role="status">Publique ou descarte o rascunho principal antes de publicar permissões.</p>
       )}
     </section>
   );

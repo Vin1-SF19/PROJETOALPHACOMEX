@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   componentCreate: vi.fn(),
   componentDeleteMany: vi.fn(),
   auditCreate: vi.fn(),
+  pipelineUpdate: vi.fn(),
   revalidatePath: vi.fn(),
   notify: vi.fn(),
 }));
@@ -131,6 +132,7 @@ function input(
 
 function transactionClient() {
   return {
+    bpmPipeline: { update: mocks.pipelineUpdate },
     bpmEtapa: { findFirst: mocks.stageFindFirst },
     bpmCampo: { findMany: mocks.fieldFindMany },
     bpmEtapaFormulario: {
@@ -180,6 +182,7 @@ describe("contrato e salvamento diferencial do formulário de etapa", () => {
     mocks.sectionDeleteMany.mockResolvedValue({ count: 0 });
     mocks.componentDeleteMany.mockResolvedValue({ count: 0 });
     mocks.auditCreate.mockResolvedValue({ id: "audit-1" });
+    mocks.pipelineUpdate.mockResolvedValue({ configVersion: 2 });
     mocks.transaction.mockImplementation(async (callback) => callback(transactionClient()));
   });
 

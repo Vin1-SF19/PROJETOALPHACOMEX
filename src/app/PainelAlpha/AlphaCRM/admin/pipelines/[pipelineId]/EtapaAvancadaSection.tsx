@@ -2,20 +2,11 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Loader2 } from "lucide-react";
-import {
-  DefinirEtapaInicialBpm,
-  DefinirEtapasFinaisBpm,
-} from "@/actions/bpm/Etapas";
+import { Plus, Loader2, Save } from "lucide-react";
 import {
   CriarSubStatusBpm,
   AtualizarSubStatusBpm,
-  AtivarDesativarSubStatusBpm,
 } from "@/actions/bpm/SubStatus";
-import {
-  CriarTransicaoEtapaBpm,
-  AtualizarTransicaoEtapaBpm,
-} from "@/actions/bpm/Transicoes";
 
 export type EtapaAvancada = {
   id: string;
@@ -64,6 +55,8 @@ interface Props {
   onEtapasAtualizadas: (patch: Record<string, Partial<EtapaAvancada>>) => void;
   onSubStatusAtualizado: (subStatus: SubStatusBpm) => void;
   onTransicaoAtualizada: (transicao: TransicaoBpm) => void;
+  publicationBlocked?: boolean;
+  onPublished?: () => void;
 }
 
 export function EtapaAvancadaSection({
@@ -76,6 +69,8 @@ export function EtapaAvancadaSection({
   onEtapasAtualizadas,
   onSubStatusAtualizado,
   onTransicaoAtualizada,
+  publicationBlocked = false,
+  onPublished,
 }: Props) {
   const [novoSubStatusNome, setNovoSubStatusNome] = useState("");
   const [novoSubStatusCor, setNovoSubStatusCor] = useState("#64748b");
@@ -87,52 +82,33 @@ export function EtapaAvancadaSection({
   const [coresRascunho, setCoresRascunho] = useState<Record<string, string>>(
     {},
   );
+  const [ativosRascunho, setAtivosRascunho] = useState<Record<string, boolean>>({});
 
-  async function handleDefinirInicial() {
+  function handleDefinirInicial() {
     if (operacao) return;
-    setOperacao("etapa-inicial");
-    const res = await DefinirEtapaInicialBpm({ pipelineId, etapaId: etapa.id });
-    if (res.success) {
-      const patch: Record<string, Partial<EtapaAvancada>> = {
-        [etapa.id]: { ehInicial: true },
-      };
-      for (const e of todasEtapas) {
-        if (e.id !== etapa.id && e.ehInicial)
-          patch[e.id] = { ehInicial: false };
-      }
-      onEtapasAtualizadas(patch);
-      toast.success(`"${etapa.nome}" definida como etapa inicial`);
-    } else {
-      toast.error(mensagemErro(res.error, "Erro ao definir etapa inicial"));
+    const patch: Record<string, Partial<EtapaAvancada>> = {
+      [etapa.id]: { ehInicial: true },
+    };
+    for (const e of todasEtapas) {
+      if (e.id !== etapa.id && e.ehInicial)
+        patch[e.id] = { ehInicial: false };
     }
-    setOperacao(null);
+    onEtapasAtualizadas(patch);
+    toast.success(`"${etapa.nome}" definida como inicial no rascunho`);
   }
 
-  async function handleToggleFinal(marcar: boolean) {
+  function handleToggleFinal(marcar: boolean) {
     if (operacao) return;
-    setOperacao("etapa-final");
-    const idsAtuais = todasEtapas
-      .filter((e) => (e.id === etapa.id ? marcar : e.ehFinal))
-      .map((e) => e.id);
-    const res = await DefinirEtapasFinaisBpm({
-      pipelineId,
-      etapaIds: idsAtuais,
-    });
-    if (res.success) {
-      onEtapasAtualizadas({ [etapa.id]: { ehFinal: marcar } });
-      toast.success(
-        marcar
-          ? `"${etapa.nome}" marcada como etapa final`
-          : `"${etapa.nome}" removida das etapas finais`,
-      );
-    } else {
-      toast.error(mensagemErro(res.error, "Erro ao definir etapas finais"));
-    }
-    setOperacao(null);
+    onEtapasAtualizadas({ [etapa.id]: { ehFinal: marcar } });
+    toast.success(
+      marcar
+        ? `"${etapa.nome}" marcada como final no rascunho`
+        : `"${etapa.nome}" removida das finais no rascunho`,
+    );
   }
 
   async function handleCriarSubStatus() {
-    if (!novoSubStatusNome.trim() || operacao) return;
+    if (!novoSubStatusNome.trim() || publicationBlocked || operacao) return;
     setOperacao("criar-substatus");
     setCriandoSubStatus(true);
     const res = await CriarSubStatusBpm({
@@ -146,36 +122,25 @@ export function EtapaAvancadaSection({
     if (res.success && res.data) {
       onSubStatusAtualizado(res.data as SubStatusBpm);
       setNovoSubStatusNome("");
-      toast.success("Substatus criado");
+      toast.success("Substatus criado e publicado");
+      onPublished?.();
     } else {
       toast.error(mensagemErro(res.error, "Erro ao criar substatus"));
     }
   }
 
-  async function handleToggleSubStatusAtivo(sub: SubStatusBpm, ativo: boolean) {
-    if (operacao) return;
-    setOperacao(`substatus:${sub.id}`);
-    const res = await AtivarDesativarSubStatusBpm({
-      subStatusId: sub.id,
-      ativo,
-    });
-    if (res.success && "data" in res && res.data) {
-      onSubStatusAtualizado(res.data as SubStatusBpm);
-    } else {
-      toast.error(mensagemErro(res.error, "Erro ao atualizar substatus"));
-    }
-    setOperacao(null);
-  }
-
-  async function handleRenomearSubStatus(sub: SubStatusBpm, nome: string) {
-    if (!nome.trim() || nome === sub.nome || operacao) {
-      setNomesRascunho((atuais) => ({ ...atuais, [sub.id]: sub.nome }));
-      return;
-    }
+  async function handlePublicarSubStatus(sub: SubStatusBpm) {
+    if (publicationBlocked || operacao) return;
+    const nome = (nomesRascunho[sub.id] ?? sub.nome).trim();
+    const cor = coresRascunho[sub.id] ?? sub.cor ?? "#64748b";
+    const ativo = ativosRascunho[sub.id] ?? sub.ativo;
+    if (!nome) return;
     setOperacao(`substatus:${sub.id}`);
     const res = await AtualizarSubStatusBpm({
       subStatusId: sub.id,
-      nome: nome.trim(),
+      nome,
+      cor,
+      ativo,
     });
     if (res.success && res.data) {
       onSubStatusAtualizado(res.data as SubStatusBpm);
@@ -183,31 +148,15 @@ export function EtapaAvancadaSection({
         ...atuais,
         [sub.id]: (res.data as SubStatusBpm).nome,
       }));
-    } else {
-      setNomesRascunho((atuais) => ({ ...atuais, [sub.id]: sub.nome }));
-      toast.error(mensagemErro(res.error, "Erro ao renomear substatus"));
-    }
-    setOperacao(null);
-  }
-
-  async function handleAlterarCorSubStatus(sub: SubStatusBpm, cor: string) {
-    if (cor === sub.cor || operacao) return;
-    setOperacao(`substatus:${sub.id}`);
-    const res = await AtualizarSubStatusBpm({ subStatusId: sub.id, cor });
-    if (res.success && res.data) {
-      onSubStatusAtualizado(res.data as SubStatusBpm);
       setCoresRascunho((atuais) => ({
         ...atuais,
         [sub.id]: (res.data as SubStatusBpm).cor ?? "#64748b",
       }));
+      setAtivosRascunho((atuais) => ({ ...atuais, [sub.id]: (res.data as SubStatusBpm).ativo }));
+      toast.success("Substatus publicado");
+      onPublished?.();
     } else {
-      setCoresRascunho((atuais) => ({
-        ...atuais,
-        [sub.id]: sub.cor ?? "#64748b",
-      }));
-      toast.error(
-        mensagemErro(res.error, "Erro ao atualizar cor do substatus"),
-      );
+      toast.error(mensagemErro(res.error, "Erro ao publicar substatus"));
     }
     setOperacao(null);
   }
@@ -220,54 +169,37 @@ export function EtapaAvancadaSection({
     );
   }
 
-  async function handleToggleTransicao(destinoId: string, permitida: boolean) {
+  function handleToggleTransicao(destinoId: string, permitida: boolean) {
     if (operacao) return;
-    setOperacao(`transicao:${destinoId}`);
     const existente = transicaoPara(destinoId);
-    const res = existente
-      ? await AtualizarTransicaoEtapaBpm({
-          transicaoId: existente.id,
-          permitida,
-        })
-      : await CriarTransicaoEtapaBpm({
-          pipelineId,
+    onTransicaoAtualizada(existente
+      ? { ...existente, permitida }
+      : {
+          id: `draft-${crypto.randomUUID()}`,
           etapaOrigemId: etapa.id,
           etapaDestinoId: destinoId,
           permitida,
           origem: "AMBOS",
         });
-    if (res.success && res.data) {
-      onTransicaoAtualizada(res.data as TransicaoBpm);
-    } else {
-      toast.error(mensagemErro(res.error, "Erro ao atualizar transição"));
-    }
-    setOperacao(null);
+    toast.success("Transição adicionada ao rascunho");
   }
 
-  async function handleAlterarOrigemTransicao(
+  function handleAlterarOrigemTransicao(
     destinoId: string,
     origem: TransicaoBpm["origem"],
   ) {
     if (operacao) return;
-    setOperacao(`transicao:${destinoId}`);
     const existente = transicaoPara(destinoId);
-    const res = existente
-      ? await AtualizarTransicaoEtapaBpm({ transicaoId: existente.id, origem })
-      : await CriarTransicaoEtapaBpm({
-          pipelineId,
+    onTransicaoAtualizada(existente
+      ? { ...existente, origem }
+      : {
+          id: `draft-${crypto.randomUUID()}`,
           etapaOrigemId: etapa.id,
           etapaDestinoId: destinoId,
           permitida: true,
           origem,
         });
-    if (res.success && res.data) {
-      onTransicaoAtualizada(res.data as TransicaoBpm);
-    } else {
-      toast.error(
-        mensagemErro(res.error, "Erro ao atualizar origem da transição"),
-      );
-    }
-    setOperacao(null);
+    toast.success("Origem adicionada ao rascunho");
   }
 
   const outrasEtapas = todasEtapas.filter((e) => e.id !== etapa.id);
@@ -325,9 +257,6 @@ export function EtapaAvancadaSection({
                       [sub.id]: e.target.value,
                     }))
                   }
-                  onBlur={(e) =>
-                    void handleAlterarCorSubStatus(sub, e.target.value)
-                  }
                   aria-label={`Cor do substatus ${sub.nome}`}
                   className="w-6 h-6 rounded border border-white/10 bg-transparent p-0"
                 />
@@ -341,23 +270,31 @@ export function EtapaAvancadaSection({
                       [sub.id]: e.target.value,
                     }))
                   }
-                  onBlur={(e) =>
-                    void handleRenomearSubStatus(sub, e.target.value)
-                  }
                   aria-label={`Nome do substatus ${sub.nome}`}
                 />
                 <label className="flex items-center gap-1 text-[11px] text-slate-400">
                   <input
                     type="checkbox"
-                    checked={sub.ativo}
+                    checked={ativosRascunho[sub.id] ?? sub.ativo}
                     disabled={Boolean(operacao)}
-                    onChange={(e) =>
-                      void handleToggleSubStatusAtivo(sub, e.target.checked)
-                    }
+                    onChange={(e) => setAtivosRascunho((atuais) => ({ ...atuais, [sub.id]: e.target.checked }))}
                     aria-label={`Ativar/desativar substatus ${sub.nome}`}
                   />
                   Ativo
                 </label>
+                <button
+                  type="button"
+                  disabled={publicationBlocked || Boolean(operacao) || (
+                    (nomesRascunho[sub.id] ?? sub.nome) === sub.nome
+                    && (coresRascunho[sub.id] ?? sub.cor ?? "#64748b") === (sub.cor ?? "#64748b")
+                    && (ativosRascunho[sub.id] ?? sub.ativo) === sub.ativo
+                  )}
+                  onClick={() => void handlePublicarSubStatus(sub)}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-white/10 px-2 text-[11px] font-semibold text-slate-200 disabled:opacity-35"
+                >
+                  {operacao === `substatus:${sub.id}` ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                  Publicar
+                </button>
               </div>
             ))}
           </div>
@@ -381,7 +318,7 @@ export function EtapaAvancadaSection({
           <button
             onClick={() => void handleCriarSubStatus()}
             disabled={
-              Boolean(operacao) || criandoSubStatus || !novoSubStatusNome.trim()
+              publicationBlocked || Boolean(operacao) || criandoSubStatus || !novoSubStatusNome.trim()
             }
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
             style={{ background: `rgba(${accent},0.85)` }}
@@ -391,10 +328,13 @@ export function EtapaAvancadaSection({
             ) : (
               <Plus size={13} />
             )}
-            Adicionar
+            Criar e publicar
           </button>
         </div>
       </div>
+      {publicationBlocked && (
+        <p className="text-xs text-amber-200" role="status">Publique ou descarte o rascunho principal antes de publicar substatus.</p>
+      )}
 
       {/* Transições permitidas */}
       <div className="space-y-2">

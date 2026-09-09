@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   notificar: vi.fn(),
   pipelineFindUnique: vi.fn(),
+  pipelineUpdate: vi.fn(),
   usuariosFindMany: vi.fn(),
   etapaFindUnique: vi.fn(),
   deleteMany: vi.fn(),
@@ -63,10 +64,12 @@ describe("actions de visibilidade por etapa", () => {
     mocks.deleteMany.mockResolvedValue({ count: 0 });
     mocks.createMany.mockResolvedValue({ count: 1 });
     mocks.auditoriaCreate.mockResolvedValue({ id: "audit-1" });
+    mocks.pipelineUpdate.mockResolvedValue({ configVersion: 2 });
     mocks.regrasFindMany.mockResolvedValue([
       { perfil: "COMERCIAL", podeVer: true, podeAgir: true },
     ]);
     mocks.transaction.mockImplementation(async (callback) => callback({
+      bpmPipeline: { update: mocks.pipelineUpdate },
       bpmEtapaVisibilidade: {
         deleteMany: mocks.deleteMany,
         createMany: mocks.createMany,

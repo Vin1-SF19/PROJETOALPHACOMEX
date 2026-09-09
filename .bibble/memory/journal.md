@@ -1,5 +1,17 @@
 # JOURNAL — Histórico Cronológico de Sessões
 
+## 2026-09-09 — Codex — RM-2026-EB2898 (CRM Config Save Consistency — P0-4)
+
+**Tags:** #crm #bpm #config-version #concorrencia #transacao #turso #concluido
+
+Implementada em branch/worktree isolado a publicação consistente da configuração. A migration aditiva criou `BpmPipeline.configVersion`; o Turso de produção recebeu a coluna após backup completo verificado e autorização explícita pelos hashes. A publicação principal passou a usar CAS e transação serializável para etapas, transições, ativação de campos e auditoria. Escritores administrativos relacionados invalidam a versão dentro das próprias transações.
+
+A UI separa e nomeia o rascunho principal, restaura o último snapshot publicado ao descartar, mostra estados publicado/pendente/publicando/erro/conflito e bloqueia editores independentes enquanto o rascunho principal está aberto. Cadência e substatus deixaram de persistir silenciosamente em seleção/blur. Erros de carga não viram arrays vazios.
+
+Validação: P0-4 26/26; regressão P0-1/P0-2/P0-3 172/172; suíte BPM 876/882 com as mesmas seis falhas basais externas; build aprovado; ESLint escopado e `git diff --check` aprovados. Gates globais mantêm débitos preexistentes fora do delta. Anubis: aprovado sem crítico após reforço de ownership de endpoints de transição e complexidade linear do validador. CodeRabbit indisponível no ambiente.
+
+**Arquivos centrais:** `prisma/schema.prisma`, migration `20260909211000_bpm_pipeline_config_version`, `ConfiguracaoPipeline.ts`, `config-version.ts`, `pipeline-config-publicacao.ts`, workspace administrativo, testes e relatório `crm-config-save-consistency-p0-4.md`.
+
 ## 2026-09-08 — Kowalski — RM-2026-3D529D (ChatBotX = Chatbot Alpha — Replicar o Frontend) — CLOSURE
 
 **Tags:** #chatbot #chatbotx #frontend #proxy #inbox #mensagens #sem-migration #concluido

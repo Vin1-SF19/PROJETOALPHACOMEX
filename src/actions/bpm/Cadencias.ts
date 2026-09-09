@@ -22,6 +22,7 @@ import {
 import { exigirAcessoBpmCard, exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import { registrarHistoricoCard } from "@/lib/bpm/historico-server";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 import {
   CADENCIA_MANUAL_DESABILITADA,
 } from "@/lib/bpm/cadencias/ativacao-automatica";
@@ -307,6 +308,7 @@ export async function ConfigurarCadenciaEtapaBpm(input: unknown) {
           valorNovoJson: JSON.stringify({ etapaId, cadenciaId: selecionada?.id ?? null }),
         },
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
       return { cadenciaId: selecionada?.id ?? null };
     }, { isolationLevel: "Serializable" });
 

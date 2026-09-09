@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   associacaoFindFirst: vi.fn(), associacaoFindUnique: vi.fn(), associacaoFindMany: vi.fn(), associacaoCreate: vi.fn(),
   associacaoCreateMany: vi.fn(), associacaoDelete: vi.fn(), associacaoDeleteMany: vi.fn(), auditoriaCreate: vi.fn(),
   transaction: vi.fn(), revalidatePath: vi.fn(),
+  pipelineUpdate: vi.fn(),
 }));
 
 vi.mock("../../auth", () => ({ auth: mocks.auth }));
@@ -26,7 +27,7 @@ const CADENCIA_ID = "clw0000000000000cadencia";
 
 function txMock() {
   return {
-    bpmPipeline: { findFirst: mocks.pipelineFindFirst },
+    bpmPipeline: { findFirst: mocks.pipelineFindFirst, update: mocks.pipelineUpdate },
     bpmEtapa: { findMany: mocks.etapaFindMany },
     bpmCadencia: { findUnique: mocks.cadenciaFindUnique, findUniqueOrThrow: mocks.cadenciaFindUniqueOrThrow, create: mocks.cadenciaCreate, update: mocks.cadenciaUpdate },
     bpmCadenciaEtapa: {
@@ -43,6 +44,7 @@ describe("actions de cadência multicoluna", () => {
     mocks.auth.mockResolvedValue({ user: { id: "7", role: "Admin" } });
     mocks.exigirConfig.mockResolvedValue(undefined);
     mocks.pipelineFindFirst.mockResolvedValue({ id: PIPELINE_ID });
+    mocks.pipelineUpdate.mockResolvedValue({ configVersion: 2 });
     mocks.etapaFindMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) => where.id.in.map((id, index) => ({ id, ordem: index + 1 })));
     mocks.associacaoFindFirst.mockResolvedValue(null);
     mocks.associacaoFindUnique.mockResolvedValue(null);

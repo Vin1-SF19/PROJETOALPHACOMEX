@@ -19,6 +19,7 @@ import {
 } from "@/lib/bpm/campos-configuraveis";
 import { grupoCondicaoSchema } from "@/lib/bpm/regras/schemas";
 import type { Prisma } from "@prisma/client";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -284,6 +285,9 @@ export async function CriarCampoBpm(dados: unknown) {
           valorNovoJson: JSON.stringify({ campoId: criado.id, tipo: entrada.tipo, escopo: entrada.escopo, pipelineIds: todosPipelines }),
         },
       });
+      for (const pipelineId of todosPipelines) {
+        await avancarConfigVersionBpm(tx, pipelineId);
+      }
       const agregado = await tx.bpmCampo.findUniqueOrThrow({
         where: { id: criado.id },
         include: campoAdminInclude,
@@ -466,6 +470,9 @@ export async function AtualizarCampoBpm(dados: unknown) {
           valorNovoJson: JSON.stringify(entrada),
         },
       });
+      for (const pipelineId of todosPipelines) {
+        await avancarConfigVersionBpm(tx, pipelineId);
+      }
       const agregado = await tx.bpmCampo.findUniqueOrThrow({
         where: { id: atualizado.id },
         include: campoAdminInclude,
@@ -534,6 +541,10 @@ export async function ConfigurarMapeamentoCampoBpm(dados: unknown) {
           valorNovoJson: JSON.stringify(entrada),
         },
       });
+      await avancarConfigVersionBpm(tx, destino.pipelineId);
+      if (origem.pipelineId !== destino.pipelineId) {
+        await avancarConfigVersionBpm(tx, origem.pipelineId);
+      }
       return salvo;
     });
     await notificarPipelines([origem.pipelineId, destino.pipelineId]);
@@ -577,6 +588,10 @@ export async function DesativarMapeamentoCampoBpm(dados: unknown) {
           valorNovoJson: JSON.stringify({ campoDestinoId: parsed.data.campoId, ativo: false }),
         },
       });
+      await avancarConfigVersionBpm(tx, existente.campoDestino.pipelineId);
+      if (existente.campoOrigem.pipelineId !== existente.campoDestino.pipelineId) {
+        await avancarConfigVersionBpm(tx, existente.campoOrigem.pipelineId);
+      }
     });
     await notificarPipelines([existente.campoOrigem.pipelineId, existente.campoDestino.pipelineId]);
     return { success: true };

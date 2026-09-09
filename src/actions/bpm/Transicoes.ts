@@ -11,6 +11,7 @@ import {
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import { registrarAuditoriaPipeline } from "@/actions/bpm/Etapas";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -77,6 +78,7 @@ export async function CriarTransicaoEtapaBpm(dados: unknown) {
         campoAlterado: "transicao_criada",
         valorNovoJson: JSON.stringify({ etapaOrigemId, etapaDestinoId, permitida, origem }),
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
       return criada;
     });
 
@@ -117,6 +119,7 @@ export async function AtualizarTransicaoEtapaBpm(dados: unknown) {
         valorAnteriorJson: JSON.stringify(anterior),
         valorNovoJson: JSON.stringify(campos),
       });
+      await avancarConfigVersionBpm(tx, anterior.pipelineId);
       return { transicao: atualizada, pipelineId: anterior.pipelineId };
     });
 
@@ -156,6 +159,7 @@ export async function RemoverTransicaoEtapaBpm(dados: unknown) {
         campoAlterado: "transicao_removida",
         valorAnteriorJson: JSON.stringify(anterior),
       });
+      await avancarConfigVersionBpm(tx, anterior.pipelineId);
       return anterior.pipelineId;
     });
 

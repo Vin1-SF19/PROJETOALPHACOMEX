@@ -1,5 +1,15 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Publicação consistente da configuração CRM — P0-4 (RM-2026-EB2898, 2026-09-09)
+
+`BpmPipeline.configVersion` é o contador inteiro do agregado administrativo. O read model carrega a versão junto da configuração; `PublicarConfiguracaoPipelineBpm` recebe `baseVersion`, revalida autorização e snapshot, executa CAS por `updateMany(id + configVersion)`, aplica etapas/transições/ativação de campos e auditoria na mesma transação serializável e só então dispara revalidação/realtime. Falha ou CAS perdido desfaz todo o lote; `updatedAt` deixou de ser autoridade de concorrência.
+
+A central distingue o rascunho principal (etapas, fluxo e ativação de campos) de publicações independentes e explicitamente rotuladas para campo, formulário, substatus, SLA, visibilidade e cadência. Escritores desses domínios incrementam o mesmo contador dentro de suas transações, invalidando workspaces antigos. Cadência e substatus deixaram de gravar silenciosamente em `onChange`/`onBlur`. Erros de carga relacionados bloqueiam o editor em vez de serem convertidos em listas vazias.
+
+DELIVERY_READY: `Alpha CRM → Configurações → pipeline` → editar rascunho → **Publicar rascunho principal** → CAS/validação/transação/auditoria → versão incrementada. Migration aditiva aplicada no Turso com backup validado.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-EB2898).
+
 ## Formulários canônicos por etapa — P0-2 concluída (RM-2026-045CC0, 2026-09-09)
 
 `BpmCampoEtapaConfig` é a única autoridade de aplicabilidade/visibilidade de campo na etapa. `BpmEtapaFormulario` e filhos são apenas composição visual e não concedem presença por pipeline. A reconciliação de produção removeu 1.043 cópias v1 de campos pertencentes a outras etapas e 14 componentes contrários a `visivel=false`: 1.237 componentes CAMPO/1.057 incompatíveis passaram a 180/zero. Os 32 CHECKLIST e 37 CAPABILITY permaneceram intactos.

@@ -13,6 +13,7 @@ import {
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import type { Prisma } from "@prisma/client";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -69,6 +70,7 @@ export async function CriarEtapaBpm(dados: unknown) {
         campoAlterado: "etapa_criada",
         valorNovoJson: JSON.stringify({ nome, ordem, cor, transicoesBloqueadasCriadas: existentes.length * 2 }),
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
       return criada;
     });
 
@@ -106,6 +108,7 @@ export async function AtualizarEtapaBpm(dados: unknown) {
         valorAnteriorJson: JSON.stringify(etapaAnterior),
         valorNovoJson: JSON.stringify(campos),
       });
+      await avancarConfigVersionBpm(tx, etapaAnterior.pipelineId);
       return { etapa: atualizada, pipelineId: etapaAnterior.pipelineId };
     });
 
@@ -147,6 +150,7 @@ export async function ReordenarEtapasBpm(dados: unknown) {
         campoAlterado: "etapas_reordenadas",
         valorNovoJson: JSON.stringify({ ordem }),
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
     });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
@@ -184,6 +188,7 @@ export async function AtivarDesativarEtapaBpm(dados: unknown) {
         valorAnteriorJson: JSON.stringify({ ativo: etapaAnterior.ativo }),
         valorNovoJson: JSON.stringify({ ativo }),
       });
+      await avancarConfigVersionBpm(tx, etapaAnterior.pipelineId);
       return { etapa: atualizada, pipelineId: etapaAnterior.pipelineId };
     });
 
@@ -228,6 +233,7 @@ export async function DefinirEtapaInicialBpm(dados: unknown) {
         campoAlterado: "etapa_inicial",
         valorNovoJson: JSON.stringify({ etapaId }),
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
     });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);
@@ -273,6 +279,7 @@ export async function DefinirEtapasFinaisBpm(dados: unknown) {
         campoAlterado: "etapas_finais",
         valorNovoJson: JSON.stringify({ etapaIds }),
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
     });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${pipelineId}`);

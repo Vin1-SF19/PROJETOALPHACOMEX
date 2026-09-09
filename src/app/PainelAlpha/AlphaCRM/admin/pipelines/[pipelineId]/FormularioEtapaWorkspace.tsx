@@ -74,6 +74,8 @@ export function FormularioEtapaWorkspace({
   etapas,
   campos,
   onFormularioAtualizado,
+  publicationBlocked = false,
+  onPublished,
 }: {
   pipelineId: string;
   etapas: EtapaFormulario[];
@@ -82,6 +84,8 @@ export function FormularioEtapaWorkspace({
     etapaId: string,
     formulario: FormularioEtapaAdmin,
   ) => void;
+  publicationBlocked?: boolean;
+  onPublished?: () => void;
 }) {
   const primeiraEtapa = etapas[0];
   const [etapaId, setEtapaId] = useState(primeiraEtapa?.id ?? "");
@@ -176,7 +180,7 @@ export function FormularioEtapaWorkspace({
   }
 
   async function salvar() {
-    if (!etapa || salvando) return;
+    if (!etapa || publicationBlocked || salvando) return;
     setSalvando(true);
     const resposta = await SalvarFormularioEtapaBpm({
       pipelineId,
@@ -217,6 +221,7 @@ export function FormularioEtapaWorkspace({
     setAtivo(confirmado.ativo);
     setSujo(false);
     toast.success("Composição do formulário publicada");
+    onPublished?.();
   }
 
   if (!etapa)
@@ -280,7 +285,7 @@ export function FormularioEtapaWorkspace({
             </label>
             <button
               type="button"
-              disabled={!sujo || salvando}
+              disabled={!sujo || publicationBlocked || salvando}
               onClick={() => void salvar()}
               className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-cyan-400 px-3 text-xs font-bold text-slate-950 disabled:opacity-40"
             >
@@ -289,10 +294,14 @@ export function FormularioEtapaWorkspace({
               ) : (
                 <Save size={14} />
               )}{" "}
-              Salvar composição
+              Publicar composição
             </button>
           </div>
         </div>
+
+        {publicationBlocked && (
+          <p className="text-xs text-amber-200" role="status">Publique ou descarte o rascunho principal antes de publicar o formulário.</p>
+        )}
 
         {secoes.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-slate-500">

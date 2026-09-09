@@ -16,6 +16,8 @@ import {
 
 const etapaSchema = z.object({
   id: z.string().min(1).max(120),
+  nome: z.string().trim().min(1).max(160),
+  cor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida").nullable(),
   ordem: z.number().int().min(0).max(10_000),
   ativo: z.boolean(),
   ehInicial: z.boolean(),
@@ -32,7 +34,7 @@ const transicaoSchema = z.object({
 
 const publicacaoSchema = z.object({
   pipelineId: z.string().min(1).max(120),
-  versaoEsperada: z.string().datetime({ offset: true }),
+  baseVersion: z.number().int().positive(),
   etapas: z.array(etapaSchema).max(250),
   transicoes: z.array(transicaoSchema).max(62_500),
   campos: z.array(z.object({ id: z.string().min(1).max(120), ativo: z.boolean() }).strict()).max(2_000),
@@ -58,8 +60,8 @@ export async function PublicarConfiguracaoPipelineBpm(dados: unknown) {
           where: { id: proposta.pipelineId },
           select: {
             id: true,
-            updatedAt: true,
-            etapas: { select: { id: true, ordem: true, ativo: true, ehInicial: true, ehFinal: true } },
+            configVersion: true,
+            etapas: { select: { id: true, nome: true, cor: true, ordem: true, ativo: true, ehInicial: true, ehFinal: true } },
             transicoesEtapa: {
               select: { id: true, etapaOrigemId: true, etapaDestinoId: true, permitida: true, origem: true },
             },
@@ -85,7 +87,9 @@ export async function PublicarConfiguracaoPipelineBpm(dados: unknown) {
         }),
       ]);
       if (!pipeline) throw new Error("PIPELINE_NAO_ENCONTRADO");
-      if (pipeline.updatedAt.toISOString() !== proposta.versaoEsperada) throw new Error("CONFLITO_VERSAO");
+      if (pipeline.configVersion !== proposta.baseVersion) {
+        throw new Error("CONFLITO_VERSAO");
+      }
 
       const atual = {
         etapas: pipeline.etapas as EtapaPublicacao[],
@@ -96,31 +100,66 @@ export async function PublicarConfiguracaoPipelineBpm(dados: unknown) {
       if (erros.length) throw new Error(`CONFIGURACAO_INVALIDA:${erros.join("|")}`);
       const alteracoes = resumirAlteracoesPublicacao({ atual, proposto: proposta });
 
-      const novaVersao = new Date(Math.max(Date.now(), pipeline.updatedAt.getTime() + 1));
+      // O CAS precisa ser uma única escrita condicional. Uma leitura seguida de
+      // update incondicional permitiria que duas sessões com a mesma base
+      // publicassem. Filhos e contador permanecem na mesma transação.
       const cas = await tx.bpmPipeline.updateMany({
-        where: { id: proposta.pipelineId, updatedAt: pipeline.updatedAt },
-        data: { updatedAt: novaVersao },
+        where: {
+          id: proposta.pipelineId,
+          configVersion: proposta.baseVersion,
+        },
+        data: { configVersion: { increment: 1 } },
       });
       if (cas.count !== 1) throw new Error("CONFLITO_VERSAO");
+      const novaVersao = proposta.baseVersion + 1;
+      const etapasAtuaisPorId = new Map(pipeline.etapas.map((item) => [item.id, item]));
+      const transicoesAtuaisPorId = new Map(pipeline.transicoesEtapa.map((item) => [item.id, item]));
+      const camposAtuaisPorId = new Map(campos.map((item) => [item.id, item]));
 
       for (const etapa of proposta.etapas) {
-        const anterior = pipeline.etapas.find((item) => item.id === etapa.id)!;
-        if (etapa.ordem === anterior.ordem && etapa.ativo === anterior.ativo && etapa.ehInicial === anterior.ehInicial && etapa.ehFinal === anterior.ehFinal) continue;
-        await tx.bpmEtapa.update({
-          where: { id: etapa.id },
-          data: { ordem: etapa.ordem, ativo: etapa.ativo, ehInicial: etapa.ehInicial, ehFinal: etapa.ehFinal },
-        });
+        const anterior = etapasAtuaisPorId.get(etapa.id);
+        if (!anterior) {
+          await tx.bpmEtapa.create({
+            data: {
+              id: etapa.id,
+              pipelineId: proposta.pipelineId,
+              nome: etapa.nome,
+              cor: etapa.cor,
+              ordem: etapa.ordem,
+              ativo: etapa.ativo,
+              ehInicial: etapa.ehInicial,
+              ehFinal: etapa.ehFinal,
+            },
+          });
+        } else if (etapa.nome !== anterior.nome || etapa.cor !== anterior.cor || etapa.ordem !== anterior.ordem || etapa.ativo !== anterior.ativo || etapa.ehInicial !== anterior.ehInicial || etapa.ehFinal !== anterior.ehFinal) {
+          await tx.bpmEtapa.update({
+            where: { id: etapa.id },
+            data: { nome: etapa.nome, cor: etapa.cor, ordem: etapa.ordem, ativo: etapa.ativo, ehInicial: etapa.ehInicial, ehFinal: etapa.ehFinal },
+          });
+        }
       }
       for (const transicao of proposta.transicoes) {
-        const anterior = pipeline.transicoesEtapa.find((item) => item.id === transicao.id)!;
-        if (transicao.permitida === anterior.permitida && transicao.origem === anterior.origem) continue;
-        await tx.bpmTransicaoEtapa.update({
-          where: { id: transicao.id },
-          data: { permitida: transicao.permitida, origem: transicao.origem },
-        });
+        const anterior = transicoesAtuaisPorId.get(transicao.id);
+        if (!anterior) {
+          await tx.bpmTransicaoEtapa.create({
+            data: {
+              id: transicao.id,
+              pipelineId: proposta.pipelineId,
+              etapaOrigemId: transicao.etapaOrigemId,
+              etapaDestinoId: transicao.etapaDestinoId,
+              permitida: transicao.permitida,
+              origem: transicao.origem,
+            },
+          });
+        } else if (transicao.permitida !== anterior.permitida || transicao.origem !== anterior.origem) {
+          await tx.bpmTransicaoEtapa.update({
+            where: { id: transicao.id },
+            data: { permitida: transicao.permitida, origem: transicao.origem },
+          });
+        }
       }
       for (const campo of proposta.campos) {
-        const anterior = campos.find((item) => item.id === campo.id)!;
+        const anterior = camposAtuaisPorId.get(campo.id)!;
         if (campo.ativo === anterior.ativo) continue;
         await tx.bpmCampo.update({ where: { id: campo.id }, data: { ativo: campo.ativo } });
       }
@@ -130,12 +169,12 @@ export async function PublicarConfiguracaoPipelineBpm(dados: unknown) {
           pipelineId: proposta.pipelineId,
           adminId: userId,
           campoAlterado: "configuracao_publicada",
-          valorAnteriorJson: JSON.stringify({ versao: pipeline.updatedAt.toISOString() }),
-          valorNovoJson: JSON.stringify({ versao: novaVersao.toISOString(), alteracoes }),
+          valorAnteriorJson: JSON.stringify({ configVersion: proposta.baseVersion }),
+          valorNovoJson: JSON.stringify({ configVersion: novaVersao, alteracoes }),
         },
       });
-      return { versao: novaVersao.toISOString(), alteracoes };
-    });
+      return { configVersion: novaVersao, alteracoes };
+    }, { isolationLevel: "Serializable" });
 
     revalidatePath(`${ROTA_BASE}/admin/pipelines/${proposta.pipelineId}`);
     revalidatePath(`${ROTA_BASE}/pipeline/${proposta.pipelineId}`);

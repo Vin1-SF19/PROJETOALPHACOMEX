@@ -17,6 +17,8 @@ interface SlaConfigSectionProps {
   etapas: { id: string; nome: string }[];
   servicos: { id: number; nome: string }[];
   configuracoesIniciais: SlaConfiguracaoAdmin[];
+  publicationBlocked?: boolean;
+  onPublished?: () => void;
 }
 
 const unidadeLabel = { MINUTOS: "min", HORAS: "h", DIAS: "dias", DIAS_UTEIS: "dias úteis" } as const;
@@ -35,7 +37,7 @@ function erroMensagem(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, configuracoesIniciais }: SlaConfigSectionProps) {
+export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, configuracoesIniciais, publicationBlocked = false, onPublished }: SlaConfigSectionProps) {
   const [configuracoes, setConfiguracoes] = useState(configuracoesIniciais);
   const [editando, setEditando] = useState<SlaConfiguracaoAdmin | null | "novo">(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -55,7 +57,7 @@ export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, c
   )).length;
 
   async function salvar(dados: SlaConfiguracaoAdminInput) {
-    if (isSaving || busyId) return;
+    if (publicationBlocked || isSaving || busyId) return;
     setIsSaving(true);
     try {
       const resultado = await SalvarConfiguracaoSlaBpm(dados);
@@ -72,26 +74,28 @@ export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, c
       });
       setEditando(null);
       toast.success(dados.id ? "SLA atualizado." : "SLA criado.");
+      onPublished?.();
     } finally {
       setIsSaving(false);
     }
   }
 
   async function alternar(config: SlaConfiguracaoAdmin) {
-    if (isSaving || busyId) return;
+    if (publicationBlocked || isSaving || busyId) return;
     setBusyId(config.id);
     try {
       const resultado = await AtivarDesativarConfiguracaoSlaBpm({ id: config.id, pipelineId, ativa: !config.ativa });
       if (!resultado.success) return toast.error(erroMensagem(resultado.error, "Não foi possível atualizar o status."));
       setConfiguracoes((atuais) => atuais.map((item) => item.id === config.id ? { ...item, ativa: !item.ativa } : item));
       toast.success(config.ativa ? "SLA desativado." : "SLA ativado.");
+      onPublished?.();
     } finally {
       setBusyId(null);
     }
   }
 
   async function excluir(config: SlaConfiguracaoAdmin) {
-    if (isSaving || busyId) return;
+    if (publicationBlocked || isSaving || busyId) return;
     if (!window.confirm(`Excluir o SLA “${config.nome}”? Configurações com histórico devem ser apenas desativadas.`)) return;
     setBusyId(config.id);
     try {
@@ -99,6 +103,7 @@ export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, c
       if (!resultado.success) return toast.error(erroMensagem(resultado.error, "Não foi possível excluir o SLA."));
       setConfiguracoes((atuais) => atuais.filter((item) => item.id !== config.id));
       toast.success("SLA excluído.");
+      onPublished?.();
     } finally {
       setBusyId(null);
     }
@@ -131,10 +136,12 @@ export function SlaConfigSection({ pipelineId, pipelineNome, etapas, servicos, c
     <section className="space-y-4" aria-labelledby="sla-alertas-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 id="sla-alertas-title" className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-white"><ShieldAlert size={16} aria-hidden="true" />SLA e Alertas</h2><p className="mt-1 text-xs text-slate-500">Prazos, início da contagem, pausa e limites sem alterar código.</p></div>
-        <Button size="sm" disabled={isSaving || Boolean(busyId)} onClick={() => setEditando("novo")}><Plus aria-hidden="true" />Novo SLA</Button>
+        <Button size="sm" disabled={publicationBlocked || isSaving || Boolean(busyId)} onClick={() => setEditando("novo")}><Plus aria-hidden="true" />Novo SLA</Button>
       </div>
 
       {editando && <SlaConfigForm key={editando === "novo" ? "novo" : editando.id} pipelineId={pipelineId} etapas={etapas} servicos={servicos} inicial={editando === "novo" ? undefined : editando} isSaving={isSaving} onCancel={() => setEditando(null)} onSave={salvar} />}
+
+      {publicationBlocked && <p className="text-xs text-amber-200" role="status">Publique ou descarte o rascunho principal antes de publicar SLA.</p>}
 
       {sobreposicoes > 0 && <p className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200" role="status">Há {sobreposicoes} configurações ativas com o mesmo escopo e gatilho. O runtime aplica maior prioridade, depois maior especificidade e, por fim, a mais antiga.</p>}
 

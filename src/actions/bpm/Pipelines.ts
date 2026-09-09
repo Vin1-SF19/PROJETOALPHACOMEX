@@ -16,6 +16,7 @@ import {
   isAdminRole,
 } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 
 const ROTA_BASE = "/PainelAlpha/AlphaCRM";
 
@@ -348,6 +349,8 @@ export async function AtualizarPipelineBpm(dados: unknown) {
         });
       }
 
+      await avancarConfigVersionBpm(tx, pipelineId);
+
       return atualizado;
     });
 
@@ -397,6 +400,7 @@ export async function AtivarDesativarPipelineBpm(dados: unknown) {
           valorNovoJson: JSON.stringify({ ativo }),
         },
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
       return atualizado;
     });
 

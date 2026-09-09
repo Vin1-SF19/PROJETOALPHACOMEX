@@ -1,5 +1,17 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-09 — RM-2026-EB2898 — contador simples no agregado, sem revisões persistidas
+
+**Decisão:** adicionar `BpmPipeline.configVersion Int @default(1)` e usar CAS por `pipelineId + baseVersion` na publicação principal. O contador, os filhos e a auditoria participam da mesma transação; efeitos externos ficam após o commit. Não criar tabela de revisão, snapshot persistido, checksum ou camada Draft/PUBLISHED.
+
+**Consequência:** duas sessões abertas na mesma versão produzem um vencedor e um conflito explícito; `updatedAt` não decide concorrência. Qualquer falha intermediária reverte filhos, auditoria e contador.
+
+### 2026-09-09 — RM-2026-EB2898 — publicações independentes precisam ser explícitas e invalidar o agregado
+
+**Decisão:** o cabeçalho publica somente o rascunho principal claramente nomeado (etapas, fluxo e ativação de campos). Editores com contratos transacionais próprios continuam como publicações delimitadas, porém usam rótulo “Publicar”, nunca autosave silencioso, e incrementam `configVersion` na mesma transação. Enquanto há rascunho principal, essas publicações ficam bloqueadas para impedir perda local em refresh.
+
+**Consequência:** o menor desenho seguro preserva actions canônicas de formulário/SLA/cadência/permissão sem construir revisão universal; toda escrita relevante invalida workspaces antigos e “Descartar” afeta apenas o estado local ainda não publicado.
+
 ### 2026-09-09 — RM-2026-045CC0 — composição não concede aplicabilidade de campo
 
 **Decisão:** `BpmCampoEtapaConfig` é autoridade para presença/visibilidade de campo na etapa; o formulário apenas referencia e ordena. Componentes gerados em massa pelo contrato antigo foram removidos quando seus IDs v1 determinísticos e a configuração em outras etapas provaram a cópia indevida. Configuração ausente não foi criada sem evidência específica da etapa.

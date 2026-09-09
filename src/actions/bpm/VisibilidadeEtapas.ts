@@ -6,6 +6,7 @@ import { z } from "zod";
 import { auth } from "../../../auth";
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 import db from "@/lib/prisma";
 import { isAdminRole, normalizeRole } from "@/lib/roles";
 
@@ -199,6 +200,7 @@ export async function SalvarVisibilidadeEtapaBpm(dados: unknown) {
           valorNovoJson: JSON.stringify({ etapaId, regras }),
         },
       });
+      await avancarConfigVersionBpm(tx, etapa.pipelineId);
       return tx.bpmEtapaVisibilidade.findMany({
         where: { etapaId },
         select: { perfil: true, podeVer: true, podeAgir: true },

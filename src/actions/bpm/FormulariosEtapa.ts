@@ -12,6 +12,7 @@ import {
 import { exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
 import db from "@/lib/prisma";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 
 const formularioInclude = {
   secoes: {
@@ -367,6 +368,7 @@ export async function SalvarFormularioEtapaBpm(input: unknown) {
           valorNovoJson: JSON.stringify(formulario),
         },
       });
+      await avancarConfigVersionBpm(tx, pipelineId);
       return { formulario, alterado: true };
     });
 

@@ -3715,13 +3715,14 @@ model BlueprintActivity {
 // Etapas/campos/SLA são metadados configuráveis via UI por pipeline (D-013), não enum fixo.
 
 model BpmPipeline {
-  id        String   @id @default(cuid())
-  chave     String?  @unique // identidade semântica estável; nome permanece apenas apresentação
-  nome      String
-  ordem     Int      @default(0)
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  chave         String?  @unique // identidade semântica estável; nome permanece apenas apresentação
+  nome          String
+  ordem         Int      @default(0)
+  ativo         Boolean  @default(true)
+  configVersion Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   setores            BpmPipelineSetor[]
   etapas             BpmEtapa[]

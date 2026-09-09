@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { exigirAcessoBpmCard, exigirAcessoConfigPipeline } from "@/lib/bpm/ownership";
 import { criarSlaInstancia, obterStatusSla, simularConfiguracaoSlaAplicavel } from "@/lib/bpm/sla";
 import { notificarPipelineBpm } from "@/lib/bpm/realtime-server";
+import { avancarConfigVersionBpm } from "@/lib/bpm/config-version";
 import {
   slaConfiguracaoAdminSchema,
   slaConfigIdSchema,
@@ -205,6 +206,7 @@ export async function SalvarConfiguracaoSlaBpm(input: unknown) {
           }),
         },
       });
+      await avancarConfigVersionBpm(tx, dados.pipelineId);
       return tx.bpmSlaConfig.findUniqueOrThrow({
         where: { id: config.id },
         include: {
@@ -248,6 +250,7 @@ export async function AtivarDesativarConfiguracaoSlaBpm(input: unknown) {
           valorNovoJson: JSON.stringify({ ativa: parsed.data.ativa }),
         },
       });
+      await avancarConfigVersionBpm(tx, parsed.data.pipelineId);
     });
     revalidatePath(`${ROTA_ADMIN}/${parsed.data.pipelineId}`);
     await notificarConfigSlaConfirmada(parsed.data.pipelineId);
@@ -280,6 +283,7 @@ export async function ExcluirConfiguracaoSlaBpm(input: unknown) {
           valorAnteriorJson: JSON.stringify({ id: config.id }),
         },
       });
+      await avancarConfigVersionBpm(tx, parsed.data.pipelineId);
     });
     revalidatePath(`${ROTA_ADMIN}/${parsed.data.pipelineId}`);
     await notificarConfigSlaConfirmada(parsed.data.pipelineId);

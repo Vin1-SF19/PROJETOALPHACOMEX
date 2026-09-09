@@ -1,5 +1,17 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Alpha CRM — publicação versionada da configuração (RM-2026-EB2898)
+
+**Fluxo principal:** `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` carrega configuração + `configVersion` → `AdminPipelineClient` mantém snapshot publicado e rascunho → `PublicarConfiguracaoPipelineBpm({ baseVersion, etapas, transicoes, campos })` → Zod + autorização externa/interna → validação do conjunto completo → CAS → filhos + auditoria → commit → revalidate/realtime.
+
+**Concorrência:** todos os escritores de etapa, transição, substatus, campo, formulário, SLA, visibilidade, cadência e metadados de pipeline chamam `avancarConfigVersionBpm` na mesma transação. Uma publicação independente torna qualquer workspace anterior obsoleto; o próximo publish principal retorna conflito sem escrita.
+
+**UX:** “Descartar alterações” restaura apenas `etapasConfirmadas`, `transicoesConfirmadas` e `camposConfirmados`. Formulário, SLA, permissões, cadência, substatus e edição estrutural de campo têm publicação explícita própria; não podem publicar enquanto o rascunho principal estiver pendente. Falha em qualquer leitura relacionada impede a montagem do editor.
+
+**Ao estender:** toda nova escrita que altere configuração operacional de um pipeline deve incrementar `configVersion` dentro da mesma transação. Nunca use `updatedAt` como CAS, nunca incremente antes/fora da transação e nunca converta erro de carregamento em coleção vazia.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-EB2898)
+
 ## Alpha CRM — formulário canônico por etapa (RM-2026-045CC0)
 
 **Caminho administrativo:** sidebar CRM → **Configurações** → `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → aba de campos/formulário → `FormularioEtapaWorkspace` → `SalvarFormularioEtapaBpm`.
