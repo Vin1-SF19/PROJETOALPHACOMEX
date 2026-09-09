@@ -18,6 +18,9 @@ const prismaMock = vi.hoisted(() => ({
     upsert: vi.fn(),
     count: vi.fn(),
   },
+  googleCalendarTaskCache: {
+    findMany: vi.fn(),
+  },
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -33,6 +36,7 @@ import {
   alternarPermissaoColegas,
   alternarVisibilidadeColega,
   listarEventosDeColega,
+  listarTarefasDeColega,
   personalizarCorColega,
   removerColegaVisivel,
 } from "@/actions/google-calendar-colegas";
@@ -135,6 +139,46 @@ describe("privacidade da agenda de colegas", () => {
         },
       ],
     });
+  });
+
+  it("expõe tarefas do colega somente ao vínculo EDITOR", async () => {
+    prismaMock.googleCalendarColegaVisivel.findUnique.mockResolvedValue({
+      cor: "#f97316",
+      papel: "EDITOR",
+      visivel: true,
+    });
+    prismaMock.usuarios.findUnique.mockResolvedValueOnce(colegaAtivo);
+    prismaMock.googleCalendarTaskCache.findMany.mockResolvedValue([{
+      id: "task-cache-8",
+      titulo: "Preparar apresentação",
+      notas: null,
+      status: "completed",
+      vencimentoEm: new Date("2026-07-30T12:00:00.000Z"),
+      inicioLocalEm: null,
+      fimLocalEm: null,
+      agendamentoChamado: null,
+      taskList: { googleTaskListId: "lista-8", titulo: "Trabalho" },
+    }]);
+
+    const resultado = await listarTarefasDeColega(8);
+
+    expect(resultado).toMatchObject({
+      success: true,
+      data: [{
+        id: "task-cache-8",
+        status: "completed",
+        colegaId: 8,
+        colegaNome: "Colega",
+        taskListGoogleId: "lista-8",
+      }],
+    });
+
+    prismaMock.googleCalendarColegaVisivel.findUnique.mockResolvedValue({
+      cor: "#f97316",
+      papel: "VISUALIZADOR",
+      visivel: true,
+    });
+    await expect(listarTarefasDeColega(8)).resolves.toEqual({ success: true, data: [] });
   });
 
   it("Admin/CEO SEM vínculo aprovado não acessa a agenda do colega", async () => {

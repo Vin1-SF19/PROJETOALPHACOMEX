@@ -154,6 +154,7 @@ export function useAgendaAlphaController({
     visao: visaoAtual,
     dataReferenciaISO: dataReferenciaAtualISO,
   });
+  const carregarCompartilhadas = compartilhadas.carregar;
   const recarregarCompartilhadasSeAtivo = compartilhadas.recarregarSeAtivo;
 
   useEffect(() => {
@@ -298,6 +299,10 @@ export function useAgendaAlphaController({
     inicializouPeriodo.current = true;
     void carregarPeriodo(visao, new Date(dataReferenciaISO));
   }, [carregarPeriodo, dataReferenciaISO, statusConexao.conectado, visao]);
+
+  useEffect(() => {
+    if (statusConexao.conectado) void carregarCompartilhadas();
+  }, [carregarCompartilhadas, statusConexao.conectado]);
 
   useEffect(() => {
     function aoVoltarOuAvancar() {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, CheckCheck, Inbox, X } from "lucide-react";
 
@@ -9,6 +8,7 @@ import {
   useCalendarioAlphaNotificacoes,
   type CalendarioAlphaNotificacao,
 } from "@/store/useCalendarioAlphaNotificacoes";
+import { intencaoParaNotificacaoAgenda, type IntencaoAgendaAlpha } from "@/lib/google-calendar/navegacao";
 
 const ROTULO_JANELA: Record<"10min" | "5min", string> = {
   "10min": "em 10 min",
@@ -93,11 +93,14 @@ function CartaoNotificacao({
  * uma nova. Estrutura inspirada em `NotificationCenter.tsx` (Chamados) — que está órfão/nunca
  * importado no projeto, então não é reaproveitado diretamente, só usado como referência de layout.
  */
-export function SinoNotificacoesCompromissos() {
+export function SinoNotificacoesCompromissos({
+  onAbrirAgenda,
+}: {
+  onAbrirAgenda: (intencao: IntencaoAgendaAlpha) => void;
+}) {
   const [aberto, setAberto] = useState(false);
   const [pulsar, setPulsar] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   const { notificacoes, marcarTodasLidas, removerNotificacao } = useCalendarioAlphaNotificacoes();
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
@@ -210,7 +213,7 @@ export function SinoNotificacoesCompromissos() {
                       onRemover={removerNotificacao}
                       onAbrirAgenda={() => {
                         setAberto(false);
-                        router.push("/PainelAlpha/CalendarioAlpha");
+                        onAbrirAgenda(intencaoParaNotificacaoAgenda(n));
                       }}
                     />
                   ))}

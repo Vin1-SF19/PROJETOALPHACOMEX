@@ -109,7 +109,23 @@ export async function listarColegasVisiveis() {
 
   const colegas = await db.googleCalendarColegaVisivel.findMany({
     where: { userId: acesso.userId },
-    include: { colega: { select: { id: true, nome: true, email: true } } },
+    include: {
+      colega: {
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          googleCalendarConexao: {
+            select: {
+              taskLists: {
+                select: { googleTaskListId: true, titulo: true },
+                orderBy: { createdAt: "asc" },
+              },
+            },
+          },
+        },
+      },
+    },
     orderBy: { createdAt: "asc" },
   });
 
@@ -117,7 +133,112 @@ export async function listarColegasVisiveis() {
   // sempre "VISUALIZADOR" | "EDITOR" — a coluna é `String` no Prisma (SQLite não tem enum nativo).
   return {
     success: true as const,
-    data: colegas.map((colega) => ({ ...colega, papel: colega.papel as "VISUALIZADOR" | "EDITOR" })),
+    data: colegas.map(({ colega, ...vinculo }) => ({
+      ...vinculo,
+      papel: vinculo.papel as "VISUALIZADOR" | "EDITOR",
+      colega: { id: colega.id, nome: colega.nome, email: colega.email },
+      listasTarefas: colega.googleCalendarConexao?.taskLists ?? [],
+    })),
+  };
+}
+
+export interface TarefaColegaDTO {
+  id: string;
+  taskListGoogleId: string;
+  listaTitulo: string;
+  titulo: string;
+  notas: string | null;
+  status: "needsAction" | "completed";
+  vencimentoEm: string | null;
+  inicioLocalEm: string | null;
+  fimLocalEm: string | null;
+  inicioAgendadoEm: string | null;
+  fimPlanejadoAgendadoEm: string | null;
+  fimConcluidoAgendadoEm: string | null;
+  statusAgendamento: "EM_ATENDIMENTO" | "CONCLUIDO" | null;
+  colegaId: number;
+  colegaNome: string;
+  cor: string;
+}
+
+/** Tarefas em cache do colega são visíveis somente para um vínculo aprovado como EDITOR. */
+export async function listarTarefasDeColega(
+  colegaId: number,
+): Promise<ResultadoAcao<TarefaColegaDTO[]>> {
+  const acesso = await verificarAcessoCalendarioAlpha();
+  if (!acesso.autorizado) return { success: false, error: "Não autorizado." };
+
+  const validacao = colegaIdInputSchema.safeParse({ colegaId });
+  if (!validacao.success) return { success: false, error: "Colega inválido." };
+
+  const vinculo = await db.googleCalendarColegaVisivel.findUnique({
+    where: { userId_colegaId: { userId: acesso.userId, colegaId: validacao.data.colegaId } },
+    select: { papel: true, visivel: true, cor: true },
+  });
+  if (!vinculo || !vinculo.visivel || vinculo.papel !== "EDITOR") {
+    return { success: true, data: [] };
+  }
+
+  const colega = await db.usuarios.findUnique({
+    where: { id: validacao.data.colegaId },
+    select: { nome: true, status: true, googleCalendarConexao: { select: { status: true } } },
+  });
+  if (!colega || colega.status !== "ATIVO" || colega.googleCalendarConexao?.status !== "ATIVA") {
+    return { success: false, error: "Agenda do colaborador não está ativa." };
+  }
+
+  const tarefas = await db.googleCalendarTaskCache.findMany({
+    where: {
+      taskList: { conexao: { userId: validacao.data.colegaId, status: "ATIVA" } },
+      excluida: false,
+      oculta: false,
+    },
+    orderBy: [{ status: "asc" }, { vencimentoEm: "asc" }],
+    take: 100,
+    select: {
+      id: true,
+      titulo: true,
+      notas: true,
+      status: true,
+      vencimentoEm: true,
+      inicioLocalEm: true,
+      fimLocalEm: true,
+      agendamentoChamado: {
+        select: {
+          inicioEm: true,
+          fimPlanejadoEm: true,
+          fimConcluidoEm: true,
+          status: true,
+        },
+      },
+      taskList: { select: { googleTaskListId: true, titulo: true } },
+    },
+  });
+
+  return {
+    success: true,
+    data: tarefas.map((tarefa) => ({
+      id: tarefa.id,
+      taskListGoogleId: tarefa.taskList.googleTaskListId,
+      listaTitulo: tarefa.taskList.titulo,
+      titulo: tarefa.titulo,
+      notas: tarefa.notas,
+      status: tarefa.status === "completed" ? "completed" : "needsAction",
+      vencimentoEm: tarefa.vencimentoEm?.toISOString() ?? null,
+      inicioLocalEm: tarefa.inicioLocalEm?.toISOString() ?? null,
+      fimLocalEm: tarefa.fimLocalEm?.toISOString() ?? null,
+      inicioAgendadoEm: tarefa.agendamentoChamado?.inicioEm.toISOString() ?? null,
+      fimPlanejadoAgendadoEm: tarefa.agendamentoChamado?.fimPlanejadoEm.toISOString() ?? null,
+      fimConcluidoAgendadoEm: tarefa.agendamentoChamado?.fimConcluidoEm?.toISOString() ?? null,
+      statusAgendamento: tarefa.agendamentoChamado?.status === "CONCLUIDO"
+        ? "CONCLUIDO"
+        : tarefa.agendamentoChamado?.status === "EM_ATENDIMENTO"
+          ? "EM_ATENDIMENTO"
+          : null,
+      colegaId: validacao.data.colegaId,
+      colegaNome: colega.nome,
+      cor: vinculo.cor,
+    })),
   };
 }
 

@@ -18,10 +18,12 @@ import { StatusSincronizacao } from "./StatusSincronizacao";
 import { TutorialAgendaModal } from "./TutorialAgendaModal";
 import { dataAnterior, proximaData, type VisaoCalendario } from "./lib/datas";
 import type { CalendarioSelecionadoView, ListaTarefasAgendaView } from "./lib/tipos";
+import { concluirTarefaParaColega } from "@/actions/google-calendar-admin";
 import { concluirTarefaAgendaAlpha } from "@/actions/google-calendar-tarefas";
 import { toast } from "sonner";
 import { TUTORIAL_AGENDA } from "./lib/tutorial-agenda";
 import { useAgendaAlphaController } from "./lib/useAgendaAlphaController";
+import { AGENDA_ALPHA_CONFIRMACAO_MENSAGEM, AGENDA_ALPHA_MENSAGEM, AGENDA_ALPHA_PRONTA_MENSAGEM, type IntencaoAgendaAlpha } from "@/lib/google-calendar/navegacao";
 
 interface CalendarioAlphaDashboardProps {
   temaName: string;
@@ -39,16 +41,7 @@ function alvoDigitavel(target: EventTarget | null): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-export function CalendarioAlphaDashboard({
-  temaName,
-  statusConexao,
-  conexaoId,
-  calendarios,
-  listasTarefas,
-  isAdmin,
-  visao,
-  dataReferenciaISO,
-}: CalendarioAlphaDashboardProps) {
+export function CalendarioAlphaDashboard({ temaName, statusConexao, conexaoId, calendarios, listasTarefas, isAdmin, visao, dataReferenciaISO }: CalendarioAlphaDashboardProps) {
   const tema = getTema(temaName);
   const accent = tema.accent;
   const agenda = useAgendaAlphaController({
@@ -63,6 +56,21 @@ export function CalendarioAlphaDashboard({
   const [tutorialAberto, setTutorialAberto] = useState(false);
   const [tourAberto, setTourAberto] = useState(false);
 
+  useEffect(() => {
+    function receberIntencaoDoPainel(evento: MessageEvent) {
+      if (evento.origin !== window.location.origin || evento.source !== window.parent) return;
+      const mensagem = evento.data as { type?: string; intencao?: IntencaoAgendaAlpha } | null;
+      if (mensagem?.type !== AGENDA_ALPHA_MENSAGEM) return;
+      if (mensagem.intencao?.acao === "ABRIR_COMPARTILHAMENTOS") {
+        void agenda.abrirColegas();
+      }
+      window.parent.postMessage({ type: AGENDA_ALPHA_CONFIRMACAO_MENSAGEM }, window.location.origin);
+    }
+    window.addEventListener("message", receberIntencaoDoPainel);
+    window.parent.postMessage({ type: AGENDA_ALPHA_PRONTA_MENSAGEM }, window.location.origin);
+    return () => window.removeEventListener("message", receberIntencaoDoPainel);
+  }, [agenda]);
+
   function concluirTarefa(tarefaCacheId: string) {
     const tarefa = agenda.itens.find(
       (item) => item.tarefaCacheId === tarefaCacheId,
@@ -74,7 +82,9 @@ export function CalendarioAlphaDashboard({
     agenda.executarMutacaoOtimista({
       item: { ...tarefa, status: "completed", calendarioCorHex: "#22c55e" },
       executar: async () => {
-        const resultado = await concluirTarefaAgendaAlpha({ tarefaCacheId });
+        const resultado = tarefa.colegaId
+          ? await concluirTarefaParaColega(tarefa.colegaId, { tarefaCacheId })
+          : await concluirTarefaAgendaAlpha({ tarefaCacheId });
         return resultado.success
           ? { success: true }
           : { success: false, error: resultado.error };

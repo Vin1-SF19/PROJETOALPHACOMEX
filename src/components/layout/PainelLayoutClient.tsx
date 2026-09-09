@@ -26,6 +26,14 @@ import { SinoNotificacoesCompromissos } from '@/components/CalendarioAlpha/SinoN
 import { isAdminRole } from '@/lib/roles';
 import type { OnboardingVideo } from '@/lib/onboarding';
 import type { LinkExternoVisivel } from '@/actions/LinksExternos';
+import {
+  AGENDA_ALPHA_LABEL,
+  AGENDA_ALPHA_MENSAGEM,
+  AGENDA_ALPHA_CONFIRMACAO_MENSAGEM,
+  AGENDA_ALPHA_PRONTA_MENSAGEM,
+  AGENDA_ALPHA_URL,
+  type IntencaoAgendaAlpha,
+} from '@/lib/google-calendar/navegacao';
 import { signOut } from 'next-auth/react';
 import { urlRepresentaLoginDoPainel } from '@/lib/auth/navegacao-sessao';
 import {
@@ -134,6 +142,8 @@ export default function PainelLayoutClient({
   const initTabIdRef = useRef<string>('');
   const initialPathnameRef = useRef(pathname);
   const encerrandoSessaoRef = useRef(false);
+  const iframesRef = useRef(new Map<string, HTMLIFrameElement>());
+  const intencaoAgendaPendenteRef = useRef<IntencaoAgendaAlpha | null>(null);
   const tabsStorageKey = getTabsStorageKey(userId);
 
   // Initialize: restore from localStorage or create from current URL
@@ -194,6 +204,28 @@ export default function PainelLayoutClient({
     });
   }, []);
 
+  const entregarIntencaoAgenda = useCallback((intencao: IntencaoAgendaAlpha): boolean => {
+    const abaAgenda = tabs.find(tab => tab.url === AGENDA_ALPHA_URL);
+    const iframe = abaAgenda ? iframesRef.current.get(abaAgenda.id) : undefined;
+    if (!iframe?.contentWindow) return false;
+    iframe.contentWindow.postMessage(
+      { type: AGENDA_ALPHA_MENSAGEM, intencao },
+      window.location.origin,
+    );
+    return true;
+  }, [tabs]);
+
+  const abrirAgendaPorNotificacao = useCallback((intencao: IntencaoAgendaAlpha) => {
+    intencaoAgendaPendenteRef.current = intencao;
+    openTab(AGENDA_ALPHA_URL, AGENDA_ALPHA_LABEL);
+    window.requestAnimationFrame(() => entregarIntencaoAgenda(intencao));
+  }, [entregarIntencaoAgenda, openTab]);
+
+  useEffect(() => {
+    const pendente = intencaoAgendaPendenteRef.current;
+    if (pendente) entregarIntencaoAgenda(pendente);
+  }, [activeId, entregarIntencaoAgenda, tabs]);
+
   const closeTab = useCallback((id: string) => {
     setTabs(prev => {
       const target = prev.find(t => t.id === id);
@@ -243,10 +275,21 @@ export default function PainelLayoutClient({
       if (e.data?.type === 'ALPHA_OPEN_TAB' && e.data.url) {
         openTab(e.data.url, e.data.label || getLabelForUrl(e.data.url));
       }
+      const abaAgenda = tabs.find(tab => tab.url === AGENDA_ALPHA_URL);
+      const origemEhAgenda = abaAgenda
+        ? iframesRef.current.get(abaAgenda.id)?.contentWindow === e.source
+        : false;
+      if (e.origin === window.location.origin && origemEhAgenda && e.data?.type === AGENDA_ALPHA_PRONTA_MENSAGEM) {
+        const pendente = intencaoAgendaPendenteRef.current;
+        if (pendente) entregarIntencaoAgenda(pendente);
+      }
+      if (e.origin === window.location.origin && origemEhAgenda && e.data?.type === AGENDA_ALPHA_CONFIRMACAO_MENSAGEM) {
+        intencaoAgendaPendenteRef.current = null;
+      }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [openTab]);
+  }, [entregarIntencaoAgenda, openTab, tabs]);
 
   // ── Embedded: render children only, no sidebar/tabs ──────────────────────
 
@@ -277,7 +320,7 @@ export default function PainelLayoutClient({
       <ChecklistNotificationToast />
       <HoleriteNotificacaoGlobal authenticated />
       <NotaNotificacaoToast />
-      {temAcessoCalendarioAlpha && <CompromissoNotificacaoToast />}
+      {temAcessoCalendarioAlpha && <CompromissoNotificacaoToast onAbrirAgenda={abrirAgendaPorNotificacao} />}
 
       {!tvMode && (
         <GlobalSidebar
@@ -321,7 +364,7 @@ export default function PainelLayoutClient({
               />
             </div>
             <div className="shrink-0 flex items-center gap-2 pr-3">
-              {temAcessoCalendarioAlpha && <SinoNotificacoesCompromissos />}
+              {temAcessoCalendarioAlpha && <SinoNotificacoesCompromissos onAbrirAgenda={abrirAgendaPorNotificacao} />}
               <BibbleWeatherWidget />
             </div>
           </div>
@@ -353,6 +396,10 @@ export default function PainelLayoutClient({
             return (
               <iframe
                 key={tab.id}
+                ref={(elemento) => {
+                  if (elemento) iframesRef.current.set(tab.id, elemento);
+                  else iframesRef.current.delete(tab.id);
+                }}
                 src={tab.url}
                 title={tab.label}
                 allow="autoplay; fullscreen"
@@ -361,6 +408,13 @@ export default function PainelLayoutClient({
                 style={{ display: visible ? 'block' : 'none' }}
                 onLoad={(event) => {
                   if (isInitTab) setInitIframeLoaded(true);
+                  const intencaoPendente = intencaoAgendaPendenteRef.current;
+                  if (tab.url === AGENDA_ALPHA_URL && intencaoPendente) {
+                    event.currentTarget.contentWindow?.postMessage(
+                      { type: AGENDA_ALPHA_MENSAGEM, intencao: intencaoPendente },
+                      window.location.origin,
+                    );
+                  }
                   try {
                     const href = event.currentTarget.contentWindow?.location.href;
                     if (

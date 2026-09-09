@@ -4,9 +4,10 @@ import { useState } from "react";
 import { CheckCircle2, Sparkles } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 import { formatarHora, formatarTituloDia } from "./lib/datas";
-import { corDoItemAgenda, type EventoExibicao } from "./lib/tipos";
+import { corDoItemAgenda, FUNDO_TAREFA_CONCLUIDA, type EventoExibicao } from "./lib/tipos";
 
 /** Lista completa dos eventos de um dia — aberta ao clicar em "+N mais" na visão de mês. */
 export function DiaEventosPopover({
@@ -34,7 +35,7 @@ export function DiaEventosPopover({
         </div>
         <div className="max-h-72 space-y-2 overflow-y-auto p-3">
             {eventos.map((evento) => evento.tipo === "tarefa" ? (
-              <div key={evento.id} className="group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/15 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/30 hover:brightness-110" style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3, background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}e8, ${corDoItemAgenda(evento)}aa)` }}>
+              <div key={evento.id} className={cn("group/item relative flex w-full items-start gap-2.5 overflow-hidden rounded-xl border border-white/15 px-3 py-2.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.2)] transition-all hover:-translate-y-px hover:border-white/30 hover:brightness-110", evento.status === "completed" && "border-slate-500/35 text-slate-400")} style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3, background: evento.status === "completed" ? FUNDO_TAREFA_CONCLUIDA : `linear-gradient(135deg, ${corDoItemAgenda(evento)}e8, ${corDoItemAgenda(evento)}aa)` }}>
                 {evento.status === "completed" ? (
                   <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/20" title="Tarefa concluída"><CheckCircle2 className="size-3.5 text-white" aria-hidden="true" /></span>
                 ) : (
@@ -43,7 +44,7 @@ export function DiaEventosPopover({
                   </button>
                 )}
                 <button type="button" onClick={() => { setOpen(false); onEditarEvento(evento); }} className="min-w-0 flex-1 text-left focus:outline-none">
-                  <span className="block truncate text-sm font-bold text-white">{evento.titulo || "(sem título)"}</span>
+                  <span className={cn("block truncate text-sm font-bold text-white", evento.status === "completed" && "text-slate-400 line-through decoration-slate-400")}>{evento.titulo || "(sem título)"}</span>
                   <span className="mt-0.5 block text-[11px] font-medium text-white/75">{evento.diaInteiro ? "Dia inteiro" : evento.inicioEm ? formatarHora(new Date(evento.inicioEm)) : "—"}</span>
                   <span className="mt-1 block text-[10px] font-bold uppercase tracking-wide text-white/80">{evento.status === "completed" ? "Concluída" : "Clique para editar"}</span>
                 </button>

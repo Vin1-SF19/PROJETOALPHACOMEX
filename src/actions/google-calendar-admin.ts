@@ -14,8 +14,12 @@ import {
   responderConvite as responderConviteGoogleApi,
 } from "@/lib/google-calendar/client";
 import { dadosCacheDeEvento } from "@/lib/google-calendar/cache-eventos";
-import { isAdminRole } from "@/lib/google-calendar/colegas";
 import { GoogleCalendarError } from "@/lib/google-calendar/errors";
+import {
+  atualizarTarefaGoogleTasks,
+  concluirTarefaGoogleTasks,
+  criarTarefaGoogleTasks,
+} from "@/lib/google-calendar/tasks";
 import type { GoogleEventoDTO } from "@/lib/google-calendar/types";
 import {
   atualizarEventoSchema,
@@ -47,6 +51,18 @@ const detalhesEventoColegaSchema = z
 
 export type CarregarDetalhesEventoColegaInput = z.input<typeof detalhesEventoColegaSchema>;
 const colegaIdSchema = z.number().int().positive();
+const criarTarefaColegaSchema = z.object({
+  taskListId: z.string().min(1).max(300),
+  titulo: z.string().trim().min(1).max(1024),
+  notas: z.string().trim().max(8192).optional(),
+  vencimentoEm: z.coerce.date().optional(),
+  inicioLocalEm: z.coerce.date().optional(),
+  fimLocalEm: z.coerce.date().optional(),
+}).strict();
+const atualizarTarefaColegaSchema = criarTarefaColegaSchema.omit({ taskListId: true }).extend({
+  tarefaCacheId: z.string().min(1),
+}).strict();
+const concluirTarefaColegaSchema = z.object({ tarefaCacheId: z.string().min(1) }).strict();
 
 function primeiroErroZod(erro: { issues: { message: string }[] }): string {
   return erro.issues[0]?.message ?? "Dados inválidos.";
@@ -88,13 +104,12 @@ function paraInputEventoParcialGoogle(
 }
 
 /**
- * Verifica que o chamador é Admin/CEO E tem o Calendário Alpha habilitado, e resolve o e-mail
- * (Workspace) do colega-alvo — sempre a partir do banco por `colegaId`, nunca aceito do cliente.
- * Só Admin/CEO chega até aqui (decisão confirmada com o usuário: acesso de escrita na agenda
- * de qualquer colaborador é exclusivo de Admin/CEO).
+ * Verifica que o chamador pode escrever na agenda do colega e resolve a identidade Workspace
+ * exclusivamente no servidor. Todos os usuários, inclusive Admin/CEO, precisam de vínculo
+ * aprovado com papel EDITOR; a função nunca aceita a identidade Google vinda do cliente.
  */
-async function resolverAlvoAdmin(colegaId: number): Promise<
-  { ok: true; adminUserId: number; colegaUserId: number; colegaEmail: string } | { ok: false; error: string }
+async function resolverAlvoGravavel(colegaId: number): Promise<
+  { ok: true; autorUserId: number; colegaUserId: number; colegaEmail: string } | { ok: false; error: string }
 > {
   const colegaIdValidado = colegaIdSchema.safeParse(colegaId);
   if (!colegaIdValidado.success) {
@@ -104,9 +119,12 @@ async function resolverAlvoAdmin(colegaId: number): Promise<
   const acesso = await verificarAcessoCalendarioAlpha();
   if (!acesso.autorizado) return { ok: false, error: "Não autorizado." };
 
-  const usuarioAtual = await db.usuarios.findUnique({ where: { id: acesso.userId }, select: { role: true } });
-  if (!isAdminRole(usuarioAtual?.role)) {
-    return { ok: false, error: "Só Admin/CEO pode alterar a agenda de outro colaborador." };
+  const vinculo = await db.googleCalendarColegaVisivel.findUnique({
+    where: { userId_colegaId: { userId: acesso.userId, colegaId: colegaIdValidado.data } },
+    select: { papel: true },
+  });
+  if (vinculo?.papel !== "EDITOR") {
+    return { ok: false, error: "Você não tem permissão de edição nesta agenda compartilhada." };
   }
 
   const colega = await db.usuarios.findUnique({
@@ -127,7 +145,7 @@ async function resolverAlvoAdmin(colegaId: number): Promise<
 
   return {
     ok: true,
-    adminUserId: acesso.userId,
+    autorUserId: acesso.userId,
     colegaUserId: colegaIdValidado.data,
     colegaEmail: colega.email,
   };
@@ -160,12 +178,155 @@ async function resolverCalendarioGravavelDoColega(
   };
 }
 
-/** Carrega do Google o evento completo de um colega antes da edição Admin/CEO. */
+async function resolverListaTarefasDoColega(colegaUserId: number, taskListId: string) {
+  return db.googleCalendarTaskListCache.findFirst({
+    where: {
+      conexao: { userId: colegaUserId, status: "ATIVA" },
+      googleTaskListId: taskListId,
+    },
+    select: { id: true, googleTaskListId: true },
+  });
+}
+
+export async function criarTarefaParaColega(
+  colegaId: number,
+  input: z.input<typeof criarTarefaColegaSchema>,
+): Promise<ResultadoAcao<{ id: string }>> {
+  const alvo = await resolverAlvoGravavel(colegaId);
+  if (!alvo.ok) return { success: false, error: alvo.error };
+
+  const validacao = criarTarefaColegaSchema.safeParse(input);
+  if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
+  const lista = await resolverListaTarefasDoColega(alvo.colegaUserId, validacao.data.taskListId);
+  if (!lista) return { success: false, error: "Lista de tarefas não encontrada na agenda compartilhada." };
+
+  try {
+    const { inicioLocalEm, fimLocalEm, ...dadosGoogle } = validacao.data;
+    const tarefa = await criarTarefaGoogleTasks({
+      emailUsuario: alvo.colegaEmail,
+      ...dadosGoogle,
+    });
+    const salva = await db.googleCalendarTaskCache.upsert({
+      where: {
+        taskListId_googleTaskId: {
+          taskListId: lista.id,
+          googleTaskId: tarefa.googleTaskId,
+        },
+      },
+      create: {
+        taskListId: lista.id,
+        ...tarefa,
+        inicioLocalEm: inicioLocalEm ?? null,
+        fimLocalEm: fimLocalEm ?? null,
+      },
+      update: {
+        ...tarefa,
+        inicioLocalEm: inicioLocalEm ?? null,
+        fimLocalEm: fimLocalEm ?? null,
+      },
+    });
+    await registrarAuditoriaCalendarioAlpha(
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_CRIOU_TAREFA_COLEGA",
+      `colegaId=${colegaId} tarefaCacheId=${salva.id}`,
+    );
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return { success: true, data: { id: salva.id } };
+  } catch {
+    return { success: false, error: "Não foi possível criar a tarefa na agenda compartilhada." };
+  }
+}
+
+export async function atualizarTarefaParaColega(
+  colegaId: number,
+  input: z.input<typeof atualizarTarefaColegaSchema>,
+): Promise<ResultadoAcao<{ id: string }>> {
+  const alvo = await resolverAlvoGravavel(colegaId);
+  if (!alvo.ok) return { success: false, error: alvo.error };
+
+  const validacao = atualizarTarefaColegaSchema.safeParse(input);
+  if (!validacao.success) return { success: false, error: primeiroErroZod(validacao.error) };
+  const tarefa = await db.googleCalendarTaskCache.findFirst({
+    where: {
+      id: validacao.data.tarefaCacheId,
+      taskList: { conexao: { userId: alvo.colegaUserId, status: "ATIVA" } },
+    },
+    include: { taskList: { select: { googleTaskListId: true } } },
+  });
+  if (!tarefa) return { success: false, error: "Tarefa não encontrada na agenda compartilhada." };
+
+  try {
+    const atualizada = await atualizarTarefaGoogleTasks({
+      emailUsuario: alvo.colegaEmail,
+      taskListId: tarefa.taskList.googleTaskListId,
+      taskId: tarefa.googleTaskId,
+      titulo: validacao.data.titulo,
+      notas: validacao.data.notas,
+      vencimentoEm: validacao.data.vencimentoEm,
+    });
+    await db.googleCalendarTaskCache.update({
+      where: { id: tarefa.id },
+      data: {
+        ...atualizada,
+        inicioLocalEm: validacao.data.inicioLocalEm ?? null,
+        fimLocalEm: validacao.data.fimLocalEm ?? null,
+      },
+    });
+    await registrarAuditoriaCalendarioAlpha(
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_EDITOU_TAREFA_COLEGA",
+      `colegaId=${colegaId} tarefaCacheId=${tarefa.id}`,
+    );
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return { success: true, data: { id: tarefa.id } };
+  } catch {
+    return { success: false, error: "Não foi possível atualizar a tarefa na agenda compartilhada." };
+  }
+}
+
+export async function concluirTarefaParaColega(
+  colegaId: number,
+  input: z.input<typeof concluirTarefaColegaSchema>,
+): Promise<ResultadoAcao<{ id: string }>> {
+  const alvo = await resolverAlvoGravavel(colegaId);
+  if (!alvo.ok) return { success: false, error: alvo.error };
+
+  const validacao = concluirTarefaColegaSchema.safeParse(input);
+  if (!validacao.success) return { success: false, error: "Tarefa inválida." };
+  const tarefa = await db.googleCalendarTaskCache.findFirst({
+    where: {
+      id: validacao.data.tarefaCacheId,
+      taskList: { conexao: { userId: alvo.colegaUserId, status: "ATIVA" } },
+    },
+    include: { taskList: { select: { googleTaskListId: true } } },
+  });
+  if (!tarefa) return { success: false, error: "Tarefa não encontrada na agenda compartilhada." };
+
+  try {
+    const atualizada = await concluirTarefaGoogleTasks({
+      emailUsuario: alvo.colegaEmail,
+      taskListId: tarefa.taskList.googleTaskListId,
+      taskId: tarefa.googleTaskId,
+    });
+    await db.googleCalendarTaskCache.update({ where: { id: tarefa.id }, data: atualizada });
+    await registrarAuditoriaCalendarioAlpha(
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_CONCLUIU_TAREFA_COLEGA",
+      `colegaId=${colegaId} tarefaCacheId=${tarefa.id}`,
+    );
+    revalidatePath("/PainelAlpha/CalendarioAlpha");
+    return { success: true, data: { id: tarefa.id } };
+  } catch {
+    return { success: false, error: "Não foi possível concluir a tarefa na agenda compartilhada." };
+  }
+}
+
+/** Carrega do Google o evento completo de um colega antes da edição por vínculo EDITOR. */
 export async function carregarDetalhesEventoColegaParaEdicao(
   colegaId: number,
   input: CarregarDetalhesEventoColegaInput,
 ): Promise<ResultadoAcao<GoogleEventoDTO>> {
-  const alvo = await resolverAlvoAdmin(colegaId);
+  const alvo = await resolverAlvoGravavel(colegaId);
   if (!alvo.ok) return { success: false, error: alvo.error };
 
   const validacao = detalhesEventoColegaSchema.safeParse(input);
@@ -205,7 +366,7 @@ export async function criarEventoParaColega(
   colegaId: number,
   input: CriarEventoInput,
 ): Promise<ResultadoAcao<{ googleEventId: string }>> {
-  const alvo = await resolverAlvoAdmin(colegaId);
+  const alvo = await resolverAlvoGravavel(colegaId);
   if (!alvo.ok) return { success: false, error: alvo.error };
 
   const validacao = criarEventoSchema.safeParse(input);
@@ -225,8 +386,8 @@ export async function criarEventoParaColega(
     });
 
     await registrarAuditoriaCalendarioAlpha(
-      alvo.adminUserId,
-      "CALENDARIO_ALPHA_ADMIN_CRIOU_EVENTO_COLEGA",
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_CRIOU_EVENTO_COLEGA",
       `colegaId=${colegaId} googleEventId=${eventoCriado.googleEventId}`,
     );
 
@@ -241,7 +402,7 @@ export async function atualizarEventoParaColega(
   colegaId: number,
   input: AtualizarEventoInput,
 ): Promise<ResultadoAcao<{ conflito: boolean }>> {
-  const alvo = await resolverAlvoAdmin(colegaId);
+  const alvo = await resolverAlvoGravavel(colegaId);
   if (!alvo.ok) return { success: false, error: alvo.error };
 
   const validacao = atualizarEventoSchema.safeParse(input);
@@ -269,8 +430,8 @@ export async function atualizarEventoParaColega(
     });
 
     await registrarAuditoriaCalendarioAlpha(
-      alvo.adminUserId,
-      "CALENDARIO_ALPHA_ADMIN_EDITOU_EVENTO_COLEGA",
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_EDITOU_EVENTO_COLEGA",
       `colegaId=${colegaId} googleEventId=${dados.googleEventId}`,
     );
 
@@ -285,14 +446,14 @@ export async function atualizarEventoParaColega(
 }
 
 /**
- * Variante parcial para o IAlpha. O calendário é sempre revalidado contra a conta Workspace do
+ * Variante parcial para a Agenda Alpha. O calendário é sempre revalidado contra a conta Workspace do
  * colega resolvida pelo servidor; um `calendarId` arbitrário do chamador não autoriza impersonation.
  */
 export async function atualizarEventoParcialParaColega(
   colegaId: number,
   input: AtualizarEventoParcialInput,
 ): Promise<ResultadoAcao<ResultadoAtualizacaoParcial>> {
-  const alvo = await resolverAlvoAdmin(colegaId);
+  const alvo = await resolverAlvoGravavel(colegaId);
   if (!alvo.ok) return { success: false, error: alvo.error };
 
   const validacao = atualizarEventoParcialSchema.safeParse(input);
@@ -364,8 +525,8 @@ export async function atualizarEventoParcialParaColega(
     }
 
     await registrarAuditoriaCalendarioAlpha(
-      alvo.adminUserId,
-      "CALENDARIO_ALPHA_ADMIN_EDITOU_EVENTO_COLEGA",
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_EDITOU_EVENTO_COLEGA",
       `colegaId=${colegaId} googleEventId=${dados.googleEventId}`,
     );
 
@@ -393,7 +554,7 @@ export async function cancelarEventoParaColega(
   colegaId: number,
   input: CancelarEventoInput,
 ): Promise<ResultadoAcao<{ ok: true }>> {
-  const alvo = await resolverAlvoAdmin(colegaId);
+  const alvo = await resolverAlvoGravavel(colegaId);
   if (!alvo.ok) return { success: false, error: alvo.error };
 
   const validacao = cancelarEventoSchema.safeParse(input);
@@ -414,8 +575,8 @@ export async function cancelarEventoParaColega(
     });
 
     await registrarAuditoriaCalendarioAlpha(
-      alvo.adminUserId,
-      "CALENDARIO_ALPHA_ADMIN_CANCELOU_EVENTO_COLEGA",
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_CANCELOU_EVENTO_COLEGA",
       `colegaId=${colegaId} googleEventId=${dados.googleEventId}`,
     );
 
@@ -438,7 +599,7 @@ export async function responderConviteParaColega(
   colegaId: number,
   input: ResponderConviteInput,
 ): Promise<ResultadoAcao<GoogleEventoDTO>> {
-  const alvo = await resolverAlvoAdmin(colegaId);
+  const alvo = await resolverAlvoGravavel(colegaId);
   if (!alvo.ok) return { success: false, error: alvo.error };
 
   const validacao = responderConviteSchema.safeParse(input);
@@ -458,8 +619,8 @@ export async function responderConviteParaColega(
     });
 
     await registrarAuditoriaCalendarioAlpha(
-      alvo.adminUserId,
-      "CALENDARIO_ALPHA_ADMIN_RESPONDEU_CONVITE_COLEGA",
+      alvo.autorUserId,
+      "CALENDARIO_ALPHA_RESPONDEU_CONVITE_COLEGA",
       `colegaId=${colegaId} googleEventId=${dados.googleEventId} resposta=${dados.resposta}`,
     );
 

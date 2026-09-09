@@ -1,5 +1,7 @@
 /** Cor usada quando o Google não retorna `backgroundColor` para o calendário/evento. */
 export const COR_CALENDARIO_PADRAO = "#3b82f6";
+export const COR_TAREFA_CONCLUIDA = "#475569";
+export const FUNDO_TAREFA_CONCLUIDA = "linear-gradient(135deg, #334155f2, #0f172acc)";
 
 function hashEstavel(valor: string): number {
   let resultado = 0;
@@ -36,8 +38,9 @@ function hslParaHex({ h, s, l }: { h: number; s: number; l: number }): string {
 }
 
 /** Varia a luminosidade da cor do calendário por item, sem perder a identidade escolhida pelo usuário. */
-export function corDoItemAgenda(item: Pick<EventoExibicao, "id" | "tipo" | "eventType" | "calendarioCorHex">): string {
-  const base = item.tipo === "tarefa" ? item.calendarioCorHex ?? "#22c55e"
+export function corDoItemAgenda(item: Pick<EventoExibicao, "id" | "tipo" | "status" | "eventType" | "calendarioCorHex">): string {
+  const base = item.tipo === "tarefa" && item.status === "completed" ? COR_TAREFA_CONCLUIDA
+    : item.tipo === "tarefa" ? item.calendarioCorHex ?? "#22c55e"
     : item.eventType === "focusTime" ? "#a855f7"
       : item.eventType === "outOfOffice" ? "#f43f5e"
         : item.eventType === "workingLocation" ? "#0ea5e9"
@@ -106,6 +109,7 @@ export interface ColegaAgendaView {
     nome: string;
     email: string;
   };
+  listasTarefas: ListaTarefasAgendaView[];
 }
 
 export interface EventoExibicao {

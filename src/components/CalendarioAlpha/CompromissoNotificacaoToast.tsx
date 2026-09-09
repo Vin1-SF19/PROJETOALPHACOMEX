@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { useCalendarioAlphaNotificacoes } from "@/store/useCalendarioAlphaNotificacoes";
+import { intencaoParaNotificacaoAgenda, type IntencaoAgendaAlpha } from "@/lib/google-calendar/navegacao";
 
 const ROTULO_JANELA: Record<"10min" | "5min", string> = {
   "10min": "em 10 minutos",
@@ -17,9 +17,12 @@ const ROTULO_PAPEL: Record<"VISUALIZADOR" | "EDITOR", string> = {
 };
 
 /** Espelha `NotaNotificacaoToast.tsx` (sonner). */
-export function CompromissoNotificacaoToast() {
+export function CompromissoNotificacaoToast({
+  onAbrirAgenda,
+}: {
+  onAbrirAgenda: (intencao: IntencaoAgendaAlpha) => void;
+}) {
   const notificacoes = useCalendarioAlphaNotificacoes((s) => s.notificacoes);
-  const router = useRouter();
   const exibidasRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export function CompromissoNotificacaoToast() {
       if (exibidasRef.current.has(notificacao.notificacaoId)) continue;
       exibidasRef.current.add(notificacao.notificacaoId);
 
-      const abrirAgenda = () => router.push("/PainelAlpha/CalendarioAlpha");
+      const abrirAgenda = () => onAbrirAgenda(intencaoParaNotificacaoAgenda(notificacao));
 
       if (notificacao.tipo === "COMPROMISSO") {
         toast.info(`Compromisso ${ROTULO_JANELA[notificacao.janela]}`, {
@@ -50,7 +53,7 @@ export function CompromissoNotificacaoToast() {
         );
       }
     }
-  }, [notificacoes, router]);
+  }, [notificacoes, onAbrirAgenda]);
 
   return null;
 }

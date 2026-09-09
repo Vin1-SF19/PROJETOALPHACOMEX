@@ -92,6 +92,7 @@ export function AgendaOverlays(props: AgendaOverlaysProps) {
           onOpenChange={props.onFormularioAbertoChange}
           tema={props.tema}
           calendarios={props.calendarios}
+          colegas={props.colegas}
           dataInicial={props.dataEvento}
           eventoParaEditar={props.evento}
           detalhesEvento={props.detalhesEvento}

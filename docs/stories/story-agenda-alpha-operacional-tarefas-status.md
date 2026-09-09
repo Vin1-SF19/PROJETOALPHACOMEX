@@ -20,6 +20,9 @@ Como usuário da Agenda Alpha, quero criar e acompanhar compromissos, tarefas, f
 - [ ] Alterações externas do Google Calendar são processadas automaticamente quando push/fila/worker estiverem configurados; a UI torna explícita a indisponibilidade operacional quando não estiverem.
 - [ ] Nenhum input do cliente escolhe a identidade Google impersonada; toda leitura/escrita continua ancorada na sessão autenticada.
 - [ ] Cobertura automatizada inclui validações, mapeamentos Google, criação/conclusão de tarefas, tipos de evento e falhas de sincronização.
+- [x] Tarefas concluídas permanecem visíveis nas visões da agenda, com aparência escurecida, indicador concluído e título riscado.
+- [x] Usuários com vínculo de compartilhamento aprovado como Editor podem criar, editar e concluir eventos e tarefas na agenda compartilhada; Visualizador permanece somente leitura.
+- [x] Notificações da Agenda Alpha ativam a aba interna do módulo e pedidos recebidos abrem diretamente o painel de aprovação/recusa, sem navegação por rota no shell.
 
 ## Vault
 
@@ -50,6 +53,9 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - [x] Consolidar eventos e tarefas do período em uma leitura cache-only autorizada e instrumentada, sem consultar o Google no carregamento da tela.
 - [x] Cobrir snapshot, cache local, navegação, reconciliação otimista e métricas seguras com testes automatizados.
 - [x] Conectar o worker persistente da Agenda Alpha ao scheduler autenticado, com uma operação por minuto e proteção por claim/lease distribuído.
+- [x] Manter tarefas concluídas no período visível e padronizar o estado visual concluído em dia, semana, mês e lista expandida.
+- [x] Integrar destinos compartilhados Editor ao formulário e proteger eventos/listas/tarefas por vínculo e identidade Workspace resolvidos no servidor.
+- [x] Substituir o `router.push` das notificações por ativação da aba interna e handshake confiável para abrir o modal de compartilhamentos.
 
 ## File List
 
@@ -75,6 +81,13 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - `tests/google-calendar/{agenda-snapshot,cache-local,observability,worker-route}.test.ts`
 - `vercel.json`
 - `plan/self-critique-agenda-alpha-performance.json`
+- `src/actions/google-calendar-{admin,colegas}.ts`
+- `src/components/layout/PainelLayoutClient.tsx`
+- `src/components/CalendarioAlpha/{CompromissoNotificacaoToast,SinoNotificacoesCompromissos}.tsx`
+- `src/components/CalendarioAlpha/lib/{useAgendasCompartilhadas,tipos,itens-agenda}.ts`
+- `src/lib/google-calendar/navegacao.ts`
+- `tests/google-calendar/{compartilhamento-escrita,navegacao-notificacoes}.test.ts`
+- `plan/self-critique-agenda-alpha-sharing.json`
 
 ## Dev Agent Record
 
@@ -88,10 +101,17 @@ Alterações previstas são somente aditivas: novas tabelas de cache/listas de t
 - Não houve mudança de schema, migration, backfill ou mutação em massa; o protocolo Vault não foi acionado.
 - Gates do recorte: ESLint sem ocorrências, 24/24 testes aprovados, typecheck filtrado sem erros e build de produção aprovado. Gates globais continuam bloqueados por dívida anterior fora deste escopo: typecheck com erros preexistentes, lint abrangendo milhares de arquivos legados e 49 testes falhando em 18 arquivos não relacionados.
 - CodeRabbit CLI não estava instalado no ambiente; revisão automatizada externa não pôde ser executada.
+- Tarefas concluídas com data/horário continuam na grade e usam tratamento escuro/riscado consistente; tarefas sem qualquer data permanecem fora da grade.
+- Agendas compartilhadas são carregadas em paralelo sem bloquear o snapshot próprio. O papel Editor habilita destinos de evento e Google Tasks, e as mesmas permissões cobrem edição e conclusão.
+- O servidor ignora identidades vindas do cliente: colega, calendário e lista são revalidados contra vínculo aprovado e conexão ativa antes de impersonar a conta Workspace.
+- O shell de abas mantém uma intenção pendente até receber confirmação do iframe da Agenda Alpha; convites abrem o painel que contém Aprovar/Recusar.
+- Nenhuma estrutura de banco, migration, backfill ou operação em massa foi necessária; Vault não foi acionado.
+- Gates do recorte: ESLint sem erros/avisos, 26/26 testes específicos aprovados e build de produção aprovado. Os gates globais continuam bloqueados pela linha de base do repositório: lint com 21.210 ocorrências, typecheck com erros preexistentes fora do recorte e suíte completa com 49 falhas em 18 arquivos; o primeiro `npm run typecheck` também excedeu o heap padrão antes da repetição com 8 GB.
 
 ### Change Log
 
 - 2026-09-09: carregamento cache-first, navegação sem round-trip de página, mutações otimistas, consulta consolidada e telemetria de latência da Agenda Alpha.
+- 2026-09-09: permanência visual de tarefas concluídas, escrita em agendas compartilhadas Editor e correção do fluxo de notificações/convites nas abas internas.
 
 ## Notas operacionais
 

@@ -4,7 +4,12 @@ import { useState, type FormEvent } from "react";
 import { Bell, Clock3, Loader2, MapPin, UsersRound, Video } from "lucide-react";
 import { toast } from "sonner";
 
-import { atualizarEventoParcialParaColega } from "@/actions/google-calendar-admin";
+import {
+  atualizarEventoParcialParaColega,
+  atualizarTarefaParaColega,
+  criarEventoParaColega,
+  criarTarefaParaColega,
+} from "@/actions/google-calendar-admin";
 import {
   atualizarEventoParcialNoCalendario,
   criarEventoNoCalendario,
@@ -21,7 +26,7 @@ import { cn } from "@/lib/utils";
 import type { AtualizarEventoParcialInput } from "@/lib/validations/google-calendar";
 
 import { AgendaModal3D } from "./AgendaModal3D";
-import type { CalendarioSelecionadoView, EventoExibicao, ListaTarefasAgendaView } from "./lib/tipos";
+import type { CalendarioSelecionadoView, ColegaAgendaView, EventoExibicao, ListaTarefasAgendaView } from "./lib/tipos";
 import type { MutacaoOtimistaAgenda } from "./lib/useAgendaAlphaController";
 
 const TIMEZONE_PADRAO = "America/Sao_Paulo";
@@ -35,6 +40,7 @@ interface FormularioEventoProps {
   onOpenChange: (open: boolean) => void;
   tema: TemaAlpha;
   calendarios: CalendarioSelecionadoView[];
+  colegas: ColegaAgendaView[];
   dataInicial: Date;
   eventoParaEditar?: EventoExibicao;
   detalhesEvento?: GoogleEventoDTO;
@@ -77,6 +83,7 @@ export function FormularioEvento({
   onOpenChange,
   tema,
   calendarios,
+  colegas,
   dataInicial,
   eventoParaEditar,
   detalhesEvento,
@@ -85,6 +92,41 @@ export function FormularioEvento({
   onSalvarOtimista,
 }: FormularioEventoProps) {
   const calendariosGravaveis = calendarios.filter((calendario) => calendario.gravavel);
+  const colegasEditores = colegas.filter((colega) => colega.papel === "EDITOR");
+  const destinosEvento = [
+    ...calendariosGravaveis.map((calendario) => ({
+      id: `proprio:${calendario.googleCalendarId}`,
+      calendarId: calendario.googleCalendarId,
+      nome: calendario.nome,
+      corHex: calendario.corHex,
+      calendarioId: calendario.id,
+      colegaId: undefined as number | undefined,
+    })),
+    ...colegasEditores.map((colega) => ({
+      id: `colega:${colega.colegaId}`,
+      calendarId: colega.colega.email,
+      nome: `Agenda de ${colega.colega.nome}`,
+      corHex: colega.cor,
+      calendarioId: `colega-${colega.colegaId}`,
+      colegaId: colega.colegaId,
+    })),
+  ];
+  const destinosTarefa = [
+    ...listasTarefas.map((lista) => ({
+      id: `proprio:${lista.googleTaskListId}`,
+      taskListId: lista.googleTaskListId,
+      nome: lista.titulo,
+      corHex: null as string | null,
+      colegaId: undefined as number | undefined,
+    })),
+    ...colegasEditores.flatMap((colega) => colega.listasTarefas.map((lista) => ({
+      id: `colega:${colega.colegaId}:${lista.googleTaskListId}`,
+      taskListId: lista.googleTaskListId,
+      nome: `${colega.colega.nome} · ${lista.titulo}`,
+      corHex: colega.cor,
+      colegaId: colega.colegaId,
+    }))),
+  ];
   const editandoEventoDeColega = Boolean(eventoParaEditar?.colegaId);
   const emEdicao = Boolean(eventoParaEditar);
   const editandoTarefa = eventoParaEditar?.tipo === "tarefa";
@@ -93,7 +135,11 @@ export function FormularioEvento({
   const fimDetalhado = dataDoGoogle(detalhesEvento?.fim);
   const inicioPadrao = inicioDetalhado ?? (eventoParaEditar?.inicioEm ? new Date(eventoParaEditar.inicioEm) : dataInicial);
   const fimPadrao = fimDetalhado ?? (eventoParaEditar?.fimEm ? new Date(eventoParaEditar.fimEm) : new Date(dataInicial.getTime() + 3600000));
-  const [calendarId, setCalendarId] = useState(eventoParaEditar?.calendarioGoogleId ?? calendariosGravaveis[0]?.googleCalendarId ?? "");
+  const [destinoEventoId, setDestinoEventoId] = useState(
+    eventoParaEditar?.colegaId
+      ? `colega:${eventoParaEditar.colegaId}`
+      : `proprio:${eventoParaEditar?.calendarioGoogleId ?? calendariosGravaveis[0]?.googleCalendarId ?? ""}`,
+  );
   const [titulo, setTitulo] = useState(detalhesEvento?.titulo ?? eventoParaEditar?.titulo ?? "");
   const [inicio, setInicio] = useState(paraInputDatetimeLocal(inicioPadrao));
   const [fim, setFim] = useState(paraInputDatetimeLocal(fimPadrao));
@@ -113,19 +159,27 @@ export function FormularioEvento({
       ? detalhesEvento.eventType
       : "default",
   );
-  const [taskListId, setTaskListId] = useState(listasTarefas[0]?.googleTaskListId ?? "");
+  const [destinoTarefaId, setDestinoTarefaId] = useState(
+    eventoParaEditar?.colegaId
+      ? `colega:${eventoParaEditar.colegaId}:${eventoParaEditar.calendarioGoogleId}`
+      : `proprio:${eventoParaEditar?.calendarioGoogleId ?? listasTarefas[0]?.googleTaskListId ?? ""}`,
+  );
   const [repeticao, setRepeticao] = useState("nunca");
   const [visibilidade, setVisibilidade] = useState<"default" | "private" | "public">("default");
   const [disponibilidade, setDisponibilidade] = useState<"opaque" | "transparent">("opaque");
   const [lembreteMinutos, setLembreteMinutos] = useState("30");
   const [conflito, setConflito] = useState(false);
+  const destinoEvento = destinosEvento.find((destino) => destino.id === destinoEventoId) ?? (!emEdicao ? destinosEvento[0] : undefined);
+  const destinoTarefa = destinosTarefa.find((destino) => destino.id === destinoTarefaId) ?? (!emEdicao ? destinosTarefa[0] : undefined);
+  const calendarId = eventoParaEditar?.calendarioGoogleId ?? destinoEvento?.calendarId ?? "";
+  const taskListId = eventoParaEditar?.calendarioGoogleId ?? destinoTarefa?.taskListId ?? "";
 
   async function handleSubmit(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (eventType !== "task" && !calendarId) return toast.error("Selecione uma agenda.");
     if (!titulo.trim()) return toast.error("Título é obrigatório.");
     if (eventType === "task" && !editandoTarefa && !taskListId) {
-      return toast.error("Sincronize as tarefas antes de criar a primeira tarefa.");
+      return toast.error("Nenhuma lista de tarefas gravável está disponível.");
     }
 
     const listaParticipantes = emailsNormalizados(participantes);
@@ -137,9 +191,6 @@ export function FormularioEvento({
       if (eventType === "task") {
         if (!editandoTarefa) {
           const idOtimista = `tarefa-otimista-${crypto.randomUUID()}`;
-          const lista = listasTarefas.find(
-            (item) => item.googleTaskListId === taskListId,
-          );
           onSalvarOtimista({
             item: {
               id: idOtimista,
@@ -156,20 +207,24 @@ export function FormularioEvento({
               tarefaNotas: descricao || null,
               calendarioId: "tarefas-google",
               calendarioGoogleId: taskListId,
-              calendarioNome: lista?.titulo ?? "Google Tasks",
-              calendarioCorHex: null,
+              calendarioNome: destinoTarefa?.nome ?? "Google Tasks",
+              calendarioCorHex: destinoTarefa?.corHex ?? null,
               calendarioGravavel: false,
               sincronizacaoPendente: true,
+              colegaId: destinoTarefa?.colegaId,
             },
             executar: async () => {
-              const resultado = await criarTarefaAgendaAlpha({
+              const payloadTarefa = {
                 taskListId,
                 titulo,
                 notas: descricao || undefined,
                 vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
                 inicioLocalEm: new Date(inicio),
                 fimLocalEm: new Date(fim),
-              });
+              };
+              const resultado = destinoTarefa?.colegaId
+                ? await criarTarefaParaColega(destinoTarefa.colegaId, payloadTarefa)
+                : await criarTarefaAgendaAlpha(payloadTarefa);
               return resultado.success
                 ? { success: true }
                 : { success: false, error: resultado.error };
@@ -181,16 +236,19 @@ export function FormularioEvento({
           return;
         }
 
-        const resultado = eventoParaEditar?.tarefaCacheId
-          ? await atualizarTarefaAgendaAlpha({
+        const payloadAtualizacaoTarefa = eventoParaEditar?.tarefaCacheId ? {
             tarefaCacheId: eventoParaEditar.tarefaCacheId,
             titulo,
             notas: descricao || undefined,
             vencimentoEm: new Date(`${inicio.slice(0, 10)}T12:00:00`),
             inicioLocalEm: new Date(inicio),
             fimLocalEm: new Date(fim),
-          })
-          : { success: false as const, error: "Tarefa inválida para edição." };
+          } : null;
+        const resultado = !payloadAtualizacaoTarefa
+          ? { success: false as const, error: "Tarefa inválida para edição." }
+          : eventoParaEditar?.colegaId
+            ? await atualizarTarefaParaColega(eventoParaEditar.colegaId, payloadAtualizacaoTarefa)
+            : await atualizarTarefaAgendaAlpha(payloadAtualizacaoTarefa);
         if (!resultado.success) {
           toast.error(resultado.error);
           return;
@@ -266,9 +324,6 @@ export function FormularioEvento({
         }
         toast.success("Evento atualizado.");
       } else {
-        const calendario = calendarios.find(
-          (item) => item.googleCalendarId === calendarId,
-        );
         const idOtimista = `evento-otimista-${crypto.randomUUID()}`;
         onSalvarOtimista({
           item: {
@@ -283,15 +338,18 @@ export function FormularioEvento({
             linkMeet: null,
             eventType,
             tipo: "evento",
-            calendarioId: calendario?.id ?? "calendario-otimista",
+            calendarioId: destinoEvento?.calendarioId ?? "calendario-otimista",
             calendarioGoogleId: calendarId,
-            calendarioNome: calendario?.nome ?? "Agenda",
-            calendarioCorHex: calendario?.corHex ?? null,
+            calendarioNome: destinoEvento?.nome ?? "Agenda",
+            calendarioCorHex: destinoEvento?.corHex ?? null,
             calendarioGravavel: false,
             sincronizacaoPendente: true,
+            colegaId: destinoEvento?.colegaId,
           },
           executar: async () => {
-            const resultado = await criarEventoNoCalendario(payloadBase);
+            const resultado = destinoEvento?.colegaId
+              ? await criarEventoParaColega(destinoEvento.colegaId, payloadBase)
+              : await criarEventoNoCalendario(payloadBase);
             return resultado.success
               ? { success: true }
               : { success: false, error: resultado.error };
@@ -405,11 +463,11 @@ export function FormularioEvento({
         {eventType === "task" ? (
           <div className="space-y-1.5">
             <Label htmlFor="ca-lista-tarefas">Lista de tarefas</Label>
-            <Select value={taskListId} onValueChange={setTaskListId} disabled={editandoTarefa}>
+            <Select value={destinoTarefa?.id ?? ""} onValueChange={setDestinoTarefaId} disabled={editandoTarefa}>
               <SelectTrigger id="ca-lista-tarefas" className="w-full"><SelectValue placeholder="Sincronize para carregar as listas" /></SelectTrigger>
               <SelectContent>
-                {listasTarefas.map((lista) => (
-                  <SelectItem key={lista.googleTaskListId} value={lista.googleTaskListId}>{lista.titulo}</SelectItem>
+                {destinosTarefa.map((destino) => (
+                  <SelectItem key={destino.id} value={destino.id}>{destino.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -420,11 +478,11 @@ export function FormularioEvento({
             {editandoEventoDeColega ? (
               <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">Agenda de {eventoParaEditar?.calendarioNome}</p>
             ) : (
-              <Select value={calendarId} onValueChange={setCalendarId} disabled={emEdicao}>
+              <Select value={destinoEvento?.id ?? ""} onValueChange={setDestinoEventoId} disabled={emEdicao}>
                 <SelectTrigger id="ca-calendario" className="w-full"><SelectValue placeholder="Selecione uma agenda" /></SelectTrigger>
                 <SelectContent>
-                  {calendariosGravaveis.map((calendario) => (
-                    <SelectItem key={calendario.googleCalendarId} value={calendario.googleCalendarId}>{calendario.nome}</SelectItem>
+                  {destinosEvento.map((destino) => (
+                    <SelectItem key={destino.id} value={destino.id}>{destino.nome}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

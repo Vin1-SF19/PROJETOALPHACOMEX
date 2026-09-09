@@ -70,13 +70,7 @@ describe("Agenda Alpha cache e wiring", () => {
     expect(controller).toContain("await recarregarPeriodoAtual(true)");
   });
 
-  it("só ativa compartilhadas por ação explícita e recarrega se já estiverem ativas", () => {
-    const dashboard = ler(
-      "src",
-      "components",
-      "CalendarioAlpha",
-      "CalendarioAlphaDashboard.tsx",
-    );
+  it("carrega compartilhadas sem bloquear a agenda própria e as mantém revalidáveis", () => {
     const controller = ler(
       "src",
       "components",
@@ -94,12 +88,34 @@ describe("Agenda Alpha cache e wiring", () => {
 
     expect(hook).not.toContain("ativarAposMontagem");
     expect(hook).toContain("recarregarSeAtivo");
-    expect(dashboard).not.toContain("ativarCompartilhadasAposMontagem");
+    expect(controller).toContain("if (statusConexao.conectado) void carregarCompartilhadas()");
     expect(controller).toContain("await compartilhadas.carregar()");
     expect(controller).toContain("void compartilhadas.carregar()");
     expect(controller).toMatch(
       /assinarInvalidacaoCalendarioAlpha\(\(\) => \{[\s\S]*void recarregarCompartilhadasSeAtivo\(\);[\s\S]*void recarregarPeriodoAtual\(true\)/,
     );
+  });
+
+  it("abre notificações pela aba interna e encaminha convites ao modal de compartilhamento", () => {
+    const layout = ler("src", "components", "layout", "PainelLayoutClient.tsx");
+    const dashboard = ler(
+      "src",
+      "components",
+      "CalendarioAlpha",
+      "CalendarioAlphaDashboard.tsx",
+    );
+    const sino = ler(
+      "src",
+      "components",
+      "CalendarioAlpha",
+      "SinoNotificacoesCompromissos.tsx",
+    );
+
+    expect(layout).toContain("openTab(AGENDA_ALPHA_URL, AGENDA_ALPHA_LABEL)");
+    expect(layout).toContain("contentWindow.postMessage");
+    expect(dashboard).toContain('mensagem.intencao?.acao === "ABRIR_COMPARTILHAMENTOS"');
+    expect(dashboard).toContain("void agenda.abrirColegas()");
+    expect(sino).not.toContain("router.push");
   });
 
   it("descarta hidratação stale e entrega evento/detalhes como sessão atômica", () => {

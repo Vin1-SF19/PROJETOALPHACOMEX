@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { listarColegasVisiveis, listarEventosDeColega } from "@/actions/google-calendar-colegas";
+import {
+  listarColegasVisiveis,
+  listarEventosDeColega,
+  listarTarefasDeColega,
+} from "@/actions/google-calendar-colegas";
 
 import { calcularIntervaloVisao, type VisaoCalendario } from "./datas";
+import { tarefasParaItensAgenda } from "./itens-agenda";
 import type { ColegaAgendaView, EventoExibicao } from "./tipos";
 
 interface UseAgendasCompartilhadasParams {
@@ -60,18 +65,25 @@ export function useAgendasCompartilhadas({
       const dataReferencia = new Date(parametros.dataReferenciaISO);
       const { inicio, fim } = calcularIntervaloVisao(parametros.visao, dataReferencia);
       const resultados = await Promise.all(
-        visiveis.map((colega) =>
-          listarEventosDeColega(colega.colegaId, inicio.toISOString(), fim.toISOString()),
-        ),
+        visiveis.map(async (colega) => {
+          const [eventosResultado, tarefasResultado] = await Promise.all([
+            listarEventosDeColega(colega.colegaId, inicio.toISOString(), fim.toISOString()),
+            colega.papel === "EDITOR"
+              ? listarTarefasDeColega(colega.colegaId)
+              : Promise.resolve({ success: true as const, data: [] }),
+          ]);
+          return { colega, eventosResultado, tarefasResultado };
+        }),
       );
 
-      const falhas = resultados.flatMap((resultado, indice) =>
-        resultado.success ? [] : [`${visiveis[indice]?.colega.nome ?? "Agenda compartilhada"}: ${resultado.error}`],
-      );
+      const falhas = resultados.flatMap(({ colega, eventosResultado, tarefasResultado }) => [
+        ...(eventosResultado.success ? [] : [`${colega.colega.nome}: ${eventosResultado.error}`]),
+        ...(tarefasResultado.success ? [] : [`${colega.colega.nome}: ${tarefasResultado.error}`]),
+      ]);
       setEventos(
-        resultados.flatMap((resultado) =>
-          resultado.success
-            ? resultado.data.map((evento) => ({
+        resultados.flatMap(({ colega, eventosResultado, tarefasResultado }) => [
+          ...(eventosResultado.success
+            ? eventosResultado.data.map((evento) => ({
                 id: evento.id,
                 googleEventId: evento.googleEventId,
                 status: evento.status,
@@ -90,8 +102,20 @@ export function useAgendasCompartilhadas({
                 calendarioGravavel: evento.gravavel,
                 colegaId: evento.colegaId,
               }))
-            : [],
-        ),
+            : []),
+          ...(tarefasResultado.success
+            ? tarefasParaItensAgenda(tarefasResultado.data).map((tarefa) => ({
+                ...tarefa,
+                id: `colega-${colega.colegaId}-${tarefa.id}`,
+                googleEventId: `colega-${colega.colegaId}-${tarefa.googleEventId}`,
+                calendarioId: `colega-${colega.colegaId}-tarefas`,
+                calendarioNome: `${colega.colega.nome} · ${tarefa.calendarioNome}`,
+                calendarioCorHex: colega.cor,
+                calendarioGravavel: true,
+                colegaId: colega.colegaId,
+              }))
+            : []),
+        ]),
       );
       setErro(falhas.length > 0 ? falhas.join(" • ") : null);
     })().finally(() => {

@@ -1,0 +1,32 @@
+{
+  "subtaskId": "agenda-alpha-sharing-completed-notifications",
+  "critiquedAt": "2026-09-09T16:30:00Z",
+  "step5_5": {
+    "predictedBugs": [
+      "A intenção de abrir o convite poderia ser enviada antes de o iframe da Agenda registrar seu listener; foi adicionado handshake READY/ACK com intenção pendente.",
+      "As agendas compartilhadas poderiam chegar depois da abertura do formulário e deixar o destino sem seleção; o formulário agora usa o primeiro destino válido como fallback.",
+      "Um cliente poderia forjar colegaId, calendarId ou taskListId para escrever em recurso alheio; vínculo EDITOR e posse do calendário/lista são revalidados no servidor.",
+      "Uma tarefa compartilhada poderia aparecer, mas falhar ao editar ou concluir; os dois fluxos agora usam ações autenticadas específicas do colega."
+    ],
+    "edgeCases": [
+      "Vínculo VISUALIZADOR não recebe tarefas e não pode executar ações de escrita.",
+      "Colega inativo ou sem Agenda Alpha ativa retorna erro seguro antes da chamada Google.",
+      "Agenda compartilhada sem lista Google Tasks sincronizada não aparece como destino de tarefa e produz mensagem acionável.",
+      "Tarefa concluída com data permanece visível; tarefa sem qualquer data ou horário continua fora da grade."
+    ],
+    "errorHandling": true,
+    "securityCheck": true,
+    "passed": true
+  },
+  "step6_5": {
+    "followsPatterns": true,
+    "noHardcoded": true,
+    "testsAdded": true,
+    "docsUpdated": true,
+    "noConsoleLogs": true,
+    "passed": true
+  },
+  "overallVerdict": "PASSED",
+  "skipped": false,
+  "skipWarning": null
+}

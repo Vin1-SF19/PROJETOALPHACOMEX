@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { DetalhePopover } from "./DetalhePopover";
 import { DiaEventosPopover } from "./DiaEventosPopover";
 import { agruparPorDia, diasDoGridMes, formatarDataCivil, mesmodia } from "./lib/datas";
-import { corDoItemAgenda, type EventoExibicao } from "./lib/tipos";
+import { corDoItemAgenda, FUNDO_TAREFA_CONCLUIDA, type EventoExibicao } from "./lib/tipos";
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -104,7 +104,7 @@ export function VisaoMes({
               </div>
               <div className="mt-1.5 space-y-1">
                 {eventosDoDia.slice(0, limiteEventosVisiveis).map((evento) => evento.tipo === "tarefa" ? (
-                  <div key={evento.id} className="group/task relative flex w-full items-center gap-1 overflow-hidden rounded-lg border border-white/15 py-1 pr-1 text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(15,23,42,0.22)] transition-all hover:-translate-y-px hover:brightness-110 hover:shadow-[0_7px_18px_rgba(15,23,42,0.3)]" style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3, background: `linear-gradient(135deg, ${corDoItemAgenda(evento)}f2, ${corDoItemAgenda(evento)}b8)` }}>
+                  <div key={evento.id} className={cn("group/task relative flex w-full items-center gap-1 overflow-hidden rounded-lg border border-white/15 py-1 pr-1 text-[10px] font-bold text-white shadow-[0_5px_14px_rgba(15,23,42,0.22)] transition-all hover:-translate-y-px hover:brightness-110 hover:shadow-[0_7px_18px_rgba(15,23,42,0.3)]", evento.status === "completed" && "border-slate-500/35 text-slate-400")} style={{ borderLeftColor: corDoItemAgenda(evento), borderLeftWidth: 3, background: evento.status === "completed" ? FUNDO_TAREFA_CONCLUIDA : `linear-gradient(135deg, ${corDoItemAgenda(evento)}f2, ${corDoItemAgenda(evento)}b8)` }}>
                     {evento.status === "completed" ? (
                       <span className="ml-1 flex size-4 shrink-0 items-center justify-center rounded-full border border-white/70 bg-white/20" title="Tarefa concluída"><CheckCircle2 className="size-3 text-white" aria-hidden="true" /></span>
                     ) : (
@@ -112,7 +112,7 @@ export function VisaoMes({
                         <CheckCircle2 className="size-3 text-white" aria-hidden="true" />
                       </button>
                     )}
-                    <button type="button" onClick={(e) => { e.stopPropagation(); onEditarEvento(evento); }} className="min-w-0 flex-1 truncate px-0.5 text-left focus:outline-none" title={`Editar tarefa: ${evento.titulo || "sem título"}`}>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onEditarEvento(evento); }} className={cn("min-w-0 flex-1 truncate px-0.5 text-left focus:outline-none", evento.status === "completed" && "line-through decoration-slate-400")} title={`Editar tarefa: ${evento.titulo || "sem título"}`}>
                       {evento.titulo || "(sem título)"}
                     </button>
                   </div>

@@ -5,11 +5,7 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
   return tarefas.flatMap((tarefa): EventoExibicao[] => {
     const possuiHorarioAgendado = Boolean(tarefa.inicioAgendadoEm && tarefa.fimPlanejadoAgendadoEm);
     const possuiHorarioLocal = Boolean(tarefa.inicioLocalEm && tarefa.fimLocalEm);
-    const concluidaAgendada = tarefa.status === "completed" && tarefa.statusAgendamento === "CONCLUIDO";
-    if (
-      (tarefa.status === "completed" && !concluidaAgendada && !possuiHorarioLocal) ||
-      (!possuiHorarioAgendado && !possuiHorarioLocal && !tarefa.vencimentoEm)
-    )
+    if (!possuiHorarioAgendado && !possuiHorarioLocal && !tarefa.vencimentoEm)
       return [];
 
     if (possuiHorarioAgendado) {
@@ -69,7 +65,7 @@ export function tarefasParaItensAgenda(tarefas: TarefaAgendaExibicao[]): EventoE
     return [{
       id: `tarefa-${tarefa.id}`,
       googleEventId: `tarefa-${tarefa.id}`,
-      status: "needsAction",
+      status: tarefa.status,
       titulo: tarefa.titulo,
       inicioEm: meioDiaUtc.toISOString(),
       fimEm: meioDiaUtc.toISOString(),
