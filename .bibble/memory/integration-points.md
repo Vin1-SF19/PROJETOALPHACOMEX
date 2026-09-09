@@ -1,5 +1,19 @@
 # INTEGRATION POINTS — Pontos de Integração
 
+## Alpha CRM — formulário canônico por etapa (RM-2026-045CC0)
+
+**Caminho administrativo:** sidebar CRM → **Configurações** → `/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]` → aba de campos/formulário → `FormularioEtapaWorkspace` → `SalvarFormularioEtapaBpm`.
+
+**Contrato de campo:** a UI oferece somente campo ativo cuja configuração `BpmCampoEtapaConfig` da etapa esteja visível. O backend revalida etapa/pipeline, catálogo proprietário ou compartilhamento real e a mesma configuração canônica. `BpmCampoPipeline` nunca implica presença em todas as etapas.
+
+**Contrato de composição:** a UI envia IDs persistidos e `versaoEsperada`; a action usa CAS e reconciliação diferencial, preservando IDs e targets. `CHECKLIST` exige `STAGE_CHECKLIST`; `CAPABILITY` exige registry canônico e habilitação em `BpmEtapa.capabilitiesJson`. Read → save sem mudança é no-op.
+
+**Operação:** `npm run bpm:stage-forms` produz dry-run/snapshot por padrão. Apply e rollback exigem ambiente, confirmação literal e hash/arquivo explícito. A P0-2 aplicada deixou 32 formulários, 180 campos válidos, 32 checklists, 37 capabilities e zero incompatíveis.
+
+**Ao estender:** primeiro crie/edite a configuração campo-etapa; só depois inclua o campo no formulário da etapa. Não recoloque campos no formulário usando apenas propriedade/associação de pipeline. O renderer compartilhado pertence à P0-3.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-045CC0)
+
 ## ChatBot Alpha → backend ChatbotX externo (RM-2026-3D529D)
 
 **Entrada do usuário:** sidebar → `/PainelAlpha/ChatBotAlpha` → `page.tsx`, que exige sessão e a permissão `chatBotAlpha` (ou perfil administrativo) antes de renderizar `ChatBotAlphaClient`.

@@ -1,12 +1,13 @@
 # CODEBASE MAP — Mapa Estrutural do Projeto
 
+- Formulários canônicos por etapa (RM-2026-045CC0): composição em `BpmEtapaFormulario`/`BpmFormularioSecao`/`BpmFormularioComponente`; contrato e allowlists em `src/lib/bpm/formularios-etapa.ts`; classificação/dry-run em `src/lib/bpm/formularios-etapa-migration.ts`; save diferencial em `src/actions/bpm/FormulariosEtapa.ts`; UI administrativa em `FormularioEtapaWorkspace.tsx`; CLI auditável em `scripts/bpm-stage-form-migration.mjs`; relatório em `docs/reports/crm-stage-form-migration-p0-2.md`.
 - Checklist Builder: models Prisma `BpmChecklistTemplate*`/`BpmCardChecklist*`; domínio em `src/lib/bpm/checklists/{schemas,leitura,service,integracao}.ts`; actions em `src/actions/bpm/Checklists.ts`; workspace em `src/components/bpm/checklists/ChecklistsWorkspace.tsx`; painel em `CardModal/PainelChecklistsCard.tsx`; alerta/navegação em `PainelProximaEtapa.tsx` + `PainelRegistrar.tsx`; ação automática `MATERIALIZAR_CHECKLIST` em `src/lib/bpm/automacoes/{schemas,executor}.ts`.
 - SLA BPM: cálculo, provisionamento idempotente, pausa/retomada, recálculo on-read e sincronização de movimento em `src/lib/bpm/sla.ts`; fachada autenticada em `src/actions/bpm/Sla.ts`; `Cards.ts` sincroniza a saída/entrada de etapa e o standby na mesma transação do movimento.
 - ChatBot Alpha: rota em `src/app/PainelAlpha/ChatBotAlpha/page.tsx`; client em `src/components/ChatBotAlpha/{ChatBotAlphaClient,ChatConversa,SeletorSistemaChatBot,IframeChatBotAlpha}.tsx`; actions em `src/actions/{ChatBotAlpha,ChatBotAlphaChat}.ts`; domínio em `src/lib/chatbot-alpha/{contracts,doctor,observability,chat-api}.ts`; CLI em `scripts/chatbot-alpha.mjs`; testes em `tests/chatbot-alpha/{contracts,observability,chat-api,actions}.test.ts`.
 
 > Mantido por: Scribe (cartógrafo)
 > Atualizar após TODA sessão significativa de desenvolvimento.
-> Última atualização: 2026-09-08 (RM-2026-3D529D — ChatBot Alpha concluído)
+> Última atualização: 2026-09-09 (RM-2026-045CC0 — formulários por etapa reconciliados)
 
 ---
 

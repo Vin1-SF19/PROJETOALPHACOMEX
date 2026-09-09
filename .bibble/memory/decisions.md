@@ -1,5 +1,23 @@
 # DECISIONS — Decisões Técnicas Tomadas
 
+### 2026-09-09 — RM-2026-045CC0 — composição não concede aplicabilidade de campo
+
+**Decisão:** `BpmCampoEtapaConfig` é autoridade para presença/visibilidade de campo na etapa; o formulário apenas referencia e ordena. Componentes gerados em massa pelo contrato antigo foram removidos quando seus IDs v1 determinísticos e a configuração em outras etapas provaram a cópia indevida. Configuração ausente não foi criada sem evidência específica da etapa.
+
+**Consequência:** o pipeline continua sendo apenas catálogo/união e compartilhamento. Uma etapa não herda campos das demais e os formulários podem ficar sem `CAMPO` quando essa é a configuração canônica atual, preservando checklist/capability.
+
+### 2026-09-09 — RM-2026-045CC0 — save diferencial com identidade e CAS
+
+**Decisão:** substituir o replace-all por reconciliação diferencial. A UI envia IDs e versão; a action recusa IDs externos ou mudança de chave/tipo/target, atualiza componentes existentes, cria apenas novos, remove apenas omitidos e usa CAS de `BpmEtapaFormulario.versao`. Save semanticamente idêntico é no-op.
+
+**Consequência:** CHECKLIST/CAPABILITY não perdem referências, IDs estáveis sobrevivem à edição e duas sessões não sobrescrevem silenciosamente uma à outra. Draft/PUBLISHED permanece fora deste contrato e segue para P0-4.
+
+### 2026-09-09 — RM-2026-045CC0 — migração operacional planejada, reversível e sem schema
+
+**Decisão:** executar a reconciliação por CLI dry-run-first com snapshot lógico, fingerprint histórico, hash de plano, detecção de drift, transação e rollback condicionado à versão aplicada. Nenhuma migration Prisma foi criada.
+
+**Consequência:** a mesma transformação foi ensaiada com apply/rollback/reapply em cópia restaurada e aplicada no Turso. Os 1.057 componentes incompatíveis saíram da composição sem tocar valores/históricos de cards; reaplicação não produz mudanças.
+
 ### 2026-09-09 — RM-2026-457A31 — associação normalizada com shadow legado
 
 **Decisão:** representar várias etapas por `BpmChecklistTemplateEtapa`, usando zero vínculos como global e mantendo `BpmChecklistTemplate.etapaId` como primeira etapa canônica para rollback. A leitura usa uma função única e preserva fallback singular legado; snapshots materializados não são reescritos.

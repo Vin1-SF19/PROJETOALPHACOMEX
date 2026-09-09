@@ -24,6 +24,7 @@
     "bpm:automacoes:migrar-hardcoded": "tsx --conditions=react-server scripts/migrar-automacoes-hardcoded.ts",
     "bpm:checklists:reconciliar": "tsx --conditions=react-server scripts/reconciliar-tarefas-checklists.ts",
     "bpm:pipeline:diagnostico": "tsx --conditions=react-server scripts/diagnosticar-pipeline-bpm.ts",
+    "bpm:stage-forms": "node --import tsx scripts/bpm-stage-form-migration.mjs",
     "roadmap:doctor": "tsx scripts/roadmap-alpha.mjs doctor",
     "roadmap:check-modules": "tsx scripts/roadmap-alpha.mjs check-modules",
     "roadmap:sync-modules": "tsx scripts/roadmap-alpha.mjs sync-modules",

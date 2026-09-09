@@ -46,7 +46,7 @@ type EtapaFormulario = {
 
 type CampoAplicavel = CampoFormulario & {
   ativo?: boolean;
-  etapaConfiguracoes?: Array<{ etapaId: string }>;
+  etapaConfiguracoes?: Array<{ etapaId: string; visivel: boolean }>;
 };
 
 function secoesDaEtapa(etapa: EtapaFormulario | undefined): SecaoFormulario[] {
@@ -93,7 +93,7 @@ export function FormularioEtapaWorkspace({
         (campo) =>
           campo.ativo !== false &&
           campo.etapaConfiguracoes?.some(
-            (config) => config.etapaId === etapaId,
+            (config) => config.etapaId === etapaId && config.visivel,
           ),
       ),
     [campos, etapaId],
@@ -149,11 +149,14 @@ export function FormularioEtapaWorkspace({
     const resposta = await SalvarFormularioEtapaBpm({
       pipelineId,
       etapaId: etapa.id,
+      versaoEsperada: etapa.formulario?.versao ?? null,
       ativo,
       secoes: secoes.map((secao) => ({
+        id: secao.id,
         chave: secao.chave,
         titulo: secao.titulo,
         componentes: secao.componentes.map((componente) => ({
+          id: componente.id,
           chave: componente.chave,
           tipo: componente.tipo,
           campoId: componente.campoId,
@@ -400,8 +403,11 @@ export function FormularioEtapaWorkspace({
                       {camposAplicaveis
                         .filter(
                           (campo) =>
-                            !secao.componentes.some(
-                              (componente) => componente.campoId === campo.id,
+                            !secoes.some((secaoAtual) =>
+                              secaoAtual.componentes.some(
+                                (componente) =>
+                                  componente.campoId === campo.id,
+                              ),
                             ),
                         )
                         .map((campo) => (

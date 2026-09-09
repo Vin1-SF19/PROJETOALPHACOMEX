@@ -5100,3 +5100,45 @@ Não houve migration, escrita direta de configuração pelo terminal, worker do 
 Cadências agora aceitam zero, uma ou várias colunas ativas do mesmo pipeline por multiselect. A associação normalizada tem FK e unicidade por etapa, foi retroalimentada de modo idempotente e mantém `etapaId` apenas como shadow de rollback. O runtime ativa somente nas colunas selecionadas; entrada no pipeline permanece explícita e ciclos já iniciados não são reprocessados.
 
 O checkpoint Vault foi aprovado pelo administrador. O dump de 106.125.243 bytes foi restaurado e conferido antes da migration; a pós-validação terminou sem vínculo inválido, duplicidade ou violação de FK. Os 40 testes focados, E2E isolado, lint direcionado, diff-check, build de 78 páginas e smoke HTTP passaram. Os débitos dos gates globais são externos e estão registrados em `known-errors.md`. Nenhum worker foi iniciado nem houve promoção para produção.
+
+---
+
+## 2026-09-09 18:32 — P0-2 reconciliou formulários canônicos por etapa
+
+**Tags:** #refactor #migration #integrity #nextjs #prisma #critical
+**Agentes envolvidos:** Scout, Echo, Nova, Vault, Sage, Forge, Probe, Anubis, Lens, Scribe, Kowalski
+**Arquivos tocados:** `src/lib/bpm/formularios-etapa*.ts`, `src/actions/bpm/FormulariosEtapa.ts`, `FormularioEtapaWorkspace.tsx`, `scripts/bpm-stage-form-migration.mjs`, testes e documentação RM-2026-045CC0.
+
+### Contexto
+
+Os 32 formulários v1 haviam sido gerados copiando o catálogo de cada pipeline para todas as etapas. Após a P0-1, 1.057 dos 1.237 componentes CAMPO divergiam de `BpmCampoEtapaConfig`.
+
+### O que foi feito
+
+- Classificados 1.043 componentes como cópias de outra etapa e 14 como contrários a `visivel=false`; zero casos ambíguos.
+- Implementados save diferencial com IDs estáveis/CAS, targets estritos de CHECKLIST/CAPABILITY e prevenção canônica na UI.
+- Criada CLI com snapshot, dry-run, hash de plano, drift guard, apply e rollback.
+- Ensaio em backup restaurado passou por apply, rollback, reaplicação e no-op; produção terminou com 180 campos válidos e zero incompatíveis.
+
+### Decisões tomadas
+
+- Composição visual não concede aplicabilidade; somente `BpmCampoEtapaConfig` decide presença na etapa.
+- Configuração ausente não é criada sem evidência específica; associação de pipeline não significa todas as etapas.
+- Valores históricos permanecem intactos mesmo quando um campo sai da composição.
+
+### Problemas encontrados / resolvidos
+
+- Replace-all apagava identidades e o target de CHECKLIST: substituído por reconciliação diferencial e validação de identidade.
+- Last-write-wins: eliminado por `versaoEsperada` e CAS transacional.
+- Turbopack recusou `node_modules` symlink do worktree: gate repetido com árvore local de hardlinks; build aprovado.
+
+### Pendências
+
+- P0-3 deve unificar builder, preview e card real no mesmo renderer.
+- P0-4 deve tratar Draft/PUBLISHED; débitos globais preexistentes permanecem fora desta RM.
+
+### Refletido também em
+
+- `decisions.md`: autoridade campo-etapa, save diferencial e migração reversível.
+- `architecture.md`: contrato final e CLI operacional.
+- `codebase-map.md` e `integration-points.md`: arquivos e fluxo administrativo.

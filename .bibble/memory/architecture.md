@@ -1,5 +1,17 @@
 # ARCHITECTURE — Mapa de Arquitetura do Projeto
 
+## Formulários canônicos por etapa — P0-2 concluída (RM-2026-045CC0, 2026-09-09)
+
+`BpmCampoEtapaConfig` é a única autoridade de aplicabilidade/visibilidade de campo na etapa. `BpmEtapaFormulario` e filhos são apenas composição visual e não concedem presença por pipeline. A reconciliação de produção removeu 1.043 cópias v1 de campos pertencentes a outras etapas e 14 componentes contrários a `visivel=false`: 1.237 componentes CAMPO/1.057 incompatíveis passaram a 180/zero. Os 32 CHECKLIST e 37 CAPABILITY permaneceram intactos.
+
+`src/lib/bpm/formularios-etapa.ts` centraliza Zod, registry de capabilities e comparação semântica. `SalvarFormularioEtapaBpm` revalida auth/permissão na transação, pipeline/etapa, catálogo e configuração canônica, preserva IDs por diff, recusa troca de identidade/target e usa `versaoEsperada` como CAS. A UI envia IDs/versão, oferece somente configurações visíveis da etapa e impede o mesmo campo em seções diferentes.
+
+`npm run bpm:stage-forms` executa inventário/snapshot/dry-run por padrão; apply exige hash, ambiente e confirmação, reconsulta dentro da transação e produz rollback. O backup completo e o rollback ficam em `database-backups/pre-change/`. Fingerprints dos cards, valores, checklists, históricos e anexos foram idênticos antes/depois. Não houve alteração de schema. Renderer compartilhado, preview real, painéis hardcoded e Draft/PUBLISHED seguem para P0-3/P0-4.
+
+DELIVERY_READY: CRM → Configurações → pipeline → composição do formulário → save diferencial canônico. Operação: `npm run bpm:stage-forms -- --dry-run`.
+
+**Última atualização:** 2026-09-09 por Codex (RM-2026-045CC0).
+
 ## Checklist em várias etapas — implementação local (RM-2026-457A31, 2026-09-09)
 
 `BpmChecklistTemplateEtapa` normaliza o escopo de etapas, preservando `BpmChecklistTemplate.etapaId` como shadow legado. Zero associações significa escopo global; uma ou mais associações restringem ao conjunto selecionado. `filtroEtapaTemplateChecklist` é compartilhado por materialização e resumo/motores, com fallback singular legado. As actions validam pipeline, etapas ativas e card, revalidam permissão em transação serializável, reconciliam metadados/itens/associações/auditoria e notificam após commit.

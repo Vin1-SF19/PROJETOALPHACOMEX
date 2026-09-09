@@ -34,7 +34,7 @@ Convergir o CRM/BPM para identidade estável, uma definição canônica de trans
 - [ ] Fase 5 — policies e requisitos independentes.
 - [ ] Fase 6 — lifecycle, outcome e substatus.
 - [ ] Fase 7 — ownership dos dados especializados.
-- [ ] Fase 8 — definição/renderização de formulário.
+- [x] Fase 8 — definição e integridade estrutural do formulário; renderer compartilhado segue para P0-3.
 - [ ] Fase 9 — SLA, eventos e automações.
 - [ ] Fase 10 — quarentena dos legados.
 - [ ] Fase 11 — auditoria final.
@@ -65,12 +65,16 @@ Seleção focada: 13 arquivos, 131 testes; 119 aprovados e 12 falhas preexistent
 
 - `docs/stories/story-saneamento-ontologico-crm-bpm.md`
 - `docs/reports/crm-config-canonical-sources-p0-1.md`
+- `docs/reports/crm-stage-form-migration-p0-2.md`
+- `docs/stories/story-rm-2026-045cc0-crm-stage-form-migration.md`
 - `plan/self-critique-p0-1.json`
 - `prisma/schema.prisma`
 - `scripts/bpm-migrate-canonical-sources.mjs`
+- `scripts/bpm-stage-form-migration.mjs`
 - `scripts/configurar-novos-leads-campos.mjs` (removido)
 - `scripts/post-audit-novos-leads.ts` (removido)
 - `src/actions/bpm/Cadencias.ts`
+- `src/actions/bpm/FormulariosEtapa.ts`
 - `src/actions/bpm/Campos.ts`
 - `src/actions/bpm/Cards.ts`
 - `src/actions/bpm/Etapas.ts`
@@ -88,6 +92,8 @@ Seleção focada: 13 arquivos, 131 testes; 119 aprovados e 12 falhas preexistent
 - `src/lib/bpm/cadencias/ativacao-automatica.ts`
 - `src/lib/bpm/cadencias/executor.ts`
 - `src/lib/bpm/lost.ts`
+- `src/lib/bpm/formularios-etapa.ts`
+- `src/lib/bpm/formularios-etapa-migration.ts`
 - `src/lib/bpm/pendencias/motor.ts`
 - `src/lib/bpm/pipeline-financeiro-migration.ts` (removido)
 - `src/lib/bpm/requisitos-etapa-server.ts`

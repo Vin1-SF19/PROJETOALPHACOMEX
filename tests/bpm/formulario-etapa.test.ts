@@ -18,6 +18,8 @@ const proximoContato = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximo
 const statusPosFechamento = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelStatusPosFechamento.tsx");
 const checklistFollowUp = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelChecklistFollowUp.tsx");
 const proximaEtapa = ler("src/app/PainelAlpha/AlphaCRM/CardModal/PainelProximaEtapa.tsx");
+const builder = ler("src/app/PainelAlpha/AlphaCRM/admin/pipelines/[pipelineId]/FormularioEtapaWorkspace.tsx");
+const saveAction = ler("src/actions/bpm/FormulariosEtapa.ts");
 
 describe("CRM - formulário unificado por etapa", () => {
   it("centraliza os campos dinâmicos atuais na aba Formulário da Etapa", () => {
@@ -68,6 +70,17 @@ describe("CRM - formulário unificado por etapa", () => {
 
   it("mantém a ação de mover no painel direito", () => {
     expect(layoutCard).toContain("<PainelProximaEtapa");
+  });
+
+  it("impede o builder de recriar campo fora da configuração canônica da etapa", () => {
+    expect(builder).toContain("config.etapaId === etapaId && config.visivel");
+    expect(builder).toContain("versaoEsperada: etapa.formulario?.versao ?? null");
+    expect(builder).toContain("id: secao.id");
+    expect(builder).toContain("id: componente.id");
+    expect(builder).toContain("!secoes.some((secaoAtual)");
+    expect(saveAction).toContain("etapaConfiguracoes[0]");
+    expect(saveAction).toContain("CONFLITO_VERSAO_FORMULARIO");
+    expect(saveAction).not.toContain("bpmFormularioSecao.deleteMany({\n        where: { formularioId");
   });
 
 
